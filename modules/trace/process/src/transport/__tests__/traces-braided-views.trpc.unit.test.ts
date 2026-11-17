@@ -30,6 +30,11 @@ function mount() {
     })),
     readSpansSinceForViewer: vi.fn<TraceApi["readSpansSinceForViewer"]>(async () => []),
     readSpansFullForViewer: vi.fn<TraceApi["readSpansFullForViewer"]>(async () => []),
+    readAgentCallGraphForViewer: vi.fn<TraceApi["readAgentCallGraphForViewer"]>(async () => ({
+      nodes: [],
+      edges: [],
+      a2aSpans: [],
+    })),
     readSpanResourcesForViewer: vi.fn<TraceApi["readSpanResourcesForViewer"]>(async () => ({
       rootSpanId: null,
       resourceAttributes: {},
@@ -76,6 +81,7 @@ describe("the drawer's views of a braided trace", () => {
       ["spansDelta", "readSpansSinceForViewer", { sinceStartTimeMs: 0 }],
       ["spansFull", "readSpansFullForViewer", {}],
       ["resourceInfo", "readSpanResourcesForViewer", {}],
+      ["agentCallGraph", "readAgentCallGraphForViewer", {}],
     ] as const)("%s asks %s alone, for the viewer", async (procedure, operation, extra) => {
       const { app, caller } = mount();
 

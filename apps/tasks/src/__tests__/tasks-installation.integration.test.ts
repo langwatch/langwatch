@@ -151,6 +151,7 @@ describe("the tasks process installation", () => {
         "slack-alert",
         "tiered-free-to-seat-event",
         "stripe-prices-sync",
+        "retention-storage-report",
         "dataset-storage-audit",
         "demo-data",
         "trace-destination-report",

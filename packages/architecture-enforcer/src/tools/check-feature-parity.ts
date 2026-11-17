@@ -261,6 +261,8 @@ const DEFAULT_GO_TEST_ROOTS: string[] = [
   // asserts it, so scenarios under specs/ci/ can only bind from this root.
   // Without it those feature files report "all bound" while binding nothing.
   "tools/ciguard",
+  // The review job's wait for the other checks (specs/ci/pr-review-bot.feature).
+  "tools/waitforchecks",
   "tools/deployimpact",
   "tools/operatornotes",
   "tools/cachesweep",

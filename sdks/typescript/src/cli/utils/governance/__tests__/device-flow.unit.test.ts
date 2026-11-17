@@ -401,6 +401,23 @@ describe("logout", () => {
     }
   });
 
+  it("sends only the access token when the session has no refresh token", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(emptyResponse(200));
+
+    await logout({ baseUrl: "http://x", fetchImpl }, undefined, "lw_at_pasted");
+
+    const [, init] = fetchImpl.mock.calls[0]!;
+    expect(JSON.parse(String(init.body))).toEqual({ access_token: "lw_at_pasted" });
+  });
+
+  it("calls nothing when it holds no token at all", async () => {
+    const fetchImpl = vi.fn();
+
+    await logout({ baseUrl: "http://x", fetchImpl }, undefined, undefined);
+
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
   it("propagates other failures", async () => {
     const fetchImpl = vi.fn().mockResolvedValue(jsonResponse(500, {}));
     await expect(logout({ baseUrl: "http://x", fetchImpl }, "rt")).rejects.toBeInstanceOf(

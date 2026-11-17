@@ -123,7 +123,7 @@ import {
   type CloneIngestionTemplateInput,
   type CreateIngestionTemplateInput,
   type UpdateIngestionTemplateOttlInput,
-  type GovernanceActorWorkspace,
+  type GovernanceActorWorkspaceLookup,
   type MePersonalCredential,
   type MeUsage,
   type PersonalUsageQueryInput,
@@ -155,6 +155,10 @@ import {
   type PeopleScreenSuggestion,
   type SessionCeilingApplied,
   type GovernanceMcpSessionTools,
+  type OcsfEventsPage,
+  type OcsfExportWindow,
+  type OcsfIngestRequest,
+  type OcsfIngestResponse,
 } from "@langwatch/enterprise-governance-contract";
 import { ScimApi } from "@langwatch/enterprise-scim-contract";
 import {
@@ -294,6 +298,14 @@ import {
 import { IngestionSourceService } from "../features/ingestion-source/services/ingestion-source.service.ts";
 import { IngestionTemplateService } from "../features/ingestion-source/services/ingestion-template.service.ts";
 import { SourceCredentialAccessService } from "../features/ingestion-source/services/source-credential-access.service.ts";
+import {
+  OutboxOcsfPushDelivery,
+  requestOcsfPushDelivery,
+} from "../features/ocsf/eventing/ocsf-push-delivery.intent.ts";
+import type { OcsfPushIntent } from "../features/ocsf/eventing/ocsf-push-delivery.process.ts";
+import { OcsfSiemExportService } from "../features/ocsf/services/ocsf-siem-export.service.ts";
+import { OcsfSiemIngestService } from "../features/ocsf/services/ocsf-siem-ingest.service.ts";
+import { OcsfSiemPushService } from "../features/ocsf/services/ocsf-siem-push.service.ts";
 import { PersonaHomeService } from "../features/personal/services/persona-home.service.ts";
 import { PersonalIngestionKeyService } from "../features/personal/services/personal-ingestion-key.service.ts";
 import { PersonalUsageDashboardService } from "../features/personal/services/personal-usage-dashboard.service.ts";
@@ -429,7 +441,7 @@ interface GovernanceAppDependencies {
   >;
   users: Pick<UserApi, "findById" | "findByEmail" | "findLastHomePath" | "personalCallerFor">;
   /** Audit-log owns the AuditLog table: workspace-view rows are written and deduped there. */
-  auditLog: Pick<AuditLogApi, "record" | "hasRecordedSince">;
+  auditLog: Pick<AuditLogApi, "record" | "hasRecordedSince" | "findForOrganization">;
   /** Where a push source's OTLP logs and webhook envelopes are collected. */
   logs: Pick<LogApi, "collectOtlpLogs">;
   /** Where a push source's OTLP metrics are collected. */
@@ -627,6 +639,33 @@ export class GovernanceModule implements GovernanceRestApi {
       history: repositories.tenantHistory,
     });
     this.tenantHistory = tenantHistory;
+    const apiOcsfPushOutbox = repositories.ocsfPushIntents
+      ? OutboxOcsfPushDelivery.create(repositories.ocsfPushIntents)
+      : undefined;
+    this.ocsfPush = OcsfSiemPushService.create({
+      events: repositories.ocsfEvents,
+      projects: dependencies.projects,
+      webhooks: dependencies.webhooks,
+      entitlements: {
+        hasEnterprisePlan: async (organizationId) =>
+          isEnterpriseTier(
+            (await dependencies.entitlements.getActivePlan({ organizationId })).type,
+          ),
+      },
+      outbox: () => this.#ocsfPushOutbox ?? apiOcsfPushOutbox,
+    });
+    this.ocsfSiemIngest = OcsfSiemIngestService.create({
+      events: repositories.ocsfEvents,
+      projects: tenantHistory,
+      now: () => nowInstant().epochMilliseconds,
+    });
+    this.ocsfSiemExport = OcsfSiemExportService.create({
+      events: repositories.ocsfEvents,
+      projects: dependencies.projects,
+      traces: dependencies.traces,
+      auditLog: dependencies.auditLog,
+      now: () => nowInstant().epochMilliseconds,
+    });
     this.anomalyRules = AnomalyRuleService.create({ repository: repositories.anomalyRules });
     this.aggregateReconciler = AggregateReconcilerService.create({
       lock: repositories.aggregateReconcileLock,
@@ -807,7 +846,7 @@ export class GovernanceModule implements GovernanceRestApi {
       teams: dependencies.organizations,
       targets: dependencies.projects,
       projects: tenantHistory,
-      events: repositories.ocsfEvents,
+      events: this.ocsfPush,
       diagnostics: { warn: (message, context) => logger.warn(context, message) },
     });
     this.ocsfExport = DefaultGovernanceOcsfExportService.create({
@@ -823,7 +862,7 @@ export class GovernanceModule implements GovernanceRestApi {
     };
     this.traceFacts = GovernanceTraceFactsService.create({
       kpis: repositories.anomalySpend,
-      ocsf: repositories.ocsfEvents,
+      ocsf: this.ocsfPush,
       traces: dependencies.traces,
       projects: dependencies.projects,
       diagnostics: anomalyDiagnostics,
@@ -1127,6 +1166,44 @@ export class GovernanceModule implements GovernanceRestApi {
 
   #anomalyAlertOutbox: OutboxAnomalyAlertDelivery | undefined;
   #agentRegistryOutbox: OutboxAgentRegistryDelivery | undefined;
+  #ocsfPushOutbox: OutboxOcsfPushDelivery | undefined;
+  private readonly ocsfPush: OcsfSiemPushService;
+  private readonly ocsfSiemExport: OcsfSiemExportService;
+  private readonly ocsfSiemIngest: OcsfSiemIngestService;
+
+  /** A built pipeline means an outbox: written OCSF batches fan out to SIEM endpoints from here on. */
+  connectOcsfPushOutbox({
+    processStore,
+  }: {
+    processStore: Pick<ProcessStore, "appendIntents">;
+  }): void {
+    this.#ocsfPushOutbox = OutboxOcsfPushDelivery.create(processStore);
+  }
+
+  /** The OCSF push intent's handler: one WebhookApi.requestDelivery per batch and endpoint. */
+  requestOcsfPushDelivery(intent: OcsfPushIntent, context: IntentContext): Promise<void> {
+    return requestOcsfPushDelivery(this.dependencies.webhooks)(intent, context);
+  }
+
+  listOcsfEvents(
+    input: OcsfExportWindow & { sourceType?: string; sourceId?: string },
+  ): Promise<OcsfEventsPage> {
+    return this.ocsfSiemExport.listEvents(input);
+  }
+
+  listOcsfProjectTraces(input: OcsfExportWindow & { projectId?: string }): Promise<OcsfEventsPage> {
+    return this.ocsfSiemExport.listProjectTraces(input);
+  }
+
+  listOcsfAudit(input: OcsfExportWindow): Promise<OcsfEventsPage> {
+    return this.ocsfSiemExport.listAudit(input);
+  }
+
+  ingestOcsfEvents(
+    input: OcsfIngestRequest & { organizationId: string },
+  ): Promise<OcsfIngestResponse> {
+    return this.ocsfSiemIngest.ingest(input);
+  }
 
   /** A built pipeline means an outbox: registry change events fan out through it from here on. */
   connectAgentRegistryOutbox({
@@ -1294,7 +1371,7 @@ export class GovernanceModule implements GovernanceRestApi {
         ensureInternal: (input) => this.tenantHistory.ensureInternal(input),
         findWithTeam: (id) => dependencies.projects.findWithTeam(id),
       },
-      sink: repositories.ocsfEvents,
+      sink: this.ocsfPush,
       usageEntitlement: {
         isEnabled: (organizationId) =>
           dependencies.featureFlags.isEnabled("release_pulled_usage_cost_enabled", {
@@ -2144,8 +2221,11 @@ export class GovernanceModule implements GovernanceRestApi {
     return this.templates.listForOrgAdmin(input);
   }
 
-  templateGetByIdForOrg(input: { id: string; organizationId: string }): Promise<IngestionTemplate> {
-    return this.templates.getByIdForOrg(input);
+  templateGetByIdForMember(input: {
+    id: string;
+    organizationId: string;
+  }): Promise<IngestionTemplate> {
+    return this.templates.getByIdForMember(input);
   }
 
   /** An `otlp_token` credential is the default one, so it is stored as none, as on main. */
@@ -2331,30 +2411,28 @@ export class GovernanceModule implements GovernanceRestApi {
 
   /**
    * The personal workspace behind a CH-side `actor` token, for the bird's-eye
-   * "View their workspace →" link on `/governance/users/[id]`.
-   *
-   * Three refusals collapse to one `null`: the token names nobody, the person
-   * it names is not in this organization, or they have no personal workspace
-   * yet. Keeping them indistinguishable is deliberate — a caller who may read
-   * the governance surface still learns nothing about who else exists on the
-   * instance from the shape of the answer.
+   * "View their workspace" link on `/governance/users/[id]`. Every miss (the
+   * token names nobody, the person is not in this organization, or they have no
+   * personal workspace yet) answers one `undisclosed`, so the shape of the
+   * answer never tells who else exists on the instance.
    */
-  async findActorWorkspace(input: {
+  async getActorWorkspace(input: {
     organizationId: string;
     actor: string;
-  }): Promise<GovernanceActorWorkspace | null> {
+  }): Promise<GovernanceActorWorkspaceLookup> {
+    const undisclosed = { status: "undisclosed" } as const;
     const user =
       (await this.dependencies.users.findById({ id: input.actor })) ??
       (input.actor.includes("@")
         ? await this.dependencies.users.findByEmail({ email: input.actor })
         : null);
-    if (!user) return null;
+    if (!user) return undisclosed;
 
     const member = await this.isOrganizationMember({
       organizationId: input.organizationId,
       userId: user.id,
     });
-    if (!member) return null;
+    if (!member) return undisclosed;
 
     const workspace = await this.dependencies.organizations
       .getPersonalWorkspace({
@@ -2365,16 +2443,19 @@ export class GovernanceModule implements GovernanceRestApi {
         if (TeamNotFoundError.is(error)) return null;
         throw error;
       });
-    if (!workspace) return null;
+    if (!workspace) return undisclosed;
 
     return {
-      userId: user.id,
-      // The admin reading the link needs a person, and any of the three
-      // columns identifies one; the id is the last resort rather than a blank.
-      displayName: user.name ?? user.email ?? user.id,
-      teamId: workspace.team.id,
-      projectId: workspace.project.id,
-      projectSlug: workspace.project.slug,
+      status: "found",
+      workspace: {
+        userId: user.id,
+        // The admin reading the link needs a person, and any of the three
+        // columns identifies one; the id is the last resort rather than a blank.
+        displayName: user.name ?? user.email ?? user.id,
+        teamId: workspace.team.id,
+        projectId: workspace.project.id,
+        projectSlug: workspace.project.slug,
+      },
     };
   }
 

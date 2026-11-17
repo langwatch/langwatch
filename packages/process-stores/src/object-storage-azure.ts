@@ -12,6 +12,7 @@ import { pipeline } from "node:stream/promises";
 
 import { toDate, type Instant } from "@langwatch/time";
 
+import type { ObjectStorageUploads } from "./config.ts";
 import type {
   Clock,
   DownloadFacts,
@@ -414,6 +415,8 @@ function signBlobDownload(
 export function azureBackend(options: {
   credentials: AzureCredentials;
   clock: Clock;
+  /** `through-langwatch` hands out the process's own route and signs no SAS. */
+  uploads?: ObjectStorageUploads;
 }): ObjectBackend {
   const place = azurePlace(options.credentials, options.clock);
   const { accountName, container } = options.credentials;
@@ -424,7 +427,10 @@ export function azureBackend(options: {
     exists: (at) => blobExists(place, at),
     digest: async (at) => digestOf(await readBlob(place, at)),
     remove: (at) => removeBlob(place, at),
-    signUpload: (at, facts) => signBlobUpload(place, at, facts),
+    signUpload: async (at, facts) =>
+      options.uploads === "through-langwatch"
+        ? { kind: "through-process" }
+        : signBlobUpload(place, at, facts),
     signDownload: (at, facts) => signBlobDownload(place, at, facts),
     probe: () => probeContainer(place),
   };

@@ -70,6 +70,7 @@ function objectStorageConfig(options: {
   const { accounts, malformed } = objectStoragePrivateFamilyOf({
     family: values.dataplaneS3,
     ...(settings.s3.region ? { region: settings.s3.region } : {}),
+    ...(settings.uploads ? { uploads: settings.uploads } : {}),
   });
   const privateAccounts = {
     privateAccounts: accounts,
@@ -86,12 +87,17 @@ function objectStorageConfig(options: {
           ...(settings.s3.endpoint ? { endpoint: settings.s3.endpoint } : {}),
           ...(settings.s3.region ? { region: settings.s3.region } : {}),
           ...s3Credentials(values),
+          ...(settings.uploads ? { uploads: settings.uploads } : {}),
         },
         ...privateAccounts,
         legacyAzure: azure,
       };
     case "azure":
-      return { backend, azure, ...privateAccounts };
+      return {
+        backend,
+        azure: { ...azure, ...(settings.uploads ? { uploads: settings.uploads } : {}) },
+        ...privateAccounts,
+      };
     case "file":
       return { ...file, ...privateAccounts, legacyAzure: azure };
   }

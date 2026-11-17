@@ -422,7 +422,9 @@ const traceSyncDataSchema = traceReceivedEventDataSchema.pick({ projectId: true 
 /**
  * The trace syncs, throttled per organization: trace records a project's first real trace as
  * first_trace_recorded and only later ones as trace_received, so both sync. Each only reads the
- * counts its root span added, so the first trace is counted once.
+ * counts its root span added, so the first trace is counted once. The queue squashes a dedup id
+ * only inside one group, and a job's group defaults to its trace, so the throttle key is the
+ * group too; the queue still prefixes each group with its project.
  */
 export function nurturingTraceUsageSyncSubscribers(tracesChanged: UsageChanged): Readonly<{
   firstTrace: PeerSubscriberDefinition<typeof firstTraceSyncDataSchema>;
@@ -432,7 +434,7 @@ export function nurturingTraceUsageSyncSubscribers(tracesChanged: UsageChanged):
     makeId: traceSyncKeyOf,
     windowMs: TRACE_USAGE_SYNC_WINDOW_MS,
   });
-  const options = { delay, deduplication: dedup };
+  const options = { delay, deduplication: dedup, groupKeyFn: traceSyncKeyOf };
   return {
     firstTrace: {
       eventType: FIRST_TRACE_RECORDED_EVENT_TYPE,

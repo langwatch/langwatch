@@ -7,7 +7,12 @@ import type { Authorization } from "@langwatch/authorization";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import type { Protections, SpanTreeNode, TraceApi } from "@langwatch/trace-contract";
+import {
+  type Protections,
+  type SpanTreeNode,
+  type TraceApi,
+  TraceWithheldOverPlanError,
+} from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { ownProof } from "../../../../__tests__/support/authorization-proofs.fixture.ts";
@@ -54,6 +59,7 @@ function drawer({ reader = readerSees, owner = ownerHides } = {}) {
     authorizationForTrace: vi.fn(
       async ({ authorization }: { authorization: Authorization }) => authorization,
     ),
+    assertTraceNotWithheld: vi.fn<TraceApi["assertTraceNotWithheld"]>(async () => undefined),
     resolveViewerProtections: vi.fn<TraceApi["resolveViewerProtections"]>(async ({ projectId }) =>
       projectId === OWNER ? owner : reader,
     ),
@@ -62,6 +68,7 @@ function drawer({ reader = readerSees, owner = ownerHides } = {}) {
       nextCursor: null,
     })),
     readSpanTreeDelta: vi.fn<TraceApi["readSpanTreeDelta"]>(async () => treeNodes),
+    readSpanSummaries: vi.fn<TraceApi["readSpanSummaries"]>(async () => []),
     readTraceEvents: vi.fn<TraceApi["readTraceEvents"]>(async () => [
       { spanId: "reader-span", timestamp: 1, name: "step", attributes: { said: "hello" } },
       {
@@ -209,6 +216,19 @@ describe("the drawer's views of a braided trace", () => {
       expect(reads.readTraceEvents).toHaveBeenCalledWith(
         expect.objectContaining({ authorization: narrowed }),
       );
+    });
+
+    /** @scenario "Opening a trace recorded after the cutoff answers a handled error" */
+    it("refuses a withheld trace before any span is read", async () => {
+      const { reads, service, view } = drawer();
+      reads.assertTraceNotWithheld.mockRejectedValueOnce(
+        new TraceWithheldOverPlanError({ traceId: "trace-1", members: 5, maxMembers: 2 }),
+      );
+
+      await expect(service.spanTree(view)).rejects.toMatchObject({
+        code: "trace_withheld_over_plan",
+      });
+      expect(reads.readSpanSummaries).not.toHaveBeenCalled();
     });
   });
 });

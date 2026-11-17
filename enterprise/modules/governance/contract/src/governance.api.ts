@@ -107,6 +107,11 @@ import type {
   QuarantineFillInput,
   QuarantineFillStats,
 } from "./features/ingestion/quarantine-fill.ts";
+import type {
+  OcsfEventsPage,
+  OcsfIngestRequest,
+  OcsfIngestResponse,
+} from "./features/ocsf/ocsf-siem.ts";
 import type { PersonaResolution } from "./features/personal/persona-home.ts";
 import type { GovernanceBudgetOverviewForUser } from "./features/personal/personal-budget-overview.ts";
 import type {
@@ -138,7 +143,7 @@ import type {
   PeopleScreenPerson,
   PeopleScreenSuggestion,
 } from "./governance-people.ts";
-import type { GovernanceActorWorkspace } from "./governance.responses.ts";
+import type { GovernanceActorWorkspaceLookup } from "./governance.responses.ts";
 import type { GovernanceSetupState } from "./governance.ts";
 import type { GovernanceOcsfExportInput, GovernanceOcsfExportPage } from "./ocsf-export.ts";
 import type { OrganizationSessionPolicyShape, SessionCeilingApplied } from "./session-policy.ts";
@@ -310,7 +315,11 @@ export interface GovernanceRestApi {
   aiToolReorder(input: ReorderAiToolEntriesInput): Promise<void>;
   templateListForUser(input: { organizationId: string }): Promise<IngestionTemplate[]>;
   templateListForOrgAdmin(input: { organizationId: string }): Promise<IngestionTemplate[]>;
-  templateGetByIdForOrg(input: { id: string; organizationId: string }): Promise<IngestionTemplate>;
+  /** The member shape, at `aiTools:view`: `ottlRules` is empty, as in `templateListForUser`. */
+  templateGetByIdForMember(input: {
+    id: string;
+    organizationId: string;
+  }): Promise<IngestionTemplate>;
   templateCreateOrg(input: CreateIngestionTemplateInput): Promise<IngestionTemplate>;
   templateUpdateOttlRules(input: UpdateIngestionTemplateOttlInput): Promise<IngestionTemplate>;
   templateArchiveOrg(input: ArchiveIngestionTemplateInput): Promise<void>;
@@ -416,10 +425,10 @@ export interface GovernanceRestApi {
   governanceRecordWorkspaceView(
     input: RecordWorkspaceViewInput,
   ): Promise<RecordWorkspaceViewResult>;
-  findActorWorkspace(input: {
+  getActorWorkspace(input: {
     organizationId: string;
     actor: string;
-  }): Promise<GovernanceActorWorkspace | null>;
+  }): Promise<GovernanceActorWorkspaceLookup>;
   departmentList(input: { organizationId: string }): Promise<Department[]>;
   departmentAssignments(input: {
     organizationId: string;
@@ -500,6 +509,27 @@ export interface GovernanceRestApi {
     organizationId: string;
     request: ArdSearchRequest;
   }): Promise<ArdSearchResponse>;
+  /** The organisation's governance events as OCSF 1.9.0, after the cursor. */
+  listOcsfEvents(
+    input: OcsfExportWindow & { sourceType?: string; sourceId?: string },
+  ): Promise<OcsfEventsPage>;
+  /** The organisation's project traces as OCSF 1.9.0, one event per trace. */
+  listOcsfProjectTraces(input: OcsfExportWindow & { projectId?: string }): Promise<OcsfEventsPage>;
+  /** The organisation's audit log as OCSF 1.9.0, oldest first. */
+  listOcsfAudit(input: OcsfExportWindow): Promise<OcsfEventsPage>;
+  /** Stores OCSF events another source sent; one row per (source, metadata.uid). */
+  ingestOcsfEvents(
+    input: OcsfIngestRequest & { organizationId: string },
+  ): Promise<OcsfIngestResponse>;
 }
+
+/** The window and cursor every OCSF export stream takes. */
+export type OcsfExportWindow = {
+  organizationId: string;
+  limit: number;
+  since?: string;
+  until?: string;
+  cursor?: string;
+};
 
 export const GovernanceRestApi = moduleApi<GovernanceRestApi>()("governance");

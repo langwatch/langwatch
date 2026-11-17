@@ -229,6 +229,7 @@ const CREATION_LIMIT_LABELS: Record<string, string> = {
   scenarios: "scenarios",
   scenarioSets: "simulations",
   evaluators: "custom evaluators",
+  testSuites: "suites",
 };
 
 /**
@@ -432,6 +433,11 @@ const presentations = {
     title: "Attribute values withheld",
     describe: () =>
       "This project hides captured input or output from you, or an attribute policy restricts this key to an audience you are not in. Facet a named field instead, such as model, status or evaluator, or call the facets endpoint with no field to see what this project has.",
+  },
+  trace_withheld_over_plan: {
+    title: "Trace held until your plan is sorted",
+    describe: () =>
+      "This trace was recorded while your organization has more members than its plan covers. It is saved and will show once you upgrade your plan or remove members.",
   },
   trace_id_ambiguous: {
     title: "Trace ID is ambiguous",
@@ -2242,6 +2248,18 @@ const presentations = {
     title: "All member seats are in use",
     describe: () => "Free a seat by disabling a membership, or upgrade the plan to add more.",
   },
+  member_additions_held_for_payment: {
+    // fault: customer. A renewal charge failed and is unpaid; members already in keep working.
+    title: "A payment failed, so new members can't be added",
+    describe: () =>
+      "Update the card on the billing page to pay the open invoice, then add them. Ask an admin if you can't.",
+  },
+  seats_held_for_payment: {
+    // fault: customer. Buying seats while an invoice is unpaid would charge the same failing card.
+    title: "A payment failed, so seats can't be added",
+    describe: () =>
+      "Update the card on the billing page to pay the open invoice, then add seats. Nothing was charged.",
+  },
   membership_disabled: {
     // The person IS a member, so nothing here may suggest they are not, and
     // nothing may suggest a role they could ask for instead — the seat is the
@@ -2907,7 +2925,7 @@ const presentations = {
     // and it says the same thing.
     describe: (error) => {
       const limitType = str(error, "limitType", "");
-      const creationLabel = CREATION_LIMIT_LABELS[limitType];
+      const creationLabel = CREATION_LIMIT_LABELS[str(error, "countedAs", "") || limitType];
       if (creationLabel) {
         const max = num(error, "max", 0);
         const included = max > 0 ? `${max} ${creationLabel}` : creationLabel;
@@ -3103,6 +3121,11 @@ const presentations = {
     describe: (error) =>
       `${scenarioFieldLabel(error)} references a parameter in a way we can't read. Check it is written as params.name, then try again.`,
   },
+  scenario_red_team_config_mismatch: {
+    title: "This scenario's red team settings don't match its kind",
+    describe: () =>
+      "A red team scenario needs an attack goal and OWASP ids, and a standard scenario takes none. Set the kind and the attack together, then try again.",
+  },
   scenario_reserved_set_id: {
     title: "This run can't be saved to that set",
     describe: () =>
@@ -3255,14 +3278,15 @@ const presentations = {
     describe: () => "Nothing was charged. Try again in a moment.",
   },
   seat_quantity_below_in_use: {
-    // fault: customer. The seat count asked for is below the minimum (the full
-    // seats in use, and never below one), so nothing changed or was charged.
+    // fault: customer. The seat count asked for is below the seats of that kind
+    // in use (full seats never below one), so nothing changed or was charged.
     title: "That's too few seats",
     describe: (error) => {
       const minimum = num(error, "minimum", 0);
+      const kind = strEq(error, "seat", "developer") ? "developer " : "";
       return minimum > 0
-        ? `Nothing changed. Choose at least ${minimum} ${minimum === 1 ? "seat" : "seats"}.`
-        : "Nothing changed. Choose at least as many seats as are in use.";
+        ? `Nothing changed. Choose at least ${minimum} ${kind}${minimum === 1 ? "seat" : "seats"}.`
+        : `Nothing changed. Choose at least as many ${kind}seats as are in use.`;
     },
   },
   subscription_already_active: {
@@ -4135,6 +4159,16 @@ const presentations = {
       return `${need} Ask an administrator, or set the length on a scope you manage.`.trim();
     },
   },
+  data_retention_billed_through_billing: {
+    title: "This retention length is billed",
+    describe: () =>
+      "Keeping data longer than 90 days adds storage to the organization's bill, so it needs subscription:manage. Ask a billing administrator, or pick 90 days or less.",
+  },
+  data_retention_not_billed: {
+    title: "This retention length isn't billed",
+    describe: () =>
+      "Only a length that adds storage to the bill is set through billing. Save this length from the data retention settings instead.",
+  },
   data_retention_disable_forbidden: {
     title: "Keeping data forever isn't available",
     describe: () =>
@@ -4439,6 +4473,10 @@ const presentations = {
   },
 
   // ---- suites (run plans) ----
+  suite_template_not_found: {
+    title: "That suite template doesn't exist",
+    describe: () => "Pick a template from the list of templates, then try again.",
+  },
   suite_not_found: {
     title: "Run plan not found",
     describe: () => "It may have been deleted. Reload to see the current list.",
