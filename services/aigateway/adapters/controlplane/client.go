@@ -117,14 +117,14 @@ func forbiddenKeyRefusal(ctx context.Context, respBody []byte) error {
 	switch rejection.Error.Code {
 	case "virtual_key_disabled":
 		return herr.New(ctx, domain.ErrKeyDisabled, herr.M{
-			"message": "This key is disabled. An administrator can re-enable it; the key material is unchanged.",
+			"message": domain.KeyDisabledMessage,
 		})
 	case "virtual_key_expired":
 		return herr.New(ctx, domain.ErrKeyExpired, herr.M{
 			"message": domain.KeyExpiredMessage,
 		})
 	}
-	return herr.New(ctx, domain.ErrKeyRevoked, nil)
+	return herr.New(ctx, domain.ErrKeyRevoked, herr.M{"message": domain.KeyRevokedMessage})
 }
 
 // ResolveKey exchanges a presented credential for a domain.Bundle: a raw

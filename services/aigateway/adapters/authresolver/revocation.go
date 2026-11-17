@@ -26,13 +26,6 @@ type denial struct {
 	kind string
 }
 
-// RevocationMetrics is the optional metrics surface for refusals and
-// stale serves. The gateway's Prometheus recorder satisfies it.
-type RevocationMetrics interface {
-	RecordAuthCacheRefusal(reason string)
-	RecordAuthCacheStaleServe(source string)
-}
-
 func newDenySet() *lru.Cache[string, denial] {
 	c, err := lru.New[string, denial](denySetSize)
 	if err != nil {
@@ -86,6 +79,31 @@ func (s *Service) deny(vkID, kind string) {
 	s.logger.Info("auth_cache_key_denied", zap.String("vk_id", vkID), zap.String("reason", evictReason(kind)))
 }
 
+// clearDenial lifts vkID's denial and forgets the credentials that carried
+// it. A re-enable or a confirmation that began after the denial calls it.
+func (s *Service) clearDenial(vkID string) {
+	s.denied.Remove(vkID)
+	for _, h := range s.deniedKeys.Keys() {
+		if v, ok := s.deniedKeys.Peek(h); ok && v == vkID {
+			s.deniedKeys.Remove(h)
+		}
+	}
+}
+
+// confirmedAt is the latest confirmation the cache holds for h, zero if none.
+func (s *Service) confirmedAt(h [64]byte) time.Time {
+	var at time.Time
+	if e, ok := s.l1.Peek(h); ok {
+		at = e.authStart()
+	}
+	if e, ok := s.lastKnown.Peek(h); ok {
+		if t := e.authStart(); t.After(at) {
+			at = t
+		}
+	}
+	return at
+}
+
 // served is one resolved answer waiting for the gate: the bundle, when the
 // control-plane call that confirmed it began, and the stale tier it came from
 // ("" when fresh). It travels with the answer, never read back from L1.
@@ -101,14 +119,17 @@ type served struct {
 func (s *Service) admit(ctx context.Context, h [64]byte, in served) (*domain.Bundle, error) {
 	b, authStart := in.bundle, in.authStart
 	if b.VirtualKeyID != "" {
-		if d, ok := s.denied.Peek(b.VirtualKeyID); ok && d.at.After(authStart) {
-			s.refuse(h, b.VirtualKeyID, "denied_"+evictReason(d.kind))
-			return nil, denialError(ctx, d.kind)
+		if d, ok := s.denied.Peek(b.VirtualKeyID); ok {
+			if d.at.After(authStart) {
+				s.refuseDenial(h, b.VirtualKeyID, "denied_"+evictReason(d.kind))
+				return nil, denialError(ctx, d.kind)
+			}
+			s.clearDenial(b.VirtualKeyID)
 		}
 	}
 	if s.failClosedAfter > 0 && b.OrganizationID != "" && s.feedSilent(b.OrganizationID) &&
 		time.Since(authStart) > s.failClosedAfter {
-		s.refuse(h, b.VirtualKeyID, "fail_closed")
+		s.countRefusal(b.VirtualKeyID, "fail_closed")
 		return nil, herr.New(ctx, domain.ErrAuthUpstream, herr.M{
 			"message": "control plane unreachable and this gateway refuses keys it cannot re-check; retry shortly",
 		}).WithRetryable(true)
@@ -127,42 +148,48 @@ func (s *Service) feedSilent(orgID string) bool {
 	return time.Since(time.Unix(0, c.polledAt.Load())) > s.failClosedAfter
 }
 
-// refuseDenied answers a credential the change feed denied with that denial's
-// error, without a control-plane call. It returns nil for any other credential.
+// refuseDenied answers a credential the change feed denied, and that nothing
+// confirmed since, with that denial's error. It returns nil for any other.
 func (s *Service) refuseDenied(ctx context.Context, h [64]byte) error {
 	vkID, ok := s.deniedKeys.Peek(h)
 	if !ok {
 		return nil
 	}
 	d, ok := s.denied.Peek(vkID)
-	if !ok {
+	if !ok || !d.at.After(s.confirmedAt(h)) {
 		return nil
 	}
-	s.refuse(h, vkID, "denied_"+evictReason(d.kind))
+	s.refuseDenial(h, vkID, "denied_"+evictReason(d.kind))
 	return denialError(ctx, d.kind)
 }
 
-func (s *Service) refuse(h [64]byte, vkID, reason string) {
+// refuseDenial drops every cached copy of h, remembers it as denied, and
+// counts the refusal.
+func (s *Service) refuseDenial(h [64]byte, vkID, reason string) {
 	s.l1.Remove(h)
-	if reason != "fail_closed" {
-		s.lastKnown.Remove(h)
-		s.deniedKeys.Add(h, vkID)
-	}
+	s.lastKnown.Remove(h)
+	s.deniedKeys.Add(h, vkID)
+	s.countRefusal(vkID, reason)
+}
+
+// countRefusal logs and counts a refusal. A fail-closed refusal calls it
+// alone, so the cached entry stays for when the control plane answers again.
+func (s *Service) countRefusal(vkID, reason string) {
 	s.logger.Warn("auth_cache_refused", zap.String("vk_id", vkID), zap.String("reason", reason))
-	if m, ok := s.metrics.(RevocationMetrics); ok {
-		m.RecordAuthCacheRefusal(reason)
+	if s.metrics != nil {
+		s.metrics.RecordAuthCacheRefusal(reason)
 	}
 }
 
 func (s *Service) recordStaleServe(source string) {
-	if m, ok := s.metrics.(RevocationMetrics); ok {
-		m.RecordAuthCacheStaleServe(source)
+	if s.metrics != nil {
+		s.metrics.RecordAuthCacheStaleServe(source)
 	}
 }
 
 func denialError(ctx context.Context, kind string) error {
 	if kind == ChangeKindVirtualKeyDisabled {
-		return herr.New(ctx, domain.ErrKeyDisabled, herr.M{"message": "This key is disabled."})
+		return herr.New(ctx, domain.ErrKeyDisabled, herr.M{"message": domain.KeyDisabledMessage})
 	}
-	return herr.New(ctx, domain.ErrKeyRevoked, herr.M{"message": "This key was revoked."})
+	return herr.New(ctx, domain.ErrKeyRevoked, herr.M{"message": domain.KeyRevokedMessage})
 }

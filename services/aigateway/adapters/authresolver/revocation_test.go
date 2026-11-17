@@ -69,12 +69,55 @@ func TestRevocation_DisabledKeyAnswersDisabled(t *testing.T) {
 	if _, err := svc.Resolve(context.Background(), key); !errors.Is(err, domain.ErrKeyDisabled) {
 		t.Fatalf("want virtual_key_disabled, got %v", err)
 	}
-	res.calls = 0
 	if _, err := svc.Resolve(context.Background(), key); !errors.Is(err, domain.ErrKeyDisabled) {
 		t.Fatalf("want virtual_key_disabled on the next request, got %v", err)
 	}
-	if res.calls != 0 {
-		t.Fatalf("a denied key must be refused without a control-plane call; got %d calls", res.calls)
+}
+
+// @scenario "a key re-enabled and re-confirmed keeps serving through a later outage"
+func TestRevocation_ReEnabledKeyServesThroughOutage(t *testing.T) {
+	res := &hookResolver{bundle: orgBundle("vk_again", time.Now().Add(time.Hour))}
+	svc, _ := newService(t, Options{Resolver: res, ConfigFetcher: res})
+	key := domain.PresentedKey{Token: "vk-lw-again"}
+	h := hashKey(key)
+	svc.storeL1(h, orgBundle("vk_again", time.Now().Add(time.Hour)), "")
+
+	svc.applyChange("org_1", CacheChange{Kind: ChangeKindVirtualKeyDisabled, VirtualKeyID: "vk_again"})
+	svc.applyChange("org_1", CacheChange{Kind: ChangeKindVirtualKeyEnabled, VirtualKeyID: "vk_again"})
+	if _, err := svc.Resolve(context.Background(), key); err != nil {
+		t.Fatalf("the re-confirmed key must serve: %v", err)
+	}
+
+	res.bundle, res.err = nil, errControlPlaneDown
+	if denied := svc.refuseDenied(context.Background(), h); denied != nil {
+		t.Fatalf("an outage after the re-enable must not answer the old denial: %v", denied)
+	}
+	if _, err := svc.Resolve(context.Background(), key); err != nil {
+		t.Fatalf("the re-confirmed key must keep serving through the outage: %v", err)
+	}
+}
+
+// @scenario "a confirmation after the denial clears it even without a re-enable event"
+func TestRevocation_LaterConfirmationClearsDenial(t *testing.T) {
+	res := &hookResolver{bundle: orgBundle("vk_missed", time.Now().Add(time.Hour))}
+	svc, _ := newService(t, Options{Resolver: res, ConfigFetcher: res})
+	key := domain.PresentedKey{Token: "vk-lw-missed"}
+	h := hashKey(key)
+	svc.storeL1(h, orgBundle("vk_missed", time.Now().Add(time.Hour)), "")
+	svc.applyChange("org_1", CacheChange{Kind: ChangeKindVirtualKeyDisabled, VirtualKeyID: "vk_missed"})
+
+	if _, err := svc.Resolve(context.Background(), key); err != nil {
+		t.Fatalf("a key the control plane confirmed after the denial must serve: %v", err)
+	}
+	if _, ok := svc.denied.Peek("vk_missed"); ok {
+		t.Fatal("the confirmation must lift the denial")
+	}
+	if _, ok := svc.deniedKeys.Peek(h); ok {
+		t.Fatal("the confirmation must forget the denied credential")
+	}
+	res.bundle, res.err = nil, errControlPlaneDown
+	if denied := svc.refuseDenied(context.Background(), h); denied != nil {
+		t.Fatalf("an outage after the confirmation must not answer the old denial: %v", denied)
 	}
 }
 

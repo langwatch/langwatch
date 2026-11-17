@@ -340,8 +340,8 @@ Feature: Gateway auth cache — hot path is zero RTT after first hit
     # The change feed delivers VK_REVOKED and VK_DISABLED in one long poll. The
     # gateway records each in a revocation list kept apart from the key cache,
     # so no stale-serve window or cache eviction expires it. VK_ENABLED lifts a
-    # denial. VK_ROTATED is not a denial: the old secret stays valid through its
-    # grace period, so the control plane decides.
+    # denial, and so does any confirmation that began after it. VK_ROTATED is
+    # not a denial: the old secret stays valid through its grace period.
 
     @unit
     Scenario: a revoked key is refused while the control plane is down
@@ -354,7 +354,8 @@ Feature: Gateway auth cache — hot path is zero RTT after first hit
     Scenario: a disabled key is refused while the control plane is down
       Given a cached key
       When the change feed disables it
-      Then the next request gets virtual_key_disabled without a control-plane call
+      And the control plane stops answering
+      Then every request with that key gets virtual_key_disabled, not a retryable error
 
     @unit
     Scenario: a resolve that started before the revocation cannot put the key back
@@ -368,6 +369,20 @@ Feature: Gateway auth cache — hot path is zero RTT after first hit
       Given the change feed disabled a key and then enabled it
       When the control plane confirms the key
       Then the request serves
+
+    @unit
+    Scenario: a key re-enabled and re-confirmed keeps serving through a later outage
+      Given the change feed disabled a cached key and then enabled it
+      And the control plane confirmed the key again
+      When the control plane stops answering
+      Then the key serves, not virtual_key_disabled
+
+    @unit
+    Scenario: a confirmation after the denial clears it even without a re-enable event
+      Given the change feed disabled a cached key
+      When the control plane confirms the key on a later request
+      Then the denial is lifted
+      And a later outage does not answer the key with virtual_key_disabled
 
     @unit
     Scenario: a normal key keeps serving from cache within the grace window

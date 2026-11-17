@@ -102,6 +102,8 @@ type CacheMetrics interface {
 	RecordAuthCacheLookup()
 	RecordAuthCacheHit(tier string)
 	RecordAuthCacheMiss(tier string)
+	RecordAuthCacheRefusal(reason string)
+	RecordAuthCacheStaleServe(source string)
 }
 
 // DefaultLastKnownConfigMaxAge bounds how long after its last confirmation an
@@ -647,7 +649,7 @@ func New(opts Options) (*Service, error) {
 // and bumps soft expiry. On auth-class failure evicts and rejects.
 func (s *Service) Resolve(ctx context.Context, key domain.PresentedKey) (*domain.Bundle, error) {
 	h := hashKey(key)
-	answer, err := s.resolveUngated(ctx, key)
+	answer, err := s.resolveUngated(ctx, key, h)
 	if err != nil {
 		if classifyRefreshError(err) == classTransportFailure {
 			if denied := s.refuseDenied(ctx, h); denied != nil {
@@ -667,21 +669,13 @@ func (s *Service) Resolve(ctx context.Context, key domain.PresentedKey) (*domain
 }
 
 // resolveUngated is the cache and control-plane walk; Resolve gates its answer.
-func (s *Service) resolveUngated(ctx context.Context, key domain.PresentedKey) (served, error) {
+func (s *Service) resolveUngated(ctx context.Context, key domain.PresentedKey, h [64]byte) (served, error) {
 	if key.Token == "" {
 		return served{}, herr.New(ctx, domain.ErrInvalidAPIKey, nil)
 	}
 
-	h := hashKey(key)
 	if key.IsLicenseToken() {
 		if err := s.admitLicenseToken(ctx, key, h); err != nil {
-			return served{}, err
-		}
-	}
-	if !key.IsLicenseToken() {
-		// A license token's own refusal (connect_license_revoked) comes from
-		// the control plane and the license refusal cache, not this list.
-		if err := s.refuseDenied(ctx, h); err != nil {
 			return served{}, err
 		}
 	}
@@ -1290,7 +1284,7 @@ func (s *Service) waitUnlessStopping(ctx context.Context, d time.Duration) bool 
 func (s *Service) applyChange(organizationID string, ch CacheChange) {
 	keepLastKnown := !revokesKey(ch.Kind)
 	if ch.Kind == ChangeKindVirtualKeyEnabled && ch.VirtualKeyID != "" {
-		s.denied.Remove(ch.VirtualKeyID)
+		s.clearDenial(ch.VirtualKeyID)
 	}
 	if deniesKey(ch.Kind) && ch.VirtualKeyID != "" {
 		// Deny before evicting: a refresh racing this event either finds the
