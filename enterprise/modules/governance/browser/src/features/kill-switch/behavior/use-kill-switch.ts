@@ -7,8 +7,16 @@ import { api } from "../../../behavior/governance-api.ts";
 import { summariesByRowId } from "../model/kill-switch-copy.ts";
 
 /**
- * Each row's open stop and plan size, plus the stops waiting for a decision. A failed read comes
- * back as `error` with its `retry`, never as an empty answer.
+ * A read's failure as soon as one attempt failed: while the client retries, `error` stays null
+ * and only `failureReason` says the read is failing.
+ */
+export function readFailureOf(read: { error: unknown; failureReason?: unknown }): unknown {
+  return read.error ?? read.failureReason ?? null;
+}
+
+/**
+ * Each row's open stop and plan size, plus the stops waiting for a decision. A failing read comes
+ * back as `error` with its `retry` and no rows, so no action rests on a stop state it lacks.
  */
 export function useKillSwitchReads({
   organizationId,
@@ -21,13 +29,15 @@ export function useKillSwitchReads({
   const options = { enabled: active, refetchOnWindowFocus: false };
   const summaries = api.governanceKillSwitch.summaries.useQuery({ organizationId }, options);
   const pending = api.governanceKillSwitch.pendingApprovals.useQuery({ organizationId }, options);
-  const summaryRows = active ? (summaries.data ?? []) : [];
-  const pendingApprovals = active ? (pending.data ?? []) : [];
+  const summariesError = active ? readFailureOf(summaries) : null;
+  const pendingApprovalsError = active ? readFailureOf(pending) : null;
+  const summaryRows = active && !summariesError ? (summaries.data ?? []) : [];
+  const pendingApprovals = active && !pendingApprovalsError ? (pending.data ?? []) : [];
   return {
     byRowId: summariesByRowId(summaryRows),
     pendingApprovals,
-    summariesError: active ? summaries.error : null,
-    pendingApprovalsError: active ? pending.error : null,
+    summariesError,
+    pendingApprovalsError,
     retrySummaries: () => void summaries.refetch(),
     retryPendingApprovals: () => void pending.refetch(),
   };

@@ -14,12 +14,18 @@ import { useState } from "react";
 import { api } from "../../../behavior/governance-api.ts";
 import { useGovernanceToaster, useShowErrorToast } from "../../../behavior/governance-feedback.ts";
 import { describeStopTarget } from "../model/kill-switch-copy.ts";
-import { useKillSwitchRefresh } from "./use-kill-switch.ts";
+import { readFailureOf, useKillSwitchRefresh } from "./use-kill-switch.ts";
 
 /** A lookup that failed with nothing to show: its error and retry, never an empty list. */
-function lookupFailure(read: { data?: unknown; error: unknown; refetch: () => unknown }) {
-  if (read.data !== undefined || !read.error) return null;
-  return { error: read.error, retry: () => void read.refetch() };
+function lookupFailure(read: {
+  data?: unknown;
+  error: unknown;
+  failureReason?: unknown;
+  refetch: () => unknown;
+}) {
+  const failure = readFailureOf(read);
+  if (read.data !== undefined || !failure) return null;
+  return { error: failure, retry: () => void read.refetch() };
 }
 
 export function useStopPlanEditor({
@@ -42,7 +48,8 @@ export function useStopPlanEditor({
   const sources = api.governanceAgents.syncSources.useQuery({ organizationId }, reads);
   const save = api.governanceKillSwitch.setPlan.useMutation();
 
-  const loaded = plan.data !== undefined && !plan.isError;
+  const planFailure = readFailureOf(plan);
+  const loaded = plan.data !== undefined && !planFailure;
   const saved = loaded ? plan.data.targets : [];
   const targets = draft ?? saved.map((row) => row.target);
   const labelOf = (target: AgentStopTarget) =>
@@ -70,8 +77,8 @@ export function useStopPlanEditor({
 
   return {
     loaded,
-    isLoading: plan.isPending && !plan.isError,
-    error: loaded ? null : plan.error,
+    isLoading: plan.isPending && !planFailure,
+    error: loaded ? null : planFailure,
     retry: () => void plan.refetch(),
     targets,
     labelOf,

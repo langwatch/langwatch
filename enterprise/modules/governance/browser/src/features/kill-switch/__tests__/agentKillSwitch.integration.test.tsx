@@ -16,6 +16,7 @@ import {
   handledError,
   assertEveryCallConfigured,
   resetTrpcDouble,
+  retryingFailure,
   trpcDouble,
 } from "./kill-switch-api-double.tsx";
 import {
@@ -325,6 +326,52 @@ describe("the Agents page when a kill switch read fails", () => {
     const alert = await screen.findByRole("alert");
     expect(alert).toHaveTextContent("Couldn't load the stops waiting for approval");
     expect(within(alert).getByRole("button", { name: "Try again" })).toBeInTheDocument();
+  });
+});
+
+describe("the Agents page when a stop read answers a server error", () => {
+  const serverError = () => {
+    throw retryingFailure(new Error("INTERNAL_SERVER_ERROR"));
+  };
+
+  /** @scenario "A failing stop read shows its error and offers no action on the stop state it lacks" */
+  it("says both stop reads failed while they retry, and offers no stop action", async () => {
+    answerAgentsPage({
+      summaries: [summary({ agentId: "a1", openStop: QUARANTINED })],
+      pendingApprovals: [PENDING],
+    });
+    answerQuery("governanceKillSwitch.summaries", serverError);
+    answerQuery("governanceKillSwitch.pendingApprovals", serverError);
+    renderAgentsPage({ permissions: MANAGER });
+
+    const alerts = await screen.findAllByRole("alert");
+    const text = alerts.map((alert) => alert.textContent).join(" ");
+    expect(text).toContain("Couldn't load the agents' stop state");
+    expect(text).toContain("Couldn't load the stops waiting for approval");
+    await screen.findAllByTestId("governance-agent-row");
+    expect(screen.queryByRole("button", { name: "Actions for support-bot" })).toBeNull();
+    expect(screen.queryByTestId("agent-stop-status")).toBeNull();
+    expect(screen.queryByTestId("stop-approvals-card")).toBeNull();
+  });
+
+  /** @scenario "A failing stop read shows its error and offers no action on the stop state it lacks" */
+  it("drops the stop state it showed once a later read fails", async () => {
+    answerAgentsPage({ summaries: [summary({ agentId: "a1", openStop: QUARANTINED })] });
+    renderAgentsPage({ permissions: MANAGER });
+    expect(await screen.findByTestId("agent-stop-status")).toHaveTextContent("Quarantined");
+
+    answerQuery("governanceKillSwitch.summaries", serverError);
+    await act(async () => {
+      await Promise.all(
+        [...(trpcDouble.mounted.get("governanceKillSwitch.summaries") ?? [])].map((run) => run()),
+      );
+    });
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Couldn't load the agents' stop state",
+    );
+    expect(screen.queryByTestId("agent-stop-status")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Actions for support-bot" })).toBeNull();
   });
 });
 

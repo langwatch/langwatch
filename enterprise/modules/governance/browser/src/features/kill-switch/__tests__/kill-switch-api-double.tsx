@@ -49,10 +49,21 @@ export function handledError({ code, httpStatus }: { code: string; httpStatus: n
   return Object.assign(new Error(code), { data: { error: { code, httpStatus, meta: {} } } });
 }
 
+const RETRYING = new WeakSet<object>();
+
+/**
+ * A failure the client is still retrying, as the tRPC client reports a 500: `error` stays null
+ * while `failureReason` holds it.
+ */
+export function retryingFailure(error: Error): Error {
+  RETRYING.add(error);
+  return error;
+}
+
 /** A read that never answers, for the loading state. */
 export const neverAnswers = () => new Promise<never>(() => undefined);
 
-type QueryState = { data: unknown; error: unknown; fetching: boolean };
+type QueryState = { data: unknown; error: unknown; fetching: boolean; retrying?: boolean };
 
 function useDoubleQuery(procedure: string, input: unknown, options?: { enabled?: boolean }) {
   if (!trpcDouble.queries.has(procedure)) {
@@ -65,9 +76,10 @@ function useDoubleQuery(procedure: string, input: unknown, options?: { enabled?:
     trpcDouble.reads.push(procedure);
     try {
       const data = await trpcDouble.queries.get(procedure)?.(input);
-      setState({ data, error: null, fetching: false });
+      setState({ data, error: null, fetching: false, retrying: false });
     } catch (error) {
-      setState((previous) => ({ ...previous, error, fetching: false }));
+      const retrying = typeof error === "object" && error !== null && RETRYING.has(error);
+      setState((previous) => ({ ...previous, error, fetching: retrying, retrying }));
     }
   };
   const fetchRef = useRef(fetchNow);
@@ -88,8 +100,9 @@ function useDoubleQuery(procedure: string, input: unknown, options?: { enabled?:
   const hasData = state.data !== undefined;
   return {
     data: state.data,
-    error: state.error,
-    isError: state.error !== null && state.error !== undefined,
+    error: state.retrying ? null : state.error,
+    failureReason: state.error,
+    isError: !state.retrying && state.error !== null && state.error !== undefined,
     isPending: !hasData,
     isLoading: !hasData && state.fetching,
     isFetching: state.fetching,

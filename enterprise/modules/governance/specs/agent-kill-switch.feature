@@ -511,6 +511,15 @@ Feature: Agent kill switch: stop a misbehaving agent where it runs, with approva
     And an approval card for "pricing-bot" offers Approve and Deny
 
   @integration
+  Scenario: A failing stop read shows its error and offers no action on the stop state it lacks
+    Given the reads of the agents' stops and of the stops waiting for approval fail with a server error
+    When a person with governance:manage opens the Agents page
+    Then the page says the stop state and the stops waiting for approval did not load, each with Try again
+    And no agent row shows a stop status or offers Stop, Restore or Retry
+    And no approval card offers Approve or Deny
+    And a stop read that fails after it answered drops the stop state it showed
+
+  @integration
   Scenario: Every agent of the Agents page gets its kill switch summary, however many there are
     Given an organisation with more agents and open stops than one read page holds
     When the Agents page reads the kill switch summaries

@@ -9,7 +9,7 @@ import { useState } from "react";
 
 import { api } from "../../../behavior/governance-api.ts";
 import { useGovernanceToaster, useShowErrorToast } from "../../../behavior/governance-feedback.ts";
-import { useKillSwitchRefresh } from "./use-kill-switch.ts";
+import { readFailureOf, useKillSwitchRefresh } from "./use-kill-switch.ts";
 
 const PLAN_CHANGED = "agent_stop_plan_changed";
 
@@ -49,7 +49,8 @@ export function useStopRequest({
     { enabled: open && !!organizationId, refetchOnWindowFocus: false },
   );
   const stop = api.governanceKillSwitch.requestStop.useMutation();
-  const shown = plan.data && !plan.isError ? plan.data : null;
+  const failure = readFailureOf(plan);
+  const shown = plan.data && !failure ? plan.data : null;
   const retry = () => void plan.refetch();
 
   const isStopping = stop.isPending || submitting;
@@ -83,12 +84,16 @@ export function useStopRequest({
   return {
     plan: {
       targets: shown?.targets ?? null,
-      isLoading: plan.isPending && !plan.isError,
-      error: shown ? null : plan.error,
+      isLoading: plan.isPending && !failure,
+      error: shown ? null : failure,
       retry,
     },
     planChanged,
-    confirmBlockedReason: confirmBlockedReason({ shown: !!shown, ...plan }),
+    confirmBlockedReason: confirmBlockedReason({
+      shown: !!shown,
+      isFetching: plan.isFetching,
+      isError: !!failure,
+    }),
     isStopping,
     requestStop,
     reset: () => setPlanChanged(null),
