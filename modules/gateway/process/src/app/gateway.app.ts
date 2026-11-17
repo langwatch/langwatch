@@ -82,6 +82,10 @@ import {
   parseVirtualKeyConfig,
   type ArchiveGatewayBudgetInput,
   type ArchiveGatewayCacheRuleInput,
+  type CreateGatewayA2aTargetInput,
+  type GatewayA2aTargetResource,
+  type SetGatewayA2aTargetBlockedInput,
+  type UpdateGatewayA2aTargetInput,
   type ArchiveGatewayGuardrailInput,
   type CreateGatewayBudgetInput,
   type CreateGatewayCacheRuleInput,
@@ -258,6 +262,7 @@ import {
   ConnectManagedKeyService,
   type ManagedKeyProvisionedSender,
 } from "../services/connect-managed-key.service.ts";
+import { GatewayA2aTargetService } from "../services/gateway-a2a-target.service.ts";
 import { GatewayAgentCacheService } from "../services/gateway-agent-cache.service.ts";
 import { GatewayAuthzScopePermissionsService } from "../services/gateway-authz-scope-permissions.service.ts";
 import { GatewayCacheRuleService } from "../services/gateway-cache-rule.service.ts";
@@ -495,6 +500,8 @@ interface GatewayAppDependencies extends GatewayRestInfrastructure {
    * copies of the same tables, so a rule written through one was invisible to the other.
    */
   budgetDecisions: GatewayService;
+  /** The A2A target registry the `/a2a/{name}` proxy reads through the config bundle. */
+  a2aTargets: GatewayA2aTargetService;
   /**
    * The ClickHouse budget-spend source. Absent on a deployment without it,
    * which is why every read of it degrades explicitly rather than reporting a
@@ -864,6 +871,7 @@ function gatewayControlPlane(options: GatewayControlPlaneOptions): GatewayContro
   return {
     virtualKeys,
     budgetDecisions,
+    a2aTargets: GatewayA2aTargetService.create(repositories.a2aTargets),
     budgetSpend,
     changeEvents: changes,
     principalSpend,
@@ -1262,6 +1270,7 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
         repository: repositories.traceExportKeys,
         apiKeys: setup.dependencies.apiKeys,
       }),
+      a2aTargets: controlPlane.a2aTargets,
     });
     const guardrails = GatewayGuardrailEvaluationService.create({
       repository: repositories.guardrails,
@@ -2080,6 +2089,29 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
 
   archiveCacheRule(input: ArchiveGatewayCacheRuleInput): Promise<GatewayCacheRuleResource> {
     return this.#dependencies.budgetDecisions.cacheRuleArchive(input);
+  }
+
+  listA2aTargets(organizationId: string): Promise<GatewayA2aTargetResource[]> {
+    return this.#dependencies.a2aTargets.list(organizationId);
+  }
+
+  createA2aTarget(input: CreateGatewayA2aTargetInput): Promise<GatewayA2aTargetResource> {
+    return this.#dependencies.a2aTargets.create(input);
+  }
+
+  updateA2aTarget(input: UpdateGatewayA2aTargetInput): Promise<GatewayA2aTargetResource> {
+    return this.#dependencies.a2aTargets.update(input);
+  }
+
+  setA2aTargetBlocked(input: SetGatewayA2aTargetBlockedInput): Promise<GatewayA2aTargetResource> {
+    return this.#dependencies.a2aTargets.setBlocked(input);
+  }
+
+  archiveA2aTarget(input: {
+    id: string;
+    organizationId: string;
+  }): Promise<GatewayA2aTargetResource> {
+    return this.#dependencies.a2aTargets.archive(input);
   }
 
   async findProjectOrganization(projectId: string): Promise<string | null> {

@@ -38,6 +38,7 @@ import {
   type GatewayConfigPayload,
   type ProviderExclusionWire,
 } from "../rules/gateway-config-wire.rules.ts";
+import type { GatewayA2aTargetService } from "./gateway-a2a-target.service.ts";
 import { GatewayConnectUpstreamService } from "./gateway-connect-upstream.service.ts";
 import type { GatewayScopeResolutionService } from "./gateway-scope-resolution.service.ts";
 import type { GatewayTraceExportKeyService } from "./gateway-trace-export-key.service.ts";
@@ -74,6 +75,7 @@ export class GatewayConfigMaterialiserService {
   private readonly langyMirrorProjectId: string | undefined;
   private readonly connectUpstream: GatewayConnectUpstreamService | undefined;
   private readonly traceExportKeys: GatewayTraceExportKeyService | undefined;
+  private readonly a2aTargets: GatewayA2aTargetService | undefined;
 
   private constructor(
     /** Which providers a key reaches, and in which dispatch order. */
@@ -87,6 +89,7 @@ export class GatewayConfigMaterialiserService {
       langyMirrorProjectId,
       connectUpstream,
       traceExportKeys,
+      a2aTargets,
     }: {
       scopeResolution: GatewayScopeResolutionService;
       projects: ProjectApi;
@@ -97,6 +100,7 @@ export class GatewayConfigMaterialiserService {
       langyMirrorProjectId: string | undefined;
       connectUpstream: GatewayConnectUpstreamService | undefined;
       traceExportKeys: GatewayTraceExportKeyService | undefined;
+      a2aTargets: GatewayA2aTargetService | undefined;
     },
   ) {
     this.scopeResolution = scopeResolution;
@@ -108,6 +112,7 @@ export class GatewayConfigMaterialiserService {
     this.langyMirrorProjectId = langyMirrorProjectId;
     this.connectUpstream = connectUpstream;
     this.traceExportKeys = traceExportKeys;
+    this.a2aTargets = a2aTargets;
   }
 
   static create(input: {
@@ -123,6 +128,8 @@ export class GatewayConfigMaterialiserService {
     connectUpstream?: GatewayConnectUpstreamService | undefined;
     /** Absent only in tests: the bundle then carries no export token. */
     traceExportKeys?: GatewayTraceExportKeyService | undefined;
+    /** Absent only in tests: the bundle then carries no A2A targets. */
+    a2aTargets?: GatewayA2aTargetService | undefined;
   }): GatewayConfigMaterialiserService {
     return new GatewayConfigMaterialiserService({
       scopeResolution: input.scopeResolution,
@@ -134,6 +141,7 @@ export class GatewayConfigMaterialiserService {
       langyMirrorProjectId: input.langyMirrorProjectId,
       connectUpstream: input.connectUpstream,
       traceExportKeys: input.traceExportKeys,
+      a2aTargets: input.a2aTargets,
     });
   }
 
@@ -185,7 +193,21 @@ export class GatewayConfigMaterialiserService {
       vk.traceProjectId && this.traceExportKeys
         ? await this.traceExportKeys.findKeyIds(vk.traceProjectId)
         : [];
-    return [token, ...keyIds].join(".");
+    const a2a = this.a2aTargets ? await this.a2aTargets.bundleFingerprint(this.a2aScopeOf(vk)) : "";
+    return [token, ...keyIds, ...(a2a ? [a2a] : [])].join(".");
+  }
+
+  /** The A2A registry slice a key reads: its trace project's targets and the org-wide ones. */
+  private a2aScopeOf(vk: VirtualKeyWithScopes): {
+    organizationId: string;
+    projectId: string | null;
+    virtualKeyId: string;
+  } {
+    return {
+      organizationId: vk.organizationId,
+      projectId: vk.traceProjectId ?? null,
+      virtualKeyId: vk.id,
+    };
   }
 
   /** The trace project's export token; never `Project.apiKey`. */
@@ -234,6 +256,12 @@ export class GatewayConfigMaterialiserService {
       })),
     });
     const otlpToken = await this.traceExportToken(vk, traceProject);
+    const a2aTargets = this.a2aTargets
+      ? await this.a2aTargets.bundleFor({
+          ...this.a2aScopeOf(vk),
+          projectId: traceProject?.id ?? null,
+        })
+      : [];
 
     return {
       revision: vk.revision.toString(),
@@ -281,6 +309,7 @@ export class GatewayConfigMaterialiserService {
       },
       budgets: budgets.map((resolved) => budgetToWire(resolved, spendByBudgetId)),
       cache_rules: bundle.cacheRules.map(cacheRuleToWire),
+      a2a_targets: a2aTargets,
       metadata: config.metadata ?? {},
       vk_tags: config.metadata?.tags ?? [],
       expires_at: toExpiresAtWire(vk.expiresAt),

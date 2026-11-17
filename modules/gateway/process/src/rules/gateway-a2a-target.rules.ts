@@ -42,3 +42,16 @@ export function a2aTargetToDto(target: GatewayA2aTargetResource): GatewayA2aTarg
     updatedAt: target.updatedAt.toISOString(),
   };
 }
+
+/** No allow list admits every key of the scope; otherwise the key must be on it. */
+export function a2aTargetAdmitsKey({
+  target,
+  virtualKeyId,
+}: {
+  target: GatewayA2aTargetWire;
+  virtualKeyId: string;
+}): boolean {
+  return (
+    target.allowed_virtual_key_ids === null || target.allowed_virtual_key_ids.includes(virtualKeyId)
+  );
+}

@@ -1,12 +1,12 @@
+import {
+  GatewayA2aTargetNameTakenError,
+  GatewayA2aTargetNotFoundError,
+} from "@langwatch/gateway-contract";
 import { describe, expect, it } from "vitest";
 
 import { MemoryGatewayA2aTargetRepository } from "../repositories/memory/memory.gateway-a2a-target.repository.ts";
 import { a2aTargetToDto } from "../rules/gateway-a2a-target.rules.ts";
-import {
-  GatewayA2aTargetNameTakenError,
-  GatewayA2aTargetNotFoundError,
-  GatewayA2aTargetService,
-} from "../services/gateway-a2a-target.service.ts";
+import { GatewayA2aTargetService } from "../services/gateway-a2a-target.service.ts";
 
 const base = {
   organizationId: "org_1",
@@ -33,9 +33,9 @@ describe("GatewayA2aTargetService", () => {
   });
 
   it("refuses names that cannot be a path segment", async () => {
-    await expect(
-      service().create({ ...base, projectId: null, name: "Bad/Name" }),
-    ).rejects.toThrow("lowercase letters");
+    await expect(service().create({ ...base, projectId: null, name: "Bad/Name" })).rejects.toThrow(
+      "lowercase letters",
+    );
   });
 
   it("refuses an upstream that is not http or https", async () => {
@@ -62,7 +62,11 @@ describe("GatewayA2aTargetService", () => {
       allowedVirtualKeyIds: ["vk_1"],
     });
 
-    const bundle = await targets.bundleFor({ organizationId: "org_1", projectId: "p1" });
+    const bundle = await targets.bundleFor({
+      organizationId: "org_1",
+      projectId: "p1",
+      virtualKeyId: "vk_1",
+    });
 
     expect(bundle.map((t) => [t.name, t.upstream_url])).toEqual([
       ["billing", "https://project.test"],
@@ -86,7 +90,11 @@ describe("GatewayA2aTargetService", () => {
       actorUserId: "user_1",
     });
 
-    const [wire] = await targets.bundleFor({ organizationId: "org_1", projectId: null });
+    const [wire] = await targets.bundleFor({
+      organizationId: "org_1",
+      projectId: null,
+      virtualKeyId: "vk_1",
+    });
 
     expect(wire).toMatchObject({ blocked: true, block_reason: "incident" });
   });
@@ -96,7 +104,9 @@ describe("GatewayA2aTargetService", () => {
     const created = await targets.create({ ...base, projectId: null, name: "billing" });
     await targets.archive({ id: created.id, organizationId: "org_1" });
 
-    expect(await targets.bundleFor({ organizationId: "org_1", projectId: null })).toEqual([]);
+    expect(
+      await targets.bundleFor({ organizationId: "org_1", projectId: null, virtualKeyId: "vk_1" }),
+    ).toEqual([]);
     await expect(targets.archive({ id: created.id, organizationId: "org_1" })).rejects.toThrow(
       GatewayA2aTargetNotFoundError,
     );
@@ -114,5 +124,65 @@ describe("GatewayA2aTargetService", () => {
 
     expect(dto.upstreamHeaderNames).toEqual(["Authorization"]);
     expect(JSON.stringify(dto)).not.toContain("s3cret");
+  });
+
+  it("carries only targets whose allow list admits the key, or that have none", async () => {
+    const targets = service();
+    await targets.create({ ...base, projectId: null, name: "open" });
+    await targets.create({
+      ...base,
+      projectId: null,
+      name: "mine",
+      allowedVirtualKeyIds: ["vk_1"],
+    });
+    await targets.create({
+      ...base,
+      projectId: null,
+      name: "theirs",
+      allowedVirtualKeyIds: ["vk_2"],
+    });
+    const bundle = await targets.bundleFor({
+      organizationId: "org_1",
+      projectId: null,
+      virtualKeyId: "vk_1",
+    });
+    expect(bundle.map((t) => t.name)).toEqual(["mine", "open"]);
+  });
+
+  it("blocks a target and changes the bundle fingerprint", async () => {
+    const targets = service();
+    const created = await targets.create({ ...base, projectId: null, name: "billing" });
+    const scope = { organizationId: "org_1", projectId: null, virtualKeyId: "vk_1" };
+    const before = await targets.bundleFingerprint(scope);
+    await targets.setBlocked({
+      id: created.id,
+      organizationId: "org_1",
+      blocked: true,
+      blockReason: "incident",
+      actorUserId: "u1",
+    });
+    const [wire] = await targets.bundleFor(scope);
+    expect(wire).toMatchObject({ blocked: true, block_reason: "incident" });
+    expect(await targets.bundleFingerprint(scope)).not.toBe(before);
+  });
+
+  it("clears the reason when a target is unblocked", async () => {
+    const targets = service();
+    const created = await targets.create({ ...base, projectId: null, name: "billing" });
+    await targets.setBlocked({
+      id: created.id,
+      organizationId: "org_1",
+      blocked: true,
+      blockReason: "x",
+      actorUserId: "u1",
+    });
+    const unblocked = await targets.setBlocked({
+      id: created.id,
+      organizationId: "org_1",
+      blocked: false,
+      blockReason: "x",
+      actorUserId: "u1",
+    });
+    expect(unblocked).toMatchObject({ blocked: false, blockReason: null });
   });
 });
