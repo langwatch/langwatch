@@ -8,10 +8,6 @@
 import { createHash } from "node:crypto";
 
 import type { LangWatchQLConnection } from "../../../repositories/langwatch-ql-executor.repository.ts";
-import type {
-  LwqlPostgresViewFound,
-  LwqlScopedViewState,
-} from "../../../repositories/langwatch-ql-postgres.repository.ts";
 import type { LwqlCollectionState } from "../../../repositories/langwatch-ql-provisioning.repository.ts";
 import { flooredViewName, flooredViewNames } from "../../../rules/lwql-dedup-floor.rules.ts";
 import { LWQL_VIEW_CATALOG } from "../../../rules/lwql-view-catalog.rules.ts";
@@ -41,10 +37,7 @@ import {
   type LwqlPostgresSettings,
   NO_COLLECTION_STATE,
 } from "./langwatch-ql-collection-binding.service.ts";
-import {
-  LangWatchQLPostgresGapsService,
-  type LwqlPostgresGap,
-} from "./langwatch-ql-postgres-gaps.service.ts";
+import type { LwqlPostgresGap } from "./langwatch-ql-postgres-gaps.service.ts";
 import {
   DEFAULT_POSTGRES_READER_LIMITS,
   LangWatchQLPostgresMappingService,
@@ -61,7 +54,6 @@ const catalogShapes = LangWatchQLCatalogShapesService.create();
 const clickHouseDrift = LangWatchQLClickHouseDriftService.create();
 const connections = LangWatchQLConnectionService.create();
 const postgresMapping = LangWatchQLPostgresMappingService.create();
-const postgresGaps = LangWatchQLPostgresGapsService.create();
 const postgresViews = LangWatchQLPostgresViewsService.create();
 const viewProvisioning = LangWatchQLViewProvisioningService.create();
 const collectionBinding = LangWatchQLCollectionBindingService.create();
@@ -409,17 +401,6 @@ export class LangWatchQLSelfProvisioningService {
   /** The approved views the reader role must select from. */
   approvedPostgresViews(): string[] {
     return postgresViews.approvedViewNames();
-  }
-
-  /** Each approved view the reader cannot select, then the scoped-reader group's gaps. */
-  findPostgresGaps({
-    found,
-    scoped,
-  }: {
-    found: readonly LwqlPostgresViewFound[];
-    scoped: LwqlScopedViewState;
-  }): LwqlPostgresGap[] {
-    return postgresGaps.findGaps({ found, scoped });
   }
 
   /** A failed statement echoes its DDL, which embeds passwords; every logged error passes here. */

@@ -15,6 +15,7 @@ import {
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { LangWatchQLCollectionBindingService } from "../../features/provisioning/services/langwatch-ql-collection-binding.service.ts";
+import { LangWatchQLPostgresGapsService } from "../../features/provisioning/services/langwatch-ql-postgres-gaps.service.ts";
 import { LWQL_POSTGRES_READER_ROLE } from "../../features/provisioning/services/langwatch-ql-production-provisioning.service.ts";
 import {
   type LwqlAppOwnedDrift,
@@ -50,6 +51,7 @@ class AllowTestQueries extends PrismaQueryGuard {
 }
 
 const selfProvisioning = LangWatchQLSelfProvisioningService.create();
+const postgresGaps = LangWatchQLPostgresGapsService.create();
 
 const collectionBinding = LangWatchQLCollectionBindingService.create();
 const ENGINE_TABLES = LangWatchQLCatalogShapesService.create()
@@ -205,14 +207,14 @@ describe("given a rendered install whose config store has not mounted the named 
         role: postgres.readerRole,
         views,
       });
-      expect(selfProvisioning.findPostgresGaps({ found: granted, scoped: NO_GROUP })).toEqual([]);
+      expect(postgresGaps.findGaps({ found: granted, scoped: NO_GROUP })).toEqual([]);
 
       const absent = await repository.findApprovedViews({
         schema: "public",
         role: "lwql_role_that_does_not_exist",
         views,
       });
-      expect(selfProvisioning.findPostgresGaps({ found: absent, scoped: NO_GROUP })).toEqual(
+      expect(postgresGaps.findGaps({ found: absent, scoped: NO_GROUP })).toEqual(
         views.map((view) => ({ kind: "shared", view, absent: false })),
       );
     });

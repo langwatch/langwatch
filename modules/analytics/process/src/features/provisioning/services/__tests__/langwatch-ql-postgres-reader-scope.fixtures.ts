@@ -29,17 +29,19 @@ import {
   LWQL_SCOPED_SCHEMA,
   scopedViewGuardCondition,
 } from "../../rules/lwql-scoped-view.rules.ts";
-import type { LwqlPostgresGap } from "../langwatch-ql-postgres-gaps.service.ts";
+import {
+  LangWatchQLPostgresGapsService,
+  type LwqlPostgresGap,
+} from "../langwatch-ql-postgres-gaps.service.ts";
 import { LWQL_SCOPED_READER_GROUP } from "../langwatch-ql-postgres-mapping.service.ts";
 import { LangWatchQLPostgresViewsService } from "../langwatch-ql-postgres-views.service.ts";
 import {
   LangWatchQLProductionProvisioningService,
   LWQL_POSTGRES_READER_ROLE,
 } from "../langwatch-ql-production-provisioning.service.ts";
-import { LangWatchQLSelfProvisioningService } from "../langwatch-ql-self-provisioning.service.ts";
 
 export const provisioning = LangWatchQLProductionProvisioningService.create();
-const selfProvisioning = LangWatchQLSelfProvisioningService.create();
+const postgresGaps = LangWatchQLPostgresGapsService.create();
 
 export const SCHEMA = "public";
 export const SCOPED = LWQL_SCOPED_SCHEMA;
@@ -142,7 +144,7 @@ export async function readPostgresGaps(
     group: GROUP,
     views: VIEW_NAMES,
   });
-  return selfProvisioning.findPostgresGaps({ found, scoped });
+  return postgresGaps.findGaps({ found, scoped });
 }
 
 class AllowTestQueries extends PrismaQueryGuard {

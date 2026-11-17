@@ -597,7 +597,7 @@ describe("given what the reconvergence check finds in PostgreSQL", () => {
 
   /** @scenario "The reconvergence check skips the PostgreSQL half when the reader role and approved views are in place" */
   it("finds no gap when every approved view exists and the reader may select it", () => {
-    expect(selfProvisioning.findPostgresGaps({ found, scoped: noGroup })).toEqual([]);
+    expect(postgresGaps.findGaps({ found, scoped: noGroup })).toEqual([]);
   });
 
   /** @scenario "The reconvergence check converges the app-owned LangWatchQL objects it finds missing" */
@@ -608,7 +608,7 @@ describe("given what the reconvergence check finds in PostgreSQL", () => {
       .filter((view) => view.view !== missing)
       .map((view) => (view.view === ungranted ? { ...view, granted: false } : view));
 
-    expect(selfProvisioning.findPostgresGaps({ found: gapped, scoped: noGroup })).toEqual([
+    expect(postgresGaps.findGaps({ found: gapped, scoped: noGroup })).toEqual([
       { kind: "shared", view: missing, absent: true },
       { kind: "shared", view: ungranted, absent: false },
     ]);
@@ -618,16 +618,14 @@ describe("given what the reconvergence check finds in PostgreSQL", () => {
   it("reports no scoped gap without the group, whatever the copies", () => {
     const copies = readable.map((copy) => ({ ...copy, exists: false }));
 
-    expect(selfProvisioning.findPostgresGaps({ found, scoped: { ...noGroup, copies } })).toEqual(
-      [],
-    );
+    expect(postgresGaps.findGaps({ found, scoped: { ...noGroup, copies } })).toEqual([]);
   });
 
   /** @scenario "Scoped copies exist only where the scoped-reader group does" */
   it("reports the scoped schema absent once the group exists", () => {
-    expect(
-      selfProvisioning.findPostgresGaps({ found, scoped: { ...noGroup, groupExists: true } }),
-    ).toEqual([{ kind: "scoped-schema-absent" }]);
+    expect(postgresGaps.findGaps({ found, scoped: { ...noGroup, groupExists: true } })).toEqual([
+      { kind: "scoped-schema-absent" },
+    ]);
   });
 
   /** @scenario "The reconvergence check guards every scoped copy" */
@@ -648,7 +646,7 @@ describe("given what the reconvergence check finds in PostgreSQL", () => {
       groupOnShared: [onShared],
       copies,
     };
-    const gaps = selfProvisioning.findPostgresGaps({ found, scoped });
+    const gaps = postgresGaps.findGaps({ found, scoped });
 
     expect(gaps).toEqual([
       { kind: "group-on-shared", view: onShared },
@@ -668,7 +666,7 @@ describe("given what the reconvergence check finds in PostgreSQL", () => {
       copies: readable.map((copy) => ({ ...copy, passesGuard: false })),
     };
 
-    expect(selfProvisioning.findPostgresGaps({ found, scoped })).toEqual([]);
+    expect(postgresGaps.findGaps({ found, scoped })).toEqual([]);
   });
 
   it("rebuilds every copy once the scoped schema was found absent", () => {

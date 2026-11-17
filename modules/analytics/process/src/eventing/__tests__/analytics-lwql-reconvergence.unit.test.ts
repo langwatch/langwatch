@@ -550,6 +550,38 @@ describe("given a check over the app-owned objects", () => {
     });
   });
 
+  describe("when the scoped-reader group's schema is absent", () => {
+    /** @scenario "Scoped copies exist only where the scoped-reader group does" */
+    it("names the absent schema by its kind in the drift sample, beside each view it names", async () => {
+      const drift: LwqlAppOwnedDrift = {
+        clickHouse: [],
+        postgres: [
+          { kind: "scoped-schema-absent" },
+          { kind: "shared", view: "lwql_agents", absent: true },
+        ],
+        isKeyMapMissing: false,
+      };
+      await runLwqlReconvergence({
+        probe: () => Promise.resolve("config_store"),
+        converge: () => Promise.resolve(),
+        findDrift: () => Promise.resolve(drift),
+        convergeAppOwned: () => Promise.resolve(),
+        fillKeyMap: () => Promise.resolve(),
+        unconfirmedSince: MemoryLwqlUnconfirmedSinceRepository.create(),
+      })(wakeOnce);
+
+      expect(logCalls).toContainEqual({
+        level: "info",
+        fields: {
+          clickHouseObjects: 0,
+          postgresViews: 2,
+          sample: ["scoped-schema-absent", "lwql_agents"],
+        },
+        message: "lwql reconvergence check found app-owned objects to converge",
+      });
+    });
+  });
+
   describe("when the key map itself is missing", () => {
     /** @scenario "The reconvergence check fills the key-map rows a project lacks" */
     it("fills only once a converge has repaired it, then on the next asked-for fill", async () => {

@@ -773,7 +773,7 @@ async function readPostgresGaps({
       group: LWQL_SCOPED_READER_GROUP,
       views,
     });
-    return selfProvisioning.findPostgresGaps({ found, scoped });
+    return postgresGaps.findGaps({ found, scoped });
   } catch (error) {
     logger.warn(
       { error: clickHouseErrorSummary(error), ...postgresErrorCodeFields(error) },
