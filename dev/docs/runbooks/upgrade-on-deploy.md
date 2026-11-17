@@ -227,6 +227,26 @@ deploy logs a warning that the schema is absent and the group reads nothing. To 
 `COMMENT ON SCHEMA lwql_scoped IS 'langwatch-lwql-scoped:<app schema>'`: the app writes copies
 only into a `lwql_scoped` whose comment names its own app schema, and otherwise logs a warning.
 
+**Organization roles for scoped logins.** Group membership alone reads zero rows. A copy returns a
+row only when the login reading it is a direct member of `lwql_org_<md5 of the organization id>`,
+for the organization that owns the row's project: the prefix `lwql_org_` and the lowercase hex md5
+of that organization's id as stored in `Team.organizationId`. LangWatch never creates these roles
+and never grants them: the operator creates one NOLOGIN role per organization and grants it to each
+scoped login that may read that organization. The copies look the membership up in
+`pg_auth_members` against `current_user`, so grant the role to the login itself; membership through
+another role does not count. The role carries no privileges, so the login need not inherit it; it
+must inherit `lwql_scoped_reader`, the default. Revoking the role hides that organization's rows
+from the next query on. For example, for one login reading one organization:
+
+```sql
+SELECT 'lwql_org_' || md5('<organization id>');  -- the role name, for example lwql_org_1a2b...
+CREATE ROLE lwql_org_<hash> NOLOGIN;              -- once per organization
+CREATE ROLE <login> LOGIN PASSWORD '<password>';
+GRANT lwql_scoped_reader TO <login>;
+GRANT lwql_org_<hash> TO <login>;                 -- once per organization it may read
+ALTER ROLE <login> SET search_path = lwql_scoped;
+```
+
 During a rolling deploy that adds the PostgreSQL schema to the credential digest, old and new workers may
 rebuild each other's engine tables on each check until the last old worker stops; the old form reads `public`.
 
