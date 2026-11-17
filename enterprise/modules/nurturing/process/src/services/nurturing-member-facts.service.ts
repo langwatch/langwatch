@@ -13,6 +13,7 @@ import {
   type KnownTraces,
   type MemberFactSignal,
 } from "../rules/nurturing-member-facts.rules.ts";
+import type { NurturingOrganizationAdmin } from "../rules/nurturing-subscription-sync-service.rules.ts";
 import { NurturingClaimReleaseService } from "./nurturing-claim-release.service.ts";
 
 type MemberFactsDependencies = Readonly<{
@@ -66,10 +67,13 @@ export class NurturingMemberFactsService {
     }
   }
 
-  /** The admin nurturing's own copy names for the organization; null when it knows none. */
-  async adminOf({ organizationId }: Readonly<{ organizationId: string }>): Promise<string | null> {
+  /** The admin nurturing's own copy names for the organization, or none when it knows none. */
+  async adminOf({
+    organizationId,
+  }: Readonly<{ organizationId: string }>): Promise<NurturingOrganizationAdmin> {
     const [organization] = await this.dependencies.milestones.findOrganization({ organizationId });
-    return organization?.adminUserId ?? null;
+    const userId = organization?.adminUserId;
+    return userId ? { kind: "admin", userId } : { kind: "none" };
   }
 
   /** Across every organization of the person: their profile is one, whichever org it is about. */

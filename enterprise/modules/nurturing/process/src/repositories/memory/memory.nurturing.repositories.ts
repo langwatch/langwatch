@@ -7,6 +7,7 @@ import type { NurturingRepositories } from "../nurturing.repositories.ts";
 import { MemoryNurturingMilestonesRepository } from "./memory.nurturing-milestones.repository.ts";
 import { MemoryNurturingOrganizationCreatedRepository } from "./memory.nurturing-organization-created.repository.ts";
 import { MemoryNurturingOrganizationMemberRepository } from "./memory.nurturing-organization-member.repository.ts";
+import { MemoryNurturingOrganizationPlanRepository } from "./memory.nurturing-organization-plan.repository.ts";
 import { MemoryNurturingPersonalProjectRepository } from "./memory.nurturing-personal-project.repository.ts";
 import { MemoryNurturingProjectDirectoryRepository } from "./memory.nurturing-project-directory.repository.ts";
 import { MemoryNurturingProjectPlacementRepository } from "./memory.nurturing-project-placement.repository.ts";
@@ -46,6 +47,7 @@ export class MemoryNurturingRepositories {
       placements: MemoryNurturingProjectPlacementRepository.create(),
       organizationsCreated: MemoryNurturingOrganizationCreatedRepository.create(),
       members: MemoryNurturingOrganizationMemberRepository.create(),
+      plans: MemoryNurturingOrganizationPlanRepository.create(),
       projectUsage: MemoryNurturingProjectUsageRepository.create(),
       traceDays: MemoryNurturingTraceDayRepository.create(),
       personalProjects: MemoryNurturingPersonalProjectRepository.create(),

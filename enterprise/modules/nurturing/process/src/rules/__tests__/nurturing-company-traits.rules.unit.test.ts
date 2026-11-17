@@ -11,43 +11,25 @@ const CREATED_AT = Date.UTC(2026, 10, 1, 9, 30, 15, 500);
 
 describe("companyTraits", () => {
   describe("when nurturing's copies hold every trait", () => {
-    it("sends the counts and the creation time in whole Unix seconds", () => {
-      const traits = companyTraits({
-        memberCount: 3,
-        projectCount: 2,
-        organizationCreatedAt: CREATED_AT,
-      });
+    it("sends the project count and the creation time in whole Unix seconds", () => {
+      const traits = companyTraits({ projectCount: 2, organizationCreatedAt: CREATED_AT });
 
-      expect(traits).toEqual({
-        member_count: 3,
-        project_count: 2,
-        created_at: Math.floor(CREATED_AT / 1000),
-      });
+      expect(traits).toEqual({ project_count: 2, created_at: Math.floor(CREATED_AT / 1000) });
     });
   });
 
   describe("when nurturing knows no creation time and no project count", () => {
     /** @scenario "Company traits nurturing does not know are left out" */
     it("leaves both out, with no zero in their place", () => {
-      const traits = companyTraits({
-        memberCount: 3,
-        projectCount: null,
-        organizationCreatedAt: null,
-      });
+      const traits = companyTraits({ projectCount: null, organizationCreatedAt: null });
 
-      expect(traits).toEqual({ member_count: 3 });
-      expect(traits).not.toHaveProperty("created_at");
-      expect(traits).not.toHaveProperty("project_count");
+      expect(traits).toEqual({});
     });
   });
 
   describe("when a copy counts zero", () => {
-    it("leaves the count out, since an organization always has a member and a project", () => {
-      const traits = companyTraits({
-        memberCount: 0,
-        projectCount: 0,
-        organizationCreatedAt: null,
-      });
+    it("leaves the count out, since an organization always has a project", () => {
+      const traits = companyTraits({ projectCount: 0, organizationCreatedAt: null });
 
       expect(traits).toEqual({});
     });

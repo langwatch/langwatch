@@ -197,7 +197,7 @@ export function subscriptionChangedSignal({
   data,
   aggregateId,
 }: OwnerEvent<SubscriptionChangedEventData>): NurturingSignal {
-  const { plan, organizationName, fromCatchUp } = data;
+  const { plan, fromCatchUp } = data;
   const sourceEventId = fromCatchUp
     ? `${aggregateId}:subscription:catch-up:${data.occurredAt}`
     : `${aggregateId}:subscription:${data.hasSubscription}:${data.occurredAt}`;
@@ -210,7 +210,6 @@ export function subscriptionChangedSignal({
     memberUserIds: data.memberUserIds,
     hasSubscription: data.hasSubscription,
     ...(plan === undefined ? {} : { plan }),
-    ...(organizationName === undefined ? {} : { organizationName }),
     ...(fromCatchUp === undefined ? {} : { fromCatchUp }),
   };
 }

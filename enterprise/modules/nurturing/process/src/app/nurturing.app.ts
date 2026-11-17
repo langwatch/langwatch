@@ -9,7 +9,10 @@ import {
 import type { EventingCommands } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import { counter } from "@langwatch/observability/metrics";
-import { OrganizationApi, type OrganizationCreatedEventData } from "@langwatch/organization-contract";
+import {
+  OrganizationApi,
+  type OrganizationCreatedEventData,
+} from "@langwatch/organization-contract";
 import type { FeatureSetup } from "@langwatch/process";
 import { nowInstant } from "@langwatch/time";
 import { UserApi } from "@langwatch/user-contract";
@@ -99,6 +102,7 @@ export class NurturingModule implements NurturingApi {
         organizations: dependencies.organizations,
       }),
       members: repositories.members,
+      plans: repositories.plans,
     });
     const milestones = NurturingMilestonesService.create({
       milestones: repositories.milestones,

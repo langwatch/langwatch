@@ -29,11 +29,7 @@ export class NurturingOrganizationCreatedService {
   async organizationCreated(data: OrganizationCreatedEventData): Promise<void> {
     const { organizationId, organizationName, userId, occurredAt } = data;
     if (!userId) return this.skipped("no_founder");
-    const created = companyTraits({
-      memberCount: null,
-      projectCount: null,
-      organizationCreatedAt: occurredAt,
-    });
+    const created = companyTraits({ projectCount: null, organizationCreatedAt: occurredAt });
     await this.dependencies.sendBatch([
       {
         type: "group",

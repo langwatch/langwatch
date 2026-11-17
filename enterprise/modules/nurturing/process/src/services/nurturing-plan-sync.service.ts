@@ -2,7 +2,9 @@
 import type { CioBatchCall, NurturingSignalOf } from "@langwatch/enterprise-nurturing-contract";
 
 import type { NurturingOrganizationMemberRepository } from "../repositories/nurturing-organization-member.repository.ts";
+import type { NurturingOrganizationPlanRepository } from "../repositories/nurturing-organization-plan.repository.ts";
 import { membersWhoseLatestOrganizationIsElsewhere } from "../rules/nurturing-organization-member.rules.ts";
+import { planFactChangesCopy } from "../rules/nurturing-organization-plan.rules.ts";
 import { fireSubscriptionSync } from "../rules/nurturing-subscription-sync-service.rules.ts";
 import type { NurturingMemberFactsService } from "./nurturing-member-facts.service.ts";
 import type { NurturingService } from "./nurturing.service.ts";
@@ -24,6 +26,8 @@ type PlanSyncDependencies = Readonly<{
   admins: Pick<NurturingMemberFactsService, "adminOf">;
   /** The same member copy the usage sync reads, read here by person: whose latest org is whose. */
   members: Pick<NurturingOrganizationMemberRepository, "findMembershipsOfUsers">;
+  /** Nurturing's plan copy: a fact that does not change it tells Customer.io nothing. */
+  plans: NurturingOrganizationPlanRepository;
 }>;
 
 type SubscriptionChanged = NurturingSignalOf<"subscription_changed">;
@@ -43,7 +47,7 @@ export class NurturingPlanSyncService {
   async planChanged(signal: SubscriptionChanged): Promise<void> {
     const customerIo = this.dependencies.customerIo;
     if (!customerIo) return;
-    for (const request of await this.requestsOf(signal)) await customerIo.batch(request);
+    await this.foldAndSend(signal, (request) => customerIo.batch(request));
   }
 
   /**
@@ -53,14 +57,34 @@ export class NurturingPlanSyncService {
   async planCaughtUp(signal: SubscriptionChanged): Promise<void> {
     const customerIo = this.dependencies.customerIo;
     if (!customerIo) throw new NoCustomerIoChannelError();
-    for (const request of await this.requestsOf(signal)) await customerIo.batchOrThrow(request);
+    await this.foldAndSend(signal, (request) => customerIo.batchOrThrow(request));
+  }
+
+  /**
+   * Sends only a fact that changes nurturing's plan copy, and records it once sent: a refused
+   * catch-up is not recorded, so its retry sends again unless a fact that beats it landed first.
+   */
+  private async foldAndSend(
+    signal: SubscriptionChanged,
+    send: (request: CioBatchCall[]) => Promise<void>,
+  ): Promise<void> {
+    if (signal.memberUserIds.length === 0) return;
+    const { organizationId } = signal;
+    const fact = {
+      plan: signal.plan ?? null,
+      occurredAt: signal.occurredAt,
+      fromCatchUp: signal.fromCatchUp ?? false,
+    };
+    const held = await this.dependencies.plans.findPlan({ organizationId });
+    if (!planFactChangesCopy({ held, incoming: fact })) return;
+    for (const request of await this.requestsOf(signal)) await send(request);
+    await this.dependencies.plans.recordPlan({ organizationId, fact });
   }
 
   private async requestsOf(signal: SubscriptionChanged): Promise<CioBatchCall[][]> {
-    if (signal.memberUserIds.length === 0) return [];
     const { organizationId, memberUserIds } = signal;
     // Read by person: a member with no row here may still be current in another organization.
-    const [adminUserId, memberships] = await Promise.all([
+    const [admin, memberships] = await Promise.all([
       this.dependencies.admins.adminOf({ organizationId }),
       this.dependencies.members.findMembershipsOfUsers({ userIds: memberUserIds }),
     ]);
@@ -68,6 +92,6 @@ export class NurturingPlanSyncService {
       memberships,
       organizationId,
     });
-    return fireSubscriptionSync({ ...signal, adminUserId, elsewhereMemberUserIds });
+    return fireSubscriptionSync({ ...signal, admin, elsewhereMemberUserIds });
   }
 }

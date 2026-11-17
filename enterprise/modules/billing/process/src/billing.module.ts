@@ -111,7 +111,7 @@ export const billingProcessModule: PublishedProcessModule<
       kind: "data",
       mode: "operator",
       description:
-        "Records each organisation's plan, name and active members again, so nurturing sends them to Customer.io.",
+        "Records each organisation's plan and active members again, so nurturing sends them to Customer.io.",
       needsOldWritersGone: true,
       run: async ({ checkpoint, dryRun, signal }) => {
         const resumed = checkpoint.resumeFrom?.afterOrganizationId;

@@ -266,7 +266,7 @@ describe("billing's subscription_changed fact, as nurturing's linked tests deliv
 
   describe("given an organization with a plan and members", () => {
     /**
-     * @scenario "A resync run records each organization's plan, name and members once and a second run sends the same values"
+     * @scenario "A resync run records each organization's plan and members once and a second run sends the same values"
      */
     it("records the same catch-up fact on each of two runs, each under its own key", async () => {
       let readAt = AT;

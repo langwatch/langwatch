@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
- * billing:resync-customer-io-plan: each organization's plan, name and active members recorded
- * again as a catch-up fact, a page of organizations at a time; nurturing sends each to Customer.io.
+ * billing:resync-customer-io-plan: each organization's plan and active members recorded again as
+ * a catch-up fact, a page of organizations at a time; nurturing sends each to Customer.io.
  * Spec: enterprise/modules/nurturing/specs/customer-io-plan-traits.feature
  */
 import { ORGANIZATION_ID_PAGE_LIMIT } from "@langwatch/organization-contract";

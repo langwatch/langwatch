@@ -12,11 +12,7 @@ import type { NurturingProjectPlacementRepository } from "../repositories/nurtur
 import type { NurturingProjectUsageReadRepository } from "../repositories/nurturing-project-usage.repository.ts";
 import type { NurturingTraceDayReadRepository } from "../repositories/nurturing-trace-day.repository.ts";
 import { companyTraits } from "../rules/nurturing-company-traits.rules.ts";
-import {
-  currentMemberCountOf,
-  membersWhoseLatestOrganizationIs,
-  type NurturingMembership,
-} from "../rules/nurturing-organization-member.rules.ts";
+import { membersWhoseLatestOrganizationIs } from "../rules/nurturing-organization-member.rules.ts";
 import {
   createdRangeOfEndedWindows,
   endedTraceWindowTraits,
@@ -72,11 +68,6 @@ type AttemptState = { counted: boolean };
 
 /** An organization as nurturing's own copies place and date it. */
 type CopiedOrganization = Readonly<{ organizationId: string; organizationCreatedAt: number }>;
-
-/** The member copy as one read gave it, or why not: the group call goes out either way. */
-type MembershipsRead =
-  | Readonly<{ outcome: "read"; memberships: readonly NurturingMembership[] }>
-  | Readonly<{ outcome: "failed"; error: Error }>;
 
 /**
  * Turns a project's changed usage into its organization's traits: sums the organization's projects
@@ -183,15 +174,7 @@ export class NurturingOrganizationUsageService {
       now,
       organizationCreatedAt,
     });
-    const members = await this.membershipsOf({ organizationId });
-    const company = companyTraits({
-      memberCount:
-        members.outcome === "read"
-          ? currentMemberCountOf({ memberships: members.memberships, organizationId })
-          : null,
-      projectCount: projectIds.length,
-      organizationCreatedAt,
-    });
+    const company = companyTraits({ projectCount: projectIds.length, organizationCreatedAt });
     try {
       await sendBatch([
         {
@@ -210,9 +193,7 @@ export class NurturingOrganizationUsageService {
     const mirrored: MirroredCounts = { members: 0, identifyCalls: 0 };
     let mirrorFailed = false;
     try {
-      if (members.outcome === "failed") throw members.error;
-      const { memberships } = members;
-      await this.mirrorOntoMembers({ organizationId, memberships, traits, counts: mirrored });
+      await this.mirrorOntoMembers({ organizationId, traits, counts: mirrored });
     } catch (error) {
       mirrorFailed = true;
       // The group call stands, and the next sync mirrors again, as the other sinks' failures.
@@ -269,10 +250,7 @@ export class NurturingOrganizationUsageService {
           continue;
         }
         await sendBatch([{ type: "group", userId: adminUserId, groupId: organizationId, traits }]);
-        const memberships = await this.dependencies.members.findMembershipsOfMembers({
-          organizationId,
-        });
-        await this.mirrorOntoMembers({ organizationId, memberships, traits, counts: mirrored });
+        await this.mirrorOntoMembers({ organizationId, traits, counts: mirrored });
         synced += 1;
       }
     } finally {
@@ -289,21 +267,6 @@ export class NurturingOrganizationUsageService {
     }
   }
 
-  /** One read of the member copy, for the group call that counts it and the mirror after it. */
-  private async membershipsOf({
-    organizationId,
-  }: Readonly<{ organizationId: string }>): Promise<MembershipsRead> {
-    try {
-      const memberships = await this.dependencies.members.findMembershipsOfMembers({
-        organizationId,
-      });
-      return { outcome: "read", memberships };
-    } catch (error) {
-      const failure = error instanceof Error ? error : new Error(String(error));
-      return { outcome: "failed", error: failure };
-    }
-  }
-
   /**
    * The onboarding emails are person-triggered and read person attributes, so each member gets the
    * traits too, unless they joined another organization since: that one's traits are theirs. A
@@ -311,17 +274,18 @@ export class NurturingOrganizationUsageService {
    */
   private async mirrorOntoMembers({
     organizationId,
-    memberships,
     traits,
     counts,
   }: Readonly<{
     organizationId: string;
-    memberships: readonly NurturingMembership[];
     traits: CioOrganizationUsageTraits;
     counts: MirroredCounts;
   }>): Promise<void> {
-    const { sendBatch } = this.dependencies;
-    const userIds = membersWhoseLatestOrganizationIs({ memberships, organizationId });
+    const { members, sendBatch } = this.dependencies;
+    const userIds = membersWhoseLatestOrganizationIs({
+      memberships: await members.findMembershipsOfMembers({ organizationId }),
+      organizationId,
+    });
     counts.members = userIds.length;
     for (let start = 0; start < userIds.length; start += MEMBER_BATCH_SIZE) {
       const batch = userIds.slice(start, start + MEMBER_BATCH_SIZE);

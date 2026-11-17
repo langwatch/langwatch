@@ -2,6 +2,7 @@ Feature: Customer.io knows each team's real plan
   Lifecycle emails branch on plan, so Customer.io holds the plan billing resolved for each
   team, on its members and on its company. Billing's subscription_changed fact carries the
   plan; nurturing never reads billing (ADR-001). A renewal or a seat change records no fact.
+  Nurturing folds each fact into its own plan copy and tells Customer.io only a fact that changes it.
 
   @unit
   Scenario: A started subscription tells Customer.io the plan on members and company
@@ -80,8 +81,8 @@ Feature: Customer.io knows each team's real plan
   Scenario: The usage sync adds the company traits to its group call only
     Given a placed organization with 3 members and 2 projects, created at a known time
     When its usage syncs
-    Then the group call carries member_count 3, project_count 2 and created_at in Unix seconds beside the usage traits
-    And the mirrored member identifies carry none of the three
+    Then the group call carries project_count 2 and created_at in Unix seconds beside the usage traits
+    And the mirrored member identifies carry neither
 
   @unit
   Scenario: Company traits nurturing does not know are left out
@@ -103,10 +104,10 @@ Feature: Customer.io knows each team's real plan
     And the report counts organizations, members, planned group calls, planned identifies and skips by reason
 
   @integration
-  Scenario: A resync run records each organization's plan, name and members once and a second run sends the same values
+  Scenario: A resync run records each organization's plan and members once and a second run sends the same values
     Given organizations with plans and members
     When the resync runs twice
-    Then both runs record the same plan, name and member list per organization
+    Then both runs record the same plan and member list per organization
     And the Customer.io attributes after the second run equal those after the first
 
   @integration
@@ -115,6 +116,13 @@ Feature: Customer.io knows each team's real plan
     When the resync's facts are delivered
     Then that fact is retried
     And no other organization's delivery is affected
+
+  @unit
+  Scenario: The plan copy keeps the newest fact, and a real fact wins a tie
+    Given nurturing's plan copy holds a real subscription_changed fact for an organization
+    When an older catch-up fact, a catch-up with the same stamp and a newer catch-up are folded in turn
+    Then the older fact and the tied catch-up leave the copy unchanged, so they send nothing
+    And the newer catch-up replaces it
 
   @unit
   Scenario: A catch-up fact with no Customer.io channel fails visibly
@@ -156,13 +164,14 @@ Feature: Customer.io knows each team's real plan
   # AC 6: "createAndAssign organization gets name and created_at, no plan" -> Scenario: A new organization gets its name and creation time on its founder
   # AC 7: "provisioned organization without founder sends nothing"     -> Scenario: A provisioned organization with no founder sends nothing
   # AC 8: "sign-up path unchanged"                                     -> Scenario: The sign-up path keeps its calls
-  # AC 9: "usage sync adds three company traits; omit unknown; not placed sends nothing"
+  # AC 9: "usage sync adds project_count and created_at; omit unknown; not placed sends nothing"
   #        -> Scenario: The usage sync adds the company traits to its group call only
   #        -> Scenario: Company traits nurturing does not know are left out
   #        -> Scenario: An organization nurturing never placed still sends nothing
   # AC 10: "dry run sends nothing, saves no checkpoint, reports counts" -> Scenario: A dry run of the resync sends nothing and saves no checkpoint
-  # AC 11: "real run records once; a second run sends the same values"  -> Scenario: A resync run records each organization's plan, name and members once and a second run sends the same values (evidence: two linked tests)
+  # AC 11: "real run records once; a second run sends the same values"  -> Scenario: A resync run records each organization's plan and members once and a second run sends the same values (evidence: two linked tests)
   # AC 12: "refused organization retries, others unaffected"            -> Scenario: A refused organization retries on its own
+  #        -> Scenario: The plan copy keeps the newest fact, and a real fact wins a tie
   # AC 13: "no channel does not finish as done"                         -> Scenario: A catch-up fact with no Customer.io channel fails visibly
   # AC 14: "no-member skip; abort stops; resume after last page"        -> Scenario: A resync skips organizations with no members and stops on abort
   # AC 15: "at most 100 members per request"                            -> Scenario: No request carries more than a hundred members

@@ -7,6 +7,9 @@ import type {
 
 import type { PostHogEventInput } from "../channels/posthog.channel.ts";
 
+/** Who carries an organization's company call, as nurturing's own copy names it. */
+export type NurturingOrganizationAdmin = { kind: "admin"; userId: string } | { kind: "none" };
+
 /** Members per Customer.io request, so a large organization never sends one huge batch. */
 export const SUBSCRIPTION_MEMBERS_PER_REQUEST = 100;
 
@@ -17,42 +20,40 @@ export function customerIoPlanOf(plan: string): string {
 
 type SubscriptionSyncInput = Pick<
   NurturingSignalOf<"subscription_changed">,
-  "organizationId" | "memberUserIds" | "hasSubscription" | "plan" | "organizationName"
+  "organizationId" | "memberUserIds" | "hasSubscription" | "plan"
 > & {
   /** The admin nurturing's copy names; without one, the first member carries the company call. */
-  adminUserId: string | null;
+  admin: NurturingOrganizationAdmin;
   /** Members whose latest organization is another one: that one's plan is theirs, not this. */
   elsewhereMemberUserIds: readonly string[];
 };
 
 /**
- * Decides a subscription change's requests, in order: one group call carrying the plan (and a
- * catch-up's name) to the admin, then the identifies of every member whose latest organization is
- * not another one, at most 100 a request. A fact with no plan sends has_subscription only and no
- * group call; no member, nothing.
+ * Decides a subscription change's requests, in order: one group call carrying the plan to the
+ * admin, then the identifies of every member whose latest organization is not another one, at
+ * most 100 a request. A fact with no plan sends has_subscription only and no group call; no
+ * member, nothing.
  */
 export function fireSubscriptionSync({
   organizationId,
   memberUserIds,
   hasSubscription,
   plan,
-  organizationName,
-  adminUserId,
+  admin,
   elsewhereMemberUserIds,
 }: SubscriptionSyncInput): CioBatchCall[][] {
-  const groupUserId = adminUserId ?? memberUserIds[0];
+  const groupUserId = admin.kind === "admin" ? admin.userId : memberUserIds[0];
   if (groupUserId === undefined || memberUserIds.length === 0) return [];
 
   const planTrait = plan === undefined ? {} : { plan: customerIoPlanOf(plan) };
   const traits: Partial<CioPersonTraits> = { has_subscription: hasSubscription, ...planTrait };
   const requests: CioBatchCall[][] = [];
   if (plan !== undefined) {
-    const name = organizationName === undefined ? {} : { name: organizationName };
     const group: CioBatchCall = {
       type: "group",
       userId: groupUserId,
       groupId: organizationId,
-      traits: { ...planTrait, ...name },
+      traits: planTrait,
     };
     requests.push([group]);
   }

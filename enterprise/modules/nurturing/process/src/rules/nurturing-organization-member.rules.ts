@@ -22,20 +22,6 @@ export function isCurrentMembership(membership: NurturingMembership): boolean {
   return leftAt === null || Math.max(joinedAt, returnedAt ?? joinedAt) > leftAt;
 }
 
-/** How many people currently belong to `organizationId`, as nurturing's member copy holds them. */
-export function currentMemberCountOf({
-  memberships,
-  organizationId,
-}: Readonly<{
-  memberships: readonly NurturingMembership[];
-  organizationId: string;
-}>): number {
-  const current = memberships.filter(
-    (membership) => membership.organizationId === organizationId && isCurrentMembership(membership),
-  );
-  return new Set(current.map(({ userId }) => userId)).size;
-}
-
 /** Each person's current membership with the latest join, ties by organization id. */
 function latestCurrentMemberships(
   memberships: readonly NurturingMembership[],

@@ -37,7 +37,7 @@ type BillingLifecycleAnnouncerDeps = Readonly<{
     findActive(organizationId: string): Promise<{ plan: string } | null>;
   };
   /** The organization's name and its active members' ids, through the shares (C2 B). */
-  organizations: Pick<BillingAccountFactsRepository, "findActiveMemberIds" | "findName">;
+  organizations: Pick<BillingAccountFactsRepository, "findActiveMemberIds">;
   /** The ops alert a peer's seat-limit event ends in, subscribed on the lifecycle pipeline. */
   resourceLimitAlerts: BuildBillingLifecyclePipelineInput["alerts"];
   /** The ops alert usage's limit-reached fact ends in, subscribed on the same pipeline. */
@@ -326,8 +326,8 @@ export class BillingLifecycleAnnouncerService {
   }
 
   /**
-   * The Customer.io plan resync's fact for one organization, from billing's own reads: plan, name
-   * and active members. Stamped before the reads, so a re-run is a new fact. Throws, unlike the live
+   * The Customer.io plan resync's fact for one organization, from billing's own reads: plan and
+   * active members. Stamped before the reads, so a re-run is a new fact. Throws, unlike the live
    * fact, so the operator step stops where it failed. No active member, no fact; a dry run reads.
    */
   async customerIoPlanCaughtUp({
@@ -342,8 +342,7 @@ export class BillingLifecycleAnnouncerService {
     const memberUserIds = await this.deps.organizations.findActiveMemberIds(organizationId);
     const members = memberUserIds.length;
     if (members === 0 || !commands) return { members };
-    const [organization, plan, lastNonCancelled] = await Promise.all([
-      this.deps.organizations.findName(organizationId),
+    const [plan, lastNonCancelled] = await Promise.all([
       this.#activePlanOf(organizationId),
       this.deps.subscriptions.findLastNonCancelled(organizationId),
     ]);
@@ -354,7 +353,6 @@ export class BillingLifecycleAnnouncerService {
       memberUserIds,
       hasSubscription: lastNonCancelled != null,
       plan,
-      ...(organization ? { organizationName: organization.name } : {}),
       fromCatchUp: true,
     });
     return { members };

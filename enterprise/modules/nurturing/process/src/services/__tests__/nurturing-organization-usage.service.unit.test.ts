@@ -154,7 +154,7 @@ const traitsOf = (call: CioBatchCall | undefined) =>
   call && "traits" in call ? call.traits : undefined;
 
 /** The traits only the company's group call carries, never a member's identify. */
-const COMPANY_KEYS = ["member_count", "project_count", "created_at"];
+const COMPANY_KEYS = ["project_count", "created_at"];
 
 /** A group call's traits without the company's own, as the members are told them. */
 const memberTraitsOf = (call: CioBatchCall | undefined) =>
@@ -368,7 +368,7 @@ describe("NurturingOrganizationUsageService", () => {
     const createdAt = NOW - DAY_MS;
 
     /** @scenario "The usage sync adds the company traits to its group call only" */
-    it("sends member_count, project_count and created_at on the group call, never to members", async () => {
+    it("sends project_count and created_at on the group call, never to members", async () => {
       const { service, projectUsage, sent } = await serviceOver({
         placed: new Map([
           ["project-1", "org-1"],
@@ -391,7 +391,6 @@ describe("NurturingOrganizationUsageService", () => {
 
       const [group, identifies] = sent;
       expect(traitsOf(group?.[0])).toMatchObject({
-        member_count: 3,
         project_count: 2,
         created_at: Math.floor(createdAt / 1000),
         prompt_count: 1,

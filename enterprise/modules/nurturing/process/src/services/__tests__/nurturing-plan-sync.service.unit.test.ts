@@ -9,6 +9,7 @@ import type { CioBatchCall, NurturingSignalOf } from "@langwatch/enterprise-nurt
 import { describe, expect, it } from "vitest";
 
 import { MemoryNurturingOrganizationMemberRepository } from "../../repositories/memory/memory.nurturing-organization-member.repository.ts";
+import { MemoryNurturingOrganizationPlanRepository } from "../../repositories/memory/memory.nurturing-organization-plan.repository.ts";
 import { NurturingPlanSyncService } from "../nurturing-plan-sync.service.ts";
 
 const change: NurturingSignalOf<"subscription_changed"> = {
@@ -22,15 +23,19 @@ const change: NurturingSignalOf<"subscription_changed"> = {
   plan: "LAUNCH",
 };
 
-function planSyncOver(members: MemoryNurturingOrganizationMemberRepository) {
+function planSyncOver(
+  members = MemoryNurturingOrganizationMemberRepository.create(),
+  plans = MemoryNurturingOrganizationPlanRepository.create(),
+) {
   const sent: CioBatchCall[][] = [];
   const record = async (calls: CioBatchCall[]) => void sent.push(calls);
   const planSync = NurturingPlanSyncService.create({
     customerIo: { batch: record, batchOrThrow: record },
-    admins: { adminOf: async () => "admin-1" },
+    admins: { adminOf: async () => ({ kind: "admin", userId: "admin-1" }) },
     members,
+    plans,
   });
-  return { planSync, sent };
+  return { planSync, sent, plans };
 }
 
 describe("NurturingPlanSyncService", () => {
@@ -51,6 +56,49 @@ describe("NurturingPlanSyncService", () => {
         ["group", "admin-1"],
         ["identify", "user-1"],
       ]);
+    });
+  });
+
+  describe("when the plan copy already holds a newer real fact", () => {
+    it("sends nothing for an older live fact and keeps the newer one", async () => {
+      const { planSync, sent, plans } = planSyncOver();
+      const newer = { ...change, occurredAt: change.occurredAt + 1, plan: "GROWTH" };
+      await planSync.planChanged(newer);
+      sent.length = 0;
+
+      await planSync.planChanged(change);
+
+      expect(sent).toEqual([]);
+      await expect(plans.findPlan({ organizationId: "org-1" })).resolves.toMatchObject({
+        fact: { plan: "GROWTH" },
+      });
+    });
+
+    it("sends nothing for a catch-up fact with the same stamp", async () => {
+      const { planSync, sent } = planSyncOver();
+      await planSync.planChanged(change);
+      sent.length = 0;
+
+      await planSync.planCaughtUp({ ...change, fromCatchUp: true });
+
+      expect(sent).toEqual([]);
+    });
+  });
+
+  describe("when the resync's newer catch-up fact meets an older real one", () => {
+    it("sends the catch-up's plan and replaces the copy, so the resync corrects a wrong plan", async () => {
+      const { planSync, sent, plans } = planSyncOver();
+      await planSync.planChanged({ ...change, plan: "FREE" });
+      sent.length = 0;
+
+      const later = { ...change, occurredAt: change.occurredAt + 1, fromCatchUp: true };
+      await planSync.planCaughtUp(later);
+
+      const planOf = (call: CioBatchCall) => ("traits" in call ? call.traits?.plan : undefined);
+      expect(sent.flat().map(planOf)).toEqual(["launch", "launch", "launch"]);
+      await expect(plans.findPlan({ organizationId: "org-1" })).resolves.toMatchObject({
+        fact: { plan: "LAUNCH", fromCatchUp: true },
+      });
     });
   });
 });

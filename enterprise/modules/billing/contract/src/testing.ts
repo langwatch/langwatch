@@ -4,18 +4,21 @@
  * records equals one of these, and nurturing's tests deliver the same one, so a change to the
  * fact breaks both. Spec: enterprise/modules/nurturing/specs/customer-io-plan-traits.feature
  */
+import { Temporal } from "@langwatch/time";
+
 import {
   type SubscriptionChangedEventData,
   subscriptionChangedEventDataSchema,
 } from "./billing-lifecycle-events.ts";
 
-/** The instant every fixture fact is stamped with; billing's tests run their clock at it. */
-export const SUBSCRIPTION_CHANGED_TEST_AT = Date.UTC(2026, 10, 17, 12);
+const fixtureNoon = Temporal.PlainDateTime.from({ year: 2026, month: 11, day: 17, hour: 12 });
 
-/** The organization, its name and its two active members, as the fixture facts name them. */
+/** The instant every fixture fact is stamped with; billing's tests run their clock at it. */
+export const SUBSCRIPTION_CHANGED_TEST_AT = fixtureNoon.toZonedDateTime("UTC").epochMilliseconds;
+
+/** The organization and its two active members, as the fixture facts name them. */
 export const SUBSCRIPTION_CHANGED_TEST_ORGANIZATION = {
   organizationId: "org-1",
-  organizationName: "Acme",
   memberUserIds: ["user-1", "user-2"],
 } as const;
 
@@ -46,9 +49,5 @@ export const subscriptionChangedFacts = {
   /** The active one was cancelled and only a pending checkout remains. */
   pendingOnly: subscriptionChangedFactFixture({ plan: "FREE" }),
   /** The resync's catch-up fact for an organization on LAUNCH. */
-  caughtUp: subscriptionChangedFactFixture({
-    plan: "LAUNCH",
-    organizationName: SUBSCRIPTION_CHANGED_TEST_ORGANIZATION.organizationName,
-    fromCatchUp: true,
-  }),
+  caughtUp: subscriptionChangedFactFixture({ plan: "LAUNCH", fromCatchUp: true }),
 } as const;

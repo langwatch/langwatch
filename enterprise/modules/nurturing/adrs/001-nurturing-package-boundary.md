@@ -66,8 +66,10 @@ nurturing's process, so no peer cycle can pass through it.
 
 Nurturing owns its copies of the owners' facts: `NurturingProject` (a project's
 organization), `NurturingOrganizationCreated` (an organization's creation),
-`NurturingOrganizationMember` (memberships), `NurturingPersonalProject` (a
-personal project's owner) and `NurturingTracedProject` (a project that traced).
+`NurturingOrganizationMember` (memberships), `NurturingOrganizationPlan` (an
+organization's plan, folded from billing's `subscription_changed` facts),
+`NurturingPersonalProject` (a personal project's owner) and `NurturingTracedProject`
+(a project that traced).
 It also owns `NurturingOrganization` (admin, milestone counts, coding signals,
 last trace), `NurturingProjectUsageView` (one peer fold row per project and
 owner), `NurturingProjectTraceDay` (trace counts per project and UTC day, kept 30
@@ -75,7 +77,11 @@ days). A redelivered batch can count a trace twice, and so can a root span store
 more than once; accepted (owner decision, issue 9378). Signals are events on the
 `nurturing` pipeline. A delivered signal is claimed in Redis for seven days under the process-wide idempotency key prefix,
 so a redelivered event sends nothing. Billing's catch-up `subscription_changed` fact, recorded by
-`billing:resync-customer-io-plan`, is never claimed: each run sends its values again.
+`billing:resync-customer-io-plan`, is never claimed. Every `subscription_changed` fact folds into
+`NurturingOrganizationPlan` as ADR-174 decision 17 folds billing's facts: the newest billing fact
+wins, and a real fact wins a tie. Customer.io hears a fact only when it changes that row, and the row is
+written once the calls are sent, so a refused catch-up's retry sends again unless a fact that
+beats it landed first.
 
 ## Runtime and registration
 

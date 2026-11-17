@@ -29,6 +29,7 @@ import { HttpCustomerIoChannel } from "../../channels/http/http.customer-io.chan
 import { MemoryPostHogChannel } from "../../channels/memory/memory.posthog.channel.ts";
 import { MemoryNurturingMilestonesRepository } from "../../repositories/memory/memory.nurturing-milestones.repository.ts";
 import { MemoryNurturingOrganizationMemberRepository } from "../../repositories/memory/memory.nurturing-organization-member.repository.ts";
+import { MemoryNurturingOrganizationPlanRepository } from "../../repositories/memory/memory.nurturing-organization-plan.repository.ts";
 import { MemoryNurturingPersonalProjectRepository } from "../../repositories/memory/memory.nurturing-personal-project.repository.ts";
 import { MemoryNurturingTracedProjectRepository } from "../../repositories/memory/memory.nurturing-traced-project.repository.ts";
 import { unplacedMemberFacts } from "../../services/__tests__/nurturing-member-facts.test-helpers.ts";
@@ -52,6 +53,7 @@ function nurturingOverCopies() {
   const delivery = NurturingDeliveryService.create({
     memberFacts: unplacedMemberFacts(),
     members: MemoryNurturingOrganizationMemberRepository.create(),
+    plans: MemoryNurturingOrganizationPlanRepository.create(),
     claims: {
       claim: async (key: string) => !seen.has(key) && Boolean(seen.add(key)),
       release: async (key: string) => void seen.delete(key),

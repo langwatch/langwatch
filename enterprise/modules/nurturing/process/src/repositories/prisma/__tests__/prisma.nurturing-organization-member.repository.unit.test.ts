@@ -2,48 +2,43 @@
 /**
  * @vitest-environment node
  * @unit
- * The read by users bounds each IN list, over a stub client.
+ * The read by users bounds each IN list, over a Prisma double.
  */
-import { describe, expect, it } from "vitest";
+import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
+import { describe, expect, it, vi } from "vitest";
 
 import { PrismaNurturingOrganizationMemberRepository } from "../prisma.nurturing-organization-member.repository.ts";
 
-type Database = Parameters<
-  typeof PrismaNurturingOrganizationMemberRepository.create
->[0]["prisma"];
+const row = {
+  organizationId: "org-2",
+  userId: "user-0",
+  joinedAt: new Date(1_000),
+  leftAt: null,
+  returnedAt: null,
+};
 
-function repositoryOverStub() {
-  const reads: string[][] = [];
-  const database = {
-    nurturingOrganizationMember: {
-      findMany: async ({ where }: { where: { userId: { in: string[] } } }) => {
-        reads.push(where.userId.in);
-        return where.userId.in.map((userId) => ({
-          organizationId: "org-2",
-          userId,
-          joinedAt: new Date(1_000),
-          leftAt: null,
-          returnedAt: null,
-        }));
-      },
-    },
-  };
+function repositoryOverDouble() {
+  const findMany = vi.fn(async (_args: unknown) => [row]);
   const members = PrismaNurturingOrganizationMemberRepository.create({
-    prisma: database as unknown as Database,
+    prisma: prismaDouble({ nurturingOrganizationMember: { findMany } }),
   });
-  return { members, reads };
+  return { members, findMany };
 }
 
 describe("PrismaNurturingOrganizationMemberRepository.findMembershipsOfUsers", () => {
   describe("when 2,001 users are named", () => {
-    it("reads them 1,000 at a time and returns every membership", async () => {
-      const { members, reads } = repositoryOverStub();
+    it("reads them 1,000 at a time and maps every row", async () => {
+      const { members, findMany } = repositoryOverDouble();
       const userIds = Array.from({ length: 2_001 }, (_, index) => `user-${index}`);
 
       const read = await members.findMembershipsOfUsers({ userIds });
 
-      expect(reads.map((list) => list.length)).toEqual([1_000, 1_000, 1]);
-      expect(read).toHaveLength(2_001);
+      expect(findMany.mock.calls.map(([args]) => args)).toEqual([
+        { where: { userId: { in: userIds.slice(0, 1_000) } } },
+        { where: { userId: { in: userIds.slice(1_000, 2_000) } } },
+        { where: { userId: { in: ["user-2000"] } } },
+      ]);
+      expect(read).toHaveLength(3);
       expect(read[0]).toEqual({
         organizationId: "org-2",
         userId: "user-0",
@@ -56,10 +51,10 @@ describe("PrismaNurturingOrganizationMemberRepository.findMembershipsOfUsers", (
 
   describe("when no user is named", () => {
     it("makes no query and returns nothing", async () => {
-      const { members, reads } = repositoryOverStub();
+      const { members, findMany } = repositoryOverDouble();
 
       expect(await members.findMembershipsOfUsers({ userIds: [] })).toEqual([]);
-      expect(reads).toEqual([]);
+      expect(findMany).not.toHaveBeenCalled();
     });
   });
 });

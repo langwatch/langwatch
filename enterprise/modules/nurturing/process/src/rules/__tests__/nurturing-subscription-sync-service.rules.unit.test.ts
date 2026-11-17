@@ -11,13 +11,16 @@ import {
   customerIoPlanOf,
   fireSubscriptionStarted,
   fireSubscriptionSync,
+  type NurturingOrganizationAdmin,
 } from "../nurturing-subscription-sync-service.rules.ts";
+
+const admin: NurturingOrganizationAdmin = { kind: "admin", userId: "admin-1" };
 
 const change = {
   organizationId: "org-1",
   memberUserIds: ["user-1", "user-2"],
   hasSubscription: true,
-  adminUserId: "admin-1",
+  admin,
   elsewhereMemberUserIds: [],
 };
 
@@ -36,15 +39,9 @@ describe("fireSubscriptionSync", () => {
     });
 
     it("sends the company call to the first member when nurturing knows no admin", () => {
-      const [group] = fireSubscriptionSync({ ...change, plan: "LAUNCH", adminUserId: null });
+      const [group] = fireSubscriptionSync({ ...change, plan: "LAUNCH", admin: { kind: "none" } });
 
       expect(group).toEqual([expect.objectContaining({ type: "group", userId: "user-1" })]);
-    });
-
-    it("names the company on a catch-up fact that carries its name", () => {
-      const [group] = fireSubscriptionSync({ ...change, plan: "LAUNCH", organizationName: "Acme" });
-
-      expect(group?.[0]).toMatchObject({ traits: { plan: "launch", name: "Acme" } });
     });
   });
 

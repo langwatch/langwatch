@@ -85,7 +85,7 @@ function recordingAnnouncer(refuse?: OrganizationRowCommand) {
   });
   const announcer = BillingLifecycleAnnouncerService.create({
     subscriptions: { findLastNonCancelled: async () => null, findActive: async () => null },
-    organizations: { findActiveMemberIds: async () => [], findName: async () => null },
+    organizations: { findActiveMemberIds: async () => [] },
     resourceLimitAlerts: { notifyResourceLimitReached: async () => {} },
     planLimitAlerts: { notifyPlanLimitReached: async () => {} },
     billingOrganizations: {
@@ -1645,7 +1645,7 @@ describe("EEWebhookService with the lifecycle announcer composed", () => {
         findLastNonCancelled: (organizationId) => subRepo.findLastNonCancelled(organizationId),
         findActive: async () => null,
       },
-      organizations: { findActiveMemberIds: async () => ["user-1"], findName: async () => null },
+      organizations: { findActiveMemberIds: async () => ["user-1"] },
       resourceLimitAlerts: { notifyResourceLimitReached: async () => {} },
       planLimitAlerts: { notifyPlanLimitReached: async () => {} },
       billingOrganizations: {

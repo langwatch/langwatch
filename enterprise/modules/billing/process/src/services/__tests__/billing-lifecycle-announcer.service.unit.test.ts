@@ -68,10 +68,7 @@ function announcerOver(input: {
       findLastNonCancelled: async () => (input.remaining ? { id: "sub-2" } : null),
       findActive: async () => (input.remaining ? { plan: "LAUNCH" } : null),
     },
-    organizations: {
-      findActiveMemberIds: async () => ["user-1", "user-2"],
-      findName: async () => ({ id: "org-1", name: "Acme" }),
-    },
+    organizations: { findActiveMemberIds: async () => ["user-1", "user-2"] },
     resourceLimitAlerts: { notifyResourceLimitReached: async () => {} },
     planLimitAlerts: { notifyPlanLimitReached: async () => {} },
     billingOrganizations: {
@@ -174,23 +171,22 @@ describe("BillingLifecycleAnnouncerService", () => {
       ]);
     });
 
-    it("carries no name and is not a catch-up fact", async () => {
+    it("is not a catch-up fact", async () => {
       const { service, changed } = announcerOver({ remaining: true });
 
       await service.subscriptionActivated(activation);
 
-      expect(changed[0]).not.toHaveProperty("organizationName");
       expect(changed[0]).not.toHaveProperty("fromCatchUp");
     });
   });
 
   describe("when the Customer.io plan resync catches an organization up", () => {
-    it("records one catch-up fact with its plan, name and active members", async () => {
+    it("records one catch-up fact with its plan and active members", async () => {
       const { service, changed } = announcerOver({ remaining: true });
 
-      await expect(
-        service.customerIoPlanCaughtUp({ organizationId: "org-1" }),
-      ).resolves.toEqual({ members: 2 });
+      await expect(service.customerIoPlanCaughtUp({ organizationId: "org-1" })).resolves.toEqual({
+        members: 2,
+      });
 
       expect(changed).toEqual([
         expect.objectContaining({
@@ -198,7 +194,6 @@ describe("BillingLifecycleAnnouncerService", () => {
           memberUserIds: ["user-1", "user-2"],
           hasSubscription: true,
           plan: "LAUNCH",
-          organizationName: "Acme",
           fromCatchUp: true,
         }),
       ]);
@@ -217,15 +212,15 @@ describe("BillingLifecycleAnnouncerService", () => {
     it("throws when its senders are not connected, so the step stops where it failed", async () => {
       const service = BillingLifecycleAnnouncerService.create({
         subscriptions: { findLastNonCancelled: async () => null, findActive: async () => null },
-        organizations: { findActiveMemberIds: async () => ["user-1"], findName: async () => null },
+        organizations: { findActiveMemberIds: async () => ["user-1"] },
         resourceLimitAlerts: { notifyResourceLimitReached: async () => {} },
         planLimitAlerts: { notifyPlanLimitReached: async () => {} },
         billingOrganizations: { getOrganizationForBilling: async () => billedLookup },
       });
 
-      await expect(
-        service.customerIoPlanCaughtUp({ organizationId: "org-1" }),
-      ).rejects.toThrow("not connected");
+      await expect(service.customerIoPlanCaughtUp({ organizationId: "org-1" })).rejects.toThrow(
+        "not connected",
+      );
     });
   });
 
@@ -257,7 +252,6 @@ describe("BillingLifecycleAnnouncerService", () => {
         findActiveMemberIds: async () => {
           throw new Error("member lookup failed");
         },
-        findName: async () => null,
       },
       resourceLimitAlerts: { notifyResourceLimitReached: async () => {} },
       planLimitAlerts: { notifyPlanLimitReached: async () => {} },
@@ -285,7 +279,7 @@ describe("BillingLifecycleAnnouncerService", () => {
   it("never throws when its senders are not connected", async () => {
     const service = BillingLifecycleAnnouncerService.create({
       subscriptions: { findLastNonCancelled: async () => null, findActive: async () => null },
-      organizations: { findActiveMemberIds: async () => [], findName: async () => null },
+      organizations: { findActiveMemberIds: async () => [] },
       resourceLimitAlerts: { notifyResourceLimitReached: async () => {} },
       planLimitAlerts: { notifyPlanLimitReached: async () => {} },
       billingOrganizations: { getOrganizationForBilling: async () => billedLookup },

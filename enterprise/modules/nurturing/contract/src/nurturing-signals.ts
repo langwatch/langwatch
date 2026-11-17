@@ -265,8 +265,6 @@ const nurturingSignalSchemaDefinition = z.discriminatedUnion("kind", [
     hasSubscription: z.boolean(),
     /** Billing's plan type; absent on a fact billing stored before it carried one. */
     plan: id.optional(),
-    /** Only on billing's catch-up fact. */
-    organizationName: z.string().optional(),
     /** Billing's resync restated it: sent at once, unclaimed, and failing when not delivered. */
     fromCatchUp: z.boolean().optional(),
   }),

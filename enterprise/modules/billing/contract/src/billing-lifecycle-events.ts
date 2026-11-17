@@ -34,8 +34,6 @@ const subscriptionChangedEventDataSchemaDefinition = z.object({
   hasSubscription: z.boolean(),
   /** The active subscription's plan type, FREE when none; absent on facts stored before it. */
   plan: z.string().min(1).optional(),
-  /** The organization's name; only a catch-up fact carries it. */
-  organizationName: z.string().optional(),
   /** Recorded by the resync from billing's reads, not by a change to a subscription. */
   fromCatchUp: z.boolean().optional(),
 });

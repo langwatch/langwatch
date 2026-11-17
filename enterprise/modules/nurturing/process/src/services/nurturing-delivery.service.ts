@@ -13,6 +13,7 @@ import type { UserApi } from "@langwatch/user-contract";
 import type { PostHogChannel } from "../channels/posthog.channel.ts";
 import type { NurturingClaimRepository } from "../repositories/nurturing-claim.repository.ts";
 import type { NurturingOrganizationMemberRepository } from "../repositories/nurturing-organization-member.repository.ts";
+import type { NurturingOrganizationPlanRepository } from "../repositories/nurturing-organization-plan.repository.ts";
 import { fire as fireActivity } from "../rules/nurturing-activity-tracking-service.rules.ts";
 import { fireCodingOrApp, isCodingOrAppSignal } from "../rules/nurturing-coding-delivery.rules.ts";
 import { selfHostedTraits, unixSecondsOf } from "../rules/nurturing-customer-io-timestamp.rules.ts";
@@ -39,6 +40,11 @@ import {
   fireInviteAccepted,
   fireSsoAutoAdded,
 } from "../rules/nurturing-membership-join-service.rules.ts";
+import {
+  fireEvaluationCompleted,
+  fireFirstTraceIntegrated,
+  fireSimulationRunFinished,
+} from "../rules/nurturing-milestone-calls.rules.ts";
 import {
   fireIntegrationMethod,
   fireUsesCodingAgent,
@@ -93,6 +99,8 @@ export class NurturingDeliveryService {
       memberFacts: NurturingMemberFactsService;
       /** Nurturing's member copy: a person is told the plan of their latest organization only. */
       members: Pick<NurturingOrganizationMemberRepository, "findMembershipsOfUsers">;
+      /** Nurturing's plan copy: a subscription fact that does not change it sends nothing. */
+      plans: NurturingOrganizationPlanRepository;
     }>,
     private readonly parts: Readonly<{
       postHogDelivery: NurturingPostHogDeliveryService | undefined;
@@ -114,6 +122,7 @@ export class NurturingDeliveryService {
         customerIo,
         admins: deps.memberFacts,
         members: deps.members,
+        plans: deps.plans,
       }),
     });
   }
@@ -284,11 +293,11 @@ export class NurturingDeliveryService {
       case "workflow_created":
         return this.sendCustomerIoCalls(fireWorkflowCreated(signal));
       case "first_trace_integrated":
-        return this.firstTraceToCustomerIo(signal);
+        return this.sendCustomerIoCalls(fireFirstTraceIntegrated(signal));
       case "simulation_run_finished":
-        return this.simulationRunFinished(signal);
+        return this.sendCustomerIoCalls(fireSimulationRunFinished(signal));
       case "evaluation_completed":
-        return this.evaluationCompleted(signal);
+        return this.sendCustomerIoCalls(fireEvaluationCompleted(signal));
       case "experiment_ran":
         return this.experimentRan(signal);
       case "prompt_created":
@@ -324,14 +333,12 @@ export class NurturingDeliveryService {
         return this.sendCustomerIoCalls(fireGuidedOnboardingProgress(signal));
       case "subscription_changed":
         // A failed change gives its claim back and fails the delivery, so the job's retry sends it.
-        return this.parts.planSync
-          .planChanged(signal)
-          .catch((error: unknown) =>
-            NurturingClaimReleaseService.create(this.deps.claims).rethrowAfterReleasing({
-              error,
-              keys: [deliveredClaim],
-            }),
-          );
+        return this.parts.planSync.planChanged(signal).catch((error: unknown) =>
+          NurturingClaimReleaseService.create(this.deps.claims).rethrowAfterReleasing({
+            error,
+            keys: [deliveredClaim],
+          }),
+        );
       case "self_hosted_crm":
         return this.selfHostedCrm(signal);
       default:
@@ -348,10 +355,6 @@ export class NurturingDeliveryService {
     for (const role of signal.roles) {
       this.sendCustomerIoCalls(fireTeamMemberInvited({ ...signal, role }));
     }
-  }
-
-  private identify(input: Parameters<NurturingService["identifyUser"]>[0]): void {
-    this.sendCustomerIoCalls([{ type: "identify", ...input }]);
   }
 
   /** A join's calls, with what the person's organizations already know of traces. */
@@ -409,95 +412,6 @@ export class NurturingDeliveryService {
         ]),
       )
       .catch(reportFailure);
-  }
-
-  /** Main's trace sync: the first trace's milestone, as the trace metadata subscriber saw it. */
-  private firstTraceToCustomerIo(signal: NurturingSignalOf<"first_trace_integrated">): void {
-    const { userId, projectId, sdkLanguage, sdkFramework } = signal;
-    this.sendCustomerIoCalls([
-      {
-        type: "identify",
-        userId,
-        traits: {
-          has_traces: true,
-          sdk_language: sdkLanguage,
-          sdk_framework: sdkFramework,
-          first_trace_at: unixSecondsOf(signal.occurredAt),
-        },
-      },
-      {
-        type: "track",
-        userId,
-        event: "first_trace_integrated",
-        properties: {
-          sdk_language: sdkLanguage,
-          sdk_framework: sdkFramework,
-          project_id: projectId,
-        },
-      },
-    ]);
-  }
-
-  /** Main's simulation sync: the organization's first run is a milestone, later ones a count. */
-  private simulationRunFinished(signal: NurturingSignalOf<"simulation_run_finished">): void {
-    const { userId, projectId, organizationRunCount } = signal;
-    const at = unixSecondsOf(signal.occurredAt);
-    if (!signal.first) {
-      return this.identify({
-        userId,
-        traits: { simulation_count: organizationRunCount, last_simulation_at: at },
-      });
-    }
-    this.sendCustomerIoCalls([
-      {
-        type: "identify",
-        userId,
-        traits: {
-          has_simulations: true,
-          simulation_count: organizationRunCount,
-          first_simulation_at: at,
-        },
-      },
-      {
-        type: "track",
-        userId,
-        event: "first_simulation_ran",
-        properties: { project_id: projectId },
-      },
-    ]);
-  }
-
-  /** Main's evaluation sync once per batch; `first` picks the milestone, `count` the batch's. */
-  private evaluationCompleted(signal: NurturingSignalOf<"evaluation_completed">): void {
-    const { userId, projectId, organizationEvaluationCount: count } = signal;
-    const at = unixSecondsOf(signal.occurredAt);
-    const calls: CioBatchCall[] = signal.first
-      ? [
-          {
-            type: "identify",
-            userId,
-            traits: { has_evaluations: true, evaluation_count: count, first_evaluation_at: at },
-          },
-          {
-            type: "track",
-            userId,
-            event: "first_evaluation_created",
-            properties: { evaluation_type: signal.evaluatorType, project_id: projectId },
-          },
-        ]
-      : [{ type: "identify", userId, traits: { evaluation_count: count, last_evaluation_at: at } }];
-    calls.push({
-      type: "track",
-      userId,
-      event: "evaluation_ran",
-      properties: {
-        evaluation_id: signal.evaluationId,
-        score: signal.score,
-        passed: signal.passed,
-        count: signal.evaluationsCounted ?? 1,
-      },
-    });
-    this.sendCustomerIoCalls(calls);
   }
 
   /** Main's self-hosted CRM: traits on the organization, then one event per raised signal. */

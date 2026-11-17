@@ -35,7 +35,7 @@ function billingAnnouncer({ billed }: { billed: Set<string> }) {
   let nowMs = Date.UTC(2026, 9, 7, 9);
   const announcer = BillingLifecycleAnnouncerService.create({
     subscriptions: { findLastNonCancelled: async () => null, findActive: async () => null },
-    organizations: { findActiveMemberIds: async () => [], findName: async () => null },
+    organizations: { findActiveMemberIds: async () => [] },
     resourceLimitAlerts: { notifyResourceLimitReached: async () => {} },
     planLimitAlerts: { notifyPlanLimitReached: async () => {} },
     billingOrganizations: {
