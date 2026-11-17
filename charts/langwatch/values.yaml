@@ -1538,15 +1538,10 @@ piiRedactionModel:
   ## @param piiRedactionModel.enabled [default: false] Deploy the PII redaction model (Deployment, Service and PDB) and point the app and workers at it.
   enabled: false
 
-  # Like enabled, it also forces the two flags below (see enableForAllOrganizations).
-  ## @param piiRedactionModel.externalEndpoint [string] PII_REDACTION_MODEL_ENDPOINT for a model this release does not deploy: an http(s) address, or a Lambda alias ARN when global.serviceAccount carries an IAM role allowed lambda:InvokeFunction. Ignored when enabled. Forces release_pii_redaction_model_enabled (unless enableForAllOrganizations is false) and release_pii_redaction_model_free.
+  # Like enabled, it forces release_pii_redaction_model_enabled: every Strict
+  # organization goes to the model. Self-hosted calls are never priced.
+  ## @param piiRedactionModel.externalEndpoint [string] PII_REDACTION_MODEL_ENDPOINT for a model this release does not deploy: an http(s) address, or a Lambda alias ARN when global.serviceAccount carries an IAM role allowed lambda:InvokeFunction. Ignored when enabled. Like enabled, it routes every Strict organization to the model.
   externalEndpoint: ""
-
-  # A configured model (enabled or externalEndpoint) forces
-  # release_pii_redaction_model_enabled for every organization, and always
-  # release_pii_redaction_model_free: the install runs the model itself.
-  ## @param piiRedactionModel.enableForAllOrganizations [default: true] Route every Strict organization to a configured model. False leaves release_pii_redaction_model_enabled to the flag store (/ops/feature-flags).
-  enableForAllOrganizations: true
 
   ## @param piiRedactionModel.imagePullSecrets [array] Optional, only for a private mirror of images.pii_redaction_model (the default image is public), e.g. [{ name: my-registry }].
   imagePullSecrets: []
@@ -1564,8 +1559,8 @@ piiRedactionModel:
   resources:
     requests: { cpu: 2, memory: 7Gi }
     limits: { cpu: 4, memory: 7Gi }
-  ## @param piiRedactionModel.terminationGracePeriodSeconds [default: 100] Time a stopping pod gets to answer requests in flight (up to 90 s by default).
-  terminationGracePeriodSeconds: 100
+  ## @param piiRedactionModel.terminationGracePeriodSeconds [default: 80] Time a stopping pod gets to answer requests in flight: 30 s body read + the 45 s request deadline + 5 s.
+  terminationGracePeriodSeconds: 80
   ## @param piiRedactionModel.scratchSizeLimit [string, default: 256Mi] Size cap for the /tmp emptyDir under the read-only root filesystem.
   scratchSizeLimit: 256Mi
 
@@ -1601,7 +1596,7 @@ piiRedactionModel:
     strategy: {}
     ## @param piiRedactionModel.deployment.revisionHistoryLimit [default: 10] Number of old replicasets to retain.
     revisionHistoryLimit: 10
-  ## @param piiRedactionModel.extraEnvs [array] Additional environment variables for the model container. An entry named PORT, PII_COMPONENTS, PII_WARMUP or PII_MAX_CONCURRENT_REQUESTS replaces the chart's value.
+  ## @param piiRedactionModel.extraEnvs [array] Additional environment variables for the model container. An entry named PII_COMPONENTS, PII_WARMUP, PII_MAX_CONCURRENT_REQUESTS or PII_REQUEST_TIMEOUT_SECONDS replaces the chart's value (raise terminationGracePeriodSeconds with a longer timeout). PORT is refused.
   extraEnvs: []
 
 # =============================================================================

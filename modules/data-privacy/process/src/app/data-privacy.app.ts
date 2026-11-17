@@ -201,6 +201,7 @@ export class DataPrivacyModule implements DataPrivacyApi {
     };
     const requestIdKey = await getRequestIdKey({ secrets, config });
     const spend = PiiRedactionSpendService.create({
+      selfHosted: !config.isSaas,
       requestIdKey: requestIdKey.kind === "keyed" ? requestIdKey.key : void 0,
       featureFlags: dependencies.featureFlags,
       recordSpendPriced: async (fact) => {

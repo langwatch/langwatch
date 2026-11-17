@@ -142,19 +142,14 @@ test_enabled_wires_app_and_workers_only() {
   ok "enabled: app and workers -> $SERVICE_URL, Service on 8080"
 }
 
-# @scenario "Deploying the model releases it for every organization, at zero price"
+# @scenario "Deploying the model releases it for every organization"
 test_flags_follow_the_toggles() {
   local flags
   flags=$(env_value "$(only "$(render "$ON")" "workers/deployment")" FEATURE_FLAG_FORCE_ENABLE)
   case ",$flags," in
-    *,release_pii_redaction_model_enabled,*release_pii_redaction_model_free,*) ok "flags forced: $flags" ;;
+    *,release_pii_redaction_model_free,*) fail "flags forced" "free flag forced: '$flags'" ;;
+    *,release_pii_redaction_model_enabled,*) ok "routing flag forced, price left to the server: $flags" ;;
     *) fail "flags forced" "FEATURE_FLAG_FORCE_ENABLE is '$flags'" ;;
-  esac
-  flags=$(env_value "$(only "$(render "$ON --set piiRedactionModel.enableForAllOrganizations=false")" "workers/deployment")" FEATURE_FLAG_FORCE_ENABLE)
-  case ",$flags," in
-    *,release_pii_redaction_model_enabled,*) fail "flags opt-out" "routing flag still forced: '$flags'" ;;
-    *,release_pii_redaction_model_free,*) ok "routing left to the flag store, still free: $flags" ;;
-    *) fail "flags opt-out" "free flag dropped: '$flags'" ;;
   esac
   flags=$(env_value "$(only "$(render "$BASE")" "workers/deployment")" FEATURE_FLAG_FORCE_ENABLE)
   case "$flags" in
@@ -184,7 +179,7 @@ flags_of() {
   printf ',%s,' "$(env_value "$(only "$(render "$1")" "$2/deployment")" FEATURE_FLAG_FORCE_ENABLE)"
 }
 
-# @scenario "An external model also releases it for every organization, at zero price"
+# @scenario "An external model also releases it for every organization"
 test_external_endpoint_forces_flags() {
   local ext="$BASE --set piiRedactionModel.externalEndpoint=http://pii.example:8080" kind flags
   for kind in app workers; do
@@ -193,18 +188,8 @@ test_external_endpoint_forces_flags() {
       *,release_pii_redaction_model_enabled,*) ;;
       *) fail "external flags $kind" "no release_pii_redaction_model_enabled in '$flags'"; return ;;
     esac
-    case "$flags" in
-      *,release_pii_redaction_model_free,*) ;;
-      *) fail "external flags $kind" "no release_pii_redaction_model_free in '$flags'"; return ;;
-    esac
   done
-  ok "external endpoint forces both flags on app and workers"
-  flags=$(flags_of "$ext --set piiRedactionModel.enableForAllOrganizations=false" workers)
-  if [[ "$flags" == *,release_pii_redaction_model_enabled,* || "$flags" != *,release_pii_redaction_model_free,* ]]; then
-    fail "external opt-out routing" "flags are '$flags'"
-    return
-  fi
-  ok "external, enableForAllOrganizations=false: only the free flag"
+  ok "external endpoint forces the routing flag on app and workers"
 }
 
 # @scenario "The image, pull secrets and probes come from values and the image's contract"
@@ -238,21 +223,32 @@ test_image_secrets_probes() {
     fail "startup probe" "failureThreshold is not 36 (180 s at 5 s)"
     return
   fi
-  if ! printf '%s\n' "$deploy" | grep -q 'terminationGracePeriodSeconds: 100'; then
-    fail "grace" "terminationGracePeriodSeconds is not 100"
+  if ! printf '%s\n' "$deploy" | grep -q 'terminationGracePeriodSeconds: 80'; then
+    fail "grace" "terminationGracePeriodSeconds is not 80"
+    return
+  fi
+  if [ "$(env_value "$deploy" PII_REQUEST_TIMEOUT_SECONDS)" != "45" ]; then
+    fail "request deadline" "PII_REQUEST_TIMEOUT_SECONDS is '$(env_value "$deploy" PII_REQUEST_TIMEOUT_SECONDS)', expected 45 (under the app's 50 s)"
     return
   fi
   if printf '%s\n' "$deploy" | grep -q 'name: THREADS'; then
     fail "threads" "THREADS is set; the binary follows the CPU limit itself"
     return
   fi
-  ok "image, pull secret, /healthz probes, 180 s startup, 100 s grace"
+  ok "image, pull secret, /healthz probes, 180 s startup, 45 s deadline, 80 s grace"
   deploy=$(only "$(render "$ON --set piiRedactionModel.extraEnvs[0].name=PII_MAX_CONCURRENT_REQUESTS --set-string piiRedactionModel.extraEnvs[0].value=2")" "pii_redaction_model/deployment")
   if [ "$(printf '%s\n' "$deploy" | grep -c 'name: PII_MAX_CONCURRENT_REQUESTS$')" != "1" ] || [ "$(env_value "$deploy" PII_MAX_CONCURRENT_REQUESTS)" != "2" ]; then
     fail "extraEnvs override" "PII_MAX_CONCURRENT_REQUESTS is not set once, to 2"
     return
   fi
   ok "extraEnvs replaces a chart setting, once"
+  local out rc
+  out=$(render "$ON --set piiRedactionModel.extraEnvs[0].name=PORT --set-string piiRedactionModel.extraEnvs[0].value=9090" 2>&1) && rc=0 || rc=$?
+  if [ "$rc" -eq 0 ] || ! grep -qF "must not set PORT" <<< "$out"; then
+    fail "extraEnvs PORT" "PORT in extraEnvs was not refused"
+    return
+  fi
+  ok "extraEnvs PORT refused"
 }
 
 # @scenario "Without an image the chart refuses to render"

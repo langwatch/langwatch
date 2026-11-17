@@ -60,10 +60,9 @@ export type PiiRedactionModelOffer =
   | null;
 
 /**
- * The Strict offer from the deployment and the two flags. On Cloud the flag gates the model and
- * the free list prices it. A self-hosted install sees the model only when the flag is on, which
- * the Helm chart forces exactly when it sets PII_REDACTION_MODEL_ENDPOINT; the install runs the
- * model itself, so it is never priced there. Otherwise self-hosted Strict is rule-based.
+ * The Strict offer: on Cloud the flag gates the model and the free list prices it. Self-hosted
+ * offers it when the flag is on (the chart forces it with the endpoint), never priced, as the
+ * ledger records it (PiiRedactionSpendService); otherwise Strict is rule-based.
  */
 export function piiRedactionModelOfferOf({
   isSaaS,

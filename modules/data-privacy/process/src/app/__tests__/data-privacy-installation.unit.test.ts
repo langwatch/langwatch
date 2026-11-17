@@ -26,6 +26,7 @@ function process(role: "api" | "worker", googleCredentials?: string) {
         googleDlpDisabled: undefined,
         enforcement: undefined,
         nodeEnvironment: undefined,
+        isSaas: true,
         langevalsEndpoint: undefined,
         piiRedactionModelEndpoint: undefined,
       },

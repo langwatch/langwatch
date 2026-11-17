@@ -53,8 +53,8 @@ spec:
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      # A stopping pod drains for up to 90 s (body read, request deadline, 5 s);
-      # the image has no shell for a preStop sleep.
+      # A stopping pod drains for up to 80 s: 30 s body read, the 45 s request
+      # deadline, 5 s. The image has no shell for a preStop sleep.
       terminationGracePeriodSeconds: {{ .Values.piiRedactionModel.terminationGracePeriodSeconds }}
       # The image is distroless :nonroot (uid 65532); pin that over the chart-wide 1000.
       securityContext:
@@ -89,14 +89,20 @@ spec:
               containerPort: 8080
               protocol: TCP
           env:
-            {{- /* The chart's settings, each left out when extraEnvs sets it, so an
-                   override never renders a duplicate name. The binary sizes its
-                   threads from the CPU limit (GOMAXPROCS, Go 1.25 and later). */}}
+            {{- /* PORT is fixed: the container port, the Service and the probes use
+                   8080. The others give way to an extraEnvs entry of the same name.
+                   The request deadline (45 s) stays under the app's 50 s abort, so a
+                   queued batch is refused before the caller times out. */}}
             {{- $own := list }}
             {{- range .Values.piiRedactionModel.extraEnvs }}
+            {{- if eq .name "PORT" }}
+            {{- fail "piiRedactionModel.extraEnvs must not set PORT: the container port, the Service and the probes are fixed at 8080." }}
+            {{- end }}
             {{- $own = append $own .name }}
             {{- end }}
-            {{- range $name, $value := dict "PORT" "8080" "PII_COMPONENTS" "level0,gliner,tracer" "PII_WARMUP" "1" "PII_MAX_CONCURRENT_REQUESTS" "1" }}
+            - name: PORT
+              value: "8080"
+            {{- range $name, $value := dict "PII_COMPONENTS" "level0,gliner,tracer" "PII_WARMUP" "1" "PII_MAX_CONCURRENT_REQUESTS" "1" "PII_REQUEST_TIMEOUT_SECONDS" "45" }}
             {{- if not (has $name $own) }}
             - name: {{ $name }}
               value: {{ $value | quote }}

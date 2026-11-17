@@ -197,5 +197,6 @@ Declared at `src/eventing/pii-redaction-spend.pipeline.ts:35`. Events: `piiRedac
 | config | `nodeEnvironment`              | `NODE_ENV`                           | `../contract/src/data-privacy.config.ts:18` |
 | config | `langevalsEndpoint`            | `LANGEVALS_ENDPOINT`                 | `../contract/src/data-privacy.config.ts:20` |
 | config | `piiRedactionModelEndpoint`    | `PII_REDACTION_MODEL_ENDPOINT`       | `../contract/src/data-privacy.config.ts:25` |
+| config | `isSaas`                       | `IS_SAAS`                            | `../contract/src/data-privacy.config.ts:27` |
 
 <!-- readme:generated:end -->

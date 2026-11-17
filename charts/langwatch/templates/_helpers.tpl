@@ -2152,12 +2152,9 @@ here, once, by name, so both consuming templates agree.
 {{- $forcedFlags = append $forcedFlags "release_langy_enabled" }}
 {{- end }}
 {{- /* Configuring a PII redaction model is the decision to use it, as for
-       Langy. Its calls are free on self-hosted: the install runs it. */}}
+       Langy. Its price is the server's rule: never priced on self-hosted. */}}
 {{- if include "langwatch.piiRedactionModel.endpoint" . }}
-{{- if .Values.piiRedactionModel.enableForAllOrganizations }}
 {{- $forcedFlags = append $forcedFlags "release_pii_redaction_model_enabled" }}
-{{- end }}
-{{- $forcedFlags = append $forcedFlags "release_pii_redaction_model_free" }}
 {{- end }}
 {{- if $forcedFlags }}
 - name: FEATURE_FLAG_FORCE_ENABLE

@@ -46,11 +46,11 @@ Feature: The chart can run the PII redaction model for strict PII analysis
       And no other workload has it
 
     @e2e
-    Scenario: Deploying the model releases it for every organization, at zero price
+    Scenario: Deploying the model releases it for every organization
       Given piiRedactionModel.enabled is true
       When the chart renders
-      Then FEATURE_FLAG_FORCE_ENABLE on the app and workers includes release_pii_redaction_model_enabled and release_pii_redaction_model_free
-      And with enableForAllOrganizations false it keeps only release_pii_redaction_model_free
+      Then FEATURE_FLAG_FORCE_ENABLE on the app and workers includes release_pii_redaction_model_enabled
+      And it does not force release_pii_redaction_model_free: the server never prices a self-hosted call
 
     @e2e
     Scenario: A model outside the release is reached through externalEndpoint
@@ -60,11 +60,10 @@ Feature: The chart can run the PII redaction model for strict PII analysis
       And the chart deploys no model
 
     @e2e
-    Scenario: An external model also releases it for every organization, at zero price
+    Scenario: An external model also releases it for every organization
       Given piiRedactionModel.enabled is false and piiRedactionModel.externalEndpoint is set
       When the chart renders
-      Then FEATURE_FLAG_FORCE_ENABLE on the app and workers includes release_pii_redaction_model_enabled and release_pii_redaction_model_free
-      And enableForAllOrganizations false drops only release_pii_redaction_model_enabled
+      Then FEATURE_FLAG_FORCE_ENABLE on the app and workers includes release_pii_redaction_model_enabled
 
   Rule: The model pod runs the image the operator names, the way Cloud runs it
 
@@ -75,8 +74,9 @@ Feature: The chart can run the PII redaction model for strict PII analysis
       Then the container runs the public langwatch/pii-redaction-model image at the chart's release with no pull secret
       And a repository, a tag and an optional imagePullSecret from values replace it
       And its startup, readiness and liveness probes are on /healthz, the startup probe allowing 180 s
-      And it has 100 s to drain
+      And its request deadline is 45 s, under the app's 50 s abort, and it has 80 s to drain
       And an extraEnvs entry replaces the chart's own setting of the same name, once
+      And an extraEnvs entry for PORT is refused, since the port, the Service and the probes are fixed
 
     @e2e
     Scenario: Without an image the chart refuses to render
