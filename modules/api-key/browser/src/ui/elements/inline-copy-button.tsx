@@ -41,10 +41,12 @@ export function InlineCopyButton({
       succeeded: { title: "Copied", description: `${label} copied to clipboard` },
     });
     if (ok) {
-      setCopied(true);
-      clearTimeout(resetTimer.current);
       // The copy is awaited, so the button may have unmounted meanwhile.
-      if (mounted.current) resetTimer.current = setTimeout(() => setCopied(false), 2000);
+      if (mounted.current) {
+        setCopied(true);
+        clearTimeout(resetTimer.current);
+        resetTimer.current = setTimeout(() => setCopied(false), 2000);
+      }
       onCopied?.();
     }
   }

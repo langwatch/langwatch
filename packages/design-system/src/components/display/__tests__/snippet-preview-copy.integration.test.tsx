@@ -73,4 +73,30 @@ describe("Feature: Code, money and dates read the one way", () => {
     expect(button.querySelector("svg.lucide-check")).toBeNull();
     expect(button.querySelector("svg.lucide-clipboard")).not.toBeNull();
   });
+
+  /** @scenario "A snippet copy button that unmounts mid-copy sets no state when the copy lands" */
+  it("Scenario: A snippet copy button that unmounts mid-copy sets no state when the copy lands", async () => {
+    vi.useFakeTimers();
+    const errors = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    let resolveCopy: (ok: boolean) => void = () => undefined;
+    const copy = vi.fn(
+      () =>
+        new Promise<boolean>((resolve) => {
+          resolveCopy = resolve;
+        }),
+    );
+    const { unmount } = renderWithDesignSystem(
+      <SnippetPreview code="npm i langwatch" filename="Install" codeLanguage="bash" copy={copy} />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Copy install" }));
+
+    unmount();
+    await act(async () => {
+      resolveCopy(true);
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    expect(vi.getTimerCount()).toBe(0);
+    expect(errors).not.toHaveBeenCalled();
+  });
 });

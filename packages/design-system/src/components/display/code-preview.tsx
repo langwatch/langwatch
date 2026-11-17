@@ -295,10 +295,11 @@ function SnippetCopyButton({
   const name = `Copy ${label.toLowerCase()}`;
   const copy = async (value: string) => {
     if (!(await copyText({ text: value, what: label }))) return;
+    // The copy is awaited, so the button may have unmounted meanwhile.
+    if (!mounted.current) return;
     setCopied(true);
     clearTimeout(resetTimer.current);
-    // The copy is awaited, so the button may have unmounted meanwhile.
-    if (mounted.current) resetTimer.current = setTimeout(() => setCopied(false), 2000);
+    resetTimer.current = setTimeout(() => setCopied(false), 2000);
   };
   return (
     <Tooltip content={copied ? "Copied!" : name} openDelay={0} showArrow>

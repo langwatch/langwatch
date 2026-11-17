@@ -347,3 +347,9 @@ Feature: Token Created modal command snippets
     Given a copy button that has just copied successfully
     When 2 seconds pass while it stays mounted
     Then its check icon goes back to the copy icon
+
+  @integration
+  Scenario: An inline copy button that unmounts mid-copy sets no state when the copy lands
+    Given a copy button whose copy has not resolved yet
+    When it unmounts and then the copy succeeds
+    Then it sets no state and starts no reset timer

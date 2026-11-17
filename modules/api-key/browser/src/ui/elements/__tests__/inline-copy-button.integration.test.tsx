@@ -59,4 +59,33 @@ describe("InlineCopyButton reset timer", () => {
     expect(button.querySelector("svg.lucide-check")).toBeNull();
     expect(button.querySelector("svg.lucide-clipboard")).not.toBeNull();
   });
+
+  /** @scenario "An inline copy button that unmounts mid-copy sets no state when the copy lands" */
+  it("sets no state and starts no timer when the copy resolves after unmount", async () => {
+    vi.useFakeTimers();
+    const errors = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const host = new FakeApiKeyHost({ copySucceeds: true });
+    let resolveCopy: (ok: boolean) => void = () => undefined;
+    vi.spyOn(host, "copyToClipboard").mockReturnValue(
+      new Promise<boolean>((resolve) => {
+        resolveCopy = resolve;
+      }),
+    );
+    const onCopied = vi.fn();
+    const { unmount } = renderWithApiKeyHost(
+      <InlineCopyButton text="sk-1" label="API key" onCopied={onCopied} />,
+      host,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Copy api key" }));
+
+    unmount();
+    await act(async () => {
+      resolveCopy(true);
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    expect(vi.getTimerCount()).toBe(0);
+    expect(errors).not.toHaveBeenCalled();
+    expect(onCopied).toHaveBeenCalledTimes(1);
+  });
 });
