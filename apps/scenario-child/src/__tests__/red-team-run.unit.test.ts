@@ -19,6 +19,7 @@ import {
 import {
   buildRedTeamCast,
   redTeamScript,
+  withEmptyReplyRetry,
   withOpeningUserTurn,
 } from "../services/scenario-child-execution.service.ts";
 
@@ -325,5 +326,68 @@ describe("withOpeningUserTurn", () => {
       { role: "user" as const, content: [{ type: "text" as const, text: "hi" }] },
     ];
     expect(addOpeningUserTurn(prompt)).toBe(prompt);
+  });
+});
+
+function reply(text: string) {
+  return {
+    content: [{ type: "text" as const, text }],
+    finishReason: { unified: "stop" as const, raw: undefined },
+    usage: {
+      inputTokens: { total: 1, noCache: 1, cacheRead: 0, cacheWrite: 0 },
+      outputTokens: { total: 1, text: 1, reasoning: 0 },
+    },
+    warnings: [],
+  };
+}
+
+describe("withEmptyReplyRetry", () => {
+  /** @scenario "An attacker turn the model answers empty is asked again" */
+  it("asks the attacker model again after an empty reply", async () => {
+    const replies = ["", "attack"];
+    const model = new MockLanguageModelV3({ doGenerate: async () => reply(replies.shift() ?? "") });
+    const result = await generateText({ model: withEmptyReplyRetry(model), prompt: "go" });
+    expect(result.text).toBe("attack");
+    expect(model.doGenerateCalls).toHaveLength(2);
+  });
+
+  it("gives up with a named error once every attempt came back empty", async () => {
+    const model = new MockLanguageModelV3({ doGenerate: async () => reply(" ") });
+    await expect(
+      generateText({ model: withEmptyReplyRetry(model), prompt: "go", maxRetries: 0 }),
+    ).rejects.toThrow("Attacker model returned no content after 3 attempts");
+    expect(model.doGenerateCalls).toHaveLength(3);
+  });
+});
+
+describe("redTeamScript with a silent attacker", () => {
+  /** @scenario "A red team run whose attacker stays silent is judged on the turns it played" */
+  it("hands the turns played to the judge instead of failing the run", async () => {
+    const script = redTeamScript({
+      attacker: { checkEarlyExit: () => false },
+      totalTurns: 3,
+      progress: { turnsRun: 1 },
+      isOutOfTime: () => false,
+    });
+    const executor = {
+      user: vi.fn().mockRejectedValue(new Error("Attacker model returned no content")),
+      judge: vi.fn(),
+    };
+    await script[3]?.({ currentTurn: 2 } as never, executor as never);
+    expect(executor.judge).toHaveBeenCalledOnce();
+  });
+
+  it("lets any other attacker error fail the run", async () => {
+    const script = redTeamScript({
+      attacker: { checkEarlyExit: () => false },
+      totalTurns: 3,
+      progress: { turnsRun: 0 },
+      isOutOfTime: () => false,
+    });
+    const executor = { user: vi.fn().mockRejectedValue(new Error("rate limited")), judge: vi.fn() };
+    await expect(script[0]?.({ currentTurn: 1 } as never, executor as never)).rejects.toThrow(
+      "rate limited",
+    );
+    expect(executor.judge).not.toHaveBeenCalled();
   });
 });

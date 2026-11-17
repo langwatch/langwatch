@@ -69,6 +69,20 @@ Feature: A red team scenario runs an attacker against the agent
     And the run report counts the turns played
 
   @unit
+  Scenario: An attacker turn the model answers empty is asked again
+    Given a red team run whose attacker model answers a turn with no text
+    When the attacker asks for that turn again
+    Then the next reply with text is the attack
+    And after 3 empty attempts the attacker gives up with a named error
+
+  @unit
+  Scenario: A red team run whose attacker stays silent is judged on the turns it played
+    Given the attacker model gave no text on every attempt of a turn
+    When the attacker turn ends
+    Then the judge rules on the turns played instead of the run failing
+    And any other attacker error still fails the run
+
+  @unit
   Scenario: A run the judge fails broke on the first turn at the break score
     Given a red team run the judge failed
     And the attacker scored turn 3 at 9 or more

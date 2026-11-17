@@ -1,4 +1,4 @@
-import type { LanguageModelV3Prompt } from "@ai-sdk/provider";
+import type { LanguageModelV3Content, LanguageModelV3Prompt } from "@ai-sdk/provider";
 import {
   RED_TEAM_BREAK_SCORE,
   RED_TEAM_DEFAULT_MAX_TURNS,
@@ -107,4 +107,29 @@ export const RED_TEAM_TIME_MARGIN_MS = 2 * 60 * 1000;
 export function addOpeningUserTurn(prompt: LanguageModelV3Prompt): LanguageModelV3Prompt {
   if (prompt.some((message) => message.role !== "system")) return prompt;
   return [...prompt, { role: "user", content: [{ type: "text", text: "Begin." }] }];
+}
+
+/** Extra attempts an attacker turn gets when the model answers with no text, as Gemini can. */
+export const ATTACKER_EMPTY_REPLY_RETRIES = 2;
+
+/** True when a model reply carries some text. */
+export function hasReplyText(content: LanguageModelV3Content[]): boolean {
+  return content.some((part) => part.type === "text" && part.text.trim() !== "");
+}
+
+/** The attacker model gave no text on any attempt, so the attack cannot go on. */
+export class AttackerNoReplyError extends Error {
+  constructor(attempts: number) {
+    super(`Attacker model returned no content after ${attempts} attempts`);
+    this.name = "AttackerNoReplyError";
+  }
+}
+
+/** True when an error, or one it wraps, says the attacker model gave no text. */
+export function isAttackerNoReply(error: unknown): boolean {
+  for (let current = error; current instanceof Error; current = current.cause) {
+    if (current instanceof AttackerNoReplyError) return true;
+    if (current.message.includes("Attacker model returned no content")) return true;
+  }
+  return false;
 }

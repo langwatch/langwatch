@@ -42,6 +42,10 @@ import {
 import { buildCallerVoiceSimulatorConfig } from "../rules/caller-voice-simulator.rules.ts";
 import {
   addOpeningUserTurn,
+  ATTACKER_EMPTY_REPLY_RETRIES,
+  AttackerNoReplyError,
+  hasReplyText,
+  isAttackerNoReply,
   buildRedTeamRunReport,
   getRedTeamRunConfig,
   isRedTeamRun,
@@ -218,7 +222,7 @@ interface RedTeamCast {
 /**
  * The attack turns, then the judge. A break ends the run as failed on the spot, so the finished
  * run already carries the failure for the suite and every other reader of it. Once time is short
- * of the child timeout the judge rules on the turns played, so the run still records a report.
+ * of the child timeout, or the attacker model stays silent, the judge rules on the turns played.
  */
 export function redTeamScript({
   attacker,
@@ -232,8 +236,16 @@ export function redTeamScript({
   isOutOfTime: () => boolean;
 }): ScenarioRunner.ScriptStep[] {
   const steps: ScenarioRunner.ScriptStep[] = [];
+  const attackerTurn: ScenarioRunner.ScriptStep = async (_state, executor) => {
+    try {
+      await executor.user();
+    } catch (error) {
+      if (!isAttackerNoReply(error)) throw error;
+      await executor.judge();
+    }
+  };
   for (let turn = 0; turn < totalTurns; turn++) {
-    steps.push(ScenarioRunner.user(), ScenarioRunner.agent(), async (state, executor) => {
+    steps.push(attackerTurn, ScenarioRunner.agent(), async (state, executor) => {
       progress.turnsRun += 1;
       if (attacker.checkEarlyExit()) {
         await executor.fail(`${EARLY_EXIT_REASONING_PREFIX} on turn ${state.currentTurn}`);
@@ -263,6 +275,24 @@ export function withOpeningUserTurn(model: LanguageModelV3): LanguageModelV3 {
   });
 }
 
+/** An attacker reply with no text is asked again a few times before the attack ends. */
+export function withEmptyReplyRetry(model: LanguageModelV3): LanguageModelV3 {
+  return wrapLanguageModel({
+    model,
+    middleware: {
+      specificationVersion: "v3",
+      wrapGenerate: async ({ doGenerate }) => {
+        const attempts = ATTACKER_EMPTY_REPLY_RETRIES + 1;
+        for (let attempt = 1; attempt <= attempts; attempt++) {
+          const result = await doGenerate();
+          if (hasReplyText(result.content)) return result;
+        }
+        throw new AttackerNoReplyError(attempts);
+      },
+    },
+  });
+}
+
 /**
  * A red team run's cast: the attacker plays the user with the simulator's model for attacks and
  * its plan, the judge holds the scenario criteria, and the marathon script runs the turn budget.
@@ -288,7 +318,7 @@ export function buildRedTeamCast({
   const turnsEndAt =
     nowInstant().epochMilliseconds + CHILD_PROCESS.TIMEOUT_MS - RED_TEAM_TIME_MARGIN_MS;
   const isOutOfTime = () => nowInstant().epochMilliseconds >= turnsEndAt;
-  const attackerModel = withOpeningUserTurn(simulatorModel);
+  const attackerModel = withEmptyReplyRetry(withOpeningUserTurn(simulatorModel));
   const attackerConfig = {
     target: config.attackGoal,
     totalTurns,
