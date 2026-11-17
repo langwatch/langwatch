@@ -26,6 +26,7 @@ import { LWQL_VIEW_CATALOG } from "../../../../rules/lwql-view-catalog.rules.ts"
 import { LangWatchQLCatalogShapesService } from "../../../../services/langwatch-ql-catalog-shapes.service.ts";
 import type { LwqlConvergencePlan } from "../../../../tasks/lwql-provision.task.ts";
 import {
+  LWQL_SCOPED_READER_GROUP,
   LWQL_SCOPED_SCHEMA,
   scopedViewGuardCondition,
 } from "../../rules/lwql-scoped-view.rules.ts";
@@ -33,7 +34,6 @@ import {
   LangWatchQLPostgresGapsService,
   type LwqlPostgresGap,
 } from "../langwatch-ql-postgres-gaps.service.ts";
-import { LWQL_SCOPED_READER_GROUP } from "../langwatch-ql-postgres-mapping.service.ts";
 import { LangWatchQLPostgresViewsService } from "../langwatch-ql-postgres-views.service.ts";
 import {
   LangWatchQLProductionProvisioningService,

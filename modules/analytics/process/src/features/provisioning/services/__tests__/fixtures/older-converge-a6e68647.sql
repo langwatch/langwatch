@@ -2,7 +2,9 @@
 -- a6e686478b9e1f86344ce9e1ad1d5f60c130f4be (the production langwatch-app version at the time,
 -- git-a6e68647) emits for schema public and reader role lwql_ro. Do NOT regenerate this file
 -- from this branch or any later commit: it exists so the old-converge suite replays the old
--- code's own statements, not the current code's.
+-- code's own statements, not the current code's. It sets the lwql_ro login password to
+-- 'scope-test-pw' (ALTER ROLE ... WITH LOGIN PASSWORD), which must equal LOGIN_PASSWORD in
+-- langwatch-ql-postgres-reader-scope.fixtures.ts.
 --
 -- Generated in a checkout detached at that commit with:
 --   node --experimental-transform-types --import ./hooks.mjs gen.ts > older-converge-a6e68647.sql

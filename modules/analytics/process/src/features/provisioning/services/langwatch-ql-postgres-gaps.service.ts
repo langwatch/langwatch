@@ -1,7 +1,7 @@
 /**
  * What the reconvergence check repairs in PostgreSQL: the shared approved views, and the
  * scoped-reader group's grants and scoped copies (ADR-159).
- * @see specs/lwql/postgres-catalog.feature
+ * @see specs/lwql/api.feature
  */
 import type {
   LwqlPostgresViewFound,

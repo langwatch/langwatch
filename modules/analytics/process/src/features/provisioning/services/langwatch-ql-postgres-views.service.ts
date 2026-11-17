@@ -17,7 +17,6 @@ import {
 import {
   DEFAULT_POSTGRES_ENGINE_POOL_SIZE,
   LangWatchQLPostgresMappingService,
-  LWQL_SCOPED_READER_GROUP,
   POSTGRES_BASE_ALIAS,
 } from "./langwatch-ql-postgres-mapping.service.ts";
 
@@ -128,10 +127,7 @@ export class LangWatchQLPostgresViewsService {
     schema: string;
     views?: readonly LangWatchQLViewDefinition[];
   }): string[] {
-    const onlyWhen = scopedCopiesWritableCondition({
-      appSchema: schema,
-      group: LWQL_SCOPED_READER_GROUP,
-    });
+    const onlyWhen = scopedCopiesWritableCondition({ appSchema: schema });
 
     return catalogShapes.postgresViews(views).map((view) => {
       const shape = approvedViewShape({ schema, view });

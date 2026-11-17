@@ -16,7 +16,10 @@ import {
 } from "../../../services/langwatch-ql-access-model.service.ts";
 import { LangWatchQLSqlTextService } from "../../../services/langwatch-ql-sql-text.service.ts";
 import type { PostgresApprovedViewJoin } from "../../lwql-catalogue/rules/lwql-tenant-paths.rules.ts";
-import { LWQL_ORG_SCOPE_FRAGMENT } from "../rules/lwql-scoped-view.rules.ts";
+import {
+  LWQL_ORG_SCOPE_FRAGMENT,
+  LWQL_SCOPED_READER_GROUP,
+} from "../rules/lwql-scoped-view.rules.ts";
 
 const accessModel = LangWatchQLAccessModelService.create();
 
@@ -74,12 +77,6 @@ function assertNoDollarTagCollision({ view, body }: { view: string; body: string
     );
   }
 }
-
-/**
- * The NOLOGIN role whose members read the scoped copies of the approved views. The copies exist,
- * and are granted, only when it exists, so a deployment without it is unchanged.
- */
-export const LWQL_SCOPED_READER_GROUP = "lwql_scoped_reader";
 
 /** Where the per-reader row scope reads each row's owning project. */
 export interface PostgresReaderRowScope {

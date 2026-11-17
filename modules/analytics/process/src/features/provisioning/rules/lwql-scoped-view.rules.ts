@@ -11,6 +11,12 @@ import { postgresLiteral } from "../../../rules/langwatch-ql-sql-literal.rules.t
  */
 export const LWQL_SCOPED_SCHEMA = "lwql_scoped";
 
+/**
+ * The NOLOGIN role whose members read the scoped copies of the approved views. The copies exist,
+ * and are granted, only when it exists, so a deployment without it is unchanged.
+ */
+export const LWQL_SCOPED_READER_GROUP = "lwql_scoped_reader";
+
 const QUOTED_SCOPED_SCHEMA = `"${LWQL_SCOPED_SCHEMA}"`;
 
 /** Prefix of the per-organization role; the suffix is the md5 of the organization id. */
@@ -47,16 +53,10 @@ export function scopedSchemaOwnedCondition({ appSchema }: { appSchema: string })
   );
 }
 
-/** SQL, true only when `group` exists and the scoped schema is this installation's. */
-export function scopedCopiesWritableCondition({
-  appSchema,
-  group,
-}: {
-  appSchema: string;
-  group: string;
-}): string {
+/** SQL, true only when the reader group exists and the scoped schema is this installation's. */
+export function scopedCopiesWritableCondition({ appSchema }: { appSchema: string }): string {
   return (
-    `EXISTS (SELECT 1 FROM pg_roles WHERE rolname = ${postgresLiteral(group)}) ` +
+    `EXISTS (SELECT 1 FROM pg_roles WHERE rolname = ${postgresLiteral(LWQL_SCOPED_READER_GROUP)}) ` +
     `AND ${scopedSchemaOwnedCondition({ appSchema })}`
   );
 }
@@ -90,21 +90,16 @@ export function scopedCopyLookup({ view }: { view: string }): string {
 }
 
 /**
- * Creates the scoped schema, marked as `appSchema`'s, only when `group` exists and the schema is
- * absent; an operator may pre-create it for a role without CREATE on the database. A role without
- * that privilege leaves it absent, so the copies and their grants are skipped (fail closed).
+ * Creates the scoped schema, marked as `appSchema`'s, only when the reader group exists and the
+ * schema is absent; an operator may pre-create it for a role without CREATE on the database. A
+ * role without that privilege leaves it absent, so the copies and their grants are skipped (fail
+ * closed).
  */
-export function scopedSchemaStatement({
-  appSchema,
-  group,
-}: {
-  appSchema: string;
-  group: string;
-}): string {
+export function scopedSchemaStatement({ appSchema }: { appSchema: string }): string {
   return [
     "DO $lwql_scoped$",
     "BEGIN",
-    `  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = ${postgresLiteral(group)}) ` +
+    `  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = ${postgresLiteral(LWQL_SCOPED_READER_GROUP)}) ` +
       `AND to_regnamespace(${postgresLiteral(LWQL_SCOPED_SCHEMA)}) IS NULL THEN`,
     `    CREATE SCHEMA ${QUOTED_SCOPED_SCHEMA};`,
     `    COMMENT ON SCHEMA ${QUOTED_SCOPED_SCHEMA} IS ${postgresLiteral(scopedSchemaMarker({ appSchema }))};`,

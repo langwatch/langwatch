@@ -11,7 +11,10 @@ import { Task } from "@langwatch/task";
 
 import { lwqlAppFunctionNames } from "../features/app-functions/rules/langwatch-ql-app-function-catalog.rules.ts";
 import { canProvisionAppFunctions } from "../features/app-functions/rules/langwatch-ql-app-function-store.rules.ts";
-import { LWQL_SCOPED_SCHEMA } from "../features/provisioning/rules/lwql-scoped-view.rules.ts";
+import {
+  LWQL_SCOPED_READER_GROUP,
+  LWQL_SCOPED_SCHEMA,
+} from "../features/provisioning/rules/lwql-scoped-view.rules.ts";
 import {
   LangWatchQLCollectionBindingService,
   type LwqlAccessModelMode,
@@ -21,7 +24,6 @@ import {
   LangWatchQLPostgresGapsService,
   type LwqlPostgresGap,
 } from "../features/provisioning/services/langwatch-ql-postgres-gaps.service.ts";
-import { LWQL_SCOPED_READER_GROUP } from "../features/provisioning/services/langwatch-ql-postgres-mapping.service.ts";
 import {
   LangWatchQLProductionProvisioningService,
   LWQL_POSTGRES_READER_ROLE,

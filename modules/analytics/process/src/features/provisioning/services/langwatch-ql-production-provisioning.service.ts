@@ -15,13 +15,13 @@ import { LangWatchQLCapabilityService } from "../../../services/langwatch-ql-cap
 import type { LangWatchQLViewDefinition } from "../../../services/langwatch-ql-catalog-shapes.service.ts";
 import { LangWatchQLSqlTextService } from "../../../services/langwatch-ql-sql-text.service.ts";
 import {
+  LWQL_SCOPED_READER_GROUP,
   LWQL_SCOPED_SCHEMA,
   scopedCopyLookup,
   scopedSchemaOwnedCondition,
   scopedSchemaStatement,
   scopedViewGuardCondition,
 } from "../rules/lwql-scoped-view.rules.ts";
-import { LWQL_SCOPED_READER_GROUP } from "./langwatch-ql-postgres-mapping.service.ts";
 import { LangWatchQLPostgresViewsService } from "./langwatch-ql-postgres-views.service.ts";
 
 const postgresViews = LangWatchQLPostgresViewsService.create();
@@ -274,7 +274,7 @@ export class LangWatchQLProductionProvisioningService {
     views?: readonly LangWatchQLViewDefinition[];
   } = {}): string[] {
     return [
-      scopedSchemaStatement({ appSchema: schema, group: LWQL_SCOPED_READER_GROUP }),
+      scopedSchemaStatement({ appSchema: schema }),
       ...postgresViews.scopedViewStatements({ schema, views }),
     ];
   }

@@ -10,9 +10,9 @@ import {
   LWQL_ORG_MEMBERSHIP_FRAGMENT,
   LWQL_ORG_SCOPE_FRAGMENT,
   LWQL_CURRENT_USER_FRAGMENT,
+  LWQL_SCOPED_READER_GROUP,
   scopedCopiesWritableCondition,
 } from "../../rules/lwql-scoped-view.rules.ts";
-import { LWQL_SCOPED_READER_GROUP } from "../langwatch-ql-postgres-mapping.service.ts";
 import { LangWatchQLPostgresViewsService } from "../langwatch-ql-postgres-views.service.ts";
 import { LangWatchQLProductionProvisioningService } from "../langwatch-ql-production-provisioning.service.ts";
 
@@ -85,10 +85,7 @@ describe("given the generated approved Postgres views", () => {
     });
 
     it("runs each only where the group exists and lwql_scoped is this installation's", () => {
-      const onlyWhen = scopedCopiesWritableCondition({
-        appSchema: "public",
-        group: LWQL_SCOPED_READER_GROUP,
-      });
+      const onlyWhen = scopedCopiesWritableCondition({ appSchema: "public" });
 
       expect(copies.filter((s) => !s.includes(`IF ${onlyWhen} THEN`))).toEqual([]);
     });
