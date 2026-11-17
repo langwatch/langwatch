@@ -100,6 +100,14 @@ Feature: Stored Objects service and API
     And failed physical cleanup remains retryable from that same row
     And repeating deletion is safe
 
+  @unit @delete
+  Scenario: A delete that keeps losing its row write reports a write conflict
+    Given an available stored object whose row another writer moves on before every delete write
+    When its project calls storedObjects.delete
+    Then the delete is refused with code "stored_object_write_conflict", which may be retried
+    And no storage failure is reported, since no storage call failed
+    And the row and its bytes stay as the other writer left them
+
   @unit @regression
   Scenario: Probing an object or minting its read URL opens none of its bytes
     Given an available stored object
