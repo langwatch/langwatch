@@ -67,6 +67,32 @@ describe("s3RegionFor()", () => {
     });
   });
 
+  describe("when the bucket cannot be asked but the host names a region", () => {
+    /** @scenario "The host's region stands in only until the bucket answers" */
+    it("uses the host's region for a pause, then asks the bucket again and keeps its answer", async () => {
+      let now = 0;
+      const askBucket = asking([{ kind: "unknown" }, { kind: "found", region: "eu-west-1" }]);
+      const region = s3RegionFor({
+        bucket: "objects",
+        askBucket,
+        configured: unset,
+        hostRegion: async () => "us-east-1",
+        now: () => now,
+      });
+
+      await expect(resolve(region)).resolves.toBe("us-east-1");
+      now += 1_000;
+      await expect(resolve(region)).resolves.toBe("us-east-1");
+      expect(askBucket).toHaveBeenCalledTimes(1);
+
+      now += 60_000;
+      await expect(resolve(region)).resolves.toBe("eu-west-1");
+      now += 60_000;
+      await expect(resolve(region)).resolves.toBe("eu-west-1");
+      expect(askBucket).toHaveBeenCalledTimes(2);
+    });
+  });
+
   describe("when the bucket's region cannot be found", () => {
     /** @scenario "A region that cannot be found names the setting that fixes it" */
     it("fails naming S3_REGION and the Helm value, then asks again after a pause", async () => {

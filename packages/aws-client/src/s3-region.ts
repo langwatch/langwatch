@@ -65,9 +65,9 @@ export class S3RegionNotFoundError extends Error {
 const REGION_RETRY_AFTER_MS = 30_000;
 
 /**
- * The region for an S3 client that knows its bucket: the shared rule's answer when it has one,
- * else a provider that tries AWS_REGION or the profile, then asks AWS where the bucket lives,
- * then the EC2 host's region (tasks#1192). One lookup is shared and kept; a failure is retried.
+ * The region for an S3 client that knows its bucket: the shared rule's answer, else AWS_REGION or
+ * the profile, then the bucket's own region (kept), then the EC2 host's (tasks#1192). One lookup
+ * is shared; the host's region and a failure last only until the next try.
  */
 export function s3RegionFor({
   region,
@@ -88,40 +88,70 @@ export function s3RegionFor({
 }): string | (() => Promise<string>) {
   const named = s3RegionOf({ region, endpoint });
   if (named !== undefined) return named;
+  return remembered({
+    now,
+    lookUp: () => lookUpRegion({ bucket, askBucket, configured, hostRegion }),
+  });
+}
 
+/** A region and whether it is the bucket's own (kept) or a stand-in until the next try. */
+type FoundRegion = { region: string; lasting: boolean };
+
+async function lookUpRegion({
+  bucket,
+  askBucket,
+  configured,
+  hostRegion,
+}: {
+  bucket: string;
+  askBucket: () => Promise<S3BucketRegionAnswer>;
+  configured: () => Promise<string | undefined>;
+  hostRegion: () => Promise<string | undefined>;
+}): Promise<FoundRegion> {
+  const fromSetting = await configured();
+  if (fromSetting) return { region: fromSetting, lasting: true };
+  const answer = await askBucket().catch((): S3BucketRegionAnswer => ({ kind: "unknown" }));
+  if (answer.kind === "found") return { region: answer.region, lasting: true };
+  if (answer.kind === "missing") throw new S3BucketNotFoundError(bucket);
+  const fromHost = await hostRegion();
+  if (fromHost) return { region: fromHost, lasting: false };
+  throw new S3RegionNotFoundError(bucket);
+}
+
+/** Shares one lookup between concurrent calls; keeps a lasting region, the rest for a pause. */
+function remembered({
+  lookUp,
+  now,
+}: {
+  lookUp: () => Promise<FoundRegion>;
+  now: () => number;
+}): () => Promise<string> {
   let known: string | undefined;
+  let standIn: { region: string; at: number } | undefined;
+  let failure: { error: unknown; at: number } | undefined;
   let pending: Promise<string> | undefined;
-  let failure: { error: Error; at: number } | undefined;
+  const recent = (at: number) => now() - at < REGION_RETRY_AFTER_MS;
 
-  const lookUp = async (): Promise<string> => {
-    const fromSetting = await configured();
-    if (fromSetting) return fromSetting;
-    const answer = await askBucket().catch((): S3BucketRegionAnswer => ({ kind: "unknown" }));
-    if (answer.kind === "found") return answer.region;
-    if (answer.kind === "missing") throw new S3BucketNotFoundError(bucket);
-    const fromHost = await hostRegion();
-    if (fromHost) return fromHost;
-    throw new S3RegionNotFoundError(bucket);
+  const settle = async (): Promise<string> => {
+    try {
+      const { region, lasting } = await lookUp();
+      if (lasting) known = region;
+      else standIn = { region, at: now() };
+      return region;
+    } catch (error) {
+      failure = { error, at: now() };
+      throw error;
+    }
   };
 
   return async () => {
     if (known !== undefined) return known;
-    if (failure && now() - failure.at < REGION_RETRY_AFTER_MS) throw failure.error;
-    pending ??= lookUp().then(
-      (found) => {
-        known = found;
-        return found;
-      },
-      (error: Error) => {
-        failure = { error, at: now() };
-        throw error;
-      },
-    );
-    try {
-      return await pending;
-    } finally {
+    if (standIn && recent(standIn.at)) return standIn.region;
+    if (failure && recent(failure.at)) throw failure.error;
+    pending ??= settle().finally(() => {
       pending = undefined;
-    }
+    });
+    return pending;
   };
 }
 

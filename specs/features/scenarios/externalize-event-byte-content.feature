@@ -532,6 +532,12 @@ Feature: Externalize event byte content to stored_objects
     Then it uses the host's region, as releases before 3.24 did
 
   @unit
+  Scenario: The host's region stands in only until the bucket answers
+    Given no region is set, the first question to AWS failed, and the client used the host's region
+    When AWS's global endpoint answers again, after a short pause
+    Then the bucket is asked again and its own region is used from then on
+
+  @unit
   Scenario: A region that cannot be found names the setting that fixes it
     Given AWS cannot be reached or names no region for the bucket, and the host names none either
     When the stored-objects client talks to S3
