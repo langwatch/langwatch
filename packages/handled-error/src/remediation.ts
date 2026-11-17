@@ -725,6 +725,12 @@ const registry = {
   },
 
   // ---- scenario runs ----
+  scenario_red_team_config_mismatch: {
+    tips: [
+      "Send kind red_team together with a redTeam config holding attackGoal and owaspIds",
+      "For a standard scenario, leave redTeam out",
+    ],
+  },
   scenario_reserved_set_id: {
     tips: [
       "Send the run without a setId; it is then recorded in the project's own one-off bucket",

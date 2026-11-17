@@ -278,6 +278,21 @@ describe("explainHandledError", () => {
       expect(description).toContain("3 simulations");
     });
 
+    /** @scenario The suite cap refusal names suites */
+    it("names suites when the suite cap refused a template apply", () => {
+      const { description } = explainHandledError(
+        shape({
+          code: "resource_limit_exceeded",
+          httpStatus: 403,
+          meta: { limitType: "scenarioSets", current: 3, max: 3, countedAs: "testSuites" },
+        }),
+      );
+
+      expect(description).toBe(
+        "Your plan includes 3 suites. Upgrade to create more. Everything you already have keeps working.",
+      );
+    });
+
     it("keeps the generic plan-limit line for every other allowance", () => {
       const { description } = explainHandledError(
         shape({

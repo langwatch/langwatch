@@ -70,7 +70,7 @@ beforeAll(() => {
 
 afterAll(async () => {
   if (!ch) return;
-  await ch.exec({
+  await ch.command({
     query: `ALTER TABLE simulation_runs DELETE WHERE TenantId = {tenantId:String}`,
     query_params: { tenantId },
   });
@@ -171,7 +171,7 @@ async function runBatch(params: {
 
   // The projection store writes async and does not wait, so a read straight
   // after it would race the queue rather than the code under test.
-  await ch!.exec({ query: "SYSTEM FLUSH ASYNC INSERT QUEUE" });
+  await ch!.command({ query: "SYSTEM FLUSH ASYNC INSERT QUEUE" });
 }
 
 /**

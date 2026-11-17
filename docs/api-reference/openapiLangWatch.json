@@ -108741,6 +108741,57 @@
                         }
                       ]
                     }
+                  },
+                  "kind": {
+                    "description": "Absent or \"standard\" plays a user simulator. \"red_team\" plays an attacker and requires redTeam; a standard scenario with redTeam answers 422 scenario_red_team_config_mismatch.",
+                    "type": "string",
+                    "enum": [
+                      "standard",
+                      "red_team"
+                    ]
+                  },
+                  "redTeam": {
+                    "description": "The attack a red_team scenario plays: goal, OWASP ids, strategy and turn budget.",
+                    "type": "object",
+                    "properties": {
+                      "attackGoal": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 4000
+                      },
+                      "owaspIds": {
+                        "minItems": 1,
+                        "maxItems": 10,
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "pattern": "^(LLM(0[1-9]|10)|ASI(0[1-9]|10))$"
+                        }
+                      },
+                      "strategy": {
+                        "default": "crescendo",
+                        "type": "string",
+                        "enum": [
+                          "crescendo",
+                          "goat"
+                        ]
+                      },
+                      "maxTurns": {
+                        "default": 30,
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 50
+                      }
+                    },
+                    "required": [
+                      "attackGoal",
+                      "owaspIds"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "sourceTemplateId": {
+                    "description": "Refused: only applying a suite template marks a scenario with its template.",
+                    "not": {}
                   }
                 },
                 "required": [
@@ -121230,6 +121281,329 @@
         }
       }
     },
+    "/api/v1/test-suites/templates": {
+      "get": {
+        "operationId": "listSuiteTemplates",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "maxLength": 80,
+                        "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
+                      },
+                      "version": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "kind": {
+                        "type": "string",
+                        "enum": [
+                          "archetype",
+                          "red_team_pack"
+                        ]
+                      },
+                      "title": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "description": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "criteria": {
+                        "default": [],
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "scenarios": {
+                        "minItems": 1,
+                        "maxItems": 50,
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "key": {
+                              "type": "string",
+                              "pattern": "^[a-z0-9_-]+$"
+                            },
+                            "name": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "situation": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "criteria": {
+                              "minItems": 1,
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "minLength": 1
+                              }
+                            },
+                            "labels": {
+                              "default": [],
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "attack": {
+                              "type": "object",
+                              "properties": {
+                                "attackGoal": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "owaspIds": {
+                                  "minItems": 1,
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string",
+                                    "pattern": "^(LLM(0[1-9]|10)|ASI(0[1-9]|10))$"
+                                  }
+                                },
+                                "strategy": {
+                                  "type": "string",
+                                  "enum": [
+                                    "crescendo",
+                                    "goat"
+                                  ]
+                                },
+                                "maxTurns": {
+                                  "default": 30,
+                                  "type": "integer",
+                                  "minimum": 1,
+                                  "maximum": 50
+                                }
+                              },
+                              "required": [
+                                "attackGoal",
+                                "owaspIds",
+                                "strategy",
+                                "maxTurns"
+                              ],
+                              "additionalProperties": false
+                            }
+                          },
+                          "required": [
+                            "key",
+                            "name",
+                            "situation",
+                            "criteria",
+                            "labels"
+                          ],
+                          "additionalProperties": false
+                        }
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "version",
+                      "kind",
+                      "title",
+                      "description",
+                      "criteria",
+                      "scenarios"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              }
+            }
+          }
+        },
+        "description": "List the suite templates that ship with LangWatch: archetypes of everyday behaviour tests and red team packs such as the OWASP Top 10 lists. Each carries its full scenario data, so a caller can preview what applying it creates.",
+        "summary": "List suite templates",
+        "tags": [
+          "Test Suites"
+        ],
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ],
+        "x-access-policy": {
+          "kind": "handlerManaged",
+          "credential": [
+            "project_api_key"
+          ],
+          "permissions": [
+            "scenarios:view"
+          ]
+        }
+      }
+    },
+    "/api/v1/test-suites/templates/{templateId}/apply": {
+      "post": {
+        "operationId": "applySuiteTemplate",
+        "responses": {
+          "201": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "suiteId": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "slug": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "name": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "scenarioIds": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    }
+                  },
+                  "required": [
+                    "suiteId",
+                    "slug",
+                    "name",
+                    "scenarioIds"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        },
+        "description": "Create a test suite from a template, with one scenario per template scenario filled from the fit: the agent's name, its tools and what it must never do. The suite name defaults to the template title. An unknown template id answers 404 suite_template_not_found.",
+        "summary": "Apply a suite template",
+        "tags": [
+          "Test Suites"
+        ],
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ],
+        "x-access-policy": {
+          "kind": "handlerManaged",
+          "credential": [
+            "project_api_key"
+          ],
+          "permissions": [
+            "scenarios:manage"
+          ]
+        },
+        "parameters": [
+          {
+            "in": "path",
+            "name": "templateId",
+            "schema": {
+              "type": "string",
+              "maxLength": 80,
+              "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
+            },
+            "required": true
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "fit": {
+                    "type": "object",
+                    "properties": {
+                      "agentName": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 120
+                      },
+                      "tools": {
+                        "default": [],
+                        "maxItems": 50,
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 120
+                        }
+                      },
+                      "mustNever": {
+                        "default": [],
+                        "maxItems": 50,
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 500
+                        }
+                      }
+                    },
+                    "required": [
+                      "agentName"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  }
+                },
+                "required": [
+                  "fit"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/test-suites/{id}": {
       "get": {
         "operationId": "getTestSuite",
@@ -121466,10 +121840,14 @@
                     },
                     "message": {
                       "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
                     }
                   },
                   "required": [
-                    "error"
+                    "error",
+                    "code"
                   ],
                   "additionalProperties": false
                 }
@@ -121721,10 +122099,14 @@
                     },
                     "message": {
                       "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
                     }
                   },
                   "required": [
-                    "error"
+                    "error",
+                    "code"
                   ],
                   "additionalProperties": false
                 }
@@ -121948,10 +122330,14 @@
                     },
                     "message": {
                       "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
                     }
                   },
                   "required": [
-                    "error"
+                    "error",
+                    "code"
                   ],
                   "additionalProperties": false
                 }
@@ -122227,10 +122613,14 @@
                     },
                     "message": {
                       "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
                     }
                   },
                   "required": [
-                    "error"
+                    "error",
+                    "code"
                   ],
                   "additionalProperties": false
                 }
