@@ -79,6 +79,21 @@ const EMPTY_INSTANT_EVAL_PAGE: InstantEvalPageOutcome = {
 
 type InstantEvalJudgePageInput = Parameters<InstantEvalRunExecutor["judgePage"]>[0];
 
+type InstantEvalJudgePageDeps = {
+  context: InstantEvalRunContextService;
+  rowSource: Pick<InstantEvalRowSourceService, "keys">;
+  textSource: InstantEvalTextSource;
+  judge: InstantEvalJudgeChannel;
+  judgments: Pick<InstantEvalJudgmentsRepository, "insert">;
+  cancellation: InstantEvalCancellationRepository;
+  budget: Pick<InstantEvalFreeBudgetService, "assertWithinBudget">;
+  gatewayBudget: Pick<InstantEvalGatewayBudgetService, "assertWithinGatewayBudget">;
+  /** The next page of each run, read while the current one judges. */
+  readAhead?: InstantEvalReadAheadService;
+  concurrency?: number;
+  now?: () => number;
+};
+
 export class InstantEvalJudgePageService {
   private readonly context: InstantEvalRunContextService;
   private readonly rowSource: Pick<InstantEvalRowSourceService, "keys">;
@@ -87,27 +102,12 @@ export class InstantEvalJudgePageService {
   private readonly judgments: Pick<InstantEvalJudgmentsRepository, "insert">;
   private readonly cancellation: InstantEvalCancellationRepository;
   private readonly budget: Pick<InstantEvalFreeBudgetService, "assertWithinBudget">;
-  private readonly gatewayBudget: Pick<
-    InstantEvalGatewayBudgetService,
-    "assertWithinGatewayBudget"
-  >;
+  private readonly gatewayBudget: InstantEvalJudgePageDeps["gatewayBudget"];
   private readonly readAhead: InstantEvalReadAheadService;
   private readonly judgeRows: InstantEvalJudgeRowsService;
   private readonly now: () => number;
 
-  private constructor(options: {
-    context: InstantEvalRunContextService;
-    rowSource: Pick<InstantEvalRowSourceService, "keys">;
-    textSource: InstantEvalTextSource;
-    judge: InstantEvalJudgeChannel;
-    judgments: Pick<InstantEvalJudgmentsRepository, "insert">;
-    cancellation: InstantEvalCancellationRepository;
-    budget: Pick<InstantEvalFreeBudgetService, "assertWithinBudget">;
-    gatewayBudget: Pick<InstantEvalGatewayBudgetService, "assertWithinGatewayBudget">;
-    readAhead: InstantEvalReadAheadService;
-    concurrency: number;
-    now: () => number;
-  }) {
+  private constructor(options: Required<InstantEvalJudgePageDeps>) {
     this.context = options.context;
     this.rowSource = options.rowSource;
     this.textSource = options.textSource;
@@ -136,20 +136,7 @@ export class InstantEvalJudgePageService {
     readAhead = InstantEvalReadAheadService.create(),
     concurrency = INSTANT_EVAL_JUDGE_CONCURRENCY,
     now = () => nowInstant().epochMilliseconds,
-  }: {
-    context: InstantEvalRunContextService;
-    rowSource: Pick<InstantEvalRowSourceService, "keys">;
-    textSource: InstantEvalTextSource;
-    judge: InstantEvalJudgeChannel;
-    judgments: Pick<InstantEvalJudgmentsRepository, "insert">;
-    cancellation: InstantEvalCancellationRepository;
-    budget: Pick<InstantEvalFreeBudgetService, "assertWithinBudget">;
-    gatewayBudget: Pick<InstantEvalGatewayBudgetService, "assertWithinGatewayBudget">;
-    /** The next page of each run, read while the current one judges. */
-    readAhead?: InstantEvalReadAheadService;
-    concurrency?: number;
-    now?: () => number;
-  }): InstantEvalJudgePageService {
+  }: InstantEvalJudgePageDeps): InstantEvalJudgePageService {
     return new InstantEvalJudgePageService({
       context,
       rowSource,
