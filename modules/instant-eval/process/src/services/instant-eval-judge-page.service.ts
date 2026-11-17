@@ -217,7 +217,9 @@ export class InstantEvalJudgePageService {
     const { judged, stop } = await this.#judgeKeys({ loaded, rows, input });
     // Every row refused for the own model's key is a run that cannot judge anything; skips
     // would read as "nothing matched". Runs only: a judged query keeps them as skips.
+    // A stopped page is cut instead: its unjudged rows were never refused.
     if (
+      stop === null &&
       isEveryRowKeyRefused(judged.usage) &&
       (await this.ownModels.isOwnDecisionModel({ projectId }))
     ) {

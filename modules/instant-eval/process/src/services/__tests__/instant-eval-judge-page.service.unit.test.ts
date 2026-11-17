@@ -702,6 +702,37 @@ describe("given a page cancelled while it was judging", () => {
   });
 });
 
+describe("given a page cancelled after every answered row was refused for the key", () => {
+  describe("when it is written", () => {
+    /** @scenario "A page cancelled part way ends the run where it got to" */
+    it("cuts the page at the stop instead of failing the run", async () => {
+      vi.useFakeTimers();
+      const cancellation = new ScriptedCancellation();
+      try {
+        const scripted = await judging({
+          cancellation,
+          ...TWO_ROWS,
+          concurrency: 1,
+          answer: async ({ index, signal }) => {
+            if (index === 0) return KEY_REFUSED;
+            await cancellation.request();
+            await vi.advanceTimersByTimeAsync(2_000);
+            if (signal?.aborted) throw new DOMException("stopped", "AbortError");
+
+            return KEY_REFUSED;
+          },
+        });
+
+        const outcome = await scripted.service.judgePage(INPUT);
+
+        expect(outcome).toMatchObject({ rows: 1, skipped: 1, cursor: "t1", hasNextPage: false });
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+  });
+});
+
 describe("given a page intent leased for a while", () => {
   /** A lease that leaves the page this many milliseconds to judge in. */
   const leasedFor = (ms: number) =>
