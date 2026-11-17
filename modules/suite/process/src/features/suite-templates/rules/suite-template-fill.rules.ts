@@ -8,12 +8,16 @@ import type {
 import { owaspAgenticTop10Template } from "./owasp-agentic-top-10.rules.ts";
 import { owaspLlmTop10Template } from "./owasp-llm-top-10-2025.rules.ts";
 import { paymentsAgentTemplate } from "./payments-agent.rules.ts";
+import { piiSensitiveDataTemplate } from "./pii-sensitive-data.rules.ts";
+import { promptInjectionTemplate } from "./prompt-injection.rules.ts";
 import { supportAgentTemplate } from "./support-agent.rules.ts";
 
 /** Every shipped suite template, sorted by kind then title. */
 export const SUITE_TEMPLATES: readonly SuiteTemplate[] = [
   owaspLlmTop10Template,
   owaspAgenticTop10Template,
+  piiSensitiveDataTemplate,
+  promptInjectionTemplate,
   supportAgentTemplate,
   paymentsAgentTemplate,
 ].toSorted(

@@ -14,6 +14,13 @@ Feature: Suite templates
     And the OWASP LLM Top 10 2025 pack holds one attack per id LLM01 to LLM10 under its official name
 
   @unit
+  Scenario: The PII and prompt injection packs are listed as red team packs
+    When the shipped templates are read
+    Then the gallery list holds the "pii-sensitive-data" and "prompt-injection" red team packs
+    And each holds six to eight attacks, mapped to LLM02 and LLM01, with a crescendo or goat strategy and a turn cap
+    And applying either pack with a fit fills the agent name, tools and must-never into every attack
+
+  @unit
   Scenario: Listing templates answers every template sorted with full preview data
     When the caller lists templates
     Then every shipped template is returned sorted by kind then title
