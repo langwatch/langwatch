@@ -122,7 +122,7 @@ import type {
   TraceHeader,
   TraceResourceInfoDto,
 } from "./trace-view.contract.ts";
-import type { Protections } from "./trace-viewer-protections.contract.ts";
+import type { Protections, TraceWithholding } from "./trace-viewer-protections.contract.ts";
 import type { TracePageSizeBound } from "./trace.errors.ts";
 import type {
   SpanTreeDeltaInput,
@@ -857,6 +857,8 @@ export interface TraceApi extends TraceOtlpIngestApi {
     cursor?: { sortValue: number; traceId: string };
     filterWhere?: { sql: string; params: Record<string, unknown> };
     visibilityCutoffMs?: number | null;
+    /** Over-plan withholding: later rows are left out and counted on `withheld`. */
+    withholding?: TraceWithholding;
   }): Promise<TraceListPage>;
   /**
    * One page of the Sessions lens through the viewer's protections: content redacted and spend
@@ -922,8 +924,18 @@ export interface TraceApi extends TraceOtlpIngestApi {
     tenantId?: string | undefined;
     occurredAtMs?: number;
     visibilityCutoffMs?: number | null;
+    /** Refuses a summary the over-plan cutoff withholds (`trace_withheld_over_plan`). */
+    withholding?: TraceWithholding;
     full?: boolean;
   }): Promise<unknown>;
+  /** Throws `trace_withheld_over_plan` when the viewer's plan withholds this trace. */
+  assertTraceNotWithheld(input: {
+    authorization: Authorization;
+    traceId: string;
+    tenantId?: string | undefined;
+    occurredAtMs?: number;
+    protections: Protections;
+  }): Promise<void>;
   isTraceWindowRedacted(input: {
     authorization: Authorization;
     traceId: string;
