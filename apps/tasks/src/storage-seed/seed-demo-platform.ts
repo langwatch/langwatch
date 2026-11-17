@@ -1,3 +1,4 @@
+import type { DatasetApi } from "@langwatch/dataset-contract";
 import { createLogger } from "@langwatch/observability";
 import { ExperimentType, type Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
 
@@ -6,54 +7,18 @@ import {
   demoHttpAgentConfig,
   DEMO_PROMPT_CONFIG_DATA,
 } from "./demo-platform-ids.ts";
-
-const DATASET_COLUMNS = [
-  { name: "input", type: "string" },
-  { name: "expected_output", type: "string" },
-  { name: "category", type: "string" },
-];
-
-const DATASET_ROWS = [
-  {
-    input: "I was charged twice for my Pro subscription. Please fix it.",
-    expected_output:
-      "Acknowledge the duplicate charge, explain the refund timeline, and avoid claiming a refund already happened.",
-    category: "billing",
-  },
-  {
-    input: "How can I invite five teammates and choose their roles?",
-    expected_output:
-      "Direct the user to Settings > Members, explain bulk invitations, and mention role selection.",
-    category: "onboarding",
-  },
-  {
-    input: "What happens when the traces API rate limit is exceeded?",
-    expected_output:
-      "Explain HTTP 429, Retry-After, and exponential backoff without inventing a numeric limit.",
-    category: "documentation",
-  },
-  {
-    input: "Checkout returned 500s after a deploy. Summarize the incident.",
-    expected_output:
-      "State the customer impact, the rollback recovery, the missing environment variable, and a prevention action.",
-    category: "incident",
-  },
-  {
-    input: "A customer asks for a refund outside policy and is angry.",
-    expected_output:
-      "Stay empathetic, explain the policy, and escalate to a human without promising an exception.",
-    category: "escalation",
-  },
-] as const;
+import { seedDemoDataset } from "./seed-demo-dataset.ts";
 
 export async function seedDemoPlatform({
   prisma,
+  datasets,
   projectId,
   organizationId,
   userId,
   environment,
 }: {
   prisma: PrismaClient;
+  datasets: DatasetApi;
   projectId: string;
   organizationId: string;
   userId: string;
@@ -250,44 +215,7 @@ export async function seedDemoPlatform({
     },
   });
 
-  const dataset = await prisma.dataset.upsert({
-    where: {
-      projectId_slug: {
-        projectId,
-        slug: "demo-support-regression",
-      },
-      projectId,
-    },
-    create: {
-      id: DEMO_PLATFORM_IDS.dataset,
-      projectId,
-      name: "Support Regression Cases",
-      slug: "demo-support-regression",
-      columnTypes: DATASET_COLUMNS,
-      rowCount: DATASET_ROWS.length,
-      contentLayout: "postgres",
-      status: "ready",
-    },
-    update: {
-      archivedAt: null,
-      columnTypes: DATASET_COLUMNS,
-      rowCount: DATASET_ROWS.length,
-      status: "ready",
-    },
-  });
-
-  for (const [index, entry] of DATASET_ROWS.entries()) {
-    await prisma.datasetRecord.upsert({
-      where: { id: `demo-dataset-record-${index + 1}`, projectId },
-      create: {
-        id: `demo-dataset-record-${index + 1}`,
-        datasetId: dataset.id,
-        projectId,
-        entry: entry,
-      },
-      update: { entry: entry },
-    });
-  }
+  const dataset = await seedDemoDataset({ datasets, projectId });
 
   const experiment = await prisma.experiment.upsert({
     where: {
@@ -368,7 +296,7 @@ export async function seedDemoPlatform({
       evaluators: 2,
       scenarios: scenarios.length,
       suites: 1,
-      datasetRows: DATASET_ROWS.length,
+      dataset: dataset.slug,
       experiment: experiment.slug,
     },
     "seeded the demo platform",

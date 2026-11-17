@@ -39,6 +39,7 @@
     "@langwatch/data-privacy-process": "workspace:*",
     "@langwatch/data-retention-contract": "workspace:*",
     "@langwatch/data-retention-process": "workspace:*",
+    "@langwatch/dataset-contract": "workspace:*",
     "@langwatch/dataset-process": "workspace:*",
     "@langwatch/enterprise-billing-process": "workspace:*",
     "@langwatch/enterprise-connect-process": "workspace:*",
@@ -111,9 +112,13 @@
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@langwatch/entitlement-contract": "workspace:*",
     "@langwatch/eventing": "workspace:*",
+    "@langwatch/project-contract": "workspace:*",
     "@langwatch/prompt-contract": "workspace:*",
+    "@langwatch/stored-object-contract": "workspace:*",
     "@langwatch/test-harness": "workspace:*",
+    "@langwatch/user-contract": "workspace:*",
     "@langwatch/vitest-config": "workspace:*",
     "@langwatch/workflow-contract": "workspace:*",
     "@types/bcrypt": "catalog:",

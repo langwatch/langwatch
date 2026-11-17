@@ -9,6 +9,7 @@ import { createHash, createHmac } from "node:crypto";
 import { API_KEY_PREFIX, INGEST_KEY_PREFIX } from "@langwatch/api-key-contract";
 import { AuthzApi } from "@langwatch/authz-contract";
 import { allowLoopbackVoiceProviders, Config, parseProcessConfig } from "@langwatch/config";
+import { DatasetApi } from "@langwatch/dataset-contract";
 import {
   DEFAULT_LICENSE_PUBLIC_KEY,
   licensingConfig,
@@ -459,12 +460,16 @@ export async function storageSeed({ connections, chain, environment }: TaskInput
   }
 
   if (environment.HAVEN_SEED_PRESET === "demo") {
-    await seedDemoPlatform({
-      prisma,
-      projectId: project.id,
-      organizationId: organization.id,
-      userId: user.id,
-      environment,
+    await withTasksApp({
+      use: (app) =>
+        seedDemoPlatform({
+          prisma,
+          datasets: app.service(DatasetApi),
+          projectId: project.id,
+          organizationId: organization.id,
+          userId: user.id,
+          environment,
+        }),
     });
     await seedGithubFixture({ prisma, organizationId: organization.id });
   }
