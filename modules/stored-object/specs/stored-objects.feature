@@ -23,7 +23,8 @@ Feature: Stored Objects service and API
     And the row contains tenant, object, status, owner, provider-relative identity, byte facts and expiry timestamps
     And StoredObjectRecordRepository is one interface with a Prisma and a memory backend
     And StoredObjectService is a concrete class
-    And no Stored Object event projection, process manager or parallel lifecycle store exists
+    And no Stored Object event, projection, lifecycle process manager or parallel lifecycle store exists
+    And the only pipeline is the scheduled upload reaper, which records no events
 
   @unit @persistence
   Scenario: The memory and Postgres stored-object repositories answer alike
@@ -99,14 +100,14 @@ Feature: Stored Objects service and API
     And failed physical cleanup remains retryable from that same row
     And repeating deletion is safe
 
-  @unit
+  @unit @regression
   Scenario: Probing an object or minting its read URL opens none of its bytes
     Given an available stored object
     When a viewer probes it, or a peer asks for its read URL for a purpose
     Then storage is asked at most whether the bytes exist
     And no byte stream is opened, so no storage connection is held
 
-  @unit
+  @unit @regression
   Scenario: A byte read hands over storage's own stream
     Given an available stored object whose bytes storage streams
     When a reader reads it by id

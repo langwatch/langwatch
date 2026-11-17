@@ -120,8 +120,18 @@ export function useSubscriptionActions({
   const manageSubscription = billingApi.subscription.manage.useMutation();
 
   /** Leaves for the Growth checkout for `seats`; the addresses are invited once it is paid. */
-  const handleUpgrade = async ({ seats, emails = [] }: { seats: number; emails?: string[] }) => {
+  const handleUpgrade = async ({
+    seats,
+    emails = [],
+    retentionDays,
+  }: {
+    seats: number;
+    emails?: string[];
+    /** The retention picked in the upgrade dialog; the seats drawer offers none. */
+    retentionDays?: number;
+  }) => {
     if (!organizationId) return;
+    const retention = retentionDays === undefined ? {} : { retentionDays };
     // A member who may not invite still buys the seats; an admin sends the invitations.
     const invites = host.canInviteMembers() ? checkoutInvites(emails) : [];
 
@@ -137,6 +147,7 @@ export function useSubscriptionActions({
               billingInterval: billingPeriod,
               totalSeats: seats,
               invites,
+              ...retention,
             })
           : createSubscription.mutateAsync({
               organizationId,
@@ -145,6 +156,7 @@ export function useSubscriptionActions({
               membersToAdd: seats,
               currency,
               billingInterval: billingPeriod,
+              ...retention,
             }),
     });
   };

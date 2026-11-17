@@ -1362,6 +1362,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/test-suites/templates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List suite templates
+         * @description List the suite templates that ship with LangWatch: archetypes of everyday behaviour tests and red team packs such as the OWASP Top 10 lists. Each carries its full scenario data, so a caller can preview what applying it creates.
+         */
+        get: operations["listSuiteTemplates"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/test-suites/templates/{templateId}/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Apply a suite template
+         * @description Create a test suite from a template, with one scenario per template scenario filled from the fit: the agent's name, its tools and what it must never do. The suite name defaults to the template title. An unknown template id answers 404 suite_template_not_found.
+         */
+        post: operations["applySuiteTemplate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/test-suites/{id}": {
         parameters: {
             query?: never;
@@ -13198,6 +13238,25 @@ export interface operations {
                     fields?: {
                         [key: string]: string | number | boolean;
                     };
+                    /**
+                     * @description Absent or "standard" plays a user simulator. "red_team" plays an attacker and requires redTeam; a standard scenario with redTeam answers 422 scenario_red_team_config_mismatch.
+                     * @enum {string}
+                     */
+                    kind?: "standard" | "red_team";
+                    /** @description The attack a red_team scenario plays: goal, OWASP ids, strategy and turn budget. */
+                    redTeam?: {
+                        attackGoal: string;
+                        owaspIds: string[];
+                        /**
+                         * @default crescendo
+                         * @enum {string}
+                         */
+                        strategy?: "crescendo" | "goat";
+                        /** @default 30 */
+                        maxTurns?: number;
+                    };
+                    /** @description Refused: only applying a suite template marks a scenario with its template. */
+                    sourceTemplateId?: unknown;
                 };
             };
         };
@@ -14693,6 +14752,104 @@ export interface operations {
             };
         };
     };
+    listSuiteTemplates: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        id: string;
+                        version: number;
+                        /** @enum {string} */
+                        kind: "archetype" | "red_team_pack";
+                        title: string;
+                        description: string;
+                        /** @default [] */
+                        criteria: string[];
+                        scenarios: {
+                            key: string;
+                            name: string;
+                            situation: string;
+                            criteria: string[];
+                            /** @default [] */
+                            labels: string[];
+                            attack?: {
+                                attackGoal: string;
+                                owaspIds: string[];
+                                /** @enum {string} */
+                                strategy: "crescendo" | "goat";
+                                /** @default 30 */
+                                maxTurns: number;
+                            };
+                        }[];
+                    }[];
+                };
+            };
+        };
+    };
+    applySuiteTemplate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                templateId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    fit: {
+                        agentName: string;
+                        /** @default [] */
+                        tools?: string[];
+                        /** @default [] */
+                        mustNever?: string[];
+                    };
+                    name?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Success */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        suiteId: string;
+                        slug: string;
+                        name: string;
+                        scenarioIds: string[];
+                    };
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                        code: string;
+                    };
+                };
+            };
+        };
+    };
     getTestSuite: {
         parameters: {
             query?: never;
@@ -14785,6 +14942,7 @@ export interface operations {
                     "application/json": {
                         error: string;
                         message?: string;
+                        code: string;
                     };
                 };
             };
@@ -14828,6 +14986,7 @@ export interface operations {
                     "application/json": {
                         error: string;
                         message?: string;
+                        code: string;
                     };
                 };
             };
@@ -14958,6 +15117,7 @@ export interface operations {
                     "application/json": {
                         error: string;
                         message?: string;
+                        code: string;
                     };
                 };
             };
@@ -15094,6 +15254,7 @@ export interface operations {
                     "application/json": {
                         error: string;
                         message?: string;
+                        code: string;
                     };
                 };
             };

@@ -348,6 +348,12 @@ jobs:
         if: "!cancelled()"
         run: ./tests/gateway-ingress-and-pdbs.sh
 
+      # Uploads through LangWatch (#9666): the upload route gets its own
+      # Ingress sized for files, and the upload setting reaches app and workers.
+      - name: "assert the stored-object upload route and setting render"
+        if: "!cancelled()"
+        run: ./tests/stored-object-uploads-ingress.sh
+
       # Argo CD renders with no cluster access and as revision 1 every time.
       # With autogen off and operator Secrets the render must be stable, take
       # remapped key names, never block ClickHouse on LangWatchQL, and keep

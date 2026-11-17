@@ -113,8 +113,17 @@ export class ObjectStorageStoredObjectBytesRepository extends StoredObjectBytesR
     return destination;
   }
 
+  async uploadsThroughProcess(input: { projectId: string; expiresAt: Instant }): Promise<boolean> {
+    const signed = await this.objects.signUpload(
+      { projectId: input.projectId, key: checkupKeyOf(input.projectId) },
+      { byteLength: 0, contentType: "text/plain", expiresAt: input.expiresAt },
+    );
+
+    return signed.kind === "through-process";
+  }
+
   async probe(input: { projectId: string }): Promise<void> {
-    const key = `${input.projectId}/checkup/${generate("checkup").toString()}.txt`;
+    const key = checkupKeyOf(input.projectId);
     const body = new TextEncoder().encode("checkup");
     await this.objects.write({ projectId: input.projectId, key }, bodyOf(body), {
       byteLength: body.byteLength,
@@ -122,6 +131,11 @@ export class ObjectStorageStoredObjectBytesRepository extends StoredObjectBytesR
     });
     await this.objects.remove({ projectId: input.projectId, key });
   }
+}
+
+/** A key no stored object takes: a probe writes there, or a checkup signs it and discards it. */
+function checkupKeyOf(projectId: string): string {
+  return `${projectId}/checkup/${generate("checkup").toString()}.txt`;
 }
 
 /** The member refuses an absent object with its own `StoredObjectNotFoundError`. */

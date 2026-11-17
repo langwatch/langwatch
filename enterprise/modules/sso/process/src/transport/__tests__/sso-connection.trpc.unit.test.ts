@@ -111,6 +111,7 @@ async function harness() {
         listEntityHistory: async () => [],
         hasRecordedSince: async () => false,
         findByTargetKind: async () => [],
+        findForOrganization: async () => [],
       },
     },
   });

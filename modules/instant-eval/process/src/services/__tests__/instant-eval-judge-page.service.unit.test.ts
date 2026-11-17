@@ -5,6 +5,7 @@
  */
 
 import { HandledError } from "@langwatch/handled-error";
+import { InstantEvalGatewayBudgetExceededError } from "@langwatch/instant-eval-contract";
 import {
   INSTANT_EVAL_PRICING,
   INSTANT_EVAL_CLASSIFIER_LIMITS,
@@ -192,6 +193,7 @@ async function judging({
   concurrency = 4,
   now = () => AT.epochMilliseconds,
   assertWithinBudget = async () => undefined,
+  assertWithinGatewayBudget = async () => undefined,
   onInsert,
   runCostUsd = 0,
 }: {
@@ -204,6 +206,7 @@ async function judging({
   concurrency?: number;
   now?: () => number;
   assertWithinBudget?: (input: { inFlightUsd?: number | undefined }) => Promise<undefined>;
+  assertWithinGatewayBudget?: (input: { inFlightUsd?: number | undefined }) => Promise<undefined>;
   onInsert?: () => void;
   /** The running row's routed cost so far; zero on an unrouted run, as on main. */
   runCostUsd?: number;
@@ -249,6 +252,7 @@ async function judging({
       judgments,
       cancellation,
       budget: { assertWithinBudget },
+      gatewayBudget: { assertWithinGatewayBudget },
       concurrency,
       now,
     }),
@@ -503,6 +507,36 @@ describe("given a run whose organization has spent its allowance", () => {
       });
 
       await expect(service.judgePage(INPUT)).rejects.toThrow(InstantEvalFreeBudgetExhaustedError);
+      expect(texts.asked).toEqual([]);
+      expect(judge.requests).toEqual([]);
+    });
+  });
+});
+
+describe("given a run whose spend so far reaches a gateway budget set to block", () => {
+  describe("when the next page comes up", () => {
+    /** @scenario "A run under way stops between pages once its spend reaches a blocking budget" */
+    it("refuses before reading anything, projecting the run's own spend", async () => {
+      const checked: number[] = [];
+      const { service, judge, texts } = await judging({
+        keyPage: { keys: [rowKey("t1")], hasMore: true },
+        rows: [{ TraceId: "t1", annoyed: "one" }],
+        runCostUsd: 0.002,
+        assertWithinGatewayBudget: async ({ inFlightUsd }) => {
+          checked.push(inFlightUsd ?? 0);
+          throw new InstantEvalGatewayBudgetExceededError({
+            budgetId: "budget-1",
+            scope: "project",
+            window: "month",
+            limitUsd: 5,
+            spentUsd: 5,
+          });
+        },
+      });
+
+      await expect(service.judgePage(INPUT)).rejects.toThrow(InstantEvalGatewayBudgetExceededError);
+      // $0.002 of routed cost at the 1.3 markup, the same figure the free budget is asked with.
+      expect(checked).toEqual([0.0026]);
       expect(texts.asked).toEqual([]);
       expect(judge.requests).toEqual([]);
     });

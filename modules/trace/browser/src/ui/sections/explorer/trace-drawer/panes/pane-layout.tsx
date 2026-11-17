@@ -8,6 +8,7 @@ import {
   PanelResizeHandle,
 } from "react-resizable-panels";
 
+import type { AgentsTab } from "../../../../../behavior/explorer/use-agents-tab.ts";
 import {
   useTraceDrawer,
   getTraceDrawer,
@@ -25,6 +26,7 @@ interface PaneLayoutProps {
   spans: SpanTreeNode[];
   selectedSpan: SpanTreeNode | null;
   isSpansLoading: boolean;
+  agentsTab: AgentsTab | undefined;
   layout: DrawerLayout;
 }
 
@@ -69,6 +71,7 @@ export function PaneLayout({
   spans,
   selectedSpan,
   isSpansLoading,
+  agentsTab,
   layout,
 }: PaneLayoutProps) {
   const vizTab = useTraceDrawer((s) => s.vizTab);
@@ -195,6 +198,7 @@ export function PaneLayout({
       detailMinSize={detailMinSize}
       detailPanelRef={detailPanelRef}
       isSpansLoading={isSpansLoading}
+      agentsTab={agentsTab}
       layout={layout}
       onClearSpan={clearSpan}
       onSelectSpan={selectSpan}
@@ -593,6 +597,7 @@ function VizDetailGroup({
   detailMinSize,
   detailPanelRef,
   isSpansLoading,
+  agentsTab,
   layout,
   onClearSpan,
   onSelectSpan,
@@ -609,6 +614,7 @@ function VizDetailGroup({
   detailMinSize: number;
   detailPanelRef: PanelRef;
   isSpansLoading: boolean;
+  agentsTab: AgentsTab | undefined;
   layout: DrawerLayout;
   onClearSpan: () => void;
   onSelectSpan: (spanId: string) => void;
@@ -646,6 +652,7 @@ function VizDetailGroup({
           trace={trace}
           spans={spans}
           isLoading={isSpansLoading}
+          agentsTab={agentsTab}
           selectedSpanId={selectedSpanId}
           onSelectSpan={onSelectSpan}
           onClearSpan={onClearSpan}
