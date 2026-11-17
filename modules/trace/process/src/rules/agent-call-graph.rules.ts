@@ -130,10 +130,12 @@ export function classifyA2aSpan(span: AgentCallGraphSpan): A2aClassification {
 /** Attributes an A2A client span may carry the callee's Agent Card name in. */
 const A2A_CALLEE_KEYS = ["a2a.agent.name", "a2a.agent.card.name", "a2a.agent_card.name"];
 
-/** The agent a span names: `gen_ai.agent.name`, `gen_ai.agent.id`, else an A2A callee. */
+/** The agent a span names: an A2A client's callee first, else `gen_ai.agent.name` or `.id`. */
 function agentLabelOf(span: AgentCallGraphSpan): string {
+  const callee = calleeOf(span);
+  if (callee) return callee;
   const name = textAttribute({ params: span.params, key: "gen_ai.agent.name" });
-  return name || textAttribute({ params: span.params, key: "gen_ai.agent.id" }) || calleeOf(span);
+  return name || textAttribute({ params: span.params, key: "gen_ai.agent.id" });
 }
 
 /** The callee an A2A client span names, from its card attributes or `invoke_agent <name>`. */
