@@ -219,11 +219,18 @@ func (s *Service) rememberDenied(vkID string, hashes ...[64]byte) {
 		set[h] = struct{}{}
 		s.deniedKeys.Add(h, vkID)
 	}
-	if len(s.deniedByVK) > denySetSize {
-		for id := range s.deniedByVK {
-			if !s.denied.Contains(id) {
-				delete(s.deniedByVK, id)
-			}
+	s.pruneDeniedIndexLocked()
+}
+
+// pruneDeniedIndexLocked drops keys that left the revocation list once the
+// index outgrows it. The caller holds denyMu.
+func (s *Service) pruneDeniedIndexLocked() {
+	if len(s.deniedByVK) <= denySetSize {
+		return
+	}
+	for id := range s.deniedByVK {
+		if !s.denied.Contains(id) {
+			delete(s.deniedByVK, id)
 		}
 	}
 }
