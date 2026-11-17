@@ -612,3 +612,38 @@ func TestRevocation_FailClosedRecheckSkipsDeadEntry(t *testing.T) {
 		t.Fatalf("an entry past its hard cap must not serve, got %v", err)
 	}
 }
+
+// @scenario "fail closed refuses a key nothing re-checked within the limit"
+func TestRevocation_FailClosedTreatsNeverPolledFeedAsSilent(t *testing.T) {
+	res := &hookResolver{err: errControlPlaneDown}
+	svc, _ := newService(t, Options{Resolver: res, ConfigFetcher: res, FailClosedAfter: time.Minute})
+	recent := domain.PresentedKey{Token: "vk-lw-recent"}
+	old := domain.PresentedKey{Token: "vk-lw-unpolled"}
+	svc.publishL1(hashKey(recent), svc.newEntry(orgBundle("vk_recent", time.Now().Add(time.Hour)), "").authFrom(time.Now()))
+	svc.publishL1(hashKey(old), svc.newEntry(orgBundle("vk_unpolled", time.Now().Add(time.Hour)), "").authFrom(time.Now().Add(-2*time.Minute)))
+
+	if _, err := svc.Resolve(context.Background(), recent); err != nil {
+		t.Fatalf("a key confirmed within the limit serves before the first poll: %v", err)
+	}
+	if _, err := svc.Resolve(context.Background(), old); !errors.Is(err, domain.ErrAuthUpstream) {
+		t.Fatalf("a feed that never answered vouches for nothing, want auth_upstream_unavailable, got %v", err)
+	}
+}
+
+// @scenario "fail closed re-checks a key before refusing it"
+func TestRevocation_ConfigFailureStaleServeKeepsFreshKeyCheck(t *testing.T) {
+	res := &hookResolver{bundle: orgBundle("vk_stalecfg", time.Now().Add(time.Hour)), cfgErr: errControlPlaneDown}
+	svc, _ := newService(t, Options{Resolver: res, ConfigFetcher: res, FailClosedAfter: time.Minute})
+	key := domain.PresentedKey{Token: "vk-lw-stalecfg"}
+	svc.publishL1(hashKey(key), svc.newEntry(orgBundle("vk_stalecfg", time.Now().Add(-time.Second)), "").authFrom(time.Now().Add(-2*time.Minute)))
+	cur, _ := svc.activeOrgs.Load("org_1")
+	cursor, _ := cur.(*orgCursor)
+	cursor.polledAt.Store(time.Now().Add(-2 * time.Minute).UnixNano())
+
+	if _, err := svc.Resolve(context.Background(), key); err != nil {
+		t.Fatalf("a key the control plane just confirmed serves its stale config: %v", err)
+	}
+	if res.calls != 1 {
+		t.Fatalf("the refresh confirmed the key, so admission needs no second check, got %d calls", res.calls)
+	}
+}

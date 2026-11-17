@@ -175,14 +175,13 @@ type Service struct {
 type orgCursor struct {
 	since string
 	// polledAt is the unix nano time of the last poll the control plane
-	// answered; the fail-closed rule reads it from request goroutines.
+	// answered (zero until the first one); the fail-closed rule reads it from
+	// request goroutines.
 	polledAt atomic.Int64
 }
 
 func newOrgCursor() *orgCursor {
-	c := &orgCursor{since: "0"}
-	c.polledAt.Store(time.Now().UnixNano())
-	return c
+	return &orgCursor{since: "0"}
 }
 
 // entry tracks both the natural JWT exp ("soft" expiry, bumpable on
@@ -1035,7 +1034,7 @@ func (s *Service) refreshOrServeStale(ctx context.Context, lk lookup, stale *ent
 			// bundle would surface as no_provider_configured for an org
 			// whose keys are fine — treat it as a transport failure and
 			// serve the stale entry's known-good credentials instead.
-			return s.serveStaleAfterFailure(ctx, staleFailure{h: h, stale: stale, staleBundle: staleBundle, hardExpiresAt: hardExpiresAt, cls: cls, cause: cfgErr})
+			return s.serveStaleAfterFailure(ctx, staleFailure{h: h, stale: stale, staleBundle: staleBundle, hardExpiresAt: hardExpiresAt, cls: cls, cause: cfgErr, authStart: start})
 		}
 		s.publishFetched(h, s.newEntry(bundle, etag).authFrom(start), since)
 		return served{bundle: bundle, authStart: start}, nil
@@ -1051,7 +1050,7 @@ func (s *Service) refreshOrServeStale(ctx context.Context, lk lookup, stale *ent
 		return served{}, err
 
 	default:
-		return s.serveStaleAfterFailure(ctx, staleFailure{h: h, stale: stale, staleBundle: staleBundle, hardExpiresAt: hardExpiresAt, cls: cls, cause: err})
+		return s.serveStaleAfterFailure(ctx, staleFailure{h: h, stale: stale, staleBundle: staleBundle, hardExpiresAt: hardExpiresAt, cls: cls, cause: err, authStart: stale.authStart()})
 	}
 }
 
@@ -1076,6 +1075,8 @@ type staleFailure struct {
 	hardExpiresAt time.Time
 	cls           refreshErrorClass
 	cause         error
+	// authStart is the key confirmation time served with the stale bundle.
+	authStart time.Time
 }
 
 // serveStaleAfterFailure is the transport-failure tail of refreshOrServeStale:
@@ -1116,7 +1117,7 @@ func (s *Service) serveStaleAfterFailure(ctx context.Context, f staleFailure) (s
 		zap.Duration("hard_grace_remaining", time.Until(hardExpiresAt)),
 		zap.String("refresh_error_class", classLabel),
 	)
-	return served{bundle: staleBundle, authStart: stale.authStart(), stale: "stale_while_error"}, nil
+	return served{bundle: staleBundle, authStart: f.authStart, stale: "stale_while_error"}, nil
 }
 
 // populateConfig eagerly fetches the bundle's config and merges it into the
