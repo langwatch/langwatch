@@ -15,10 +15,11 @@ import {
   type OcsfIngestOrderedReader,
   type OcsfSeatReportReader,
 } from "../clickhouse/clickhouse.ocsf-events.repository.ts";
-import type {
-  GovernanceOcsfEvent,
-  GovernanceOcsfEventsReader,
-  GovernanceOcsfEventWriter,
+import {
+  governanceOcsfExportRowOf,
+  type GovernanceOcsfEvent,
+  type GovernanceOcsfEventsReader,
+  type GovernanceOcsfEventWriter,
 } from "../governance.repositories.ts";
 
 /**
@@ -73,7 +74,7 @@ export class MemoryOcsfEventsRepository
         return byTime !== 0 ? byTime : a.eventId.localeCompare(b.eventId);
       })
       .slice(0, input.limit)
-      .map(toExportRow);
+      .map(governanceOcsfExportRowOf);
   }
 
   async findAllByIngest(
@@ -98,7 +99,7 @@ export class MemoryOcsfEventsRepository
       )
       .toSorted((a, b) => ingestedAt(a) - ingestedAt(b) || a.eventId.localeCompare(b.eventId))
       .slice(0, input.limit)
-      .map((row) => ({ ...toExportRow(row), ingestedAtMs: ingestedAt(row) }));
+      .map((row) => ({ ...governanceOcsfExportRowOf(row), ingestedAtMs: ingestedAt(row) }));
   }
 
   /** The newest seat report per pool, from LangWatch's own events only, as the live read. */
@@ -127,27 +128,4 @@ export class MemoryOcsfEventsRepository
         }),
       );
   }
-}
-
-function toExportRow(row: GovernanceOcsfEvent): GovernanceOcsfExportRow {
-  return {
-    eventId: row.eventId,
-    ocsfSchemaVersion: "1.1.0",
-    traceId: row.traceId,
-    sourceId: row.sourceId,
-    sourceType: row.sourceType,
-    classUid: row.classUid ?? 6003,
-    categoryUid: row.categoryUid ?? 6,
-    activityId: row.activityId,
-    typeUid: row.typeUid ?? (row.classUid ?? 6003) * 100 + row.activityId,
-    severityId: row.severityId,
-    eventTimeMs: row.eventTime.epochMilliseconds,
-    actorUserId: row.actorUserId,
-    actorEmail: row.actorEmail,
-    actorEnduserId: row.actorEnduserId,
-    actionName: row.actionName,
-    targetName: row.targetName,
-    anomalyAlertId: row.anomalyAlertId,
-    rawOcsfJson: row.rawOcsfJson,
-  };
 }

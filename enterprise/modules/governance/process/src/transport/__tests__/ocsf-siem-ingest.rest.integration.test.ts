@@ -116,6 +116,34 @@ describe("the OCSF SIEM REST family: ingest", () => {
       expect(JSON.stringify(await response.json())).toContain("class_uid");
     });
 
+    /** @scenario An event timed more than a day ahead is refused */
+    it("refuses an event two days in the future with 422", async () => {
+      const { post } = await buildApi();
+      const event = { ...okta("o-ahead"), time: Date.now() + 2 * 24 * 60 * 60 * 1000 };
+
+      const response = await post("/api/governance/ocsf/ingest", {
+        source: "okta",
+        events: [event],
+      });
+
+      expect(response.status).toBe(422);
+      expect(JSON.stringify(await response.json())).toContain("time");
+    });
+
+    /** @scenario An event timed before the year 2000 is refused */
+    it("refuses an event timed in 1970 with 422", async () => {
+      const { post } = await buildApi();
+      const event = { ...okta("o-1970"), time: 1_000 };
+
+      const response = await post("/api/governance/ocsf/ingest", {
+        source: "okta",
+        events: [event],
+      });
+
+      expect(response.status).toBe(422);
+      expect(JSON.stringify(await response.json())).toContain("time");
+    });
+
     /** @scenario A seat report pushed in from another source leaves the seat figures alone */
     it("keeps an ingested seat_report out of the seat reports", async () => {
       const { post, seatReports } = await buildApi();

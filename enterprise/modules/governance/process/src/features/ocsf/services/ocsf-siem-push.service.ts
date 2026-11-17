@@ -2,13 +2,12 @@
 import {
   OCSF_EVENT_TYPE,
   OCSF_PUSHED_SOURCE_TYPE,
-  type GovernanceOcsfExportRow,
 } from "@langwatch/enterprise-governance-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { eventMatches, type WebhookApi } from "@langwatch/webhook-contract";
 
 import {
-  OCSF_STORED_SCHEMA_VERSION,
+  governanceOcsfExportRowOf,
   type GovernanceOcsfEvent,
   type GovernanceOcsfEventSink,
 } from "../../../repositories/governance.repositories.ts";
@@ -28,29 +27,6 @@ type OcsfSiemPushDependencies = {
   /** The pipeline's outbox in the worker, the Postgres intents in the api; memory-only stacks push nothing. */
   outbox: () => OcsfPushOutbox | undefined;
 };
-
-function exportRowOf(row: GovernanceOcsfEvent): GovernanceOcsfExportRow {
-  return {
-    eventId: row.eventId,
-    ocsfSchemaVersion: OCSF_STORED_SCHEMA_VERSION,
-    traceId: row.traceId,
-    sourceId: row.sourceId,
-    sourceType: row.sourceType,
-    classUid: row.classUid ?? 6003,
-    categoryUid: row.categoryUid ?? 6,
-    activityId: row.activityId,
-    typeUid: row.typeUid ?? 6003 * 100 + row.activityId,
-    severityId: row.severityId,
-    eventTimeMs: row.eventTime.epochMilliseconds,
-    actorUserId: row.actorUserId,
-    actorEmail: row.actorEmail,
-    actorEnduserId: row.actorEnduserId,
-    actionName: row.actionName,
-    targetName: row.targetName,
-    anomalyAlertId: row.anomalyAlertId,
-    rawOcsfJson: row.rawOcsfJson,
-  };
-}
 
 /**
  * The writer every LangWatch-built OCSF row goes through: it writes the rows, then queues each event
@@ -100,7 +76,10 @@ export class OcsfSiemPushService implements GovernanceOcsfEventSink {
     if (!(await this.deps.entitlements.hasEnterprisePlan(organizationId))) return;
 
     const intents = rows.flatMap((row) => {
-      const body = governanceRowToOcsfEvent({ row: exportRowOf(row), organizationId });
+      const body = governanceRowToOcsfEvent({
+        row: governanceOcsfExportRowOf(row),
+        organizationId,
+      });
       return endpoints.map((endpoint) => ({
         organizationId,
         endpointId: endpoint.id,

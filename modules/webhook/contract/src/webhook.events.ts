@@ -6,6 +6,8 @@ const webhookEventTypeSchemaDefinition = z.object({
   family: z.string().min(1),
   schemaVersion: z.literal("1"),
   isEmitting: z.boolean(),
+  /** Left out of `*`: an endpoint receives the type only when it names it or its family. */
+  isOptInOnly: z.boolean().optional(),
   description: z.string().min(1),
 });
 export interface WebhookEventTypeSchema extends Named<typeof webhookEventTypeSchemaDefinition> {}
@@ -128,6 +130,7 @@ export const WEBHOOK_EVENT_TYPES = [
     family: "ocsf",
     schemaVersion: "1",
     isEmitting: true,
+    isOptInOnly: true,
     description:
       "One OCSF 1.9.0 governance event for a SIEM, batched per delivery like every event type. Sent only to endpoints that name this type or ocsf.*, never to *.",
   },
@@ -154,12 +157,18 @@ export function isValidEventSelector(selector: string): boolean {
   return knownTypes.has(selector);
 }
 
-/** `*` matches every type except `ocsf.*`, which an endpoint must name to receive. */
+const optInOnlyTypes = new Set<string>(
+  WEBHOOK_EVENT_TYPES.flatMap((entry) =>
+    "isOptInOnly" in entry && entry.isOptInOnly ? [entry.type] : [],
+  ),
+);
+
+/** `*` matches every type except an opt-in-only one, which an endpoint must name to receive. */
 export function eventMatches(enabledEvents: readonly string[], eventType: string): boolean {
-  const isOcsfEvent = eventType.startsWith("ocsf.");
+  const isOptInOnly = optInOnlyTypes.has(eventType);
   return enabledEvents.some(
     (selector) =>
-      (selector === "*" && !isOcsfEvent) ||
+      (selector === "*" && !isOptInOnly) ||
       selector === eventType ||
       (selector.endsWith(".*") && eventType.startsWith(selector.slice(0, -1))),
   );

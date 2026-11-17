@@ -50,16 +50,6 @@ const logger = createLogger("langwatch:governance:clickhouse-ocsf-events-reposit
 const OCSF_CLASS_API_ACTIVITY = 6003;
 const OCSF_CATEGORY_APPLICATION_ACTIVITY = 6;
 
-/**
- * Single source of truth for the OCSF schema version stamped on every
- * row written to governance_ocsf_events. SIEM consumers filter on this
- * to opt into / out of new OCSF revisions. Bump in lockstep with the
- * `RawOcsfJson` payload shape; downstream OCSF v1.2 work would update
- * this constant + (optionally) emit a new ClassUid.
- *
- * Migration: 00028_add_ocsf_schema_version.sql
- */
-
 /** Cursor-paginated read of `governance_ocsf_events`, ordered EventTime ASC. */
 export interface FindOcsfEventsInput {
   tenantId: string;

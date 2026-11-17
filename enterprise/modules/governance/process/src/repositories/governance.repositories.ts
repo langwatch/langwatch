@@ -228,5 +228,35 @@ export type GovernanceClickHouseTenantResolver = (
   tenantId: string,
 ) => Promise<GovernanceClickHouseTenantClient>;
 
-/** The OCSF schema version every stored governance row is written under. */
+/**
+ * The OCSF schema version stamped on every governance_ocsf_events row (migration 00028).
+ * SIEM consumers filter on it; bump it with the RawOcsfJson shape.
+ */
 export const OCSF_STORED_SCHEMA_VERSION = "1.1.0";
+export const OCSF_API_ACTIVITY_CLASS_UID = 6003;
+export const OCSF_APPLICATION_ACTIVITY_CATEGORY_UID = 6;
+
+/** A stored event as the export reads it; LangWatch's own rows default to API Activity. */
+export function governanceOcsfExportRowOf(row: GovernanceOcsfEvent): GovernanceOcsfExportRow {
+  const classUid = row.classUid ?? OCSF_API_ACTIVITY_CLASS_UID;
+  return {
+    eventId: row.eventId,
+    ocsfSchemaVersion: OCSF_STORED_SCHEMA_VERSION,
+    traceId: row.traceId,
+    sourceId: row.sourceId,
+    sourceType: row.sourceType,
+    classUid,
+    categoryUid: row.categoryUid ?? OCSF_APPLICATION_ACTIVITY_CATEGORY_UID,
+    activityId: row.activityId,
+    typeUid: row.typeUid ?? classUid * 100 + row.activityId,
+    severityId: row.severityId,
+    eventTimeMs: row.eventTime.epochMilliseconds,
+    actorUserId: row.actorUserId,
+    actorEmail: row.actorEmail,
+    actorEnduserId: row.actorEnduserId,
+    actionName: row.actionName,
+    targetName: row.targetName,
+    anomalyAlertId: row.anomalyAlertId,
+    rawOcsfJson: row.rawOcsfJson,
+  };
+}

@@ -107,6 +107,19 @@ Feature: OCSF 1.9 SIEM export, push and ingest
       Then the answer is 422 with code "validation_error"
 
     @integration
+    Scenario: The governance events stream pages in write order and reads an event written again once, at its newest version
+      Given three governance events stored one after another
+      When a SIEM reads them two per page with the cursor
+      Then the pages hold the events in the order they were stored
+      And an event written again after the cursor is read once more, with its newest payload only
+
+    @integration
+    Scenario: The governance events stream filters stored events by source and time
+      Given governance events from two source types at different times
+      When the stream is read for one source type, one source or one time window
+      Then only the events inside that filter are returned
+
+    @integration
     Scenario: The project traces stream walks every project and resumes from its cursor
       Given each of the two projects holds one trace
       When a SIEM reads the project traces stream until has_more is false
@@ -214,6 +227,16 @@ Feature: OCSF 1.9 SIEM export, push and ingest
     Scenario: An event with a class_uid outside the OCSF range is refused
       When a source pushes an event with class_uid 99999999999
       Then the response is 422 naming class_uid
+
+    @integration
+    Scenario: An event timed more than a day ahead is refused
+      When a source pushes an event whose time is two days from now
+      Then the response is 422 naming time
+
+    @integration
+    Scenario: An event timed before the year 2000 is refused
+      When a source pushes an event whose time is in 1970
+      Then the response is 422 naming time
 
     @integration
     Scenario: A seat report pushed in from another source leaves the seat figures alone
