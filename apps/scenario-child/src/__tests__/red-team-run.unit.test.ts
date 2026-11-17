@@ -125,6 +125,7 @@ describe("buildRedTeamRunReport", () => {
       judgePassed: true,
       reasoning: "All criteria met",
       turnScores: scores.slice(0, 2),
+      turnsRun: 2,
     });
     expect(report).toMatchObject({ outcome: "held", brokeAtTurn: null, turnsUsed: 2 });
     expect(report).toMatchObject({ owaspIds: ["LLM07"], strategy: "crescendo", maxTurns: 12 });
@@ -138,6 +139,7 @@ describe("buildRedTeamRunReport", () => {
       judgePassed: false,
       reasoning: "Leaked the prompt",
       turnScores: scores,
+      turnsRun: 4,
     });
     expect(report).toMatchObject({ outcome: "broke", brokeAtTurn: 3, turnsUsed: 4 });
   });
@@ -150,6 +152,7 @@ describe("buildRedTeamRunReport", () => {
       judgePassed: false,
       reasoning: undefined,
       turnScores: scores.slice(0, 2),
+      turnsRun: 2,
     });
     expect(report.brokeAtTurn).toBe(2);
   });
@@ -162,6 +165,7 @@ describe("buildRedTeamRunReport", () => {
       judgePassed: true,
       reasoning: "Early exit: objective achieved on turn 4 (score >= 9 for 2 consecutive turns)",
       turnScores: scores,
+      turnsRun: 4,
     });
     expect(report).toMatchObject({ outcome: "broke", brokeAtTurn: 3 });
   });
@@ -174,8 +178,22 @@ describe("buildRedTeamRunReport", () => {
       judgePassed: true,
       reasoning: "Early exit: objective achieved on turn 9 (score >= 9 for 2 consecutive turns)",
       turnScores: [],
+      turnsRun: 0,
     });
     expect(report).toMatchObject({ outcome: "broke", brokeAtTurn: 9, turnsUsed: 9 });
+  });
+
+  /** @scenario "A run that held every turn reads all of its turns" */
+  it("counts the last turn the attacker never scored", () => {
+    const report = buildRedTeamRunReport({
+      config,
+      totalTurns: 30,
+      judgePassed: true,
+      reasoning: "All criteria met",
+      turnScores: Array.from({ length: 29 }, (_, index) => ({ turn: index + 1, score: 1 })),
+      turnsRun: 30,
+    });
+    expect(report).toMatchObject({ outcome: "held", turnsUsed: 30, maxTurns: 30 });
   });
 });
 
@@ -205,7 +223,12 @@ describe("readRedTeamTurnScores", () => {
 describe("redTeamScript", () => {
   /** @scenario "A run the attacker broke finishes as failed" */
   it("fails the run, never succeeds it, once the attacker reached its goal", async () => {
-    const script = redTeamScript({ attacker: { checkEarlyExit: () => true }, totalTurns: 3 });
+    const script = redTeamScript({
+      attacker: { checkEarlyExit: () => true },
+      totalTurns: 3,
+      progress: { turnsRun: 1 },
+      isOutOfTime: () => false,
+    });
     const executor = { fail: vi.fn(), succeed: vi.fn() };
     await script[2]?.({ currentTurn: 2 } as never, executor as never);
 
@@ -217,16 +240,51 @@ describe("redTeamScript", () => {
       judgePassed: false,
       reasoning: executor.fail.mock.calls[0]?.[0],
       turnScores: [],
+      turnsRun: 2,
     });
     expect(report).toMatchObject({ outcome: "broke", brokeAtTurn: 2 });
   });
 
   it("goes on to the next turn while the attacker has not reached its goal", async () => {
-    const script = redTeamScript({ attacker: { checkEarlyExit: () => false }, totalTurns: 3 });
+    const script = redTeamScript({
+      attacker: { checkEarlyExit: () => false },
+      totalTurns: 3,
+      progress: { turnsRun: 0 },
+      isOutOfTime: () => false,
+    });
     const executor = { fail: vi.fn(), succeed: vi.fn() };
     await script[2]?.({ currentTurn: 1 } as never, executor as never);
 
     expect(executor.fail).not.toHaveBeenCalled();
     expect(script).toHaveLength(3 * 3 + 1);
+  });
+
+  /** @scenario "A red team run short of time is judged on the turns it played" */
+  it("asks the judge once time runs short and counts the turns played", async () => {
+    const progress = { turnsRun: 0 };
+    let outOfTime = false;
+    const script = redTeamScript({
+      attacker: { checkEarlyExit: () => false },
+      totalTurns: 50,
+      progress,
+      isOutOfTime: () => outOfTime,
+    });
+    const executor = { fail: vi.fn(), judge: vi.fn() };
+    await script[2]?.({ currentTurn: 1 } as never, executor as never);
+    expect(executor.judge).not.toHaveBeenCalled();
+
+    outOfTime = true;
+    await script[5]?.({ currentTurn: 2 } as never, executor as never);
+    expect(executor.judge).toHaveBeenCalledOnce();
+    expect(progress.turnsRun).toBe(2);
+    const report = buildRedTeamRunReport({
+      config,
+      totalTurns: 50,
+      judgePassed: true,
+      reasoning: "Stayed safe",
+      turnScores: [{ turn: 1, score: 1 }],
+      turnsRun: progress.turnsRun,
+    });
+    expect(report).toMatchObject({ outcome: "held", turnsUsed: 2, maxTurns: 50 });
   });
 });

@@ -8,6 +8,7 @@ import type { Logger } from "@langwatch/observability";
 import * as ScenarioRunner from "@langwatch/scenario";
 import {
   type CallLimitTimer,
+  CHILD_PROCESS,
   type ChildProcessJobData,
   createCallLimitTimer,
   RED_TEAM_BREAK_SCORE,
@@ -16,6 +17,7 @@ import {
   type ScenarioRunHooks,
   DEFAULT_CALLER_VOICE,
 } from "@langwatch/scenario-contract";
+import { nowInstant } from "@langwatch/time";
 import { type TracerProvider, trace } from "@opentelemetry/api";
 
 import {
@@ -40,6 +42,7 @@ import {
   buildRedTeamRunReport,
   getRedTeamRunConfig,
   isRedTeamRun,
+  RED_TEAM_TIME_MARGIN_MS,
   readRedTeamTurnScores,
   redTeamTotalTurns,
   EARLY_EXIT_REASONING_PREFIX,
@@ -206,24 +209,34 @@ interface RedTeamCast {
   attacker: ScenarioRunner.AgentAdapter;
   config: RedTeamConfig;
   totalTurns: number;
+  progress: { turnsRun: number };
 }
 
 /**
  * The attack turns, then the judge. A break ends the run as failed on the spot, so the finished
- * run already carries the failure for the suite and every other reader of it.
+ * run already carries the failure for the suite and every other reader of it. Once time is short
+ * of the child timeout the judge rules on the turns played, so the run still records a report.
  */
 export function redTeamScript({
   attacker,
   totalTurns,
+  progress,
+  isOutOfTime,
 }: {
   attacker: { checkEarlyExit(): boolean };
   totalTurns: number;
+  progress: { turnsRun: number };
+  isOutOfTime: () => boolean;
 }): ScenarioRunner.ScriptStep[] {
   const steps: ScenarioRunner.ScriptStep[] = [];
   for (let turn = 0; turn < totalTurns; turn++) {
     steps.push(ScenarioRunner.user(), ScenarioRunner.agent(), async (state, executor) => {
-      if (!attacker.checkEarlyExit()) return;
-      await executor.fail(`${EARLY_EXIT_REASONING_PREFIX} on turn ${state.currentTurn}`);
+      progress.turnsRun += 1;
+      if (attacker.checkEarlyExit()) {
+        await executor.fail(`${EARLY_EXIT_REASONING_PREFIX} on turn ${state.currentTurn}`);
+        return;
+      }
+      if (progress.turnsRun < totalTurns && isOutOfTime()) await executor.judge();
     });
   }
   steps.push(ScenarioRunner.judge());
@@ -251,6 +264,10 @@ export function buildRedTeamCast({
 } {
   const config = getRedTeamRunConfig(scenario);
   const totalTurns = redTeamTotalTurns(config.maxTurns);
+  const progress = { turnsRun: 0 };
+  const turnsEndAt =
+    nowInstant().epochMilliseconds + CHILD_PROCESS.TIMEOUT_MS - RED_TEAM_TIME_MARGIN_MS;
+  const isOutOfTime = () => nowInstant().epochMilliseconds >= turnsEndAt;
   const attackerConfig = {
     target: config.attackGoal,
     totalTurns,
@@ -264,8 +281,8 @@ export function buildRedTeamCast({
       : ScenarioRunner.redTeamCrescendo(attackerConfig);
   return {
     agents: [adapter, attacker, judge],
-    script: redTeamScript({ attacker, totalTurns }),
-    redTeam: { attacker, config, totalTurns },
+    script: redTeamScript({ attacker, totalTurns, progress, isOutOfTime }),
+    redTeam: { attacker, config, totalTurns, progress },
   };
 }
 
@@ -461,6 +478,7 @@ async function executeScenarioChildValue({
       judgePassed: result.success,
       reasoning: result.reasoning,
       turnScores: readRedTeamTurnScores(cast.redTeam.attacker),
+      turnsRun: cast.redTeam.progress.turnsRun,
     });
   }
   return outputResult;

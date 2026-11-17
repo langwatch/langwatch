@@ -62,9 +62,9 @@ export function readRedTeamTurnScores(attacker: unknown): RedTeamTurnScore[] {
 }
 
 /**
- * What a finished red team run records. The run held when the judge passed it; it broke when the
- * judge failed it or the attacker's own scorer ended it early. A broken run names the first turn
- * that reached the break score, else its last scored turn.
+ * What a finished red team run records: held when the judge passed it, broke when the judge failed
+ * it or the attacker's scorer ended it early, naming the first turn at the break score. `turnsRun`
+ * counts turns played, scored or not: the attacker scores a turn only once the next one starts.
  * @see modules/scenario/specs/red-team-scenario.feature
  */
 export function buildRedTeamRunReport({
@@ -73,12 +73,14 @@ export function buildRedTeamRunReport({
   judgePassed,
   reasoning,
   turnScores,
+  turnsRun,
 }: {
   config: RedTeamConfig;
   totalTurns: number;
   judgePassed: boolean;
   reasoning: string | undefined;
   turnScores: RedTeamTurnScore[];
+  turnsRun: number;
 }): RedTeamRunReport {
   const endedEarly = reasoning?.startsWith(EARLY_EXIT_REASONING_PREFIX) ?? false;
   const outcome = judgePassed && !endedEarly ? "held" : "broke";
@@ -92,7 +94,10 @@ export function buildRedTeamRunReport({
     owaspIds: config.owaspIds,
     attackGoal: config.attackGoal,
     maxTurns: totalTurns,
-    turnsUsed: Math.max(lastTurn ?? 0, earlyExitTurn ?? 0),
+    turnsUsed: Math.min(totalTurns, Math.max(turnsRun, lastTurn ?? 0, earlyExitTurn ?? 0)),
     turnScores,
   };
 }
+
+/** Turns stop this long before the child timeout, so the judge and the report still fit. */
+export const RED_TEAM_TIME_MARGIN_MS = 2 * 60 * 1000;
