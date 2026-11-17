@@ -593,6 +593,35 @@ function annotationInserts(): string {
   );
 }
 
+type QueryRunner = (args: {
+  sql: string;
+  list: readonly string[];
+}) => Promise<{ rows?: string; count?: number; error?: string }>;
+
+/** Each moved query, read once per trace, matches its pre-move form under every source list. */
+async function expectEachMovedQueryMatchesBaseline({
+  run,
+  sent,
+  database,
+}: {
+  run: QueryRunner;
+  sent: (label: string) => string;
+  database: string;
+}): Promise<void> {
+  const onePerTrace = (sql: string) => readingOneRowPerTrace({ sql, database });
+  const differing: string[] = [];
+  for (const { list } of LISTS) {
+    for (const { label, sql: before } of BEFORE) {
+      const now = await run({ sql: onePerTrace(sent(label)), list });
+      const moved = await run({ sql: onePerTrace(before), list });
+      expect(now.error, `${label} now under ${list.join(", ")}`).toBeUndefined();
+      expect(moved.error, `${label} before the move under ${list.join(", ")}`).toBeUndefined();
+      if (now.rows !== moved.rows) differing.push(`${label} under ${list.join(", ")}`);
+    }
+  }
+  expect(differing).toEqual([]);
+}
+
 describe("given trace evaluations with unmerged retraction pairs beside main's facts", () => {
   let harness: LangWatchQLClickHouseHarness;
   let postgres: LangWatchQLPostgresHarness;
@@ -644,19 +673,8 @@ describe("given trace evaluations with unmerged retraction pairs beside main's f
   }
 
   /** Every moved query reads the moved trace as its pre-move form reads it once, at its latest. */
-  async function expectMovedQueriesMatchBaseline(): Promise<void> {
-    const onePerTrace = (sql: string) => readingOneRowPerTrace({ sql, database: oneRowPerTrace });
-    const differing: string[] = [];
-    for (const { list } of LISTS) {
-      for (const { label, sql: before } of BEFORE) {
-        const now = await run({ sql: onePerTrace(sent(label)), list });
-        const moved = await run({ sql: onePerTrace(before), list });
-        expect(now.error, `${label} now under ${list.join(", ")}`).toBeUndefined();
-        expect(moved.error, `${label} before the move under ${list.join(", ")}`).toBeUndefined();
-        if (now.rows !== moved.rows) differing.push(`${label} under ${list.join(", ")}`);
-      }
-    }
-    expect(differing).toEqual([]);
+  function expectMovedQueriesMatchBaseline(): Promise<void> {
+    return expectEachMovedQueryMatchesBaseline({ run, sent, database: oneRowPerTrace });
   }
 
   /** The move wrote a second, unmerged `trace_analytics` row, so the views must pick the later. */
@@ -877,7 +895,7 @@ describe("given trace evaluations with unmerged retraction pairs beside main's f
   });
 
   // These write traces the earlier tests do not expect, so they run last.
-  /** One judged trace's writes as the folds make them, each write anchored and written on its day. */
+  /** One judged trace's writes as the folds make them, each anchored and written on its day. */
   async function writeJudgedTrace({
     trace,
     writes,
@@ -933,7 +951,8 @@ describe("given trace evaluations with unmerged retraction pairs beside main's f
         ["trace_analytics", [{ ...analyticsRow(seed), UpdatedAt: onDay(write.updated) }]],
       );
       const previous = writes[index - 1];
-      if (previous) inserts.push(["trace_evaluation_analytics", [judged(seedOf(previous), -1, index)]]);
+      if (previous)
+        inserts.push(["trace_evaluation_analytics", [judged(seedOf(previous), -1, index)]]);
       inserts.push(["trace_evaluation_analytics", [judged(seed, 1, index + 1)]]);
     });
     inserts.push([
@@ -965,7 +984,9 @@ describe("given trace evaluations with unmerged retraction pairs beside main's f
   const MANAGED_FIXTURE_VERSIONS = ["pv-a", "pv-b", "pv-old", "pv-new"];
 
   /** att-change/units' rows for the fixtures' versions, sent floored and in main's form. */
-  async function managedUnitRows(list: readonly string[]): Promise<{ now: string[]; main: string[] }> {
+  async function managedUnitRows(
+    list: readonly string[],
+  ): Promise<{ now: string[]; main: string[] }> {
     const label = "att-change/units";
     const rowsOf = async (sql: string) => {
       const result = await client.query({

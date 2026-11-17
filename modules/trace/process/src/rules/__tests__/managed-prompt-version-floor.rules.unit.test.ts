@@ -26,13 +26,19 @@ describe("managedPromptVersionFloorOf", () => {
     ["no ledger row", []],
     ["a pending row", [{ status: "pending", report: null, startedAt: null }]],
     ["a gated row", [{ status: "gated", report: null, startedAt: null }]],
-    ["a running row", [{ status: "running", report: { replayedSince: SINCE }, startedAt: STARTED }]],
+    [
+      "a running row",
+      [{ status: "running", report: { replayedSince: SINCE }, startedAt: STARTED }],
+    ],
   ];
 
   /** @scenario "A widget reading the managed version says history is rebuilding until the replay is done" */
-  it.each(notYetDone)("is rebuilding with %s, even once a running replay records its since", (_, rows) => {
-    expect(managedPromptVersionFloorOf(rows)).toEqual(REBUILDING);
-  });
+  it.each(notYetDone)(
+    "is rebuilding with %s, even once a running replay records its since",
+    (_, rows) => {
+      expect(managedPromptVersionFloorOf(rows)).toEqual(REBUILDING);
+    },
+  );
 
   /** @scenario "A replay that failed after its retries shows the history as unknown, never the rows" */
   it("is unknown when the replay failed after its retries", () => {

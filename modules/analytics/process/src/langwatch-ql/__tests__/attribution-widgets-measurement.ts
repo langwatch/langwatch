@@ -4,11 +4,11 @@ import { fileURLToPath } from "node:url";
 
 import { expect, vi } from "vitest";
 
-import { ClickHouseLangWatchQLExecutorRepository } from "../../repositories/clickhouse/clickhouse.langwatch-ql-executor.repository.ts";
+import type { ClickHouseLangWatchQLExecutorRepository } from "../../repositories/clickhouse/clickhouse.langwatch-ql-executor.repository.ts";
 import { lwqlLogComment } from "../../rules/langwatch-ql-tenant-capability.rules.ts";
 import { LangWatchQLFlooredReadService } from "../../services/langwatch-ql-floored-read.service.ts";
-import { type LangWatchQLClickHouseHarness, selectRows } from "./lwql-clickhouse-harness.ts";
 import { PARAMETERS, type TenantSeed, VIEWS } from "./attribution-widgets-seed.ts";
+import { type LangWatchQLClickHouseHarness, selectRows } from "./lwql-clickhouse-harness.ts";
 
 const flooredRead = LangWatchQLFlooredReadService.create();
 
@@ -28,7 +28,11 @@ function fixture(name: string): readonly StockQuery[] {
   );
 }
 
-export const QUERY_LABELS = ["att-change/change", "att-change/units", "att-table/passRates"] as const;
+export const QUERY_LABELS = [
+  "att-change/change",
+  "att-change/units",
+  "att-table/passRates",
+] as const;
 export const ATT_CHANGE_LABELS = ["att-change/change", "att-change/units"] as const;
 export type QueryLabel = (typeof QUERY_LABELS)[number];
 
@@ -85,10 +89,7 @@ export function expectRefused({
   runs: readonly Run[];
   code: number;
 }): void {
-  expect(
-    runs.map((run) => run.exceptionCode),
-    described(runs),
-  ).toEqual(runs.map(() => code));
+  expect(runs.map((run) => run.exceptionCode), described(runs)).toEqual(runs.map(() => code));
 }
 
 /** Runs queries as the service sends them and reads each one's cost from the query log. */

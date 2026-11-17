@@ -192,11 +192,11 @@ describe("given a widget that reads LastUsedPromptVersionId", () => {
     it("mounts the body", async () => {
       renderCard({ floor: { from: null, rebuilding: false, unknown: false } });
 
-      await screen.findByTestId("sandboxed-frame");
+      expect(await screen.findByTestId("sandboxed-frame")).toBeInTheDocument();
     });
   });
 
-  describe("while the floor loads", () => {
+  describe("when the floor loads", () => {
     it("shows the loading face, no notice, and holds the body back", async () => {
       const door = renderCard({ floor: "loading" });
 

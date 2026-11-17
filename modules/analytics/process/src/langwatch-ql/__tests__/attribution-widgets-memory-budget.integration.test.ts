@@ -81,8 +81,15 @@ describe("given three tenants' attribution traces, read over a 60-day period and
   const measurer = createMeasurer({ harness: () => harness, executor: () => executor });
   const { measurements } = measurer;
 
-  const measured = ({ form, label, tenant }: { form: Form; label: QueryLabel; tenant: TenantSeed }) =>
-    measurer.measured({ form, label, tenant, runs: form === "main" ? 1 : RUNS });
+  const measured = ({
+    form,
+    label,
+    tenant,
+  }: {
+    form: Form;
+    label: QueryLabel;
+    tenant: TenantSeed;
+  }) => measurer.measured({ form, label, tenant, runs: form === "main" ? 1 : RUNS });
 
   beforeAll(async () => {
     harness = await startLangWatchQLClickHouse({

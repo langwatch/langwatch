@@ -12,8 +12,8 @@ import { createTrpcRuntime, TrpcRootDefinition } from "@langwatch/api/trpc";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { trpcTestMembers } from "@langwatch/test-harness/trpc-members";
 import { traceManagedPromptVersionFloorSchema } from "@langwatch/trace-contract";
-import { z } from "zod";
 import { describe, expect, it } from "vitest";
+import { z } from "zod";
 
 import { type AnalyticsLwqlApi, analyticsLwqlTrpcTransport } from "../analytics-lwql.trpc.ts";
 
@@ -100,14 +100,16 @@ describe("given TraceApi's floor schema and the tRPC output schema", () => {
       const viaTrace = traceManagedPromptVersionFloorSchema.parse(fixture);
 
       expect(lwqlManagedPromptVersionFloorSchema.parse(viaTrace)).toEqual(fixture);
-      expect(traceManagedPromptVersionFloorSchema.parse(
-        lwqlManagedPromptVersionFloorSchema.parse(fixture),
-      )).toEqual(fixture);
+      expect(
+        traceManagedPromptVersionFloorSchema.parse(
+          lwqlManagedPromptVersionFloorSchema.parse(fixture),
+        ),
+      ).toEqual(fixture);
     });
 
     it.each(malformed)("refuses %o both ways", (fixture) => {
-      expect(traceManagedPromptVersionFloorSchema.safeParse(fixture).success).toBe(false);
-      expect(lwqlManagedPromptVersionFloorSchema.safeParse(fixture).success).toBe(false);
+      expect(traceManagedPromptVersionFloorSchema.validate(fixture)).toBe(false);
+      expect(lwqlManagedPromptVersionFloorSchema.validate(fixture)).toBe(false);
     });
   });
 });

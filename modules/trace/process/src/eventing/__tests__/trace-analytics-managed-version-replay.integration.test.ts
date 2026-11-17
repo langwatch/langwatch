@@ -52,8 +52,11 @@ const NOW = Date.now();
 type Position = Pick<ReplayEvent, "timestamp" | "id">;
 
 /** `(EventTimestamp, EventId)` order, as the event log sorts. */
-const byPosition = (a: Position, b: Position) =>
-  a.timestamp - b.timestamp || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+function byPosition(a: Position, b: Position): number {
+  if (a.timestamp !== b.timestamp) return a.timestamp - b.timestamp;
+  if (a.id < b.id) return -1;
+  return a.id > b.id ? 1 : 0;
+}
 
 /** A span that used the support-bot prompt at `versionId`, recorded in the log at `recordedAt`. */
 function promptSpanEvent({

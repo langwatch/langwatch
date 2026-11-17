@@ -117,7 +117,7 @@ describe("given the moved stock widget queries", () => {
 
 /** The att-change queries, which read the managed prompt version (goose 00133). */
 const ATT_CHANGE = ["att-change/change", "att-change/units"];
-/** Out of this change's scope: they look back 90 days on `traces`, unfloored (analytics ADR-006). */
+/** Out of this change's scope: they look back 90 days on `traces`, unfloored (ADR-006). */
 const MANAGED_VERSION_ON_TRACES = ["ck-trend/changes", "ext-cost-per-doc/changes"];
 
 const sqlOf = (label: string) => queries.find((query) => query.label === label)?.sql ?? "";

@@ -417,6 +417,7 @@ import {
   TraceEvaluationOutcomesMigrationService,
 } from "../services/trace-evaluation-outcomes-migration.service.ts";
 import { TraceInstantEvalRunService } from "../services/trace-instant-eval-run.service.ts";
+import { TraceManagedPromptVersionFloorService } from "../services/trace-managed-prompt-version-floor.service.ts";
 import {
   TraceMetadataWriteService,
   type TraceSpanIngest,
@@ -428,7 +429,6 @@ import {
 } from "../services/trace-month-ids-migration.service.ts";
 import { TraceOffloadResolutionBatchService } from "../services/trace-offload-resolution-batch.service.ts";
 import { TraceOffloadResolutionService } from "../services/trace-offload-resolution.service.ts";
-import { TraceManagedPromptVersionFloorService } from "../services/trace-managed-prompt-version-floor.service.ts";
 import { TracePreconditionSampleService } from "../services/trace-precondition-sample.service.ts";
 import { TraceProcessingCommandsService } from "../services/trace-processing-commands.service.ts";
 import type { TraceProcessingCommands } from "../services/trace-processing-commands.service.ts";

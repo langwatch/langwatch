@@ -788,7 +788,8 @@ describe("given traces, spans and evaluations of each source that the stock quer
     for (const seed of reused) await writeTrace({ seed, updated: seed.day });
 
     await expectChangeMatchesMain();
-    // Its first use in the window, day 6, makes it the newest; all history would make it the oldest.
+    // Its first use in the window, day 6, makes it the newest; all history would make it the
+    // oldest.
     const { floored } = changeForms();
     const [row] = await changeRows({ sql: floored, list: ["application"] });
     expect(row).toMatchObject({ version: "pv-200", previous: "pv-b" });
@@ -796,8 +797,9 @@ describe("given traces, spans and evaluations of each source that the stock quer
   });
 
   /**
-   * The floor's one ruled difference (ADR-006 amendment 2026-11-16, ~181-191): a newer write anchored
-   * before the window is cut off, so the new form counts the stale in-window row; `traces` drops it.
+   * The floor's one ruled difference (ADR-006 amendment 2026-11-16, ~181-191): a newer write
+   * anchored before the window is cut off, so the new form counts the stale in-window row;
+   * `traces` drops it.
    * @scenario "A trace whose newest row anchored before the window counts with its in-window version"
    */
   it("counts a trace whose newest row fell before the window with its in-window version", async () => {
@@ -821,9 +823,10 @@ describe("given traces, spans and evaluations of each source that the stock quer
   });
 
   /**
-   * Part of the anchor-move trade (advisor 43435): the new form filters rows by Source before argMax,
-   * so it counts S's older application row; `traces` drops a trace with any row from another source
-   * under application (stock-query-sources.ts:186-198). Under langy both read the langy row only.
+   * Part of the anchor-move trade (advisor 43435): the new form filters rows by Source before
+   * argMax, so it counts S's older application row; `traces` drops a trace with any row from
+   * another source under application (stock-query-sources.ts:186-198). Under langy both read the
+   * langy row only.
    * @scenario "A trace whose two rows carry different sources counts with the listed row's version"
    */
   it("counts a trace whose newest row is from another source with its listed row's version", async () => {
@@ -834,7 +837,8 @@ describe("given traces, spans and evaluations of each source that the stock quer
       updated: 6.9,
     });
 
-    // pv-b and pv-old come from earlier tests' traces (pv-9 from the seeds): fails alone under .only.
+    // pv-b and pv-old come from earlier tests' traces (pv-9 from the seeds): fails alone under
+    // .only.
     const forms = changeForms();
     const main = await changeRows({ sql: forms.main, list: ["application"] });
     expect(main).toEqual([expect.objectContaining({ version: "pv-200", previous: "pv-b" })]);

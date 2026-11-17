@@ -103,7 +103,11 @@ const AFTER_EVERY_ROW = "toDateTime64('2200-01-01 00:00:00', 3)";
  * row's. Read from the floor with no upper bound, so the caller drops a newest row past the end;
  * a newest row before the floor goes unseen: the one ruled difference (ADR-006, a falling anchor).
  */
-const managedVersionPerTrace = ({ where = "" }: { where?: string } = {}) => `SELECT ${TRACE_KEY} AS trace,
+const managedVersionPerTrace = ({
+  where = "",
+}: {
+  where?: string;
+} = {}) => `SELECT ${TRACE_KEY} AS trace,
         argMax(LastUsedPromptVersionId, UpdatedAt) AS managed,
         argMax(OccurredAt, UpdatedAt) AS anchored
       FROM trace_metrics

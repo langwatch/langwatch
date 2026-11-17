@@ -176,7 +176,6 @@ function traceEvaluationInsert({
   `;
 }
 
-
 /** Provisions the views and access model, seeds the three tenants and checks the row counts. */
 export async function seedAttributionTenants({
   harness,
