@@ -61,6 +61,8 @@ export class MemoryScenarioRepository extends ScenarioRepository {
       minTurns: scenarioInput.minTurns ?? null,
       fields: scenarioInput.fields ?? {},
       testSuiteId: scenarioInput.testSuiteId ?? null,
+      kind: scenarioInput.kind ?? "standard",
+      redTeam: scenarioInput.redTeam ?? null,
       version: 1,
       lastUpdatedById: scenarioInput.lastUpdatedById ?? null,
       archivedAt: null,

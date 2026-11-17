@@ -4,6 +4,7 @@ import type { Instant } from "@langwatch/time";
 import { z } from "zod";
 
 import { evaluatorAttachmentsSchema, parseEvaluatorAttachments } from "./evaluator-attachments.ts";
+import { parseRedTeamConfig, redTeamConfigSchema, scenarioKindSchema } from "./red-team.ts";
 import { scenarioParameterDefinitionsSchema } from "./scenario.parameters.ts";
 import {
   parseScenarioFieldValues,
@@ -52,6 +53,9 @@ const scenarioSchemaDefinition = z
     // still parse. See specs/features/agents/voice-agents-v1.feature.
     callerVoice: jsonValueSchema.nullable().default(null),
     testSuiteId: z.string().min(1).nullable().default(null),
+    // "red_team" runs an attacker against the target with the config in redTeam.
+    kind: scenarioKindSchema.default("standard"),
+    redTeam: z.preprocess((raw) => parseRedTeamConfig(raw), redTeamConfigSchema.nullable()),
     version: z.number().int().positive().default(1),
     lastUpdatedById: z.string().nullable(),
     archivedAt: z.date().nullable(),
@@ -189,6 +193,9 @@ const scenarioCreateInputSchemaDefinition = z
     labels: z.array(z.string()).default([]),
     projectId: z.string().min(1),
     actor: scenarioActorSchema.optional(),
+    // A red_team scenario requires redTeam; a standard one refuses it.
+    kind: scenarioKindSchema.optional(),
+    redTeam: redTeamConfigSchema.optional(),
   })
   .strict();
 export interface ScenarioCreateInputSchema extends Named<

@@ -1,5 +1,6 @@
 import {
   ScenarioNotFoundError,
+  ScenarioRedTeamConfigError,
   scenarioCreateInputSchema,
   scenarioDuplicateInputSchema,
   scenarioTestSuiteCreateInputSchema,
@@ -91,6 +92,10 @@ export class ScenarioService {
 
   async create(input: ScenarioCreateInput): Promise<Scenario> {
     const parsed = scenarioCreateInputSchema.parse(input);
+    const kind = parsed.kind ?? "standard";
+    if ((kind === "red_team") !== (parsed.redTeam !== undefined)) {
+      throw new ScenarioRedTeamConfigError({ kind });
+    }
     // No scenario is loose: a create that names no suite files into the
     // project's Default, which is created here on the first such write.
     const testSuiteId =
@@ -103,6 +108,7 @@ export class ScenarioService {
 
     return this.options.repository.create({
       ...parsed,
+      kind,
       ...(fields !== undefined ? { fields } : {}),
       testSuiteId,
       id: this.options.ids.next(),
