@@ -357,7 +357,13 @@ export class LangWatchQLViewStatementsService {
     const floored = floor === undefined ? {} : { floor };
     const from = settled
       ? viewDedup.settledRelation({ view, relation, ...floored })
-      : viewDedup.relation({ view, relation, strategy, engineDedup: !postgres && !grouped });
+      : viewDedup.relation({
+          view,
+          relation,
+          strategy,
+          engineDedup: !postgres && !grouped,
+          ...floored,
+        });
     const joinClause = joinRelationClause(view, sourceDatabase);
     const enginePredicate =
       strategy === "in-tuple" ? `\n${viewDedup.predicate({ view, relation, ...floored })}` : "";
