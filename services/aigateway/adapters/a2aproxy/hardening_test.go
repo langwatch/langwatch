@@ -267,3 +267,24 @@ func TestCheckDialAddress(t *testing.T) {
 		}
 	}
 }
+
+func TestReadEventsSplitsBareCRAndDropsBOM(t *testing.T) {
+	body := "\xef\xbb\xbfdata: one\r\r: ping\rdata: two\r\n\r\ndata: three\n\n"
+	var got []string
+	err := readEvents(strings.NewReader(body), func(event []byte) bool {
+		got = append(got, string(eventData(event)))
+		return true
+	})
+	if err != nil {
+		t.Fatalf("readEvents: %v", err)
+	}
+	want := []string{"one\n", "two\n", "three\n"}
+	if len(got) != len(want) {
+		t.Fatalf("events = %q, want %q", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("event %d = %q, want %q", i, got[i], want[i])
+		}
+	}
+}

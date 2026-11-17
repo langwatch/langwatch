@@ -21,6 +21,7 @@ function service(changeEvents = MemoryGatewayChangeEventsRepository.create()) {
   return GatewayA2aTargetService.create({
     repository: MemoryGatewayA2aTargetRepository.create(),
     changeEvents,
+    transactions: { run: (work) => work({}) },
   });
 }
 

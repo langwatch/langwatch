@@ -52,12 +52,16 @@ func (c *call) errorEvent(r refusal) []byte {
 
 // readEvents splits an SSE body into events, each with its trailing blank
 // line, and stops when fn returns false. An event, counted with its line
-// breaks, may hold at most maxEventBytes.
+// breaks, may hold at most maxEventBytes. One leading UTF-8 BOM is dropped,
+// as SSE decoding does.
 func readEvents(r io.Reader, fn func(event []byte) bool) error {
-	br := bufio.NewReaderSize(r, 64<<10)
+	lr := &lineReader{br: bufio.NewReaderSize(r, 64<<10)}
+	if head, err := lr.br.Peek(len(utf8BOM)); err == nil && bytes.Equal(head, utf8BOM) {
+		_, _ = lr.br.Discard(len(utf8BOM))
+	}
 	var event bytes.Buffer
 	for {
-		blank, err := readLine(br, &event)
+		blank, err := lr.readLine(&event)
 		if err != nil {
 			return finishEvents(err, &event, fn)
 		}
@@ -70,6 +74,8 @@ func readEvents(r io.Reader, fn func(event []byte) bool) error {
 		}
 	}
 }
+
+var utf8BOM = []byte{0xEF, 0xBB, 0xBF}
 
 // finishEvents hands over the last event of a body that ended without a
 // blank line. Any error other than the end of the body is returned.
@@ -84,30 +90,54 @@ func finishEvents(err error, event *bytes.Buffer, fn func(event []byte) bool) er
 	return nil
 }
 
-// readLine appends one line and its line break to event and reports whether
-// the line was blank, which ends an event. It refuses to grow event past
-// maxEventBytes.
-func readLine(br *bufio.Reader, event *bytes.Buffer) (blank bool, err error) {
+// lineReader reads SSE lines ended by CR, LF or CRLF. After a CR it skips
+// one LF at the next read instead of waiting for it, so a bare CR at the end
+// of a burst does not hold the line back.
+type lineReader struct {
+	br     *bufio.Reader
+	skipLF bool
+}
+
+// readLine appends one line and an LF to event and reports whether the line
+// was blank, which ends an event. It refuses to grow event past maxEventBytes.
+func (lr *lineReader) readLine(event *bytes.Buffer) (blank bool, err error) {
 	lineLen := 0
 	for {
-		chunk, isPrefix, err := br.ReadLine()
+		b, err := lr.next()
 		if err != nil {
+			if lineLen > 0 && errors.Is(err, io.EOF) {
+				return endLine(event, lineLen), nil
+			}
 			return false, err
 		}
-		if event.Len()+len(chunk)+2 > maxEventBytes {
+		switch {
+		case b == '\r' || b == '\n':
+			return endLine(event, lineLen), nil
+		case event.Len()+2 > maxEventBytes:
 			return false, errEventTooLarge
 		}
-		event.Write(chunk)
-		lineLen += len(chunk)
-		if isPrefix {
-			continue
-		}
-		if lineLen == 0 {
-			return true, nil
-		}
-		event.WriteByte('\n')
-		return false, nil
+		event.WriteByte(b)
+		lineLen++
 	}
+}
+
+// next reads one byte, skipping the LF of a CRLF whose CR ended the last line.
+func (lr *lineReader) next() (byte, error) {
+	b, err := lr.br.ReadByte()
+	if err == nil && lr.skipLF && b == '\n' {
+		b, err = lr.br.ReadByte()
+	}
+	lr.skipLF = err == nil && b == '\r'
+	return b, err
+}
+
+// endLine closes a line in event and reports whether it was blank.
+func endLine(event *bytes.Buffer, lineLen int) bool {
+	if lineLen == 0 {
+		return true
+	}
+	event.WriteByte('\n')
+	return false
 }
 
 // eventData joins the data lines of one SSE event.
