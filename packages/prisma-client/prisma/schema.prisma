@@ -6423,9 +6423,6 @@ model IngestionTemplate {
 // state) live on `ModelProvider` directly; the order-of-providers
 // ("which to try first") lives on `RoutingPolicy.modelProviderIds`.
 
-// The LangWatch-hosted provider a connected install's gateway adds for one
-// organization (ADR-156 §8): where to call and the token to present. Written
-// and cleared only by licensing through GatewayApi; the token is encrypted.
 // An agent the gateway proxies A2A calls to under /a2a/{name}. projectId null makes it org-wide;
 // the upstream headers rest sealed. specs/ai-gateway/a2a-proxy.feature
 model GatewayA2ATarget {
@@ -6446,9 +6443,13 @@ model GatewayA2ATarget {
   updatedAt                DateTime  @updatedAt
   archivedAt               DateTime?
 
+  // Live names are unique per scope: partial index GatewayA2ATarget_live_name_key in its migration.
   @@index([organizationId, projectId])
 }
 
+// The LangWatch-hosted provider a connected install's gateway adds for one
+// organization (ADR-156 §8): where to call and the token to present. Written
+// and cleared only by licensing through GatewayApi; the token is encrypted.
 model GatewayConnectUpstream {
   organizationId String   @id
   baseUrl        String

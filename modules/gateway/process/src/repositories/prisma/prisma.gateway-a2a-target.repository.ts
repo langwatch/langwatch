@@ -1,4 +1,5 @@
 import {
+  GatewayA2aTargetNameTakenError,
   createGatewayA2aTargetInputSchema,
   gatewayA2aTargetHeadersSchema,
   gatewayA2aTargetResourceSchema,
@@ -50,23 +51,28 @@ export class PrismaGatewayA2aTargetRepository extends GatewayA2aTargetRepository
 
   async create(input: CreateGatewayA2aTargetInput): Promise<GatewayA2aTargetResource> {
     const parsed = createGatewayA2aTargetInputSchema.parse(input);
-    const row = await this.prisma.gatewayA2ATarget.create({
-      data: {
-        id: generate("gateway").toString(),
-        organizationId: parsed.organizationId,
-        projectId: parsed.projectId,
-        name: parsed.name,
-        agentName: parsed.agentName,
-        cardUrl: parsed.cardUrl,
-        upstreamUrl: parsed.upstreamUrl,
-        encryptedUpstreamHeaders: this.#seal(parsed.upstreamHeaders),
-        restrictToAllowList: parsed.allowedVirtualKeyIds !== null,
-        allowedVirtualKeyIds: parsed.allowedVirtualKeyIds ?? [],
-        blocked: parsed.blocked,
-        blockReason: parsed.blockReason,
-        createdById: parsed.actorUserId,
-      },
-    });
+    const row = await this.prisma.gatewayA2ATarget
+      .create({
+        data: {
+          id: generate("gateway").toString(),
+          organizationId: parsed.organizationId,
+          projectId: parsed.projectId,
+          name: parsed.name,
+          agentName: parsed.agentName,
+          cardUrl: parsed.cardUrl,
+          upstreamUrl: parsed.upstreamUrl,
+          encryptedUpstreamHeaders: this.#seal(parsed.upstreamHeaders),
+          restrictToAllowList: parsed.allowedVirtualKeyIds !== null,
+          allowedVirtualKeyIds: parsed.allowedVirtualKeyIds ?? [],
+          blocked: parsed.blocked,
+          blockReason: parsed.blockReason,
+          createdById: parsed.actorUserId,
+        },
+      })
+      .catch((error: unknown) => {
+        if (isUniqueViolation(error)) throw new GatewayA2aTargetNameTakenError(parsed.name);
+        throw error;
+      });
     return this.#toResource(row);
   }
 
@@ -113,4 +119,9 @@ export class PrismaGatewayA2aTargetRepository extends GatewayA2aTargetRepository
       allowedVirtualKeyIds: restrictToAllowList ? allowedVirtualKeyIds : null,
     });
   }
+}
+
+/** Prisma reports the live-name index (`GatewayA2ATarget_live_name_key`) as `P2002`. */
+function isUniqueViolation(error: unknown): boolean {
+  return (error as { code?: unknown } | null)?.code === "P2002";
 }

@@ -210,4 +210,33 @@ describe("GatewayA2aTargetService", () => {
       ["A2A_TARGET_DELETED", "p1"],
     ]);
   });
+
+  it("stores one target when two creates with the same name race", async () => {
+    const targets = service();
+    const results = await Promise.allSettled([
+      targets.create({ ...base, projectId: null, name: "billing" }),
+      targets.create({ ...base, projectId: null, name: "billing" }),
+    ]);
+
+    expect(results.map((result) => result.status).toSorted()).toEqual(["fulfilled", "rejected"]);
+    expect(results.find((result) => result.status === "rejected")).toMatchObject({
+      reason: { code: "gateway_a2a_target_name_taken" },
+    });
+  });
+});
+
+describe("MemoryGatewayA2aTargetRepository", () => {
+  it("keeps an archive that lands while an update is in flight", async () => {
+    const repository = MemoryGatewayA2aTargetRepository.create();
+    const created = await repository.create({ ...base, projectId: null, name: "billing" });
+    const target = { id: created.id, organizationId: base.organizationId };
+
+    await Promise.all([
+      repository.update({ ...target, agentName: "Renamed", actorUserId: base.actorUserId }),
+      repository.archive(target),
+    ]);
+
+    expect(await repository.findById(target)).toBeNull();
+    expect(await repository.findAll(base.organizationId)).toEqual([]);
+  });
 });
