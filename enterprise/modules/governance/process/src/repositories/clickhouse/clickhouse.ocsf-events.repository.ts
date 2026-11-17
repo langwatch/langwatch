@@ -410,16 +410,17 @@ export class ClickHouseOcsfEventsRepository
     return rows.map(toExportRow);
   }
 
+  /** The seat figure one stored seat report carries; the memory twin decodes with it too. */
+  static seatReportsOf(row: SeatReportCHRow): GovernanceSeatReportRow[] {
+    const report = findSeatReport(row);
+    return report === null ? [] : [report];
+  }
+
   /**
    * The SIEM stream: the latest version of each (TenantId, EventId), ordered by the time it was
    * stored. Paging by EventTime would skip an event that arrives with a time before the cursor.
    * Spec: enterprise/modules/governance/specs/ocsf-siem.feature
    */
-  /** The seat figure one stored seat report carries; the memory twin decodes with it too. */
-  static seatReportsOf(row: SeatReportCHRow): GovernanceSeatReportRow[] {
-    return findSeatReport(row) ?? [];
-  }
-
   async findAllByIngest(
     input: FindOcsfEventsByIngestInput,
   ): Promise<GovernanceOcsfIngestOrderedRow[]> {
