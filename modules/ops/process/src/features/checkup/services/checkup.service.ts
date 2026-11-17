@@ -198,8 +198,8 @@ export class CheckupService {
         outcome: "refused",
         code: "checkup_lwql_not_provisionable",
         detail:
-          "ClickHouse is replicated and Keeper holds no SQL function store at /clickhouse/user_defined, so LWQL app functions cannot be created on every replica.",
-        fix: "Set user_defined_zookeeper_path to /clickhouse/user_defined in the ClickHouse server configuration on every replica and restart ClickHouse.",
+          "ClickHouse is replicated and Keeper has no function store at /clickhouse/user_defined, so LWQL app functions cannot reach every replica.",
+        fix: "Set user_defined_zookeeper_path to /clickhouse/user_defined in the server config of every ClickHouse replica and restart them.",
         docsPath: CHECKUP_DOCS.lwql,
       };
     }
