@@ -13,7 +13,7 @@ import {
 } from "../features/suite-templates/rules/suite-template-fill.rules.ts";
 
 export type SuiteTemplateServiceOptions = {
-  scenarios: Pick<ScenarioApi, "assertScenarioCreationAllowed" | "createTestSuite" | "create">;
+  scenarios: Pick<ScenarioApi, "createTestSuite" | "create">;
   templates?: readonly SuiteTemplate[];
 };
 
@@ -49,12 +49,6 @@ export class SuiteTemplateService {
     const filled = template.scenarios.map((scenario) =>
       fillTemplateScenario({ template, scenario, fit: parsed.fit }),
     );
-    await this.options.scenarios.assertScenarioCreationAllowed({
-      projectId: parsed.projectId,
-      additional: filled.length,
-      by,
-    });
-
     const suite = await this.options.scenarios.createTestSuite({
       projectId: parsed.projectId,
       name: parsed.name ?? template.title,
@@ -66,6 +60,7 @@ export class SuiteTemplateService {
       const created = await this.options.scenarios.create(
         { ...scenario, projectId: parsed.projectId, testSuiteId: suite.id },
         by,
+        { countsTowardScenarioCap: false },
       );
       scenarioIds.push(created.id);
     }

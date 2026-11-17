@@ -124,6 +124,25 @@ describe("ScenarioModule on the cloud Free scenario cap", () => {
       ).rejects.toMatchObject(LIMIT_SHAPE);
     });
 
+    /** @scenario A scenario a suite template creates is not counted against the scenario cap */
+    it("creates a template scenario over the cap", async () => {
+      const { app } = await organizationAtTheScenarioCap();
+
+      const created = await app.create(
+        {
+          projectId: "project-1",
+          name: "LLM01 Prompt Injection",
+          situation: "An attacker hides instructions",
+          criteria: [],
+          labels: [],
+        },
+        BY,
+        { countsTowardScenarioCap: false },
+      );
+
+      expect(created.name).toBe("LLM01 Prompt Injection");
+    });
+
     /** @scenario An organization over the scenario cap can still edit its scenarios */
     it("still saves an edit to an existing scenario", async () => {
       const { app } = await organizationAtTheScenarioCap();

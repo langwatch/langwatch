@@ -22,6 +22,8 @@ import {
 import type { SuiteTemplate, SuiteTemplateFit, SuiteTemplateKind } from "@langwatch/suite-contract";
 import { useEffect, useState } from "react";
 
+import { owaspCategoryLabel } from "../../../../model/owasp-category.ts";
+
 export type SuiteTemplateCreateRequest = {
   templateId: string;
   fit: SuiteTemplateFit;
@@ -113,7 +115,7 @@ function TemplatePreview({ template }: { template: SuiteTemplate }) {
               <HStack gap={1}>
                 {scenario.attack.owaspIds.map((owaspId) => (
                   <Badge key={owaspId} size="sm" colorPalette="red">
-                    {owaspId}
+                    {owaspCategoryLabel({ id: owaspId })}
                   </Badge>
                 ))}
               </HStack>

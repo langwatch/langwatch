@@ -80,3 +80,9 @@ Feature: Create a test suite from a template
     When the reader creates the suite
     Then the refusal goes to the shared error handler, which opens the upgrade message
     And the gallery draws no second message of its own
+
+  @unit
+  Scenario: The preview names each OWASP category by its official name
+    Given a red team scenario tagged with OWASP id "LLM07"
+    When the gallery shows the scenario in the preview
+    Then its badge reads "LLM07 System Prompt Leakage"

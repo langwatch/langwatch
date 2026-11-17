@@ -8,6 +8,7 @@ import {
   createRestRuntime,
   projectRequestContext,
 } from "@langwatch/api/rest";
+import { HandledError } from "@langwatch/handled-error";
 import { SuiteTemplateNotFoundError, type SuiteApi } from "@langwatch/suite-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
@@ -17,10 +18,17 @@ import { SUITE_TEMPLATES } from "../../features/suite-templates/rules/suite-temp
 import { suiteRunOrigin } from "../../rules/suite-wire-v1.rules.ts";
 import { createTestSuitesRest } from "../test-suites.rest.ts";
 
+class ForbiddenTestError extends HandledError {
+  constructor() {
+    super("forbidden", "forbidden", { httpStatus: 403 });
+  }
+}
+
 const BASE = "http://api.test/api/v1/test-suites/templates";
 const fit = { agentName: "Ava", tools: ["refund_order"], mustNever: ["issue refunds over 100"] };
 
-function mount() {
+/** A caller holding only these permissions; every permission by default. */
+function mount({ grants }: { grants?: readonly string[] } = {}) {
   const listTemplates = vi.fn(async () => [...SUITE_TEMPLATES]);
   const applyTemplate = vi.fn(async ({ templateId }: { templateId: string }) => {
     if (templateId === "no-such-template") throw new SuiteTemplateNotFoundError(templateId);
@@ -31,10 +39,13 @@ function mount() {
     audit: { record: () => {} },
     authorization: restTestAuthorization(),
     identity: {
-      authenticate: () => ({
-        actor: { type: "user", id: "user_lena" },
-        scope: { tier: "project", id: "project_1" },
-      }),
+      authenticate: ({ permission }: { permission: string }) => {
+        if (grants && !grants.includes(permission)) throw new ForbiddenTestError();
+        return {
+          actor: { type: "user" as const, id: "user_lena" },
+          scope: { tier: "project" as const, id: "project_1" },
+        };
+      },
     },
   });
   const hono = runtime.mount(createTestSuitesRest().router(), {
@@ -108,5 +119,21 @@ describe("POST /api/v1/test-suites/templates/:templateId/apply", () => {
     const response = await send("POST", `${BASE}/no-such-template/apply`, { fit });
     expect(response.status).toBe(404);
     expect(JSON.stringify(await response.json())).toContain("suite_template_not_found");
+  });
+
+  describe("when the caller may only view scenarios", () => {
+    /** @scenario "A caller without scenario manage permission cannot apply a template" */
+    it("refuses with 403 before the handler runs", async () => {
+      const { send, applyTemplate } = mount({ grants: ["scenarios:view"] });
+      const response = await send("POST", `${BASE}/owasp-llm-top-10-2025/apply`, { fit });
+      expect(response.status).toBe(403);
+      expect(applyTemplate).not.toHaveBeenCalled();
+    });
+
+    it("still lists the templates", async () => {
+      const { send } = mount({ grants: ["scenarios:view"] });
+      const response = await send("GET", BASE);
+      expect(response.status).toBe(200);
+    });
   });
 });

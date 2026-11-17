@@ -43,13 +43,16 @@ Feature: Suite templates
     Then the created test suite records template id "owasp-llm-top-10-2025" and template version 1
 
   @unit
-  Scenario: A plan creation cap that cannot take every scenario refuses before anything is written
+  Scenario: Applying a template never counts its scenarios against the plan's scenario cap
     Given the organization's plan caps scenarios and has fewer free slots than the template's scenarios
     When the caller applies the template
-    Then the apply is refused with the existing limit exceeded error for scenarios
-    And no test suite and no scenario is created
+    Then the test suite and every template scenario are created
+    And the scenarios are created outside the per-scenario cap
 
-  @unimplemented
+  # The Free plan limits test suites, not scenarios: a template is one suite, and
+  # running it counts once against the simulation (suite) cap at run start.
+
+  @unit
   Scenario: A caller without scenario manage permission cannot apply a template
     Given a caller who may only view scenarios
     When the caller applies a template

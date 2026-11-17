@@ -34,26 +34,21 @@ const archetype: SuiteTemplate = {
   ],
 };
 
-function setup(options: { capRefuses?: boolean; templates?: SuiteTemplate[] } = {}) {
+function setup(options: { templates?: SuiteTemplate[] } = {}) {
   let next = 0;
   const create = vi.fn().mockImplementation(async () => ({ id: `scenario_${++next}` }));
   const createTestSuite = vi
     .fn()
     .mockResolvedValue({ id: "suite_1", slug: "owasp", name: "OWASP" });
-  const assertScenarioCreationAllowed = vi.fn().mockImplementation(async () => {
-    if (options.capRefuses)
-      throw Object.assign(new Error("over the cap"), { code: "resource_limit_exceeded" });
-  });
   const scenarios = createApiFixture<SuiteTemplateServiceOptions["scenarios"]>({
     create,
     createTestSuite,
-    assertScenarioCreationAllowed,
   });
   const service = SuiteTemplateService.create({
     scenarios,
     ...(options.templates ? { templates: options.templates } : {}),
   });
-  return { service, create, createTestSuite, assertScenarioCreationAllowed };
+  return { service, create, createTestSuite };
 }
 
 describe("SuiteTemplateService", () => {
@@ -132,25 +127,17 @@ describe("SuiteTemplateService", () => {
     });
   });
 
-  describe("when the plan cannot take every scenario", () => {
-    /** @scenario "A plan creation cap that cannot take every scenario refuses before anything is written" */
-    it("refuses with the scenarios limit before creating the suite", async () => {
-      const { service, createTestSuite, create, assertScenarioCreationAllowed } = setup({
-        capRefuses: true,
-      });
-      await expect(
-        service.applyTemplate(
-          { projectId: "project_1", templateId: "owasp-llm-top-10-2025", fit },
-          by,
-        ),
-      ).rejects.toMatchObject({ code: "resource_limit_exceeded" });
-      expect(assertScenarioCreationAllowed).toHaveBeenCalledWith({
-        projectId: "project_1",
-        additional: 10,
+  describe("when the template has more scenarios than the plan's scenario cap", () => {
+    /** @scenario "Applying a template never counts its scenarios against the plan's scenario cap" */
+    it("creates every scenario outside the per-scenario cap", async () => {
+      const { service, create } = setup();
+      const applied = await service.applyTemplate(
+        { projectId: "project_1", templateId: "owasp-llm-top-10-2025", fit },
         by,
-      });
-      expect(createTestSuite).not.toHaveBeenCalled();
-      expect(create).not.toHaveBeenCalled();
+      );
+      expect(applied.scenarioIds).toHaveLength(10);
+      for (const call of create.mock.calls)
+        expect(call[2]).toEqual({ countsTowardScenarioCap: false });
     });
   });
 

@@ -309,16 +309,15 @@ export interface ScenarioApi {
   getById(input: ScenarioIdInput): Promise<Scenario>;
   /** The same read, archived rows included; a miss is `found: false`, not a refusal. */
   readByIdIncludingArchived(input: ScenarioIdInput): Promise<ScenarioLookup>;
+  /**
+   * `countsTowardScenarioCap: false` is for scenarios a suite template creates: the
+   * Free plan counts a template as one suite, never its scenarios.
+   */
   create(
     input: Omit<ScenarioCreateInput, "lastUpdatedById">,
     by: ScenarioCaller,
+    options?: { countsTowardScenarioCap?: boolean },
   ): Promise<Scenario>;
-  /** Refuses with `LimitExceededError` (`scenarios`) when `additional` more pass the plan cap. */
-  assertScenarioCreationAllowed(input: {
-    projectId: string;
-    additional: number;
-    by: ScenarioCaller;
-  }): Promise<void>;
   update(
     input: Omit<ScenarioUpdateInput, "lastUpdatedById">,
     by: ScenarioCaller,
