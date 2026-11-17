@@ -364,9 +364,9 @@ func TestAgentCardURLIsRewritten(t *testing.T) {
 	}
 	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &card))
 	assert.Equal(t, "http://gw.acme.test/a2a/billing", card.URL)
+	require.Len(t, card.Interfaces, 1)
 	assert.Equal(t, "http://gw.acme.test/a2a/billing", card.Interfaces[0].URL)
-	assert.Equal(t, "http://gw.acme.test/a2a/billing/v1", card.Interfaces[1].URL)
-	assert.Equal(t, "http://gw.acme.test/a2a/billing", card.Additional[0].URL)
+	assert.Empty(t, card.Additional)
 	assert.NotContains(t, rec.Body.String(), f.upstream.URL)
 }
 

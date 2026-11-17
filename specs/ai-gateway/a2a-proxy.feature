@@ -167,6 +167,43 @@ Feature: A2A proxy on the gateway
     And the caller receives HTTP 404 with reason "a2a_operation_not_supported"
 
   @unit
+  Scenario: a JSON-RPC method that is not an A2A method is refused
+    When the caller sends POST /a2a/billing with JSON-RPC method "admin/drop_all"
+    Then the upstream is not called
+    And the caller receives a JSON-RPC error with code -32601 and reason "a2a_operation_not_supported"
+
+  @unit
+  Scenario: the query string of the upstream URL stays after the forwarded path
+    Given the target's upstream URL is "https://billing.acme.test/?tenant=7"
+    When the caller sends POST /a2a/billing/message:send?x=1
+    Then the upstream receives POST /message:send?tenant=7&x=1
+
+  @unit
+  Scenario: the Agent Card lists only the endpoint the gateway serves
+    Given the upstream card lists interfaces at the upstream URL and at another path
+    When the caller fetches GET /a2a/billing/.well-known/agent.json, the A2A v0.2 card path
+    Then the card's url and its one interface point at the gateway's /a2a/billing
+    And the interface at the other path is left out
+
+  @unit
+  Scenario: a path refusal says the path is not allowed
+    When the caller sends a path with an encoded slash
+    Then the error message is "the A2A path is not allowed"
+
+  @unit
+  Scenario: content outside text parts is scanned before the upstream
+    Given the caller's key has a request guardrail that denies a token
+    When the token sits in a data part, in the bytes of a text file part, or in message metadata
+    Then the upstream is not called
+    And the caller receives reason "a2a_content_blocked"
+
+  @unit
+  Scenario: a stream line that is not an SSE data, event, id or retry field never reaches the caller
+    When the upstream streams a comment line or a line with no field name
+    Then the caller receives the event without that line
+    And a denied token in an event or id field ends the stream with reason "a2a_content_blocked"
+
+  @unit
   Scenario: a path that could leave the upstream base path is refused
     When the caller sends a path with a dot segment, or an encoded slash, backslash, "?" or "#"
     Then the upstream is not called
