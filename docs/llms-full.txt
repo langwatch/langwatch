@@ -13898,7 +13898,7 @@ A traced agent matches a listed one when its `gen_ai.agent.id` equals one of the
 | Vertex AI Agent Engine | Resource name | The full resource name, or the trailing engine id such as `42` |
 | ARD registry | `urn:air:` identifier | The `urn:air:` identifier |
 
-A traced agent also matches when its `gen_ai.agent.name` equals the listed agent's name, ignoring case. A traced agent that only shares its name with a listed one therefore counts as that listed agent and is not flagged as shadow, even when their ids differ. To keep a traced agent apart from a listed one, give it a different `gen_ai.agent.name`.
+A traced agent also matches when its `gen_ai.agent.name` equals the listed agent's name, ignoring case. A traced agent that only shares its name with a listed one therefore counts as that listed agent and is not flagged as shadow, even when their ids differ. To keep a traced agent apart from a listed one, give it a different `gen_ai.agent.name`, and if it sets a `gen_ai.agent.id`, use one that matches none of the listed agent's ids.
 
 ## Alerts
 

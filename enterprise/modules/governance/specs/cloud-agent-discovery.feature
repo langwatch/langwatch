@@ -53,7 +53,7 @@ Feature: Cloud agent discovery with shadow and dormant agents
     When the source lists its agents
     Then the listing is refused as "not_configured"
 
-  @unit
+  @integration
   Scenario: An AWS source naming an AWS connection of another organisation refuses as not configured
     Given an AWS source whose connection id belongs to another organisation
     When the source lists its agents
@@ -136,32 +136,32 @@ Feature: Cloud agent discovery with shadow and dormant agents
     Then the source's agents are listed and the outcome is recorded on the source's run
     And no usage pull is attempted for it
 
-  @unit
+  @integration
   Scenario: A listing that no longer names an agent marks it gone
     Given an AWS source that listed agents "A" and "B"
     When the next listing names only "A"
     Then "B" is marked gone and its registry entry is removed with a "governance.agent.removed" event
 
-  @unit
+  @integration
   Scenario: An agent that comes back after it was marked gone is active again
     Given agent "B" was marked gone
     When a later listing names "B" again
     Then "B" is active and its registry entry is versioned back to active
 
-  @unit
+  @integration
   Scenario: An agent another source still lists stays when one source stops listing it
     Given two sources that both listed agent "A"
     When the first source's next listing names no agents
     Then "A" stays active because the second source still lists it
     And "A" is marked gone only once the second source stops listing it too
 
-  @unit
+  @integration
   Scenario: A refused listing marks nothing gone
     Given an AWS source that listed agents "A" and "B"
     When the next listing is refused
     Then both stay as they were
 
-  @unit
+  @integration
   Scenario: Listing the same agents twice records no change
     Given an AWS source that listed agent "A"
     When the source lists "A" again unchanged
@@ -279,13 +279,13 @@ Feature: Cloud agent discovery with shadow and dormant agents
 
   # Test connection
 
-  @unit
+  @integration
   Scenario: Testing a source's connection lists without recording
     Given an AWS source whose regions answer three agents
     When an admin tests the connection
     Then the answer says three agents were found and no sighting is recorded
 
-  @unit
+  @integration
   Scenario: A test connection that the provider refuses answers the refusal reason
     Given a Google Cloud source whose token exchange is refused
     When an admin tests the connection
