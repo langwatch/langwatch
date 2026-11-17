@@ -177,6 +177,125 @@ describe.each(backends)("given the $name stored-object record repository", ({ cr
     });
   });
 
+  describe("when a row is moved on conditionally", () => {
+    /** @scenario "A confirm and the reaper never both win" */
+    it("writes the next row while the status and generation still hold", async () => {
+      const repository = create();
+      const pending = record({ status: "pending", generation: 0 });
+      await repository.upsert(pending);
+
+      await expect(
+        repository.transition({
+          expected: pending,
+          next: { ...pending, status: "available", generation: 1 },
+        }),
+      ).resolves.toBe(true);
+      await expect(repository.findById({ tenantId: ACME, id: pending.id })).resolves.toMatchObject({
+        status: "available",
+        generation: 1,
+      });
+    });
+
+    /** @scenario "A confirm and the reaper never both win" */
+    it("loses the race to a write that moved the row first, and changes nothing", async () => {
+      const repository = create();
+      const pending = record({ status: "pending", generation: 0 });
+      await repository.upsert(pending);
+      await repository.transition({
+        expected: pending,
+        next: { ...pending, status: "failed", generation: 1 },
+      });
+
+      await expect(
+        repository.transition({
+          expected: pending,
+          next: { ...pending, status: "available", generation: 1 },
+        }),
+      ).resolves.toBe(false);
+      await expect(
+        repository.transition({
+          expected: { status: "failed", generation: 0 },
+          next: { ...pending, status: "available", generation: 2 },
+        }),
+      ).resolves.toBe(false);
+      await expect(repository.findById({ tenantId: ACME, id: pending.id })).resolves.toMatchObject({
+        status: "failed",
+        generation: 1,
+      });
+    });
+
+    it("never moves another tenant's row under the same id", async () => {
+      const repository = create();
+      const theirs = record({ tenantId: OTHER, status: "pending", generation: 0 });
+      await repository.upsert(theirs);
+
+      await expect(
+        repository.transition({
+          expected: theirs,
+          next: { ...theirs, tenantId: ACME, status: "available", generation: 1 },
+        }),
+      ).resolves.toBe(false);
+      await expect(repository.findById({ tenantId: OTHER, id: theirs.id })).resolves.toMatchObject({
+        status: "pending",
+      });
+    });
+
+    it("pages rows of any of several statuses", async () => {
+      const repository = create();
+      await repository.upsert(record({ id: "so_a" as StoredObjectId, status: "pending" }));
+      await repository.upsert(record({ id: "so_b" as StoredObjectId, status: "uploading" }));
+      await repository.upsert(record({ id: "so_c" as StoredObjectId, status: "failed" }));
+
+      await expect(
+        repository.findPage({ tenantId: ACME, status: ["pending", "uploading"], limit: 10 }),
+      ).resolves.toMatchObject([{ id: "so_a" }, { id: "so_b" }]);
+    });
+  });
+
+  describe("when projects holding expired pending uploads are asked for", () => {
+    it("names each such project once, in order after the cursor, across tenants", async () => {
+      const repository = create();
+      const expired = Temporal.Instant.from("2026-08-21T00:00:00.000Z");
+      const later = Temporal.Instant.from("2026-08-23T00:00:00.000Z");
+      const pending: { status: StoredObjectLifecycleStatus } = { status: "pending" };
+
+      await repository.upsert(record({ ...pending, tenantId: OTHER, expiresAt: expired }));
+      await repository.upsert(
+        record({ ...pending, id: "so_a" as StoredObjectId, expiresAt: expired }),
+      );
+      await repository.upsert(
+        record({ ...pending, id: "so_b" as StoredObjectId, expiresAt: expired }),
+      );
+      await repository.upsert(
+        record({ ...pending, id: "so_c" as StoredObjectId, expiresAt: later }),
+      );
+      await repository.upsert(
+        record({ id: "so_d" as StoredObjectId, status: "failed", expiresAt: expired }),
+      );
+      await repository.upsert(
+        record({
+          tenantId: "project_uploading" as StoredObjectProjectId,
+          status: "uploading",
+          expiresAt: expired,
+        }),
+      );
+
+      await expect(
+        repository.findTenantsWithExpiredUploads({ expiresBefore: AT, limit: 10 }),
+      ).resolves.toEqual([ACME, OTHER, "project_uploading"]);
+      await expect(
+        repository.findTenantsWithExpiredUploads({
+          expiresBefore: AT,
+          afterTenantId: ACME,
+          limit: 10,
+        }),
+      ).resolves.toEqual([OTHER, "project_uploading"]);
+      await expect(
+        repository.findTenantsWithExpiredUploads({ expiresBefore: AT, limit: 1 }),
+      ).resolves.toEqual([ACME]);
+    });
+  });
+
   describe("when another tenant holds a row with the same id", () => {
     /** @scenario "The memory and Postgres stored-object repositories answer alike" */
     it("never answers the other tenant's row", async () => {

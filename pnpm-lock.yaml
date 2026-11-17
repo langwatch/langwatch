@@ -15112,6 +15112,9 @@ importers:
       '@langwatch/egress':
         specifier: workspace:*
         version: link:../../../packages/egress
+      '@langwatch/eventing':
+        specifier: workspace:*
+        version: link:../../../packages/eventing
       '@langwatch/group-queue':
         specifier: workspace:*
         version: link:../../../packages/group-queue

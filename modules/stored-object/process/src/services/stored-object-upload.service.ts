@@ -5,6 +5,7 @@
  */
 import { HandledError, ValidationError } from "@langwatch/handled-error";
 import { ObjectBodyShortError, ObjectBodyTooLargeError } from "@langwatch/process-stores";
+import type { ObjectDigest } from "@langwatch/process-stores/members";
 import {
   DirectUploadUnavailableError,
   StorageUnavailableError,
@@ -39,8 +40,12 @@ import type {
   StoredObjectRecord,
   StoredObjectRecordRepository,
 } from "../repositories/stored-object-record.repository.ts";
+import { movedOn } from "../rules/stored-object-lifecycle.rules.ts";
 import { storedObjectReferenceOf } from "../rules/stored-object-view.rules.ts";
 import type { StoredObjectUploadSignerService } from "./stored-object-upload-signer.service.ts";
+
+/** How long the reaper leaves an "uploading" row alone: past the api's two-hour body limit. */
+const UPLOAD_RECEIVE_WINDOW_MS = 3 * 60 * 60 * 1000;
 
 type StoredObjectUploadServiceOptions = Readonly<{
   records: StoredObjectRecordRepository;
@@ -211,22 +216,96 @@ export class StoredObjectUploadService {
       tenantId: seal.projectId,
       id: input.objectId,
     });
+    if (value?.status === "uploading") throw new UploadIncompleteError();
     if (value?.status !== "pending" || !value.storage) throw new UploadTokenInvalidError();
 
     if (!input.body) throw new UploadIncompleteError();
 
     const address = value.storage;
+    const receivingAt = this.options.now();
+    const uploading = movedOn(value, receivingAt, {
+      status: "uploading",
+      expiresAt: receivingAt.add({ milliseconds: UPLOAD_RECEIVE_WINDOW_MS }),
+    });
+    if (!(await this.options.records.transition({ expected: value, next: uploading }))) {
+      throw new UploadIncompleteError();
+    }
+
+    const client = { broke: false };
+    let digest: ObjectDigest;
     try {
-      await this.options.storage.write({
+      digest = await this.options.storage.write({
         projectId: seal.projectId,
         address,
-        body: chunksOf(input.body),
+        body: chunksOf(input.body, client),
         byteLength: seal.byteLength,
         mediaType: seal.mediaType,
       });
     } catch (error) {
-      throw writeRefusalOf(error, seal.byteLength);
+      await this.restorePending({ uploading, expiresAt: value.expiresAt });
+      throw writeRefusalOf({ error, byteLength: seal.byteLength, clientBroke: client.broke });
     }
+
+    await this.recordLanded({ uploading, digest, expiresAt: value.expiresAt });
+  }
+
+  /** A write that failed hands the row back as it was, so the reaper keeps its first schedule. */
+  private async restorePending(input: {
+    uploading: StoredObjectRecord;
+    expiresAt: Instant | null;
+  }): Promise<void> {
+    const pending = movedOn(input.uploading, this.options.now(), {
+      status: "pending",
+      expiresAt: input.expiresAt,
+    });
+    await this.options.records.transition({ expected: input.uploading, next: pending });
+  }
+
+  /** Keeps the digest the write took, so confirm reads nothing back (#9666). */
+  private async recordLanded(input: {
+    uploading: StoredObjectRecord;
+    digest: ObjectDigest;
+    /** The pending row's own expiry, handed back if what landed is refused. */
+    expiresAt: Instant | null;
+  }): Promise<void> {
+    const { uploading, digest } = input;
+    const address = uploading.storage;
+    if (!address) throw new UploadIncompleteError();
+
+    try {
+      StoredObjectUploadService.assertByteFacts(uploading, digest.byteLength);
+    } catch (error) {
+      await this.restorePending({ uploading, expiresAt: input.expiresAt });
+      await this.discard({ projectId: uploading.tenantId, address });
+      throw error;
+    }
+
+    const now = this.options.now();
+    const landed = movedOn(uploading, now, {
+      status: "pending",
+      sha256: digest.sha256,
+      expiresAt: now.add({ milliseconds: this.options.uploadExpiryMs }),
+    });
+    if (await this.options.records.transition({ expected: uploading, next: landed })) return;
+
+    // Reaped or deleted while the bytes streamed: what just landed is nobody's.
+    const current = await this.options.records.findById({
+      tenantId: uploading.tenantId,
+      id: uploading.id,
+    });
+    if (current?.status === "available") throw new UploadIncompleteError();
+    await this.discard({ projectId: uploading.tenantId, address });
+    if (current?.status === "deleted") {
+      throw new StoredObjectDeletedError(uploading.tenantId, uploading.id);
+    }
+    throw new UploadExpiredError();
+  }
+
+  private async discard(input: {
+    projectId: string;
+    address: StoredObjectStorageAddress;
+  }): Promise<void> {
+    await StoredObjectUploadService.ignoreStorageFailure(() => this.options.storage.delete(input));
   }
 
   async confirmUpload(input: ConfirmStoredObjectUploadInput): Promise<StoredObjectReference> {
@@ -238,38 +317,60 @@ export class StoredObjectUploadService {
     if (value.status === "available") return storedObjectReferenceOf(value);
     if (value.status === "deleted")
       throw new StoredObjectDeletedError(input.projectId, input.objectId);
+    // "uploading": the bytes are still arriving through the process; the client retries.
     if (value.status !== "pending" || !value.storage) throw new UploadIncompleteError();
 
+    const digest = isLanded(value) ? landedDigestOf(value) : await this.unseenDigestOf(value);
+
+    StoredObjectUploadService.assertByteFacts(value, digest.byteLength);
+    const now = this.options.now();
+    const available = movedOn(value, now, {
+      status: "available",
+      sha256: digest.sha256,
+      mediaTypeVerified: true,
+      expiresAt: null,
+      availableAt: now,
+    });
+    if (await this.options.records.transition({ expected: value, next: available })) {
+      return storedObjectReferenceOf(available);
+    }
+
+    return this.answerAfterLostConfirm(input);
+  }
+
+  /** Another write moved the row first: answer from what it holds now. */
+  private async answerAfterLostConfirm(
+    input: ConfirmStoredObjectUploadInput,
+  ): Promise<StoredObjectReference> {
+    const current = await this.options.records.findById({
+      tenantId: input.projectId,
+      id: input.objectId,
+    });
+    if (current?.status === "available") return storedObjectReferenceOf(current);
+    if (current?.status === "deleted") {
+      throw new StoredObjectDeletedError(input.projectId, input.objectId);
+    }
+    throw new UploadIncompleteError();
+  }
+
+  /** A direct upload's bytes, which LangWatch never saw: its window still applies. */
+  private async unseenDigestOf(value: StoredObjectRecord): Promise<ObjectDigest> {
     const isExpired =
       value.expiresAt === null ||
       Temporal.Instant.compare(value.expiresAt, this.options.now()) <= 0;
     if (isExpired) throw new UploadExpiredError();
 
     const address = value.storage;
-    const digest = await StoredObjectUploadService.storageCall(() =>
-      this.options.storage.getStat({ projectId: input.projectId, address }),
+    if (!address) throw new UploadIncompleteError();
+
+    return StoredObjectUploadService.storageCall(() =>
+      this.options.storage.getStat({ projectId: value.tenantId, address }),
     ).catch((error: unknown) => {
       if (error instanceof HandledError && error.code === "stored_object_not_found") {
         throw new UploadIncompleteError();
       }
       throw error;
     });
-
-    StoredObjectUploadService.assertByteFacts(value, digest.byteLength);
-    const now = this.options.now();
-    const available: StoredObjectRecord = {
-      ...value,
-      status: "available",
-      sha256: digest.sha256,
-      mediaTypeVerified: true,
-      generation: value.generation + 1,
-      expiresAt: null,
-      availableAt: now,
-      updatedAt: now,
-    };
-    await this.options.records.upsert(available);
-
-    return storedObjectReferenceOf(available);
   }
 
   /** In-process bytes: a buffer is written as it is; a stream is counted within the ceiling. */
@@ -318,22 +419,48 @@ function refusedField(field: "purpose" | "mediaType", message: string): Validati
   return new ValidationError(message, { meta: { fieldErrors: { [field]: [message] } } });
 }
 
-/** The member refuses a body past or short of its declared length, and keeps nothing. */
-function writeRefusalOf(error: unknown, byteLength: number): Error {
+/**
+ * The member refuses a body past or short of its declared length, and keeps nothing.
+ * A client whose body broke off is told its upload is incomplete, not that storage failed.
+ */
+function writeRefusalOf(input: {
+  error: unknown;
+  byteLength: number;
+  clientBroke: boolean;
+}): Error {
+  const { error, byteLength } = input;
   if (error instanceof ObjectBodyTooLargeError)
     return new UploadTooLargeError(byteLength + 1, byteLength);
-  if (error instanceof ObjectBodyShortError) return new UploadIncompleteError();
+  if (error instanceof ObjectBodyShortError || input.clientBroke)
+    return new UploadIncompleteError();
 
   return new StorageUnavailableError();
 }
 
-async function* chunksOf(body: StoredObjectUploadBody): StoredObjectByteStream {
+async function* chunksOf(
+  body: StoredObjectUploadBody,
+  client: { broke: boolean },
+): StoredObjectByteStream {
   const reader = body.getReader();
+  const read = () =>
+    reader.read().catch((error: unknown) => {
+      client.broke = true;
+      throw error;
+    });
   try {
-    for (let next = await reader.read(); !next.done; next = await reader.read()) yield next.value;
+    for (let next = await read(); !next.done; next = await read()) yield next.value;
   } finally {
     reader.releaseLock();
   }
+}
+
+/** A pending row the signed route already wrote holds the digest that write took. */
+function isLanded(value: StoredObjectRecord): boolean {
+  return value.sha256 !== "";
+}
+
+function landedDigestOf(value: StoredObjectRecord): ObjectDigest {
+  return { sha256: value.sha256, byteLength: value.byteLength };
 }
 
 async function* streamOf(chunks: readonly Uint8Array[]): StoredObjectByteStream {
