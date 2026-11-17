@@ -147,6 +147,17 @@ Feature: GroupQueue batch bisection
     Then the failure names a retry delay
     And the job takes the longer overload retry budget instead of the ordinary one
 
+  # A handler waiting on work still to land (an evaluation outcome whose trace is not stored yet)
+  # is a planned wait, not a failure. Overload stays a retry: it is real backpressure.
+  @unit
+  Scenario: A planned wait is counted apart from a failed retry
+    Given a job whose handler throws a queue error marked as a planned wait, naming a delay
+    When it is re-staged after that delay
+    Then gq_jobs_waited_total counts it and gq_jobs_retried_total does not
+    And it is logged at debug, not as a failed attempt at warn
+    And it spends an attempt from the same budget as before
+    And a failure that names a delay but is not marked a planned wait still counts as a retry
+
   @integration @coalescing @bisection
   Scenario: Splitting is bounded within one locked attempt
     Given a handler that only ever accepts a single payload

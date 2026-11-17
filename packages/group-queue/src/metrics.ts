@@ -77,6 +77,13 @@ export const gqJobsRetriedTotal = counter({
   description: "Total number of intermediate retry attempts",
 });
 
+/** Re-stages of a planned wait (a GroupQueueError marked `waiting`), kept out of the retries. */
+export const gqJobsWaitedTotal = counter({
+  name: "gq_jobs_waited_total",
+  description:
+    "Total number of jobs re-staged after the delay their handler named while waiting on work still to land; a planned wait, not a failed attempt, so gq_jobs_retried_total leaves it out",
+});
+
 export const gqJobsExhaustedTotal = counter({
   name: "gq_jobs_exhausted_total",
   description: "Total number of jobs that exhausted all retry attempts",
