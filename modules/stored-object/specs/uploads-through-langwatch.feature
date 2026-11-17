@@ -108,7 +108,7 @@ Feature: Uploads through LangWatch when browsers cannot reach the bucket
     Scenario: An nginx install routes LangWatch's upload route through its own Ingress
       Given the app Ingress is enabled with class "nginx"
       When the chart renders
-      Then an Ingress routes /api/stored-objects/uploads/ on the app host to the app Service
+      Then an Ingress routes /api/stored-objects/uploads (no trailing slash) on the app host to the app Service
       And it turns off request buffering, allows bodies up to the upload limit and sets long timeouts
       And the app Ingress keeps its own settings
 

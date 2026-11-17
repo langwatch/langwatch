@@ -5,7 +5,7 @@
 #
 #   - app.dataplane.uploads reaches the app and the workers as STORED_OBJECTS_UPLOADS,
 #     and nothing is set without it.
-#   - an nginx app Ingress gets a second Ingress for /api/stored-objects/uploads/
+#   - an nginx app Ingress gets a second Ingress for /api/stored-objects/uploads
 #     sized for files (body limit, no request buffering, long timeouts), and the
 #     app Ingress keeps its own settings.
 #
@@ -133,10 +133,10 @@ test_nginx_upload_route_has_its_own_ingress() {
       fail "uploads host $host" "the uploads Ingress does not carry app host $host"
     fi
   done
-  if [ "$(printf '%s\n' "$doc" | grep -c 'path: /api/stored-objects/uploads/$')" = "2" ] \
+  if [ "$(printf '%s\n' "$doc" | grep -c 'path: /api/stored-objects/uploads$')" = "2" ] \
       && [ "$(printf '%s\n' "$doc" | grep -c 'pathType: Prefix$')" = "2" ] \
       && [ "$(printf '%s\n' "$doc" | grep -A2 'service:$' | grep -c 'name: lw-app$')" = "2" ]; then
-    ok "uploads backend" "/api/stored-objects/uploads/ (Prefix) routes to the lw-app Service"
+    ok "uploads backend" "/api/stored-objects/uploads (Prefix, no trailing slash: nginx would 301 the create route) routes to the lw-app Service"
   else
     fail "uploads backend" "the upload path does not route to lw-app as a Prefix"
   fi

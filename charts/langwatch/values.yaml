@@ -1764,7 +1764,7 @@ ingress:
     annotations: {}
 
   # Upload route on the app hosts. The chart renders a second Ingress,
-  # `<release>-uploads-ingress`, routing /api/stored-objects/uploads/ (Prefix)
+  # `<release>-uploads-ingress`, routing /api/stored-objects/uploads (Prefix)
   # on every ingress.hosts host to the app Service, with ingress.annotations
   # (minus rewrites and server/configuration snippets). When className
   # contains "nginx" it adds request buffering off, a 5121m body limit (the

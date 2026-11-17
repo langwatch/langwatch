@@ -156,10 +156,10 @@ spec:
   timeouts per Ingress, so the route gets its own. On for className nginx unless switched.
   Annotations: the app's minus rewrites and snippets, the upload settings, then ingress.uploads.
 */}}
-{{- $uploadsPath := "/api/stored-objects/uploads/" }}
+{{- $uploadsPath := "/api/stored-objects/uploads" }}
 {{- $uploadsBlocked := false }}
 {{- range $blockedPaths }}
-  {{- if hasPrefix (printf "%s/" .) $uploadsPath }}{{ $uploadsBlocked = true }}{{ end }}
+  {{- if hasPrefix (printf "%s/" .) (printf "%s/" $uploadsPath) }}{{ $uploadsBlocked = true }}{{ end }}
 {{- end }}
 {{- $uploadsClass := toString (.Values.ingress.className | default "") }}
 {{- $uploadsOn := ternary $uploadsSwitch (eq $uploadsClass "nginx") (kindIs "bool" $uploadsSwitch) }}
