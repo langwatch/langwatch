@@ -180,7 +180,9 @@ async function writeObject(options: {
 function idleBounded(body: Readable, key: string, idleMs: number): Readable {
   if (!(body instanceof IncomingMessage)) return body;
   body.setTimeout(idleMs, () => {
-    const stalled = new Error(`S3 sent no bytes of "${key}" for ${idleMs} ms.`);
+    const stalled = new Error(
+      `No bytes of "${key}" moved for ${idleMs} ms, so the body was closed to free its connection.`,
+    );
     body.destroy(Object.assign(stalled, { name: "TimeoutError" }));
   });
   return body;

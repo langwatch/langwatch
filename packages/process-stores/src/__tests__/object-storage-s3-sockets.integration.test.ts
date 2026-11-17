@@ -263,6 +263,7 @@ describe("given an S3 backend with a short body idle limit", () => {
 
       await expect(within(drained, 3_000, "the stalled body")).rejects.toMatchObject({
         name: "TimeoutError",
+        message: expect.stringMatching(/^No bytes of ".+" moved for 300 ms/),
       });
       await vi.waitFor(() => expect(s3.openSockets()).toBe(0), { timeout: 2_000 });
     });

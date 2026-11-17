@@ -226,6 +226,11 @@ export function releasingBody(body: AsyncIterable<Uint8Array>): AsyncIterable<Ui
   return body;
 }
 
+/** A body as a Node stream: the member's own one when it is, so stopping early frees its socket. */
+export function readableBody(body: AsyncIterable<Uint8Array>): Readable {
+  return body instanceof Readable ? body : Readable.from(body, { objectMode: false });
+}
+
 /** Reads a stream to its end through the hash, holding one chunk at a time. */
 export async function digestOf(stream: AsyncIterable<Uint8Array>): Promise<ObjectDigest> {
   const hash = createHash("sha256");
