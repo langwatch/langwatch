@@ -27,12 +27,14 @@
 -- two results and a newer verdict replaces an older one.
 --
 -- KeyVersion is the version of the recall key's hashing. Recall reads only rows
--- of the current version, so rows written before recall is switched on, or
--- under a key bug, are never recalled or shown; bumping the version retires
--- them.
+-- of the current version. Every row is written with the current version,
+-- including rows written while recall is off, so recall serves them once it is
+-- switched on. Only a version bump, for a key bug, retires the rows written
+-- under the old version, from recall and from readers.
 --
--- NO JUDGED TEXT IS STORED, as in 00097. InputHash is a hash of the text, not
--- the text. A judgment of free text with no trace is not stored.
+-- NO JUDGED TEXT IS STORED, as in 00097. InputHash is a hash of the judged
+-- column name and its text (of {input, output, contexts} as canonical JSON for
+-- a monitor), not the text. A judgment of free text with no trace is not stored.
 --
 -- No Passed column: a pass is Probability against the reader's threshold, so
 -- two readers with different thresholds share one judge call.
@@ -41,7 +43,9 @@
 -- trace's time, as trace_summaries does. The table is in
 -- RETENTION_TABLE_CATEGORY_MAP under "traces". The TTL clause below is
 -- character-for-character what `buildRetentionTTLExpression` emits for this
--- table's TABLE_TTL_CONFIG entry, so the reconciler's first pass issues no ALTER.
+-- table's TABLE_TTL_CONFIG entry, so with cold storage off the reconciler's
+-- first pass issues no ALTER. With CLICKHOUSE_COLD_STORAGE_ENABLED on,
+-- planTieredTTL adds TO VOLUME 'cold', as for every tiered table.
 --
 -- Cluster note: no ON CLUSTER. When CLICKHOUSE_CLUSTER is set the database uses
 -- the Replicated engine (00001), which propagates DDL to every node itself.
@@ -68,7 +72,8 @@ CREATE TABLE IF NOT EXISTS ${CLICKHOUSE_DATABASE}.eval_results
     -- The resolved decision model and its version (ADR-182).
     JudgeModel LowCardinality(String) CODEC(ZSTD(1)),
 
-    -- sha256 of the judged column name and the judged text.
+    -- sha256 of the judged column name and its text; for a monitor, of
+    -- {input, output, contexts} as canonical JSON.
     InputHash String DEFAULT '' CODEC(ZSTD(1)),
 
     -- The judged column (input, output, ...); 'monitor' for a monitor. Every

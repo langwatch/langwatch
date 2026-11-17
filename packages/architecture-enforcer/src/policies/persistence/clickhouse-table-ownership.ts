@@ -678,6 +678,17 @@ function owners(access: readonly Access[]): Map<string, Access[]> {
 
 type Feeds = ReadonlyMap<string, readonly string[]>;
 
+/** What a module writing a recorded table is told, by the kind of record. */
+function writeMessage({ record, module }: { record: OwnershipRecord; module: string }): string {
+  if (record.owner !== "reserved") {
+    return `${module} writes ${record.table}, recorded as ${record.owner} owned (${record.writer}: ${record.reason}).`;
+  }
+
+  return module === record.writer
+    ? `${module} writes ${record.table}, reserved for it. Delete the record: the write owns the table now.`
+    : `${module} writes ${record.table}, reserved for ${record.writer} (${record.reason}).`;
+}
+
 /**
  * A recorded table no migration creates, a module writing one, or a foreign read
  * of a reserved one.
@@ -709,10 +720,7 @@ function recordFindings({
       key: `${writer.module}|${record.table}`,
       file: writer.file,
       line: writer.line,
-      message:
-        record.owner === "reserved" && writer.module === record.writer
-          ? `${writer.module} writes ${record.table}, reserved for it. Delete the record: the write owns the table now.`
-          : `${writer.module} writes ${record.table}, recorded as ${record.owner} owned (${record.writer}: ${record.reason}).`,
+      message: writeMessage({ record, module: writer.module }),
     }));
 
     if (record.owner !== "reserved") return writes;
@@ -823,6 +831,7 @@ function staleShared({
   writers,
   feeds,
   shared,
+  records,
   root,
 }: {
   access: readonly Access[];
@@ -830,12 +839,16 @@ function staleShared({
   writers: ReadonlyMap<string, Access[]>;
   feeds: Feeds;
   shared: readonly SharedTable[];
+  records: readonly OwnershipRecord[];
   root: string;
 }): Finding[] {
   return shared.flatMap((item): Finding[] => {
     const owner = tables.has(item.table) ? ownerOf({ table: item.table, writers, feeds }) : void 0;
+    const reservedFor = records.find(
+      (record) => record.table === item.table && record.owner === "reserved",
+    )?.writer;
 
-    if (owner?.module !== item.owner) {
+    if ((reservedFor ?? owner?.module) !== item.owner) {
       return [
         {
           key: `shared|${item.table}`,
@@ -851,7 +864,7 @@ function staleShared({
       )
       .map((reader) => ({
         key: `shared|${item.table}|${reader}`,
-        file: owner.file,
+        file: owner?.file ?? join(root, MIGRATIONS),
         message: `Table ${item.table} is shared with ${reader}, which no longer reads it. Delete the reader.`,
       }));
   });
@@ -943,7 +956,7 @@ function collectFindings({
     ...findings.values(),
     ...recordFindings({ tables, writers, records: declared.records, context }),
     ...staleExceptions({ access, exceptions, root }),
-    ...staleShared({ access, tables, writers, feeds, shared, root }),
+    ...staleShared({ access, tables, writers, feeds, shared, records: declared.records, root }),
   ];
 }
 

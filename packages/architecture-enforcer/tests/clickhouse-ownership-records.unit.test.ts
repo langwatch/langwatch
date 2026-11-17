@@ -187,7 +187,7 @@ describe("ClickHouse ownership records", () => {
       );
 
       expect(world.messages()).toEqual([
-        "trace writes eval_results, recorded as reserved owned (instant-eval: step 1).",
+        "trace writes eval_results, reserved for instant-eval (step 1).",
       ]);
     });
 
@@ -211,8 +211,26 @@ describe("ClickHouse ownership records", () => {
       );
 
       expect(world.messages()).toEqual([
-        "trace writes eval_results, recorded as reserved owned (instant-eval: step 1).",
+        "trace writes eval_results, reserved for instant-eval (step 1).",
       ]);
+    });
+
+    /** @scenario "A reserved table its owner shares for reading is not stale" */
+    it("reports nothing for a shared declaration on a reserved table", () => {
+      const world = fixture({
+        ...RESERVED,
+        shared: [
+          ...RESERVED.shared,
+          { table: "eval_results", owner: "instant-eval", readers: ["analytics"], reason: "x" },
+        ],
+      });
+      world.write(
+        "packages/clickhouse-migrations/migrations/00005_eval_results.sql",
+        create("eval_results"),
+      );
+      world.write(ANALYTICS_READER.replace("slim.mapper", "eval-results"), reader("eval_results"));
+
+      expect(world.messages()).toEqual([]);
     });
 
     /** @scenario "A reserved table's owner is its named writer" */

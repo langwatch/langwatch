@@ -60,6 +60,13 @@ Feature: ClickHouse ownership records and named exceptions
     Then the policy reports trace writing it and no separate read
 
   @unit @architecture
+  Scenario: A reserved table its owner shares for reading is not stale
+    Given the policy records eval_results as reserved for instant-eval
+    And instant-eval shares eval_results for reading with analytics
+    When analytics reads eval_results
+    Then the policy reports nothing
+
+  @unit @architecture
   Scenario: A reserved table's owner is its named writer
     Given the policy records eval_results as reserved for instant-eval
     When the table owners are listed
