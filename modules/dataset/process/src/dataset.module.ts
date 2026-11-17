@@ -1,7 +1,7 @@
 import { projectRequestContextOf } from "@langwatch/api/rest";
 import type { DatasetApi, DatasetServerConfig } from "@langwatch/dataset-contract";
 import { defineProcessModule, type PublishedProcessModule } from "@langwatch/process";
-import { defineMigrationStep, type MigrationStepRun } from "@langwatch/upgrade/step";
+import { defineMigrationStep } from "@langwatch/upgrade/step";
 
 import { DatasetModule } from "#app/dataset.app";
 import { datasetNormalizationEventing } from "#eventing/dataset-normalization.pipeline";
@@ -47,21 +47,20 @@ export const datasetProcessModule: PublishedProcessModule<
           projects: dependencies.projects,
         }).runStep(args),
     });
-    const moveContent = (args: Parameters<MigrationStepRun>[0]) =>
-      DatasetMigrationService.create({
-        repository: repositories.migration,
-        storage: repositories.migrationChunks,
-        projects: dependencies.projects,
-      }).runStep(args);
     // Background, after old writers are gone: an older image may still write
-    // postgres-layout content.
+    // postgres-layout content. Released in 3.21.0, so this block stays as it shipped.
     const firstMove = defineMigrationStep({
       id: "dataset:move-content-to-object-storage",
       kind: "data",
       mode: "background",
       description: "Moves each dataset's content out of Postgres and into object-storage chunks.",
       needsOldWritersGone: true,
-      run: moveContent,
+      run: (args) =>
+        DatasetMigrationService.create({
+          repository: repositories.migration,
+          storage: repositories.migrationChunks,
+          projects: dependencies.projects,
+        }).runStep(args),
     });
     // The same move under a new id: the first is recorded done on installs that ran it, and
     // 3.21.0 to 3.23.0 kept creating datasets in the records table after it ran.
@@ -73,7 +72,12 @@ export const datasetProcessModule: PublishedProcessModule<
         "Moves the datasets still in the Postgres records table, archived and empty ones too, into object-storage chunks.",
       needsOldWritersGone: true,
       after: [firstMove],
-      run: moveContent,
+      run: (args) =>
+        DatasetMigrationService.create({
+          repository: repositories.migration,
+          storage: repositories.migrationChunks,
+          projects: dependencies.projects,
+        }).runStep(args),
     });
     return [
       firstMove,
