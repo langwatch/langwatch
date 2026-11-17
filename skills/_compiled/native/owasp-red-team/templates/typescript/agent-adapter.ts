@@ -14,6 +14,7 @@ export type OpenAIChatMessage =
   | {
       role: "assistant";
       content: string | null;
+      refusal?: string | null;
       tool_calls?: {
         id: string;
         type: "function";
@@ -70,7 +71,12 @@ const toolCallsOf = (message: ScenarioMessage) =>
           {
             id: part.toolCallId,
             type: "function" as const,
-            function: { name: part.toolName, arguments: JSON.stringify(part.input ?? {}) },
+            function: {
+              name: part.toolName,
+              // Arguments that were not valid JSON travel back as the raw string.
+              arguments:
+                typeof part.input === "string" ? part.input : JSON.stringify(part.input ?? {}),
+            },
           },
         ]
       : [],
@@ -124,6 +130,25 @@ const parseJson = (text: string): unknown => {
   }
 };
 
+type OpenAIAssistantMessage = Extract<OpenAIChatMessage, { role: "assistant" }>;
+
+const fromOpenAIAssistant = (message: OpenAIAssistantMessage): ScenarioMessage => {
+  const calls = message.tool_calls ?? [];
+  const text = message.content || message.refusal || "";
+  return {
+    role: "assistant",
+    content: [
+      ...(text ? [{ type: "text" as const, text }] : []),
+      ...calls.map((call) => ({
+        type: "tool-call" as const,
+        toolCallId: call.id,
+        toolName: call.function.name,
+        input: parseJson(call.function.arguments || "{}") ?? call.function.arguments,
+      })),
+    ],
+  };
+};
+
 /** Converts the agent's new OpenAI chat messages back to scenario messages. */
 export function fromOpenAIMessages({
   messages,
@@ -134,21 +159,8 @@ export function fromOpenAIMessages({
   const out: ScenarioMessage[] = [];
   for (const message of messages) {
     if (message.role === "assistant") {
-      const calls = message.tool_calls ?? [];
-      for (const call of calls) toolNames.set(call.id, call.function.name);
-      const text = message.content ?? "";
-      out.push({
-        role: "assistant",
-        content: [
-          ...(text ? [{ type: "text" as const, text }] : []),
-          ...calls.map((call) => ({
-            type: "tool-call" as const,
-            toolCallId: call.id,
-            toolName: call.function.name,
-            input: parseJson(call.function.arguments || "{}") ?? {},
-          })),
-        ],
-      });
+      for (const call of message.tool_calls ?? []) toolNames.set(call.id, call.function.name);
+      out.push(fromOpenAIAssistant(message));
     } else if (message.role === "tool") {
       const json = parseJson(message.content);
       out.push({

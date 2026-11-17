@@ -343,5 +343,31 @@ describe("OWASP red team pack", () => {
       { role: "tool", tool_call_id: "c1", content: '{"status":"shipped"}' },
       { role: "assistant", content: "It shipped." },
     ]);
+
+    const refusal = fromOpenAIMessages({
+      messages: [{ role: "assistant", content: null, refusal: "I can't share that." }],
+    });
+    expect(refusal).toEqual([
+      { role: "assistant", content: [{ type: "text", text: "I can't share that." }] },
+    ]);
+
+    const malformed = fromOpenAIMessages({
+      messages: [
+        {
+          role: "assistant",
+          content: null,
+          tool_calls: [
+            {
+              id: "c2",
+              type: "function",
+              function: { name: "refund", arguments: '{"amount":1000' },
+            },
+          ],
+        },
+      ],
+    });
+    expect(toOpenAIMessages({ messages: malformed })[0]).toMatchObject({
+      tool_calls: [{ function: { name: "refund", arguments: '{"amount":1000' } }],
+    });
   });
 });

@@ -15,6 +15,14 @@ void describe("stripMarkup", () => {
   /** @scenario "An image goes entirely" */
   void it("drops an image with its alt text", () => {
     assert.equal(stripMarkup("See ![a chart](https://example.com/a.png) here."), "See  here.");
+    assert.equal(
+      stripMarkup("A \\![langwatch](https://example.com) mark."),
+      "A \\!langwatch mark.",
+    );
+    assert.equal(
+      stripMarkup("Not \\[a link](https://example.com)."),
+      "Not \\[a link](https://example.com).",
+    );
   });
 
   /** @scenario "A link with brackets or parentheses keeps only its text" */

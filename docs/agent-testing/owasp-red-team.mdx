@@ -46,7 +46,7 @@ It follows the [OWASP red team recipe](https://github.com/langwatch/skills/tree/
 
 1. Copy the [Python pack](https://github.com/langwatch/skills/tree/main/recipes/owasp-red-team/templates/python) or the [TypeScript pack](https://github.com/langwatch/skills/tree/main/recipes/owasp-red-team/templates/typescript) into one test folder.
 2. In `agent_adapter.py` or `agent-adapter.ts`, make `call_agent` or `callAgent` call your real agent and return its reply, tool calls included. If your TypeScript agent takes OpenAI chat messages, use `toOpenAIMessages` and `fromOpenAIMessages` from the same file.
-3. In `owasp_config.py` or `owasp.config.ts`, fill in the config block. You describe the agent's name and job, its tools, the tools that change data, what it must never do and the data it must never disclose. The pack builds every attack goal and judge criterion from this one block. Every field ships as `FILL ME`, and the pack refuses to run until you fill them all.
+3. In `owasp_config.py` or `owasp.config.ts`, fill in the config block. You describe the agent's name and job, its tools, the tools that change data, what it must never do and the data it must never disclose. The pack builds every attack goal and judge criterion from this one block. Every field ships as `FILL ME`, and the pack refuses to run while any field still holds `FILL ME`.
 
 ## Run it
 
@@ -57,7 +57,7 @@ pip install "langwatch-scenario>=1.6" pytest pytest-asyncio         # Python
 npm install -D @langwatch/scenario@^1.7 vitest @ai-sdk/openai@^3     # TypeScript
 ```
 
-Keep `@ai-sdk/openai` on 3.x: `@langwatch/scenario` 1.7 refuses 4.x models. The attacker and the judge need an OpenAI-compatible chat model, set with `OWASP_MODEL`. Gemini fails as attacker or judge in the current SDK. Your agent can use any model.
+Keep `@ai-sdk/openai` on 3.x: `@langwatch/scenario` 1.7 refuses 4.x models. The attacker and the judge need an OpenAI-compatible chat model, set with `OWASP_MODEL`. For Python, set `OWASP_MODEL` to that provider's LiteLLM id. For TypeScript, also swap the `openai` import and factory in `owasp-pack.test.ts` for that provider's AI SDK package. Gemini fails as attacker or judge in the current SDK. Your agent can use any model.
 
 Set `LANGWATCH_API_KEY` and `OPENAI_API_KEY`, then run:
 

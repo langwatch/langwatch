@@ -371,6 +371,12 @@ function stripLinks(text) {
   let out = "";
   let i = 0;
   while (i < text.length) {
+    // An escaped character is literal, so `\![` and `\[` open nothing.
+    if (text[i] === "\\" && i + 1 < text.length) {
+      out += text.slice(i, i + 2);
+      i += 2;
+      continue;
+    }
     const link = readLink(text, i);
     if (link) {
       out += link.keep;
