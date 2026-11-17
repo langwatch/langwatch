@@ -18,35 +18,94 @@ import {
   piiRedactionModelPrice,
   ruleSaveConfirmation,
   STRICT_FALLBACK_NOTE,
+  STRICT_RULE_BASED_NOTES,
   withOrganizationPiiLevel,
 } from "../pii-redaction-level-offer.ts";
 
+type Licence = Parameters<typeof piiRedactionModelOfferOf>[0]["licence"];
+
 describe("given the deployment and the PII redaction model flags", () => {
   describe("when the deployment is self-hosted", () => {
-    /** @scenario The Strict offer on a self-hosted deployment follows the model flag */
-    it("offers the model, never priced, only with the flag on", () => {
-      expect(piiRedactionModelOfferOf({ isSaaS: false, modelFlag: true, freeFlag: false })).toEqual(
-        { kind: "model", free: true },
-      );
-      expect(piiRedactionModelOfferOf({ isSaaS: false, modelFlag: false, freeFlag: true })).toEqual(
-        { kind: "rule-based" },
-      );
+    const selfHosted = ({
+      licence,
+      modelFlag,
+      mayManageLicence = true,
+    }: {
+      licence: Licence;
+      modelFlag: boolean;
+      mayManageLicence?: boolean;
+    }) =>
+      piiRedactionModelOfferOf({
+        isSaaS: false,
+        modelFlag,
+        freeFlag: false,
+        licence,
+        mayManageLicence,
+      });
+
+    /** @scenario The Strict offer on a self-hosted deployment follows the license and the model flag */
+    it("offers the model, never priced, only with an Enterprise licence and the flag on", () => {
+      expect(selfHosted({ licence: "enterprise", modelFlag: true })).toEqual({
+        kind: "model",
+        free: true,
+        licensed: true,
+      });
+    });
+
+    it("says how to turn the model on with the licence and no flag", () => {
+      expect(selfHosted({ licence: "enterprise", modelFlag: false })).toEqual({
+        kind: "rule-based",
+        note: "turn-on",
+      });
+    });
+
+    it("advertises the licence without it, whatever the flag says", () => {
+      expect(selfHosted({ licence: "none", modelFlag: true })).toEqual({
+        kind: "rule-based",
+        note: "licence",
+        activate: true,
+      });
+      expect(selfHosted({ licence: "none", modelFlag: false })).toEqual({
+        kind: "rule-based",
+        note: "licence",
+        activate: true,
+      });
+    });
+
+    it("links the advert to activating a licence only for a reader who may manage it", () => {
+      expect(selfHosted({ licence: "none", modelFlag: true, mayManageLicence: false })).toEqual({
+        kind: "rule-based",
+        note: "licence",
+        activate: false,
+      });
+    });
+
+    it("offers nothing while the plan is not answered yet or cannot be read", () => {
+      expect(selfHosted({ licence: "loading", modelFlag: true })).toBeNull();
+      expect(selfHosted({ licence: "unknown", modelFlag: true })).toBeNull();
+    });
+
+    it("never names LangWatch Cloud in a self-hosted note, and spells license as the app does", () => {
+      for (const note of Object.values(STRICT_RULE_BASED_NOTES)) {
+        expect(note).not.toMatch(/cloud/i);
+        expect(note).not.toMatch(/licence/i);
+      }
     });
   });
 
   describe("when the deployment is LangWatch Cloud", () => {
     it("offers the model only with the flag, priced unless the organization is free", () => {
-      expect(
-        piiRedactionModelOfferOf({ isSaaS: true, modelFlag: false, freeFlag: true }),
-      ).toBeNull();
-      expect(piiRedactionModelOfferOf({ isSaaS: true, modelFlag: true, freeFlag: false })).toEqual({
-        kind: "model",
-        free: false,
-      });
-      expect(piiRedactionModelOfferOf({ isSaaS: true, modelFlag: true, freeFlag: true })).toEqual({
-        kind: "model",
-        free: true,
-      });
+      const cloud = ({ modelFlag, freeFlag }: { modelFlag: boolean; freeFlag: boolean }) =>
+        piiRedactionModelOfferOf({
+          isSaaS: true,
+          modelFlag,
+          freeFlag,
+          licence: "none",
+          mayManageLicence: true,
+        });
+      expect(cloud({ modelFlag: false, freeFlag: true })).toBeNull();
+      expect(cloud({ modelFlag: true, freeFlag: false })).toEqual({ kind: "model", free: false });
+      expect(cloud({ modelFlag: true, freeFlag: true })).toEqual({ kind: "model", free: true });
     });
   });
 });
@@ -215,7 +274,11 @@ describe("given a rule saved from the drawer", () => {
       }),
     ).toBeNull();
     expect(
-      ruleSaveConfirmation({ offer: { kind: "rule-based" }, before: undefined, after: strict }),
+      ruleSaveConfirmation({
+        offer: { kind: "rule-based", note: "licence", activate: true },
+        before: undefined,
+        after: strict,
+      }),
     ).toBeNull();
     expect(ruleSaveConfirmation({ offer: null, before: undefined, after: strict })).toBeNull();
     expect(

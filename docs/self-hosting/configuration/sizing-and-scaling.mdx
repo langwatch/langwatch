@@ -144,7 +144,8 @@ The PII redaction model does the Strict PII level's analysis instead of Presidio
 - Each replica analyzes one batch at a time. Another batch waits for it; the model refuses one it cannot finish within 45 s, and that batch falls back to Presidio without pausing the model for other batches.
 - At that rate a 1,000-character span takes 3 to 4 seconds, so one replica handles roughly 15 such spans a minute. Add replicas for more Strict traffic.
 - A batch over 8,000 characters, or one the model does not answer within 50 s, goes to Presidio instead. After a timeout, that process sends every Strict batch to Presidio for 2 minutes.
-- With neither `piiRedactionModel.enabled` nor `piiRedactionModel.externalEndpoint` set, Strict stays on Presidio. An `externalEndpoint` sends Strict analysis to that model even when `enabled` is `false`.
+- The model needs an Enterprise license: an organization without one stays on Presidio, whatever the chart sets.
+- With neither `piiRedactionModel.enabled` nor `piiRedactionModel.externalEndpoint` set, Strict stays on Presidio. An `externalEndpoint` sends a licensed organization's Strict analysis to that model even when `enabled` is `false`.
 - If the model is down, Strict falls back to Presidio, so turning it off or losing a pod never stops redaction.
 
 ## Throughput by size
