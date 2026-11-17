@@ -8,9 +8,10 @@ import {
   type UpdateGatewayA2aTargetInput,
 } from "@langwatch/gateway-contract";
 import { generate } from "@langwatch/ksuid";
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
 
 import { GatewayA2aTargetRepository } from "../gateway-a2a-target.repository.ts";
+import type { GatewayPersistenceTransaction } from "../gateway-transaction.repository.ts";
 import type { GatewayCipher } from "../gateway.repositories.ts";
 
 type A2aTargetRow = Awaited<ReturnType<PrismaClient["gatewayA2ATarget"]["findFirstOrThrow"]>>;
@@ -49,10 +50,13 @@ export class PrismaGatewayA2aTargetRepository extends GatewayA2aTargetRepository
     return row ? this.#toResource(row) : null;
   }
 
-  async create(input: CreateGatewayA2aTargetInput): Promise<GatewayA2aTargetResource> {
+  async create(
+    input: CreateGatewayA2aTargetInput,
+    transaction?: GatewayPersistenceTransaction,
+  ): Promise<GatewayA2aTargetResource> {
     const parsed = createGatewayA2aTargetInputSchema.parse(input);
-    const row = await this.prisma.gatewayA2ATarget
-      .create({
+    const row = await this.#client(transaction)
+      .gatewayA2ATarget.create({
         data: {
           id: generate("gateway").toString(),
           organizationId: parsed.organizationId,
@@ -76,9 +80,12 @@ export class PrismaGatewayA2aTargetRepository extends GatewayA2aTargetRepository
     return this.#toResource(row);
   }
 
-  async update(input: UpdateGatewayA2aTargetInput): Promise<GatewayA2aTargetResource> {
+  async update(
+    input: UpdateGatewayA2aTargetInput,
+    transaction?: GatewayPersistenceTransaction,
+  ): Promise<GatewayA2aTargetResource> {
     const allowList = input.allowedVirtualKeyIds;
-    const row = await this.prisma.gatewayA2ATarget.update({
+    const row = await this.#client(transaction).gatewayA2ATarget.update({
       where: { id: input.id, organizationId: input.organizationId },
       data: {
         agentName: input.agentName,
@@ -95,12 +102,19 @@ export class PrismaGatewayA2aTargetRepository extends GatewayA2aTargetRepository
     return this.#toResource(row);
   }
 
-  async archive(input: { id: string; organizationId: string }): Promise<GatewayA2aTargetResource> {
-    const row = await this.prisma.gatewayA2ATarget.update({
+  async archive(
+    input: { id: string; organizationId: string },
+    transaction?: GatewayPersistenceTransaction,
+  ): Promise<GatewayA2aTargetResource> {
+    const row = await this.#client(transaction).gatewayA2ATarget.update({
       where: { id: input.id, organizationId: input.organizationId },
       data: { archivedAt: new Date() },
     });
     return this.#toResource(row);
+  }
+
+  #client(transaction?: GatewayPersistenceTransaction): Prisma.TransactionClient {
+    return (transaction as Prisma.TransactionClient | undefined) ?? this.prisma;
   }
 
   #seal(headers: Record<string, string>): string | null {

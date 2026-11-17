@@ -16,6 +16,10 @@ import type {
   GatewayChangeEventKind,
   GatewayChangeEventsRepository,
 } from "../repositories/gateway-change-event.repository.ts";
+import type {
+  GatewayPersistenceTransaction,
+  GatewayTransactionRepository,
+} from "../repositories/gateway-transaction.repository.ts";
 import { a2aTargetAdmitsKey, a2aTargetsForProject } from "../rules/gateway-a2a-target.rules.ts";
 
 /** The A2A target registry: one name per scope (org-wide or one project). */
@@ -23,27 +27,35 @@ export class GatewayA2aTargetService {
   static create(input: {
     repository: GatewayA2aTargetRepository;
     changeEvents: GatewayChangeEventsRepository;
+    transactions: GatewayTransactionRepository;
   }): GatewayA2aTargetService {
-    return new GatewayA2aTargetService(input.repository, input.changeEvents);
+    return new GatewayA2aTargetService(input.repository, input.changeEvents, input.transactions);
   }
 
   private constructor(
     private readonly repository: GatewayA2aTargetRepository,
     private readonly changeEvents: GatewayChangeEventsRepository,
+    private readonly transactions: GatewayTransactionRepository,
   ) {}
 
-  /** Bumps the change feed so gateways refetch the bundles carrying this target. */
-  private async announce(
+  /** Writes the target and bumps the change feed in one transaction, so gateways always refetch. */
+  private announce(
     kind: GatewayChangeEventKind,
-    target: GatewayA2aTargetResource,
+    write: (transaction: GatewayPersistenceTransaction) => Promise<GatewayA2aTargetResource>,
   ): Promise<GatewayA2aTargetResource> {
-    await this.changeEvents.append({
-      organizationId: target.organizationId,
-      projectId: target.projectId,
-      kind,
-      payload: { a2aTargetId: target.id },
+    return this.transactions.run(async (transaction) => {
+      const target = await write(transaction);
+      await this.changeEvents.append(
+        {
+          organizationId: target.organizationId,
+          projectId: target.projectId,
+          kind,
+          payload: { a2aTargetId: target.id },
+        },
+        transaction,
+      );
+      return target;
     });
-    return target;
   }
 
   list(organizationId: string): Promise<GatewayA2aTargetResource[]> {
@@ -56,18 +68,18 @@ export class GatewayA2aTargetService {
     if (existing.some((t) => t.name === parsed.name && t.projectId === parsed.projectId)) {
       throw new GatewayA2aTargetNameTakenError(parsed.name);
     }
-    return this.announce("A2A_TARGET_CREATED", await this.repository.create(parsed));
+    return this.announce("A2A_TARGET_CREATED", (tx) => this.repository.create(parsed, tx));
   }
 
   async update(input: UpdateGatewayA2aTargetInput): Promise<GatewayA2aTargetResource> {
     const parsed = updateGatewayA2aTargetInputSchema.parse(input);
     if (!(await this.repository.findById(parsed))) throw new GatewayA2aTargetNotFoundError();
-    return this.announce("A2A_TARGET_UPDATED", await this.repository.update(parsed));
+    return this.announce("A2A_TARGET_UPDATED", (tx) => this.repository.update(parsed, tx));
   }
 
   async archive(input: { id: string; organizationId: string }): Promise<GatewayA2aTargetResource> {
     if (!(await this.repository.findById(input))) throw new GatewayA2aTargetNotFoundError();
-    return this.announce("A2A_TARGET_DELETED", await this.repository.archive(input));
+    return this.announce("A2A_TARGET_DELETED", (tx) => this.repository.archive(input, tx));
   }
 
   /** The bundle's `a2a_targets`: the key's project and org-wide targets the key may call. */

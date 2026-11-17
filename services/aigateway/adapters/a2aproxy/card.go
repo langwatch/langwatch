@@ -16,38 +16,12 @@ import (
 // serveCard fetches the target's Agent Card and points every interface URL
 // at the gateway, so a client that reads the card keeps calling through it.
 func (h *Handler) serveCard(c *call, target domain.A2ATarget) {
-	ctx := c.ctx
-	cardURL := target.CardURL
-	if cardURL == "" {
-		cardURL = strings.TrimSuffix(target.UpstreamURL, "/") + cardPath
-	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, cardURL, nil)
-	if err != nil {
-		c.refuse(refuseUpstream.withMessage("the Agent Card URL is invalid"))
-		return
-	}
-	for k, v := range target.UpstreamHeaders {
-		req.Header.Set(k, v)
-	}
-	propagation.TraceContext{}.Inject(ctx, propagation.HeaderCarrier(req.Header))
-	resp, err := h.cfg.Client.Do(req)
-	if err != nil {
-		c.refuse(upstreamRefusal(err))
-		return
-	}
-	defer func() { _ = resp.Body.Close() }()
-	raw, tooLarge, err := readLimited(resp.Body)
-	if tooLarge {
-		c.refuse(refuseReplyTooLarge)
-		return
-	}
-	var card map[string]any
-	if err != nil || resp.StatusCode != http.StatusOK || json.Unmarshal(raw, &card) != nil {
-		c.refuse(refuseUpstream.withMessage("the A2A agent has no readable Agent Card"))
+	card, ok := h.fetchCard(c, target)
+	if !ok {
 		return
 	}
 	if target.AgentName == "" {
-		if name, ok := card["name"].(string); ok && name != "" {
+		if name, isName := card["name"].(string); isName && name != "" {
 			c.span.SetAttributes(attribute.String(attrAgentName, name))
 		}
 	}
@@ -56,6 +30,40 @@ func (h *Handler) serveCard(c *call, target domain.A2ATarget) {
 	c.w.Header().Set("Content-Type", "application/json")
 	c.w.WriteHeader(http.StatusOK)
 	_, _ = c.w.Write(out)
+}
+
+// fetchCard reads the upstream Agent Card, refusing the call when it cannot.
+func (h *Handler) fetchCard(c *call, target domain.A2ATarget) (map[string]any, bool) {
+	cardURL := target.CardURL
+	if cardURL == "" {
+		cardURL = strings.TrimSuffix(target.UpstreamURL, "/") + cardPath
+	}
+	req, err := http.NewRequestWithContext(c.ctx, http.MethodGet, cardURL, nil)
+	if err != nil {
+		c.refuse(refuseUpstream.withMessage("the Agent Card URL is invalid"))
+		return nil, false
+	}
+	for k, v := range target.UpstreamHeaders {
+		req.Header.Set(k, v)
+	}
+	propagation.TraceContext{}.Inject(c.ctx, propagation.HeaderCarrier(req.Header))
+	resp, err := h.cfg.Client.Do(req)
+	if err != nil {
+		c.refuse(upstreamRefusal(err))
+		return nil, false
+	}
+	defer func() { _ = resp.Body.Close() }()
+	raw, tooLarge, err := readLimited(resp.Body)
+	if tooLarge {
+		c.refuse(refuseReplyTooLarge)
+		return nil, false
+	}
+	var card map[string]any
+	if err != nil || resp.StatusCode != http.StatusOK || json.Unmarshal(raw, &card) != nil {
+		c.refuse(refuseUpstream.withMessage("the A2A agent has no readable Agent Card"))
+		return nil, false
+	}
+	return card, true
 }
 
 // rewriteCard swaps the upstream base for the proxy base in the card's url

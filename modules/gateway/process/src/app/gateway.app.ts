@@ -875,6 +875,7 @@ function gatewayControlPlane(options: GatewayControlPlaneOptions): GatewayContro
     a2aTargets: GatewayA2aTargetService.create({
       repository: repositories.a2aTargets,
       changeEvents: changes,
+      transactions: repositories.transactions,
     }),
     budgetSpend,
     changeEvents: changes,

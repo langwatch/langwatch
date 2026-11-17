@@ -299,22 +299,22 @@ archiveCacheRule(input: ArchiveGatewayCacheRuleInput): Promise<GatewayCacheRuleR
 
 #### `listA2aTargets`
 
-Org-wide and project-scoped A2A targets of the organization.
+Org-wide and project-scoped A2A targets; each A2A operation refuses a missing organization.
 
 ```typescript
-listA2aTargets(organizationId: string): Promise<GatewayA2aTargetResource[]>;
+listA2aTargets(organizationId: string): Promise<GatewayA2aTargetDto[]>;
 ```
 
 #### `createA2aTarget`
 
 ```typescript
-createA2aTarget(input: CreateGatewayA2aTargetInput): Promise<GatewayA2aTargetResource>;
+createA2aTarget(input: CreateGatewayA2aTargetInput): Promise<GatewayA2aTargetDto>;
 ```
 
 #### `updateA2aTarget`
 
 ```typescript
-updateA2aTarget(input: UpdateGatewayA2aTargetInput): Promise<GatewayA2aTargetResource>;
+updateA2aTarget(input: UpdateGatewayA2aTargetInput): Promise<GatewayA2aTargetDto>;
 ```
 
 #### `setA2aTargetBlocked`
@@ -322,13 +322,13 @@ updateA2aTarget(input: UpdateGatewayA2aTargetInput): Promise<GatewayA2aTargetRes
 The kill switch for one target: the gateway refuses calls to a blocked target.
 
 ```typescript
-setA2aTargetBlocked(input: SetGatewayA2aTargetBlockedInput): Promise<GatewayA2aTargetResource>;
+setA2aTargetBlocked(input: SetGatewayA2aTargetBlockedInput): Promise<GatewayA2aTargetDto>;
 ```
 
 #### `archiveA2aTarget`
 
 ```typescript
-archiveA2aTarget(input: { id: string; organizationId: string; }): Promise<GatewayA2aTargetResource>;
+archiveA2aTarget(input: { id: string; organizationId: string }): Promise<GatewayA2aTargetDto>;
 ```
 
 #### `listGuardrails`
@@ -1441,7 +1441,7 @@ type Response = z.infer<typeof gatewayEndUserSpendResponseSchema>; // ../contrac
 
 ### `gatewayA2aTargets`
 
-Contract `../contract/src/gateway-a2a-target.trpc.ts:14`, router `src/transport/gateway-a2a-target.trpc.ts:10`.
+Contract `../contract/src/gateway-a2a-target.trpc.ts:14`, router `src/transport/gateway-a2a-target.trpc.ts:8`.
 
 | Procedure                      | Kind     | Gate                            | Input            | Output                      |
 | ------------------------------ | -------- | ------------------------------- | ---------------- | --------------------------- |
@@ -1921,9 +1921,9 @@ Run by the tasks process, before serve.
 
 | Kind   | Leaf                          | Environment variable                    | Declared at                            |
 | ------ | ----------------------------- | --------------------------------------- | -------------------------------------- |
-| secret | `internalSecret`              | `LW_GATEWAY_INTERNAL_SECRET`            | `src/app/gateway.app.ts:1173`          |
-| secret | `jwtSecret`                   | `LW_GATEWAY_JWT_SECRET`                 | `src/app/gateway.app.ts:1174`          |
-| secret | `virtualKeyPepper`            | `LW_VIRTUAL_KEY_PEPPER`                 | `src/app/gateway.app.ts:1175`          |
+| secret | `internalSecret`              | `LW_GATEWAY_INTERNAL_SECRET`            | `src/app/gateway.app.ts:1175`          |
+| secret | `jwtSecret`                   | `LW_GATEWAY_JWT_SECRET`                 | `src/app/gateway.app.ts:1176`          |
+| secret | `virtualKeyPepper`            | `LW_VIRTUAL_KEY_PEPPER`                 | `src/app/gateway.app.ts:1177`          |
 | config | `spendSettlementGraceMs`      | `LW_SPEND_SETTLEMENT_GRACE_MS`          | `../contract/src/gateway.config.ts:27` |
 | config | `internalUrl`                 | `LW_GATEWAY_INTERNAL_URL`               | `../contract/src/gateway.config.ts:29` |
 | config | `controlPlaneUrl`             | `GATEWAY_CONTROL_PLANE_URL`             | `../contract/src/gateway.config.ts:31` |
