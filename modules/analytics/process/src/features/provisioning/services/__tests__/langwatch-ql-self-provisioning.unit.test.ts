@@ -13,6 +13,7 @@ import type { LangWatchQLNames } from "../../../../services/langwatch-ql-access-
 import { lwqlAppFunctionNames } from "../../../app-functions/rules/langwatch-ql-app-function-catalog.rules.ts";
 import { canProvisionAppFunctions } from "../../../app-functions/rules/langwatch-ql-app-function-store.rules.ts";
 import { LangWatchQLCollectionBindingService } from "../langwatch-ql-collection-binding.service.ts";
+import { LangWatchQLPostgresGapsService } from "../langwatch-ql-postgres-gaps.service.ts";
 import { LangWatchQLPostgresMappingService } from "../langwatch-ql-postgres-mapping.service.ts";
 import { LangWatchQLSelfProvisioningService } from "../langwatch-ql-self-provisioning.service.ts";
 
@@ -20,6 +21,7 @@ const selfProvisioning = LangWatchQLSelfProvisioningService.create();
 
 const collectionBinding = LangWatchQLCollectionBindingService.create();
 const postgresMapping = LangWatchQLPostgresMappingService.create();
+const postgresGaps = LangWatchQLPostgresGapsService.create();
 
 const SOURCE_DATABASE = "langwatch";
 const NAMES: LangWatchQLNames = {
@@ -654,7 +656,7 @@ describe("given what the reconvergence check finds in PostgreSQL", () => {
       { kind: "scoped", view: unscoped, repair: "unscoped" },
       { kind: "scoped", view: ungranted, repair: "ungranted" },
     ]);
-    expect(selfProvisioning.scopedCopiesToRebuild({ gaps })).toEqual([absent, unscoped]);
+    expect(postgresGaps.scopedCopiesToRebuild({ gaps })).toEqual([absent, unscoped]);
   });
 
   /** @scenario "A scoped schema marked as another installation's is left alone" */
@@ -671,7 +673,7 @@ describe("given what the reconvergence check finds in PostgreSQL", () => {
 
   it("rebuilds every copy once the scoped schema was found absent", () => {
     expect(
-      selfProvisioning.scopedCopiesToRebuild({ gaps: [{ kind: "scoped-schema-absent" }] }),
+      postgresGaps.scopedCopiesToRebuild({ gaps: [{ kind: "scoped-schema-absent" }] }),
     ).toEqual(views);
   });
 });

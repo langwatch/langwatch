@@ -44,7 +44,6 @@ import {
 import {
   LangWatchQLPostgresGapsService,
   type LwqlPostgresGap,
-  type LwqlSharedPostgresGap,
 } from "./langwatch-ql-postgres-gaps.service.ts";
 import {
   DEFAULT_POSTGRES_READER_LIMITS,
@@ -421,16 +420,6 @@ export class LangWatchQLSelfProvisioningService {
     scoped: LwqlScopedViewState;
   }): LwqlPostgresGap[] {
     return postgresGaps.findGaps({ found, scoped });
-  }
-
-  /** The gaps on shared approved views alone. */
-  sharedPostgresGaps({ gaps }: { gaps: readonly LwqlPostgresGap[] }): LwqlSharedPostgresGap[] {
-    return postgresGaps.sharedGaps({ gaps });
-  }
-
-  /** The scoped copies a check rewrites; an ungranted copy needs only its grant. */
-  scopedCopiesToRebuild({ gaps }: { gaps: readonly LwqlPostgresGap[] }): string[] {
-    return postgresGaps.scopedCopiesToRebuild({ gaps });
   }
 
   /** A failed statement echoes its DDL, which embeds passwords; every logged error passes here. */

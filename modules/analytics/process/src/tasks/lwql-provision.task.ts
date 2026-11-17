@@ -17,7 +17,10 @@ import {
   type LwqlAccessModelMode,
   type LwqlCollectionProbe,
 } from "../features/provisioning/services/langwatch-ql-collection-binding.service.ts";
-import type { LwqlPostgresGap } from "../features/provisioning/services/langwatch-ql-postgres-gaps.service.ts";
+import {
+  LangWatchQLPostgresGapsService,
+  type LwqlPostgresGap,
+} from "../features/provisioning/services/langwatch-ql-postgres-gaps.service.ts";
 import { LWQL_SCOPED_READER_GROUP } from "../features/provisioning/services/langwatch-ql-postgres-mapping.service.ts";
 import {
   LangWatchQLProductionProvisioningService,
@@ -51,6 +54,7 @@ const lwqlProvisioning = LangWatchQLProductionProvisioningService.create();
 const clusterGuard = LangWatchQLSqlModeClusterGuardService.create();
 const selfProvisioning = LangWatchQLSelfProvisioningService.create();
 const collectionBinding = LangWatchQLCollectionBindingService.create();
+const postgresGaps = LangWatchQLPostgresGapsService.create();
 
 /** One global key: the self-provision convergence is a singleton, not per tenant. */
 const LWQL_SELF_PROVISION_LOCK_KEY = "lwql:self-provision";
@@ -541,7 +545,7 @@ function postgresStatements({
       scoped: [...lwqlProvisioning.postgresScopedViewStatements({ schema }), ...scopedGrants],
     };
   }
-  const shared = selfProvisioning.sharedPostgresGaps({ gaps });
+  const shared = postgresGaps.sharedGaps({ gaps });
   const absent = shared.filter((gap) => gap.absent).map((gap) => gap.view);
   const views = (approvedViews: string[]) => selfProvisioning.postgresDatasets({ approvedViews });
   return {
@@ -561,7 +565,7 @@ function postgresStatements({
     scoped: [
       ...lwqlProvisioning.postgresScopedViewStatements({
         schema,
-        views: views(selfProvisioning.scopedCopiesToRebuild({ gaps })),
+        views: views(postgresGaps.scopedCopiesToRebuild({ gaps })),
       }),
       ...scopedGrants,
     ],
