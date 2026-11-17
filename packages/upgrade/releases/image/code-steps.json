@@ -133,6 +133,22 @@
     "needsOldWritersGone": true
   },
   {
+    "id": "dataset:move-remaining-content-to-object-storage",
+    "kind": "data",
+    "mode": "background",
+    "owner": "dataset",
+    "description": "Moves the datasets still in the Postgres records table, archived and empty ones too, into object-storage chunks.",
+    "needsOldWritersGone": true
+  },
+  {
+    "id": "dataset:convert-single-file-datasets",
+    "kind": "data",
+    "mode": "background",
+    "owner": "dataset",
+    "description": "Converts each dataset an older release kept as one file into object-storage chunks, keeping the old file.",
+    "needsOldWritersGone": true
+  },
+  {
     "id": "dataset:fill-empty-slugs",
     "kind": "data",
     "mode": "background",

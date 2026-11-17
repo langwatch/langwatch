@@ -8,6 +8,7 @@ import type {
   DatasetMigrationRepository,
 } from "../../repositories/dataset-migration.repository.ts";
 import { MemoryDatasetMigrationRepository } from "../../repositories/memory/memory.dataset-migration.repository.ts";
+import { MemoryDatasetDatabase } from "../../repositories/memory/memory.dataset.database.ts";
 import { ObjectStorageDatasetChunkRepository } from "../../repositories/object-storage/object-storage.dataset-chunk.repository.ts";
 import { DatasetMigrationService } from "../dataset-migration.service.ts";
 
@@ -20,7 +21,9 @@ const PAGES: Record<string, { ids: string[]; next: string | null }> = {
 function subject(
   listAllIds: (input?: ProjectIdPageInput) => Promise<{ ids: string[]; next: string | null }>,
 ) {
-  const repository: DatasetMigrationRepository = MemoryDatasetMigrationRepository.create();
+  const repository: DatasetMigrationRepository = MemoryDatasetMigrationRepository.create({
+    database: MemoryDatasetDatabase.create(),
+  });
   const findPostgresDatasetIds = vi.spyOn(repository, "findPostgresDatasetIds");
   const projects = { listAllIds: vi.fn(listAllIds) };
   const migration = DatasetMigrationService.create({
@@ -96,6 +99,7 @@ function step(
     findPostgresDatasetIds: async ({ projectId, afterId }) =>
       afterId ? [] : [`dataset_of_${projectId}`],
     isPostgresLayout: async () => true,
+    findMoveNotes: async () => ({ archived: false, rowsUnderOtherProject: 0 }),
     getFingerprint: async () => ({ count: 1, maxUpdatedAt: null }),
     findRecordPage: async ({ afterId }) => (afterId ? [] : [{ id: "record_1", entry: { a: 1 } }]),
     commit,

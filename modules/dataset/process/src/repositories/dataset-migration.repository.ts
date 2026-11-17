@@ -12,6 +12,19 @@ export type DatasetMigrationSummary = {
   alreadyMigrated: number;
   skippedConcurrentWrite: number;
   failed: number;
+  /** Of the moved datasets, how many were archived (they stay archived). */
+  archived: number;
+  /** Of the moved datasets, how many held no rows. */
+  empty: number;
+  /** Rows a moved dataset left behind because they are filed under another project. */
+  rowsUnderOtherProject: { datasetId: string; projectId: string; rows: number }[];
+};
+
+/** What the move reports about one dataset beside its outcome. */
+export type DatasetMoveNotes = {
+  archived: boolean;
+  /** Rows of this dataset filed under a project other than its own: never moved. */
+  rowsUnderOtherProject: number;
 };
 
 /** `incomplete`: some dataset failed or changed mid-move; the checkpoint never passed it. */
@@ -45,6 +58,8 @@ export interface DatasetMigrationRepository {
     limit: number;
   }): Promise<string[]>;
   isPostgresLayout(input: DatasetKey): Promise<boolean>;
+  /** Whether the dataset is archived, and how many of its rows sit under another project. */
+  findMoveNotes(input: DatasetKey): Promise<DatasetMoveNotes>;
   getFingerprint(input: DatasetKey): Promise<DatasetMigrationFingerprint>;
   /** One page of a dataset's records in canonical order. */
   findRecordPage(

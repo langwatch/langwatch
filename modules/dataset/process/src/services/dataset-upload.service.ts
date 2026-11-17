@@ -162,7 +162,13 @@ export class DatasetUploadService implements DatasetUpload {
       entry,
     }));
     if (isSingleFileDataset(dataset) && this.singleFile) {
-      await this.singleFile.appendRecords({ dataset, records: stamped });
+      // Converted to chunks while the append waited for the dataset's lock: append there.
+      if ((await this.singleFile.appendRecords({ dataset, records: stamped })) === "converted") {
+        await this.appendToChunks({
+          dataset: await this.findDataset(dataset.id, projectId),
+          stamped,
+        });
+      }
     } else if (dataset.contentLayout === "s3_jsonl") {
       await this.appendToChunks({ dataset, stamped });
     } else if ((await this.appendToRecordsTable({ dataset, stamped })) === "moved") {

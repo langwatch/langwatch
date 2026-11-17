@@ -9,6 +9,7 @@ import type {
   DatasetMigrationMetadata,
   DatasetMigrationOutcome,
   DatasetMigrationRepository,
+  DatasetMoveNotes,
 } from "../dataset-migration.repository.ts";
 import {
   DATASET_MUTATION_TXN_MAX_WAIT_MS,
@@ -54,6 +55,30 @@ export class PrismaDatasetMigrationRepository implements DatasetMigrationReposit
       select: { contentLayout: true, useS3: true },
     });
     return current?.contentLayout === "postgres" && !current.useS3;
+  }
+
+  async findMoveNotes(input: { datasetId: string; projectId: string }): Promise<DatasetMoveNotes> {
+    const [dataset, misfiled] = await Promise.all([
+      this.options.database.dataset.findFirst({
+        where: { id: input.datasetId, projectId: input.projectId },
+        select: { archivedAt: true },
+      }),
+      // A row whose project differs from its dataset's is never read by the move, which reads
+      // by both; this counts them so the report names what stays behind.
+      this.options.database.$queryRaw<{ count: bigint }[]>` ${skipTenantCheck({
+        // Counts, by dataset id, the rows filed under any other project: no tenant to bind.
+        SKIP_TENANT_CHECK: true,
+      })}
+        SELECT count(*) AS count
+          FROM "DatasetRecord"
+         WHERE "datasetId" = ${input.datasetId}
+           AND "projectId" <> ${input.projectId}
+      `,
+    ]);
+    return {
+      archived: dataset?.archivedAt != null,
+      rowsUnderOtherProject: Number(misfiled[0]?.count ?? 0n),
+    };
   }
 
   getFingerprint(input: {
