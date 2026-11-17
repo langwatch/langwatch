@@ -51,6 +51,14 @@ const TAB_LABELS: Record<SuiteTemplateKind, string> = {
 
 type Step = "browse" | "preview" | "fit";
 
+/** Template copy names {{agentName}} and {{tools}}; before the fit step they read generically. */
+function withAgentPlaceholder(text: string): string {
+  return text
+    .replace(/\{\{\s*agentName\s*\}\}/g, "your agent")
+    .replace(/\s*\(\{\{\s*tools\s*\}\}\)/g, "")
+    .replace(/\{\{\s*tools\s*\}\}/g, "its tools");
+}
+
 function scenarioCount(template: SuiteTemplate): string {
   const count = template.scenarios.length;
   return count === 1 ? "1 scenario" : `${count} scenarios`;
@@ -81,8 +89,12 @@ function TemplateCards({
         <Card
           key={template.id}
           title={template.title}
-          description={template.description}
-          badge={<Badge size="sm">{scenarioCount(template)}</Badge>}
+          description={withAgentPlaceholder(template.description)}
+          badge={
+            <Badge size="sm" flexShrink={0} whiteSpace="nowrap">
+              {scenarioCount(template)}
+            </Badge>
+          }
           opener={
             <button
               type="button"
@@ -101,7 +113,7 @@ function TemplatePreview({ template }: { template: SuiteTemplate }) {
   return (
     <VStack align="stretch" gap={3} data-testid="suite-template-preview">
       <Text textStyle="sm" color="fg.muted">
-        {template.description}
+        {withAgentPlaceholder(template.description)}
       </Text>
       {template.scenarios.map((scenario) => (
         <Card
@@ -109,15 +121,17 @@ function TemplatePreview({ template }: { template: SuiteTemplate }) {
           variant="nested"
           padding="sm"
           title={scenario.name}
-          description={scenario.attack?.attackGoal ?? scenario.situation}
+          description={withAgentPlaceholder(scenario.attack?.attackGoal ?? scenario.situation)}
           badge={
             scenario.attack ? (
               <HStack gap={1}>
-                {scenario.attack.owaspIds.map((owaspId) => (
-                  <Badge key={owaspId} size="sm" colorPalette="red">
-                    {owaspCategoryLabel({ id: owaspId })}
-                  </Badge>
-                ))}
+                {scenario.attack.owaspIds
+                  .filter((owaspId) => owaspCategoryLabel({ id: owaspId }) !== scenario.name)
+                  .map((owaspId) => (
+                    <Badge key={owaspId} size="sm" colorPalette="red">
+                      {owaspCategoryLabel({ id: owaspId })}
+                    </Badge>
+                  ))}
               </HStack>
             ) : undefined
           }
