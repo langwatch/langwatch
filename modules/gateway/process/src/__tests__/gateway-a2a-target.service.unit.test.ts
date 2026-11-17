@@ -5,6 +5,7 @@ import {
 import { describe, expect, it } from "vitest";
 
 import { MemoryGatewayA2aTargetRepository } from "../repositories/memory/memory.gateway-a2a-target.repository.ts";
+import { MemoryGatewayChangeEventsRepository } from "../repositories/memory/memory.gateway-change-event.repository.ts";
 import { a2aTargetToDto } from "../rules/gateway-a2a-target.rules.ts";
 import { GatewayA2aTargetService } from "../services/gateway-a2a-target.service.ts";
 
@@ -16,8 +17,11 @@ const base = {
   actorUserId: "user_1",
 };
 
-function service() {
-  return GatewayA2aTargetService.create(MemoryGatewayA2aTargetRepository.create());
+function service(changeEvents = MemoryGatewayChangeEventsRepository.create()) {
+  return GatewayA2aTargetService.create({
+    repository: MemoryGatewayA2aTargetRepository.create(),
+    changeEvents,
+  });
 }
 
 describe("GatewayA2aTargetService", () => {
@@ -184,5 +188,26 @@ describe("GatewayA2aTargetService", () => {
       actorUserId: "u1",
     });
     expect(unblocked).toMatchObject({ blocked: false, blockReason: null });
+  });
+
+  it("appends a change event on every write so gateways refetch their bundles", async () => {
+    const changeEvents = MemoryGatewayChangeEventsRepository.create();
+    const targets = service(changeEvents);
+    const created = await targets.create({ ...base, projectId: "p1", name: "billing" });
+    await targets.setBlocked({
+      id: created.id,
+      organizationId: base.organizationId,
+      blocked: true,
+      blockReason: "incident",
+      actorUserId: base.actorUserId,
+    });
+    await targets.archive({ id: created.id, organizationId: base.organizationId });
+
+    const { events } = await changeEvents.since(base.organizationId, 0n);
+    expect(events.map((event) => [event.kind, event.projectId])).toEqual([
+      ["A2A_TARGET_CREATED", "p1"],
+      ["A2A_TARGET_UPDATED", "p1"],
+      ["A2A_TARGET_DELETED", "p1"],
+    ]);
   });
 });
