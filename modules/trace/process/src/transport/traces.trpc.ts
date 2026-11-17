@@ -13,6 +13,7 @@ import {
   facetValuesResultSchema,
   TraceApi,
   traceListPageSchema,
+  traceWithholdingOf,
   tracesEvaluationRunsSchema,
   tracesTrpc,
 } from "@langwatch/trace-contract";
@@ -318,6 +319,7 @@ export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesT
           cursor: input.cursor,
           filterWhere,
           visibilityCutoffMs: protections.visibilityCutoffMs,
+          withholding: traceWithholdingOf(protections),
         }),
       );
 
@@ -342,15 +344,16 @@ export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesT
     .procedure("newCount")
     .withPermission("traces:view")
     .handle(async ({ app, input, actor, authorization }) => {
+      const protections = await app.resolveViewerProtections({
+        projectId: input.projectId,
+        userId: actor.id,
+        authorization,
+      });
       const filterWhere = await app.compileExplorerTraceFilter({
         query: input.query ?? "",
         tenantId: input.projectId,
         timeRange: input.timeRange,
-        protections: await app.resolveViewerProtections({
-          projectId: input.projectId,
-          userId: actor.id,
-          authorization,
-        }),
+        protections,
         evalRuns: await app.findExplorerEvalRuns({
           projectId: input.projectId,
           evalRuns: input.evalRuns,
@@ -361,6 +364,7 @@ export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesT
         timeRange: input.timeRange,
         since: input.since,
         filterWhere,
+        withholding: traceWithholdingOf(protections),
       });
 
       return { count };
@@ -534,6 +538,12 @@ export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesT
         userId: actor.id,
         authorization,
       });
+      await app.assertTraceNotWithheld({
+        authorization,
+        traceId: input.traceId,
+        occurredAtMs: input.occurredAtMs,
+        protections,
+      });
       const rows = await app.readTraceLogRecords({
         projectId: input.projectId,
         traceId: input.traceId,
@@ -619,6 +629,12 @@ export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesT
     .withPermission("traces:view")
     .handle(({ app, input, authorization, actor }) =>
       app.readSpansFullForViewer({ ...input, authorization, viewerUserId: actor.id }),
+    )
+
+    .procedure("agentCallGraph")
+    .withPermission("traces:view")
+    .handle(({ app, input, authorization, actor }) =>
+      app.readAgentCallGraphForViewer({ ...input, authorization, viewerUserId: actor.id }),
     )
 
     .procedure("spanDetail")

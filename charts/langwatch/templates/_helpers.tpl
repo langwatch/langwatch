@@ -1115,6 +1115,15 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- include "langwatch.secretOrValue" (dict "envName" "S3_SECRET_ACCESS_KEY" "fieldValues" .Values.app.dataplane.providers.awsS3.secretAccessKey) }}
 {{- include "langwatch.secretOrValue" (dict "envName" "S3_KEY_SALT" "fieldValues" .Values.app.dataplane.providers.awsS3.keySalt) }}
 {{- end }}
+{{- /* Where clients send upload bytes (#9666): straight to the bucket, or through
+       LangWatch's signed route when browsers and SDKs cannot reach the bucket. */}}
+{{- with .Values.app.dataplane.uploads }}
+{{- if not (has (toString .) (list "direct" "through-langwatch")) }}
+{{- fail (printf "app.dataplane.uploads is %q; use direct or through-langwatch, or leave it empty for direct." (toString .)) }}
+{{- end }}
+- name: STORED_OBJECTS_UPLOADS
+  value: {{ . | quote }}
+{{- end }}
 {{/* The active provider's WRITE configuration above never depends on the
      legacy read flags below — an Azure->S3 migration must configure S3
      writes exactly like a plain S3 install, or new writes silently fall

@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 Callable capability exposed by the composed Suite application.
 
-Peers call these through the token, declared at `../contract/src/suite.api.ts:34`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/suite.api.ts:37`; nothing else in this package is public.
 
 #### `listByIds`
 
@@ -86,6 +86,22 @@ create(input: CreateSuiteCommand): Promise<Suite>;
 
 ```typescript
 createTestSuite(input: ScenarioTestSuiteCreateInput): Promise<ScenarioTestSuite>;
+```
+
+#### `listTemplates`
+
+Every shipped suite template, sorted by kind then title.
+
+```typescript
+listTemplates(input: { projectId: string }): Promise<SuiteTemplate[]>;
+```
+
+#### `applyTemplate`
+
+Creates a test suite from a template fitted to the agent, with every scenario filed in it.
+
+```typescript
+applyTemplate(input: ApplySuiteTemplateTrpcInput, by: ScenarioCaller, author?: ScenarioActor): Promise<AppliedSuiteTemplate>;
 ```
 
 #### `update`
@@ -418,7 +434,7 @@ interface Response {
 
 |             |                                         |
 | ----------- | --------------------------------------- |
-| Declared at | `src/transport/test-suites.rest.ts:221` |
+| Declared at | `src/transport/test-suites.rest.ts:225` |
 | Base URL    | `/api/v1/test-suites`                   |
 | Addressing  | v1-only                                 |
 | Credential  | project                                 |
@@ -427,7 +443,7 @@ interface Response {
 
 List the project's test suites. Archived suites are left out unless includeArchived is set. Run plans are not test suites and are listed by the run plans family.
 
-Permission `scenarios:view`. Declared at `src/transport/test-suites.rest.ts:226`.
+Permission `scenarios:view`. Declared at `src/transport/test-suites.rest.ts:230`.
 
 Answers at `/api/v1/test-suites`.
 
@@ -436,14 +452,14 @@ Answers at `/api/v1/test-suites`.
 interface Query {
   includeArchived?: string;
 }
-// Response: z.array(testSuiteWireSchema) (inline, src/transport/test-suites.rest.ts:229)
+// Response: z.array(testSuiteWireSchema) (inline, src/transport/test-suites.rest.ts:233)
 ```
 
 #### `POST /` · `createTestSuite`
 
 Create a test suite. It starts empty: scenarios join it by being filed into it, and the targets a run goes against are sent with the run. It may declare fields and attach evaluators from the start.
 
-Permission `scenarios:create`. Declared at `src/transport/test-suites.rest.ts:242`.
+Permission `scenarios:create`. Declared at `src/transport/test-suites.rest.ts:246`.
 
 Answers at `/api/v1/test-suites`.
 
@@ -452,11 +468,54 @@ type Body = z.infer<typeof testSuiteCreateInputSchema>; // src/rules/suite-wire-
 type Response = z.infer<typeof testSuiteWireSchema>; // src/rules/suite-wire-v1.rules.ts:201
 ```
 
+#### `GET /templates` · `listSuiteTemplates`
+
+List suite templates
+
+Permission `scenarios:view`. Declared at `src/transport/test-suites.rest.ts:272`.
+
+Answers at `/api/v1/test-suites/templates`.
+
+```typescript
+// Response: z.array(suiteTemplateSchema) (inline, src/transport/test-suites.rest.ts:274)
+```
+
+#### `POST /templates/:templateId/apply` · `applySuiteTemplate`
+
+Apply a suite template
+
+Permission `scenarios:manage`. Declared at `src/transport/test-suites.rest.ts:283`.
+
+Answers at `/api/v1/test-suites/templates/:templateId/apply`.
+
+```typescript
+// Params: suiteTemplateIdParamsSchema, ../contract/src/suite.ts:453
+interface Params {
+  templateId: string;
+}
+// Body: applySuiteTemplateBodySchema, ../contract/src/suite.ts:463
+interface Body {
+  fit: {
+    agentName: string;
+    tools?: string[];
+    mustNever?: string[];
+  };
+  name?: string;
+}
+// Response: appliedSuiteTemplateSchema, ../contract/src/suite.ts:442
+interface Response {
+  suiteId: string;
+  slug: string;
+  name: string;
+  scenarioIds: string[];
+}
+```
+
 #### `GET /:id` · `getTestSuite`
 
 Read one test suite
 
-Permission `scenarios:view`. Declared at `src/transport/test-suites.rest.ts:268`.
+Permission `scenarios:view`. Declared at `src/transport/test-suites.rest.ts:319`.
 
 Answers at `/api/v1/test-suites/:id`.
 
@@ -472,7 +531,7 @@ type Response = z.infer<typeof testSuiteDetailWireSchema>; // src/rules/suite-wi
 
 Edit a test suite: its name, the fields it declares, the evaluators attached to it. Send only what changes. The slug is kept on a rename, so links and run history stay where they are.
 
-Permission `scenarios:update`. Declared at `src/transport/test-suites.rest.ts:289`.
+Permission `scenarios:update`. Declared at `src/transport/test-suites.rest.ts:340`.
 
 Answers at `/api/v1/test-suites/:id`.
 
@@ -486,7 +545,7 @@ type Response = z.infer<typeof testSuiteWireSchema>; // src/rules/suite-wire-v1.
 
 Archive a test suite. The scenarios filed in it are archived with it, in one step, because the suite is where they live.
 
-Permission `scenarios:manage`. Declared at `src/transport/test-suites.rest.ts:312`.
+Permission `scenarios:manage`. Declared at `src/transport/test-suites.rest.ts:363`.
 
 Answers at `/api/v1/test-suites/:id`.
 
@@ -503,7 +562,7 @@ interface Response {
 
 Run a test suite
 
-Permission `scenarios:create`. Declared at `src/transport/test-suites.rest.ts:336`.
+Permission `scenarios:create`. Declared at `src/transport/test-suites.rest.ts:387`.
 
 Answers at `/api/v1/test-suites/:id/run`.
 
@@ -517,7 +576,7 @@ type Response = z.infer<typeof runPlanRunResultSchema>; // src/rules/suite-wire-
 
 ### `suites`
 
-Contract `../contract/src/suite.trpc.ts:35`, router `src/transport/suite.trpc.ts:15`.
+Contract `../contract/src/suite.trpc.ts:40`, router `src/transport/suite.trpc.ts:15`.
 
 | Procedure                     | Kind     | Gate                          | Input                               | Output                      |
 | ----------------------------- | -------- | ----------------------------- | ----------------------------------- | --------------------------- |
@@ -536,7 +595,7 @@ Contract `../contract/src/suite.trpc.ts:35`, router `src/transport/suite.trpc.ts
 ```typescript
 // suites.create
 type Input = z.infer<typeof createSuiteTrpcInputSchema>; // ../contract/src/suite-trpc.schemas.ts:79
-type Output = z.infer<typeof suiteSchema>; // ../contract/src/suite.ts:134
+type Output = z.infer<typeof suiteSchema>; // ../contract/src/suite.ts:138
 
 // suites.getAll
 // Input: listSuitesTrpcInputSchema, ../contract/src/suite-trpc.schemas.ts:165
@@ -544,7 +603,7 @@ interface Input {
   projectId: string;
   kinds?: ("test_suite" | "run_plan")[];
 }
-// Output: suiteOrTestSuiteSchema.array() (inline, ../contract/src/suite.trpc.ts:44)
+// Output: suiteOrTestSuiteSchema.array() (inline, ../contract/src/suite.trpc.ts:49)
 
 // suites.getById
 // Input: suiteTrpcIdInputSchema, ../contract/src/suite-trpc.schemas.ts:32
@@ -560,11 +619,11 @@ type Output = z.infer<typeof suiteOrTestSuiteSchema>; // ../contract/src/suite-t
 
 // suites.duplicate
 type Input = z.infer<typeof suiteTrpcIdInputSchema>; // ../contract/src/suite-trpc.schemas.ts:32
-type Output = z.infer<typeof suiteSchema>; // ../contract/src/suite.ts:134
+type Output = z.infer<typeof suiteSchema>; // ../contract/src/suite.ts:138
 
 // suites.archive
 type Input = z.infer<typeof suiteTrpcIdInputSchema>; // ../contract/src/suite-trpc.schemas.ts:32
-type Output = z.infer<typeof suiteSchema>; // ../contract/src/suite.ts:134
+type Output = z.infer<typeof suiteSchema>; // ../contract/src/suite.ts:138
 
 // suites.resolveArchivedNames
 type Input = z.infer<typeof suiteArchivedNamesTrpcInputSchema>; // ../contract/src/suite-trpc.schemas.ts:176
@@ -601,7 +660,7 @@ interface Input {
   startDate?: number;
   endDate?: number;
 }
-// Output: inline, ../contract/src/suite.trpc.ts:97
+// Output: inline, ../contract/src/suite.trpc.ts:102
 type Output = Record<
   string,
   {
@@ -615,27 +674,29 @@ type Output = Record<
 
 ### `suites.testSuites`
 
-Contract `../contract/src/suite.trpc.ts:105`, router `src/transport/test-suite.trpc.ts:12`.
+Contract `../contract/src/suite.trpc.ts:110`, router `src/transport/test-suite.trpc.ts:12`.
 
-| Procedure                   | Kind     | Gate                          | Input                            | Output                    |
-| --------------------------- | -------- | ----------------------------- | -------------------------------- | ------------------------- |
-| `suites.testSuites.create`  | mutation | Permission `scenarios:manage` | `createTestSuiteTrpcInputSchema` | `scenarioTestSuiteSchema` |
-| `suites.testSuites.getAll`  | query    | Permission `scenarios:view`   | `suiteProjectInputSchema`        | inline                    |
-| `suites.testSuites.rename`  | mutation | Permission `scenarios:manage` | `renameTestSuiteTrpcInputSchema` | `scenarioTestSuiteSchema` |
-| `suites.testSuites.update`  | mutation | Permission `scenarios:manage` | `updateTestSuiteTrpcInputSchema` | `scenarioTestSuiteSchema` |
-| `suites.testSuites.archive` | mutation | Permission `scenarios:manage` | `testSuiteTrpcIdInputSchema`     | `scenarioTestSuiteSchema` |
+| Procedure                         | Kind     | Gate                          | Input                               | Output                       |
+| --------------------------------- | -------- | ----------------------------- | ----------------------------------- | ---------------------------- |
+| `suites.testSuites.create`        | mutation | Permission `scenarios:manage` | `createTestSuiteTrpcInputSchema`    | `scenarioTestSuiteSchema`    |
+| `suites.testSuites.getAll`        | query    | Permission `scenarios:view`   | `suiteProjectInputSchema`           | inline                       |
+| `suites.testSuites.rename`        | mutation | Permission `scenarios:manage` | `renameTestSuiteTrpcInputSchema`    | `scenarioTestSuiteSchema`    |
+| `suites.testSuites.update`        | mutation | Permission `scenarios:manage` | `updateTestSuiteTrpcInputSchema`    | `scenarioTestSuiteSchema`    |
+| `suites.testSuites.archive`       | mutation | Permission `scenarios:manage` | `testSuiteTrpcIdInputSchema`        | `scenarioTestSuiteSchema`    |
+| `suites.testSuites.listTemplates` | query    | Permission `scenarios:view`   | `suiteProjectInputSchema`           | inline                       |
+| `suites.testSuites.applyTemplate` | mutation | Permission `scenarios:manage` | `applySuiteTemplateTrpcInputSchema` | `appliedSuiteTemplateSchema` |
 
 ```typescript
 // suites.testSuites.create
 type Input = z.infer<typeof createTestSuiteTrpcInputSchema>; // ../contract/src/suite-trpc.schemas.ts:199
-type Output = z.infer<typeof scenarioTestSuiteSchema>; // ../../scenario/contract/src/scenario.ts:93
+type Output = z.infer<typeof scenarioTestSuiteSchema>; // ../../scenario/contract/src/scenario.ts:224
 
 // suites.testSuites.getAll
 // Input: suiteProjectInputSchema, ../contract/src/suite-trpc.schemas.ts:27
 interface Input {
   projectId: string;
 }
-// Output: scenarioTestSuiteSchema.array() (inline, ../contract/src/suite.trpc.ts:113)
+// Output: scenarioTestSuiteSchema.array() (inline, ../contract/src/suite.trpc.ts:118)
 
 // suites.testSuites.rename
 // Input: renameTestSuiteTrpcInputSchema, ../contract/src/suite-trpc.schemas.ts:209
@@ -644,11 +705,11 @@ interface Input {
   testSuiteId: string;
   name: string;
 }
-type Output = z.infer<typeof scenarioTestSuiteSchema>; // ../../scenario/contract/src/scenario.ts:93
+type Output = z.infer<typeof scenarioTestSuiteSchema>; // ../../scenario/contract/src/scenario.ts:224
 
 // suites.testSuites.update
 type Input = z.infer<typeof updateTestSuiteTrpcInputSchema>; // ../contract/src/suite-trpc.schemas.ts:222
-type Output = z.infer<typeof scenarioTestSuiteSchema>; // ../../scenario/contract/src/scenario.ts:93
+type Output = z.infer<typeof scenarioTestSuiteSchema>; // ../../scenario/contract/src/scenario.ts:224
 
 // suites.testSuites.archive
 // Input: testSuiteTrpcIdInputSchema, ../contract/src/suite-trpc.schemas.ts:39
@@ -656,7 +717,25 @@ interface Input {
   projectId: string;
   testSuiteId: string;
 }
-type Output = z.infer<typeof scenarioTestSuiteSchema>; // ../../scenario/contract/src/scenario.ts:93
+type Output = z.infer<typeof scenarioTestSuiteSchema>; // ../../scenario/contract/src/scenario.ts:224
+
+// suites.testSuites.listTemplates
+type Input = z.infer<typeof suiteProjectInputSchema>; // ../contract/src/suite-trpc.schemas.ts:27
+// Output: suiteTemplateSchema.array() (inline, ../contract/src/suite.trpc.ts:135)
+
+// suites.testSuites.applyTemplate
+// Input: applySuiteTemplateTrpcInputSchema, ../contract/src/suite.ts:426
+interface Input {
+  templateId: string;
+  fit: {
+    agentName: string;
+    tools?: string[];
+    mustNever?: string[];
+  };
+  name?: string;
+  projectId: string;
+}
+type Output = z.infer<typeof appliedSuiteTemplateSchema>; // ../contract/src/suite.ts:442
 ```
 
 ## Sockets

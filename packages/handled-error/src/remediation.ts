@@ -78,11 +78,36 @@ const registry = {
     ],
   },
 
+  storage_credentials_refused: {
+    tips: [
+      "On Azure Blob with a shared key, check AZURE_BLOB_ACCOUNT_NAME and AZURE_BLOB_ACCOUNT_KEY name the same account, then restart the api and worker",
+      "Under a token mode, check the identity's client id, tenant and secret or federated token; a role grant does not fix a credential Azure rejects",
+    ],
+    docsPath: "/self-hosting/configuration/environment-variables",
+  },
+
+  storage_permission_denied: {
+    tips: [
+      'Grant the identity "Storage Blob Data Contributor" on the storage account or the container',
+      'The control-plane "Contributor" role does not grant data access',
+    ],
+    docsPath: "/self-hosting/configuration/environment-variables",
+  },
+
   dataset_invalid_column: {
     tips: [
       "Add the column to the dataset, or remove it from the row, and send it again; retrying unchanged will fail identically",
       "The message names the dataset's valid columns",
     ],
+  },
+
+  // ---- data retention ----
+  data_retention_billed_through_billing: {
+    tips: [
+      "Ask someone with subscription:manage in the organization to set this length; it adds a storage line to the subscription",
+      "Or pick 90 days or less, which the plan includes",
+    ],
+    docsPath: "/platform/data-retention",
   },
 
   // ---- automations ----
@@ -100,6 +125,12 @@ const registry = {
       "If you just sent this trace, retry in a few seconds; ingestion is asynchronous",
     ],
     docsPath: "/platform/data-retention",
+  },
+  trace_withheld_over_plan: {
+    tips: [
+      "Upgrade the plan on Settings > Subscription to show every held trace again",
+      "Or remove members on Settings > Members until they fit the plan",
+    ],
   },
   span_not_found: {
     tips: ["Check the span id; spans are deleted with their trace after the retention window"],
@@ -710,6 +741,12 @@ const registry = {
   },
 
   // ---- scenario runs ----
+  scenario_red_team_config_mismatch: {
+    tips: [
+      "Send kind red_team together with a redTeam config holding attackGoal and owaspIds",
+      "For a standard scenario, leave redTeam out",
+    ],
+  },
   scenario_reserved_set_id: {
     tips: [
       "Send the run without a setId; it is then recorded in the project's own one-off bucket",
@@ -1058,6 +1095,13 @@ const registry = {
       "Read `meta.spentUsd` against `meta.budgetUsd`; the organization has spent its free Instant Evals allowance across every project",
       "Upgrade the organization to a paid plan under Settings, Plan & billing; judged queries and runs are then billed per input token",
     ],
+  },
+  instant_eval_gateway_budget_exceeded: {
+    tips: [
+      "Read `meta.scope` and `meta.budgetId`; that gateway budget is set to block, and Instant Evals count against it like gateway traffic",
+      "Compare `meta.spentUsd` with `meta.limitUsd`, then raise or remove the budget under AI Gateway, Budgets, or wait for its `meta.window` to reset",
+    ],
+    docsPath: "/features/instant-evals/limits-and-cost",
   },
   instant_eval_not_enabled: {
     tips: [

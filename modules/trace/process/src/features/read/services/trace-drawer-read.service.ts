@@ -5,6 +5,7 @@ import {
 } from "@langwatch/authorization";
 import {
   traceSummaryReadSchema,
+  traceWithholdingOf,
   type DerivedTraceEvent,
   type Protections,
   type OwnedSpan,
@@ -18,8 +19,10 @@ import {
   type TraceDrawerReadInput,
   type TraceHeader,
   type TraceResourceInfoDto,
+  type AgentCallGraph,
 } from "@langwatch/trace-contract";
 
+import { buildAgentCallGraph, visibleResourcesOf } from "../../../rules/agent-call-graph.rules.ts";
 import {
   deriveTraceDropPrivacy,
   mapLegacySpanSummaryToTreeNode,
@@ -47,6 +50,7 @@ import type { TraceBraidedTotalsService } from "./trace-braided-totals.service.t
 type TraceDrawerReads = Pick<
   TraceApi,
   | "authorizationForTrace"
+  | "assertTraceNotWithheld"
   | "resolveViewerProtections"
   | "readTraceSummary"
   | "readSpansPage"
@@ -57,8 +61,12 @@ type TraceDrawerReads = Pick<
   | "readSpans"
   | "enrichSpansFromCodingAgentLogs"
   | "readSpanResources"
+  | "readSpansWithResources"
   | "readTraceEvents"
 >;
+
+type StoredSpans = Awaited<ReturnType<TraceDrawerReads["readSpans"]>>;
+type StoredResources = Awaited<ReturnType<TraceDrawerReads["readSpanResources"]>>;
 
 type TraceDrawerReadDependencies = Readonly<{
   reads: TraceDrawerReads;
@@ -96,6 +104,7 @@ export class TraceDrawerReadService {
         tenantId: input.tenantId,
         occurredAtMs: input.occurredAtMs,
         visibilityCutoffMs: protections.visibilityCutoffMs,
+        withholding: traceWithholdingOf(protections),
         full: input.full,
       }),
     );
@@ -204,23 +213,50 @@ export class TraceDrawerReadService {
   }
 
   async spansFull(input: TraceDrawerReadInput): Promise<SpanDetail[]> {
-    const { reads, braids, mappers } = this.deps;
-    const { authorization, protections } = await this.#open(input);
-    const storedSpans = await reads.readSpans({
-      authorization,
+    return this.#protectedSpans({ input, joinsCodingAgentLogs: true });
+  }
+
+  /** Protected span details; the coding-agent log join only adds message bodies. */
+  async #protectedSpans({
+    input,
+    joinsCodingAgentLogs,
+  }: {
+    input: TraceDrawerReadInput;
+    joinsCodingAgentLogs: boolean;
+  }): Promise<SpanDetail[]> {
+    const opened = await this.#open(input);
+    const storedSpans = await this.deps.reads.readSpans({
+      authorization: opened.authorization,
       traceId: input.traceId,
       occurredAtMs: input.occurredAtMs,
-      visibilityCutoffMs: protections.visibilityCutoffMs,
+      visibilityCutoffMs: opened.protections.visibilityCutoffMs,
       reads: "spans",
     });
+    return this.#protectedSpanDetails({ input, opened, storedSpans, joinsCodingAgentLogs });
+  }
+
+  async #protectedSpanDetails({
+    input,
+    opened: { authorization, protections },
+    storedSpans,
+    joinsCodingAgentLogs,
+  }: {
+    input: TraceDrawerReadInput;
+    opened: OpenedTrace;
+    storedSpans: StoredSpans;
+    joinsCodingAgentLogs: boolean;
+  }): Promise<SpanDetail[]> {
+    const { reads, braids, mappers } = this.deps;
     // Coding-agent message content lives in the trace's OTLP log records; joined on BEFORE
     // protections run, so it goes through the same redaction pass.
-    const spans = await reads.enrichSpansFromCodingAgentLogs({
-      projectId: input.projectId,
-      traceId: input.traceId,
-      spans: storedSpans,
-      ...(input.occurredAtMs !== undefined ? { occurredAtMs: input.occurredAtMs } : {}),
-    });
+    const spans = joinsCodingAgentLogs
+      ? await reads.enrichSpansFromCodingAgentLogs({
+          projectId: input.projectId,
+          traceId: input.traceId,
+          spans: storedSpans,
+          ...(input.occurredAtMs !== undefined ? { occurredAtMs: input.occurredAtMs } : {}),
+        })
+      : storedSpans;
     const [owners, spanBraids] = await Promise.all([
       this.ownerProtections({
         viewerUserId: input.viewerUserId,
@@ -245,6 +281,33 @@ export class TraceDrawerReadService {
     });
   }
 
+  /** The agent call graph over the viewer's protected spans and their resources. */
+  async agentCallGraph(input: TraceDrawerReadInput): Promise<AgentCallGraph> {
+    const opened = await this.#open(input);
+    const read = await this.deps.reads.readSpansWithResources({
+      authorization: opened.authorization,
+      traceId: input.traceId,
+      occurredAtMs: input.occurredAtMs,
+      visibilityCutoffMs: opened.protections.visibilityCutoffMs,
+      reads: "spans",
+    });
+    const [spans, resources] = await Promise.all([
+      this.#protectedSpanDetails({
+        input,
+        opened,
+        storedSpans: read.spans,
+        joinsCodingAgentLogs: false,
+      }),
+      this.#resourceInfo({ input, protections: opened.protections, rows: read.resources }),
+    ]);
+    const kindOf = new Map(read.spans.map((stored) => [stored.span_id, stored.kind ?? null]));
+    const withKinds = spans.map((span) => ({ ...span, kind: kindOf.get(span.spanId) ?? null }));
+    return buildAgentCallGraph({
+      spans: withKinds,
+      resources: visibleResourcesOf({ resources, spans }),
+    });
+  }
+
   async resources(input: TraceDrawerReadInput): Promise<TraceResourceInfoDto> {
     const { authorization, protections } = await this.#open(input);
     const rows = await this.deps.reads.readSpanResources({
@@ -253,6 +316,18 @@ export class TraceDrawerReadService {
       occurredAtMs: input.occurredAtMs,
       reads: "spans",
     });
+    return this.#resourceInfo({ input, protections, rows });
+  }
+
+  async #resourceInfo({
+    input,
+    protections,
+    rows,
+  }: {
+    input: TraceDrawerReadInput;
+    protections: Protections;
+    rows: StoredResources;
+  }): Promise<TraceResourceInfoDto> {
     const ownerProtections = await this.ownerProtections({
       viewerUserId: input.viewerUserId,
       ownerProjectIds: rows.map((row) => row.ownerProjectId),
@@ -312,6 +387,12 @@ export class TraceDrawerReadService {
       projectId: input.projectId,
       userId: input.viewerUserId,
       authorization,
+    });
+    await this.deps.reads.assertTraceNotWithheld({
+      authorization,
+      traceId: input.traceId,
+      ...(input.occurredAtMs === undefined ? {} : { occurredAtMs: input.occurredAtMs }),
+      protections,
     });
     return { authorization, protections };
   }

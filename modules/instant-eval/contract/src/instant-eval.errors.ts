@@ -299,3 +299,46 @@ export class InstantEvalEstimateUnavailableError extends HandledError {
     this.name = "InstantEvalEstimateUnavailableError";
   }
 }
+
+/** Whose budget a gateway refusal names, by the gateway's own lower-case scope. */
+const GATEWAY_BUDGET_OWNERS: Readonly<Record<string, string>> = {
+  organization: "This organization's",
+  team: "This team's",
+  project: "This project's",
+};
+
+/**
+ * A gateway budget set to block has been reached. Refused before anything is judged, and
+ * between pages of a run under way, so the budget is a ceiling as it is for gateway traffic.
+ * @see modules/instant-eval/specs/instant-eval-billing.feature
+ */
+export class InstantEvalGatewayBudgetExceededError extends HandledError {
+  declare readonly code: "instant_eval_gateway_budget_exceeded";
+
+  constructor({
+    budgetId,
+    scope,
+    window,
+    limitUsd,
+    spentUsd,
+  }: {
+    readonly budgetId: string;
+    readonly scope: string;
+    readonly window: string;
+    readonly limitUsd: number;
+    readonly spentUsd: number;
+  }) {
+    const owner = GATEWAY_BUDGET_OWNERS[scope] ?? "A";
+    super(
+      "instant_eval_gateway_budget_exceeded",
+      `${owner} gateway budget is used up. Raise or remove it under AI Gateway, Budgets to keep judging.`,
+      {
+        httpStatus: 402,
+        fault: "customer",
+        meta: { budgetId, scope, window, limitUsd, spentUsd },
+        ...remediation("instant_eval_gateway_budget_exceeded"),
+      },
+    );
+    this.name = "InstantEvalGatewayBudgetExceededError";
+  }
+}

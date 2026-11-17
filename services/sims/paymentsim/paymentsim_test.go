@@ -23,6 +23,9 @@ const (
 	catalog    = "../../../enterprise/modules/billing/contract/src/stripe-catalog.json"
 	seatPrice  = "price_1SzP11IMsTw08cudRhGETYNa" // GROWTH_SEAT_USD_MONTHLY, 3200 usd
 	eventsMtr  = "mtr_test_61UBL0fe0hM4Csg7x41IMsTw08cudQaG"
+	storageMtr = "mtr_test_61VjKmnOYgbfwXOun41IMsTw08cudHtw"
+	// RETENTION_STORAGE_EUR_MONTHLY, 300 eur per GB-month
+	storagePrice = "price_1UZwpSIMsTw08cud1AbkINGw"
 	// GROWTH_PII_REDACTION_USD, 100 usd cents per dollar on the PII redaction meter
 	piiRedactionPrice = "price_1Uat9tIMsTw08cudpWWrZG4a"
 )
@@ -212,17 +215,16 @@ func TestCatalogSeedsRealPriceIDs(t *testing.T) {
 	}
 	_, meters := g.stripe(http.MethodGet, "/v1/billing/meters", "limit=10")
 	// Meters are seeded from a map, so listing order is not fixed.
-	var m map[string]any
-	for _, candidate := range meters["data"].([]any) {
-		if c := candidate.(map[string]any); c["id"] == eventsMtr {
-			m = c
-		}
+	events := map[string]any{}
+	for _, m := range meters["data"].([]any) {
+		events[m.(map[string]any)["id"].(string)] = m.(map[string]any)["event_name"]
 	}
-	if m == nil {
-		t.Fatalf("meter %s not listed: %v", eventsMtr, meters["data"])
+	if events[eventsMtr] != "langwatch_billable_events" || events[storageMtr] != "langwatch_retention_storage_gb" {
+		t.Fatalf("meters %v", events)
 	}
-	if m["event_name"] != "langwatch_billable_events" {
-		t.Fatalf("meter %v", m)
+	storage, _ := found[storagePrice]["recurring"].(map[string]any)
+	if storage == nil || storage["usage_type"] != "metered" || storage["meter"] != storageMtr {
+		t.Fatalf("storage price %v", found[storagePrice])
 	}
 }
 

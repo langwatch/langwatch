@@ -253,6 +253,8 @@ export type GrowthSeatPlan = {
   developerTaxCents?: number;
   /** When the period already paid for ends, epoch milliseconds. */
   periodEndsAt: number | undefined;
+  /** The price did not load, so the confirm names the change without one. */
+  priceFailed?: boolean;
 };
 
 /** The seats the drawer may not go under: everyone who holds or is invited to a full seat. */
@@ -276,7 +278,15 @@ export function growthSeatPlan(plan: GrowthSeatPlan) {
         : undefined,
     note: growthNote({ delta, paid, seats, quote, day }),
     summary: growthSummary({ ...plan, delta, devDelta, day, monthly }),
-    action: growthAction({ delta, devDelta, seats, invites, price, developer }),
+    action: growthAction({
+      delta,
+      devDelta,
+      seats,
+      invites,
+      price,
+      developer,
+      priceFailed: plan.priceFailed === true,
+    }),
   };
 }
 
@@ -467,6 +477,7 @@ function growthAction({
   invites,
   price,
   developer,
+  priceFailed,
 }: {
   delta: number;
   devDelta: number;
@@ -474,20 +485,22 @@ function growthAction({
   invites: number;
   price: SeatPrice;
   developer: DeveloperSeatPlan | undefined;
+  priceFailed: boolean;
 }): SeatAction {
-  const per = (cents: number) => `${money(price, cents)}${price.periodSuffix}`;
+  const priced = (text: string, cents: number) =>
+    priceFailed ? text : `${text} · ${money(price, cents)}${price.periodSuffix}`;
   if (delta !== 0 && devDelta !== 0) return { kind: "change", label: "Confirm seat changes" };
   if (delta > 0) {
     return {
       kind: "change",
-      label: `Add ${plural(delta, "seat")} · ${per(delta * price.seatCents)}`,
+      label: priced(`Add ${plural(delta, "seat")}`, delta * price.seatCents),
     };
   }
   if (delta < 0) return { kind: "change", label: `Lower to ${plural(seats, "seat")}` };
   if (devDelta > 0 && developer) {
     return {
       kind: "change",
-      label: `Add ${plural(devDelta, "developer seat")} · ${per(devDelta * developer.unitCents)}`,
+      label: priced(`Add ${plural(devDelta, "developer seat")}`, devDelta * developer.unitCents),
     };
   }
   if (devDelta < 0 && developer) {

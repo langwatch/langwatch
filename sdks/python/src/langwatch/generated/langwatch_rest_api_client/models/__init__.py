@@ -8,6 +8,10 @@ from .api_key_info import ApiKeyInfo
 from .api_key_info_role_bindings_item import ApiKeyInfoRoleBindingsItem
 from .api_key_info_role_bindings_item_role import ApiKeyInfoRoleBindingsItemRole
 from .api_key_info_role_bindings_item_scope_type import ApiKeyInfoRoleBindingsItemScopeType
+from .apply_suite_template_body import ApplySuiteTemplateBody
+from .apply_suite_template_body_fit import ApplySuiteTemplateBodyFit
+from .apply_suite_template_response_201 import ApplySuiteTemplateResponse201
+from .apply_suite_template_response_404 import ApplySuiteTemplateResponse404
 from .approve_langy_control_request_body import ApproveLangyControlRequestBody
 from .approve_langy_control_request_body_workspace import ApproveLangyControlRequestBodyWorkspace
 from .approve_langy_control_request_response_200 import ApproveLangyControlRequestResponse200
@@ -1678,6 +1682,72 @@ from .get_api_governance_ingestion_templates_response_400 import GetApiGovernanc
 from .get_api_governance_ingestion_templates_response_401 import GetApiGovernanceIngestionTemplatesResponse401
 from .get_api_governance_ingestion_templates_response_422 import GetApiGovernanceIngestionTemplatesResponse422
 from .get_api_governance_ingestion_templates_response_500 import GetApiGovernanceIngestionTemplatesResponse500
+from .get_api_governance_ocsf_audit_response_200 import GetApiGovernanceOcsfAuditResponse200
+from .get_api_governance_ocsf_audit_response_200_data_item import GetApiGovernanceOcsfAuditResponse200DataItem
+from .get_api_governance_ocsf_audit_response_400 import GetApiGovernanceOcsfAuditResponse400
+from .get_api_governance_ocsf_audit_response_400_fault import GetApiGovernanceOcsfAuditResponse400Fault
+from .get_api_governance_ocsf_audit_response_400_meta import GetApiGovernanceOcsfAuditResponse400Meta
+from .get_api_governance_ocsf_audit_response_400_trace import GetApiGovernanceOcsfAuditResponse400Trace
+from .get_api_governance_ocsf_audit_response_401 import GetApiGovernanceOcsfAuditResponse401
+from .get_api_governance_ocsf_audit_response_401_fault import GetApiGovernanceOcsfAuditResponse401Fault
+from .get_api_governance_ocsf_audit_response_401_meta import GetApiGovernanceOcsfAuditResponse401Meta
+from .get_api_governance_ocsf_audit_response_401_trace import GetApiGovernanceOcsfAuditResponse401Trace
+from .get_api_governance_ocsf_audit_response_403 import GetApiGovernanceOcsfAuditResponse403
+from .get_api_governance_ocsf_audit_response_403_fault import GetApiGovernanceOcsfAuditResponse403Fault
+from .get_api_governance_ocsf_audit_response_403_meta import GetApiGovernanceOcsfAuditResponse403Meta
+from .get_api_governance_ocsf_audit_response_403_trace import GetApiGovernanceOcsfAuditResponse403Trace
+from .get_api_governance_ocsf_audit_response_422 import GetApiGovernanceOcsfAuditResponse422
+from .get_api_governance_ocsf_audit_response_422_fault import GetApiGovernanceOcsfAuditResponse422Fault
+from .get_api_governance_ocsf_audit_response_422_meta import GetApiGovernanceOcsfAuditResponse422Meta
+from .get_api_governance_ocsf_audit_response_422_trace import GetApiGovernanceOcsfAuditResponse422Trace
+from .get_api_governance_ocsf_audit_response_500 import GetApiGovernanceOcsfAuditResponse500
+from .get_api_governance_ocsf_audit_response_500_fault import GetApiGovernanceOcsfAuditResponse500Fault
+from .get_api_governance_ocsf_audit_response_500_meta import GetApiGovernanceOcsfAuditResponse500Meta
+from .get_api_governance_ocsf_audit_response_500_trace import GetApiGovernanceOcsfAuditResponse500Trace
+from .get_api_governance_ocsf_events_response_200 import GetApiGovernanceOcsfEventsResponse200
+from .get_api_governance_ocsf_events_response_200_data_item import GetApiGovernanceOcsfEventsResponse200DataItem
+from .get_api_governance_ocsf_events_response_400 import GetApiGovernanceOcsfEventsResponse400
+from .get_api_governance_ocsf_events_response_400_fault import GetApiGovernanceOcsfEventsResponse400Fault
+from .get_api_governance_ocsf_events_response_400_meta import GetApiGovernanceOcsfEventsResponse400Meta
+from .get_api_governance_ocsf_events_response_400_trace import GetApiGovernanceOcsfEventsResponse400Trace
+from .get_api_governance_ocsf_events_response_401 import GetApiGovernanceOcsfEventsResponse401
+from .get_api_governance_ocsf_events_response_401_fault import GetApiGovernanceOcsfEventsResponse401Fault
+from .get_api_governance_ocsf_events_response_401_meta import GetApiGovernanceOcsfEventsResponse401Meta
+from .get_api_governance_ocsf_events_response_401_trace import GetApiGovernanceOcsfEventsResponse401Trace
+from .get_api_governance_ocsf_events_response_403 import GetApiGovernanceOcsfEventsResponse403
+from .get_api_governance_ocsf_events_response_403_fault import GetApiGovernanceOcsfEventsResponse403Fault
+from .get_api_governance_ocsf_events_response_403_meta import GetApiGovernanceOcsfEventsResponse403Meta
+from .get_api_governance_ocsf_events_response_403_trace import GetApiGovernanceOcsfEventsResponse403Trace
+from .get_api_governance_ocsf_events_response_422 import GetApiGovernanceOcsfEventsResponse422
+from .get_api_governance_ocsf_events_response_422_fault import GetApiGovernanceOcsfEventsResponse422Fault
+from .get_api_governance_ocsf_events_response_422_meta import GetApiGovernanceOcsfEventsResponse422Meta
+from .get_api_governance_ocsf_events_response_422_trace import GetApiGovernanceOcsfEventsResponse422Trace
+from .get_api_governance_ocsf_events_response_500 import GetApiGovernanceOcsfEventsResponse500
+from .get_api_governance_ocsf_events_response_500_fault import GetApiGovernanceOcsfEventsResponse500Fault
+from .get_api_governance_ocsf_events_response_500_meta import GetApiGovernanceOcsfEventsResponse500Meta
+from .get_api_governance_ocsf_events_response_500_trace import GetApiGovernanceOcsfEventsResponse500Trace
+from .get_api_governance_ocsf_traces_response_200 import GetApiGovernanceOcsfTracesResponse200
+from .get_api_governance_ocsf_traces_response_200_data_item import GetApiGovernanceOcsfTracesResponse200DataItem
+from .get_api_governance_ocsf_traces_response_400 import GetApiGovernanceOcsfTracesResponse400
+from .get_api_governance_ocsf_traces_response_400_fault import GetApiGovernanceOcsfTracesResponse400Fault
+from .get_api_governance_ocsf_traces_response_400_meta import GetApiGovernanceOcsfTracesResponse400Meta
+from .get_api_governance_ocsf_traces_response_400_trace import GetApiGovernanceOcsfTracesResponse400Trace
+from .get_api_governance_ocsf_traces_response_401 import GetApiGovernanceOcsfTracesResponse401
+from .get_api_governance_ocsf_traces_response_401_fault import GetApiGovernanceOcsfTracesResponse401Fault
+from .get_api_governance_ocsf_traces_response_401_meta import GetApiGovernanceOcsfTracesResponse401Meta
+from .get_api_governance_ocsf_traces_response_401_trace import GetApiGovernanceOcsfTracesResponse401Trace
+from .get_api_governance_ocsf_traces_response_403 import GetApiGovernanceOcsfTracesResponse403
+from .get_api_governance_ocsf_traces_response_403_fault import GetApiGovernanceOcsfTracesResponse403Fault
+from .get_api_governance_ocsf_traces_response_403_meta import GetApiGovernanceOcsfTracesResponse403Meta
+from .get_api_governance_ocsf_traces_response_403_trace import GetApiGovernanceOcsfTracesResponse403Trace
+from .get_api_governance_ocsf_traces_response_422 import GetApiGovernanceOcsfTracesResponse422
+from .get_api_governance_ocsf_traces_response_422_fault import GetApiGovernanceOcsfTracesResponse422Fault
+from .get_api_governance_ocsf_traces_response_422_meta import GetApiGovernanceOcsfTracesResponse422Meta
+from .get_api_governance_ocsf_traces_response_422_trace import GetApiGovernanceOcsfTracesResponse422Trace
+from .get_api_governance_ocsf_traces_response_500 import GetApiGovernanceOcsfTracesResponse500
+from .get_api_governance_ocsf_traces_response_500_fault import GetApiGovernanceOcsfTracesResponse500Fault
+from .get_api_governance_ocsf_traces_response_500_meta import GetApiGovernanceOcsfTracesResponse500Meta
+from .get_api_governance_ocsf_traces_response_500_trace import GetApiGovernanceOcsfTracesResponse500Trace
 from .get_api_governance_registry_agents_by_id_response_200 import GetApiGovernanceRegistryAgentsByIdResponse200
 from .get_api_governance_registry_agents_by_id_response_200_data import (
     GetApiGovernanceRegistryAgentsByIdResponse200Data,
@@ -3934,6 +4004,15 @@ from .list_run_plans_response_200_item_targets_item_scenario_mappings_additional
 from .list_run_plans_response_200_item_targets_item_type import ListRunPlansResponse200ItemTargetsItemType
 from .list_scim_tokens_response_200 import ListScimTokensResponse200
 from .list_scim_tokens_response_200_tokens_item import ListScimTokensResponse200TokensItem
+from .list_suite_templates_response_200_item import ListSuiteTemplatesResponse200Item
+from .list_suite_templates_response_200_item_kind import ListSuiteTemplatesResponse200ItemKind
+from .list_suite_templates_response_200_item_scenarios_item import ListSuiteTemplatesResponse200ItemScenariosItem
+from .list_suite_templates_response_200_item_scenarios_item_attack import (
+    ListSuiteTemplatesResponse200ItemScenariosItemAttack,
+)
+from .list_suite_templates_response_200_item_scenarios_item_attack_strategy import (
+    ListSuiteTemplatesResponse200ItemScenariosItemAttackStrategy,
+)
 from .list_test_suites_response_200_item import ListTestSuitesResponse200Item
 from .list_test_suites_response_200_item_evaluators_item import ListTestSuitesResponse200ItemEvaluatorsItem
 from .list_test_suites_response_200_item_evaluators_item_mappings import (
@@ -6754,6 +6833,30 @@ from .post_api_governance_ingestion_templates_response_400 import PostApiGoverna
 from .post_api_governance_ingestion_templates_response_401 import PostApiGovernanceIngestionTemplatesResponse401
 from .post_api_governance_ingestion_templates_response_422 import PostApiGovernanceIngestionTemplatesResponse422
 from .post_api_governance_ingestion_templates_response_500 import PostApiGovernanceIngestionTemplatesResponse500
+from .post_api_governance_ocsf_ingest_body import PostApiGovernanceOcsfIngestBody
+from .post_api_governance_ocsf_ingest_body_events_item import PostApiGovernanceOcsfIngestBodyEventsItem
+from .post_api_governance_ocsf_ingest_body_events_item_metadata import PostApiGovernanceOcsfIngestBodyEventsItemMetadata
+from .post_api_governance_ocsf_ingest_response_200 import PostApiGovernanceOcsfIngestResponse200
+from .post_api_governance_ocsf_ingest_response_400 import PostApiGovernanceOcsfIngestResponse400
+from .post_api_governance_ocsf_ingest_response_400_fault import PostApiGovernanceOcsfIngestResponse400Fault
+from .post_api_governance_ocsf_ingest_response_400_meta import PostApiGovernanceOcsfIngestResponse400Meta
+from .post_api_governance_ocsf_ingest_response_400_trace import PostApiGovernanceOcsfIngestResponse400Trace
+from .post_api_governance_ocsf_ingest_response_401 import PostApiGovernanceOcsfIngestResponse401
+from .post_api_governance_ocsf_ingest_response_401_fault import PostApiGovernanceOcsfIngestResponse401Fault
+from .post_api_governance_ocsf_ingest_response_401_meta import PostApiGovernanceOcsfIngestResponse401Meta
+from .post_api_governance_ocsf_ingest_response_401_trace import PostApiGovernanceOcsfIngestResponse401Trace
+from .post_api_governance_ocsf_ingest_response_403 import PostApiGovernanceOcsfIngestResponse403
+from .post_api_governance_ocsf_ingest_response_403_fault import PostApiGovernanceOcsfIngestResponse403Fault
+from .post_api_governance_ocsf_ingest_response_403_meta import PostApiGovernanceOcsfIngestResponse403Meta
+from .post_api_governance_ocsf_ingest_response_403_trace import PostApiGovernanceOcsfIngestResponse403Trace
+from .post_api_governance_ocsf_ingest_response_422 import PostApiGovernanceOcsfIngestResponse422
+from .post_api_governance_ocsf_ingest_response_422_fault import PostApiGovernanceOcsfIngestResponse422Fault
+from .post_api_governance_ocsf_ingest_response_422_meta import PostApiGovernanceOcsfIngestResponse422Meta
+from .post_api_governance_ocsf_ingest_response_422_trace import PostApiGovernanceOcsfIngestResponse422Trace
+from .post_api_governance_ocsf_ingest_response_500 import PostApiGovernanceOcsfIngestResponse500
+from .post_api_governance_ocsf_ingest_response_500_fault import PostApiGovernanceOcsfIngestResponse500Fault
+from .post_api_governance_ocsf_ingest_response_500_meta import PostApiGovernanceOcsfIngestResponse500Meta
+from .post_api_governance_ocsf_ingest_response_500_trace import PostApiGovernanceOcsfIngestResponse500Trace
 from .post_api_governance_registry_ard_search_body import PostApiGovernanceRegistryArdSearchBody
 from .post_api_governance_registry_ard_search_body_federation import PostApiGovernanceRegistryArdSearchBodyFederation
 from .post_api_governance_registry_ard_search_body_query import PostApiGovernanceRegistryArdSearchBodyQuery
@@ -7529,8 +7632,11 @@ from .post_api_scenario_events_response_422 import PostApiScenarioEventsResponse
 from .post_api_scenario_events_response_500 import PostApiScenarioEventsResponse500
 from .post_api_scenarios_body import PostApiScenariosBody
 from .post_api_scenarios_body_fields import PostApiScenariosBodyFields
+from .post_api_scenarios_body_kind import PostApiScenariosBodyKind
 from .post_api_scenarios_body_parameters_item import PostApiScenariosBodyParametersItem
 from .post_api_scenarios_body_parameters_item_type import PostApiScenariosBodyParametersItemType
+from .post_api_scenarios_body_red_team import PostApiScenariosBodyRedTeam
+from .post_api_scenarios_body_red_team_strategy import PostApiScenariosBodyRedTeamStrategy
 from .post_api_scenarios_response_201 import PostApiScenariosResponse201
 from .post_api_scenarios_response_201_fields import PostApiScenariosResponse201Fields
 from .post_api_scenarios_response_201_parameters_item import PostApiScenariosResponse201ParametersItem
@@ -9909,6 +10015,10 @@ __all__ = (
     "ApiKeyInfoRoleBindingsItem",
     "ApiKeyInfoRoleBindingsItemRole",
     "ApiKeyInfoRoleBindingsItemScopeType",
+    "ApplySuiteTemplateBody",
+    "ApplySuiteTemplateBodyFit",
+    "ApplySuiteTemplateResponse201",
+    "ApplySuiteTemplateResponse404",
     "ApproveLangyControlRequestBody",
     "ApproveLangyControlRequestBodyWorkspace",
     "ApproveLangyControlRequestResponse200",
@@ -10935,6 +11045,72 @@ __all__ = (
     "GetApiGovernanceIngestionTemplatesResponse401",
     "GetApiGovernanceIngestionTemplatesResponse422",
     "GetApiGovernanceIngestionTemplatesResponse500",
+    "GetApiGovernanceOcsfAuditResponse200",
+    "GetApiGovernanceOcsfAuditResponse200DataItem",
+    "GetApiGovernanceOcsfAuditResponse400",
+    "GetApiGovernanceOcsfAuditResponse400Fault",
+    "GetApiGovernanceOcsfAuditResponse400Meta",
+    "GetApiGovernanceOcsfAuditResponse400Trace",
+    "GetApiGovernanceOcsfAuditResponse401",
+    "GetApiGovernanceOcsfAuditResponse401Fault",
+    "GetApiGovernanceOcsfAuditResponse401Meta",
+    "GetApiGovernanceOcsfAuditResponse401Trace",
+    "GetApiGovernanceOcsfAuditResponse403",
+    "GetApiGovernanceOcsfAuditResponse403Fault",
+    "GetApiGovernanceOcsfAuditResponse403Meta",
+    "GetApiGovernanceOcsfAuditResponse403Trace",
+    "GetApiGovernanceOcsfAuditResponse422",
+    "GetApiGovernanceOcsfAuditResponse422Fault",
+    "GetApiGovernanceOcsfAuditResponse422Meta",
+    "GetApiGovernanceOcsfAuditResponse422Trace",
+    "GetApiGovernanceOcsfAuditResponse500",
+    "GetApiGovernanceOcsfAuditResponse500Fault",
+    "GetApiGovernanceOcsfAuditResponse500Meta",
+    "GetApiGovernanceOcsfAuditResponse500Trace",
+    "GetApiGovernanceOcsfEventsResponse200",
+    "GetApiGovernanceOcsfEventsResponse200DataItem",
+    "GetApiGovernanceOcsfEventsResponse400",
+    "GetApiGovernanceOcsfEventsResponse400Fault",
+    "GetApiGovernanceOcsfEventsResponse400Meta",
+    "GetApiGovernanceOcsfEventsResponse400Trace",
+    "GetApiGovernanceOcsfEventsResponse401",
+    "GetApiGovernanceOcsfEventsResponse401Fault",
+    "GetApiGovernanceOcsfEventsResponse401Meta",
+    "GetApiGovernanceOcsfEventsResponse401Trace",
+    "GetApiGovernanceOcsfEventsResponse403",
+    "GetApiGovernanceOcsfEventsResponse403Fault",
+    "GetApiGovernanceOcsfEventsResponse403Meta",
+    "GetApiGovernanceOcsfEventsResponse403Trace",
+    "GetApiGovernanceOcsfEventsResponse422",
+    "GetApiGovernanceOcsfEventsResponse422Fault",
+    "GetApiGovernanceOcsfEventsResponse422Meta",
+    "GetApiGovernanceOcsfEventsResponse422Trace",
+    "GetApiGovernanceOcsfEventsResponse500",
+    "GetApiGovernanceOcsfEventsResponse500Fault",
+    "GetApiGovernanceOcsfEventsResponse500Meta",
+    "GetApiGovernanceOcsfEventsResponse500Trace",
+    "GetApiGovernanceOcsfTracesResponse200",
+    "GetApiGovernanceOcsfTracesResponse200DataItem",
+    "GetApiGovernanceOcsfTracesResponse400",
+    "GetApiGovernanceOcsfTracesResponse400Fault",
+    "GetApiGovernanceOcsfTracesResponse400Meta",
+    "GetApiGovernanceOcsfTracesResponse400Trace",
+    "GetApiGovernanceOcsfTracesResponse401",
+    "GetApiGovernanceOcsfTracesResponse401Fault",
+    "GetApiGovernanceOcsfTracesResponse401Meta",
+    "GetApiGovernanceOcsfTracesResponse401Trace",
+    "GetApiGovernanceOcsfTracesResponse403",
+    "GetApiGovernanceOcsfTracesResponse403Fault",
+    "GetApiGovernanceOcsfTracesResponse403Meta",
+    "GetApiGovernanceOcsfTracesResponse403Trace",
+    "GetApiGovernanceOcsfTracesResponse422",
+    "GetApiGovernanceOcsfTracesResponse422Fault",
+    "GetApiGovernanceOcsfTracesResponse422Meta",
+    "GetApiGovernanceOcsfTracesResponse422Trace",
+    "GetApiGovernanceOcsfTracesResponse500",
+    "GetApiGovernanceOcsfTracesResponse500Fault",
+    "GetApiGovernanceOcsfTracesResponse500Meta",
+    "GetApiGovernanceOcsfTracesResponse500Trace",
     "GetApiGovernanceRegistryAgentsByIdResponse200",
     "GetApiGovernanceRegistryAgentsByIdResponse200Data",
     "GetApiGovernanceRegistryAgentsByIdResponse200DataEndpointsItem",
@@ -12083,6 +12259,11 @@ __all__ = (
     "ListRunPlansResponse200ItemTargetsItemType",
     "ListScimTokensResponse200",
     "ListScimTokensResponse200TokensItem",
+    "ListSuiteTemplatesResponse200Item",
+    "ListSuiteTemplatesResponse200ItemKind",
+    "ListSuiteTemplatesResponse200ItemScenariosItem",
+    "ListSuiteTemplatesResponse200ItemScenariosItemAttack",
+    "ListSuiteTemplatesResponse200ItemScenariosItemAttackStrategy",
     "ListTestSuitesResponse200Item",
     "ListTestSuitesResponse200ItemEvaluatorsItem",
     "ListTestSuitesResponse200ItemEvaluatorsItemMappings",
@@ -13421,6 +13602,30 @@ __all__ = (
     "PostApiGovernanceIngestionTemplatesResponse401",
     "PostApiGovernanceIngestionTemplatesResponse422",
     "PostApiGovernanceIngestionTemplatesResponse500",
+    "PostApiGovernanceOcsfIngestBody",
+    "PostApiGovernanceOcsfIngestBodyEventsItem",
+    "PostApiGovernanceOcsfIngestBodyEventsItemMetadata",
+    "PostApiGovernanceOcsfIngestResponse200",
+    "PostApiGovernanceOcsfIngestResponse400",
+    "PostApiGovernanceOcsfIngestResponse400Fault",
+    "PostApiGovernanceOcsfIngestResponse400Meta",
+    "PostApiGovernanceOcsfIngestResponse400Trace",
+    "PostApiGovernanceOcsfIngestResponse401",
+    "PostApiGovernanceOcsfIngestResponse401Fault",
+    "PostApiGovernanceOcsfIngestResponse401Meta",
+    "PostApiGovernanceOcsfIngestResponse401Trace",
+    "PostApiGovernanceOcsfIngestResponse403",
+    "PostApiGovernanceOcsfIngestResponse403Fault",
+    "PostApiGovernanceOcsfIngestResponse403Meta",
+    "PostApiGovernanceOcsfIngestResponse403Trace",
+    "PostApiGovernanceOcsfIngestResponse422",
+    "PostApiGovernanceOcsfIngestResponse422Fault",
+    "PostApiGovernanceOcsfIngestResponse422Meta",
+    "PostApiGovernanceOcsfIngestResponse422Trace",
+    "PostApiGovernanceOcsfIngestResponse500",
+    "PostApiGovernanceOcsfIngestResponse500Fault",
+    "PostApiGovernanceOcsfIngestResponse500Meta",
+    "PostApiGovernanceOcsfIngestResponse500Trace",
     "PostApiGovernanceRegistryArdSearchBody",
     "PostApiGovernanceRegistryArdSearchBodyFederation",
     "PostApiGovernanceRegistryArdSearchBodyQuery",
@@ -13778,8 +13983,11 @@ __all__ = (
     "PostApiScenarioEventsResponse500",
     "PostApiScenariosBody",
     "PostApiScenariosBodyFields",
+    "PostApiScenariosBodyKind",
     "PostApiScenariosBodyParametersItem",
     "PostApiScenariosBodyParametersItemType",
+    "PostApiScenariosBodyRedTeam",
+    "PostApiScenariosBodyRedTeamStrategy",
     "PostApiScenariosResponse201",
     "PostApiScenariosResponse201Fields",
     "PostApiScenariosResponse201ParametersItem",

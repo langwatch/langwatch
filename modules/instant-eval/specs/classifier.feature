@@ -162,6 +162,46 @@ Feature: The Instant Evals classifier interface — one judged question, priced 
     Then five attempts are made
     And the row is skipped with the rate-limited reason
 
+  @unit @regression
+  Scenario: A classifier failing on every send stops being sent to until a probe is answered
+    Given a classifier answering 500 to every send
+    When sixteen sends in a row have failed
+    Then later attempts send nothing until a probe is due, ten seconds on
+    And each attempt still waits the usual backoff
+    And its text is skipped with the failed reason
+
+  @unit
+  Scenario: An answered probe lets every text be sent again
+    Given a classifier that has stopped being sent to after sixteen failed sends
+    When ten seconds have passed and the one probe sent is answered
+    Then the next text is sent and its verdict comes back
+
+  @unit
+  Scenario: A probe refused as too large lets every text be sent again
+    Given a classifier that has stopped being sent to after sixteen failed sends
+    When ten seconds have passed and the one probe sent is refused as too large
+    Then the cut text is sent and its verdict comes back
+    And the next text is sent and its verdict comes back
+
+  @unit
+  Scenario: A cancelled probe does not stop the next one
+    Given a classifier that has stopped being sent to after sixteen failed sends
+    When the one probe sent is cancelled before it is answered
+    Then another probe is sent once ten more seconds have passed
+    And a send that began before the probe never frees it early
+
+  @unit
+  Scenario: Rate limits and permanent refusals never stop sends
+    Given a classifier answering 429, 529 or 401 to every send
+    When more than sixteen sends in a row have been refused
+    Then every later text is still sent
+
+  @unit
+  Scenario: One text failing on every attempt does not stop the others
+    Given a classifier answering 500 to all five attempts for one text
+    When the next text is classified
+    Then it is sent and its verdict comes back
+
   @unit
   Scenario: A text the classifier refuses as too large is cut once and retried
     Given a classifier refusing the text as past its token cap, then answering
