@@ -119,6 +119,7 @@ export {
   type NormalizedLink,
   type NormalizedSpan,
   type NormalizedSpanSchema,
+  type OwnedSpan,
 } from "./trace.spans.ts";
 export {
   ADD_ANNOTATION_COMMAND_TYPE,
@@ -187,6 +188,12 @@ export {
   TRACE_SUMMARY_PROJECTION_VERSION_PRE_STORAGE_ANCHOR,
   TRACE_SUMMARY_PROJECTION_VERSIONS,
   isStorageAnchoredVersion,
+  A2A_V0_METHODS,
+  A2A_V1_METHODS,
+  a2aSpanNameMatch,
+  isA2aSpanName,
+  isAgentCallSpanName,
+  type A2aSpanNameMatch,
   type TraceProcessingCommandType,
   type TraceProcessingEventType,
 } from "./trace.constants.ts";

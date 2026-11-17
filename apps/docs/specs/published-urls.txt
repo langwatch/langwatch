@@ -863,6 +863,7 @@
 /langy/security/sandbox
 /langy/token-usage-and-cost
 /observability
+/observability/multi-agent-a2a
 /observability/overview
 /observability/trace-vs-activity-ingestion
 /optimization-studio/datasets
