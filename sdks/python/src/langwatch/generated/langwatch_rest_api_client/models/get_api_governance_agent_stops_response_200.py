@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, TypeVar
+from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 from attrs import define as _attrs_define
 
@@ -19,9 +19,11 @@ class GetApiGovernanceAgentStopsResponse200:
     """
     Attributes:
         data (list[GetApiGovernanceAgentStopsResponse200DataItem]):
+        next_cursor (None | str):
     """
 
     data: list[GetApiGovernanceAgentStopsResponse200DataItem]
+    next_cursor: None | str
 
     def to_dict(self) -> dict[str, Any]:
         data = []
@@ -29,11 +31,15 @@ class GetApiGovernanceAgentStopsResponse200:
             data_item = data_item_data.to_dict()
             data.append(data_item)
 
+        next_cursor: None | str
+        next_cursor = self.next_cursor
+
         field_dict: dict[str, Any] = {}
 
         field_dict.update(
             {
                 "data": data,
+                "next_cursor": next_cursor,
             }
         )
 
@@ -53,8 +59,16 @@ class GetApiGovernanceAgentStopsResponse200:
 
             data.append(data_item)
 
+        def _parse_next_cursor(data: object) -> None | str:
+            if data is None:
+                return data
+            return cast(None | str, data)
+
+        next_cursor = _parse_next_cursor(d.pop("next_cursor"))
+
         get_api_governance_agent_stops_response_200 = cls(
             data=data,
+            next_cursor=next_cursor,
         )
 
         return get_api_governance_agent_stops_response_200

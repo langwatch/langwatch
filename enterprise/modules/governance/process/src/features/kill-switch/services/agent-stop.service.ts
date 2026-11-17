@@ -7,6 +7,7 @@ import {
   type AgentStopCaller,
   type AgentStopDecidedEventData,
   AgentStopNotFoundError,
+  type AgentStopPage,
   AgentStopNotPendingError,
   AgentStopNotRestorableError,
   AgentStopPlanChangedError,
@@ -31,7 +32,9 @@ import {
   type AgentStopRecord,
   approvalOf,
   approvedStop,
+  decodeStopCursor,
   deniedStop,
+  encodeStopCursor,
   inventoryRowIdsOf,
   isRestorableStatus,
   requestedStop,
@@ -221,6 +224,32 @@ export class AgentStopService {
       limit: READ_LIMIT,
     });
     return stops.map(viewOfStop);
+  }
+
+  /** One page of stops, latest request first; `next_cursor` is null on the last page. */
+  async listStops({
+    organizationId,
+    statuses,
+    limit,
+    cursor,
+  }: {
+    organizationId: string;
+    statuses?: readonly AgentStopStatus[];
+    limit: number;
+    cursor?: string;
+  }): Promise<AgentStopPage> {
+    const read = await this.deps.stops.findByStatuses({
+      organizationId,
+      ...(statuses && statuses.length > 0 ? { statuses } : {}),
+      limit: limit + 1,
+      ...(cursor ? { before: decodeStopCursor(cursor) } : {}),
+    });
+    const page = read.slice(0, limit);
+    const last = page.at(-1);
+    return {
+      data: page.map(viewOfStop),
+      next_cursor: read.length > limit && last ? encodeStopCursor(last) : null,
+    };
   }
 
   findPendingApprovals({ organizationId }: { organizationId: string }): Promise<AgentStopView[]> {

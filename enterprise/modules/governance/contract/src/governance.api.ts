@@ -110,6 +110,7 @@ import type {
 import type {
   AgentKillSwitchSummary,
   AgentStopCaller,
+  AgentStopPage,
   AgentStopPlan,
   AgentStopSeverity,
   AgentStopStatus,
@@ -530,14 +531,20 @@ export interface GovernanceRestApi {
     targets: readonly AgentStopTarget[];
   }): Promise<AgentStopPlan>;
   findAwsConnections(input: { organizationId: string }): Promise<AwsConnectionView[]>;
+  /** Writes an audit row naming `userId`, the person who added it. */
   createAwsConnection(input: {
     organizationId: string;
     connection: AwsConnectionInput;
+    userId: string | null;
   }): Promise<AwsConnectionView>;
-  /** Throws `governance_aws_connection_in_use` while a plan target or unrestored stop uses it. */
+  /**
+   * Throws `governance_aws_connection_in_use` while a plan target or unrestored stop uses it; a
+   * delete that removed a connection writes an audit row naming `userId`.
+   */
   deleteAwsConnection(input: {
     organizationId: string;
     connectionId: string;
+    userId: string | null;
   }): Promise<{ deleted: boolean }>;
   requestAgentStop(input: {
     organizationId: string;
@@ -567,10 +574,13 @@ export interface GovernanceRestApi {
   }): Promise<AgentStopView>;
   /** The agent's latest stop; throws `agent_stop_not_found` when it was never stopped. */
   getLatestAgentStop(input: { organizationId: string; agentId: string }): Promise<AgentStopView>;
-  findAgentStops(input: {
+  /** Latest request first, `limit` at a time; a cursor it never returned is a validation error. */
+  listAgentStops(input: {
     organizationId: string;
     statuses?: readonly AgentStopStatus[];
-  }): Promise<AgentStopView[]>;
+    limit: number;
+    cursor?: string;
+  }): Promise<AgentStopPage>;
 }
 
 export const GovernanceRestApi = moduleApi<GovernanceRestApi>()("governance");

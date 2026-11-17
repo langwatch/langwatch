@@ -2,6 +2,8 @@
  * The AWS connections: sealed secrets, and the refusal to delete one a plan or a stop still uses.
  * Spec: enterprise/modules/governance/specs/agent-kill-switch.feature
  */
+import type { AuditLogApi, RecordAuditLogCommand } from "@langwatch/audit-log-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import { MemoryAgentStopPlanRepository } from "../../../../repositories/memory/memory.agent-stop-plan.repository.ts";
@@ -14,8 +16,15 @@ function connectionService(
   repository: MemoryGovernanceAwsConnectionRepository,
   plans = MemoryAgentStopPlanRepository.create(),
   stops = MemoryAgentStopRepository.create(),
+  audit: RecordAuditLogCommand[] = [],
 ) {
-  return GovernanceAwsConnectionService.create({ connections: repository, plans, stops });
+  const auditLog = createApiFixture<AuditLogApi>({
+    record: async (command) => {
+      audit.push(command);
+      return { id: `audit-${audit.length}`, occurredAt: 0 };
+    },
+  });
+  return GovernanceAwsConnectionService.create({ connections: repository, plans, stops, auditLog });
 }
 
 describe("GovernanceAwsConnectionService", () => {
@@ -27,6 +36,7 @@ describe("GovernanceAwsConnectionService", () => {
 
       const view = await service.createConnection({
         organizationId: ORG,
+        userId: "user-ops",
         connection: {
           name: "ACME production",
           accessKeyId: "AKIAACMEEXAMPLE0001",
@@ -61,6 +71,7 @@ describe("GovernanceAwsConnectionService", () => {
 
       const view = await service.createConnection({
         organizationId: ORG,
+        userId: "user-ops",
         connection: {
           name: "ACME role",
           roleArn: "arn:aws:iam::123456789012:role/langwatch-kill-switch",
@@ -88,6 +99,7 @@ describe("GovernanceAwsConnectionService", () => {
       const service = connectionService(repository, plans);
       const view = await service.createConnection({
         organizationId: ORG,
+        userId: "user-ops",
         connection: { name: "ACME role", roleArn: "arn:aws:iam::123456789012:role/kill-switch" },
       });
       await plans.replaceTargets({
@@ -109,7 +121,7 @@ describe("GovernanceAwsConnectionService", () => {
       });
 
       const refusal = await service
-        .deleteConnection({ organizationId: ORG, connectionId: view.id })
+        .deleteConnection({ organizationId: ORG, connectionId: view.id, userId: "user-ops" })
         .then(
           () => undefined,
           (error: { code?: string; meta?: unknown }) => error,
@@ -121,8 +133,67 @@ describe("GovernanceAwsConnectionService", () => {
 
       await plans.replaceTargets({ organizationId: ORG, agentId: "agent-1", targets: [] });
       expect(
-        await service.deleteConnection({ organizationId: ORG, connectionId: view.id }),
+        await service.deleteConnection({
+          organizationId: ORG,
+          connectionId: view.id,
+          userId: "user-ops",
+        }),
       ).toEqual({ deleted: true });
+    });
+  });
+
+  describe("when a connection is added and then removed", () => {
+    /** @scenario "Adding and removing an AWS connection is audited without its secrets" */
+    it("audits both writes with the connection as target and no secret", async () => {
+      const audit: RecordAuditLogCommand[] = [];
+      const service = connectionService(
+        MemoryGovernanceAwsConnectionRepository.create(),
+        undefined,
+        undefined,
+        audit,
+      );
+
+      const view = await service.createConnection({
+        organizationId: ORG,
+        userId: "user-ops",
+        connection: {
+          name: "ACME production",
+          accessKeyId: "AKIAACMEEXAMPLE0001",
+          secretAccessKey: "acme-secret-access-key-0001",
+        },
+      });
+      await service.deleteConnection({
+        organizationId: ORG,
+        connectionId: view.id,
+        userId: "user-ops",
+      });
+      await service.deleteConnection({
+        organizationId: ORG,
+        connectionId: view.id,
+        userId: "user-ops",
+      });
+
+      expect(audit.map((row) => [row.action, row.targetKind, row.targetId, row.userId])).toEqual([
+        [
+          "governance.agent.aws_connection_created",
+          "governance_aws_connection",
+          view.id,
+          "user-ops",
+        ],
+        [
+          "governance.agent.aws_connection_deleted",
+          "governance_aws_connection",
+          view.id,
+          "user-ops",
+        ],
+      ]);
+      expect(audit[0]?.metadata).toEqual({
+        name: "ACME production",
+        accessKeyIdLastFour: "0001",
+        roleArn: null,
+        hasExternalId: false,
+      });
+      expect(JSON.stringify(audit)).not.toContain("acme-secret-access-key-0001");
     });
   });
 });

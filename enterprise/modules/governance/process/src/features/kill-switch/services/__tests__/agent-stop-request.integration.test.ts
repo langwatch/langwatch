@@ -219,6 +219,50 @@ describe("AgentStopService", () => {
     });
   });
 
+  describe("when the organisation holds more stops than one listing page", () => {
+    /** @scenario "The stop listing pages through every stop with a cursor" */
+    it("answers every stop once, latest first, across pages, and refuses a forged cursor", async () => {
+      const others = ["pricing-bot", "billing-bot", "triage-bot"];
+      const harness = await killSwitchHarness({ otherAgents: others });
+      const stopIds: string[] = [];
+      for (const agentId of [AGENT_ID, ...others.map((name) => `agent-${name}`)]) {
+        await harness.plans.setPlan({
+          organizationId: ORG,
+          agentId,
+          targets: [{ kind: "gateway_virtual_key", virtualKeyId: VIRTUAL_KEY_ID }],
+        });
+        const view = await harness.stops.requestStop({
+          organizationId: ORG,
+          agentId,
+          reason: "prompt injection in production",
+          severity: "high",
+          caller: PERSON,
+        });
+        stopIds.push(view.id);
+        await settled(harness, view.id, "quarantined");
+      }
+
+      const first = await harness.stops.listStops({ organizationId: ORG, limit: 3 });
+      const second = await harness.stops.listStops({
+        organizationId: ORG,
+        limit: 3,
+        ...(first.next_cursor ? { cursor: first.next_cursor } : {}),
+      });
+
+      expect(first.data).toHaveLength(3);
+      expect(first.next_cursor).not.toBeNull();
+      expect(second.data).toHaveLength(1);
+      expect(second.next_cursor).toBeNull();
+      expect([...first.data, ...second.data].map((stop) => stop.id)).toEqual(
+        expect.arrayContaining(stopIds),
+      );
+      expect(
+        await codeOf(harness.stops.listStops({ organizationId: ORG, limit: 3, cursor: "forged" })),
+      ).toBe("validation_error");
+      await harness.eventing.close();
+    });
+  });
+
   describe("when the agent is not in the registry", () => {
     /** @scenario "A stop of an agent outside the registry is refused" */
     it("refuses the request", async () => {

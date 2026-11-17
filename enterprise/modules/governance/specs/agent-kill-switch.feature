@@ -42,6 +42,13 @@ Feature: Agent kill switch: stop a misbehaving agent where it runs, with approva
     Then the write is refused with code "agent_stop_target_invalid"
 
   @unit
+  Scenario: Adding and removing an AWS connection is audited without its secrets
+    Given a person with "governance:manage"
+    When they add an AWS connection with an access key pair and then remove it
+    Then the audit log records "governance.agent.aws_connection_created" and "governance.agent.aws_connection_deleted" with the connection as the target and the person as the actor
+    And neither row holds the secret access key or the external id
+
+  @unit
   Scenario: An AWS connection stores its secret key encrypted and never answers it
     When a person with governance:manage stores an AWS connection with an access key pair
     Then the stored row holds the secret access key encrypted
@@ -180,6 +187,15 @@ Feature: Agent kill switch: stop a misbehaving agent where it runs, with approva
     When a stop's stop_requested, quarantined and restored milestones are each announced twice
     Then the registry feed holds each milestone once, in order
     And the endpoint gets one delivery per milestone
+
+  @integration
+  Scenario: The stop listing pages through every stop with a cursor
+    Given the organisation holds four stops
+    When GET /api/governance/agent-stops is read with limit 3
+    Then it answers the three latest stops and a next_cursor
+    When the next_cursor is passed back as cursor
+    Then it answers the last stop and a null next_cursor
+    And a cursor the listing never returned is refused with a validation error
 
   @integration
   Scenario: A stop of an agent with no stop plan is refused

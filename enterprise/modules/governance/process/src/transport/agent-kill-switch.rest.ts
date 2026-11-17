@@ -153,7 +153,7 @@ export const agentKillSwitchRest = defineRestRouter(GovernanceRestApi)
     data: await app.getLatestAgentStop({ organizationId: scope.id, agentId: input.agentId }),
   }))
 
-  .get("/api/governance/agent-stops", "findAgentStops")
+  .get("/api/governance/agent-stops", "listAgentStops")
   .withQuery(agentStopListQuerySchema)
   .withPermission("governance:view")
   .withEntitlement("enterprise", { feature: "AGENT_REGISTRY" })
@@ -163,15 +163,17 @@ export const agentKillSwitchRest = defineRestRouter(GovernanceRestApi)
     summary: "List the organisation's agent stops",
     tags: TAGS,
     description:
-      "The organisation's stops, latest request first, at most 200. `status=pending_approval` lists the stops waiting for a decision.",
+      "The organisation's stops, latest request first, `limit` at a time (default 50, at most 200). Pass `next_cursor` back as `cursor` for the next page; it is null on the last page. `status=pending_approval` lists the stops waiting for a decision.",
     responses: { ...canonicalBaseResponses, ...canonicalUnprocessableResponses },
   })
-  .handle(async ({ app, input, scope }) => ({
-    data: await app.findAgentStops({
+  .handle(({ app, input, scope }) =>
+    app.listAgentStops({
       organizationId: scope.id,
+      limit: input.limit,
       ...(input.status ? { statuses: [input.status] } : {}),
+      ...(input.cursor ? { cursor: input.cursor } : {}),
     }),
-  }))
+  )
 
   .post("/api/governance/agent-stops/:stopId/approve", "approveAgentStop")
   .withoutAudit("the kill switch service records this row itself, with the stop and its caller")

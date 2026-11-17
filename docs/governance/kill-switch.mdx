@@ -90,7 +90,7 @@ The `json` filter quotes the reason, so a trigger name with quotes still sends v
 
 ## Audit log and webhooks
 
-The audit log records `governance.agent.stop_requested`, `governance.agent.stop_approved`, `governance.agent.stop_denied`, `governance.agent.quarantined`, `governance.agent.stop_failed`, `governance.agent.restore_requested`, `governance.agent.restored` and `governance.agent.restore_failed`, with the agent as the target.
+The audit log records `governance.agent.stop_requested`, `governance.agent.stop_approved`, `governance.agent.stop_denied`, `governance.agent.quarantined`, `governance.agent.stop_failed`, `governance.agent.restore_requested`, `governance.agent.restored` and `governance.agent.restore_failed`, with the agent as the target. Adding and removing an AWS connection records `governance.agent.aws_connection_created` and `governance.agent.aws_connection_deleted`, with the connection as the target and no secret in the row.
 
 Webhook endpoints subscribed to `governance.agent.*` receive `governance.agent.stop_requested`, `governance.agent.quarantined`, `governance.agent.stop_failed`, `governance.agent.restored` and `governance.agent.restore_failed`. Each event carries the registry entry and a `stop` object with the status and every target's outcome. They are also in the registry's change feed.
 

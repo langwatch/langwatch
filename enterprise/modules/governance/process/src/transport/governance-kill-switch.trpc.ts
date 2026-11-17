@@ -49,12 +49,16 @@ export const governanceKillSwitchTrpcTransport: TrpcRouterDeclaration<
   .procedure("createAwsConnection")
   .withEntitlement("enterprise", AGENT_REGISTRY)
   .withPermission("governance:manage")
-  .handle(({ app, input }) => app.createAwsConnection(input))
+  .handle(({ app, input, actor }) =>
+    app.createAwsConnection({ ...input, userId: personOf(actor).userId }),
+  )
 
   .procedure("deleteAwsConnection")
   .withEntitlement("enterprise", AGENT_REGISTRY)
   .withPermission("governance:manage")
-  .handle(({ app, input }) => app.deleteAwsConnection(input))
+  .handle(({ app, input, actor }) =>
+    app.deleteAwsConnection({ ...input, userId: personOf(actor).userId }),
+  )
 
   .procedure("requestStop")
   .withEntitlement("enterprise", AGENT_REGISTRY)

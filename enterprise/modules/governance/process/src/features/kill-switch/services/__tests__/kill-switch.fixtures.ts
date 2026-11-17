@@ -232,15 +232,19 @@ export async function killSwitchHarness({
     connections: repositories.awsConnections,
     plans: repositories.agentStopPlans,
     stops: repositories.agentStops,
+    auditLog,
   });
   const connection = await connections.createConnection({
     organizationId: ORG,
+    userId: "user-ops",
     connection: {
       name: "ACME production",
       accessKeyId: "AKIAACMEEXAMPLE0001",
       secretAccessKey: "acme-secret-access-key-0001",
     },
   });
+  // The trail a test reads starts after the harness's own setup writes.
+  audit.length = 0;
 
   const eventStore = EventStoreMemory.createForTesting();
   const eventing = new EventSourcing({

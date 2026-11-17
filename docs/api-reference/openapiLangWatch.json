@@ -85818,10 +85818,17 @@
                         ],
                         "additionalProperties": false
                       }
+                    },
+                    "next_cursor": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
                     }
                   },
                   "required": [
-                    "data"
+                    "data",
+                    "next_cursor"
                   ],
                   "additionalProperties": false
                 }
@@ -86239,7 +86246,7 @@
             }
           }
         },
-        "description": "The organisation's stops, latest request first, at most 200. `status=pending_approval` lists the stops waiting for a decision.",
+        "description": "The organisation's stops, latest request first, `limit` at a time (default 50, at most 200). Pass `next_cursor` back as `cursor` for the next page; it is null on the last page. `status=pending_approval` lists the stops waiting for a decision.",
         "summary": "List the organisation's agent stops",
         "tags": [
           "Governance / Kill Switch"
@@ -86274,6 +86281,24 @@
                 "restored",
                 "restore_failed"
               ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "default": 50,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "schema": {
+              "type": "string",
+              "minLength": 1
             }
           }
         ]

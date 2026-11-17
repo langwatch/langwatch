@@ -181,6 +181,7 @@ describe("AgentStopService restore", () => {
         harness.connections.deleteConnection({
           organizationId: ORG,
           connectionId: harness.connection.id,
+          userId: "user-ops",
         });
       await harness.plans.setPlan({ organizationId: ORG, agentId: AGENT_ID, targets: [] });
 

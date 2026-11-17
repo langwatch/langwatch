@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
+import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import {
   AGENT_STOP_OPEN_STATUSES,
   AGENT_STOP_RESTORABLE_STATUSES,
@@ -21,8 +22,12 @@ interface GovernanceAwsConnectionDependencies {
   connections: GovernanceAwsConnectionRepository;
   plans: Pick<AgentStopPlanRepository, "findAgentIdsByAwsConnection">;
   stops: Pick<AgentStopRepository, "findAllByStatuses">;
+  auditLog: Pick<AuditLogApi, "record">;
   newId: () => string;
 }
+
+/** The audit target of a connection write; the row never carries the secret or external id. */
+export const AWS_CONNECTION_AUDIT_TARGET_KIND = "governance_aws_connection";
 
 /** A read answers the access key id's last four characters and never a secret. */
 function viewOfAwsConnection(record: GovernanceAwsConnectionRecord): AwsConnectionView {
@@ -44,7 +49,8 @@ const STOP_STATUSES_HOLDING_CONNECTIONS = [
 /**
  * The AWS connections a Bedrock kill switch target signs with: a key pair, a role to assume, or
  * both. The repository seals the secret access key and the external id before they are stored. A
- * connection a plan target or an unrestored stop still names cannot be deleted.
+ * connection a plan target or an unrestored stop still names cannot be deleted. Adding and removing
+ * one writes an audit row.
  */
 export class GovernanceAwsConnectionService {
   private constructor(private readonly deps: GovernanceAwsConnectionDependencies) {}
@@ -61,9 +67,11 @@ export class GovernanceAwsConnectionService {
   async createConnection({
     organizationId,
     connection,
+    userId,
   }: {
     organizationId: string;
     connection: AwsConnectionInput;
+    userId: string | null;
   }): Promise<AwsConnectionView> {
     const input = awsConnectionInputSchema.parse(connection);
     const record = await this.deps.connections.create({
@@ -75,7 +83,20 @@ export class GovernanceAwsConnectionService {
       roleArn: input.roleArn ?? null,
       externalId: input.externalId ?? null,
     });
-    return viewOfAwsConnection(record);
+    const view = viewOfAwsConnection(record);
+    await this.audit({
+      action: "governance.agent.aws_connection_created",
+      organizationId,
+      userId,
+      connectionId: view.id,
+      metadata: {
+        name: view.name,
+        accessKeyIdLastFour: view.accessKeyIdLastFour,
+        roleArn: view.roleArn,
+        hasExternalId: view.hasExternalId,
+      },
+    });
+    return view;
   }
 
   async findConnections({
@@ -89,15 +110,50 @@ export class GovernanceAwsConnectionService {
   async deleteConnection({
     organizationId,
     connectionId,
+    userId,
   }: {
     organizationId: string;
     connectionId: string;
+    userId: string | null;
   }): Promise<{ deleted: boolean }> {
     const agentIds = await this.findAgentIdsUsing({ organizationId, connectionId });
     if (agentIds.length > 0) {
       throw new GovernanceAwsConnectionInUseError({ connectionId, agentIds });
     }
-    return { deleted: await this.deps.connections.delete({ organizationId, id: connectionId }) };
+    const deleted = await this.deps.connections.delete({ organizationId, id: connectionId });
+    if (deleted) {
+      await this.audit({
+        action: "governance.agent.aws_connection_deleted",
+        organizationId,
+        userId,
+        connectionId,
+        metadata: {},
+      });
+    }
+    return { deleted };
+  }
+
+  private async audit({
+    action,
+    organizationId,
+    userId,
+    connectionId,
+    metadata,
+  }: {
+    action: string;
+    organizationId: string;
+    userId: string | null;
+    connectionId: string;
+    metadata: Record<string, string | boolean | null>;
+  }): Promise<void> {
+    await this.deps.auditLog.record({
+      ...(userId ? { userId } : {}),
+      organizationId,
+      action,
+      targetKind: AWS_CONNECTION_AUDIT_TARGET_KIND,
+      targetId: connectionId,
+      metadata,
+    });
   }
 
   private async findAgentIdsUsing({

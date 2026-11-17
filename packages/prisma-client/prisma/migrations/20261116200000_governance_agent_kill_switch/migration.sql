@@ -66,6 +66,7 @@ CREATE TABLE IF NOT EXISTS "AgentStopClaim" (
     "claimedAt" TIMESTAMP(3) NOT NULL,
     "sentAt" TIMESTAMP(3),
     "decision" TEXT,
+    "decisionTakenAt" TIMESTAMP(3),
 
     CONSTRAINT "AgentStopClaim_pkey" PRIMARY KEY ("organizationId","agentId")
 );

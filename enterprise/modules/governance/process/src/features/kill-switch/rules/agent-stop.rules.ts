@@ -24,9 +24,13 @@ import {
   AGENT_STOP_SEVERITIES,
   AGENT_STOP_STATUSES,
   AGENT_STOP_TRIGGERS,
+  GovernanceValidationError,
 } from "@langwatch/enterprise-governance-contract";
 import { Temporal } from "@langwatch/time";
 import { z } from "zod";
+
+/** Where a stop sits in the latest-first listing. */
+type StopPosition = { requestedAt: string; id: string };
 
 /** The stop as the fold keeps it: the view, plus what only the backend reads. */
 export const agentStopRecordSchema = z.object({
@@ -407,4 +411,25 @@ export function inventoryRowIdsOf(sourceKey: string): string[] {
     return [`registered:${sourceKey.slice("langwatch:".length)}`];
   if (sourceKey.startsWith("discovered:")) return [sourceKey];
   return [];
+}
+
+const stopCursorSchema = z.object({ r: z.string().min(1), i: z.string().min(1) });
+
+/** The page position after `stop`, as the opaque `next_cursor` the stop listing answers. */
+export function encodeStopCursor(stop: StopPosition): string {
+  return Buffer.from(JSON.stringify({ r: stop.requestedAt, i: stop.id })).toString("base64url");
+}
+
+/** The position a stop listing cursor names; refused as a validation error when it is not one. */
+export function decodeStopCursor(cursor: string): StopPosition {
+  try {
+    const parsed = stopCursorSchema.parse(
+      JSON.parse(Buffer.from(cursor, "base64url").toString("utf8")),
+    );
+    return { requestedAt: parsed.r, id: parsed.i };
+  } catch {
+    throw new GovernanceValidationError("The cursor is not one this listing returned.", {
+      formErrors: ["cursor is invalid"],
+    });
+  }
 }

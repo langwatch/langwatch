@@ -264,8 +264,12 @@ const agentStopParamsSchemaDefinition = z.object({ stopId: z.string().min(1) });
 export interface AgentStopParamsSchema extends Named<typeof agentStopParamsSchemaDefinition> {}
 export const agentStopParamsSchema: AgentStopParamsSchema = agentStopParamsSchemaDefinition;
 
+export const AGENT_STOP_PAGE_LIMIT_MAX = 200;
+
 const agentStopListQuerySchemaDefinition = z.object({
   status: z.enum(AGENT_STOP_STATUSES).optional(),
+  limit: z.coerce.number().int().min(1).max(AGENT_STOP_PAGE_LIMIT_MAX).default(50),
+  cursor: z.string().min(1).optional(),
 });
 export interface AgentStopListQuerySchema extends Named<
   typeof agentStopListQuerySchemaDefinition
@@ -284,12 +288,17 @@ const agentStopResponseSchemaDefinition = z.object({ data: agentStopViewSchema }
 export interface AgentStopResponseSchema extends Named<typeof agentStopResponseSchemaDefinition> {}
 export const agentStopResponseSchema: AgentStopResponseSchema = agentStopResponseSchemaDefinition;
 
-const agentStopListResponseSchemaDefinition = z.object({ data: agentStopViewSchema.array() });
+const agentStopListResponseSchemaDefinition = z.object({
+  data: agentStopViewSchema.array(),
+  /** Pass back as `cursor`; null when the page was the last. */
+  next_cursor: z.string().nullable(),
+});
 export interface AgentStopListResponseSchema extends Named<
   typeof agentStopListResponseSchemaDefinition
 > {}
 export const agentStopListResponseSchema: AgentStopListResponseSchema =
   agentStopListResponseSchemaDefinition;
+export type AgentStopPage = z.infer<typeof agentStopListResponseSchema>;
 
 // ── Events (aggregate `agent_stop`, one per stop) ──────────────────────────
 

@@ -68,7 +68,7 @@ function words(segment: string): string[] {
     .map((word) => word.toLowerCase());
 }
 
-const IRREGULAR_PARTICIPLES: ReadonlySet<string> = new Set(["set", "reset", "sent", "run"]);
+const IRREGULAR_PARTICIPLES: ReadonlySet<string> = new Set(["set"]);
 
 function isParticiple(word: string): boolean {
   return word.endsWith("ed") || IRREGULAR_PARTICIPLES.has(word);

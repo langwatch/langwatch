@@ -51785,6 +51785,8 @@ type ReadStoredObjectBytesParams struct {
 // GetApiGovernanceAgentStopsParams defines parameters for GetApiGovernanceAgentStops.
 type GetApiGovernanceAgentStopsParams struct {
 	Status *GetApiGovernanceAgentStopsParamsStatus `form:"status,omitempty" json:"status,omitempty"`
+	Limit  *int                                    `form:"limit,omitempty" json:"limit,omitempty"`
+	Cursor *string                                 `form:"cursor,omitempty" json:"cursor,omitempty"`
 }
 
 // GetApiGovernanceAgentStopsParamsStatus defines parameters for GetApiGovernanceAgentStops.
@@ -152174,6 +152176,30 @@ func NewGetApiGovernanceAgentStopsRequest(server string, params *GetApiGovernanc
 
 		}
 
+		if params.Limit != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "limit", *params.Limit, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Cursor != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "cursor", *params.Cursor, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
 		if encoded := queryValues.Encode(); encoded != "" {
 			rawQueryFragments = append(rawQueryFragments, encoded)
 		}
@@ -177633,6 +177659,7 @@ type GetApiGovernanceAgentStopsResponse struct {
 			} `json:"targets"`
 			Trigger GetApiGovernanceAgentStops200JSONResponseBodyDataTrigger `json:"trigger"`
 		} `json:"data"`
+		NextCursor *string `json:"next_cursor"`
 	}
 	JSON400 *struct {
 		Code      string                                              `json:"code"`
@@ -213650,6 +213677,7 @@ func ParseGetApiGovernanceAgentStopsResponse(rsp *http.Response) (*GetApiGoverna
 				} `json:"targets"`
 				Trigger GetApiGovernanceAgentStops200JSONResponseBodyDataTrigger `json:"trigger"`
 			} `json:"data"`
+			NextCursor *string `json:"next_cursor"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err

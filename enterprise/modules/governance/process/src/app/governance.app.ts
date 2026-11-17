@@ -91,6 +91,7 @@ import {
   type AgentStopSeverity,
   type AgentStopStatus,
   type AgentStopTarget,
+  type AgentStopPage,
   type AgentStopView,
   type AwsConnectionInput,
   type AwsConnectionView,
@@ -954,6 +955,7 @@ export class GovernanceModule implements GovernanceRestApi {
       connections: repositories.awsConnections,
       plans: repositories.agentStopPlans,
       stops: repositories.agentStops,
+      auditLog: dependencies.auditLog,
     });
     const sendAgentStop: AgentStopCommandSend = async (name, payload) => {
       await this.agentStopSender(name).send(payload);
@@ -1918,6 +1920,7 @@ export class GovernanceModule implements GovernanceRestApi {
   createAwsConnection(input: {
     organizationId: string;
     connection: AwsConnectionInput;
+    userId: string | null;
   }): Promise<AwsConnectionView> {
     return this.awsConnections.createConnection(input);
   }
@@ -1925,6 +1928,7 @@ export class GovernanceModule implements GovernanceRestApi {
   deleteAwsConnection(input: {
     organizationId: string;
     connectionId: string;
+    userId: string | null;
   }): Promise<{ deleted: boolean }> {
     return this.awsConnections.deleteConnection(input);
   }
@@ -1970,11 +1974,13 @@ export class GovernanceModule implements GovernanceRestApi {
     return this.agentStops.getLatestStop(input);
   }
 
-  findAgentStops(input: {
+  listAgentStops(input: {
     organizationId: string;
     statuses?: readonly AgentStopStatus[];
-  }): Promise<AgentStopView[]> {
-    return this.agentStops.findStops(input);
+    limit: number;
+    cursor?: string;
+  }): Promise<AgentStopPage> {
+    return this.agentStops.listStops(input);
   }
 
   governanceAgentsList(input: { organizationId: string }): Promise<GovernanceAgentRow[]> {
