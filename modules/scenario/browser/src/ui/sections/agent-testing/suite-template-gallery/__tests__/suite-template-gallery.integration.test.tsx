@@ -205,6 +205,10 @@ describe("SuiteTemplateGallery", () => {
     const user = userEvent.setup();
     renderGallery();
     await goToFit(user);
+    expect(screen.getByTestId("suite-template-agent-name")).toHaveAttribute(
+      "aria-required",
+      "true",
+    );
     await user.click(screen.getByTestId("suite-template-create"));
     expect(await screen.findByText(AGENT_NAME_REQUIRED)).toBeInTheDocument();
     expect(mockApply).not.toHaveBeenCalled();

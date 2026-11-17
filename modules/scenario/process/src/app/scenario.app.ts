@@ -841,15 +841,21 @@ export class ScenarioModule implements ScenarioApi {
     return this.#dependencies.scenarios.moveToTestSuite(input);
   }
 
-  /** Copies a scenario, attributed to the caller who asked for it. */
+  /** Copies a scenario for its caller; a copy filed in a test suite skips the Free cap. */
   async duplicate(
     input: Omit<ScenarioDuplicateInput, "lastUpdatedById">,
     by: ScenarioCaller,
   ): Promise<Scenario> {
-    await this.#dependencies.creationCaps.assertScenarioCreationAllowed({
+    const original = await this.#dependencies.scenarios.getById({
+      id: input.scenarioId,
       projectId: input.projectId,
-      operatorId: by.label === "user" ? by.id : undefined,
     });
+    if (!original.testSuiteId) {
+      await this.#dependencies.creationCaps.assertScenarioCreationAllowed({
+        projectId: input.projectId,
+        operatorId: by.label === "user" ? by.id : undefined,
+      });
+    }
     return this.#dependencies.scenarios.duplicate({ ...input, lastUpdatedById: by.id });
   }
 

@@ -144,6 +144,14 @@ Feature: Cloud Free plan caps scenarios, simulations and custom evaluators
     When a member duplicates one of them
     Then the request fails as FORBIDDEN with limit type "scenarios", current 3 and max 3
 
+  @unit
+  Scenario: Duplicating a scenario filed in a test suite is not refused for scenario count
+    Given the organization is on the cloud Free plan
+    And it has 3 active scenarios
+    And a scenario filed in a test suite
+    When a member duplicates the suite scenario
+    Then the copy is created in the same test suite
+
   @integration
   Scenario: Saving a workflow as a fourth custom evaluator is refused with the limit shape
     Given the organization is on the cloud Free plan

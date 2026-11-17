@@ -144,6 +144,27 @@ describe("ScenarioModule on the cloud Free scenario cap", () => {
       expect(created.name).toBe("LLM01 Prompt Injection");
     });
 
+    /** @scenario Duplicating a scenario filed in a test suite is not refused for scenario count */
+    it("duplicates a scenario filed in a test suite over the cap", async () => {
+      const { app } = await organizationAtTheScenarioCap();
+      const suite = await app.createTestSuite({ projectId: "project-1", name: "OWASP LLM" });
+      const original = await app.create(
+        {
+          projectId: "project-1",
+          name: "LLM01 Prompt Injection",
+          situation: "An attacker hides instructions",
+          criteria: [],
+          labels: [],
+          testSuiteId: suite.id,
+        },
+        BY,
+      );
+
+      const copy = await app.duplicate({ scenarioId: original.id, projectId: "project-1" }, BY);
+
+      expect(copy.testSuiteId).toBe(suite.id);
+    });
+
     /** @scenario An organization over the scenario cap can still edit its scenarios */
     it("still saves an edit to an existing scenario", async () => {
       const { app } = await organizationAtTheScenarioCap();

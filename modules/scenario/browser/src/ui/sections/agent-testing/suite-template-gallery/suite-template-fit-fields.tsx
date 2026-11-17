@@ -68,6 +68,7 @@ export function SuiteTemplateFitFields({
           size="sm"
           value={wizard.agentName}
           placeholder="e.g. Refunds assistant"
+          aria-required
           data-testid="suite-template-agent-name"
           onChange={(event) => wizard.setAgentName(event.target.value)}
         />
