@@ -29,7 +29,7 @@ export class MemoryDatasetRepositories {
       content: MemoryDatasetContentRepository.create({ database }),
       batchEvaluations: MemoryBatchEvaluationRepository.create({ database }),
       count: MemoryDatasetCountRepository.create({ database }),
-      migration: MemoryDatasetMigrationRepository.create(),
+      migration: MemoryDatasetMigrationRepository.create({ database }),
       chunks,
       migrationChunks: chunks,
       storageAudit: MemoryDatasetStorageAuditRepository.create({ database }),
