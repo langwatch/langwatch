@@ -124,6 +124,12 @@ Feature: A2A proxy on the gateway
     Then the caller receives HTTP 502 with reason "a2a_payload_too_large"
 
   @unit
+  Scenario: a method and path that is not an A2A operation is refused
+    When the caller sends GET /a2a/billing/admin
+    Then the upstream is not called
+    And the caller receives HTTP 404 with reason "a2a_operation_not_supported"
+
+  @unit
   Scenario: a path that could leave the upstream base path is refused
     When the caller sends a path with a dot segment, or an encoded slash, backslash, "?" or "#"
     Then the upstream is not called

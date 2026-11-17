@@ -153,12 +153,16 @@ func parseCall(w http.ResponseWriter, r *http.Request) (*call, *refusal) {
 	name, rest, decoded, pathErr := splitPath(r)
 	c.name, c.rest = name, rest
 	c.isCard = decoded == cardPath && r.Method == http.MethodGet
-	c.method = restMethod(r.Method, decoded)
+	method, known := restMethod(r.Method, decoded)
+	c.method = method
 	if (decoded == "" || decoded == "/") && r.Method == http.MethodPost {
-		c.binding = bindingJSONRPC
+		c.binding, known = bindingJSONRPC, true
 	}
 	if pathErr != nil {
 		return c, &refuseInvalidRequest
+	}
+	if !known {
+		return c, &refuseUnsupported
 	}
 	body, tooLarge, err := readLimited(r.Body)
 	c.body = body

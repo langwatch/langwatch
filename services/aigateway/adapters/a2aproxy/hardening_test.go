@@ -91,6 +91,42 @@ func TestPathThatLeavesTheBaseIsRefused(t *testing.T) {
 	}
 }
 
+// @scenario "a method and path that is not an A2A operation is refused"
+func TestUnsupportedOperationIsRefused(t *testing.T) {
+	for _, call := range [][2]string{
+		{http.MethodGet, "/a2a/billing/admin"},
+		{http.MethodPost, "/a2a/billing/tasks/abc"},
+		{http.MethodGet, "/a2a/billing/tasks/abc:cancel"},
+		{http.MethodDelete, "/a2a/billing/message:send"},
+		{http.MethodGet, "/a2a/billing/tasks/abc/other"},
+		{http.MethodPut, "/a2a/billing/tasks/abc/pushNotificationConfigs/c1"},
+	} {
+		t.Run(call[0]+" "+call[1], func(t *testing.T) {
+			f := newFixture(t)
+			rec := f.do(call[0], call[1], "")
+			assert.Equal(t, http.StatusNotFound, rec.Code, rec.Body.String())
+			assert.Equal(t, "a2a_operation_not_supported", httpError(t, rec))
+			assert.Empty(t, f.upstreamCalls())
+		})
+	}
+}
+
+func TestKnownOperationsAreNamed(t *testing.T) {
+	for _, c := range []struct{ method, path, want string }{
+		{http.MethodGet, "/tasks/abc", "GetTask"},
+		{http.MethodPost, "/tasks/abc:cancel", "CancelTask"},
+		{http.MethodGet, "/tasks/abc:subscribe", "SubscribeToTask"},
+		{http.MethodGet, "/tasks", "ListTasks"},
+		{http.MethodGet, "/extendedAgentCard", "GetExtendedAgentCard"},
+		{http.MethodPost, "/tasks/abc/pushNotificationConfigs", "CreateTaskPushNotificationConfig"},
+		{http.MethodDelete, "/tasks/abc/pushNotificationConfigs/c1", "DeleteTaskPushNotificationConfig"},
+	} {
+		got, ok := restMethod(c.method, c.path)
+		assert.True(t, ok, c.path)
+		assert.Equal(t, c.want, got)
+	}
+}
+
 func TestEscapedPathIsForwardedEscaped(t *testing.T) {
 	f := newFixture(t)
 	var escaped string
