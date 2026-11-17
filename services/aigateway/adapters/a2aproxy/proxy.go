@@ -305,6 +305,9 @@ func (h *Handler) forward(c *call, target domain.A2ATarget) {
 	if !h.scan(c, DirectionResponse, respBody) {
 		return
 	}
+	if c.method == "GetExtendedAgentCard" {
+		respBody = rewriteReplyCard(respBody, strings.TrimSuffix(target.UpstreamURL, "/"), proxyBase(c.r, target.Name))
+	}
 	copyHeader(c.w.Header(), resp.Header)
 	c.w.WriteHeader(resp.StatusCode)
 	_, _ = c.w.Write(respBody)
