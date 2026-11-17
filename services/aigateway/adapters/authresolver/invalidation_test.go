@@ -2,6 +2,7 @@ package authresolver
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -109,15 +110,58 @@ func TestInvalidation_BudgetDebitMidFetchCachesMarkedBehind(t *testing.T) {
 	assert.Equal(t, uint64(1), e.budgetChangeCount(), "the entry is marked behind the debit it may have missed")
 }
 
-func TestInvalidation_TrimmedLogRefusesOldFetch(t *testing.T) {
+// storeL1 seeds L1 with a bundle as if its config was just fetched.
+func (s *Service) storeL1(h [64]byte, bundle *domain.Bundle, configETag string) {
+	s.publishL1(h, s.newEntry(bundle, configETag))
+}
+
+// @scenario "a burst of budget debits does not stop the cache from filling"
+func TestInvalidation_BudgetDebitBurstStillPublishes(t *testing.T) {
+	svc, _ := newService(t, Options{Resolver: &fakeResolver{}, ConfigFetcher: &fakeResolver{}, LRUSize: 16})
+	since := svc.fetchGeneration()
+	for i := range 5000 {
+		svc.applyChange("org_1", CacheChange{Kind: ChangeKindBudgetUpdated, ProjectID: fmt.Sprintf("proj_%d", i)})
+	}
+	svc.applyChange("org_1", CacheChange{Kind: ChangeKindBudgetUpdated})
+
+	h := hashKey(domain.PresentedKey{Token: "vk-lw-burst"})
+	require.True(t, svc.publishFetched(h, svc.newEntry(orgBundle("vk_burst", time.Now().Add(10*time.Minute)), ""), since),
+		"budget debits only mark a publish behind, however many land")
+	e, _ := svc.l1.Peek(h)
+	assert.Equal(t, uint64(1), e.budgetChangeCount(), "the publish that raced the debits is marked behind")
+
+	h2 := hashKey(domain.PresentedKey{Token: "vk-lw-after"})
+	require.True(t, svc.publishFetched(h2, svc.newEntry(orgBundle("vk_after", time.Now().Add(10*time.Minute)), ""), svc.fetchGeneration()))
+	e2, _ := svc.l1.Peek(h2)
+	assert.Zero(t, e2.budgetChangeCount(), "a fetch that began after the burst publishes caught up")
+}
+
+// @scenario "a key change during a fetch blocks only that key's publish"
+func TestInvalidation_KeyChangeBlocksOnlyThatKey(t *testing.T) {
 	svc, _ := newService(t, Options{Resolver: &fakeResolver{}, ConfigFetcher: &fakeResolver{}})
 	since := svc.fetchGeneration()
-	for range invalidationLogSize + 1 {
-		svc.evictWhere(func(*domain.Bundle) bool { return false }, evictScope{reason: "test"})
+	svc.applyChange("org_1", CacheChange{Kind: ChangeKindVirtualKeyConfigUpdate, VirtualKeyID: "vk_a"})
+
+	ha, hb := hashKey(domain.PresentedKey{Token: "vk-lw-a"}), hashKey(domain.PresentedKey{Token: "vk-lw-b"})
+	assert.False(t, svc.publishFetched(ha, svc.newEntry(orgBundle("vk_a", time.Now().Add(10*time.Minute)), ""), since),
+		"the changed key's earlier answer is not cached")
+	assert.True(t, svc.publishFetched(hb, svc.newEntry(orgBundle("vk_b", time.Now().Add(10*time.Minute)), ""), since),
+		"another key fetched over the same window is cached")
+}
+
+func TestInvalidation_EvictAllAndOverflowBumpTheEpoch(t *testing.T) {
+	svc, _ := newService(t, Options{Resolver: &fakeResolver{}, ConfigFetcher: &fakeResolver{}, LRUSize: 2})
+	bundle := func() *entry { return svc.newEntry(orgBundle("vk_x", time.Now().Add(10*time.Minute)), "") }
+	h := hashKey(domain.PresentedKey{Token: "vk-lw-x"})
+
+	since := svc.fetchGeneration()
+	svc.evictWhere(func(*domain.Bundle) bool { return true }, evictScope{reason: "test"})
+	assert.False(t, svc.publishFetched(h, bundle(), since), "an evict-all event reaches every fetch in flight")
+
+	since = svc.fetchGeneration()
+	for _, id := range []string{"vk_1", "vk_2", "vk_3"} {
+		svc.applyChange("org_1", CacheChange{Kind: ChangeKindVirtualKeyConfigUpdate, VirtualKeyID: id})
 	}
-	h := hashKey(domain.PresentedKey{Token: "vk-lw-old"})
-
-	published := svc.publishFetched(h, svc.newEntry(orgBundle("vk_old", time.Now().Add(10*time.Minute)), ""), since)
-
-	assert.False(t, published, "a fetch older than every kept event cannot be checked, so it is not cached")
+	assert.False(t, svc.publishFetched(h, bundle(), since), "an identity pushed out of the guard counts as reaching every bundle")
+	assert.True(t, svc.publishFetched(h, bundle(), svc.fetchGeneration()), "a fetch after the overflow publishes")
 }

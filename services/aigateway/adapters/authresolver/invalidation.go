@@ -3,32 +3,74 @@ package authresolver
 import (
 	"sync"
 
+	lru "github.com/hashicorp/golang-lru/v2"
 	"go.uber.org/zap"
 
 	"github.com/langwatch/langwatch/services/aigateway/domain"
 )
 
-// invalidationLogSize bounds the change events kept for in-flight fetches to
-// check against. A fetch that began before the oldest kept event is refused
-// its publish, since the events it may have missed are gone.
-const invalidationLogSize = 1024
-
-// invalidationLog numbers every change-feed eviction and budget change, so a
-// fetch that started before one cannot publish the result it read earlier.
-// Evictions and guarded publishes share mu: an eviction either removes the
-// published entry or is seen by the publish check, never neither.
-type invalidationLog struct {
-	mu     sync.Mutex
-	gen    uint64
-	events []invalidation
+// invalidationGuard stops a fetch that began before a change event from
+// publishing the answer it read earlier. Each event stamps the identities it
+// targets (key, project, organization, provider credential) with a new
+// generation, and a publish compares its own bundle's identities with the
+// generation captured before its fetch. Events and publishes share mu.
+type invalidationGuard struct {
+	mu      sync.Mutex
+	gen     uint64
+	evicted *stampSet
+	budget  *stampSet
 }
 
-// invalidation is one change event: the bundles it reached and whether it
-// evicts them or only marks their budget behind.
+// stampSet holds the last generation per identity, bounded like L1. Its epoch
+// is the generation of the last event that reached every bundle: an evict-all
+// event, or an identity pushed out of the LRU.
+type stampSet struct {
+	stamps *lru.Cache[string, uint64]
+	epoch  uint64
+}
+
+func newStampSet(size int) (*stampSet, error) {
+	t := &stampSet{}
+	stamps, err := lru.NewWithEvict(size, func(_ string, gen uint64) { t.epoch = max(t.epoch, gen) })
+	if err != nil {
+		return nil, err
+	}
+	t.stamps = stamps
+	return t, nil
+}
+
+func newInvalidationGuard(size int) (*invalidationGuard, error) {
+	evicted, err := newStampSet(size)
+	if err != nil {
+		return nil, err
+	}
+	budget, err := newStampSet(size)
+	if err != nil {
+		return nil, err
+	}
+	return &invalidationGuard{evicted: evicted, budget: budget}, nil
+}
+
+// invalidation is one change event: the identities it reached (none means
+// every bundle) and whether it evicts them or only marks their budget behind.
 type invalidation struct {
-	gen        uint64
-	match      func(*domain.Bundle) bool
+	keys       []string
 	budgetOnly bool
+}
+
+func keyScope(id string) string        { return "vk:" + id }
+func projectScope(id string) string    { return "project:" + id }
+func orgScope(id string) string        { return "org:" + id }
+func credentialScope(id string) string { return "credential:" + id }
+
+// guardKeys lists the identities a bundle can be reached by.
+func guardKeys(b *domain.Bundle) []string {
+	keys := make([]string, 0, 3+len(b.Config.Credentials))
+	keys = append(keys, keyScope(b.VirtualKeyID), projectScope(b.ProjectID), orgScope(b.OrganizationID))
+	for _, c := range b.Config.Credentials {
+		keys = append(keys, credentialScope(c.ID))
+	}
+	return keys
 }
 
 // fetchGeneration is the generation a fetch records before it calls the
@@ -39,42 +81,54 @@ func (s *Service) fetchGeneration() uint64 {
 	return s.invalidations.gen
 }
 
-// recordInvalidation numbers a change and runs apply (the L1 walk) under the
-// same lock the guarded publish takes. Caller does not hold mu.
+// recordInvalidation stamps a change on its identities and runs apply (the L1
+// walk) under the lock the guarded publish takes. Caller does not hold mu.
 func (s *Service) recordInvalidation(ev invalidation, apply func()) {
-	log := &s.invalidations
-	log.mu.Lock()
-	defer log.mu.Unlock()
-	log.gen++
-	ev.gen = log.gen
-	log.events = append(log.events, ev)
-	if over := len(log.events) - invalidationLogSize; over > 0 {
-		log.events = append(log.events[:0:0], log.events[over:]...)
+	g := s.invalidations
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	g.gen++
+	set := g.evicted
+	if ev.budgetOnly {
+		set = g.budget
+	}
+	if len(ev.keys) == 0 {
+		set.epoch = g.gen
+	}
+	for _, k := range ev.keys {
+		set.stamps.Add(k, g.gen)
 	}
 	apply()
 }
 
+// reachedSince reports whether an event after since reached any of keys.
+func (t *stampSet) reachedSince(keys []string, since uint64) bool {
+	if t.epoch > since {
+		return true
+	}
+	for _, k := range keys {
+		if gen, ok := t.stamps.Peek(k); ok && gen > since {
+			return true
+		}
+	}
+	return false
+}
+
 // publishFetched publishes an entry built from a fetch that started at
-// generation since, unless a change event after since reached its bundle. A
-// budget-only change publishes the entry marked behind instead. Reports
-// whether it published.
+// generation since, unless an eviction after since reached its bundle. A
+// budget change only marks the published entry behind. Reports whether it
+// published.
 func (s *Service) publishFetched(h [64]byte, stored *entry, since uint64) bool {
-	log := &s.invalidations
-	log.mu.Lock()
-	defer log.mu.Unlock()
-	if since < log.gen && (len(log.events) == 0 || log.events[0].gen > since+1) {
-		s.logger.Debug("auth_cache_publish_dropped_unknown_changes")
+	g := s.invalidations
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	keys := guardKeys(stored.bundle)
+	if g.evicted.reachedSince(keys, since) {
+		s.logger.Debug("auth_cache_publish_dropped_stale",
+			zap.String("vk_id", stored.bundle.VirtualKeyID))
 		return false
 	}
-	for _, ev := range log.events {
-		if ev.gen <= since || !ev.match(stored.bundle) {
-			continue
-		}
-		if !ev.budgetOnly {
-			s.logger.Debug("auth_cache_publish_dropped_stale",
-				zap.String("vk_id", stored.bundle.VirtualKeyID))
-			return false
-		}
+	if g.budget.reachedSince(keys, since) {
 		stored.budgetChanges = 1
 	}
 	s.publishL1(h, stored)

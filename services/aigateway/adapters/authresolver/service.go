@@ -150,11 +150,11 @@ type Service struct {
 	configTTL        time.Duration
 
 	// Active orgs whose bundles are currently in L1. Populated on every
-	// storeL1, never cleared explicitly — entries that drop out of L1 via
+	// publishL1, never cleared explicitly — entries that drop out of L1 via
 	// LRU pressure are still safe to poll for; the next request for that
 	// org refreshes via the normal resolve path. Used by the change-feed
 	// loop to know which org cursors to advance. sync.Map (not a regular
-	// map + RWMutex) because polling reads + storeL1 writes interleave.
+	// map + RWMutex) because polling reads + publishL1 writes interleave.
 	activeOrgs sync.Map // key: orgID string, value: *orgCursor
 
 	// denied is the revocation list, kept apart from L1 so no stale-serve
@@ -163,9 +163,9 @@ type Service struct {
 	deniedKeys      *lru.Cache[[64]byte, string]
 	failClosedAfter time.Duration
 	rechecks        denialRechecks
-	// invalidations numbers change events so a fetch in flight across one
-	// cannot publish what it read before it (invalidation.go).
-	invalidations invalidationLog
+	// invalidations stamps change events per identity so a fetch in flight
+	// across one cannot publish what it read before it (invalidation.go).
+	invalidations *invalidationGuard
 
 	stopCh chan struct{}
 }
@@ -215,7 +215,7 @@ type entry struct {
 	// conditional revalidation still holding the dead period's spend.
 	//
 	// Only a config the gateway actually received clears a roll, and that
-	// arrives as a new entry through storeL1 rather than a mutation here — so
+	// arrives as a new entry through publishL1 rather than a mutation here — so
 	// there is no ack on the refresh path at all. A 304 must not clear one: it
 	// carries no spend, and a 304 taken while the period was still running
 	// would ack a boundary the entry has not reached yet and suppress the roll
@@ -636,6 +636,10 @@ func New(opts Options) (*Service, error) {
 	if err != nil {
 		return nil, err
 	}
+	invalidations, err := newInvalidationGuard(opts.LRUSize)
+	if err != nil {
+		return nil, err
+	}
 
 	logger := opts.Logger
 	if logger == nil {
@@ -650,6 +654,7 @@ func New(opts Options) (*Service, error) {
 		deniedKeys:        deniedKeys,
 		failClosedAfter:   opts.FailClosedAfter,
 		rechecks:          denialRechecks{interval: opts.DenialRecheckInterval, state: recheckStates},
+		invalidations:     invalidations,
 		lastKnown:         lastKnown,
 		lastKnownMaxAge:   DefaultLastKnownConfigMaxAge,
 
@@ -1152,14 +1157,6 @@ func (s *Service) Stop() {
 
 // --- Internal ---
 
-// storeL1 caches a bundle whose config was just fetched under configETag, and
-// records its org for the change feed. An empty configETag is the honest state
-// after a response that carried none: the next staleness refresh asks for the
-// config outright rather than revalidating against a token we do not have.
-func (s *Service) storeL1(h [64]byte, bundle *domain.Bundle, configETag string) {
-	s.publishL1(h, s.newEntry(bundle, configETag))
-}
-
 // carryBudgetChanges marks an unpublished replacement behind when budget
 // changes reached the entry it replaces after its refresh had started, since
 // the figures that refresh read may predate them. It runs before publishL1:
@@ -1365,16 +1362,16 @@ func (s *Service) applyChange(organizationID string, ch CacheChange) {
 				}
 			}
 			return false
-		}, evictScope{reason: evictReason(ch.Kind), target: ch.ModelProviderID, keepLastKnown: keepLastKnown})
+		}, evictScope{reason: evictReason(ch.Kind), target: ch.ModelProviderID, keepLastKnown: keepLastKnown, guard: providerGuard(organizationID, ch.ModelProviderID)})
 	case ChangeKindBudgetUpdated:
 		// Every debit emits this, so evicting would put a control-plane round
 		// trip in front of the project's next request. The cached bundle keeps
 		// serving and the next request refreshes it in the background.
 		match, target := budgetChangeMatch(organizationID, ch)
-		s.markBudgetChangedWhere(match, evictReason(ch.Kind), target)
+		s.markBudgetChangedWhere(match, evictScope{reason: evictReason(ch.Kind), target: target, guard: []string{budgetGuard(organizationID, ch)}})
 	case ChangeKindBudgetCreated, ChangeKindBudgetDeleted:
 		match, target := budgetChangeMatch(organizationID, ch)
-		s.evictWhere(match, evictScope{reason: evictReason(ch.Kind), target: target, keepLastKnown: keepLastKnown})
+		s.evictWhere(match, evictScope{reason: evictReason(ch.Kind), target: target, keepLastKnown: keepLastKnown, guard: []string{budgetGuard(organizationID, ch)}})
 	case ChangeKindVirtualKeyConfigUpdate, ChangeKindVirtualKeyRotated, ChangeKindVirtualKeyRevoked,
 		ChangeKindVirtualKeyDisabled, ChangeKindVirtualKeyEnabled:
 		if ch.VirtualKeyID == "" {
@@ -1382,7 +1379,7 @@ func (s *Service) applyChange(organizationID string, ch CacheChange) {
 		}
 		s.evictWhere(func(b *domain.Bundle) bool {
 			return b.VirtualKeyID == ch.VirtualKeyID
-		}, evictScope{reason: evictReason(ch.Kind), target: ch.VirtualKeyID, keepLastKnown: keepLastKnown})
+		}, evictScope{reason: evictReason(ch.Kind), target: ch.VirtualKeyID, keepLastKnown: keepLastKnown, guard: []string{keyScope(ch.VirtualKeyID)}})
 	case ChangeKindRoutingPolicyUpdated, ChangeKindRoutingPolicyDeleted:
 		// A bundle carries the resolved routing mode and chain, not the id
 		// of the policy they came from, so there is nothing finer than the
@@ -1390,13 +1387,13 @@ func (s *Service) applyChange(organizationID string, ch CacheChange) {
 		// project.
 		s.evictWhere(func(b *domain.Bundle) bool {
 			return b.OrganizationID == organizationID
-		}, evictScope{reason: evictReason(ch.Kind), target: organizationID, keepLastKnown: keepLastKnown})
+		}, evictScope{reason: evictReason(ch.Kind), target: organizationID, keepLastKnown: keepLastKnown, guard: []string{orgScope(organizationID)}})
 	case ChangeKindCacheRuleCreated, ChangeKindCacheRuleUpdated, ChangeKindCacheRuleDeleted:
 		// Cache rules are org-scoped and baked into every bundle as a
 		// pre-sorted array, with no rule id left on the bundle to join on.
 		s.evictWhere(func(b *domain.Bundle) bool {
 			return b.OrganizationID == organizationID
-		}, evictScope{reason: evictReason(ch.Kind), target: organizationID, keepLastKnown: keepLastKnown})
+		}, evictScope{reason: evictReason(ch.Kind), target: organizationID, keepLastKnown: keepLastKnown, guard: []string{orgScope(organizationID)}})
 	case ChangeKindVirtualKeyCreated:
 		// Nothing to evict: a key nobody has resolved yet is in no cache, on
 		// this node or any other. Named rather than left to the default so a
@@ -1428,10 +1425,27 @@ func budgetChangeMatch(organizationID string, ch CacheChange) (func(*domain.Bund
 	return func(b *domain.Bundle) bool { return b.OrganizationID == organizationID }, organizationID
 }
 
+// budgetGuard is the identity a budget change reaches, matching budgetChangeMatch.
+func budgetGuard(organizationID string, ch CacheChange) string {
+	if ch.ProjectID != "" {
+		return projectScope(ch.ProjectID)
+	}
+	return orgScope(organizationID)
+}
+
+// providerGuard is the identities a provider change reaches: the credential
+// and, when known, every bundle of the polled organization.
+func providerGuard(organizationID, providerID string) []string {
+	if organizationID == "" {
+		return []string{credentialScope(providerID)}
+	}
+	return []string{credentialScope(providerID), orgScope(organizationID)}
+}
+
 // markBudgetChangedWhere marks every L1 entry whose bundle matches as behind
 // on spend, without removing any. Peek for the same reason as evictWhere.
-func (s *Service) markBudgetChangedWhere(match func(*domain.Bundle) bool, reason, target string) {
-	s.recordInvalidation(invalidation{match: match, budgetOnly: true}, func() { s.markMatching(match, reason, target) })
+func (s *Service) markBudgetChangedWhere(match func(*domain.Bundle) bool, scope evictScope) {
+	s.recordInvalidation(invalidation{keys: scope.guard, budgetOnly: true}, func() { s.markMatching(match, scope.reason, scope.target) })
 }
 
 // markMatching is the L1 walk of markBudgetChangedWhere, run under the
@@ -1497,7 +1511,7 @@ func evictReason(kind string) string {
 // keepLastKnown sets the evicted entries aside as the outage fallback; a key
 // the change made unusable passes false, which also drops any fallback held.
 func (s *Service) evictWhere(match func(*domain.Bundle) bool, scope evictScope) {
-	s.recordInvalidation(invalidation{match: match}, func() { s.evictMatching(match, scope) })
+	s.recordInvalidation(invalidation{keys: scope.guard}, func() { s.evictMatching(match, scope) })
 }
 
 // evictMatching is the L1 walk of evictWhere, run under the invalidation lock.
@@ -1535,6 +1549,8 @@ type evictScope struct {
 	reason        string
 	target        string
 	keepLastKnown bool
+	// guard names the identities the event reaches; none means every bundle.
+	guard []string
 }
 
 // dropLastKnownWhere discards every outage fallback whose bundle matches.
@@ -1681,7 +1697,7 @@ func (s *Service) refreshConfigBackground(h [64]byte, e *entry) {
 	fresh := *stale
 	fresh.Config = res.Config
 	fresh.Credentials = res.Config.Credentials
-	// The key's own end date moves in both directions here, and storeL1 rebuilds
+	// The key's own end date moves in both directions here, and publishL1 rebuilds
 	// both deadlines from it. A response that says nothing about expiry comes
 	// from a control plane older than the field, so the copied date stands: an
 	// absent field read as "no date" would lift the cap off a key whose token

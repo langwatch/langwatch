@@ -426,6 +426,12 @@ Feature: Gateway auth cache — hot path is zero RTT after first hit
       Then the denial is lifted and the key serves
       And a later outage does not answer the key with virtual_key_disabled
 
+    @unit @regression
+    Scenario: a denial that lands during a recheck is kept
+      Given the change feed disabled a cached key and the recheck interval has passed
+      When the change feed disables the key again while the recheck waits on the control plane
+      Then the denial survives the recheck and the key stays refused
+
     @unit
     Scenario: a normal key keeps serving from cache within the grace window
       Given a cached key nobody revoked, past its JWT expiry
@@ -892,7 +898,9 @@ Feature: Gateway auth cache — hot path is zero RTT after first hit
     The change feed only evicts entries already in the cache. A fetch that began
     before a key, config or budget change answers after it with what the control
     plane said before the change. That answer serves the request that made it,
-    and is not cached.
+    and is not cached. Each event stamps the key, project, organization or
+    provider it reaches, so only fetches of those bundles are affected; a
+    budget debit only marks the answer behind.
 
     @unit @regression
     Scenario: a revocation during a cold fetch keeps the key out of the cache
@@ -919,3 +927,17 @@ Feature: Gateway auth cache — hot path is zero RTT after first hit
       Given a request for a key asks the control plane
       When the change feed reports a budget update for its organization before the answer arrives
       Then the answer is cached and marked behind the update
+
+    @unit @regression
+    Scenario: a burst of budget debits does not stop the cache from filling
+      Given a request for a key asks the control plane
+      When the change feed reports 5000 budget updates before the answer arrives
+      Then the answer is cached and marked behind the updates
+      And a request that starts after the burst caches its answer caught up
+
+    @unit
+    Scenario: a key change during a fetch blocks only that key's publish
+      Given requests for two keys ask the control plane at the same time
+      When the change feed reports a config change for the first key before the answers arrive
+      Then the first key's answer is not cached
+      And the second key's answer is cached

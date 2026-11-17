@@ -133,6 +133,36 @@ func TestRevocation_RecheckClearsDenialAfterInterval(t *testing.T) {
 	}
 }
 
+// @scenario "a denial that lands during a recheck is kept"
+func TestRevocation_RecheckKeepsDenialThatLandsInFlight(t *testing.T) {
+	const interval = 50 * time.Millisecond
+	res := &hookResolver{bundle: orgBundle("vk_again", time.Now().Add(time.Hour))}
+	svc, _ := newService(t, Options{Resolver: res, ConfigFetcher: res, DenialRecheckInterval: interval})
+	key := domain.PresentedKey{Token: "vk-lw-again"}
+	h := hashKey(key)
+	svc.storeL1(h, orgBundle("vk_again", time.Now().Add(time.Hour)), "")
+	svc.applyChange("org_1", CacheChange{Kind: ChangeKindVirtualKeyDisabled, VirtualKeyID: "vk_again"})
+	time.Sleep(interval + 10*time.Millisecond)
+	res.during = func() {
+		time.Sleep(time.Millisecond)
+		svc.applyChange("org_1", CacheChange{Kind: ChangeKindVirtualKeyDisabled, VirtualKeyID: "vk_again"})
+	}
+
+	if _, err := svc.Resolve(context.Background(), key); !errors.Is(err, domain.ErrKeyDisabled) {
+		t.Fatalf("the request that starts the recheck is refused locally: %v", err)
+	}
+	waitForRecheck(t, svc, h)
+	if res.calls != 1 {
+		t.Fatalf("want one recheck call, got %d", res.calls)
+	}
+	if _, ok := svc.denied.Peek("vk_again"); !ok {
+		t.Fatal("a denial newer than the recheck's confirmation must survive it")
+	}
+	if _, err := svc.Resolve(context.Background(), key); !errors.Is(err, domain.ErrKeyDisabled) {
+		t.Fatalf("the key stays refused after the recheck: %v", err)
+	}
+}
+
 // @scenario "a re-enable on the change feed lifts the denial at once"
 func TestRevocation_ReEnableClearsDenialAtOnce(t *testing.T) {
 	res := &hookResolver{bundle: orgBundle("vk_flip", time.Now().Add(time.Hour))}
