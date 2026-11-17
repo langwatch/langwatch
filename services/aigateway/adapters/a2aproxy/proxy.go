@@ -26,8 +26,8 @@ import (
 const PathPrefix = "/a2a/"
 
 const (
-	maxBodyBytes  = 16 << 20
-	maxEventBytes = 4 << 20
+	maxBodyBytes  = 1 << 20
+	maxEventBytes = 1 << 20
 	cardPath      = "/.well-known/agent-card.json"
 )
 
@@ -84,7 +84,8 @@ type Config struct {
 
 // Handler serves /a2a/{target}/...
 type Handler struct {
-	cfg Config
+	cfg      Config
+	inflight inflight
 }
 
 // New builds the proxy handler.
@@ -121,6 +122,14 @@ type call struct {
 }
 
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if b := h.cfg.Bundle(r.Context()); b != nil {
+		if !h.inflight.acquire(b.VirtualKeyID) {
+			busy := &call{w: w, binding: bindingHTTPJSON, span: trace.SpanFromContext(r.Context())}
+			busy.refuse(refuseBusy)
+			return
+		}
+		defer h.inflight.release(b.VirtualKeyID)
+	}
 	c, bad := parseCall(w, r)
 	c.bundle = h.cfg.Bundle(c.ctx)
 	if c.bundle == nil {
@@ -264,7 +273,7 @@ func (h *Handler) admit(c *call) (domain.A2ATarget, bool) {
 
 func (h *Handler) forward(c *call, target domain.A2ATarget) {
 	setMessageAttrs(c.span, c.body)
-	if !h.scan(c, DirectionRequest, collectTexts(c.body)) {
+	if !h.scan(c, DirectionRequest, c.body) {
 		return
 	}
 	req, err := newUpstreamRequest(c, target)
@@ -293,7 +302,7 @@ func (h *Handler) forward(c *call, target domain.A2ATarget) {
 		return
 	}
 	setResultAttrs(c.span, respBody)
-	if !h.scan(c, DirectionResponse, collectTexts(respBody)) {
+	if !h.scan(c, DirectionResponse, respBody) {
 		return
 	}
 	copyHeader(c.w.Header(), resp.Header)
@@ -334,14 +343,14 @@ func newUpstreamRequest(c *call, target domain.A2ATarget) (*http.Request, error)
 	return req, nil
 }
 
-// check returns the refusal the payload calls for. When the key scans this
-// direction, a payload that is not JSON is refused (fail closed): text the
-// scanner cannot read is text it did not check. A scan error follows the
-// key's fail-open setting; a deny verdict refuses.
-func (h *Handler) check(c *call, dir Direction, p payload) *refusal {
+// check returns the refusal the body calls for. It reads the body only when
+// the key scans this direction; then a body that is not JSON is refused (fail
+// closed). A scan error follows the key's fail-open setting.
+func (h *Handler) check(c *call, dir Direction, body []byte) *refusal {
 	if !h.cfg.Scanner.Applies(c.bundle, dir) {
 		return nil
 	}
+	p := collectTexts(body)
 	if !p.parsed {
 		if dir == DirectionResponse {
 			return &refuseReplyUnscannable
@@ -379,8 +388,8 @@ func (h *Handler) scanFailed(c *call, dir Direction) *refusal {
 }
 
 // scan refuses the call when check says so and reports whether it may go on.
-func (h *Handler) scan(c *call, dir Direction, p payload) bool {
-	if r := h.check(c, dir, p); r != nil {
+func (h *Handler) scan(c *call, dir Direction, body []byte) bool {
+	if r := h.check(c, dir, body); r != nil {
 		c.refuse(*r)
 		return false
 	}

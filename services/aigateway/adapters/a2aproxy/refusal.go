@@ -31,6 +31,7 @@ var (
 	refuseRegistry        = refusal{-32017, "a2a_registry_unavailable", "the A2A registry is unavailable", http.StatusServiceUnavailable}
 	refuseUnscannable     = refusal{-32018, "a2a_content_unscannable", "the content is not JSON the guardrail scan can read", http.StatusUnprocessableEntity}
 	refuseTooLarge        = refusal{-32019, "a2a_payload_too_large", "the request body is over the size limit", http.StatusRequestEntityTooLarge}
+	refuseBusy            = refusal{-32020, "a2a_too_many_requests", "this virtual key has too many A2A calls in flight", http.StatusTooManyRequests}
 	refuseUnsupported     = refusal{-32601, "a2a_operation_not_supported", "this method and path is not an A2A operation", http.StatusNotFound}
 )
 
