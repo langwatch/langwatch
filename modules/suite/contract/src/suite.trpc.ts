@@ -9,11 +9,6 @@ import { SIMULATION_RUN_EVENT_TYPES, scenarioTestSuiteSchema } from "@langwatch/
 import { z } from "zod";
 
 import {
-  applySuiteTemplateTrpcInputSchema,
-  appliedSuiteTemplateSchema,
-  suiteTemplateSchema,
-} from "./suite-template.ts";
-import {
   createSuiteTrpcInputSchema,
   createTestSuiteTrpcInputSchema,
   listSuitesTrpcInputSchema,
@@ -35,7 +30,12 @@ import {
   updateSuiteTrpcInputSchema,
   updateTestSuiteTrpcInputSchema,
 } from "./suite-trpc.schemas.ts";
-import { suiteSchema } from "./suite.ts";
+import {
+  appliedSuiteTemplateSchema,
+  applySuiteTemplateTrpcInputSchema,
+  suiteSchema,
+  suiteTemplateSchema,
+} from "./suite.ts";
 
 export const suiteTrpc = defineTrpcContract("suites")
   .mutation("create")

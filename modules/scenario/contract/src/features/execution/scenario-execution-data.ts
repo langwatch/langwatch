@@ -2,9 +2,9 @@ import { agentHooksSchema } from "@langwatch/agent-contract";
 import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
-import { redTeamConfigSchema, redTeamRunReportSchema, scenarioKindSchema } from "../../red-team.ts";
 import { FieldMappingSchema } from "../../resolve-field-mappings.ts";
 import { runParameterValuesSchema } from "../../scenario.parameters.ts";
+import { redTeamConfigSchema, redTeamRunReportSchema, scenarioKindSchema } from "../../scenario.ts";
 import { callerVoiceConfigSchema } from "../../voice/caller-voice.config.ts";
 import { scenarioRunHooksSchema } from "./scenario-hooks.ts";
 

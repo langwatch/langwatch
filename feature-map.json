@@ -449,7 +449,9 @@
                 "test-suite update",
                 "test-suite rename",
                 "test-suite archive",
-                "test-suite run"
+                "test-suite run",
+                "test-suite templates",
+                "test-suite apply-template"
               ],
               "hints": {
                 "test-suite list": "langwatch test-suite list -o json",

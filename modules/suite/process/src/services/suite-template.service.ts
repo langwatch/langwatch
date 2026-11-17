@@ -1,4 +1,8 @@
-import type { ScenarioApi, ScenarioCaller } from "@langwatch/scenario-contract";
+import {
+  redTeamConfigSchema,
+  type ScenarioApi,
+  type ScenarioCaller,
+} from "@langwatch/scenario-contract";
 import {
   applySuiteTemplateTrpcInputSchema,
   SuiteTemplateNotFoundError,
@@ -46,9 +50,11 @@ export class SuiteTemplateService {
     const template = this.templates.find((candidate) => candidate.id === parsed.templateId);
     if (!template) throw new SuiteTemplateNotFoundError(parsed.templateId);
 
-    const filled = template.scenarios.map((scenario) =>
-      fillTemplateScenario({ template, scenario, fit: parsed.fit }),
-    );
+    const filled = template.scenarios.map((scenario) => {
+      const result = fillTemplateScenario({ template, scenario, fit: parsed.fit });
+      if (result.redTeam) redTeamConfigSchema.parse(result.redTeam);
+      return result;
+    });
     const suite = await this.options.scenarios.createTestSuite({
       projectId: parsed.projectId,
       name: parsed.name ?? template.title,

@@ -1,8 +1,8 @@
 import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
-import { redTeamRunReportSchema } from "../../red-team.ts";
 import { scenarioCriterionResultSchema } from "../../scenario-criterion-result.ts";
+import { redTeamRunReportSchema } from "../../scenario.ts";
 import { scenarioEvaluationResultSchema } from "../../schemas/event-schemas.ts";
 import { scenarioRunHooksSchema } from "../execution/scenario-hooks.ts";
 import { runEvaluatorsSchema } from "../run/scenario-run-evaluators.ts";

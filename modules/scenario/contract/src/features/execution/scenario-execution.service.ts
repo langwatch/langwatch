@@ -1,5 +1,5 @@
-import type { RedTeamRunReport } from "../../red-team.ts";
 import type { RunParameterValues } from "../../scenario.parameters.ts";
+import type { RedTeamRunReport } from "../../scenario.ts";
 import type { ResolvedRunModels } from "../run/run-models.ts";
 import type { RunSecretCiphertext } from "../run/run-parameters.ts";
 import type {

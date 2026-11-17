@@ -165,7 +165,9 @@ describe("SuiteTemplateService", () => {
           },
           by,
         ),
-      ).rejects.toThrow(/agentName|too_small|at least/i);
+      ).rejects.toMatchObject({
+        issues: [expect.objectContaining({ code: "too_small", path: ["fit", "agentName"] })],
+      });
       expect(createTestSuite).not.toHaveBeenCalled();
     });
   });

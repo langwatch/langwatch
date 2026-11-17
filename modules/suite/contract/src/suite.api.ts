@@ -30,11 +30,7 @@ import type {
   SuiteRunPlanResult,
   UpdateSuiteCommand,
 } from "./index.ts";
-import type {
-  AppliedSuiteTemplate,
-  ApplySuiteTemplateTrpcInput,
-  SuiteTemplate,
-} from "./suite-template.ts";
+import type { AppliedSuiteTemplate, ApplySuiteTemplateTrpcInput, SuiteTemplate } from "./suite.ts";
 
 /** Callable capability exposed by the composed Suite application. */
 export interface SuiteApi {
