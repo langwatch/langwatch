@@ -23,7 +23,7 @@ type PlanSyncDependencies = Readonly<{
   /** The admin who carries the company call, from nurturing's own copy. */
   admins: Pick<NurturingMemberFactsService, "adminOf">;
   /** Nurturing's member copy, the one the usage sync reads: whose latest organization is whose. */
-  members: Pick<NurturingOrganizationMemberRepository, "findMembershipsOfMembers">;
+  members: Pick<NurturingOrganizationMemberRepository, "findMembershipsOfUsers">;
 }>;
 
 type SubscriptionChanged = NurturingSignalOf<"subscription_changed">;
@@ -58,10 +58,11 @@ export class NurturingPlanSyncService {
 
   private async requestsOf(signal: SubscriptionChanged): Promise<CioBatchCall[][]> {
     if (signal.memberUserIds.length === 0) return [];
-    const { organizationId } = signal;
+    const { organizationId, memberUserIds } = signal;
+    // Read by person: a member with no row here may still be current in another organization.
     const [adminUserId, memberships] = await Promise.all([
       this.dependencies.admins.adminOf({ organizationId }),
-      this.dependencies.members.findMembershipsOfMembers({ organizationId }),
+      this.dependencies.members.findMembershipsOfUsers({ userIds: memberUserIds }),
     ]);
     const elsewhereMemberUserIds = membersWhoseLatestOrganizationIsElsewhere({
       memberships,

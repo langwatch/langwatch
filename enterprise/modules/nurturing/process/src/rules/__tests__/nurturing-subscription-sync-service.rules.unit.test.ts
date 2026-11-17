@@ -3,6 +3,7 @@
  * What a subscription change tells Customer.io, and a started one tells PostHog.
  * @see specs/features/customer-io-nurturing-integration.feature
  * @see specs/analytics/posthog-campaign-conversion.feature
+ * @see enterprise/modules/nurturing/specs/customer-io-plan-traits.feature
  */
 import { describe, expect, it } from "vitest";
 
@@ -47,7 +48,8 @@ describe("fireSubscriptionSync", () => {
     });
   });
 
-  describe("when a member's latest organization is another one", () => {
+  describe("when a member is current in another organization", () => {
+    /** @scenario "A member current in another organization is not told this plan" */
     it("does not identify that member, and still groups the admin", () => {
       const requests = fireSubscriptionSync({
         ...change,

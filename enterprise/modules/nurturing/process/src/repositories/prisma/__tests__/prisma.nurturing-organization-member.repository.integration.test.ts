@@ -78,6 +78,28 @@ describe.skipIf(!databaseUrl)("given nurturing's member and organization creatio
     ]);
   });
 
+  it("reads every membership of the named users, including one with no row in this organization", async () => {
+    const elsewhere = `${namespace}-elsewhere`;
+    await members.recordMembershipChange({
+      organizationId: otherOrganizationId,
+      userId: elsewhere,
+      change: "joined",
+      at: 4_000,
+    });
+
+    const read = await members.findMembershipsOfUsers({ userIds: [elsewhere] });
+
+    expect(read).toEqual([
+      {
+        organizationId: otherOrganizationId,
+        userId: elsewhere,
+        joinedAt: 4_000,
+        leftAt: null,
+        returnedAt: null,
+      },
+    ]);
+  });
+
   /** @scenario "The trace traits are removed once when an organization's window ends" */
   it("answers the organizations created in the sweep's span", async () => {
     const at = Date.UTC(2001, 0, 1);

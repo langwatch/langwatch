@@ -156,8 +156,8 @@ describe("NurturingDeliveryService, delivering billing's subscription_changed fa
     });
   });
 
-  describe("when a member's latest organization is another one", () => {
-    /** @scenario "A member whose latest organization is another is not told this plan" */
+  describe("when a member is current in another organization", () => {
+    /** @scenario "A member current in another organization is not told this plan" */
     it("groups the admin and does not identify that member", async () => {
       const members = await fixtureMemberCopy();
       await members.recordMembershipChange({
@@ -173,6 +173,25 @@ describe("NurturingDeliveryService, delivering billing's subscription_changed fa
       expect(sent).toEqual([
         [{ type: "group", userId: "admin-1", groupId: "org-1", traits: { plan: "launch" } }],
         [{ type: "identify", userId: "user-1", traits }],
+      ]);
+    });
+  });
+
+  describe("when a member's only row in the copy is a current one in another organization", () => {
+    it("does not identify that member, though the copy holds no row of theirs here", async () => {
+      const members = await memberCopyOf({ organizationId: "org-1", userIds: ["user-1"] });
+      await members.recordMembershipChange({
+        organizationId: "org-2",
+        userId: "user-2",
+        change: "joined",
+        at: 1,
+      });
+
+      const { sent } = await liveRequestsOf(subscriptionChangedFactFixture(), members);
+
+      expect(sent.flat().map(({ type, userId }) => [type, userId])).toEqual([
+        ["group", "admin-1"],
+        ["identify", "user-1"],
       ]);
     });
   });

@@ -92,7 +92,7 @@ export class NurturingDeliveryService {
       /** Who hears an organization's fact, and what a joining person is told of traces. */
       memberFacts: NurturingMemberFactsService;
       /** Nurturing's member copy: a person is told the plan of their latest organization only. */
-      members: Pick<NurturingOrganizationMemberRepository, "findMembershipsOfMembers">;
+      members: Pick<NurturingOrganizationMemberRepository, "findMembershipsOfUsers">;
     }>,
     private readonly parts: Readonly<{
       postHogDelivery: NurturingPostHogDeliveryService | undefined;

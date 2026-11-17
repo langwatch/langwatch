@@ -24,4 +24,8 @@ export interface NurturingOrganizationMemberRepository {
   findMembershipsOfMembers(
     input: Readonly<{ organizationId: string }>,
   ): Promise<NurturingMembership[]>;
+  /** Every membership, of any organization, of the named people, with a row here or not. */
+  findMembershipsOfUsers(
+    input: Readonly<{ userIds: readonly string[] }>,
+  ): Promise<NurturingMembership[]>;
 }

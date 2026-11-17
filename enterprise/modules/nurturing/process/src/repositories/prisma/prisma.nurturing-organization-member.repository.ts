@@ -87,4 +87,28 @@ export class PrismaNurturingOrganizationMemberRepository
       returnedAt: row.returnedAt?.getTime() ?? null,
     }));
   }
+
+  /** A read by the named users, which the tenancy guard admits for a non-empty list. */
+  async findMembershipsOfUsers({
+    userIds,
+  }: Readonly<{ userIds: readonly string[] }>): Promise<NurturingMembership[]> {
+    // Bounds each IN list, so a large organization never sends one huge query.
+    const usersPerRead = 1000;
+    const memberships: NurturingMembership[] = [];
+    for (let start = 0; start < userIds.length; start += usersPerRead) {
+      const rows = await this.#database.nurturingOrganizationMember.findMany({
+        where: { userId: { in: userIds.slice(start, start + usersPerRead) } },
+      });
+      memberships.push(
+        ...rows.map((row) => ({
+          organizationId: row.organizationId,
+          userId: row.userId,
+          joinedAt: row.joinedAt?.getTime() ?? null,
+          leftAt: row.leftAt?.getTime() ?? null,
+          returnedAt: row.returnedAt?.getTime() ?? null,
+        })),
+      );
+    }
+    return memberships;
+  }
 }

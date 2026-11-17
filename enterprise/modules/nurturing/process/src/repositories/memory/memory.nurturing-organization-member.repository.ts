@@ -55,4 +55,11 @@ export class MemoryNurturingOrganizationMemberRepository implements NurturingOrg
     );
     return all.filter(({ userId }) => members.has(userId));
   }
+
+  async findMembershipsOfUsers({
+    userIds,
+  }: Readonly<{ userIds: readonly string[] }>): Promise<NurturingMembership[]> {
+    const named = new Set(userIds);
+    return [...this.#memberships.values()].filter(({ userId }) => named.has(userId));
+  }
 }
