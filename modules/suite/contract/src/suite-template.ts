@@ -135,7 +135,14 @@ export const appliedSuiteTemplateSchema: AppliedSuiteTemplateSchema =
 export type AppliedSuiteTemplate = z.infer<typeof appliedSuiteTemplateSchema>;
 
 /** `POST /api/v1/test-suites/templates/{templateId}/apply` path params. */
-export const suiteTemplateIdParamsSchema = z.object({ templateId: suiteTemplateIdSchema }).strict();
+const suiteTemplateIdParamsSchemaDefinition = z
+  .object({ templateId: suiteTemplateIdSchema })
+  .strict();
+export interface SuiteTemplateIdParamsSchema extends Named<
+  typeof suiteTemplateIdParamsSchemaDefinition
+> {}
+export const suiteTemplateIdParamsSchema: SuiteTemplateIdParamsSchema =
+  suiteTemplateIdParamsSchemaDefinition;
 
 const applySuiteTemplateBodySchemaDefinition = applySuiteTemplateInputSchemaDefinition.omit({
   templateId: true,
