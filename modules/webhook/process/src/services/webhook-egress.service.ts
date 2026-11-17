@@ -27,10 +27,9 @@ import { judgeWebhookUrl, webhookUrlValidator } from "../rules/webhook-url-polic
 import type { WebhookDispatchCapService } from "./webhook-dispatch-cap.service.ts";
 
 /**
- * A failure the customer's own receiver caused: a non-2xx answer, or a failed connection
- * to its endpoint. Refusals before any connection, our SSRF fence included, are never one.
- * Its name stays `DispatchError`, which the outbox reads; callers tell it apart by
- * {@link WEBHOOK_RECEIVER_FAILURE} (`findWebhookReceiverFailure` in the contract).
+ * A failure the customer's own receiver caused: a non-2xx answer or a failed connection to
+ * it, never a refusal before any connection. Still named `DispatchError` for the outbox;
+ * callers read {@link WEBHOOK_RECEIVER_FAILURE} through `findWebhookReceiverFailure`.
  */
 export class WebhookReceiverError extends DispatchError {
   readonly [WEBHOOK_RECEIVER_FAILURE]: WebhookReceiverFailure;

@@ -161,10 +161,9 @@ export const webhookRequestFailureResponseSchema: WebhookRequestFailureResponseS
 export type WebhookRequestFailureResponse = z.infer<typeof webhookRequestFailureResponseSchema>;
 
 /**
- * The field a failed request carries when the customer's own receiver caused it: it
- * answered a non-2xx status or a connection to it failed. A refusal before any connection,
- * our SSRF fence included, never carries it. Read by field, not class, so a caller in
- * another package recognises it without importing the process that threw it.
+ * Carried when the customer's own receiver caused the failure: a non-2xx answer or a failed
+ * connection to it, never a refusal before any connection (our SSRF fence included). Read by
+ * field, not class, so a caller need not import the process that threw it.
  */
 export const WEBHOOK_RECEIVER_FAILURE = "webhookReceiverFailure";
 
