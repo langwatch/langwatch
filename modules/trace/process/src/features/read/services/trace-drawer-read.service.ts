@@ -59,8 +59,12 @@ type TraceDrawerReads = Pick<
   | "readSpans"
   | "enrichSpansFromCodingAgentLogs"
   | "readSpanResources"
+  | "readSpansWithResources"
   | "readTraceEvents"
 >;
+
+type StoredSpans = Awaited<ReturnType<TraceDrawerReads["readSpans"]>>;
+type StoredResources = Awaited<ReturnType<TraceDrawerReads["readSpanResources"]>>;
 
 type TraceDrawerReadDependencies = Readonly<{
   reads: TraceDrawerReads;
@@ -217,15 +221,29 @@ export class TraceDrawerReadService {
     input: TraceDrawerReadInput;
     joinsCodingAgentLogs: boolean;
   }): Promise<SpanDetail[]> {
-    const { reads, braids, mappers } = this.deps;
-    const { authorization, protections } = await this.#open(input);
-    const storedSpans = await reads.readSpans({
-      authorization,
+    const opened = await this.#open(input);
+    const storedSpans = await this.deps.reads.readSpans({
+      authorization: opened.authorization,
       traceId: input.traceId,
       occurredAtMs: input.occurredAtMs,
-      visibilityCutoffMs: protections.visibilityCutoffMs,
+      visibilityCutoffMs: opened.protections.visibilityCutoffMs,
       reads: "spans",
     });
+    return this.#protectedSpanDetails({ input, opened, storedSpans, joinsCodingAgentLogs });
+  }
+
+  async #protectedSpanDetails({
+    input,
+    opened: { authorization, protections },
+    storedSpans,
+    joinsCodingAgentLogs,
+  }: {
+    input: TraceDrawerReadInput;
+    opened: OpenedTrace;
+    storedSpans: StoredSpans;
+    joinsCodingAgentLogs: boolean;
+  }): Promise<SpanDetail[]> {
+    const { reads, braids, mappers } = this.deps;
     // Coding-agent message content lives in the trace's OTLP log records; joined on BEFORE
     // protections run, so it goes through the same redaction pass.
     const spans = joinsCodingAgentLogs
@@ -262,9 +280,22 @@ export class TraceDrawerReadService {
 
   /** The agent call graph over the viewer's protected spans and their resources. */
   async agentCallGraph(input: TraceDrawerReadInput): Promise<AgentCallGraph> {
+    const opened = await this.#open(input);
+    const read = await this.deps.reads.readSpansWithResources({
+      authorization: opened.authorization,
+      traceId: input.traceId,
+      occurredAtMs: input.occurredAtMs,
+      visibilityCutoffMs: opened.protections.visibilityCutoffMs,
+      reads: "spans",
+    });
     const [spans, resources] = await Promise.all([
-      this.#protectedSpans({ input, joinsCodingAgentLogs: false }),
-      this.resources(input),
+      this.#protectedSpanDetails({
+        input,
+        opened,
+        storedSpans: read.spans,
+        joinsCodingAgentLogs: false,
+      }),
+      this.#resourceInfo({ input, protections: opened.protections, rows: read.resources }),
     ]);
     return buildAgentCallGraph({ spans, resources: visibleResourcesOf({ resources, spans }) });
   }
@@ -277,6 +308,18 @@ export class TraceDrawerReadService {
       occurredAtMs: input.occurredAtMs,
       reads: "spans",
     });
+    return this.#resourceInfo({ input, protections, rows });
+  }
+
+  async #resourceInfo({
+    input,
+    protections,
+    rows,
+  }: {
+    input: TraceDrawerReadInput;
+    protections: Protections;
+    rows: StoredResources;
+  }): Promise<TraceResourceInfoDto> {
     const ownerProtections = await this.ownerProtections({
       viewerUserId: input.viewerUserId,
       ownerProjectIds: rows.map((row) => row.ownerProjectId),

@@ -627,6 +627,15 @@ export interface TraceApi extends TraceOtlpIngestApi {
     /** `spans`: the trace view's read, where the proof's braids show owners' spans (ADR-201 §5). */
     reads?: "spans" | "traces";
   }): Promise<SpanResourceInfo[]>;
+  /** A trace's spans and their resource rows in one read, audited once for both. */
+  readSpansWithResources(input: {
+    authorization: Authorization;
+    traceId: string;
+    occurredAtMs?: number;
+    visibilityCutoffMs?: number | null;
+    /** `spans`: the trace view's read, where the proof's braids show owners' spans (ADR-201 §5). */
+    reads?: "spans" | "traces";
+  }): Promise<{ spans: OwnedSpan[]; resources: SpanResourceInfo[] }>;
   readTraceEvents(input: {
     authorization: Authorization;
     traceId: string;

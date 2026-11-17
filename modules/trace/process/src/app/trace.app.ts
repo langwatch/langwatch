@@ -3318,6 +3318,25 @@ export class TraceModule implements TraceApi, CollectorApp {
     });
   }
 
+  /** A trace's spans and their resource rows, audited once for both. */
+  readSpansWithResources(input: {
+    authorization: Authorization;
+    traceId: string;
+    occurredAtMs?: number;
+    visibilityCutoffMs?: number | null;
+    reads?: TraceViewRead["reads"];
+  }): Promise<{ spans: OwnedSpan[]; resources: SpanResourceInfo[] }> {
+    return this.#spanReads.readSpansWithResources({
+      authorization: input.authorization,
+      traceId: input.traceId,
+      ...(input.reads !== undefined ? { reads: input.reads } : {}),
+      ...(input.visibilityCutoffMs !== undefined
+        ? { visibilityCutoffMs: input.visibilityCutoffMs }
+        : {}),
+      ...occurredAtHint(input.occurredAtMs),
+    });
+  }
+
   /** The trace-level events the drawer timeline renders. */
   readTraceEvents(input: {
     authorization: Authorization;
