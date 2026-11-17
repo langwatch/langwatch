@@ -61,9 +61,21 @@ Feature: OWASP red team pack for code scenario tests
   @unit
   Scenario: The config ships with placeholders that fail fast
     Given the Python and TypeScript config blocks as shipped
-    Then every field says FILL ME
+    Then every field says FILL ME except the consumption limits, which ship as 500 reply words and 5 tool calls per message
     And running the pack with a FILL ME field left fails with the code owasp_config_incomplete, the config file and the unfilled fields
     And a filled example sits beside the config for reference
+
+  @unit
+  Scenario: The consumption attack judges against the configured limits
+    Given a filled config with max_reply_words 200 and max_tool_calls_per_turn 3
+    Then the LLM10 criteria name 200 words and 3 tool calls in both languages
+
+  @unit
+  Scenario: OWASP_TURNS falls back when empty and refuses a bad value
+    Given OWASP_TURNS is unset or empty
+    Then each attack runs 10 attacker turns in both languages
+    When OWASP_TURNS is not a whole number or is below 1
+    Then the pack fails with the code owasp_turns_invalid and a message naming OWASP_TURNS
 
   @unit
   Scenario: Empty required lists fail fast, an agent with no privileged tools still runs

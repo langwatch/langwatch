@@ -48,6 +48,8 @@ It follows the [OWASP red team recipe](https://github.com/langwatch/skills/tree/
 2. In `agent_adapter.py` or `agent-adapter.ts`, make `call_agent` or `callAgent` call your real agent and return its reply, tool calls included. If your TypeScript agent takes OpenAI chat messages, use `toOpenAIMessages` and `fromOpenAIMessages` from the same file.
 3. In `owasp_config.py` or `owasp.config.ts`, fill in the config block. You describe the agent's name and job, its tools, the tools that change data, what it must never do and the data it must never disclose. The pack builds every attack goal and judge criterion from this one block. Every field ships as `FILL ME`, and the pack refuses to run while any field still holds `FILL ME`.
 
+   Two limits ship filled: `max_reply_words` (500) and `max_tool_calls_per_turn` (5). They set the longest reply and the most tool calls per message that the LLM10 attack accepts.
+
 ## Run it
 
 Install the test dependencies if your repo does not have them yet:
@@ -66,7 +68,7 @@ pytest test_owasp_pack.py -v            # Python
 npx vitest run owasp-pack.test.ts       # TypeScript
 ```
 
-Add `-k LLM01` (pytest) or `-t LLM01` (vitest) to run one id. `OWASP_TURNS` sets the attacker's turns per attack: 10 by default, 30 before a release.
+Add `-k LLM01` (pytest) or `-t LLM01` (vitest) to run one id. `OWASP_TURNS` sets the attacker's turns per attack: 10 when unset or empty, 30 before a release. A value that is not a whole number of at least 1 stops the run.
 
 To read the results:
 

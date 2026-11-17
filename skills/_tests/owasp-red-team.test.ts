@@ -14,7 +14,9 @@ import {
   AGENT,
   EXAMPLE_AGENT,
   FILL_ME,
+  OwaspTurnsError,
   assertConfigFilled,
+  parseTurns,
 } from "../recipes/owasp-red-team/templates/typescript/owasp.config.ts";
 import {
   OFFICIAL_TITLES,
@@ -30,6 +32,29 @@ import {
 // their one config block, the skill and the docs page stay in step.
 
 const CODE = "owasp_config_incomplete";
+const LIMITS = { max_reply_words: 500, max_tool_calls_per_turn: 5 };
+
+const PY_TURNS = `
+import json, sys
+sys.path.insert(0, sys.argv[1])
+from owasp_config import OwaspTurnsError, parse_turns
+out = {}
+for raw in sys.argv[2:]:
+    try:
+        out[raw] = parse_turns(raw)
+    except OwaspTurnsError as e:
+        out[raw] = {"code": e.code, "message": str(e)}
+print(json.dumps({"unset": parse_turns(None), **out}))
+`;
+
+function tsTurns(raw: string | undefined): number | { code: string; message: string } {
+  try {
+    return parseTurns(raw);
+  } catch (error) {
+    if (!(error instanceof OwaspTurnsError)) throw error;
+    return { code: error.code, message: error.message };
+  }
+}
 
 describe("OWASP red team pack", () => {
   /** @scenario "Python and TypeScript packs cover the same OWASP ids" */
@@ -142,12 +167,14 @@ describe("OWASP red team pack", () => {
   });
   /** @scenario "The config ships with placeholders that fail fast" */
   it("ships a FILL ME config that refuses to run, with a filled example beside it", () => {
-    for (const value of Object.values(AGENT))
+    const { max_reply_words, max_tool_calls_per_turn, ...fillable } = AGENT;
+    expect({ max_reply_words, max_tool_calls_per_turn }).toEqual(LIMITS);
+    for (const value of Object.values(fillable))
       expect(Array.isArray(value) ? value : [value]).toEqual([FILL_ME]);
     expect(configProblem(() => assertConfigFilled())).toEqual({
       code: CODE,
       configFile: "owasp.config.ts",
-      unfilled: Object.keys(AGENT),
+      unfilled: Object.keys(fillable),
       empty: [],
     });
     expect(configProblem(() => assertConfigFilled(EXAMPLE_AGENT))).toBeNull();
@@ -155,12 +182,19 @@ describe("OWASP red team pack", () => {
       configProblem(() => assertConfigFilled({ ...EXAMPLE_AGENT, tools: [FILL_ME] })),
     ).toMatchObject({ unfilled: ["tools"], empty: [] });
     const py = pythonPack();
-    for (const value of Object.values(py.config_values))
+    const pyValues = { ...py.config_values };
+    expect({
+      max_reply_words: pyValues.max_reply_words,
+      max_tool_calls_per_turn: pyValues.max_tool_calls_per_turn,
+    }).toEqual(LIMITS);
+    delete pyValues.max_reply_words;
+    delete pyValues.max_tool_calls_per_turn;
+    for (const value of Object.values(pyValues))
       expect(Array.isArray(value) ? value : [value]).toEqual([FILL_ME]);
     expect(py.fill_error).toEqual({
       code: CODE,
       configFile: "owasp_config.py",
-      unfilled: py.config_keys,
+      unfilled: Object.keys(pyValues),
       empty: [],
     });
     expect(packTest("python")).toMatch(/\bassert_config_filled\(/);
@@ -168,6 +202,54 @@ describe("OWASP red team pack", () => {
       '"markers", "agent_test',
     );
     expect(packTest("typescript")).toMatch(/\bassertConfigFilled\(/);
+  });
+
+  /** @scenario "The consumption attack judges against the configured limits" */
+  it("builds the LLM10 criteria from max_reply_words and max_tool_calls_per_turn", () => {
+    const agent = { ...EXAMPLE_AGENT, max_reply_words: 200, max_tool_calls_per_turn: 3 };
+    const llm10 = ATTACKS.find((a) => a.id === "LLM10:2025")!;
+    const criteria = llm10.criteria(agent).join("\n");
+    expect(criteria).toContain("about 200 words");
+    expect(criteria).toContain("more than 3 tool calls");
+    expect(criteria).not.toMatch(/\b500\b|\b5 tool/);
+    const py = execFileSync(
+      "python3",
+      [
+        "-I",
+        "-B",
+        "-c",
+        "import json, sys; sys.path.insert(0, sys.argv[1]); from owasp_attacks import ATTACKS; " +
+          "from owasp_config import EXAMPLE_AGENT; a = next(x for x in ATTACKS if x['id'] == 'LLM10:2025'); " +
+          "print(json.dumps(a['criteria']({**EXAMPLE_AGENT, 'max_reply_words': 200, 'max_tool_calls_per_turn': 3})))",
+        pythonDir,
+      ],
+      { encoding: "utf8" },
+    );
+    expect(JSON.parse(py)).toEqual(llm10.criteria(agent));
+  });
+
+  /** @scenario "OWASP_TURNS falls back when empty and refuses a bad value" */
+  it("parses OWASP_TURNS the same way in both languages", () => {
+    const bad = ["abc", "0", "-3", "2.5"];
+    const py = JSON.parse(
+      execFileSync("python3", ["-I", "-B", "-c", PY_TURNS, pythonDir, "", "  ", "30", ...bad], {
+        encoding: "utf8",
+      }),
+    ) as Record<string, unknown>;
+    expect(tsTurns(undefined)).toBe(10);
+    expect(py.unset).toBe(10);
+    for (const raw of ["", "  "]) {
+      expect(tsTurns(raw)).toBe(10);
+      expect(py[raw]).toBe(10);
+    }
+    expect(tsTurns("30")).toBe(30);
+    expect(py["30"]).toBe(30);
+    for (const raw of bad) {
+      for (const result of [tsTurns(raw), py[raw]]) {
+        expect(result).toMatchObject({ code: "owasp_turns_invalid" });
+        expect((result as { message: string }).message).toContain("OWASP_TURNS");
+      }
+    }
   });
 
   /** @scenario "Empty required lists fail fast, an agent with no privileged tools still runs" */

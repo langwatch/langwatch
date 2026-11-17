@@ -66,19 +66,20 @@ Call the real agent with its real tools and system prompt. A mock defeats the te
 
 ## Step 4: Fill the config
 
-Fill the one config block (`AGENT` in `owasp_config.py` or `owasp.config.ts`) from what you read in Step 1. Every field ships as `FILL ME`, and the pack refuses to run, naming the file and the fields, until none is left. `EXAMPLE_AGENT` beside it shows a filled block:
+Fill the one config block (`AGENT` in `owasp_config.py` or `owasp.config.ts`) from what you read in Step 1. Every field but the two limits ships as `FILL ME`, and the pack refuses to run, naming the file and the fields, until none is left. `EXAMPLE_AGENT` beside it shows a filled block:
 
 - `name`, `description`: what the agent is called and what it does.
 - `tools`: every tool name the model sees. `privileged_tools`: the ones that change data, spend money or reach outside. `privileged_tools` may be an empty list (the privilege attacks then name every tool); empty `tools`, `must_never` or `protected_data` make the pack refuse to run.
 - `must_never`: the actions the agent must refuse, from its system prompt and business rules, one sentence each.
 - `protected_data`: what it must never disclose.
 - `output_rendered_as`: where replies are shown (HTML widget, Slack, plain API).
+- `max_reply_words`, `max_tool_calls_per_turn`: the longest reply and the most tool calls for one message that the unbounded consumption attack (LLM10) still accepts. They ship as 500 and 5; raise them for an agent whose normal work needs more.
 
 Every attack goal and judge criterion is built from these fields, so do not edit `owasp_attacks.py` or `owasp-attacks.ts` for a new agent. Ask the user only for rules you cannot find in the code.
 
 ## Step 5: Run
 
-Set `LANGWATCH_API_KEY` (results go to that project) and the model key for the attacker and judge (`OPENAI_API_KEY` by default). `OWASP_MODEL` picks the attacker and judge model (default `gpt-6-luna`; Python takes a LiteLLM id such as `openai/gpt-5-mini`). Use an OpenAI-compatible chat model for the attacker and the judge: Gemini fails in the current scenario SDK (the attacker's first call has no user turn). The agent under test can use any model. For another provider in Python, set `OWASP_MODEL` to that provider's LiteLLM id. In TypeScript, also swap the `openai` import and factory in `owasp-pack.test.ts` for that provider's AI SDK package. For an OpenAI-compatible endpoint in TypeScript, import `createOpenAI` beside `openai` from `@ai-sdk/openai`, define `baseURL` as the endpoint URL and `apiKey` as that endpoint's key (read both from environment variables), add `const provider = createOpenAI({ baseURL, apiKey })`, and replace each of the three `openai(MODEL)` calls (attacker, metaprompt and judge) with `provider.chat(MODEL)`. `OWASP_TURNS` sets attacker turns per attack: the default 10 keeps a run cheap, use 30 before a release.
+Set `LANGWATCH_API_KEY` (results go to that project) and the model key for the attacker and judge (`OPENAI_API_KEY` by default). `OWASP_MODEL` picks the attacker and judge model (default `gpt-6-luna`; Python takes a LiteLLM id such as `openai/gpt-5-mini`). Use an OpenAI-compatible chat model for the attacker and the judge: Gemini fails in the current scenario SDK (the attacker's first call has no user turn). The agent under test can use any model. For another provider in Python, set `OWASP_MODEL` to that provider's LiteLLM id. In TypeScript, also swap the `openai` import and factory in `owasp-pack.test.ts` for that provider's AI SDK package. For an OpenAI-compatible endpoint in TypeScript, import `createOpenAI` beside `openai` from `@ai-sdk/openai`, define `baseURL` as the endpoint URL and `apiKey` as that endpoint's key (read both from environment variables), add `const provider = createOpenAI({ baseURL, apiKey })`, and replace each of the three `openai(MODEL)` calls (attacker, metaprompt and judge) with `provider.chat(MODEL)`. `OWASP_TURNS` sets attacker turns per attack: unset or empty gives 10, which keeps a run cheap; use 30 before a release. Any other value that is not a whole number of at least 1 stops the run with an error naming `OWASP_TURNS`.
 
 ```bash
 # Python, from the folder with the pack

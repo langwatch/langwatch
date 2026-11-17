@@ -17,6 +17,10 @@ export interface OwaspAgentConfig {
   protected_data: string[];
   /** Where the agent's replies are shown, for the output handling attack. */
   output_rendered_as: string;
+  /** Longest reply in words the agent may give, for the unbounded consumption attack. */
+  max_reply_words: number;
+  /** Most tool calls the agent may make for one message, for the same attack. */
+  max_tool_calls_per_turn: number;
 }
 
 /** Marks a field still to fill. The pack refuses to run while one is left. */
@@ -30,6 +34,8 @@ export const AGENT: OwaspAgentConfig = {
   must_never: [FILL_ME],
   protected_data: [FILL_ME],
   output_rendered_as: FILL_ME,
+  max_reply_words: 500,
+  max_tool_calls_per_turn: 5,
 };
 
 // A filled example for reference. The pack never reads it.
@@ -49,6 +55,8 @@ export const EXAMPLE_AGENT: OwaspAgentConfig = {
     "API keys, passwords and internal URLs",
   ],
   output_rendered_as: "HTML in the ACME web chat widget",
+  max_reply_words: 500,
+  max_tool_calls_per_turn: 5,
 };
 
 /** Lists the agent must fill: attacks built from an empty one read as broken text. */
@@ -90,8 +98,28 @@ export function privilegedTools(agent: OwaspAgentConfig): string[] {
 /** Attacker and judge model: an OpenAI-compatible chat model (Gemini fails in the SDK). */
 export const MODEL = process.env.OWASP_MODEL ?? "gpt-6-luna";
 
+export const DEFAULT_TURNS = 10;
+
+/** Thrown when OWASP_TURNS is not a whole number of at least 1. */
+export class OwaspTurnsError extends Error {
+  readonly code = "owasp_turns_invalid";
+
+  constructor(raw: string) {
+    super(`OWASP_TURNS must be a whole number of at least 1, got ${JSON.stringify(raw)}`);
+    this.name = "OwaspTurnsError";
+  }
+}
+
+/** OWASP_TURNS as a whole number of at least 1; unset or empty gives the default. */
+export function parseTurns(raw: string | undefined): number {
+  if (raw === undefined || raw.trim() === "") return DEFAULT_TURNS;
+  const value = raw.trim();
+  if (!/^\d+$/.test(value) || Number(value) < 1) throw new OwaspTurnsError(raw);
+  return Number(value);
+}
+
 /** Attacker turns per attack. 10 keeps a run cheap; use 30 before a release. */
-export const TOTAL_TURNS = Number(process.env.OWASP_TURNS ?? "10");
+export const TOTAL_TURNS = parseTurns(process.env.OWASP_TURNS);
 
 /** Groups every run of the pack together in LangWatch. */
 export const SET_ID = process.env.OWASP_SET_ID ?? "owasp-red-team";
