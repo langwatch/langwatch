@@ -1,6 +1,7 @@
 import { ChildProcess } from "node:child_process";
 
 import {
+  type RedTeamRunReport,
   type ScenarioExecutionService,
   type ScenarioExecutionPrefetchResult,
 } from "@langwatch/scenario-contract";
@@ -174,6 +175,56 @@ describe("ScenarioProcessorService", () => {
         scenarioRunId: "run-1",
       });
       expect(lines.findLine("warn", "Could not record")).toBeUndefined();
+    });
+  });
+
+  describe("given a finished red team run", () => {
+    const report: RedTeamRunReport = {
+      outcome: "broke",
+      brokeAtTurn: 3,
+      strategy: "crescendo",
+      owaspIds: ["LLM07"],
+      attackGoal: "Reveal the system prompt",
+      maxTurns: 30,
+      turnsUsed: 3,
+      turnScores: [{ turn: 3, score: 9 }],
+    };
+
+    /** @scenario "The processor records the child's red team report on the run" */
+    it("records the report the child returned", async () => {
+      const fixture = processorFixture();
+      const recordRedTeamReport = vi.fn().mockResolvedValue(undefined);
+      fixture.execution.recordRedTeamReport = recordRedTeamReport;
+
+      await fixture.processor.handleSucceeded({
+        jobData: job("run-1"),
+        result: { success: true, redTeam: report },
+      });
+
+      expect(recordRedTeamReport).toHaveBeenCalledWith({
+        projectId: "project-1",
+        scenarioRunId: "run-1",
+        report,
+      });
+    });
+
+    /** @scenario "A red team report that cannot be written is logged and never fails the job" */
+    it("logs a warning and never fails the job when the record write is refused", async () => {
+      const fixture = processorFixture();
+      fixture.execution.recordRedTeamReport = () => Promise.reject(new Error("store down"));
+      const { logger, lines } = createTestLogger();
+
+      await expect(
+        fixture.processor.handleSucceeded({
+          jobData: job("run-1"),
+          result: { success: true, redTeam: report },
+          jobLogger: logger,
+        }),
+      ).resolves.toBeUndefined();
+
+      expect(lines.findLine("warn", "Could not record the red team run's report")).toMatchObject({
+        scenarioRunId: "run-1",
+      });
     });
   });
 

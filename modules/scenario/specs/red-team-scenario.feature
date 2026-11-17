@@ -97,6 +97,26 @@ Feature: A red team scenario runs an attacker against the agent
     And the run's status and other metadata are unchanged
 
   @unit
+  Scenario: The processor records the child's red team report on the run
+    Given a red team run whose child returned a report
+    When the job finishes
+    Then the report is recorded on the run
+
+  @unit
+  Scenario: A red team report that cannot be written is logged and never fails the job
+    Given a red team run whose child returned a report
+    And the record write is refused
+    When the job finishes
+    Then a warning names the run
+    And the job does not fail
+
+  @unit
+  Scenario: A duplicated red team scenario stays a red team scenario
+    Given a red team scenario with its attack config
+    When a member duplicates it
+    Then the copy has kind "red_team" and the same attack config
+
+  @unit
   Scenario: A red team run with an unreadable attack config fails with a clear error
     Given a red team job whose attack config was missing or unreadable
     When the runner builds the run's cast
