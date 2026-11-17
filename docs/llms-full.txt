@@ -38647,7 +38647,7 @@ In **Agent Testing**, press **+** on the test suite rail and pick **From templat
 - **OWASP Top 10 for LLM Applications (2025)**: one attack per risk, `LLM01` to `LLM10`.
 - **OWASP Top 10 for Agentic Applications**: one attack per agentic risk, `ASI01` to `ASI10`.
 - **PII and sensitive data**: eight attacks that try to get your agent to reveal another user's personal data, stored customer records, credentials or API keys, another tenant's data, or personal data from raw tool results. Mapped to `LLM02`.
-- **Prompt injection**: eight `LLM01` attacks: direct overrides, injection through tool output and retrieved documents, instructions hidden in encodings or other languages, persona drift over many turns, and payloads split across messages.
+- **Prompt injection**: six `LLM01` attacks: direct overrides, injection through tool output and retrieved documents, instructions hidden in encodings or other languages, persona drift over many turns, and payloads split across messages.
 
 ## Preview a pack
 
