@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import type { Prisma } from "@langwatch/prisma-client/generated";
+import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
 import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
@@ -30,16 +30,18 @@ function recordingPrisma({
   const listingUpdateMany = vi.fn(async (_args: Prisma.DiscoveredAgentListingUpdateManyArgs) => ({
     count: 1,
   }));
-  const repository = PrismaDiscoveredAgentRepository.create(
-    prismaDouble({
-      discoveredAgent: { createMany, updateMany, findFirst },
-      discoveredAgentListing: { createMany: listingCreateMany, updateMany: listingUpdateMany },
-    }),
-  );
+  const transaction = vi.fn(async (work: (tx: PrismaClient) => Promise<unknown>) => work(client));
+  const client: PrismaClient = prismaDouble({
+    discoveredAgent: { createMany, updateMany, findFirst },
+    discoveredAgentListing: { createMany: listingCreateMany, updateMany: listingUpdateMany },
+    $transaction: transaction,
+  });
+  const repository = PrismaDiscoveredAgentRepository.create(client);
   const updates = () => updateMany.mock.calls.map(([args]) => args);
   const listingUpdates = () => listingUpdateMany.mock.calls.map(([args]) => args);
   return {
     repository,
+    transaction,
     createMany,
     updateMany,
     findFirst,
@@ -229,6 +231,7 @@ describe("PrismaDiscoveredAgentRepository source presence", () => {
       await world.repository.recordAgentSighting({ ...sighting(), ingestionSourceId: "source_1" });
 
       expect(world.updates()).toHaveLength(2);
+      expect(world.transaction).toHaveBeenCalledOnce();
       expect(world.listingCreateMany).toHaveBeenCalledWith({
         data: [
           {
@@ -247,6 +250,7 @@ describe("PrismaDiscoveredAgentRepository source presence", () => {
             ingestionSourceId: "source_1",
             discoveredAgentId: "agent_1",
             lastListedAt: { lte: SEPT_5 },
+            OR: [{ goneAt: null }, { goneAt: { lte: SEPT_5 } }],
           },
           data: { lastListedAt: SEPT_5, goneAt: null },
         },

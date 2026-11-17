@@ -67,4 +67,19 @@ describe.skipIf(!databaseUrl)("PrismaDiscoveredAgentRepository presence", () => 
     await sight({ name: "shared", source: "source-a", at: T3.add({ hours: 1 }) });
     expect(await listed()).toEqual(["older-sighting", "shared"]);
   });
+
+  it("keeps a disappearance when an older sighting arrives late, and clears it on a newer one", async () => {
+    await sight({ name: "late", source: "source-c", at: T1 });
+    await repository().markUnlistedGone({
+      organizationId,
+      ingestionSourceId: "source-c",
+      listedAt: T3,
+    });
+
+    await sight({ name: "late", source: "source-c", at: T2 });
+    expect(await listed()).not.toContain("late");
+
+    await sight({ name: "late", source: "source-c", at: T3.add({ hours: 2 }) });
+    expect(await listed()).toContain("late");
+  });
 });

@@ -53,6 +53,7 @@ The identity behind the connection needs this policy:
       "Effect": "Allow",
       "Action": [
         "bedrock-agentcore:ListAgentRuntimes",
+        "bedrock-agentcore:GetAgentRuntime",
         "bedrock-agentcore:ListTagsForResource"
       ],
       "Resource": "*"
@@ -61,7 +62,7 @@ The identity behind the connection needs this policy:
 }
 ```
 
-`bedrock-agentcore:ListTagsForResource` is only needed to read runtime tags. Without it, runtimes are still listed.
+`bedrock-agentcore:GetAgentRuntime` is required: LangWatch reads each runtime's details, and if AWS refuses that read the whole listing fails, Bedrock agents included. `bedrock-agentcore:ListTagsForResource` is only needed to read runtime tags. Without it, runtimes are still listed.
 
 If the connection assumes a role, the role's trust policy lets the identity LangWatch runs as assume it, and only with your external id. Replace the principal with that identity's ARN and the external id with the one you set on the connection:
 
@@ -130,7 +131,7 @@ A traced agent matches a listed one when its `gen_ai.agent.id` equals one of the
 | Vertex AI Agent Engine | Resource name | The full resource name, or the trailing engine id such as `42` |
 | ARD registry | `urn:air:` identifier | The `urn:air:` identifier |
 
-A traced agent also matches when its `gen_ai.agent.name` equals the listed agent's name, ignoring case. A traced agent that only shares its name with a listed one therefore counts as that listed agent and is not flagged as shadow, even when their ids differ. Send `gen_ai.agent.id` on your traces to keep the two apart.
+A traced agent also matches when its `gen_ai.agent.name` equals the listed agent's name, ignoring case. A traced agent that only shares its name with a listed one therefore counts as that listed agent and is not flagged as shadow, even when their ids differ. To keep a traced agent apart from a listed one, give it a different `gen_ai.agent.name`.
 
 ## Alerts
 

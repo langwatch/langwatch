@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
 import { fromDate, toDate, type Instant } from "@langwatch/time";
 
 import {
@@ -14,7 +14,11 @@ import {
   type DiscoveredAgentRow,
 } from "../discovered-agent.repository.ts";
 
-type DiscoveredAgentDatabase = Pick<PrismaClient, "discoveredAgent" | "discoveredAgentListing">;
+type DiscoveredAgentDatabase = Pick<
+  PrismaClient,
+  "discoveredAgent" | "discoveredAgentListing" | "$transaction"
+>;
+type SightingWriter = Pick<Prisma.TransactionClient, "discoveredAgent" | "discoveredAgentListing">;
 
 export class PrismaDiscoveredAgentRepository extends DiscoveredAgentRepository {
   private constructor(private readonly prisma: DiscoveredAgentDatabase) {
@@ -92,28 +96,31 @@ export class PrismaDiscoveredAgentRepository extends DiscoveredAgentRepository {
       rawAgentId: input.rawAgentId,
     };
     const seenAt = toDate(input.seenAt);
-    const created = await this.prisma.discoveredAgent.createMany({
-      data: [
-        {
-          ...key,
-          displayText: input.displayText,
-          metadata: input.metadata,
-          firstSeenAt: seenAt,
-          lastSeenAt: seenAt,
-        },
-      ],
-      skipDuplicates: true,
-    });
-    const agentId =
-      created.count > 0
-        ? await this.agentIdOf({ key, needed: input.ingestionSourceId !== undefined })
-        : await this.mergeSighting({ key, input, seenAt });
-    if (agentId === undefined || input.ingestionSourceId === undefined) return;
-    await this.recordListing({
-      organizationId: input.organizationId,
-      ingestionSourceId: input.ingestionSourceId,
-      discoveredAgentId: agentId,
-      listedAt: seenAt,
+    await this.prisma.$transaction(async (tx) => {
+      const created = await tx.discoveredAgent.createMany({
+        data: [
+          {
+            ...key,
+            displayText: input.displayText,
+            metadata: input.metadata,
+            firstSeenAt: seenAt,
+            lastSeenAt: seenAt,
+          },
+        ],
+        skipDuplicates: true,
+      });
+      const agentId =
+        created.count > 0
+          ? await this.agentIdOf({ db: tx, key, needed: input.ingestionSourceId !== undefined })
+          : await this.mergeSighting({ db: tx, key, input, seenAt });
+      if (agentId === undefined || input.ingestionSourceId === undefined) return;
+      await this.recordListing({
+        db: tx,
+        organizationId: input.organizationId,
+        ingestionSourceId: input.ingestionSourceId,
+        discoveredAgentId: agentId,
+        listedAt: seenAt,
+      });
     });
   }
 
@@ -148,37 +155,41 @@ export class PrismaDiscoveredAgentRepository extends DiscoveredAgentRepository {
   }
 
   private async agentIdOf({
+    db,
     key,
     needed,
   }: {
+    db: SightingWriter;
     key: { organizationId: string; provider: string; rawAgentId: string };
     needed: boolean;
   }): Promise<string | undefined> {
     if (!needed) return undefined;
-    const row = await this.prisma.discoveredAgent.findFirst({ where: key, select: { id: true } });
+    const row = await db.discoveredAgent.findFirst({ where: key, select: { id: true } });
     return row?.id;
   }
 
   /** Widens the seen range and merges text and metadata into the existing row; answers its id. */
   private async mergeSighting({
+    db,
     key,
     input,
     seenAt,
   }: {
+    db: SightingWriter;
     key: { organizationId: string; provider: string; rawAgentId: string };
     input: { displayText: string; metadata: Record<string, string> };
     seenAt: Date;
   }): Promise<string | undefined> {
-    await this.prisma.discoveredAgent.updateMany({
+    await db.discoveredAgent.updateMany({
       where: { ...key, lastSeenAt: { lt: seenAt } },
       data: { lastSeenAt: seenAt },
     });
-    await this.prisma.discoveredAgent.updateMany({
+    await db.discoveredAgent.updateMany({
       where: { ...key, firstSeenAt: { gt: seenAt } },
       data: { firstSeenAt: seenAt },
     });
 
-    const existing = await this.prisma.discoveredAgent.findFirst({
+    const existing = await db.discoveredAgent.findFirst({
       where: key,
       select: { id: true, displayText: true, metadata: true },
     });
@@ -191,13 +202,15 @@ export class PrismaDiscoveredAgentRepository extends DiscoveredAgentRepository {
     }
     if (merged.changed) data.metadata = merged.metadata;
     if (Object.keys(data).length > 0) {
-      await this.prisma.discoveredAgent.updateMany({ where: key, data });
+      await db.discoveredAgent.updateMany({ where: key, data });
     }
     return existing.id;
   }
 
-  /** The source's presence for the agent: created once, then moved forward and un-gone. */
+  /** The source's presence for the agent: created once, then moved forward. Only a sighting
+   * newer than the disappearance clears it. */
   private async recordListing({
+    db,
     organizationId,
     ingestionSourceId,
     discoveredAgentId,
@@ -206,19 +219,21 @@ export class PrismaDiscoveredAgentRepository extends DiscoveredAgentRepository {
     organizationId: string;
     ingestionSourceId: string;
     discoveredAgentId: string;
+    db: SightingWriter;
     listedAt: Date;
   }): Promise<void> {
-    const created = await this.prisma.discoveredAgentListing.createMany({
+    const created = await db.discoveredAgentListing.createMany({
       data: [{ organizationId, ingestionSourceId, discoveredAgentId, lastListedAt: listedAt }],
       skipDuplicates: true,
     });
     if (created.count > 0) return;
-    await this.prisma.discoveredAgentListing.updateMany({
+    await db.discoveredAgentListing.updateMany({
       where: {
         organizationId,
         ingestionSourceId,
         discoveredAgentId,
         lastListedAt: { lte: listedAt },
+        OR: [{ goneAt: null }, { goneAt: { lte: listedAt } }],
       },
       data: { lastListedAt: listedAt, goneAt: null },
     });

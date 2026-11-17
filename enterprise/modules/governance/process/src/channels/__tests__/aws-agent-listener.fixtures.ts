@@ -27,9 +27,9 @@ export interface Call {
 export type Answer = { status: number; body: unknown; errorType?: string };
 export type Route = (call: Call) => Answer | undefined;
 
-export const agentArn = (region: string, id: string) =>
+export const agentArn = ({ region, id }: { region: string; id: string }) =>
   `arn:aws:bedrock:${region}:${ACCOUNT}:agent/${id}`;
-export const runtimeArn = (region: string, id: string) =>
+export const runtimeArn = ({ region, id }: { region: string; id: string }) =>
   `arn:aws:bedrock-agentcore:${region}:${ACCOUNT}:runtime/${id}`;
 export const ok = (body: unknown): Answer => ({ status: 200, body });
 
@@ -66,7 +66,7 @@ export function bedrockAgent({
         agent: {
           agentId,
           agentName,
-          agentArn: agentArn(region, agentId),
+          agentArn: agentArn({ region, id: agentId }),
           agentVersion: "DRAFT",
           agentStatus: "PREPARED",
           foundationModel,
@@ -81,7 +81,7 @@ export function bedrockAgent({
   };
 }
 
-export function agentSummary(agentId: string, agentName: string) {
+export function agentSummary({ agentId, agentName }: { agentId: string; agentName: string }) {
   return {
     agentId,
     agentName,
@@ -90,9 +90,9 @@ export function agentSummary(agentId: string, agentName: string) {
   };
 }
 
-export function runtimeSummary(region: string, id: string) {
+export function runtimeSummary({ region, id }: { region: string; id: string }) {
   return {
-    agentRuntimeArn: runtimeArn(region, id),
+    agentRuntimeArn: runtimeArn({ region, id }),
     agentRuntimeId: id,
     agentRuntimeName: id.split("-")[0],
     agentRuntimeVersion: "1",
@@ -102,7 +102,7 @@ export function runtimeSummary(region: string, id: string) {
   };
 }
 
-function callOf(req: IncomingMessage, raw: string): Call {
+function callOf({ req, raw }: { req: IncomingMessage; raw: string }): Call {
   const url = new URL(req.url ?? "/", "http://listener");
   // SigV4: `Credential=<key>/<date>/<region>/<service>/aws4_request`, one of the comma parts.
   const credential = (req.headers.authorization ?? "")
@@ -134,7 +134,7 @@ function answerFor({ routes, call }: { routes: Route[]; call: Call }): Answer {
   return NO_ROUTE;
 }
 
-function reply(res: ServerResponse, answer: Answer) {
+function reply({ res, answer }: { res: ServerResponse; answer: Answer }) {
   res.writeHead(answer.status, {
     "content-type": "application/json",
     ...(answer.errorType ? { "x-amzn-errortype": answer.errorType } : {}),
@@ -155,9 +155,9 @@ export async function startListener(): Promise<{
     let raw = "";
     req.on("data", (chunk: Buffer) => (raw += chunk.toString()));
     req.on("end", () => {
-      const call = callOf(req, raw);
+      const call = callOf({ req, raw });
       calls.push(call);
-      reply(res, answerFor({ routes, call }));
+      reply({ res, answer: answerFor({ routes, call }) });
     });
   });
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
@@ -166,10 +166,13 @@ export async function startListener(): Promise<{
 }
 
 /** A route answering one method and path, optionally only for one region or signing service. */
-export function on(
-  match: { method: string; path: string; region?: string; service?: string },
-  answer: Answer | ((call: Call) => Answer),
-): Route {
+export function on({
+  match,
+  answer,
+}: {
+  match: { method: string; path: string; region?: string; service?: string };
+  answer: Answer | ((call: Call) => Answer);
+}): Route {
   return (call) => {
     if (call.method !== match.method || call.path !== match.path) return undefined;
     if (match.region && call.region !== match.region) return undefined;

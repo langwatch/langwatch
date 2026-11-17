@@ -46,16 +46,18 @@ describe("HttpAwsAgentInventoryChannel", () => {
   /** @scenario "A Bedrock agent listed in a region becomes a sighting keyed by its ARN" */
   it("lists a Bedrock agent as a sighting keyed by its ARN with model, owner and match ids", async () => {
     const region = "eu-west-1";
-    const arn = agentArn(region, "AGENT12345");
+    const arn = agentArn({ region, id: "AGENT12345" });
     routes.push(
-      on(
-        { method: "POST", path: "/agents/", region },
-        ok({ agentSummaries: [agentSummary("AGENT12345", "refund-bot")] }),
-      ),
+      on({
+        match: { method: "POST", path: "/agents/", region },
+        answer: ok({
+          agentSummaries: [agentSummary({ agentId: "AGENT12345", agentName: "refund-bot" })],
+        }),
+      }),
       bedrockAgent({ region, agentId: "AGENT12345", agentName: "refund-bot" }),
-      on(
-        { method: "POST", path: "/agents/AGENT12345/agentaliases/" },
-        ok({
+      on({
+        match: { method: "POST", path: "/agents/AGENT12345/agentaliases/" },
+        answer: ok({
           agentAliasSummaries: [
             {
               agentAliasId: "PRODALIAS1",
@@ -65,8 +67,11 @@ describe("HttpAwsAgentInventoryChannel", () => {
             },
           ],
         }),
-      ),
-      on({ method: "GET", path: `/tags/${arn}` }, ok({ tags: { owner: "payments", env: "prod" } })),
+      }),
+      on({
+        match: { method: "GET", path: `/tags/${arn}` },
+        answer: ok({ tags: { owner: "payments", env: "prod" } }),
+      }),
     );
 
     const listing = await channel.listAgents({
@@ -106,20 +111,22 @@ describe("HttpAwsAgentInventoryChannel", () => {
   it("keeps the shared test alias id out of the bare match ids, keeping its agent-scoped ARN", async () => {
     const region = "eu-west-1";
     routes.push(
-      on(
-        { method: "POST", path: "/agents/" },
-        ok({ agentSummaries: [agentSummary("AGENT12345", "refund-bot")] }),
-      ),
+      on({
+        match: { method: "POST", path: "/agents/" },
+        answer: ok({
+          agentSummaries: [agentSummary({ agentId: "AGENT12345", agentName: "refund-bot" })],
+        }),
+      }),
       bedrockAgent({ region, agentId: "AGENT12345", agentName: "refund-bot" }),
-      on(
-        { method: "POST", path: "/agents/AGENT12345/agentaliases/" },
-        ok({
+      on({
+        match: { method: "POST", path: "/agents/AGENT12345/agentaliases/" },
+        answer: ok({
           agentAliasSummaries: [
             { agentAliasId: "TSTALIASID", agentAliasName: "AgentTestAlias" },
             { agentAliasId: "PRODALIAS1", agentAliasName: "prod" },
           ],
         }),
-      ),
+      }),
     );
 
     const listing = await channel.listAgents({ credentials: KEY_PAIR, regions: [region] });
@@ -131,17 +138,22 @@ describe("HttpAwsAgentInventoryChannel", () => {
       "PRODALIAS1",
       "arn:aws:bedrock:eu-west-1:111122223333:agent-alias/AGENT12345/TSTALIASID",
       "arn:aws:bedrock:eu-west-1:111122223333:agent-alias/AGENT12345/PRODALIAS1",
-      agentArn(region, "AGENT12345"),
+      agentArn({ region, id: "AGENT12345" }),
     ]);
   });
 
   it("refuses as malformed when GetAgent answers without an agent ARN, so nothing is marked gone", async () => {
     routes.push(
-      on(
-        { method: "POST", path: "/agents/" },
-        ok({ agentSummaries: [agentSummary("AGENT12345", "refund-bot")] }),
-      ),
-      on({ method: "GET", path: "/agents/AGENT12345/" }, ok({ agent: { agentId: "AGENT12345" } })),
+      on({
+        match: { method: "POST", path: "/agents/" },
+        answer: ok({
+          agentSummaries: [agentSummary({ agentId: "AGENT12345", agentName: "refund-bot" })],
+        }),
+      }),
+      on({
+        match: { method: "GET", path: "/agents/AGENT12345/" },
+        answer: ok({ agent: { agentId: "AGENT12345" } }),
+      }),
     );
 
     const listing = await channel.listAgents({ credentials: KEY_PAIR, regions: ["eu-west-1"] });
@@ -155,16 +167,16 @@ describe("HttpAwsAgentInventoryChannel", () => {
   /** @scenario "A Bedrock AgentCore runtime becomes a sighting keyed by its ARN" */
   it("lists an AgentCore runtime as a sighting keyed by its runtime ARN", async () => {
     const region = "us-east-1";
-    const arn = runtimeArn(region, "support_runtime-abc123");
+    const arn = runtimeArn({ region, id: "support_runtime-abc123" });
     routes.push(
-      on(
-        { method: "POST", path: "/runtimes/" },
-        ok({ agentRuntimes: [runtimeSummary(region, "support_runtime-abc123")] }),
-      ),
-      on(
-        { method: "GET", path: `/tags/${arn}`, service: "bedrock-agentcore" },
-        ok({ tags: { team: "support" } }),
-      ),
+      on({
+        match: { method: "POST", path: "/runtimes/" },
+        answer: ok({ agentRuntimes: [runtimeSummary({ region, id: "support_runtime-abc123" })] }),
+      }),
+      on({
+        match: { method: "GET", path: `/tags/${arn}`, service: "bedrock-agentcore" },
+        answer: ok({ tags: { team: "support" } }),
+      }),
     );
 
     const listing = await channel.listAgents({ credentials: KEY_PAIR, regions: [region] });
@@ -191,18 +203,28 @@ describe("HttpAwsAgentInventoryChannel", () => {
   it("follows nextToken through every ListAgents and ListAgentRuntimes page", async () => {
     const region = "eu-west-1";
     routes.push(
-      on({ method: "POST", path: "/agents/" }, (call) =>
-        call.body.nextToken === "page-2"
-          ? ok({ agentSummaries: [agentSummary("AGENTTWO02", "two")] })
-          : ok({ agentSummaries: [agentSummary("AGENTONE01", "one")], nextToken: "page-2" }),
-      ),
+      on({
+        match: { method: "POST", path: "/agents/" },
+        answer: (call) =>
+          call.body.nextToken === "page-2"
+            ? ok({ agentSummaries: [agentSummary({ agentId: "AGENTTWO02", agentName: "two" })] })
+            : ok({
+                agentSummaries: [agentSummary({ agentId: "AGENTONE01", agentName: "one" })],
+                nextToken: "page-2",
+              }),
+      }),
       bedrockAgent({ region, agentId: "AGENTONE01", agentName: "one" }),
       bedrockAgent({ region, agentId: "AGENTTWO02", agentName: "two" }),
-      on({ method: "POST", path: "/runtimes/" }, (call) =>
-        call.query.get("nextToken") === "runtimes-2"
-          ? ok({ agentRuntimes: [runtimeSummary(region, "second-r2")] })
-          : ok({ agentRuntimes: [runtimeSummary(region, "first-r1")], nextToken: "runtimes-2" }),
-      ),
+      on({
+        match: { method: "POST", path: "/runtimes/" },
+        answer: (call) =>
+          call.query.get("nextToken") === "runtimes-2"
+            ? ok({ agentRuntimes: [runtimeSummary({ region, id: "second-r2" })] })
+            : ok({
+                agentRuntimes: [runtimeSummary({ region, id: "first-r1" })],
+                nextToken: "runtimes-2",
+              }),
+      }),
     );
 
     const listing = await channel.listAgents({ credentials: KEY_PAIR, regions: [region] });
@@ -210,25 +232,31 @@ describe("HttpAwsAgentInventoryChannel", () => {
     expect(listing.outcome).toBe("listed");
     if (listing.outcome !== "listed") return;
     expect(listing.items.map((item) => item.rawAgentId)).toEqual([
-      agentArn(region, "AGENTONE01"),
-      agentArn(region, "AGENTTWO02"),
-      runtimeArn(region, "first-r1"),
-      runtimeArn(region, "second-r2"),
+      agentArn({ region, id: "AGENTONE01" }),
+      agentArn({ region, id: "AGENTTWO02" }),
+      runtimeArn({ region, id: "first-r1" }),
+      runtimeArn({ region, id: "second-r2" }),
     ]);
   });
 
   /** @scenario "An AWS region that refuses fails the whole listing and records nothing" */
   it("refuses the whole listing as unauthorized when one region answers 403", async () => {
     routes.push(
-      on(
-        { method: "POST", path: "/agents/", region: "eu-west-1" },
-        ok({ agentSummaries: [agentSummary("AGENT12345", "refund-bot")] }),
-      ),
+      on({
+        match: { method: "POST", path: "/agents/", region: "eu-west-1" },
+        answer: ok({
+          agentSummaries: [agentSummary({ agentId: "AGENT12345", agentName: "refund-bot" })],
+        }),
+      }),
       bedrockAgent({ region: "eu-west-1", agentId: "AGENT12345", agentName: "refund-bot" }),
-      on(
-        { method: "POST", path: "/agents/", region: "us-east-1" },
-        { status: 403, body: { message: "not authorized" }, errorType: "AccessDeniedException" },
-      ),
+      on({
+        match: { method: "POST", path: "/agents/", region: "us-east-1" },
+        answer: {
+          status: 403,
+          body: { message: "not authorized" },
+          errorType: "AccessDeniedException",
+        },
+      }),
     );
 
     const listing = await channel.listAgents({
@@ -245,9 +273,10 @@ describe("HttpAwsAgentInventoryChannel", () => {
   it("refuses as too_many_pages when a provider keeps answering a next page", async () => {
     let page = 0;
     routes.push(
-      on({ method: "POST", path: "/agents/" }, () =>
-        ok({ agentSummaries: [], nextToken: `page-${++page}` }),
-      ),
+      on({
+        match: { method: "POST", path: "/agents/" },
+        answer: () => ok({ agentSummaries: [], nextToken: `page-${++page}` }),
+      }),
     );
 
     const listing = await channel.listAgents({ credentials: KEY_PAIR, regions: ["eu-west-1"] });

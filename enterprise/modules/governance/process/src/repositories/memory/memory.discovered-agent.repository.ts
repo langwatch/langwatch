@@ -170,6 +170,7 @@ export class MemoryDiscoveredAgentRepository extends DiscoveredAgentRepository {
       return;
     }
     if (Temporal.Instant.compare(existing.lastListedAt, input.listedAt) > 0) return;
+    if (existing.goneAt && Temporal.Instant.compare(existing.goneAt, input.listedAt) > 0) return;
     existing.lastListedAt = input.listedAt;
     existing.goneAt = null;
   }
