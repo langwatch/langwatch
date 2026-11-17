@@ -167,7 +167,7 @@ spec:
   {{- $owned := false }}
   {{- range $host.http.paths }}
     {{- $p := trimSuffix "/" (toString .path) }}
-    {{- if or (eq $p $uploadsPath) (hasPrefix (printf "%s/" $uploadsPath) $p) }}{{ $owned = true }}{{ end }}
+    {{- if eq $p $uploadsPath }}{{ $owned = true }}{{ end }}
   {{- end }}
   {{- if not $owned }}{{ $uploadsHosts = append $uploadsHosts $host.host }}{{ end }}
 {{- end }}

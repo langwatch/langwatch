@@ -60,11 +60,19 @@ function fixture() {
   let now: Instant = Temporal.Instant.from("2026-11-17T09:00:00.000Z");
   const inner = memoryObjectStorage();
   /** Holds a write once its bytes are visible, as S3 answers a PUT the SDK has not returned. */
-  const inFlight = { hold: null as Promise<void> | null, landed: gate() };
+  const inFlight = {
+    hold: null as Promise<void> | null,
+    landed: gate(),
+    /** Holds a write before any byte lands, as a PUT still streaming does. */
+    holdBefore: null as Promise<void> | null,
+    started: gate(),
+  };
   const deleteFailures = { remaining: 0 };
   const objectStorage: ObjectStorage = {
     ...inner,
     write: async (at, body, facts) => {
+      inFlight.started.open();
+      if (inFlight.holdBefore) await inFlight.holdBefore;
       const digest = await inner.write(at, body, facts);
       inFlight.landed.open();
       if (inFlight.hold) await inFlight.hold;
@@ -327,7 +335,7 @@ describe("upload lifecycle races", () => {
   describe("given an expired pending upload whose bytes will not delete on the first try", () => {
     describe("when the reaper wakes twice", () => {
       /** @scenario "Expired pending uploads are reaped on a schedule" */
-      it("keeps it failed with its address, then deletes the bytes on the next wake", async () => {
+      it("keeps it failed with its address, then deletes the bytes once the retry delay ends", async () => {
         const { reaper, deleteFailures, create, send, confirm, row, bytesOf, later } = fixture();
         const upload = await create();
         await send(upload);
@@ -341,6 +349,9 @@ describe("upload lifecycle races", () => {
         await expect(confirm(upload.objectId)).rejects.toMatchObject({
           code: "upload_incomplete",
         });
+        later(15);
+        await expect(reaper.reap()).resolves.toBe(0);
+        later(60);
 
         await expect(reaper.reap()).resolves.toBe(1);
         const reaped = await row(upload.objectId);
@@ -470,6 +481,99 @@ describe("upload lifecycle races", () => {
         const cleaned = await row(upload.objectId);
         expect(cleaned.storage).toBeNull();
         await expect(bytesOf({ ...cleaned, storage: address })).resolves.toBeNull();
+      });
+    });
+  });
+
+  describe("given a delete while a write is still streaming, then a deleted-bytes cleanup", () => {
+    describe("when the bytes land after the cleanup deleted the address, and the writer's discard fails", () => {
+      /** @scenario "A confirm and the reaper never both win" */
+      it("keeps the address with a deadline, so a stale cleanup cannot clear it and the reaper retries", async () => {
+        const {
+          service,
+          records,
+          reaper,
+          inFlight,
+          deleteFailures,
+          create,
+          send,
+          remove,
+          row,
+          bytesOf,
+          later,
+        } = fixture();
+        const upload = await create();
+        const address = (await row(upload.objectId)).storage;
+        const release = gate();
+        inFlight.holdBefore = release.opened;
+        const sending = send(upload).catch((error: unknown) => error);
+        await inFlight.started.opened;
+        await remove(upload.objectId);
+        const transition = records.transition.bind(records);
+        let landedUnderCleanup = false;
+        vi.spyOn(records, "transition").mockImplementation(async (input) => {
+          const isCleanupClear = input.expected.status === "deleted" && input.next.storage === null;
+          if (isCleanupClear && !landedUnderCleanup) {
+            landedUnderCleanup = true;
+            deleteFailures.remaining = 1;
+            release.open();
+            await sending;
+          }
+          return transition(input);
+        });
+
+        await service.cleanupDeletedObjects({ projectId: PROJECT_ID });
+
+        expect(landedUnderCleanup).toBe(true);
+        await expect(sending).resolves.toMatchObject({ code: "stored_object_deleted" });
+        const kept = await row(upload.objectId);
+        await expect(bytesOf({ ...kept, storage: address })).resolves.toBe(SHA256);
+        expect(kept.storage).toEqual(address);
+        expect(kept.expiresAt).not.toBeNull();
+
+        later(PAST_LANDED_WINDOW_MINUTES);
+        await reaper.reap();
+        const cleaned = await row(upload.objectId);
+        expect(cleaned.storage).toBeNull();
+        await expect(bytesOf({ ...cleaned, storage: address })).resolves.toBeNull();
+      });
+    });
+
+    describe("when the cleanup cleared the address and expiry before the bytes landed", () => {
+      /** @scenario "Expired pending uploads are reaped on a schedule" */
+      it("puts the address back with a deadline the reaper acts on", async () => {
+        const {
+          service,
+          reaper,
+          inFlight,
+          deleteFailures,
+          create,
+          send,
+          remove,
+          row,
+          bytesOf,
+          later,
+        } = fixture();
+        const upload = await create();
+        const address = (await row(upload.objectId)).storage;
+        const release = gate();
+        inFlight.holdBefore = release.opened;
+        const sending = send(upload).catch((error: unknown) => error);
+        await inFlight.started.opened;
+        await remove(upload.objectId);
+        await service.cleanupDeletedObjects({ projectId: PROJECT_ID });
+        deleteFailures.remaining = 1;
+        release.open();
+        await expect(sending).resolves.toMatchObject({ code: "stored_object_deleted" });
+
+        const kept = await row(upload.objectId);
+        expect(kept.storage).toEqual(address);
+        expect(kept.expiresAt).not.toBeNull();
+
+        later(PAST_LANDED_WINDOW_MINUTES);
+        await reaper.reap();
+        await expect(bytesOf({ ...kept, storage: address })).resolves.toBeNull();
+        await expect(row(upload.objectId)).resolves.toMatchObject({ storage: null });
       });
     });
   });

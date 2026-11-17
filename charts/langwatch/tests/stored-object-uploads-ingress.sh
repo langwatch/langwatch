@@ -269,7 +269,7 @@ test_uploads_ingress_switch() {
 # @scenario "An nginx install routes LangWatch's upload route through its own Ingress"
 test_operator_owned_upload_path() {
   local spelling doc
-  for spelling in /api/stored-objects/uploads /api/stored-objects/uploads/ /api/stored-objects/uploads/content; do
+  for spelling in /api/stored-objects/uploads /api/stored-objects/uploads/; do
     render owned --set ingress.enabled=true --set ingress.className=nginx \
       --set 'ingress.hosts[0].host=langwatch.acme.com' \
       --set 'ingress.hosts[0].http.paths[0].path=/' --set 'ingress.hosts[0].http.paths[0].pathType=Prefix' \
@@ -282,6 +282,17 @@ test_operator_owned_upload_path() {
       ok "operator path $spelling" "the operator's own route wins; no uploads Ingress"
     fi
   done
+
+  render descendant --set ingress.enabled=true --set ingress.className=nginx \
+    --set 'ingress.hosts[0].host=langwatch.acme.com' \
+    --set 'ingress.hosts[0].http.paths[0].path=/' --set 'ingress.hosts[0].http.paths[0].pathType=Prefix' \
+    --set 'ingress.hosts[0].http.paths[1].path=/api/stored-objects/uploads/content' --set 'ingress.hosts[0].http.paths[1].pathType=Prefix'
+  doc=$(doc_named descendant lw-uploads-ingress)
+  if printf '%s\n' "$doc" | grep -q 'host: "langwatch.acme.com"$' && printf '%s\n' "$doc" | grep -q 'path: /api/stored-objects/uploads$'; then
+    ok "operator descendant path" "a longer operator path keeps the parent upload route, so other upload ids do not fall to /"
+  else
+    fail "operator descendant path" "an operator path under the upload route dropped the host: $(cat "$tmp/descendant.err")"
+  fi
 
   render owned-one "${APP_INGRESS[@]}" --set ingress.className=nginx \
     --set 'ingress.hosts[1].http.paths[1].path=/api/stored-objects/uploads/' --set 'ingress.hosts[1].http.paths[1].pathType=Prefix'

@@ -44,6 +44,9 @@ import { movedOn } from "../rules/stored-object-lifecycle.rules.ts";
 import { storedObjectReferenceOf } from "../rules/stored-object-view.rules.ts";
 import type { StoredObjectUploadSignerService } from "./stored-object-upload-signer.service.ts";
 
+/** Writes a lost landing takes to record whether its bytes are still held. */
+const MAX_ADDRESS_ATTEMPTS = 3;
+
 /** How long a landed upload waits for its confirm before the reaper takes it (ADR-158 §4). */
 const LANDED_CONFIRM_WINDOW_MS = 24 * 60 * 60 * 1000;
 
@@ -317,21 +320,30 @@ export class StoredObjectUploadService {
     throw new UploadExpiredError();
   }
 
-  /** A row whose bytes may still be held keeps their address, so a cleanup pass can retry. */
+  /**
+   * A row whose bytes may still be held keeps their address under a new generation, so a
+   * cleanup that read it before they landed cannot clear it, and an expired deadline, so the
+   * reaper retries. Bytes known gone clear both.
+   */
   private async keepAddressUntilGone(input: {
     current: StoredObjectRecord;
     address: StoredObjectStorageAddress;
     isGone: boolean;
   }): Promise<void> {
-    const { current, address, isGone } = input;
-    const storage = isGone ? null : address;
-    const isRecorded = current.storage === storage || (!isGone && current.storage !== null);
-    if (isRecorded) return;
+    let current: StoredObjectRecord | null = input.current;
+    for (let attempt = 0; current && attempt < MAX_ADDRESS_ATTEMPTS; attempt += 1) {
+      const now = this.options.now();
+      const next = input.isGone
+        ? { ...current, storage: null, expiresAt: null, updatedAt: now }
+        : movedOn({ value: current, now, changes: { storage: input.address, expiresAt: now } });
+      if (input.isGone && current.storage === null && current.expiresAt === null) return;
+      if (await this.options.records.transition({ expected: current, next })) return;
 
-    await this.options.records.transition({
-      expected: current,
-      next: { ...current, storage, updatedAt: this.options.now() },
-    });
+      current = await this.options.records.findById({
+        tenantId: current.tenantId,
+        id: current.id,
+      });
+    }
   }
 
   private async discarded(input: {

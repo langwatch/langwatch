@@ -1,5 +1,5 @@
 import { createLogger } from "@langwatch/observability";
-import type { StoredObjectProjectId } from "@langwatch/stored-object-contract";
+import type { StoredObjectId, StoredObjectProjectId } from "@langwatch/stored-object-contract";
 import { type Instant, nowInstant } from "@langwatch/time";
 
 import type { StoredObjectBytesRepository } from "../repositories/stored-object-bytes.repository.ts";
@@ -15,6 +15,10 @@ const logger = createLogger("langwatch:stored-object:upload-reap");
 const DEFAULT_BATCH_SIZE = 100;
 /** Pages of projects one pass walks; what is left waits for the next wake. */
 const MAX_PROJECT_PAGES = 10;
+/** Pages of one project's rows one pass walks. */
+const MAX_ROW_PAGES = 10;
+/** How long a row whose bytes would not delete waits before the reaper tries it again. */
+const REAP_RETRY_DELAY_MS = 60 * 60 * 1000;
 
 type StoredObjectUploadReapOptions = Readonly<{
   records: StoredObjectRecordRepository;
@@ -56,18 +60,25 @@ export class StoredObjectUploadReapService {
     return reaped;
   }
 
-  /** One page of a project's expired uploads and leftover bytes; undeletable bytes wait. */
+  /** A project's expired uploads and leftover bytes, page by page; undeletable bytes wait. */
   async reapProject(input: { projectId: string; limit?: number }): Promise<number> {
     const now = this.now();
-    const page = await this.options.records.findPage({
-      tenantId: input.projectId,
-      status: ["pending", "uploading", "failed", "deleted"],
-      expiresBefore: now,
-      limit: input.limit ?? this.batchSize,
-    });
+    const limit = input.limit ?? this.batchSize;
+    let afterId: StoredObjectId | undefined;
     let reaped = 0;
-    for (const value of page) {
-      if (await this.reapOne({ value, now })) reaped += 1;
+    for (let page = 0; page < MAX_ROW_PAGES; page += 1) {
+      const rows = await this.options.records.findPage({
+        tenantId: input.projectId,
+        status: ["pending", "uploading", "failed", "deleted"],
+        expiresBefore: now,
+        limit,
+        ...(afterId ? { afterId } : {}),
+      });
+      for (const value of rows) {
+        if (await this.reapOne({ value, now })) reaped += 1;
+      }
+      if (rows.length < limit) break;
+      afterId = rows.at(-1)?.id;
     }
 
     return reaped;
@@ -111,8 +122,17 @@ export class StoredObjectUploadReapService {
             objectId: value.id,
             error: error instanceof Error ? error.name : "unknown",
           },
-          "an expired upload's bytes would not delete; left for the next reap",
+          "an expired upload's bytes would not delete; retried after a delay",
         );
+        // Out of every pass until the delay ends, so the rows and projects behind it are reached.
+        await this.options.records.transition({
+          expected: value,
+          next: movedOn({
+            value,
+            now,
+            changes: { expiresAt: now.add({ milliseconds: REAP_RETRY_DELAY_MS }) },
+          }),
+        });
         return false;
       }
     }
