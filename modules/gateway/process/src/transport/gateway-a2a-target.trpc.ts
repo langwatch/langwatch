@@ -16,6 +16,8 @@ export const gatewayA2aTargetTrpcTransport: TrpcRouterDeclaration<
   })
 
   .procedure("create")
+  // A project-scoped row names the project's organization; an org-wide one derives its target.
+  .withAudit({ target: "organization", via: "projectId" })
   .withPermission("virtualKeys:manage")
   .handle(async ({ app, input, actor }) => {
     await app.assertOrganizationExists(input.organizationId);

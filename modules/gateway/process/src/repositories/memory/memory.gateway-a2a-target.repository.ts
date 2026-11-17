@@ -1,4 +1,5 @@
 import {
+  GatewayA2aTargetNameTakenError,
   createGatewayA2aTargetInputSchema,
   gatewayA2aTargetResourceSchema,
   type CreateGatewayA2aTargetInput,
@@ -36,6 +37,14 @@ export class MemoryGatewayA2aTargetRepository extends GatewayA2aTargetRepository
 
   async create(input: CreateGatewayA2aTargetInput): Promise<GatewayA2aTargetResource> {
     const { actorUserId, ...fields } = createGatewayA2aTargetInputSchema.parse(input);
+    const taken = [...this.#rows.values()].some(
+      (row) =>
+        row.archivedAt === null &&
+        row.organizationId === fields.organizationId &&
+        row.projectId === fields.projectId &&
+        row.name === fields.name,
+    );
+    if (taken) throw new GatewayA2aTargetNameTakenError(fields.name);
     const now = toDate(nowInstant());
     this.#sequence += 1;
     const row = gatewayA2aTargetResourceSchema.parse({
@@ -51,8 +60,7 @@ export class MemoryGatewayA2aTargetRepository extends GatewayA2aTargetRepository
   }
 
   async update(input: UpdateGatewayA2aTargetInput): Promise<GatewayA2aTargetResource> {
-    const existing = await this.findById(input);
-    if (!existing) throw new Error("A2A target must exist before update");
+    const existing = this.#live(input);
     const { id: _id, organizationId: _org, actorUserId: _actor, ...changes } = input;
     const defined = Object.fromEntries(
       Object.entries(changes).filter(([, value]) => value !== undefined),
@@ -67,11 +75,19 @@ export class MemoryGatewayA2aTargetRepository extends GatewayA2aTargetRepository
   }
 
   async archive(input: { id: string; organizationId: string }): Promise<GatewayA2aTargetResource> {
-    const existing = await this.findById(input);
-    if (!existing) throw new Error("A2A target must exist before archive");
+    const existing = this.#live(input);
     const now = toDate(nowInstant());
     const row = { ...existing, archivedAt: now, updatedAt: now };
     this.#rows.set(row.id, row);
     return structuredClone(row);
+  }
+
+  /** The stored live row, read without yielding so a write replaces exactly what it read. */
+  #live(input: { id: string; organizationId: string }): GatewayA2aTargetResource {
+    const row = this.#rows.get(input.id);
+    if (row?.organizationId !== input.organizationId || row.archivedAt !== null) {
+      throw new Error("A2A target must exist before it is changed");
+    }
+    return row;
   }
 }

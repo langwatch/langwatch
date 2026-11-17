@@ -5,6 +5,7 @@
 import type { TrpcProcedureFactory } from "@langwatch/api/trpc";
 import type { AuthzPermission } from "@langwatch/authorization";
 import {
+  GatewayOrganizationNotFoundError,
   gatewayA2aTargetTrpc,
   type GatewayA2aTargetResource,
   type GatewayApi,
@@ -55,10 +56,12 @@ function fakeApp() {
 function mounted(app: ReturnType<typeof fakeApp>) {
   const permissions: Record<string, AuthzPermission | object> = {};
   const handlers: Record<string, Handler> = {};
+  const audits: Record<string, unknown> = {};
   const api = createApiFixture<GatewayApi>(app);
   const runtime: TrpcProcedureFactory<object> = {
-    procedure: ({ access, handle, procedure }) => {
+    procedure: ({ access, audit, handle, procedure }) => {
       const name = procedure.slice(procedure.indexOf(".") + 1);
+      if (audit) audits[name] = audit;
       permissions[name] = access.kind === "permission" ? access.permission : access;
       handlers[name] = (args) =>
         Promise.resolve((handle as (given: unknown) => unknown)({ ...args, app: api }));
@@ -67,7 +70,7 @@ function mounted(app: ReturnType<typeof fakeApp>) {
     router: (record) => record,
   };
   gatewayA2aTargetTrpcTransport.router(runtime, () => api);
-  return { permissions, handlers };
+  return { permissions, handlers, audits };
 }
 
 describe("the gatewayA2aTargets tRPC declaration", () => {
@@ -85,6 +88,12 @@ describe("the gatewayA2aTargets tRPC declaration", () => {
         setBlocked: "virtualKeys:manage",
         delete: "virtualKeys:manage",
       });
+    });
+
+    it("records a project-scoped create against the project's organization", () => {
+      const { audits } = mounted(fakeApp());
+
+      expect(audits).toEqual({ create: { target: "organization", via: "projectId" } });
     });
   });
 
@@ -155,11 +164,11 @@ describe("the gatewayA2aTargets tRPC declaration", () => {
   describe("given an organization that does not exist", () => {
     it("refuses before touching any target", async () => {
       const app = fakeApp();
-      app.assertOrganizationExists.mockRejectedValueOnce(new Error("organization not found"));
+      app.assertOrganizationExists.mockRejectedValueOnce(new GatewayOrganizationNotFoundError());
 
       await expect(
         mounted(app).handlers.list!({ input: { organizationId: "org_missing" }, actor }),
-      ).rejects.toThrow("organization not found");
+      ).rejects.toMatchObject({ code: "not_found" });
       expect(app.listA2aTargets).not.toHaveBeenCalled();
     });
   });
