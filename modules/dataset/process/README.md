@@ -6,7 +6,7 @@ The server half of [dataset](../README.md). Datasets and their records: creating
 
 ## Installation
 
-`defineProcessModule("dataset").withRepositories(datasetRepositories).withApi(DatasetModule).withTransports(…, datasetTrpcTransport, datasetRecordTrpcTransport).provideMiddlewareContext(…).withEventing(datasetNormalizationEventing).withEventing(datasetVersionsEventing).withMigrations(…)`, `src/dataset.module.ts:20`.
+`defineProcessModule("dataset").withRepositories(datasetRepositories).withApi(DatasetModule).withTransports(…, datasetTrpcTransport, datasetRecordTrpcTransport).provideMiddlewareContext(…).withEventing(datasetNormalizationEventing).withEventing(datasetVersionsEventing).withTasks(…).withMigrations(…)`, `src/dataset.module.ts:22`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -1112,6 +1112,14 @@ Declared at `src/eventing/dataset-versions.pipeline.ts:79`. Events: `datasetCont
 | process manager | `datasetAutosave`              | intents `snapshot` (outbox)                                                                        | `src/eventing/dataset-versions.pipeline.ts:91`  |
 | process manager | `datasetVersionRetention`      | every 6 h (`DATASET_VERSION_RETENTION_INTERVAL_MS = 6 * 60 * 60 * 1000`); intents `sweep` (outbox) | `src/eventing/dataset-versions.pipeline.ts:101` |
 | peer subscriber | `datasetVersionUserErased`     | `lw.identity.user_erased` from [identity](../../identity/README.md)                                | `src/eventing/dataset-versions.pipeline.ts:111` |
+
+### Tasks
+
+Run by the tasks process, before serve.
+
+| Task                    | Class                     | Declared at                                  |
+| ----------------------- | ------------------------- | -------------------------------------------- |
+| `dataset-storage-audit` | `DatasetStorageAuditTask` | `src/tasks/dataset-storage-audit.task.ts:13` |
 
 ## Configuration
 

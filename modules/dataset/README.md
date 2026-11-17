@@ -29,7 +29,7 @@ Datasets and their records: creating, naming, mapping and reading them by slug o
 | Postgres table  | `DatasetVersion`                                                                                                                         | `process/src/repositories/prisma/prisma.dataset-version.repository.ts:29`  |
 | Postgres table  | `DatasetVersionRun`                                                                                                                      | `process/src/repositories/prisma/prisma.dataset-version.repository.ts:29`  |
 | Postgres table  | `Dataset`                                                                                                                                | `process/src/repositories/prisma/prisma.dataset.repository.ts:33`          |
-| Stores required | prisma, objectStorage                                                                                                                    | `process/src/repositories/prisma/prisma.dataset.repositories.ts:30`        |
+| Stores required | prisma, objectStorage                                                                                                                    | `process/src/repositories/prisma/prisma.dataset.repositories.ts:31`        |
 | Config          | `publicBaseUrl` (BASE_HOST), `singleFileStorage.onLocalDisk` (DATASET_STORAGE_LOCAL), `singleFileStorage.localPath` (LOCAL_STORAGE_PATH) | `contract/src/dataset.config.ts:11`                                        |
 
 Anything else dataset needs belongs to another module and is reached through its `*Api`.
