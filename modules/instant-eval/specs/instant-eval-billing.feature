@@ -116,7 +116,8 @@ Feature: Instant Evals are metered on the gateway spend spine, reported to Strip
 
   # The check is the gateway's own preflight for the project, under a key no
   # key budget names, so the organization, team and project budgets apply.
-  # Hosted judging only: an own decision model's cost is not on our ledger.
+  # An own decision model is checked too: its provider usage is debited to the
+  # same budgets (ADR-193).
   Rule: A gateway budget set to block stops Instant Evals
 
     @unit
@@ -146,12 +147,6 @@ Feature: Instant Evals are metered on the gateway spend spine, reported to Strip
       Given a project whose blocking budget is at its limit
       When a statement calling an eval function is submitted
       Then it is refused with instant_eval_gateway_budget_exceeded before anything is held or judged
-
-    @unit
-    Scenario: A run on the project's own decision model is not checked
-      Given a project that runs Instant Evals on its own decision model
-      When a run is requested
-      Then no gateway budget is asked
 
   Rule: The month's Instant Eval price is one Stripe meter per organization
 
