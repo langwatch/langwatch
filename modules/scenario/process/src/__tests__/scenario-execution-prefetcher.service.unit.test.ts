@@ -2278,6 +2278,28 @@ describe("prefetchWithFixture, given a run that resolved parameter values", () =
     });
   });
 
+  describe("given a scenario whose situation declares a parameter inline", () => {
+    /** @scenario "An inline declaration in the situation declares a parameter with its default" */
+    it("hands on the situation with the declaration replaced by the resolved value", async () => {
+      const deps = depsForScenario({
+        ...defaultScenario,
+        situation: "A { plan: free } customer asks for a refund",
+        parameters: [],
+      });
+
+      const result = await prefetchWithFixture({
+        context: defaultContext,
+        target: promptTarget,
+        deps,
+      });
+
+      expect(result.success).toBe(true);
+      if (!result.success) return;
+      expect(result.data.parameters).toEqual({ plan: "free" });
+      expect(result.data.scenario.situation).toBe("A free customer asks for a refund");
+    });
+  });
+
   describe("given a scenario that declares none", () => {
     /** @scenario "A scenario without parameters renders byte-identical to its stored text" */
     it("hands its text on byte-identical", async () => {

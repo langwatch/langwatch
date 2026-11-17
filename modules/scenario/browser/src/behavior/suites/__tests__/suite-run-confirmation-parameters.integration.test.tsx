@@ -14,7 +14,7 @@ import { useRunSuite } from "../use-run-suite.ts";
 
 const mocks = vi.hoisted(() => ({
   mutate: vi.fn(),
-  scenarios: [] as { id: string; parameters: unknown }[],
+  scenarios: [] as { id: string; parameters: unknown; situation?: string }[],
 }));
 
 vi.mock("../../scenario-api.ts", () => ({
@@ -35,7 +35,10 @@ vi.mock("@langwatch/scenario-client", () => ({
     }),
     scenarios: {
       getAll: {
-        useQuery: () => ({ data: mocks.scenarios, isLoading: false }),
+        useQuery: () => ({
+          data: mocks.scenarios.map((scenario) => ({ situation: "", ...scenario })),
+          isLoading: false,
+        }),
       },
     },
   },

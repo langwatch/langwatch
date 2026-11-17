@@ -12,6 +12,7 @@ import {
   CASE_MODAL_SUBTITLE,
   CaseModalFields,
   CaseModalHeaderTools,
+  caseDraftProblems,
   caseModalFooter,
 } from "./case-modal-parts.tsx";
 import type { CaseEditorState } from "./use-case-editor.ts";
@@ -43,7 +44,18 @@ export function CaseModal({
     if (editor.isSaving || editor.isLoading) return;
     if (!editor.problem) return editor.save(options);
     setAttempted(true);
-    const invalid = editor.draft.title.trim() ? "Criteria" : "Title";
+    const problems = caseDraftProblems({
+      draft: editor.draft,
+      inlineDeclarations: editor.inlineDeclarations,
+      attempted: true,
+    });
+    // The first field a save refused, in the order the form asks them.
+    const [invalid] =
+      [
+        ["Title", problems.title],
+        ["Situation", problems.situation],
+        ["Criteria", problems.criteria],
+      ].find(([, message]) => message !== undefined) ?? [];
     document
       .querySelector<HTMLElement>(`[data-testid="case-modal"] [aria-label="${invalid}"]`)
       ?.focus();
