@@ -433,6 +433,11 @@ const presentations = {
     describe: () =>
       "This project hides captured input or output from you, or an attribute policy restricts this key to an audience you are not in. Facet a named field instead, such as model, status or evaluator, or call the facets endpoint with no field to see what this project has.",
   },
+  trace_withheld_over_plan: {
+    title: "Trace held until your plan is sorted",
+    describe: () =>
+      "This trace was recorded while your organization has more members than its plan covers. It is saved and will show once you upgrade your plan or remove members.",
+  },
   trace_id_ambiguous: {
     title: "Trace ID is ambiguous",
     describe: () => "That prefix matches more than one trace. Use a longer prefix.",
@@ -2241,6 +2246,18 @@ const presentations = {
   member_seat_limit_reached: {
     title: "All member seats are in use",
     describe: () => "Free a seat by disabling a membership, or upgrade the plan to add more.",
+  },
+  member_additions_held_for_payment: {
+    // fault: customer. A renewal charge failed and is unpaid; members already in keep working.
+    title: "A payment failed, so new members can't be added",
+    describe: () =>
+      "Update the card on the billing page to pay the open invoice, then add them. Ask an admin if you can't.",
+  },
+  seats_held_for_payment: {
+    // fault: customer. Buying seats while an invoice is unpaid would charge the same failing card.
+    title: "A payment failed, so seats can't be added",
+    describe: () =>
+      "Update the card on the billing page to pay the open invoice, then add seats. Nothing was charged.",
   },
   membership_disabled: {
     // The person IS a member, so nothing here may suggest they are not, and
@@ -4192,6 +4209,16 @@ const presentations = {
       const need = permission ? `You need ${permission} here.` : "";
       return `${need} Ask an administrator, or set the length on a scope you manage.`.trim();
     },
+  },
+  data_retention_billed_through_billing: {
+    title: "This retention length is billed",
+    describe: () =>
+      "Keeping data longer than 90 days adds storage to the organization's bill, so it needs subscription:manage. Ask a billing administrator, or pick 90 days or less.",
+  },
+  data_retention_not_billed: {
+    title: "This retention length isn't billed",
+    describe: () =>
+      "Only a length that adds storage to the bill is set through billing. Save this length from the data retention settings instead.",
   },
   data_retention_disable_forbidden: {
     title: "Keeping data forever isn't available",

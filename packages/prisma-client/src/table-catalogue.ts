@@ -2304,6 +2304,11 @@ export const prismaModelFieldCatalogue = {
     "seatRepairFlaggedAt",
     "seatLineLeaseToken",
     "seatLineLeaseUntil",
+    "paymentRecoveryInvoiceId",
+    "paymentRecoveryStartedAt",
+    "paymentRecoveryNoticeDay",
+    "overPlanSince",
+    "overPlanEndedAt",
     "organization",
     "invoices"
   ],

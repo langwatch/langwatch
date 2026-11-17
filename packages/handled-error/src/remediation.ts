@@ -85,6 +85,15 @@ const registry = {
     ],
   },
 
+  // ---- data retention ----
+  data_retention_billed_through_billing: {
+    tips: [
+      "Ask someone with subscription:manage in the organization to set this length; it adds a storage line to the subscription",
+      "Or pick 90 days or less, which the plan includes",
+    ],
+    docsPath: "/platform/data-retention",
+  },
+
   // ---- automations ----
   automation_dataset_unavailable: {
     tips: [
@@ -100,6 +109,12 @@ const registry = {
       "If you just sent this trace, retry in a few seconds; ingestion is asynchronous",
     ],
     docsPath: "/platform/data-retention",
+  },
+  trace_withheld_over_plan: {
+    tips: [
+      "Upgrade the plan on Settings > Subscription to show every held trace again",
+      "Or remove members on Settings > Members until they fit the plan",
+    ],
   },
   span_not_found: {
     tips: ["Check the span id; spans are deleted with their trace after the retention window"],

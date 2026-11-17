@@ -5,6 +5,7 @@ import {
 } from "@langwatch/authorization";
 import {
   traceSummaryReadSchema,
+  traceWithholdingOf,
   type DerivedTraceEvent,
   type Protections,
   type OwnedSpan,
@@ -47,6 +48,7 @@ import type { TraceBraidedTotalsService } from "./trace-braided-totals.service.t
 type TraceDrawerReads = Pick<
   TraceApi,
   | "authorizationForTrace"
+  | "assertTraceNotWithheld"
   | "resolveViewerProtections"
   | "readTraceSummary"
   | "readSpansPage"
@@ -96,6 +98,7 @@ export class TraceDrawerReadService {
         tenantId: input.tenantId,
         occurredAtMs: input.occurredAtMs,
         visibilityCutoffMs: protections.visibilityCutoffMs,
+        withholding: traceWithholdingOf(protections),
         full: input.full,
       }),
     );
@@ -312,6 +315,12 @@ export class TraceDrawerReadService {
       projectId: input.projectId,
       userId: input.viewerUserId,
       authorization,
+    });
+    await this.deps.reads.assertTraceNotWithheld({
+      authorization,
+      traceId: input.traceId,
+      ...(input.occurredAtMs === undefined ? {} : { occurredAtMs: input.occurredAtMs }),
+      protections,
     });
     return { authorization, protections };
   }
