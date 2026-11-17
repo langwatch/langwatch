@@ -9,6 +9,8 @@ import { datasetVersionsEventing } from "#eventing/dataset-versions.pipeline";
 import { datasetRepositories } from "#repositories/dataset-repositories.registry";
 import { DatasetEmptySlugService } from "#services/dataset-empty-slug.service";
 import { DatasetMigrationService } from "#services/dataset-migration.service";
+import { DatasetStorageAuditService } from "#services/dataset-storage-audit.service";
+import { DatasetStorageAuditTask } from "#tasks/dataset-storage-audit.task";
 import { datasetRecordTrpcTransport } from "#transport/dataset-record.trpc";
 import { createDatasetRest } from "#transport/dataset.rest";
 import { datasetTrpcTransport } from "#transport/dataset.trpc";
@@ -24,6 +26,14 @@ export const datasetProcessModule: PublishedProcessModule<
   .provideMiddlewareContext({ projectRequestContext: projectRequestContextOf })
   .withEventing(datasetNormalizationEventing)
   .withEventing(datasetVersionsEventing)
+  .withTasks(({ repositories, dependencies }) => [
+    DatasetStorageAuditTask.create({
+      audit: DatasetStorageAuditService.create({
+        repository: repositories.storageAudit,
+        projects: dependencies.projects,
+      }),
+    }),
+  ])
   .withMigrations(({ app, repositories, dependencies }) => {
     const fillEmptySlugs = defineMigrationStep({
       id: "dataset:fill-empty-slugs",

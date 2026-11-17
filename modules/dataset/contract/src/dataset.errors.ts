@@ -146,6 +146,23 @@ export class DuplicateRecordIdError extends HandledError {
 }
 
 /**
+ * A write to the Postgres records table for a dataset whose rows live in object storage (ADR-032
+ * I-PG). Rows written there would never be read, so the write is refused instead.
+ */
+export class DatasetRecordsTableWriteRefusedError extends HandledError {
+  declare readonly code: "dataset_records_table_write_refused";
+
+  constructor(datasetId: string) {
+    super(
+      "dataset_records_table_write_refused",
+      `Dataset ${datasetId} keeps its rows in object storage; the records table takes none for it`,
+      { httpStatus: 500, fault: "platform", meta: { datasetId } },
+    );
+    this.name = "DatasetRecordsTableWriteRefusedError";
+  }
+}
+
+/**
  * Thrown when a dataset's persisted columnTypes is not a valid array of {name, type} objects.
  * This indicates a data integrity issue — the schema stored in the database is corrupt.
  */

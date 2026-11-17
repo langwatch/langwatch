@@ -9,6 +9,7 @@ import {
 import { toDate } from "@langwatch/time";
 
 import { lockedView } from "../../rules/dataset-record-lock.rules.ts";
+import { assertRecordsTableHolds } from "../../rules/dataset-records-table.rules.ts";
 import type {
   DatasetRecordRepository,
   LockedDatasetRecords,
@@ -138,6 +139,7 @@ export class MemoryDatasetRecordRepository implements DatasetRecordRepository {
     projectId: string;
     entries: (DatasetRecordInput & { id: string })[];
   }): Promise<DatasetRecord[]> {
+    this.#refuseObjectStorageDataset(input);
     const now = toDate(this.#database.now());
 
     for (const { id, ...entry } of input.entries) {
@@ -167,6 +169,7 @@ export class MemoryDatasetRecordRepository implements DatasetRecordRepository {
     projectId: string;
     entry: Record<string, unknown>;
   }): Promise<DatasetRecord> {
+    this.#refuseObjectStorageDataset(input);
     const record = this.#of(input).find((candidate) => candidate.id === input.id);
     if (!record) throw new DatasetRecordNotFoundError();
 
@@ -194,6 +197,7 @@ export class MemoryDatasetRecordRepository implements DatasetRecordRepository {
     projectId: string;
     entries: (DatasetRecordInput & { id: string })[];
   }): Promise<void> {
+    this.#refuseObjectStorageDataset(input);
     const previous = this.#of(input);
     this.#database.removeRecords({ ...input, recordIds: previous.map((record) => record.id) });
     try {
@@ -221,6 +225,13 @@ export class MemoryDatasetRecordRepository implements DatasetRecordRepository {
       for (const record of previous) this.#database.putRecord(record);
       throw error;
     }
+  }
+
+  #refuseObjectStorageDataset(input: { datasetId: string; projectId: string }): void {
+    const dataset = this.#database
+      .datasets()
+      .find((row) => row.projectId === input.projectId && row.id === input.datasetId);
+    assertRecordsTableHolds(dataset ?? null);
   }
 
   #of(input: { datasetId: string; projectId: string }): DatasetRecord[] {

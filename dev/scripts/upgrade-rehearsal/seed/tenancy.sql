@@ -40,4 +40,24 @@ INSERT INTO "Project" (id, name, slug, "apiKey", "teamId", language, framework, 
   ('rh_' || :'run' || '_p_personal', 'Personal project', 'rh-' || :'run' || '-p-personal', 'sk-lw-rh' || :'run' || 'personal', 'rh_' || :'run' || '_team_personal', 'typescript', 'vercel_ai', now(), now(), NULL, true, 'rh_' || :'run' || '_u_active'),
   ('rh_' || :'run' || '_p_org_b', 'Second organisation project', 'rh-' || :'run' || '-p-org-b', 'sk-lw-rh' || :'run' || 'orgb', 'rh_' || :'run' || '_team_b', 'python', 'langchain', now(), now(), NULL, false, NULL);
 
+-- Datasets whose rows are in the Postgres records table, written as SQL because no release from
+-- the fix on creates one: the dataset content move needs them to have something to move. The
+-- layout column is left to its default, so the insert holds on schemas from before it existed.
+INSERT INTO "Dataset" (id, "projectId", name, slug, "columnTypes", "createdAt", "updatedAt", "archivedAt") VALUES
+  ('rh_' || :'run' || '_ds_live', 'rh_' || :'run' || '_p_team', 'Rehearsal records table', 'rh-' || :'run' || '-ds-live',
+   '[{"name":"input","type":"string"},{"name":"expected_output","type":"string"}]', now(), now(), NULL),
+  ('rh_' || :'run' || '_ds_archived', 'rh_' || :'run' || '_p_team', 'Rehearsal archived records table', 'rh-' || :'run' || '-ds-archived',
+   '[{"name":"input","type":"string"},{"name":"expected_output","type":"string"}]', now(), now(), now());
+
+INSERT INTO "DatasetRecord" (id, "datasetId", "projectId", entry, "createdAt", "updatedAt")
+SELECT 'rh_' || :'run' || '_ds_live_r' || g, 'rh_' || :'run' || '_ds_live', 'rh_' || :'run' || '_p_team',
+       jsonb_build_object('input', 'question ' || g, 'expected_output', 'answer ' || g),
+       now() + make_interval(secs => g), now() + make_interval(secs => g)
+FROM generate_series(1, 3) g
+UNION ALL
+SELECT 'rh_' || :'run' || '_ds_archived_r' || g, 'rh_' || :'run' || '_ds_archived', 'rh_' || :'run' || '_p_team',
+       jsonb_build_object('input', 'archived question ' || g, 'expected_output', 'archived answer ' || g),
+       now() + make_interval(secs => g), now() + make_interval(secs => g)
+FROM generate_series(1, 2) g;
+
 COMMIT;

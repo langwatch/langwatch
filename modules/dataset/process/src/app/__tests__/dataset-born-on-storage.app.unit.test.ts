@@ -302,6 +302,7 @@ describe("copying a dataset kept in the Postgres records table", () => {
       name: "Legacy Rows",
       slug: "legacy-rows",
       columnTypes,
+      contentLayout: "postgres",
     });
     await repositories.records.createMany({
       datasetId: source.id,

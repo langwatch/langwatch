@@ -148,8 +148,8 @@ Feature: Remaining dataset rows move to object storage and leave the records tab
 
     # Read-only, like the plan and verify phases of `pnpm task object-storage-migrate`
     # (modules/stored-object/process/src/tasks/object-storage-migrate.task.ts:286-292).
-    # becomes @integration
-    @unimplemented
+    # `pnpm task dataset-storage-audit` (modules/dataset/process/src/tasks/dataset-storage-audit.task.ts).
+    @integration
     Scenario: The dataset storage audit lists what is left per organization without changing anything
       Given an organization with 2 datasets in the records table holding 7 rows
       And 1 single-file dataset
