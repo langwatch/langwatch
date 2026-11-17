@@ -146,6 +146,7 @@ function billingOver(held: readonly Held[], now: () => Instant = () => AT) {
     host: {
       sendSlackSubscriptionEvent: async () => {},
       sendSlackBillingThresholdFailureAlert: async () => {},
+      sendSlackAccountPaymentFailed: async () => {},
     },
     announcer,
   });
