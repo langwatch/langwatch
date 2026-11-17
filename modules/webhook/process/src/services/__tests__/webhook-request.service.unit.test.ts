@@ -1,4 +1,4 @@
-import { DispatchError } from "@langwatch/eventing";
+import { DispatchError, isDispatchError } from "@langwatch/eventing";
 import { Temporal } from "@langwatch/time";
 import { findWebhookReceiverFailure, type WebhookSendRequest } from "@langwatch/webhook-contract";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -131,19 +131,15 @@ describe("WebhookRequestService", () => {
   describe("given a sender that fails before the receiver answers", () => {
     /** @scenario "An attempt that never reached the endpoint is recorded too" */
     it("files the error and the latency but no status", async () => {
-      const unreachable = new DispatchError({
-        message: "connection refused",
-        retryable: true,
-        customerMessage: "The endpoint refused the connection.",
-      });
-      mockedSend.mockRejectedValue(unreachable);
+      mockedSend.mockRejectedValue(
+        new DispatchError({ message: "connection refused", retryable: true }),
+      );
       const { log, requests } = requestsWith();
 
-      await expect(requests.send(request())).rejects.toMatchObject({
-        message: "connection refused",
-        retryable: true,
-        customerMessage: "The endpoint refused the connection.",
-      });
+      const refusal = await requests.send(request()).catch((error: unknown) => error);
+
+      expect(isDispatchError(refusal)).toBe(true);
+      expect(findWebhookReceiverFailure(refusal)).toEqual({ status: null, retryable: true });
       expect(log.attempts[0]).toMatchObject({
         responseStatus: null,
         error: "connection refused",

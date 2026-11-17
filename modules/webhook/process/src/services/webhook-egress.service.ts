@@ -27,7 +27,8 @@ import { judgeWebhookUrl, webhookUrlValidator } from "../rules/webhook-url-polic
 import type { WebhookDispatchCapService } from "./webhook-dispatch-cap.service.ts";
 
 /**
- * A refusal the customer's own receiver caused: a non-2xx answer, or no answer at all.
+ * A failure the customer's own receiver caused: a non-2xx answer, or a failed connection
+ * to its endpoint. Refusals before any connection, our SSRF fence included, are never one.
  * Its name stays `DispatchError`, which the outbox reads; callers tell it apart by
  * {@link WEBHOOK_RECEIVER_FAILURE} (`findWebhookReceiverFailure` in the contract).
  */
@@ -204,11 +205,11 @@ export class WebhookEgressService {
     const admission = judgeWebhookUrl({ url, allowInsecureLocal });
     if (!admission.admitted) {
       // The author typed this URL, so the refusal is theirs to read (a test fire answers it).
-      throw new WebhookReceiverError({
+      // Refused before any connection, so the receiver played no part: left unmarked, ours.
+      throw new DispatchError({
         message: `${label}: ${admission.reason}`,
         retryable: false,
         customerMessage: `${admission.reason.charAt(0).toUpperCase()}${admission.reason.slice(1)}`,
-        status: null,
       });
     }
     // A real fire only; a test fire is counted on its own door instead — the
@@ -250,15 +251,20 @@ export class WebhookEgressService {
   }
 }
 
-/** The author supplied this endpoint, so a failure to reach it is theirs and is named. */
+/**
+ * The author supplied this endpoint, so a failure to reach it is named. Only a failed
+ * connection to it (retryable) is marked as the receiver's; our fence refusing an address
+ * or a redirect is terminal, never reached the receiver, and stays ours, at error.
+ */
 function withTransportFailureNamed({ error }: { error: unknown }): unknown {
-  if (!isDispatchError(error)) return error;
-  return new WebhookReceiverError({
+  if (!isDispatchError(error) || error.customerMessage) return error;
+  const named = {
     message: error.message,
     retryable: error.retryable,
     cause: error.cause,
     retryAfterMs: error.retryAfterMs,
-    customerMessage: error.customerMessage ?? describeTransportFailure({ error: error.cause }),
-    status: null,
-  });
+    customerMessage: describeTransportFailure({ error: error.cause }),
+  };
+  if (!error.retryable) return new DispatchError(named);
+  return new WebhookReceiverError({ ...named, status: null });
 }

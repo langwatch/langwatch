@@ -3,14 +3,28 @@ import type {
   GraphTriggerEvaluationResult,
   GraphTriggerSweepCandidate,
 } from "@langwatch/automation-contract";
-import { describe, expect, it } from "vitest";
+import type * as observabilityModule from "@langwatch/observability";
+import { createTestLogger } from "@langwatch/test-harness";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
-import {
-  InertIntentRetention,
-  InertScheduledIntents,
-} from "../../__tests__/fixtures/pipeline-test-harness.ts";
-import { webhookReceiverRefusal } from "../../__tests__/fixtures/webhook-receiver.fixture.ts";
-import { runGraphAlertSweep } from "../graph-alert-sweep.intent.ts";
+/**
+ * Spec: modules/automation/specs/graph-alert-worker-composition.feature
+ */
+
+const testLog = createTestLogger();
+vi.mock("@langwatch/observability", async (importOriginal) => ({
+  ...(await importOriginal<typeof observabilityModule>()),
+  createLogger: () => testLog.logger,
+}));
+
+// After the mock: the sweep and the fixtures build their loggers when their modules load.
+const { InertIntentRetention, InertScheduledIntents } =
+  await import("../../__tests__/fixtures/pipeline-test-harness.ts");
+const { webhookReceiverRefusal } =
+  await import("../../__tests__/fixtures/webhook-receiver.fixture.ts");
+const { runGraphAlertSweep } = await import("../graph-alert-sweep.intent.ts");
+
+const RECEIVER_REFUSED = "refused by the automation's own webhook receiver";
 
 /** Hands out one candidate per scripted failure and throws it when evaluated. */
 class FailingCandidates extends InertScheduledIntents {
@@ -48,25 +62,38 @@ function sweep(candidates: FailingCandidates): Promise<void> {
 }
 
 describe("runGraphAlertSweep", () => {
+  afterEach(() => {
+    testLog.lines.length = 0;
+  });
+
   describe("given a candidate whose own webhook receiver answers 404", () => {
-    it("does not retry the sweep for it", async () => {
+    /** @scenario "The scheduled sweep does not redeliver a terminal webhook receiver refusal" */
+    it("warns with its status, never its body, and does not retry the sweep", async () => {
       const candidates = new FailingCandidates({
         a: webhookReceiverRefusal({ status: 404, retryable: false }),
       });
 
       await expect(sweep(candidates)).resolves.toBeUndefined();
-      expect(candidates.evaluated).toEqual(["a"]);
+      expect(testLog.lines.findLine("warn", RECEIVER_REFUSED)).toMatchObject({
+        projectId: "project-1",
+        triggerId: "a",
+        status: 404,
+        retryable: false,
+      });
+      expect(JSON.stringify(testLog.lines)).not.toContain("Token not found");
     });
   });
 
   describe("given candidates failing at a 503 receiver and inside LangWatch", () => {
-    it("retries the sweep for both", async () => {
+    /** @scenario "The scheduled sweep redelivers only failures a retry can help" */
+    it("evaluates both and retries the sweep for both", async () => {
       const candidates = new FailingCandidates({
         a: webhookReceiverRefusal({ status: 503, retryable: true }),
         b: new Error("analytics unavailable"),
       });
 
       await expect(sweep(candidates)).rejects.toThrow(/failed for 2\/2 candidates/);
+      expect(candidates.evaluated).toEqual(["a", "b"]);
     });
   });
 });

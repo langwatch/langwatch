@@ -1,20 +1,28 @@
 import type { GraphTriggerEvaluationResult, TriggerSummary } from "@langwatch/automation-contract";
+import type * as observabilityModule from "@langwatch/observability";
+import { createTestLogger } from "@langwatch/test-harness";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { webhookReceiverRefusal } from "../../__tests__/fixtures/webhook-receiver.fixture.ts";
 import type { AutomationGraphActivity } from "../../features/graph-alert/services/automation-graph-activity.service.ts";
-import { createGraphTriggerActivityHandler } from "../graph-trigger-activity.subscriber.ts";
 
 /**
  * Spec: modules/automation/specs/graph-alert-worker-composition.feature
  */
 
-const logged = vi.hoisted(() => ({ warn: vi.fn(), error: vi.fn() }));
-
+const testLog = createTestLogger();
 vi.mock("@langwatch/observability", async (importOriginal) => ({
-  ...(await importOriginal<Record<string, unknown>>()),
-  createLogger: () => ({ debug: vi.fn(), info: vi.fn(), warn: logged.warn, error: logged.error }),
+  ...(await importOriginal<typeof observabilityModule>()),
+  createLogger: () => testLog.logger,
 }));
+
+// After the mock: the subscriber and the fixture build their loggers when their modules load.
+const { webhookReceiverRefusal } =
+  await import("../../__tests__/fixtures/webhook-receiver.fixture.ts");
+const { createGraphTriggerActivityHandler } =
+  await import("../graph-trigger-activity.subscriber.ts");
+
+const RECEIVER_REFUSED = "the automation's own webhook receiver refused the alert";
+const errors = () => testLog.lines.filter((line) => line.level >= 50);
 
 const context = { tenantId: "project-1" } as never;
 const event = { occurredAt: Date.now() } as never;
@@ -46,7 +54,9 @@ function run(activity: ScriptedActivity): Promise<void> {
 }
 
 describe("createGraphTriggerActivityHandler", () => {
-  afterEach(() => vi.clearAllMocks());
+  afterEach(() => {
+    testLog.lines.length = 0;
+  });
 
   describe("given a graph automation whose own webhook receiver answers 404", () => {
     /** @scenario "A webhook receiver's terminal refusal is the customer's, not ours" */
@@ -56,11 +66,14 @@ describe("createGraphTriggerActivityHandler", () => {
       });
 
       await expect(run(activity)).resolves.toBeUndefined();
-      expect(logged.warn).toHaveBeenCalledWith(
-        { projectId: "project-1", triggerId: "a", status: 404, retryable: false },
-        expect.any(String),
-      );
-      expect(logged.error).not.toHaveBeenCalled();
+      expect(testLog.lines.findLine("warn", RECEIVER_REFUSED)).toMatchObject({
+        projectId: "project-1",
+        triggerId: "a",
+        status: 404,
+        retryable: false,
+      });
+      expect(errors()).toEqual([]);
+      expect(JSON.stringify(testLog.lines)).not.toContain("Token not found");
     });
   });
 
@@ -72,11 +85,13 @@ describe("createGraphTriggerActivityHandler", () => {
       });
 
       await expect(run(activity)).rejects.toThrow(/1\/1 evaluations failed/);
-      expect(logged.warn).toHaveBeenCalledWith(
-        { projectId: "project-1", triggerId: "a", status: 503, retryable: true },
-        expect.any(String),
-      );
-      expect(logged.error).not.toHaveBeenCalled();
+      expect(testLog.lines.findLine("warn", RECEIVER_REFUSED)).toMatchObject({
+        projectId: "project-1",
+        triggerId: "a",
+        status: 503,
+        retryable: true,
+      });
+      expect(errors()).toEqual([]);
     });
   });
 
@@ -86,11 +101,10 @@ describe("createGraphTriggerActivityHandler", () => {
       const activity = new ScriptedActivity({ a: analyticsDown });
 
       await expect(run(activity)).rejects.toThrow(/1\/1 evaluations failed/);
-      expect(logged.error).toHaveBeenCalledWith(
-        { projectId: "project-1", triggerId: "a", error: "analytics unavailable" },
-        "graphTriggerActivity: evaluation failed",
-      );
-      expect(logged.warn).not.toHaveBeenCalled();
+      expect(
+        testLog.lines.findLine("error", "graphTriggerActivity: evaluation failed"),
+      ).toMatchObject({ projectId: "project-1", triggerId: "a", error: "analytics unavailable" });
+      expect(testLog.lines.findLine("warn", RECEIVER_REFUSED)).toBeUndefined();
     });
   });
 

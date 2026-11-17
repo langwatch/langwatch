@@ -304,6 +304,13 @@ Feature: The fence a customer-supplied webhook leaves through
       And a refusal of our own, such as the hourly cap, carries neither
 
     @unit
+    Scenario: A refusal before any connection is never marked as the receiver's
+      Given a URL the address policy refuses, or one our fence refuses at connect
+      When the webhook module is asked to send it
+      Then the refusal carries no receiver failure
+      And it stays reported as ours, since our fence firing is a security signal
+
+    @unit
     Scenario: A webhook request to a private address is refused before any connection
       Given an automation's webhook action pointing at a private, loopback or metadata address
       When the webhook module is asked to send it

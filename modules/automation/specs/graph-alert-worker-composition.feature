@@ -114,6 +114,20 @@ Feature: Composing the graph-alert vertical outside the application
     And only the failures inside LangWatch and at the 503 receiver count toward redelivery
 
   @unit
+  Scenario: The scheduled sweep does not redeliver a terminal webhook receiver refusal
+    Given a sweep candidate whose own webhook receiver answers 404
+    When the scheduled graph-alert sweep runs
+    Then it warns with the trigger and the status, never the response body
+    And the sweep does not ask the queue to redeliver it
+
+  @unit
+  Scenario: The scheduled sweep redelivers only failures a retry can help
+    Given sweep candidates failing at a 503 receiver and inside LangWatch
+    When the scheduled graph-alert sweep runs
+    Then every candidate is still evaluated
+    And the sweep reports failure for both so the queue redelivers it
+
+  @unit
   Scenario: With a public origin, a graph alert's email leaves through notification
     Given a process that names its public origin
     When a crossed graph alert is dispatched to one email recipient
