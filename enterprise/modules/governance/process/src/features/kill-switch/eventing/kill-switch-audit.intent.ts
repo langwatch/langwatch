@@ -3,12 +3,12 @@ import type { AuditLogApi, AuditLogIntent } from "@langwatch/audit-log-contract"
 import type { ProcessStore } from "@langwatch/eventing";
 import { nowInstant } from "@langwatch/time";
 
-import { killSwitchAuditAppend } from "../rules/kill-switch-audit.rules.ts";
-import type { KillSwitchAuditOutbox } from "../services/kill-switch-audit.service.ts";
 import {
   KILL_SWITCH_AUDIT_PROCESS_NAME,
-  KILL_SWITCH_AUDIT_RETENTION_MS,
-} from "./kill-switch-audit.process.ts";
+  killSwitchAuditAppend,
+} from "../rules/kill-switch-audit.rules.ts";
+import type { KillSwitchAuditOutbox } from "../services/kill-switch-audit.service.ts";
+import { KILL_SWITCH_AUDIT_RETENTION_MS } from "./kill-switch-audit.process.ts";
 
 /** The worker's side: deliver one recorded intent; its key makes a redelivery write nothing. */
 export function recordKillSwitchAudit(

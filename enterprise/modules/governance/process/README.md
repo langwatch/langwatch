@@ -2722,15 +2722,15 @@ Declared at `src/features/kill-switch/eventing/agent-stop.pipeline.ts:68`. Event
 
 ### Pipeline `governance_agent_registry` (aggregate `global`)
 
-Declared at `src/features/registry/eventing/agent-registry.pipeline.ts:105`.
+Declared at `src/features/registry/eventing/agent-registry.pipeline.ts:107`.
 
 | Kind            | Name                                    | Handles                                                                                                                             | Declared at                                                     |
 | --------------- | --------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
-| process manager | `agentRegistryDelivery`                 | every 1 d (`AGENT_REGISTRY_DELIVERY_PRUNE_INTERVAL_MS = 24 * 60 * 60 * 1000`); intents `pruneDelivered`, `requestDelivery` (outbox) | `src/features/registry/eventing/agent-registry.pipeline.ts:123` |
-| process manager | `killSwitchAudit`                       | every 1 d (`KILL_SWITCH_AUDIT_PRUNE_INTERVAL_MS = 24 * 60 * 60 * 1000`); intents `pruneAudit`, `recordAudit` (outbox)               | `src/features/registry/eventing/agent-registry.pipeline.ts:140` |
-| process manager | `agentRegistryTraffic`                  | every 15 min (`AGENT_REGISTRY_TRAFFIC_INTERVAL_MS = 15 * 60 * 1000`); intents `pass` (outbox)                                       | `src/features/registry/eventing/agent-registry.pipeline.ts:155` |
-| peer subscriber | `reconcileAgentRegistryOnAgentChanged`  | `lw.agent.changed` from [agent](../../../../modules/agent/README.md)                                                                | `src/features/registry/eventing/agent-registry.pipeline.ts:111` |
-| peer subscriber | `reconcileAgentRegistryOnAgentArchived` | `lw.agent.archived` from [agent](../../../../modules/agent/README.md)                                                               | `src/features/registry/eventing/agent-registry.pipeline.ts:117` |
+| process manager | `agentRegistryDelivery`                 | every 1 d (`AGENT_REGISTRY_DELIVERY_PRUNE_INTERVAL_MS = 24 * 60 * 60 * 1000`); intents `pruneDelivered`, `requestDelivery` (outbox) | `src/features/registry/eventing/agent-registry.pipeline.ts:125` |
+| process manager | `killSwitchAudit`                       | every 1 d (`KILL_SWITCH_AUDIT_PRUNE_INTERVAL_MS = 24 * 60 * 60 * 1000`); intents `pruneAudit`, `recordAudit` (outbox)               | `src/features/registry/eventing/agent-registry.pipeline.ts:142` |
+| process manager | `agentRegistryTraffic`                  | every 15 min (`AGENT_REGISTRY_TRAFFIC_INTERVAL_MS = 15 * 60 * 1000`); intents `pass` (outbox)                                       | `src/features/registry/eventing/agent-registry.pipeline.ts:157` |
+| peer subscriber | `reconcileAgentRegistryOnAgentChanged`  | `lw.agent.changed` from [agent](../../../../modules/agent/README.md)                                                                | `src/features/registry/eventing/agent-registry.pipeline.ts:113` |
+| peer subscriber | `reconcileAgentRegistryOnAgentArchived` | `lw.agent.archived` from [agent](../../../../modules/agent/README.md)                                                               | `src/features/registry/eventing/agent-registry.pipeline.ts:119` |
 
 ## Configuration
 

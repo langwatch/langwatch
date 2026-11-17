@@ -28,14 +28,16 @@ import { pruneKillSwitchAudits } from "../../kill-switch/eventing/kill-switch-au
 import {
   KILL_SWITCH_AUDIT_INITIAL_STATE,
   KILL_SWITCH_AUDIT_MAX_ATTEMPTS,
-  KILL_SWITCH_AUDIT_PROCESS_NAME,
   KILL_SWITCH_AUDIT_PRUNE_INTENT,
   KILL_SWITCH_AUDIT_PRUNE_INTERVAL_MS,
-  KILL_SWITCH_AUDIT_RECORD_INTENT,
   killSwitchAuditPruneSchema,
   killSwitchAuditPruneWake,
   killSwitchAuditStateSchema,
 } from "../../kill-switch/eventing/kill-switch-audit.process.ts";
+import {
+  KILL_SWITCH_AUDIT_PROCESS_NAME,
+  KILL_SWITCH_AUDIT_RECORD_INTENT,
+} from "../../kill-switch/rules/kill-switch-audit.rules.ts";
 import { pruneAgentRegistryDeliveries } from "./agent-registry-delivery.intent.ts";
 import {
   AGENT_REGISTRY_DELIVERY_INITIAL_STATE,

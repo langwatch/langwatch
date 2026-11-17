@@ -3,15 +3,14 @@ import type { auditLogIntentSchema } from "@langwatch/audit-log-contract";
 import type { IntentSpec, WakeHandler } from "@langwatch/eventing";
 import { z } from "zod";
 
+import type { KILL_SWITCH_AUDIT_RECORD_INTENT } from "../rules/kill-switch-audit.rules.ts";
+
 /**
  * The kill switch's audit outbox (the audit outbox rule of modules/audit-log/specs): a request
  * appends its audit intent here and the worker writes it to the audit log, retried and once per
  * key. A daily wake prunes delivered rows. Spec: specs/agent-kill-switch.feature
  */
-export const KILL_SWITCH_AUDIT_PROCESS_NAME = "killSwitchAudit" as const;
-export const KILL_SWITCH_AUDIT_RECORD_INTENT = "recordAudit" as const;
 export const KILL_SWITCH_AUDIT_PRUNE_INTENT = "pruneAudit" as const;
-export const KILL_SWITCH_AUDIT_PROCESS_KEY = "kill-switch-audit";
 /** An audit row is worth a day of retries; a dead one stays visible on the ops outbox page. */
 export const KILL_SWITCH_AUDIT_MAX_ATTEMPTS = 12;
 export const KILL_SWITCH_AUDIT_RETENTION_MS = 2 * 24 * 60 * 60 * 1000;

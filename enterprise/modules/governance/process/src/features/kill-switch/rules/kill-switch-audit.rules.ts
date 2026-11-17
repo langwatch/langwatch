@@ -1,17 +1,23 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import type { AuditLogIntent } from "@langwatch/audit-log-contract";
-import type { ProcessStore } from "@langwatch/eventing";
 
-import {
-  KILL_SWITCH_AUDIT_PROCESS_KEY,
-  KILL_SWITCH_AUDIT_PROCESS_NAME,
-  KILL_SWITCH_AUDIT_RECORD_INTENT,
-} from "../eventing/kill-switch-audit.process.ts";
+export const KILL_SWITCH_AUDIT_PROCESS_NAME = "killSwitchAudit" as const;
+export const KILL_SWITCH_AUDIT_RECORD_INTENT = "recordAudit" as const;
+/** The organisation's one audit outbox instance. */
+export const KILL_SWITCH_AUDIT_PROCESS_KEY = "kill-switch-audit";
 
-type KillSwitchAuditAppend = Omit<
-  Parameters<ProcessStore["appendIntents"]>[0],
-  "transaction" | "now"
->;
+type KillSwitchAuditAppend = {
+  ref: { processName: string; projectId: string; processKey: string };
+  tenantId: string;
+  userId?: string;
+  sourceEventId: null;
+  messages: {
+    messageKey: string;
+    intentType: string;
+    payload: AuditLogIntent;
+    traceCarrier: Record<string, string>;
+  }[];
+};
 
 /** The outbox append of one kill switch audit intent, under its own key; the caller adds `now`. */
 export function killSwitchAuditAppend(intent: AuditLogIntent): KillSwitchAuditAppend {
