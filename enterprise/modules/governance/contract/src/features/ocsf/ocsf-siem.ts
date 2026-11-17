@@ -126,12 +126,22 @@ const YEAR_2000_MS = 946_684_800_000;
 /** How far ahead of now a pushed-in event's `time` may be. */
 export const OCSF_INGEST_MAX_FUTURE_MS = 24 * 60 * 60 * 1000;
 
+/** OCSF class ids are six digits (category * 1000 + class); type_uid is class_uid * 100 + activity. */
+export const OCSF_CLASS_UID_MAX = 999_999;
+export const OCSF_CATEGORY_UID_MAX = 999;
+export const OCSF_TYPE_UID_MAX = OCSF_CLASS_UID_MAX * 100 + 99;
+
+/** The size limit is in bytes on the wire, so multibyte text counts as it is sent. */
+function utf8ByteLength(text: string): number {
+  return new TextEncoder().encode(text).byteLength;
+}
+
 const ocsfIngestEventSchemaDefinition = z
   .looseObject({
-    class_uid: z.number().int().nonnegative(),
-    category_uid: z.number().int().nonnegative().optional(),
+    class_uid: z.number().int().min(0).max(OCSF_CLASS_UID_MAX),
+    category_uid: z.number().int().min(0).max(OCSF_CATEGORY_UID_MAX).optional(),
     activity_id: z.number().int().min(0).max(255).optional(),
-    type_uid: z.number().int().nonnegative().optional(),
+    type_uid: z.number().int().min(0).max(OCSF_TYPE_UID_MAX).optional(),
     severity_id: z.number().int().min(0).max(255),
     /** Epoch milliseconds; the route also refuses a time more than a day ahead. */
     time: z.number().int().min(YEAR_2000_MS),
@@ -140,7 +150,7 @@ const ocsfIngestEventSchemaDefinition = z
       version: z.string().min(1).max(32),
     }),
   })
-  .refine((event) => JSON.stringify(event).length <= OCSF_INGEST_EVENT_MAX_BYTES, {
+  .refine((event) => utf8ByteLength(JSON.stringify(event)) <= OCSF_INGEST_EVENT_MAX_BYTES, {
     message: `An event is at most ${OCSF_INGEST_EVENT_MAX_BYTES} bytes as JSON`,
   });
 export interface OcsfIngestEventSchema extends Named<typeof ocsfIngestEventSchemaDefinition> {}

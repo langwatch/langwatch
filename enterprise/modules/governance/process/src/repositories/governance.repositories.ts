@@ -10,6 +10,7 @@ import type { AiToolCatalogRepository } from "./ai-tool-catalog.repository.ts";
 import type { AnomalyRuleRepository } from "./anomaly-rule.repository.ts";
 import type {
   OcsfEventBatchWriter,
+  OcsfIngestOrderedReader,
   OcsfSeatReportReader,
 } from "./clickhouse/clickhouse.ocsf-events.repository.ts";
 import type { CostAttributionPolicyRepository } from "./cost-attribution-policy.repository.ts";
@@ -64,6 +65,8 @@ export interface AnomalySpendReader {
     sourceFilter: AnomalySpendSourceFilter;
   }): Promise<{ currentSpend: number; baselineSpend: number }>;
 }
+
+export type { OcsfIngestOrderedReader };
 
 export interface GovernanceOcsfEventsReader {
   findAll(input: {
@@ -185,7 +188,8 @@ export interface GovernanceClickHouseRepositories {
   readonly ocsfEvents: GovernanceOcsfEventsReader &
     GovernanceOcsfEventWriter &
     OcsfEventBatchWriter &
-    OcsfSeatReportReader;
+    OcsfSeatReportReader &
+    OcsfIngestOrderedReader;
 }
 
 /**

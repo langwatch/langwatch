@@ -202,8 +202,13 @@ async function buildApi({
     secrets: new ScopedSecrets(async (_handle, build) => build(undefined)),
   });
 
+  const audits: unknown[] = [];
   const runtime = createRestRuntime({
-    audit: { record: () => {} },
+    audit: {
+      record: (row: unknown) => {
+        audits.push(row);
+      },
+    },
     authorization: restTestAuthorization(),
     entitlements: { holds: async () => planType === "ENTERPRISE" },
     identity: {
@@ -231,7 +236,10 @@ async function buildApi({
     });
   const seed = (rows: GovernanceOcsfEvent[]) => repositories.ocsfEvents.insertEvents(rows);
 
-  return { get, post, seed };
+  const seatReports = () =>
+    repositories.ocsfEvents.findLatestSeatReports({ tenantId: TENANT, actionName: "seat_report" });
+
+  return { get, post, seed, audits, seatReports, hono };
 }
 
 type Page = {
@@ -457,6 +465,103 @@ describe("the OCSF SIEM REST family", () => {
       expect(body.code).toBe("validation_error");
       expect(JSON.stringify(body)).toContain("metadata");
       expect(JSON.stringify(body)).toContain("uid");
+    });
+
+    /** @scenario A SIEM reading on with its cursor receives an event pushed in with an earlier time */
+    it("returns a back-dated event on the next cursor read", async () => {
+      const { get, post } = await buildApi();
+      await post("/api/governance/ocsf/ingest", { source: "okta", events: [okta("o-1")] });
+      const first = (await (await get("/api/governance/ocsf/events")).json()) as Page;
+
+      const backDated = { ...okta("o-old"), time: Date.parse("2026-11-09T09:00:00Z") };
+      await post("/api/governance/ocsf/ingest", { source: "okta", events: [backDated] });
+      const next = (await (
+        await get(`/api/governance/ocsf/events?cursor=${first.next_cursor}`)
+      ).json()) as Page;
+
+      expect(uids(first)).toEqual(["o-1"]);
+      expect(uids(next)).toEqual(["o-old"]);
+    });
+
+    /** @scenario A push-in body over the bulk body limit is refused with 413 */
+    it("answers 413 for a 40 MB body", async () => {
+      const { hono } = await buildApi();
+
+      const response = await hono.request("/api/governance/ocsf/ingest", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${KEY}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          source: "okta",
+          events: [okta("o-1")],
+          pad: "x".repeat(40_000_000),
+        }),
+      });
+
+      expect(response.status).toBe(413);
+    });
+
+    /** @scenario An event over 64 KiB of UTF-8 is refused even when it holds fewer characters */
+    it("counts the 64 KiB limit in UTF-8 bytes", async () => {
+      const { post } = await buildApi();
+      const event = { ...okta("o-1"), message: "\u00e9".repeat(40_000) };
+
+      const response = await post("/api/governance/ocsf/ingest", {
+        source: "okta",
+        events: [event],
+      });
+
+      expect(JSON.stringify(event).length).toBeLessThan(64 * 1024);
+      expect(response.status).toBe(422);
+    });
+
+    /** @scenario An event with a class_uid outside the OCSF range is refused */
+    it("refuses a class_uid past six digits with 422", async () => {
+      const { post } = await buildApi();
+      const event = { ...okta("o-1"), class_uid: 99_999_999_999 };
+
+      const response = await post("/api/governance/ocsf/ingest", {
+        source: "okta",
+        events: [event],
+      });
+
+      expect(response.status).toBe(422);
+      expect(JSON.stringify(await response.json())).toContain("class_uid");
+    });
+
+    /** @scenario A seat report pushed in from another source leaves the seat figures alone */
+    it("keeps an ingested seat_report out of the seat reports", async () => {
+      const { post, seatReports } = await buildApi();
+      const forged = {
+        ...okta("o-seat"),
+        api: { operation: "seat_report" },
+        metadata: {
+          uid: "o-seat",
+          version: "1.4.0",
+          extension: { skuPartNumber: "SKU", seatsBought: 9999, seatsAssigned: 8888 },
+        },
+      };
+
+      const response = await post("/api/governance/ocsf/ingest", {
+        source: "okta",
+        events: [forged],
+      });
+
+      expect(response.status).toBe(200);
+      expect(await seatReports()).toEqual([]);
+    });
+
+    /** @scenario Each push-in batch leaves one audit row without the events */
+    it("writes one audit row per batch with no event payload", async () => {
+      const { post, audits } = await buildApi();
+
+      await post("/api/governance/ocsf/ingest", {
+        source: "okta",
+        events: [okta("o-1"), okta("o-2")],
+      });
+
+      expect(audits).toHaveLength(1);
+      expect(JSON.stringify(audits[0])).toContain("governance.ocsfEvents.ingest");
+      expect(JSON.stringify(audits[0])).not.toContain("Okta");
     });
 
     /** @scenario A key without governance:manage cannot push events in */

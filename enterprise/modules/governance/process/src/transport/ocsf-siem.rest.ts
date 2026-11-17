@@ -19,8 +19,10 @@ import {
   ocsfIngestResponseSchema,
   ocsfTracesQuerySchema,
 } from "@langwatch/enterprise-governance-contract";
+import { resolveRequestBound } from "@langwatch/plans";
 
 const TAGS = ["Governance / OCSF SIEM"];
+const BODY_LIMIT_BULK_BYTES = resolveRequestBound("bodyLimitBulkBytes", "ENTERPRISE");
 
 const PAGING =
   "Pass `next_cursor` back as `cursor` to read on; it is always set, so a puller stores it between runs. `has_more` is true when more events are already waiting. `since` and `until` (ISO 8601) bound the first read; a cursor carries its own position.";
@@ -103,7 +105,8 @@ export const ocsfSiemRest = defineRestRouter(GovernanceRestApi)
 
   .post("/api/governance/ocsf/ingest", "ingestOcsfEvents")
   .keepsRecords()
-  .withoutAudit("a bulk data write; each event is itself an audit record")
+  .withAudit("governance.ocsfEvents.ingest")
+  .withBodyLimit({ maxBytes: BODY_LIMIT_BULK_BYTES })
   .withInput(ocsfIngestRequestSchema)
   .withPermission("governance:manage")
   .withEntitlement("enterprise", { feature: "OCSF_EXPORT" })
@@ -113,7 +116,7 @@ export const ocsfSiemRest = defineRestRouter(GovernanceRestApi)
     summary: "Push OCSF events in from another source",
     tags: TAGS,
     description:
-      "Stores up to 500 OCSF events from another tool, named by `source`. Each event needs `class_uid`, `severity_id`, `time` (epoch ms) and `metadata.uid` and `metadata.version`, and is at most 64 KiB. An event is identified by `source` and `metadata.uid`: sending it again replaces it. Stored events are returned by `GET /api/governance/ocsf/events` with `source_type=ocsf_push`, as received, and are not pushed to webhook endpoints.",
+      "Stores up to 500 OCSF events from another tool, named by `source`. Each event needs `class_uid`, `severity_id`, `time` (epoch ms) and `metadata.uid` and `metadata.version`, and is at most 64 KiB as UTF-8 JSON; the request body is at most 10 MiB. An event is identified by `source` and `metadata.uid`: sending it again replaces it. Stored events are returned by `GET /api/governance/ocsf/events` with `source_type=ocsf_push`, as received, and are not pushed to webhook endpoints.",
     responses: { ...canonicalBaseResponses, ...canonicalUnprocessableResponses },
   })
   .handle(({ app, input, scope }) => app.ingestOcsfEvents({ ...input, organizationId: scope.id }))

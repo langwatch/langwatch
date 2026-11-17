@@ -974,3 +974,8 @@
 /workflows/overview
 /workflows/workflow-as-agent
 /workflows/workflow-as-evaluator
+/api-reference/governance-ocsf/export-governance-events-as-ocsf-1-9-0
+/api-reference/governance-ocsf/export-project-traces-as-ocsf-1-9-0
+/api-reference/governance-ocsf/export-the-audit-log-as-ocsf-1-9-0
+/api-reference/governance-ocsf/overview
+/api-reference/governance-ocsf/push-ocsf-events-in-from-another-source

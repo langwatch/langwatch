@@ -21,7 +21,7 @@ import type { TraceApi } from "@langwatch/trace-contract";
 import type {
   GovernanceOcsfEvent,
   GovernanceOcsfEventSink,
-  GovernanceOcsfEventsReader,
+  OcsfIngestOrderedReader,
 } from "../../../repositories/governance.repositories.ts";
 import {
   auditEntryToOcsfEvent,
@@ -35,7 +35,7 @@ const EMPTY_PROJECTS_PER_PAGE = 20;
 type ExportWindow = { limit: number; since?: string; until?: string; cursor?: string };
 
 type OcsfSiemExportDependencies = {
-  events: GovernanceOcsfEventsReader & GovernanceOcsfEventSink;
+  events: OcsfIngestOrderedReader & GovernanceOcsfEventSink;
   projects: Pick<
     ProjectApi,
     "findInternal" | "ensureInternal" | "findLiveNonGovernanceIdsByOrganization"
@@ -140,7 +140,7 @@ export class OcsfSiemExportService {
   ): Promise<OcsfEventsPage> {
     const cursor =
       input.cursor === undefined ? undefined : getCursor(input.cursor, decodeOcsfGovernanceCursor);
-    const watermark = cursor ?? { t: sinceMs(input.since), e: "" };
+    const watermark = cursor ?? { t: 0, e: "" };
     const tenant = await this.deps.projects.findInternal({
       organizationId: input.organizationId,
       kind: PROJECT_KIND.INTERNAL_GOVERNANCE,
@@ -148,11 +148,12 @@ export class OcsfSiemExportService {
     if (!tenant) return this.page({ data: [], cursor: watermark, hasMore: false });
 
     const untilMs = input.until === undefined ? undefined : toEpochMs(input.until);
-    const rows = await this.deps.events.findAll({
+    const rows = await this.deps.events.findAllByIngest({
       tenantId: tenant.id,
-      sinceMs: watermark.t,
-      sinceEventId: watermark.e,
+      afterIngestedMs: watermark.t,
+      afterEventId: watermark.e,
       limit: input.limit + 1,
+      ...(input.since === undefined ? {} : { sinceMs: toEpochMs(input.since) }),
       ...(untilMs === undefined ? {} : { untilMs }),
       ...(input.sourceType === undefined ? {} : { sourceType: input.sourceType }),
       ...(input.sourceId === undefined ? {} : { sourceId: input.sourceId }),
@@ -163,7 +164,7 @@ export class OcsfSiemExportService {
       data: kept.map((row) =>
         governanceRowToOcsfEvent({ row, organizationId: input.organizationId }),
       ),
-      cursor: last ? { t: last.eventTimeMs, e: last.eventId } : watermark,
+      cursor: last ? { t: last.ingestedAtMs, e: last.eventId } : watermark,
       hasMore: rows.length > input.limit,
     });
   }

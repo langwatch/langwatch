@@ -176,6 +176,31 @@ Feature: OCSF 1.9 SIEM export, push and ingest
       Then the answer is 422 with code "validation_error" naming "metadata.uid"
 
     @integration
+    Scenario: A SIEM reading on with its cursor receives an event pushed in with an earlier time
+      Given a SIEM read the export and kept its next_cursor
+      When an OCSF event whose time is a day earlier is pushed in
+      Then the read from that cursor returns the event
+
+    Scenario: A push-in body over the bulk body limit is refused with 413
+      When a source pushes a 40 MB body to the ingest route
+      Then the response is 413
+
+    Scenario: An event over 64 KiB of UTF-8 is refused even when it holds fewer characters
+      When a source pushes an event of under 65,536 characters but over 64 KiB as UTF-8
+      Then the response is 422
+
+    Scenario: An event with a class_uid outside the OCSF range is refused
+      When a source pushes an event with class_uid 99999999999
+      Then the response is 422 naming class_uid
+
+    Scenario: A seat report pushed in from another source leaves the seat figures alone
+      When a source pushes an event whose api.operation is seat_report
+      Then the organisation's seat reports are unchanged
+
+    Scenario: Each push-in batch leaves one audit row without the events
+      When a source pushes two events in one request
+      Then one audit row records the ingest and holds none of the event payloads
+
     Scenario: A key without governance:manage cannot push events in
       Given an organisation API key holding only complianceExport:view
       When it posts an OCSF event

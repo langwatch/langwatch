@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import type { GovernanceOcsfExportRow } from "@langwatch/enterprise-governance-contract";
+import {
+  type GovernanceOcsfExportRow,
+  OCSF_PUSHED_SOURCE_TYPE,
+} from "@langwatch/enterprise-governance-contract";
 import { createLogger } from "@langwatch/observability";
 import { toDate } from "@langwatch/time";
 
@@ -80,6 +83,27 @@ export interface OcsfEventBatchWriter {
   insertEvents(rows: GovernanceOcsfEvent[]): Promise<void>;
 }
 
+/** An export row with the time ClickHouse stored it, which is what the SIEM cursor pages by. */
+export type GovernanceOcsfIngestOrderedRow = GovernanceOcsfExportRow & { ingestedAtMs: number };
+
+/** Events stored after an (ingest time, EventId) watermark, so a back-dated event is still read. */
+export interface FindOcsfEventsByIngestInput {
+  tenantId: string;
+  afterIngestedMs: number;
+  afterEventId: string;
+  limit: number;
+  /** Inclusive lower bound on EventTime. */
+  sinceMs?: number;
+  /** Exclusive upper bound on EventTime. */
+  untilMs?: number;
+  sourceType?: string;
+  sourceId?: string;
+}
+
+export interface OcsfIngestOrderedReader {
+  findAllByIngest(input: FindOcsfEventsByIngestInput): Promise<GovernanceOcsfIngestOrderedRow[]>;
+}
+
 /** The licence-seat read `governanceCost.service.ts`'s seats screen needs. */
 export interface OcsfSeatReportReader {
   findLatestSeatReports(input: {
@@ -135,7 +159,7 @@ export interface GovernanceSeatReportRow {
   seatStem: boolean;
 }
 
-interface SeatReportCHRow {
+export interface SeatReportCHRow {
   SourceId: string;
   SkuPartNumber: string;
   Day: string;
@@ -200,6 +224,29 @@ function findSeatReport(row: SeatReportCHRow): GovernanceSeatReportRow | null {
   };
 }
 
+function toExportRow(r: OcsfExportCHRow): GovernanceOcsfExportRow {
+  return {
+    eventId: r.EventId,
+    ocsfSchemaVersion: r.OcsfSchemaVersion,
+    traceId: r.TraceId,
+    sourceId: r.SourceId,
+    sourceType: r.SourceType,
+    classUid: Number(r.ClassUid),
+    categoryUid: Number(r.CategoryUid),
+    activityId: Number(r.ActivityId),
+    typeUid: Number(r.TypeUid),
+    severityId: Number(r.SeverityId),
+    eventTimeMs: Number(r.EventTimeMs),
+    actorUserId: r.ActorUserId,
+    actorEmail: r.ActorEmail,
+    actorEnduserId: r.ActorEnduserId,
+    actionName: r.ActionName,
+    targetName: r.TargetName,
+    anomalyAlertId: r.AnomalyAlertId,
+    rawOcsfJson: r.RawOcsfJson,
+  };
+}
+
 function toOcsfEventValues(row: GovernanceOcsfEvent): Record<string, unknown> {
   return {
     TenantId: row.tenantId,
@@ -230,7 +277,8 @@ export class ClickHouseOcsfEventsRepository
     GovernanceOcsfEventsReader,
     GovernanceOcsfEventWriter,
     OcsfEventBatchWriter,
-    OcsfSeatReportReader
+    OcsfSeatReportReader,
+    OcsfIngestOrderedReader
 {
   private constructor(private readonly resolveClient: GovernanceClickHouseTenantResolver) {}
 
@@ -359,26 +407,88 @@ export class ClickHouseOcsfEventsRepository
     });
 
     const rows = (await result.json()) as OcsfExportCHRow[];
-    return rows.map((r) => ({
-      eventId: r.EventId,
-      ocsfSchemaVersion: r.OcsfSchemaVersion,
-      traceId: r.TraceId,
-      sourceId: r.SourceId,
-      sourceType: r.SourceType,
-      classUid: Number(r.ClassUid),
-      categoryUid: Number(r.CategoryUid),
-      activityId: Number(r.ActivityId),
-      typeUid: Number(r.TypeUid),
-      severityId: Number(r.SeverityId),
-      eventTimeMs: Number(r.EventTimeMs),
-      actorUserId: r.ActorUserId,
-      actorEmail: r.ActorEmail,
-      actorEnduserId: r.ActorEnduserId,
-      actionName: r.ActionName,
-      targetName: r.TargetName,
-      anomalyAlertId: r.AnomalyAlertId,
-      rawOcsfJson: r.RawOcsfJson,
-    }));
+    return rows.map(toExportRow);
+  }
+
+  /**
+   * The SIEM stream: the latest version of each (TenantId, EventId), ordered by the time it was
+   * stored. Paging by EventTime would skip an event that arrives with a time before the cursor.
+   * Spec: enterprise/modules/governance/specs/ocsf-siem.feature
+   */
+  /** The seat figure one stored seat report carries; the memory twin decodes with it too. */
+  static seatReportsOf(row: SeatReportCHRow): GovernanceSeatReportRow[] {
+    return findSeatReport(row) ?? [];
+  }
+
+  async findAllByIngest(
+    input: FindOcsfEventsByIngestInput,
+  ): Promise<GovernanceOcsfIngestOrderedRow[]> {
+    const client = await this.resolveClient(input.tenantId);
+    const filters = [
+      input.sinceMs === undefined
+        ? ""
+        : "AND EventTime >= fromUnixTimestamp64Milli({sinceMs:UInt64})",
+      input.untilMs === undefined
+        ? ""
+        : "AND EventTime < fromUnixTimestamp64Milli({untilMs:UInt64})",
+      input.sourceType === undefined ? "" : "AND SourceType = {sourceType:String}",
+      input.sourceId === undefined ? "" : "AND SourceId = {sourceId:String}",
+    ].join(" ");
+    const result = await client.query({
+      query: `
+        SELECT
+          EventId,
+          OcsfSchemaVersion,
+          TraceId,
+          SourceId,
+          SourceType,
+          ClassUid,
+          CategoryUid,
+          ActivityId,
+          TypeUid,
+          SeverityId,
+          toString(toUnixTimestamp64Milli(EventTime)) AS EventTimeMs,
+          toString(toUnixTimestamp64Milli(LastUpdatedAt)) AS IngestedAtMs,
+          ActorUserId,
+          ActorEmail,
+          ActorEnduserId,
+          ActionName,
+          TargetName,
+          AnomalyAlertId,
+          RawOcsfJson
+        FROM ${TABLE_NAME}
+        WHERE TenantId = {tenantId:String}
+          AND LastUpdatedAt >= fromUnixTimestamp64Milli({afterIngestedMs:UInt64})
+          ${filters}
+          AND (TenantId, EventId, LastUpdatedAt) IN (
+            SELECT TenantId, EventId, max(LastUpdatedAt) AS Latest
+            FROM ${TABLE_NAME}
+            WHERE TenantId = {tenantId:String}
+              ${filters}
+            GROUP BY TenantId, EventId
+            HAVING (Latest, EventId) > (fromUnixTimestamp64Milli({afterIngestedMs:UInt64}), {afterEventId:String})
+            ORDER BY Latest ASC, EventId ASC
+            LIMIT {limit:UInt32}
+          )
+        ORDER BY LastUpdatedAt ASC, EventId ASC
+        LIMIT 1 BY EventId
+        LIMIT {limit:UInt32}
+      `,
+      query_params: {
+        tenantId: input.tenantId,
+        afterIngestedMs: input.afterIngestedMs,
+        afterEventId: input.afterEventId,
+        limit: input.limit,
+        ...(input.sinceMs === undefined ? {} : { sinceMs: input.sinceMs }),
+        ...(input.untilMs === undefined ? {} : { untilMs: input.untilMs }),
+        ...(input.sourceType === undefined ? {} : { sourceType: input.sourceType }),
+        ...(input.sourceId === undefined ? {} : { sourceId: input.sourceId }),
+      },
+      format: "JSONEachRow",
+    });
+
+    const rows = (await result.json()) as (OcsfExportCHRow & { IngestedAtMs: string })[];
+    return rows.map((r) => ({ ...toExportRow(r), ingestedAtMs: Number(r.IngestedAtMs) }));
   }
 
   /**
@@ -397,7 +507,8 @@ export class ClickHouseOcsfEventsRepository
    * whichever version the merge had not collapsed yet, so the same query would
    * answer differently before and after a merge.
    *
-   * TenantId leads the predicate — nothing else here is unique across tenants
+   * Events pushed in from another source (`ocsf_push`) never count: a seat figure is
+   * LangWatch's own read of the provider. TenantId leads the predicate — nothing else here is unique across tenants
    * — and `ActionName` narrows to seat reports, so no conversation reaches the
    * decode.
    */
@@ -416,12 +527,14 @@ export class ClickHouseOcsfEventsRepository
         FROM ${TABLE_NAME}
         WHERE TenantId = {tenantId:String}
           AND ActionName = {actionName:String}
+          AND SourceType != {pushedSourceType:String}
         GROUP BY SourceId, TargetName
         ORDER BY SourceId, TargetName
       `,
       query_params: {
         tenantId: input.tenantId,
         actionName: input.actionName,
+        pushedSourceType: OCSF_PUSHED_SOURCE_TYPE,
       },
       format: "JSONEachRow",
     });
