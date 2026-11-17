@@ -70,8 +70,8 @@ function slugify(value: string): string {
 }
 
 /** `sourceTemplateId` is storage-only: it marks a template-made row for the Free cap count. */
-function mapScenario(row: unknown): Scenario {
-  const { sourceTemplateId: _, ...scenario } = row as Record<string, unknown>;
+function mapScenario(row: PrismaScenario): Scenario {
+  const { sourceTemplateId: _, ...scenario } = row;
   return scenarioSchema.parse(scenario);
 }
 
