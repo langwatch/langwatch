@@ -314,11 +314,34 @@ Feature: Agent kill switch: stop a misbehaving agent where it runs, with approva
     And an approval card for "pricing-bot" offers Approve and Deny
 
   @integration
+  Scenario: Every agent of the Agents page gets its kill switch summary, however many there are
+    Given an organisation with more agents and open stops than one read page holds
+    When the Agents page reads the kill switch summaries
+    Then every agent has a summary with its plan size and its open stop
+
+  @integration
   Scenario: The Stop button asks for confirmation before stopping
     Given "support-bot" has a stop plan
     When a person with governance:manage presses Stop on the agent
     Then a dialog names the plan's targets and asks for a reason
     And confirming requests the stop
+
+  @integration
+  Scenario: Denying a pending stop from its approval card keeps the note
+    Given a stop of "pricing-bot" pending approval
+    When a person with governance:manage denies it from its approval card with a note
+    Then the denial carries the note, trimmed, and the approvals are read again
+    And a refused denial keeps the dialog open
+
+  @integration
+  Scenario: The AWS connection form adds a key pair or a role to assume
+    When a person adds an AWS connection with an access key pair, or switches to a role to assume
+    Then only the fields of the chosen kind are sent, trimmed
+
+  @integration
+  Scenario: The AWS connection form refuses a connection the contract would refuse
+    When a person adds an access key id without its secret, or a role ARN that is not an IAM role
+    Then the form says why and sends nothing
 
   @integration
   Scenario: The stop plan dialog offers the organisation's Databricks Genie sources

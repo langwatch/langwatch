@@ -5,6 +5,7 @@
  */
 import { defineTrpcRouter, type TrpcRouterDeclaration } from "@langwatch/api/trpc";
 import {
+  GOVERNANCE_UI_STOP_SEVERITY,
   GovernanceRestApi,
   governanceKillSwitchTrpc,
 } from "@langwatch/enterprise-governance-contract";
@@ -63,7 +64,7 @@ export const governanceKillSwitchTrpcTransport: TrpcRouterDeclaration<
       organizationId: input.organizationId,
       agentId: input.agentId,
       reason: input.reason,
-      severity: "high",
+      severity: GOVERNANCE_UI_STOP_SEVERITY,
       ...(input.expectedTargetIds ? { expectedTargetIds: input.expectedTargetIds } : {}),
       caller: personOf(actor),
     }),

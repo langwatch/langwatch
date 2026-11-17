@@ -241,6 +241,108 @@ describe("the stop plan of an agent", () => {
     expect(within(dialog).getAllByTestId("stop-plan-target")).toHaveLength(2);
   });
 
+  describe("when a person adds an AWS connection", () => {
+    const CREATED = {
+      id: "aws-2",
+      name: "Bedrock prod",
+      accessKeyIdLastFour: null,
+      roleArn: null,
+      hasExternalId: false,
+      createdAt: "2026-11-16T00:00:00.000Z",
+    };
+    const openConnectionForm = async () => {
+      const { dialog } = await openPlanDialog();
+      await userEvent.click(await within(dialog).findByRole("button", { name: "Add connection" }));
+      const form = await within(dialog).findByTestId("aws-connection-form");
+      await userEvent.type(within(form).getByLabelText("Connection name"), "Bedrock prod");
+      return form;
+    };
+    const submit = (form: HTMLElement) =>
+      userEvent.click(within(form).getByRole("button", { name: "Add connection" }));
+
+    /** @scenario "The AWS connection form adds a key pair or a role to assume" */
+    it("sends a trimmed access key pair and nothing of the role", async () => {
+      answerMutation("governanceKillSwitch.createAwsConnection", () => CREATED);
+      const form = await openConnectionForm();
+
+      await userEvent.type(within(form).getByLabelText("Access key id"), "  AKIAACMEEXAMPLE0001 ");
+      await userEvent.type(
+        within(form).getByLabelText("Secret access key"),
+        "acme-secret-access-key-0001",
+      );
+      await submit(form);
+
+      expect(trpcDouble.calls).toEqual([
+        {
+          procedure: "governanceKillSwitch.createAwsConnection",
+          input: {
+            organizationId: "org-1",
+            connection: {
+              name: "Bedrock prod",
+              accessKeyId: "AKIAACMEEXAMPLE0001",
+              secretAccessKey: "acme-secret-access-key-0001",
+            },
+          },
+        },
+      ]);
+      expect(trpcDouble.invalidated).toContain("governanceKillSwitch.awsConnections");
+    });
+
+    /** @scenario "The AWS connection form adds a key pair or a role to assume" */
+    it("sends a role ARN with its external id and no key pair", async () => {
+      answerMutation("governanceKillSwitch.createAwsConnection", () => CREATED);
+      const form = await openConnectionForm();
+
+      await userEvent.type(within(form).getByLabelText("Access key id"), "AKIAACMEEXAMPLE0001");
+      await userEvent.click(within(form).getByText("Role to assume"));
+      await userEvent.type(
+        within(form).getByLabelText("Role ARN"),
+        "arn:aws:iam::123456789012:role/langwatch-kill-switch",
+      );
+      await userEvent.type(within(form).getByLabelText("External id"), "acme-external");
+      await submit(form);
+
+      expect(trpcDouble.calls).toEqual([
+        {
+          procedure: "governanceKillSwitch.createAwsConnection",
+          input: {
+            organizationId: "org-1",
+            connection: {
+              name: "Bedrock prod",
+              roleArn: "arn:aws:iam::123456789012:role/langwatch-kill-switch",
+              externalId: "acme-external",
+            },
+          },
+        },
+      ]);
+    });
+
+    /** @scenario "The AWS connection form refuses a connection the contract would refuse" */
+    it("refuses an access key id without its secret, says why and sends nothing", async () => {
+      const form = await openConnectionForm();
+
+      await userEvent.type(within(form).getByLabelText("Access key id"), "AKIAACMEEXAMPLE0001");
+      await submit(form);
+
+      expect(within(form).getByRole("alert")).toHaveTextContent(
+        "an access key id and its secret come together",
+      );
+      expect(trpcDouble.calls).toEqual([]);
+    });
+
+    /** @scenario "The AWS connection form refuses a connection the contract would refuse" */
+    it("refuses a role ARN that is not an IAM role and sends nothing", async () => {
+      const form = await openConnectionForm();
+
+      await userEvent.click(within(form).getByText("Role to assume"));
+      await userEvent.type(within(form).getByLabelText("Role ARN"), "not-an-arn");
+      await submit(form);
+
+      expect(within(form).getByRole("alert")).toHaveTextContent("an IAM role ARN");
+      expect(trpcDouble.calls).toEqual([]);
+    });
+  });
+
   it("says why an AWS connection still in use cannot be deleted", async () => {
     answerQuery("governanceKillSwitch.awsConnections", () => [
       {

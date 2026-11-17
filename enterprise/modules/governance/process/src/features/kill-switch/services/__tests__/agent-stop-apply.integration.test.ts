@@ -2,6 +2,7 @@
  * The worker applying each target of a stop through the real `agent_stop` pipeline.
  * Spec: enterprise/modules/governance/specs/agent-kill-switch.feature
  */
+import { createTestLogger } from "@langwatch/test-harness";
 import { describe, expect, it, vi } from "vitest";
 
 import { AGENT_STOP_MAX_ATTEMPTS } from "../../eventing/agent-stop.process.ts";
@@ -111,7 +112,8 @@ describe("AgentStopTargetService", () => {
 
     /** @scenario "A target the platform refuses is retried, then recorded as failed" */
     it("retries a refused Bedrock target, records it failed with the error name and fails the stop", async () => {
-      const harness = await killSwitchHarness({ maxAttempts: 3 });
+      const { logger, lines } = createTestLogger();
+      const harness = await killSwitchHarness({ maxAttempts: 3, logger });
       await harness.setFullPlan();
       harness.bedrock.refuseWith("ThrottlingException");
 
@@ -128,6 +130,11 @@ describe("AgentStopTargetService", () => {
       ).toEqual(["databricks_serving_endpoint", "gateway_virtual_key"]);
       await vi.waitFor(() => expect(harness.announced).toHaveLength(1));
       expect(harness.announced[0]?.milestone).toBe("governance.agent.stop_failed");
+      expect(lines.findLine("warn", "failed on its last attempt")).toMatchObject({
+        stopId: view.id,
+        targetId: bedrock?.id,
+        errorCode: "ThrottlingException",
+      });
       await harness.eventing.close();
     });
   });

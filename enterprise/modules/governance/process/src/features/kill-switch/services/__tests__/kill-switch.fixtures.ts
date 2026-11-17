@@ -5,6 +5,7 @@
  */
 import type { AuditLogApi, RecordAuditLogCommand } from "@langwatch/audit-log-contract";
 import type {
+  AgentStopCaller,
   AgentStopTarget,
   AgentStopView,
   AgentStopWebhookEventType,
@@ -17,6 +18,7 @@ import type {
   GatewayVirtualKeyDisableCommand,
   GatewayVirtualKeyRecord,
 } from "@langwatch/gateway-contract";
+import type { Logger } from "@langwatch/observability";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { Temporal } from "@langwatch/time";
 
@@ -32,7 +34,7 @@ import { buildAgentStopPipeline } from "../../eventing/agent-stop.pipeline.ts";
 import { AgentStopClaimService } from "../agent-stop-claim.service.ts";
 import { AgentStopPlanService } from "../agent-stop-plan.service.ts";
 import { AgentStopTargetService } from "../agent-stop-target.service.ts";
-import { type AgentStopCaller, AgentStopService } from "../agent-stop.service.ts";
+import { AgentStopService } from "../agent-stop.service.ts";
 import { GovernanceAwsConnectionService } from "../governance-aws-connection.service.ts";
 
 export const ORG = "org-1";
@@ -108,19 +110,37 @@ export type VirtualKeyCall =
   | { action: "disable"; input: GatewayVirtualKeyDisableCommand }
   | { action: "enable"; input: GatewayVirtualKeyCommand };
 
-export async function killSwitchHarness({ maxAttempts = 3 }: { maxAttempts?: number } = {}) {
+/**
+ * `otherAgents` registers more agents beside "support-bot", each with the id `agent-<name>`;
+ * `pageSize` is how many rows the stop service reads at a time.
+ */
+export async function killSwitchHarness({
+  maxAttempts = 3,
+  otherAgents = [],
+  pageSize,
+  logger,
+}: {
+  maxAttempts?: number;
+  otherAgents?: readonly string[];
+  pageSize?: number;
+  logger?: Logger;
+} = {}) {
   const repositories = MemoryGovernanceRepositories.create();
-  await repositories.agentRegistry.applyChanges({
-    organizationId: ORG,
-    plan: (stored) =>
-      planRegistryChanges({
-        stored,
-        drafts: [draft("support-bot")],
-        now: Temporal.Instant.from("2026-11-01T00:00:00Z"),
-        newId: () => AGENT_ID,
-      }),
-    baselineAt: Temporal.Instant.from("2026-11-01T00:00:00Z"),
-  });
+  const names = ["support-bot", ...otherAgents];
+  for (const [index, name] of names.entries()) {
+    const id = index === 0 ? AGENT_ID : `agent-${name}`;
+    await repositories.agentRegistry.applyChanges({
+      organizationId: ORG,
+      plan: (stored) =>
+        planRegistryChanges({
+          stored,
+          drafts: names.slice(0, index + 1).map(draft),
+          now: Temporal.Instant.from("2026-11-01T00:00:00Z"),
+          newId: () => id,
+        }),
+      baselineAt: Temporal.Instant.from("2026-11-01T00:00:00Z"),
+    });
+  }
   const source = await repositories.ingestionSources.create({
     organizationId: ORG,
     teamId: null,
@@ -258,6 +278,7 @@ export async function killSwitchHarness({ maxAttempts = 3 }: { maxAttempts?: num
     registry: repositories.agentRegistry,
     auditLog,
     send,
+    ...(pageSize ? { pageSize } : {}),
   });
   const targets = AgentStopTargetService.create({
     send,
@@ -278,6 +299,7 @@ export async function killSwitchHarness({ maxAttempts = 3 }: { maxAttempts?: num
     },
     auditLog,
     maxAttempts,
+    ...(logger ? { logger } : {}),
   });
   const pipeline = eventing.register(
     buildAgentStopPipeline({

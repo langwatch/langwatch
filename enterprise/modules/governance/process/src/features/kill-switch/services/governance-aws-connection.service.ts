@@ -20,11 +20,9 @@ import type {
 interface GovernanceAwsConnectionDependencies {
   connections: GovernanceAwsConnectionRepository;
   plans: Pick<AgentStopPlanRepository, "findAgentIdsByAwsConnection">;
-  stops: Pick<AgentStopRepository, "findByStatuses">;
+  stops: Pick<AgentStopRepository, "findAllByStatuses">;
   newId: () => string;
 }
-
-const STOPS_READ_LIMIT = 500;
 
 /** A read answers the access key id's last four characters and never a secret. */
 function viewOfAwsConnection(record: GovernanceAwsConnectionRecord): AwsConnectionView {
@@ -114,10 +112,9 @@ export class GovernanceAwsConnectionService {
         organizationId,
         awsConnectionId: connectionId,
       }),
-      this.deps.stops.findByStatuses({
+      this.deps.stops.findAllByStatuses({
         organizationId,
         statuses: STOP_STATUSES_HOLDING_CONNECTIONS,
-        limit: STOPS_READ_LIMIT,
       }),
     ]);
     const stopped = stops

@@ -252,13 +252,6 @@ export class AgentRegistryService {
   }
 
   /** Each entry's source key, so a caller can name the Agents-page row the entry backs. */
-  findSourceKeys(input: {
-    organizationId: string;
-    ids: readonly string[];
-  }): Promise<{ id: string; sourceKey: string }[]> {
-    return this.deps.registry.findSourceKeys(input);
-  }
-
   private async reconcileLogged({ organizationId }: { organizationId: string }): Promise<void> {
     try {
       await this.reconcileOrganization({ organizationId });

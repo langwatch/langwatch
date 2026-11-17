@@ -128,6 +128,11 @@ export type AwsConnectionView = z.infer<typeof awsConnectionViewSchema>;
 
 export const AGENT_STOP_SEVERITIES = ["low", "medium", "high", "critical"] as const;
 export type AgentStopSeverity = (typeof AGENT_STOP_SEVERITIES)[number];
+/**
+ * The severity a stop from the governance UI carries. A person's stop acts at once whatever its
+ * severity, so the Stop dialog asks none; the audit row and the webhook payload name this one.
+ */
+export const GOVERNANCE_UI_STOP_SEVERITY: AgentStopSeverity = "high";
 
 /** `user`: a person in the UI or tRPC. `api_key`: a machine credential, a trace rule's webhook included. */
 export const AGENT_STOP_TRIGGERS = ["user", "api_key"] as const;

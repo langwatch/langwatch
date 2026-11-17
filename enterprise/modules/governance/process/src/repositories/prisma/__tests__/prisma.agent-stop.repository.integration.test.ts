@@ -70,4 +70,59 @@ describe.skipIf(!connection)("the AgentStop Prisma repository", () => {
       ).rejects.toMatchObject({ code: "agent_stop_not_found" });
     });
   });
+
+  describe("when more stops match than one page holds", () => {
+    /** @scenario "Every agent of the Agents page gets its kill switch summary, however many there are" */
+    it("reads every one of them, latest first, a page at a time", async () => {
+      const organizationId = newOrganization();
+      const repository = PrismaAgentStopRepository.create(prisma());
+      const requested = ["10:00:00", "10:00:00", "10:05:00", "10:10:00", "10:15:00"].map(
+        (time, index) =>
+          requestedStop({
+            data: {
+              stopId: `agentstop-${ns}-${index}`,
+              organizationId,
+              agentId: `agent-${index}`,
+              agentName: `bot-${index}`,
+              severity: "high",
+              approval: "required",
+              trigger: "api_key",
+              reason: "cost spike",
+              requestedByUserId: null,
+              requestedByApiKeyId: "key-trace-rule",
+              targets: [],
+            },
+            at: Date.parse(`2026-11-16T${time}Z`),
+          }),
+      );
+      for (const stop of requested) {
+        const at = Date.parse(stop.requestedAt);
+        await repository.store(
+          {
+            state: stop,
+            cursor: { acceptedAt: at, eventId: `event-${stop.id}` },
+            occurredAt: at,
+            createdAt: at,
+            updatedAt: at,
+            version: "2026-11-16",
+          },
+          { tenantId: createTenantId(organizationId), aggregateId: stop.id },
+        );
+      }
+
+      const all = await repository.findAllByStatuses({
+        organizationId,
+        statuses: ["pending_approval"],
+        pageSize: 2,
+      });
+
+      expect(all.map((stop) => stop.id)).toEqual([
+        `agentstop-${ns}-4`,
+        `agentstop-${ns}-3`,
+        `agentstop-${ns}-2`,
+        `agentstop-${ns}-1`,
+        `agentstop-${ns}-0`,
+      ]);
+    });
+  });
 });

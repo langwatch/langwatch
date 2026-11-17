@@ -12,6 +12,7 @@ import {
   ORG,
   OTHER_MACHINE,
   PERSON,
+  VIRTUAL_KEY_ID,
 } from "./kill-switch.fixtures.ts";
 
 describe("AgentStopService", () => {
@@ -181,6 +182,39 @@ describe("AgentStopService", () => {
       const harness = await killSwitchHarness();
 
       expect(await codeOf(request(harness))).toBe("agent_stop_plan_empty");
+      await harness.eventing.close();
+    });
+  });
+
+  describe("when the organisation holds more agents and open stops than one read page", () => {
+    /** @scenario "Every agent of the Agents page gets its kill switch summary, however many there are" */
+    it("answers a summary with its open stop for every agent", async () => {
+      const others = ["pricing-bot", "billing-bot", "triage-bot"];
+      const harness = await killSwitchHarness({ otherAgents: others, pageSize: 2 });
+      const agentIds = [AGENT_ID, ...others.map((name) => `agent-${name}`)];
+      const stopIds: string[] = [];
+      for (const agentId of agentIds) {
+        await harness.plans.setPlan({
+          organizationId: ORG,
+          agentId,
+          targets: [{ kind: "gateway_virtual_key", virtualKeyId: VIRTUAL_KEY_ID }],
+        });
+        const view = await harness.stops.requestStop({
+          organizationId: ORG,
+          agentId,
+          reason: "prompt injection in production",
+          severity: "high",
+          caller: PERSON,
+        });
+        stopIds.push(view.id);
+        await settled(harness, view.id, "quarantined");
+      }
+
+      const summaries = await harness.stops.findSummaries({ organizationId: ORG });
+
+      expect(summaries).toHaveLength(agentIds.length);
+      expect(summaries.map((row) => row.agentId)).toEqual(expect.arrayContaining(agentIds));
+      expect(summaries.map((row) => row.openStop?.id)).toEqual(expect.arrayContaining(stopIds));
       await harness.eventing.close();
     });
   });

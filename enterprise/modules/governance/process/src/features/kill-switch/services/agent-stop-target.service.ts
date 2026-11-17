@@ -7,6 +7,7 @@ import {
 } from "@langwatch/enterprise-governance-contract";
 import type { IntentContext } from "@langwatch/eventing";
 import type { GatewayApi } from "@langwatch/gateway-contract";
+import { createLogger, type Logger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 
 import type { BedrockAgentAliasChannel } from "../../../channels/bedrock-agent-alias.channel.ts";
@@ -42,6 +43,7 @@ interface AgentStopTargetDependencies {
   auditLog: Pick<AuditLogApi, "record">;
   maxAttempts: number;
   now: () => number;
+  logger: Logger;
 }
 
 type Direction = "stop" | "restore";
@@ -58,12 +60,14 @@ export class AgentStopTargetService implements AgentStopIntentExecutors {
   static create({
     maxAttempts = AGENT_STOP_MAX_ATTEMPTS,
     now = () => nowInstant().epochMilliseconds,
+    logger = createLogger("langwatch:governance:kill-switch"),
     ...deps
-  }: Omit<AgentStopTargetDependencies, "maxAttempts" | "now"> & {
+  }: Omit<AgentStopTargetDependencies, "maxAttempts" | "now" | "logger"> & {
     maxAttempts?: number;
     now?: () => number;
+    logger?: Logger;
   }): AgentStopTargetService {
-    return new AgentStopTargetService({ ...deps, maxAttempts, now });
+    return new AgentStopTargetService({ ...deps, maxAttempts, now, logger });
   }
 
   async applyTarget(intent: AgentStopApplyIntent, context: IntentContext): Promise<void> {
@@ -141,7 +145,19 @@ export class AgentStopTargetService implements AgentStopIntentExecutors {
       return { ok: true, changed, errorCode: null };
     } catch (error) {
       if (context.attempt < this.deps.maxAttempts) throw error;
-      return { ok: false, changed: false, errorCode: errorCodeOf(error) };
+      const errorCode = errorCodeOf(error);
+      this.deps.logger.warn(
+        {
+          error,
+          errorCode,
+          direction,
+          stopId: intent.stopId,
+          targetId: intent.target.id,
+          organizationId: intent.organizationId,
+        },
+        "kill switch target call failed on its last attempt; recording the target failed",
+      );
+      return { ok: false, changed: false, errorCode };
     }
   }
 

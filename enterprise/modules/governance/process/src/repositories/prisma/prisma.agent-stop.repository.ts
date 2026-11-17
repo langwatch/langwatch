@@ -17,7 +17,7 @@ import {
   type AgentStopRecord,
   agentStopRecordSchema,
 } from "../../features/kill-switch/rules/agent-stop.rules.ts";
-import { AgentStopRepository } from "../agent-stop.repository.ts";
+import { type AgentStopPosition, AgentStopRepository } from "../agent-stop.repository.ts";
 
 type AgentStopDatabase = Pick<PrismaClient, "agentStop">;
 type Row = Prisma.AgentStopGetPayload<object>;
@@ -166,13 +166,27 @@ export class PrismaAgentStopRepository extends AgentStopRepository {
     organizationId,
     statuses,
     limit,
+    before,
   }: {
     organizationId: string;
     statuses?: readonly AgentStopStatus[];
     limit: number;
+    before?: AgentStopPosition;
   }): Promise<AgentStopRecord[]> {
+    const beforeAt = before ? new Date(before.requestedAt) : undefined;
     const rows = await this.prisma.agentStop.findMany({
-      where: { organizationId, ...(statuses ? { status: { in: [...statuses] } } : {}) },
+      where: {
+        organizationId,
+        ...(statuses ? { status: { in: [...statuses] } } : {}),
+        ...(before && beforeAt
+          ? {
+              OR: [
+                { requestedAt: { lt: beforeAt } },
+                { requestedAt: beforeAt, id: { lt: before.id } },
+              ],
+            }
+          : {}),
+      },
       orderBy: [{ requestedAt: "desc" }, { id: "desc" }],
       take: limit,
     });

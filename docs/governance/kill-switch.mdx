@@ -23,7 +23,7 @@ Each agent has a stop plan: the targets a stop acts on. Set it on the Agents pag
 
 A Databricks target uses the workspace and credentials of a Databricks [ingestion source](/ai-governance/ingestion-sources/index). A Bedrock target uses an AWS connection you add under **AWS connections** on the same screen: an access key pair, a role ARN to assume (with an external id), or both. The secret access key and the external id are stored encrypted and are never shown again.
 
-A Bedrock alias that already rejects invocations, or a virtual key that is already disabled, when the stop starts is left as it is, and a restore leaves it that way too.
+A Bedrock alias that already rejects invocations, or a virtual key that is already disabled, when the stop starts is left as it is, and a restore leaves it that way too. A Databricks endpoint is always stopped, and a restore starts it again even if it was stopped before: Databricks reports a stopped endpoint and one still deploying the same way, as not ready.
 
 Databricks stops only endpoints that serve custom models and have no update in progress. A stopped endpoint answers `400` to queries.
 

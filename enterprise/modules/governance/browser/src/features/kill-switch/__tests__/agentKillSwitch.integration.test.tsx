@@ -6,7 +6,7 @@
  * Only the tRPC binding is doubled. Spec: enterprise/modules/governance/specs/agent-kill-switch.feature
  */
 import "@testing-library/jest-dom/vitest";
-import { act, cleanup, screen, within } from "@testing-library/react";
+import { act, cleanup, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -118,6 +118,52 @@ describe("the Agents page with stops of its agents", () => {
         input: { organizationId: "org-1", stopId: "stop-2" },
       });
       expect(trpcDouble.invalidated).toContain("governanceKillSwitch.pendingApprovals");
+    });
+
+    /** @scenario "Denying a pending stop from its approval card keeps the note" */
+    it("denies pricing-bot's stop with the trimmed note and closes the dialog", async () => {
+      answerMutation("governanceKillSwitch.denyStop", () => ({ ...PENDING, status: "denied" }));
+      renderAgentsPage({ permissions: MANAGER });
+
+      const row = within(await screen.findByTestId("stop-approvals-card")).getByTestId(
+        "stop-approval-row",
+      );
+      await userEvent.click(within(row).getByRole("button", { name: "Deny" }));
+      const dialog = await screen.findByRole("dialog", { name: "Deny the stop of pricing-bot?" });
+      await userEvent.type(within(dialog).getByRole("textbox", { name: "Note" }), " False alarm ");
+      await userEvent.click(within(dialog).getByRole("button", { name: "Deny stop" }));
+
+      expect(trpcDouble.calls).toContainEqual({
+        procedure: "governanceKillSwitch.denyStop",
+        input: { organizationId: "org-1", stopId: "stop-2", note: "False alarm" },
+      });
+      expect(trpcDouble.invalidated).toContain("governanceKillSwitch.pendingApprovals");
+      await waitFor(() =>
+        expect(screen.queryByRole("dialog", { name: "Deny the stop of pricing-bot?" })).toBeNull(),
+      );
+    });
+
+    /** @scenario "Denying a pending stop from its approval card keeps the note" */
+    it("keeps the dialog open when the denial is refused", async () => {
+      answerMutation("governanceKillSwitch.denyStop", () => {
+        throw handledError({ code: "agent_stop_not_pending", httpStatus: 409 });
+      });
+      renderAgentsPage({ permissions: MANAGER });
+
+      const row = within(await screen.findByTestId("stop-approvals-card")).getByTestId(
+        "stop-approval-row",
+      );
+      await userEvent.click(within(row).getByRole("button", { name: "Deny" }));
+      const dialog = await screen.findByRole("dialog", { name: "Deny the stop of pricing-bot?" });
+      await userEvent.click(within(dialog).getByRole("button", { name: "Deny stop" }));
+
+      expect(trpcDouble.calls).toContainEqual({
+        procedure: "governanceKillSwitch.denyStop",
+        input: { organizationId: "org-1", stopId: "stop-2" },
+      });
+      expect(
+        screen.getByRole("dialog", { name: "Deny the stop of pricing-bot?" }),
+      ).toBeInTheDocument();
     });
 
     /** @scenario "The agents inventory shows a quarantined agent's status and pending approvals" */

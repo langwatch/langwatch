@@ -15,6 +15,9 @@ import type { AgentStopRecord } from "../features/kill-switch/rules/agent-stop.r
  * The AgentStop projection: written by the `agent_stop` pipeline's fold, read by the kill switch
  * services. Tenant is the organisation.
  */
+/** Keyset position in the latest-first stop listing: request moment, then id. */
+export type AgentStopPosition = { requestedAt: string; id: string };
+
 export abstract class AgentStopRepository implements StateProjectionStore<AgentStopProjectionState> {
   abstract get(
     key: string,
@@ -32,10 +35,42 @@ export abstract class AgentStopRepository implements StateProjectionStore<AgentS
     agentId: string;
     limit: number;
   }): Promise<AgentStopRecord[]>;
-  /** The organisation's stops in any of `statuses` (every status when absent), latest first. */
+  /**
+   * The organisation's stops in any of `statuses` (every status when absent), latest first; with
+   * `before`, only the stops after that position in the same order.
+   */
   abstract findByStatuses(input: {
     organizationId: string;
     statuses?: readonly AgentStopStatus[];
     limit: number;
+    before?: AgentStopPosition;
   }): Promise<AgentStopRecord[]>;
+
+  /** Every stop in any of `statuses`, latest first, read `pageSize` at a time to the end. */
+  async findAllByStatuses({
+    organizationId,
+    statuses,
+    pageSize = 200,
+  }: {
+    organizationId: string;
+    statuses: readonly AgentStopStatus[];
+    pageSize?: number;
+  }): Promise<AgentStopRecord[]> {
+    const stops: AgentStopRecord[] = [];
+    let before: AgentStopPosition | undefined;
+    let hasMore = true;
+    while (hasMore) {
+      const page = await this.findByStatuses({
+        organizationId,
+        statuses,
+        limit: pageSize,
+        ...(before ? { before } : {}),
+      });
+      stops.push(...page);
+      const last = page.at(-1);
+      hasMore = page.length === pageSize && last !== undefined;
+      if (last) before = { requestedAt: last.requestedAt, id: last.id };
+    }
+    return stops;
+  }
 }

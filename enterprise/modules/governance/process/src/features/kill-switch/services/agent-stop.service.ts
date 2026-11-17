@@ -4,6 +4,7 @@ import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import {
   AGENT_STOP_OPEN_STATUSES,
   type AgentKillSwitchSummary,
+  type AgentStopCaller,
   type AgentStopDecidedEventData,
   AgentStopNotFoundError,
   AgentStopNotPendingError,
@@ -20,7 +21,10 @@ import {
 import { generate } from "@langwatch/ksuid";
 import { nowInstant } from "@langwatch/time";
 
-import type { AgentRegistryRepository } from "../../../repositories/agent-registry.repository.ts";
+import type {
+  AgentRegistryRepository,
+  RegistryEntryPosition,
+} from "../../../repositories/agent-registry.repository.ts";
 import type { AgentStopRepository } from "../../../repositories/agent-stop.repository.ts";
 import type { AgentStopCommandName } from "../eventing/agent-stop.commands.ts";
 import {
@@ -36,9 +40,6 @@ import {
 } from "../rules/agent-stop.rules.ts";
 import type { AgentStopClaimService } from "./agent-stop-claim.service.ts";
 import type { AgentStopPlanService } from "./agent-stop-plan.service.ts";
-
-/** Who asked: a person (userId only) or an organisation API key (its id, and its owner if any). */
-export type AgentStopCaller = { userId: string | null; apiKeyId: string | null };
 
 /** Sends one `agent_stop` command; the payload is the event data with tenant and moment merged in. */
 export type AgentStopCommandSend = (
@@ -58,14 +59,18 @@ function isSamePlan(targetIds: readonly string[], expected: readonly string[]): 
 }
 
 interface AgentStopDependencies {
-  stops: Pick<AgentStopRepository, "getStop" | "findByAgent" | "findByStatuses">;
+  stops: Pick<
+    AgentStopRepository,
+    "getStop" | "findByAgent" | "findByStatuses" | "findAllByStatuses"
+  >;
   claims: Pick<AgentStopClaimService, "claim" | "markSent" | "release" | "withDecision">;
   plans: Pick<AgentStopPlanService, "findTargets" | "findPlanCounts">;
-  registry: Pick<AgentRegistryRepository, "getEntry" | "findEntries" | "findSourceKeys">;
+  registry: Pick<AgentRegistryRepository, "getEntry" | "listEntries" | "findSourceKeys">;
   auditLog: Pick<AuditLogApi, "record">;
   send: AgentStopCommandSend;
   newId: () => string;
   now: () => number;
+  pageSize: number;
 }
 
 /**
@@ -80,12 +85,14 @@ export class AgentStopService {
   static create({
     newId = () => generate("agentstop").toString(),
     now = () => nowInstant().epochMilliseconds,
+    pageSize = READ_LIMIT,
     ...deps
-  }: Omit<AgentStopDependencies, "newId" | "now"> & {
+  }: Omit<AgentStopDependencies, "newId" | "now" | "pageSize"> & {
     newId?: () => string;
     now?: () => number;
+    pageSize?: number;
   }): AgentStopService {
-    return new AgentStopService({ ...deps, newId, now });
+    return new AgentStopService({ ...deps, newId, now, pageSize });
   }
 
   async requestStop({
@@ -223,32 +230,27 @@ export class AgentStopService {
   /**
    * One row per active registry agent, plus any other agent holding a plan or an open stop, keyed
    * to its Agents-page row. An agent with no plan yet still gets a row, so its first plan can be set.
+   * The Agents page lists every agent, so both reads are paged to the end.
    */
   async findSummaries({
     organizationId,
   }: {
     organizationId: string;
   }): Promise<AgentKillSwitchSummary[]> {
-    const [counts, open, active] = await Promise.all([
+    const [counts, open, activeIds] = await Promise.all([
       this.deps.plans.findPlanCounts({ organizationId }),
-      this.deps.stops.findByStatuses({
+      this.deps.stops.findAllByStatuses({
         organizationId,
         statuses: AGENT_STOP_OPEN_STATUSES,
-        limit: READ_LIMIT,
+        pageSize: this.deps.pageSize,
       }),
-      this.deps.registry.findEntries({ organizationId, status: "active", limit: READ_LIMIT }),
+      this.findAllActiveAgentIds({ organizationId }),
     ]);
     const openByAgent = new Map<string, AgentStopRecord>();
     for (const stop of open)
       if (!openByAgent.has(stop.agentId)) openByAgent.set(stop.agentId, stop);
     const countByAgent = new Map(counts.map((count) => [count.agentId, count.targetCount]));
-    const agentIds = [
-      ...new Set([
-        ...active.map((entry) => entry.id),
-        ...countByAgent.keys(),
-        ...openByAgent.keys(),
-      ]),
-    ];
+    const agentIds = [...new Set([...activeIds, ...countByAgent.keys(), ...openByAgent.keys()])];
     if (agentIds.length === 0) return [];
     const sourceKeys = new Map(
       (await this.deps.registry.findSourceKeys({ organizationId, ids: agentIds })).map((row) => [
@@ -266,6 +268,29 @@ export class AgentStopService {
         openStop: openStop ? viewOfStop(openStop) : null,
       };
     });
+  }
+
+  private async findAllActiveAgentIds({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<string[]> {
+    const ids: string[] = [];
+    let after: RegistryEntryPosition | undefined;
+    let hasMore = true;
+    while (hasMore) {
+      const page = await this.deps.registry.listEntries({
+        organizationId,
+        status: "active",
+        limit: this.deps.pageSize,
+        ...(after ? { after } : {}),
+      });
+      ids.push(...page.entries.map((entry) => entry.id));
+      const last = page.entries.at(-1);
+      hasMore = page.hasMore && last !== undefined;
+      if (last) after = { updatedAt: last.updated_at, id: last.id };
+    }
+    return ids;
   }
 
   private async decide({

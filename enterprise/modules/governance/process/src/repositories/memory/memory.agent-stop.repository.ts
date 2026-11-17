@@ -12,9 +12,9 @@ import type {
 
 import type { AgentStopProjectionState } from "../../features/kill-switch/eventing/agent-stop.projection.ts";
 import type { AgentStopRecord } from "../../features/kill-switch/rules/agent-stop.rules.ts";
-import { AgentStopRepository } from "../agent-stop.repository.ts";
+import { type AgentStopPosition, AgentStopRepository } from "../agent-stop.repository.ts";
 
-function latestFirst(a: AgentStopRecord, b: AgentStopRecord): number {
+function latestFirst(a: AgentStopPosition, b: AgentStopPosition): number {
   return b.requestedAt.localeCompare(a.requestedAt) || b.id.localeCompare(a.id);
 }
 
@@ -90,13 +90,16 @@ export class MemoryAgentStopRepository extends AgentStopRepository {
     organizationId,
     statuses,
     limit,
+    before,
   }: {
     organizationId: string;
     statuses?: readonly AgentStopStatus[];
     limit: number;
+    before?: AgentStopPosition;
   }): Promise<AgentStopRecord[]> {
     return this.all(organizationId)
       .filter((stop) => !statuses || statuses.includes(stop.status))
+      .filter((stop) => !before || latestFirst(before, stop) < 0)
       .toSorted(latestFirst)
       .slice(0, limit);
   }
