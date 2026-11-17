@@ -45,23 +45,69 @@ func hasControl(s string) bool {
 	return false
 }
 
-// restMethod maps an HTTP+JSON path to its A2A method name.
-func restMethod(httpMethod, rest string) string {
+// restMethod maps an HTTP+JSON method and path to its A2A method name, and
+// reports whether the pair is an A2A operation. Anything else is refused
+// before it reaches the upstream.
+func restMethod(httpMethod, rest string) (string, bool) {
+	get, post := httpMethod == http.MethodGet, httpMethod == http.MethodPost
+	task, isTask := strings.CutPrefix(rest, "/tasks/")
 	switch {
-	case rest == cardPath:
-		return "GetAgentCard"
-	case rest == "/message:send":
-		return "SendMessage"
-	case rest == "/message:stream":
-		return "SendStreamingMessage"
-	case strings.HasPrefix(rest, "/tasks/") && strings.HasSuffix(rest, ":cancel"):
-		return "CancelTask"
-	case strings.HasPrefix(rest, "/tasks/") && strings.HasSuffix(rest, ":subscribe"):
-		return "SubscribeToTask"
-	case strings.HasPrefix(rest, "/tasks/") && httpMethod == http.MethodGet:
-		return "GetTask"
-	case rest == "/tasks" && httpMethod == http.MethodGet:
-		return "ListTasks"
+	case get && rest == cardPath:
+		return "GetAgentCard", true
+	case get && rest == "/extendedAgentCard":
+		return "GetExtendedAgentCard", true
+	case post && rest == "/message:send":
+		return "SendMessage", true
+	case post && rest == "/message:stream":
+		return "SendStreamingMessage", true
+	case get && rest == "/tasks":
+		return "ListTasks", true
+	case isTask:
+		return taskMethod(httpMethod, task)
 	}
-	return fmt.Sprintf("%s %s", httpMethod, rest)
+	return fmt.Sprintf("%s %s", httpMethod, rest), false
+}
+
+// taskMethod maps the part after /tasks/ to its A2A method name.
+func taskMethod(httpMethod, task string) (string, bool) {
+	id, sub, hasSub := strings.Cut(task, "/")
+	id, verb, hasVerb := strings.Cut(id, ":")
+	if id == "" || (hasVerb && hasSub) {
+		return httpMethod + " /tasks/" + task, false
+	}
+	switch {
+	case hasVerb && !hasSub:
+		return taskVerbMethod(httpMethod, verb)
+	case !hasSub:
+		return "GetTask", httpMethod == http.MethodGet
+	}
+	return pushConfigMethod(httpMethod, sub)
+}
+
+func taskVerbMethod(httpMethod, verb string) (string, bool) {
+	switch {
+	case verb == "cancel" && httpMethod == http.MethodPost:
+		return "CancelTask", true
+	case verb == "subscribe" && (httpMethod == http.MethodGet || httpMethod == http.MethodPost):
+		return "SubscribeToTask", true
+	}
+	return httpMethod + " :" + verb, false
+}
+
+// pushConfigMethod maps /tasks/{id}/pushNotificationConfigs[/{configId}].
+func pushConfigMethod(httpMethod, sub string) (string, bool) {
+	config, hasConfig := strings.CutPrefix(sub, "pushNotificationConfigs/")
+	switch {
+	case sub == "pushNotificationConfigs" && httpMethod == http.MethodPost:
+		return "CreateTaskPushNotificationConfig", true
+	case sub == "pushNotificationConfigs" && httpMethod == http.MethodGet:
+		return "ListTaskPushNotificationConfig", true
+	case !hasConfig || config == "" || strings.Contains(config, "/"):
+		return httpMethod + " " + sub, false
+	case httpMethod == http.MethodGet:
+		return "GetTaskPushNotificationConfig", true
+	case httpMethod == http.MethodDelete:
+		return "DeleteTaskPushNotificationConfig", true
+	}
+	return httpMethod + " " + sub, false
 }
