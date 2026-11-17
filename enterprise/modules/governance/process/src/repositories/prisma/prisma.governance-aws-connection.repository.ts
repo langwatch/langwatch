@@ -1,16 +1,20 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
+import type { AuditLogIntent } from "@langwatch/audit-log-contract";
 import { GovernanceAwsConnectionNotFoundError } from "@langwatch/enterprise-governance-contract";
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { PrismaProcessStore } from "@langwatch/eventing/server";
+import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
 import type { Encryption } from "@langwatch/process-stores";
+import { nowInstant } from "@langwatch/time";
 
+import { killSwitchAuditAppend } from "../../features/kill-switch/rules/kill-switch-audit.rules.ts";
 import {
   type GovernanceAwsConnectionRecord,
   GovernanceAwsConnectionRepository,
   type GovernanceAwsCredentials,
 } from "../governance-aws-connection.repository.ts";
 
-type AwsConnectionDatabase = Pick<PrismaClient, "governanceAwsConnection">;
+type AwsConnectionDatabase = PrismaClient;
 
 const RECORD_SELECT = {
   id: true,
@@ -42,13 +46,33 @@ function recordOf(row: {
   };
 }
 
-/** Seals the secret access key and the external id under the process cipher (CREDENTIALS_SECRET). */
+/**
+ * Seals the secret access key and the external id under the process cipher (CREDENTIALS_SECRET).
+ * A write and its audit intent share one transaction, as the organisation audit store does.
+ */
 export class PrismaGovernanceAwsConnectionRepository extends GovernanceAwsConnectionRepository {
   private constructor(
     private readonly prisma: AwsConnectionDatabase,
     private readonly cipher: Encryption,
   ) {
     super();
+  }
+
+  #outbox: PrismaProcessStore | undefined;
+
+  private async appendAudit({
+    audit,
+    transaction,
+  }: {
+    audit: AuditLogIntent;
+    transaction: Prisma.TransactionClient;
+  }): Promise<void> {
+    this.#outbox ??= PrismaProcessStore.create({ database: this.prisma });
+    await this.#outbox.appendIntents({
+      ...killSwitchAuditAppend(audit),
+      now: nowInstant().epochMilliseconds,
+      transaction,
+    });
   }
 
   static create({
@@ -69,22 +93,26 @@ export class PrismaGovernanceAwsConnectionRepository extends GovernanceAwsConnec
     secretAccessKey: string | null;
     roleArn: string | null;
     externalId: string | null;
+    audit: AuditLogIntent;
   }): Promise<GovernanceAwsConnectionRecord> {
-    const row = await this.prisma.governanceAwsConnection.create({
-      data: {
-        id: input.id,
-        organizationId: input.organizationId,
-        name: input.name,
-        accessKeyId: input.accessKeyId,
-        encryptedSecretAccessKey:
-          input.secretAccessKey === null ? null : this.cipher.encrypt(input.secretAccessKey),
-        roleArn: input.roleArn,
-        encryptedExternalId:
-          input.externalId === null ? null : this.cipher.encrypt(input.externalId),
-      },
-      select: RECORD_SELECT,
+    return this.prisma.$transaction(async (transaction) => {
+      const row = await transaction.governanceAwsConnection.create({
+        data: {
+          id: input.id,
+          organizationId: input.organizationId,
+          name: input.name,
+          accessKeyId: input.accessKeyId,
+          encryptedSecretAccessKey:
+            input.secretAccessKey === null ? null : this.cipher.encrypt(input.secretAccessKey),
+          roleArn: input.roleArn,
+          encryptedExternalId:
+            input.externalId === null ? null : this.cipher.encrypt(input.externalId),
+        },
+        select: RECORD_SELECT,
+      });
+      await this.appendAudit({ audit: input.audit, transaction });
+      return recordOf(row);
     });
-    return recordOf(row);
   }
 
   async findAll({
@@ -144,10 +172,21 @@ export class PrismaGovernanceAwsConnectionRepository extends GovernanceAwsConnec
     };
   }
 
-  async delete({ organizationId, id }: { organizationId: string; id: string }): Promise<boolean> {
-    const { count } = await this.prisma.governanceAwsConnection.deleteMany({
-      where: { organizationId, id },
+  async delete({
+    organizationId,
+    id,
+    audit,
+  }: {
+    organizationId: string;
+    id: string;
+    audit: AuditLogIntent;
+  }): Promise<boolean> {
+    return this.prisma.$transaction(async (transaction) => {
+      const { count } = await transaction.governanceAwsConnection.deleteMany({
+        where: { organizationId, id },
+      });
+      if (count > 0) await this.appendAudit({ audit, transaction });
+      return count > 0;
     });
-    return count > 0;
   }
 }

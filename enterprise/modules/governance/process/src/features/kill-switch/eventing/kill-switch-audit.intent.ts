@@ -3,11 +3,10 @@ import type { AuditLogApi, AuditLogIntent } from "@langwatch/audit-log-contract"
 import type { ProcessStore } from "@langwatch/eventing";
 import { nowInstant } from "@langwatch/time";
 
+import { killSwitchAuditAppend } from "../rules/kill-switch-audit.rules.ts";
 import type { KillSwitchAuditOutbox } from "../services/kill-switch-audit.service.ts";
 import {
-  KILL_SWITCH_AUDIT_PROCESS_KEY,
   KILL_SWITCH_AUDIT_PROCESS_NAME,
-  KILL_SWITCH_AUDIT_RECORD_INTENT,
   KILL_SWITCH_AUDIT_RETENTION_MS,
 } from "./kill-switch-audit.process.ts";
 
@@ -41,25 +40,8 @@ export class OutboxKillSwitchAudit implements KillSwitchAuditOutbox {
   private constructor(private readonly processStore: Pick<ProcessStore, "appendIntents">) {}
 
   async record(intent: AuditLogIntent): Promise<void> {
-    const tenantId = intent.organizationId ?? intent.projectId;
-    if (!tenantId) throw new Error("a kill switch audit intent names its organisation");
     await this.processStore.appendIntents({
-      ref: {
-        processName: KILL_SWITCH_AUDIT_PROCESS_NAME,
-        projectId: tenantId,
-        processKey: KILL_SWITCH_AUDIT_PROCESS_KEY,
-      },
-      tenantId,
-      ...(intent.userId ? { userId: intent.userId } : {}),
-      sourceEventId: null,
-      messages: [
-        {
-          messageKey: intent.idempotencyKey,
-          intentType: KILL_SWITCH_AUDIT_RECORD_INTENT,
-          payload: intent,
-          traceCarrier: {},
-        },
-      ],
+      ...killSwitchAuditAppend(intent),
       now: nowInstant().epochMilliseconds,
     });
   }

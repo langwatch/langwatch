@@ -31,8 +31,13 @@ export class KillSwitchAuditService {
     return new KillSwitchAuditService({ ...deps, newKey });
   }
 
+  /** The entry keyed once, for a repository that commits it with its own write. */
+  intentOf(entry: AuditLogEntry): AuditLogIntent {
+    return { ...entry, idempotencyKey: this.deps.newKey() };
+  }
+
   async record(entry: AuditLogEntry): Promise<void> {
-    const intent: AuditLogIntent = { ...entry, idempotencyKey: this.deps.newKey() };
+    const intent = this.intentOf(entry);
     const outbox = this.deps.outbox();
     if (outbox) {
       await outbox.record(intent);

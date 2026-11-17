@@ -314,6 +314,13 @@ Feature: Agent kill switch: stop a misbehaving agent where it runs, with approva
     And the second restore's own outcome still settles it
 
   @unit
+  Scenario: An AWS connection write commits only together with its audit row
+    Given the audit outbox refuses the next append
+    When an AWS connection is added or deleted
+    Then the write is refused and nothing changes
+    And a retry commits the write together with its audit row
+
+  @unit
   Scenario: A kill switch audit row is written through the outbox, once per key
     Given the audit outbox is connected
     When an AWS connection is deleted

@@ -4,7 +4,9 @@
  * Stop plans and sealed AWS connections in Postgres.
  * Spec: enterprise/modules/governance/specs/agent-kill-switch.feature
  */
+import type { AuditLogIntent } from "@langwatch/audit-log-contract";
 import type { GatewayApi } from "@langwatch/gateway-contract";
+import { generate } from "@langwatch/ksuid";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { afterAll, describe, expect, it } from "vitest";
 
@@ -12,6 +14,13 @@ import { virtualKey } from "../../../features/kill-switch/services/__tests__/kil
 import { AgentStopPlanService } from "../../../features/kill-switch/services/agent-stop-plan.service.ts";
 import { MemoryGovernanceRepositories } from "../../memory/memory.governance.repositories.ts";
 import { PrismaAgentStopPlanRepository } from "../prisma.agent-stop-plan.repository.ts";
+
+/** The audit intent a connection write commits with. */
+const auditOf = (organizationId: string, action: string): AuditLogIntent => ({
+  idempotencyKey: generate("audit").toString(),
+  organizationId,
+  action,
+});
 import {
   AGENT_ID,
   connection,
@@ -56,6 +65,7 @@ describe.skipIf(!connection)("the kill switch plan and AWS connection repositori
         secretAccessKey: "acme-secret",
         roleArn: null,
         externalId: null,
+        audit: auditOf(organizationId, "governance.agent.aws_connection_created"),
       });
       let ids = 0;
       const plans = AgentStopPlanService.create({
@@ -113,6 +123,7 @@ describe.skipIf(!connection)("the kill switch plan and AWS connection repositori
         secretAccessKey: "acme-secret-two",
         roleArn: "arn:aws:iam::123456789012:role/kill-switch",
         externalId: "acme-external-id",
+        audit: auditOf(organizationId, "governance.agent.aws_connection_created"),
       });
       const row = await prisma().governanceAwsConnection.findFirstOrThrow({
         where: { organizationId, id: stored.id },
@@ -128,7 +139,11 @@ describe.skipIf(!connection)("the kill switch plan and AWS connection repositori
         externalId: "acme-external-id",
       });
       expect(
-        await awsConnections().delete({ organizationId: newOrganization(), id: stored.id }),
+        await awsConnections().delete({
+          organizationId: newOrganization(),
+          id: stored.id,
+          audit: auditOf(organizationId, "governance.agent.aws_connection_deleted"),
+        }),
       ).toBe(false);
       expect(await awsConnections().findAll({ organizationId })).toHaveLength(1);
     });

@@ -151,13 +151,9 @@ describe("GovernanceAwsConnectionService", () => {
   describe("when a connection is added and then removed", () => {
     /** @scenario "Adding and removing an AWS connection is audited without its secrets" */
     it("audits both writes with the connection as target and no secret", async () => {
-      const audit: RecordAuditLogCommand[] = [];
-      const service = connectionService(
-        MemoryGovernanceAwsConnectionRepository.create(),
-        undefined,
-        undefined,
-        audit,
-      );
+      const repository = MemoryGovernanceAwsConnectionRepository.create();
+      const service = connectionService(repository);
+      const audit = repository.auditIntents;
 
       const view = await service.createConnection({
         organizationId: ORG,
@@ -200,6 +196,51 @@ describe("GovernanceAwsConnectionService", () => {
         hasExternalId: false,
       });
       expect(JSON.stringify(audit)).not.toContain("acme-secret-access-key-0001");
+    });
+  });
+
+  describe("when the audit append of a delete fails", () => {
+    /** @scenario "An AWS connection write commits only together with its audit row" */
+    it("keeps the connection, and the retry deletes it with its audit row", async () => {
+      const repository = MemoryGovernanceAwsConnectionRepository.create();
+      const service = connectionService(repository);
+      repository.refuseNextAudit("outbox unavailable");
+      await expect(
+        service.createConnection({
+          organizationId: ORG,
+          userId: "user-ops",
+          connection: { name: "ACME staging", roleArn: "arn:aws:iam::123456789012:role/acme" },
+        }),
+      ).rejects.toThrow("outbox unavailable");
+      expect(await service.findConnections({ organizationId: ORG })).toEqual([]);
+      const view = await service.createConnection({
+        organizationId: ORG,
+        userId: "user-ops",
+        connection: { name: "ACME staging", roleArn: "arn:aws:iam::123456789012:role/acme" },
+      });
+
+      repository.refuseNextAudit("outbox unavailable");
+      const refused = service.deleteConnection({
+        organizationId: ORG,
+        connectionId: view.id,
+        userId: "user-ops",
+      });
+
+      await expect(refused).rejects.toThrow("outbox unavailable");
+      expect((await service.findConnections({ organizationId: ORG })).map((row) => row.id)).toEqual(
+        [view.id],
+      );
+      expect(
+        await service.deleteConnection({
+          organizationId: ORG,
+          connectionId: view.id,
+          userId: null,
+        }),
+      ).toEqual({ deleted: true });
+      expect(repository.auditIntents.map((row) => row.action)).toEqual([
+        "governance.agent.aws_connection_created",
+        "governance.agent.aws_connection_deleted",
+      ]);
     });
   });
 });

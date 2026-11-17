@@ -2,6 +2,7 @@
 
 import { randomBytes } from "node:crypto";
 
+import type { AuditLogIntent } from "@langwatch/audit-log-contract";
 import { GovernanceAwsConnectionNotFoundError } from "@langwatch/enterprise-governance-contract";
 import { aesEncryption, type Encryption } from "@langwatch/process-stores";
 import { nowInstant } from "@langwatch/time";
@@ -50,6 +51,22 @@ export class MemoryGovernanceAwsConnectionRepository extends GovernanceAwsConnec
     return new MemoryGovernanceAwsConnectionRepository(cipher);
   }
 
+  /** The audit intents committed with the writes, as the outbox holds them. */
+  readonly auditIntents: AuditLogIntent[] = [];
+  #auditRefusal: string | null = null;
+
+  /** The next audit append throws `message`, so its write rolls back as a transaction would. */
+  refuseNextAudit(message: string): void {
+    this.#auditRefusal = message;
+  }
+
+  private commitAudit(audit: AuditLogIntent): void {
+    const refusal = this.#auditRefusal;
+    this.#auditRefusal = null;
+    if (refusal) throw new Error(refusal);
+    this.auditIntents.push(audit);
+  }
+
   /** The rows as stored, sealed values included, for a test to read. */
   storedRows(): MemoryAwsConnectionRow[] {
     return structuredClone(this.rows);
@@ -63,7 +80,9 @@ export class MemoryGovernanceAwsConnectionRepository extends GovernanceAwsConnec
     secretAccessKey: string | null;
     roleArn: string | null;
     externalId: string | null;
+    audit: AuditLogIntent;
   }): Promise<GovernanceAwsConnectionRecord> {
+    this.commitAudit(input.audit);
     const row: MemoryAwsConnectionRow = {
       id: input.id,
       organizationId: input.organizationId,
@@ -122,11 +141,20 @@ export class MemoryGovernanceAwsConnectionRepository extends GovernanceAwsConnec
     };
   }
 
-  async delete({ organizationId, id }: { organizationId: string; id: string }): Promise<boolean> {
+  async delete({
+    organizationId,
+    id,
+    audit,
+  }: {
+    organizationId: string;
+    id: string;
+    audit: AuditLogIntent;
+  }): Promise<boolean> {
     const index = this.rows.findIndex(
       (row) => row.organizationId === organizationId && row.id === id,
     );
     if (index < 0) return false;
+    this.commitAudit(audit);
     this.rows.splice(index, 1);
     return true;
   }
