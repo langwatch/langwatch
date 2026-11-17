@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import type { CioBatchCall } from "@langwatch/enterprise-nurturing-contract";
 import type { OrganizationCreatedEventData } from "@langwatch/organization-contract";
-import { nowInstant, type Temporal } from "@langwatch/time";
+import { type Instant, nowInstant } from "@langwatch/time";
 
 import { companyTraits } from "../rules/nurturing-company-traits.rules.ts";
 
@@ -14,7 +14,7 @@ type OrganizationCreatedDependencies = Readonly<{
   /** Lines carry counts and reasons only, never an organization or user id. */
   logger: Readonly<{ info(payload: Readonly<Record<string, unknown>>, message: string): void }>;
   /** The clock the stale check reads; the system clock by default. */
-  now?: () => Temporal.Instant;
+  now?: () => Instant;
 }>;
 
 /**
