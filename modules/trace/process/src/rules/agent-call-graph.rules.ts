@@ -127,10 +127,24 @@ export function classifyA2aSpan(span: AgentCallGraphSpan): A2aClassification {
   };
 }
 
-/** The agent a span names itself, by `gen_ai.agent.name` then `gen_ai.agent.id`. */
+/** Attributes an A2A client span may carry the callee's Agent Card name in. */
+const A2A_CALLEE_KEYS = ["a2a.agent.name", "a2a.agent.card.name", "a2a.agent_card.name"];
+
+/** The agent a span names: `gen_ai.agent.name`, `gen_ai.agent.id`, else an A2A callee. */
 function agentLabelOf(span: AgentCallGraphSpan): string {
   const name = textAttribute({ params: span.params, key: "gen_ai.agent.name" });
-  return name || textAttribute({ params: span.params, key: "gen_ai.agent.id" });
+  return name || textAttribute({ params: span.params, key: "gen_ai.agent.id" }) || calleeOf(span);
+}
+
+/** The callee an A2A client span names, from its card attributes or `invoke_agent <name>`. */
+function calleeOf(span: AgentCallGraphSpan): string {
+  const a2a = classifyA2aSpan(span);
+  if (!a2a.isA2a || a2a.mark.role !== "client") return "";
+  for (const key of A2A_CALLEE_KEYS) {
+    const value = textAttribute({ params: span.params, key });
+    if (value) return value;
+  }
+  return /^invoke_agent\s+(.+)$/.exec(span.name.trim())?.[1]?.trim() ?? "";
 }
 
 const agentOwner = (label: string): Owner => ({ id: `agent:${label}`, label, kind: "agent" });

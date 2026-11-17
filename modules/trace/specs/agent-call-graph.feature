@@ -47,3 +47,11 @@ Feature: Agent call graph across A2A hops
       When the call graph is read for the trace
       Then each of them is listed as an A2A span with its role, method, context, task and state
       And plain spans are not listed
+
+    @unit
+    Scenario: Both sides share one service.name and the client span names the callee
+      Given a trace where the caller and the remote agent report the same service.name
+      And the A2A client span names the callee from its Agent Card
+      When the agent call graph is built
+      Then the spans under the A2A client span belong to the callee agent
+      And the graph has two nodes and one A2A edge

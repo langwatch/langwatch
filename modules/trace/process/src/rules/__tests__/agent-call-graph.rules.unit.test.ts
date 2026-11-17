@@ -184,3 +184,89 @@ describe("classifyA2aSpan", () => {
     expect(graph.a2aSpans.map((mark) => mark.spanId)).toEqual(["a2a-client", "a2a-server"]);
   });
 });
+
+describe("buildAgentCallGraph, when both sides of an A2A hop share one service.name", () => {
+  const sharedService = resources(
+    {
+      root: "shared-svc",
+      call: "shared-svc",
+      client: "shared-svc",
+      server: "shared-svc",
+      llm: "shared-svc",
+    },
+    "shared-svc",
+  );
+  const clientParams = { "a2a.method": "SendMessage", "gen_ai.operation.name": "invoke_agent" };
+
+  /** @scenario "Both sides share one service.name and the client span names the callee" */
+  it("gives two nodes and one A2A edge when the client span names the callee", () => {
+    const graph = buildAgentCallGraph({
+      spans: [
+        span({ spanId: "root", name: "Scenario Turn" }),
+        span({ spanId: "call", parentSpanId: "root", name: "A2AAgent.call" }),
+        span({
+          spanId: "client",
+          parentSpanId: "call",
+          name: "invoke_agent ACME Support Agent",
+          params: { ...clientParams, "gen_ai.agent.name": "ACME Support Agent" },
+        }),
+        span({ spanId: "server", parentSpanId: "client", name: "a2a.server SendMessage" }),
+        span({ spanId: "llm", parentSpanId: "server", type: "llm" }),
+      ],
+      resources: sharedService,
+    });
+
+    expect(graph.nodes.map((node) => node.id)).toEqual([
+      "service:shared-svc",
+      "agent:ACME Support Agent",
+    ]);
+    expect(graph.nodes[1]?.spanCount).toBe(3);
+    expect(graph.edges).toHaveLength(1);
+    expect(graph.edges[0]).toMatchObject({
+      from: "service:shared-svc",
+      to: "agent:ACME Support Agent",
+      a2a: true,
+      spanIds: ["client"],
+    });
+  });
+
+  it("takes the callee from an a2a.* card attribute or the invoke_agent span name", () => {
+    for (const params of [{ ...clientParams, "a2a.agent.name": "Billing" }, clientParams]) {
+      const graph = buildAgentCallGraph({
+        spans: [
+          span({ spanId: "root" }),
+          span({ spanId: "client", parentSpanId: "root", name: "invoke_agent Billing", params }),
+          span({ spanId: "server", parentSpanId: "client", name: "a2a.server SendMessage" }),
+        ],
+        resources: sharedService,
+      });
+      expect(graph.nodes.map((node) => node.id)).toEqual(["service:shared-svc", "agent:Billing"]);
+      expect(graph.edges.map((edge) => edge.a2a)).toEqual([true]);
+    }
+  });
+
+  it("gives a descendant naming its own agent a node of its own", () => {
+    const graph = buildAgentCallGraph({
+      spans: [
+        span({ spanId: "root" }),
+        span({
+          spanId: "client",
+          parentSpanId: "root",
+          name: "invoke_agent Billing",
+          params: clientParams,
+        }),
+        span({
+          spanId: "server",
+          parentSpanId: "client",
+          params: { "gen_ai.agent.name": "Ledger" },
+        }),
+      ],
+      resources: sharedService,
+    });
+    expect(graph.nodes.map((node) => node.id)).toEqual([
+      "service:shared-svc",
+      "agent:Billing",
+      "agent:Ledger",
+    ]);
+  });
+});
