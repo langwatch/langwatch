@@ -616,9 +616,9 @@ describe("given what the reconvergence check finds in PostgreSQL", () => {
   it("reports no scoped gap without the group, whatever the copies", () => {
     const copies = readable.map((copy) => ({ ...copy, exists: false }));
 
-    expect(
-      selfProvisioning.findPostgresGaps({ found, scoped: { ...noGroup, copies } }),
-    ).toEqual([]);
+    expect(selfProvisioning.findPostgresGaps({ found, scoped: { ...noGroup, copies } })).toEqual(
+      [],
+    );
   });
 
   /** @scenario "Scoped copies exist only where the scoped-reader group does" */

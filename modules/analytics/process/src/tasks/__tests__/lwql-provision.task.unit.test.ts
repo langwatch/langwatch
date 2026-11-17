@@ -482,9 +482,9 @@ function describeReconvergenceCheck() {
       expect(first).toContain(`REVOKE SELECT ON "public"."${onShared}" FROM`);
       expect(first).toContain(`REVOKE SELECT ON "lwql_scoped"."${unscoped}" FROM`);
       expect(first).not.toMatch(/\bGRANT\b|\bCREATE\b/);
-      expect(postgres.ran.filter((run) => run.includes(`CREATE OR REPLACE VIEW "public".`))).toEqual(
-        [],
-      );
+      expect(
+        postgres.ran.filter((run) => run.includes(`CREATE OR REPLACE VIEW "public".`)),
+      ).toEqual([]);
       expect([onShared, absent, unscoped, ungranted].map(copyCreated)).toEqual([
         false,
         true,
@@ -634,9 +634,9 @@ function describeReconvergenceCheck() {
       );
       expect(logCalls.filter((call) => call.level === "error")).toEqual([]);
       expect(postgres.ran.some((run) => run.includes("ALTER ROLE"))).toBe(true);
-      expect(postgres.ran.some((run) => run.includes('CREATE OR REPLACE VIEW "lwql_scoped".'))).toBe(
-        false,
-      );
+      expect(
+        postgres.ran.some((run) => run.includes('CREATE OR REPLACE VIEW "lwql_scoped".')),
+      ).toBe(false);
     });
 
     /** @scenario "An older worker never rewrites a newer view for columns it does not declare" */

@@ -11,12 +11,13 @@ import { Task } from "@langwatch/task";
 
 import { lwqlAppFunctionNames } from "../features/app-functions/rules/langwatch-ql-app-function-catalog.rules.ts";
 import { canProvisionAppFunctions } from "../features/app-functions/rules/langwatch-ql-app-function-store.rules.ts";
+import { LWQL_SCOPED_SCHEMA } from "../features/provisioning/rules/lwql-scoped-view.rules.ts";
 import {
   LangWatchQLCollectionBindingService,
   type LwqlAccessModelMode,
   type LwqlCollectionProbe,
 } from "../features/provisioning/services/langwatch-ql-collection-binding.service.ts";
-import { LWQL_SCOPED_SCHEMA } from "../features/provisioning/rules/lwql-scoped-view.rules.ts";
+import type { LwqlPostgresGap } from "../features/provisioning/services/langwatch-ql-postgres-gaps.service.ts";
 import { LWQL_SCOPED_READER_GROUP } from "../features/provisioning/services/langwatch-ql-postgres-mapping.service.ts";
 import {
   LangWatchQLProductionProvisioningService,
@@ -25,7 +26,6 @@ import {
 import {
   LangWatchQLSelfProvisioningService,
   type LwqlAppOwnedDrift,
-  type LwqlPostgresGap,
   type LwqlSelfProvisionRequest,
 } from "../features/provisioning/services/langwatch-ql-self-provisioning.service.ts";
 import { ClickHouseLangWatchQLProvisioningRepository } from "../repositories/clickhouse/clickhouse.langwatch-ql-provisioning.repository.ts";

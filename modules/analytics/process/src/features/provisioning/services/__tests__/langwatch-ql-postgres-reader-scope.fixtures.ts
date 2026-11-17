@@ -25,17 +25,18 @@ import { PrismaLangWatchQLPostgresRepository } from "../../../../repositories/pr
 import { LWQL_VIEW_CATALOG } from "../../../../rules/lwql-view-catalog.rules.ts";
 import { LangWatchQLCatalogShapesService } from "../../../../services/langwatch-ql-catalog-shapes.service.ts";
 import type { LwqlConvergencePlan } from "../../../../tasks/lwql-provision.task.ts";
-import { LWQL_SCOPED_SCHEMA, scopedViewGuardCondition } from "../../rules/lwql-scoped-view.rules.ts";
+import {
+  LWQL_SCOPED_SCHEMA,
+  scopedViewGuardCondition,
+} from "../../rules/lwql-scoped-view.rules.ts";
+import type { LwqlPostgresGap } from "../langwatch-ql-postgres-gaps.service.ts";
 import {
   LWQL_SCOPED_READER_GROUP,
   LWQL_SHARED_READER_ROLE,
 } from "../langwatch-ql-postgres-mapping.service.ts";
 import { LangWatchQLPostgresViewsService } from "../langwatch-ql-postgres-views.service.ts";
 import { LangWatchQLProductionProvisioningService } from "../langwatch-ql-production-provisioning.service.ts";
-import {
-  type LwqlPostgresGap,
-  LangWatchQLSelfProvisioningService,
-} from "../langwatch-ql-self-provisioning.service.ts";
+import { LangWatchQLSelfProvisioningService } from "../langwatch-ql-self-provisioning.service.ts";
 
 export const provisioning = LangWatchQLProductionProvisioningService.create();
 const selfProvisioning = LangWatchQLSelfProvisioningService.create();
@@ -348,7 +349,9 @@ export async function startScopeHarness({
     const connection = PrismaConnectionService.create({
       guard: new AllowTestQueries(),
       logger: createLogger("langwatch:analytics:lwql-reader-scope-test"),
-    }).connect(PrismaConfigService.create().resolve({ databaseUrl: url.toString(), log: ["error"] }));
+    }).connect(
+      PrismaConfigService.create().resolve({ databaseUrl: url.toString(), log: ["error"] }),
+    );
 
     return { database: connection.client, close: () => connection.closeOnce() };
   }

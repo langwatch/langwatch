@@ -8,7 +8,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { convergeLwqlAccessModel } from "../../../../tasks/lwql-provision.task.ts";
-import type { LwqlPostgresGap } from "../langwatch-ql-self-provisioning.service.ts";
+import type { LwqlPostgresGap } from "../langwatch-ql-postgres-gaps.service.ts";
 import {
   ADMIN,
   deployStatements,

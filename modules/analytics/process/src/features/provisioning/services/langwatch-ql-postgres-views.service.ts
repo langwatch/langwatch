@@ -10,7 +10,10 @@ import {
   type LangWatchQLViewDefinition,
 } from "../../../services/langwatch-ql-catalog-shapes.service.ts";
 import { postgresEngineColumnType } from "../rules/lwql-postgres-engine-type.rules.ts";
-import { LWQL_SCOPED_SCHEMA, scopedCopiesWritableCondition } from "../rules/lwql-scoped-view.rules.ts";
+import {
+  LWQL_SCOPED_SCHEMA,
+  scopedCopiesWritableCondition,
+} from "../rules/lwql-scoped-view.rules.ts";
 import {
   DEFAULT_POSTGRES_ENGINE_POOL_SIZE,
   LangWatchQLPostgresMappingService,

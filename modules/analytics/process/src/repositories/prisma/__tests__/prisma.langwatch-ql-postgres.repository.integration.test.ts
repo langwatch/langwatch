@@ -77,7 +77,9 @@ describe("the scoped-reader state read over a real Postgres", () => {
     );
     await run(`CREATE SCHEMA "${APP_SCHEMA}"`);
     await run(`CREATE TABLE "${APP_SCHEMA}".base (id int)`);
-    await run(`CREATE VIEW "${APP_SCHEMA}"."${SHARED_GRANTED}" AS SELECT id FROM "${APP_SCHEMA}".base`);
+    await run(
+      `CREATE VIEW "${APP_SCHEMA}"."${SHARED_GRANTED}" AS SELECT id FROM "${APP_SCHEMA}".base`,
+    );
   }, 120_000);
 
   afterAll(async () => {
