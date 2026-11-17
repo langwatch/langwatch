@@ -5,7 +5,8 @@ import { defineModuleVitestConfig } from "@langwatch/vitest-config";
 export default defineModuleVitestConfig({
   kind: "node",
   isolate: false,
-  exclude: ["**/node_modules/**", "**/dist/**", "**/*.scenario.test.ts"],
+  // recipes/*/templates hold test files users copy into their own repos.
+  exclude: ["**/node_modules/**", "**/dist/**", "**/*.scenario.test.ts", "recipes/*/templates/**"],
   test: {
     globalSetup: ["./_tests/helpers/temp-workdir-teardown.ts"],
   },
