@@ -133,3 +133,16 @@ export interface AppliedSuiteTemplateSchema extends Named<
 export const appliedSuiteTemplateSchema: AppliedSuiteTemplateSchema =
   appliedSuiteTemplateSchemaDefinition;
 export type AppliedSuiteTemplate = z.infer<typeof appliedSuiteTemplateSchema>;
+
+/** `POST /api/v1/test-suites/templates/{templateId}/apply` path params. */
+export const suiteTemplateIdParamsSchema = z.object({ templateId: suiteTemplateIdSchema }).strict();
+
+const applySuiteTemplateBodySchemaDefinition = applySuiteTemplateInputSchemaDefinition.omit({
+  templateId: true,
+});
+export interface ApplySuiteTemplateBodySchema extends Named<
+  typeof applySuiteTemplateBodySchemaDefinition
+> {}
+/** The apply request body: the fit and an optional suite name; the template comes from the path. */
+export const applySuiteTemplateBodySchema: ApplySuiteTemplateBodySchema =
+  applySuiteTemplateBodySchemaDefinition;

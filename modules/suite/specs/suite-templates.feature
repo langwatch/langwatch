@@ -81,3 +81,18 @@ Feature: Suite templates
   Scenario: A standard scenario with a red team config is refused
     When a standard scenario is created with a red team config
     Then it is refused with code "scenario_red_team_config_mismatch" and nothing is written
+
+  @unit
+  Scenario: Listing templates over REST answers every shipped template
+    When the caller sends GET /api/v1/test-suites/templates with scenarios view permission
+    Then the response is 200 with every shipped template and its scenarios
+
+  @unit
+  Scenario: Applying a template over REST creates a test suite
+    When the caller sends POST /api/v1/test-suites/templates/owasp-agentic-top-10/apply with a fit
+    Then the response is 201 with the suite id, slug, name and scenario ids
+
+  @unit
+  Scenario: Applying an unknown template over REST answers 404
+    When the caller sends POST /api/v1/test-suites/templates/no-such-template/apply
+    Then the response is 404 with code "suite_template_not_found"
