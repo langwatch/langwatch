@@ -147,6 +147,10 @@ type AuthCacheConfig struct {
 	// re-fetch, covering config mutations that don't emit change-feed
 	// events. Default 60s; negative disables.
 	ConfigTTLSeconds int64 `env:"CONFIG_TTL_SECONDS"`
+	// FailClosedAfterSeconds, when positive, refuses a cached key whose last
+	// control-plane confirmation and whose org's last change-feed poll are both
+	// older than this. 0 (default) keeps serving through an outage.
+	FailClosedAfterSeconds int64 `env:"FAIL_CLOSED_AFTER_SECONDS"`
 }
 
 // CircuitConfig tunes the per-credential circuit breaker that preempts

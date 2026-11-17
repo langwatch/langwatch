@@ -32,6 +32,7 @@ import (
 	"errors"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	lru "github.com/hashicorp/golang-lru/v2"
@@ -154,6 +155,12 @@ type Service struct {
 	// map + RWMutex) because polling reads + storeL1 writes interleave.
 	activeOrgs sync.Map // key: orgID string, value: *orgCursor
 
+	// denied is the revocation list, kept apart from L1 so no stale-serve
+	// window or eviction can expire it (revocation.go).
+	denied          *lru.Cache[string, denial]
+	deniedKeys      *lru.Cache[[64]byte, string]
+	failClosedAfter time.Duration
+
 	stopCh chan struct{}
 }
 
@@ -161,6 +168,9 @@ type Service struct {
 // for one organization. Mutated only inside the change-feed loop.
 type orgCursor struct {
 	since string
+	// polledAt is the unix nano time of the last poll the control plane
+	// answered; the fail-closed rule reads it from request goroutines.
+	polledAt atomic.Int64
 }
 
 // entry tracks both the natural JWT exp ("soft" expiry, bumpable on
@@ -210,6 +220,9 @@ type entry struct {
 	// refresh; budgetRetryAt paces it when that refresh fails.
 	budgetChanges uint64
 	budgetRetryAt time.Time
+	// authStartedAt is when the control-plane call that confirmed this key
+	// began. A revocation seen after it voids the entry (revocation.go).
+	authStartedAt time.Time
 }
 
 // markBudgetChanged records that the spend this entry carries is behind.
@@ -550,6 +563,10 @@ type Options struct {
 	// linked, a binding reset) takes to be noticed. Default 30s. Negative
 	// disables.
 	LicenseRefusalTTL time.Duration
+	// FailClosedAfter, when positive, refuses a cached key once both its last
+	// control-plane confirmation and its org's last change-feed poll are
+	// older than this. Zero (the default) keeps serving through an outage.
+	FailClosedAfter time.Duration
 }
 
 // New creates the auth service.
@@ -603,6 +620,9 @@ func New(opts Options) (*Service, error) {
 		l1:                l1,
 		licenseRefusals:   licenseRefusals,
 		licenseRefusalTTL: opts.LicenseRefusalTTL,
+		denied:            newDenySet(),
+		deniedKeys:        newDeniedKeys(),
+		failClosedAfter:   opts.FailClosedAfter,
 		lastKnown:         lastKnown,
 		lastKnownMaxAge:   DefaultLastKnownConfigMaxAge,
 
@@ -626,6 +646,17 @@ func New(opts Options) (*Service, error) {
 // foreground refresh; on transport-class failure serves the stale bundle
 // and bumps soft expiry. On auth-class failure evicts and rejects.
 func (s *Service) Resolve(ctx context.Context, key domain.PresentedKey) (*domain.Bundle, error) {
+	start := time.Now()
+	h := hashKey(key)
+	bundle, err := s.resolveUngated(ctx, key)
+	if err != nil {
+		return nil, s.deniedAnswer(ctx, h, err)
+	}
+	return s.admit(ctx, admitInput{hash: h, bundle: bundle, requestStart: start})
+}
+
+// resolveUngated is the cache and control-plane walk; Resolve gates its answer.
+func (s *Service) resolveUngated(ctx context.Context, key domain.PresentedKey) (*domain.Bundle, error) {
 	if key.Token == "" {
 		return nil, herr.New(ctx, domain.ErrInvalidAPIKey, nil)
 	}
@@ -739,6 +770,7 @@ func (s *Service) recordMiss() {
 // Used for cold misses; not on stale-entry refresh paths (those use
 // refreshOrServeStale for the served-stale fallback).
 func (s *Service) resolveFresh(ctx context.Context, key domain.PresentedKey, h [64]byte) (*domain.Bundle, error) {
+	start := time.Now()
 	fallback := s.lastKnownFor(h)
 	fetchCtx := ctx
 	if fallback != nil {
@@ -759,7 +791,7 @@ func (s *Service) resolveFresh(ctx context.Context, key domain.PresentedKey, h [
 	}
 	etag, cfgErr := s.populateConfig(fetchCtx, bundle)
 	if cfgErr == nil {
-		s.storeL1(h, bundle, etag)
+		s.publishL1(h, s.newEntry(bundle, etag).authFrom(start))
 		return bundle, nil
 	}
 	if classifyRefreshError(cfgErr) == classAuthRejection {
@@ -859,7 +891,9 @@ func (s *Service) serveLastKnown(h [64]byte, in lastKnownServe) *domain.Bundle {
 		configFetchedAt:    confirmedAt,
 		configConfirmedAt:  confirmedAt,
 		budgetRollAckedFor: acked,
+		authStartedAt:      old.authStart(),
 	})
+	s.recordStaleServe("last_known")
 	s.logger.Warn("auth_cache_serve_last_known",
 		zap.String("vk_id", bundle.VirtualKeyID),
 		zap.Duration("config_age", now.Sub(confirmedAt)),
@@ -874,6 +908,7 @@ func (s *Service) serveLastKnown(h [64]byte, in lastKnownServe) *domain.Bundle {
 // stale entry's soft expiry by SoftBump and serves the stale bundle. On
 // auth-class failure evicts the entry and returns the rejection.
 func (s *Service) refreshOrServeStale(ctx context.Context, lk lookup, stale *entry) (*domain.Bundle, error) {
+	start := time.Now()
 	h := lk.hash
 	bundle, err := s.resolver.ResolveKey(ctx, lk.key)
 	cls := classifyRefreshError(err)
@@ -895,7 +930,7 @@ func (s *Service) refreshOrServeStale(ctx context.Context, lk lookup, stale *ent
 			// serve the stale entry's known-good credentials instead.
 			return s.serveStaleAfterFailure(ctx, h, stale, staleBundle, vkID, hardExpiresAt, cls, cfgErr)
 		}
-		s.storeL1(h, bundle, etag)
+		s.publishL1(h, s.newEntry(bundle, etag).authFrom(start))
 		return bundle, nil
 
 	case classAuthRejection:
@@ -956,6 +991,7 @@ func (s *Service) serveStaleAfterFailure(ctx context.Context, h [64]byte, stale 
 		zap.Duration("hard_grace_remaining", time.Until(hardExpiresAt)),
 		zap.Error(cause),
 	)
+	s.recordStaleServe("stale_while_error")
 	s.logger.Info("auth_cache_serve_stale",
 		zap.String("vk_id", vkID),
 		zap.Duration("stale_for", time.Since(staleBundle.ExpiresAt)),
@@ -1062,6 +1098,7 @@ func (s *Service) newEntry(bundle *domain.Bundle, configETag string) *entry {
 		configConfirmedAt:  now,
 		configETag:         configETag,
 		budgetRollAckedFor: ackedBoundaryAtBuild(bundle, now),
+		authStartedAt:      now,
 	}
 }
 
@@ -1077,7 +1114,7 @@ func (s *Service) publishL1(h [64]byte, stored *entry) {
 	// don't reset to "0" and re-stream the entire history on every new
 	// bundle for an existing org.
 	if bundle.OrganizationID != "" {
-		s.activeOrgs.LoadOrStore(bundle.OrganizationID, &orgCursor{since: "0"})
+		s.activeOrgs.LoadOrStore(bundle.OrganizationID, newOrgCursor())
 	}
 }
 
@@ -1169,6 +1206,7 @@ func (s *Service) pollOrgChanges(ctx context.Context, orgID string, cursor *orgC
 	if nextRev != "" {
 		cursor.since = nextRev
 	}
+	cursor.polledAt.Store(time.Now().UnixNano())
 	return nil
 }
 
@@ -1207,6 +1245,11 @@ func (s *Service) waitUnlessStopping(ctx context.Context, d time.Duration) bool 
 // that logs "updated" is worse than no label at all.
 func (s *Service) applyChange(organizationID string, ch CacheChange) {
 	keepLastKnown := !revokesKey(ch.Kind)
+	if !keepLastKnown && ch.VirtualKeyID != "" {
+		// Deny before evicting: a refresh racing this event either finds the
+		// denial when its answer is gated, or is evicted below.
+		s.deny(ch.VirtualKeyID, ch.Kind)
+	}
 	switch ch.Kind {
 	case ChangeKindProviderBindingUpdated:
 		// The control plane emits ModelProvider.id. Config materialization puts
@@ -1402,6 +1445,7 @@ func (s *Service) dropLastKnownWhere(match func(*domain.Bundle) bool) {
 // AuthRejection evicts; TransportFailure bumps the existing entry.
 func (s *Service) refreshBackground(key domain.PresentedKey, h [64]byte, started *entry) {
 	defer started.endAuthRefresh()
+	start := time.Now()
 	budgetChangesAtStart := started.budgetChangeCount()
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
@@ -1429,7 +1473,7 @@ func (s *Service) refreshBackground(key domain.PresentedKey, h [64]byte, started
 			s.logger.Debug("auth_cache_refresh_dropped_stale", zap.String("vk_id", bundle.VirtualKeyID))
 			return
 		}
-		s.publishL1(h, s.newEntry(bundle, etag).carryBudgetChanges(started, budgetChangesAtStart))
+		s.publishL1(h, s.newEntry(bundle, etag).authFrom(start).carryBudgetChanges(started, budgetChangesAtStart))
 		s.logger.Debug("auth_cache_refresh_success", zap.String("vk_id", bundle.VirtualKeyID))
 
 	case classAuthRejection:
@@ -1550,7 +1594,7 @@ func (s *Service) refreshConfigBackground(h [64]byte, e *entry) {
 		)
 		return
 	}
-	s.publishL1(h, s.newEntry(&fresh, res.ETag).carryBudgetChanges(e, budgetChangesAtStart))
+	s.publishL1(h, s.newEntry(&fresh, res.ETag).authFrom(e.authStart()).carryBudgetChanges(e, budgetChangesAtStart))
 	s.logger.Debug("config_ttl_refresh_success", zap.String("vk_id", stale.VirtualKeyID))
 }
 

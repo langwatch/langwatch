@@ -95,32 +95,34 @@ type Recorder struct {
 	// metrics that have no series yet.
 	declared []prometheus.Collector
 
-	httpRequests   *prometheus.CounterVec
-	httpDuration   *prometheus.HistogramVec
-	inFlight       prometheus.Gauge
-	streamingOpen  prometheus.Gauge
-	streamNoUsage  *prometheus.CounterVec
-	providerTime   *prometheus.HistogramVec
-	providerTries  *prometheus.CounterVec
-	fallbackEvents *prometheus.CounterVec
-	circuitState   *prometheus.GaugeVec
-	authHits       *prometheus.CounterVec
-	authMisses     *prometheus.CounterVec
-	authLookups    prometheus.Counter
-	budgetBlocks   *prometheus.CounterVec
-	cacheHits      *prometheus.CounterVec
-	cacheRuleHits  *prometheus.CounterVec
-	guardrails     *prometheus.CounterVec
-	internalRTT    *prometheus.HistogramVec
-	controlPlane   *prometheus.CounterVec
-	rateLimits     *prometheus.CounterVec
-	clientRejects  *prometheus.CounterVec
-	realtimeMints  *prometheus.CounterVec
-	realtimeLimits *prometheus.CounterVec
-	realtimeErrors *prometheus.CounterVec
-	voiceSessions  *prometheus.GaugeVec
-	voiceEnded     *prometheus.CounterVec
-	voiceReports   *prometheus.CounterVec
+	httpRequests    *prometheus.CounterVec
+	httpDuration    *prometheus.HistogramVec
+	inFlight        prometheus.Gauge
+	streamingOpen   prometheus.Gauge
+	streamNoUsage   *prometheus.CounterVec
+	providerTime    *prometheus.HistogramVec
+	providerTries   *prometheus.CounterVec
+	fallbackEvents  *prometheus.CounterVec
+	circuitState    *prometheus.GaugeVec
+	authHits        *prometheus.CounterVec
+	authMisses      *prometheus.CounterVec
+	authRefusals    *prometheus.CounterVec
+	authStaleServes *prometheus.CounterVec
+	authLookups     prometheus.Counter
+	budgetBlocks    *prometheus.CounterVec
+	cacheHits       *prometheus.CounterVec
+	cacheRuleHits   *prometheus.CounterVec
+	guardrails      *prometheus.CounterVec
+	internalRTT     *prometheus.HistogramVec
+	controlPlane    *prometheus.CounterVec
+	rateLimits      *prometheus.CounterVec
+	clientRejects   *prometheus.CounterVec
+	realtimeMints   *prometheus.CounterVec
+	realtimeLimits  *prometheus.CounterVec
+	realtimeErrors  *prometheus.CounterVec
+	voiceSessions   *prometheus.GaugeVec
+	voiceEnded      *prometheus.CounterVec
+	voiceReports    *prometheus.CounterVec
 
 	draining      gaugeSource
 	authCacheSize gaugeSource
@@ -200,6 +202,16 @@ func New() *Recorder {
 		Name: "gateway_auth_cache_misses_total",
 		Help: "Virtual-key lookups that missed a cache tier and had to fall through.",
 	}, []string{"tier"})
+
+	r.authRefusals = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name: "gateway_auth_cache_refusals_total",
+		Help: "Cached virtual keys refused by the revocation list or the fail-closed rule.",
+	}, []string{"reason"})
+
+	r.authStaleServes = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name: "gateway_auth_cache_stale_serves_total",
+		Help: "Virtual keys served from cache because the control plane could not answer.",
+	}, []string{"source"})
 
 	r.authLookups = prometheus.NewCounter(prometheus.CounterOpts{
 		Name: "gateway_auth_cache_lookups_total",
@@ -304,7 +316,7 @@ func New() *Recorder {
 		r.httpRequests, r.httpDuration, r.inFlight,
 		r.streamingOpen, r.streamNoUsage,
 		r.providerTime, r.providerTries, r.fallbackEvents, r.circuitState,
-		r.authHits, r.authMisses, r.authLookups,
+		r.authHits, r.authMisses, r.authLookups, r.authRefusals, r.authStaleServes,
 		r.budgetBlocks, r.cacheHits, r.cacheRuleHits,
 		r.guardrails, r.internalRTT, r.controlPlane, r.rateLimits,
 		r.clientRejects,
@@ -552,6 +564,22 @@ func (r *Recorder) RecordAuthCacheMiss(tier string) {
 		return
 	}
 	r.authMisses.WithLabelValues(orUnknown(tier)).Inc()
+}
+
+// RecordAuthCacheRefusal counts a cached key the gateway refused.
+func (r *Recorder) RecordAuthCacheRefusal(reason string) {
+	if r == nil {
+		return
+	}
+	r.authRefusals.WithLabelValues(orUnknown(reason)).Inc()
+}
+
+// RecordAuthCacheStaleServe counts a key served while the control plane was down.
+func (r *Recorder) RecordAuthCacheStaleServe(source string) {
+	if r == nil {
+		return
+	}
+	r.authStaleServes.WithLabelValues(orUnknown(source)).Inc()
 }
 
 // RecordBudgetBlock counts a request rejected by the named budget scope.

@@ -335,6 +335,59 @@ Feature: Gateway auth cache — hot path is zero RTT after first hit
       And a background goroutine calls /resolve-key for a fresh JWT
       And the replacement bundle is stored in the cache
 
+  Rule: A revoked key is refused from every cache tier, even with the control plane down
+
+    # The change feed delivers VK_REVOKED, VK_DISABLED and VK_ROTATED in one
+    # long poll. The gateway records each in a revocation list kept apart from
+    # the key cache, so no stale-serve window or cache eviction expires it.
+
+    @unit
+    Scenario: a revoked key is refused while the control plane is down
+      Given a cached key past its JWT expiry
+      When the change feed revokes it
+      And the control plane stops answering
+      Then every request with that key gets virtual_key_revoked, not a retryable error
+
+    @unit
+    Scenario: a disabled key is refused while the control plane is down
+      Given a cached key
+      When the change feed disables it
+      Then the next request gets virtual_key_disabled without a control-plane call
+
+    @unit
+    Scenario: a resolve that started before the revocation cannot put the key back
+      Given a resolve-key call is in flight for a key
+      When the change feed revokes the key before that call returns
+      Then the request is refused with virtual_key_revoked
+      And nothing is left in the cache for that key
+
+    @unit
+    Scenario: a key confirmed after its re-enable serves again
+      Given the change feed disabled a key and then enabled it
+      When the control plane confirms the key
+      Then the request serves
+
+    @unit
+    Scenario: a normal key keeps serving from cache within the grace window
+      Given a cached key nobody revoked, past its JWT expiry
+      When the control plane stops answering
+      Then the key keeps serving inside the stale-while-error window
+
+    @unit
+    Scenario: fail closed refuses a key nothing re-checked within the limit
+      Given LW_GATEWAY_AUTH_CACHE_FAIL_CLOSED_AFTER_SECONDS is 60
+      And a cached key last confirmed 2 minutes ago
+      When the org's change feed answered within the last 60 seconds
+      Then the key serves
+      When the org's change feed has not answered for 2 minutes
+      Then the key is refused with auth_upstream_unavailable
+
+    @unit
+    Scenario: fail closed is off by default
+      Given LW_GATEWAY_AUTH_CACHE_FAIL_CLOSED_AFTER_SECONDS is unset
+      And a cached key last confirmed 3 hours ago with a silent change feed
+      Then the key serves
+
   Rule: Revocation propagates within 60 seconds via long-poll /changes
 
     @integration @unimplemented
