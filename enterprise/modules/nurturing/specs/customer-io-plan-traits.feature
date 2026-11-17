@@ -10,6 +10,13 @@ Feature: Customer.io knows each team's real plan
     Then each member is identified with that plan in lower case and has_subscription true
     And one group call carries the plan to the organization's admin
 
+  @unit
+  Scenario: A member whose latest organization is another is not told this plan
+    Given an organization with two active members, one of whom joined another organization since
+    When billing's subscription_changed fact for it is delivered
+    Then only the other member is identified with the plan
+    And the group call still carries the plan to the organization's admin
+
   @integration
   Scenario: A paid-to-paid change shows the new plan and never free
     Given an organization on an active tiered subscription
@@ -138,6 +145,7 @@ Feature: Customer.io knows each team's real plan
 
   # --- AC Coverage Map ---
   # AC 1: "started subscription: plan on members and company"          -> Scenario: A started subscription tells Customer.io the plan on members and company
+  #        -> Scenario: A member whose latest organization is another is not told this plan
   # AC 2: "paid-to-paid shows new plan, never free"                    -> Scenario: A paid-to-paid change shows the new plan and never free (evidence: two linked tests)
   # AC 3: "last cancel returns to free; remaining sub keeps plan; pending is not paid" (evidence: two linked tests)
   #        -> Scenario: Cancelling the last active subscription returns the organization to free

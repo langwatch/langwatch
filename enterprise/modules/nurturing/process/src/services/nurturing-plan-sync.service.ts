@@ -2,7 +2,7 @@
 import type { CioBatchCall, NurturingSignalOf } from "@langwatch/enterprise-nurturing-contract";
 
 import type { NurturingOrganizationMemberRepository } from "../repositories/nurturing-organization-member.repository.ts";
-import { membersWhoseLatestOrganizationIs } from "../rules/nurturing-organization-member.rules.ts";
+import { membersWhoseLatestOrganizationIsElsewhere } from "../rules/nurturing-organization-member.rules.ts";
 import { fireSubscriptionSync } from "../rules/nurturing-subscription-sync-service.rules.ts";
 import type { NurturingMemberFactsService } from "./nurturing-member-facts.service.ts";
 import type { NurturingService } from "./nurturing.service.ts";
@@ -63,7 +63,10 @@ export class NurturingPlanSyncService {
       this.dependencies.admins.adminOf({ organizationId }),
       this.dependencies.members.findMembershipsOfMembers({ organizationId }),
     ]);
-    const latestMemberUserIds = membersWhoseLatestOrganizationIs({ memberships, organizationId });
-    return fireSubscriptionSync({ ...signal, adminUserId, latestMemberUserIds });
+    const elsewhereMemberUserIds = membersWhoseLatestOrganizationIsElsewhere({
+      memberships,
+      organizationId,
+    });
+    return fireSubscriptionSync({ ...signal, adminUserId, elsewhereMemberUserIds });
   }
 }

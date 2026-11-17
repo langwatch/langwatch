@@ -36,6 +36,22 @@ export function currentMemberCountOf({
   return new Set(current.map(({ userId }) => userId)).size;
 }
 
+/** Each person's current membership with the latest join, ties by organization id. */
+function latestCurrentMemberships(
+  memberships: readonly NurturingMembership[],
+): NurturingMembership[] {
+  const latest = new Map<string, NurturingMembership>();
+  for (const membership of memberships.filter(isCurrentMembership)) {
+    const known = latest.get(membership.userId);
+    const later =
+      !known ||
+      (membership.joinedAt ?? 0) > (known.joinedAt ?? 0) ||
+      (membership.joinedAt === known.joinedAt && membership.organizationId < known.organizationId);
+    if (later) latest.set(membership.userId, membership);
+  }
+  return [...latest.values()];
+}
+
 /**
  * The members of `organizationId` whose current membership with the latest join is this one
  * (ties by organization id): its traits are theirs. `memberships` holds every membership of the
@@ -48,16 +64,24 @@ export function membersWhoseLatestOrganizationIs({
   memberships: readonly NurturingMembership[];
   organizationId: string;
 }>): string[] {
-  const latest = new Map<string, NurturingMembership>();
-  for (const membership of memberships.filter(isCurrentMembership)) {
-    const known = latest.get(membership.userId);
-    const later =
-      !known ||
-      (membership.joinedAt ?? 0) > (known.joinedAt ?? 0) ||
-      (membership.joinedAt === known.joinedAt && membership.organizationId < known.organizationId);
-    if (later) latest.set(membership.userId, membership);
-  }
-  return [...latest.values()]
+  return latestCurrentMemberships(memberships)
     .filter((membership) => membership.organizationId === organizationId)
+    .map(({ userId }) => userId);
+}
+
+/**
+ * The people whose current membership with the latest join is another organization than
+ * `organizationId`: that one's traits are theirs. Someone the copy holds no current membership
+ * for is not among them, since the copy was never backfilled.
+ */
+export function membersWhoseLatestOrganizationIsElsewhere({
+  memberships,
+  organizationId,
+}: Readonly<{
+  memberships: readonly NurturingMembership[];
+  organizationId: string;
+}>): string[] {
+  return latestCurrentMemberships(memberships)
+    .filter((membership) => membership.organizationId !== organizationId)
     .map(({ userId }) => userId);
 }

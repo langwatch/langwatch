@@ -157,7 +157,8 @@ describe("NurturingDeliveryService, delivering billing's subscription_changed fa
   });
 
   describe("when a member's latest organization is another one", () => {
-    it("groups the admin and identifies only the members whose latest organization this is", async () => {
+    /** @scenario "A member whose latest organization is another is not told this plan" */
+    it("groups the admin and does not identify that member", async () => {
       const members = await fixtureMemberCopy();
       await members.recordMembershipChange({
         organizationId: "org-3",
@@ -177,14 +178,12 @@ describe("NurturingDeliveryService, delivering billing's subscription_changed fa
   });
 
   describe("when nurturing holds no membership copy for a member", () => {
-    it("identifies only the members it has a copy of", async () => {
+    it("still identifies that member, as billing lists them active", async () => {
       const members = await memberCopyOf({ organizationId: "org-1", userIds: ["user-1"] });
 
       const { sent } = await liveRequestsOf(subscriptionChangedFactFixture(), members);
 
-      expect(sent.flat().filter((call) => call.type === "identify")).toEqual([
-        { type: "identify", userId: "user-1", traits: { has_subscription: true, plan: "launch" } },
-      ]);
+      expect(sent).toEqual(requestsFor({ plan: "launch", hasSubscription: true }));
     });
 
     it("does the same for a catch-up fact", async () => {
@@ -197,7 +196,24 @@ describe("NurturingDeliveryService, delivering billing's subscription_changed fa
       expect(cio.sent.flat().map(({ type, userId }) => [type, userId])).toEqual([
         ["group", "admin-1"],
         ["identify", "user-1"],
+        ["identify", "user-2"],
       ]);
+    });
+  });
+
+  describe("when the copy shows a member left here and current nowhere else", () => {
+    it("still identifies them: billing lists them active and the copy names no other plan of theirs", async () => {
+      const members = await fixtureMemberCopy();
+      await members.recordMembershipChange({
+        organizationId: "org-1",
+        userId: "user-2",
+        change: "left",
+        at: 2,
+      });
+
+      const { sent } = await liveRequestsOf(subscriptionChangedFactFixture(), members);
+
+      expect(sent).toEqual(requestsFor({ plan: "launch", hasSubscription: true }));
     });
   });
 
