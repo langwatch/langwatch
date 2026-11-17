@@ -305,14 +305,9 @@ function resolveOwner({
   seen.add(span.spanId);
   const parentOwner = ownerOfSpan({ span: parent, context, seen });
   const changedService = service !== null && service !== context.serviceOf(parent.spanId);
-  const namesCallee = isA2aClient(parent) && agentLabelOf(parent) !== "";
+  const namesCallee = calleeOf(parent) !== "";
   if (changedService && !namesCallee) return serviceOwnerOf(service);
   return parentOwner;
-}
-
-function isA2aClient(span: AgentCallGraphSpan): boolean {
-  const a2a = classifyA2aSpan(span);
-  return a2a.isA2a && a2a.mark.role === "client";
 }
 
 /** Resource rows of the spans the viewer sees; the trace default comes from a visible root only. */

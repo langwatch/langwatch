@@ -319,6 +319,35 @@ describe("buildAgentCallGraph, when an unnamed A2A client under a named agent ca
       ["agent:Planner", "service:weather-svc"],
     ]);
   });
+
+  /** @scenario "An unnamed A2A client keeps the remote service as its own node" */
+  it("treats the client's own gen_ai.agent.name as the caller, not the callee", () => {
+    const graph = buildAgentCallGraph({
+      spans: [
+        span({ spanId: "root", params: { "gen_ai.agent.name": "Planner" } }),
+        span({
+          spanId: "client",
+          parentSpanId: "root",
+          name: "a2a.client SendMessage",
+          params: { "a2a.method": "SendMessage", "gen_ai.agent.name": "Planner" },
+        }),
+        span({ spanId: "server", parentSpanId: "client", name: "a2a.server SendMessage" }),
+        span({ spanId: "llm", parentSpanId: "server", type: "llm" }),
+      ],
+      resources: resources({
+        root: "caller-svc",
+        client: "caller-svc",
+        server: "weather-svc",
+        llm: "weather-svc",
+      }),
+    });
+
+    expect(graph.nodes.map((node) => node.id)).toEqual(["agent:Planner", "service:weather-svc"]);
+    expect(graph.nodes[1]?.llmSpanCount).toBe(1);
+    expect(graph.edges.map((edge) => [edge.from, edge.to])).toEqual([
+      ["agent:Planner", "service:weather-svc"],
+    ]);
+  });
 });
 
 describe("visibleResourcesOf", () => {
