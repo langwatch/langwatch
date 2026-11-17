@@ -4,7 +4,7 @@
 
 **Status:** Accepted
 
-**Amended:** 2026-11-17: customer-facing text names the product, never a backend. A routed result's details read "LangWatch Judge" and the escalation count (decision 10), and unrouted spend rows name the model `langwatch-evals-preview` (decision 6). Rows written before carry `jev`. Route table backend ids stay in logs and traces.
+**Amended:** 2026-11-17: customer-facing text names the product, never a backend. A routed result's details read "LangWatch Judge" and the escalation count (decision 10), and unrouted spend rows name the model `langwatch-evals-preview` (decision 6). Rows written before carry `jev`. Route table backend ids stay on the judgement's routing, not in customer-facing text.
 
 > One line: when a judge call carries a **route**, the Instant Evals judge may ask a decision model, Jev and an LLM judge, add up what every call cost at deploy-time prices, and charge that sum at the one published markup. Unrouted calls keep the ADR-174 rule.
 

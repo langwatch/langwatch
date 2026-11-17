@@ -57,7 +57,7 @@ export function instantEvalJudgeResult({
 
 /**
  * A routed judgement names the product and how many questions escalated, never a route table
- * backend id: `answeredBy` stays on the judgement for logs (ADR-190 decision 10, amended).
+ * backend id; `answeredBy` stays on the judgement only (ADR-190 decision 10, amended).
  */
 function routedLine({ escalated }: InstantEvalJudgeRouting): string {
   const escalation = escalated > 0 ? `, ${escalated} escalated` : "";

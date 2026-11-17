@@ -118,6 +118,7 @@ describe("instantEvalPricedSpend", () => {
     });
   });
 
+  /** @scenario "An unrouted spend row names the product, never a backend" */
   it("names the product customers read in billing, never an internal backend id", () => {
     const { model } = instantEvalPricedSpend({ record: record(), attribution, requestId: "req-1" });
 

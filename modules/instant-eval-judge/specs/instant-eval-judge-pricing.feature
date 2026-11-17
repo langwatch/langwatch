@@ -20,6 +20,13 @@ Feature: What the Instant Evals judge costs us, and what the customer is charged
     Then it is the rate the classifier publishes for two million tokens
 
   @unit
+  Scenario: An unrouted spend row names the product, never a backend
+    Given an unrouted run's priced spend
+    When its spend row is built
+    Then its model is langwatch-evals-preview
+    And it names no route table backend id
+
+  @unit
   Scenario: The customer price is the cost at the published markup
     Given a run costing one dollar
     When the price is computed
