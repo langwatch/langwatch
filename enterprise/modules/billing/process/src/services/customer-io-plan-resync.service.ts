@@ -19,8 +19,10 @@ export type CustomerIoPlanResyncTotals = {
   organizations: number;
   members: number;
   factsRecorded: number;
-  plannedGroupCalls: number;
-  plannedIdentifies: number;
+  /** Upper bound: nurturing may skip members and unchanged organizations. */
+  maxGroupCalls: number;
+  /** Upper bound: nurturing may skip members and unchanged organizations. */
+  maxIdentifies: number;
   skipped: { no_active_members: number };
 };
 
@@ -54,8 +56,8 @@ export class CustomerIoPlanResyncService {
       organizations: 0,
       members: 0,
       factsRecorded: 0,
-      plannedGroupCalls: 0,
-      plannedIdentifies: 0,
+      maxGroupCalls: 0,
+      maxIdentifies: 0,
       skipped: { no_active_members: 0 },
     };
     const { afterOrganizationId } = await this.pages.walk({
@@ -71,8 +73,8 @@ export class CustomerIoPlanResyncService {
           return;
         }
         totals.members += members;
-        totals.plannedGroupCalls += 1;
-        totals.plannedIdentifies += members;
+        totals.maxGroupCalls += 1;
+        totals.maxIdentifies += members;
         if (!dryRun) totals.factsRecorded += 1;
       },
     });

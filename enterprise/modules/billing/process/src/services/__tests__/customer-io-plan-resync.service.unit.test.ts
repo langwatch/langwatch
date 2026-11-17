@@ -61,8 +61,8 @@ describe("CustomerIoPlanResyncService", () => {
         organizations: 3,
         members: 252,
         factsRecorded: 2,
-        plannedGroupCalls: 2,
-        plannedIdentifies: 252,
+        maxGroupCalls: 2,
+        maxIdentifies: 252,
         skipped: { no_active_members: 1 },
       });
     });
@@ -81,8 +81,8 @@ describe("CustomerIoPlanResyncService", () => {
         organizations: 3,
         members: 252,
         factsRecorded: 0,
-        plannedGroupCalls: 2,
-        plannedIdentifies: 252,
+        maxGroupCalls: 2,
+        maxIdentifies: 252,
         skipped: { no_active_members: 1 },
       });
     });

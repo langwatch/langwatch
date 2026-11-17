@@ -328,8 +328,8 @@ describe("billing's subscription_changed fact, as nurturing's linked tests deliv
         organizations: 1,
         members: 2,
         factsRecorded: 0,
-        plannedGroupCalls: 1,
-        plannedIdentifies: 2,
+        maxGroupCalls: 1,
+        maxIdentifies: 2,
         skipped: { no_active_members: 0 },
       });
     });

@@ -101,7 +101,7 @@ Feature: Customer.io knows each team's real plan
     Given organizations with plans and members
     When billing:resync-customer-io-plan runs as a dry run
     Then no fact is recorded and no Customer.io call is sent
-    And the report counts organizations, members, planned group calls, planned identifies and skips by reason
+    And the report counts organizations, members, the most group calls and identifies it could send, and skips by reason
 
   @integration
   Scenario: A resync run records each organization's plan and members once and a second run sends the same values
