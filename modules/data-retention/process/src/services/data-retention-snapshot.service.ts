@@ -21,7 +21,7 @@ type DataRetentionSnapshotServiceOptions = Readonly<{
   retention: Pick<DataRetentionService, "getResolvedForProject" | "listOrganizationRules">;
   directory: DataRetentionDirectoryReader;
   permissions: RetentionPermissionsService;
-  policy: Pick<DataRetentionPolicyService, "canConfigureRetention">;
+  policy: Pick<DataRetentionPolicyService, "canConfigureRetention" | "storageBilled">;
 }>;
 
 type OrganizationDirectory = Awaited<
@@ -95,6 +95,7 @@ export class DataRetentionSnapshotService {
           : [],
       },
       canConfigureRetention: false,
+      storageBilled: false,
     };
   }
 
@@ -110,13 +111,19 @@ export class DataRetentionSnapshotService {
     const { directory, permissions, retention, policy } = this.options;
     const userId = actor.userId;
 
-    const [organizationDirectory, rows, canManageOrganization, canConfigureRetention] =
-      await Promise.all([
-        directory.findOrganizationDirectory({ organizationId }),
-        retention.listOrganizationRules({ organizationId }),
-        permissions.canManageOrganization({ userId, organizationId }),
-        policy.canConfigureRetention({ organizationId, actor }),
-      ]);
+    const [
+      organizationDirectory,
+      rows,
+      canManageOrganization,
+      canConfigureRetention,
+      storageBilled,
+    ] = await Promise.all([
+      directory.findOrganizationDirectory({ organizationId }),
+      retention.listOrganizationRules({ organizationId }),
+      permissions.canManageOrganization({ userId, organizationId }),
+      policy.canConfigureRetention({ organizationId, actor }),
+      policy.storageBilled({ organizationId, actor }),
+    ]);
 
     const [teamManage, projectUpdate] = await Promise.all([
       permissions.canManageTeams({
@@ -163,6 +170,7 @@ export class DataRetentionSnapshotService {
           .map(({ id, name, teamId }) => ({ id, name, teamId })),
       },
       canConfigureRetention,
+      storageBilled,
     };
   }
 
