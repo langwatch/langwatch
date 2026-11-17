@@ -97,9 +97,9 @@ export class PrismaLangWatchQLPostgresRepository extends LangWatchQLPostgresRepo
   }
 
   /**
-   * The per-view read runs only once the group is known to exist: `has_table_privilege` raises on
-   * an unknown role name. Catalog lookups by name, never `to_regclass`, which raises without
-   * USAGE on a scoped schema another installation owns.
+   * The group is read by oid, so one dropped mid-read reads as not granted rather than raising.
+   * Catalog lookups by name, never `to_regclass`, which raises without USAGE on a scoped schema
+   * another installation owns.
    */
   async findScopedViewState({
     appSchema,
@@ -126,12 +126,13 @@ export class PrismaLangWatchQLPostgresRepository extends LangWatchQLPostgresRepo
     const rows = scopedViewRowsSchema.parse(
       await this.database.$queryRawUnsafe(
         `${CATALOG}\nSELECT v AS view, ` +
-          `coalesce(has_table_privilege($1::text, s.oid, 'SELECT'), false) AS "groupOnShared", ` +
+          `coalesce(has_table_privilege(g.oid, s.oid, 'SELECT'), false) AS "groupOnShared", ` +
           `c.oid IS NOT NULL AS "copyExists", ` +
           `coalesce(${scopedViewGuardCondition({ relation: "c" })}, false) AS "copyPassesGuard", ` +
-          `coalesce(has_schema_privilege($1::text, c.relnamespace, 'USAGE') ` +
-          `AND has_table_privilege($1::text, c.oid, 'SELECT'), false) AS "copyGranted" ` +
+          `coalesce(has_schema_privilege(g.oid, c.relnamespace, 'USAGE') ` +
+          `AND has_table_privilege(g.oid, c.oid, 'SELECT'), false) AS "copyGranted" ` +
           `FROM unnest($3::text[]) AS v ` +
+          `LEFT JOIN pg_roles g ON g.rolname = $1::text ` +
           relationNamed({ schema: "$2::text", alias: "s" }) +
           relationNamed({ schema: scopedSchema, alias: "c" }) +
           `ORDER BY v`,
