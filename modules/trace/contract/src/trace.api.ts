@@ -93,7 +93,6 @@ import type {
   ModelSpanSampleRow,
 } from "./features/span/trace-span-read-model.ts";
 import type { Trace, Span, ElasticSearchEvent } from "./trace-format.schemas.ts";
-import type { OwnedSpan } from "./trace.spans.ts";
 import type {
   TraceFullReadInput,
   TraceFullRecord,
@@ -138,6 +137,7 @@ import type {
   TracesConversationContext,
   TracesSessionsPage,
 } from "./trace.responses.ts";
+import type { OwnedSpan } from "./trace.spans.ts";
 import type { NormalizedSpan } from "./trace.spans.ts";
 import type { SpanTreeNode, SpanTreePage } from "./trace.ts";
 import type { TraceSessionGroupsInput } from "./traces.trpc.ts";

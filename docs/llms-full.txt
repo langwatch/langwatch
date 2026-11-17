@@ -246,7 +246,7 @@ A span is marked as an A2A call when it carries `a2a.*` attributes, such as `a2a
 
 Each node is an agent, with its span count and the cost of its own LLM spans, so a parent is never charged for its children. Each edge counts the calls from one agent to another, with errors, average and maximum latency. Click an edge to open its first call in the span details.
 
-The **Agents** tab appears only when a trace has more than one agent.
+The **Agents** tab appears when a trace names more than one agent or holds an A2A call. When the graph finds only one agent, the tab stays and shows that one node. Each edge's latency is the caller's A2A client span when there is one, else the callee's first span. Edges with errors come first, then the busiest; a node with failed calls has a red border and the slowest callee an orange one.
 
 ---
 
