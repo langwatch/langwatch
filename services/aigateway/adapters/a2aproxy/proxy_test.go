@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -367,4 +368,15 @@ func TestAgentCardURLIsRewritten(t *testing.T) {
 	assert.Equal(t, "http://gw.acme.test/a2a/billing/v1", card.Interfaces[1].URL)
 	assert.Equal(t, "http://gw.acme.test/a2a/billing", card.Additional[0].URL)
 	assert.NotContains(t, rec.Body.String(), f.upstream.URL)
+}
+
+func TestBundleRegistryFindsTargetInBundle(t *testing.T) {
+	bundle := &domain.Bundle{Config: domain.BundleConfig{A2ATargets: []domain.A2ATarget{{Name: "billing", UpstreamURL: "http://billing"}}}}
+	got, err := BundleRegistry{}.Lookup(context.Background(), bundle, "billing")
+	if err != nil || got.UpstreamURL != "http://billing" {
+		t.Fatalf("lookup = %+v, %v", got, err)
+	}
+	if _, err := (BundleRegistry{}).Lookup(context.Background(), bundle, "other"); !errors.Is(err, domain.ErrA2ATargetNotFound) {
+		t.Fatalf("missing target err = %v", err)
+	}
 }

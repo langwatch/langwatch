@@ -3,6 +3,7 @@ package aigateway
 import (
 	"context"
 	"fmt"
+	"github.com/langwatch/langwatch/services/aigateway/adapters/a2aproxy"
 	"net/http"
 	"time"
 
@@ -13,6 +14,7 @@ import (
 	"github.com/langwatch/langwatch/pkg/httpmiddleware"
 	"github.com/langwatch/langwatch/pkg/lifecycle"
 	"github.com/langwatch/langwatch/services/aigateway/adapters/gatewaymetrics"
+	"github.com/langwatch/langwatch/services/aigateway/adapters/a2aproxy"
 	"github.com/langwatch/langwatch/services/aigateway/adapters/httpapi"
 	"github.com/langwatch/langwatch/services/aigateway/adapters/ottlserver"
 	"github.com/langwatch/langwatch/services/aigateway/adapters/providers"
@@ -62,6 +64,11 @@ func Serve(ctx context.Context, application *app.App, deps *Deps, cfg Config) er
 		CORSAllowedOrigins:    cfg.CORS.AllowedOriginList(),
 		WebhookRelay:          deps.ControlPlane,
 		VoiceRelay:            deps.Voice,
+		A2A: a2aproxy.New(a2aproxy.Config{
+			Registry: a2aproxy.BundleRegistry{},
+			Scanner:  a2aproxy.GuardrailScanner{Evaluator: deps.ControlPlane},
+			Bundle:   httpapi.BundleFromContext,
+		}),
 	})
 
 	srv := &http.Server{Handler: handler, Addr: cfg.Server.Addr, ReadHeaderTimeout: 10 * time.Second}

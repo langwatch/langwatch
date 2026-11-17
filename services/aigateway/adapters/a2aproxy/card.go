@@ -122,3 +122,19 @@ func (s *StaticRegistry) Lookup(_ context.Context, bundle *domain.Bundle, name s
 	}
 	return t, nil
 }
+
+// BundleRegistry finds targets in the caller's config bundle, which the
+// control plane fills from the project's A2A target registry.
+type BundleRegistry struct{}
+
+// Lookup implements Registry.
+func (BundleRegistry) Lookup(_ context.Context, bundle *domain.Bundle, name string) (domain.A2ATarget, error) {
+	if bundle != nil {
+		for _, t := range bundle.Config.A2ATargets {
+			if t.Name == name {
+				return t, nil
+			}
+		}
+	}
+	return domain.A2ATarget{}, domain.ErrA2ATargetNotFound
+}
