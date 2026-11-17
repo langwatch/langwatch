@@ -480,6 +480,9 @@ type Claims struct {
 	// than the claim sees nothing at all; both decode to 0, which means the
 	// key never expires.
 	VirtualKeyExpiresAt int64
+	// SecretValidUntil is the secret_valid_until claim in unix seconds: the
+	// rotation grace end of a previous secret, 0 for any other credential.
+	SecretValidUntil int64
 	// ConnectServices is the connect_services claim: the hosted services the
 	// license behind the presented token is entitled to. Non-nil only when the
 	// control plane sent the claim, which it does for a license token and for
@@ -507,6 +510,9 @@ func extractClaims(m map[string]any) *Claims {
 	}
 	if v, ok := m["vk_expires_at"].(float64); ok {
 		c.VirtualKeyExpiresAt = int64(v)
+	}
+	if v, ok := m["secret_valid_until"].(float64); ok {
+		c.SecretValidUntil = int64(v)
 	}
 	if v, ok := m["connect_services"].([]any); ok {
 		c.ConnectServices = connectServicesClaim(v)
@@ -540,6 +546,9 @@ func claimsToBundle(c *Claims) *domain.Bundle {
 	// clock comparison would read as an expired key.
 	if c.VirtualKeyExpiresAt > 0 {
 		b.VirtualKeyExpiresAt = time.Unix(c.VirtualKeyExpiresAt, 0)
+	}
+	if c.SecretValidUntil > 0 {
+		b.SecretValidUntil = time.Unix(c.SecretValidUntil, 0)
 	}
 	return b
 }

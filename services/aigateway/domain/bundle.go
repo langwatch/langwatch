@@ -40,6 +40,23 @@ type Bundle struct {
 	// it the key is finished and the request is refused. The zero value means
 	// the key has no expiration date and never runs out.
 	VirtualKeyExpiresAt time.Time
+
+	// SecretValidUntil is the end of the rotation grace when the presented
+	// credential is a rotated key's previous secret, from the
+	// secret_valid_until claim; zero otherwise. Only a new token sets it: a
+	// config refresh describes the key, not the secret, and leaves it as is.
+	SecretValidUntil time.Time
+}
+
+// ServesUntil is the instant this bundle stops being servable from cache: the
+// earlier of the key's own expiration date and the presented secret's grace
+// end. The zero value means neither applies.
+func (b *Bundle) ServesUntil() time.Time {
+	until := b.VirtualKeyExpiresAt
+	if !b.SecretValidUntil.IsZero() && (until.IsZero() || b.SecretValidUntil.Before(until)) {
+		until = b.SecretValidUntil
+	}
+	return until
 }
 
 // KeyExpired reports whether the virtual key's own expiration date has passed

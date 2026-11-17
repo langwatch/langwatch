@@ -106,7 +106,9 @@ describe("the internal door's resolve-key", () => {
         node: undefined,
       });
 
-      expect(signJwt).toHaveBeenCalledWith(expect.objectContaining({ notAfter: graceEnd }));
+      expect(signJwt).toHaveBeenCalledWith(
+        expect.objectContaining({ notAfter: graceEnd, secretNotAfter: graceEnd }),
+      );
     });
 
     /** @scenario The current secret keeps its own expiry during a rotation grace */
@@ -132,6 +134,9 @@ describe("the internal door's resolve-key", () => {
       });
 
       expect(signJwt).toHaveBeenCalledWith(expect.objectContaining({ notAfter: null }));
+      expect(signJwt).toHaveBeenCalledWith(
+        expect.not.objectContaining({ secretNotAfter: expect.anything() }),
+      );
     });
 
     it("ignores a grace that already ended", async () => {

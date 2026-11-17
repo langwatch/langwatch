@@ -182,6 +182,7 @@ JWT claims (short, hot-path-verified):
   "principal_id":  "user_01HZ... | svc_01HZ...",  // for trace attribution
   "revision":      142,                            // bumped on any mutation
   "vk_expires_at": 1734568790,                     // key's own expiry, null when it has none
+  "secret_valid_until": 1734568500,                // only for a previous secret in its rotation grace
   "iat":           1734567890,
   "exp":           1734568790,                     // TTL 900s, or vk_expires_at when sooner
   "iss":           "langwatch-control-plane",
@@ -196,6 +197,11 @@ refresh boundary: the gateway caps both auth-cache deadlines at it and refuses
 a request past it with `403 virtual_key_expired`, without a round trip. That is
 what stops a key from serving through the stale-while-error window (§9) after
 its date has passed while the control plane is unreachable.
+
+`secret_valid_until` is sent only when the presented credential is a rotated
+key's previous secret inside its grace. The gateway caps that entry at it on
+its own field, because a config refresh (§4.2) moves `vk_expires_at` to the
+key's own date and must not extend the old secret past its grace.
 
 Errors: `401 invalid_api_key`, `403 virtual_key_revoked`, `403 virtual_key_disabled`, `403 virtual_key_expired`.
 

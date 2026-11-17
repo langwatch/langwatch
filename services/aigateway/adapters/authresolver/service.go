@@ -39,7 +39,6 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/langwatch/langwatch/pkg/herr"
-	"github.com/langwatch/langwatch/services/aigateway/adapters/gatewaymetrics"
 	"github.com/langwatch/langwatch/services/aigateway/domain"
 )
 
@@ -125,6 +124,16 @@ const budgetRefreshRetry = time.Second
 // the label carries one value; it stays a label because the metric names are
 // published and an operator's dashboard should not break to save a string.
 const tierL1 = "l1"
+
+// Refusal reasons and stale-serve sources reported on the auth-cache metrics.
+// They match the label values the metrics adapter documents.
+const (
+	refusalDeniedRevoked  = "denied_vk_revoked"
+	refusalDeniedDisabled = "denied_vk_disabled"
+	refusalFailClosed     = "fail_closed"
+	staleServeLastKnown   = "last_known"
+	staleServeWhileError  = "stale_while_error"
+)
 
 // Service is the auth resolver: one in-memory LRU in front of the control
 // plane.
@@ -719,7 +728,7 @@ func (s *Service) Resolve(ctx context.Context, key domain.PresentedKey) (*domain
 		}
 	}
 	if errors.Is(err, domain.ErrAuthUpstream) {
-		s.countRefusal(answer.bundle.VirtualKeyID, gatewaymetrics.AuthRefusalFailClosed)
+		s.countRefusal(answer.bundle.VirtualKeyID, refusalFailClosed)
 	}
 	if err != nil {
 		return nil, err
@@ -1013,7 +1022,7 @@ func (s *Service) serveLastKnown(h [64]byte, in lastKnownServe) *served {
 			zap.Bool("cached", false),
 			zap.Error(cause),
 		)
-		return &served{bundle: bundle, authStart: authStart, stale: gatewaymetrics.StaleServeLastKnown}
+		return &served{bundle: bundle, authStart: authStart, stale: staleServeLastKnown}
 	}
 	s.lastKnown.Remove(h)
 	s.logger.Warn("auth_cache_serve_last_known",
@@ -1022,7 +1031,7 @@ func (s *Service) serveLastKnown(h [64]byte, in lastKnownServe) *served {
 		zap.Time("serve_until", hard),
 		zap.Error(cause),
 	)
-	return &served{bundle: bundle, authStart: authStart, stale: gatewaymetrics.StaleServeLastKnown}
+	return &served{bundle: bundle, authStart: authStart, stale: staleServeLastKnown}
 }
 
 // refreshOrServeStale tries to resolve fresh against the control plane.
@@ -1134,7 +1143,7 @@ func (s *Service) serveStaleAfterFailure(ctx context.Context, f staleFailure) (s
 		zap.Duration("hard_grace_remaining", time.Until(hardExpiresAt)),
 		zap.String("refresh_error_class", classLabel),
 	)
-	return served{bundle: staleBundle, authStart: f.authStart, stale: gatewaymetrics.StaleServeWhileError}, nil
+	return served{bundle: staleBundle, authStart: f.authStart, stale: staleServeWhileError}, nil
 }
 
 // populateConfig eagerly fetches the bundle's config and merges it into the
@@ -1251,22 +1260,23 @@ func (s *Service) publishL1(h [64]byte, stored *entry) {
 // exp it refreshes at, and the hard cap the stale-while-error grace may extend
 // it to.
 //
-// Both are capped at the virtual key's own expiration date when the bundle
-// carries one, because the grace window exists to cover an unreachable control
+// Both are capped at the virtual key's own expiration date, and at a rotated
+// key's previous-secret grace end, when the bundle carries them, because the grace window exists to cover an unreachable control
 // plane and this date needs no control plane to be true. Without the cap, the
 // grace is added to the JWT exp and a key that ran out keeps serving for the
 // length of the window. A bundle with no date is left exactly as it was.
 func entryDeadlines(bundle *domain.Bundle, hardGrace time.Duration) (soft, hard time.Time) {
 	soft = bundle.ExpiresAt
 	hard = bundle.ExpiresAt.Add(hardGrace)
-	if bundle.VirtualKeyExpiresAt.IsZero() {
+	until := bundle.ServesUntil()
+	if until.IsZero() {
 		return soft, hard
 	}
-	if soft.After(bundle.VirtualKeyExpiresAt) {
-		soft = bundle.VirtualKeyExpiresAt
+	if soft.After(until) {
+		soft = until
 	}
-	if hard.After(bundle.VirtualKeyExpiresAt) {
-		hard = bundle.VirtualKeyExpiresAt
+	if hard.After(until) {
+		hard = until
 	}
 	return soft, hard
 }

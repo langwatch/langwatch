@@ -845,6 +845,13 @@ Feature: Gateway auth cache — hot path is zero RTT after first hit
       And both cache deadlines move past the old date
 
     @unit
+    Scenario: a config refresh during a rotation grace never extends the old secret
+      Given a cached old secret whose rotation grace ends in a moment
+      When the config refresh answers with the key's own later expiration date
+      And the control plane is unreachable when the grace ends
+      Then the old secret stops being served at the grace end
+
+    @unit
     Scenario: a config response with no expiration field keeps the date the gateway holds
       Given a cached key that expires in five minutes
       When the config refresh comes from a control plane that sends no expiration field

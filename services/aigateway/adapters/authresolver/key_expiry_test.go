@@ -247,3 +247,32 @@ func TestResolve_ConfigRefreshWithoutExpiryField_KeepsTheCachedDate(t *testing.T
 	_, hard := deadlines(t, svc, rawKey)
 	assert.True(t, hard.Equal(keyExpiry), "and the hard cap stays on it")
 }
+
+// @scenario "a config refresh during a rotation grace never extends the old secret"
+func TestResolve_ConfigRefreshDuringRotationGrace_OldSecretStopsAtGraceEnd(t *testing.T) {
+	graceEnd := time.Now().Add(300 * time.Millisecond)
+	keyExpiry := time.Now().Add(1 * time.Hour)
+	fetcher := &expiryConfigFetcher{expiry: keyExpiry, known: true}
+	fetcher.returns = []resolverReturn{{err: herr.New(context.Background(), domain.ErrAuthUpstream, nil)}}
+	rawKey := "vk-lw-old-secret-in-grace"
+	bundle := expiringBundle("vk_rotated", time.Now().Add(1*time.Hour), keyExpiry)
+	bundle.SecretValidUntil = graceEnd
+	svc, e := newExpiryService(t, fetcher, rawKey, bundle)
+
+	_, err := svc.Resolve(context.Background(), domain.PresentedKey{Token: rawKey})
+	require.NoError(t, err, "the old secret serves inside its grace")
+	awaitConfigRefresh(t, e)
+
+	live, ok := svc.l1.Peek(hashKey(domain.PresentedKey{Token: rawKey}))
+	require.True(t, ok)
+	assert.True(t, live.bundle.VirtualKeyExpiresAt.Equal(keyExpiry), "the refresh brings the key's own date")
+	assert.True(t, live.bundle.SecretValidUntil.Equal(graceEnd), "and leaves the secret's grace end alone")
+	_, hard := deadlines(t, svc, rawKey)
+	assert.False(t, hard.After(graceEnd), "the hard cap stays at the grace end")
+
+	time.Sleep(time.Until(graceEnd) + 20*time.Millisecond)
+	served, err := svc.Resolve(context.Background(), domain.PresentedKey{Token: rawKey})
+
+	assert.Nil(t, served, "the old secret must not serve past its grace end")
+	require.Error(t, err)
+}

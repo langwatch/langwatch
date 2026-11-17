@@ -171,8 +171,8 @@ export class GatewayInternalKeyResolutionService {
       return refuse(statusRejection.status, { ...statusRejection });
     }
 
-    // A token minted for the old secret inside a rotation grace ends with it, so
-    // a gateway that cached the old secret asks again when the grace ends.
+    // A token minted for the old secret inside a rotation grace ends with it, and
+    // carries the grace end as its own claim so a gateway caps the old secret there.
     const now = nowInstant().epochMilliseconds;
     const graceEnd =
       vk.presentedPreviousSecret &&
@@ -183,7 +183,9 @@ export class GatewayInternalKeyResolutionService {
     const [notAfter] = [vk.expiresAt, graceEnd]
       .filter((at): at is Instant => at !== null)
       .toSorted((a, b) => a.epochMilliseconds - b.epochMilliseconds);
-    return answer(await this.keyResolution({ vk, notAfter: notAfter ?? null }));
+    return answer(
+      await this.keyResolution({ vk, notAfter: notAfter ?? null, secretNotAfter: graceEnd }),
+    );
   }
 
   /**
@@ -194,10 +196,12 @@ export class GatewayInternalKeyResolutionService {
   private async keyResolution({
     vk,
     notAfter,
+    secretNotAfter,
     connectServices,
   }: {
     vk: GatewayVirtualKeyRecord;
     notAfter: Instant | null;
+    secretNotAfter?: Instant | null;
     connectServices?: string[];
   }) {
     // Null for a key written before the destination was stored, in an organization
@@ -213,6 +217,7 @@ export class GatewayInternalKeyResolutionService {
       principal_id: vk.principalUserId,
       revision: vk.revision.toString(),
       notAfter,
+      ...(secretNotAfter ? { secretNotAfter } : {}),
       ...(connectServices ? { connect_services: connectServices } : {}),
     });
     // Fire-and-forget last-used bump. Failures here must not deny the request.

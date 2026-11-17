@@ -9,7 +9,6 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/langwatch/langwatch/pkg/herr"
-	"github.com/langwatch/langwatch/services/aigateway/adapters/gatewaymetrics"
 	"github.com/langwatch/langwatch/services/aigateway/domain"
 )
 
@@ -457,9 +456,9 @@ func (s *Service) countRefusal(vkID, reason string) {
 
 func denialReason(kind string) string {
 	if kind == ChangeKindVirtualKeyDisabled {
-		return gatewaymetrics.AuthRefusalDeniedDisabled
+		return refusalDeniedDisabled
 	}
-	return gatewaymetrics.AuthRefusalDeniedRevoked
+	return refusalDeniedRevoked
 }
 
 func denialError(ctx context.Context, kind string) error {
