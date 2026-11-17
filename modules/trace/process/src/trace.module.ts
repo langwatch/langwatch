@@ -58,7 +58,7 @@ import { trackedEventLegacyPathRest, trackedEventRest } from "./transport/tracke
 
 /**
  * Refolds the 122 days att-change reads so each trace_analytics row carries its trace's managed
- * prompt version (goose 00132), once no older writer is left to write rows without it.
+ * prompt version (goose 00133), once no older writer is left to write rows without it.
  * `after` names the lane's earlier replays: two replays of one lane share its markers and pause.
  */
 export function managedPromptVersionReplayStep({

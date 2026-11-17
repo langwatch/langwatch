@@ -86,7 +86,7 @@ const traceAnalyticsEvents = [
 /**
  * Schema-snapshot version (calendar date), bumped on derivation/trim changes; NOT a refold
  * trigger, see {@link TRACE_ANALYTICS_PROJECTION_VERSION_PRE_SPLIT}. 2026-11-17 = the managed
- * prompt version the trace last used (goose 00132); replayed rows win a tie on `UpdatedAt` by it.
+ * prompt version the trace last used (goose 00133); replayed rows win a tie on `UpdatedAt` by it.
  */
 export const TRACE_ANALYTICS_PROJECTION_VERSION_LATEST = "2026-11-17" as const;
 

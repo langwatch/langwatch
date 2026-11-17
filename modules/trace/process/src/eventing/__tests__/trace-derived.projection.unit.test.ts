@@ -1,6 +1,6 @@
 /**
  * The analytics fold writes the managed prompt version its trace last used as a column of its row:
- * the latest prompt span by start time wins, the larger SpanId breaking a tie (goose 00132).
+ * the latest prompt span by start time wins, the larger SpanId breaking a tie (goose 00133).
  */
 import { createTenantId, type ProjectionStoreContext } from "@langwatch/eventing";
 import type { NormalizedSpan } from "@langwatch/trace-contract";

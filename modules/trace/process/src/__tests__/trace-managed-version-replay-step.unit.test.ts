@@ -1,6 +1,6 @@
 /**
  * The trace module's managed-version replay step: a background refold of the traceAnalytics lane
- * over the last 122 days, held until no older writer is left (goose 00132).
+ * over the last 122 days, held until no older writer is left (goose 00133).
  */
 import { toEpochMs } from "@langwatch/time";
 import type { LaneReplayer } from "@langwatch/upgrade/step";

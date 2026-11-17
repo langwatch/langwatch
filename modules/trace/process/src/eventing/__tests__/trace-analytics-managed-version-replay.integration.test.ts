@@ -1,6 +1,6 @@
 /**
  * The managed-version replay step over the real replay engine, fold and store (log and table in
- * memory): a pre-00132 row inside its 122 days gains its trace's managed prompt version, an older
+ * memory): a pre-00133 row inside its 122 days gains its trace's managed prompt version, an older
  * row is left as it was, and a live write the replay defers still ends as the latest version.
  */
 import { type Authorization, projectIdsReadBy } from "@langwatch/authorization";
@@ -222,7 +222,7 @@ class TraceAnalyticsTable extends TraceAnalyticsProjectionRepository {
   }
 }
 
-/** A trace's row as the release before goose 00132 wrote it: folded then, no version column. */
+/** A trace's row as the release before goose 00133 wrote it: folded then, no version column. */
 function preColumnEntry(events: readonly SpanReceivedEvent[]): TraceAnalyticsProjectionEntry {
   const fold = TraceAnalyticsFoldProjection.create({
     store: { store: async () => {}, get: async () => ({ kind: "empty" as const }) },
@@ -359,7 +359,7 @@ function deployment({
 }
 
 describe("the trace analytics managed-version replay", () => {
-  describe("given rows written before goose 00132, on each side of the step's 122 days", () => {
+  describe("given rows written before goose 00133, on each side of the step's 122 days", () => {
     const inside = promptSpanEvent({
       eventId: "event-inside",
       traceId: "aaaa0000000000000000000000000121",
