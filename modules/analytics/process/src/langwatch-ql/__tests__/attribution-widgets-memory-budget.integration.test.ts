@@ -5,6 +5,7 @@
  * history; main's form was refused (code 241) once that history grew.
  * @see specs/lwql/stock-widgets-on-trace-metrics.feature
  * @see specs/lwql/stock-widgets-read-trace-evaluations.feature
+ */
 import {
   DEFAULT_LWQL_RESOURCE_LIMITS,
   type LangWatchQLResourceLimits,
