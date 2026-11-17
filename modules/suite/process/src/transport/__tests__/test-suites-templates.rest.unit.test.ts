@@ -118,7 +118,7 @@ describe("POST /api/v1/test-suites/templates/:templateId/apply", () => {
     const { send } = mount();
     const response = await send("POST", `${BASE}/no-such-template/apply`, { fit });
     expect(response.status).toBe(404);
-    expect(JSON.stringify(await response.json())).toContain("suite_template_not_found");
+    expect(await response.json()).toMatchObject({ code: "suite_template_not_found" });
   });
 
   describe("when the caller may only view scenarios", () => {

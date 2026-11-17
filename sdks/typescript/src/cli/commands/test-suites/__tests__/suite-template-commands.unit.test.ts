@@ -94,7 +94,7 @@ describe("listSuiteTemplatesCommand()", () => {
     it("exits with code 1", async () => {
       listTemplatesSpy.mockRejectedValue(new TestSuitesApiError("nope", "list suite templates"));
 
-      await expect(listSuiteTemplatesCommand()).rejects.toThrow(ProcessExitError);
+      await expect(listSuiteTemplatesCommand()).rejects.toMatchObject({ code: 1 });
     });
   });
 });
@@ -153,7 +153,7 @@ describe("applySuiteTemplateCommand()", () => {
 
       await expect(
         applySuiteTemplateCommand({ templateId: "nope", agentName: "Support bot" }),
-      ).rejects.toThrow(ProcessExitError);
+      ).rejects.toMatchObject({ code: 1 });
     });
   });
 });

@@ -292,7 +292,7 @@ export function createTestSuitesRest(): Readonly<{
       tags: ["Test Suites"],
       summary: "Apply a suite template",
       description:
-        "Create a test suite from a template, with one scenario per template scenario filled from the fit: the agent's name, its tools and what it must never do. The suite name defaults to the template title. A plan that cannot take every scenario refuses before anything is written. An unknown template id answers 404 suite_template_not_found.",
+        "Create a test suite from a template, with one scenario per template scenario filled from the fit: the agent's name, its tools and what it must never do. The suite name defaults to the template title. An unknown template id answers 404 suite_template_not_found.",
       responses: notFound,
     })
     .withMiddlewareContext(projectRequestContext, suiteRunOrigin)
