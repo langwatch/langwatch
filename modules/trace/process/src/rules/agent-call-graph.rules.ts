@@ -268,7 +268,10 @@ type OwnerContext = {
   owners: Map<string, Owner>;
 };
 
-/** A span's own agent; a node for a changed service unless an A2A client named it; else the parent's. */
+/**
+ * A span's own agent; a node for a changed service unless an A2A client named it;
+ * else the parent's.
+ */
 function ownerOfSpan({
   span,
   context,
