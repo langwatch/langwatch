@@ -110,11 +110,6 @@ func TestInvalidation_BudgetDebitMidFetchCachesMarkedBehind(t *testing.T) {
 	assert.Equal(t, uint64(1), e.budgetChangeCount(), "the entry is marked behind the debit it may have missed")
 }
 
-// storeL1 seeds L1 with a bundle as if its config was just fetched.
-func (s *Service) storeL1(h [64]byte, bundle *domain.Bundle, configETag string) {
-	s.publishL1(h, s.newEntry(bundle, configETag))
-}
-
 // @scenario "a burst of budget debits does not stop the cache from filling"
 func TestInvalidation_BudgetDebitBurstStillPublishes(t *testing.T) {
 	svc, _ := newService(t, Options{Resolver: &fakeResolver{}, ConfigFetcher: &fakeResolver{}, LRUSize: 16})

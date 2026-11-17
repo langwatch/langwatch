@@ -111,12 +111,6 @@ func (s *Service) recheckDenied(key domain.PresentedKey, h [64]byte, vkID string
 	s.logger.Info("auth_cache_denial_cleared", zap.String("vk_id", vkID), zap.String("source", "recheck"))
 }
 
-func newOrgCursor() *orgCursor {
-	c := &orgCursor{since: "0"}
-	c.polledAt.Store(time.Now().UnixNano())
-	return c
-}
-
 // authFrom stamps when the confirming control-plane call began. Call it before
 // the entry is published.
 func (e *entry) authFrom(t time.Time) *entry {
@@ -348,12 +342,6 @@ func (s *Service) countRefusal(vkID, reason string) {
 	s.logger.Info("auth_cache_refused", zap.String("vk_id", vkID), zap.String("reason", reason))
 	if s.metrics != nil {
 		s.metrics.RecordAuthCacheRefusal(reason)
-	}
-}
-
-func (s *Service) recordStaleServe(source string) {
-	if s.metrics != nil {
-		s.metrics.RecordAuthCacheStaleServe(source)
 	}
 }
 

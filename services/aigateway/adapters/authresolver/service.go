@@ -179,6 +179,12 @@ type orgCursor struct {
 	polledAt atomic.Int64
 }
 
+func newOrgCursor() *orgCursor {
+	c := &orgCursor{since: "0"}
+	c.polledAt.Store(time.Now().UnixNano())
+	return c
+}
+
 // entry tracks both the natural JWT exp ("soft" expiry, bumpable on
 // transport failure) and the absolute hard cap. softExpiresAt is mutable;
 // hardExpiresAt is set once at insert time and never changes.
@@ -824,6 +830,12 @@ func (s *Service) recordMiss() {
 	}
 }
 
+func (s *Service) recordStaleServe(source string) {
+	if s.metrics != nil {
+		s.metrics.RecordAuthCacheStaleServe(source)
+	}
+}
+
 // resolveFresh calls the upstream resolver and caches the result.
 // Used for cold misses; not on stale-entry refresh paths (those use
 // refreshOrServeStale for the served-stale fallback).
@@ -853,7 +865,7 @@ func (s *Service) resolveFresh(ctx context.Context, key domain.PresentedKey, h [
 		s.publishFetched(h, s.newEntry(bundle, etag).authFrom(start), since)
 		return served{bundle: bundle, authStart: start}, nil
 	}
-	return s.resolveFreshWithoutConfig(ctx, freshWithoutConfig{h: h, fallback: fallback, bundle: bundle, cfgErr: cfgErr, since: since})
+	return s.resolveFreshWithoutConfig(ctx, freshWithoutConfig{h: h, fallback: fallback, bundle: bundle, start: start, cfgErr: cfgErr, since: since})
 }
 
 // freshWithoutConfig is a resolve-key answer whose config fetch failed.
@@ -861,6 +873,7 @@ type freshWithoutConfig struct {
 	h        [64]byte
 	fallback *entry
 	bundle   *domain.Bundle
+	start    time.Time
 	cfgErr   error
 	since    uint64
 }
@@ -875,7 +888,7 @@ func (s *Service) resolveFreshWithoutConfig(ctx context.Context, in freshWithout
 		return served{}, cfgErr
 	}
 	if fallback != nil {
-		if answer := s.serveLastKnown(h, lastKnownServe{old: fallback, fresh: bundle, cause: cfgErr, since: in.since}); answer != nil {
+		if answer := s.serveLastKnown(h, lastKnownServe{old: fallback, fresh: bundle, freshStart: in.start, cause: cfgErr, since: in.since}); answer != nil {
 			return *answer, nil
 		}
 		if bundle.KeyExpired(time.Now()) {
@@ -918,14 +931,17 @@ func (s *Service) lastKnownUsable(e *entry, now time.Time) bool {
 type lastKnownServe struct {
 	old   *entry
 	fresh *domain.Bundle
-	cause error
-	since uint64
+	// freshStart is when the resolve-key call behind fresh began.
+	freshStart time.Time
+	cause      error
+	since      uint64
 }
 
 // serveLastKnown puts an evicted entry back in L1 after a failed refetch and
 // returns its bundle, or nil when the entry stopped being servable while the
-// refetch ran. When resolve-key answered (fresh non-nil), the fresh token and
-// its expiry are kept and only the config comes from the evicted entry. The
+// refetch ran. When resolve-key answered (fresh non-nil), the fresh token, its
+// expiry and its check time are kept; only the config comes from the evicted
+// entry. The
 // new entry carries no ETag, so the next refresh asks for the config
 // outright, and its hard cap never passes lastKnownMaxAge after the last
 // confirmation.
@@ -947,6 +963,7 @@ func (s *Service) serveLastKnown(h [64]byte, in lastKnownServe) *served {
 			s.lastKnown.Remove(h)
 			return nil
 		}
+		authStart = in.freshStart
 		merged := *fresh
 		merged.Config = bundle.Config
 		merged.Credentials = bundle.Credentials
@@ -1143,7 +1160,7 @@ func (s *Service) populateConfig(ctx context.Context, bundle *domain.Bundle) (st
 func errConfigUnavailable(ctx context.Context, err error) error {
 	return herr.New(ctx, domain.ErrAuthUpstream, herr.M{
 		"message": "control plane unavailable while loading this key's provider configuration — retry shortly",
-	}, err)
+	}, err).WithRetryable(true)
 }
 
 // Start launches the background refresh loop and (when configured) the

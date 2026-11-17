@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/langwatch/langwatch/pkg/herr"
 	"github.com/langwatch/langwatch/services/aigateway/domain"
 )
 
@@ -34,6 +35,10 @@ func TestResolve_ColdMiss_ConfigFetchFailure_FailsClosedAndCachesNothing(t *test
 	}
 	if !errors.Is(err, domain.ErrAuthUpstream) {
 		t.Fatalf("expected auth_upstream_unavailable (retryable), got %v", err)
+	}
+	var unavailable herr.E
+	if !errors.As(err, &unavailable) || !unavailable.Retryable {
+		t.Fatalf("auth_upstream_unavailable always tells the client to retry: %v", err)
 	}
 	if svc.l1.Len() != 0 {
 		t.Fatalf("a config-less bundle must not be cached; L1 holds %d entries", svc.l1.Len())

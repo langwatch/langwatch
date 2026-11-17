@@ -128,6 +128,11 @@ func freshBundle(vkID string, exp time.Time) *domain.Bundle {
 	return &domain.Bundle{VirtualKeyID: vkID, ExpiresAt: exp}
 }
 
+// storeL1 seeds L1 with a bundle as if its config was just fetched.
+func (s *Service) storeL1(h [64]byte, bundle *domain.Bundle, configETag string) {
+	s.publishL1(h, s.newEntry(bundle, configETag))
+}
+
 // seedExpiredEntry primes L1 with a vk whose JWT exp is `staleness` in the
 // past (i.e. soft-expired). HardExpiresAt is set per the service's config.
 func seedExpiredEntry(t *testing.T, svc *Service, rawKey, vkID string, staleness time.Duration) {

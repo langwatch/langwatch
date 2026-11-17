@@ -335,3 +335,30 @@ func TestServeLastKnown_RotationMidRefetchDropsTheFallback(t *testing.T) {
 	assert.Nil(t, svc.serveLastKnown(h, lastKnownServe{old: old, cause: context.DeadlineExceeded, since: since}))
 	assert.Nil(t, svc.lastKnownFor(h))
 }
+
+// @scenario "an outage fallback after a fresh key check passes fail closed"
+func TestResolve_LastKnownAfterFreshKeyCheck_PassesFailClosed(t *testing.T) {
+	fetcher := &fakeConfigFetcher{cfgErr: context.DeadlineExceeded}
+	fetcher.returns = []resolverReturn{{bundle: freshBundle("vk_checked", time.Now().Add(10*time.Minute))}}
+	svc, _ := newService(t, Options{
+		Resolver: &fetcher.fakeResolver, ConfigFetcher: fetcher, FailClosedAfter: time.Minute,
+	})
+	rawKey := "vk-lw-checked"
+	h := seedServedKey(t, svc, rawKey, "vk_checked")
+	seeded, ok := svc.l1.Peek(h)
+	require.True(t, ok)
+	seeded.mu.Lock()
+	seeded.authStartedAt = time.Now().Add(-2 * time.Minute)
+	seeded.mu.Unlock()
+	budgetCreated(svc)
+
+	before := time.Now()
+	b, err := svc.Resolve(context.Background(), domain.PresentedKey{Token: rawKey})
+
+	require.NoError(t, err, "resolve-key just confirmed the key, so fail closed lets the fallback through")
+	assert.Equal(t, "cred-known-good", b.Credentials[0].ID)
+	assert.Equal(t, int64(1), fetcher.calls.Load(), "no second key check for an answer seconds old")
+	restored, ok := svc.l1.Peek(h)
+	require.True(t, ok)
+	assert.False(t, restored.authStart().Before(before.Add(-time.Second)), "the restored entry carries the fresh key check time")
+}

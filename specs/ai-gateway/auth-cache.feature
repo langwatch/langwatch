@@ -448,6 +448,14 @@ Feature: Gateway auth cache — hot path is zero RTT after first hit
       Then the key is refused with auth_upstream_unavailable
 
     @unit
+    Scenario: an outage fallback after a fresh key check passes fail closed
+      Given fail closed is on and the change feed has gone silent
+      And a key whose last known entry was confirmed 2 minutes ago
+      When resolve-key confirms the key but the config fetch times out
+      Then the last known config serves under the fresh key check
+      And the restored entry carries the fresh key check time
+
+    @unit
     Scenario: fail closed re-checks the key before it refuses
       Given fail closed is on and the change feed has gone silent
       And a cached key whose last key check is older than the limit
