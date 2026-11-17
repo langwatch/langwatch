@@ -6,6 +6,7 @@ import {
   scopedSchemaOwnedCondition,
   scopedViewGuardCondition,
 } from "../../features/provisioning/rules/lwql-scoped-view.rules.ts";
+import { postgresLiteral } from "../../rules/langwatch-ql-sql-literal.rules.ts";
 import {
   LangWatchQLPostgresRepository,
   type LwqlPostgresViewFound,
@@ -110,7 +111,7 @@ export class PrismaLangWatchQLPostgresRepository extends LangWatchQLPostgresRepo
     group: string;
     views: readonly string[];
   }): Promise<LwqlScopedViewState> {
-    const scopedSchema = `'${LWQL_SCOPED_SCHEMA}'`;
+    const scopedSchema = postgresLiteral(LWQL_SCOPED_SCHEMA);
     const [header] = scopedHeaderRowsSchema.parse(
       await this.database.$queryRawUnsafe(
         `${CATALOG}\nSELECT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = $1::text) AS "groupExists", ` +

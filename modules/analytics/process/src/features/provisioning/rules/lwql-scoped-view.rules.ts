@@ -30,8 +30,11 @@ const ORG_ROLE_PREFIX = "lwql_org_";
 export const LWQL_ORG_SCOPE_FRAGMENT = `${postgresLiteral(ORG_ROLE_PREFIX)}::text || md5(`;
 
 /** The complete org-role name for an organization id expression: the fragment plus its close. */
-export const lwqlOrgRoleName = ({ organizationId }: { organizationId: string }): string =>
-  `${LWQL_ORG_SCOPE_FRAGMENT}${organizationId})`;
+export const lwqlOrgRoleName = ({
+  organizationIdExpression,
+}: {
+  organizationIdExpression: string;
+}): string => `${LWQL_ORG_SCOPE_FRAGMENT}${organizationIdExpression})`;
 
 /**
  * Lower-cased fragments a scoped copy's stored definition must also carry: the membership catalog

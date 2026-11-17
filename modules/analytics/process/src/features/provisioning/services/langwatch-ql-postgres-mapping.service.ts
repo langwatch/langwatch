@@ -94,7 +94,7 @@ function readerRowScopePredicate({
   quotedSchema: string;
 }): string {
   const tenant = `${sqlText.postgresQuoted(scope.tenant.alias)}.${sqlText.postgresQuoted(scope.tenant.column)}`;
-  const orgRole = lwqlOrgRoleName({ organizationId: 'lwql_t."organizationId"' });
+  const orgRole = lwqlOrgRoleName({ organizationIdExpression: 'lwql_t."organizationId"' });
 
   return (
     `EXISTS (SELECT 1 ` +
