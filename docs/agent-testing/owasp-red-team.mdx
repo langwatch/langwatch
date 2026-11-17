@@ -7,7 +7,7 @@ description: Run one multi-turn attack per OWASP risk against your agent as pyte
 
 <Warning>Use red teaming only on agents you own or have explicit permission to test.</Warning>
 
-Your security team wants to know whether your agent holds up against the OWASP Top 10 for LLM Applications and the OWASP Top 10 for Agentic Applications. The OWASP pack answers that with code: one multi-turn [red team](/agent-testing/red-teaming) scenario per OWASP risk, judged against your agent's own rules, running in the same CI job as your other tests.
+The OWASP pack is a set of multi-turn [red team](/agent-testing/red-teaming) tests, one per OWASP risk, that you add to your agent's test suite. You get a pytest or vitest file per language, judged against your agent's own rules, so you can show your security team where the agent stands on the OWASP Top 10 for LLM Applications and the OWASP Top 10 for Agentic Applications.
 
 ## What the pack covers
 
@@ -29,21 +29,25 @@ The other ids (LLM03, LLM04, LLM08, ASI04, ASI05, ASI07 to ASI10) concern supply
 
 ## Apply it with your coding agent
 
-The [owasp-red-team skill](https://github.com/langwatch/skills/tree/main/recipes/owasp-red-team) walks a coding agent through it. Install the LangWatch skills and ask your agent:
+Install the LangWatch skills and ask your coding agent:
 
 ```text
 Red team my agent against the OWASP Top 10 for LLM and agentic applications
 ```
 
-The agent detects your language, copies the Python or TypeScript pack into your tests, connects it to your agent, fills in the config and runs it.
+It follows the [OWASP red team recipe](https://github.com/langwatch/skills/tree/main/recipes/owasp-red-team). Expect it to:
+
+- detect your language
+- copy the Python or TypeScript pack into your tests
+- connect the pack to your agent
+- fill in the config from your system prompt and tools
+- run one attack, then the full pack
 
 ## Apply it by hand
 
-Copy the pack from [templates/python](https://github.com/langwatch/skills/tree/main/recipes/owasp-red-team/templates/python) or [templates/typescript](https://github.com/langwatch/skills/tree/main/recipes/owasp-red-team/templates/typescript) into one test folder. Then make two edits.
-
-In `agent_adapter.py` or `agent-adapter.ts`, make `call_agent` or `callAgent` call your real agent with the conversation and return its reply, tool calls included.
-
-In `owasp_config.py` or `owasp.config.ts`, fill in the one config block: the agent's name and job, its tools, the tools that change data, what it must never do, and the data it must never disclose. Every attack goal and judge criterion is built from this block.
+1. Copy the [Python pack](https://github.com/langwatch/skills/tree/main/recipes/owasp-red-team/templates/python) or the [TypeScript pack](https://github.com/langwatch/skills/tree/main/recipes/owasp-red-team/templates/typescript) into one test folder.
+2. In `agent_adapter.py` or `agent-adapter.ts`, make `call_agent` or `callAgent` call your real agent and return its reply, tool calls included.
+3. In `owasp_config.py` or `owasp.config.ts`, fill in the config block. You describe the agent's name and job, its tools, the tools that change data, what it must never do and the data it must never disclose. The pack builds every attack goal and judge criterion from this one block.
 
 ## Run it
 
@@ -56,4 +60,8 @@ npx vitest run owasp-pack.test.ts       # TypeScript
 
 Add `-k LLM01` (pytest) or `-t LLM01` (vitest) to run one id. `OWASP_TURNS` sets the attacker's turns per attack: 10 by default, 30 before a release.
 
-Each run lands in LangWatch as a scenario named after its OWASP id, grouped under the set `owasp-red-team`, with the full conversation and the judge's verdict per criterion.
+To read the results:
+
+1. In LangWatch, open Simulations.
+2. Pick the `owasp-red-team` set: it holds one run per OWASP id.
+3. Open a run to read the conversation and the judge's verdict on each criterion.
