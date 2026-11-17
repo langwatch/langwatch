@@ -4,6 +4,7 @@ import type {
 } from "@langwatch/automation-contract";
 import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
+import { findWebhookReceiverFailure } from "@langwatch/webhook-contract";
 
 import type { AutomationGraphActivity } from "../features/graph-alert/services/automation-graph-activity.service.ts";
 
@@ -36,15 +37,10 @@ export async function handleGraphTriggerActivity(
         reason: "real-time",
       });
     } catch (error) {
-      failures++;
-      logger.error(
-        {
-          projectId,
-          triggerId: trigger.id,
-          error: error instanceof Error ? error.message : String(error),
-        },
-        "graphTriggerActivity: evaluation failed",
-      );
+      const redeliver = reportFailure({ projectId, triggerId: trigger.id, error });
+      if (redeliver) {
+        failures++;
+      }
     }
   }
   // Throw AFTER the loop so one trigger's failure doesn't starve the
@@ -55,6 +51,36 @@ export async function handleGraphTriggerActivity(
       `graphTriggerActivity: ${failures}/${triggers.length} evaluations failed — retry via queue redelivery`,
     );
   }
+}
+
+/**
+ * Logs one failed evaluation and answers whether redelivery could help. A failure the
+ * customer's own webhook receiver caused is theirs, not ours: a warning naming its status,
+ * never its body, redelivered only when a retry may pass (5xx, 408, 429, unreachable).
+ */
+function reportFailure({
+  projectId,
+  triggerId,
+  error,
+}: {
+  projectId: string;
+  triggerId: string;
+  error: unknown;
+}): boolean {
+  const receiver = findWebhookReceiverFailure(error);
+  if (receiver === null) {
+    logger.error(
+      { projectId, triggerId, error: error instanceof Error ? error.message : String(error) },
+      "graphTriggerActivity: evaluation failed",
+    );
+    return true;
+  }
+
+  logger.warn(
+    { projectId, triggerId, status: receiver.status, retryable: receiver.retryable },
+    "graphTriggerActivity: the automation's own webhook receiver refused the alert",
+  );
+  return receiver.retryable;
 }
 
 export function createGraphTriggerActivityHandler(

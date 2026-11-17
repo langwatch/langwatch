@@ -1,4 +1,5 @@
 import { DispatchError } from "@langwatch/eventing";
+import { findWebhookReceiverFailure } from "@langwatch/webhook-contract";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { HttpWebhookSender } from "../../channels/webhook-destination.channel.ts";
@@ -355,10 +356,17 @@ describe("WebhookEgressService content type", () => {
   });
 });
 
-function transportFailure({ cause }: { cause: Error }): DispatchError {
+/** What the HTTP channel throws; our SSRF fence refusing is the terminal kind. */
+function transportFailure({
+  cause,
+  retryable = true,
+}: {
+  cause: Error;
+  retryable?: boolean;
+}): DispatchError {
   return new DispatchError({
     message: `Webhook for trigger "Timeout watcher": HTTP request failed — ${cause.message}`,
-    retryable: true,
+    retryable,
     cause,
   });
 }
@@ -430,6 +438,47 @@ describe("WebhookEgressService transport failures", () => {
       const error = await testFire();
 
       expect(error.customerMessage).toBe("Kept.");
+    });
+  });
+});
+
+describe("WebhookEgressService receiver failures", () => {
+  describe("given a URL the address policy refuses before any connection", () => {
+    /** @scenario "A refusal before any connection is never marked as the receiver's" */
+    it("leaves the refusal unmarked, so it stays ours", async () => {
+      const error = await serviceWith(allowing())
+        .send({ ...base, url: "https://169.254.169.254/hook" })
+        .catch((err: unknown) => err);
+
+      expect(findWebhookReceiverFailure(error)).toBeNull();
+    });
+  });
+
+  describe("given an address or a redirect our fence refuses at connect", () => {
+    /** @scenario "A refusal before any connection is never marked as the receiver's" */
+    it.each([
+      "This hostname resolves to a private or localhost IP address, which is not allowed",
+      "Redirects are not followed",
+    ])("leaves %s unmarked, so it stays ours", async (refusal) => {
+      mockedSend.mockRejectedValue(
+        transportFailure({ cause: new Error(refusal), retryable: false }),
+      );
+
+      const error = await testFire();
+
+      expect(findWebhookReceiverFailure(error)).toBeNull();
+      expect(error.retryable).toBe(false);
+    });
+  });
+
+  describe("given a connection to the receiver's own endpoint that fails", () => {
+    /** @scenario "A webhook request names a failure its receiver caused" */
+    it("marks it as the receiver's, with no status", async () => {
+      mockedSend.mockRejectedValue(transportFailure({ cause: new Error("ECONNREFUSED") }));
+
+      const error = await testFire();
+
+      expect(findWebhookReceiverFailure(error)).toEqual({ status: null, retryable: true });
     });
   });
 });

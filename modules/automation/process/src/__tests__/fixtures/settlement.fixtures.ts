@@ -324,6 +324,8 @@ class SettlementDelivery extends AutomationNotificationDelivery {
   readonly legacySlackWebhooks: Record<string, unknown>[] = [];
   readonly slackBots: Record<string, unknown>[] = [];
   readonly webhooks: { eventId: string }[] = [];
+  /** What the webhook module throws for each send, when set. */
+  webhookFailure?: Error;
 
   async sendLegacyEmail(input: Record<string, unknown>): Promise<void> {
     this.legacyEmails.push(input);
@@ -344,6 +346,9 @@ class SettlementDelivery extends AutomationNotificationDelivery {
     eventId: string;
   }): Promise<{ dispatchId: string; status: number }> {
     this.webhooks.push(input);
+    if (this.webhookFailure) {
+      throw this.webhookFailure;
+    }
     return { dispatchId: input.eventId, status: 200 };
   }
 }

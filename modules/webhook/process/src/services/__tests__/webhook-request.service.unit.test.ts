@@ -1,6 +1,6 @@
-import { DispatchError } from "@langwatch/eventing";
+import { DispatchError, isDispatchError } from "@langwatch/eventing";
 import { Temporal } from "@langwatch/time";
-import type { WebhookSendRequest } from "@langwatch/webhook-contract";
+import { findWebhookReceiverFailure, type WebhookSendRequest } from "@langwatch/webhook-contract";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { HttpWebhookSender } from "../../channels/webhook-destination.channel.ts";
@@ -131,15 +131,15 @@ describe("WebhookRequestService", () => {
   describe("given a sender that fails before the receiver answers", () => {
     /** @scenario "An attempt that never reached the endpoint is recorded too" */
     it("files the error and the latency but no status", async () => {
-      const unreachable = new DispatchError({
-        message: "connection refused",
-        retryable: true,
-        customerMessage: "The endpoint refused the connection.",
-      });
-      mockedSend.mockRejectedValue(unreachable);
+      mockedSend.mockRejectedValue(
+        new DispatchError({ message: "connection refused", retryable: true }),
+      );
       const { log, requests } = requestsWith();
 
-      await expect(requests.send(request())).rejects.toBe(unreachable);
+      const refusal = await requests.send(request()).catch((error: unknown) => error);
+
+      expect(isDispatchError(refusal)).toBe(true);
+      expect(findWebhookReceiverFailure(refusal)).toEqual({ status: null, retryable: true });
       expect(log.attempts[0]).toMatchObject({
         responseStatus: null,
         error: "connection refused",
@@ -147,6 +147,44 @@ describe("WebhookRequestService", () => {
         outcome: "retryable",
       });
       expect(log.attempts[0]?.latencyMs).toBeGreaterThanOrEqual(0);
+    });
+  });
+
+  describe("given a failure the customer's own receiver caused", () => {
+    /** @scenario "A webhook request names a failure its receiver caused" */
+    it.each([
+      { answer: 404, failure: { status: 404, retryable: false } },
+      { answer: 503, failure: { status: 503, retryable: true } },
+    ])("marks an HTTP $answer as the receiver's", async ({ answer, failure }) => {
+      mockedSend.mockResolvedValue({
+        status: answer,
+        body: "Token not found",
+        responseHeaders: {},
+      });
+      const { requests } = requestsWith();
+
+      const refusal = await requests.send(request()).catch((error: unknown) => error);
+
+      expect(findWebhookReceiverFailure(refusal)).toEqual(failure);
+    });
+
+    it("marks an endpoint it could not reach as the receiver's, with no status", async () => {
+      mockedSend.mockRejectedValue(
+        new DispatchError({ message: "connection refused", retryable: true }),
+      );
+      const { requests } = requestsWith();
+
+      const refusal = await requests.send(request()).catch((error: unknown) => error);
+
+      expect(findWebhookReceiverFailure(refusal)).toEqual({ status: null, retryable: true });
+    });
+
+    it("does not mark the hourly cap, which is ours", async () => {
+      const { requests } = requestsWith({ allowed: false });
+
+      const refusal = await requests.send(request()).catch((error: unknown) => error);
+
+      expect(findWebhookReceiverFailure(refusal)).toBeNull();
     });
   });
 

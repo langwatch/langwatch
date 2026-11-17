@@ -160,6 +160,32 @@ export const webhookRequestFailureResponseSchema: WebhookRequestFailureResponseS
   webhookRequestFailureResponseSchemaDefinition;
 export type WebhookRequestFailureResponse = z.infer<typeof webhookRequestFailureResponseSchema>;
 
+/**
+ * Carried when the customer's own receiver caused the failure: a non-2xx answer or a failed
+ * connection to it, never a refusal before any connection (our SSRF fence included). Read by
+ * field, not class, so a caller need not import the process that threw it.
+ */
+export const WEBHOOK_RECEIVER_FAILURE = "webhookReceiverFailure";
+
+/** What the receiver did; never its body, its headers or any secret. */
+const webhookReceiverFailureSchema = z.object({
+  /** The status it answered; null when it was never reached. */
+  status: z.number().int().nullable(),
+  /** 5xx, 408, 429 and an unreachable endpoint may pass; any other status will not. */
+  retryable: z.boolean(),
+});
+export type WebhookReceiverFailure = z.infer<typeof webhookReceiverFailureSchema>;
+
+const receiverFailedErrorSchema = z.object({
+  [WEBHOOK_RECEIVER_FAILURE]: webhookReceiverFailureSchema,
+});
+
+/** The receiver's part in a failed request, or null when the failure is not the receiver's. */
+export function findWebhookReceiverFailure(error: unknown): WebhookReceiverFailure | null {
+  const parsed = receiverFailedErrorSchema.safeParse(error);
+  return parsed.success ? parsed.data[WEBHOOK_RECEIVER_FAILURE] : null;
+}
+
 /** One recorded attempt of {@link webhookSendRequestSchema}, newest first. */
 const webhookRequestDeliverySchemaDefinition = z.object({
   id: z.string(),

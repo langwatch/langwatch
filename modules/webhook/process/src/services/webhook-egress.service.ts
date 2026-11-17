@@ -4,7 +4,9 @@ import { nowInstant } from "@langwatch/time";
 import {
   sanitizeWebhookHeaders,
   WEBHOOK_HEADER_VALUE_KEPT,
+  WEBHOOK_RECEIVER_FAILURE,
   type WebhookMethod,
+  type WebhookReceiverFailure,
   type WebhookSignatureScheme,
 } from "@langwatch/webhook-contract";
 
@@ -23,6 +25,23 @@ import {
 import { describeTransportFailure } from "../rules/webhook-transport-failure.rules.ts";
 import { judgeWebhookUrl, webhookUrlValidator } from "../rules/webhook-url-policy.rules.ts";
 import type { WebhookDispatchCapService } from "./webhook-dispatch-cap.service.ts";
+
+/**
+ * A failure the customer's own receiver caused: a non-2xx answer or a failed connection to
+ * it, never a refusal before any connection. Still named `DispatchError` for the outbox;
+ * callers read {@link WEBHOOK_RECEIVER_FAILURE} through `findWebhookReceiverFailure`.
+ */
+export class WebhookReceiverError extends DispatchError {
+  readonly [WEBHOOK_RECEIVER_FAILURE]: WebhookReceiverFailure;
+
+  constructor({
+    status,
+    ...refusal
+  }: ConstructorParameters<typeof DispatchError>[0] & { status: number | null }) {
+    super(refusal);
+    this[WEBHOOK_RECEIVER_FAILURE] = { status, retryable: refusal.retryable };
+  }
+}
 
 export interface WebhookSendInput {
   url: string;
@@ -185,6 +204,7 @@ export class WebhookEgressService {
     const admission = judgeWebhookUrl({ url, allowInsecureLocal });
     if (!admission.admitted) {
       // The author typed this URL, so the refusal is theirs to read (a test fire answers it).
+      // Refused before any connection, so the receiver played no part: left unmarked, ours.
       throw new DispatchError({
         message: `${label}: ${admission.reason}`,
         retryable: false,
@@ -230,14 +250,20 @@ export class WebhookEgressService {
   }
 }
 
-/** The author supplied this endpoint, so a failure to reach it is named. */
+/**
+ * The author supplied this endpoint, so a failure to reach it is named. Only a failed
+ * connection to it (retryable) is marked as the receiver's; our fence refusing an address
+ * or a redirect is terminal, never reached the receiver, and stays ours, at error.
+ */
 function withTransportFailureNamed({ error }: { error: unknown }): unknown {
   if (!isDispatchError(error) || error.customerMessage) return error;
-  return new DispatchError({
+  const named = {
     message: error.message,
     retryable: error.retryable,
     cause: error.cause,
     retryAfterMs: error.retryAfterMs,
     customerMessage: describeTransportFailure({ error: error.cause }),
-  });
+  };
+  if (!error.retryable) return new DispatchError(named);
+  return new WebhookReceiverError({ ...named, status: null });
 }

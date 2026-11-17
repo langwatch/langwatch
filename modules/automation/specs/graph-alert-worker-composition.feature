@@ -87,6 +87,47 @@ Feature: Composing the graph-alert vertical outside the application
     And the sweep reports failure so the queue redelivers it
 
   @unit
+  Scenario: A webhook receiver's terminal refusal is the customer's, not ours
+    Given a graph automation whose own webhook receiver answers 404
+    When the trace subscriber runs
+    Then it warns with the trigger and the status, never the response body
+    And the queue is not asked to redeliver it
+
+  @unit
+  Scenario: A webhook receiver that may yet answer is warned about and redelivered
+    Given a graph automation whose own webhook receiver answers 503
+    When the trace subscriber runs
+    Then it warns with the trigger and the status
+    And the queue redelivers it
+
+  @unit
+  Scenario: Our own evaluation failure is an error and is redelivered
+    Given a graph automation whose evaluation fails inside LangWatch
+    When the trace subscriber runs
+    Then it logs an error and the queue redelivers it
+
+  @unit
+  Scenario: Only failures a retry can help are redelivered
+    Given graph automations failing at a 404 receiver, inside LangWatch and at a 503 receiver
+    When the trace subscriber runs
+    Then every automation is still evaluated
+    And only the failures inside LangWatch and at the 503 receiver count toward redelivery
+
+  @unit
+  Scenario: The scheduled sweep does not redeliver a terminal webhook receiver refusal
+    Given a sweep candidate whose own webhook receiver answers 404
+    When the scheduled graph-alert sweep runs
+    Then it warns with the trigger and the status, never the response body
+    And the sweep does not ask the queue to redeliver it
+
+  @unit
+  Scenario: The scheduled sweep redelivers only failures a retry can help
+    Given sweep candidates failing at a 503 receiver and inside LangWatch
+    When the scheduled graph-alert sweep runs
+    Then every candidate is still evaluated
+    And the sweep reports failure for both so the queue redelivers it
+
+  @unit
   Scenario: With a public origin, a graph alert's email leaves through notification
     Given a process that names its public origin
     When a crossed graph alert is dispatched to one email recipient

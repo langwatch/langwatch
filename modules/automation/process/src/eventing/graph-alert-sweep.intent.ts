@@ -5,6 +5,7 @@ import type {
 } from "@langwatch/automation-contract";
 import { createLogger } from "@langwatch/observability";
 import { type Instant, Temporal } from "@langwatch/time";
+import { findWebhookReceiverFailure } from "@langwatch/webhook-contract";
 import { z } from "zod";
 
 import type { AutomationIntentRetentionRepository } from "../repositories/automation-intent-retention.repository.ts";
@@ -30,16 +31,10 @@ export function runGraphAlertSweep(
       try {
         await scheduledIntents.evaluateGraphTrigger(candidate);
       } catch (error) {
-        failures.push(candidate);
-        logger.warn(
-          {
-            projectId: candidate.projectId,
-            triggerId: candidate.triggerId,
-            reason: candidate.reason,
-            error: error instanceof Error ? error.message : String(error),
-          },
-          "Graph-alert sweep candidate failed; retrying the durable intent",
-        );
+        const redeliver = reportCandidateFailure({ candidate, error });
+        if (redeliver) {
+          failures.push(candidate);
+        }
       }
     }
     await retention.deleteDispatchedBefore({
@@ -52,6 +47,39 @@ export function runGraphAlertSweep(
       );
     }
   };
+}
+
+/**
+ * Logs one failed candidate and answers whether retrying the intent could help. The
+ * customer's own webhook receiver refusing is named by its status, never its body, and
+ * retried only when a retry may pass (5xx, 408, 429, unreachable).
+ */
+function reportCandidateFailure({
+  candidate,
+  error,
+}: {
+  candidate: GraphTriggerSweepCandidate;
+  error: unknown;
+}): boolean {
+  const where = {
+    projectId: candidate.projectId,
+    triggerId: candidate.triggerId,
+    reason: candidate.reason,
+  };
+  const receiver = findWebhookReceiverFailure(error);
+  if (receiver === null) {
+    logger.warn(
+      { ...where, error: error instanceof Error ? error.message : String(error) },
+      "Graph-alert sweep candidate failed; retrying the durable intent",
+    );
+    return true;
+  }
+
+  logger.warn(
+    { ...where, status: receiver.status, retryable: receiver.retryable },
+    "Graph-alert sweep candidate refused by the automation's own webhook receiver",
+  );
+  return receiver.retryable;
 }
 
 export abstract class AutomationScheduledIntent {

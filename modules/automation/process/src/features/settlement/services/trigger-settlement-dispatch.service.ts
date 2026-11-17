@@ -1,6 +1,10 @@
 import type { IntentContext } from "@langwatch/eventing";
 import { refusesRetry } from "@langwatch/group-queue";
 import { createLogger, createWarnThrottle } from "@langwatch/observability";
+import {
+  findWebhookReceiverFailure,
+  type WebhookReceiverFailure,
+} from "@langwatch/webhook-contract";
 
 import type { AutomationNotificationDelivery } from "../../../channels/automation-notification-delivery.channel.ts";
 import {
@@ -119,9 +123,9 @@ export class AutomationSettlementDispatchService extends AutomationSettlementExe
   }
 
   /**
-   * A refusal the customer fixes is a warning, once per automation per window,
-   * and ends the dispatch. Anything else is captured once and rethrown when a
-   * retry could succeed.
+   * A refusal the customer fixes, or their own webhook receiver's, is a warning once per
+   * automation per window; only a receiver that may yet answer is retried. Anything else
+   * is captured once and rethrown when a retry could succeed.
    */
   private rethrowIfRetryable({
     error,
@@ -130,6 +134,15 @@ export class AutomationSettlementDispatchService extends AutomationSettlementExe
     error: unknown;
     context: Record<string, unknown> & { triggerId: string };
   }): void {
+    const receiver = findWebhookReceiverFailure(error);
+    if (receiver !== null) {
+      this.warnReceiverRefused({ receiver, context });
+      if (receiver.retryable) {
+        throw error;
+      }
+      return;
+    }
+
     const retryable = !refusesRetry(error);
     if (!retryable && isCustomerConfigurationRefusal(error)) {
       const suppressedRefusals = this.refusalLog.claim({
@@ -155,5 +168,24 @@ export class AutomationSettlementDispatchService extends AutomationSettlementExe
     if (retryable) {
       throw error;
     }
+  }
+
+  /** The customer's own webhook receiver refused: named by its status, never its body. */
+  private warnReceiverRefused({
+    receiver,
+    context,
+  }: {
+    receiver: WebhookReceiverFailure;
+    context: Record<string, unknown> & { triggerId: string };
+  }): void {
+    const suppressedRefusals = this.refusalLog.claim({
+      key: `${context.triggerId}:webhook_receiver:${receiver.status ?? "unreachable"}`,
+      now: this.composition.clock.now().epochMilliseconds,
+    });
+    if (suppressedRefusals === undefined) return;
+    logger.warn(
+      { ...context, status: receiver.status, retryable: receiver.retryable, suppressedRefusals },
+      "Settlement dispatch refused by the automation's own webhook receiver",
+    );
   }
 }
