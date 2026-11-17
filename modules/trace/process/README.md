@@ -12,7 +12,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 ## Module API (`TraceApi`)
 
-Peers call these through the token, declared at `../contract/src/trace.api.ts:199`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/trace.api.ts:201`; nothing else in this package is public.
 It extends `TraceOtlpIngestApi`.
 
 #### `extractInlineMediaFromEvent`
@@ -172,7 +172,7 @@ findSummary(input: TraceSummaryLookupInput): Promise<TraceSummaryData | null>;
 #### `listTraces`
 
 ```typescript
-listTraces(input: { query: TraceLegacyListInput; protections: unknown; options?: { dateField?: TraceDateField; downloadMode?: boolean; includeSpans?: boolean; resolveBlobs?: boolean; scrollId?: string | null; /** The v1 REST search's compiled query-language filter, ANDed into the read. */ filterWhere?: { sql: string; params: Record<string, unknown> }; /** The proof `filterWhere`'s tenant markers expand into (ADR-177 block C). */ authorization?: Authorization; /** Refuse above this plan bound instead of clamping to the list bound. */ refuseAbove?: "tracesPageSizeMax" | "tracesDownloadPageSizeMax"; }; }): Promise<TracesForProjectResult>;
+listTraces(input: { query: TraceLegacyListInput; protections: unknown; options?: { dateField?: TraceDateField; downloadMode?: boolean; includeSpans?: boolean; resolveBlobs?: boolean; scrollId?: string | null; /** The v1 REST search's filter as written; trace compiles it into the read (Decided 25). */ filter?: TraceListFilter; /** Refuse above this plan bound instead of clamping to the list bound. */ refuseAbove?: "tracesPageSizeMax" | "tracesDownloadPageSizeMax"; }; }): Promise<TracesForProjectResult>;
 ```
 
 #### `listTraceSummaries`
@@ -180,7 +180,7 @@ listTraces(input: { query: TraceLegacyListInput; protections: unknown; options?:
 The project's latest trace summaries on the `dateField` axis, paged by `scrollId`: no content, spans, evaluations or protections, for a system reader.
 
 ```typescript
-listTraceSummaries(input: { query: TraceSummaryListQuery; options?: TraceSummaryListOptions; }): Promise<TraceSummaryPage>;
+listTraceSummaries(input: { query: TraceSummaryListQuery; options?: TraceSummaryListRequestOptions; }): Promise<TraceSummaryPage>;
 ```
 
 #### `findTrace`
@@ -745,26 +745,10 @@ readCustomersAndLabels(input: TraceLegacyListInput): Promise<unknown>;
 
 #### `translateTraceFilter`
 
-The trace query language's free-text filter, compiled to a parameterized ClickHouse WHERE fragment. Null for an empty query; throws `FilterParseError` on invalid syntax.
+Checks a trace query language filter as written, compiling nothing out (ADR-202 Decided 25): throws `FilterParseError` on invalid syntax or an unknown field.
 
 ```typescript
-translateTraceFilter(input: { query: string; tenantId: string; timeRange: { from: number; to: number }; /** The Instant Eval runs registered for the query's `eval` chips. */ evalRuns?: readonly ResolvedInstantEvalRun[]; /** The viewer's; under any content protection free text skips captured I/O. */ protections?: Protections; }): { sql: string; params: Record<string, unknown> } | null;
-```
-
-#### `translateLegacyFilters`
-
-A legacy `filters` document compiled to parameterized ClickHouse conditions over `trace_summaries ts`; Trace owns the grammar because it owns the tables. `fenced` writes side-table subqueries for a statement read through a proof's fence (ADR-177).
-
-```typescript
-translateLegacyFilters(input: { filters: Readonly<Record<string, unknown>>; window?: { startDate?: number; endDate?: number }; fenced?: boolean; }): { conditions: string[]; params: Record<string, unknown>; hasUnsupportedFilters: boolean };
-```
-
-#### `compileExplorerTraceFilter`
-
-The Explorer's own filter: the query compiled, hidden origins left out unless the query (or `originNamed`) names one or the project is personal; `dateField` refuses a span/event clause on the `updated` axis.
-
-```typescript
-compileExplorerTraceFilter(input: { query: string; tenantId: string; timeRange: { from: number; to: number }; evalRuns?: readonly ResolvedInstantEvalRun[]; originNamed?: boolean; dateField?: TraceDateField; protections?: Protections; }): Promise<{ sql: string; params: Record<string, unknown> }>;
+translateTraceFilter(input: { query: string }): void;
 ```
 
 #### `compileLangWatchQLTraceFilter`
@@ -806,7 +790,7 @@ findPromptStudioSpan(input: { projectId: string; spanId: string; protections: un
 #### `readTraceList`
 
 ```typescript
-readTraceList(params: { authorization: Authorization; timeRange: { from: number; to: number }; sort: { columnId: string; direction: "asc" | "desc" }; page?: number; pageSize: number; cursor?: { sortValue: number; traceId: string }; filterWhere?: { sql: string; params: Record<string, unknown> }; visibilityCutoffMs?: number | null; }): Promise<TraceListPage>;
+readTraceList(params: { authorization: Authorization; timeRange: { from: number; to: number }; sort: { columnId: string; direction: "asc" | "desc" }; page?: number; pageSize: number; cursor?: { sortValue: number; traceId: string }; /** The filter as written; trace compiles it inside the read (ADR-202 Decided 25). */ filter?: TraceListFilter; visibilityCutoffMs?: number | null; }): Promise<TraceListPage>;
 ```
 
 #### `readSessionGroups`
@@ -1121,6 +1105,14 @@ The project's distinct traces over the last 24 hours.
 countTracesInLastDay(input: { projectId: string }): Promise<number>;
 ```
 
+#### `getStoredBytes`
+
+The project's stored bytes over spans and trace summaries, as the storage meter counts.
+
+```typescript
+getStoredBytes(input: TraceStoredBytesInput): Promise<number>;
+```
+
 #### `hasTraceWithAttribute`
 
 Whether any trace carrying `attribute` landed for the project at or after `sinceMs`.
@@ -1296,7 +1288,7 @@ type Response = unknown;
 
 |             |                                      |
 | ----------- | ------------------------------------ |
-| Declared at | `src/transport/traces.rest.ts:307`   |
+| Declared at | `src/transport/traces.rest.ts:300`   |
 | Base URL    | `/api/traces`, twin `/api/v1/traces` |
 | Addressing  | dated                                |
 | Credential  | project                              |
@@ -1306,13 +1298,13 @@ type Response = unknown;
 
 Search traces for a project
 
-Permission `traces:view`. Declared at `src/transport/traces.rest.ts:311`.
+Permission `traces:view`. Declared at `src/transport/traces.rest.ts:304`.
 
 Answers at `/api/traces/search`, `/api/v1/traces/search`; also, undocumented, `/api/traces/2026-08-07/search`, `/api/v1/traces/2026-08-07/search`, `/api/traces/latest/search`, `/api/v1/traces/latest/search`.
 
 ```typescript
 type Body = z.infer<typeof traceSearchBodySchema>; // ../contract/src/trace-rest.schemas.ts:124
-// Response: inline, src/transport/traces.rest.ts:316
+// Response: inline, src/transport/traces.rest.ts:309
 type Response = unknown;
 ```
 
@@ -1320,7 +1312,7 @@ type Response = unknown;
 
 Discover what the trace filter fields hold
 
-Permission `traces:view`. Declared at `src/transport/traces.rest.ts:338`.
+Permission `traces:view`. Declared at `src/transport/traces.rest.ts:331`.
 
 Answers at `/api/traces/facets`, `/api/v1/traces/facets`; also, undocumented, `/api/traces/2026-08-07/facets`, `/api/v1/traces/2026-08-07/facets`, `/api/traces/latest/facets`, `/api/v1/traces/latest/facets`.
 
@@ -1342,7 +1334,7 @@ type Response = Record<string, unknown>;
 
 Derived coding-agent transcript for a trace: what the agent did, in order, with per-call token and cost economics. Empty entries for traces without coding-agent content.
 
-Permission `traces:view`. Declared at `src/transport/traces.rest.ts:371`.
+Permission `traces:view`. Declared at `src/transport/traces.rest.ts:364`.
 
 Answers at `/api/traces/:traceId/transcript`, `/api/v1/traces/:traceId/transcript`; also, undocumented, `/api/traces/2026-08-07/:traceId/transcript`, `/api/v1/traces/2026-08-07/:traceId/transcript`, `/api/traces/latest/:traceId/transcript`, `/api/v1/traces/latest/:traceId/transcript`.
 
@@ -1358,7 +1350,7 @@ type Response = z.infer<typeof transcriptRestResponseSchema>; // ../contract/src
 
 Update metadata on a trace after creation. Inserts a synthetic span carrying the new attributes through the standard ingestion pipeline. New keys are added, existing keys are updated, missing keys are preserved. Labels replace entirely.
 
-Permission `traces:update`. Declared at `src/transport/traces.rest.ts:410`.
+Permission `traces:update`. Declared at `src/transport/traces.rest.ts:403`.
 
 Answers at `/api/traces/:traceId/metadata`, `/api/v1/traces/:traceId/metadata`; also, undocumented, `/api/traces/2026-08-07/:traceId/metadata`, `/api/v1/traces/2026-08-07/:traceId/metadata`, `/api/traces/latest/:traceId/metadata`, `/api/v1/traces/latest/:traceId/metadata`.
 
@@ -1378,7 +1370,7 @@ interface Response {
 
 Get a single trace by ID.
 
-Permission `traces:view`. Declared at `src/transport/traces.rest.ts:436`.
+Permission `traces:view`. Declared at `src/transport/traces.rest.ts:429`.
 
 Answers at `/api/traces/:traceId`, `/api/v1/traces/:traceId`; also, undocumented, `/api/traces/2026-08-07/:traceId`, `/api/v1/traces/2026-08-07/:traceId`, `/api/traces/latest/:traceId`, `/api/v1/traces/latest/:traceId`.
 
@@ -1599,7 +1591,7 @@ Contract `../contract/src/traces.trpc.ts:189`, router `src/transport/traces.trpc
 ```typescript
 // traces.getAllForProject
 type Input = z.infer<typeof traceListInputSchema>; // ../contract/src/traces.trpc.ts:123
-type Output = z.infer<typeof tracesForProjectResultSchema>; // ../contract/src/trace-read.contract.ts:202
+type Output = z.infer<typeof tracesForProjectResultSchema>; // ../contract/src/trace-read.contract.ts:206
 
 // traces.getById
 // Input: inline, ../contract/src/traces.trpc.ts:197
@@ -1629,7 +1621,7 @@ interface Input {
 
 // traces.getCustomersAndLabels
 type Input = z.infer<typeof traceFilterInputSchema>; // ../contract/src/traces.trpc.ts:111
-// Output: customersAndLabelsResultSchema, ../contract/src/trace-read.contract.ts:219
+// Output: customersAndLabelsResultSchema, ../contract/src/trace-read.contract.ts:223
 interface Output {
   customers: string[];
   labels: string[];
@@ -1686,7 +1678,7 @@ interface Input {
   startDate: number;
   endDate: number;
 }
-type Output = z.infer<typeof distinctFieldNamesResultSchema>; // ../contract/src/trace-read.contract.ts:232
+type Output = z.infer<typeof distinctFieldNamesResultSchema>; // ../contract/src/trace-read.contract.ts:236
 
 // traces.getFieldRedactionStatus
 // Input: inline, ../contract/src/traces.trpc.ts:269
@@ -1707,7 +1699,7 @@ interface Output {
 
 // traces.getAllForDownload
 // Input: z.object({ ...traceListInputSchema.shape, ...downloadExtrasSchema.shape, pageSize: z.numb… (inline, ../contract/src/traces.trpc.ts:274)
-type Output = z.infer<typeof tracesForProjectResultSchema>; // ../contract/src/trace-read.contract.ts:202
+type Output = z.infer<typeof tracesForProjectResultSchema>; // ../contract/src/trace-read.contract.ts:206
 
 // traces.onTraceUpdate
 // Input: inline, ../contract/src/traces.trpc.ts:287

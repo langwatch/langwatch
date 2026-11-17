@@ -6,7 +6,7 @@ The server half of [data-retention](../README.md). Data retention: the retention
 
 ## Installation
 
-`defineProcessModule("data-retention").withRepositories(dataRetentionRepositories).withApi(DataRetentionModule).withTransports(dataRetentionTrpcTransport).withEventing(dataRetentionSeatPolicyEventing).withEventing(retroactiveRetentionEventing).withMigrations(…)`, `src/data-retention.module.ts:19`.
+`defineProcessModule("data-retention").withRepositories(dataRetentionRepositories).withChannels(dataRetentionChannels).withApi(DataRetentionModule).withTransports(dataRetentionTrpcTransport).withEventing(dataRetentionSeatPolicyEventing).withEventing(retroactiveRetentionEventing).withMigrations(…)`, `src/data-retention.module.ts:20`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
