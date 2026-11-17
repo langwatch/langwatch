@@ -93,6 +93,8 @@ creation register only with a Customer.io channel. Owners
 send the command in any role; the subscribers run in the worker. The founder's
 call carries the name and creation time but no plan, so a replay or retry never
 resets a paying organization's plan.
+The one exception is the sign-up path, whose group call still sends plan "free" for a
+brand-new organization, which has no paid plan yet; that call is claimed once per sign-up.
 
 ## Environment and configuration
 

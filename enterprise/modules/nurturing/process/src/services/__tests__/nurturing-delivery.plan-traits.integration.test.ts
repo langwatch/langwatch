@@ -385,6 +385,31 @@ describe("NurturingDeliveryService, delivering billing's subscription_changed fa
     });
   });
 
+  describe("when Customer.io refuses a live change", () => {
+    it("fails the delivery without recording the plan, and sends the change on its retry", async () => {
+      const cio = recordingCustomerIo();
+      const plans = MemoryNurturingOrganizationPlanRepository.create();
+      const delivery = await deliveryOver({ customerIo: cio.service, plans });
+      const live = subscriptionChangedFactFixture({ plan: "GROWTH" });
+      cio.refusing.add("admin-1");
+
+      await expect(deliverFact(delivery, live)).rejects.toThrow(
+        "Customer.io /batch failed: HTTP 500",
+      );
+
+      await expect(plans.findPlan({ organizationId: "org-1" })).resolves.toEqual({
+        outcome: "none",
+      });
+      cio.refusing.clear();
+      await deliverFact(delivery, live);
+      expect(cio.sent).toEqual(requestsFor({ plan: "growth", hasSubscription: true }));
+      await expect(plans.findPlan({ organizationId: "org-1" })).resolves.toMatchObject({
+        outcome: "held",
+        fact: { plan: "GROWTH" },
+      });
+    });
+  });
+
   describe("when the deployment names no Customer.io key", () => {
     /** @scenario "A catch-up fact with no Customer.io channel fails visibly" */
     it("fails with no_customer_io_channel and claims nothing, so a replay delivers it", async () => {

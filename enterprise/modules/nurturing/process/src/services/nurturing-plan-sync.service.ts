@@ -21,7 +21,7 @@ export class NoCustomerIoChannelError extends Error {
 
 type PlanSyncDependencies = Readonly<{
   /** Absent where the deployment named no Customer.io key. */
-  customerIo: Pick<NurturingService, "batch" | "batchOrThrow"> | undefined;
+  customerIo: Pick<NurturingService, "batchOrThrow"> | undefined;
   /** The admin who carries the company call, from nurturing's own copy. */
   admins: Pick<NurturingMemberFactsService, "adminOf">;
   /** The same member copy the usage sync reads, read here by person: whose latest org is whose. */
@@ -43,11 +43,15 @@ export class NurturingPlanSyncService {
 
   private constructor(private readonly dependencies: PlanSyncDependencies) {}
 
-  /** A live change: a refused request only logs; a failed read of nurturing's copy rejects. */
+  /**
+   * A live change: with no channel it is dropped quietly; a refused request or a failed read of
+   * nurturing's copy rejects before the copy is recorded, so the caller gives its claim back and
+   * the job's retry sends it.
+   */
   async planChanged(signal: SubscriptionChanged): Promise<void> {
     const customerIo = this.dependencies.customerIo;
     if (!customerIo) return;
-    await this.foldAndSend(signal, (request) => customerIo.batch(request));
+    await this.foldAndSend(signal, (request) => customerIo.batchOrThrow(request));
   }
 
   /**
@@ -62,7 +66,8 @@ export class NurturingPlanSyncService {
 
   /**
    * Sends only a fact that changes nurturing's plan copy, and records it once sent: a refused
-   * catch-up is not recorded, so its retry sends again unless a fact that beats it landed first.
+   * fact, live or catch-up, is not recorded, so its retry sends again unless a fact that beats it
+   * landed first.
    */
   private async foldAndSend(
     signal: SubscriptionChanged,

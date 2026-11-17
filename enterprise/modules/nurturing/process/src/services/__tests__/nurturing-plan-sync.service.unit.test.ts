@@ -30,7 +30,7 @@ function planSyncOver(
   const sent: CioBatchCall[][] = [];
   const record = async (calls: CioBatchCall[]) => void sent.push(calls);
   const planSync = NurturingPlanSyncService.create({
-    customerIo: { batch: record, batchOrThrow: record },
+    customerIo: { batchOrThrow: record },
     admins: { adminOf: async () => ({ kind: "admin", userId: "admin-1" }) },
     members,
     plans,
@@ -56,6 +56,36 @@ describe("NurturingPlanSyncService", () => {
         ["group", "admin-1"],
         ["identify", "user-1"],
       ]);
+    });
+  });
+
+  describe("when Customer.io refuses a live change", () => {
+    it("rejects without recording the plan copy, and sends the change on a retry", async () => {
+      const plans = MemoryNurturingOrganizationPlanRepository.create();
+      const sent: CioBatchCall[][] = [];
+      let refusing = true;
+      const send = async (calls: CioBatchCall[]) => {
+        if (refusing) throw new Error("refused");
+        sent.push(calls);
+      };
+      const planSync = NurturingPlanSyncService.create({
+        customerIo: { batchOrThrow: send },
+        admins: { adminOf: async () => ({ kind: "admin", userId: "admin-1" }) },
+        members: MemoryNurturingOrganizationMemberRepository.create(),
+        plans,
+      });
+
+      await expect(planSync.planChanged(change)).rejects.toThrow("refused");
+
+      await expect(plans.findPlan({ organizationId: "org-1" })).resolves.toEqual({
+        outcome: "none",
+      });
+      refusing = false;
+      await planSync.planChanged(change);
+      expect(sent).toHaveLength(2);
+      await expect(plans.findPlan({ organizationId: "org-1" })).resolves.toMatchObject({
+        fact: { plan: "LAUNCH" },
+      });
     });
   });
 

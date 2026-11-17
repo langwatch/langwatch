@@ -43,6 +43,7 @@ import {
   defineAggregate,
   defineEventingModule,
   definePipeline,
+  type Event,
   type EventingSetup,
   type LaneAlias,
   type StaticPipelineDefinition,
@@ -233,6 +234,12 @@ export const MAIN_NURTURING_LANE_ALIASES: readonly LaneAlias[] = [
   },
 ];
 
+/** The queue group of a subscription change: its organization, whose one plan copy its jobs fold. */
+export function subscriptionOrganizationGroupOf(event: Event): string {
+  const { data } = event as Event<{ organizationId: string }>;
+  return `subscriptionChanged:${data.organizationId}`;
+}
+
 export type NurturingPipeline = StaticPipelineDefinition<
   NurturingSignalRecordedEvent,
   Record<string, never>,
@@ -377,6 +384,8 @@ export function buildNurturingPipeline(deps: {
       .withPeerSubscriber("subscriptionChanged", {
         eventType: SUBSCRIPTION_CHANGED_EVENT_TYPE,
         data: subscriptionChangedEventDataSchema,
+        // One job per organization at a time: its plan copy is a read-then-write fold.
+        options: { groupKeyFn: subscriptionOrganizationGroupOf },
         handle: (data, { aggregateId }) => {
           const signal = subscriptionChangedSignal({ data, aggregateId });
           return deliverSignal(signal);

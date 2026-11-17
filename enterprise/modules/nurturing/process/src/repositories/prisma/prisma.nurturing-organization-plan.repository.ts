@@ -60,7 +60,8 @@ export class PrismaNurturingOrganizationPlanRepository
     await this.#database.$executeRaw`
       INSERT INTO "NurturingOrganizationPlan" AS known
         ("organizationId", "plan", "occurredAt", "fromCatchUp")
-      VALUES (${organizationId}, ${plan}, ${occurredAt}::timestamp(3), ${fromCatchUp})
+      VALUES (${organizationId}, ${plan}, (${occurredAt}::timestamptz AT TIME ZONE 'UTC')::timestamp(3),
+              ${fromCatchUp})
       ON CONFLICT ("organizationId") DO UPDATE SET
         "plan" = EXCLUDED."plan",
         "occurredAt" = EXCLUDED."occurredAt",
