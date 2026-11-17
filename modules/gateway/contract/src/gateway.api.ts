@@ -46,11 +46,13 @@ import type {
   SpendUsage,
 } from "./features/spend/gateway-spend.schemas.ts";
 import type {
-  ArchiveGatewayCacheRuleInput,
   CreateGatewayA2aTargetInput,
   GatewayA2aTargetResource,
   SetGatewayA2aTargetBlockedInput,
   UpdateGatewayA2aTargetInput,
+} from "./gateway-a2a-target.ts";
+import type {
+  ArchiveGatewayCacheRuleInput,
   CreateGatewayCacheRuleInput,
   GatewayCacheRuleResource,
   UpdateGatewayCacheRuleInput,
