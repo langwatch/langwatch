@@ -35,6 +35,17 @@ describe("given the scoped copies and the group's grants on them", () => {
   let readerA: RowsByView;
   let organizations: Record<string, string>;
 
+  const columnsOf = async ({ schema, view }: { schema: string; view: string }) =>
+    (
+      await harness.admin(
+        `SELECT string_agg(column_name::text, ',' ORDER BY ordinal_position) ` +
+          `FROM information_schema.columns ` +
+          `WHERE table_schema = '${schema}' AND table_name = '${view.replaceAll("'", "''")}'`,
+      )
+    )
+      .split(",")
+      .filter(Boolean);
+
   beforeAll(async () => {
     harness = await startScopeHarness();
     before = await harness.scopedCopyDefinitions();
@@ -89,10 +100,19 @@ describe("given the scoped copies and the group's grants on them", () => {
     /** @scenario "An older version's converge cannot weaken a scoped copy" */
     it.each(VIEW_NAMES)(
       "%s: the org_a login's copy rows equal the shared rows filtered to org_a",
-      (view) => {
+      async (view) => {
+        const sharedColumns = await columnsOf({ schema: SCHEMA, view });
+        const copyColumns = await columnsOf({ schema: SCOPED, view });
+        // The frozen older converge leaves shared views without columns the current copy adds, so
+        // the copy must cover the shared columns and is compared on those alone.
+        const missing = sharedColumns.filter((column) => !copyColumns.includes(column));
+        const project = (row: Row): Row =>
+          Object.fromEntries(sharedColumns.map((column) => [column, row[column]])) as Row;
         const expected = (shared[view] as Row[]).filter(ownedBy(organizations, ORG_A));
 
-        expect(canon(readerA[view] as Row[])).toEqual(canon(expected));
+        expect(sharedColumns.length).toBeGreaterThan(0);
+        expect(missing).toEqual([]);
+        expect(canon((readerA[view] as Row[]).map(project))).toEqual(canon(expected.map(project)));
       },
     );
   });
