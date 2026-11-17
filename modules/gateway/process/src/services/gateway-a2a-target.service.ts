@@ -100,9 +100,20 @@ export class GatewayA2aTargetService {
     projectId: string | null;
     virtualKeyId: string;
   }): Promise<string> {
-    const wire = await this.bundleFor(input);
+    // Header values stay sealed: a header edit moves `updatedAt`, which is hashed.
+    const targets = await this.repository.findAll(input.organizationId, { headers: false });
+    const wire = a2aTargetsForProject({ targets, projectId: input.projectId }).filter((target) =>
+      a2aTargetAdmitsKey({ target, virtualKeyId: input.virtualKeyId }),
+    );
     if (wire.length === 0) return "";
-    return createHash("sha256").update(JSON.stringify(wire)).digest("hex").slice(0, 16);
+    const names = new Set(wire.map((target) => target.name));
+    const versions = targets
+      .filter((target) => names.has(target.name))
+      .map((target) => [target.id, target.updatedAt.toISOString()]);
+    return createHash("sha256")
+      .update(JSON.stringify({ wire, versions }))
+      .digest("hex")
+      .slice(0, 16);
   }
 
   async setBlocked(input: {

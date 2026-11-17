@@ -25,7 +25,7 @@ func (h *Handler) serveCard(c *call, target domain.A2ATarget) {
 			c.span.SetAttributes(attribute.String(attrAgentName, name))
 		}
 	}
-	rewriteCard(card, strings.TrimSuffix(target.UpstreamURL, "/"), proxyBase(c.r, target.Name))
+	rewriteCard(card, strings.TrimSuffix(target.UpstreamURL, "/"), proxyBase(h.cfg.PublicBaseURL, c.r, target.Name))
 	out, _ := json.Marshal(card)
 	c.w.Header().Set("Content-Type", "application/json")
 	c.w.WriteHeader(http.StatusOK)
@@ -126,7 +126,10 @@ func rewriteURL(m map[string]any, rewrite func(string) string) {
 	}
 }
 
-func proxyBase(r *http.Request, target string) string {
+func proxyBase(public string, r *http.Request, target string) string {
+	if public != "" {
+		return strings.TrimSuffix(public, "/") + strings.TrimSuffix(PathPrefix, "/") + "/" + target
+	}
 	scheme := "http"
 	if r.TLS != nil {
 		scheme = "https"

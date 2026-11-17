@@ -2,7 +2,7 @@ import {
   GatewayA2aTargetNameTakenError,
   GatewayA2aTargetNotFoundError,
 } from "@langwatch/gateway-contract";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { MemoryGatewayA2aTargetRepository } from "../repositories/memory/memory.gateway-a2a-target.repository.ts";
 import { MemoryGatewayChangeEventsRepository } from "../repositories/memory/memory.gateway-change-event.repository.ts";
@@ -152,6 +152,29 @@ describe("GatewayA2aTargetService", () => {
       virtualKeyId: "vk_1",
     });
     expect(bundle.map((t) => t.name)).toEqual(["mine", "open"]);
+  });
+
+  it("fingerprints without unsealing headers and still moves on a header edit", async () => {
+    const repository = MemoryGatewayA2aTargetRepository.create();
+    const findAll = vi.spyOn(repository, "findAll");
+    const targets = GatewayA2aTargetService.create({
+      repository,
+      changeEvents: MemoryGatewayChangeEventsRepository.create(),
+      transactions: { run: (work) => work({}) },
+    });
+    const created = await targets.create({ ...base, projectId: null, name: "billing" });
+    const scope = { organizationId: "org_1", projectId: null, virtualKeyId: "vk_1" };
+    const before = await targets.bundleFingerprint(scope);
+    expect(findAll).toHaveBeenLastCalledWith("org_1", { headers: false });
+
+    await new Promise((resolve) => setTimeout(resolve, 2));
+    await targets.update({
+      id: created.id,
+      organizationId: "org_1",
+      upstreamHeaders: { "X-Token": "rotated" },
+      actorUserId: "u1",
+    });
+    expect(await targets.bundleFingerprint(scope)).not.toBe(before);
   });
 
   it("blocks a target and changes the bundle fingerprint", async () => {

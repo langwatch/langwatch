@@ -33,12 +33,15 @@ export class PrismaGatewayA2aTargetRepository extends GatewayA2aTargetRepository
     return new PrismaGatewayA2aTargetRepository(prisma, cipher);
   }
 
-  async findAll(organizationId: string): Promise<GatewayA2aTargetResource[]> {
+  async findAll(
+    organizationId: string,
+    options?: { headers?: boolean },
+  ): Promise<GatewayA2aTargetResource[]> {
     const rows = await this.prisma.gatewayA2ATarget.findMany({
       where: { organizationId, archivedAt: null },
       orderBy: [{ name: "asc" }, { id: "asc" }],
     });
-    return rows.map((row) => this.#toResource(row));
+    return rows.map((row) => this.#toResource(row, options?.headers ?? true));
   }
 
   async findById(input: {
@@ -122,15 +125,16 @@ export class PrismaGatewayA2aTargetRepository extends GatewayA2aTargetRepository
     return Object.keys(headers).length === 0 ? null : this.cipher.encrypt(JSON.stringify(headers));
   }
 
-  #toResource(row: A2aTargetRow): GatewayA2aTargetResource {
+  #toResource(row: A2aTargetRow, headers = true): GatewayA2aTargetResource {
     const { encryptedUpstreamHeaders, restrictToAllowList, allowedVirtualKeyIds, ...rest } = row;
     return gatewayA2aTargetResourceSchema.parse({
       ...rest,
-      upstreamHeaders: encryptedUpstreamHeaders
-        ? gatewayA2aTargetHeadersSchema.parse(
-            JSON.parse(this.cipher.decrypt(encryptedUpstreamHeaders)),
-          )
-        : {},
+      upstreamHeaders:
+        headers && encryptedUpstreamHeaders
+          ? gatewayA2aTargetHeadersSchema.parse(
+              JSON.parse(this.cipher.decrypt(encryptedUpstreamHeaders)),
+            )
+          : {},
       allowedVirtualKeyIds: restrictToAllowList ? allowedVirtualKeyIds : null,
     });
   }

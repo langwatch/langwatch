@@ -19,10 +19,16 @@ export class MemoryGatewayA2aTargetRepository extends GatewayA2aTargetRepository
   readonly #rows = new Map<string, GatewayA2aTargetResource>();
   #sequence = 0;
 
-  async findAll(organizationId: string): Promise<GatewayA2aTargetResource[]> {
+  async findAll(
+    organizationId: string,
+    options?: { headers?: boolean },
+  ): Promise<GatewayA2aTargetResource[]> {
     return [...this.#rows.values()]
       .filter((row) => row.organizationId === organizationId && row.archivedAt === null)
-      .map((row) => structuredClone(row));
+      .map((row) => ({
+        ...structuredClone(row),
+        ...(options?.headers === false ? { upstreamHeaders: {} } : {}),
+      }));
   }
 
   async findById(input: {

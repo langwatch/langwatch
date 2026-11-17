@@ -75,8 +75,18 @@ type Config struct {
 	Scanner Scanner
 	// Bundle reads the authenticated caller from the request context.
 	Bundle func(context.Context) *domain.Bundle
-	// Client calls the upstream. Nil uses NewUpstreamClient(true).
+	// Client calls the upstream. Nil blocks local addresses.
 	Client *http.Client
+	// RateLimit checks the key's rate limits. Nil checks none.
+	RateLimit func(ctx context.Context, vkID string, limits domain.RateLimits) error
+	// BudgetPrecheck checks the key's budgets. Nil checks none; an error
+	// admits the call, as on the LLM routes.
+	BudgetPrecheck func(ctx context.Context, bundle *domain.Bundle) (domain.BudgetDecision, error)
+	// RequireHTTPS refuses targets whose upstream is not https.
+	RequireHTTPS bool
+	// PublicBaseURL is the gateway's public origin for Agent Card URLs.
+	// Empty uses the request's own scheme and Host.
+	PublicBaseURL string
 	// Tracer records the hop: the customer trace bridge's tracer, so the span
 	// lands in the caller's project. Nil uses the global tracer provider.
 	Tracer trace.Tracer
@@ -94,7 +104,7 @@ func New(cfg Config) *Handler {
 		cfg.Scanner = NoopScanner{}
 	}
 	if cfg.Client == nil {
-		cfg.Client = NewUpstreamClient(true)
+		cfg.Client = NewUpstreamClient(UpstreamPolicy{BlockLocal: true})
 	}
 	if cfg.Tracer == nil {
 		cfg.Tracer = otel.Tracer("github.com/langwatch/langwatch/services/aigateway/adapters/a2aproxy")
@@ -145,7 +155,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	target, ok := h.admit(c)
-	if !ok {
+	if !ok || !h.withinLimits(c) {
 		return
 	}
 	if c.isCard {
@@ -264,11 +274,35 @@ func (h *Handler) admit(c *call) (domain.A2ATarget, bool) {
 		c.refuse(r)
 		return target, false
 	case domain.A2ACallerNotAllowed:
-		c.refuse(refuseCallerNotAllow)
+		// The control plane leaves such targets out of the key's bundle, so
+		// both paths answer the same and the target's existence stays hidden.
+		c.refuse(refuseTargetNotFound)
 		return target, false
 	case domain.A2AAllowed:
 	}
+	if h.cfg.RequireHTTPS && !strings.HasPrefix(strings.ToLower(target.UpstreamURL), "https://") {
+		c.refuse(refuseNotHTTPS)
+		return target, false
+	}
 	return target, true
+}
+
+// withinLimits applies the key's rate limits and budgets, as the LLM routes
+// do. Every card fetch, call and stream counts as one request.
+func (h *Handler) withinLimits(c *call) bool {
+	if h.cfg.RateLimit != nil && h.cfg.RateLimit(c.ctx, c.bundle.VirtualKeyID, c.bundle.Config.RateLimits) != nil {
+		c.refuse(refuseRateLimited)
+		return false
+	}
+	if h.cfg.BudgetPrecheck == nil {
+		return true
+	}
+	decision, err := h.cfg.BudgetPrecheck(c.ctx, c.bundle)
+	if err == nil && decision.Verdict == domain.BudgetBlock {
+		c.refuse(refuseBudgetExceeded)
+		return false
+	}
+	return true
 }
 
 func (h *Handler) forward(c *call, target domain.A2ATarget) {
@@ -306,7 +340,7 @@ func (h *Handler) forward(c *call, target domain.A2ATarget) {
 		return
 	}
 	if c.method == "GetExtendedAgentCard" {
-		respBody = rewriteReplyCard(respBody, strings.TrimSuffix(target.UpstreamURL, "/"), proxyBase(c.r, target.Name))
+		respBody = rewriteReplyCard(respBody, strings.TrimSuffix(target.UpstreamURL, "/"), proxyBase(h.cfg.PublicBaseURL, c.r, target.Name))
 	}
 	copyHeader(c.w.Header(), resp.Header)
 	c.w.WriteHeader(resp.StatusCode)
@@ -360,10 +394,15 @@ func (h *Handler) check(c *call, dir Direction, body []byte) *refusal {
 		}
 		return &refuseUnscannable
 	}
-	if len(p.texts) == 0 {
+	return h.checkTexts(c, dir, p.texts)
+}
+
+// checkTexts sends the texts to the scanner and maps a deny to a refusal.
+func (h *Handler) checkTexts(c *call, dir Direction, texts []string) *refusal {
+	if len(texts) == 0 {
 		return nil
 	}
-	verdict, err := h.cfg.Scanner.Scan(c.ctx, ScanInput{Bundle: c.bundle, Direction: dir, Texts: p.texts})
+	verdict, err := h.cfg.Scanner.Scan(c.ctx, ScanInput{Bundle: c.bundle, Direction: dir, Texts: texts})
 	if err != nil {
 		return h.scanFailed(c, dir)
 	}

@@ -14,10 +14,15 @@ Feature: A2A proxy on the gateway
     Given a target "billing" registered for project "p1" with upstream "https://billing.acme.test/a2a"
     And the caller presents virtual key "vk_support" of project "p1"
 
-  @unimplemented
+  @unit
   Scenario: targets are registered from the control plane
     When an admin registers an A2A agent in the project settings
     Then the gateway loads it with the project's configuration
+
+  @unit
+  Scenario: a target the gateway cannot call safely is left out of the configuration
+    Given the configuration holds a target whose URL is not http or https, or whose header holds a line break
+    Then the gateway leaves that target out
 
   @unit
   Scenario: the Agent Card is served with the gateway URL in place of the upstream
@@ -51,7 +56,7 @@ Feature: A2A proxy on the gateway
     Given the target "billing" allows only virtual key "vk_finance"
     When the caller sends a JSON-RPC "SendMessage" to POST /a2a/billing
     Then the upstream is not called
-    And the caller receives a JSON-RPC error with code -32010 and reason "a2a_caller_not_allowed"
+    And the caller receives a JSON-RPC error with code -32013 and reason "a2a_target_not_found"
     And the error carries the request id
 
   @unit
@@ -203,3 +208,47 @@ Feature: A2A proxy on the gateway
     When an A2A target of the organization is created, updated, blocked or deleted
     Then the gateway drops the organization's cached key bundles
     And the next call reads the target as it is now
+
+  @unit
+  Scenario: a virtual key over its rate limit is refused
+    Given virtual key "vk_support" is over its requests-per-minute limit
+    When the caller sends a JSON-RPC "SendMessage" to POST /a2a/billing
+    Then the upstream is not called
+    And the caller receives a JSON-RPC error with code -32021 and reason "a2a_rate_limited"
+
+  @unit
+  Scenario: a virtual key with a used up budget is refused
+    Given a budget on virtual key "vk_support" is used up
+    When the caller sends a JSON-RPC "SendMessage" to POST /a2a/billing
+    Then the upstream is not called
+    And the caller receives a JSON-RPC error with code -32022 and reason "a2a_budget_exceeded"
+    And a budget check that fails admits the call, as on the LLM routes
+
+  @unit
+  Scenario: a plain http target is refused where https is required
+    Given the gateway requires https for customer endpoints
+    And the target "billing" has an http upstream
+    When the caller sends a JSON-RPC "SendMessage" to POST /a2a/billing
+    Then the upstream is not called
+    And the caller receives a JSON-RPC error with code -32023 and reason "a2a_target_not_https"
+
+  @unit
+  Scenario: Agent Card URLs use the configured public base URL
+    Given the gateway's public base URL is "https://gateway.acme.test"
+    When the caller fetches the Agent Card with another Host and X-Forwarded-Proto
+    Then every interface URL in the card starts with "https://gateway.acme.test/a2a/billing"
+
+  @unit
+  Scenario: a phrase split across streamed events is scanned whole
+    Given the key scans replies for "card number"
+    When the upstream streams "your card num" and then "ber 4111" as appended artifact text
+    Then the first event is forwarded
+    And the stream ends with an error event with reason "a2a_content_blocked"
+    And "4111" never reaches the caller
+
+  @unit
+  Scenario: an allowed host may resolve to a local address and no environment proxy is used
+    Given local addresses are blocked
+    Then a target on a local address is not called
+    And a host listed in ALLOWED_PROXY_HOSTS may resolve to a local address
+    And the upstream client uses no environment proxy
