@@ -176,6 +176,7 @@ Migration path: about 139 non-test TypeScript files under ClickHouse repository 
 27. Under a share, a filter's side-table check (evaluations, spans, scenario runs, Instant Eval judgments) reads only rows inside the share's windows, on each table's own time column; out-of-window rows never decide whether a trace matches. This is stricter than main for shared projects only.
 28. Under a share, the session-groups log search reads only `log_records` rows inside the share's windows, on `TimeUnixMs`; a log line outside the window no longer admits a session.
 29. Analytics answers differ from main where main's answer was wrong: under an aggregate proof each member's trace counts separately; pipeline series main dropped are computed; a pipeline or evaluation series beside span or run metrics is read on its own; span-grouped counts honour the metric's condition; evaluation metrics compute per run; span-grouped event, thumbs and token values count only the spans or events behind each group key.
+30. Instant Eval's LangWatchQL statement keeps trace's text filter dialect (`compileLangWatchQLTraceFilter`): the user reads and reruns it, it queries the LangWatchQL view, and it runs as the reader under row policies.
 
 ## Open questions for Alex
 
