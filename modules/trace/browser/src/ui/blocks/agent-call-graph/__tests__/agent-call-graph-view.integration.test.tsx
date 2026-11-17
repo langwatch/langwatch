@@ -36,7 +36,7 @@ const graph: AgentCallGraph = {
       totalDurationMs: 3000,
       maxDurationMs: 1800,
       a2a: true,
-      spanIds: ["span-a", "span-b", "span-c"],
+      firstSpanId: "span-a",
     },
   ],
   a2aSpans: [],
@@ -51,6 +51,13 @@ describe("<AgentCallGraphView/>", () => {
     expect(nodes[0]?.textContent).toContain("planner");
     expect(nodes[0]?.textContent).toContain("$");
     expect(nodes[1]?.textContent).toContain("Caller not in this trace");
+  });
+
+  /** @scenario "Each agent shows its LLM calls and tokens" */
+  it("shows each agent's LLM calls with prompt and completion tokens", () => {
+    renderWithDesignSystem(<AgentCallGraphView graph={graph} onSelectSpan={vi.fn()} />);
+    const tokens = screen.getAllByTestId("agent-call-graph-node-tokens");
+    expect(tokens[0]?.textContent).toBe("1 LLM call · 10 prompt / 5 completion tokens");
   });
 
   /** @scenario "An edge shows calls, errors, latency and the A2A label" */

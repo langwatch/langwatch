@@ -176,7 +176,7 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
       <KeyboardShortcutsHelp
         open={shortcutsOpen}
         onClose={() => setShortcutsOpen(false)}
-        showsAgents={showsAgents}
+        context={trace ? { trace, spanTree, canGoBack, showsAgents } : undefined}
         fallbackFocusSelector='[data-testid="trace-overflow-menu"]'
       />
       {/* Show-once feature spotlights — only meaningful once a trace has

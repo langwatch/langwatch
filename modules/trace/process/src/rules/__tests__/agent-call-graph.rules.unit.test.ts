@@ -57,7 +57,7 @@ describe("buildAgentCallGraph", () => {
         totalDurationMs: 250,
         maxDurationMs: 250,
         a2a: true,
-        spanIds: ["a2a-client"],
+        firstSpanId: "a2a-client",
       },
     ]);
   });
@@ -120,7 +120,7 @@ describe("buildAgentCallGraph", () => {
       resources: resources({}),
     });
 
-    expect(graph.edges).toMatchObject([{ callCount: 2, spanIds: ["w1"] }]);
+    expect(graph.edges).toMatchObject([{ callCount: 2, firstSpanId: "w1" }]);
   });
 
   /** @scenario "A remote span whose parent is missing stays in the graph" */
@@ -221,5 +221,35 @@ describe("visibleResourcesOf", () => {
       resources: visible,
     });
     expect(graph.nodes.map((node) => node.id)).toEqual(["unknown"]);
+  });
+});
+
+describe("visibleResourcesOf on a braided trace", () => {
+  /** @scenario "A braided span never sets the trace default service" */
+  it("takes the default service from the owner's own root span", () => {
+    const row = (
+      spanId: string,
+      parentSpanId: string | null,
+      service: string,
+      ownerProjectId?: string,
+    ) => ({
+      spanId,
+      parentSpanId,
+      resourceAttributes: { "service.name": service },
+      scope: { name: "", version: "" },
+      ...(ownerProjectId ? { ownerProjectId } : {}),
+    });
+    const braided: AgentCallGraphResources = {
+      resourceAttributes: {},
+      spans: [
+        row("partner", "elsewhere", "partner-service", "project-b"),
+        row("root", null, "owner-service"),
+      ],
+    };
+    const visible = visibleResourcesOf({
+      resources: braided,
+      spans: [{ spanId: "partner" }, { spanId: "root" }],
+    });
+    expect(visible.resourceAttributes["service.name"]).toBe("owner-service");
   });
 });

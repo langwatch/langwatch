@@ -266,7 +266,8 @@ const agentCallGraphEdgeSchema = z.object({
   maxDurationMs: z.number(),
   /** True when at least one of the calls is an A2A span. */
   a2a: z.boolean(),
-  spanIds: z.array(z.string()),
+  /** The span of the first call, which the view selects on click. */
+  firstSpanId: z.string(),
 });
 
 /** A span recognised as an A2A call, so the span tree can label it. */

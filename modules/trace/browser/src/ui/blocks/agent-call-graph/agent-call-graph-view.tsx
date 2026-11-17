@@ -43,6 +43,13 @@ export function AgentCallGraphView({
                   {node.spanCount} {node.spanCount === 1 ? "span" : "spans"}
                   {node.cost !== null ? ` · ${formatCost(node.cost)}` : ""}
                 </Text>
+                {node.llmSpanCount > 0 && (
+                  <Text textStyle="xs" color="fg.muted" data-testid="agent-call-graph-node-tokens">
+                    {node.llmSpanCount} LLM {node.llmSpanCount === 1 ? "call" : "calls"} ·{" "}
+                    {node.promptTokens.toLocaleString()} prompt /{" "}
+                    {node.completionTokens.toLocaleString()} completion tokens
+                  </Text>
+                )}
                 {node.hasMissingParent && (
                   <Text textStyle="xs" color="fg.subtle">
                     Caller not in this trace
@@ -81,7 +88,7 @@ function EdgeRow({
   toLabel: string;
   onSelectSpan: (spanId: string) => void;
 }) {
-  const firstSpanId = edge.spanIds[0];
+  const firstSpanId = edge.firstSpanId;
   const averageMs = edge.callCount > 0 ? edge.totalDurationMs / edge.callCount : 0;
   return (
     <Flex

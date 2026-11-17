@@ -44,7 +44,7 @@ describe("buildAgentCallGraph, when both sides of an A2A hop share one service.n
       from: "service:shared-svc",
       to: "agent:ACME Support Agent",
       a2a: true,
-      spanIds: ["client"],
+      firstSpanId: "client",
     });
   });
 

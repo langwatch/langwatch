@@ -47,7 +47,7 @@ const A2A_METHODS = new Set([
 type Owner = { id: string; label: string; kind: AgentCallGraphNode["kind"] };
 
 /** Reads a flat dotted key first, then the same path through nested objects. */
-export function attributeOf({
+function attributeOf({
   params,
   key,
 }: {
@@ -295,14 +295,13 @@ function addCall({
     totalDurationMs: 0,
     maxDurationMs: 0,
     a2a: false,
-    spanIds: [],
+    firstSpanId: span.spanId,
   };
   edge.callCount += 1;
   if (span.status === "error") edge.errorCount += 1;
   edge.totalDurationMs += span.durationMs;
   edge.maxDurationMs = Math.max(edge.maxDurationMs, span.durationMs);
   edge.a2a = edge.a2a || isA2a;
-  if (edge.spanIds.length === 0) edge.spanIds.push(span.spanId);
   edges.set(key, edge);
 }
 
@@ -354,7 +353,7 @@ function resolveOwner({
   return parentOwner;
 }
 
-/** Resource rows of the spans the viewer sees; the trace default comes from a visible root only. */
+/** Resource rows of the spans the viewer sees; the default comes from the owner's own root. */
 export function visibleResourcesOf({
   resources,
   spans,
@@ -364,6 +363,9 @@ export function visibleResourcesOf({
 }): AgentCallGraphResources {
   const visible = new Set(spans.map((span) => span.spanId));
   const rows = resources.spans.filter((row) => visible.has(row.spanId));
-  const root = rows.find((row) => !row.parentSpanId || !visible.has(row.parentSpanId));
+  const ownRows = rows.filter((row) => row.ownerProjectId === undefined);
+  const root =
+    ownRows.find((row) => !row.parentSpanId) ??
+    ownRows.find((row) => !row.parentSpanId || !visible.has(row.parentSpanId));
   return { resourceAttributes: root?.resourceAttributes ?? {}, spans: rows };
 }

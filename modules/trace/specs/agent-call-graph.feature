@@ -71,7 +71,32 @@ Feature: Agent call graph across A2A hops
       When the agent call graph is built
       Then the graph has one node for that agent and no edges
 
+    @unit
+    Scenario: A braided span never sets the trace default service
+      Given a braided trace whose first visible span comes from another project
+      When the visible resources are taken
+      Then the trace default service comes from the trace owner's own root span
+
   Rule: Agents view in the trace drawer
+
+    @unit
+    Scenario: The drawer reads the call graph only for a trace that may hold several agents
+      Given a trace with one service and no span named as an agent call
+      Then the Agents tab is hidden and the call graph is not read
+      Given a trace with two services, or a span named invoke_agent or as an A2A call
+      Then the Agents tab shows, and the graph is read when the tab opens
+
+    @integration
+    Scenario: An A2A span is labelled in the span tree
+      Given a span marked as an A2A call
+      When the span tree renders
+      Then its row carries an A2A label and other rows do not
+
+    @integration
+    Scenario: Each agent shows its LLM calls and tokens
+      Given a call graph with an agent that made one LLM call
+      When the Agents view renders
+      Then the agent node shows its LLM call count and its prompt and completion tokens
 
     @unit
     Scenario: The Agents tab shows only for a trace with more than one agent

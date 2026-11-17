@@ -860,9 +860,9 @@
 /langy/security/sandbox
 /langy/token-usage-and-cost
 /observability
+/observability/multi-agent-a2a
 /observability/overview
 /observability/trace-vs-activity-ingestion
-/observability/multi-agent-a2a
 /optimization-studio/datasets
 /optimization-studio/evaluating
 /optimization-studio/llm-nodes

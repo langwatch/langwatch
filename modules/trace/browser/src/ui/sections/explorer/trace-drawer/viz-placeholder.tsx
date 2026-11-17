@@ -33,7 +33,6 @@ import {
 import { useShallow } from "zustand/react/shallow";
 
 import { useVizHeight } from "../../../../behavior/explorer/trace-drawer/use-viz-height.ts";
-import { useAgentCallGraph } from "../../../../behavior/explorer/use-agent-call-graph.ts";
 import { useOverflowVisibility } from "../../../../behavior/explorer/use-overflow-visibility.ts";
 // PeerCursorOverlay used to wrap just the viz pane (scoped to the
 // active viz tab). It was lifted to the drawer level (TraceDrawerShell)
@@ -46,7 +45,6 @@ import {
 } from "../../../../behavior/presence/presence-store.ts";
 import { useTraceDrawer } from "../../../../behavior/trace-drawer.ts";
 import { drawerShortcut } from "../../../../features/trace-drawer/behavior/trace-drawer-shortcut-table.ts";
-import { hasMultipleAgents } from "../../../../model/agent-call-graph-layout.ts";
 import type { VizTab } from "../../../../model/trace-drawer-params.ts";
 import { AgentCallGraphView } from "../../../blocks/agent-call-graph/agent-call-graph-view.tsx";
 import { SequenceSkeleton } from "../../../blocks/sequence/sequence-skeleton.tsx";
@@ -55,6 +53,7 @@ import { OverflowMenu } from "../../../elements/explorer/shared/overflow-menu.ts
 import { PresenceMarker } from "../../../elements/presence/presence-marker.tsx";
 import { FlameView } from "../../flame/flame-view.tsx";
 import { spanTypeColor } from "../utils/span-type-color.ts";
+import { useAgentsTab } from "./use-agents-tab.ts";
 import { WaterfallView } from "./waterfall-view/index.ts";
 
 // SequenceView pulls in `mermaid` (~1MB+ — d3, dagre, several parsers).
@@ -127,9 +126,9 @@ function VizTabContent({ tab, traceId }: { tab: VizTabDef; traceId: string | nul
   );
 }
 
-// The viz strip ships four tabs as of Round 3. Span List stays retired — it added
-// filter chrome but no fundamentally new data axis, and the waterfall + sidebar filter
-// together cover the same workflow.
+// The viz strip ships five tabs; Agents shows only for a trace with more than one agent.
+// Span List stays retired: it added filter chrome but no new data axis, and the waterfall
+// plus the sidebar filter cover the same workflow.
 const TABS: VizTabDef[] = [
   {
     value: "waterfall",
@@ -417,18 +416,21 @@ export function VizPlaceholder({
   const detailCollapsed = useTraceDrawer((s) => s.paneState.spanDetail.collapsed);
   const togglePaneCollapsed = useTraceDrawer((s) => s.togglePaneCollapsed);
 
-  const agentCallGraph = useAgentCallGraph().data;
-  const showsAgents = hasMultipleAgents({ graph: agentCallGraph });
+  const {
+    graph: agentCallGraph,
+    showsAgents,
+    isSettled: isAgentGraphSettled,
+    a2aSpanIds,
+  } = useAgentsTab({
+    traceId: trace?.traceId,
+    spanTree: spans,
+    isAgentsTabOpen: vizTab === "agents",
+  });
   const hidesAgentsTab = vizTab === "agents" && !showsAgents;
   const effectiveVizTab: VizTab = hidesAgentsTab ? "waterfall" : vizTab;
-  const isAgentGraphSettled = agentCallGraph !== undefined;
   useEffect(() => {
     if (hidesAgentsTab && isAgentGraphSettled) onVizTabChange("waterfall");
   }, [hidesAgentsTab, isAgentGraphSettled, onVizTabChange]);
-  const a2aSpanIds = useMemo(
-    () => new Set(agentCallGraph?.a2aSpans.map((mark) => mark.spanId) ?? []),
-    [agentCallGraph],
-  );
 
   const viz = useVizHeight({ fillParent, hasData: spans.length > 0 });
   const containerRef = useRef<HTMLDivElement>(null);

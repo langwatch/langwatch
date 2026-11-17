@@ -1,7 +1,12 @@
 import type { AgentCallGraph } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
-import { hasMultipleAgents, layerAgentCallGraph } from "../agent-call-graph-layout.ts";
+import {
+  hasMultipleAgents,
+  isAgentCallSpanName,
+  layerAgentCallGraph,
+  mayHaveSeveralAgents,
+} from "../agent-call-graph-layout.ts";
 
 function graphOf(ids: string[], edges: [string, string][]): AgentCallGraph {
   return {
@@ -24,7 +29,7 @@ function graphOf(ids: string[], edges: [string, string][]): AgentCallGraph {
       totalDurationMs: 1,
       maxDurationMs: 1,
       a2a: false,
-      spanIds: [],
+      firstSpanId: "",
     })),
     a2aSpans: [],
   };
@@ -65,5 +70,30 @@ describe("layerAgentCallGraph", () => {
       ),
     });
     expect(layers.flat()).toHaveLength(2);
+  });
+});
+
+describe("mayHaveSeveralAgents", () => {
+  /** @scenario "The drawer reads the call graph only for a trace that may hold several agents" */
+  it("stays off for one service with no agent call span", () => {
+    expect(
+      mayHaveSeveralAgents({
+        spanNames: ["chat", "tool"],
+        serviceNames: ["api", "api", undefined],
+      }),
+    ).toBe(false);
+  });
+
+  /** @scenario "The drawer reads the call graph only for a trace that may hold several agents" */
+  it("turns on for two services or a span naming an agent call", () => {
+    expect(mayHaveSeveralAgents({ spanNames: ["chat"], serviceNames: ["api", "partner"] })).toBe(
+      true,
+    );
+    expect(
+      mayHaveSeveralAgents({ spanNames: ["invoke_agent Researcher"], serviceNames: ["api"] }),
+    ).toBe(true);
+    expect(isAgentCallSpanName("a2a.server SendMessage")).toBe(true);
+    expect(isAgentCallSpanName("a2a.v1.A2AService/SendMessage")).toBe(true);
+    expect(isAgentCallSpanName("chat gpt-5")).toBe(false);
   });
 });

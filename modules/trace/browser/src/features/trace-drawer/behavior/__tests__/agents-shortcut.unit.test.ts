@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  helpGroupsWithoutAgents,
+  helpGroupsFor,
+  type ShortcutGuardContext,
   type ShortcutContext,
   TRACE_DRAWER_HELP_GROUPS,
   TRACE_DRAWER_SHORTCUTS,
@@ -23,6 +24,17 @@ describe("the Agents shortcut", () => {
   /** @scenario "Shortcut 5 opens the Agents tab only when the tab shows" */
   it("leaves Agents out of the help when the tab is hidden", () => {
     expect(helpLabels(TRACE_DRAWER_HELP_GROUPS)).toContain("Agents");
-    expect(helpLabels(helpGroupsWithoutAgents(TRACE_DRAWER_HELP_GROUPS))).not.toContain("Agents");
+    const context = (showsAgents: boolean): ShortcutGuardContext => ({
+      trace: { serviceName: "api", origin: "application" } as ShortcutGuardContext["trace"],
+      spanTree: [],
+      canGoBack: false,
+      showsAgents,
+    });
+    const help = (showsAgents: boolean) =>
+      helpLabels(
+        helpGroupsFor({ groups: TRACE_DRAWER_HELP_GROUPS, context: context(showsAgents) }),
+      );
+    expect(help(false)).not.toContain("Agents");
+    expect(help(true)).toContain("Agents");
   });
 });

@@ -27,6 +27,12 @@ export interface ShortcutContext {
   onClose: () => void;
 }
 
+/** What a guard reads, so the help can drop a shortcut that would not run. */
+export type ShortcutGuardContext = Pick<
+  ShortcutContext,
+  "trace" | "spanTree" | "canGoBack" | "showsAgents"
+>;
+
 export type TraceDrawerShortcutId = (typeof SHORTCUT_IDS)[number];
 
 const SHORTCUT_IDS = [
@@ -61,7 +67,7 @@ interface ShortcutEntry {
   description: string;
   detail?: string;
   /** When false, the entry is silently skipped (no preventDefault, no run). */
-  guard?: (ctx: ShortcutContext) => boolean;
+  guard?: (ctx: ShortcutGuardContext) => boolean;
   run: (ctx: ShortcutContext) => void;
 }
 
@@ -293,6 +299,8 @@ export interface ShortcutHelpItem {
   detail?: string;
   /** Where the key works, e.g. "When the span tabs are focused". */
   scope?: string;
+  /** The entry's guard: the help leaves the item out when it would not run. */
+  guard?: (ctx: ShortcutGuardContext) => boolean;
 }
 
 export interface ShortcutHelpGroup {
@@ -334,6 +342,7 @@ export const TRACE_DRAWER_HELP_GROUPS: ShortcutHelpGroup[] = HELP_GROUP_ORDER.ma
     label: s.description,
     shortcut: definitionFor(s),
     detail: s.detail,
+    guard: s.guard,
   })),
 }))
   .map((g) =>
@@ -343,13 +352,12 @@ export const TRACE_DRAWER_HELP_GROUPS: ShortcutHelpGroup[] = HELP_GROUP_ORDER.ma
   )
   .filter((g) => g.items.length > 0);
 
-/** The help groups without the Agents entry, for a trace whose Agents tab is hidden. */
-export function helpGroupsWithoutAgents<T extends { title: string; items: { label: string }[] }>(
-  groups: readonly T[],
-): T[] {
-  return groups.map((group) =>
-    group.title === "Visualisation"
-      ? { ...group, items: group.items.filter((item) => item.label !== AGENTS_SHORTCUT_LABEL) }
-      : group,
-  );
+/** The help groups without the shortcuts whose guard would not run for this trace. */
+export function helpGroupsFor<
+  T extends { items: { guard?: (ctx: ShortcutGuardContext) => boolean }[] },
+>({ groups, context }: { groups: readonly T[]; context: ShortcutGuardContext }): T[] {
+  return groups.map((group) => ({
+    ...group,
+    items: group.items.filter((item) => !item.guard || item.guard(context)),
+  }));
 }

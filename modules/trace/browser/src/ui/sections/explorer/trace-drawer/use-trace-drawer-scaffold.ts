@@ -2,7 +2,6 @@ import { getTopDrawer, useDrawer } from "@langwatch/browser-host/drawer";
 import type { SpanTreeNode, TraceHeader } from "@langwatch/trace-contract";
 import { type RefObject, useCallback, useEffect, useMemo, useRef } from "react";
 
-import { useAgentCallGraph } from "../../../../behavior/explorer/use-agent-call-graph.ts";
 import { guardTraceEditExit } from "../../../../behavior/explorer/utils/trace-edit-mode.ts";
 import { api } from "../../../../behavior/trace-api.ts";
 import { useTraceDrawer } from "../../../../behavior/trace-drawer.ts";
@@ -13,9 +12,9 @@ import { useSpanTreeWithCaptured } from "../../../../features/span/behavior/use-
 import { useTraceDrawerNavigation } from "../../../../features/trace-drawer/behavior/use-trace-drawer-navigation.ts";
 import { useTraceDrawerShortcuts } from "../../../../features/trace-drawer/behavior/use-trace-drawer-shortcuts.ts";
 import { useTraceHeader } from "../../../../features/trace-drawer/behavior/use-trace-header.ts";
-import { hasMultipleAgents } from "../../../../model/agent-call-graph-layout.ts";
 import { TRACE_DRAWER_NAME } from "../../../../model/trace-drawer-params.ts";
 import { useTraceRefresh } from "../hooks/use-trace-refresh.ts";
+import { useAgentsTab } from "./use-agents-tab.ts";
 
 interface TraceDrawerScaffold {
   traceId: string | undefined;
@@ -146,7 +145,8 @@ export function useTraceDrawerScaffold(): TraceDrawerScaffold {
   useConversationPrefetch(conversationId, conversationTraceId);
 
   const { navigateToTrace, goBack: goBackInTraceHistory, canGoBack } = useTraceDrawerNavigation();
-  const showsAgents = hasMultipleAgents({ graph: useAgentCallGraph().data });
+  const isAgentsTabOpen = useTraceDrawer((s) => s.vizTab === "agents");
+  const { showsAgents } = useAgentsTab({ traceId, spanTree, isAgentsTabOpen });
   // The header's refresh, again here so R works while the header spins; memoised per trace.
   const { refresh: refreshActiveTrace } = useTraceRefresh(traceId ?? "");
 
