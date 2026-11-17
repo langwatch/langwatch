@@ -8,6 +8,7 @@ import {
   A2A_V0_METHODS,
   A2A_V1_METHODS,
   a2aSpanNameMatch,
+  NormalizedSpanKind,
   type A2aSpanMark,
   type AgentCallGraph,
   type AgentCallGraphEdge,
@@ -16,10 +17,11 @@ import {
   type TraceResourceInfoDto,
 } from "@langwatch/trace-contract";
 
+/** `kind` is the stored OTLP span kind; ingestion keeps it as a column, not an attribute. */
 export type AgentCallGraphSpan = Pick<
   SpanDetail,
   "spanId" | "parentSpanId" | "name" | "type" | "durationMs" | "status" | "metrics" | "params"
->;
+> & { kind?: NormalizedSpanKind | null };
 
 export type AgentCallGraphResources = Pick<TraceResourceInfoDto, "resourceAttributes" | "spans">;
 
@@ -75,9 +77,24 @@ function hasA2aAttribute(params: AgentCallGraphSpan["params"]): boolean {
 
 export type A2aClassification = { isA2a: false } | { isA2a: true; mark: A2aSpanMark };
 
-function a2aRoleOf({ name, fromName, kind }: { name: string; fromName: string; kind: string }) {
-  if (fromName === "server" || kind.includes("server")) return "server" as const;
-  if (fromName === "client" || kind.includes("client")) return "client" as const;
+const SERVER_KINDS = new Set([NormalizedSpanKind.SERVER, NormalizedSpanKind.CONSUMER]);
+const CLIENT_KINDS = new Set([NormalizedSpanKind.CLIENT, NormalizedSpanKind.PRODUCER]);
+
+function a2aRoleOf({
+  name,
+  fromName,
+  kind,
+  spanKind,
+}: {
+  name: string;
+  fromName: string;
+  kind: string;
+  spanKind: NormalizedSpanKind | null | undefined;
+}) {
+  const isServerKind = spanKind != null && SERVER_KINDS.has(spanKind);
+  const isClientKind = spanKind != null && CLIENT_KINDS.has(spanKind);
+  if (fromName === "server" || isServerKind || kind.includes("server")) return "server" as const;
+  if (fromName === "client" || isClientKind || kind.includes("client")) return "client" as const;
   if (name.startsWith("invoke_agent")) return "client" as const;
   return "unknown" as const;
 }
@@ -98,7 +115,7 @@ function a2aMethodOf({
 
 /** Whether a span is an A2A call, by a2a.* attributes, A2A method names or span name. */
 export function classifyA2aSpan(
-  span: Pick<AgentCallGraphSpan, "spanId" | "name" | "params">,
+  span: Pick<AgentCallGraphSpan, "spanId" | "name" | "params" | "kind">,
 ): A2aClassification {
   const { params } = span;
   const name = span.name.trim();
@@ -115,7 +132,7 @@ export function classifyA2aSpan(
     isA2a: true,
     mark: {
       spanId: span.spanId,
-      role: a2aRoleOf({ name, fromName: byName?.role ?? "", kind }),
+      role: a2aRoleOf({ name, fromName: byName?.role ?? "", kind, spanKind: span.kind }),
       method: method || null,
       contextId: textAttribute({ params, key: ATTR_KEYS.A2A_CONTEXT_ID }) || null,
       taskId: textAttribute({ params, key: ATTR_KEYS.A2A_TASK_ID }) || null,
@@ -151,11 +168,13 @@ export function ownAgentNameOf(span: Pick<AgentCallGraphSpan, "params">): string
 export function spanTreeAgentMarksOf({
   name,
   attributes,
+  kind,
 }: {
   name: string;
   attributes: Record<string, string>;
+  kind?: NormalizedSpanKind | null;
 }): { agentName: string | null; isA2aCall: boolean } {
-  const span = { spanId: "", name, params: attributes };
+  const span = { spanId: "", name, params: attributes, kind };
   return { agentName: ownAgentNameOf(span) || null, isA2aCall: classifyA2aSpan(span).isA2a };
 }
 
@@ -226,12 +245,24 @@ export function buildAgentCallGraph({
     if (a2a.isA2a) a2aSpans.push(a2a.mark);
     const parent = span.parentSpanId ? byId.get(span.parentSpanId) : undefined;
     if (parent) {
-      addCall({ edges, from: ownerAfterFold(parent), to: owner, span, isA2a: a2a.isA2a });
+      const above = facts.get(parent.spanId)?.a2a;
+      const timed = above?.isA2a && above.mark.role === "client" ? parent : span;
+      const isCall = a2a.isA2a || timed !== span;
+      addCall({ edges, from: ownerAfterFold(parent), to: owner, span, timed, isA2a: isCall });
     }
   }
 
-  return { nodes: [...nodes.values()], edges: [...edges.values()], a2aSpans };
+  const rootSpan = spans.find((span) => !span.parentSpanId);
+  const rootId = rootSpan ? ownerAfterFold(rootSpan).id : undefined;
+  const ordered = [...nodes.values()].toSorted(
+    (a, b) => Number(b.id === rootId) - Number(a.id === rootId),
+  );
+  return { nodes: ordered, edges: [...edges.values()].toSorted(byErrorsThenCalls), a2aSpans };
 }
+
+/** Edges with errors first, then the busiest. */
+const byErrorsThenCalls = (a: AgentCallGraphEdge, b: AgentCallGraphEdge): number =>
+  Number(b.errorCount > 0) - Number(a.errorCount > 0) || b.callCount - a.callCount;
 
 function ownerFrom(owners: Map<string, Owner>, span: AgentCallGraphSpan): Owner {
   return owners.get(span.spanId) ?? serviceOwnerOf(null, span.spanId);
@@ -339,18 +370,23 @@ function addSpanToNode({
 const finiteOrZero = (value: number | null | undefined): number =>
   typeof value === "number" && Number.isFinite(value) ? value : 0;
 
-/** Counts one call where the agent changes between a parent span and its child. */
+/**
+ * Counts one call where the agent changes between a parent span and its child.
+ * `timed` is the A2A client span when the caller has one, so latency is client side.
+ */
 function addCall({
   edges,
   from,
   to,
   span,
+  timed,
   isA2a,
 }: {
   edges: Map<string, AgentCallGraphEdge>;
   from: Owner;
   to: Owner;
   span: AgentCallGraphSpan;
+  timed: AgentCallGraphSpan;
   isA2a: boolean;
 }): void {
   if (from.id === to.id) return;
@@ -366,9 +402,9 @@ function addCall({
     firstSpanId: span.spanId,
   };
   // A span still open has no end time, so its duration can come out negative.
-  const durationMs = Math.max(0, finiteOrZero(span.durationMs));
+  const durationMs = Math.max(0, finiteOrZero(timed.durationMs));
   edge.callCount += 1;
-  if (span.status === "error") edge.errorCount += 1;
+  if (span.status === "error" || timed.status === "error") edge.errorCount += 1;
   edge.totalDurationMs += durationMs;
   edge.maxDurationMs = Math.max(edge.maxDurationMs, durationMs);
   edge.a2a = edge.a2a || isA2a;

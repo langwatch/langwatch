@@ -78,3 +78,62 @@ describe("<AgentCallGraphView/>", () => {
     expect(onSelectSpan).toHaveBeenCalledWith("span-a");
   });
 });
+
+const edge = (to: string, over: Partial<AgentCallGraph["edges"][number]> = {}) => ({
+  from: "root",
+  to,
+  callCount: 1,
+  errorCount: 0,
+  totalDurationMs: 100,
+  maxDurationMs: 100,
+  a2a: true,
+  firstSpanId: `span-${to}`,
+  ...over,
+});
+
+describe("AgentCallGraphView with many callees", () => {
+  /** @scenario "A wide fan-out keeps the agent nodes visible" */
+  it("keeps the node area from shrinking under 55 edges", () => {
+    const ids = Array.from({ length: 55 }, (_, index) => `callee-${index}`);
+    renderWithDesignSystem(
+      <AgentCallGraphView
+        graph={{
+          nodes: [node("root"), ...ids.map((id) => node(id))],
+          edges: ids.map((id) => edge(id)),
+          a2aSpans: [],
+        }}
+        onSelectSpan={() => {}}
+      />,
+    );
+    const area = screen.getByTestId("agent-call-graph-nodes");
+    const style = getComputedStyle(area);
+    expect(style.flexShrink).toBe("0");
+    expect(style.overflow).toBe("auto");
+    expect(screen.getAllByTestId("agent-call-graph-node")).toHaveLength(56);
+  });
+
+  /** @scenario "Agent nodes show failed calls and the slowest callee" */
+  it("colours a callee with failed calls and the slowest clean callee", () => {
+    renderWithDesignSystem(
+      <AgentCallGraphView
+        graph={{
+          nodes: [node("root"), node("broken"), node("slow"), node("fast")],
+          edges: [
+            edge("broken", { errorCount: 2, callCount: 2, totalDurationMs: 400 }),
+            edge("slow", { totalDurationMs: 3000, maxDurationMs: 3000 }),
+            edge("fast", { totalDurationMs: 50 }),
+          ],
+          a2aSpans: [],
+        }}
+        onSelectSpan={() => {}}
+      />,
+    );
+    const statusOf = Object.fromEntries(
+      screen
+        .getAllByTestId("agent-call-graph-node")
+        .map((element) => [element.textContent?.split(/\d/)[0], element.dataset.status]),
+    );
+    expect(statusOf).toMatchObject({ root: "ok", broken: "error", slow: "slow", fast: "ok" });
+    expect(screen.getByText(/2 failed calls/)).toBeTruthy();
+  });
+});

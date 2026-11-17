@@ -38,7 +38,7 @@ const AGENT_MARK_KEYS = [
   .join(", ");
 
 /** The span attributes the tree marks agents and A2A calls from, each value cut to 256 chars. */
-export const AGENT_MARK_ATTRIBUTES_SELECT = `mapApply((k, v) -> (k, substring(v, 1, 256)), mapFilter((k, v) -> startsWith(k, 'a2a.') OR k IN (${AGENT_MARK_KEYS}), SpanAttributes)) AS AgentAttributes`;
+export const AGENT_MARK_ATTRIBUTES_SELECT = `mapApply((k, v) -> (k, substring(v, 1, 256)), mapFilter((k, v) -> startsWith(k, 'a2a.') OR k IN (${AGENT_MARK_KEYS}), SpanAttributes)) AS AgentAttributes, SpanKind AS AgentSpanKind`;
 
 const DECIMAL_NUMBER_RE = /^-?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?$/;
 

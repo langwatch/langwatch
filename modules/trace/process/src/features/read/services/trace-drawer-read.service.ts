@@ -297,7 +297,12 @@ export class TraceDrawerReadService {
       }),
       this.#resourceInfo({ input, protections: opened.protections, rows: read.resources }),
     ]);
-    return buildAgentCallGraph({ spans, resources: visibleResourcesOf({ resources, spans }) });
+    const kindOf = new Map(read.spans.map((stored) => [stored.spanId, stored.kind]));
+    const withKinds = spans.map((span) => ({ ...span, kind: kindOf.get(span.spanId) ?? null }));
+    return buildAgentCallGraph({
+      spans: withKinds,
+      resources: visibleResourcesOf({ resources, spans }),
+    });
   }
 
   async resources(input: TraceDrawerReadInput): Promise<TraceResourceInfoDto> {

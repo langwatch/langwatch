@@ -183,11 +183,49 @@ Feature: Agent call graph across A2A hops
       Then the agent node shows its LLM call count and its prompt and completion tokens
 
     @unit
-    Scenario: The Agents tab shows only for a trace with more than one agent
+    Scenario: A one-agent call graph says so
       Given a call graph with one node
-      Then the Agents tab is hidden
+      Then the graph has a single agent
       Given a call graph with two nodes
-      Then the Agents tab shows
+      Then the graph has several agents
+
+    @integration
+    Scenario: The Agents tab stays when the graph finds one agent
+      Given a trace with an A2A span and only one agent
+      When the Agents tab opens and the graph loads with one node
+      Then the Agents tab still shows, with the one node and a note that it is the only agent
+
+    @unit
+    Scenario: An A2A client span is read by its stored span kind
+      Given a caller and an unnamed callee sharing one service
+      And a client span named "send_message" with a2a attributes, span kind CLIENT and a2a.agent.name
+      When the call graph is built
+      Then the graph has two nodes and the callee's LLM cost sits on the callee
+
+    @unit
+    Scenario: Edge latency is the client side and edges with errors come first
+      Given an A2A client span in the caller and a faster server span in the callee
+      When the call graph is built
+      Then the edge latency is the client span's duration
+      And edges with errors come first, then the edges with the most calls
+
+    @unit
+    Scenario: A cycle keeps the root caller in the leftmost column
+      Given agent A calls B and B calls A back
+      When the graph is laid out
+      Then A is in the first column and B in the second
+
+    @integration
+    Scenario: A wide fan-out keeps the agent nodes visible
+      Given a call graph with one caller and 55 callees
+      When the Agents view renders
+      Then the node area does not shrink below its content and scrolls on its own
+
+    @integration
+    Scenario: Agent nodes show failed calls and the slowest callee
+      Given a call graph whose callees differ in errors and latency
+      When the Agents view renders
+      Then a callee with failed calls has the error border and the slowest clean callee the warning border
 
     @unit
     Scenario: Shortcut 5 opens the Agents tab only when the tab shows

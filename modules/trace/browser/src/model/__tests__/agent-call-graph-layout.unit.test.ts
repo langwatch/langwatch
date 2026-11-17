@@ -36,7 +36,7 @@ function graphOf(ids: string[], edges: [string, string][]): AgentCallGraph {
 }
 
 describe("hasMultipleAgents", () => {
-  /** @scenario "The Agents tab shows only for a trace with more than one agent" */
+  /** @scenario "A one-agent call graph says so" */
   it("hides the graph for a single agent", () => {
     expect(hasMultipleAgents({ graph: graphOf(["a"], []) })).toBe(false);
     expect(hasMultipleAgents({ graph: undefined })).toBe(false);
@@ -117,5 +117,36 @@ describe("a2aSpanIdsOf", () => {
       ],
     });
     expect([...ids]).toEqual(["client"]);
+  });
+});
+
+describe("layerAgentCallGraph with a cycle", () => {
+  /** @scenario "A cycle keeps the root caller in the leftmost column" */
+  it("keeps the root caller leftmost when the callee calls back", () => {
+    const layers = layerAgentCallGraph({
+      graph: graphOf(
+        ["a", "b"],
+        [
+          ["a", "b"],
+          ["b", "a"],
+        ],
+      ),
+    });
+    expect(layers.map((layer) => layer.map((node) => node.id))).toEqual([["a"], ["b"]]);
+  });
+
+  /** @scenario "A cycle keeps the root caller in the leftmost column" */
+  it("keeps a three-agent loop in call order from the root", () => {
+    const layers = layerAgentCallGraph({
+      graph: graphOf(
+        ["a", "b", "c"],
+        [
+          ["a", "b"],
+          ["b", "c"],
+          ["c", "a"],
+        ],
+      ),
+    });
+    expect(layers.map((layer) => layer.map((node) => node.id))).toEqual([["a"], ["b"], ["c"]]);
   });
 });

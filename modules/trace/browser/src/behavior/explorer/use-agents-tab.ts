@@ -1,7 +1,7 @@
 import type { AgentCallGraph, SpanTreeNode } from "@langwatch/trace-contract";
 import { useMemo } from "react";
 
-import { hasMultipleAgents, mayHaveSeveralAgents } from "../../model/agent-call-graph-layout.ts";
+import { mayHaveSeveralAgents } from "../../model/agent-call-graph-layout.ts";
 import { useAgentCallGraph } from "./use-agent-call-graph.ts";
 
 export interface AgentsTab {
@@ -16,6 +16,7 @@ export interface AgentsTab {
 /**
  * Whether the Agents tab shows, from the span tree's agent names and A2A marks.
  * The graph loads only once the tab opens; a read-only trace never shows the tab.
+ * Once offered the tab stays, even when the graph comes back with one agent.
  */
 export function useAgentsTab({
   spanTree,
@@ -33,7 +34,7 @@ export function useAgentsTab({
   const isSettled =
     !isReady || graph !== undefined || isGraphError || (!isSpanTreeLoading && !maySeveral);
   return {
-    showsAgents: isReady && (graph ? hasMultipleAgents({ graph }) : maySeveral),
+    showsAgents: isReady && maySeveral,
     isSettled,
     graph,
     isGraphError,

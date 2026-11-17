@@ -68,6 +68,7 @@ const spanSummaryRowSchema = z.looseObject({
   UpdatedAtMs: numeric,
   StatusCode: numeric.nullable(),
   AgentAttributes: chStringMap.optional(),
+  AgentSpanKind: numeric.optional(),
   TenantId: chString.optional(),
 });
 
@@ -544,7 +545,11 @@ export class ClickHouseTraceSpanRepository extends TraceProjectedReadRepository 
       cacheCreationTokens: ClickHouseTraceSpanRepository.numberOrNull(row.CacheCreationTokens),
       updatedAtMs: Number(row.UpdatedAtMs),
       costInput: ClickHouseTraceSpanRepository.costInputOf(row),
-      ...spanTreeAgentMarksOf({ name: row.SpanName, attributes: row.AgentAttributes ?? {} }),
+      ...spanTreeAgentMarksOf({
+        name: row.SpanName,
+        attributes: row.AgentAttributes ?? {},
+        kind: row.AgentSpanKind ?? null,
+      }),
       ...braidedOwnerOf({ authorization, tenantId: row.TenantId }),
     };
   }

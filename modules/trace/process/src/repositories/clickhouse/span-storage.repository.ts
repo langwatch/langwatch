@@ -549,6 +549,7 @@ const spanSummaryQueryRowSchema = z.looseObject({
   CustomCacheCreation1hRate: chString,
   LwSpanCost: chString,
   AgentAttributes: chStringMap.optional(),
+  AgentSpanKind: chNumber.optional(),
   StartTimeMs: chNumber,
   UpdatedAtMs: chNumber,
 });
@@ -2085,7 +2086,11 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
       cacheCreationTokens,
       startTimeMs: Number(row.StartTimeMs),
       updatedAtMs: Number(row.UpdatedAtMs),
-      ...spanTreeAgentMarksOf({ name: row.SpanName, attributes: row.AgentAttributes ?? {} }),
+      ...spanTreeAgentMarksOf({
+        name: row.SpanName,
+        attributes: row.AgentAttributes ?? {},
+        kind: row.AgentSpanKind ?? null,
+      }),
     };
   }
 }

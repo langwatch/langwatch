@@ -92,4 +92,17 @@ describe("useAgentsTab", () => {
     expect(result.current.showsAgents).toBe(true);
     expect(result.current.isGraphError).toBe(true);
   });
+
+  /** @scenario "The Agents tab stays when the graph finds one agent" */
+  it("keeps the tab once the graph loads with one node", () => {
+    const a2aOnly = [{ spanId: "a", agentName: null, isA2aCall: true }] as SpanTreeNode[];
+    const { result, rerender } = renderHook(() =>
+      useAgentsTab({ spanTree: a2aOnly, isSpanTreeLoading: false, isAgentsTabOpen: true }),
+    );
+    expect(result.current.showsAgents).toBe(true);
+    queryState.data = { nodes: [{ id: "service:svc" }], edges: [], a2aSpans: [] };
+    rerender();
+    expect(result.current.showsAgents).toBe(true);
+    expect(result.current.isSettled).toBe(true);
+  });
 });
