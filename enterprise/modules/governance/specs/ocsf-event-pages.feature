@@ -45,6 +45,12 @@ Feature: governance_ocsf_events pages cost the page
       Then ClickHouse reads less than half the payload bytes the tenant stores
 
     @integration
+    Scenario: A SIEM export page bounded by until fills from events whose newest version is before it
+      Given a tenant holds an event rewritten to a time after until, between two events before it
+      When a SIEM client reads a page of two with until set
+      Then the page holds the two events before until
+
+    @integration
     Scenario: A rewritten event is exported once, at its newest version, across pages
       Given an OCSF event was written twice, the second time with a new payload
       When a SIEM client pages through the whole export
