@@ -223,7 +223,7 @@ func (s *Service) admit(ctx context.Context, h [64]byte, in served) (*domain.Bun
 	}
 	if s.failClosedAfter > 0 && s.feedSilent(b.OrganizationID) &&
 		time.Since(authStart) > s.failClosedAfter {
-		s.countRefusal(b.VirtualKeyID, "fail_closed")
+		// Resolve counts this refusal once the key re-check has had its say.
 		return nil, herr.New(ctx, domain.ErrAuthUpstream, herr.M{
 			"message": "control plane unreachable and this gateway refuses keys it cannot re-check; retry shortly",
 		}).WithRetryable(true)
@@ -244,6 +244,65 @@ func (s *Service) claimReconfirm(h [64]byte) bool {
 		return false
 	}
 	return e.reconfirmAt.CompareAndSwap(last, now)
+}
+
+// reconfirm is the key re-check fail closed makes. A rejection evicts both
+// cached copies; a config fetch that fails after the key checked out keeps
+// the cached config and its deadlines, with the fresh key check stamped.
+func (s *Service) reconfirm(ctx context.Context, key domain.PresentedKey, h [64]byte) (served, error) {
+	start := time.Now()
+	bundle, err := s.resolver.ResolveKey(ctx, key)
+	if err != nil {
+		if classifyRefreshError(err) == classAuthRejection {
+			s.dropRejected(h, err)
+		}
+		return served{}, err
+	}
+	etag, cfgErr := s.populateConfig(ctx, bundle)
+	if cfgErr == nil {
+		s.publishL1(h, s.newEntry(bundle, etag).authFrom(start))
+		return served{bundle: bundle, authStart: start}, nil
+	}
+	if classifyRefreshError(cfgErr) == classAuthRejection {
+		s.dropRejected(h, cfgErr)
+		return served{}, cfgErr
+	}
+	if e, ok := s.l1.Peek(h); ok && !bundle.KeyExpired(start) {
+		return s.keepCachedConfig(h, e, served{bundle: bundle, authStart: start}), nil
+	}
+	return served{}, errConfigUnavailable(ctx, cfgErr)
+}
+
+// keepCachedConfig re-stores e with the fresh key answer and e's config,
+// never past e's own deadlines.
+func (s *Service) keepCachedConfig(h [64]byte, e *entry, check served) served {
+	fresh, start := check.bundle, check.authStart
+	e.mu.Lock()
+	merged := *fresh
+	merged.Config, merged.Credentials = e.bundle.Config, e.bundle.Credentials
+	soft, hard := entryDeadlines(&merged, s.hardGrace)
+	if e.softExpiresAt.Before(soft) {
+		soft = e.softExpiresAt
+	}
+	if e.hardExpiresAt.Before(hard) {
+		hard = e.hardExpiresAt
+	}
+	kept := &entry{
+		bundle: &merged, softExpiresAt: soft, hardExpiresAt: hard,
+		configFetchedAt: e.configFetchedAt, configConfirmedAt: e.configConfirmedAt,
+		configETag: e.configETag, budgetRollAckedFor: e.budgetRollAckedFor,
+		budgetChanges: e.budgetChanges, authStartedAt: start,
+	}
+	e.mu.Unlock()
+	s.publishL1(h, kept)
+	return served{bundle: &merged, authStart: start}
+}
+
+// dropRejected evicts both cached copies of a key the control plane refused.
+func (s *Service) dropRejected(h [64]byte, err error) {
+	s.l1.Remove(h)
+	s.lastKnown.Remove(h)
+	s.logger.Error("auth_cache_hard_evict", zap.String("reason", "reconfirm_rejection"), zap.Error(err))
 }
 
 // FailClosedReconfirmInterval bounds the re-checks fail closed makes per key.

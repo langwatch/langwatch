@@ -27,6 +27,7 @@ type hookResolver struct {
 	err    error
 	during func()
 	calls  int
+	cfgErr error
 }
 
 func (r *hookResolver) ResolveKey(_ context.Context, _ domain.PresentedKey) (*domain.Bundle, error) {
@@ -39,7 +40,7 @@ func (r *hookResolver) ResolveKey(_ context.Context, _ domain.PresentedKey) (*do
 }
 
 func (r *hookResolver) FetchConfig(_ context.Context, _, _ string) (domain.ConfigFetchResult, error) {
-	return domain.ConfigFetchResult{}, nil
+	return domain.ConfigFetchResult{}, r.cfgErr
 }
 
 // @scenario "a revoked key is refused while the control plane is down"
@@ -440,5 +441,56 @@ func TestRevocation_FailClosedCoversKeyWithoutOrganization(t *testing.T) {
 
 	if _, err := svc.Resolve(context.Background(), key); !errors.Is(err, domain.ErrAuthUpstream) {
 		t.Fatalf("a key with no change feed past the limit must be refused, got %v", err)
+	}
+}
+
+// staleKeyCheck marks key's cached entry and its org feed as older than the
+// fail-closed limit.
+func staleKeyCheck(t *testing.T, svc *Service, key domain.PresentedKey, vkID string) {
+	t.Helper()
+	svc.publishL1(hashKey(key), svc.newEntry(orgBundle(vkID, time.Now().Add(time.Hour)), "").authFrom(time.Now().Add(-2*time.Minute)))
+	cur, _ := svc.activeOrgs.Load("org_1")
+	cursor, _ := cur.(*orgCursor)
+	cursor.polledAt.Store(time.Now().Add(-2 * time.Minute).UnixNano())
+}
+
+// @scenario "fail closed keeps the cached config when only the config fetch fails"
+func TestRevocation_FailClosedRecheckKeepsCachedConfig(t *testing.T) {
+	res := &hookResolver{bundle: orgBundle("vk_cfg", time.Now().Add(time.Hour)), cfgErr: errControlPlaneDown}
+	m := newRevocationMetrics()
+	svc, _ := newService(t, Options{Resolver: res, ConfigFetcher: res, Metrics: m, FailClosedAfter: time.Minute})
+	key := domain.PresentedKey{Token: "vk-lw-cfg"}
+	staleKeyCheck(t, svc, key, "vk_cfg")
+	before, _ := svc.l1.Peek(hashKey(key))
+
+	if _, err := svc.Resolve(context.Background(), key); err != nil {
+		t.Fatalf("a key the control plane just confirmed must serve its cached config: %v", err)
+	}
+	if m.refusals["fail_closed"] != 0 {
+		t.Fatalf("a served request is no refusal, got %v", m.refusals)
+	}
+	after, ok := svc.l1.Peek(hashKey(key))
+	if !ok || after.hardExpiresAt.After(before.hardExpiresAt) || time.Since(after.authStart()) > time.Minute {
+		t.Fatalf("want the cached entry kept within its deadlines with a fresh key check")
+	}
+}
+
+// @scenario "fail closed evicts a key its re-check rejects"
+func TestRevocation_FailClosedRecheckRejectionEvicts(t *testing.T) {
+	res := &hookResolver{}
+	svc, _ := newService(t, Options{Resolver: res, ConfigFetcher: res, FailClosedAfter: time.Minute})
+	res.err = herr.New(context.Background(), domain.ErrKeyRevoked, nil)
+	key := domain.PresentedKey{Token: "vk-lw-rejected"}
+	staleKeyCheck(t, svc, key, "vk_rejected")
+	svc.lastKnown.Add(hashKey(key), svc.newEntry(orgBundle("vk_rejected", time.Now().Add(time.Hour)), ""))
+
+	if _, err := svc.Resolve(context.Background(), key); !errors.Is(err, domain.ErrKeyRevoked) {
+		t.Fatalf("want virtual_key_revoked, got %v", err)
+	}
+	if _, ok := svc.l1.Peek(hashKey(key)); ok {
+		t.Fatal("a rejected key must leave L1")
+	}
+	if _, ok := svc.lastKnown.Peek(hashKey(key)); ok {
+		t.Fatal("a rejected key must leave the last-known store")
 	}
 }

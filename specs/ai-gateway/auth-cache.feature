@@ -438,6 +438,21 @@ Feature: Gateway auth cache — hot path is zero RTT after first hit
       Then the gateway makes one key check and refuses them all
 
     @unit
+    Scenario: fail closed keeps the cached config when only the config fetch fails
+      Given fail closed is on and a cached key whose last key check is older than the limit
+      And the control plane confirms the key but its config fetch fails
+      When a request arrives
+      Then the request is served with the cached config
+      And no fail closed refusal is counted
+
+    @unit
+    Scenario: fail closed evicts a key its re-check rejects
+      Given fail closed is on and a cached key whose last key check is older than the limit
+      When the re-check answers that the key is revoked
+      Then the request is refused as revoked
+      And neither the cache nor the last-known store holds the key
+
+    @unit
     Scenario: fail closed covers a key with no organization
       Given fail closed is on and the control plane is down
       And a cached key with no organization and no change feed

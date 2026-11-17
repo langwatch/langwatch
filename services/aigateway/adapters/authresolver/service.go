@@ -670,12 +670,15 @@ func (s *Service) Resolve(ctx context.Context, key domain.PresentedKey) (*domain
 	}
 	bundle, err := s.admit(ctx, h, answer)
 	if errors.Is(err, domain.ErrAuthUpstream) && s.claimReconfirm(h) {
-		if fresh, ferr := s.resolveFresh(ctx, key, h); ferr == nil {
+		if fresh, ferr := s.reconfirm(ctx, key, h); ferr == nil {
 			answer = fresh
 			bundle, err = s.admit(ctx, h, answer)
 		} else if classifyRefreshError(ferr) != classTransportFailure {
 			return nil, ferr
 		}
+	}
+	if errors.Is(err, domain.ErrAuthUpstream) {
+		s.countRefusal(answer.bundle.VirtualKeyID, "fail_closed")
 	}
 	if err != nil {
 		return nil, err
