@@ -228,6 +228,39 @@ describe("ScenarioProcessorService", () => {
       expect(lines.findLine("error", "Could not record the red team run's report")).toBeUndefined();
     });
 
+    /** @scenario "A broke red team run whose report cannot be written still records the break" */
+    it("writes the break without its turn scores after the full report is refused 3 times", async () => {
+      const fixture = processorFixture();
+      const recordRedTeamReport = vi
+        .fn()
+        .mockRejectedValueOnce(new Error("payload refused"))
+        .mockRejectedValueOnce(new Error("payload refused"))
+        .mockRejectedValueOnce(new Error("payload refused"))
+        .mockResolvedValue(undefined);
+      fixture.execution.recordRedTeamReport = recordRedTeamReport;
+      const { logger, lines } = createTestLogger();
+
+      await expect(
+        fixture.processor.handleSucceeded({
+          jobData: job("run-1"),
+          result: { success: true, redTeam: report },
+          jobLogger: logger,
+        }),
+      ).resolves.toBeUndefined();
+
+      expect(recordRedTeamReport).toHaveBeenCalledTimes(4);
+      expect(recordRedTeamReport).toHaveBeenLastCalledWith({
+        projectId: "project-1",
+        scenarioRunId: "run-1",
+        report: { ...report, turnScores: [] },
+      });
+      expect(
+        lines.findLine("warn", "Recorded the red team break without its turn scores"),
+      ).toMatchObject({
+        scenarioRunId: "run-1",
+      });
+    });
+
     /** @scenario "A red team report that cannot be written is logged and never fails the job" */
     it("logs an error after every attempt is refused and never fails the job", async () => {
       const fixture = processorFixture();
@@ -243,11 +276,14 @@ describe("ScenarioProcessorService", () => {
         }),
       ).resolves.toBeUndefined();
 
-      expect(recordRedTeamReport).toHaveBeenCalledTimes(3);
+      expect(recordRedTeamReport).toHaveBeenCalledTimes(6);
       expect(lines.findLine("error", "Could not record the red team run's report")).toMatchObject({
         scenarioRunId: "run-1",
         attempts: 3,
       });
+      expect(
+        lines.findLine("error", "Could not record the red team break: the run may read as passed"),
+      ).toMatchObject({ scenarioRunId: "run-1" });
     });
   });
 

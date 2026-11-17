@@ -141,6 +141,21 @@ describe("simulationRunStateFoldProjection red team report", () => {
       expect(state.Verdict).toBe("failure");
     });
 
+    /** @scenario "A broke red team run whose report cannot be written still records the break" */
+    it("shows the run as failed when only the break without turn scores was recorded", () => {
+      const outcomeOnly: SimulationRunRedTeamReportRecordedEvent = {
+        ...recorded,
+        data: {
+          scenarioRunId: RUN_ID,
+          report: { ...report, brokeAtTurn: 9, turnsUsed: 9, turnScores: [] },
+        },
+      };
+      const state = fold([queued, passed, outcomeOnly]);
+      expect(state.Status).toBe("FAILED");
+      expect(state.Verdict).toBe("failure");
+      expect(JSON.parse(state.Metadata ?? "null").redTeam.brokeAtTurn).toBe(9);
+    });
+
     it("keeps a passed verdict when the agent held", () => {
       const held: SimulationRunRedTeamReportRecordedEvent = {
         ...recorded,

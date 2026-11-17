@@ -114,8 +114,18 @@ Feature: A red team scenario runs an attacker against the agent
     Given a red team run whose child returned a report
     And every record write is refused
     When the job finishes
-    Then the write was tried 3 times
-    And an error names the run
+    Then the full report was tried 3 times
+    And the break without its turn scores was tried 3 times
+    And an error says the run may read as passed
+    And the job does not fail
+
+  @unit
+  Scenario: A broke red team run whose report cannot be written still records the break
+    Given a red team run the attacker broke on turn 9 and the judge passed
+    And the full report write is refused 3 times
+    When the job finishes
+    Then the break is recorded without its turn scores
+    And the run shows as failed, not passed
     And the job does not fail
 
   @unit

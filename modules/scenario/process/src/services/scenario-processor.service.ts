@@ -472,31 +472,65 @@ export class ScenarioProcessorService implements ScenarioExecutionRunner {
     }
   }
 
-  /** The report is the only record of a break, so its write is retried before it is given up. */
+  /**
+   * The report is the only record of a break. When the full report cannot be written, a broke
+   * outcome is written again without its turn scores, so the run still folds to FAILED.
+   */
   private async recordRedTeamReportWithRetry(input: {
     projectId: string;
     scenarioRunId: string;
     report: NonNullable<ScenarioExecutionResult["redTeam"]>;
     jobLogger: Logger;
   }): Promise<void> {
-    const { jobLogger, ...record } = input;
+    const { jobLogger, report, ...run } = input;
+    const full = await this.writeRedTeamReport({ ...run, report });
+    if (full.isWritten) return;
+    jobLogger.error(
+      {
+        err: full.error,
+        scenarioRunId: run.scenarioRunId,
+        attempts: RED_TEAM_REPORT_WRITE_ATTEMPTS,
+      },
+      "Could not record the red team run's report",
+    );
+    if (report.outcome !== "broke") return;
+    const outcomeOnly = await this.writeRedTeamReport({
+      ...run,
+      report: { ...report, turnScores: [] },
+    });
+    if (outcomeOnly.isWritten) {
+      jobLogger.warn(
+        { scenarioRunId: run.scenarioRunId },
+        "Recorded the red team break without its turn scores",
+      );
+      return;
+    }
+    jobLogger.error(
+      { err: outcomeOnly.error, scenarioRunId: run.scenarioRunId },
+      "Could not record the red team break: the run may read as passed",
+    );
+  }
+
+  private async writeRedTeamReport(input: {
+    projectId: string;
+    scenarioRunId: string;
+    report: NonNullable<ScenarioExecutionResult["redTeam"]>;
+  }): Promise<{ isWritten: true } | { isWritten: false; error: unknown }> {
+    let lastError: unknown;
     for (let attempt = 1; attempt <= RED_TEAM_REPORT_WRITE_ATTEMPTS; attempt++) {
       try {
-        await this.options.execution.recordRedTeamReport(record);
-        return;
+        await this.options.execution.recordRedTeamReport(input);
+        return { isWritten: true };
       } catch (error) {
-        if (attempt === RED_TEAM_REPORT_WRITE_ATTEMPTS) {
-          jobLogger.error(
-            { err: error, scenarioRunId: record.scenarioRunId, attempts: attempt },
-            "Could not record the red team run's report",
+        lastError = error;
+        if (attempt < RED_TEAM_REPORT_WRITE_ATTEMPTS) {
+          await new Promise((resolve) =>
+            setTimeout(resolve, RED_TEAM_REPORT_RETRY_DELAY_MS * attempt),
           );
-          return;
         }
-        await new Promise((resolve) =>
-          setTimeout(resolve, RED_TEAM_REPORT_RETRY_DELAY_MS * attempt),
-        );
       }
     }
+    return { isWritten: false, error: lastError };
   }
 
   private async handleCancelled(
