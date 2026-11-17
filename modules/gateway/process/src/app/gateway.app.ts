@@ -871,7 +871,10 @@ function gatewayControlPlane(options: GatewayControlPlaneOptions): GatewayContro
   return {
     virtualKeys,
     budgetDecisions,
-    a2aTargets: GatewayA2aTargetService.create(repositories.a2aTargets),
+    a2aTargets: GatewayA2aTargetService.create({
+      repository: repositories.a2aTargets,
+      changeEvents: changes,
+    }),
     budgetSpend,
     changeEvents: changes,
     principalSpend,

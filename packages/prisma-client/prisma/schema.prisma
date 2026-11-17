@@ -5554,6 +5554,9 @@ enum GatewayChangeEventKind {
   CACHE_RULE_DELETED
   ROUTING_POLICY_UPDATED
   ROUTING_POLICY_DELETED
+  A2A_TARGET_CREATED
+  A2A_TARGET_UPDATED
+  A2A_TARGET_DELETED
 }
 
 // Gateway audit action codes - kept as a TypeScript const union in
