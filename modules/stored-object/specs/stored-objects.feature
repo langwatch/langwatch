@@ -168,6 +168,20 @@ Feature: Stored Objects service and API
     Then it reports every row unchanged and writes nothing
 
   @unit @migration
+  Scenario: A Stored Objects import copies again a legacy row that changed
+    Given the import already copied a project's row
+    And that row's legacy version changed since
+    When it runs for that project again
+    Then the row store holds the changed version under a new generation
+
+  @unit @migration
+  Scenario: A Stored Objects import leaves a row another writer moved
+    Given a delete moves a project's row after the import read it
+    When the import writes that row
+    Then it reports the row unchanged
+    And the row stays as the delete left it
+
+  @unit @migration
   Scenario: A legacy row stored outside its project fails the Stored Objects import
     Given a legacy row's storage location does not sit under its project
     When the import runs for that project
