@@ -9,17 +9,16 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"net/http"
 	"strings"
 
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/trace"
 
+	"github.com/langwatch/langwatch/pkg/customertracebridge"
 	"github.com/langwatch/langwatch/services/aigateway/domain"
 )
 
@@ -53,6 +52,8 @@ const (
 	attrCallerVK        = "langwatch.a2a.caller.virtual_key_id"
 	attrCallerAgentName = "langwatch.a2a.caller.agent.name"
 	attrDecision        = "langwatch.a2a.decision"
+	// attrProjectID is what the customer trace bridge routes a span by.
+	attrProjectID = "langwatch.project_id"
 )
 
 // CallerAgentHeader optionally names the calling agent for the trace.
@@ -61,32 +62,6 @@ const CallerAgentHeader = "X-LangWatch-Agent-Name"
 // forwardedHeaders are the caller headers that reach the upstream. The
 // caller's Authorization (its virtual key) is never one of them.
 var forwardedHeaders = []string{"Content-Type", "Accept", "A2A-Version", "A2A-Extensions", "X-A2A-Extensions"}
-
-// refusal is one way the proxy says no. Codes sit in the JSON-RPC
-// server-defined range that A2A leaves free.
-type refusal struct {
-	code   int
-	reason string
-	msg    string
-	status int
-}
-
-var (
-	refuseInvalidRequest  = refusal{-32600, "a2a_invalid_request", "the body is not a valid A2A request", http.StatusBadRequest}
-	refuseCallerNotAllow  = refusal{-32010, string(domain.A2ACallerNotAllowed), "this virtual key may not call this A2A agent", http.StatusForbidden}
-	refuseTargetBlocked   = refusal{-32011, string(domain.A2ATargetBlocked), "this A2A agent is blocked", http.StatusForbidden}
-	refuseContentBlocked  = refusal{-32012, "a2a_content_blocked", "blocked by a guardrail", http.StatusForbidden}
-	refuseTargetNotFound  = refusal{-32013, "a2a_target_not_found", "no such A2A agent in this project", http.StatusNotFound}
-	refuseScanUnavailable = refusal{-32014, "a2a_scan_unavailable", "the content scan could not complete", http.StatusServiceUnavailable}
-	refuseUpstream        = refusal{-32015, "a2a_upstream_unreachable", "the A2A agent did not answer", http.StatusBadGateway}
-	refuseUnauthenticated = refusal{-32016, "a2a_unauthenticated", "no virtual key on the request", http.StatusUnauthorized}
-	refuseRegistry        = refusal{-32017, "a2a_registry_unavailable", "the A2A registry is unavailable", http.StatusServiceUnavailable}
-)
-
-func (r refusal) withMessage(msg string) refusal {
-	r.msg = msg
-	return r
-}
 
 // Registry finds the target a caller asked for within the caller's project.
 type Registry interface {
@@ -100,9 +75,10 @@ type Config struct {
 	Scanner Scanner
 	// Bundle reads the authenticated caller from the request context.
 	Bundle func(context.Context) *domain.Bundle
-	// Client calls the upstream. Nil uses http.DefaultClient.
+	// Client calls the upstream. Nil uses NewUpstreamClient(true).
 	Client *http.Client
-	// Tracer records the hop. Nil uses the global tracer provider.
+	// Tracer records the hop: the customer trace bridge's tracer, so the span
+	// lands in the caller's project. Nil uses the global tracer provider.
 	Tracer trace.Tracer
 }
 
@@ -117,7 +93,7 @@ func New(cfg Config) *Handler {
 		cfg.Scanner = NoopScanner{}
 	}
 	if cfg.Client == nil {
-		cfg.Client = http.DefaultClient
+		cfg.Client = NewUpstreamClient(true)
 	}
 	if cfg.Tracer == nil {
 		cfg.Tracer = otel.Tracer("github.com/langwatch/langwatch/services/aigateway/adapters/a2aproxy")
@@ -127,12 +103,13 @@ func New(cfg Config) *Handler {
 
 // call is one proxied request as it moves through the stages.
 type call struct {
-	w       http.ResponseWriter
-	r       *http.Request
-	ctx     context.Context
-	span    trace.Span
-	bundle  *domain.Bundle
-	name    string
+	w      http.ResponseWriter
+	r      *http.Request
+	ctx    context.Context
+	span   trace.Span
+	bundle *domain.Bundle
+	name   string
+	// rest is the path after the target, escaped as the caller sent it.
 	rest    string
 	binding string
 	method  string
@@ -145,12 +122,17 @@ type call struct {
 
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	c, bad := parseCall(w, r)
+	c.bundle = h.cfg.Bundle(c.ctx)
+	if c.bundle == nil {
+		c.refuse(refuseUnauthenticated)
+		return
+	}
 	ctx, span := h.cfg.Tracer.Start(spanParent(c), "invoke_agent "+c.name,
 		trace.WithSpanKind(trace.SpanKindClient), trace.WithAttributes(spanAttrs(c)...))
 	defer span.End()
 	c.ctx, c.span = ctx, span
-	if bad {
-		c.refuse(refuseInvalidRequest)
+	if bad != nil {
+		c.refuse(*bad)
 		return
 	}
 	target, ok := h.admit(c)
@@ -164,45 +146,69 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	h.forward(c, target)
 }
 
-// parseCall reads the target, binding, method and body. It reports true when
-// the request cannot be read as A2A.
-func parseCall(w http.ResponseWriter, r *http.Request) (*call, bool) {
-	name, rest, _ := strings.Cut(strings.TrimPrefix(r.URL.Path, PathPrefix), "/")
-	if rest != "" {
-		rest = "/" + rest
-	}
-	c := &call{w: w, r: r, ctx: r.Context(), name: name, rest: rest, binding: bindingHTTPJSON}
-	c.isCard = rest == cardPath && r.Method == http.MethodGet
-	c.method = restMethod(r.Method, rest)
-	if (rest == "" || rest == "/") && r.Method == http.MethodPost {
+// parseCall reads the target, binding, method and body. It returns the
+// refusal for a request that cannot be read as A2A.
+func parseCall(w http.ResponseWriter, r *http.Request) (*call, *refusal) {
+	c := &call{w: w, r: r, ctx: r.Context(), binding: bindingHTTPJSON, span: trace.SpanFromContext(context.Background())}
+	name, rest, decoded, pathErr := splitPath(r)
+	c.name, c.rest = name, rest
+	c.isCard = decoded == cardPath && r.Method == http.MethodGet
+	c.method = restMethod(r.Method, decoded)
+	if (decoded == "" || decoded == "/") && r.Method == http.MethodPost {
 		c.binding = bindingJSONRPC
 	}
-	body, err := io.ReadAll(io.LimitReader(r.Body, maxBodyBytes))
+	if pathErr != nil {
+		return c, &refuseInvalidRequest
+	}
+	body, tooLarge, err := readLimited(r.Body)
 	c.body = body
+	if tooLarge {
+		return c, &refuseTooLarge
+	}
 	if err != nil {
-		return c, true
+		return c, &refuseInvalidRequest
 	}
 	if c.binding != bindingJSONRPC {
-		return c, false
+		return c, nil
 	}
 	var env struct {
 		ID     json.RawMessage `json:"id"`
 		Method string          `json:"method"`
 	}
 	if json.Unmarshal(body, &env) != nil {
-		return c, true
+		return c, &refuseInvalidRequest
 	}
 	c.id, c.method = env.ID, env.Method
-	return c, false
+	return c, nil
 }
 
-// spanParent is the caller's trace: the gateway middleware's span, or the
-// request's traceparent when no span is on the context.
-func spanParent(c *call) context.Context {
-	if trace.SpanContextFromContext(c.ctx).IsValid() {
-		return c.ctx
+// readLimited reads at most maxBodyBytes. A body over the limit is reported,
+// never returned cut, so a truncated payload is neither scanned nor relayed.
+func readLimited(r io.Reader) (body []byte, tooLarge bool, err error) {
+	if r == nil {
+		return nil, false, nil
 	}
-	return propagation.TraceContext{}.Extract(c.ctx, propagation.HeaderCarrier(c.r.Header))
+	body, err = io.ReadAll(io.LimitReader(r, maxBodyBytes+1))
+	if len(body) > maxBodyBytes {
+		return nil, true, nil
+	}
+	return body, false, err
+}
+
+// spanParent is the caller's trace: the traceparent the customer trace
+// middleware kept, or the request's own header. A gateway-internal span on
+// the context is never the parent, so the hop's trace is the caller's alone.
+func spanParent(c *call) context.Context {
+	tp := customertracebridge.TraceParent(c.ctx)
+	if tp == "" {
+		tp = c.r.Header.Get("Traceparent")
+	}
+	carrier := propagation.MapCarrier{"traceparent": tp}
+	sc := trace.SpanContextFromContext(propagation.TraceContext{}.Extract(context.Background(), carrier))
+	if sc.IsValid() {
+		return trace.ContextWithRemoteSpanContext(c.ctx, sc)
+	}
+	return trace.ContextWithSpanContext(c.ctx, trace.SpanContext{})
 }
 
 func spanAttrs(c *call) []attribute.KeyValue {
@@ -211,6 +217,10 @@ func spanAttrs(c *call) []attribute.KeyValue {
 		attribute.String(attrBinding, c.binding),
 		attribute.String(attrMethod, c.method),
 		attribute.String(attrTarget, c.name),
+		attribute.String(attrCallerVK, c.bundle.VirtualKeyID),
+	}
+	if pid := c.bundle.Config.TraceProjectID; pid != "" {
+		attrs = append(attrs, attribute.String(attrProjectID, pid))
 	}
 	if caller := c.r.Header.Get(CallerAgentHeader); caller != "" {
 		attrs = append(attrs, attribute.String(attrCallerAgentName, caller))
@@ -220,12 +230,6 @@ func spanAttrs(c *call) []attribute.KeyValue {
 
 // admit finds the target and applies its block switch and allow list.
 func (h *Handler) admit(c *call) (domain.A2ATarget, bool) {
-	c.bundle = h.cfg.Bundle(c.ctx)
-	if c.bundle == nil {
-		c.refuse(refuseUnauthenticated)
-		return domain.A2ATarget{}, false
-	}
-	c.span.SetAttributes(attribute.String(attrCallerVK, c.bundle.VirtualKeyID))
 	target, err := h.cfg.Registry.Lookup(c.ctx, c.bundle, c.name)
 	if errors.Is(err, domain.ErrA2ATargetNotFound) {
 		c.refuse(refuseTargetNotFound)
@@ -266,7 +270,7 @@ func (h *Handler) forward(c *call, target domain.A2ATarget) {
 	}
 	resp, err := h.cfg.Client.Do(req)
 	if err != nil {
-		c.refuse(refuseUpstream)
+		c.refuse(upstreamRefusal(err))
 		return
 	}
 	defer func() { _ = resp.Body.Close() }()
@@ -275,7 +279,11 @@ func (h *Handler) forward(c *call, target domain.A2ATarget) {
 		h.stream(c, resp)
 		return
 	}
-	respBody, err := io.ReadAll(io.LimitReader(resp.Body, maxBodyBytes))
+	respBody, tooLarge, err := readLimited(resp.Body)
+	if tooLarge {
+		c.refuse(refuseReplyTooLarge)
+		return
+	}
 	if err != nil {
 		c.refuse(refuseUpstream.withMessage("the A2A agent reply was cut off"))
 		return
@@ -287,6 +295,18 @@ func (h *Handler) forward(c *call, target domain.A2ATarget) {
 	copyHeader(c.w.Header(), resp.Header)
 	c.w.WriteHeader(resp.StatusCode)
 	_, _ = c.w.Write(respBody)
+}
+
+// upstreamRefusal names why the upstream call failed when the cause is the
+// proxy's own egress policy.
+func upstreamRefusal(err error) refusal {
+	switch {
+	case errors.Is(err, errRedirectRefused):
+		return refuseUpstream.withMessage(errRedirectRefused.Error())
+	case errors.Is(err, errAddressBlocked):
+		return refuseUpstream.withMessage(errAddressBlocked.Error())
+	}
+	return refuseUpstream
 }
 
 func newUpstreamRequest(c *call, target domain.A2ATarget) (*http.Request, error) {
@@ -310,23 +330,26 @@ func newUpstreamRequest(c *call, target domain.A2ATarget) (*http.Request, error)
 	return req, nil
 }
 
-// check runs the scanner and returns the refusal a deny verdict, or an error
-// the key does not allow to fail open, calls for.
-func (h *Handler) check(c *call, dir Direction, texts []string) *refusal {
-	if len(texts) == 0 {
+// check returns the refusal the payload calls for. When the key scans this
+// direction, a payload that is not JSON is refused (fail closed): text the
+// scanner cannot read is text it did not check. A scan error follows the
+// key's fail-open setting; a deny verdict refuses.
+func (h *Handler) check(c *call, dir Direction, p payload) *refusal {
+	if !h.cfg.Scanner.Applies(c.bundle, dir) {
 		return nil
 	}
-	verdict, err := h.cfg.Scanner.Scan(c.ctx, ScanInput{Bundle: c.bundle, Direction: dir, Texts: texts})
-	if err != nil {
-		failOpen := c.bundle.Config.Guardrails.RequestFailOpen
+	if !p.parsed {
 		if dir == DirectionResponse {
-			failOpen = c.bundle.Config.Guardrails.ResponseFailOpen
+			return &refuseReplyUnscannable
 		}
-		if failOpen {
-			c.span.SetAttributes(attribute.Bool("langwatch.a2a.scan.failed_open", true))
-			return nil
-		}
-		return &refuseScanUnavailable
+		return &refuseUnscannable
+	}
+	if len(p.texts) == 0 {
+		return nil
+	}
+	verdict, err := h.cfg.Scanner.Scan(c.ctx, ScanInput{Bundle: c.bundle, Direction: dir, Texts: p.texts})
+	if err != nil {
+		return h.scanFailed(c, dir)
 	}
 	if verdict.Action != domain.GuardrailBlock {
 		return nil
@@ -338,106 +361,24 @@ func (h *Handler) check(c *call, dir Direction, texts []string) *refusal {
 	return &r
 }
 
+// scanFailed applies the key's fail-open setting for that direction.
+func (h *Handler) scanFailed(c *call, dir Direction) *refusal {
+	failOpen := c.bundle.Config.Guardrails.RequestFailOpen
+	if dir == DirectionResponse {
+		failOpen = c.bundle.Config.Guardrails.ResponseFailOpen
+	}
+	if !failOpen {
+		return &refuseScanUnavailable
+	}
+	c.span.SetAttributes(attribute.Bool("langwatch.a2a.scan.failed_open", true))
+	return nil
+}
+
 // scan refuses the call when check says so and reports whether it may go on.
-func (h *Handler) scan(c *call, dir Direction, texts []string) bool {
-	if r := h.check(c, dir, texts); r != nil {
+func (h *Handler) scan(c *call, dir Direction, p payload) bool {
+	if r := h.check(c, dir, p); r != nil {
 		c.refuse(*r)
 		return false
 	}
 	return true
-}
-
-// stream forwards an SSE reply event by event. An event that fails the scan
-// is replaced by one error event and the stream ends.
-func (h *Handler) stream(c *call, resp *http.Response) {
-	copyHeader(c.w.Header(), resp.Header)
-	c.w.WriteHeader(resp.StatusCode)
-	flusher, _ := c.w.(http.Flusher)
-	err := readEvents(resp.Body, func(event []byte) bool {
-		data := eventData(event)
-		setResultAttrs(c.span, data)
-		if r := h.check(c, DirectionResponse, collectTexts(data)); r != nil {
-			c.markRefused(*r)
-			event = []byte("data: " + string(c.errorBody(*r)) + "\n\n")
-		}
-		_, _ = c.w.Write(event)
-		if flusher != nil {
-			flusher.Flush()
-		}
-		return c.refusedReason == ""
-	})
-	if err != nil {
-		c.span.RecordError(err)
-	}
-}
-
-func (c *call) markRefused(r refusal) {
-	c.span.SetAttributes(attribute.String(attrDecision, r.reason))
-	c.span.SetStatus(codes.Error, r.msg)
-	c.refusedReason = r.reason
-}
-
-// refuse answers in the binding's error shape: a JSON-RPC error object with
-// HTTP 200 for JSON-RPC, the HTTP status for HTTP+JSON.
-func (c *call) refuse(r refusal) {
-	c.markRefused(r)
-	c.w.Header().Set("Content-Type", "application/json")
-	if c.binding == bindingJSONRPC {
-		c.w.WriteHeader(http.StatusOK)
-	} else {
-		c.w.WriteHeader(r.status)
-	}
-	_, _ = c.w.Write(c.errorBody(r))
-}
-
-func (c *call) errorBody(r refusal) []byte {
-	var out any
-	if c.binding == bindingJSONRPC {
-		id := c.id
-		if len(id) == 0 {
-			id = json.RawMessage("null")
-		}
-		out = map[string]any{
-			"jsonrpc": "2.0",
-			"id":      id,
-			"error":   map[string]any{"code": r.code, "message": r.msg, "data": map[string]any{"reason": r.reason}},
-		}
-	} else {
-		out = map[string]any{"error": map[string]any{
-			"code": r.status, "status": http.StatusText(r.status), "message": r.msg, "reason": r.reason,
-		}}
-	}
-	b, _ := json.Marshal(out)
-	return b
-}
-
-// restMethod maps an HTTP+JSON path to its A2A method name.
-func restMethod(httpMethod, rest string) string {
-	switch {
-	case rest == cardPath:
-		return "GetAgentCard"
-	case rest == "/message:send":
-		return "SendMessage"
-	case rest == "/message:stream":
-		return "SendStreamingMessage"
-	case strings.HasPrefix(rest, "/tasks/") && strings.HasSuffix(rest, ":cancel"):
-		return "CancelTask"
-	case strings.HasPrefix(rest, "/tasks/") && strings.HasSuffix(rest, ":subscribe"):
-		return "SubscribeToTask"
-	case strings.HasPrefix(rest, "/tasks/") && httpMethod == http.MethodGet:
-		return "GetTask"
-	case rest == "/tasks" && httpMethod == http.MethodGet:
-		return "ListTasks"
-	}
-	return fmt.Sprintf("%s %s", httpMethod, rest)
-}
-
-func copyHeader(dst, src http.Header) {
-	for k, vs := range src {
-		switch http.CanonicalHeaderKey(k) {
-		case "Content-Length", "Connection", "Transfer-Encoding":
-			continue
-		}
-		dst[k] = append([]string(nil), vs...)
-	}
 }

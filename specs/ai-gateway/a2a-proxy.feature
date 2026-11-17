@@ -105,3 +105,70 @@ Feature: A2A proxy on the gateway
     Then the upstream receives a traceparent with trace id "4bf92f3577b34da6a3ce929d0e0e4736"
     And the gateway records a span "invoke_agent billing" in that trace
     And the span carries "gen_ai.agent.name", "a2a.method", "a2a.protocol.binding" and "langwatch.a2a.caller.virtual_key_id"
+
+  @unit
+  Scenario: the hop's span is routed to the caller's project
+    When the caller sends a call with traceparent "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01"
+    Then the span "invoke_agent billing" carries the caller's trace project as "langwatch.project_id"
+    And its parent is the caller's traceparent, never a gateway-internal span
+
+  @unit
+  Scenario: a request body over the size limit is refused, not cut
+    When the caller sends POST /a2a/billing/message:send with a body over 16 MiB
+    Then the upstream is not called
+    And the caller receives HTTP 413 with reason "a2a_payload_too_large"
+
+  @unit
+  Scenario: a reply over the size limit is refused, not cut
+    When the upstream replies with a body over 16 MiB
+    Then the caller receives HTTP 502 with reason "a2a_payload_too_large"
+
+  @unit
+  Scenario: a path that could leave the upstream base path is refused
+    When the caller sends a path with a dot segment, or an encoded slash, backslash, "?" or "#"
+    Then the upstream is not called
+    And the caller receives HTTP 400 with reason "a2a_invalid_request"
+
+  @unit
+  Scenario: a request the scanner cannot read is refused when the key scans requests
+    Given the caller's key has a request guardrail
+    When the caller sends POST /a2a/billing/message:send with a body that is not JSON
+    Then the upstream is not called
+    And the caller receives HTTP 422 with reason "a2a_content_unscannable"
+
+  @unit
+  Scenario: a reply the scanner cannot read is refused when the key scans replies
+    Given the caller's key has a response guardrail
+    When the upstream replies with text that is not JSON
+    Then the caller receives HTTP 502 with reason "a2a_content_unscannable"
+    And the reply text does not reach the caller
+
+  @unit
+  Scenario: hop-by-hop and cookie headers from the upstream are dropped
+    When the upstream replies with hop-by-hop headers, headers named in Connection and Set-Cookie
+    Then the caller receives none of them
+
+  @unit
+  Scenario: an overlong streamed event ends the stream with an error event
+    When the upstream streams an event over 4 MiB
+    Then the caller receives the events before it
+    And then one error event with reason "a2a_payload_too_large"
+
+  @unit
+  Scenario: a redirect from the upstream is not followed
+    When the upstream answers with a redirect to another host
+    Then the other host is not called and does not receive the target's upstream headers
+    And the caller receives HTTP 502 with reason "a2a_upstream_unreachable"
+
+  @unit
+  Scenario: an upstream on a blocked address is not called
+    Given the gateway blocks local egress
+    When the target's upstream resolves to a loopback, private, link-local or metadata address
+    Then the upstream is not called
+    And the caller receives HTTP 502 with reason "a2a_upstream_unreachable"
+
+  @unit
+  Scenario: a change to an A2A target reaches the gateway on the change feed
+    When an A2A target of the organization is created, updated, blocked or deleted
+    Then the gateway drops the organization's cached key bundles
+    And the next call reads the target as it is now

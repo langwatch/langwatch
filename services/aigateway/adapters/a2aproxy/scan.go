@@ -1,11 +1,9 @@
 package a2aproxy
 
 import (
-	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
-	"io"
 	"strings"
 
 	"go.opentelemetry.io/otel/attribute"
@@ -32,11 +30,17 @@ type ScanInput struct {
 
 // Scanner checks the text parts of A2A messages. A block verdict stops the hop.
 type Scanner interface {
+	// Applies reports whether the caller's key scans payloads going this way.
+	// When it does, a payload the proxy cannot read as JSON is refused.
+	Applies(bundle *domain.Bundle, dir Direction) bool
 	Scan(ctx context.Context, in ScanInput) (domain.GuardrailVerdict, error)
 }
 
 // NoopScanner allows everything.
 type NoopScanner struct{}
+
+// Applies is false: nothing is scanned.
+func (NoopScanner) Applies(*domain.Bundle, Direction) bool { return false }
 
 // Scan allows the text.
 func (NoopScanner) Scan(context.Context, ScanInput) (domain.GuardrailVerdict, error) {
@@ -55,12 +59,17 @@ type GuardrailScanner struct {
 	Evaluator guardrailEvaluator
 }
 
+// Applies reports whether the key has a guardrail in that direction.
+func (GuardrailScanner) Applies(bundle *domain.Bundle, dir Direction) bool {
+	return bundle != nil && len(bundle.Config.Guardrails.IDs(string(dir))) > 0
+}
+
 // Scan runs the key's request or response guardrails over the text. A key
 // with no guardrail in that direction is allowed without a call.
 func (s GuardrailScanner) Scan(ctx context.Context, in ScanInput) (domain.GuardrailVerdict, error) {
 	bundle, dir, texts := in.Bundle, in.Direction, in.Texts
 	allow := domain.GuardrailVerdict{Action: domain.GuardrailAllow}
-	if len(bundle.Config.Guardrails.IDs(string(dir))) == 0 {
+	if !s.Applies(bundle, dir) {
 		return allow, nil
 	}
 	text := strings.Join(texts, "\n")
@@ -72,16 +81,28 @@ func (s GuardrailScanner) Scan(ctx context.Context, in ScanInput) (domain.Guardr
 	return s.Evaluator.EvaluatePost(ctx, bundle, &domain.Request{}, &domain.Response{Body: body})
 }
 
+// payload is what the scanner sees of one body: its text parts, and whether
+// the body could be read at all.
+type payload struct {
+	texts []string
+	// parsed is false for a non-empty body that is not JSON.
+	parsed bool
+}
+
 // collectTexts returns the text of every part found anywhere in an A2A
 // payload: message parts, task history and artifacts, in v1.0 and v0.3 shapes.
-func collectTexts(body []byte) []string {
+// An empty body is parsed and has no text.
+func collectTexts(body []byte) payload {
+	if len(bytes.TrimSpace(body)) == 0 {
+		return payload{parsed: true}
+	}
 	var v any
 	if json.Unmarshal(body, &v) != nil {
-		return nil
+		return payload{}
 	}
-	var out []string
-	walkTexts(v, false, &out)
-	return out
+	p := payload{parsed: true}
+	walkTexts(v, false, &p.texts)
+	return p
 }
 
 func walkTexts(node any, inParts bool, out *[]string) {
@@ -98,45 +119,6 @@ func walkTexts(node any, inParts bool, out *[]string) {
 			walkTexts(child, inParts, out)
 		}
 	}
-}
-
-// readEvents splits an SSE body into events, each with its trailing blank
-// line, and stops when fn returns false.
-func readEvents(r io.Reader, fn func(event []byte) bool) error {
-	sc := bufio.NewScanner(r)
-	sc.Buffer(make([]byte, 0, 64<<10), maxEventBytes)
-	var event bytes.Buffer
-	for sc.Scan() {
-		if line := sc.Bytes(); len(line) > 0 {
-			event.Write(line)
-			event.WriteByte('\n')
-			continue
-		}
-		if event.Len() == 0 {
-			continue
-		}
-		event.WriteByte('\n')
-		if !fn(append([]byte(nil), event.Bytes()...)) {
-			return nil
-		}
-		event.Reset()
-	}
-	if event.Len() > 0 {
-		fn(event.Bytes())
-	}
-	return sc.Err()
-}
-
-// eventData joins the data lines of one SSE event.
-func eventData(event []byte) []byte {
-	var data bytes.Buffer
-	for _, line := range bytes.Split(event, []byte("\n")) {
-		if v, ok := bytes.CutPrefix(line, []byte("data:")); ok {
-			data.Write(bytes.TrimPrefix(v, []byte(" ")))
-			data.WriteByte('\n')
-		}
-	}
-	return data.Bytes()
 }
 
 func lookup(v any, path ...string) any {

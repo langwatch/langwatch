@@ -3,7 +3,6 @@ package a2aproxy
 import (
 	"context"
 	"encoding/json"
-	"io"
 	"net/http"
 	"strings"
 	"sync"
@@ -33,11 +32,15 @@ func (h *Handler) serveCard(c *call, target domain.A2ATarget) {
 	propagation.TraceContext{}.Inject(ctx, propagation.HeaderCarrier(req.Header))
 	resp, err := h.cfg.Client.Do(req)
 	if err != nil {
-		c.refuse(refuseUpstream)
+		c.refuse(upstreamRefusal(err))
 		return
 	}
 	defer func() { _ = resp.Body.Close() }()
-	raw, err := io.ReadAll(io.LimitReader(resp.Body, maxBodyBytes))
+	raw, tooLarge, err := readLimited(resp.Body)
+	if tooLarge {
+		c.refuse(refuseReplyTooLarge)
+		return
+	}
 	var card map[string]any
 	if err != nil || resp.StatusCode != http.StatusOK || json.Unmarshal(raw, &card) != nil {
 		c.refuse(refuseUpstream.withMessage("the A2A agent has no readable Agent Card"))
