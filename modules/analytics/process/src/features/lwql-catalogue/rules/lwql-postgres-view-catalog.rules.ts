@@ -1357,7 +1357,7 @@ export const LWQL_POSTGRES_CATALOGUE = defineLwqlCatalog({
       CallerVoice: { source: "callerVoice", content: "output" },
       Kind: { source: "kind" },
       RedTeam: { source: "redTeam", content: "output" },
-      SourceTemplateId: { source: "sourceTemplateId" },
+      sourceTemplateId: "omit", // internal bookkeeping: the template a scenario came from
       TestSuiteId: { source: "testSuiteId" },
       Version: { source: "version" },
       LastUpdatedById: { source: "lastUpdatedById" },
