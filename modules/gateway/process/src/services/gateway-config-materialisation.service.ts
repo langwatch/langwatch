@@ -244,24 +244,7 @@ export class GatewayConfigMaterialiserService {
     );
     const policySides = resolvePolicySideOfBundle(vk, config, this.assembly);
     const slots = await this.providerSlots({ organizationId: vk.organizationId, providers });
-    // The cache-rule bundle, the project's guardrail catalogue and the key's
-    // surviving attachments come from the one Gateway service that owns those
-    // tables, rather than from a second copy of each query living here.
-    const bundle = await this.budgetDecisions.loadConfigurationPersistence({
-      organizationId: vk.organizationId,
-      traceProjectId: traceProject?.id ?? null,
-      guardrailAttachments: config.guardrailAttachments.map((attachment) => ({
-        direction: attachment.direction,
-        guardrailIds: [...attachment.guardrailIds],
-      })),
-    });
-    const otlpToken = await this.traceExportToken(vk, traceProject);
-    const a2aTargets = this.a2aTargets
-      ? await this.a2aTargets.bundleFor({
-          ...this.a2aScopeOf(vk),
-          projectId: traceProject?.id ?? null,
-        })
-      : [];
+    const { bundle, otlpToken, a2aTargets } = await this.persistedSlices(vk, traceProject, config);
 
     return {
       revision: vk.revision.toString(),
@@ -314,6 +297,33 @@ export class GatewayConfigMaterialiserService {
       vk_tags: config.metadata?.tags ?? [],
       expires_at: toExpiresAtWire(vk.expiresAt),
     };
+  }
+
+  /** The slices other Gateway services own: cache rules, guardrails, export token, A2A targets. */
+  private async persistedSlices(
+    vk: VirtualKeyWithScopes,
+    traceProject: { id: string } | null,
+    config: ReturnType<typeof parseVirtualKeyConfig>,
+  ) {
+    // The cache-rule bundle, the project's guardrail catalogue and the key's
+    // surviving attachments come from the one Gateway service that owns those
+    // tables, rather than from a second copy of each query living here.
+    const bundle = await this.budgetDecisions.loadConfigurationPersistence({
+      organizationId: vk.organizationId,
+      traceProjectId: traceProject?.id ?? null,
+      guardrailAttachments: config.guardrailAttachments.map((attachment) => ({
+        direction: attachment.direction,
+        guardrailIds: [...attachment.guardrailIds],
+      })),
+    });
+    const otlpToken = await this.traceExportToken(vk, traceProject);
+    const a2aTargets = this.a2aTargets
+      ? await this.a2aTargets.bundleFor({
+          ...this.a2aScopeOf(vk),
+          projectId: traceProject?.id ?? null,
+        })
+      : [];
+    return { bundle, otlpToken, a2aTargets };
   }
 
   /** Dispatch slots: the key's own providers with their credentials, then the upstream. */

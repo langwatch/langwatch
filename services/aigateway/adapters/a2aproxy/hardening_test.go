@@ -288,3 +288,15 @@ func TestReadEventsSplitsBareCRAndDropsBOM(t *testing.T) {
 		}
 	}
 }
+
+func TestReadEventsDropsAnUnfinishedEventAtEOF(t *testing.T) {
+	for _, body := range []string{"data: one\n\ndata: {\"result\":{}}", "data: one\n\ndata: two\n"} {
+		var got []string
+		err := readEvents(strings.NewReader(body), func(event []byte) bool {
+			got = append(got, string(eventData(event)))
+			return true
+		})
+		require.NoError(t, err)
+		assert.Equal(t, []string{"one\n"}, got, body)
+	}
+}
