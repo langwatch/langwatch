@@ -38,7 +38,7 @@ A stop is applied at once when:
 
 Any other stop from a machine credential waits for an approval. It shows as an approval card on the Agents page and pushes `governance.agent.stop_requested` to your webhook endpoints, so your on-call tool can page someone. A person or key with `governance:manage` approves or denies it. The key that requested a stop cannot approve it.
 
-One agent has at most one open stop. A new request while one is pending approval, stopping, quarantined, failed to stop, restoring or failed to restore answers `409` with code `agent_stop_already_open`. When two people decide one pending stop at once, the first decision wins and the other answers `409` with code `agent_stop_not_pending`.
+One agent has at most one open stop. A new request while one is pending approval, stopping, quarantined, failed to stop, restoring or failed to restore answers `409` with code `agent_stop_already_open`; run a failed stop again with [Retry stop](#retry-a-stop). When two people decide one pending stop at once, the first decision wins and the other answers `409` with code `agent_stop_not_pending`.
 
 To make sure a stop acts on the plan you checked, send the plan's target ids as `expectedTargetIds`. If the plan changed since you read it, the stop answers `409` with code `agent_stop_plan_changed` and no target is changed. The Agents page does this for you.
 
@@ -59,9 +59,27 @@ An AWS connection that a stop plan target, or a stop that is not restored yet, s
 
 Each target is retried with backoff before it is recorded as failed. A failed target carries an error code such as `http_403` or `AccessDeniedException`. Restore reverts only the targets that were applied, so a key that failed to disable is not enabled by a restore.
 
+A deleted resource counts as done. When Databricks answers `404` or Bedrock answers `ResourceNotFoundException`, the target is recorded as applied on a stop and as reverted on a restore, with `gone: true` in the stop, the audit row and the webhook body.
+
+## Retry a stop
+
+**Retry stop** in the agent's actions, or `POST /api/governance/agent-stops/{stopId}/retry`, runs the stop again on every target it has not stopped: the ones that failed, the ones a restore turned back on, and targets added to the stop plan since the stop was requested. Targets that are already stopped are not called again.
+
+You can retry a `quarantined`, `stop_failed` or `restore_failed` stop. Any other status answers `409` with code `agent_stop_not_retryable`. The stop goes back to `stopping` and announces its outcome again. On a quarantined stop the action is called **Stop again**.
+
+## Change the plan of a stopped agent
+
+Removing a target from the stop plan also removes it from the agent's open stop. A stop or restore that only waited on that target finishes: a stop that failed on it becomes `quarantined`, and a restore that failed on it becomes `restored`. A restore does not touch a removed target, so it stays as the stop left it.
+
+## Shared virtual keys
+
+Two agents can share one gateway virtual key. Restoring one of them keeps the key disabled while another agent's open stop still holds it, and records the target as reverted with `keptDisabled: true`. The Restore dialog names the agents that keep the key disabled. The last restore enables the key.
+
 ## Endpoints
 
-Every route takes an organization API key in `Authorization: Bearer <key>`. Reads need `governance:view`; stops, decisions, restores and plan changes need `governance:manage`. Organization admins hold both.
+Every route takes an organization API key in `Authorization: Bearer <key>`. Reads need `governance:view`; stops, retries, decisions, restores and plan changes need `governance:manage`. Organization admins hold both.
+
+A stop is readable as soon as its `202` returns: the latest stop route answers it, and another key can approve it right away.
 
 | Method and path | Does |
 |---|---|
@@ -73,6 +91,7 @@ Every route takes an organization API key in `Authorization: Bearer <key>`. Read
 | `POST /api/governance/agent-stops/{stopId}/approve` | Approves a pending stop |
 | `POST /api/governance/agent-stops/{stopId}/deny` | Denies a pending stop |
 | `POST /api/governance/agent-stops/{stopId}/restore` | Restores a quarantined agent |
+| `POST /api/governance/agent-stops/{stopId}/retry` | Runs the stop again on what it has not stopped. Answers `202` with the stop |
 
 Each path also answers under `/api/v1/governance/...`. The routes are in the OpenAPI document under the tag **Governance / Kill Switch**.
 
@@ -90,7 +109,7 @@ The `json` filter quotes the reason, so a trigger name with quotes still sends v
 
 ## Audit log and webhooks
 
-The audit log records `governance.agent.stop_requested`, `governance.agent.stop_approved`, `governance.agent.stop_denied`, `governance.agent.quarantined`, `governance.agent.stop_failed`, `governance.agent.restore_requested`, `governance.agent.restored` and `governance.agent.restore_failed`, with the agent as the target. Adding and removing an AWS connection records `governance.agent.aws_connection_created` and `governance.agent.aws_connection_deleted`, with the connection as the target and no secret in the row.
+The audit log records `governance.agent.stop_requested`, `governance.agent.stop_approved`, `governance.agent.stop_denied`, `governance.agent.stop_retried`, `governance.agent.quarantined`, `governance.agent.stop_failed`, `governance.agent.restore_requested`, `governance.agent.restored` and `governance.agent.restore_failed`, with the agent as the target. Each action writes one row, named after the agent. Adding and removing an AWS connection records `governance.agent.aws_connection_created` and `governance.agent.aws_connection_deleted`, with the connection as the target and no secret in the row.
 
 Webhook endpoints subscribed to `governance.agent.*` receive `governance.agent.stop_requested`, `governance.agent.quarantined`, `governance.agent.stop_failed`, `governance.agent.restored` and `governance.agent.restore_failed`. Each event carries the registry entry and a `stop` object with the status and every target's outcome. They are also in the registry's change feed.
 

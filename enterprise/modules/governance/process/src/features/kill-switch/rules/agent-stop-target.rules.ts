@@ -1,5 +1,27 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /** How a kill switch target is reached and how its refusal is named. */
+import type { AgentStopTarget } from "@langwatch/enterprise-governance-contract";
+
+/**
+ * What a target acts on, whatever its plan row id: a plan save gives every row a new id, so a stop
+ * and the plan are compared by this.
+ */
+export function targetKeyOf(target: AgentStopTarget): string {
+  switch (target.kind) {
+    case "databricks_serving_endpoint":
+      return [target.kind, target.ingestionSourceId, target.endpointName].join("\u001f");
+    case "bedrock_agent_alias":
+      return [
+        target.kind,
+        target.awsConnectionId,
+        target.region,
+        target.agentId,
+        target.agentAliasId,
+      ].join("\u001f");
+    case "gateway_virtual_key":
+      return [target.kind, target.virtualKeyId].join("\u001f");
+  }
+}
 
 export function servingEndpointPath({
   endpointName,
@@ -19,10 +41,6 @@ export const BEDROCK_INVOCATION_STATES = {
 export type BedrockInvocationState =
   (typeof BEDROCK_INVOCATION_STATES)[keyof typeof BEDROCK_INVOCATION_STATES];
 
-/**
- * A stable code for what refused a target: the error's own `code` when it carries a string one
- * (`http_404`, a HandledError code), else its name (the AWS SDK names its exceptions), never prose.
- */
 /** The codes a platform answers for a resource that no longer exists (Databricks, Bedrock). */
 const GONE_ERROR_CODES = new Set(["http_404", "ResourceNotFoundException"]);
 
@@ -31,6 +49,10 @@ export function isGoneErrorCode(code: string): boolean {
   return GONE_ERROR_CODES.has(code);
 }
 
+/**
+ * A stable code for what refused a target: the error's own `code` when it carries a string one
+ * (`http_404`, a HandledError code), else its name (the AWS SDK names its exceptions), never prose.
+ */
 export function errorCodeOf(error: unknown): string {
   if (error !== null && typeof error === "object" && "code" in error) {
     const { code } = error;

@@ -42,22 +42,34 @@ import { AGENT_STOP_AUDIT_TARGET_KIND, type AgentStopCommandSend } from "./agent
 /** The audit log takes an `audit` KSUID as a key, and reads the row's moment from it. */
 const AUDIT_KEY_RESOURCE = "audit";
 
+/** The round a milestone belongs to; a retry's milestones carry its round as well. */
+function milestoneRoundOf({
+  restoreRound,
+  retryRound = 0,
+}: {
+  restoreRound: number;
+  retryRound?: number;
+}): string {
+  return retryRound > 0 ? `${restoreRound}_retry_${retryRound}` : String(restoreRound);
+}
+
 /**
- * The audit key of one announced milestone: derived from the stop, milestone and restore round, so
- * a redelivered announcement names one row. Its moment is the stop's latest recorded time.
+ * The audit key of one announced milestone: derived from the stop, milestone and its rounds, so a
+ * redelivered announcement names one row. Its moment is the stop's latest recorded time.
  */
 export function milestoneAuditKeyOf({
   stop,
   milestone,
   restoreRound,
+  retryRound = 0,
 }: {
   stop: AgentStopView;
   milestone: AgentStopWebhookEventType;
   restoreRound: number;
+  retryRound?: number;
 }): string {
-  const digest = createHash("sha256")
-    .update(`${stop.id}\u001f${milestone}\u001f${restoreRound}`)
-    .digest();
+  const round = milestoneRoundOf({ restoreRound, retryRound });
+  const digest = createHash("sha256").update(`${stop.id}\u001f${milestone}\u001f${round}`).digest();
   const moments = [
     stop.requestedAt,
     stop.decidedAt,
@@ -93,6 +105,9 @@ interface AgentStopTargetDependencies {
 
 type Direction = "stop" | "restore";
 
+/** What every platform call reads off its intent, an apply or a revert. */
+type AgentStopTargetWork = Omit<AgentStopApplyIntent, "retryRound">;
+
 /** A call's outcome: whether it changed the platform, and whether a shared key was left disabled. */
 type CallOutcome = { changed: boolean; keptDisabled?: boolean };
 
@@ -127,6 +142,7 @@ export class AgentStopTargetService implements AgentStopIntentExecutors {
       organizationId: intent.organizationId,
       targetId: intent.target.id,
       errorCode: outcome.errorCode,
+      ...(intent.retryRound > 0 ? { retryRound: intent.retryRound } : {}),
       ...(outcome.ok && !outcome.changed ? { alreadyStopped: true } : {}),
       ...(outcome.gone ? { gone: true } : {}),
     };
@@ -154,16 +170,17 @@ export class AgentStopTargetService implements AgentStopIntentExecutors {
    * request's own row was written by whoever asked, so a stop_requested milestone is pushed only.
    */
   async announce(intent: AgentStopAnnounceIntent): Promise<void> {
-    const { organizationId, milestone, restoreRound, stop } = intent;
+    const { organizationId, milestone, restoreRound, retryRound, stop } = intent;
+    const round = milestoneRoundOf({ restoreRound, retryRound });
     await this.deps.registry.announceStop({
       organizationId,
-      eventId: `${stop.id}_${milestone.replace("governance.agent.", "")}_${restoreRound}`,
+      eventId: `${stop.id}_${milestone.replace("governance.agent.", "")}_${round}`,
       milestone,
       stop,
     });
     if (milestone === "governance.agent.stop_requested") return;
     await this.deps.auditLog.record({
-      idempotencyKey: milestoneAuditKeyOf({ stop, milestone, restoreRound }),
+      idempotencyKey: milestoneAuditKeyOf({ stop, milestone, restoreRound, retryRound }),
       organizationId,
       action: milestone,
       targetKind: AGENT_STOP_AUDIT_TARGET_KIND,
@@ -174,6 +191,7 @@ export class AgentStopTargetService implements AgentStopIntentExecutors {
         agentName: stop.agentName,
         status: stop.status,
         restoreRound,
+        ...(retryRound > 0 ? { retryRound } : {}),
         targets: stop.targets.map((target) => ({
           id: target.id,
           label: target.label,
@@ -191,7 +209,7 @@ export class AgentStopTargetService implements AgentStopIntentExecutors {
     direction,
     context,
   }: {
-    intent: AgentStopApplyIntent;
+    intent: AgentStopTargetWork;
     direction: Direction;
     context: IntentContext;
   }): Promise<{
@@ -245,7 +263,7 @@ export class AgentStopTargetService implements AgentStopIntentExecutors {
     isStopped,
     stop,
   }: {
-    intent: AgentStopApplyIntent;
+    intent: AgentStopTargetWork;
     isStopped: () => Promise<boolean>;
     stop: () => Promise<unknown>;
   }): Promise<{ changed: boolean }> {
@@ -275,7 +293,7 @@ export class AgentStopTargetService implements AgentStopIntentExecutors {
     virtualKeyId,
     direction,
   }: {
-    intent: AgentStopApplyIntent;
+    intent: AgentStopTargetWork;
     virtualKeyId: string;
     direction: Direction;
   }): Promise<CallOutcome> {
@@ -309,7 +327,7 @@ export class AgentStopTargetService implements AgentStopIntentExecutors {
     target,
     direction,
   }: {
-    intent: AgentStopApplyIntent;
+    intent: AgentStopTargetWork;
     target: Extract<AgentStopTarget, { kind: "bedrock_agent_alias" }>;
     direction: Direction;
   }): Promise<{ changed: boolean }> {
@@ -343,7 +361,7 @@ export class AgentStopTargetService implements AgentStopIntentExecutors {
     intent,
     virtualKeyId,
   }: {
-    intent: AgentStopApplyIntent;
+    intent: AgentStopTargetWork;
     virtualKeyId: string;
   }): Promise<boolean> {
     const open = await this.deps.stops.findAllByStatuses({
@@ -367,7 +385,7 @@ export class AgentStopTargetService implements AgentStopIntentExecutors {
     target,
     direction,
   }: {
-    intent: AgentStopApplyIntent;
+    intent: AgentStopTargetWork;
     target: AgentStopTarget;
     direction: Direction;
   }): Promise<CallOutcome> {

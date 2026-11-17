@@ -589,6 +589,10 @@ const registry = {
     tips: ["Restore a stop whose status is `quarantined`, `stop_failed` or `restore_failed`"],
     docsPath: "/governance/kill-switch",
   },
+  agent_stop_not_retryable: {
+    tips: ["Retry a stop whose status is `quarantined`, `stop_failed` or `restore_failed`"],
+    docsPath: "/governance/kill-switch",
+  },
   agent_stop_plan_changed: {
     tips: [
       "Read the plan again with GET /api/governance/agents/{agentId}/stop-plan and confirm its targets",

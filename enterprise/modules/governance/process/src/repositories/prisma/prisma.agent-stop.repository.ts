@@ -14,6 +14,7 @@ import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
 
 import type { AgentStopProjectionState } from "../../features/kill-switch/eventing/agent-stop.projection.ts";
 import {
+  AGENT_STOP_PROJECTION_VERSION,
   type AgentStopRecord,
   agentStopRecordSchema,
 } from "../../features/kill-switch/rules/agent-stop.rules.ts";
@@ -22,15 +23,27 @@ import { type AgentStopPosition, AgentStopRepository } from "../agent-stop.repos
 type AgentStopDatabase = Pick<PrismaClient, "agentStop">;
 type Row = Prisma.AgentStopGetPayload<object>;
 
-/** The targets column holds the outcomes; `restoreRound` rides along beside them. */
+/** The targets column holds the outcomes; the restore and retry rounds ride along beside them. */
 const storedTargetsSchema = agentStopTargetOutcomeSchema.array();
 
 function targetsColumnOf(stop: AgentStopRecord): Prisma.InputJsonValue {
-  return { outcomes: stop.targets, restoreRound: stop.restoreRound } as Prisma.InputJsonValue;
+  return {
+    outcomes: stop.targets,
+    restoreRound: stop.restoreRound,
+    retryRound: stop.retryRound,
+    retriedByUserId: stop.retriedByUserId,
+    retriedByApiKeyId: stop.retriedByApiKeyId,
+  } as Prisma.InputJsonValue;
 }
 
 function recordOf(row: Row): AgentStopRecord {
-  const column = (row.targets ?? {}) as { outcomes?: unknown; restoreRound?: unknown };
+  const column = (row.targets ?? {}) as {
+    outcomes?: unknown;
+    restoreRound?: unknown;
+    retryRound?: unknown;
+    retriedByUserId?: unknown;
+    retriedByApiKeyId?: unknown;
+  };
   return agentStopRecordSchema.parse({
     id: row.id,
     organizationId: row.organizationId,
@@ -54,7 +67,35 @@ function recordOf(row: Row): AgentStopRecord {
     restoreRequestedAt: row.restoreRequestedAt?.toISOString() ?? null,
     restoredAt: row.restoredAt?.toISOString() ?? null,
     restoreRound: typeof column.restoreRound === "number" ? column.restoreRound : 0,
+    retryRound: typeof column.retryRound === "number" ? column.retryRound : 0,
+    retriedByUserId: typeof column.retriedByUserId === "string" ? column.retriedByUserId : null,
+    retriedByApiKeyId:
+      typeof column.retriedByApiKeyId === "string" ? column.retriedByApiKeyId : null,
   });
+}
+
+function columnsOf(stop: AgentStopRecord) {
+  return {
+    agentId: stop.agentId,
+    agentName: stop.agentName,
+    status: stop.status,
+    severity: stop.severity,
+    approval: stop.approval,
+    trigger: stop.trigger,
+    reason: stop.reason,
+    requestedByUserId: stop.requestedByUserId,
+    requestedByApiKeyId: stop.requestedByApiKeyId,
+    decidedByUserId: stop.decidedByUserId,
+    decidedByApiKeyId: stop.decidedByApiKeyId,
+    restoredByUserId: stop.restoredByUserId,
+    restoredByApiKeyId: stop.restoredByApiKeyId,
+    targets: targetsColumnOf(stop),
+    requestedAt: new Date(stop.requestedAt),
+    decidedAt: stop.decidedAt ? new Date(stop.decidedAt) : null,
+    quarantinedAt: stop.quarantinedAt ? new Date(stop.quarantinedAt) : null,
+    restoreRequestedAt: stop.restoreRequestedAt ? new Date(stop.restoreRequestedAt) : null,
+    restoredAt: stop.restoredAt ? new Date(stop.restoredAt) : null,
+  };
 }
 
 export class PrismaAgentStopRepository extends AgentStopRepository {
@@ -95,25 +136,7 @@ export class PrismaAgentStopRepository extends AgentStopRepository {
     if (!stop) return;
     const organizationId = String(context.tenantId);
     const data = {
-      agentId: stop.agentId,
-      agentName: stop.agentName,
-      status: stop.status,
-      severity: stop.severity,
-      approval: stop.approval,
-      trigger: stop.trigger,
-      reason: stop.reason,
-      requestedByUserId: stop.requestedByUserId,
-      requestedByApiKeyId: stop.requestedByApiKeyId,
-      decidedByUserId: stop.decidedByUserId,
-      decidedByApiKeyId: stop.decidedByApiKeyId,
-      restoredByUserId: stop.restoredByUserId,
-      restoredByApiKeyId: stop.restoredByApiKeyId,
-      targets: targetsColumnOf(stop),
-      requestedAt: new Date(stop.requestedAt),
-      decidedAt: stop.decidedAt ? new Date(stop.decidedAt) : null,
-      quarantinedAt: stop.quarantinedAt ? new Date(stop.quarantinedAt) : null,
-      restoreRequestedAt: stop.restoreRequestedAt ? new Date(stop.restoreRequestedAt) : null,
-      restoredAt: stop.restoredAt ? new Date(stop.restoredAt) : null,
+      ...columnsOf(stop),
       lastAppliedEventId: projection.cursor.eventId,
       lastAcceptedAt: BigInt(projection.cursor.acceptedAt),
       lastOccurredAt: BigInt(projection.occurredAt),
@@ -124,12 +147,33 @@ export class PrismaAgentStopRepository extends AgentStopRepository {
       where: { id: stop.id, organizationId },
       select: { id: true },
     });
-    if (existing) {
-      await this.prisma.agentStop.updateMany({ where: { id: stop.id, organizationId }, data });
-      return;
+    if (!existing) {
+      const { count } = await this.prisma.agentStop.createMany({
+        data: [{ ...data, id: stop.id, organizationId, createdAt: new Date(projection.createdAt) }],
+        skipDuplicates: true,
+      });
+      if (count > 0) return;
     }
-    await this.prisma.agentStop.create({
-      data: { ...data, id: stop.id, organizationId, createdAt: new Date(projection.createdAt) },
+    // Updated in place, also when the request's seed row landed after the read above.
+    await this.prisma.agentStop.updateMany({ where: { id: stop.id, organizationId }, data });
+  }
+
+  async seed({ stop, at }: { stop: AgentStopRecord; at: number }): Promise<void> {
+    await this.prisma.agentStop.createMany({
+      data: [
+        {
+          ...columnsOf(stop),
+          id: stop.id,
+          organizationId: stop.organizationId,
+          lastAppliedEventId: "",
+          lastAcceptedAt: 0n,
+          lastOccurredAt: BigInt(at),
+          projectionVersion: AGENT_STOP_PROJECTION_VERSION,
+          createdAt: new Date(at),
+          updatedAt: new Date(at),
+        },
+      ],
+      skipDuplicates: true,
     });
   }
 

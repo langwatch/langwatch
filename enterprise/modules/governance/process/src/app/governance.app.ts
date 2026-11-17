@@ -1930,12 +1930,18 @@ export class GovernanceModule implements GovernanceRestApi {
     return this.agentStopPlans.getPlan(input);
   }
 
-  setAgentStopPlan(input: {
+  async setAgentStopPlan(input: {
     organizationId: string;
     agentId: string;
     targets: readonly AgentStopTarget[];
   }): Promise<AgentStopPlan> {
-    return this.agentStopPlans.setPlan(input);
+    const plan = await this.agentStopPlans.setPlan(input);
+    await this.agentStops.dropRemovedTargets({
+      organizationId: input.organizationId,
+      agentId: input.agentId,
+      plan: plan.targets,
+    });
+    return plan;
   }
 
   findAwsConnections(input: { organizationId: string }): Promise<AwsConnectionView[]> {
@@ -1993,6 +1999,14 @@ export class GovernanceModule implements GovernanceRestApi {
     caller: AgentStopCaller;
   }): Promise<AgentStopView> {
     return this.agentStops.restore(input);
+  }
+
+  retryAgentStop(input: {
+    organizationId: string;
+    stopId: string;
+    caller: AgentStopCaller;
+  }): Promise<AgentStopView> {
+    return this.agentStops.retryStop(input);
   }
 
   getLatestAgentStop(input: { organizationId: string; agentId: string }): Promise<AgentStopView> {

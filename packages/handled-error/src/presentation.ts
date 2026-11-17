@@ -3807,6 +3807,10 @@ const presentations = {
     title: "This stop cannot be restored",
     describe: () => "Only a quarantined stop, or one that failed, can be restored.",
   },
+  agent_stop_not_retryable: {
+    title: "This stop cannot be retried",
+    describe: () => "Only a stop that is quarantined, or one that failed, can be stopped again.",
+  },
   agent_stop_plan_changed: {
     title: "The stop plan changed",
     describe: () => "Someone edited this agent's stop plan. Check the targets again, then confirm.",

@@ -162,6 +162,7 @@ describe("AgentStopTargetService", () => {
             reason: "prompt injection in production",
             actorUserId: "user-ops",
             target: { id: target.id, label: target.label, target: target.target },
+            retryRound: 0,
           },
           { ...context, messageKey: `apply:${target.id}` },
         );

@@ -88,4 +88,9 @@ export const governanceKillSwitchTrpcTransport: TrpcRouterDeclaration<
   .withEntitlement("enterprise", AGENT_REGISTRY)
   .withPermission("governance:manage")
   .handle(({ app, input, actor }) => app.restoreAgentStop({ ...input, caller: personOf(actor) }))
+
+  .procedure("retryStop")
+  .withEntitlement("enterprise", AGENT_REGISTRY)
+  .withPermission("governance:manage")
+  .handle(({ app, input, actor }) => app.retryAgentStop({ ...input, caller: personOf(actor) }))
   .build();

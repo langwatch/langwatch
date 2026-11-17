@@ -6,16 +6,19 @@
 import {
   AGENT_STOP_OPEN_STATUSES,
   AGENT_STOP_RESTORABLE_STATUSES,
+  AGENT_STOP_RETRYABLE_STATUSES,
   type AgentStopApproval,
   type AgentStopDecidedEventData,
   type AgentStopPlanTarget,
   type AgentStopRequestedEventData,
   type AgentStopRestoreRequestedEventData,
+  type AgentStopRetryRequestedEventData,
   type AgentStopSeverity,
   type AgentStopStatus,
   type AgentStopTarget,
   type AgentStopTargetOutcome,
   type AgentStopTargetSettledEventData,
+  type AgentStopTargetsDroppedEventData,
   type AgentStopTrigger,
   type AgentStopView,
   type AgentStopWebhookEventType,
@@ -28,6 +31,9 @@ import {
 } from "@langwatch/enterprise-governance-contract";
 import { Temporal } from "@langwatch/time";
 import { z } from "zod";
+
+/** The AgentStop projection's version, also stamped on a requested stop's seed row. */
+export const AGENT_STOP_PROJECTION_VERSION = "2026-11-16" as const;
 
 /** Where a stop sits in the latest-first listing. */
 type StopPosition = { requestedAt: string; id: string };
@@ -57,6 +63,10 @@ export const agentStopRecordSchema = z.object({
   restoredAt: z.string().nullable(),
   /** One more on every restore request, so a second restore's intents get keys of their own. */
   restoreRound: z.number().int().nonnegative(),
+  /** One more on every retry, so a retry's applies and milestones get keys of their own. */
+  retryRound: z.number().int().nonnegative().default(0),
+  retriedByUserId: z.string().nullable().default(null),
+  retriedByApiKeyId: z.string().nullable().default(null),
 });
 export type AgentStopRecord = z.infer<typeof agentStopRecordSchema>;
 
@@ -85,6 +95,10 @@ export function isOpenStatus(status: AgentStopStatus): boolean {
 
 export function isRestorableStatus(status: AgentStopStatus): boolean {
   return AGENT_STOP_RESTORABLE_STATUSES.includes(status);
+}
+
+export function isRetryableStatus(status: AgentStopStatus): boolean {
+  return AGENT_STOP_RETRYABLE_STATUSES.includes(status);
 }
 
 /** What a person reads for a target in lists, the audit row and the webhook body. */
@@ -163,6 +177,9 @@ export function requestedStop({
     restoreRequestedAt: null,
     restoredAt: null,
     restoreRound: 0,
+    retryRound: 0,
+    retriedByUserId: null,
+    retriedByApiKeyId: null,
   };
 }
 
@@ -187,12 +204,13 @@ function decided({
   };
 }
 
+/** An approved stop whose plan lost every target meanwhile has nothing to apply: it settles. */
 export function approvedStop(input: {
   stop: AgentStopRecord;
   data: AgentStopDecidedEventData;
   at: number;
 }): AgentStopRecord {
-  return decided({ ...input, status: "stopping" });
+  return settleStop({ stop: decided({ ...input, status: "stopping" }), at: input.at });
 }
 
 export function deniedStop(input: {
@@ -242,6 +260,17 @@ function withTarget({
   };
 }
 
+/** An apply outcome from an earlier run of the stop says nothing about the retry in flight. */
+function isStaleRetry({
+  stop,
+  data,
+}: {
+  stop: AgentStopRecord;
+  data: AgentStopTargetSettledEventData;
+}): boolean {
+  return (data.retryRound ?? 0) !== stop.retryRound;
+}
+
 export function targetAppliedStop({
   stop,
   data,
@@ -251,7 +280,7 @@ export function targetAppliedStop({
   data: AgentStopTargetSettledEventData;
   at: number;
 }): AgentStopRecord {
-  if (stop.status !== "stopping") return stop;
+  if (stop.status !== "stopping" || isStaleRetry({ stop, data })) return stop;
   const changed = withTarget({
     stop,
     targetId: data.targetId,
@@ -277,7 +306,7 @@ export function targetFailedStop({
   data: AgentStopTargetSettledEventData;
   at: number;
 }): AgentStopRecord {
-  if (stop.status !== "stopping") return stop;
+  if (stop.status !== "stopping" || isStaleRetry({ stop, data })) return stop;
   const changed = withTarget({
     stop,
     targetId: data.targetId,
@@ -384,6 +413,84 @@ export function targetRevertFailedStop({
     change: (target) => ({ ...target, state: "revert_failed", errorCode: data.errorCode }),
   });
   return settleRestore({ stop: changed, at });
+}
+
+/**
+ * A retry applies again what is not stopped: a failed or reverted target goes back to pending, a
+ * target whose revert failed is still stopped, and plan targets added since join as pending.
+ */
+export function retriedStop({
+  stop,
+  data,
+  at,
+}: {
+  stop: AgentStopRecord;
+  data: AgentStopRetryRequestedEventData;
+  at: number;
+}): AgentStopRecord {
+  if (!isRetryableStatus(stop.status)) return stop;
+  const targets = [
+    ...stop.targets.map(retriedOutcome),
+    ...data.targets
+      .filter((target) => !stop.targets.some((held) => held.id === target.id))
+      .map(pendingOutcome),
+  ];
+  const retried: AgentStopRecord = {
+    ...stop,
+    retryRound: data.retryRound,
+    retriedByUserId: data.requestedByUserId,
+    retriedByApiKeyId: data.requestedByApiKeyId,
+    targets,
+  };
+  if (!targets.some((target) => target.state === "pending")) {
+    return stop.status === "quarantined"
+      ? retried
+      : settleStop({ stop: { ...retried, status: "stopping" }, at });
+  }
+  return { ...retried, status: "stopping" };
+}
+
+function retriedOutcome(target: AgentStopTargetOutcome): AgentStopTargetOutcome {
+  if (target.state === "revert_failed") return { ...target, state: "applied", errorCode: null };
+  if (target.state !== "failed" && target.state !== "reverted") return target;
+  return {
+    id: target.id,
+    label: target.label,
+    target: target.target,
+    state: "pending",
+    errorCode: null,
+    appliedAt: null,
+    revertedAt: null,
+  };
+}
+
+/**
+ * Targets removed from the plan leave the open stop, so they no longer hold it from settling: a
+ * stop or restore that only waited on them settles on what is left.
+ */
+export function targetsDroppedStop({
+  stop,
+  data,
+  at,
+}: {
+  stop: AgentStopRecord;
+  data: AgentStopTargetsDroppedEventData;
+  at: number;
+}): AgentStopRecord {
+  if (!isOpenStatus(stop.status)) return stop;
+  const dropped = new Set(data.targetIds);
+  const kept: AgentStopRecord = {
+    ...stop,
+    targets: stop.targets.filter((target) => !dropped.has(target.id)),
+  };
+  if (kept.targets.length === stop.targets.length) return stop;
+  if (stop.status === "stopping" || stop.status === "stop_failed") {
+    return settleStop({ stop: { ...kept, status: "stopping" }, at });
+  }
+  if (stop.status === "restoring" || stop.status === "restore_failed") {
+    return settleRestore({ stop: { ...kept, status: "restoring" }, at });
+  }
+  return kept;
 }
 
 const MILESTONE_OF_STATUS: Partial<Record<AgentStopStatus, AgentStopWebhookEventType>> = {

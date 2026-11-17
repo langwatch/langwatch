@@ -572,6 +572,15 @@ export interface GovernanceRestApi {
     stopId: string;
     caller: AgentStopCaller;
   }): Promise<AgentStopView>;
+  /**
+   * Applies again every target the stop has not stopped, plus plan targets added since; throws
+   * `agent_stop_not_retryable` unless the stop is quarantined, stop_failed or restore_failed.
+   */
+  retryAgentStop(input: {
+    organizationId: string;
+    stopId: string;
+    caller: AgentStopCaller;
+  }): Promise<AgentStopView>;
   /** The agent's latest stop; throws `agent_stop_not_found` when it was never stopped. */
   getLatestAgentStop(input: { organizationId: string; agentId: string }): Promise<AgentStopView>;
   /** Latest request first, `limit` at a time; a cursor it never returned is a validation error. */

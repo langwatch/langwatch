@@ -62,6 +62,7 @@ export const APP_ERROR_CODES = [
   "agent_stop_not_found",
   "agent_stop_not_pending",
   "agent_stop_not_restorable",
+  "agent_stop_not_retryable",
   "agent_stop_plan_changed",
   "agent_stop_plan_empty",
   "agent_stop_self_approval",

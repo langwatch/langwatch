@@ -125,4 +125,54 @@ describe.skipIf(!connection)("the AgentStop Prisma repository", () => {
       ]);
     });
   });
+
+  describe("when a requested stop is seeded before the projection folds it", () => {
+    /** @scenario "A new stop reads back as soon as its 202 returns" */
+    it("reads the seed back, lets the projection fold onto it and never overwrites a folded row", async () => {
+      const organizationId = newOrganization();
+      const repository = PrismaAgentStopRepository.create(prisma());
+      const at = Date.parse("2026-11-17T10:00:00Z");
+      const stop = requestedStop({
+        data: {
+          stopId: `agentstop-${ns}-seed`,
+          organizationId,
+          agentId: "agent-support-bot",
+          agentName: "support-bot",
+          severity: "high",
+          approval: "required",
+          trigger: "api_key",
+          reason: "cost spike",
+          requestedByUserId: null,
+          requestedByApiKeyId: "key-trace-rule",
+          targets: [],
+        },
+        at,
+      });
+      const context = { tenantId: createTenantId(organizationId), aggregateId: stop.id };
+
+      await repository.seed({ stop, at });
+      expect(await repository.getStop({ organizationId, stopId: stop.id })).toEqual(stop);
+      const read = await repository.get(stop.id, context);
+      expect(read.kind === "folded" ? read.projection.cursor : null).toEqual({
+        acceptedAt: 0,
+        eventId: "",
+      });
+
+      const approved = { ...stop, status: "stopping" as const, retryRound: 2 };
+      await repository.store(
+        {
+          state: approved,
+          cursor: { acceptedAt: at + 1, eventId: "event-approved" },
+          occurredAt: at + 1,
+          createdAt: at,
+          updatedAt: at + 1,
+          version: "2026-11-16",
+        },
+        context,
+      );
+      await repository.seed({ stop, at });
+
+      expect(await repository.getStop({ organizationId, stopId: stop.id })).toEqual(approved);
+    });
+  });
 });

@@ -3,7 +3,7 @@ import { Menu } from "@langwatch/design-system/menu";
 import { Button, Text, VStack } from "@langwatch/design-system/primitives";
 import { ListChecks, MoreVertical, OctagonX, RotateCcw } from "lucide-react";
 
-export type KillSwitchAction = "stop" | "restore" | "plan";
+export type KillSwitchAction = "stop" | "retry" | "restore" | "plan";
 
 function ItemLabel({ label, hint }: { label: string; hint: string | null }) {
   return (
@@ -19,18 +19,22 @@ function ItemLabel({ label, hint }: { label: string; hint: string | null }) {
 }
 
 /**
- * One agent row's overflow menu: Restore when its stop can be restored, Stop otherwise, and the
- * stop plan. A shut item says why (dev/docs/best_practices/row-actions-overflow-menu.md).
+ * One agent row's overflow menu: Restore when its stop can be restored, Stop otherwise, a way to
+ * stop an open stop again, and the stop plan. A shut item says why
+ * (dev/docs/best_practices/row-actions-overflow-menu.md).
  */
 export function KillSwitchActionsMenu({
   agentName,
   restorable,
+  retryLabel,
   stopUnavailableReason,
   manageHint,
   onPick,
 }: {
   agentName: string;
   restorable: boolean;
+  /** "Retry stop" or "Stop again" when the open stop can be stopped again, else null. */
+  retryLabel: string | null;
   stopUnavailableReason: string | null;
   manageHint: string | null;
   onPick: (action: KillSwitchAction) => void;
@@ -47,6 +51,16 @@ export function KillSwitchActionsMenu({
         </Button>
       </Menu.Trigger>
       <Menu.Content>
+        {retryLabel ? (
+          <Menu.Item
+            value="retry"
+            color="red.fg"
+            disabled={manageHint !== null}
+            onClick={pick("retry")}
+          >
+            <OctagonX size={14} /> <ItemLabel label={retryLabel} hint={manageHint} />
+          </Menu.Item>
+        ) : null}
         {restorable ? (
           <Menu.Item value="restore" disabled={manageHint !== null} onClick={pick("restore")}>
             <RotateCcw size={14} /> <ItemLabel label="Restore" hint={manageHint} />

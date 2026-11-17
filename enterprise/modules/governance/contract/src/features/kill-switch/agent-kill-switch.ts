@@ -167,6 +167,15 @@ export const AGENT_STOP_RESTORABLE_STATUSES: readonly AgentStopStatus[] = [
   "stop_failed",
   "restore_failed",
 ];
+/**
+ * A stop in one of these may be retried: every target it holds that is not stopped, and every
+ * plan target added since, is applied again.
+ */
+export const AGENT_STOP_RETRYABLE_STATUSES: readonly AgentStopStatus[] = [
+  "quarantined",
+  "stop_failed",
+  "restore_failed",
+];
 
 export const AGENT_STOP_TARGET_STATES = [
   "pending",
@@ -247,6 +256,14 @@ export interface DecideAgentStopInputSchema extends Named<
 export const decideAgentStopInputSchema: DecideAgentStopInputSchema =
   decideAgentStopInputSchemaDefinition;
 
+/** A retry takes no fields: it applies again what the stop has not stopped. */
+const retryAgentStopInputSchemaDefinition = z.object({});
+export interface RetryAgentStopInputSchema extends Named<
+  typeof retryAgentStopInputSchemaDefinition
+> {}
+export const retryAgentStopInputSchema: RetryAgentStopInputSchema =
+  retryAgentStopInputSchemaDefinition;
+
 /** A restore takes no fields: it reverts what the stop applied. */
 const restoreAgentStopInputSchemaDefinition = z.object({});
 export interface RestoreAgentStopInputSchema extends Named<
@@ -316,6 +333,8 @@ export const AGENT_STOP_EVENT_TYPES = {
   RESTORE_REQUESTED: "lw.governance.agent_stop.restore_requested",
   TARGET_REVERTED: "lw.governance.agent_stop.target_reverted",
   TARGET_REVERT_FAILED: "lw.governance.agent_stop.target_revert_failed",
+  RETRY_REQUESTED: "lw.governance.agent_stop.retry_requested",
+  TARGETS_DROPPED: "lw.governance.agent_stop.targets_dropped",
 } as const;
 export const AGENT_STOP_EVENT_VERSION = "2026-11-16" as const;
 export const AGENT_STOP_COMMAND_TYPES = {
@@ -327,6 +346,8 @@ export const AGENT_STOP_COMMAND_TYPES = {
   REQUEST_RESTORE: "lw.governance.agent_stop.request_restore",
   RECORD_TARGET_REVERTED: "lw.governance.agent_stop.record_target_reverted",
   RECORD_TARGET_REVERT_FAILED: "lw.governance.agent_stop.record_target_revert_failed",
+  RETRY: "lw.governance.agent_stop.retry",
+  DROP_TARGETS: "lw.governance.agent_stop.drop_targets",
 } as const;
 
 const stopRef = { stopId: z.string().min(1), organizationId: z.string().min(1) };
@@ -341,7 +362,7 @@ const agentStopRequestedEventDataSchemaDefinition = z.object({
   reason: z.string(),
   requestedByUserId: z.string().nullable(),
   requestedByApiKeyId: z.string().nullable(),
-  /** The plan as it stood at request: a later plan edit never changes what this stop acts on. */
+  /** The plan as it stood at request; a target later removed from the plan leaves the stop. */
   targets: agentStopPlanTargetSchema.array().min(1),
 });
 export interface AgentStopRequestedEventDataSchema extends Named<
@@ -376,6 +397,8 @@ const agentStopTargetSettledEventDataSchemaDefinition = z.object({
   keptDisabled: z.boolean().optional(),
   /** On a revert outcome: the restore it answers, so a second restore records its own outcome. */
   restoreRound: z.number().int().positive().optional(),
+  /** On an apply outcome: the retry it answers, absent for the stop's first run. */
+  retryRound: z.number().int().positive().optional(),
 });
 export interface AgentStopTargetSettledEventDataSchema extends Named<
   typeof agentStopTargetSettledEventDataSchemaDefinition
@@ -398,6 +421,40 @@ export const agentStopRestoreRequestedEventDataSchema: AgentStopRestoreRequested
   agentStopRestoreRequestedEventDataSchemaDefinition;
 export type AgentStopRestoreRequestedEventData = z.infer<
   typeof agentStopRestoreRequestedEventDataSchema
+>;
+
+const agentStopRetryRequestedEventDataSchemaDefinition = z.object({
+  ...stopRef,
+  requestedByUserId: z.string().nullable(),
+  requestedByApiKeyId: z.string().nullable(),
+  /** 1 for the stop's first retry, one more on each later one. */
+  retryRound: z.number().int().positive(),
+  /** Plan targets the stop did not hold yet; they are applied with the ones it failed to stop. */
+  targets: agentStopPlanTargetSchema.array(),
+});
+export interface AgentStopRetryRequestedEventDataSchema extends Named<
+  typeof agentStopRetryRequestedEventDataSchemaDefinition
+> {}
+export const agentStopRetryRequestedEventDataSchema: AgentStopRetryRequestedEventDataSchema =
+  agentStopRetryRequestedEventDataSchemaDefinition;
+export type AgentStopRetryRequestedEventData = z.infer<
+  typeof agentStopRetryRequestedEventDataSchema
+>;
+
+const agentStopTargetsDroppedEventDataSchemaDefinition = z.object({
+  ...stopRef,
+  /** The stop's targets the plan no longer holds. */
+  targetIds: z.string().min(1).array().min(1),
+  /** One per plan change, so each drop records once. */
+  dropId: z.string().min(1),
+});
+export interface AgentStopTargetsDroppedEventDataSchema extends Named<
+  typeof agentStopTargetsDroppedEventDataSchemaDefinition
+> {}
+export const agentStopTargetsDroppedEventDataSchema: AgentStopTargetsDroppedEventDataSchema =
+  agentStopTargetsDroppedEventDataSchemaDefinition;
+export type AgentStopTargetsDroppedEventData = z.infer<
+  typeof agentStopTargetsDroppedEventDataSchema
 >;
 
 const event = governanceEventEnvelopeSchema.safeExtend({
@@ -435,6 +492,14 @@ export const agentStopTargetRevertedEventSchema = event.safeExtend({
 export const agentStopTargetRevertFailedEventSchema = event.safeExtend({
   type: z.literal(AGENT_STOP_EVENT_TYPES.TARGET_REVERT_FAILED),
   data: agentStopTargetSettledEventDataSchema,
+});
+export const agentStopRetryRequestedEventSchema = event.safeExtend({
+  type: z.literal(AGENT_STOP_EVENT_TYPES.RETRY_REQUESTED),
+  data: agentStopRetryRequestedEventDataSchema,
+});
+export const agentStopTargetsDroppedEventSchema = event.safeExtend({
+  type: z.literal(AGENT_STOP_EVENT_TYPES.TARGETS_DROPPED),
+  data: agentStopTargetsDroppedEventDataSchema,
 });
 
 /** The webhook and audit names of a stop's milestones, pushed through the registry's feed. */
@@ -525,6 +590,10 @@ export const governanceKillSwitchTrpc = defineTrpcContract("governanceKillSwitch
   .withOutput(agentStopViewSchema)
 
   .mutation("restore")
+  .withInput(z.object(stopScope))
+  .withOutput(agentStopViewSchema)
+
+  .mutation("retryStop")
   .withInput(z.object(stopScope))
   .withOutput(agentStopViewSchema)
   .build();

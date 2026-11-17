@@ -4,24 +4,28 @@ import {
   agentStopDecidedEventDataSchema,
   agentStopRequestedEventDataSchema,
   agentStopRestoreRequestedEventDataSchema,
+  agentStopRetryRequestedEventDataSchema,
   agentStopTargetSettledEventDataSchema,
+  agentStopTargetsDroppedEventDataSchema,
 } from "@langwatch/enterprise-governance-contract";
 import type { Event, StateProjectionDefinition, StateProjectionStore } from "@langwatch/eventing";
 
 import {
+  AGENT_STOP_PROJECTION_VERSION,
   type AgentStopRecord,
   approvedStop,
   deniedStop,
   requestedStop,
   restoreRequestedStop,
+  retriedStop,
   targetAppliedStop,
   targetFailedStop,
   targetRevertedStop,
   targetRevertFailedStop,
+  targetsDroppedStop,
 } from "../rules/agent-stop.rules.ts";
 
 const AGENT_STOP_PROJECTION_NAME = "agentStop" as const;
-const AGENT_STOP_PROJECTION_VERSION = "2026-11-16" as const;
 
 /** Null until the stop's request is folded; the store writes nothing for it. */
 export type AgentStopProjectionState = AgentStopRecord | null;
@@ -75,6 +79,14 @@ export function foldAgentStop({
       return targetRevertFailedStop({
         stop,
         data: agentStopTargetSettledEventDataSchema.parse(data),
+        at,
+      });
+    case AGENT_STOP_EVENT_TYPES.RETRY_REQUESTED:
+      return retriedStop({ stop, data: agentStopRetryRequestedEventDataSchema.parse(data), at });
+    case AGENT_STOP_EVENT_TYPES.TARGETS_DROPPED:
+      return targetsDroppedStop({
+        stop,
+        data: agentStopTargetsDroppedEventDataSchema.parse(data),
         at,
       });
     default:

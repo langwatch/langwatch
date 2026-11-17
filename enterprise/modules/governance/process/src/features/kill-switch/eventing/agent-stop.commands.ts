@@ -11,7 +11,9 @@ import {
   agentStopDecidedEventDataSchema,
   agentStopRequestedEventDataSchema,
   agentStopRestoreRequestedEventDataSchema,
+  agentStopRetryRequestedEventDataSchema,
   agentStopTargetSettledEventDataSchema,
+  agentStopTargetsDroppedEventDataSchema,
 } from "@langwatch/enterprise-governance-contract";
 import { defineCommand } from "@langwatch/eventing";
 
@@ -30,6 +32,18 @@ function revertKey({
   outcome: string;
 }): string {
   return `${data.stopId}:${outcome}:${data.targetId}:${data.restoreRound ?? 1}`;
+}
+
+/** An apply outcome carries its retry round once the stop was retried, so each run records its own. */
+function applyKey({
+  data,
+  outcome,
+}: {
+  data: { stopId: string; targetId: string; retryRound?: number | undefined };
+  outcome: string;
+}): string {
+  const key = `${data.stopId}:${outcome}:${data.targetId}`;
+  return data.retryRound ? `${key}:retry:${data.retryRound}` : key;
 }
 
 const RequestAgentStopCommand = defineCommand({
@@ -75,9 +89,9 @@ const RecordAgentStopTargetAppliedCommand = defineCommand({
   aggregateType: AGENT_STOP_AGGREGATE_TYPE,
   schema: agentStopTargetSettledEventDataSchema,
   aggregateId: (data) => data.stopId,
-  idempotencyKey: (data) => `${data.stopId}:applied:${data.targetId}`,
+  idempotencyKey: (data) => applyKey({ data, outcome: "applied" }),
   spanAttributes: targetAttributes,
-  makeJobId: (data) => `${data.stopId}:applied:${data.targetId}`,
+  makeJobId: (data) => applyKey({ data, outcome: "applied" }),
 });
 
 const RecordAgentStopTargetFailedCommand = defineCommand({
@@ -87,9 +101,9 @@ const RecordAgentStopTargetFailedCommand = defineCommand({
   aggregateType: AGENT_STOP_AGGREGATE_TYPE,
   schema: agentStopTargetSettledEventDataSchema,
   aggregateId: (data) => data.stopId,
-  idempotencyKey: (data) => `${data.stopId}:failed:${data.targetId}`,
+  idempotencyKey: (data) => applyKey({ data, outcome: "failed" }),
   spanAttributes: targetAttributes,
-  makeJobId: (data) => `${data.stopId}:failed:${data.targetId}`,
+  makeJobId: (data) => applyKey({ data, outcome: "failed" }),
 });
 
 const RequestAgentStopRestoreCommand = defineCommand({
@@ -128,6 +142,30 @@ const RecordAgentStopTargetRevertFailedCommand = defineCommand({
   makeJobId: (data) => revertKey({ data, outcome: "revert_failed" }),
 });
 
+const RetryAgentStopCommand = defineCommand({
+  commandType: AGENT_STOP_COMMAND_TYPES.RETRY,
+  eventType: AGENT_STOP_EVENT_TYPES.RETRY_REQUESTED,
+  eventVersion: AGENT_STOP_EVENT_VERSION,
+  aggregateType: AGENT_STOP_AGGREGATE_TYPE,
+  schema: agentStopRetryRequestedEventDataSchema,
+  aggregateId: (data) => data.stopId,
+  idempotencyKey: (data) => `${data.stopId}:retry:${data.retryRound}`,
+  spanAttributes: stopAttributes,
+  makeJobId: (data) => `${data.stopId}:retry:${data.retryRound}`,
+});
+
+const DropAgentStopTargetsCommand = defineCommand({
+  commandType: AGENT_STOP_COMMAND_TYPES.DROP_TARGETS,
+  eventType: AGENT_STOP_EVENT_TYPES.TARGETS_DROPPED,
+  eventVersion: AGENT_STOP_EVENT_VERSION,
+  aggregateType: AGENT_STOP_AGGREGATE_TYPE,
+  schema: agentStopTargetsDroppedEventDataSchema,
+  aggregateId: (data) => data.stopId,
+  idempotencyKey: (data) => `${data.stopId}:drop:${data.dropId}`,
+  spanAttributes: stopAttributes,
+  makeJobId: (data) => `${data.stopId}:drop:${data.dropId}`,
+});
+
 export const AGENT_STOP_COMMANDS = {
   request: RequestAgentStopCommand,
   approve: ApproveAgentStopCommand,
@@ -137,5 +175,7 @@ export const AGENT_STOP_COMMANDS = {
   requestRestore: RequestAgentStopRestoreCommand,
   recordTargetReverted: RecordAgentStopTargetRevertedCommand,
   recordTargetRevertFailed: RecordAgentStopTargetRevertFailedCommand,
+  retry: RetryAgentStopCommand,
+  dropTargets: DropAgentStopTargetsCommand,
 } as const;
 export type AgentStopCommandName = keyof typeof AGENT_STOP_COMMANDS;

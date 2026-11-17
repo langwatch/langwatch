@@ -67,6 +67,7 @@ const SELF_AUDITED_PATHS = new Set([
   "governanceKillSwitch.approveStop",
   "governanceKillSwitch.denyStop",
   "governanceKillSwitch.restore",
+  "governanceKillSwitch.retryStop",
 ]);
 
 export function isAuditLogExempt(path: string): boolean {

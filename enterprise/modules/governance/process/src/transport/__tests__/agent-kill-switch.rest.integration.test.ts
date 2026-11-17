@@ -177,6 +177,34 @@ describe("the agent kill switch REST family", () => {
       await eventing.close();
     });
 
+    /** @scenario "A new stop reads back as soon as its 202 returns" */
+    it("serves the new stop as the latest one and approves it straight after the 202", async () => {
+      const { call, eventing } = await buildKillSwitchRest();
+      const requested = (await (
+        await call({
+          method: "POST",
+          path: `/api/governance/agents/${AGENT_ID}/stop`,
+          body: JSON.stringify({ reason: "cost spike", severity: "high" }),
+          key: KEYS.traceRule,
+        })
+      ).json()) as StopBody;
+
+      const latest = await call({ method: "GET", path: `/api/governance/agents/${AGENT_ID}/stop` });
+      const approved = await call({
+        method: "POST",
+        path: `/api/governance/agent-stops/${requested.data.id}/approve`,
+        body: "{}",
+      });
+
+      expect(((await latest.json()) as StopBody).data).toMatchObject({
+        id: requested.data.id,
+        status: "pending_approval",
+      });
+      expect(approved.status).toBe(200);
+      expect(((await approved.json()) as StopBody).data.status).toBe("stopping");
+      await eventing.close();
+    });
+
     it("answers 404 agent_stop_not_found for an agent that was never stopped", async () => {
       const { call, eventing } = await buildKillSwitchRest();
 
@@ -187,6 +215,90 @@ describe("the agent kill switch REST family", () => {
 
       expect(response.status).toBe(404);
       expect(((await response.json()) as { code: string }).code).toBe("agent_stop_not_found");
+      await eventing.close();
+    });
+  });
+});
+
+describe("the retry route and the stop plan route", () => {
+  async function quarantined() {
+    const harness = await buildKillSwitchRest();
+    const requested = (await (
+      await harness.call({
+        method: "POST",
+        path: `/api/governance/agents/${AGENT_ID}/stop`,
+        body: JSON.stringify({ reason: "data exfiltration attempt", severity: "critical" }),
+        key: KEYS.traceRule,
+      })
+    ).json()) as StopBody;
+    const stopId = requested.data.id;
+    await vi.waitFor(async () =>
+      expect(
+        (await harness.repositories.agentStops.getStop({ organizationId: "org-1", stopId })).status,
+      ).toBe("quarantined"),
+    );
+    return { ...harness, stopId };
+  }
+
+  describe("given a quarantined stop", () => {
+    /** @scenario "The REST route retries a stop" */
+    it("answers 202 to a retry and keeps the stop quarantined when nothing is left to stop", async () => {
+      const { call, eventing, stopId } = await quarantined();
+
+      const retried = await call({
+        method: "POST",
+        path: `/api/governance/agent-stops/${stopId}/retry`,
+        body: "{}",
+      });
+
+      expect(retried.status).toBe(202);
+      expect(((await retried.json()) as StopBody).data).toMatchObject({
+        id: stopId,
+        status: "quarantined",
+      });
+      await eventing.close();
+    });
+
+    /** @scenario "Removing a target from the plan drops it from the open stop" */
+    it("drops the virtual key from the open stop when the plan no longer holds it", async () => {
+      const { call, repositories, eventing, stopId } = await quarantined();
+
+      const replaced = await call({
+        method: "PUT",
+        path: `/api/governance/agents/${AGENT_ID}/stop-plan`,
+        body: JSON.stringify({ targets: [] }),
+      });
+
+      expect(replaced.status).toBe(200);
+      await vi.waitFor(async () =>
+        expect(
+          (await repositories.agentStops.getStop({ organizationId: "org-1", stopId })).targets,
+        ).toEqual([]),
+      );
+      await eventing.close();
+    });
+  });
+
+  describe("given a stop waiting for an approval", () => {
+    it("refuses a retry with 409 agent_stop_not_retryable", async () => {
+      const { call, eventing } = await buildKillSwitchRest();
+      const requested = (await (
+        await call({
+          method: "POST",
+          path: `/api/governance/agents/${AGENT_ID}/stop`,
+          body: JSON.stringify({ reason: "cost spike", severity: "high" }),
+          key: KEYS.traceRule,
+        })
+      ).json()) as StopBody;
+
+      const retried = await call({
+        method: "POST",
+        path: `/api/governance/agent-stops/${requested.data.id}/retry`,
+        body: "{}",
+      });
+
+      expect(retried.status).toBe(409);
+      expect(((await retried.json()) as { code: string }).code).toBe("agent_stop_not_retryable");
       await eventing.close();
     });
   });

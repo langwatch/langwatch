@@ -11,10 +11,12 @@ import {
   agentStopPlanTargetSchema,
   agentStopRequestedEventSchema,
   agentStopRestoreRequestedEventSchema,
+  agentStopRetryRequestedEventSchema,
   agentStopTargetAppliedEventSchema,
   agentStopTargetFailedEventSchema,
   agentStopTargetRevertedEventSchema,
   agentStopTargetRevertFailedEventSchema,
+  agentStopTargetsDroppedEventSchema,
   agentStopViewSchema,
   AGENT_STOP_WEBHOOK_EVENT_TYPES,
 } from "@langwatch/enterprise-governance-contract";
@@ -57,7 +59,11 @@ const targetWorkSchema = z.object({
   actorUserId: z.string().min(1),
   target: agentStopPlanTargetSchema,
 });
-const agentStopApplyIntentSchema = targetWorkSchema;
+const agentStopApplyIntentSchema = z.object({
+  ...targetWorkSchema.shape,
+  /** The retry the apply belongs to, 0 for the stop's first run. */
+  retryRound: z.number().int().nonnegative().default(0),
+});
 const agentStopRevertIntentSchema = z.object({
   ...targetWorkSchema.shape,
   restoreRound: z.number().int().positive(),
@@ -67,6 +73,8 @@ const agentStopAnnounceIntentSchema = z.object({
   milestone: z.enum(AGENT_STOP_WEBHOOK_EVENT_TYPES),
   /** The restore the milestone belongs to (0 before any), so each restore announces once. */
   restoreRound: z.number().int().nonnegative(),
+  /** The retry the milestone belongs to (0 before any), so each retry announces once. */
+  retryRound: z.number().int().nonnegative().default(0),
   stop: agentStopViewSchema,
 });
 export type AgentStopApplyIntent = z.infer<typeof agentStopApplyIntentSchema>;
@@ -92,7 +100,8 @@ export interface AgentStopIntentExecutors {
 }
 
 /**
- * A restore acts as whoever asked for it; a stop as whoever decided, else requested it. A machine
+ * A restore acts as whoever asked for it; a retried stop as whoever retried it; a stop as whoever
+ * decided, else requested it. A machine
  * credential with no owner acts as a stable service principal named after the key, as the gateway
  * does for an ownerless key.
  */
@@ -104,6 +113,7 @@ function actorPairOf({
   restoring: boolean;
 }): [string | null, string | null] {
   if (restoring) return [stop.restoredByUserId, stop.restoredByApiKeyId];
+  if (stop.retryRound > 0) return [stop.retriedByUserId, stop.retriedByApiKeyId];
   if (stop.decidedByUserId !== null || stop.decidedByApiKeyId !== null) {
     return [stop.decidedByUserId, stop.decidedByApiKeyId];
   }
@@ -140,12 +150,13 @@ function intentsOfTransition({
   const intents: ProcessIntent[] = [];
   if (after.status === "stopping" && before?.status !== "stopping") {
     for (const target of after.targets.filter((outcome) => outcome.state === "pending")) {
+      const key =
+        after.retryRound > 0 ? `apply:${target.id}:${after.retryRound}` : `apply:${target.id}`;
       intents.push(
-        context.intent(
-          AGENT_STOP_INTENT_TYPES.APPLY,
-          `apply:${target.id}`,
-          work(after, target, false),
-        ),
+        context.intent(AGENT_STOP_INTENT_TYPES.APPLY, key, {
+          ...work(after, target, false),
+          retryRound: after.retryRound,
+        }),
       );
     }
   }
@@ -167,14 +178,16 @@ function intentsOfTransition({
     before: before?.status ?? null,
     after: after.status,
   })) {
+    const key = `announce:${milestone}:${after.restoreRound}`;
     intents.push(
       context.intent(
         AGENT_STOP_INTENT_TYPES.ANNOUNCE,
-        `announce:${milestone}:${after.restoreRound}`,
+        after.retryRound > 0 ? `${key}:retry:${after.retryRound}` : key,
         {
           organizationId: after.organizationId,
           milestone,
           restoreRound: after.restoreRound,
+          retryRound: after.retryRound,
           stop: viewOfStop(after),
         },
       ),
@@ -192,6 +205,8 @@ const HANDLED_EVENTS = [
   agentStopRestoreRequestedEventSchema,
   agentStopTargetRevertedEventSchema,
   agentStopTargetRevertFailedEventSchema,
+  agentStopRetryRequestedEventSchema,
+  agentStopTargetsDroppedEventSchema,
 ] as const;
 
 function evolve({

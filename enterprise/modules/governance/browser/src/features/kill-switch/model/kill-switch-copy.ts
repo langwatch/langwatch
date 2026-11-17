@@ -5,6 +5,7 @@
  */
 import {
   AGENT_STOP_RESTORABLE_STATUSES,
+  AGENT_STOP_RETRYABLE_STATUSES,
   type AgentKillSwitchSummary,
   type AgentStopSeverity,
   type AgentStopStatus,
@@ -47,6 +48,12 @@ export function stopStatusChip(
 
 export const isRestorableStop = (status: AgentStopStatus) =>
   AGENT_STOP_RESTORABLE_STATUSES.includes(status);
+
+/** The menu's name for stopping an open stop again, or null when it cannot be: a failed one is retried. */
+export function retryStopLabelOf(status: AgentStopStatus): string | null {
+  if (!AGENT_STOP_RETRYABLE_STATUSES.includes(status)) return null;
+  return status === "quarantined" ? "Stop again" : "Retry stop";
+}
 
 export const STOP_TARGET_KIND_LABELS: Record<AgentStopTargetKind, string> = {
   databricks_serving_endpoint: "Databricks serving endpoint",

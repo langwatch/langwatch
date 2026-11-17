@@ -11,7 +11,10 @@ import type {
 } from "@langwatch/eventing";
 
 import type { AgentStopProjectionState } from "../../features/kill-switch/eventing/agent-stop.projection.ts";
-import type { AgentStopRecord } from "../../features/kill-switch/rules/agent-stop.rules.ts";
+import {
+  AGENT_STOP_PROJECTION_VERSION,
+  type AgentStopRecord,
+} from "../../features/kill-switch/rules/agent-stop.rules.ts";
 import { type AgentStopPosition, AgentStopRepository } from "../agent-stop.repository.ts";
 
 function latestFirst(a: AgentStopPosition, b: AgentStopPosition): number {
@@ -50,6 +53,19 @@ export class MemoryAgentStopRepository extends AgentStopRepository {
       this.key(String(context.tenantId), projection.state.id),
       structuredClone(projection),
     );
+  }
+
+  async seed({ stop, at }: { stop: AgentStopRecord; at: number }): Promise<void> {
+    const key = this.key(stop.organizationId, stop.id);
+    if (this.rows.has(key)) return;
+    this.rows.set(key, {
+      state: structuredClone(stop),
+      cursor: { acceptedAt: 0, eventId: "" },
+      occurredAt: at,
+      createdAt: at,
+      updatedAt: at,
+      version: AGENT_STOP_PROJECTION_VERSION,
+    });
   }
 
   private all(organizationId: string): AgentStopRecord[] {

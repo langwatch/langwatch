@@ -483,6 +483,20 @@ export class AgentStopNotRestorableError extends HandledError {
   }
 }
 
+export class AgentStopNotRetryableError extends HandledError {
+  declare readonly code: "agent_stop_not_retryable";
+
+  constructor(meta: { stopId: string; status: string }) {
+    super("agent_stop_not_retryable", "The stop cannot be retried in its current status.", {
+      httpStatus: 409,
+      fault: "customer",
+      meta,
+      ...remediation("agent_stop_not_retryable"),
+    });
+    this.name = "AgentStopNotRetryableError";
+  }
+}
+
 export class AgentStopNotFoundError extends NotFoundError {
   constructor(id: string) {
     super(

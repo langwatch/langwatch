@@ -10,10 +10,12 @@ import {
   agentStopDeniedEventSchema,
   agentStopRequestedEventSchema,
   agentStopRestoreRequestedEventSchema,
+  agentStopRetryRequestedEventSchema,
   agentStopTargetAppliedEventSchema,
   agentStopTargetFailedEventSchema,
   agentStopTargetRevertedEventSchema,
   agentStopTargetRevertFailedEventSchema,
+  agentStopTargetsDroppedEventSchema,
 } from "@langwatch/enterprise-governance-contract";
 import {
   defineAggregate,
@@ -47,7 +49,9 @@ type AgentStopEvent =
   | z.infer<typeof agentStopTargetFailedEventSchema>
   | z.infer<typeof agentStopRestoreRequestedEventSchema>
   | z.infer<typeof agentStopTargetRevertedEventSchema>
-  | z.infer<typeof agentStopTargetRevertFailedEventSchema>;
+  | z.infer<typeof agentStopTargetRevertFailedEventSchema>
+  | z.infer<typeof agentStopRetryRequestedEventSchema>
+  | z.infer<typeof agentStopTargetsDroppedEventSchema>;
 
 export type AgentStopPipelineDefinition = StaticPipelineDefinition<
   AgentStopEvent,
@@ -78,6 +82,8 @@ export function buildAgentStopPipeline({
       agentStopRestoreRequestedEventSchema,
       agentStopTargetRevertedEventSchema,
       agentStopTargetRevertFailedEventSchema,
+      agentStopRetryRequestedEventSchema,
+      agentStopTargetsDroppedEventSchema,
     ])
     .withPostgresProjection(agentStopProjection(store))
     .withCommand("request", AGENT_STOP_COMMANDS.request)
@@ -88,6 +94,8 @@ export function buildAgentStopPipeline({
     .withCommand("requestRestore", AGENT_STOP_COMMANDS.requestRestore)
     .withCommand("recordTargetReverted", AGENT_STOP_COMMANDS.recordTargetReverted)
     .withCommand("recordTargetRevertFailed", AGENT_STOP_COMMANDS.recordTargetRevertFailed)
+    .withCommand("retry", AGENT_STOP_COMMANDS.retry)
+    .withCommand("dropTargets", AGENT_STOP_COMMANDS.dropTargets)
     .withProcessManager(
       AGENT_STOP_PROCESS_NAME,
       agentStopProcessManager({ executors, ...(retryDelayMs ? { retryDelayMs } : {}) }),

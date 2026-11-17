@@ -9,9 +9,12 @@ import { isGoneErrorCode } from "../agent-stop-target.rules.ts";
 import {
   requestedStop,
   restoreRequestedStop,
+  retriedStop,
   targetAppliedStop,
+  targetFailedStop,
   targetRevertedStop,
   targetRevertFailedStop,
+  targetsDroppedStop,
   viewOfStop,
 } from "../agent-stop.rules.ts";
 
@@ -127,5 +130,111 @@ describe("isGoneErrorCode", () => {
     expect(isGoneErrorCode("http_404")).toBe(true);
     expect(isGoneErrorCode("ResourceNotFoundException")).toBe(true);
     expect(isGoneErrorCode("http_503")).toBe(false);
+  });
+});
+
+describe("retriedStop", () => {
+  describe("given a stop whose restore failed", () => {
+    it("keeps the target whose revert failed as stopped and settles quarantined", () => {
+      const { failed } = restoreFailedStop();
+
+      const retried = retriedStop({
+        stop: failed,
+        data: {
+          stopId: STOP_ID,
+          organizationId: ORG,
+          requestedByUserId: "user-oncall",
+          requestedByApiKeyId: null,
+          retryRound: 1,
+          targets: [],
+        },
+        at: 5_000,
+      });
+
+      expect(retried).toMatchObject({
+        status: "quarantined",
+        retryRound: 1,
+        retriedByUserId: "user-oncall",
+      });
+      expect(retried.targets[0]).toMatchObject({ state: "applied", errorCode: null });
+    });
+  });
+
+  describe("given a stop whose target failed", () => {
+    /** @scenario "A late outcome of an earlier run changes nothing after a retry" */
+    it("puts the target back to pending and ignores an outcome of the first run", () => {
+      const { settledOutcome } = restoreFailedStop();
+      const requested = requestedStop({
+        data: {
+          stopId: STOP_ID,
+          organizationId: ORG,
+          agentId: "agent-1",
+          agentName: "support-bot",
+          severity: "high",
+          approval: "immediate",
+          trigger: "user",
+          reason: "r",
+          requestedByUserId: "user-ops",
+          requestedByApiKeyId: null,
+          targets: [
+            {
+              id: TARGET_ID,
+              label: "Virtual key",
+              target: { kind: "gateway_virtual_key", virtualKeyId: "vk-1" },
+            },
+          ],
+        },
+        at: 1_000,
+      });
+      const failed = targetFailedStop({
+        stop: requested,
+        data: { ...settledOutcome, errorCode: "http_503" },
+        at: 2_000,
+      });
+      const retried = retriedStop({
+        stop: failed,
+        data: {
+          stopId: STOP_ID,
+          organizationId: ORG,
+          requestedByUserId: "user-ops",
+          requestedByApiKeyId: null,
+          retryRound: 1,
+          targets: [],
+        },
+        at: 3_000,
+      });
+
+      const late = targetAppliedStop({
+        stop: retried,
+        data: { ...settledOutcome, errorCode: null },
+        at: 4_000,
+      });
+      const applied = targetAppliedStop({
+        stop: retried,
+        data: { ...settledOutcome, errorCode: null, retryRound: 1 },
+        at: 4_000,
+      });
+
+      expect(failed.status).toBe("stop_failed");
+      expect(retried).toMatchObject({ status: "stopping", targets: [{ state: "pending" }] });
+      expect(late).toEqual(retried);
+      expect(applied.status).toBe("quarantined");
+    });
+  });
+});
+
+describe("targetsDroppedStop", () => {
+  describe("given a stop whose restore failed on its only target", () => {
+    it("restores the stop once that target leaves it", () => {
+      const { failed } = restoreFailedStop();
+
+      const dropped = targetsDroppedStop({
+        stop: failed,
+        data: { stopId: STOP_ID, organizationId: ORG, targetIds: [TARGET_ID], dropId: "drop-1" },
+        at: 5_000,
+      });
+
+      expect(dropped).toMatchObject({ status: "restored", targets: [] });
+    });
   });
 });

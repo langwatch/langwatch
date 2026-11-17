@@ -1470,6 +1470,7 @@
               "api-reference/governance-kill-switch/approve-a-pending-stop",
               "api-reference/governance-kill-switch/deny-a-pending-stop",
               "api-reference/governance-kill-switch/restore-a-stopped-agent",
+              "api-reference/governance-kill-switch/retry-a-stop",
               "api-reference/governance-kill-switch/stop-an-agent"
             ]
           },

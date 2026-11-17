@@ -249,6 +249,7 @@ describe("AgentStopService restore", () => {
         organizationId: ORG,
         milestone: announced.milestone,
         restoreRound: 0,
+        retryRound: 0,
         stop: announced.stop,
       });
 

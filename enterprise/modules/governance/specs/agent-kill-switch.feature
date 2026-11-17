@@ -373,6 +373,80 @@ Feature: Agent kill switch: stop a misbehaving agent where it runs, with approva
     When an API key with no owner approves it
     Then the gateway disables the virtual key as the approving key's service principal
 
+  # Retry and plan changes
+
+  @integration
+  Scenario: A failed stop is retried on the targets it did not stop
+    Given a stop of "support-bot" that ended stop_failed because the serving endpoint answered 503
+    And the serving endpoint stops again
+    When a person with governance:manage retries the stop
+    Then only the serving endpoint is called again
+    And the stop is quarantined
+    And a "governance.agent.quarantined" event is pushed and a "governance.agent.stop_retried" audit row is written
+
+  @integration
+  Scenario: A retry that fails again announces the failure again
+    Given a stop of "support-bot" that ended stop_failed
+    When it is retried and the serving endpoint still answers 503
+    Then the stop is stop_failed again
+    And a second "governance.agent.stop_failed" event is pushed with an event id of its own
+
+  @integration
+  Scenario: A stop whose restore failed can be stopped again
+    Given a stop of "support-bot" whose restore failed because the serving endpoint refused to start
+    When the stop is retried
+    Then the virtual key and the Bedrock alias are stopped again
+    And the stop is quarantined
+
+  @integration
+  Scenario: Stopping a quarantined agent again applies the targets added to its plan
+    Given a quarantined stop of "support-bot" whose plan gained a serving endpoint since
+    When the stop is retried
+    Then only the serving endpoint is stopped
+    And the stop is quarantined with the three targets
+
+  @integration
+  Scenario: Only a quarantined or failed stop can be retried
+    Given a stop of "support-bot" pending approval
+    When it is retried
+    Then the retry is refused with code "agent_stop_not_retryable"
+
+  @integration
+  Scenario: The REST route retries a stop
+    Given a quarantined stop of "support-bot"
+    When an API key with governance:manage posts to its retry route
+    Then the route answers 202 with the stop
+
+  @unit
+  Scenario: A late outcome of an earlier run changes nothing after a retry
+    Given a failed stop that was retried
+    When an apply outcome of the first run arrives
+    Then the stop is unchanged, and the retry's own outcome settles it
+
+  @integration
+  Scenario: A failed target removed from the plan no longer fails the stop
+    Given a stop of "support-bot" that ended stop_failed on its serving endpoint
+    When the serving endpoint is removed from the plan
+    Then the stop drops the serving endpoint and is quarantined
+
+  @integration
+  Scenario: A target removed from the plan no longer holds a failed restore
+    Given a stop of "support-bot" whose restore failed on its serving endpoint
+    When the serving endpoint is removed from the plan
+    Then the stop is restored
+
+  @integration
+  Scenario: Removing a target from the plan drops it from the open stop
+    Given a quarantined stop of "support-bot"
+    When its plan is replaced over REST without the virtual key
+    Then the open stop no longer holds the virtual key
+
+  @integration
+  Scenario: A new stop reads back as soon as its 202 returns
+    When an API key requests a stop of "support-bot" that waits for an approval
+    Then the latest stop of "support-bot" is that stop right after the 202
+    And another key approves it right after the 202
+
   # Audit
 
   @integration
@@ -460,6 +534,18 @@ Feature: Agent kill switch: stop a misbehaving agent where it runs, with approva
   Scenario: The AWS connection form adds a key pair or a role to assume
     When a person adds an AWS connection with an access key pair, or switches to a role to assume
     Then only the fields of the chosen kind are sent, trimmed
+
+  @integration
+  Scenario: The agent row menu always offers a way to stop an open stop again
+    Given "support-bot" has a quarantined, stop_failed or restore_failed stop
+    When a person with governance:manage opens its row menu
+    Then the menu offers "Stop again" for a quarantined stop and "Retry stop" for a failed one, beside Restore
+
+  @integration
+  Scenario: A failed stop is retried from the agent row menu
+    Given "support-bot" has a stop_failed stop
+    When a person with governance:manage picks "Retry stop" and confirms
+    Then the stop is retried
 
   @integration
   Scenario: The Restore dialog restores only the stop it was opened for

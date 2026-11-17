@@ -355,6 +355,7 @@
 /api-reference/governance-kill-switch/overview
 /api-reference/governance-kill-switch/replace-an-agent-s-stop-plan
 /api-reference/governance-kill-switch/restore-a-stopped-agent
+/api-reference/governance-kill-switch/retry-a-stop
 /api-reference/governance-kill-switch/stop-an-agent
 /api-reference/grants
 /api-reference/grants/change-a-grant-s-role

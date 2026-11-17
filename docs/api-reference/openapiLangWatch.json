@@ -78594,6 +78594,12 @@
                                     },
                                     "alreadyStopped": {
                                       "type": "boolean"
+                                    },
+                                    "gone": {
+                                      "type": "boolean"
+                                    },
+                                    "keptDisabled": {
+                                      "type": "boolean"
                                     }
                                   },
                                   "required": [
@@ -79805,6 +79811,12 @@
                                       ]
                                     },
                                     "alreadyStopped": {
+                                      "type": "boolean"
+                                    },
+                                    "gone": {
+                                      "type": "boolean"
+                                    },
+                                    "keptDisabled": {
                                       "type": "boolean"
                                     }
                                   },
@@ -83659,7 +83671,7 @@
             }
           }
         },
-        "description": "Replaces every target at once; an empty list clears the plan. Each target must name what the organisation holds: a Databricks governance source, a stored AWS connection or a gateway virtual key. Anything else is a 422 `agent_stop_target_invalid` naming the target's position.",
+        "description": "Replaces every target at once; an empty list clears the plan. Each target must name what the organisation holds: a Databricks governance source, a stored AWS connection or a gateway virtual key. Anything else is a 422 `agent_stop_target_invalid` naming the target's position. A target removed from the plan also leaves the agent's open stop, so it no longer holds that stop or its restore from finishing; a restore leaves it as it is.",
         "summary": "Replace an agent's stop plan",
         "tags": [
           "Governance / Kill Switch"
@@ -84004,6 +84016,12 @@
                                 ]
                               },
                               "alreadyStopped": {
+                                "type": "boolean"
+                              },
+                              "gone": {
+                                "type": "boolean"
+                              },
+                              "keptDisabled": {
                                 "type": "boolean"
                               }
                             },
@@ -84938,6 +84956,12 @@
                               },
                               "alreadyStopped": {
                                 "type": "boolean"
+                              },
+                              "gone": {
+                                "type": "boolean"
+                              },
+                              "keptDisabled": {
+                                "type": "boolean"
                               }
                             },
                             "required": [
@@ -85755,6 +85779,12 @@
                                 },
                                 "alreadyStopped": {
                                   "type": "boolean"
+                                },
+                                "gone": {
+                                  "type": "boolean"
+                                },
+                                "keptDisabled": {
+                                  "type": "boolean"
                                 }
                               },
                               "required": [
@@ -86521,6 +86551,12 @@
                                 ]
                               },
                               "alreadyStopped": {
+                                "type": "boolean"
+                              },
+                              "gone": {
+                                "type": "boolean"
+                              },
+                              "keptDisabled": {
                                 "type": "boolean"
                               }
                             },
@@ -87435,6 +87471,12 @@
                               },
                               "alreadyStopped": {
                                 "type": "boolean"
+                              },
+                              "gone": {
+                                "type": "boolean"
+                              },
+                              "keptDisabled": {
+                                "type": "boolean"
                               }
                             },
                             "required": [
@@ -88348,6 +88390,12 @@
                               },
                               "alreadyStopped": {
                                 "type": "boolean"
+                              },
+                              "gone": {
+                                "type": "boolean"
+                              },
+                              "keptDisabled": {
+                                "type": "boolean"
                               }
                             },
                             "required": [
@@ -88997,6 +89045,909 @@
         },
         "description": "Reverts the targets the stop applied: serving endpoints are started, Bedrock aliases accept invocations again and virtual keys are enabled. Targets the stop failed to apply are left alone. Only a `quarantined`, `stop_failed` or `restore_failed` stop can be restored (409 `agent_stop_not_restorable`).",
         "summary": "Restore a stopped agent",
+        "tags": [
+          "Governance / Kill Switch"
+        ],
+        "security": [
+          {
+            "admin_api_key": []
+          }
+        ],
+        "x-access-policy": {
+          "kind": "handlerManaged",
+          "credential": [
+            "organization_api_key"
+          ],
+          "permissions": [
+            "governance:manage"
+          ]
+        },
+        "parameters": [
+          {
+            "in": "path",
+            "name": "stopId",
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true
+          }
+        ]
+      }
+    },
+    "/api/v1/governance/agent-stops/{stopId}/retry": {
+      "post": {
+        "operationId": "postApiGovernanceAgentStopsByIdRetry",
+        "responses": {
+          "202": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "agentId": {
+                          "type": "string"
+                        },
+                        "agentName": {
+                          "type": "string"
+                        },
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "pending_approval",
+                            "denied",
+                            "stopping",
+                            "quarantined",
+                            "stop_failed",
+                            "restoring",
+                            "restored",
+                            "restore_failed"
+                          ]
+                        },
+                        "severity": {
+                          "type": "string",
+                          "enum": [
+                            "low",
+                            "medium",
+                            "high",
+                            "critical"
+                          ]
+                        },
+                        "approval": {
+                          "type": "string",
+                          "enum": [
+                            "immediate",
+                            "required"
+                          ]
+                        },
+                        "trigger": {
+                          "type": "string",
+                          "enum": [
+                            "user",
+                            "api_key"
+                          ]
+                        },
+                        "reason": {
+                          "type": "string"
+                        },
+                        "requestedBy": {
+                          "type": "object",
+                          "properties": {
+                            "userId": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "apiKeyId": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "userId",
+                            "apiKeyId"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "decidedByUserId": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "restoredByUserId": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "targets": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "label": {
+                                "type": "string"
+                              },
+                              "target": {
+                                "oneOf": [
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "kind": {
+                                        "type": "string",
+                                        "const": "databricks_serving_endpoint"
+                                      },
+                                      "ingestionSourceId": {
+                                        "type": "string",
+                                        "minLength": 1
+                                      },
+                                      "endpointName": {
+                                        "type": "string",
+                                        "minLength": 1,
+                                        "maxLength": 63,
+                                        "pattern": "^[A-Za-z0-9_-]+$"
+                                      }
+                                    },
+                                    "required": [
+                                      "kind",
+                                      "ingestionSourceId",
+                                      "endpointName"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "kind": {
+                                        "type": "string",
+                                        "const": "bedrock_agent_alias"
+                                      },
+                                      "awsConnectionId": {
+                                        "type": "string",
+                                        "minLength": 1
+                                      },
+                                      "region": {
+                                        "type": "string",
+                                        "pattern": "^[a-z]{2}(-[a-z]+)+-\\d$"
+                                      },
+                                      "agentId": {
+                                        "type": "string",
+                                        "pattern": "^[0-9a-zA-Z]{10}$"
+                                      },
+                                      "agentAliasId": {
+                                        "type": "string",
+                                        "pattern": "^[0-9a-zA-Z]{10}$"
+                                      }
+                                    },
+                                    "required": [
+                                      "kind",
+                                      "awsConnectionId",
+                                      "region",
+                                      "agentId",
+                                      "agentAliasId"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "kind": {
+                                        "type": "string",
+                                        "const": "gateway_virtual_key"
+                                      },
+                                      "virtualKeyId": {
+                                        "type": "string",
+                                        "minLength": 1
+                                      }
+                                    },
+                                    "required": [
+                                      "kind",
+                                      "virtualKeyId"
+                                    ],
+                                    "additionalProperties": false
+                                  }
+                                ]
+                              },
+                              "state": {
+                                "type": "string",
+                                "enum": [
+                                  "pending",
+                                  "applied",
+                                  "failed",
+                                  "reverting",
+                                  "reverted",
+                                  "revert_failed"
+                                ]
+                              },
+                              "errorCode": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "appliedAt": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "revertedAt": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "alreadyStopped": {
+                                "type": "boolean"
+                              },
+                              "gone": {
+                                "type": "boolean"
+                              },
+                              "keptDisabled": {
+                                "type": "boolean"
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "label",
+                              "target",
+                              "state",
+                              "errorCode",
+                              "appliedAt",
+                              "revertedAt"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "requestedAt": {
+                          "type": "string"
+                        },
+                        "decidedAt": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "quarantinedAt": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "restoreRequestedAt": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "restoredAt": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "agentId",
+                        "agentName",
+                        "status",
+                        "severity",
+                        "approval",
+                        "trigger",
+                        "reason",
+                        "requestedBy",
+                        "decidedByUserId",
+                        "restoredByUserId",
+                        "targets",
+                        "requestedAt",
+                        "decidedAt",
+                        "quarantinedAt",
+                        "restoreRequestedAt",
+                        "restoredAt"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "retryable": {
+                      "type": "boolean"
+                    },
+                    "meta": {
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "additionalProperties": {}
+                    },
+                    "trace_id": {
+                      "type": "string"
+                    },
+                    "span_id": {
+                      "type": "string"
+                    },
+                    "trace": {
+                      "type": "object",
+                      "properties": {
+                        "traceId": {
+                          "type": "string"
+                        },
+                        "spanId": {
+                          "type": "string"
+                        },
+                        "traceUrl": {
+                          "type": "string"
+                        },
+                        "logsUrl": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "tips": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "docs_url": {
+                      "type": "string"
+                    },
+                    "fault": {
+                      "type": "string",
+                      "enum": [
+                        "customer",
+                        "platform",
+                        "provider",
+                        "presumed_platform"
+                      ]
+                    },
+                    "reasons": {
+                      "type": "array",
+                      "items": {}
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "code",
+                    "message",
+                    "retryable"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "retryable": {
+                      "type": "boolean"
+                    },
+                    "meta": {
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "additionalProperties": {}
+                    },
+                    "trace_id": {
+                      "type": "string"
+                    },
+                    "span_id": {
+                      "type": "string"
+                    },
+                    "trace": {
+                      "type": "object",
+                      "properties": {
+                        "traceId": {
+                          "type": "string"
+                        },
+                        "spanId": {
+                          "type": "string"
+                        },
+                        "traceUrl": {
+                          "type": "string"
+                        },
+                        "logsUrl": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "tips": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "docs_url": {
+                      "type": "string"
+                    },
+                    "fault": {
+                      "type": "string",
+                      "enum": [
+                        "customer",
+                        "platform",
+                        "provider",
+                        "presumed_platform"
+                      ]
+                    },
+                    "reasons": {
+                      "type": "array",
+                      "items": {}
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "code",
+                    "message",
+                    "retryable"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "retryable": {
+                      "type": "boolean"
+                    },
+                    "meta": {
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "additionalProperties": {}
+                    },
+                    "trace_id": {
+                      "type": "string"
+                    },
+                    "span_id": {
+                      "type": "string"
+                    },
+                    "trace": {
+                      "type": "object",
+                      "properties": {
+                        "traceId": {
+                          "type": "string"
+                        },
+                        "spanId": {
+                          "type": "string"
+                        },
+                        "traceUrl": {
+                          "type": "string"
+                        },
+                        "logsUrl": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "tips": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "docs_url": {
+                      "type": "string"
+                    },
+                    "fault": {
+                      "type": "string",
+                      "enum": [
+                        "customer",
+                        "platform",
+                        "provider",
+                        "presumed_platform"
+                      ]
+                    },
+                    "reasons": {
+                      "type": "array",
+                      "items": {}
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "code",
+                    "message",
+                    "retryable"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "retryable": {
+                      "type": "boolean"
+                    },
+                    "meta": {
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "additionalProperties": {}
+                    },
+                    "trace_id": {
+                      "type": "string"
+                    },
+                    "span_id": {
+                      "type": "string"
+                    },
+                    "trace": {
+                      "type": "object",
+                      "properties": {
+                        "traceId": {
+                          "type": "string"
+                        },
+                        "spanId": {
+                          "type": "string"
+                        },
+                        "traceUrl": {
+                          "type": "string"
+                        },
+                        "logsUrl": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "tips": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "docs_url": {
+                      "type": "string"
+                    },
+                    "fault": {
+                      "type": "string",
+                      "enum": [
+                        "customer",
+                        "platform",
+                        "provider",
+                        "presumed_platform"
+                      ]
+                    },
+                    "reasons": {
+                      "type": "array",
+                      "items": {}
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "code",
+                    "message",
+                    "retryable"
+                  ]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The stop or its plan is not in a state that allows this",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "retryable": {
+                      "type": "boolean"
+                    },
+                    "meta": {
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "additionalProperties": {}
+                    },
+                    "trace_id": {
+                      "type": "string"
+                    },
+                    "span_id": {
+                      "type": "string"
+                    },
+                    "trace": {
+                      "type": "object",
+                      "properties": {
+                        "traceId": {
+                          "type": "string"
+                        },
+                        "spanId": {
+                          "type": "string"
+                        },
+                        "traceUrl": {
+                          "type": "string"
+                        },
+                        "logsUrl": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "tips": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "docs_url": {
+                      "type": "string"
+                    },
+                    "fault": {
+                      "type": "string",
+                      "enum": [
+                        "customer",
+                        "platform",
+                        "provider",
+                        "presumed_platform"
+                      ]
+                    },
+                    "reasons": {
+                      "type": "array",
+                      "items": {}
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "code",
+                    "message",
+                    "retryable"
+                  ]
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "retryable": {
+                      "type": "boolean"
+                    },
+                    "meta": {
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "additionalProperties": {}
+                    },
+                    "trace_id": {
+                      "type": "string"
+                    },
+                    "span_id": {
+                      "type": "string"
+                    },
+                    "trace": {
+                      "type": "object",
+                      "properties": {
+                        "traceId": {
+                          "type": "string"
+                        },
+                        "spanId": {
+                          "type": "string"
+                        },
+                        "traceUrl": {
+                          "type": "string"
+                        },
+                        "logsUrl": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "tips": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "docs_url": {
+                      "type": "string"
+                    },
+                    "fault": {
+                      "type": "string",
+                      "enum": [
+                        "customer",
+                        "platform",
+                        "provider",
+                        "presumed_platform"
+                      ]
+                    },
+                    "reasons": {
+                      "type": "array",
+                      "items": {}
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "code",
+                    "message",
+                    "retryable"
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "retryable": {
+                      "type": "boolean"
+                    },
+                    "meta": {
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "additionalProperties": {}
+                    },
+                    "trace_id": {
+                      "type": "string"
+                    },
+                    "span_id": {
+                      "type": "string"
+                    },
+                    "trace": {
+                      "type": "object",
+                      "properties": {
+                        "traceId": {
+                          "type": "string"
+                        },
+                        "spanId": {
+                          "type": "string"
+                        },
+                        "traceUrl": {
+                          "type": "string"
+                        },
+                        "logsUrl": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "tips": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "docs_url": {
+                      "type": "string"
+                    },
+                    "fault": {
+                      "type": "string",
+                      "enum": [
+                        "customer",
+                        "platform",
+                        "provider",
+                        "presumed_platform"
+                      ]
+                    },
+                    "reasons": {
+                      "type": "array",
+                      "items": {}
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "code",
+                    "message",
+                    "retryable"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "description": "Applies the stop again to every target it has not stopped: the ones that failed, the ones a restore turned back on, and plan targets added since the stop was requested. Targets already stopped are left alone. Only a `quarantined`, `stop_failed` or `restore_failed` stop can be retried (409 `agent_stop_not_retryable`). The stop goes back to `stopping` and announces its new outcome.",
+        "summary": "Retry a stop",
         "tags": [
           "Governance / Kill Switch"
         ],

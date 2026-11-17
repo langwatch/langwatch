@@ -137,6 +137,7 @@ describe("AgentStopTargetService", () => {
         reason: "redelivery",
         actorUserId: "user-ops",
         target: { id: first.id, label: first.label, target: first.target },
+        retryRound: 0,
       };
       const context = {
         processName: "agentStop",

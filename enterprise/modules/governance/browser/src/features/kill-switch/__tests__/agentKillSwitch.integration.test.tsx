@@ -187,6 +187,47 @@ describe("the Agents page with stops of its agents", () => {
   });
 });
 
+describe("the agent row menu of an agent whose stop is open", () => {
+  /** @scenario "The agent row menu always offers a way to stop an open stop again" */
+  it.each([
+    ["quarantined", "Stop again"],
+    ["stop_failed", "Retry stop"],
+    ["restore_failed", "Retry stop"],
+  ] as const)("offers %s agents %s beside Restore", async (status, label) => {
+    answerAgentsPage({
+      summaries: [summary({ agentId: "a1", openStop: { ...QUARANTINED, status } })],
+      pendingApprovals: [],
+    });
+    renderAgentsPage({ permissions: MANAGER });
+
+    await openActions("support-bot");
+
+    expect(await screen.findByRole("menuitem", { name: new RegExp(label) })).toBeEnabled();
+    expect(screen.getByRole("menuitem", { name: /Restore/ })).toBeInTheDocument();
+  });
+
+  /** @scenario "A failed stop is retried from the agent row menu" */
+  it("retries a failed stop after a confirm", async () => {
+    const failed = { ...QUARANTINED, status: "stop_failed" as const };
+    answerAgentsPage({
+      summaries: [summary({ agentId: "a1", openStop: failed })],
+      pendingApprovals: [],
+    });
+    answerMutation("governanceKillSwitch.retryStop", () => ({ ...failed, status: "stopping" }));
+    renderAgentsPage({ permissions: MANAGER });
+
+    await openActions("support-bot");
+    await userEvent.click(await screen.findByRole("menuitem", { name: /Retry stop/ }));
+    const dialog = await screen.findByRole("dialog", { name: "Retry stop for support-bot?" });
+    await userEvent.click(within(dialog).getByRole("button", { name: "Retry stop" }));
+
+    expect(trpcDouble.calls).toContainEqual({
+      procedure: "governanceKillSwitch.retryStop",
+      input: { organizationId: "org-1", stopId: "stop-1" },
+    });
+  });
+});
+
 describe("the Restore dialog when the agent's open stop changes under it", () => {
   /** @scenario "The Restore dialog restores only the stop it was opened for" */
   it("goes away instead of retargeting another stop", async () => {

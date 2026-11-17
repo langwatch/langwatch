@@ -25,6 +25,7 @@ import {
   GovernanceRestApi,
   requestAgentStopInputSchema,
   restoreAgentStopInputSchema,
+  retryAgentStopInputSchema,
   setAgentStopPlanInputSchema,
 } from "@langwatch/enterprise-governance-contract";
 
@@ -83,7 +84,7 @@ export const agentKillSwitchRest = defineRestRouter(GovernanceRestApi)
     summary: "Replace an agent's stop plan",
     tags: TAGS,
     description:
-      "Replaces every target at once; an empty list clears the plan. Each target must name what the organisation holds: a Databricks governance source, a stored AWS connection or a gateway virtual key. Anything else is a 422 `agent_stop_target_invalid` naming the target's position.",
+      "Replaces every target at once; an empty list clears the plan. Each target must name what the organisation holds: a Databricks governance source, a stored AWS connection or a gateway virtual key. Anything else is a 422 `agent_stop_target_invalid` naming the target's position. A target removed from the plan also leaves the agent's open stop, so it no longer holds that stop or its restore from finishing; a restore leaves it as it is.",
     responses: {
       ...canonicalBaseResponses,
       ...canonicalUnprocessableResponses,
@@ -262,6 +263,37 @@ export const agentKillSwitchRest = defineRestRouter(GovernanceRestApi)
   })
   .handle(async ({ app, input, scope, key }) => ({
     data: await app.restoreAgentStop({
+      organizationId: scope.id,
+      stopId: input.stopId,
+      caller: agentStopCallerOfKey(key),
+    }),
+  }))
+
+  .post("/api/governance/agent-stops/:stopId/retry", "retryAgentStop")
+  .withoutAudit("the kill switch service records this row itself, with the stop and its caller")
+  .withoutConfirmation("asked at the organization, where a Langy key holds no grant")
+  .withCredential("organization", { key: true })
+  .withParams(agentStopParamsSchema)
+  .withInput(retryAgentStopInputSchema)
+  .withPermission("governance:manage")
+  .withEntitlement("enterprise", { feature: "AGENT_REGISTRY" })
+  .withStatus(202)
+  .withOutput(agentStopResponseSchema)
+  .withDocs({
+    operationId: "postApiGovernanceAgentStopsByIdRetry",
+    summary: "Retry a stop",
+    tags: TAGS,
+    description:
+      "Applies the stop again to every target it has not stopped: the ones that failed, the ones a restore turned back on, and plan targets added since the stop was requested. Targets already stopped are left alone. Only a `quarantined`, `stop_failed` or `restore_failed` stop can be retried (409 `agent_stop_not_retryable`). The stop goes back to `stopping` and announces its new outcome.",
+    responses: {
+      ...canonicalBaseResponses,
+      ...canonicalUnprocessableResponses,
+      ...canonicalNotFoundResponses,
+      ...conflictResponses,
+    },
+  })
+  .handle(async ({ app, input, scope, key }) => ({
+    data: await app.retryAgentStop({
       organizationId: scope.id,
       stopId: input.stopId,
       caller: agentStopCallerOfKey(key),

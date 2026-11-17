@@ -145,7 +145,9 @@ def sync_detailed(
 
      Replaces every target at once; an empty list clears the plan. Each target must name what the
     organisation holds: a Databricks governance source, a stored AWS connection or a gateway virtual
-    key. Anything else is a 422 `agent_stop_target_invalid` naming the target's position.
+    key. Anything else is a 422 `agent_stop_target_invalid` naming the target's position. A target
+    removed from the plan also leaves the agent's open stop, so it no longer holds that stop or its
+    restore from finishing; a restore leaves it as it is.
 
     Args:
         agent_id (str):
@@ -190,7 +192,9 @@ def sync(
 
      Replaces every target at once; an empty list clears the plan. Each target must name what the
     organisation holds: a Databricks governance source, a stored AWS connection or a gateway virtual
-    key. Anything else is a 422 `agent_stop_target_invalid` naming the target's position.
+    key. Anything else is a 422 `agent_stop_target_invalid` naming the target's position. A target
+    removed from the plan also leaves the agent's open stop, so it no longer holds that stop or its
+    restore from finishing; a restore leaves it as it is.
 
     Args:
         agent_id (str):
@@ -229,7 +233,9 @@ async def asyncio_detailed(
 
      Replaces every target at once; an empty list clears the plan. Each target must name what the
     organisation holds: a Databricks governance source, a stored AWS connection or a gateway virtual
-    key. Anything else is a 422 `agent_stop_target_invalid` naming the target's position.
+    key. Anything else is a 422 `agent_stop_target_invalid` naming the target's position. A target
+    removed from the plan also leaves the agent's open stop, so it no longer holds that stop or its
+    restore from finishing; a restore leaves it as it is.
 
     Args:
         agent_id (str):
@@ -272,7 +278,9 @@ async def asyncio(
 
      Replaces every target at once; an empty list clears the plan. Each target must name what the
     organisation holds: a Databricks governance source, a stored AWS connection or a gateway virtual
-    key. Anything else is a 422 `agent_stop_target_invalid` naming the target's position.
+    key. Anything else is a 422 `agent_stop_target_invalid` naming the target's position. A target
+    removed from the plan also leaves the agent's open stop, so it no longer holds that stop or its
+    restore from finishing; a restore leaves it as it is.
 
     Args:
         agent_id (str):

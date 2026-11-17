@@ -2,12 +2,17 @@
 import type { AgentKillSwitchSummary } from "@langwatch/enterprise-governance-contract";
 import { useState } from "react";
 
-import { isRestorableStop, sharedKeyHoldersOf } from "../../model/kill-switch-copy.ts";
+import {
+  isRestorableStop,
+  retryStopLabelOf,
+  sharedKeyHoldersOf,
+} from "../../model/kill-switch-copy.ts";
 import {
   type KillSwitchAction,
   KillSwitchActionsMenu,
 } from "../blocks/kill-switch-actions-menu.tsx";
 import { RestoreAgentDialog } from "./restore-agent-dialog.tsx";
+import { RetryStopDialog } from "./retry-stop-dialog.tsx";
 import { StopAgentDialog } from "./stop-agent-dialog.tsx";
 import { StopPlanDialog } from "./stop-plan-dialog.tsx";
 
@@ -26,9 +31,9 @@ function stopUnavailableReason({
 }
 
 /**
- * The kill switch actions of one agent row, and the dialog the picked action opens. Restore is
- * bound to the stop open when it was picked; once that stop is no longer open the dialog goes, and
- * each dialog closes only itself.
+ * The kill switch actions of one agent row, and the dialog the picked action opens. Restore and
+ * retry are bound to the stop open when picked; once that stop is no longer open the dialog goes,
+ * and each dialog closes only itself.
  */
 export function AgentKillSwitchMenu({
   organizationId,
@@ -54,12 +59,14 @@ export function AgentKillSwitchMenu({
   const opened = dialog;
   const close = () => setDialog((current) => (current === opened ? null : current));
   const dialogProps = { organizationId, agentName, open: true, onClose: close };
+  const retryLabel = openStop ? retryStopLabelOf(openStop.status) : null;
 
   return (
     <>
       <KillSwitchActionsMenu
         agentName={agentName}
         restorable={openStop !== null && isRestorableStop(openStop.status)}
+        retryLabel={retryLabel}
         stopUnavailableReason={stopUnavailableReason({ summary, canManage })}
         manageHint={canManage ? null : "Needs governance:manage"}
         onPick={pick}
@@ -72,6 +79,12 @@ export function AgentKillSwitchMenu({
           {...dialogProps}
         />
       )}
+      {dialog?.action === "retry" &&
+        dialog.stopId !== null &&
+        openStop?.id === dialog.stopId &&
+        retryLabel !== null && (
+          <RetryStopDialog stopId={dialog.stopId} actionLabel={retryLabel} {...dialogProps} />
+        )}
       {dialog?.action === "plan" && <StopPlanDialog agentId={summary.agentId} {...dialogProps} />}
     </>
   );

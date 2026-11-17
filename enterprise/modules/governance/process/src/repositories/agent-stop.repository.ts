@@ -27,6 +27,11 @@ export abstract class AgentStopRepository implements StateProjectionStore<AgentS
     projection: StoredProjection<AgentStopProjectionState>,
     context: ProjectionStoreContext,
   ): Promise<void>;
+  /**
+   * Writes a just requested stop's row unless the projection wrote it first, so the stop reads
+   * back before the worker folds its request. The row's empty cursor lets every event fold onto it.
+   */
+  abstract seed(input: { stop: AgentStopRecord; at: number }): Promise<void>;
   /** Throws `agent_stop_not_found` for an id outside the organisation. */
   abstract getStop(input: { organizationId: string; stopId: string }): Promise<AgentStopRecord>;
   /** The agent's stops, latest request first. */

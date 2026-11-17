@@ -39,6 +39,8 @@ class GetApiGovernanceAgentsByIdStopResponse200DataTargetsItem:
         applied_at (None | str):
         reverted_at (None | str):
         already_stopped (bool | Unset):
+        gone (bool | Unset):
+        kept_disabled (bool | Unset):
     """
 
     id: str
@@ -53,6 +55,8 @@ class GetApiGovernanceAgentsByIdStopResponse200DataTargetsItem:
     applied_at: None | str
     reverted_at: None | str
     already_stopped: bool | Unset = UNSET
+    gone: bool | Unset = UNSET
+    kept_disabled: bool | Unset = UNSET
 
     def to_dict(self) -> dict[str, Any]:
         from ..models.get_api_governance_agents_by_id_stop_response_200_data_targets_item_target_type_0 import (
@@ -87,6 +91,10 @@ class GetApiGovernanceAgentsByIdStopResponse200DataTargetsItem:
 
         already_stopped = self.already_stopped
 
+        gone = self.gone
+
+        kept_disabled = self.kept_disabled
+
         field_dict: dict[str, Any] = {}
 
         field_dict.update(
@@ -102,6 +110,10 @@ class GetApiGovernanceAgentsByIdStopResponse200DataTargetsItem:
         )
         if already_stopped is not UNSET:
             field_dict["alreadyStopped"] = already_stopped
+        if gone is not UNSET:
+            field_dict["gone"] = gone
+        if kept_disabled is not UNSET:
+            field_dict["keptDisabled"] = kept_disabled
 
         return field_dict
 
@@ -178,6 +190,10 @@ class GetApiGovernanceAgentsByIdStopResponse200DataTargetsItem:
 
         already_stopped = d.pop("alreadyStopped", UNSET)
 
+        gone = d.pop("gone", UNSET)
+
+        kept_disabled = d.pop("keptDisabled", UNSET)
+
         get_api_governance_agents_by_id_stop_response_200_data_targets_item = cls(
             id=id,
             label=label,
@@ -187,6 +203,8 @@ class GetApiGovernanceAgentsByIdStopResponse200DataTargetsItem:
             applied_at=applied_at,
             reverted_at=reverted_at,
             already_stopped=already_stopped,
+            gone=gone,
+            kept_disabled=kept_disabled,
         )
 
         return get_api_governance_agents_by_id_stop_response_200_data_targets_item

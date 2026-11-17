@@ -1055,7 +1055,7 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 
 ## Agent Kill Switch
 
-- [Overview](https://langwatch.ai/docs/api-reference/governance-kill-switch/overview.md): Stop a registry agent on the targets of its stop plan: Databricks serving endpoints, Amazon Bedrock agent aliases and gateway virtual keys. Set each agent's stop plan, request a stop, approve or deny it, read every target's outcome and restore the agent. Needs an organization API key on an Enterprise plan.
+- [Overview](https://langwatch.ai/docs/api-reference/governance-kill-switch/overview.md): Stop a registry agent on the targets of its stop plan: Databricks serving endpoints, Amazon Bedrock agent aliases and gateway virtual keys. Set each agent's stop plan, request a stop, approve or deny it, read every target's outcome, retry a failed stop and restore the agent. Needs an organization API key on an Enterprise plan.
 - [List the organisation's agent stops](https://langwatch.ai/docs/api-reference/governance-kill-switch/list-the-organisation-s-agent-stops.md)
 - [Get an agent's latest stop](https://langwatch.ai/docs/api-reference/governance-kill-switch/get-an-agent-s-latest-stop.md)
 - [Get an agent's stop plan](https://langwatch.ai/docs/api-reference/governance-kill-switch/get-an-agent-s-stop-plan.md)
@@ -1063,6 +1063,7 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 - [Approve a pending stop](https://langwatch.ai/docs/api-reference/governance-kill-switch/approve-a-pending-stop.md)
 - [Deny a pending stop](https://langwatch.ai/docs/api-reference/governance-kill-switch/deny-a-pending-stop.md)
 - [Restore a stopped agent](https://langwatch.ai/docs/api-reference/governance-kill-switch/restore-a-stopped-agent.md)
+- [Retry a stop](https://langwatch.ai/docs/api-reference/governance-kill-switch/retry-a-stop.md)
 - [Stop an agent](https://langwatch.ai/docs/api-reference/governance-kill-switch/stop-an-agent.md)
 
 ## Coding Agents
