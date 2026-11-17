@@ -28,11 +28,11 @@ function routingRows(): { skill: string; commands: string }[] {
     });
 }
 
-/** Every file under a skill directory, relative to it; Python bytecode caches are not shipped. */
+/** Every file under a skill directory, relative to it, stray caches included. */
 function skillFiles(dir: string): string[] {
   return fs
     .readdirSync(dir, { recursive: true, withFileTypes: true })
-    .filter((e) => e.isFile() && !e.parentPath.split(path.sep).includes("__pycache__"))
+    .filter((e) => e.isFile())
     .map((e) => path.relative(dir, path.join(e.parentPath, e.name)))
     .toSorted();
 }

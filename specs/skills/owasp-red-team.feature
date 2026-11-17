@@ -59,6 +59,20 @@ Feature: OWASP red team pack for code scenario tests
     And a filled example sits beside the config for reference
 
   @unit
+  Scenario: Empty required lists fail fast, an agent with no privileged tools still runs
+    Given a filled config in Python or TypeScript
+    When tools, must_never or protected_data is an empty list
+    Then running the pack fails with a message naming the empty fields
+    When only privileged_tools is empty
+    Then the pack runs and the privilege attacks name every tool instead
+
+  @unit
+  Scenario: The skill copier leaves caches and dotfiles behind
+    Given a skill folder with a __pycache__ folder, a .pyc file and a dotfile beside its templates
+    When the skill assets are listed and copied
+    Then only the templates are copied
+
+  @unit
   Scenario: The skill pins the TypeScript model provider to the scenario SDK's ai version
     Given the rendered skill and the docs page
     Then the TypeScript install line pins @ai-sdk/openai to the major the scenario SDK accepts
@@ -81,3 +95,4 @@ Feature: OWASP red team pack for code scenario tests
     Given a conversation with a user turn, an assistant tool call and a tool result
     When it goes through toOpenAIMessages and fromOpenAIMessages
     Then the tool call and tool result keep their ids, names and payloads
+    And arguments that are invalid JSON or a JSON string travel back byte for byte

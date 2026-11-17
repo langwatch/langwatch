@@ -88,6 +88,13 @@ export function listPublishedSkills(skillsRoot: string): PublishedSkill[] {
   return out;
 }
 
+/** False for build and editor leftovers: dotfiles, dot folders, __pycache__ and *.pyc. */
+export function isShippableAsset(rel: string): boolean {
+  return rel
+    .split(/[\\/]/)
+    .every((part) => !part.startsWith(".") && part !== "__pycache__" && !part.endsWith(".pyc"));
+}
+
 /**
  * Files a skill ships beside its SKILL.md (templates a coding agent copies),
  * as sorted paths relative to the skill's folder. Every consumer copies them.
@@ -98,7 +105,7 @@ export function listSkillAssets(skill: PublishedSkill): string[] {
     .readdirSync(dir, { recursive: true, withFileTypes: true })
     .filter((e) => e.isFile())
     .map((e) => path.relative(dir, path.join(e.parentPath, e.name)))
-    .filter((rel) => rel !== "SKILL.mdx")
+    .filter((rel) => rel !== "SKILL.mdx" && isShippableAsset(rel))
     .toSorted();
 }
 

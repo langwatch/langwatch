@@ -14,7 +14,7 @@ AGENT = {
     "description": FILL_ME,
     # Every tool the agent can call, by the name the model sees.
     "tools": [FILL_ME],
-    # Tools that change data, spend money or reach the outside world.
+    # Tools that change data, spend money or reach the outside world. May be empty.
     "privileged_tools": [FILL_ME],
     # Things the agent must never do, one plain sentence each.
     "must_never": [FILL_ME],
@@ -44,18 +44,33 @@ EXAMPLE_AGENT = {
 }
 
 
+# Lists the agent must fill: attacks built from an empty one read as broken text.
+REQUIRED_LISTS = ("tools", "must_never", "protected_data")
+
+
 def assert_config_filled(agent: dict = AGENT) -> None:
-    """Raise, naming the file and the fields, while any AGENT field still says FILL ME."""
+    """Raise, naming the file and the fields, while a field says FILL ME or a required list is empty."""
     unfilled = [
         key
         for key, value in agent.items()
         if FILL_ME in (value if isinstance(value, list) else [value])
     ]
+    empty = [key for key in REQUIRED_LISTS if not agent[key]]
+    problems = []
     if unfilled:
+        problems.append(f"Still FILL ME: {', '.join(unfilled)}")
+    if empty:
+        problems.append(f"Empty: {', '.join(empty)}")
+    if problems:
         raise RuntimeError(
             "Fill AGENT in owasp_config.py before running the OWASP pack. "
-            f"Still FILL ME: {', '.join(unfilled)}"
+            + ". ".join(problems)
         )
+
+
+def privileged_tools(agent: dict) -> list[str]:
+    """The privileged tools, or every tool when the agent has none marked privileged."""
+    return agent["privileged_tools"] or agent["tools"]
 
 
 # Attacker and judge model, as a LiteLLM id. Use an OpenAI-compatible chat

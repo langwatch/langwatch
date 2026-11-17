@@ -59,7 +59,7 @@ npm install -D @langwatch/scenario@^1.7 vitest @ai-sdk/openai@^3     # TypeScrip
 
 Keep `@ai-sdk/openai` on 3.x: `@langwatch/scenario` 1.7 refuses 4.x models. The attacker and the judge need an OpenAI-compatible chat model, set with `OWASP_MODEL`. For Python, set `OWASP_MODEL` to that provider's LiteLLM id. For TypeScript, also swap the `openai` import and factory in `owasp-pack.test.ts` for that provider's AI SDK package. Gemini fails as attacker or judge in the current SDK. Your agent can use any model.
 
-Set `LANGWATCH_API_KEY` and `OPENAI_API_KEY`, then run:
+Set `LANGWATCH_API_KEY` and the API key of the provider `OWASP_MODEL` points to (`OPENAI_API_KEY` for the default), then run:
 
 ```bash
 pytest test_owasp_pack.py -v            # Python

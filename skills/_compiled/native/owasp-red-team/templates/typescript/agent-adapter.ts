@@ -73,7 +73,7 @@ const toolCallsOf = (message: ScenarioMessage) =>
             type: "function" as const,
             function: {
               name: part.toolName,
-              // Arguments that were not valid JSON travel back as the raw string.
+              // Arguments kept as a string (invalid JSON, a JSON string) travel back raw.
               arguments:
                 typeof part.input === "string" ? part.input : JSON.stringify(part.input ?? {}),
             },
@@ -130,6 +130,12 @@ const parseJson = (text: string): unknown => {
   }
 };
 
+// Invalid JSON and JSON strings stay as the raw text, so replay sends the same bytes.
+const argumentsInput = (raw: string): unknown => {
+  const parsed = parseJson(raw || "{}");
+  return parsed === undefined || typeof parsed === "string" ? raw : parsed;
+};
+
 type OpenAIAssistantMessage = Extract<OpenAIChatMessage, { role: "assistant" }>;
 
 const fromOpenAIAssistant = (message: OpenAIAssistantMessage): ScenarioMessage => {
@@ -143,7 +149,7 @@ const fromOpenAIAssistant = (message: OpenAIAssistantMessage): ScenarioMessage =
         type: "tool-call" as const,
         toolCallId: call.id,
         toolName: call.function.name,
-        input: parseJson(call.function.arguments || "{}") ?? call.function.arguments,
+        input: argumentsInput(call.function.arguments),
       })),
     ],
   };

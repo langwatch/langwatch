@@ -7,7 +7,7 @@ import { fileURLToPath } from "url";
 import { describe, expect, it } from "vitest";
 
 import { listNativeSkills, listPublishedSkills, renderSkill } from "../_compiler/native.ts";
-import { listSkillAssets } from "../_lib/feature-skills.ts";
+import { copySkillAssets, isShippableAsset, listSkillAssets } from "../_lib/feature-skills.ts";
 import { sync } from "../_publish/sync.ts";
 import {
   fromOpenAIMessages,
@@ -63,6 +63,9 @@ interface PythonPack {
     identity: { id: string; name: string; metadata: Record<string, string> };
   }[];
   name: string;
+  empty_error: string;
+  no_privileged_error: string;
+  no_privileged_criteria: string[];
 }
 
 const PYTHON_DUMP = `
@@ -75,11 +78,21 @@ try:
     fill_error = ""
 except RuntimeError as e:
     fill_error = str(e)
+def config_error(agent):
+    try:
+        assert_config_filled(agent)
+        return ""
+    except RuntimeError as e:
+        return str(e)
+no_privileged = {**EXAMPLE_AGENT, "privileged_tools": []}
 print(json.dumps({
     "config_keys": list(AGENT.keys()),
     "config_values": AGENT,
     "example_keys": list(EXAMPLE_AGENT.keys()),
     "fill_error": fill_error,
+    "empty_error": config_error({**EXAMPLE_AGENT, "tools": [], "must_never": []}),
+    "no_privileged_error": config_error(no_privileged),
+    "no_privileged_criteria": [c for a in ATTACKS for c in a["criteria"](no_privileged)],
     "name": EXAMPLE_AGENT["name"],
     "attacks": [
         {"id": a["id"], "title": a["title"], "strategy": a["strategy"],
@@ -115,6 +128,7 @@ describe("OWASP red team pack", () => {
     expect(skill.isRecipe).toBe(true);
     const assets = listSkillAssets(skill);
     expect(assets).toContain(path.join("templates", "python", "test_owasp_pack.py"));
+    expect(assets.filter((rel) => !isShippableAsset(rel))).toEqual([]);
     expect(assets).toContain(path.join("templates", "typescript", "owasp-pack.test.ts"));
 
     const target = fs.mkdtempSync(path.join(os.tmpdir(), "owasp-skills-sync-"));
@@ -255,6 +269,58 @@ describe("OWASP red team pack", () => {
     expect(packTest("typescript")).toMatch(/\bassertConfigFilled\(/);
   });
 
+  /** @scenario "Empty required lists fail fast, an agent with no privileged tools still runs" */
+  it("refuses empty tools, must_never and protected_data, and falls back to every tool", () => {
+    expect(() => assertConfigFilled({ ...EXAMPLE_AGENT, tools: [], must_never: [] })).toThrow(
+      /Empty: tools, must_never/,
+    );
+    expect(() => assertConfigFilled({ ...EXAMPLE_AGENT, protected_data: [] })).toThrow(
+      /Empty: protected_data/,
+    );
+    const noPrivileged = { ...EXAMPLE_AGENT, privileged_tools: [] };
+    expect(() => assertConfigFilled(noPrivileged)).not.toThrow();
+    const texts = ATTACKS.flatMap((a) => [a.goal(noPrivileged), ...a.criteria(noPrivileged)]);
+    for (const text of texts) expect(text).not.toMatch(/ {2}|\(\)|: $/);
+    expect(texts.join("\n")).toContain(`call ${noPrivileged.tools.join("; ")}`);
+
+    const py = pythonPack();
+    expect(py.empty_error).toMatch(/owasp_config\.py.*Empty: tools, must_never/);
+    expect(py.no_privileged_error).toBe("");
+    expect(py.no_privileged_criteria).toEqual(ATTACKS.flatMap((a) => a.criteria(noPrivileged)));
+  });
+
+  /** @scenario "The skill copier leaves caches and dotfiles behind" */
+  it("copies only shippable files from a skill folder", () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "owasp-skill-assets-"));
+    try {
+      const from = path.join(root, "from");
+      const files = [
+        "SKILL.mdx",
+        "templates/a.py",
+        "templates/__pycache__/a.cpython-312.pyc",
+        "templates/b.pyc",
+        "templates/.DS_Store",
+        ".cache/x.txt",
+      ];
+      for (const rel of files) {
+        fs.mkdirSync(path.dirname(path.join(from, rel)), { recursive: true });
+        fs.writeFileSync(path.join(from, rel), rel);
+      }
+      const skill = { slug: "x", src: path.join(from, "SKILL.mdx"), isRecipe: true };
+      expect(listSkillAssets(skill)).toEqual([path.join("templates", "a.py")]);
+      const to = path.join(root, "to");
+      copySkillAssets({ skill, toDir: to });
+      expect(
+        fs
+          .readdirSync(to, { recursive: true })
+          .map(String)
+          .toSorted((x, y) => x.localeCompare(y)),
+      ).toEqual(["templates", path.join("templates", "a.py")]);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   /** @scenario "The skill pins the TypeScript model provider to the scenario SDK's ai version" */
   it("pins @ai-sdk/openai to 3.x and asks for an OpenAI-compatible attacker model", () => {
     const rendered = renderSkill(owaspSkill());
@@ -368,6 +434,21 @@ describe("OWASP red team pack", () => {
     });
     expect(toOpenAIMessages({ messages: malformed })[0]).toMatchObject({
       tool_calls: [{ function: { name: "refund", arguments: '{"amount":1000' } }],
+    });
+
+    const jsonString = fromOpenAIMessages({
+      messages: [
+        {
+          role: "assistant",
+          content: null,
+          tool_calls: [
+            { id: "c3", type: "function", function: { name: "search", arguments: '"abc"' } },
+          ],
+        },
+      ],
+    });
+    expect(toOpenAIMessages({ messages: jsonString })[0]).toMatchObject({
+      tool_calls: [{ function: { name: "search", arguments: '"abc"' } }],
     });
   });
 });

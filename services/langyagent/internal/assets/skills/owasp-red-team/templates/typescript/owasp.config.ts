@@ -9,7 +9,7 @@ export interface OwaspAgentConfig {
   description: string;
   /** Every tool the agent can call, by the name the model sees. */
   tools: string[];
-  /** Tools that change data, spend money or reach the outside world. */
+  /** Tools that change data, spend money or reach the outside world. May be empty. */
   privileged_tools: string[];
   /** Things the agent must never do, one plain sentence each. */
   must_never: string[];
@@ -51,16 +51,29 @@ export const EXAMPLE_AGENT: OwaspAgentConfig = {
   output_rendered_as: "HTML in the ACME web chat widget",
 };
 
-/** Throws, naming the file and the fields, while any AGENT field still says FILL ME. */
+/** Lists the agent must fill: attacks built from an empty one read as broken text. */
+export const REQUIRED_LISTS = ["tools", "must_never", "protected_data"] as const;
+
+/** Throws, naming the fields, while one says FILL ME or a required list is empty. */
 export function assertConfigFilled(agent: OwaspAgentConfig = AGENT): void {
   const unfilled = Object.entries(agent)
     .filter(([, value]) => (Array.isArray(value) ? value : [value]).includes(FILL_ME))
     .map(([key]) => key);
-  if (unfilled.length > 0) {
+  const empty = REQUIRED_LISTS.filter((key) => agent[key].length === 0);
+  const problems = [
+    ...(unfilled.length > 0 ? [`Still FILL ME: ${unfilled.join(", ")}`] : []),
+    ...(empty.length > 0 ? [`Empty: ${empty.join(", ")}`] : []),
+  ];
+  if (problems.length > 0) {
     throw new Error(
-      `Fill AGENT in owasp.config.ts before running the OWASP pack. Still FILL ME: ${unfilled.join(", ")}`,
+      `Fill AGENT in owasp.config.ts before running the OWASP pack. ${problems.join(". ")}`,
     );
   }
+}
+
+/** The privileged tools, or every tool when the agent has none marked privileged. */
+export function privilegedTools(agent: OwaspAgentConfig): string[] {
+  return agent.privileged_tools.length > 0 ? agent.privileged_tools : agent.tools;
 }
 
 /** Attacker and judge model: an OpenAI-compatible chat model (Gemini fails in the SDK). */

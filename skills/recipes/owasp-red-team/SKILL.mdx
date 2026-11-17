@@ -74,7 +74,7 @@ Call the real agent with its real tools and system prompt. A mock defeats the te
 Fill the one config block (`AGENT` in `owasp_config.py` or `owasp.config.ts`) from what you read in Step 1. Every field ships as `FILL ME`, and the pack refuses to run, naming the file and the fields, until none is left. `EXAMPLE_AGENT` beside it shows a filled block:
 
 - `name`, `description`: what the agent is called and what it does.
-- `tools`: every tool name the model sees. `privileged_tools`: the ones that change data, spend money or reach outside.
+- `tools`: every tool name the model sees. `privileged_tools`: the ones that change data, spend money or reach outside. `privileged_tools` may be an empty list (the privilege attacks then name every tool); empty `tools`, `must_never` or `protected_data` make the pack refuse to run.
 - `must_never`: the actions the agent must refuse, from its system prompt and business rules, one sentence each.
 - `protected_data`: what it must never disclose.
 - `output_rendered_as`: where replies are shown (HTML widget, Slack, plain API).
