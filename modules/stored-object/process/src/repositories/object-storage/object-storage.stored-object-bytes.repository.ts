@@ -113,13 +113,15 @@ export class ObjectStorageStoredObjectBytesRepository extends StoredObjectBytesR
     return destination;
   }
 
-  async uploadsThroughProcess(input: { projectId: string; expiresAt: Instant }): Promise<boolean> {
-    const signed = await this.objects.signUpload(
+  async uploadsThroughProcess(input: { projectId: string }): Promise<boolean> {
+    return (await this.objects.uploadRoute(input.projectId)) === "through-process";
+  }
+
+  async signCheckupUpload(input: { projectId: string; expiresAt: Instant }): Promise<void> {
+    await this.objects.signUpload(
       { projectId: input.projectId, key: checkupKeyOf(input.projectId) },
       { byteLength: 0, contentType: "text/plain", expiresAt: input.expiresAt },
     );
-
-    return signed.kind === "through-process";
   }
 
   async probe(input: { projectId: string }): Promise<void> {

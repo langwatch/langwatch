@@ -109,6 +109,10 @@ export class MemoryStoredObjectStorage extends StoredObjectBytesRepository {
   async uploadsThroughProcess(): Promise<boolean> {
     return this.signed === "through-process";
   }
+
+  async signCheckupUpload(): Promise<void> {
+    await this.signUpload();
+  }
 }
 
 /** Seals under the process's random key, as the memory tier does. */
