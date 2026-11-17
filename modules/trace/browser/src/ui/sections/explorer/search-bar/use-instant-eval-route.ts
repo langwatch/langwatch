@@ -124,6 +124,7 @@ function routeRunKey({
 
 /** The bar's query with the route's eval chip in it: what a refusal leaves for the reader. */
 function pendingChipQuery(payload: InstantEvalRoutePayload): string {
+  if (payload.typedQuery !== undefined) return payload.typedQuery;
   return combineQueries({
     base: payload.otherQuery,
     addition: instantEvalChipText({
@@ -254,15 +255,17 @@ function useInstantEvalStarter({
     ({ payload, key, runId }: PendingRoute & { runId: string }) => {
       const lensId = useViewStore.getState().activeLensId;
       registerEvalRun({ key, runId });
+      // A chip typed by hand goes back as typed, so a `NOT` in front of it stays.
       applyQueryText(
-        combineQueries({
-          base: payload.otherQuery,
-          addition: instantEvalChipText({
-            question: payload.question.instructions,
-            target: payload.target,
-            lensId,
+        payload.typedQuery ??
+          combineQueries({
+            base: payload.otherQuery,
+            addition: instantEvalChipText({
+              question: payload.question.instructions,
+              target: payload.target,
+              lensId,
+            }),
           }),
-        }),
       );
       if (!payload.modelTrouble) return;
       // Against the text the store settled on: the strip shows while the bar holds it.

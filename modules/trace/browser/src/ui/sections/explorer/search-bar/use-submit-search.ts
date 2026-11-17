@@ -186,6 +186,7 @@ function typedEvalRunOf({
       question: pending.question,
     }),
     fallbackQuery: queryText,
+    typedQuery: queryText,
     timeRange: { from: timeRange.from, to: timeRange.to },
   };
 }

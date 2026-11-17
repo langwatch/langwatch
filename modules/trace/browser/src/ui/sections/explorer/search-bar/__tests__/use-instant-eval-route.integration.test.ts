@@ -251,6 +251,48 @@ describe("given the router answered instant_eval", () => {
   });
 });
 
+describe("given a chip typed by hand under NOT", () => {
+  const typed: InstantEvalRoutePayload = {
+    ...payload,
+    sentence: "the user is annoyed",
+    otherQuery: "",
+    fallbackQuery: 'NOT eval:"the user is annoyed"',
+    typedQuery: 'NOT eval:"the user is annoyed"',
+  };
+
+  /** @scenario "A chip typed by hand starts its run on Enter" */
+  it("keeps the NOT in the bar once the run starts", () => {
+    const { result } = renderHook(() => useInstantEvalRoute({ isInstantEvalAvailable: true }));
+    act(() => result.current.onInstantEvalRoute(typed));
+    act(() => estimateCallbacks().onSuccess?.({ rows: 120, isRowsCapped: false, priceUsd: 0.1 }));
+    act(() => startCallbacks().onSuccess?.({ id: "run-1" }));
+
+    expect(useFilterStore.getState().queryText).toBe('NOT eval:"the user is annoyed"');
+  });
+
+  /** @scenario "A chip typed by hand starts its run on Enter" */
+  it("keeps the NOT under a refusal popover", () => {
+    const { result } = renderHook(() => useInstantEvalRoute({ isInstantEvalAvailable: true }));
+    act(() => result.current.onInstantEvalRoute(typed));
+    act(() =>
+      estimateCallbacks().onError?.(handledError({ code: "instant_eval_classifier_unavailable" })),
+    );
+
+    expect(result.current.refusal).toEqual({ kind: "model" });
+    expect(useFilterStore.getState().queryText).toBe('NOT eval:"the user is annoyed"');
+  });
+
+  /** @scenario "A chip typed by hand starts its run on Enter" */
+  it("still rebuilds the chip beside the other terms for a routed sentence", () => {
+    const { result } = renderHook(() => useInstantEvalRoute({ isInstantEvalAvailable: true }));
+    act(() => result.current.onInstantEvalRoute(payload));
+    act(() => estimateCallbacks().onSuccess?.({ rows: 120, isRowsCapped: false, priceUsd: 0.1 }));
+    act(() => startCallbacks().onSuccess?.({ id: "run-1" }));
+
+    expect(useFilterStore.getState().queryText).toBe(CHIP_QUERY);
+  });
+});
+
 /** The last request's input and callbacks on one mutation. */
 function lastCall(mutation: { mutate: { mock: { calls: [unknown, MutateOptions][] } } }) {
   const call = mutation.mutate.mock.calls.at(-1);

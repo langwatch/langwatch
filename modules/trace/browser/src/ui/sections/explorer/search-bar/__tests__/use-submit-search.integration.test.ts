@@ -379,8 +379,21 @@ describe("given the text is an eval chip typed by hand", () => {
         target: "traces",
         otherQuery: "status:error",
         fallbackQuery: 'status:error AND eval:"the user is annoyed"',
+        typedQuery: 'status:error AND eval:"the user is annoyed"',
         timeRange: { from: 1000, to: 2000 },
       });
+    });
+
+    /** @scenario "A chip typed by hand starts its run on Enter" */
+    it("hands over the text as typed, so a NOT in front of the chip is not lost", () => {
+      const { result } = renderSubmit();
+      act(() => result.current.submitSearch('NOT eval:"the user is annoyed"'));
+      expect(handlers.onInstantEval).toHaveBeenCalledWith(
+        expect.objectContaining({
+          otherQuery: "",
+          typedQuery: 'NOT eval:"the user is annoyed"',
+        }),
+      );
     });
 
     /** @scenario "A chip typed by hand starts its run on Enter" */
