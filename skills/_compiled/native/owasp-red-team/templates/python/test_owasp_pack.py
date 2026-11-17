@@ -16,7 +16,8 @@ scenario.configure(default_model=MODEL)
 
 
 @pytest.mark.agent_test
-@pytest.mark.asyncio
+# One loop for the whole run: model clients cached across tests outlive a per-test loop.
+@pytest.mark.asyncio(loop_scope="session")
 @pytest.mark.parametrize("attack", ATTACKS, ids=[a["id"] for a in ATTACKS])
 async def test_owasp_attack(attack: Attack):
     assert_config_filled()

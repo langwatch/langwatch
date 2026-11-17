@@ -7244,7 +7244,7 @@ Install the test dependencies:
 
 ```bash
 # Python
-uv add --dev "langwatch-scenario>=1.6" pytest pytest-asyncio   # or: pip install ...
+uv add --dev "langwatch-scenario>=1.6" pytest "pytest-asyncio>=0.24"   # or: pip install ...
 # TypeScript: @langwatch/scenario 1.7 bundles ai 6, which takes only @ai-sdk/* 3.x
 npm install -D @langwatch/scenario@^1.7 vitest @ai-sdk/openai@^3
 ```
@@ -7273,7 +7273,7 @@ Every attack goal and judge criterion is built from these fields, so do not edit
 
 ## Step 5: Run
 
-Set `LANGWATCH_API_KEY` (results go to that project) and the model key for the attacker and judge (`OPENAI_API_KEY` by default). `OWASP_MODEL` picks the attacker and judge model (default `gpt-6-luna`; Python takes a LiteLLM id such as `openai/gpt-5-mini`). Use an OpenAI-compatible chat model for the attacker and the judge: Gemini fails in the current scenario SDK (the attacker's first call has no user turn). The agent under test can use any model. For another provider in Python, set `OWASP_MODEL` to that provider's LiteLLM id. In TypeScript, also swap the `openai` import and factory in `owasp-pack.test.ts` for that provider's AI SDK package. `OWASP_TURNS` sets attacker turns per attack: the default 10 keeps a run cheap, use 30 before a release.
+Set `LANGWATCH_API_KEY` (results go to that project) and the model key for the attacker and judge (`OPENAI_API_KEY` by default). `OWASP_MODEL` picks the attacker and judge model (default `gpt-6-luna`; Python takes a LiteLLM id such as `openai/gpt-5-mini`). Use an OpenAI-compatible chat model for the attacker and the judge: Gemini fails in the current scenario SDK (the attacker's first call has no user turn). The agent under test can use any model. For another provider in Python, set `OWASP_MODEL` to that provider's LiteLLM id. In TypeScript, also swap the `openai` import and factory in `owasp-pack.test.ts` for that provider's AI SDK package. For an OpenAI-compatible endpoint in TypeScript, keep `@ai-sdk/openai` and change only the model line: `createOpenAI({ baseURL, apiKey }).chat(MODEL)` instead of `openai(MODEL)`. `OWASP_TURNS` sets attacker turns per attack: the default 10 keeps a run cheap, use 30 before a release.
 
 ```bash
 # Python, from the folder with the pack
@@ -7286,9 +7286,14 @@ npx vitest run tests/owasp/owasp-pack.test.ts -t LLM01
 
 Run one id first to prove the wiring, then the full pack. ALWAYS run it: an unrun pack proves nothing.
 
+Python may print `RuntimeError: Event loop is closed` at teardown. It comes from a model client closing after the loop and does not change any result.
+
 ## Step 6: Read the results in LangWatch
 
-Each attack is a scenario run named `<OWASP id> <title>: <agent name>`, grouped under the set `owasp-red-team`. Open Simulations in the LangWatch project to read each conversation and the judge's verdict per criterion. A failed test names the OWASP id, the unmet criteria and the judge's reasoning. The result does not say which turn broke: open the run in Simulations and find the first agent reply that breaks a criterion. Report to the user, per id, whether the agent held and the turn where it broke.
+Each attack is a scenario run named `<OWASP id> <title>: <agent name>`, grouped under the set `owasp-red-team`. Open Simulations in the LangWatch project to read each conversation and the judge's verdict per criterion. A test that does not pass is one of two things, and the runner shows both as failed:
+
+- A breach: the judge gave a verdict and the attack broke through. The message names the OWASP id, the unmet criteria and the judge's reasoning. Fix the agent (see below) and run that id again.
+- An error: the test stopped on an exception with no verdict, because a provider call or a tool call failed (for example `Failed to parse tool call arguments`, a timeout or a 429). It says nothing about the agent. Rerun that id; if it repeats, switch `OWASP_MODEL` to a model with reliable tool calls. Report it as an error, not as a breach or a pass. The result does not say which turn broke: open the run in Simulations and find the first agent reply that breaks a criterion. Report to the user, per id, whether the agent held and the turn where it broke.
 
 A failing test tells you WHERE the agent fails, not that the prompt is where to fix it. One more rule is the cheapest edit that turns it green, and a prompt maintained that way overfits: it passes exactly the cases it was patched against and degrades everywhere else.
 

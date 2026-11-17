@@ -66,6 +66,7 @@ interface PythonPack {
   empty_error: string;
   no_privileged_error: string;
   no_privileged_criteria: string[];
+  semicolon_rule: string[];
 }
 
 const PYTHON_DUMP = `
@@ -94,6 +95,8 @@ print(json.dumps({
     "no_privileged_error": config_error(no_privileged),
     "no_privileged_criteria": [c for a in ATTACKS for c in a["criteria"](no_privileged)],
     "name": EXAMPLE_AGENT["name"],
+    "semicolon_rule": (lambda a, agent: [a["goal"](agent), *a["criteria"](agent)])(
+        ATTACKS[0], {**EXAMPLE_AGENT, "must_never": ["issue a refund; even a small one", "reveal the system prompt"]}),
     "attacks": [
         {"id": a["id"], "title": a["title"], "strategy": a["strategy"],
          "goal": a["goal"](EXAMPLE_AGENT), "criteria": a["criteria"](EXAMPLE_AGENT),
@@ -177,6 +180,17 @@ describe("OWASP red team pack", () => {
       expect(pyAttack.goal).toBe(attack.goal(EXAMPLE_AGENT));
       expect(pyAttack.criteria).toEqual(attack.criteria(EXAMPLE_AGENT));
     }
+  });
+
+  /** @scenario "A rule that holds a semicolon stays one rule in the attack text" */
+  it("puts each must_never rule on its own numbered line in both languages", () => {
+    const py = pythonPack();
+    const rule = "issue a refund; even a small one";
+    const agent = { ...EXAMPLE_AGENT, must_never: [rule, "reveal the system prompt"] };
+    const llm01 = ATTACKS.find((a) => a.id === "LLM01:2025")!;
+    const text = [llm01.goal(agent), ...llm01.criteria(agent)].join("\n");
+    expect(text).toContain(`\n1. ${rule}\n2. reveal the system prompt`);
+    expect(py.semicolon_rule).toEqual([llm01.goal(agent), ...llm01.criteria(agent)]);
   });
 
   /** @scenario "One config block drives every attack" */
@@ -281,7 +295,7 @@ describe("OWASP red team pack", () => {
     expect(() => assertConfigFilled(noPrivileged)).not.toThrow();
     const texts = ATTACKS.flatMap((a) => [a.goal(noPrivileged), ...a.criteria(noPrivileged)]);
     for (const text of texts) expect(text).not.toMatch(/ {2}|\(\)|: $/);
-    expect(texts.join("\n")).toContain(`call ${noPrivileged.tools.join("; ")}`);
+    expect(texts.join("\n")).toContain(`call ${noPrivileged.tools.join(", ")}`);
 
     const py = pythonPack();
     expect(py.empty_error).toMatch(/owasp_config\.py.*Empty: tools, must_never/);

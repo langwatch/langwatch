@@ -30,6 +30,13 @@ Feature: OWASP red team pack for code scenario tests
     And it has at least two judge criteria
 
   @unit
+  Scenario: A rule that holds a semicolon stays one rule in the attack text
+    Given a must_never rule that contains a semicolon
+    When the Python and TypeScript packs build the goals and criteria
+    Then each rule sits on its own numbered line
+    And both languages build the same text
+
+  @unit
   Scenario: One config block drives every attack
     Given the Python and TypeScript config blocks
     Then both carry the same keys
