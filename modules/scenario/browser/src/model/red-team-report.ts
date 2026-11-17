@@ -21,10 +21,16 @@ export const RED_TEAM_OUTCOME_LABELS: Record<RedTeamOutcome, string> = {
   broke: "Broke",
 };
 
-/** Text colour tokens for the outcome label: success when held, danger when broke. */
+/** Colour palette per outcome: success when held, danger when broke. */
+export const RED_TEAM_OUTCOME_PALETTES: Record<RedTeamOutcome, "green" | "red"> = {
+  held: "green",
+  broke: "red",
+};
+
+/** Text colour tokens for the outcome label, from the outcome's palette. */
 export const RED_TEAM_OUTCOME_COLORS: Record<RedTeamOutcome, string> = {
-  held: "green.fg",
-  broke: "red.fg",
+  held: `${RED_TEAM_OUTCOME_PALETTES.held}.fg`,
+  broke: `${RED_TEAM_OUTCOME_PALETTES.broke}.fg`,
 };
 
 /** "Broke on turn 3 of 30" or "Held for 30 of 30 turns": the line under the outcome. */

@@ -1,11 +1,11 @@
 import { Badge } from "@langwatch/design-system/primitives";
 import type { RedTeamOutcome } from "@langwatch/scenario-contract";
 
-import { RED_TEAM_OUTCOME_LABELS } from "../../model/red-team-report.ts";
+import { RED_TEAM_OUTCOME_LABELS, RED_TEAM_OUTCOME_PALETTES } from "../../model/red-team-report.ts";
 
 /** Held (the target resisted the attack) in the success palette, Broke in the danger one. */
 export function RedTeamOutcomeBadge({ outcome }: { outcome: RedTeamOutcome }) {
-  const palette = outcome === "held" ? "green" : "red";
+  const palette = RED_TEAM_OUTCOME_PALETTES[outcome];
   return (
     <Badge
       colorPalette={palette}

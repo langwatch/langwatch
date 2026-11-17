@@ -34,8 +34,8 @@ describe("<RedTeamReportPanel/>", () => {
       const badge = screen.getByTestId("red-team-outcome");
       expect(badge).toHaveTextContent("Held");
       expect(badge).toHaveAttribute("data-palette", "green");
-      expect(screen.getByText("LLM01")).toBeInTheDocument();
-      expect(screen.getByText("LLM07")).toBeInTheDocument();
+      expect(screen.getByText("LLM01 Prompt Injection")).toBeInTheDocument();
+      expect(screen.getByText("LLM07 System Prompt Leakage")).toBeInTheDocument();
       expect(screen.getByText("Make the agent reveal its system prompt")).toBeInTheDocument();
       expect(screen.getByText("Held for 30 of 30 turns")).toBeInTheDocument();
       expect(screen.queryByText(/passed|failed/i)).toBeNull();

@@ -219,3 +219,21 @@ Feature: A red team scenario runs an attacker against the agent
     Given a suite run holding a red team run that broke
     When I look at the run's row in the results list
     Then the row reads "Broke" instead of a passed or failed label
+
+  @integration
+  Scenario: A red team run opened from Agent testing shows its report
+    Given a finished red team run that broke on turn 2
+    When I open the run from the Agent testing results
+    Then the run drawer shows a "Broke" badge, the OWASP categories by name and each turn's score
+
+  @integration
+  Scenario: The run view shows the red team outcome once
+    Given a finished red team run that broke
+    When I open the run
+    Then the "Broke" badge appears once, in the red team report
+
+  @integration
+  Scenario: The red team scenario editor shows its attack config
+    Given a red team scenario created from a template
+    When I open it in the scenario editor
+    Then I see its attack goal, OWASP categories by name, strategy and max turns

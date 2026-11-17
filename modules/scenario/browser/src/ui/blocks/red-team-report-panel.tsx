@@ -1,6 +1,7 @@
 import { Box, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { RED_TEAM_BREAK_SCORE, type RedTeamRunReport } from "@langwatch/scenario-contract";
 
+import { owaspCategoryLabel } from "../../model/owasp-category.ts";
 import { redTeamTurnSummary } from "../../model/red-team-report.ts";
 import { RedTeamOutcomeBadge } from "../elements/red-team-outcome-badge.tsx";
 
@@ -26,7 +27,7 @@ export function RedTeamReportPanel({ report }: { report: RedTeamRunReport }) {
             px={2}
             py={0.5}
           >
-            {owaspId}
+            {owaspCategoryLabel({ id: owaspId })}
           </Text>
         ))}
       </HStack>

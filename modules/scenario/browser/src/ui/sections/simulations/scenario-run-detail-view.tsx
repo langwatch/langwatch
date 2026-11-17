@@ -29,7 +29,6 @@ import { RedTeamReportPanel } from "../../blocks/red-team-report-panel.tsx";
 import { CopyIdChip } from "../../elements/copy-id-chip.tsx";
 import { CutAtLimitBadge, isCutAtLimitOf } from "../../elements/cut-at-limit-badge.tsx";
 import { ParameterRow, SECRET_VALUE_MASK } from "../../elements/parameter-row.tsx";
-import { RedTeamOutcomeBadge } from "../../elements/red-team-outcome-badge.tsx";
 import { RunCriteriaChip } from "../../elements/run-criteria-chip.tsx";
 import { RunDetailSection } from "../../elements/run-detail-section.tsx";
 import {
@@ -196,7 +195,6 @@ export function RunDetailView({
               {displayTitle}
             </Heading>
             {isCutAtLimitOf(scenarioState.metadata) ? <CutAtLimitBadge /> : null}
-            {redTeamReport ? <RedTeamOutcomeBadge outcome={redTeamReport.outcome} /> : null}
           </HStack>
           <HStack gap={1} flexShrink={0}>
             <ScenarioRunActions
@@ -325,11 +323,6 @@ export function RunDetailView({
                   scenarioName={scenarioState.name ?? undefined}
                   status={scenarioState.status}
                   durationInMs={scenarioState.durationInMs}
-                  statusLine={
-                    redTeamReport ? (
-                      <RedTeamOutcomeBadge outcome={redTeamReport.outcome} />
-                    ) : undefined
-                  }
                   titleBarActions={
                     scenarioState.results ? (
                       <CopyButton
