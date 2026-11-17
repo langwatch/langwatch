@@ -266,6 +266,12 @@ Feature: IngestionSource — admin configuration of cross-platform feeds
       When the admin chooses "View source page"
       Then the admin goes to that source's page
 
+    @unit
+    Scenario: The test command survives an apostrophe in the source name
+      Given a new push source named "O'Brien's laptop"
+      When its once-shown secret offers the test command
+      Then the command's body is one shell argument holding that name
+
   Rule: Notes about why a field is locked sit behind the title, not above the fields
 
     @integration

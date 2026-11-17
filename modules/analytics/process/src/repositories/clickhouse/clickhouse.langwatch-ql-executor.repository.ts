@@ -24,6 +24,7 @@ import {
   withoutTenantCapability,
   withTenantCapability,
 } from "../../rules/langwatch-ql-tenant-capability.rules.ts";
+import { isFlooredViewName } from "../../rules/lwql-dedup-floor.rules.ts";
 import {
   type LangWatchQLConnection,
   type LangWatchQLExecutionRequest,
@@ -42,6 +43,7 @@ import {
   isClickHouseUnknownIdentifierError,
   translateClickHouseQueryError,
   extractUnknownIdentifier,
+  extractUnknownTableFunction,
   toError,
 } from "./clickhouse.query-error-translation.mapper.ts";
 
@@ -77,13 +79,20 @@ function elapsedMs(elapsedSeconds: number | undefined): number {
   return Math.round((elapsedSeconds ?? 0) * 1000);
 }
 
-/**
- * What a failed governed run is reported as.
- */
 function namesAnAppFunction(sql: string): boolean {
   return lwqlAppFunctionNames().some((name) => new RegExp(`\\b${name}\\s*\\(`, "i").test(sql));
 }
 
+/**
+ * The refusal names, as an unknown table function, a floored twin this statement reads.
+ * Matched on the twin's own name: the rewrite keeps the caller's quoting of the database.
+ */
+function namesMissingFlooredTwin({ error, sql }: { error: unknown; sql: string }): boolean {
+  const twin = extractUnknownTableFunction(error)?.split(".").at(-1);
+  return twin !== undefined && isFlooredViewName(twin) && sql.includes(`${twin}(`);
+}
+
+/** What a failed governed run is reported as. */
 function refusalFor({
   error,
   durationMs,
@@ -125,6 +134,12 @@ function refusalFor({
   // and worth the caller's retry rather than an unknown 500.
   if (isClickHouseTooManyQueriesError(error)) {
     return new LangWatchQLBusyError({ reasons: [toError(error)] });
+  }
+
+  // A floored twin not provisioned yet is read as a table function the server lacks: the
+  // deployment is missing an object, as code 60 says for a plain view, so the floor falls back.
+  if (namesMissingFlooredTwin({ error, sql })) {
+    return new LangWatchQLUnavailableError({ reasons: [toError(error)] });
   }
 
   // An unknown function in a statement that calls one of ours cannot be the

@@ -212,6 +212,9 @@ export class UserService {
     return this.repository.create(createUserInputSchema.parse(input));
   }
 
+  recordCreated = (input: UserIdInput): Promise<void> =>
+    this.repository.appendCreatedFact(userIdInputSchema.parse(input).id);
+
   /**
    * The signup form's mint: its registered fact commits with the account. Born confirmed when a
    * spent mailbox proof confirmed the address.
