@@ -39,6 +39,36 @@ Feature: Agent call graph across A2A hops
       When the call graph is read for the trace
       Then that service is a node and the call to it is an edge
 
+    @unit
+    Scenario: An HTTP span between the A2A client and an unnamed server keeps one remote agent
+      Given an A2A client span that names its callee
+      And an HTTP client span in the caller's service under it
+      And an unnamed server span in another service under that
+      When the agent call graph is built
+      Then the server's spans and LLM usage belong to the callee
+      And the graph has the caller, the callee and one A2A edge between them
+
+    @unit
+    Scenario: A plain call into a service that also hosts an agent keeps its own node
+      Given an agent that calls one endpoint of a service with no agent below it
+      And calls another endpoint of the same service that reaches a named agent
+      When the agent call graph is built
+      Then only the entry that reaches the agent folds into it
+      And the plain call stays a call to the service node
+
+    @unit
+    Scenario: An Agent Card name and the server's own agent name stay one node
+      Given an A2A client span naming the callee by its Agent Card name
+      And the server span under it naming its agent differently
+      When the agent call graph is built
+      Then the callee is one node under the server's own agent name
+
+    @unit
+    Scenario: Open spans, deep chains and bad costs keep the graph sound
+      Given a span with no end time, a very deep parent chain or a cost that is not a finite number
+      When the agent call graph is built
+      Then durations never go below zero, the chain resolves and the cost leaves the bad value out
+
   Rule: A2A span marks
 
     @unit
@@ -47,6 +77,26 @@ Feature: Agent call graph across A2A hops
       When the call graph is read for the trace
       Then each of them is listed as an A2A span with its role, method, context, task and state
       And plain spans are not listed
+
+    @unit
+    Scenario: A gRPC call to another service with an A2A method name is not an A2A call
+      Given a gRPC span whose rpc.method is SendMessage on a service that is not A2A
+      When the span is classified
+      Then it is not an A2A call
+      And the same method on an A2A rpc.service is one
+
+    @unit
+    Scenario: Stock a2a-sdk span names are marked as A2A calls
+      Given spans named the way the a2a-sdk traces its client transport and request handler
+      When the spans are classified
+      Then each is an A2A call with its role and its A2A method
+      And the SDK's internal event queue spans are not
+
+    @unit
+    Scenario: Span tree nodes carry the agent name and the A2A mark
+      Given a span naming its agent and a span marked as an A2A call
+      When the span tree is read
+      Then each node carries the agent name it names and whether it is an A2A call
 
     @unit
     Scenario: Both sides share one service.name and the client span names the callee

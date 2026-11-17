@@ -57,7 +57,9 @@ type WithDateWrites<T, K extends keyof T> = {
 import { PLATFORM_DEFAULT_RETENTION_DAYS } from "@langwatch/data-retention-contract";
 import { z } from "zod";
 
+import { spanTreeAgentMarksOf } from "../../rules/agent-call-graph.rules.ts";
 import {
+  AGENT_MARK_ATTRIBUTES_SELECT,
   chNumber,
   chString,
   chStringMap,
@@ -228,6 +230,7 @@ const SUMMARY_SPAN_SELECT = `
   SpanAttributes['langwatch.model.cacheCreationCostPerToken'] AS CustomCacheCreationRate,
   SpanAttributes['langwatch.model.cacheCreation1hCostPerToken'] AS CustomCacheCreation1hRate,
   SpanAttributes['langwatch.span.cost'] AS LwSpanCost,
+  ${AGENT_MARK_ATTRIBUTES_SELECT},
   toUnixTimestamp64Milli(StartTime) AS StartTimeMs,
   toUnixTimestamp64Milli(UpdatedAt) AS UpdatedAtMs
 `;
@@ -545,6 +548,7 @@ const spanSummaryQueryRowSchema = z.looseObject({
   CustomCacheCreationRate: chString,
   CustomCacheCreation1hRate: chString,
   LwSpanCost: chString,
+  AgentAttributes: chStringMap.optional(),
   StartTimeMs: chNumber,
   UpdatedAtMs: chNumber,
 });
@@ -2081,6 +2085,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
       cacheCreationTokens,
       startTimeMs: Number(row.StartTimeMs),
       updatedAtMs: Number(row.UpdatedAtMs),
+      ...spanTreeAgentMarksOf({ name: row.SpanName, attributes: row.AgentAttributes ?? {} }),
     };
   }
 }

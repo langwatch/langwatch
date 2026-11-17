@@ -1507,7 +1507,7 @@ Contract `../contract/src/traces.trpc.ts:667`, router `src/transport/shared-trac
 interface Input {
   token: string;
 }
-type Output = z.infer<typeof sharedTraceDtoSchema>; // ../contract/src/trace-share.schemas.ts:215
+type Output = z.infer<typeof sharedTraceDtoSchema>; // ../contract/src/trace-share.schemas.ts:218
 ```
 
 ### `spans`
@@ -1994,7 +1994,7 @@ interface Input {
   occurredAtMs?: number;
   tenantId?: string;
 }
-type Output = z.infer<typeof spanTreePageSchema>; // ../contract/src/trace.ts:46
+type Output = z.infer<typeof spanTreePageSchema>; // ../contract/src/trace.ts:50
 
 // traces.spanTreeDelta
 // Input: inline, ../contract/src/traces.trpc.ts:538
