@@ -245,6 +245,8 @@ func NewRouter(deps RouterDeps) http.Handler {
 	if deps.A2A != nil {
 		r.Route("/a2a", func(a2a chi.Router) {
 			a2a.Use(AuthMiddleware(deps.App.Auth()))
+			a2a.Use(CustomerTraceMiddleware())
+			a2a.Use(TraceRegistryMiddleware(deps.TraceRegistry, deps.DefaultExportEndpoint))
 			a2a.Handle("/*", deps.A2A)
 		})
 	}
