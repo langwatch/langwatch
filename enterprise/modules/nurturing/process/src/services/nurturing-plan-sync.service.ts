@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import type { CioBatchCall, NurturingSignalOf } from "@langwatch/enterprise-nurturing-contract";
 
+import type { NurturingOrganizationMemberRepository } from "../repositories/nurturing-organization-member.repository.ts";
+import { membersWhoseLatestOrganizationIs } from "../rules/nurturing-organization-member.rules.ts";
 import { fireSubscriptionSync } from "../rules/nurturing-subscription-sync-service.rules.ts";
 import type { NurturingMemberFactsService } from "./nurturing-member-facts.service.ts";
 import type { NurturingService } from "./nurturing.service.ts";
@@ -20,6 +22,8 @@ type PlanSyncDependencies = Readonly<{
   customerIo: Pick<NurturingService, "batch" | "batchOrThrow"> | undefined;
   /** The admin who carries the company call, from nurturing's own copy. */
   admins: Pick<NurturingMemberFactsService, "adminOf">;
+  /** Nurturing's member copy, the one the usage sync reads: whose latest organization is whose. */
+  members: Pick<NurturingOrganizationMemberRepository, "findMembershipsOfMembers">;
 }>;
 
 type SubscriptionChanged = NurturingSignalOf<"subscription_changed">;
@@ -35,7 +39,7 @@ export class NurturingPlanSyncService {
 
   private constructor(private readonly dependencies: PlanSyncDependencies) {}
 
-  /** A live change, sent as every lifecycle signal is: the channel logs a refused request. */
+  /** A live change: a refused request only logs; a failed read of nurturing's copy rejects. */
   async planChanged(signal: SubscriptionChanged): Promise<void> {
     const customerIo = this.dependencies.customerIo;
     if (!customerIo) return;
@@ -55,7 +59,11 @@ export class NurturingPlanSyncService {
   private async requestsOf(signal: SubscriptionChanged): Promise<CioBatchCall[][]> {
     if (signal.memberUserIds.length === 0) return [];
     const { organizationId } = signal;
-    const adminUserId = await this.dependencies.admins.adminOf({ organizationId });
-    return fireSubscriptionSync({ ...signal, adminUserId });
+    const [adminUserId, memberships] = await Promise.all([
+      this.dependencies.admins.adminOf({ organizationId }),
+      this.dependencies.members.findMembershipsOfMembers({ organizationId }),
+    ]);
+    const latestMemberUserIds = membersWhoseLatestOrganizationIs({ memberships, organizationId });
+    return fireSubscriptionSync({ ...signal, adminUserId, latestMemberUserIds });
   }
 }

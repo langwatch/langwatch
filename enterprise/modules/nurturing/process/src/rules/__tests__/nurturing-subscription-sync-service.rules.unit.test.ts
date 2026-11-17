@@ -17,6 +17,7 @@ const change = {
   memberUserIds: ["user-1", "user-2"],
   hasSubscription: true,
   adminUserId: "admin-1",
+  latestMemberUserIds: ["user-1", "user-2"],
 };
 
 describe("fireSubscriptionSync", () => {
@@ -46,6 +47,21 @@ describe("fireSubscriptionSync", () => {
     });
   });
 
+  describe("when a member's latest organization is another one", () => {
+    it("identifies only the members whose latest organization this is, and still groups the admin", () => {
+      const requests = fireSubscriptionSync({
+        ...change,
+        plan: "LAUNCH",
+        latestMemberUserIds: ["user-1"],
+      });
+
+      expect(requests.flat().map(({ type, userId }) => [type, userId])).toEqual([
+        ["group", "admin-1"],
+        ["identify", "user-1"],
+      ]);
+    });
+  });
+
   describe("when the organization has no active member", () => {
     it("decides nothing, not even the company call", () => {
       expect(fireSubscriptionSync({ ...change, memberUserIds: [], plan: "LAUNCH" })).toEqual([]);
@@ -69,7 +85,12 @@ describe("fireSubscriptionSync", () => {
     it("sends the identifies in requests of at most 100", () => {
       const memberUserIds = Array.from({ length: 250 }, (_, index) => `user-${index}`);
 
-      const requests = fireSubscriptionSync({ ...change, memberUserIds, plan: "LAUNCH" });
+      const requests = fireSubscriptionSync({
+        ...change,
+        memberUserIds,
+        latestMemberUserIds: memberUserIds,
+        plan: "LAUNCH",
+      });
 
       expect(requests.map((request) => request.length)).toEqual([1, 100, 100, 50]);
       expect(requests.flat().filter((call) => call.type === "identify")).toHaveLength(250);

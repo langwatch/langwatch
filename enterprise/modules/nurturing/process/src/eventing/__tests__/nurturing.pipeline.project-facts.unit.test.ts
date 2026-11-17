@@ -51,6 +51,7 @@ function nurturingOverCopies() {
   const seen = new Set<string>();
   const delivery = NurturingDeliveryService.create({
     memberFacts: unplacedMemberFacts(),
+    members: MemoryNurturingOrganizationMemberRepository.create(),
     claims: {
       claim: async (key: string) => !seen.has(key) && Boolean(seen.add(key)),
       release: async (key: string) => void seen.delete(key),

@@ -20,6 +20,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { HttpCustomerIoChannel } from "../../channels/http/http.customer-io.channel.ts";
 import { MemoryNurturingMilestonesRepository } from "../../repositories/memory/memory.nurturing-milestones.repository.ts";
+import type { MemoryNurturingOrganizationMemberRepository } from "../../repositories/memory/memory.nurturing-organization-member.repository.ts";
 import { MemoryNurturingProjectDirectoryRepository } from "../../repositories/memory/memory.nurturing-project-directory.repository.ts";
 import { MemoryNurturingClaimRepository } from "../../repositories/memory/memory.nurturing.repositories.ts";
 import { subscriptionChangedSignal } from "../../rules/nurturing-owner-signals.rules.ts";
@@ -27,6 +28,7 @@ import { NurturingDeliveryService } from "../nurturing-delivery.service.ts";
 import { NurturingMemberFactsService } from "../nurturing-member-facts.service.ts";
 import { NoCustomerIoChannelError } from "../nurturing-plan-sync.service.ts";
 import { NurturingService } from "../nurturing.service.ts";
+import { memberCopyOf } from "./nurturing-member-facts.test-helpers.ts";
 
 /** Customer.io over a recording fetch: each accepted request's batch, and the refused ones. */
 function recordingCustomerIo() {
@@ -51,13 +53,33 @@ function recordingCustomerIo() {
   return { service, sent, paths, refusing };
 }
 
-/** A delivery whose own copy names admin-1 as org-1's admin; `claims` may be shared. */
+/**
+ * The member copy the linked fixtures need: user-1 and user-2 current members of org-1 alone,
+ * user-3 of org-2.
+ */
+async function fixtureMemberCopy(): Promise<MemoryNurturingOrganizationMemberRepository> {
+  const members = await memberCopyOf({ organizationId: "org-1", userIds: ["user-1", "user-2"] });
+  await members.recordMembershipChange({
+    organizationId: "org-2",
+    userId: "user-3",
+    change: "joined",
+    at: 1,
+  });
+  return members;
+}
+
+/**
+ * A delivery whose own copy names admin-1 as org-1's admin, over the fixtures' member copy unless
+ * `members` is given; `claims` may be shared.
+ */
 async function deliveryOver({
   customerIo,
   claims = MemoryNurturingClaimRepository.create(),
+  members,
 }: {
   customerIo: NurturingService | undefined;
   claims?: MemoryNurturingClaimRepository;
+  members?: MemoryNurturingOrganizationMemberRepository;
 }) {
   const milestones = MemoryNurturingMilestonesRepository.create();
   await milestones.recordOrganization({
@@ -76,6 +98,7 @@ async function deliveryOver({
       projects: MemoryNurturingProjectDirectoryRepository.create(),
       organizations: createApiFixture<OrganizationApi>({}),
     }),
+    members: members ?? (await fixtureMemberCopy()),
   });
 }
 
@@ -91,9 +114,12 @@ async function settle(): Promise<void> {
 }
 
 /** The requests a delivered live fact sends: the company call, then the members. */
-async function liveRequestsOf(fact: SubscriptionChangedEventData) {
+async function liveRequestsOf(
+  fact: SubscriptionChangedEventData,
+  members?: MemoryNurturingOrganizationMemberRepository,
+) {
   const cio = recordingCustomerIo();
-  await deliverFact(await deliveryOver({ customerIo: cio.service }), fact);
+  await deliverFact(await deliveryOver({ customerIo: cio.service, members }), fact);
   await settle();
   return cio;
 }
@@ -127,6 +153,51 @@ describe("NurturingDeliveryService, delivering billing's subscription_changed fa
       const { sent } = await liveRequestsOf(subscriptionChangedFactFixture({ memberUserIds: [] }));
 
       expect(sent).toEqual([]);
+    });
+  });
+
+  describe("when a member's latest organization is another one", () => {
+    it("groups the admin and identifies only the members whose latest organization this is", async () => {
+      const members = await fixtureMemberCopy();
+      await members.recordMembershipChange({
+        organizationId: "org-3",
+        userId: "user-2",
+        change: "joined",
+        at: 2,
+      });
+
+      const { sent } = await liveRequestsOf(subscriptionChangedFactFixture(), members);
+
+      const traits = { has_subscription: true, plan: "launch" };
+      expect(sent).toEqual([
+        [{ type: "group", userId: "admin-1", groupId: "org-1", traits: { plan: "launch" } }],
+        [{ type: "identify", userId: "user-1", traits }],
+      ]);
+    });
+  });
+
+  describe("when nurturing holds no membership copy for a member", () => {
+    it("identifies only the members it has a copy of", async () => {
+      const members = await memberCopyOf({ organizationId: "org-1", userIds: ["user-1"] });
+
+      const { sent } = await liveRequestsOf(subscriptionChangedFactFixture(), members);
+
+      expect(sent.flat().filter((call) => call.type === "identify")).toEqual([
+        { type: "identify", userId: "user-1", traits: { has_subscription: true, plan: "launch" } },
+      ]);
+    });
+
+    it("does the same for a catch-up fact", async () => {
+      const cio = recordingCustomerIo();
+      const members = await memberCopyOf({ organizationId: "org-1", userIds: ["user-1"] });
+      const delivery = await deliveryOver({ customerIo: cio.service, members });
+
+      await deliverFact(delivery, subscriptionChangedFacts.caughtUp);
+
+      expect(cio.sent.flat().map(({ type, userId }) => [type, userId])).toEqual([
+        ["group", "admin-1"],
+        ["identify", "user-1"],
+      ]);
     });
   });
 

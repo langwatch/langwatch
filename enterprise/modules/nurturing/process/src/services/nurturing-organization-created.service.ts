@@ -12,9 +12,9 @@ type OrganizationCreatedDependencies = Readonly<{
 }>;
 
 /**
- * Names a new organization in Customer.io on its founder: its name and creation time, and no plan,
- * so a replay or retry never resets a paying one's plan. Covers organizations created without a
- * sign-up. A provisioned one names no founder, so nothing carries the call.
+ * Names every new organization in Customer.io on its founder, sign-ups included: its name and
+ * creation time, and no plan, so a replay or retry never resets a paying one's plan. A provisioned
+ * one names no founder, so nothing carries the call.
  * Spec: customer-io-plan-traits.feature
  */
 export class NurturingOrganizationCreatedService {

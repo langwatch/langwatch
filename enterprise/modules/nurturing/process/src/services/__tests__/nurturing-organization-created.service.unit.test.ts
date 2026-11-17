@@ -33,8 +33,8 @@ const created = (userId: string | undefined): OrganizationCreatedEventData => ({
 });
 
 describe("NurturingOrganizationCreatedService", () => {
-  describe("when organization records a creation naming a founder and no sign-up", () => {
-    /** @scenario "An organization created for an existing user gets its name and creation time" */
+  describe("when organization records a creation naming a founder", () => {
+    /** @scenario "A new organization gets its name and creation time on its founder" */
     it("sends the founder one group call with the name and created_at, and no plan", async () => {
       const { service, sent } = serviceOver();
 

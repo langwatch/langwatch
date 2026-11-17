@@ -11,10 +11,11 @@ import { describe, expect, it, vi } from "vitest";
 import { HttpCustomerIoChannel } from "../../channels/http/http.customer-io.channel.ts";
 import { MemoryPostHogChannel } from "../../channels/memory/memory.posthog.channel.ts";
 import { PostHogChannel } from "../../channels/posthog.channel.ts";
+import { MemoryNurturingOrganizationMemberRepository } from "../../repositories/memory/memory.nurturing-organization-member.repository.ts";
 import { MemoryNurturingClaimRepository } from "../../repositories/memory/memory.nurturing.repositories.ts";
 import { NurturingDeliveryService } from "../nurturing-delivery.service.ts";
 import { NurturingService } from "../nurturing.service.ts";
-import { unplacedMemberFacts } from "./nurturing-member-facts.test-helpers.ts";
+import { memberCopyOf, unplacedMemberFacts } from "./nurturing-member-facts.test-helpers.ts";
 
 const scenarioCreated: NurturingSignal = {
   kind: "scenario_created",
@@ -62,14 +63,15 @@ async function settle(): Promise<void> {
   for (let tick = 0; tick < 3; tick++) await new Promise((resolve) => setTimeout(resolve, 0));
 }
 
-/** A delivery over memory PostHog and a recording Customer.io. */
-function deliveryOverBothSinks() {
+/** A delivery over memory PostHog and a recording Customer.io; `members` is nurturing's copy. */
+function deliveryOverBothSinks(members = MemoryNurturingOrganizationMemberRepository.create()) {
   const posthog = MemoryPostHogChannel.create();
   const cio = customerIo();
   const delivery = NurturingDeliveryService.create({
     claims: claims(),
     users: users(),
     memberFacts: unplacedMemberFacts(),
+    members,
     customerIo: cio.service,
     posthog,
   });
@@ -118,6 +120,7 @@ describe("NurturingDeliveryService", () => {
         claims: claims(),
         users: users(),
         memberFacts: unplacedMemberFacts(),
+        members: MemoryNurturingOrganizationMemberRepository.create(),
         customerIo: cio.service,
         posthog,
       });
@@ -150,6 +153,7 @@ describe("NurturingDeliveryService", () => {
         claims: claims(),
         users: users(),
         memberFacts: unplacedMemberFacts(),
+        members: MemoryNurturingOrganizationMemberRepository.create(),
         customerIo: cio.service,
         posthog,
       });
@@ -453,6 +457,7 @@ describe("NurturingDeliveryService", () => {
         claims: claims(),
         users: users(),
         memberFacts: unplacedMemberFacts(),
+        members: MemoryNurturingOrganizationMemberRepository.create(),
         customerIo: cio.service,
         posthog: new ThrowingPostHogChannel(),
       });
@@ -468,7 +473,9 @@ describe("NurturingDeliveryService", () => {
 
   describe("when a subscription change is delivered", () => {
     it("tells Customer.io every member's trait and tracks nothing in PostHog", async () => {
-      const { posthog, cio, delivery } = deliveryOverBothSinks();
+      const { posthog, cio, delivery } = deliveryOverBothSinks(
+        await memberCopyOf({ organizationId: "org-1", userIds: ["user-1", "user-2"] }),
+      );
 
       await delivery.deliver({
         key: "subscription_changed:event-21",
@@ -497,7 +504,7 @@ describe("NurturingDeliveryService", () => {
       ]);
     });
 
-    it("gives its claim back when the admin read fails, so a redelivery sends", async () => {
+    it("fails and gives its claim back when the admin read fails, so the retry sends", async () => {
       const cio = customerIo();
       const memberFacts = unplacedMemberFacts();
       vi.spyOn(memberFacts, "adminOf").mockRejectedValueOnce(new Error("milestones unavailable"));
@@ -505,6 +512,7 @@ describe("NurturingDeliveryService", () => {
         claims: MemoryNurturingClaimRepository.create(),
         users: users(),
         memberFacts,
+        members: await memberCopyOf({ organizationId: "org-1", userIds: ["user-1"] }),
         customerIo: cio.service,
         posthog: undefined,
       });
@@ -519,7 +527,7 @@ describe("NurturingDeliveryService", () => {
 
       await expect(
         delivery.deliver({ key: "subscription_changed:event-22", signal }),
-      ).resolves.toBeUndefined();
+      ).rejects.toThrow("milestones unavailable");
       expect(cio.sent).toEqual([]);
       await delivery.deliver({ key: "subscription_changed:event-22", signal });
 
@@ -575,6 +583,7 @@ describe("NurturingDeliveryService", () => {
         claims: claims(),
         users: users(),
         memberFacts: unplacedMemberFacts(),
+        members: MemoryNurturingOrganizationMemberRepository.create(),
         customerIo: cio.service,
         posthog: undefined,
       });
@@ -598,6 +607,7 @@ describe("NurturingDeliveryService", () => {
         claims: claims(),
         users: users(),
         memberFacts: unplacedMemberFacts(),
+        members: MemoryNurturingOrganizationMemberRepository.create(),
         customerIo: undefined,
         posthog: new ThrowingPostHogChannel(),
       });
@@ -632,6 +642,7 @@ describe("NurturingDeliveryService", () => {
         claims: claims(),
         users: users(),
         memberFacts: unplacedMemberFacts(),
+        members: MemoryNurturingOrganizationMemberRepository.create(),
         customerIo: service,
         posthog: undefined,
       });
@@ -849,6 +860,7 @@ describe("NurturingDeliveryService", () => {
         claims: claim,
         users: users(),
         memberFacts: unplacedMemberFacts(),
+        members: MemoryNurturingOrganizationMemberRepository.create(),
         customerIo: undefined,
         posthog: undefined,
       });
@@ -867,6 +879,7 @@ describe("NurturingDeliveryService", () => {
         claims: claims(),
         users: users(),
         memberFacts: unplacedMemberFacts(),
+        members: MemoryNurturingOrganizationMemberRepository.create(),
         customerIo: cio.service,
         posthog: undefined,
       });
@@ -887,6 +900,7 @@ describe("NurturingDeliveryService", () => {
         claims: claims(),
         users: users(),
         memberFacts: unplacedMemberFacts(),
+        members: MemoryNurturingOrganizationMemberRepository.create(),
         customerIo: cio.service,
         posthog: undefined,
       });
@@ -1029,6 +1043,7 @@ describe("NurturingDeliveryService", () => {
         claims: claims(),
         users: users(),
         memberFacts: unplacedMemberFacts(),
+        members: MemoryNurturingOrganizationMemberRepository.create(),
         customerIo: cio.service,
         posthog: undefined,
       });
@@ -1056,6 +1071,7 @@ describe("NurturingDeliveryService", () => {
         claims: claims(),
         users: users(),
         memberFacts: unplacedMemberFacts(),
+        members: MemoryNurturingOrganizationMemberRepository.create(),
         customerIo: cio.service,
         posthog: undefined,
       });
@@ -1085,6 +1101,7 @@ describe("NurturingDeliveryService", () => {
         claims: claims(),
         users: users(),
         memberFacts: unplacedMemberFacts(),
+        members: MemoryNurturingOrganizationMemberRepository.create(),
         customerIo: cio.service,
         posthog: undefined,
       });
@@ -1112,6 +1129,7 @@ describe("NurturingDeliveryService", () => {
         claims: claims(),
         users: users(),
         memberFacts: unplacedMemberFacts(),
+        members: MemoryNurturingOrganizationMemberRepository.create(),
         customerIo: cio.service,
         posthog: undefined,
       });
@@ -1140,6 +1158,7 @@ describe("NurturingDeliveryService", () => {
         claims: claims(),
         users: users(),
         memberFacts: unplacedMemberFacts(),
+        members: MemoryNurturingOrganizationMemberRepository.create(),
         customerIo: cio.service,
         posthog: undefined,
       });
@@ -1170,6 +1189,7 @@ describe("NurturingDeliveryService", () => {
         claims: claims(),
         users: users(),
         memberFacts: unplacedMemberFacts(),
+        members: MemoryNurturingOrganizationMemberRepository.create(),
         customerIo: cio.service,
         posthog: undefined,
       });
@@ -1203,6 +1223,7 @@ describe("NurturingDeliveryService", () => {
         claims: claims(),
         users: users(),
         memberFacts: unplacedMemberFacts(),
+        members: MemoryNurturingOrganizationMemberRepository.create(),
         customerIo: undefined,
         posthog: MemoryPostHogChannel.create(),
       });
@@ -1229,6 +1250,7 @@ describe("NurturingDeliveryService", () => {
         claims: claims(),
         users: users(),
         memberFacts: unplacedMemberFacts(),
+        members: MemoryNurturingOrganizationMemberRepository.create(),
         customerIo: undefined,
         posthog,
       });

@@ -47,6 +47,7 @@ import { describe, expect, it, vi } from "vitest";
  */
 import { HttpCustomerIoChannel } from "../../channels/http/http.customer-io.channel.ts";
 import { MemoryPostHogChannel } from "../../channels/memory/memory.posthog.channel.ts";
+import { MemoryNurturingOrganizationMemberRepository } from "../../repositories/memory/memory.nurturing-organization-member.repository.ts";
 import { postHogUuidFor } from "../../rules/nurturing-guided-onboarding-service.rules.ts";
 import { unplacedMemberFacts } from "../../services/__tests__/nurturing-member-facts.test-helpers.ts";
 import { NurturingDeliveryService } from "../../services/nurturing-delivery.service.ts";
@@ -98,6 +99,7 @@ function nurturingOverMemoryPostHog(users: UserApi = createApiFixture<UserApi>({
   const seen = new Set<string>();
   const delivery = NurturingDeliveryService.create({
     memberFacts: unplacedMemberFacts(),
+    members: MemoryNurturingOrganizationMemberRepository.create(),
     claims: {
       claim: async (key: string) => !seen.has(key) && Boolean(seen.add(key)),
       release: async (key: string) => void seen.delete(key),
@@ -634,6 +636,7 @@ describe("nurturing's usageReportReceived peer subscriber", () => {
         posthog: undefined,
         users: createApiFixture<UserApi>({}),
         memberFacts: unplacedMemberFacts(),
+        members: MemoryNurturingOrganizationMemberRepository.create(),
       });
 
       await delivery.deliverUsageReport({

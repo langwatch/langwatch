@@ -98,6 +98,7 @@ export class NurturingModule implements NurturingApi {
         projects: repositories.projects,
         organizations: dependencies.organizations,
       }),
+      members: repositories.members,
     });
     const milestones = NurturingMilestonesService.create({
       milestones: repositories.milestones,
@@ -202,7 +203,10 @@ export class NurturingModule implements NurturingApi {
     await this.#organizationUsage?.tracesChanged(input);
   }
 
-  /** A new organization: its name, plan and creation time go to Customer.io on its founder. */
+  /**
+   * A new organization: its name and creation time go to Customer.io on its founder, never its
+   * plan.
+   */
   async organizationCreated(data: OrganizationCreatedEventData): Promise<void> {
     await this.#organizationCreated?.organizationCreated(data);
   }

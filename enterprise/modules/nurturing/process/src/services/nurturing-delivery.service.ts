@@ -12,6 +12,7 @@ import type { UserApi } from "@langwatch/user-contract";
 
 import type { PostHogChannel } from "../channels/posthog.channel.ts";
 import type { NurturingClaimRepository } from "../repositories/nurturing-claim.repository.ts";
+import type { NurturingOrganizationMemberRepository } from "../repositories/nurturing-organization-member.repository.ts";
 import { fire as fireActivity } from "../rules/nurturing-activity-tracking-service.rules.ts";
 import { fireCodingOrApp, isCodingOrAppSignal } from "../rules/nurturing-coding-delivery.rules.ts";
 import { selfHostedTraits, unixSecondsOf } from "../rules/nurturing-customer-io-timestamp.rules.ts";
@@ -90,6 +91,8 @@ export class NurturingDeliveryService {
       users: UserApi;
       /** Who hears an organization's fact, and what a joining person is told of traces. */
       memberFacts: NurturingMemberFactsService;
+      /** Nurturing's member copy: a person is told the plan of their latest organization only. */
+      members: Pick<NurturingOrganizationMemberRepository, "findMembershipsOfMembers">;
     }>,
     private readonly parts: Readonly<{
       postHogDelivery: NurturingPostHogDeliveryService | undefined;
@@ -107,7 +110,11 @@ export class NurturingDeliveryService {
         customerIo && NurturingOwnCodingDeliveryService.create({ claims, customerIo }),
       joinedOrganization:
         customerIo && NurturingJoinedOrganizationService.create({ claims, customerIo }),
-      planSync: NurturingPlanSyncService.create({ customerIo, admins: deps.memberFacts }),
+      planSync: NurturingPlanSyncService.create({
+        customerIo,
+        admins: deps.memberFacts,
+        members: deps.members,
+      }),
     });
   }
 
@@ -316,7 +323,7 @@ export class NurturingDeliveryService {
       case "guided_onboarding_progress":
         return this.sendCustomerIoCalls(fireGuidedOnboardingProgress(signal));
       case "subscription_changed":
-        // Its claim goes back before the failure is reported, so a redelivery sends the change.
+        // A failed change gives its claim back and fails the delivery, so the job's retry sends it.
         return this.parts.planSync
           .planChanged(signal)
           .catch((error: unknown) =>
@@ -324,8 +331,7 @@ export class NurturingDeliveryService {
               error,
               keys: [deliveredClaim],
             }),
-          )
-          .catch(reportFailure);
+          );
       case "self_hosted_crm":
         return this.selfHostedCrm(signal);
       default:

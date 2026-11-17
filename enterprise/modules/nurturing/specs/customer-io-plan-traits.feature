@@ -50,8 +50,8 @@ Feature: Customer.io knows each team's real plan
     Then members are identified with has_subscription only and no plan trait is sent
 
   @unit
-  Scenario: An organization created for an existing user gets its name and creation time
-    Given organization records a creation naming a founder and no sign-up
+  Scenario: A new organization gets its name and creation time on its founder
+    Given organization records a creation naming a founder
     When the created fact is delivered
     Then the founder gets one group call with the name and created_at in Unix seconds, and no plan
     And no signed_up track is sent
@@ -145,7 +145,7 @@ Feature: Customer.io knows each team's real plan
   #        -> Scenario: A pending checkout does not make the plan paid
   # AC 4: "renewal or seat change sends nothing"                       -> Scenario: A renewal or a seat change tells Customer.io nothing
   # AC 5: "stored fact without plan sends no plan"                     -> Scenario: A subscription_changed fact stored before it carried a plan sends no plan
-  # AC 6: "createAndAssign organization gets name and created_at, no plan" -> Scenario: An organization created for an existing user gets its name and creation time
+  # AC 6: "createAndAssign organization gets name and created_at, no plan" -> Scenario: A new organization gets its name and creation time on its founder
   # AC 7: "provisioned organization without founder sends nothing"     -> Scenario: A provisioned organization with no founder sends nothing
   # AC 8: "sign-up path unchanged"                                     -> Scenario: The sign-up path keeps its calls
   # AC 9: "usage sync adds three company traits; omit unknown; not placed sends nothing"

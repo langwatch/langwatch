@@ -11,6 +11,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 
 import { HttpCustomerIoChannel } from "../../channels/http/http.customer-io.channel.ts";
 import { MemoryPostHogChannel } from "../../channels/memory/memory.posthog.channel.ts";
+import { MemoryNurturingOrganizationMemberRepository } from "../../repositories/memory/memory.nurturing-organization-member.repository.ts";
 import { MemoryNurturingClaimRepository } from "../../repositories/memory/memory.nurturing.repositories.ts";
 import type { NurturingClaimRepository } from "../../repositories/nurturing-claim.repository.ts";
 import { NurturingDeliveryService } from "../nurturing-delivery.service.ts";
@@ -68,6 +69,7 @@ function deliveryOver(claims: NurturingClaimRepository, cio = customerIo()) {
     claims,
     users: createApiFixture<UserApi>({}),
     memberFacts: unplacedMemberFacts(),
+    members: MemoryNurturingOrganizationMemberRepository.create(),
     customerIo: cio.service,
     posthog,
   });
