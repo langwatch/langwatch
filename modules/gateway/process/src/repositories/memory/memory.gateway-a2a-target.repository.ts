@@ -1,0 +1,77 @@
+import {
+  createGatewayA2aTargetInputSchema,
+  gatewayA2aTargetResourceSchema,
+  type CreateGatewayA2aTargetInput,
+  type GatewayA2aTargetResource,
+  type UpdateGatewayA2aTargetInput,
+} from "@langwatch/gateway-contract";
+import { nowInstant, toDate } from "@langwatch/time";
+
+import { GatewayA2aTargetRepository } from "../gateway-a2a-target.repository.ts";
+
+/** A2A targets in memory; headers held in plaintext like the other memory twins. */
+export class MemoryGatewayA2aTargetRepository extends GatewayA2aTargetRepository {
+  static create(): MemoryGatewayA2aTargetRepository {
+    return new MemoryGatewayA2aTargetRepository();
+  }
+
+  readonly #rows = new Map<string, GatewayA2aTargetResource>();
+  #sequence = 0;
+
+  async findAll(organizationId: string): Promise<GatewayA2aTargetResource[]> {
+    return [...this.#rows.values()]
+      .filter((row) => row.organizationId === organizationId && row.archivedAt === null)
+      .map((row) => structuredClone(row));
+  }
+
+  async findById(input: {
+    id: string;
+    organizationId: string;
+  }): Promise<GatewayA2aTargetResource | null> {
+    const row = this.#rows.get(input.id);
+    return row?.organizationId === input.organizationId && row.archivedAt === null
+      ? structuredClone(row)
+      : null;
+  }
+
+  async create(input: CreateGatewayA2aTargetInput): Promise<GatewayA2aTargetResource> {
+    const { actorUserId, ...fields } = createGatewayA2aTargetInputSchema.parse(input);
+    const now = toDate(nowInstant());
+    this.#sequence += 1;
+    const row = gatewayA2aTargetResourceSchema.parse({
+      ...fields,
+      id: `gatewaya2atarget_${this.#sequence}`,
+      createdById: actorUserId,
+      createdAt: now,
+      updatedAt: now,
+      archivedAt: null,
+    });
+    this.#rows.set(row.id, row);
+    return structuredClone(row);
+  }
+
+  async update(input: UpdateGatewayA2aTargetInput): Promise<GatewayA2aTargetResource> {
+    const existing = await this.findById(input);
+    if (!existing) throw new Error("A2A target must exist before update");
+    const { id: _id, organizationId: _org, actorUserId: _actor, ...changes } = input;
+    const defined = Object.fromEntries(
+      Object.entries(changes).filter(([, value]) => value !== undefined),
+    );
+    const row = gatewayA2aTargetResourceSchema.parse({
+      ...existing,
+      ...defined,
+      updatedAt: toDate(nowInstant()),
+    });
+    this.#rows.set(row.id, row);
+    return structuredClone(row);
+  }
+
+  async archive(input: { id: string; organizationId: string }): Promise<GatewayA2aTargetResource> {
+    const existing = await this.findById(input);
+    if (!existing) throw new Error("A2A target must exist before archive");
+    const now = toDate(nowInstant());
+    const row = { ...existing, archivedAt: now, updatedAt: now };
+    this.#rows.set(row.id, row);
+    return structuredClone(row);
+  }
+}

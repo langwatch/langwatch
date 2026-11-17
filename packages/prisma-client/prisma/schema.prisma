@@ -6423,6 +6423,29 @@ model IngestionTemplate {
 // The LangWatch-hosted provider a connected install's gateway adds for one
 // organization (ADR-156 §8): where to call and the token to present. Written
 // and cleared only by licensing through GatewayApi; the token is encrypted.
+// An agent the gateway proxies A2A calls to under /a2a/{name}. projectId null makes it org-wide;
+// the upstream headers rest sealed. specs/ai-gateway/a2a-proxy.feature
+model GatewayA2ATarget {
+  id                       String    @id
+  organizationId           String
+  projectId                String?
+  name                     String
+  agentName                String
+  cardUrl                  String
+  upstreamUrl              String
+  encryptedUpstreamHeaders String?
+  restrictToAllowList      Boolean   @default(false)
+  allowedVirtualKeyIds     String[]  @default([])
+  blocked                  Boolean   @default(false)
+  blockReason              String?
+  createdById              String
+  createdAt                DateTime  @default(now())
+  updatedAt                DateTime  @updatedAt
+  archivedAt               DateTime?
+
+  @@index([organizationId, projectId])
+}
+
 model GatewayConnectUpstream {
   organizationId String   @id
   baseUrl        String

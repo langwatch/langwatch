@@ -24236,6 +24236,160 @@
       ]
     },
     {
+      "name": "GatewayA2ATarget",
+      "tableName": "GatewayA2ATarget",
+      "documentation": "",
+      "primaryKey": [
+        "id"
+      ],
+      "fields": [
+        {
+          "name": "id",
+          "columnName": "id",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "organizationId",
+          "columnName": "organizationId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "projectId",
+          "columnName": "projectId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "name",
+          "columnName": "name",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "agentName",
+          "columnName": "agentName",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "cardUrl",
+          "columnName": "cardUrl",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "upstreamUrl",
+          "columnName": "upstreamUrl",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "encryptedUpstreamHeaders",
+          "columnName": "encryptedUpstreamHeaders",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "restrictToAllowList",
+          "columnName": "restrictToAllowList",
+          "type": "Boolean",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "allowedVirtualKeyIds",
+          "columnName": "allowedVirtualKeyIds",
+          "type": "String",
+          "kind": "scalar",
+          "isList": true,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "blocked",
+          "columnName": "blocked",
+          "type": "Boolean",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "blockReason",
+          "columnName": "blockReason",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "createdById",
+          "columnName": "createdById",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "createdAt",
+          "columnName": "createdAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "updatedAt",
+          "columnName": "updatedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "archivedAt",
+          "columnName": "archivedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        }
+      ]
+    },
+    {
       "name": "GatewayConnectUpstream",
       "tableName": "GatewayConnectUpstream",
       "documentation": "",
