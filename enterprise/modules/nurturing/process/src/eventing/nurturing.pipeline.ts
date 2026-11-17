@@ -53,6 +53,14 @@ import {
   experimentRanEventDataSchema,
 } from "@langwatch/experiment-contract";
 import {
+  GATEWAY_BUDGET_CROSSING_EVENT_TYPE,
+  GATEWAY_VK_LIFECYCLE_EVENT_TYPE,
+  type RecordBudgetCrossingCommandData,
+  recordBudgetCrossingCommandDataSchema,
+  type RecordVkLifecycleCommandData,
+  recordVkLifecycleCommandDataSchema,
+} from "@langwatch/gateway-contract";
+import {
   INSIGHT_EVENT_TYPES,
   insightFiledEventDataSchema,
   insightReaderEventDataSchema,
@@ -290,6 +298,16 @@ export function buildNurturingPipeline(deps: {
   }) => Promise<void>;
   /** Takes an erased account out of nurturing's own rows; never delivers. */
   forgetErasedUser: (input: { userId: string }) => Promise<void>;
+  /** A gateway key's lifecycle fact: a created person's key delivers one person's signal. */
+  virtualKeyCreated: (input: {
+    data: RecordVkLifecycleCommandData;
+    deliver: (signal: NurturingSignal) => Promise<void>;
+  }) => Promise<void>;
+  /** A budget crossing: a copied person's key delivers one person's signal. */
+  keyBudgetCrossed: (input: {
+    data: RecordBudgetCrossingCommandData;
+    deliver: (signal: NurturingSignal) => Promise<void>;
+  }) => Promise<void>;
 }): NurturingPipeline {
   const deliverSignal = (signal: NurturingSignal) =>
     deps.deliver({ key: nurturingSignalKey(signal), signal });
@@ -612,6 +630,17 @@ export function buildNurturingPipeline(deps: {
         eventType: APP_PAGE_OPENED_EVENT_TYPE,
         data: appPageOpenedEventDataSchema,
         handle: (data) => deliverEach(appOpenedSignals({ data })),
+      })
+      // Gateway's key facts: the recipient is chosen from nurturing's own key and member copies.
+      .withPeerSubscriber("virtualKeyCreated", {
+        eventType: GATEWAY_VK_LIFECYCLE_EVENT_TYPE,
+        data: recordVkLifecycleCommandDataSchema,
+        handle: (data) => deps.virtualKeyCreated({ data, deliver: deliverSignal }),
+      })
+      .withPeerSubscriber("keyBudgetThreshold", {
+        eventType: GATEWAY_BUDGET_CROSSING_EVENT_TYPE,
+        data: recordBudgetCrossingCommandDataSchema,
+        handle: (data) => deps.keyBudgetCrossed({ data, deliver: deliverSignal }),
       })
       .withPeerSubscriber("langyFirstMessageSeen", {
         eventType: LANGY_FIRST_MESSAGE_SEEN_EVENT_TYPE,

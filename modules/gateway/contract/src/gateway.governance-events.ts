@@ -18,6 +18,9 @@ export const vkLifecycleActionSchema = z.enum([
 ]);
 export type VkLifecycleAction = z.infer<typeof vkLifecycleActionSchema>;
 
+/** `VirtualKey.purpose` (gateway.rows.ts): only a USER key has a person behind it. */
+export const vkLifecyclePurposeSchema = z.enum(["USER", "LANGY", "CONNECT"]);
+
 const recordVkLifecycleCommandDataSchemaDefinition = z.object({
   tenantId: z.string().min(1),
   organization_id: z.string().min(1),
@@ -26,6 +29,13 @@ const recordVkLifecycleCommandDataSchemaDefinition = z.object({
   name: z.string(),
   display_prefix: z.string(),
   reason: z.string().nullable().default(null),
+  // The three below are absent on a fact stored before they were recorded, which reads as null.
+  /** The person who made the change; null when no person did (a project key, Connect). */
+  actor_user_id: z.string().min(1).nullish(),
+  /** `VirtualKey.principalUserId`: the person the key acts for. */
+  principal_user_id: z.string().min(1).nullish(),
+  /** `VirtualKey.purpose`; null reads as USER. */
+  purpose: vkLifecyclePurposeSchema.nullish(),
   /** Unix ms of the mutation. */
   occurred_at: z.number().int().positive(),
 });
@@ -53,6 +63,11 @@ const recordBudgetCrossingCommandDataSchemaDefinition = z.object({
   window: z.string().min(1),
   /** Period identity for once-per-crossing-per-period dedup, unix ms. */
   period_started_at_ms: z.number().int().min(0),
+  /**
+   * When the period gives way to the next, unix ms, by gateway's own window logic. Null for a
+   * window that never rolls (TOTAL, MANUAL); absent on a fact stored before it was recorded.
+   */
+  period_ends_at_ms: z.number().int().min(0).nullish(),
   limit_usd: z.string(),
   spent_usd: z.string(),
   on_breach: z.enum(["block", "warn"]),

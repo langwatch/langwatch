@@ -11,7 +11,7 @@ Product analytics and lifecycle messaging: nurturing learns from the owners' eve
 | Classification | enterprise (`modules/catalogue.json`)                                                                          |
 | Subjects       | nurturing, product-milestone                                                                                   |
 | Halves         | [contract](contract) · [process](process/README.md)                                                            |
-| Api token      | `NurturingApi` = `moduleApi<NurturingApi>()("nurturing")`, `contract/src/nurturing-types.ts:261` (1 operation) |
+| Api token      | `NurturingApi` = `moduleApi<NurturingApi>()("nurturing")`, `contract/src/nurturing-types.ts:266` (1 operation) |
 | Installed by   | api, worker, tasks (process)                                                                                   |
 
 ## What nurturing owns
@@ -28,6 +28,7 @@ Product analytics and lifecycle messaging: nurturing learns from the owners' eve
 | Postgres table                 | `NurturingProjectTraceDay`                                                                                                                    | `process/src/repositories/prisma/prisma.nurturing-trace-day.repository.ts:18`            |
 | Postgres table                 | `NurturingTracedProject`                                                                                                                      | `process/src/repositories/prisma/prisma.nurturing-traced-project.repository.ts:13`       |
 | Postgres table                 | `NurturingUncopiedProject`                                                                                                                    | `process/src/repositories/prisma/prisma.nurturing-uncopied-project.repository.ts:12`     |
+| Postgres table                 | `NurturingVirtualKey`                                                                                                                         | `process/src/repositories/prisma/prisma.nurturing-virtual-key.repository.ts:21`          |
 | Postgres, accessed not claimed | `Organization`, `OrganizationUser`, `Project`, `Team`                                                                                         | `process/src/repositories/prisma/prisma.nurturing-member-source.repository.ts:10`        |
 | Stores required                |                                                                                                                                               | `process/src/channels/http/http.customer-io.channel.ts:20`                               |
 | Stores required                |                                                                                                                                               | `process/src/channels/http/http.nurturing.channels.ts:13`                                |

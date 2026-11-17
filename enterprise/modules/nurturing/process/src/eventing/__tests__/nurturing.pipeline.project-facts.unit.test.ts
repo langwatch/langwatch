@@ -32,6 +32,7 @@ import { MemoryNurturingOrganizationMemberRepository } from "../../repositories/
 import { MemoryNurturingOrganizationPlanRepository } from "../../repositories/memory/memory.nurturing-organization-plan.repository.ts";
 import { MemoryNurturingPersonalProjectRepository } from "../../repositories/memory/memory.nurturing-personal-project.repository.ts";
 import { MemoryNurturingTracedProjectRepository } from "../../repositories/memory/memory.nurturing-traced-project.repository.ts";
+import { MemoryNurturingVirtualKeyRepository } from "../../repositories/memory/memory.nurturing-virtual-key.repository.ts";
 import { unplacedMemberFacts } from "../../services/__tests__/nurturing-member-facts.test-helpers.ts";
 import { NurturingDeliveryService } from "../../services/nurturing-delivery.service.ts";
 import { NurturingProjectFactsService } from "../../services/nurturing-project-facts.service.ts";
@@ -81,6 +82,7 @@ function nurturingOverCopies() {
     personalProjects,
     organizations,
     members,
+    virtualKeys: MemoryNurturingVirtualKeyRepository.create(),
   });
   const pipeline = buildNurturingPipeline({
     deliver: (input) => delivery.deliver(input),
@@ -93,6 +95,8 @@ function nurturingOverCopies() {
     recordPersonalOwner: (input) => projectFacts.recordPersonalOwner(input),
     recordTracedProject: (input) => projectFacts.recordTracedProject(input),
     forgetErasedUser: (input) => userErasure.forgetUser(input),
+    virtualKeyCreated: async () => undefined,
+    keyBudgetCrossed: async () => undefined,
   });
   const subscribers: EventSubscriberDefinition<Event>[] = [];
   const registry = createApiFixture<

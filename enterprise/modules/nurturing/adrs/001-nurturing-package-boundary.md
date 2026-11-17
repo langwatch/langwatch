@@ -1,6 +1,6 @@
 # ADR-001: Nurturing learns from events and keeps its own copies
 
-**Status:** Accepted (2026-09-29; amended 2026-11-11 and 2026-11-17)
+**Status:** Accepted (2026-09-29; amended 2026-11-11 and 2026-11-17, twice)
 
 **Behavioural contract:** [Nurturing](../specs/nurturing.feature)
 
@@ -59,7 +59,12 @@ The contract holds the signal union, the Customer.io vocabulary, the Api token,
 the config (`CUSTOMER_IO_REGION`, the shared `POSTHOG_KEY`/`POSTHOG_HOST`
 leaves) and the `CUSTOMER_IO_API_KEY` secret. The process imports the event
 schemas of the owners it listens to, and the `UserApi` and `OrganizationApi`
-contracts only for the exceptions above. No feature module depends on
+contracts only for the exceptions above. Gateway's contract
+(`@langwatch/gateway-contract`) is one of those owners: its
+`lw.governance.vk_lifecycle` and `lw.governance.budget_crossing` facts carry who
+created a key, who it acts for, its purpose and a crossing's period end, so
+nurturing never reads gateway's tables
+(https://github.com/langwatch/tasks/issues/1200). No feature module depends on
 nurturing's process, so no peer cycle can pass through it.
 
 ## Persistence
@@ -68,6 +73,8 @@ Nurturing owns its copies of the owners' facts: `NurturingProject` (a project's
 organization), `NurturingOrganizationCreated` (an organization's creation),
 `NurturingOrganizationMember` (memberships), `NurturingOrganizationPlan` (an
 organization's plan, folded from billing's `subscription_changed` facts),
+`NurturingVirtualKey` (a gateway key's organization, name, creator, holder,
+purpose and state, folded order-free from gateway's `vk_lifecycle` facts),
 `NurturingPersonalProject` (a personal project's owner) and `NurturingTracedProject`
 (a project that traced).
 It also owns `NurturingOrganization` (admin, milestone counts, coding signals,
@@ -76,7 +83,9 @@ owner), `NurturingProjectTraceDay` (trace counts per project and UTC day, kept 3
 days). A redelivered batch can count a trace twice, and so can a root span stored
 more than once; accepted (owner decision, issue 9378). Signals are events on the
 `nurturing` pipeline. A delivered signal is claimed in Redis for seven days under the process-wide idempotency key prefix,
-so a redelivered event sends nothing. Billing's catch-up `subscription_changed` fact, recorded by
+so a redelivered event sends nothing. A gateway key's creation and its budget's crossings
+are claimed per call, the identify apart from the track, so a retry after a refused call
+sends only that call. Billing's catch-up `subscription_changed` fact, recorded by
 the `customer-io-plan-resync` task, is never claimed. Every `subscription_changed` fact folds into
 `NurturingOrganizationPlan` as ADR-174 decision 17 folds billing's facts: the newest billing fact
 wins, and a real fact wins a tie. Customer.io hears a fact only when it changes that row, and the row is
@@ -108,7 +117,9 @@ A failed claim throws, and the subscriber is retried. A `subscription_changed`
 fact is not swallowed either. A refused live one gives its claim back and fails
 its job, so it is retried. A catch-up one fails its job on a refused call or on
 no Customer.io channel (`no_customer_io_channel`), so it is retried or replayed
-(https://github.com/langwatch/tasks/issues/1196).
+(https://github.com/langwatch/tasks/issues/1196). So does a gateway key's call
+Customer.io refuses: its claim and the signal's are given back first
+(https://github.com/langwatch/tasks/issues/1200).
 
 ## Contracts and validation
 

@@ -39,6 +39,7 @@ const COPY_LANES = [
   "memberRemoved",
   "memberDisabled",
   "memberEnabled",
+  "virtualKeyCopy",
 ];
 
 /** The lanes only a deployment with a Customer.io channel registers: the folds and the syncs. */

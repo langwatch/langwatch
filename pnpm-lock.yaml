@@ -3989,6 +3989,9 @@ importers:
       '@langwatch/experiment-contract':
         specifier: workspace:*
         version: link:../../../../modules/experiment/contract
+      '@langwatch/gateway-contract':
+        specifier: workspace:*
+        version: link:../../../../modules/gateway/contract
       '@langwatch/group-queue':
         specifier: workspace:*
         version: link:../../../../packages/group-queue

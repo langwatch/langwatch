@@ -5289,6 +5289,28 @@ model NurturingOrganizationPlan {
   fromCatchUp    Boolean
 }
 
+/// Each gateway virtual key, folded from gateway's vk_lifecycle facts: nurturing's own copy. The
+/// creator comes from the created fact alone; the holder and purpose are each the latest non-null
+/// value by the fact's time (stamped beside them); the state times keep their latest.
+model NurturingVirtualKey {
+  virtualKeyId      String    @id
+  organizationId    String
+  name              String
+  occurredAt        DateTime
+  keyCreatedAt      DateTime?
+  creatorUserId     String?
+  principalUserId   String?
+  principalUserIdAt DateTime?
+  purpose           String?
+  purposeAt         DateTime?
+  disabledAt        DateTime?
+  enabledAt         DateTime?
+  revokedAt         DateTime?
+
+  @@index([creatorUserId])
+  @@index([principalUserId])
+}
+
 /// Nurturing's read model per organization: its admin and its milestone counts.
 /// `seeded` marks an organization learned from the project backfill: its first_* already happened.
 model NurturingOrganization {

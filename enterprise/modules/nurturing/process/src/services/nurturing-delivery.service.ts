@@ -53,6 +53,7 @@ import {
 import { firePromptCreated } from "../rules/nurturing-prompt-creation-service.rules.ts";
 import { fireSignup } from "../rules/nurturing-signup-identification-service.rules.ts";
 import { NurturingClaimReleaseService } from "./nurturing-claim-release.service.ts";
+import { NurturingGatewayKeyDeliveryService } from "./nurturing-gateway-key-delivery.service.ts";
 import { NurturingJoinedOrganizationService } from "./nurturing-joined-organization.service.ts";
 import type { NurturingMemberFactsService } from "./nurturing-member-facts.service.ts";
 import { NurturingOwnCodingDeliveryService } from "./nurturing-own-coding-delivery.service.ts";
@@ -106,6 +107,7 @@ export class NurturingDeliveryService {
       postHogDelivery: NurturingPostHogDeliveryService | undefined;
       ownCodingDelivery: NurturingOwnCodingDeliveryService | undefined;
       joinedOrganization: NurturingJoinedOrganizationService | undefined;
+      gatewayKeys: NurturingGatewayKeyDeliveryService | undefined;
       planSync: NurturingPlanSyncService;
     }>,
   ) {}
@@ -118,6 +120,13 @@ export class NurturingDeliveryService {
         customerIo && NurturingOwnCodingDeliveryService.create({ claims, customerIo }),
       joinedOrganization:
         customerIo && NurturingJoinedOrganizationService.create({ claims, customerIo }),
+      gatewayKeys:
+        customerIo &&
+        NurturingGatewayKeyDeliveryService.create({
+          claims,
+          customerIo,
+          windowSeconds: DELIVERED_WINDOW_SECONDS,
+        }),
       planSync: NurturingPlanSyncService.create({
         customerIo,
         admins: deps.memberFacts,
@@ -341,6 +350,10 @@ export class NurturingDeliveryService {
         );
       case "self_hosted_crm":
         return this.selfHostedCrm(signal);
+      case "virtual_key_created":
+      case "key_budget_threshold":
+        // Each call is claimed on its own; a refused one fails the delivery, so its job retries.
+        return this.parts.gatewayKeys?.deliver({ signal, deliveredClaim });
       default:
         return;
     }

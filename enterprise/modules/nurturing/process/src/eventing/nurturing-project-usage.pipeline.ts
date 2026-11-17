@@ -39,6 +39,10 @@ import {
   throttledWindow,
 } from "@langwatch/eventing";
 import {
+  GATEWAY_VK_LIFECYCLE_EVENT_TYPE,
+  recordVkLifecycleCommandDataSchema,
+} from "@langwatch/gateway-contract";
+import {
   INVITE_ACCEPTED_EVENT_TYPE,
   inviteAcceptedEventDataSchema,
   ORGANIZATION_CREATED_EVENT_TYPE,
@@ -96,6 +100,7 @@ import {
   type NurturingProjectUsageOwner,
   type NurturingProjectUsageRepository,
 } from "../repositories/nurturing-project-usage.repository.ts";
+import type { NurturingVirtualKeyRepository } from "../repositories/nurturing-virtual-key.repository.ts";
 import type { NurturingRepositories } from "../repositories/nurturing.repositories.ts";
 import type { NurturingMembershipChange } from "../rules/nurturing-organization-member.rules.ts";
 import {
@@ -106,6 +111,7 @@ import {
 } from "../rules/nurturing-project-usage.rules.ts";
 import { utcDayOf } from "../rules/nurturing-time.rules.ts";
 import type { NurturingCountedTrace } from "../rules/nurturing-trace-day.rules.ts";
+import { virtualKeyFactOf } from "../rules/nurturing-virtual-key.rules.ts";
 
 /** Hosts nurturing's peer folds and subscribers over the owners' facts; no event of its own. */
 export const NURTURING_PROJECT_USAGE_PIPELINE_NAME = "nurturing_project_usage" as const;
@@ -483,6 +489,7 @@ export type NurturingUsageCopies = Readonly<{
   copyLanded: (input: Readonly<{ projectId: string }>) => Promise<void>;
   organizationsCreated: NurturingOrganizationCreatedRepository;
   members: NurturingOrganizationMemberRepository;
+  virtualKeys: NurturingVirtualKeyRepository;
 }>;
 
 /** What the usage sync needs; absent without a Customer.io channel, when nothing syncs. */
@@ -504,9 +511,9 @@ function nurturingProjectUsageHost({
   copies: NurturingUsageCopies;
   sync: NurturingUsageSync | undefined;
 }>) {
-  const { organizationsCreated, members } = copies;
+  const { organizationsCreated, members, virtualKeys } = copies;
   // The copies always register, as nurturing's other copies do: a channel configured later
-  // then finds the projects, organizations and members created before it.
+  // then finds the projects, organizations, members and gateway keys created before it.
   const copied = definePipeline({
     name: NURTURING_PROJECT_USAGE_PIPELINE_NAME,
     aggregate: defineAggregate({ type: "nurturing_project_usage_view" }),
@@ -571,7 +578,8 @@ function nurturingProjectUsageHost({
         change: "returned",
         members,
       }),
-    );
+    )
+    .withPeerSubscriber("virtualKeyCopy", nurturingVirtualKeyCopySubscriber(virtualKeys));
   // Without a channel no sync reads the usage rows, and none prunes the trace days, so none is kept.
   if (!sync) return copied;
   const { usageChanged, tracesChanged, organizationCreated } = sync;
@@ -693,6 +701,21 @@ export function nurturingFounderMembershipSubscriber(
   };
 }
 
+/**
+ * Nurturing's own copy of a gateway key, from each of gateway's lifecycle facts (§9): its
+ * organization, name, creator, holder, purpose and state. Every column folds order-free, so a
+ * redelivered or late fact changes nothing.
+ */
+export function nurturingVirtualKeyCopySubscriber(
+  virtualKeys: Pick<NurturingVirtualKeyRepository, "recordKeyFact">,
+): PeerSubscriberDefinition<typeof recordVkLifecycleCommandDataSchema> {
+  return {
+    eventType: GATEWAY_VK_LIFECYCLE_EVENT_TYPE,
+    data: recordVkLifecycleCommandDataSchema,
+    handle: (data) => virtualKeys.recordKeyFact({ fact: virtualKeyFactOf(data) }),
+  };
+}
+
 /** The host pipeline as a TYPE, derived from the builder above. */
 export type NurturingProjectUsagePipeline = ReturnType<
   ReturnType<typeof nurturingProjectUsageHost>["build"]
@@ -714,6 +737,7 @@ export const nurturingProjectUsageEventing = defineEventingModule({
         copyLanded: (input) => app.uncopiedProjectCopied(input),
         organizationsCreated: repositories.organizationsCreated,
         members: repositories.members,
+        virtualKeys: repositories.virtualKeys,
       },
       sync: app.syncsOrganizationUsage()
         ? {

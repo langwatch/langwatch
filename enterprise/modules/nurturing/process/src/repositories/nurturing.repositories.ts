@@ -17,6 +17,7 @@ import type { NurturingProjectUsageRepository } from "./nurturing-project-usage.
 import type { NurturingTraceDayRepository } from "./nurturing-trace-day.repository.ts";
 import type { NurturingTracedProjectRepository } from "./nurturing-traced-project.repository.ts";
 import type { NurturingUncopiedProjectRepository } from "./nurturing-uncopied-project.repository.ts";
+import type { NurturingVirtualKeyRepository } from "./nurturing-virtual-key.repository.ts";
 
 /** The rows nurturing owns and the owners' project rows it reads (R40), chosen once at boot. */
 export interface NurturingRepositories {
@@ -35,6 +36,8 @@ export interface NurturingRepositories {
   readonly members: NurturingOrganizationMemberRepository;
   /** Nurturing's own copy of each organization's plan, folded from billing's subscription facts. */
   readonly plans: NurturingOrganizationPlanRepository;
+  /** Nurturing's own copy of each gateway key, folded from gateway's lifecycle facts. */
+  readonly virtualKeys: NurturingVirtualKeyRepository;
   /** Nurturing's own per-project usage: the peer folds' rows. */
   readonly projectUsage: NurturingProjectUsageRepository;
   /** Nurturing's own trace counts per project and day: the trace-day fold's rows. */
