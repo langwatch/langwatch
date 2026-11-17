@@ -12,6 +12,7 @@ import {
   type CallerVoiceConfig,
 } from "@langwatch/scenario-contract";
 
+import { scenarioRunKindFields } from "../rules/red-team-job.rules.ts";
 import type { ScenarioService } from "./scenario.service.ts";
 
 type FetchProjectResult =
@@ -94,6 +95,7 @@ export class ScenarioExecutionLookupService {
         labels: scenario.labels,
         maxTurns: scenario.maxTurns ?? undefined,
         minTurns: scenario.minTurns ?? undefined,
+        ...scenarioRunKindFields(scenario),
       },
       parameters,
       simulatorModel: scenario.simulatorModel ?? null,

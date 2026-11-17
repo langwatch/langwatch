@@ -77,6 +77,19 @@ export class SeatQuantityBelowInUseError extends HandledError {
   }
 }
 
+/** A failed payment is unpaid: buying seats would charge the same card, so it waits for payment. */
+export class SeatsHeldForPaymentError extends HandledError {
+  declare readonly code: "seats_held_for_payment";
+
+  constructor() {
+    super("seats_held_for_payment", "A payment failed. Update the card on file to add seats.", {
+      httpStatus: 402,
+      fault: "customer",
+    });
+    this.name = "SeatsHeldForPaymentError";
+  }
+}
+
 /** Seat billing not configured; platform fault, not provider. */
 export class SeatBillingUnavailableError extends HandledError {
   declare readonly code: "seat_billing_unavailable";

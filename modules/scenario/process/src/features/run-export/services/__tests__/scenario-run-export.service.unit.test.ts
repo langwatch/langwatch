@@ -62,6 +62,7 @@ class NoopSimulationExecution extends SimulationExecution {
   recordAgentInstance = noop;
   recordCutAtLimit = noop;
   recordHooks = noop;
+  recordRedTeamReport = noop;
 }
 
 function createSimulationService(): SimulationService {

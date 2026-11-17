@@ -85,11 +85,15 @@ function sharedBackend(options: {
         throw new Error("Object storage selected S3 without a bucket name (S3_BUCKET_NAME).");
       const client = s3Client(config.s3);
       clients.push(client);
-      return s3Backend({ client, bucket, clock });
+      return s3Backend({ client, bucket, clock, uploads: config.s3.uploads });
     }
     case "azure":
       return lazyBackend(() =>
-        azureBackend({ credentials: resolveAzureCredentials(config.azure), clock }),
+        azureBackend({
+          credentials: resolveAzureCredentials(config.azure),
+          clock,
+          uploads: config.azure.uploads,
+        }),
       );
     case "file": {
       const root = config.root.trim();
@@ -132,7 +136,12 @@ function privateBackends(options: {
     options.clients.push(client);
     backends.set(
       account.organizationId,
-      s3Backend({ client, bucket: account.bucket, clock: options.clock }),
+      s3Backend({
+        client,
+        bucket: account.bucket,
+        clock: options.clock,
+        uploads: account.uploads,
+      }),
     );
   }
   return backends;

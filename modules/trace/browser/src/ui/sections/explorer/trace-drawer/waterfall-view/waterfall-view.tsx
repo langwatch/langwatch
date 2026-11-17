@@ -96,6 +96,7 @@ export const WaterfallView = memo(function WaterfallView({
   spans,
   selectedSpanId,
   promptSpanIds,
+  a2aSpanIds,
   onSelectSpan,
   onClearSpan,
   braidedOwners,
@@ -365,6 +366,7 @@ export const WaterfallView = memo(function WaterfallView({
                 onToggleGroup={handleToggleGroup}
                 onToggleSpanDeleted={toggleSpanDeleted}
                 promptSpanIds={promptSpanIds}
+                a2aSpanIds={a2aSpanIds}
                 rootCount={rootCount}
                 rootDuration={rootDuration}
                 rootStart={rootStart}
@@ -674,6 +676,7 @@ function WaterfallVirtualRow({
   onToggleGroup,
   onToggleSpanDeleted,
   promptSpanIds,
+  a2aSpanIds,
   rootCount,
   rootDuration,
   rootStart,
@@ -701,6 +704,7 @@ function WaterfallVirtualRow({
   onToggleGroup: (groupKey: string) => void;
   onToggleSpanDeleted: (spanId: string) => void;
   promptSpanIds: WaterfallViewProps["promptSpanIds"];
+  a2aSpanIds: WaterfallViewProps["a2aSpanIds"];
   rootCount: number;
   rootDuration: number;
   rootStart: number;
@@ -761,6 +765,7 @@ function WaterfallVirtualRow({
         rootDuration={rootDuration}
         isSelected={node.span.spanId === selectedSpanId}
         isPrompt={promptSpanIds?.has(node.span.spanId) ?? false}
+        isA2a={a2aSpanIds?.has(node.span.spanId) ?? false}
         logCount={logsBySpanId.get(node.span.spanId)?.length ?? 0}
         isCollapsed={collapsedIds.has(spanNodeKey(node.span))}
         hasChildren={node.children.length > 0}

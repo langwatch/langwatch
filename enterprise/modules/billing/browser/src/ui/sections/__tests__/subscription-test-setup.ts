@@ -172,6 +172,7 @@ export const mockGetUsage = vi.fn(
           currentMonthMessagesCount?: number | null;
           messageLimitInfo?: MockMessageLimitInfo;
           usageUnit?: "traces" | "events";
+          activePlan?: { overPlan?: { sinceMs: number; members: number; maxMembers: number } };
         }
       | undefined;
     isLoading: boolean;

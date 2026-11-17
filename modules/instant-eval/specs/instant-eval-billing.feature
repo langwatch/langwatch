@@ -114,6 +114,45 @@ Feature: Instant Evals are metered on the gateway spend spine, reported to Strip
       # The debits process already takes an outcome that carries its own
       # attribution; the empty key and provider only narrow which budgets match.
 
+  # The check is the gateway's own preflight for the project, under a key no
+  # key budget names, so the organization, team and project budgets apply.
+  # Hosted judging only: an own decision model's cost is not on our ledger.
+  Rule: A gateway budget set to block stops Instant Evals
+
+    @unit
+    Scenario: A run is refused once a blocking budget is reached
+      Given an organization on a paid plan whose project budget is set to block
+      And the budget's spend is at its limit
+      When a run is requested
+      Then it is refused with instant_eval_gateway_budget_exceeded
+      And the refusal names the budget, its scope, window, limit and spend
+      And nothing is held or queued
+
+    @unit
+    Scenario: A budget set to warn never refuses a run
+      Given an organization whose only reached budget is set to warn
+      When a run is requested
+      Then it is accepted
+
+    @unit
+    Scenario: A run under way stops between pages once its spend reaches a blocking budget
+      Given a run whose judged rows have taken a blocking budget to its limit
+      When the next page is asked for
+      Then it is refused with instant_eval_gateway_budget_exceeded before anything is read
+      And the check projects the run's own spend so far
+
+    @unit
+    Scenario: A judged query is refused once a blocking budget is reached
+      Given a project whose blocking budget is at its limit
+      When a statement calling an eval function is submitted
+      Then it is refused with instant_eval_gateway_budget_exceeded before anything is held or judged
+
+    @unit
+    Scenario: A run on the project's own decision model is not checked
+      Given a project that runs Instant Evals on its own decision model
+      When a run is requested
+      Then no gateway budget is asked
+
   Rule: The month's Instant Eval price is one Stripe meter per organization
 
     @unit

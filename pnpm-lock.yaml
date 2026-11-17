@@ -1475,6 +1475,9 @@ importers:
       esbuild:
         specifier: 'catalog:'
         version: 0.28.2
+      tsx:
+        specifier: 4.22.4
+        version: 4.22.4
       typescript:
         specifier: 'catalog:'
         version: 7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2)
@@ -2580,6 +2583,9 @@ importers:
       '@langwatch/browser-host':
         specifier: workspace:*
         version: link:../../../../packages/browser-host
+      '@langwatch/data-retention-contract':
+        specifier: workspace:*
+        version: link:../../../../modules/data-retention/contract
       '@langwatch/design-system':
         specifier: workspace:*
         version: link:../../../../packages/design-system
@@ -2678,6 +2684,9 @@ importers:
       '@langwatch/config':
         specifier: workspace:*
         version: link:../../../../packages/config
+      '@langwatch/data-retention-contract':
+        specifier: workspace:*
+        version: link:../../../../modules/data-retention/contract
       '@langwatch/enterprise-licensing-contract':
         specifier: workspace:*
         version: link:../../licensing/contract
@@ -7534,6 +7543,9 @@ importers:
       '@langwatch/project-contract':
         specifier: workspace:*
         version: link:../../project/contract
+      '@langwatch/task':
+        specifier: workspace:*
+        version: link:../../../packages/task
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time
@@ -11632,6 +11644,9 @@ importers:
       '@langwatch/design-system':
         specifier: workspace:*
         version: link:../../../packages/design-system
+      '@langwatch/enterprise-billing-client':
+        specifier: workspace:*
+        version: link:../../../enterprise/modules/billing/client
       '@langwatch/enterprise-licensing-contract':
         specifier: workspace:*
         version: link:../../../enterprise/modules/licensing/contract
@@ -12809,6 +12824,9 @@ importers:
       '@langwatch/config':
         specifier: workspace:*
         version: link:../../../packages/config
+      '@langwatch/data-retention-contract':
+        specifier: workspace:*
+        version: link:../../data-retention/contract
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
@@ -15112,6 +15130,9 @@ importers:
       '@langwatch/egress':
         specifier: workspace:*
         version: link:../../../packages/egress
+      '@langwatch/eventing':
+        specifier: workspace:*
+        version: link:../../../packages/eventing
       '@langwatch/group-queue':
         specifier: workspace:*
         version: link:../../../packages/group-queue
@@ -42761,7 +42782,6 @@ snapshots:
       esbuild: 0.28.2
     optionalDependencies:
       fsevents: 2.3.3
-    optional: true
 
   tsyringe@4.10.0:
     dependencies:

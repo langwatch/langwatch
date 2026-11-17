@@ -15,6 +15,7 @@ import { drainHttpServer } from "./lifecycle/http-drain.ts";
 import {
   HEARTBEAT_INTERVAL_MS,
   LIVENESS_PATH,
+  PUBLIC_LISTENER_TIMEOUTS,
   READINESS_PATH,
   startHeartbeat,
   startLivenessThread,
@@ -291,9 +292,8 @@ export class Server {
         listener.on("clientError", (error: ClientError, socket: Duplex) =>
           this.refuseUnparsed(error, socket),
         );
-        // Outlives any proxy's idle reuse, as the liveness thread's public listener does.
-        listener.keepAliveTimeout = PUBLIC_KEEP_ALIVE_MS;
-        listener.headersTimeout = PUBLIC_KEEP_ALIVE_MS + 1_000;
+        // The liveness thread's public listener takes the same timeouts (#9666).
+        Object.assign(listener, PUBLIC_LISTENER_TIMEOUTS);
         if (this.livenessOffLoop) {
           this.livenessThread = await this.startOffLoop(listener, port ?? 0);
         }
@@ -767,8 +767,6 @@ function installFatalHandlers(options: {
  * handover: the outgoing process drains in-flight work before it lets go.
  */
 const BIND_HANDOVER_MS = 10_000;
-/** Above the 60s idle reuse of ALB and nginx, so Node never closes a socket a proxy reuses. */
-const PUBLIC_KEEP_ALIVE_MS = 65_000;
 const BIND_RETRY_MS = 250;
 
 function isAddressInUse(error: unknown): boolean {

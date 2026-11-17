@@ -229,6 +229,7 @@ const CREATION_LIMIT_LABELS: Record<string, string> = {
   scenarios: "scenarios",
   scenarioSets: "simulations",
   evaluators: "custom evaluators",
+  testSuites: "suites",
 };
 
 /**
@@ -432,6 +433,11 @@ const presentations = {
     title: "Attribute values withheld",
     describe: () =>
       "This project hides captured input or output from you, or an attribute policy restricts this key to an audience you are not in. Facet a named field instead, such as model, status or evaluator, or call the facets endpoint with no field to see what this project has.",
+  },
+  trace_withheld_over_plan: {
+    title: "Trace held until your plan is sorted",
+    describe: () =>
+      "This trace was recorded while your organization has more members than its plan covers. It is saved and will show once you upgrade your plan or remove members.",
   },
   trace_id_ambiguous: {
     title: "Trace ID is ambiguous",
@@ -2242,6 +2248,18 @@ const presentations = {
     title: "All member seats are in use",
     describe: () => "Free a seat by disabling a membership, or upgrade the plan to add more.",
   },
+  member_additions_held_for_payment: {
+    // fault: customer. A renewal charge failed and is unpaid; members already in keep working.
+    title: "A payment failed, so new members can't be added",
+    describe: () =>
+      "Update the card on the billing page to pay the open invoice, then add them. Ask an admin if you can't.",
+  },
+  seats_held_for_payment: {
+    // fault: customer. Buying seats while an invoice is unpaid would charge the same failing card.
+    title: "A payment failed, so seats can't be added",
+    describe: () =>
+      "Update the card on the billing page to pay the open invoice, then add seats. Nothing was charged.",
+  },
   membership_disabled: {
     // The person IS a member, so nothing here may suggest they are not, and
     // nothing may suggest a role they could ask for instead — the seat is the
@@ -2907,7 +2925,7 @@ const presentations = {
     // and it says the same thing.
     describe: (error) => {
       const limitType = str(error, "limitType", "");
-      const creationLabel = CREATION_LIMIT_LABELS[limitType];
+      const creationLabel = CREATION_LIMIT_LABELS[str(error, "countedAs", "") || limitType];
       if (creationLabel) {
         const max = num(error, "max", 0);
         const included = max > 0 ? `${max} ${creationLabel}` : creationLabel;
@@ -3102,6 +3120,11 @@ const presentations = {
     title: "This scenario's text couldn't be filled in",
     describe: (error) =>
       `${scenarioFieldLabel(error)} references a parameter in a way we can't read. Check it is written as params.name, then try again.`,
+  },
+  scenario_red_team_config_mismatch: {
+    title: "This scenario's red team settings don't match its kind",
+    describe: () =>
+      "A red team scenario needs an attack goal and OWASP ids, and a standard scenario takes none. Set the kind and the attack together, then try again.",
   },
   scenario_reserved_set_id: {
     title: "This run can't be saved to that set",
@@ -3826,6 +3849,17 @@ const presentations = {
       return `Organizations without a paid plan can judge up to ${allowance} of text in total. Upgrade your plan under Settings, Plan & billing to keep running Instant Evals.`;
     },
   },
+  instant_eval_gateway_budget_exceeded: {
+    title: "A gateway budget stopped Instant Evals",
+    // The budget is one the customer set to block, so the way out is theirs:
+    // raise or remove it. The scope says whose budget it is.
+    titleFor: (error) => {
+      const owner = budgetMetaWord(error, "scope", BUDGET_SCOPE_OWNERS);
+      return owner ? `${owner} gateway budget stopped Instant Evals` : undefined;
+    },
+    describe: () =>
+      "The budget is set to block once it is reached, and Instant Evals count against it. Raise or remove it under AI Gateway, Budgets to keep judging.",
+  },
   instant_eval_memory_judge_in_production: {
     title: "This installation's Instant Evals judge is for development only",
     describe: () =>
@@ -4136,6 +4170,16 @@ const presentations = {
       return `${need} Ask an administrator, or set the length on a scope you manage.`.trim();
     },
   },
+  data_retention_billed_through_billing: {
+    title: "This retention length is billed",
+    describe: () =>
+      "Keeping data longer than 90 days adds storage to the organization's bill, so it needs subscription:manage. Ask a billing administrator, or pick 90 days or less.",
+  },
+  data_retention_not_billed: {
+    title: "This retention length isn't billed",
+    describe: () =>
+      "Only a length that adds storage to the bill is set through billing. Save this length from the data retention settings instead.",
+  },
   data_retention_disable_forbidden: {
     title: "Keeping data forever isn't available",
     describe: () =>
@@ -4387,6 +4431,20 @@ const presentations = {
     describe: () =>
       "Nothing was saved. An administrator has to set up storage before rows can be added.",
   },
+  storage_credentials_refused: {
+    // fault: platform. The deployment's own storage key or identity was turned
+    // away; only an administrator can change it, and the tips say where.
+    title: "Storage turned this workspace's credentials away",
+    describe: () =>
+      "Nothing was read or saved. An administrator has to check the storage credentials this deployment uses.",
+  },
+  storage_permission_denied: {
+    // fault: platform. The identity signs in but holds no data access; the
+    // role to grant is in the tips, for the administrator.
+    title: "Storage won't let this workspace read or save files",
+    describe: () =>
+      "Nothing was read or saved. An administrator has to give this deployment's storage identity access to its files.",
+  },
   export_failed: {
     // fault: platform. The export ran on our side and did not finish, so the
     // copy has to say nothing was changed — an export that half-worked is the
@@ -4440,6 +4498,10 @@ const presentations = {
   },
 
   // ---- suites (run plans) ----
+  suite_template_not_found: {
+    title: "That suite template doesn't exist",
+    describe: () => "Pick a template from the list of templates, then try again.",
+  },
   suite_not_found: {
     title: "Run plan not found",
     describe: () => "It may have been deleted. Reload to see the current list.",

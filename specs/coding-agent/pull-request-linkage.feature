@@ -76,6 +76,14 @@ Rule: Branches map to their pull requests through the organization connection
     When the periodic recheck selects branches
     Then that branch is not rechecked
 
+  @unit
+  Scenario: Two first writes of the same branch's check both land
+    Given no check row for a branch yet
+    And a webhook and a branch listing write that branch's first check at the same time
+    When the slower insert fails on the branch's unique key
+    Then it retries once as an update and the check is recorded
+    And any other write failure is raised, not retried
+
   # The sweep is the one read in this feature with no organization to name, so
   # every replica running its own timer meant the whole fleet scanning the same
   # branches and asking GitHub about them N times.
