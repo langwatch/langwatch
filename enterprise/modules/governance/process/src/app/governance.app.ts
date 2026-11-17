@@ -639,6 +639,9 @@ export class GovernanceModule implements GovernanceRestApi {
       history: repositories.tenantHistory,
     });
     this.tenantHistory = tenantHistory;
+    const apiOcsfPushOutbox = repositories.ocsfPushIntents
+      ? OutboxOcsfPushDelivery.create(repositories.ocsfPushIntents)
+      : undefined;
     this.ocsfPush = OcsfSiemPushService.create({
       events: repositories.ocsfEvents,
       projects: dependencies.projects,
@@ -649,7 +652,7 @@ export class GovernanceModule implements GovernanceRestApi {
             (await dependencies.entitlements.getActivePlan({ organizationId })).type,
           ),
       },
-      outbox: () => this.#ocsfPushOutbox,
+      outbox: () => this.#ocsfPushOutbox ?? apiOcsfPushOutbox,
     });
     this.ocsfSiemIngest = OcsfSiemIngestService.create({
       events: repositories.ocsfEvents,

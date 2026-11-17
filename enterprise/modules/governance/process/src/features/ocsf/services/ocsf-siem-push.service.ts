@@ -15,7 +15,7 @@ import {
 import type { OcsfPushIntent } from "../eventing/ocsf-push-delivery.process.ts";
 import { governanceRowToOcsfEvent } from "../rules/ocsf-v1-9-event.rules.ts";
 
-/** Where the push records its webhook fan-out; governance's outbox in the worker. */
+/** Where the push records its webhook fan-out: governance's outbox, drained by the worker. */
 export interface OcsfPushOutbox {
   record(intents: readonly OcsfPushIntent[]): Promise<void>;
 }
@@ -25,7 +25,7 @@ type OcsfSiemPushDependencies = {
   projects: Pick<ProjectApi, "getOrganizationId">;
   webhooks: Pick<WebhookApi, "getAll">;
   entitlements: { hasEnterprisePlan: (organizationId: string) => Promise<boolean> };
-  /** Present in the worker, where the delivery process runs; elsewhere nothing is pushed. */
+  /** The pipeline's outbox in the worker, the Postgres intents in the api; memory-only stacks push nothing. */
   outbox: () => OcsfPushOutbox | undefined;
 };
 

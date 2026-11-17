@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import type { GovernanceOcsfExportRow } from "@langwatch/enterprise-governance-contract";
+import type { ProcessStore } from "@langwatch/eventing";
 import type { Instant } from "@langwatch/time";
 
 import type { ActivityMonitorRepository } from "./activity-monitor.repository.ts";
@@ -167,6 +168,8 @@ export interface GovernanceRepositories {
   /** The per-charge record the drift check holds the rollup against. */
   readonly costCharges: GovernanceCostChargeRepository;
   readonly ocsfEvents: GovernanceClickHouseRepositories["ocsfEvents"];
+  /** Where a process without a pipeline queues OCSF pushes; the memory tier has none. */
+  readonly ocsfPushIntents?: Pick<ProcessStore, "appendIntents">;
   /** The push receivers' per-caller throttle. */
   readonly rateLimits: GovernanceRateLimitRepository;
   /** The `governance_kpis` rows the spend-spike evaluator reads and the trace pull writes. */

@@ -126,6 +126,13 @@ Feature: OCSF 1.9 SIEM export, push and ingest
 
   Rule: events are pushed to the webhook endpoints that subscribe to ocsf.event
 
+    @integration
+    Scenario: An event the api writes reaches a subscribed endpoint once
+      Given an active webhook endpoint subscribed to "ocsf.event"
+      When the api, which runs no pipeline, writes an admin workspace view event twice
+      Then one push intent is queued in Postgres for the worker
+      And the worker's handler asks one signed delivery for that endpoint
+
     @unit
     Scenario: Each written OCSF event is queued for every subscribed endpoint
       Given an active webhook endpoint subscribed to "ocsf.event"
