@@ -111,5 +111,16 @@ describe("given a piece of judged text", () => {
         instantEvalQuestionTokens(questions) + INSTANT_EVAL_CLASSIFIER_LIMITS.requestOverheadTokens,
       );
     });
+
+    // A page is refused past its rows times the state cap, so an overhead past
+    // the reserve would refuse every page of full-length rows.
+    it("keeps a full-length request within the state cap", () => {
+      const questions = [question("q1", "the customer sounds annoyed")];
+      const text = "x".repeat(INSTANT_EVAL_CLASSIFIER_LIMITS.stateTokens * 4);
+
+      expect(estimateInstantEvalRequestTokens({ text, questions })).toBeLessThanOrEqual(
+        INSTANT_EVAL_CLASSIFIER_LIMITS.stateTokens,
+      );
+    });
   });
 });
