@@ -7,7 +7,7 @@ import type {
   NurturingVirtualKey,
   NurturingVirtualKeyFact,
 } from "../../rules/nurturing-virtual-key.rules.ts";
-import type { NurturingVirtualKeyRepository } from "../nurturing-virtual-key.repository.ts";
+import type { NurturingVirtualKeyRepository } from "../nurturing-gateway-key.repository.ts";
 
 type NurturingVirtualKeyDatabase = Pick<PrismaClient, "nurturingVirtualKey" | "$executeRaw">;
 

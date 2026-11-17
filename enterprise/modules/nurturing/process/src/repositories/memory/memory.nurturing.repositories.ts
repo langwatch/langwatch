@@ -4,6 +4,7 @@ import { nowInstant } from "@langwatch/time";
 
 import type { NurturingClaimRepository } from "../nurturing-claim.repository.ts";
 import type { NurturingRepositories } from "../nurturing.repositories.ts";
+import { MemoryNurturingVirtualKeyRepository } from "./memory.nurturing-gateway-key.repository.ts";
 import { MemoryNurturingMemberSourceRepository } from "./memory.nurturing-member-source.repository.ts";
 import { MemoryNurturingMilestonesRepository } from "./memory.nurturing-milestones.repository.ts";
 import { MemoryNurturingOrganizationCreatedRepository } from "./memory.nurturing-organization-created.repository.ts";
@@ -16,7 +17,6 @@ import { MemoryNurturingProjectUsageRepository } from "./memory.nurturing-projec
 import { MemoryNurturingTraceDayRepository } from "./memory.nurturing-trace-day.repository.ts";
 import { MemoryNurturingTracedProjectRepository } from "./memory.nurturing-traced-project.repository.ts";
 import { MemoryNurturingUncopiedProjectRepository } from "./memory.nurturing-uncopied-project.repository.ts";
-import { MemoryNurturingVirtualKeyRepository } from "./memory.nurturing-virtual-key.repository.ts";
 
 /** One claim per key, lapsing when its window does, as the Redis key expires. */
 export class MemoryNurturingClaimRepository implements NurturingClaimRepository {

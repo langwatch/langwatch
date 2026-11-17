@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import type { NurturingClaimRepository } from "./nurturing-claim.repository.ts";
+import type { NurturingVirtualKeyRepository } from "./nurturing-gateway-key.repository.ts";
 import type { NurturingMemberSourceRepository } from "./nurturing-member-source.repository.ts";
 import type {
   NurturingCodingMilestonesRepository,
@@ -17,7 +18,6 @@ import type { NurturingProjectUsageRepository } from "./nurturing-project-usage.
 import type { NurturingTraceDayRepository } from "./nurturing-trace-day.repository.ts";
 import type { NurturingTracedProjectRepository } from "./nurturing-traced-project.repository.ts";
 import type { NurturingUncopiedProjectRepository } from "./nurturing-uncopied-project.repository.ts";
-import type { NurturingVirtualKeyRepository } from "./nurturing-virtual-key.repository.ts";
 
 /** The rows nurturing owns and the owners' project rows it reads (R40), chosen once at boot. */
 export interface NurturingRepositories {

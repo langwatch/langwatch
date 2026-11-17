@@ -5,8 +5,8 @@ import type {
   RecordVkLifecycleCommandData,
 } from "@langwatch/gateway-contract";
 
+import type { NurturingVirtualKeyRepository } from "../repositories/nurturing-gateway-key.repository.ts";
 import type { NurturingOrganizationMemberRepository } from "../repositories/nurturing-organization-member.repository.ts";
-import type { NurturingVirtualKeyRepository } from "../repositories/nurturing-virtual-key.repository.ts";
 import {
   isKeyOwnBudget,
   keyBudgetPeriodEndOf,

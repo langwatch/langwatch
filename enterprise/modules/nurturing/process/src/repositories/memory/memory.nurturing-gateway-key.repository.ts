@@ -5,7 +5,7 @@ import {
   type NurturingVirtualKey,
   type NurturingVirtualKeyFact,
 } from "../../rules/nurturing-virtual-key.rules.ts";
-import type { NurturingVirtualKeyRepository } from "../nurturing-virtual-key.repository.ts";
+import type { NurturingVirtualKeyRepository } from "../nurturing-gateway-key.repository.ts";
 
 /** The Postgres twin's semantics: every fact folds in by the key copy's rules. */
 export class MemoryNurturingVirtualKeyRepository implements NurturingVirtualKeyRepository {

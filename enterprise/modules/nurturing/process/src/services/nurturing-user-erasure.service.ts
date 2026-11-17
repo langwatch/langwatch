@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+import type { NurturingVirtualKeyRepository } from "../repositories/nurturing-gateway-key.repository.ts";
 import type { NurturingOrganizationAdminRepository } from "../repositories/nurturing-milestones.repository.ts";
 import type { NurturingOrganizationMemberRepository } from "../repositories/nurturing-organization-member.repository.ts";
 import type { NurturingPersonalProjectRepository } from "../repositories/nurturing-personal-project.repository.ts";
-import type { NurturingVirtualKeyRepository } from "../repositories/nurturing-virtual-key.repository.ts";
 
 type UserErasureDependencies = Readonly<{
   personalProjects: Pick<NurturingPersonalProjectRepository, "forgetOwner">;

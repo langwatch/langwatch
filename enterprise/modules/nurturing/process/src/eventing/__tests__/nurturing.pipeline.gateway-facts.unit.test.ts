@@ -357,7 +357,9 @@ describe("gateway's key facts in nurturing", () => {
       await facts.joined("user-holder");
       facts.refusing.add("track");
 
-      await expect(facts.deliverFact(created())).rejects.toThrow();
+      await expect(facts.deliverFact(created())).rejects.toThrow(
+        "Customer.io /batch failed: HTTP 500",
+      );
       facts.refusing.clear();
       await facts.deliverFact(created());
 

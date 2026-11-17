@@ -2,7 +2,7 @@
 import type { CioBatchCall } from "@langwatch/enterprise-nurturing-contract";
 import { createTenantId, type Event, type EventSubscriberDefinition } from "@langwatch/eventing";
 import {
-  GATEWAY_BUDGET_CROSSING_EVENT_TYPE,
+  type GATEWAY_BUDGET_CROSSING_EVENT_TYPE,
   GATEWAY_VK_LIFECYCLE_EVENT_TYPE,
   type RecordBudgetCrossingCommandData,
   type RecordVkLifecycleCommandData,
@@ -20,12 +20,12 @@ import {
 import { vi } from "vitest";
 
 import { HttpCustomerIoChannel } from "../../channels/http/http.customer-io.channel.ts";
+import { MemoryNurturingVirtualKeyRepository } from "../../repositories/memory/memory.nurturing-gateway-key.repository.ts";
 import { MemoryNurturingMilestonesRepository } from "../../repositories/memory/memory.nurturing-milestones.repository.ts";
 import { MemoryNurturingOrganizationMemberRepository } from "../../repositories/memory/memory.nurturing-organization-member.repository.ts";
 import { MemoryNurturingOrganizationPlanRepository } from "../../repositories/memory/memory.nurturing-organization-plan.repository.ts";
 import { MemoryNurturingPersonalProjectRepository } from "../../repositories/memory/memory.nurturing-personal-project.repository.ts";
 import { MemoryNurturingProjectDirectoryRepository } from "../../repositories/memory/memory.nurturing-project-directory.repository.ts";
-import { MemoryNurturingVirtualKeyRepository } from "../../repositories/memory/memory.nurturing-virtual-key.repository.ts";
 import { MemoryNurturingClaimRepository } from "../../repositories/memory/memory.nurturing.repositories.ts";
 import type { NurturingClaimRepository } from "../../repositories/nurturing-claim.repository.ts";
 import { NurturingDeliveryService } from "../../services/nurturing-delivery.service.ts";

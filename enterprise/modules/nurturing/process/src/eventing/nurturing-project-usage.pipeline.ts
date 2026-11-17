@@ -92,6 +92,7 @@ import {
 import { z } from "zod";
 
 import type { NurturingModule } from "../app/nurturing.app.ts";
+import type { NurturingVirtualKeyRepository } from "../repositories/nurturing-gateway-key.repository.ts";
 import type { NurturingOrganizationCreatedRepository } from "../repositories/nurturing-organization-created.repository.ts";
 import type { NurturingOrganizationMemberRepository } from "../repositories/nurturing-organization-member.repository.ts";
 import type { NurturingProjectPlacementRepository } from "../repositories/nurturing-project-placement.repository.ts";
@@ -100,7 +101,6 @@ import {
   type NurturingProjectUsageOwner,
   type NurturingProjectUsageRepository,
 } from "../repositories/nurturing-project-usage.repository.ts";
-import type { NurturingVirtualKeyRepository } from "../repositories/nurturing-virtual-key.repository.ts";
 import type { NurturingRepositories } from "../repositories/nurturing.repositories.ts";
 import type { NurturingMembershipChange } from "../rules/nurturing-organization-member.rules.ts";
 import {

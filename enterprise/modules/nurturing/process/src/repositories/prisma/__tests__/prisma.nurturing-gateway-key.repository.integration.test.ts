@@ -17,8 +17,8 @@ import {
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import type { NurturingVirtualKeyFact } from "../../../rules/nurturing-virtual-key.rules.ts";
-import { MemoryNurturingVirtualKeyRepository } from "../../memory/memory.nurturing-virtual-key.repository.ts";
-import { PrismaNurturingVirtualKeyRepository } from "../prisma.nurturing-virtual-key.repository.ts";
+import { MemoryNurturingVirtualKeyRepository } from "../../memory/memory.nurturing-gateway-key.repository.ts";
+import { PrismaNurturingVirtualKeyRepository } from "../prisma.nurturing-gateway-key.repository.ts";
 
 const databaseUrl = process.env.LANGWATCH_TEST_DATABASE_URL;
 const run = randomUUID();

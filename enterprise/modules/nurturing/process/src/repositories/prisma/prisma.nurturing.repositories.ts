@@ -3,6 +3,7 @@ import { prismaRepositories } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
 import type { NurturingRepositories } from "../nurturing.repositories.ts";
+import { PrismaNurturingVirtualKeyRepository } from "./prisma.nurturing-gateway-key.repository.ts";
 import { PrismaNurturingMemberSourceRepository } from "./prisma.nurturing-member-source.repository.ts";
 import { PrismaNurturingMilestonesRepository } from "./prisma.nurturing-milestones.repository.ts";
 import { PrismaNurturingOrganizationCreatedRepository } from "./prisma.nurturing-organization-created.repository.ts";
@@ -15,7 +16,6 @@ import { PrismaNurturingProjectUsageRepository } from "./prisma.nurturing-projec
 import { PrismaNurturingTraceDayRepository } from "./prisma.nurturing-trace-day.repository.ts";
 import { PrismaNurturingTracedProjectRepository } from "./prisma.nurturing-traced-project.repository.ts";
 import { PrismaNurturingUncopiedProjectRepository } from "./prisma.nurturing-uncopied-project.repository.ts";
-import { PrismaNurturingVirtualKeyRepository } from "./prisma.nurturing-virtual-key.repository.ts";
 
 /**
  * Nurturing's own tables: its organizations, usage view, trace days, and its copies of project

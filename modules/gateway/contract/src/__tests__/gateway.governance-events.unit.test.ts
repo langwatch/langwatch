@@ -4,6 +4,7 @@
  * @see modules/gateway/specs/gateway-governance-events.feature
  */
 import { describe, expect, it } from "vitest";
+import { ZodError } from "zod";
 
 import {
   recordBudgetCrossingCommandDataSchema,
@@ -68,7 +69,7 @@ describe("gateway's governance facts", () => {
     it("refuses it, so a new purpose is a contract change rather than a silent USER", () => {
       expect(() =>
         recordVkLifecycleCommandDataSchema.parse({ ...storedLifecycle, purpose: "ROBOT" }),
-      ).toThrow();
+      ).toThrow(ZodError);
     });
   });
 });
