@@ -3,7 +3,6 @@ package aigateway
 import (
 	"context"
 	"fmt"
-	"github.com/langwatch/langwatch/services/aigateway/adapters/a2aproxy"
 	"net/http"
 	"time"
 
