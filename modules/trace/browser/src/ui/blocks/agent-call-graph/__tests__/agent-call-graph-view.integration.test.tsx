@@ -43,6 +43,7 @@ const graph: AgentCallGraph = {
 };
 
 describe("<AgentCallGraphView/>", () => {
+  /** @scenario "Each agent shows its name and cost" */
   it("shows each agent with its name and cost", () => {
     renderWithDesignSystem(<AgentCallGraphView graph={graph} onSelectSpan={vi.fn()} />);
     const nodes = screen.getAllByTestId("agent-call-graph-node");
@@ -52,6 +53,7 @@ describe("<AgentCallGraphView/>", () => {
     expect(nodes[1]?.textContent).toContain("Caller not in this trace");
   });
 
+  /** @scenario "An edge shows calls, errors, latency and the A2A label" */
   it("shows calls, errors, latency and the A2A label on an edge", () => {
     renderWithDesignSystem(<AgentCallGraphView graph={graph} onSelectSpan={vi.fn()} />);
     const edge = screen.getByTestId("agent-call-graph-edge");
@@ -61,6 +63,7 @@ describe("<AgentCallGraphView/>", () => {
     expect(edge.textContent).toContain("max");
   });
 
+  /** @scenario "Clicking an edge selects its first span" */
   it("selects the first span of an edge when clicked", () => {
     const onSelectSpan = vi.fn();
     renderWithDesignSystem(<AgentCallGraphView graph={graph} onSelectSpan={onSelectSpan} />);

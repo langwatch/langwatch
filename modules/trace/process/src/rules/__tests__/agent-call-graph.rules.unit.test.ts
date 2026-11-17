@@ -289,6 +289,38 @@ describe("buildAgentCallGraph, when an unnamed span under a named agent changes 
   });
 });
 
+describe("buildAgentCallGraph, when an unnamed A2A client under a named agent calls another service", () => {
+  /** @scenario "An unnamed A2A client keeps the remote service as its own node" */
+  it("gives the remote service its own node and charges its LLM spans to it", () => {
+    const graph = buildAgentCallGraph({
+      spans: [
+        span({ spanId: "root", params: { "gen_ai.agent.name": "Planner" } }),
+        span({
+          spanId: "client",
+          parentSpanId: "root",
+          name: "a2a.client SendMessage",
+          params: { "a2a.method": "SendMessage" },
+        }),
+        span({ spanId: "server", parentSpanId: "client", name: "a2a.server SendMessage" }),
+        span({ spanId: "llm", parentSpanId: "server", type: "llm" }),
+      ],
+      resources: resources({
+        root: "caller-svc",
+        client: "caller-svc",
+        server: "weather-svc",
+        llm: "weather-svc",
+      }),
+    });
+
+    expect(graph.nodes.map((node) => node.id)).toEqual(["agent:Planner", "service:weather-svc"]);
+    expect(graph.nodes[1]?.llmSpanCount).toBe(1);
+    expect(graph.nodes[0]?.llmSpanCount).toBe(0);
+    expect(graph.edges.map((edge) => [edge.from, edge.to])).toEqual([
+      ["agent:Planner", "service:weather-svc"],
+    ]);
+  });
+});
+
 describe("visibleResourcesOf", () => {
   it("drops resource rows of hidden spans and never falls back to a hidden root's service", () => {
     const all: AgentCallGraphResources = {

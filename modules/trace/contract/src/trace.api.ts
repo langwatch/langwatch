@@ -2,7 +2,6 @@ import type { Authorization, PrincipalRef } from "@langwatch/authorization";
 import type { InstantEvalRunReference } from "@langwatch/instant-eval-contract";
 import { moduleApi } from "@langwatch/module";
 
-import type { AgentCallGraph } from "./agent-call-graph.contract.ts";
 import type { ConversationView } from "./conversation/conversation-steps.ts";
 import type { TraceAgentSeen } from "./features/analytics/trace-agent-traffic.ts";
 import type {
@@ -102,6 +101,7 @@ import type {
 import type { TraceDateField } from "./trace-legacy-read.types.ts";
 import type { CheckPreconditions } from "./trace-precondition.schemas.ts";
 import type {
+  AgentCallGraph,
   TraceCost,
   TraceLegacyListInput,
   TraceSummaryListOptions,

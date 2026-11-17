@@ -55,3 +55,31 @@ Feature: Agent call graph across A2A hops
       When the agent call graph is built
       Then the spans under the A2A client span belong to the callee agent
       And the graph has two nodes and one A2A edge
+
+    @unit
+    Scenario: An unnamed A2A client keeps the remote service as its own node
+      Given a named agent whose A2A client span carries no callee name
+      And the server span under it runs in another service
+      When the agent call graph is built
+      Then the remote service is its own node with its own LLM usage
+      And the agent has an edge to it
+
+  Rule: Agents view in the trace drawer
+
+    @integration
+    Scenario: Each agent shows its name and cost
+      Given a call graph with two agents
+      When the Agents view renders
+      Then each agent node shows its name and cost
+
+    @integration
+    Scenario: An edge shows calls, errors, latency and the A2A label
+      Given a call graph with an A2A edge
+      When the Agents view renders
+      Then the edge shows its call count, errors, latency and an A2A label
+
+    @integration
+    Scenario: Clicking an edge selects its first span
+      Given a call graph with an edge
+      When the edge is clicked
+      Then the first span of that edge is selected

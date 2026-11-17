@@ -305,7 +305,8 @@ function resolveOwner({
   seen.add(span.spanId);
   const parentOwner = ownerOfSpan({ span: parent, context, seen });
   const changedService = service !== null && service !== context.serviceOf(parent.spanId);
-  if (changedService && !isA2aClient(parent)) return serviceOwnerOf(service);
+  const namesCallee = isA2aClient(parent) && agentLabelOf(parent) !== "";
+  if (changedService && !namesCallee) return serviceOwnerOf(service);
   return parentOwner;
 }
 

@@ -8,7 +8,6 @@ import { defineTrpcContract, type Named } from "@langwatch/module";
 import { resolveRequestBound } from "@langwatch/plans";
 import { z } from "zod";
 
-import { agentCallGraphSchema } from "./agent-call-graph.contract.ts";
 import {
   braidActivityInputSchema,
   braidActivitySchema,
@@ -30,6 +29,7 @@ import {
 import { evaluationSchema, traceSchema } from "./trace-format.schemas.ts";
 import { checkPreconditionsSchema } from "./trace-precondition.schemas.ts";
 import {
+  agentCallGraphSchema,
   customersAndLabelsResultSchema,
   distinctFieldNamesResultSchema,
   tracesForProjectResultSchema,

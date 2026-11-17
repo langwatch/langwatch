@@ -1,5 +1,3 @@
-import { keepPreviousData } from "@tanstack/react-query";
-
 import { api } from "../trace-api.ts";
 import { useTraceQueryArgs } from "./use-trace-query-args.ts";
 
@@ -9,6 +7,5 @@ export function useAgentCallGraph() {
   return api.traces.agentCallGraph.useQuery(queryArgs, {
     enabled: isReady,
     gcTime: 1_800_000,
-    placeholderData: keepPreviousData,
   });
 }
