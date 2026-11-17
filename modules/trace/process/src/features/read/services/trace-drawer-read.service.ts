@@ -21,7 +21,7 @@ import {
   type AgentCallGraph,
 } from "@langwatch/trace-contract";
 
-import { buildAgentCallGraph } from "../../../rules/agent-call-graph.rules.ts";
+import { buildAgentCallGraph, visibleResourcesOf } from "../../../rules/agent-call-graph.rules.ts";
 import {
   deriveTraceDropPrivacy,
   mapLegacySpanSummaryToTreeNode,
@@ -250,7 +250,7 @@ export class TraceDrawerReadService {
   /** The agent call graph over the viewer's protected spans and their resources. */
   async agentCallGraph(input: TraceDrawerReadInput): Promise<AgentCallGraph> {
     const [spans, resources] = await Promise.all([this.spansFull(input), this.resources(input)]);
-    return buildAgentCallGraph({ spans, resources });
+    return buildAgentCallGraph({ spans, resources: visibleResourcesOf({ resources, spans }) });
   }
 
   async resources(input: TraceDrawerReadInput): Promise<TraceResourceInfoDto> {

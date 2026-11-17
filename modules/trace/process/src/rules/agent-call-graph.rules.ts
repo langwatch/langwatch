@@ -268,7 +268,7 @@ type OwnerContext = {
   owners: Map<string, Owner>;
 };
 
-/** A span's own agent, else its parent's, else a new node for a changed service. */
+/** A span's own agent; a node for a changed service unless an A2A client named it; else the parent's. */
 function ownerOfSpan({
   span,
   context,
@@ -302,6 +302,25 @@ function resolveOwner({
   seen.add(span.spanId);
   const parentOwner = ownerOfSpan({ span: parent, context, seen });
   const changedService = service !== null && service !== context.serviceOf(parent.spanId);
-  if (changedService && !agentLabelOf(parent)) return serviceOwnerOf(service);
+  if (changedService && !isA2aClient(parent)) return serviceOwnerOf(service);
   return parentOwner;
+}
+
+function isA2aClient(span: AgentCallGraphSpan): boolean {
+  const a2a = classifyA2aSpan(span);
+  return a2a.isA2a && a2a.mark.role === "client";
+}
+
+/** Resource rows of the spans the viewer sees; the trace default comes from a visible root only. */
+export function visibleResourcesOf({
+  resources,
+  spans,
+}: {
+  resources: AgentCallGraphResources;
+  spans: readonly Pick<AgentCallGraphSpan, "spanId">[];
+}): AgentCallGraphResources {
+  const visible = new Set(spans.map((span) => span.spanId));
+  const rows = resources.spans.filter((row) => visible.has(row.spanId));
+  const root = rows.find((row) => !row.parentSpanId || !visible.has(row.parentSpanId));
+  return { resourceAttributes: root?.resourceAttributes ?? {}, spans: rows };
 }

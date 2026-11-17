@@ -5,6 +5,7 @@ import {
   type AgentCallGraphSpan,
   classifyA2aSpan,
   buildAgentCallGraph,
+  visibleResourcesOf,
 } from "../agent-call-graph.rules.ts";
 
 function span(overrides: Partial<AgentCallGraphSpan> & { spanId: string }): AgentCallGraphSpan {
@@ -268,5 +269,54 @@ describe("buildAgentCallGraph, when both sides of an A2A hop share one service.n
       "agent:Billing",
       "agent:Ledger",
     ]);
+  });
+});
+
+describe("buildAgentCallGraph, when an unnamed span under a named agent changes service", () => {
+  it("keeps the service as its own node with a call edge from the agent", () => {
+    const graph = buildAgentCallGraph({
+      spans: [
+        span({ spanId: "root", params: { "gen_ai.agent.name": "Planner" } }),
+        span({ spanId: "search", parentSpanId: "root", name: "POST /search" }),
+      ],
+      resources: resources({ root: "caller-svc", search: "search-svc" }),
+    });
+
+    expect(graph.nodes.map((node) => node.id)).toEqual(["agent:Planner", "service:search-svc"]);
+    expect(graph.edges.map((edge) => [edge.from, edge.to, edge.a2a])).toEqual([
+      ["agent:Planner", "service:search-svc", false],
+    ]);
+  });
+});
+
+describe("visibleResourcesOf", () => {
+  it("drops resource rows of hidden spans and never falls back to a hidden root's service", () => {
+    const all: AgentCallGraphResources = {
+      resourceAttributes: { "service.name": "hidden-root-svc" },
+      spans: [
+        {
+          spanId: "old-root",
+          parentSpanId: null,
+          resourceAttributes: { "service.name": "hidden-root-svc" },
+          scope: { name: "t", version: null },
+        },
+        {
+          spanId: "child",
+          parentSpanId: "old-root",
+          resourceAttributes: {},
+          scope: { name: "t", version: null },
+        },
+      ],
+    };
+
+    const visible = visibleResourcesOf({ resources: all, spans: [{ spanId: "child" }] });
+
+    expect(visible.spans.map((row) => row.spanId)).toEqual(["child"]);
+    expect(visible.resourceAttributes["service.name"]).toBeUndefined();
+    const graph = buildAgentCallGraph({
+      spans: [span({ spanId: "child", parentSpanId: "old-root" })],
+      resources: visible,
+    });
+    expect(graph.nodes.map((node) => node.id)).toEqual(["unknown"]);
   });
 });
