@@ -1,0 +1,96 @@
+import {
+  RED_TEAM_BREAK_SCORE,
+  RED_TEAM_DEFAULT_MAX_TURNS,
+  RED_TEAM_MAX_TURNS_CAP,
+  type RedTeamConfig,
+  type RedTeamRunReport,
+  type RedTeamTurnScore,
+  type ScenarioConfig,
+} from "@langwatch/scenario-contract";
+
+/** The reasoning the library's marathon script ends a run with when the attacker's goal was met. */
+const EARLY_EXIT_REASONING_PREFIX = "Early exit: objective achieved";
+const HINT_MAX_CHARS = 2000;
+
+/** Whether a job runs the attacker in place of the user simulator. */
+export function isRedTeamRun(scenario: ScenarioConfig): boolean {
+  return scenario.kind === "red_team";
+}
+
+/** The attack a red team job plays; a job whose config was missing or unreadable is refused. */
+export function getRedTeamRunConfig(scenario: ScenarioConfig): RedTeamConfig {
+  if (scenario.redTeam) return scenario.redTeam;
+  throw new Error(
+    `Red team scenario "${scenario.name}" has no readable attack config (attack goal, OWASP ids, strategy, max turns). Edit the scenario and save its attack again.`,
+  );
+}
+
+/** The attacker's turn budget: the scenario's max turns, never past the hard cap. */
+export function redTeamTotalTurns(maxTurns: number | undefined): number {
+  const wanted = maxTurns ?? RED_TEAM_DEFAULT_MAX_TURNS;
+  return Math.max(1, Math.min(Math.trunc(wanted), RED_TEAM_MAX_TURNS_CAP));
+}
+
+function isScoreEntry(value: unknown): value is { score: number; hint?: unknown } {
+  return (
+    value != null &&
+    typeof value === "object" &&
+    "score" in value &&
+    typeof value.score === "number" &&
+    Number.isFinite(value.score)
+  );
+}
+
+/**
+ * The per-turn scores the attacker kept, read from the library agent's `turnScores` map (private
+ * in its types, plain at runtime). Anything that does not have that shape reads as no scores.
+ */
+export function readRedTeamTurnScores(attacker: unknown): RedTeamTurnScore[] {
+  if (attacker == null || typeof attacker !== "object" || !("turnScores" in attacker)) return [];
+  const { turnScores } = attacker;
+  if (!(turnScores instanceof Map)) return [];
+  const scores: RedTeamTurnScore[] = [];
+  for (const [turn, entry] of turnScores) {
+    if (typeof turn !== "number" || !Number.isInteger(turn) || turn < 1) continue;
+    if (!isScoreEntry(entry)) continue;
+    const score = Math.min(10, Math.max(0, entry.score));
+    const hint = typeof entry.hint === "string" ? entry.hint.slice(0, HINT_MAX_CHARS) : undefined;
+    scores.push(hint ? { turn, score, hint } : { turn, score });
+  }
+  return scores.toSorted((a, b) => a.turn - b.turn);
+}
+
+/**
+ * What a finished red team run records. The run held when the judge passed it; it broke when the
+ * judge failed it or the attacker's own scorer ended it early. A broken run names the first turn
+ * that reached the break score, else its last scored turn.
+ * @see modules/scenario/specs/red-team-scenario.feature
+ */
+export function buildRedTeamRunReport({
+  config,
+  totalTurns,
+  judgePassed,
+  reasoning,
+  turnScores,
+}: {
+  config: RedTeamConfig;
+  totalTurns: number;
+  judgePassed: boolean;
+  reasoning: string | undefined;
+  turnScores: RedTeamTurnScore[];
+}): RedTeamRunReport {
+  const endedEarly = reasoning?.startsWith(EARLY_EXIT_REASONING_PREFIX) ?? false;
+  const outcome = judgePassed && !endedEarly ? "held" : "broke";
+  const lastTurn = turnScores.at(-1)?.turn ?? null;
+  const firstBreak = turnScores.find((entry) => entry.score >= RED_TEAM_BREAK_SCORE)?.turn;
+  return {
+    outcome,
+    brokeAtTurn: outcome === "held" ? null : (firstBreak ?? lastTurn),
+    strategy: config.strategy,
+    owaspIds: config.owaspIds,
+    attackGoal: config.attackGoal,
+    maxTurns: totalTurns,
+    turnsUsed: lastTurn ?? 0,
+    turnScores,
+  };
+}

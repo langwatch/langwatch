@@ -10,6 +10,9 @@ import {
   type CallLimitTimer,
   type ChildProcessJobData,
   createCallLimitTimer,
+  RED_TEAM_BREAK_SCORE,
+  type RedTeamConfig,
+  type RedTeamRunReport,
   type ScenarioRunHooks,
   DEFAULT_CALLER_VOICE,
 } from "@langwatch/scenario-contract";
@@ -33,6 +36,13 @@ import {
   buildAgentGreetsFirstScript,
 } from "../rules/agent-first-script.rules.ts";
 import { buildCallerVoiceSimulatorConfig } from "../rules/caller-voice-simulator.rules.ts";
+import {
+  buildRedTeamRunReport,
+  getRedTeamRunConfig,
+  isRedTeamRun,
+  readRedTeamTurnScores,
+  redTeamTotalTurns,
+} from "../rules/red-team-run.rules.ts";
 import { buildRemoteTraceRunConfig } from "../rules/remote-trace-run.rules.ts";
 import { selectRoleModelParams } from "../rules/scenario-role-model.rules.ts";
 import { AgentTestScriptService } from "./agent-test-script.service.ts";
@@ -78,6 +88,8 @@ export interface ScenarioChildExecutionResult {
   agentInstance?: { hostname: string; label: string | null };
   /** LangWatch ended the voice call at the maximum call duration (AC28). */
   isCutAtLimit?: boolean;
+  /** A red team run's outcome and per-turn scores. */
+  redTeam?: RedTeamRunReport;
   /** The setup and teardown the run called, when the agent declared any (ADR-180). */
   hooks?: ScenarioRunHooks;
 }
@@ -138,6 +150,7 @@ function buildRunCast({
 }): {
   agents: ScenarioRunner.AgentAdapter[];
   script?: ScenarioRunner.ScriptStep[];
+  redTeam?: RedTeamCast;
 } {
   if (jobData.script) {
     return AgentTestScriptService.create().build({
@@ -165,6 +178,9 @@ function buildRunCast({
     nlpServiceUrl,
     nlpInternalSecret,
   });
+  if (isRedTeamRun(scenario)) {
+    return buildRedTeamCast({ adapter, scenario, simulatorModel, judgeModel });
+  }
   // An inbound phone agent that greets on connect opens the run with its own
   // turn (so the greeting is captured first), then hands over to the
   // simulator/judge loop; every other run keeps the default cast, which opens
@@ -180,6 +196,53 @@ function buildRunCast({
   return {
     agents: [adapter, userSimulator, judge],
     ...(agentGreetsFirstScript ? { script: agentGreetsFirstScript } : {}),
+  };
+}
+
+/** The attacker a red team run plays in place of the user simulator, kept to read its scores. */
+interface RedTeamCast {
+  attacker: ScenarioRunner.AgentAdapter;
+  config: RedTeamConfig;
+  totalTurns: number;
+}
+
+/**
+ * A red team run's cast: the attacker plays the user with the simulator's model for attacks and
+ * its plan, the judge holds the scenario criteria, and the marathon script runs the turn budget.
+ */
+export function buildRedTeamCast({
+  adapter,
+  scenario,
+  simulatorModel,
+  judgeModel,
+}: {
+  adapter: ScenarioRunner.AgentAdapter;
+  scenario: ChildProcessJobData["scenario"];
+  simulatorModel: ScenarioRunner.RedTeamAgentConfig["model"];
+  judgeModel: ScenarioRunner.JudgeAgentConfig["model"];
+}): {
+  agents: ScenarioRunner.AgentAdapter[];
+  script: ScenarioRunner.ScriptStep[];
+  redTeam: RedTeamCast;
+} {
+  const config = getRedTeamRunConfig(scenario);
+  const totalTurns = redTeamTotalTurns(config.maxTurns);
+  const attackerConfig = {
+    target: config.attackGoal,
+    totalTurns,
+    model: simulatorModel,
+    metapromptModel: simulatorModel,
+    successScore: RED_TEAM_BREAK_SCORE,
+  };
+  const attacker =
+    config.strategy === "goat"
+      ? ScenarioRunner.redTeamGoat(attackerConfig)
+      : ScenarioRunner.redTeamCrescendo(attackerConfig);
+  const judge = ScenarioRunner.judgeAgent({ criteria: scenario.criteria, model: judgeModel });
+  return {
+    agents: [adapter, attacker, judge],
+    script: attacker.marathonScript(),
+    redTeam: { attacker, config, totalTurns },
   };
 }
 
@@ -263,10 +326,10 @@ function runScenarioTurns({
         langwatchEndpoint,
         langwatchApiKey,
       }),
-      ...buildMaxTurnsRunConfig({
-        jobData,
-        scenarioMaxTurns: scenario.maxTurns,
-      }),
+      // A red team script plays its whole budget, plus the judge's closing turn.
+      ...(cast.redTeam
+        ? { maxTurns: cast.redTeam.totalTurns + 1 }
+        : buildMaxTurnsRunConfig({ jobData, scenarioMaxTurns: scenario.maxTurns })),
       ...(scenario.minTurns != null && { minTurns: scenario.minTurns }),
       metadata: {
         langwatch: {
@@ -368,6 +431,15 @@ async function executeScenarioChildValue({
   // The parent records the marker so the run header can show "Cut at the call limit".
   if (callLimitTimer?.wasCut()) outputResult.isCutAtLimit = true;
   if (hooks) outputResult.hooks = hooks;
+  if (cast.redTeam) {
+    outputResult.redTeam = buildRedTeamRunReport({
+      config: cast.redTeam.config,
+      totalTurns: cast.redTeam.totalTurns,
+      judgePassed: result.success,
+      reasoning: result.reasoning,
+      turnScores: readRedTeamTurnScores(cast.redTeam.attacker),
+    });
+  }
   return outputResult;
 }
 
