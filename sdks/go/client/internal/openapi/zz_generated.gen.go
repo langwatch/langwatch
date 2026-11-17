@@ -15849,6 +15849,486 @@ func (e DeleteApiGovernanceIngestionTemplatesById200JSONResponseBodyArchived) Va
 	}
 }
 
+// Defines values for GetApiGovernanceOcsfAudit400JSONResponseBodyFault.
+const (
+	GetApiGovernanceOcsfAudit400JSONResponseBodyFaultCustomer         GetApiGovernanceOcsfAudit400JSONResponseBodyFault = "customer"
+	GetApiGovernanceOcsfAudit400JSONResponseBodyFaultPlatform         GetApiGovernanceOcsfAudit400JSONResponseBodyFault = "platform"
+	GetApiGovernanceOcsfAudit400JSONResponseBodyFaultPresumedPlatform GetApiGovernanceOcsfAudit400JSONResponseBodyFault = "presumed_platform"
+	GetApiGovernanceOcsfAudit400JSONResponseBodyFaultProvider         GetApiGovernanceOcsfAudit400JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the GetApiGovernanceOcsfAudit400JSONResponseBodyFault enum.
+func (e GetApiGovernanceOcsfAudit400JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case GetApiGovernanceOcsfAudit400JSONResponseBodyFaultCustomer:
+		return true
+	case GetApiGovernanceOcsfAudit400JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiGovernanceOcsfAudit400JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case GetApiGovernanceOcsfAudit400JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiGovernanceOcsfAudit401JSONResponseBodyFault.
+const (
+	GetApiGovernanceOcsfAudit401JSONResponseBodyFaultCustomer         GetApiGovernanceOcsfAudit401JSONResponseBodyFault = "customer"
+	GetApiGovernanceOcsfAudit401JSONResponseBodyFaultPlatform         GetApiGovernanceOcsfAudit401JSONResponseBodyFault = "platform"
+	GetApiGovernanceOcsfAudit401JSONResponseBodyFaultPresumedPlatform GetApiGovernanceOcsfAudit401JSONResponseBodyFault = "presumed_platform"
+	GetApiGovernanceOcsfAudit401JSONResponseBodyFaultProvider         GetApiGovernanceOcsfAudit401JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the GetApiGovernanceOcsfAudit401JSONResponseBodyFault enum.
+func (e GetApiGovernanceOcsfAudit401JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case GetApiGovernanceOcsfAudit401JSONResponseBodyFaultCustomer:
+		return true
+	case GetApiGovernanceOcsfAudit401JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiGovernanceOcsfAudit401JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case GetApiGovernanceOcsfAudit401JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiGovernanceOcsfAudit403JSONResponseBodyFault.
+const (
+	GetApiGovernanceOcsfAudit403JSONResponseBodyFaultCustomer         GetApiGovernanceOcsfAudit403JSONResponseBodyFault = "customer"
+	GetApiGovernanceOcsfAudit403JSONResponseBodyFaultPlatform         GetApiGovernanceOcsfAudit403JSONResponseBodyFault = "platform"
+	GetApiGovernanceOcsfAudit403JSONResponseBodyFaultPresumedPlatform GetApiGovernanceOcsfAudit403JSONResponseBodyFault = "presumed_platform"
+	GetApiGovernanceOcsfAudit403JSONResponseBodyFaultProvider         GetApiGovernanceOcsfAudit403JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the GetApiGovernanceOcsfAudit403JSONResponseBodyFault enum.
+func (e GetApiGovernanceOcsfAudit403JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case GetApiGovernanceOcsfAudit403JSONResponseBodyFaultCustomer:
+		return true
+	case GetApiGovernanceOcsfAudit403JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiGovernanceOcsfAudit403JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case GetApiGovernanceOcsfAudit403JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiGovernanceOcsfAudit422JSONResponseBodyFault.
+const (
+	GetApiGovernanceOcsfAudit422JSONResponseBodyFaultCustomer         GetApiGovernanceOcsfAudit422JSONResponseBodyFault = "customer"
+	GetApiGovernanceOcsfAudit422JSONResponseBodyFaultPlatform         GetApiGovernanceOcsfAudit422JSONResponseBodyFault = "platform"
+	GetApiGovernanceOcsfAudit422JSONResponseBodyFaultPresumedPlatform GetApiGovernanceOcsfAudit422JSONResponseBodyFault = "presumed_platform"
+	GetApiGovernanceOcsfAudit422JSONResponseBodyFaultProvider         GetApiGovernanceOcsfAudit422JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the GetApiGovernanceOcsfAudit422JSONResponseBodyFault enum.
+func (e GetApiGovernanceOcsfAudit422JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case GetApiGovernanceOcsfAudit422JSONResponseBodyFaultCustomer:
+		return true
+	case GetApiGovernanceOcsfAudit422JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiGovernanceOcsfAudit422JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case GetApiGovernanceOcsfAudit422JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiGovernanceOcsfAudit500JSONResponseBodyFault.
+const (
+	GetApiGovernanceOcsfAudit500JSONResponseBodyFaultCustomer         GetApiGovernanceOcsfAudit500JSONResponseBodyFault = "customer"
+	GetApiGovernanceOcsfAudit500JSONResponseBodyFaultPlatform         GetApiGovernanceOcsfAudit500JSONResponseBodyFault = "platform"
+	GetApiGovernanceOcsfAudit500JSONResponseBodyFaultPresumedPlatform GetApiGovernanceOcsfAudit500JSONResponseBodyFault = "presumed_platform"
+	GetApiGovernanceOcsfAudit500JSONResponseBodyFaultProvider         GetApiGovernanceOcsfAudit500JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the GetApiGovernanceOcsfAudit500JSONResponseBodyFault enum.
+func (e GetApiGovernanceOcsfAudit500JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case GetApiGovernanceOcsfAudit500JSONResponseBodyFaultCustomer:
+		return true
+	case GetApiGovernanceOcsfAudit500JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiGovernanceOcsfAudit500JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case GetApiGovernanceOcsfAudit500JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiGovernanceOcsfEvents400JSONResponseBodyFault.
+const (
+	GetApiGovernanceOcsfEvents400JSONResponseBodyFaultCustomer         GetApiGovernanceOcsfEvents400JSONResponseBodyFault = "customer"
+	GetApiGovernanceOcsfEvents400JSONResponseBodyFaultPlatform         GetApiGovernanceOcsfEvents400JSONResponseBodyFault = "platform"
+	GetApiGovernanceOcsfEvents400JSONResponseBodyFaultPresumedPlatform GetApiGovernanceOcsfEvents400JSONResponseBodyFault = "presumed_platform"
+	GetApiGovernanceOcsfEvents400JSONResponseBodyFaultProvider         GetApiGovernanceOcsfEvents400JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the GetApiGovernanceOcsfEvents400JSONResponseBodyFault enum.
+func (e GetApiGovernanceOcsfEvents400JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case GetApiGovernanceOcsfEvents400JSONResponseBodyFaultCustomer:
+		return true
+	case GetApiGovernanceOcsfEvents400JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiGovernanceOcsfEvents400JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case GetApiGovernanceOcsfEvents400JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiGovernanceOcsfEvents401JSONResponseBodyFault.
+const (
+	GetApiGovernanceOcsfEvents401JSONResponseBodyFaultCustomer         GetApiGovernanceOcsfEvents401JSONResponseBodyFault = "customer"
+	GetApiGovernanceOcsfEvents401JSONResponseBodyFaultPlatform         GetApiGovernanceOcsfEvents401JSONResponseBodyFault = "platform"
+	GetApiGovernanceOcsfEvents401JSONResponseBodyFaultPresumedPlatform GetApiGovernanceOcsfEvents401JSONResponseBodyFault = "presumed_platform"
+	GetApiGovernanceOcsfEvents401JSONResponseBodyFaultProvider         GetApiGovernanceOcsfEvents401JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the GetApiGovernanceOcsfEvents401JSONResponseBodyFault enum.
+func (e GetApiGovernanceOcsfEvents401JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case GetApiGovernanceOcsfEvents401JSONResponseBodyFaultCustomer:
+		return true
+	case GetApiGovernanceOcsfEvents401JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiGovernanceOcsfEvents401JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case GetApiGovernanceOcsfEvents401JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiGovernanceOcsfEvents403JSONResponseBodyFault.
+const (
+	GetApiGovernanceOcsfEvents403JSONResponseBodyFaultCustomer         GetApiGovernanceOcsfEvents403JSONResponseBodyFault = "customer"
+	GetApiGovernanceOcsfEvents403JSONResponseBodyFaultPlatform         GetApiGovernanceOcsfEvents403JSONResponseBodyFault = "platform"
+	GetApiGovernanceOcsfEvents403JSONResponseBodyFaultPresumedPlatform GetApiGovernanceOcsfEvents403JSONResponseBodyFault = "presumed_platform"
+	GetApiGovernanceOcsfEvents403JSONResponseBodyFaultProvider         GetApiGovernanceOcsfEvents403JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the GetApiGovernanceOcsfEvents403JSONResponseBodyFault enum.
+func (e GetApiGovernanceOcsfEvents403JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case GetApiGovernanceOcsfEvents403JSONResponseBodyFaultCustomer:
+		return true
+	case GetApiGovernanceOcsfEvents403JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiGovernanceOcsfEvents403JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case GetApiGovernanceOcsfEvents403JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiGovernanceOcsfEvents422JSONResponseBodyFault.
+const (
+	GetApiGovernanceOcsfEvents422JSONResponseBodyFaultCustomer         GetApiGovernanceOcsfEvents422JSONResponseBodyFault = "customer"
+	GetApiGovernanceOcsfEvents422JSONResponseBodyFaultPlatform         GetApiGovernanceOcsfEvents422JSONResponseBodyFault = "platform"
+	GetApiGovernanceOcsfEvents422JSONResponseBodyFaultPresumedPlatform GetApiGovernanceOcsfEvents422JSONResponseBodyFault = "presumed_platform"
+	GetApiGovernanceOcsfEvents422JSONResponseBodyFaultProvider         GetApiGovernanceOcsfEvents422JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the GetApiGovernanceOcsfEvents422JSONResponseBodyFault enum.
+func (e GetApiGovernanceOcsfEvents422JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case GetApiGovernanceOcsfEvents422JSONResponseBodyFaultCustomer:
+		return true
+	case GetApiGovernanceOcsfEvents422JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiGovernanceOcsfEvents422JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case GetApiGovernanceOcsfEvents422JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiGovernanceOcsfEvents500JSONResponseBodyFault.
+const (
+	GetApiGovernanceOcsfEvents500JSONResponseBodyFaultCustomer         GetApiGovernanceOcsfEvents500JSONResponseBodyFault = "customer"
+	GetApiGovernanceOcsfEvents500JSONResponseBodyFaultPlatform         GetApiGovernanceOcsfEvents500JSONResponseBodyFault = "platform"
+	GetApiGovernanceOcsfEvents500JSONResponseBodyFaultPresumedPlatform GetApiGovernanceOcsfEvents500JSONResponseBodyFault = "presumed_platform"
+	GetApiGovernanceOcsfEvents500JSONResponseBodyFaultProvider         GetApiGovernanceOcsfEvents500JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the GetApiGovernanceOcsfEvents500JSONResponseBodyFault enum.
+func (e GetApiGovernanceOcsfEvents500JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case GetApiGovernanceOcsfEvents500JSONResponseBodyFaultCustomer:
+		return true
+	case GetApiGovernanceOcsfEvents500JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiGovernanceOcsfEvents500JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case GetApiGovernanceOcsfEvents500JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiGovernanceOcsfIngest400JSONResponseBodyFault.
+const (
+	PostApiGovernanceOcsfIngest400JSONResponseBodyFaultCustomer         PostApiGovernanceOcsfIngest400JSONResponseBodyFault = "customer"
+	PostApiGovernanceOcsfIngest400JSONResponseBodyFaultPlatform         PostApiGovernanceOcsfIngest400JSONResponseBodyFault = "platform"
+	PostApiGovernanceOcsfIngest400JSONResponseBodyFaultPresumedPlatform PostApiGovernanceOcsfIngest400JSONResponseBodyFault = "presumed_platform"
+	PostApiGovernanceOcsfIngest400JSONResponseBodyFaultProvider         PostApiGovernanceOcsfIngest400JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the PostApiGovernanceOcsfIngest400JSONResponseBodyFault enum.
+func (e PostApiGovernanceOcsfIngest400JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case PostApiGovernanceOcsfIngest400JSONResponseBodyFaultCustomer:
+		return true
+	case PostApiGovernanceOcsfIngest400JSONResponseBodyFaultPlatform:
+		return true
+	case PostApiGovernanceOcsfIngest400JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case PostApiGovernanceOcsfIngest400JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiGovernanceOcsfIngest401JSONResponseBodyFault.
+const (
+	PostApiGovernanceOcsfIngest401JSONResponseBodyFaultCustomer         PostApiGovernanceOcsfIngest401JSONResponseBodyFault = "customer"
+	PostApiGovernanceOcsfIngest401JSONResponseBodyFaultPlatform         PostApiGovernanceOcsfIngest401JSONResponseBodyFault = "platform"
+	PostApiGovernanceOcsfIngest401JSONResponseBodyFaultPresumedPlatform PostApiGovernanceOcsfIngest401JSONResponseBodyFault = "presumed_platform"
+	PostApiGovernanceOcsfIngest401JSONResponseBodyFaultProvider         PostApiGovernanceOcsfIngest401JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the PostApiGovernanceOcsfIngest401JSONResponseBodyFault enum.
+func (e PostApiGovernanceOcsfIngest401JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case PostApiGovernanceOcsfIngest401JSONResponseBodyFaultCustomer:
+		return true
+	case PostApiGovernanceOcsfIngest401JSONResponseBodyFaultPlatform:
+		return true
+	case PostApiGovernanceOcsfIngest401JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case PostApiGovernanceOcsfIngest401JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiGovernanceOcsfIngest403JSONResponseBodyFault.
+const (
+	PostApiGovernanceOcsfIngest403JSONResponseBodyFaultCustomer         PostApiGovernanceOcsfIngest403JSONResponseBodyFault = "customer"
+	PostApiGovernanceOcsfIngest403JSONResponseBodyFaultPlatform         PostApiGovernanceOcsfIngest403JSONResponseBodyFault = "platform"
+	PostApiGovernanceOcsfIngest403JSONResponseBodyFaultPresumedPlatform PostApiGovernanceOcsfIngest403JSONResponseBodyFault = "presumed_platform"
+	PostApiGovernanceOcsfIngest403JSONResponseBodyFaultProvider         PostApiGovernanceOcsfIngest403JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the PostApiGovernanceOcsfIngest403JSONResponseBodyFault enum.
+func (e PostApiGovernanceOcsfIngest403JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case PostApiGovernanceOcsfIngest403JSONResponseBodyFaultCustomer:
+		return true
+	case PostApiGovernanceOcsfIngest403JSONResponseBodyFaultPlatform:
+		return true
+	case PostApiGovernanceOcsfIngest403JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case PostApiGovernanceOcsfIngest403JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiGovernanceOcsfIngest422JSONResponseBodyFault.
+const (
+	PostApiGovernanceOcsfIngest422JSONResponseBodyFaultCustomer         PostApiGovernanceOcsfIngest422JSONResponseBodyFault = "customer"
+	PostApiGovernanceOcsfIngest422JSONResponseBodyFaultPlatform         PostApiGovernanceOcsfIngest422JSONResponseBodyFault = "platform"
+	PostApiGovernanceOcsfIngest422JSONResponseBodyFaultPresumedPlatform PostApiGovernanceOcsfIngest422JSONResponseBodyFault = "presumed_platform"
+	PostApiGovernanceOcsfIngest422JSONResponseBodyFaultProvider         PostApiGovernanceOcsfIngest422JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the PostApiGovernanceOcsfIngest422JSONResponseBodyFault enum.
+func (e PostApiGovernanceOcsfIngest422JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case PostApiGovernanceOcsfIngest422JSONResponseBodyFaultCustomer:
+		return true
+	case PostApiGovernanceOcsfIngest422JSONResponseBodyFaultPlatform:
+		return true
+	case PostApiGovernanceOcsfIngest422JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case PostApiGovernanceOcsfIngest422JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiGovernanceOcsfIngest500JSONResponseBodyFault.
+const (
+	PostApiGovernanceOcsfIngest500JSONResponseBodyFaultCustomer         PostApiGovernanceOcsfIngest500JSONResponseBodyFault = "customer"
+	PostApiGovernanceOcsfIngest500JSONResponseBodyFaultPlatform         PostApiGovernanceOcsfIngest500JSONResponseBodyFault = "platform"
+	PostApiGovernanceOcsfIngest500JSONResponseBodyFaultPresumedPlatform PostApiGovernanceOcsfIngest500JSONResponseBodyFault = "presumed_platform"
+	PostApiGovernanceOcsfIngest500JSONResponseBodyFaultProvider         PostApiGovernanceOcsfIngest500JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the PostApiGovernanceOcsfIngest500JSONResponseBodyFault enum.
+func (e PostApiGovernanceOcsfIngest500JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case PostApiGovernanceOcsfIngest500JSONResponseBodyFaultCustomer:
+		return true
+	case PostApiGovernanceOcsfIngest500JSONResponseBodyFaultPlatform:
+		return true
+	case PostApiGovernanceOcsfIngest500JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case PostApiGovernanceOcsfIngest500JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiGovernanceOcsfTraces400JSONResponseBodyFault.
+const (
+	GetApiGovernanceOcsfTraces400JSONResponseBodyFaultCustomer         GetApiGovernanceOcsfTraces400JSONResponseBodyFault = "customer"
+	GetApiGovernanceOcsfTraces400JSONResponseBodyFaultPlatform         GetApiGovernanceOcsfTraces400JSONResponseBodyFault = "platform"
+	GetApiGovernanceOcsfTraces400JSONResponseBodyFaultPresumedPlatform GetApiGovernanceOcsfTraces400JSONResponseBodyFault = "presumed_platform"
+	GetApiGovernanceOcsfTraces400JSONResponseBodyFaultProvider         GetApiGovernanceOcsfTraces400JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the GetApiGovernanceOcsfTraces400JSONResponseBodyFault enum.
+func (e GetApiGovernanceOcsfTraces400JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case GetApiGovernanceOcsfTraces400JSONResponseBodyFaultCustomer:
+		return true
+	case GetApiGovernanceOcsfTraces400JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiGovernanceOcsfTraces400JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case GetApiGovernanceOcsfTraces400JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiGovernanceOcsfTraces401JSONResponseBodyFault.
+const (
+	GetApiGovernanceOcsfTraces401JSONResponseBodyFaultCustomer         GetApiGovernanceOcsfTraces401JSONResponseBodyFault = "customer"
+	GetApiGovernanceOcsfTraces401JSONResponseBodyFaultPlatform         GetApiGovernanceOcsfTraces401JSONResponseBodyFault = "platform"
+	GetApiGovernanceOcsfTraces401JSONResponseBodyFaultPresumedPlatform GetApiGovernanceOcsfTraces401JSONResponseBodyFault = "presumed_platform"
+	GetApiGovernanceOcsfTraces401JSONResponseBodyFaultProvider         GetApiGovernanceOcsfTraces401JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the GetApiGovernanceOcsfTraces401JSONResponseBodyFault enum.
+func (e GetApiGovernanceOcsfTraces401JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case GetApiGovernanceOcsfTraces401JSONResponseBodyFaultCustomer:
+		return true
+	case GetApiGovernanceOcsfTraces401JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiGovernanceOcsfTraces401JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case GetApiGovernanceOcsfTraces401JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiGovernanceOcsfTraces403JSONResponseBodyFault.
+const (
+	GetApiGovernanceOcsfTraces403JSONResponseBodyFaultCustomer         GetApiGovernanceOcsfTraces403JSONResponseBodyFault = "customer"
+	GetApiGovernanceOcsfTraces403JSONResponseBodyFaultPlatform         GetApiGovernanceOcsfTraces403JSONResponseBodyFault = "platform"
+	GetApiGovernanceOcsfTraces403JSONResponseBodyFaultPresumedPlatform GetApiGovernanceOcsfTraces403JSONResponseBodyFault = "presumed_platform"
+	GetApiGovernanceOcsfTraces403JSONResponseBodyFaultProvider         GetApiGovernanceOcsfTraces403JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the GetApiGovernanceOcsfTraces403JSONResponseBodyFault enum.
+func (e GetApiGovernanceOcsfTraces403JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case GetApiGovernanceOcsfTraces403JSONResponseBodyFaultCustomer:
+		return true
+	case GetApiGovernanceOcsfTraces403JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiGovernanceOcsfTraces403JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case GetApiGovernanceOcsfTraces403JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiGovernanceOcsfTraces422JSONResponseBodyFault.
+const (
+	GetApiGovernanceOcsfTraces422JSONResponseBodyFaultCustomer         GetApiGovernanceOcsfTraces422JSONResponseBodyFault = "customer"
+	GetApiGovernanceOcsfTraces422JSONResponseBodyFaultPlatform         GetApiGovernanceOcsfTraces422JSONResponseBodyFault = "platform"
+	GetApiGovernanceOcsfTraces422JSONResponseBodyFaultPresumedPlatform GetApiGovernanceOcsfTraces422JSONResponseBodyFault = "presumed_platform"
+	GetApiGovernanceOcsfTraces422JSONResponseBodyFaultProvider         GetApiGovernanceOcsfTraces422JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the GetApiGovernanceOcsfTraces422JSONResponseBodyFault enum.
+func (e GetApiGovernanceOcsfTraces422JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case GetApiGovernanceOcsfTraces422JSONResponseBodyFaultCustomer:
+		return true
+	case GetApiGovernanceOcsfTraces422JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiGovernanceOcsfTraces422JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case GetApiGovernanceOcsfTraces422JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiGovernanceOcsfTraces500JSONResponseBodyFault.
+const (
+	GetApiGovernanceOcsfTraces500JSONResponseBodyFaultCustomer         GetApiGovernanceOcsfTraces500JSONResponseBodyFault = "customer"
+	GetApiGovernanceOcsfTraces500JSONResponseBodyFaultPlatform         GetApiGovernanceOcsfTraces500JSONResponseBodyFault = "platform"
+	GetApiGovernanceOcsfTraces500JSONResponseBodyFaultPresumedPlatform GetApiGovernanceOcsfTraces500JSONResponseBodyFault = "presumed_platform"
+	GetApiGovernanceOcsfTraces500JSONResponseBodyFaultProvider         GetApiGovernanceOcsfTraces500JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the GetApiGovernanceOcsfTraces500JSONResponseBodyFault enum.
+func (e GetApiGovernanceOcsfTraces500JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case GetApiGovernanceOcsfTraces500JSONResponseBodyFaultCustomer:
+		return true
+	case GetApiGovernanceOcsfTraces500JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiGovernanceOcsfTraces500JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case GetApiGovernanceOcsfTraces500JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for GetApiGovernanceRegistryAgentsParamsStatus.
 const (
 	GetApiGovernanceRegistryAgentsParamsStatusActive  GetApiGovernanceRegistryAgentsParamsStatus = "active"
@@ -48991,6 +49471,118 @@ type PatchApiGovernanceIngestionTemplatesByIdOttlRulesJSONBody struct {
 	OttlRules string `json:"ottl_rules"`
 }
 
+// GetApiGovernanceOcsfAuditParams defines parameters for GetApiGovernanceOcsfAudit.
+type GetApiGovernanceOcsfAuditParams struct {
+	Limit  *int       `form:"limit,omitempty" json:"limit,omitempty"`
+	Since  *time.Time `form:"since,omitempty" json:"since,omitempty"`
+	Until  *time.Time `form:"until,omitempty" json:"until,omitempty"`
+	Cursor *string    `form:"cursor,omitempty" json:"cursor,omitempty"`
+}
+
+// GetApiGovernanceOcsfAudit400JSONResponseBodyFault defines parameters for GetApiGovernanceOcsfAudit.
+type GetApiGovernanceOcsfAudit400JSONResponseBodyFault string
+
+// GetApiGovernanceOcsfAudit401JSONResponseBodyFault defines parameters for GetApiGovernanceOcsfAudit.
+type GetApiGovernanceOcsfAudit401JSONResponseBodyFault string
+
+// GetApiGovernanceOcsfAudit403JSONResponseBodyFault defines parameters for GetApiGovernanceOcsfAudit.
+type GetApiGovernanceOcsfAudit403JSONResponseBodyFault string
+
+// GetApiGovernanceOcsfAudit422JSONResponseBodyFault defines parameters for GetApiGovernanceOcsfAudit.
+type GetApiGovernanceOcsfAudit422JSONResponseBodyFault string
+
+// GetApiGovernanceOcsfAudit500JSONResponseBodyFault defines parameters for GetApiGovernanceOcsfAudit.
+type GetApiGovernanceOcsfAudit500JSONResponseBodyFault string
+
+// GetApiGovernanceOcsfEventsParams defines parameters for GetApiGovernanceOcsfEvents.
+type GetApiGovernanceOcsfEventsParams struct {
+	Limit      *int       `form:"limit,omitempty" json:"limit,omitempty"`
+	Since      *time.Time `form:"since,omitempty" json:"since,omitempty"`
+	Until      *time.Time `form:"until,omitempty" json:"until,omitempty"`
+	Cursor     *string    `form:"cursor,omitempty" json:"cursor,omitempty"`
+	SourceType *string    `form:"source_type,omitempty" json:"source_type,omitempty"`
+	SourceId   *string    `form:"source_id,omitempty" json:"source_id,omitempty"`
+}
+
+// GetApiGovernanceOcsfEvents400JSONResponseBodyFault defines parameters for GetApiGovernanceOcsfEvents.
+type GetApiGovernanceOcsfEvents400JSONResponseBodyFault string
+
+// GetApiGovernanceOcsfEvents401JSONResponseBodyFault defines parameters for GetApiGovernanceOcsfEvents.
+type GetApiGovernanceOcsfEvents401JSONResponseBodyFault string
+
+// GetApiGovernanceOcsfEvents403JSONResponseBodyFault defines parameters for GetApiGovernanceOcsfEvents.
+type GetApiGovernanceOcsfEvents403JSONResponseBodyFault string
+
+// GetApiGovernanceOcsfEvents422JSONResponseBodyFault defines parameters for GetApiGovernanceOcsfEvents.
+type GetApiGovernanceOcsfEvents422JSONResponseBodyFault string
+
+// GetApiGovernanceOcsfEvents500JSONResponseBodyFault defines parameters for GetApiGovernanceOcsfEvents.
+type GetApiGovernanceOcsfEvents500JSONResponseBodyFault string
+
+// PostApiGovernanceOcsfIngestJSONBody defines parameters for PostApiGovernanceOcsfIngest.
+type PostApiGovernanceOcsfIngestJSONBody struct {
+	Events []PostApiGovernanceOcsfIngestJSONBody_Events_Item `json:"events"`
+	Source string                                            `json:"source"`
+}
+
+// PostApiGovernanceOcsfIngestJSONBody_Events_Metadata defines parameters for PostApiGovernanceOcsfIngest.
+type PostApiGovernanceOcsfIngestJSONBody_Events_Metadata struct {
+	Uid                  string                 `json:"uid"`
+	Version              string                 `json:"version"`
+	AdditionalProperties map[string]interface{} `json:"-"`
+}
+
+// PostApiGovernanceOcsfIngestJSONBody_Events_Item defines parameters for PostApiGovernanceOcsfIngest.
+type PostApiGovernanceOcsfIngestJSONBody_Events_Item struct {
+	ActivityId           *int                                                `json:"activity_id,omitempty"`
+	CategoryUid          *int                                                `json:"category_uid,omitempty"`
+	ClassUid             int                                                 `json:"class_uid"`
+	Metadata             PostApiGovernanceOcsfIngestJSONBody_Events_Metadata `json:"metadata"`
+	SeverityId           int                                                 `json:"severity_id"`
+	Time                 int                                                 `json:"time"`
+	TypeUid              *int                                                `json:"type_uid,omitempty"`
+	AdditionalProperties map[string]interface{}                              `json:"-"`
+}
+
+// PostApiGovernanceOcsfIngest400JSONResponseBodyFault defines parameters for PostApiGovernanceOcsfIngest.
+type PostApiGovernanceOcsfIngest400JSONResponseBodyFault string
+
+// PostApiGovernanceOcsfIngest401JSONResponseBodyFault defines parameters for PostApiGovernanceOcsfIngest.
+type PostApiGovernanceOcsfIngest401JSONResponseBodyFault string
+
+// PostApiGovernanceOcsfIngest403JSONResponseBodyFault defines parameters for PostApiGovernanceOcsfIngest.
+type PostApiGovernanceOcsfIngest403JSONResponseBodyFault string
+
+// PostApiGovernanceOcsfIngest422JSONResponseBodyFault defines parameters for PostApiGovernanceOcsfIngest.
+type PostApiGovernanceOcsfIngest422JSONResponseBodyFault string
+
+// PostApiGovernanceOcsfIngest500JSONResponseBodyFault defines parameters for PostApiGovernanceOcsfIngest.
+type PostApiGovernanceOcsfIngest500JSONResponseBodyFault string
+
+// GetApiGovernanceOcsfTracesParams defines parameters for GetApiGovernanceOcsfTraces.
+type GetApiGovernanceOcsfTracesParams struct {
+	Limit     *int       `form:"limit,omitempty" json:"limit,omitempty"`
+	Since     *time.Time `form:"since,omitempty" json:"since,omitempty"`
+	Until     *time.Time `form:"until,omitempty" json:"until,omitempty"`
+	Cursor    *string    `form:"cursor,omitempty" json:"cursor,omitempty"`
+	ProjectId *string    `form:"project_id,omitempty" json:"project_id,omitempty"`
+}
+
+// GetApiGovernanceOcsfTraces400JSONResponseBodyFault defines parameters for GetApiGovernanceOcsfTraces.
+type GetApiGovernanceOcsfTraces400JSONResponseBodyFault string
+
+// GetApiGovernanceOcsfTraces401JSONResponseBodyFault defines parameters for GetApiGovernanceOcsfTraces.
+type GetApiGovernanceOcsfTraces401JSONResponseBodyFault string
+
+// GetApiGovernanceOcsfTraces403JSONResponseBodyFault defines parameters for GetApiGovernanceOcsfTraces.
+type GetApiGovernanceOcsfTraces403JSONResponseBodyFault string
+
+// GetApiGovernanceOcsfTraces422JSONResponseBodyFault defines parameters for GetApiGovernanceOcsfTraces.
+type GetApiGovernanceOcsfTraces422JSONResponseBodyFault string
+
+// GetApiGovernanceOcsfTraces500JSONResponseBodyFault defines parameters for GetApiGovernanceOcsfTraces.
+type GetApiGovernanceOcsfTraces500JSONResponseBodyFault string
+
 // GetApiGovernanceRegistryAgentsParams defines parameters for GetApiGovernanceRegistryAgents.
 type GetApiGovernanceRegistryAgentsParams struct {
 	Limit        *int                                        `form:"limit,omitempty" json:"limit,omitempty"`
@@ -59406,6 +59998,9 @@ type PostApiGovernanceIngestionTemplatesCloneJSONRequestBody PostApiGovernanceIn
 // PatchApiGovernanceIngestionTemplatesByIdOttlRulesJSONRequestBody defines body for PatchApiGovernanceIngestionTemplatesByIdOttlRules for application/json ContentType.
 type PatchApiGovernanceIngestionTemplatesByIdOttlRulesJSONRequestBody PatchApiGovernanceIngestionTemplatesByIdOttlRulesJSONBody
 
+// PostApiGovernanceOcsfIngestJSONRequestBody defines body for PostApiGovernanceOcsfIngest for application/json ContentType.
+type PostApiGovernanceOcsfIngestJSONRequestBody PostApiGovernanceOcsfIngestJSONBody
+
 // PostApiGovernanceRegistryArdSearchJSONRequestBody defines body for PostApiGovernanceRegistryArdSearch for application/json ContentType.
 type PostApiGovernanceRegistryArdSearchJSONRequestBody PostApiGovernanceRegistryArdSearchJSONBody
 
@@ -66475,6 +67070,235 @@ func (a PostApiDspyLogStepsJSONBody_Predictors_Predictor) MarshalJSON() ([]byte,
 		object["__class__"], err = json.Marshal(a.UnderscoreUnderscoreClass)
 		if err != nil {
 			return nil, fmt.Errorf("error marshaling '__class__': %w", err)
+		}
+	}
+
+	for fieldName, field := range a.AdditionalProperties {
+		object[fieldName], err = json.Marshal(field)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling '%s': %w", fieldName, err)
+		}
+	}
+	return json.Marshal(object)
+}
+
+// Getter for additional properties for PostApiGovernanceOcsfIngestJSONBody_Events_Metadata. Returns the specified
+// element and whether it was found
+func (a PostApiGovernanceOcsfIngestJSONBody_Events_Metadata) Get(fieldName string) (value interface{}, found bool) {
+	if a.AdditionalProperties != nil {
+		value, found = a.AdditionalProperties[fieldName]
+	}
+	return
+}
+
+// Setter for additional properties for PostApiGovernanceOcsfIngestJSONBody_Events_Metadata
+func (a *PostApiGovernanceOcsfIngestJSONBody_Events_Metadata) Set(fieldName string, value interface{}) {
+	if a.AdditionalProperties == nil {
+		a.AdditionalProperties = make(map[string]interface{})
+	}
+	a.AdditionalProperties[fieldName] = value
+}
+
+// Override default JSON handling for PostApiGovernanceOcsfIngestJSONBody_Events_Metadata to handle AdditionalProperties
+func (a *PostApiGovernanceOcsfIngestJSONBody_Events_Metadata) UnmarshalJSON(b []byte) error {
+	object := make(map[string]json.RawMessage)
+	err := json.Unmarshal(b, &object)
+	if err != nil {
+		return err
+	}
+
+	if raw, found := object["uid"]; found {
+		err = json.Unmarshal(raw, &a.Uid)
+		if err != nil {
+			return fmt.Errorf("error reading 'uid': %w", err)
+		}
+		delete(object, "uid")
+	}
+
+	if raw, found := object["version"]; found {
+		err = json.Unmarshal(raw, &a.Version)
+		if err != nil {
+			return fmt.Errorf("error reading 'version': %w", err)
+		}
+		delete(object, "version")
+	}
+
+	if len(object) != 0 {
+		a.AdditionalProperties = make(map[string]interface{})
+		for fieldName, fieldBuf := range object {
+			var fieldVal interface{}
+			err := json.Unmarshal(fieldBuf, &fieldVal)
+			if err != nil {
+				return fmt.Errorf("error unmarshaling field %s: %w", fieldName, err)
+			}
+			a.AdditionalProperties[fieldName] = fieldVal
+		}
+	}
+	return nil
+}
+
+// Override default JSON handling for PostApiGovernanceOcsfIngestJSONBody_Events_Metadata to handle AdditionalProperties
+func (a PostApiGovernanceOcsfIngestJSONBody_Events_Metadata) MarshalJSON() ([]byte, error) {
+	var err error
+	object := make(map[string]json.RawMessage)
+
+	object["uid"], err = json.Marshal(a.Uid)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'uid': %w", err)
+	}
+
+	object["version"], err = json.Marshal(a.Version)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'version': %w", err)
+	}
+
+	for fieldName, field := range a.AdditionalProperties {
+		object[fieldName], err = json.Marshal(field)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling '%s': %w", fieldName, err)
+		}
+	}
+	return json.Marshal(object)
+}
+
+// Getter for additional properties for PostApiGovernanceOcsfIngestJSONBody_Events_Item. Returns the specified
+// element and whether it was found
+func (a PostApiGovernanceOcsfIngestJSONBody_Events_Item) Get(fieldName string) (value interface{}, found bool) {
+	if a.AdditionalProperties != nil {
+		value, found = a.AdditionalProperties[fieldName]
+	}
+	return
+}
+
+// Setter for additional properties for PostApiGovernanceOcsfIngestJSONBody_Events_Item
+func (a *PostApiGovernanceOcsfIngestJSONBody_Events_Item) Set(fieldName string, value interface{}) {
+	if a.AdditionalProperties == nil {
+		a.AdditionalProperties = make(map[string]interface{})
+	}
+	a.AdditionalProperties[fieldName] = value
+}
+
+// Override default JSON handling for PostApiGovernanceOcsfIngestJSONBody_Events_Item to handle AdditionalProperties
+func (a *PostApiGovernanceOcsfIngestJSONBody_Events_Item) UnmarshalJSON(b []byte) error {
+	object := make(map[string]json.RawMessage)
+	err := json.Unmarshal(b, &object)
+	if err != nil {
+		return err
+	}
+
+	if raw, found := object["activity_id"]; found {
+		err = json.Unmarshal(raw, &a.ActivityId)
+		if err != nil {
+			return fmt.Errorf("error reading 'activity_id': %w", err)
+		}
+		delete(object, "activity_id")
+	}
+
+	if raw, found := object["category_uid"]; found {
+		err = json.Unmarshal(raw, &a.CategoryUid)
+		if err != nil {
+			return fmt.Errorf("error reading 'category_uid': %w", err)
+		}
+		delete(object, "category_uid")
+	}
+
+	if raw, found := object["class_uid"]; found {
+		err = json.Unmarshal(raw, &a.ClassUid)
+		if err != nil {
+			return fmt.Errorf("error reading 'class_uid': %w", err)
+		}
+		delete(object, "class_uid")
+	}
+
+	if raw, found := object["metadata"]; found {
+		err = json.Unmarshal(raw, &a.Metadata)
+		if err != nil {
+			return fmt.Errorf("error reading 'metadata': %w", err)
+		}
+		delete(object, "metadata")
+	}
+
+	if raw, found := object["severity_id"]; found {
+		err = json.Unmarshal(raw, &a.SeverityId)
+		if err != nil {
+			return fmt.Errorf("error reading 'severity_id': %w", err)
+		}
+		delete(object, "severity_id")
+	}
+
+	if raw, found := object["time"]; found {
+		err = json.Unmarshal(raw, &a.Time)
+		if err != nil {
+			return fmt.Errorf("error reading 'time': %w", err)
+		}
+		delete(object, "time")
+	}
+
+	if raw, found := object["type_uid"]; found {
+		err = json.Unmarshal(raw, &a.TypeUid)
+		if err != nil {
+			return fmt.Errorf("error reading 'type_uid': %w", err)
+		}
+		delete(object, "type_uid")
+	}
+
+	if len(object) != 0 {
+		a.AdditionalProperties = make(map[string]interface{})
+		for fieldName, fieldBuf := range object {
+			var fieldVal interface{}
+			err := json.Unmarshal(fieldBuf, &fieldVal)
+			if err != nil {
+				return fmt.Errorf("error unmarshaling field %s: %w", fieldName, err)
+			}
+			a.AdditionalProperties[fieldName] = fieldVal
+		}
+	}
+	return nil
+}
+
+// Override default JSON handling for PostApiGovernanceOcsfIngestJSONBody_Events_Item to handle AdditionalProperties
+func (a PostApiGovernanceOcsfIngestJSONBody_Events_Item) MarshalJSON() ([]byte, error) {
+	var err error
+	object := make(map[string]json.RawMessage)
+
+	if a.ActivityId != nil {
+		object["activity_id"], err = json.Marshal(a.ActivityId)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'activity_id': %w", err)
+		}
+	}
+
+	if a.CategoryUid != nil {
+		object["category_uid"], err = json.Marshal(a.CategoryUid)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'category_uid': %w", err)
+		}
+	}
+
+	object["class_uid"], err = json.Marshal(a.ClassUid)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'class_uid': %w", err)
+	}
+
+	object["metadata"], err = json.Marshal(a.Metadata)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'metadata': %w", err)
+	}
+
+	object["severity_id"], err = json.Marshal(a.SeverityId)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'severity_id': %w", err)
+	}
+
+	object["time"], err = json.Marshal(a.Time)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'time': %w", err)
+	}
+
+	if a.TypeUid != nil {
+		object["type_uid"], err = json.Marshal(a.TypeUid)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'type_uid': %w", err)
 		}
 	}
 
@@ -130644,6 +131468,20 @@ type ClientInterface interface {
 
 	PatchApiGovernanceIngestionTemplatesByIdOttlRules(ctx context.Context, ingestionTemplateId string, body PatchApiGovernanceIngestionTemplatesByIdOttlRulesJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// GetApiGovernanceOcsfAudit request
+	GetApiGovernanceOcsfAudit(ctx context.Context, params *GetApiGovernanceOcsfAuditParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetApiGovernanceOcsfEvents request
+	GetApiGovernanceOcsfEvents(ctx context.Context, params *GetApiGovernanceOcsfEventsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PostApiGovernanceOcsfIngestWithBody request with any body
+	PostApiGovernanceOcsfIngestWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	PostApiGovernanceOcsfIngest(ctx context.Context, body PostApiGovernanceOcsfIngestJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetApiGovernanceOcsfTraces request
+	GetApiGovernanceOcsfTraces(ctx context.Context, params *GetApiGovernanceOcsfTracesParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// GetApiGovernanceRegistryAgents request
 	GetApiGovernanceRegistryAgents(ctx context.Context, params *GetApiGovernanceRegistryAgentsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -134850,6 +135688,66 @@ func (c *Client) PatchApiGovernanceIngestionTemplatesByIdOttlRulesWithBody(ctx c
 
 func (c *Client) PatchApiGovernanceIngestionTemplatesByIdOttlRules(ctx context.Context, ingestionTemplateId string, body PatchApiGovernanceIngestionTemplatesByIdOttlRulesJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewPatchApiGovernanceIngestionTemplatesByIdOttlRulesRequest(c.Server, ingestionTemplateId, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) GetApiGovernanceOcsfAudit(ctx context.Context, params *GetApiGovernanceOcsfAuditParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetApiGovernanceOcsfAuditRequest(c.Server, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) GetApiGovernanceOcsfEvents(ctx context.Context, params *GetApiGovernanceOcsfEventsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetApiGovernanceOcsfEventsRequest(c.Server, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) PostApiGovernanceOcsfIngestWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPostApiGovernanceOcsfIngestRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) PostApiGovernanceOcsfIngest(ctx context.Context, body PostApiGovernanceOcsfIngestJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPostApiGovernanceOcsfIngestRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) GetApiGovernanceOcsfTraces(ctx context.Context, params *GetApiGovernanceOcsfTracesParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetApiGovernanceOcsfTracesRequest(c.Server, params)
 	if err != nil {
 		return nil, err
 	}
@@ -147708,6 +148606,352 @@ func NewPatchApiGovernanceIngestionTemplatesByIdOttlRulesRequestWithBody(server 
 	return req, nil
 }
 
+// NewGetApiGovernanceOcsfAuditRequest generates requests for GetApiGovernanceOcsfAudit
+func NewGetApiGovernanceOcsfAuditRequest(server string, params *GetApiGovernanceOcsfAuditParams) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/governance/ocsf/audit")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.Limit != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "limit", *params.Limit, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Since != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "since", *params.Since, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "date-time"}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Until != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "until", *params.Until, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "date-time"}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Cursor != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "cursor", *params.Cursor, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetApiGovernanceOcsfEventsRequest generates requests for GetApiGovernanceOcsfEvents
+func NewGetApiGovernanceOcsfEventsRequest(server string, params *GetApiGovernanceOcsfEventsParams) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/governance/ocsf/events")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.Limit != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "limit", *params.Limit, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Since != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "since", *params.Since, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "date-time"}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Until != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "until", *params.Until, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "date-time"}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Cursor != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "cursor", *params.Cursor, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.SourceType != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "source_type", *params.SourceType, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.SourceId != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "source_id", *params.SourceId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewPostApiGovernanceOcsfIngestRequest calls the generic PostApiGovernanceOcsfIngest builder with application/json body
+func NewPostApiGovernanceOcsfIngestRequest(server string, body PostApiGovernanceOcsfIngestJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewPostApiGovernanceOcsfIngestRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewPostApiGovernanceOcsfIngestRequestWithBody generates requests for PostApiGovernanceOcsfIngest with any type of body
+func NewPostApiGovernanceOcsfIngestRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/governance/ocsf/ingest")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewGetApiGovernanceOcsfTracesRequest generates requests for GetApiGovernanceOcsfTraces
+func NewGetApiGovernanceOcsfTracesRequest(server string, params *GetApiGovernanceOcsfTracesParams) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/governance/ocsf/traces")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.Limit != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "limit", *params.Limit, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Since != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "since", *params.Since, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "date-time"}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Until != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "until", *params.Until, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "date-time"}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Cursor != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "cursor", *params.Cursor, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.ProjectId != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "project_id", *params.ProjectId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewGetApiGovernanceRegistryAgentsRequest generates requests for GetApiGovernanceRegistryAgents
 func NewGetApiGovernanceRegistryAgentsRequest(server string, params *GetApiGovernanceRegistryAgentsParams) (*http.Request, error) {
 	var err error
@@ -158516,6 +159760,20 @@ type ClientWithResponsesInterface interface {
 	PatchApiGovernanceIngestionTemplatesByIdOttlRulesWithBodyWithResponse(ctx context.Context, ingestionTemplateId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PatchApiGovernanceIngestionTemplatesByIdOttlRulesResponse, error)
 
 	PatchApiGovernanceIngestionTemplatesByIdOttlRulesWithResponse(ctx context.Context, ingestionTemplateId string, body PatchApiGovernanceIngestionTemplatesByIdOttlRulesJSONRequestBody, reqEditors ...RequestEditorFn) (*PatchApiGovernanceIngestionTemplatesByIdOttlRulesResponse, error)
+
+	// GetApiGovernanceOcsfAuditWithResponse request
+	GetApiGovernanceOcsfAuditWithResponse(ctx context.Context, params *GetApiGovernanceOcsfAuditParams, reqEditors ...RequestEditorFn) (*GetApiGovernanceOcsfAuditResponse, error)
+
+	// GetApiGovernanceOcsfEventsWithResponse request
+	GetApiGovernanceOcsfEventsWithResponse(ctx context.Context, params *GetApiGovernanceOcsfEventsParams, reqEditors ...RequestEditorFn) (*GetApiGovernanceOcsfEventsResponse, error)
+
+	// PostApiGovernanceOcsfIngestWithBodyWithResponse request with any body
+	PostApiGovernanceOcsfIngestWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostApiGovernanceOcsfIngestResponse, error)
+
+	PostApiGovernanceOcsfIngestWithResponse(ctx context.Context, body PostApiGovernanceOcsfIngestJSONRequestBody, reqEditors ...RequestEditorFn) (*PostApiGovernanceOcsfIngestResponse, error)
+
+	// GetApiGovernanceOcsfTracesWithResponse request
+	GetApiGovernanceOcsfTracesWithResponse(ctx context.Context, params *GetApiGovernanceOcsfTracesParams, reqEditors ...RequestEditorFn) (*GetApiGovernanceOcsfTracesResponse, error)
 
 	// GetApiGovernanceRegistryAgentsWithResponse request
 	GetApiGovernanceRegistryAgentsWithResponse(ctx context.Context, params *GetApiGovernanceRegistryAgentsParams, reqEditors ...RequestEditorFn) (*GetApiGovernanceRegistryAgentsResponse, error)
@@ -172949,6 +174207,523 @@ func (r PatchApiGovernanceIngestionTemplatesByIdOttlRulesResponse) StatusCode() 
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r PatchApiGovernanceIngestionTemplatesByIdOttlRulesResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type GetApiGovernanceOcsfAuditResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		Data        []map[string]interface{} `json:"data"`
+		HasMore     bool                     `json:"has_more"`
+		NextCursor  string                   `json:"next_cursor"`
+		OcsfVersion string                   `json:"ocsf_version"`
+	}
+	JSON400 *struct {
+		Code      string                                             `json:"code"`
+		DocsUrl   *string                                            `json:"docs_url,omitempty"`
+		Fault     *GetApiGovernanceOcsfAudit400JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                             `json:"message"`
+		Meta      *map[string]interface{}                            `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                     `json:"reasons,omitempty"`
+		Retryable bool                                               `json:"retryable"`
+		SpanId    *string                                            `json:"span_id,omitempty"`
+		Tips      *[]string                                          `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+	JSON401 *struct {
+		Code      string                                             `json:"code"`
+		DocsUrl   *string                                            `json:"docs_url,omitempty"`
+		Fault     *GetApiGovernanceOcsfAudit401JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                             `json:"message"`
+		Meta      *map[string]interface{}                            `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                     `json:"reasons,omitempty"`
+		Retryable bool                                               `json:"retryable"`
+		SpanId    *string                                            `json:"span_id,omitempty"`
+		Tips      *[]string                                          `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+	JSON403 *struct {
+		Code      string                                             `json:"code"`
+		DocsUrl   *string                                            `json:"docs_url,omitempty"`
+		Fault     *GetApiGovernanceOcsfAudit403JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                             `json:"message"`
+		Meta      *map[string]interface{}                            `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                     `json:"reasons,omitempty"`
+		Retryable bool                                               `json:"retryable"`
+		SpanId    *string                                            `json:"span_id,omitempty"`
+		Tips      *[]string                                          `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+	JSON422 *struct {
+		Code      string                                             `json:"code"`
+		DocsUrl   *string                                            `json:"docs_url,omitempty"`
+		Fault     *GetApiGovernanceOcsfAudit422JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                             `json:"message"`
+		Meta      *map[string]interface{}                            `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                     `json:"reasons,omitempty"`
+		Retryable bool                                               `json:"retryable"`
+		SpanId    *string                                            `json:"span_id,omitempty"`
+		Tips      *[]string                                          `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+	JSON500 *struct {
+		Code      string                                             `json:"code"`
+		DocsUrl   *string                                            `json:"docs_url,omitempty"`
+		Fault     *GetApiGovernanceOcsfAudit500JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                             `json:"message"`
+		Meta      *map[string]interface{}                            `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                     `json:"reasons,omitempty"`
+		Retryable bool                                               `json:"retryable"`
+		SpanId    *string                                            `json:"span_id,omitempty"`
+		Tips      *[]string                                          `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+}
+
+// Status returns HTTPResponse.Status
+func (r GetApiGovernanceOcsfAuditResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetApiGovernanceOcsfAuditResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetApiGovernanceOcsfAuditResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type GetApiGovernanceOcsfEventsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		Data        []map[string]interface{} `json:"data"`
+		HasMore     bool                     `json:"has_more"`
+		NextCursor  string                   `json:"next_cursor"`
+		OcsfVersion string                   `json:"ocsf_version"`
+	}
+	JSON400 *struct {
+		Code      string                                              `json:"code"`
+		DocsUrl   *string                                             `json:"docs_url,omitempty"`
+		Fault     *GetApiGovernanceOcsfEvents400JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                              `json:"message"`
+		Meta      *map[string]interface{}                             `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                      `json:"reasons,omitempty"`
+		Retryable bool                                                `json:"retryable"`
+		SpanId    *string                                             `json:"span_id,omitempty"`
+		Tips      *[]string                                           `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+	JSON401 *struct {
+		Code      string                                              `json:"code"`
+		DocsUrl   *string                                             `json:"docs_url,omitempty"`
+		Fault     *GetApiGovernanceOcsfEvents401JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                              `json:"message"`
+		Meta      *map[string]interface{}                             `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                      `json:"reasons,omitempty"`
+		Retryable bool                                                `json:"retryable"`
+		SpanId    *string                                             `json:"span_id,omitempty"`
+		Tips      *[]string                                           `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+	JSON403 *struct {
+		Code      string                                              `json:"code"`
+		DocsUrl   *string                                             `json:"docs_url,omitempty"`
+		Fault     *GetApiGovernanceOcsfEvents403JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                              `json:"message"`
+		Meta      *map[string]interface{}                             `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                      `json:"reasons,omitempty"`
+		Retryable bool                                                `json:"retryable"`
+		SpanId    *string                                             `json:"span_id,omitempty"`
+		Tips      *[]string                                           `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+	JSON422 *struct {
+		Code      string                                              `json:"code"`
+		DocsUrl   *string                                             `json:"docs_url,omitempty"`
+		Fault     *GetApiGovernanceOcsfEvents422JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                              `json:"message"`
+		Meta      *map[string]interface{}                             `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                      `json:"reasons,omitempty"`
+		Retryable bool                                                `json:"retryable"`
+		SpanId    *string                                             `json:"span_id,omitempty"`
+		Tips      *[]string                                           `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+	JSON500 *struct {
+		Code      string                                              `json:"code"`
+		DocsUrl   *string                                             `json:"docs_url,omitempty"`
+		Fault     *GetApiGovernanceOcsfEvents500JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                              `json:"message"`
+		Meta      *map[string]interface{}                             `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                      `json:"reasons,omitempty"`
+		Retryable bool                                                `json:"retryable"`
+		SpanId    *string                                             `json:"span_id,omitempty"`
+		Tips      *[]string                                           `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+}
+
+// Status returns HTTPResponse.Status
+func (r GetApiGovernanceOcsfEventsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetApiGovernanceOcsfEventsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetApiGovernanceOcsfEventsResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type PostApiGovernanceOcsfIngestResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		Accepted int `json:"accepted"`
+	}
+	JSON400 *struct {
+		Code      string                                               `json:"code"`
+		DocsUrl   *string                                              `json:"docs_url,omitempty"`
+		Fault     *PostApiGovernanceOcsfIngest400JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                               `json:"message"`
+		Meta      *map[string]interface{}                              `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                       `json:"reasons,omitempty"`
+		Retryable bool                                                 `json:"retryable"`
+		SpanId    *string                                              `json:"span_id,omitempty"`
+		Tips      *[]string                                            `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+	JSON401 *struct {
+		Code      string                                               `json:"code"`
+		DocsUrl   *string                                              `json:"docs_url,omitempty"`
+		Fault     *PostApiGovernanceOcsfIngest401JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                               `json:"message"`
+		Meta      *map[string]interface{}                              `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                       `json:"reasons,omitempty"`
+		Retryable bool                                                 `json:"retryable"`
+		SpanId    *string                                              `json:"span_id,omitempty"`
+		Tips      *[]string                                            `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+	JSON403 *struct {
+		Code      string                                               `json:"code"`
+		DocsUrl   *string                                              `json:"docs_url,omitempty"`
+		Fault     *PostApiGovernanceOcsfIngest403JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                               `json:"message"`
+		Meta      *map[string]interface{}                              `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                       `json:"reasons,omitempty"`
+		Retryable bool                                                 `json:"retryable"`
+		SpanId    *string                                              `json:"span_id,omitempty"`
+		Tips      *[]string                                            `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+	JSON422 *struct {
+		Code      string                                               `json:"code"`
+		DocsUrl   *string                                              `json:"docs_url,omitempty"`
+		Fault     *PostApiGovernanceOcsfIngest422JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                               `json:"message"`
+		Meta      *map[string]interface{}                              `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                       `json:"reasons,omitempty"`
+		Retryable bool                                                 `json:"retryable"`
+		SpanId    *string                                              `json:"span_id,omitempty"`
+		Tips      *[]string                                            `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+	JSON500 *struct {
+		Code      string                                               `json:"code"`
+		DocsUrl   *string                                              `json:"docs_url,omitempty"`
+		Fault     *PostApiGovernanceOcsfIngest500JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                               `json:"message"`
+		Meta      *map[string]interface{}                              `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                       `json:"reasons,omitempty"`
+		Retryable bool                                                 `json:"retryable"`
+		SpanId    *string                                              `json:"span_id,omitempty"`
+		Tips      *[]string                                            `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+}
+
+// Status returns HTTPResponse.Status
+func (r PostApiGovernanceOcsfIngestResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r PostApiGovernanceOcsfIngestResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r PostApiGovernanceOcsfIngestResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type GetApiGovernanceOcsfTracesResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		Data        []map[string]interface{} `json:"data"`
+		HasMore     bool                     `json:"has_more"`
+		NextCursor  string                   `json:"next_cursor"`
+		OcsfVersion string                   `json:"ocsf_version"`
+	}
+	JSON400 *struct {
+		Code      string                                              `json:"code"`
+		DocsUrl   *string                                             `json:"docs_url,omitempty"`
+		Fault     *GetApiGovernanceOcsfTraces400JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                              `json:"message"`
+		Meta      *map[string]interface{}                             `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                      `json:"reasons,omitempty"`
+		Retryable bool                                                `json:"retryable"`
+		SpanId    *string                                             `json:"span_id,omitempty"`
+		Tips      *[]string                                           `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+	JSON401 *struct {
+		Code      string                                              `json:"code"`
+		DocsUrl   *string                                             `json:"docs_url,omitempty"`
+		Fault     *GetApiGovernanceOcsfTraces401JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                              `json:"message"`
+		Meta      *map[string]interface{}                             `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                      `json:"reasons,omitempty"`
+		Retryable bool                                                `json:"retryable"`
+		SpanId    *string                                             `json:"span_id,omitempty"`
+		Tips      *[]string                                           `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+	JSON403 *struct {
+		Code      string                                              `json:"code"`
+		DocsUrl   *string                                             `json:"docs_url,omitempty"`
+		Fault     *GetApiGovernanceOcsfTraces403JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                              `json:"message"`
+		Meta      *map[string]interface{}                             `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                      `json:"reasons,omitempty"`
+		Retryable bool                                                `json:"retryable"`
+		SpanId    *string                                             `json:"span_id,omitempty"`
+		Tips      *[]string                                           `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+	JSON422 *struct {
+		Code      string                                              `json:"code"`
+		DocsUrl   *string                                             `json:"docs_url,omitempty"`
+		Fault     *GetApiGovernanceOcsfTraces422JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                              `json:"message"`
+		Meta      *map[string]interface{}                             `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                      `json:"reasons,omitempty"`
+		Retryable bool                                                `json:"retryable"`
+		SpanId    *string                                             `json:"span_id,omitempty"`
+		Tips      *[]string                                           `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+	JSON500 *struct {
+		Code      string                                              `json:"code"`
+		DocsUrl   *string                                             `json:"docs_url,omitempty"`
+		Fault     *GetApiGovernanceOcsfTraces500JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                              `json:"message"`
+		Meta      *map[string]interface{}                             `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                      `json:"reasons,omitempty"`
+		Retryable bool                                                `json:"retryable"`
+		SpanId    *string                                             `json:"span_id,omitempty"`
+		Tips      *[]string                                           `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+}
+
+// Status returns HTTPResponse.Status
+func (r GetApiGovernanceOcsfTracesResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetApiGovernanceOcsfTracesResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetApiGovernanceOcsfTracesResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -189670,6 +191445,50 @@ func (c *ClientWithResponses) PatchApiGovernanceIngestionTemplatesByIdOttlRulesW
 		return nil, err
 	}
 	return ParsePatchApiGovernanceIngestionTemplatesByIdOttlRulesResponse(rsp)
+}
+
+// GetApiGovernanceOcsfAuditWithResponse request returning *GetApiGovernanceOcsfAuditResponse
+func (c *ClientWithResponses) GetApiGovernanceOcsfAuditWithResponse(ctx context.Context, params *GetApiGovernanceOcsfAuditParams, reqEditors ...RequestEditorFn) (*GetApiGovernanceOcsfAuditResponse, error) {
+	rsp, err := c.GetApiGovernanceOcsfAudit(ctx, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetApiGovernanceOcsfAuditResponse(rsp)
+}
+
+// GetApiGovernanceOcsfEventsWithResponse request returning *GetApiGovernanceOcsfEventsResponse
+func (c *ClientWithResponses) GetApiGovernanceOcsfEventsWithResponse(ctx context.Context, params *GetApiGovernanceOcsfEventsParams, reqEditors ...RequestEditorFn) (*GetApiGovernanceOcsfEventsResponse, error) {
+	rsp, err := c.GetApiGovernanceOcsfEvents(ctx, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetApiGovernanceOcsfEventsResponse(rsp)
+}
+
+// PostApiGovernanceOcsfIngestWithBodyWithResponse request with arbitrary body returning *PostApiGovernanceOcsfIngestResponse
+func (c *ClientWithResponses) PostApiGovernanceOcsfIngestWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostApiGovernanceOcsfIngestResponse, error) {
+	rsp, err := c.PostApiGovernanceOcsfIngestWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePostApiGovernanceOcsfIngestResponse(rsp)
+}
+
+func (c *ClientWithResponses) PostApiGovernanceOcsfIngestWithResponse(ctx context.Context, body PostApiGovernanceOcsfIngestJSONRequestBody, reqEditors ...RequestEditorFn) (*PostApiGovernanceOcsfIngestResponse, error) {
+	rsp, err := c.PostApiGovernanceOcsfIngest(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePostApiGovernanceOcsfIngestResponse(rsp)
+}
+
+// GetApiGovernanceOcsfTracesWithResponse request returning *GetApiGovernanceOcsfTracesResponse
+func (c *ClientWithResponses) GetApiGovernanceOcsfTracesWithResponse(ctx context.Context, params *GetApiGovernanceOcsfTracesParams, reqEditors ...RequestEditorFn) (*GetApiGovernanceOcsfTracesResponse, error) {
+	rsp, err := c.GetApiGovernanceOcsfTraces(ctx, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetApiGovernanceOcsfTracesResponse(rsp)
 }
 
 // GetApiGovernanceRegistryAgentsWithResponse request returning *GetApiGovernanceRegistryAgentsResponse
@@ -207502,6 +209321,627 @@ func ParsePatchApiGovernanceIngestionTemplatesByIdOttlRulesResponse(rsp *http.Re
 		var dest struct {
 			Error   string  `json:"error"`
 			Message *string `json:"message,omitempty"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetApiGovernanceOcsfAuditResponse parses an HTTP response from a GetApiGovernanceOcsfAuditWithResponse call
+func ParseGetApiGovernanceOcsfAuditResponse(rsp *http.Response) (*GetApiGovernanceOcsfAuditResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetApiGovernanceOcsfAuditResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest struct {
+			Data        []map[string]interface{} `json:"data"`
+			HasMore     bool                     `json:"has_more"`
+			NextCursor  string                   `json:"next_cursor"`
+			OcsfVersion string                   `json:"ocsf_version"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Code      string                                             `json:"code"`
+			DocsUrl   *string                                            `json:"docs_url,omitempty"`
+			Fault     *GetApiGovernanceOcsfAudit400JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                             `json:"message"`
+			Meta      *map[string]interface{}                            `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                     `json:"reasons,omitempty"`
+			Retryable bool                                               `json:"retryable"`
+			SpanId    *string                                            `json:"span_id,omitempty"`
+			Tips      *[]string                                          `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest struct {
+			Code      string                                             `json:"code"`
+			DocsUrl   *string                                            `json:"docs_url,omitempty"`
+			Fault     *GetApiGovernanceOcsfAudit401JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                             `json:"message"`
+			Meta      *map[string]interface{}                            `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                     `json:"reasons,omitempty"`
+			Retryable bool                                               `json:"retryable"`
+			SpanId    *string                                            `json:"span_id,omitempty"`
+			Tips      *[]string                                          `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest struct {
+			Code      string                                             `json:"code"`
+			DocsUrl   *string                                            `json:"docs_url,omitempty"`
+			Fault     *GetApiGovernanceOcsfAudit403JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                             `json:"message"`
+			Meta      *map[string]interface{}                            `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                     `json:"reasons,omitempty"`
+			Retryable bool                                               `json:"retryable"`
+			SpanId    *string                                            `json:"span_id,omitempty"`
+			Tips      *[]string                                          `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest struct {
+			Code      string                                             `json:"code"`
+			DocsUrl   *string                                            `json:"docs_url,omitempty"`
+			Fault     *GetApiGovernanceOcsfAudit422JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                             `json:"message"`
+			Meta      *map[string]interface{}                            `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                     `json:"reasons,omitempty"`
+			Retryable bool                                               `json:"retryable"`
+			SpanId    *string                                            `json:"span_id,omitempty"`
+			Tips      *[]string                                          `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON422 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest struct {
+			Code      string                                             `json:"code"`
+			DocsUrl   *string                                            `json:"docs_url,omitempty"`
+			Fault     *GetApiGovernanceOcsfAudit500JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                             `json:"message"`
+			Meta      *map[string]interface{}                            `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                     `json:"reasons,omitempty"`
+			Retryable bool                                               `json:"retryable"`
+			SpanId    *string                                            `json:"span_id,omitempty"`
+			Tips      *[]string                                          `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetApiGovernanceOcsfEventsResponse parses an HTTP response from a GetApiGovernanceOcsfEventsWithResponse call
+func ParseGetApiGovernanceOcsfEventsResponse(rsp *http.Response) (*GetApiGovernanceOcsfEventsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetApiGovernanceOcsfEventsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest struct {
+			Data        []map[string]interface{} `json:"data"`
+			HasMore     bool                     `json:"has_more"`
+			NextCursor  string                   `json:"next_cursor"`
+			OcsfVersion string                   `json:"ocsf_version"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Code      string                                              `json:"code"`
+			DocsUrl   *string                                             `json:"docs_url,omitempty"`
+			Fault     *GetApiGovernanceOcsfEvents400JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                              `json:"message"`
+			Meta      *map[string]interface{}                             `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                      `json:"reasons,omitempty"`
+			Retryable bool                                                `json:"retryable"`
+			SpanId    *string                                             `json:"span_id,omitempty"`
+			Tips      *[]string                                           `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest struct {
+			Code      string                                              `json:"code"`
+			DocsUrl   *string                                             `json:"docs_url,omitempty"`
+			Fault     *GetApiGovernanceOcsfEvents401JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                              `json:"message"`
+			Meta      *map[string]interface{}                             `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                      `json:"reasons,omitempty"`
+			Retryable bool                                                `json:"retryable"`
+			SpanId    *string                                             `json:"span_id,omitempty"`
+			Tips      *[]string                                           `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest struct {
+			Code      string                                              `json:"code"`
+			DocsUrl   *string                                             `json:"docs_url,omitempty"`
+			Fault     *GetApiGovernanceOcsfEvents403JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                              `json:"message"`
+			Meta      *map[string]interface{}                             `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                      `json:"reasons,omitempty"`
+			Retryable bool                                                `json:"retryable"`
+			SpanId    *string                                             `json:"span_id,omitempty"`
+			Tips      *[]string                                           `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest struct {
+			Code      string                                              `json:"code"`
+			DocsUrl   *string                                             `json:"docs_url,omitempty"`
+			Fault     *GetApiGovernanceOcsfEvents422JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                              `json:"message"`
+			Meta      *map[string]interface{}                             `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                      `json:"reasons,omitempty"`
+			Retryable bool                                                `json:"retryable"`
+			SpanId    *string                                             `json:"span_id,omitempty"`
+			Tips      *[]string                                           `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON422 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest struct {
+			Code      string                                              `json:"code"`
+			DocsUrl   *string                                             `json:"docs_url,omitempty"`
+			Fault     *GetApiGovernanceOcsfEvents500JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                              `json:"message"`
+			Meta      *map[string]interface{}                             `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                      `json:"reasons,omitempty"`
+			Retryable bool                                                `json:"retryable"`
+			SpanId    *string                                             `json:"span_id,omitempty"`
+			Tips      *[]string                                           `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParsePostApiGovernanceOcsfIngestResponse parses an HTTP response from a PostApiGovernanceOcsfIngestWithResponse call
+func ParsePostApiGovernanceOcsfIngestResponse(rsp *http.Response) (*PostApiGovernanceOcsfIngestResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &PostApiGovernanceOcsfIngestResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest struct {
+			Accepted int `json:"accepted"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Code      string                                               `json:"code"`
+			DocsUrl   *string                                              `json:"docs_url,omitempty"`
+			Fault     *PostApiGovernanceOcsfIngest400JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                               `json:"message"`
+			Meta      *map[string]interface{}                              `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                       `json:"reasons,omitempty"`
+			Retryable bool                                                 `json:"retryable"`
+			SpanId    *string                                              `json:"span_id,omitempty"`
+			Tips      *[]string                                            `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest struct {
+			Code      string                                               `json:"code"`
+			DocsUrl   *string                                              `json:"docs_url,omitempty"`
+			Fault     *PostApiGovernanceOcsfIngest401JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                               `json:"message"`
+			Meta      *map[string]interface{}                              `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                       `json:"reasons,omitempty"`
+			Retryable bool                                                 `json:"retryable"`
+			SpanId    *string                                              `json:"span_id,omitempty"`
+			Tips      *[]string                                            `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest struct {
+			Code      string                                               `json:"code"`
+			DocsUrl   *string                                              `json:"docs_url,omitempty"`
+			Fault     *PostApiGovernanceOcsfIngest403JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                               `json:"message"`
+			Meta      *map[string]interface{}                              `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                       `json:"reasons,omitempty"`
+			Retryable bool                                                 `json:"retryable"`
+			SpanId    *string                                              `json:"span_id,omitempty"`
+			Tips      *[]string                                            `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest struct {
+			Code      string                                               `json:"code"`
+			DocsUrl   *string                                              `json:"docs_url,omitempty"`
+			Fault     *PostApiGovernanceOcsfIngest422JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                               `json:"message"`
+			Meta      *map[string]interface{}                              `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                       `json:"reasons,omitempty"`
+			Retryable bool                                                 `json:"retryable"`
+			SpanId    *string                                              `json:"span_id,omitempty"`
+			Tips      *[]string                                            `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON422 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest struct {
+			Code      string                                               `json:"code"`
+			DocsUrl   *string                                              `json:"docs_url,omitempty"`
+			Fault     *PostApiGovernanceOcsfIngest500JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                               `json:"message"`
+			Meta      *map[string]interface{}                              `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                       `json:"reasons,omitempty"`
+			Retryable bool                                                 `json:"retryable"`
+			SpanId    *string                                              `json:"span_id,omitempty"`
+			Tips      *[]string                                            `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetApiGovernanceOcsfTracesResponse parses an HTTP response from a GetApiGovernanceOcsfTracesWithResponse call
+func ParseGetApiGovernanceOcsfTracesResponse(rsp *http.Response) (*GetApiGovernanceOcsfTracesResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetApiGovernanceOcsfTracesResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest struct {
+			Data        []map[string]interface{} `json:"data"`
+			HasMore     bool                     `json:"has_more"`
+			NextCursor  string                   `json:"next_cursor"`
+			OcsfVersion string                   `json:"ocsf_version"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Code      string                                              `json:"code"`
+			DocsUrl   *string                                             `json:"docs_url,omitempty"`
+			Fault     *GetApiGovernanceOcsfTraces400JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                              `json:"message"`
+			Meta      *map[string]interface{}                             `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                      `json:"reasons,omitempty"`
+			Retryable bool                                                `json:"retryable"`
+			SpanId    *string                                             `json:"span_id,omitempty"`
+			Tips      *[]string                                           `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest struct {
+			Code      string                                              `json:"code"`
+			DocsUrl   *string                                             `json:"docs_url,omitempty"`
+			Fault     *GetApiGovernanceOcsfTraces401JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                              `json:"message"`
+			Meta      *map[string]interface{}                             `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                      `json:"reasons,omitempty"`
+			Retryable bool                                                `json:"retryable"`
+			SpanId    *string                                             `json:"span_id,omitempty"`
+			Tips      *[]string                                           `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest struct {
+			Code      string                                              `json:"code"`
+			DocsUrl   *string                                             `json:"docs_url,omitempty"`
+			Fault     *GetApiGovernanceOcsfTraces403JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                              `json:"message"`
+			Meta      *map[string]interface{}                             `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                      `json:"reasons,omitempty"`
+			Retryable bool                                                `json:"retryable"`
+			SpanId    *string                                             `json:"span_id,omitempty"`
+			Tips      *[]string                                           `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest struct {
+			Code      string                                              `json:"code"`
+			DocsUrl   *string                                             `json:"docs_url,omitempty"`
+			Fault     *GetApiGovernanceOcsfTraces422JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                              `json:"message"`
+			Meta      *map[string]interface{}                             `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                      `json:"reasons,omitempty"`
+			Retryable bool                                                `json:"retryable"`
+			SpanId    *string                                             `json:"span_id,omitempty"`
+			Tips      *[]string                                           `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON422 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest struct {
+			Code      string                                              `json:"code"`
+			DocsUrl   *string                                             `json:"docs_url,omitempty"`
+			Fault     *GetApiGovernanceOcsfTraces500JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                              `json:"message"`
+			Meta      *map[string]interface{}                             `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                      `json:"reasons,omitempty"`
+			Retryable bool                                                `json:"retryable"`
+			SpanId    *string                                             `json:"span_id,omitempty"`
+			Tips      *[]string                                           `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err

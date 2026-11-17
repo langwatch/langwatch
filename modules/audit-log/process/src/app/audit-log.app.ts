@@ -1,8 +1,10 @@
 import {
   AuditLogApi,
+  type AuditLogExportEntry,
   type AuditLogHistoryEntry,
   type AuditLogTargetEntry,
   type FindAuditLogByTargetKindInput,
+  type FindAuditLogForOrganizationInput,
   type ListAuditLogEntityHistoryInput,
   type RecentItem,
   type RecordAuditLogCommand,
@@ -77,6 +79,10 @@ export class AuditLogModule implements AuditLogApi, AuditLogHomeApi {
 
   findByTargetKind(input: FindAuditLogByTargetKindInput): Promise<AuditLogTargetEntry[]> {
     return this.#entries.findByTargetKind(input);
+  }
+
+  findForOrganization(input: FindAuditLogForOrganizationInput): Promise<AuditLogExportEntry[]> {
+    return this.#entries.findForOrganization(input);
   }
 
   getRecentItems(input: {

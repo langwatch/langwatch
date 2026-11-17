@@ -94,6 +94,59 @@ export const auditLogTargetEntrySchema: AuditLogTargetEntrySchema =
   auditLogTargetEntrySchemaDefinition;
 export type AuditLogTargetEntry = z.infer<typeof auditLogTargetEntrySchema>;
 
+/** The most rows one page of an organisation's audit export holds. */
+export const AUDIT_LOG_EXPORT_PAGE_MAX = 1_000;
+
+/**
+ * One organisation's audit trail read in order for its SIEM export: rows naming the organisation
+ * or one of its projects, oldest first, after the `(createdAt, id)` watermark. A read takes one
+ * row past the page to tell whether more follow.
+ */
+const findAuditLogForOrganizationInputSchemaDefinition = z
+  .object({
+    organizationId: z.string().min(1),
+    projectIds: z.array(z.string().min(1)),
+    afterMs: z.number().int().nonnegative(),
+    afterId: z.string(),
+    untilMs: z.number().int().nonnegative().optional(),
+    limit: z
+      .number()
+      .int()
+      .positive()
+      .max(AUDIT_LOG_EXPORT_PAGE_MAX + 1),
+  })
+  .strict();
+export interface FindAuditLogForOrganizationInputSchema extends Named<
+  typeof findAuditLogForOrganizationInputSchemaDefinition
+> {}
+export const findAuditLogForOrganizationInputSchema: FindAuditLogForOrganizationInputSchema =
+  findAuditLogForOrganizationInputSchemaDefinition;
+export type FindAuditLogForOrganizationInput = z.infer<
+  typeof findAuditLogForOrganizationInputSchema
+>;
+
+/** The exported columns of a row; args, metadata and before/after stay in LangWatch. */
+const auditLogExportEntrySchemaDefinition = z.object({
+  id: z.string(),
+  createdAt: z.date(),
+  userId: z.string().nullable(),
+  actorUserId: z.string().nullable(),
+  organizationId: z.string().nullable(),
+  projectId: z.string().nullable(),
+  action: z.string(),
+  error: z.string().nullable(),
+  ipAddress: z.string().nullable(),
+  userAgent: z.string().nullable(),
+  targetKind: z.string().nullable(),
+  targetId: z.string().nullable(),
+});
+export interface AuditLogExportEntrySchema extends Named<
+  typeof auditLogExportEntrySchemaDefinition
+> {}
+export const auditLogExportEntrySchema: AuditLogExportEntrySchema =
+  auditLogExportEntrySchemaDefinition;
+export type AuditLogExportEntry = z.infer<typeof auditLogExportEntrySchema>;
+
 /** Portable audit write capability. */
 export interface AuditLogApi {
   record(command: RecordAuditLogCommand): Promise<RecordedAuditLogEntry>;
@@ -102,6 +155,8 @@ export interface AuditLogApi {
   findByTargetKind(input: FindAuditLogByTargetKindInput): Promise<AuditLogTargetEntry[]>;
   /** Whether this actor already recorded this action on this target since `sinceMs`. */
   hasRecordedSince(input: RecordedSinceInput): Promise<boolean>;
+  /** Oldest first after the watermark, at most `limit`; an organisation with no rows finds none. */
+  findForOrganization(input: FindAuditLogForOrganizationInput): Promise<AuditLogExportEntry[]>;
 }
 
 export const AuditLogApi = moduleApi<AuditLogApi>()("audit-log");
