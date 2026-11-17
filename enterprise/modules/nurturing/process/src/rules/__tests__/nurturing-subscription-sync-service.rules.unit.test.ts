@@ -7,24 +7,89 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  customerIoPlanOf,
   fireSubscriptionStarted,
   fireSubscriptionSync,
 } from "../nurturing-subscription-sync-service.rules.ts";
 
+const change = {
+  organizationId: "org-1",
+  memberUserIds: ["user-1", "user-2"],
+  hasSubscription: true,
+  adminUserId: "admin-1",
+};
+
 describe("fireSubscriptionSync", () => {
-  it("decides one has_subscription identify per member", () => {
-    expect(
-      fireSubscriptionSync({ memberUserIds: ["user-1", "user-2"], hasSubscription: true }),
-    ).toEqual([
-      { type: "identify", userId: "user-1", traits: { has_subscription: true } },
-      { type: "identify", userId: "user-2", traits: { has_subscription: true } },
-    ]);
+  describe("when the change names a plan", () => {
+    it("decides the group call to the admin first, then the members in one request", () => {
+      const traits = { has_subscription: true, plan: "launch" };
+
+      expect(fireSubscriptionSync({ ...change, plan: "LAUNCH" })).toEqual([
+        [{ type: "group", userId: "admin-1", groupId: "org-1", traits: { plan: "launch" } }],
+        [
+          { type: "identify", userId: "user-1", traits },
+          { type: "identify", userId: "user-2", traits },
+        ],
+      ]);
+    });
+
+    it("sends the company call to the first member when nurturing knows no admin", () => {
+      const [group] = fireSubscriptionSync({ ...change, plan: "LAUNCH", adminUserId: null });
+
+      expect(group).toEqual([expect.objectContaining({ type: "group", userId: "user-1" })]);
+    });
+
+    it("names the company on a catch-up fact that carries its name", () => {
+      const [group] = fireSubscriptionSync({ ...change, plan: "LAUNCH", organizationName: "Acme" });
+
+      expect(group?.[0]).toMatchObject({ traits: { plan: "launch", name: "Acme" } });
+    });
+  });
+
+  describe("when the organization has no active member", () => {
+    it("decides nothing, not even the company call", () => {
+      expect(fireSubscriptionSync({ ...change, memberUserIds: [], plan: "LAUNCH" })).toEqual([]);
+    });
+  });
+
+  describe("when a fact stored before it carried a plan is delivered", () => {
+    /** @scenario "A subscription_changed fact stored before it carried a plan sends no plan" */
+    it("identifies the members with has_subscription only and sends no group call", () => {
+      expect(fireSubscriptionSync(change)).toEqual([
+        [
+          { type: "identify", userId: "user-1", traits: { has_subscription: true } },
+          { type: "identify", userId: "user-2", traits: { has_subscription: true } },
+        ],
+      ]);
+    });
+  });
+
+  describe("when an organization has 250 active members", () => {
+    /** @scenario "No request carries more than a hundred members" */
+    it("sends the identifies in requests of at most 100", () => {
+      const memberUserIds = Array.from({ length: 250 }, (_, index) => `user-${index}`);
+
+      const requests = fireSubscriptionSync({ ...change, memberUserIds, plan: "LAUNCH" });
+
+      expect(requests.map((request) => request.length)).toEqual([1, 100, 100, 50]);
+      expect(requests.flat().filter((call) => call.type === "identify")).toHaveLength(250);
+    });
+  });
+});
+
+describe("customerIoPlanOf", () => {
+  it("lower-cases billing's plan type, as sign-up's free already is", () => {
+    expect(customerIoPlanOf("GROWTH_SEAT_EUR_MONTHLY")).toBe("growth_seat_eur_monthly");
+    expect(customerIoPlanOf("FREE")).toBe("free");
   });
 });
 
 describe("fireSubscriptionStarted", () => {
   describe("when a subscription becomes active", () => {
-    /** @scenario A started subscription tracks subscription_started for every organization member */
+    /**
+     * @scenario A started subscription tracks subscription_started for every organization member
+     * @scenario "PostHog's subscription_started is unchanged"
+     */
     it("decides one subscription_started per member with the plan and the organization", () => {
       const properties = {
         plan: "GROWTH_SEAT_EUR_MONTHLY",

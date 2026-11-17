@@ -2,7 +2,10 @@
 import type { OrganizationApi } from "@langwatch/organization-contract";
 
 import type { NurturingClaimRepository } from "../repositories/nurturing-claim.repository.ts";
-import type { NurturingTraceMilestonesRepository } from "../repositories/nurturing-milestones.repository.ts";
+import type {
+  NurturingMilestonesRepository,
+  NurturingTraceMilestonesRepository,
+} from "../repositories/nurturing-milestones.repository.ts";
 import type { NurturingProjectDirectoryRepository } from "../repositories/nurturing-project-directory.repository.ts";
 import { pickOrganizationDebounce } from "../rules/nurturing-delivery-debounce.rules.ts";
 import {
@@ -14,7 +17,8 @@ import { NurturingClaimReleaseService } from "./nurturing-claim-release.service.
 
 type MemberFactsDependencies = Readonly<{
   claims: NurturingClaimRepository;
-  milestones: NurturingTraceMilestonesRepository;
+  milestones: NurturingTraceMilestonesRepository &
+    Pick<NurturingMilestonesRepository, "findOrganization">;
   projects: NurturingProjectDirectoryRepository;
   organizations: OrganizationApi;
 }>;
@@ -60,6 +64,12 @@ export class NurturingMemberFactsService {
         keys: debounce ? [debounce.claimKey] : [],
       });
     }
+  }
+
+  /** The admin nurturing's own copy names for the organization; null when it knows none. */
+  async adminOf({ organizationId }: Readonly<{ organizationId: string }>): Promise<string | null> {
+    const [organization] = await this.dependencies.milestones.findOrganization({ organizationId });
+    return organization?.adminUserId ?? null;
   }
 
   /** Across every organization of the person: their profile is one, whichever org it is about. */

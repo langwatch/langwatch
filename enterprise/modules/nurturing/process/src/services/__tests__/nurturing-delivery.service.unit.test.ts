@@ -483,7 +483,17 @@ describe("NurturingDeliveryService", () => {
       await settle();
 
       expect(posthog.tracked).toEqual([]);
-      expect(cio.sent.map((call) => call.path)).toEqual(["/v1/identify", "/v1/identify"]);
+      expect(cio.sent).toEqual([
+        {
+          path: "/v1/batch",
+          body: {
+            batch: [
+              { type: "identify", userId: "user-1", traits: { has_subscription: true } },
+              { type: "identify", userId: "user-2", traits: { has_subscription: true } },
+            ],
+          },
+        },
+      ]);
     });
   });
 

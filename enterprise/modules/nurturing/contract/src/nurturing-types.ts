@@ -167,6 +167,8 @@ export interface CioOrgTraits extends CioOrganizationUsageTraits {
   company_size: string;
   member_count: number;
   project_count: number;
+  /** Unix seconds of the organization's creation, as nurturing's own copy holds it. */
+  created_at?: number;
   onboarding_variant?: string;
   onboarding_paths?: string;
   onboarding_primary_path?: string;

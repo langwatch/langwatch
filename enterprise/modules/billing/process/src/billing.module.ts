@@ -22,6 +22,7 @@ import {
   RedisBillingOrganizationCacheRepository,
   type BillingOrganizationCacheRedis,
 } from "./repositories/redis/redis.billing-organization-cache.repository.ts";
+import { CustomerIoPlanResyncService } from "./services/customer-io-plan-resync.service.ts";
 import { UsageBillingBackfillService } from "./services/usage-billing-backfill.service.ts";
 import {
   StripeUsageReportingBuilder,
@@ -100,6 +101,31 @@ export const billingProcessModule: PublishedProcessModule<
           dryRun,
           signal,
           onBatch: (batch) => checkpoint.save({ report: batch }),
+        });
+        return { ...report, dryRun };
+      },
+    }),
+    // Operator: deploy runs nothing; a person runs it, dry run first (tasks#1196).
+    defineMigrationStep({
+      id: "billing:resync-customer-io-plan",
+      kind: "data",
+      mode: "operator",
+      description:
+        "Records each organisation's plan, name and active members again, so nurturing sends them to Customer.io.",
+      needsOldWritersGone: true,
+      run: async ({ checkpoint, dryRun, signal }) => {
+        const resumed = checkpoint.resumeFrom?.afterOrganizationId;
+        const resync = CustomerIoPlanResyncService.create({
+          peers: {
+            organizations: repositories.organizations,
+            catchUp: (input) => app.catchUpCustomerIoPlan(input),
+          },
+        });
+        const report = await resync.resync({
+          after: typeof resumed === "string" ? resumed : undefined,
+          dryRun,
+          signal,
+          onPage: (page) => checkpoint.save({ report: page }),
         });
         return { ...report, dryRun };
       },

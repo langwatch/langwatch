@@ -153,6 +153,15 @@ const usageOf = (projectId: string, promptIds: readonly string[]) =>
 const traitsOf = (call: CioBatchCall | undefined) =>
   call && "traits" in call ? call.traits : undefined;
 
+/** The traits only the company's group call carries, never a member's identify. */
+const COMPANY_KEYS = ["member_count", "project_count", "created_at"];
+
+/** A group call's traits without the company's own, as the members are told them. */
+const memberTraitsOf = (call: CioBatchCall | undefined) =>
+  Object.fromEntries(
+    Object.entries(traitsOf(call) ?? {}).filter(([key]) => !COMPANY_KEYS.includes(key)),
+  );
+
 const storeContext = (key: string) => ({ aggregateId: key, tenantId: createTenantId(key), key });
 
 /** Arranges one project's trace day by counting its traces and failures, each a trace. */
@@ -355,6 +364,62 @@ describe("NurturingOrganizationUsageService", () => {
     expect(sent).toEqual([]);
   });
 
+  describe("given a placed organization with 3 members and 2 projects, created at a known time", () => {
+    const createdAt = NOW - DAY_MS;
+
+    /** @scenario "The usage sync adds the company traits to its group call only" */
+    it("sends member_count, project_count and created_at on the group call, never to members", async () => {
+      const { service, projectUsage, sent } = await serviceOver({
+        placed: new Map([
+          ["project-1", "org-1"],
+          ["project-2", "org-1"],
+        ]),
+        createdAt: new Map([["org-1", createdAt]]),
+        members: await membersOver(
+          new Map([
+            ["admin-1", ["org-1"]],
+            ["member-2", ["org-1"]],
+            ["member-3", ["org-1"]],
+          ]),
+        ),
+      });
+      await projectUsage
+        .forOwner("prompt")
+        .store(usageOf("project-1", ["p1"]), storeContext("project-1"));
+
+      await service.usageChanged({ projectId: "project-1" });
+
+      const [group, identifies] = sent;
+      expect(traitsOf(group?.[0])).toMatchObject({
+        member_count: 3,
+        project_count: 2,
+        created_at: Math.floor(createdAt / 1000),
+        prompt_count: 1,
+      });
+      expect(identifies).toHaveLength(3);
+      for (const identify of identifies ?? []) {
+        for (const key of COMPANY_KEYS) expect(traitsOf(identify)).not.toHaveProperty(key);
+      }
+    });
+  });
+
+  describe("given a project of an organization nurturing never saw created", () => {
+    /** @scenario "An organization nurturing never placed still sends nothing" */
+    it("sends no group call and counts the sync not_placed", async () => {
+      const observed = runObserved();
+      const { service, sent } = await serviceOver({
+        placed: new Map([["project-1", "org-1"]]),
+        createdAt: new Map(),
+        syncs: observed.syncs,
+      });
+
+      await service.usageChanged({ projectId: "project-1" });
+
+      expect(sent).toEqual([]);
+      expect(observed.outcomes).toEqual([{ outcome: "not_placed" }]);
+    });
+  });
+
   /** @scenario "A project nurturing never saw created sends nothing" */
   it("sends nothing for a project nurturing never saw created", async () => {
     const { service, projectUsage, sent } = await serviceOver({ placed: new Map() });
@@ -390,8 +455,8 @@ describe("NurturingOrganizationUsageService", () => {
       const [group, identifies] = sent;
       expect(group).toEqual([expect.objectContaining({ type: "group", groupId: "org-1" })]);
       expect(identifies).toEqual([
-        { type: "identify", userId: "admin-1", traits: traitsOf(group?.[0]) },
-        { type: "identify", userId: "member-2", traits: traitsOf(group?.[0]) },
+        { type: "identify", userId: "admin-1", traits: memberTraitsOf(group?.[0]) },
+        { type: "identify", userId: "member-2", traits: memberTraitsOf(group?.[0]) },
       ]);
       expect(traitsOf(identifies?.[0])).toMatchObject({ prompt_count: 1, trace_count: 0 });
     });

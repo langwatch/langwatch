@@ -1,6 +1,6 @@
 # ADR-001: Nurturing learns from events and keeps its own copies
 
-**Status:** Accepted (2026-09-29; amended 2026-11-11)
+**Status:** Accepted (2026-09-29; amended 2026-11-11 and 2026-11-17)
 
 **Behavioural contract:** [Nurturing](../specs/nurturing.feature)
 
@@ -74,15 +74,19 @@ owner), `NurturingProjectTraceDay` (trace counts per project and UTC day, kept 3
 days). A redelivered batch can count a trace twice, and so can a root span stored
 more than once; accepted (owner decision, issue 9378). Signals are events on the
 `nurturing` pipeline. A delivered signal is claimed in Redis for seven days under the process-wide idempotency key prefix,
-so a redelivered event sends nothing.
+so a redelivered event sends nothing. Billing's catch-up `subscription_changed` fact, recorded by
+`billing:resync-customer-io-plan`, is never claimed: each run sends its values again.
 
 ## Runtime and registration
 
 The Customer.io service and the PostHog client are built in `NurturingModule.create`
 only when their key is set; the PostHog client is closed with the process. The
 copies' subscribers always register. The per-project usage folds, the trace
-counting and the usage sync register only with a Customer.io channel. Owners
-send the command in any role; the subscribers run in the worker.
+counting, the usage sync and the founder's group call on an organization's
+creation register only with a Customer.io channel. Owners
+send the command in any role; the subscribers run in the worker. The founder's
+call is skipped when the fact is more than a day old, so a replay never resets a
+paying organization to free.
 
 ## Environment and configuration
 
@@ -92,7 +96,10 @@ the contract and composed by the apps.
 ## Errors
 
 A sink failure is reported and swallowed, as main's fire-and-forget calls were.
-A failed claim throws, and the subscriber is retried.
+A failed claim throws, and the subscriber is retried. A catch-up
+`subscription_changed` fact throws instead: a refused call, or no Customer.io
+channel (`no_customer_io_channel`), fails its job so it is retried or replayed
+(https://github.com/langwatch/tasks/issues/1196).
 
 ## Contracts and validation
 

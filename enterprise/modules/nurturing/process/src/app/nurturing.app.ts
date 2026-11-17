@@ -9,7 +9,7 @@ import {
 import type { EventingCommands } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import { counter } from "@langwatch/observability/metrics";
-import { OrganizationApi } from "@langwatch/organization-contract";
+import { OrganizationApi, type OrganizationCreatedEventData } from "@langwatch/organization-contract";
 import type { FeatureSetup } from "@langwatch/process";
 import { nowInstant } from "@langwatch/time";
 import { UserApi } from "@langwatch/user-contract";
@@ -23,6 +23,7 @@ import { NurturingCopiedProjectsService } from "../services/nurturing-copied-pro
 import { NurturingDeliveryService } from "../services/nurturing-delivery.service.ts";
 import { NurturingMemberFactsService } from "../services/nurturing-member-facts.service.ts";
 import { NurturingMilestonesService } from "../services/nurturing-milestones.service.ts";
+import { NurturingOrganizationCreatedService } from "../services/nurturing-organization-created.service.ts";
 import { NurturingOrganizationUsageService } from "../services/nurturing-organization-usage.service.ts";
 import { NurturingProjectFactsService } from "../services/nurturing-project-facts.service.ts";
 import { NurturingTraceCountingService } from "../services/nurturing-trace-counting.service.ts";
@@ -49,6 +50,7 @@ export class NurturingModule implements NurturingApi {
 
   readonly #pipeline: NurturingPipeline;
   readonly #organizationUsage: NurturingOrganizationUsageService | undefined;
+  readonly #organizationCreated: NurturingOrganizationCreatedService | undefined;
   readonly #uncopiedProjects: NurturingUncopiedProjectsService;
   readonly #traceCounting: NurturingTraceCountingService;
   #commands: EventingCommands<NurturingPipeline> | undefined;
@@ -56,16 +58,19 @@ export class NurturingModule implements NurturingApi {
   private constructor({
     pipeline,
     organizationUsage,
+    organizationCreated,
     uncopiedProjects,
     traceCounting,
   }: Readonly<{
     pipeline: NurturingPipeline;
     organizationUsage: NurturingOrganizationUsageService | undefined;
+    organizationCreated: NurturingOrganizationCreatedService | undefined;
     uncopiedProjects: NurturingUncopiedProjectsService;
     traceCounting: NurturingTraceCountingService;
   }>) {
     this.#pipeline = pipeline;
     this.#organizationUsage = organizationUsage;
+    this.#organizationCreated = organizationCreated;
     this.#uncopiedProjects = uncopiedProjects;
     this.#traceCounting = traceCounting;
   }
@@ -133,6 +138,12 @@ export class NurturingModule implements NurturingApi {
           }),
         })
       : void 0;
+    const organizationCreated = customerIo
+      ? NurturingOrganizationCreatedService.create({
+          sendBatch: (calls) => customerIo.batchOrThrow(calls),
+          logger,
+        })
+      : void 0;
     const projectFacts = NurturingProjectFactsService.create({
       personalProjects: repositories.personalProjects,
       tracedProjects: repositories.tracedProjects,
@@ -166,6 +177,7 @@ export class NurturingModule implements NurturingApi {
         forgetErasedUser: (input) => userErasure.forgetUser(input),
       }),
       organizationUsage,
+      organizationCreated,
       uncopiedProjects,
       traceCounting,
     });
@@ -188,6 +200,11 @@ export class NurturingModule implements NurturingApi {
   /** A project traced: its organization's traits sync, unless its counting window ended. */
   async organizationTracesChanged(input: Readonly<{ projectId: string }>): Promise<void> {
     await this.#organizationUsage?.tracesChanged(input);
+  }
+
+  /** A new organization: its name, plan and creation time go to Customer.io on its founder. */
+  async organizationCreated(data: OrganizationCreatedEventData): Promise<void> {
+    await this.#organizationCreated?.organizationCreated(data);
   }
 
   /** Counts the traces whose organization is inside its window; rejects while a copy is awaited. */

@@ -45,11 +45,11 @@ import {
 } from "../rules/nurturing-product-interest-service.rules.ts";
 import { firePromptCreated } from "../rules/nurturing-prompt-creation-service.rules.ts";
 import { fireSignup } from "../rules/nurturing-signup-identification-service.rules.ts";
-import { fireSubscriptionSync } from "../rules/nurturing-subscription-sync-service.rules.ts";
 import { NurturingClaimReleaseService } from "./nurturing-claim-release.service.ts";
 import { NurturingJoinedOrganizationService } from "./nurturing-joined-organization.service.ts";
 import type { NurturingMemberFactsService } from "./nurturing-member-facts.service.ts";
 import { NurturingOwnCodingDeliveryService } from "./nurturing-own-coding-delivery.service.ts";
+import { NurturingPlanSyncService } from "./nurturing-plan-sync.service.ts";
 import { NurturingPostHogDeliveryService } from "./nurturing-posthog-delivery.service.ts";
 import type { NurturingService } from "./nurturing.service.ts";
 
@@ -95,6 +95,7 @@ export class NurturingDeliveryService {
       postHogDelivery: NurturingPostHogDeliveryService | undefined;
       ownCodingDelivery: NurturingOwnCodingDeliveryService | undefined;
       joinedOrganization: NurturingJoinedOrganizationService | undefined;
+      planSync: NurturingPlanSyncService;
     }>,
   ) {}
 
@@ -106,11 +107,16 @@ export class NurturingDeliveryService {
         customerIo && NurturingOwnCodingDeliveryService.create({ claims, customerIo }),
       joinedOrganization:
         customerIo && NurturingJoinedOrganizationService.create({ claims, customerIo }),
+      planSync: NurturingPlanSyncService.create({ customerIo, admins: deps.memberFacts }),
     });
   }
 
   /** `key` names the signal: its kind and source event. A first session also tells its members. */
   async deliver({ key, signal }: { key: string; signal: NurturingSignal }): Promise<void> {
+    // Before any claim: a catch-up fact must fail, not vanish, when it is not delivered.
+    if (signal.kind === "subscription_changed" && signal.fromCatchUp) {
+      return this.parts.planSync.planCaughtUp(signal);
+    }
     if (!this.deps.customerIo && !this.deps.posthog) return;
     // Before the delivered claim: a replay it stops must still send a failed joined_organization.
     await this.parts.joinedOrganization?.deliver(signal);
@@ -310,7 +316,7 @@ export class NurturingDeliveryService {
       case "guided_onboarding_progress":
         return this.sendCustomerIoCalls(fireGuidedOnboardingProgress(signal));
       case "subscription_changed":
-        return this.sendCustomerIoCalls(fireSubscriptionSync(signal));
+        return void this.parts.planSync.planChanged(signal).catch(reportFailure);
       case "self_hosted_crm":
         return this.selfHostedCrm(signal);
       default:

@@ -247,7 +247,7 @@ export class BillingModule
     };
     const resourceLimitAlerts = BillingModule.#composeResourceLimitAlerts(setup, notices, stamps);
     const lifecycle = BillingLifecycleAnnouncerService.create({
-      subscriptions: setup.repositories.webhookSubscriptions,
+      subscriptions: setup.repositories.subscriptions,
       organizations: setup.repositories.organizations,
       resourceLimitAlerts,
       planLimitAlerts: BillingModule.#composePlanLimitAlerts(setup, notices, stamps),
@@ -974,6 +974,20 @@ export class BillingModule
       throw new Error("This billing app was composed without a lifecycle pipeline");
     }
     return this.#lifecycle.usageBillingCaughtUp({ organizationId, isDryRun });
+  }
+
+  /** The Customer.io plan resync for one organization, for its operator step (tasks#1196). */
+  async catchUpCustomerIoPlan({
+    organizationId,
+    isDryRun = false,
+  }: {
+    organizationId: string;
+    isDryRun?: boolean;
+  }): Promise<{ members: number }> {
+    if (!this.#lifecycle) {
+      throw new Error("This billing app was composed without a lifecycle pipeline");
+    }
+    return this.#lifecycle.customerIoPlanCaughtUp({ organizationId, isDryRun });
   }
 
   /** Records billing's pricing-model fact, for the tiered-free-to-seat-event hand-run task. */

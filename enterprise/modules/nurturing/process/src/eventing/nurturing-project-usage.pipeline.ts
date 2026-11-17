@@ -46,6 +46,7 @@ import {
   ORGANIZATION_MEMBER_ENABLED_EVENT_TYPE,
   ORGANIZATION_MEMBER_REMOVED_EVENT_TYPE,
   ORGANIZATION_SIGNED_UP_EVENT_TYPE,
+  type OrganizationCreatedEventData,
   organizationCreatedEventDataSchema,
   organizationMemberDisabledEventDataSchema,
   organizationMemberEnabledEventDataSchema,
@@ -490,6 +491,8 @@ export type NurturingUsageSync = NurturingTraceCounting &
     usageChanged: UsageChanged;
     /** A trace's sync: the organization's, unless its counting window has ended. */
     tracesChanged: UsageChanged;
+    /** Names a new organization in Customer.io on its founder. */
+    organizationCreated: (data: OrganizationCreatedEventData) => Promise<void>;
   }>;
 
 function nurturingProjectUsageHost({
@@ -571,7 +574,7 @@ function nurturingProjectUsageHost({
     );
   // Without a channel no sync reads the usage rows, and none prunes the trace days, so none is kept.
   if (!sync) return copied;
-  const { usageChanged, tracesChanged } = sync;
+  const { usageChanged, tracesChanged, organizationCreated } = sync;
   const subscribers = [organizationUsageSubscriber(usageChanged)];
   const traceSyncs = nurturingTraceUsageSyncSubscribers(tracesChanged);
   return (
@@ -599,6 +602,11 @@ function nurturingProjectUsageHost({
       .withPeerSubscriber("firstTraceUsageSync", traceSyncs.firstTrace)
       .withPeerSubscriber("traceUsageSync", traceSyncs.laterTrace)
       .withPeerSubscriber("evaluationActiveDay", nurturingEvaluationDaySubscriber(store))
+      .withPeerSubscriber("organizationCreatedSync", {
+        eventType: ORGANIZATION_CREATED_EVENT_TYPE,
+        data: organizationCreatedEventDataSchema,
+        handle: (data) => organizationCreated(data),
+      })
   );
 }
 
@@ -712,6 +720,7 @@ export const nurturingProjectUsageEventing = defineEventingModule({
             countTraces: (input) => app.countTraces(input),
             usageChanged: (input) => app.organizationUsageChanged(input),
             tracesChanged: (input) => app.organizationTracesChanged(input),
+            organizationCreated: (data) => app.organizationCreated(data),
           }
         : undefined,
     }),
