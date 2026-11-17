@@ -134,3 +134,9 @@ Feature: The stock evaluation widgets read the evaluations the trace fold writes
       When its anchor moves into the period and ck-kpis reads the real views
       Then its check and its outcome each count once, in the period
       And neither counts in the previous period any more
+
+    @integration
+    Scenario: passRates answers within the memory cap on 120 days
+      Given a large project with 300 days of older history, every trace judged twice and a tenth of them with an unmerged retraction pair
+      When att-table's pass rates read a 60-day period and the window before it, under the widget cap at compatibility 25.10
+      Then the query answers at or under 70% of the cap

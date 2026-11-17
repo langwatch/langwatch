@@ -84,6 +84,17 @@ Feature: Stock trace widgets read the light trace table
       When att-table reads its per-unit volumes and its per-unit pass rates
       Then the units judged in the period are the units its volumes list
 
+  Rule: att-change reads the managed prompt version from trace_metrics
+
+    @integration
+    Scenario: att-change and passRates answer within the memory cap on 120 days, whatever the history
+      Given a small project and a large project, each with 300 days of older history, and a large project with none
+      And every trace judged twice, a tenth of them with an unmerged retraction pair
+      When att-change's two queries and att-table's pass rates read a 60-day period and the window before it, under the widget cap at compatibility 25.10
+      Then each answers on the large project at or under 70% of the cap
+      And its peak on the large project is at most 2.2 times its peak on the small one
+      And its peak on the large project is within 10% of the project with no older history
+
   Rule: The moved widgets render on the app
 
     # Checked by hand on a local stack with seeded traces; see the PR.
