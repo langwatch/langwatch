@@ -1,11 +1,9 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import { servingEndpointPath } from "../../features/kill-switch/rules/agent-stop-target.rules.ts";
-import {
-  type DatabricksServingEndpointChannel,
-  KillSwitchPlatformError,
-} from "../databricks-serving-endpoint.channel.ts";
+import type { DatabricksServingEndpointChannel } from "../databricks-serving-endpoint.channel.ts";
 import type { GovernanceHttpClient } from "../governance-http.channel.ts";
+import { KillSwitchPlatformError } from "../kill-switch-platform.channel.ts";
 
 /** A person or a trace rule is waiting on the stop; a slow workspace is retried by the outbox. */
 const SERVING_TIMEOUT_MS = 20_000;

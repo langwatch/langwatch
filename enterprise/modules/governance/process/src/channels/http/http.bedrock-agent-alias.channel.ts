@@ -12,7 +12,7 @@ import type {
   BedrockAgentAliasChannel,
   BedrockAliasTarget,
 } from "../bedrock-agent-alias.channel.ts";
-import { KillSwitchPlatformError } from "../databricks-serving-endpoint.channel.ts";
+import { KillSwitchPlatformError } from "../kill-switch-platform.channel.ts";
 
 /**
  * The Bedrock Agents control plane, signed with the organisation's AWS connection: a static key

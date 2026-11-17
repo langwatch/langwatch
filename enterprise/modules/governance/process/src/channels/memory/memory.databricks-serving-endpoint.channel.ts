@@ -1,10 +1,8 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import { servingEndpointPath } from "../../features/kill-switch/rules/agent-stop-target.rules.ts";
-import {
-  type DatabricksServingEndpointChannel,
-  KillSwitchPlatformError,
-} from "../databricks-serving-endpoint.channel.ts";
+import type { DatabricksServingEndpointChannel } from "../databricks-serving-endpoint.channel.ts";
+import { KillSwitchPlatformError } from "../kill-switch-platform.channel.ts";
 
 type ServingEndpointCall = { workspaceUrl: string; token: string; path: string };
 

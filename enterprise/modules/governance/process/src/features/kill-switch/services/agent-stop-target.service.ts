@@ -11,10 +11,8 @@ import { createLogger, type Logger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 
 import type { BedrockAgentAliasChannel } from "../../../channels/bedrock-agent-alias.channel.ts";
-import {
-  type DatabricksServingEndpointChannel,
-  KillSwitchPlatformError,
-} from "../../../channels/databricks-serving-endpoint.channel.ts";
+import type { DatabricksServingEndpointChannel } from "../../../channels/databricks-serving-endpoint.channel.ts";
+import { KillSwitchPlatformError } from "../../../channels/kill-switch-platform.channel.ts";
 import type { ProviderSignInChannel } from "../../../channels/provider-sign-in.channel.ts";
 import type { AgentStopTargetPriorStateRepository } from "../../../repositories/agent-stop-target-prior-state.repository.ts";
 import type { GovernanceAwsConnectionRepository } from "../../../repositories/governance-aws-connection.repository.ts";

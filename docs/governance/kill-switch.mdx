@@ -38,7 +38,7 @@ A stop is applied at once when:
 
 Any other stop from a machine credential waits for an approval. It shows as an approval card on the Agents page and pushes `governance.agent.stop_requested` to your webhook endpoints, so your on-call tool can page someone. A person or key with `governance:manage` approves or denies it. The key that requested a stop cannot approve it.
 
-One agent has at most one open stop. A new request while one is pending, stopping or quarantined answers `409` with code `agent_stop_already_open`. When two people decide one pending stop at once, the first decision wins and the other answers `409` with code `agent_stop_not_pending`.
+One agent has at most one open stop. A new request while one is pending approval, stopping, quarantined, failed to stop, restoring or failed to restore answers `409` with code `agent_stop_already_open`. When two people decide one pending stop at once, the first decision wins and the other answers `409` with code `agent_stop_not_pending`.
 
 To make sure a stop acts on the plan you checked, send the plan's target ids as `expectedTargetIds`. If the plan changed since you read it, the stop answers `409` with code `agent_stop_plan_changed` and no target is changed. The Agents page does this for you.
 

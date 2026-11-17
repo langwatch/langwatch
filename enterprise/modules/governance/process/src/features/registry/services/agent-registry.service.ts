@@ -251,7 +251,7 @@ export class AgentRegistryService {
     return event;
   }
 
-  /** Each entry's source key, so a caller can name the Agents-page row the entry backs. */
+  /** Reconciles one organisation, logging a failure instead of throwing so the caller's loop goes on. */
   private async reconcileLogged({ organizationId }: { organizationId: string }): Promise<void> {
     try {
       await this.reconcileOrganization({ organizationId });

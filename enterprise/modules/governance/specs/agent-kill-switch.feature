@@ -168,6 +168,20 @@ Feature: Agent kill switch: stop a misbehaving agent where it runs, with approva
     Then it is refused with code "agent_stop_not_pending"
 
   @integration
+  Scenario: A kill switch milestone is appended to the registry feed once however often it is announced
+    Given a registry agent "alpha"
+    When its stop_requested milestone is announced twice at once with one event id
+    Then the registry feed holds one stop_requested event carrying the stop
+    And it comes after every event already in the feed
+
+  @integration
+  Scenario: Each kill switch milestone reaches the registry feed and each subscribed webhook once
+    Given a webhook endpoint subscribed to "governance.agent.*"
+    When a stop's stop_requested, quarantined and restored milestones are each announced twice
+    Then the registry feed holds each milestone once, in order
+    And the endpoint gets one delivery per milestone
+
+  @integration
   Scenario: A stop of an agent with no stop plan is refused
     Given "support-bot" has no stop plan
     When a stop is requested

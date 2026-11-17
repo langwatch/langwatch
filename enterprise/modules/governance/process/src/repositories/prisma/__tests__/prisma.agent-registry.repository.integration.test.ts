@@ -3,18 +3,28 @@
  * @vitest-environment node
  * @see specs/agent-registry.feature
  */
+import type {
+  AgentStopView,
+  AgentStopWebhookEventType,
+} from "@langwatch/enterprise-governance-contract";
 import { createLogger } from "@langwatch/observability";
 import {
   PrismaConfigService,
   PrismaConnectionService,
   PrismaTenancyGuardService,
 } from "@langwatch/prisma-client";
+import { createTestLogger } from "@langwatch/test-harness";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { Temporal } from "@langwatch/time";
+import type { WebhookApi, WebhookEndpointView } from "@langwatch/webhook-contract";
 import { nanoid } from "nanoid";
 import { afterAll, describe, expect, it } from "vitest";
 
+import type { AgentRegistryDeliveryIntent } from "../../../features/registry/eventing/agent-registry-delivery.process.ts";
 import type { RegistryDraft } from "../../../features/registry/rules/registry-entry.rules.ts";
 import { planRegistryChanges } from "../../../features/registry/rules/registry-reconcile.rules.ts";
+import { AgentRegistryService } from "../../../features/registry/services/agent-registry.service.ts";
+import { MemoryGovernanceRepositories } from "../../memory/memory.governance.repositories.ts";
 import { PrismaAgentRegistryRepository } from "../prisma.agent-registry.repository.ts";
 
 const DB_URL = process.env.LANGWATCH_TEST_DATABASE_URL;
@@ -46,6 +56,51 @@ function draft(name: string): RegistryDraft {
     tools: [],
     firstSeenAt: Temporal.Instant.from("2026-11-01T00:00:00Z"),
     lastSeenAt: null,
+  };
+}
+
+function stopView({ agentId, status }: { agentId: string; status: AgentStopView["status"] }) {
+  return {
+    id: "agentstop-1",
+    agentId,
+    agentName: "alpha",
+    status,
+    severity: "high",
+    approval: "required",
+    trigger: "user",
+    reason: "leaking prices",
+    requestedBy: { userId: "user-ops", apiKeyId: null },
+    decidedByUserId: null,
+    restoredByUserId: null,
+    targets: [],
+    requestedAt: "2026-11-12T00:00:00.000Z",
+    decidedAt: null,
+    quarantinedAt: null,
+    restoreRequestedAt: null,
+    restoredAt: null,
+  } satisfies AgentStopView;
+}
+
+function governanceEndpoint(organizationId: string): WebhookEndpointView {
+  return {
+    id: "hook-governance",
+    organizationId,
+    destinationKind: "http",
+    url: "https://hooks.acme.test/governance",
+    sqs: null,
+    enabledEvents: ["governance.agent.*"],
+    status: "ACTIVE",
+    disabledReason: null,
+    disabledAt: null,
+    failingSince: null,
+    lastSuccessAt: null,
+    lastFailureAt: null,
+    maxBatchSize: 1,
+    maxBatchDelayMs: 0,
+    maxInFlight: 1,
+    allowSelfSignedCertificate: false,
+    createdAt: new Date(),
+    updatedAt: new Date(),
   };
 }
 
@@ -239,6 +294,104 @@ describe.skipIf(!connection)("PrismaAgentRegistryRepository", () => {
       });
 
       expect(entries.map((entry) => entry.name)).toEqual(["gamma"]);
+    });
+  });
+
+  describe("given a kill switch milestone appended twice at once with one event id", () => {
+    /** @scenario "A kill switch milestone is appended to the registry feed once however often it is announced" */
+    it("stores one event carrying the stop and answers both calls with it", async () => {
+      const organizationId = await seeded();
+      const [alpha] = await repository().findEntries({
+        organizationId,
+        status: "active",
+        limit: 1,
+      });
+      if (!alpha) throw new Error("no seeded entry");
+      const append = () =>
+        repository().appendStopEvent({
+          organizationId,
+          event: {
+            id: `${ns}-stop-requested`,
+            type: "governance.agent.stop_requested",
+            entryId: alpha.id,
+            occurredAt: Temporal.Instant.from("2026-11-12T00:00:00Z"),
+            stop: stopView({ agentId: alpha.id, status: "pending_approval" }),
+          },
+        });
+
+      const [first, second] = await Promise.all([append(), append()]);
+
+      expect(second).toEqual(first);
+      const feed = await repository().findEventsAfter({ organizationId, limit: 10 });
+      const stops = feed.filter((event) => event.type === "governance.agent.stop_requested");
+      expect(stops).toHaveLength(1);
+      expect(stops[0]?.stop).toMatchObject({ id: "agentstop-1", status: "pending_approval" });
+      expect(Number(stops[0]?.sequence)).toBeGreaterThan(Number(feed[0]?.sequence));
+    });
+  });
+
+  describe("given each kill switch milestone of one stop announced through the registry", () => {
+    /** @scenario "Each kill switch milestone reaches the registry feed and each subscribed webhook once" */
+    it("appends one feed event and records one webhook intent per milestone, once", async () => {
+      const organizationId = await seeded();
+      const [alpha] = await repository().findEntries({
+        organizationId,
+        status: "active",
+        limit: 1,
+      });
+      if (!alpha) throw new Error("no seeded entry");
+      const intents: AgentRegistryDeliveryIntent[] = [];
+      const registry = AgentRegistryService.create({
+        registry: repository(),
+        discoveredAgents: MemoryGovernanceRepositories.create().discoveredAgents,
+        agents: createApiFixture({}),
+        projects: createApiFixture({}),
+        organizations: createApiFixture({}),
+        traces: createApiFixture({}),
+        webhooks: createApiFixture<WebhookApi>({
+          getAll: async () => [governanceEndpoint(organizationId)],
+        }),
+        entitlements: { hasEnterprisePlan: async () => true },
+        outbox: () => ({
+          record: async (batch) => {
+            intents.push(...batch);
+          },
+        }),
+        publicBaseUrl: "https://app.langwatch.test",
+        logger: createTestLogger().logger,
+        now: () => Temporal.Instant.from("2026-11-12T00:00:00Z"),
+      });
+      await registry.fanOutPending({ organizationId });
+      intents.length = 0;
+      const milestones: [AgentStopWebhookEventType, AgentStopView["status"]][] = [
+        ["governance.agent.stop_requested", "pending_approval"],
+        ["governance.agent.quarantined", "quarantined"],
+        ["governance.agent.restored", "restored"],
+      ];
+      const announce = ([milestone, status]: [
+        AgentStopWebhookEventType,
+        AgentStopView["status"],
+      ]) =>
+        registry.announceStop({
+          organizationId,
+          eventId: `${ns}-${milestone}`,
+          milestone,
+          stop: stopView({ agentId: alpha.id, status }),
+        });
+
+      for (const milestone of milestones) await announce(milestone);
+      for (const milestone of milestones) await announce(milestone);
+
+      const feed = await repository().findEventsAfter({ organizationId, limit: 20 });
+      expect(feed.filter((event) => event.stop).map((event) => event.type)).toEqual(
+        milestones.map(([milestone]) => milestone),
+      );
+      expect(intents.map((intent) => [intent.endpointId, intent.eventType])).toEqual(
+        milestones.map(([milestone]) => ["hook-governance", milestone]),
+      );
+      await expect(
+        repository().findUndeliveredEvents({ organizationId, limit: 10 }),
+      ).resolves.toEqual([]);
     });
   });
 });
