@@ -10,8 +10,9 @@ Feature: The organization picks its PII redaction level on the Data Privacy page
   # its PII level. Everything here is behind release_pii_redaction_model_enabled on
   # LangWatch Cloud: with the flag off for the organization the page and the drawer
   # are as they were. The browser cannot see whether the deployment names a model
-  # endpoint, so Cloud plus the flag is the gate; on a self-hosted deployment the
-  # drawer says Strict there is the rule-based detector (decision of 4 Nov).
+  # endpoint. On a self-hosted deployment the Helm chart forces the flag exactly when
+  # it sets the endpoint, so the flag is the gate there too: on, the page offers the
+  # model, never priced; off, the drawer says Strict there is the rule-based detector.
   # The price shown is derived from the rate billing charges (ADR-201); organizations
   # on release_pii_redaction_model_free see Strict as included instead.
 
@@ -161,6 +162,17 @@ Feature: The organization picks its PII redaction level on the Data Privacy page
     Then the page shows no organization PII level picker and no price
     When the admin sets a rule's PII redaction to Strict in the drawer
     Then the drawer says "Strict here uses the rule-based detector. The LangWatch PII Redaction Model is available on LangWatch Cloud."
+
+  @integration
+  Scenario: A self-hosted deployment that runs the model offers Strict on it, included
+    Given a self-hosted deployment with release_pii_redaction_model_enabled forced on
+    When an admin opens the Data Privacy page for project "web-app"
+    Then the picker shows Strict as included, with no price
+    And the drawer does not say Strict is rule-based
+
+  @unit
+  Scenario: The Strict offer on a self-hosted deployment follows the model flag
+    Then a self-hosted deployment offers the model, never priced, with the flag on, and the rule-based detector with it off
 
   @integration
   Scenario: A level changed elsewhere after a pick shows the stored level

@@ -8,9 +8,7 @@ metadata:
     app.kubernetes.io/name: {{ $.Release.Name }}-pii-redaction-model
     app.kubernetes.io/instance: {{ $.Release.Name }}
     app.kubernetes.io/component: pii-redaction-model
-    {{- /* The common labels without their name and instance, which name this
-           component above: a repeated key is invalid YAML. */}}
-    {{- toYaml (omit (include "langwatch.labels" $ | fromYaml) "app.kubernetes.io/name" "app.kubernetes.io/instance") | nindent 4 }}
+    {{- include "langwatch.componentLabels" $ | nindent 4 }}
 spec:
   selector:
     matchLabels:

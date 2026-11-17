@@ -1534,13 +1534,8 @@ LWQL_POSTGRES_READER_PASSWORD
 {{- end -}}
 {{- end -}}
 
-{{/*
-  The PII redaction model's address for PII_REDACTION_MODEL_ENDPOINT, or
-  nothing. The chart's own Service when piiRedactionModel.enabled; otherwise
-  piiRedactionModel.externalEndpoint, for a model run outside this release.
-  The app takes an http(s) address or a Lambda alias ARN
-  (modules/data-privacy, piiRedactionModelTargetOf).
-*/}}
+{{/* PII_REDACTION_MODEL_ENDPOINT: the chart's Service when piiRedactionModel.enabled,
+     else piiRedactionModel.externalEndpoint, else nothing. */}}
 {{- define "langwatch.piiRedactionModel.endpoint" -}}
 {{- if .Values.piiRedactionModel.enabled -}}
 http://{{ .Release.Name }}-pii-redaction-model:{{ .Values.piiRedactionModel.service.port }}
@@ -1549,25 +1544,10 @@ http://{{ .Release.Name }}-pii-redaction-model:{{ .Values.piiRedactionModel.serv
 {{- end -}}
 {{- end -}}
 
-{{/*
-  ONNX Runtime threads per model session (THREADS) for the PII redaction
-  model: its CPU limit rounded up, at least 1, the way Cloud runs it (4 threads
-  on a 4-CPU limit). Without it the binary uses GOMAXPROCS, which follows the
-  limit too on Go 1.25 and later, so this mainly states the number.
-*/}}
-{{- define "langwatch.piiRedactionModel.threads" -}}
-{{- $cpu := "" -}}
-{{- with .Values.piiRedactionModel.resources -}}
-{{- $cpu = (dig "limits" "cpu" (dig "requests" "cpu" "" .) .) -}}
-{{- end -}}
-{{- $cpu = $cpu | toString -}}
-{{- if eq $cpu "" -}}
-1
-{{- else if hasSuffix "m" $cpu -}}
-{{- max 1 (ceil (divf (float64 (trimSuffix "m" $cpu)) 1000.0)) -}}
-{{- else -}}
-{{- max 1 (ceil (float64 $cpu)) -}}
-{{- end -}}
+{{/* The common labels without app.kubernetes.io/name and instance, for a
+     component that sets its own: langwatch.labels repeats both keys. */}}
+{{- define "langwatch.componentLabels" -}}
+{{- toYaml (omit (include "langwatch.labels" . | fromYaml) "app.kubernetes.io/name" "app.kubernetes.io/instance") -}}
 {{- end -}}
 
 {{- define "langwatch.storedObjects.localFilesystemIsActive" -}}
@@ -2148,10 +2128,8 @@ here, once, by name, so both consuming templates agree.
       key: {{ (index .Values "langyagent").secrets.internalSecretKey | default "LANGY_INTERNAL_SECRET" }}
 {{- include "langwatch.langyCallbackUrlEnv" . | nindent 0 }}
 {{- end }}
-{{- /* PII redaction model. The app and the workers send an organization's
-       strict PII analysis to this address (modules/data-privacy,
-       PII_REDACTION_MODEL_ENDPOINT); unset, strict stays on Presidio.
-       Only these two processes call it, so it is not in sharedEnv. */}}
+{{- /* Strict PII analysis goes to this model; unset, it stays on Presidio.
+       Only the app and workers call it, so it is not in sharedEnv. */}}
 {{- with (include "langwatch.piiRedactionModel.endpoint" .) }}
 - name: PII_REDACTION_MODEL_ENDPOINT
   value: {{ . | quote }}
@@ -2173,21 +2151,13 @@ here, once, by name, so both consuming templates agree.
 {{- if and (index .Values "langyagent").chartManaged (index .Values "langyagent").enableForAllUsers }}
 {{- $forcedFlags = append $forcedFlags "release_langy_enabled" }}
 {{- end }}
-{{- /* The same reasoning for the PII redaction model: the app routes strict
-       analysis to it only for organizations with
-       release_pii_redaction_model_enabled, which is off by default and has no
-       self-hosted default of its own. Deploying the model is the decision to
-       use it; piiRedactionModel.enableForAllOrganizations=false hands the
-       choice back to the flag store. release_pii_redaction_model_free records
-       each call at a price of zero: the install runs the model on its own
-       nodes, so the Cloud per-character price does not apply to it. */}}
+{{- /* Configuring a PII redaction model is the decision to use it, as for
+       Langy. Its calls are free on self-hosted: the install runs it. */}}
 {{- if include "langwatch.piiRedactionModel.endpoint" . }}
 {{- if .Values.piiRedactionModel.enableForAllOrganizations }}
 {{- $forcedFlags = append $forcedFlags "release_pii_redaction_model_enabled" }}
 {{- end }}
-{{- if .Values.piiRedactionModel.recordAtZeroPrice }}
 {{- $forcedFlags = append $forcedFlags "release_pii_redaction_model_free" }}
-{{- end }}
 {{- end }}
 {{- if $forcedFlags }}
 - name: FEATURE_FLAG_FORCE_ENABLE

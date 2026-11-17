@@ -3,9 +3,8 @@
 {{- if or (not $image.repository) (not $image.tag) }}
 {{- fail "piiRedactionModel.enabled needs images.pii_redaction_model.repository and images.pii_redaction_model.tag: they default to the public langwatch/pii-redaction-model image at the chart's release. Set both (and piiRedactionModel.imagePullSecrets for a private mirror), or set piiRedactionModel.enabled=false to keep strict PII analysis on Presidio." }}
 {{- end }}
-# Deployment for the PII redaction model: the strict PII detector (Level 0
-# patterns plus the GLiNER and PII-Tracer models) the app and the workers call
-# over HTTP instead of Presidio. It stores nothing and calls nothing.
+# The PII redaction model: the strict PII detector the app and the workers call
+# instead of Presidio. It stores nothing and calls nothing.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -14,9 +13,7 @@ metadata:
     app.kubernetes.io/name: {{ .Release.Name }}-pii-redaction-model
     app.kubernetes.io/instance: {{ .Release.Name }}
     app.kubernetes.io/component: pii-redaction-model
-    {{- /* The common labels without their name and instance, which name this
-           component above: a repeated key is invalid YAML. */}}
-    {{- toYaml (omit (include "langwatch.labels" . | fromYaml) "app.kubernetes.io/name" "app.kubernetes.io/instance") | nindent 4 }}
+    {{- include "langwatch.componentLabels" . | nindent 4 }}
     {{- with .Values.piiRedactionModel.deployment.labels }}
     {{- toYaml . | nindent 4 }}
     {{- end }}
@@ -46,52 +43,41 @@ spec:
         {{- with .Values.piiRedactionModel.pod.labels }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
+      {{- with (coalesce .Values.piiRedactionModel.pod.annotations .Values.global.podAnnotations) }}
       annotations:
-        {{- with (coalesce .Values.piiRedactionModel.pod.annotations .Values.global.podAnnotations) }}
         {{- toYaml . | nindent 8 }}
-        {{- end }}
+      {{- end }}
     spec:
-      # The model calls nothing, the Kubernetes API included.
       automountServiceAccountToken: {{ .Values.global.automountServiceAccountToken }}
       {{- with .Values.piiRedactionModel.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      # A stopping pod drains for up to 90 s: 30 s to read a body, the 55 s
-      # request deadline and 5 s. At Kubernetes' default 30 s a long request
-      # in flight is killed with the pod (measured on k3s); at 100 s it is
-      # answered and the pod exits 0. The image has no shell, so there is no
-      # preStop sleep.
+      # A stopping pod drains for up to 90 s (body read, request deadline, 5 s);
+      # the image has no shell for a preStop sleep.
       terminationGracePeriodSeconds: {{ .Values.piiRedactionModel.terminationGracePeriodSeconds }}
-      # The image is distroless :nonroot, built to run as uid 65532 (as
-      # Cloud runs it); pin that over the chart-wide 1000.
+      # The image is distroless :nonroot (uid 65532); pin that over the chart-wide 1000.
       securityContext:
         {{- include "langwatch.podSecurityContext" (dict "ctx" . "component" .Values.piiRedactionModel "base" (dict "runAsUser" 65532 "runAsGroup" 65532 "fsGroup" 65532)) | nindent 8 }}
-
       {{- with (coalesce .Values.piiRedactionModel.nodeSelector .Values.global.scheduling.nodeSelector) }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-
       {{- with (coalesce .Values.piiRedactionModel.tolerations .Values.global.scheduling.tolerations) }}
       tolerations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-
       {{- with (coalesce .Values.piiRedactionModel.affinity .Values.global.scheduling.affinity) }}
       affinity:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-
       {{- with (coalesce .Values.piiRedactionModel.topologySpreadConstraints .Values.global.scheduling.topologySpreadConstraints) }}
       topologySpreadConstraints:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-
       {{- with (coalesce .Values.piiRedactionModel.priorityClassName .Values.global.scheduling.priorityClassName) }}
       priorityClassName: {{ . | quote }}
       {{- end }}
-
       containers:
         - name: {{ .Release.Name }}-pii-redaction-model
           securityContext:
@@ -103,32 +89,26 @@ spec:
               containerPort: 8080
               protocol: TCP
           env:
-            - name: PORT
-              value: "8080"
-            # Every Level 1 component in one pod: the mixed build's GLiNER (fp32)
-            # and PII-Tracer (int8), plus the Level 0 patterns.
-            - name: PII_COMPONENTS
-              value: "level0,gliner,tracer"
-            - name: THREADS
-              value: {{ include "langwatch.piiRedactionModel.threads" . | quote }}
-            # One synthetic sentence through each model at start; a model
-            # that fails it stops the process instead of serving.
-            - name: PII_WARMUP
-              value: "1"
-            # One request at a time per pod, the service's default. More share
-            # the same model sessions, so memory grows with requests in flight
-            # and the memory limit below is only validated at 1.
-            - name: PII_MAX_CONCURRENT_REQUESTS
-              value: "1"
+            {{- /* The chart's settings, each left out when extraEnvs sets it, so an
+                   override never renders a duplicate name. The binary sizes its
+                   threads from the CPU limit (GOMAXPROCS, Go 1.25 and later). */}}
+            {{- $own := list }}
+            {{- range .Values.piiRedactionModel.extraEnvs }}
+            {{- $own = append $own .name }}
+            {{- end }}
+            {{- range $name, $value := dict "PORT" "8080" "PII_COMPONENTS" "level0,gliner,tracer" "PII_WARMUP" "1" "PII_MAX_CONCURRENT_REQUESTS" "1" }}
+            {{- if not (has $name $own) }}
+            - name: {{ $name }}
+              value: {{ $value | quote }}
+            {{- end }}
+            {{- end }}
             {{- with .Values.piiRedactionModel.extraEnvs }}
             {{- toYaml . | nindent 12 }}
             {{- end }}
           resources:
             {{- toYaml .Values.piiRedactionModel.resources | nindent 12 }}
-          # The models load and warm up before the port answers: 3 to 6 s with
-          # the image already on the node on k3s, up to 136 s for a cold load on
-          # Lambda. 180 s (36 x 5 s) covers that; liveness waits for it, so a
-          # slow load is never killed.
+          # 180 s to load the models: a cold load took up to 136 s on Lambda.
+          # Liveness waits for it, so a slow load is never killed.
           startupProbe:
             httpGet:
               path: /healthz
@@ -151,7 +131,6 @@ spec:
             timeoutSeconds: 5
             failureThreshold: 6
           volumeMounts:
-            # Read-only root filesystem; ONNX Runtime and Go may want scratch.
             - name: tmp-dir
               mountPath: /tmp
       volumes:

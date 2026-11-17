@@ -9,12 +9,9 @@ Feature: The chart can run the PII redaction model for strict PII analysis
   #   charts/langwatch/tests/pii-redaction-model.sh - renders the chart and asserts these.
   #   modules/data-privacy/README.md - "PII redaction model": routing, time cap, fallbacks.
 
-  # The model is one public multi-arch image (the mixed build), whose source is not public
-  # and whose binary checks the licence. It stays off in every profile until that image is
-  # published (item I08), which waits on the licence check in the binary (item I07);
-  # size-prod and size-ha carry its sizing (7Gi memory request and limit) for that day. It answers the Presidio route on port 8080 and /healthz once its
-  # models have loaded. Any failure of the model falls back to Presidio, so turning it off,
-  # or a pod that is not ready, never stops strict redaction.
+  # The model is one public multi-arch image, off by default in every profile. It answers
+  # the Presidio route on port 8080 and /healthz once its models have loaded. Any failure
+  # of the model falls back to Presidio, so a pod that is not ready never stops redaction.
 
   Rule: The model is off unless the operator turns it on
 
@@ -36,7 +33,8 @@ Feature: The chart can run the PII redaction model for strict PII analysis
       Given the size-prod or the size-ha profile with piiRedactionModel.enabled true
       When the chart renders
       Then the PII redaction model Deployment requests and limits 7Gi of memory
-      And size-prod runs one replica and size-ha runs two with a PodDisruptionBudget
+      And size-prod and size-ha run two replicas with a PodDisruptionBudget
+      And the size-ha zone spread counts only this release's pods
 
   Rule: Turned on, the app and the workers reach the model and nothing else does
 
@@ -52,7 +50,7 @@ Feature: The chart can run the PII redaction model for strict PII analysis
       Given piiRedactionModel.enabled is true
       When the chart renders
       Then FEATURE_FLAG_FORCE_ENABLE on the app and workers includes release_pii_redaction_model_enabled and release_pii_redaction_model_free
-      And with enableForAllOrganizations and recordAtZeroPrice false it includes neither
+      And with enableForAllOrganizations false it keeps only release_pii_redaction_model_free
 
     @e2e
     Scenario: A model outside the release is reached through externalEndpoint
@@ -66,7 +64,7 @@ Feature: The chart can run the PII redaction model for strict PII analysis
       Given piiRedactionModel.enabled is false and piiRedactionModel.externalEndpoint is set
       When the chart renders
       Then FEATURE_FLAG_FORCE_ENABLE on the app and workers includes release_pii_redaction_model_enabled and release_pii_redaction_model_free
-      And enableForAllOrganizations false drops only the first, recordAtZeroPrice false drops only the second
+      And enableForAllOrganizations false drops only release_pii_redaction_model_enabled
 
   Rule: The model pod runs the image the operator names, the way Cloud runs it
 
@@ -77,7 +75,8 @@ Feature: The chart can run the PII redaction model for strict PII analysis
       Then the container runs the public langwatch/pii-redaction-model image at the chart's release with no pull secret
       And a repository, a tag and an optional imagePullSecret from values replace it
       And its startup, readiness and liveness probes are on /healthz, the startup probe allowing 180 s
-      And it has 100 s to drain and THREADS follows its CPU limit
+      And it has 100 s to drain
+      And an extraEnvs entry replaces the chart's own setting of the same name, once
 
     @e2e
     Scenario: Without an image the chart refuses to render

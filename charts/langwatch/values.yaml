@@ -171,11 +171,8 @@ images:
     repository: langwatch/langevals
     tag: 3.23.0 # x-release-please-version
     pullPolicy: IfNotPresent
-  # The PII redaction model (piiRedactionModel below): one public multi-arch
-  # image, the mixed build (GLiNER fp32 plus PII-Tracer int8), versioned with
-  # the release. Its source is not public and the binary checks the licence.
-  # Used only when piiRedactionModel.enabled; enable once the public image is
-  # published (item I08), which waits on the licence check in the binary (I07).
+  # The PII redaction model's public image (piiRedactionModel below), used
+  # only when piiRedactionModel.enabled.
   ## @param images.pii_redaction_model.repository [string] PII redaction model image repository.
   ## @param images.pii_redaction_model.tag [string] PII redaction model image tag.
   ## @param images.pii_redaction_model.pullPolicy [string] PII redaction model image pull policy.
@@ -1533,58 +1530,27 @@ langevals:
 # =============================================================================
 # PII Redaction Model
 # =============================================================================
-# The strict PII detector (Level 0 patterns plus the GLiNER and PII-Tracer
-# models) the app and the workers call instead of Presidio for an
-# organization whose privacy policy resolves to Strict. Enabled, the chart
-# runs it as a Deployment and Service and sets PII_REDACTION_MODEL_ENDPOINT on
-# the app and the workers. Any failure of the model (unreachable, slow, over
-# 8,000 characters in a batch) falls back to Presidio, then Google DLP if
-# configured, as with the model off.
-#
-# Off by default and in every size profile: enable once the public image
-# langwatch/pii-redaction-model is published (item I08, which waits on the
-# licence check in the binary, I07). size-prod and size-ha
-# already carry its sizing, so turning it on there is one line. Each replica
-# needs a 7Gi memory reservation.
+# The model the app and workers call for Strict PII analysis instead of
+# Presidio; any failure falls back to Presidio. Off by default; see the chart
+# README. Sizing and measured memory: docs/self-hosting/configuration/sizing-and-scaling.mdx
 ## @section PII redaction model
 piiRedactionModel:
   ## @param piiRedactionModel.enabled [default: false] Deploy the PII redaction model (Deployment, Service and PDB) and point the app and workers at it.
   enabled: false
 
-  # A model run outside this release (another namespace, another cluster, or
-  # a Lambda alias ARN for an install on AWS). Used only while enabled is
-  # false; enabled always points at the chart's own Service.
-  # Setting it has the same effect on the app as enabled: by default it also
-  # forces release_pii_redaction_model_enabled (every Strict organization is
-  # routed to the model) and release_pii_redaction_model_free (calls recorded
-  # at zero price). Opt out of each with enableForAllOrganizations: false and
-  # recordAtZeroPrice: false below.
-  ## @param piiRedactionModel.externalEndpoint [string] PII_REDACTION_MODEL_ENDPOINT for a model this release does not deploy (an http(s) address or a Lambda alias ARN). Ignored when enabled. Also forces release_pii_redaction_model_enabled and release_pii_redaction_model_free unless enableForAllOrganizations / recordAtZeroPrice are false.
+  # Like enabled, it also forces the two flags below (see enableForAllOrganizations).
+  ## @param piiRedactionModel.externalEndpoint [string] PII_REDACTION_MODEL_ENDPOINT for a model this release does not deploy: an http(s) address, or a Lambda alias ARN when global.serviceAccount carries an IAM role allowed lambda:InvokeFunction. Ignored when enabled. Forces release_pii_redaction_model_enabled (unless enableForAllOrganizations is false) and release_pii_redaction_model_free.
   externalEndpoint: ""
 
-  # Configuring a model (enabled or externalEndpoint) is the decision to use
-  # it: force release_pii_redaction_model_enabled for every organization.
-  # False leaves the choice per organization to the flag store
-  # (/ops/feature-flags).
-  ## @param piiRedactionModel.enableForAllOrganizations [default: true] Route every Strict organization to the model as soon as it is configured. False keeps release_pii_redaction_model_enabled authoritative.
+  # A configured model (enabled or externalEndpoint) forces
+  # release_pii_redaction_model_enabled for every organization, and always
+  # release_pii_redaction_model_free: the install runs the model itself.
+  ## @param piiRedactionModel.enableForAllOrganizations [default: true] Route every Strict organization to a configured model. False leaves release_pii_redaction_model_enabled to the flag store (/ops/feature-flags).
   enableForAllOrganizations: true
-  # A self-hosted install runs the model on its own nodes, so whenever a model
-  # is configured (enabled or externalEndpoint) its calls are recorded at a
-  # price of zero (release_pii_redaction_model_free), never at Cloud's
-  # per-character price. False leaves that flag to the flag store.
-  ## @param piiRedactionModel.recordAtZeroPrice [default: true] Record model calls at zero (release_pii_redaction_model_free). False records them at the Cloud price.
-  recordAtZeroPrice: true
 
-  # Optional. The default image is public; set this only for a mirror in a
-  # private registry.
-  ## @param piiRedactionModel.imagePullSecrets [array] Optional pull secrets, only for a private mirror of images.pii_redaction_model (the default image is public), e.g. [{ name: my-registry }].
+  ## @param piiRedactionModel.imagePullSecrets [array] Optional, only for a private mirror of images.pii_redaction_model (the default image is public), e.g. [{ name: my-registry }].
   imagePullSecrets: []
 
-  # Measured: one request at a time, peak 4.1 to 4.6 GiB (x86 and arm64), 5.3 GB
-  # for a 100,000-character text under a 7 GB memory limit with no OOM; a pod rests at
-  # 1.2 GB and keeps about 4.2 GB after its first long text. Requests equal to
-  # the limit for memory, so the scheduler only places it where 7Gi is free.
-  # Inference is CPU bound; THREADS follows the CPU limit.
   ## @param piiRedactionModel.replicaCount [default: 1] Number of PII redaction model replicas.
   replicaCount: 1
   ## @extra piiRedactionModel.service Service for the PII redaction model.
@@ -1593,7 +1559,7 @@ piiRedactionModel:
   ## @extra piiRedactionModel.resources Resource requests and limits.
   ## @param piiRedactionModel.resources.requests.cpu [string, default: 2] Requested CPU.
   ## @param piiRedactionModel.resources.requests.memory [string, default: 7Gi] Requested memory.
-  ## @param piiRedactionModel.resources.limits.cpu [string, default: 4] CPU limit (also THREADS).
+  ## @param piiRedactionModel.resources.limits.cpu [string, default: 4] CPU limit (the model's threads follow it).
   ## @param piiRedactionModel.resources.limits.memory [string, default: 7Gi] Memory limit.
   resources:
     requests: { cpu: 2, memory: 7Gi }
@@ -1635,9 +1601,7 @@ piiRedactionModel:
     strategy: {}
     ## @param piiRedactionModel.deployment.revisionHistoryLimit [default: 10] Number of old replicasets to retain.
     revisionHistoryLimit: 10
-  # PII_REQUEST_TIMEOUT_SECONDS, PII_REQUEST_MAX_CHARS and the PII_SPLIT_*
-  # settings are documented with the image.
-  ## @param piiRedactionModel.extraEnvs [array] Additional environment variables for the model container.
+  ## @param piiRedactionModel.extraEnvs [array] Additional environment variables for the model container. An entry named PORT, PII_COMPONENTS, PII_WARMUP or PII_MAX_CONCURRENT_REQUESTS replaces the chart's value.
   extraEnvs: []
 
 # =============================================================================

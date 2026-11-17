@@ -59,6 +59,26 @@ export type PiiRedactionModelOffer =
   | { kind: "rule-based" }
   | null;
 
+/**
+ * The Strict offer from the deployment and the two flags. On Cloud the flag gates the model and
+ * the free list prices it. A self-hosted install sees the model only when the flag is on, which
+ * the Helm chart forces exactly when it sets PII_REDACTION_MODEL_ENDPOINT; the install runs the
+ * model itself, so it is never priced there. Otherwise self-hosted Strict is rule-based.
+ */
+export function piiRedactionModelOfferOf({
+  isSaaS,
+  modelFlag,
+  freeFlag,
+}: {
+  isSaaS: boolean;
+  modelFlag: boolean;
+  freeFlag: boolean;
+}): PiiRedactionModelOffer {
+  if (!isSaaS) return modelFlag ? { kind: "model", free: true } : { kind: "rule-based" };
+  if (!modelFlag) return null;
+  return { kind: "model", free: freeFlag };
+}
+
 /** The second thought a level change asks for, or null when it needs none. */
 type LevelChangeConfirmation = {
   title: string;

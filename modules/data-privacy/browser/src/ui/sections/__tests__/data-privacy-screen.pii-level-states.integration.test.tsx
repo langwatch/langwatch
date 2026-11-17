@@ -143,6 +143,19 @@ describe("given the Data Privacy page", () => {
     });
   });
 
+  describe("when the deployment is self-hosted and runs the model", () => {
+    /** @scenario A self-hosted deployment that runs the model offers Strict on it, included */
+    it("shows the picker with Strict included and no rule-based note", () => {
+      page({ flagOn: true, isSaaS: false });
+
+      expect(screen.getByTestId("pii-redaction-model-price").textContent).toBe(
+        "Includedfor your organization",
+      );
+      expect(screen.queryByText(/\$0\.50/)).toBeNull();
+      expect(screen.queryByText(/Strict here uses the rule-based detector/)).toBeNull();
+    });
+  });
+
   describe("when the level changes elsewhere after a successful pick", () => {
     /** @scenario A level changed elsewhere after a pick shows the stored level */
     it("shows the stored level, not the old pick", async () => {

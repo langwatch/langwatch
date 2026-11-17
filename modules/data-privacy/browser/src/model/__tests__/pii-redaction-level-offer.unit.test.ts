@@ -14,11 +14,42 @@ import {
   organizationRule,
   PII_REDACTION_MODEL_PRICE,
   PII_REDACTION_MODEL_PRICE_UNIT,
+  piiRedactionModelOfferOf,
   piiRedactionModelPrice,
   ruleSaveConfirmation,
   STRICT_FALLBACK_NOTE,
   withOrganizationPiiLevel,
 } from "../pii-redaction-level-offer.ts";
+
+describe("given the deployment and the PII redaction model flags", () => {
+  describe("when the deployment is self-hosted", () => {
+    /** @scenario The Strict offer on a self-hosted deployment follows the model flag */
+    it("offers the model, never priced, only with the flag on", () => {
+      expect(piiRedactionModelOfferOf({ isSaaS: false, modelFlag: true, freeFlag: false })).toEqual(
+        { kind: "model", free: true },
+      );
+      expect(piiRedactionModelOfferOf({ isSaaS: false, modelFlag: false, freeFlag: true })).toEqual(
+        { kind: "rule-based" },
+      );
+    });
+  });
+
+  describe("when the deployment is LangWatch Cloud", () => {
+    it("offers the model only with the flag, priced unless the organization is free", () => {
+      expect(
+        piiRedactionModelOfferOf({ isSaaS: true, modelFlag: false, freeFlag: true }),
+      ).toBeNull();
+      expect(piiRedactionModelOfferOf({ isSaaS: true, modelFlag: true, freeFlag: false })).toEqual({
+        kind: "model",
+        free: false,
+      });
+      expect(piiRedactionModelOfferOf({ isSaaS: true, modelFlag: true, freeFlag: true })).toEqual({
+        kind: "model",
+        free: true,
+      });
+    });
+  });
+});
 
 describe("given the rate billing charges for the PII redaction model", () => {
   describe("when it is 500 nano-dollars per character", () => {

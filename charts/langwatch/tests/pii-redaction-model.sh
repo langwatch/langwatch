@@ -82,7 +82,7 @@ test_every_profile_is_off() {
 # @scenario "Turned on, the prod and HA profiles run the model with its measured sizing"
 test_prod_and_ha_profiles_when_enabled() {
   local profile replicas out deploy got_replicas memory pdb
-  for pair in "size-prod:1" "size-ha:2"; do
+  for pair in "size-prod:2" "size-ha:2"; do
     profile=${pair%%:*}
     replicas=${pair##*:}
     out=$(render "$BASE -f examples/overlays/$profile.yaml --set piiRedactionModel.enabled=true")
@@ -102,7 +102,7 @@ test_prod_and_ha_profiles_when_enabled() {
       continue
     fi
     pdb=$(only "$out" "pii_redaction_model/pdb")
-    if [ "$replicas" -gt 1 ] && [ -z "$pdb" ]; then
+    if [ -z "$pdb" ]; then
       fail "$profile" "renders no PodDisruptionBudget for $replicas replicas"
       continue
     fi
@@ -110,7 +110,11 @@ test_prod_and_ha_profiles_when_enabled() {
       fail "$profile" "PII_REDACTION_MODEL_ENDPOINT is on: $(endpoint_sources "$out" | tr '\n' ' ')"
       continue
     fi
-    ok "$profile: $replicas replica(s), 7Gi, endpoint on app and workers"
+    if [ "$profile" = "size-ha" ] && ! printf '%s\n' "$deploy" | grep -A1 'matchLabelKeys:' | grep -q 'app.kubernetes.io/instance'; then
+      fail "$profile" "zone spread does not match on app.kubernetes.io/instance"
+      continue
+    fi
+    ok "$profile: $replicas replicas, PDB, 7Gi, endpoint on app and workers"
   done
 }
 
@@ -146,10 +150,11 @@ test_flags_follow_the_toggles() {
     *,release_pii_redaction_model_enabled,*release_pii_redaction_model_free,*) ok "flags forced: $flags" ;;
     *) fail "flags forced" "FEATURE_FLAG_FORCE_ENABLE is '$flags'" ;;
   esac
-  flags=$(env_value "$(only "$(render "$ON --set piiRedactionModel.enableForAllOrganizations=false --set piiRedactionModel.recordAtZeroPrice=false")" "workers/deployment")" FEATURE_FLAG_FORCE_ENABLE)
-  case "$flags" in
-    *release_pii_redaction_model*) fail "flags opt-out" "FEATURE_FLAG_FORCE_ENABLE still has '$flags'" ;;
-    *) ok "flags left to the flag store: ${flags:-<unset>}" ;;
+  flags=$(env_value "$(only "$(render "$ON --set piiRedactionModel.enableForAllOrganizations=false")" "workers/deployment")" FEATURE_FLAG_FORCE_ENABLE)
+  case ",$flags," in
+    *,release_pii_redaction_model_enabled,*) fail "flags opt-out" "routing flag still forced: '$flags'" ;;
+    *,release_pii_redaction_model_free,*) ok "routing left to the flag store, still free: $flags" ;;
+    *) fail "flags opt-out" "free flag dropped: '$flags'" ;;
   esac
   flags=$(env_value "$(only "$(render "$BASE")" "workers/deployment")" FEATURE_FLAG_FORCE_ENABLE)
   case "$flags" in
@@ -200,12 +205,6 @@ test_external_endpoint_forces_flags() {
     return
   fi
   ok "external, enableForAllOrganizations=false: only the free flag"
-  flags=$(flags_of "$ext --set piiRedactionModel.recordAtZeroPrice=false" workers)
-  if [[ "$flags" == *,release_pii_redaction_model_free,* || "$flags" != *,release_pii_redaction_model_enabled,* ]]; then
-    fail "external opt-out price" "flags are '$flags'"
-    return
-  fi
-  ok "external, recordAtZeroPrice=false: only the routing flag"
 }
 
 # @scenario "The image, pull secrets and probes come from values and the image's contract"
@@ -243,11 +242,17 @@ test_image_secrets_probes() {
     fail "grace" "terminationGracePeriodSeconds is not 100"
     return
   fi
-  if [ "$(env_value "$deploy" THREADS)" != "3" ]; then
-    fail "threads" "THREADS is '$(env_value "$deploy" THREADS)', expected 3 for a 3-CPU limit"
+  if printf '%s\n' "$deploy" | grep -q 'name: THREADS'; then
+    fail "threads" "THREADS is set; the binary follows the CPU limit itself"
     return
   fi
-  ok "image, pull secret, /healthz probes, 180 s startup, 100 s grace, THREADS=3"
+  ok "image, pull secret, /healthz probes, 180 s startup, 100 s grace"
+  deploy=$(only "$(render "$ON --set piiRedactionModel.extraEnvs[0].name=PII_MAX_CONCURRENT_REQUESTS --set-string piiRedactionModel.extraEnvs[0].value=2")" "pii_redaction_model/deployment")
+  if [ "$(printf '%s\n' "$deploy" | grep -c 'name: PII_MAX_CONCURRENT_REQUESTS$')" != "1" ] || [ "$(env_value "$deploy" PII_MAX_CONCURRENT_REQUESTS)" != "2" ]; then
+    fail "extraEnvs override" "PII_MAX_CONCURRENT_REQUESTS is not set once, to 2"
+    return
+  fi
+  ok "extraEnvs replaces a chart setting, once"
 }
 
 # @scenario "Without an image the chart refuses to render"

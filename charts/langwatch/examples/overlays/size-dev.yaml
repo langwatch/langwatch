@@ -38,11 +38,6 @@ langevals:
   extraEnvs:
     - { name: DISABLE_EVALUATORS_PRELOAD, value: "true" }
 
-piiRedactionModel:
-  # Off: strict PII analysis stays on Presidio. The model needs 7Gi reserved
-  # per replica; see size-prod.yaml to turn it on.
-  enabled: false
-
 clickhouse:
   chartManaged: true
   replicas: 1
