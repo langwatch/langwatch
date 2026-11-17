@@ -3,12 +3,17 @@
  * the query's series; the row parser merges the parts' rows by period, date and group key.
  */
 
-import type { AnalyticsSeries } from "@langwatch/analytics-contract";
+import type { AnalyticsSeries, AnalyticsTable } from "@langwatch/analytics-contract";
 
 import type { TimeseriesQueryInput } from "./clickhouse.aggregation-builder.mapper.ts";
+import { isRunGrouping } from "./clickhouse.joined-timeseries-query.mapper.ts";
 import { spanGroupedPartOf } from "./clickhouse.span-grouped-joined-timeseries-query.mapper.ts";
 import { isSpanGrouping } from "./clickhouse.span-grouped-timeseries-query.mapper.ts";
-import { specOf } from "./clickhouse.trace-summaries-timeseries-query.mapper.ts";
+import {
+  GROUP_BYS,
+  specOf,
+  TRACE_ID_GROUPING,
+} from "./clickhouse.trace-summaries-timeseries-query.mapper.ts";
 
 /** One part: its own query, and the query's index for each of its series. */
 export type SeriesPart = { input: TimeseriesQueryInput; indexes: number[] };
@@ -53,6 +58,34 @@ export function findRunParts(input: TimeseriesQueryInput): SeriesPart[] {
     if (series.pipeline) return "pipeline";
     return specOf(series, index).joins.includes("evaluation_runs") ? "runs" : "rest";
   });
+}
+
+/**
+ * One part per series, where no split by kind serves: each series read on its own, as rulings
+ * 2a and 4a read pipelines and runs, so no series is inflated by another's join.
+ */
+export function findSeriesParts(input: TimeseriesQueryInput): SeriesPart[] {
+  if (input.series.length < 2) return [];
+  return input.series.map((_, index) => partOf(input, [index]));
+}
+
+/**
+ * A trace_summaries or evaluation_runs query with a grouping no shape knows, read by the trace id
+ * as main's default did; other tables keep their own groupings.
+ */
+export function withKnownGrouping({
+  table,
+  input,
+}: {
+  table: AnalyticsTable;
+  input: TimeseriesQueryInput;
+}): TimeseriesQueryInput {
+  const { groupBy } = input;
+  if (table !== "trace_summaries" && table !== "evaluation_runs") return input;
+  if (!groupBy || GROUP_BYS[groupBy] || isRunGrouping(groupBy) || isSpanGrouping(groupBy)) {
+    return input;
+  }
+  return { ...input, groupBy: TRACE_ID_GROUPING };
 }
 
 const SERIES_KEY = /^m(\d+)__/;

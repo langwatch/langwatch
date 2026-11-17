@@ -1063,6 +1063,21 @@ const RUNS_BESIDE_SPANS: AnalyticsSeries[] = [
   mixed("evaluations.evaluation_runs", "cardinality"),
 ];
 
+/** Pipelines whose inner metric reads the trace's spans or runs: per user or thread. */
+const PIPELINES_OVER_JOINS: AnalyticsSeries[] = [
+  graded("sum", { pipeline: { field: "user_id", aggregation: "avg" } }),
+  mixed("evaluations.evaluation_score", "max", {
+    key: "ev",
+    pipeline: { field: "user_id", aggregation: "sum" },
+  }),
+  mixed("sentiment.thumbs_up_down", "cardinality", {
+    pipeline: { field: "user_id", aggregation: "avg" },
+  }),
+  mixed("evaluations.evaluation_runs", "cardinality", {
+    pipeline: { field: "thread_id", aggregation: "sum" },
+  }),
+];
+
 /**
  * Shapes main dropped or inflated, computed by Alex's rulings of 2026-11-16: 1a, a full-scale
  * grouped pipeline is computed; 2a, a pipeline beside span or run metrics is read on its own.
@@ -1152,7 +1167,37 @@ export const BY_RULING_SHAPES: (Shape & { ruling: string })[] = [
     timeScale: "full",
     ruling: "Risk 11.1 1a",
   },
+  // Main's text failed on a span or run column in a pipeline: ported by the 2026-11-17 ruling 1.
+  ...(["full", 60] as const).map((timeScale) => ({
+    ...pipelines(
+      `over span and run metrics, ${timeScale === "full" ? "both periods" : "hourly"}`,
+      PIPELINES_OVER_JOINS,
+      timeScale,
+    ),
+    ruling: "2026-11-17 1",
+  })),
 ];
+
+/** A grouping no shape knows: main's default grouped by the trace id. */
+export const UNKNOWN_GROUPING_SHAPES: Shape[] = (["full", 60] as const).map((timeScale) => ({
+  name: `trace metrics by an unknown grouping, ${timeScale === "full" ? "both periods" : "hourly"}`,
+  table: "trace_summaries",
+  series: TRACE_SHORT,
+  groupBy: "no.such",
+  timeScale,
+}));
+
+/** Thread duration beside span metrics: no split by kind serves, so each series reads alone. */
+export const SERIES_PART_SHAPES: Shape[] = (["full", 60] as const).map((timeScale) => ({
+  name: `thread duration beside span metrics, ${timeScale === "full" ? "both periods" : "hourly"}`,
+  table: "trace_summaries",
+  series: [
+    mixed("threads.average_duration_per_thread", "avg"),
+    graded("avg"),
+    mixed("sentiment.thumbs_up_down", "sum"),
+  ],
+  timeScale,
+}));
 
 /** Pipeline series: the both-periods summary CTEs and the date-bucketed pipeline. */
 export const PIPELINE_SHAPES: Shape[] = [
@@ -1180,6 +1225,7 @@ export const PIPELINE_SHAPES: Shape[] = [
     traceIds: [`trace-${RUN}-0`, `trace-${RUN}-1`, `trace-${RUN}-4`],
     excludeOrigins: ["evaluation"],
   }),
+  pipelines("over run counts per thread, hourly", PIPELINES_OVER_JOINS.slice(3), 60),
 ];
 
 const tool = { "spans.type": ["tool"] } as AnalyticsFilters;
@@ -1361,4 +1407,6 @@ export const SHAPES: Shape[] = [
     timeZone: "Europe/Amsterdam",
   },
   ...SUMMARY_SHAPES,
+  ...UNKNOWN_GROUPING_SHAPES,
+  ...SERIES_PART_SHAPES,
 ];

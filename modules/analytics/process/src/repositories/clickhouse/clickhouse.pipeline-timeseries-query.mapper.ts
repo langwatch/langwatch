@@ -23,6 +23,7 @@ import {
 } from "@langwatch/clickhouse-client/builder";
 
 import type { TimeseriesQueryInput } from "./clickhouse.aggregation-builder.mapper.ts";
+import { sourceOf, spansOf } from "./clickhouse.joined-timeseries-query.mapper.ts";
 import {
   type MetricSource,
   type MetricSpec,
@@ -31,6 +32,7 @@ import {
   shapeSeries,
   threadDuration,
 } from "./clickhouse.metric-spec.mapper.ts";
+import { runsOf } from "./clickhouse.mixed-eval-timeseries-query.mapper.ts";
 import {
   allOf,
   currentPeriod,
@@ -96,10 +98,17 @@ export function servesPipelines(input: TimeseriesQueryInput): boolean {
   let reaggregated = false;
   for (const [index, series] of input.series.entries()) {
     const spec = pipelineSpecOf(series, index);
-    if (spec.joins.length > 0 || spec.form !== "scalar") return false;
     if (spec.outer) reaggregated = true;
+    if (spec.joins.length === 0 && spec.form === "scalar") continue;
+    if (!readsPerEntityJoined(spec)) return false;
   }
   return reaggregated;
+}
+
+/** A per-entity pipeline over one joined table's rows: its spans' or runs' metric per entity. */
+function readsPerEntityJoined(spec: MetricSpec): boolean {
+  if (spec.outer?.kind !== "per-entity" || spec.joins.length !== 1) return false;
+  return spec.joins[0] === "stored_spans" || spec.joins[0] === "evaluation_runs";
 }
 
 function outerAggregate<T extends string>(
@@ -249,6 +258,7 @@ function reaggregated(parts: Parts, series: AnalyticsSeries, index: number): Rea
   const own = series;
   const tag = `${index}_${parts.bucketing.kind === "period" ? parts.bucketing.period : "dated"}`;
   if (spec.outer?.kind !== "per-entity") return threadDurations({ parts, spec, own, tag });
+  if (spec.joins.length > 0) return joinedEntities({ parts, spec, own, tag });
   const buckets = bucketsOf(parts);
   const key = spec.outer.key(SOURCE);
   const value = renderMetric({ spec: { ...spec, outer: undefined }, source: SOURCE });
@@ -261,6 +271,63 @@ function reaggregated(parts: Parts, series: AnalyticsSeries, index: number): Rea
     from: entities,
     buckets: Object.fromEntries(Object.keys(buckets).map((name) => [name, inner[name]!])),
     value: outerAggregate(spec.outer.aggregation, inner.inner_value!),
+  };
+}
+
+/**
+ * A pipeline over its spans' or runs' metric: each member's entity's joined rows, as main's
+ * pipeline CTE joined them (an inner join), then over the entities. Ruling 1a keys by member.
+ */
+function joinedEntities({
+  parts,
+  spec,
+  own,
+  tag,
+}: {
+  parts: Parts;
+  spec: MetricSpec;
+  own: AnalyticsSeries;
+  tag: string;
+}): Reaggregated {
+  const outer = spec.outer as Extract<MetricSpec["outer"], { kind: "per-entity" }>;
+  const { scope, input, bucketing } = parts;
+  const spans = spec.joins.includes("stored_spans") ? spansOf(scope, input) : undefined;
+  const runs = spec.joins.includes("evaluation_runs") ? runsOf(scope, input) : undefined;
+  const source = sourceOf({ spans, runs });
+  const buckets = bucketsOf(parts);
+  const key = outer.key(SOURCE);
+  const value = renderMetric({ spec: { ...spec, outer: undefined }, source });
+  const { filters, restrictions } = filtersOf(input);
+  const base = clickhouseRead({ scope }).from(ts).withinWindows();
+  const joined = spans
+    ? base.innerJoin(spans, ({ and, eq }) =>
+        and(eq(spans.TenantId, ts.TenantId), eq(spans.TraceId, ts.TraceId)),
+      )
+    : base.innerJoin(runs!, ({ and, eq }) =>
+        and(eq(runs!.TenantId, ts.TenantId), eq(runs!.TraceId, ts.TraceId)),
+      );
+  const entities = (joined as typeof base)
+    .select(() => ({ ...buckets, inner_value: value }) as Record<string, Measure<Summaries>>)
+    .where(() => {
+      if (bucketing.kind === "dated") return inEitherPeriod(ts.OccurredAt, input);
+      return bucketing.period === "current"
+        ? currentPeriod(ts.OccurredAt, input)
+        : previousPeriod(ts.OccurredAt, input);
+    })
+    .where(
+      (ops) =>
+        allOf([filters(ops), ...restrictions, ...seriesConditions({ series: own, input, ops })]),
+      { inElection: false },
+    )
+    .latestVersion()
+    .groupBy(...(Object.values(buckets) as Measure<Summaries>[]), ts.TenantId, key)
+    .having(() => present(key))
+    .as(`entities_${tag}`) as Derived;
+  const inner: Columns = entities;
+  return {
+    from: entities,
+    buckets: Object.fromEntries(Object.keys(buckets).map((name) => [name, inner[name]!])),
+    value: outerAggregate(outer.aggregation, inner.inner_value!),
   };
 }
 

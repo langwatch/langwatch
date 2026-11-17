@@ -118,6 +118,11 @@ const RUN_GROUP_BYS: Record<string, (evaluatorId: string | undefined) => RunGrou
   }),
 };
 
+/** Whether `groupBy` is an evaluation grouping, read off the runs. */
+export function isRunGrouping(groupBy: string | undefined): boolean {
+  return groupBy !== undefined && RUN_GROUP_BYS[groupBy] !== undefined;
+}
+
 const isEvaluation = (spec: MetricSpec) => spec.joins.includes(EVALUATIONS);
 
 /** Which tables a query joins, or that this shape does not serve it. */
@@ -194,7 +199,8 @@ const SPAN_COLUMNS: Record<SpanMetricColumn, "SpanAttributes" | "eventNames" | "
     "Events.Attributes": "eventAttributes",
   };
 
-function sourceOf({
+/** A metric's columns on the trace row and the spans or runs joined to it. */
+export function sourceOf({
   spans,
   runs,
 }: {

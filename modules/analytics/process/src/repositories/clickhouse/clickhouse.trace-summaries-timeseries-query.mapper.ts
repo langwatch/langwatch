@@ -47,6 +47,9 @@ import { traceSummaries as ts } from "./clickhouse.trace-summaries.table.ts";
 
 type Summaries = "trace_summaries";
 
+/** Main grouped by the trace id where it knew no grouping by the name asked (its default). */
+export const TRACE_ID_GROUPING = "(trace id)";
+
 /** The trace columns this shape groups by; each says whether it answers for its own empty value. */
 export const GROUP_BYS: Record<string, { key: Measure<Summaries>; handlesUnknown: boolean }> = {
   "topics.topics": { key: ts.TopicId, handlesUnknown: false },
@@ -68,6 +71,7 @@ export const GROUP_BYS: Record<string, { key: Measure<Summaries>; handlesUnknown
     key: fn.if(ts.ContainsErrorStatus, param.string("with error"), param.string("without error")),
     handlesUnknown: true,
   },
+  [TRACE_ID_GROUPING]: { key: ts.TraceId, handlesUnknown: false },
 };
 
 const unjoined = (table: string) => (): never => {

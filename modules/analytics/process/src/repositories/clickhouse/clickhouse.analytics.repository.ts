@@ -60,8 +60,10 @@ import { rollupTimeseriesRead } from "./clickhouse.rollup-timeseries-query.mappe
 import {
   findPipelineParts,
   findRunParts,
+  findSeriesParts,
   renumberedRows,
   type SeriesPart,
+  withKnownGrouping,
 } from "./clickhouse.series-parts.mapper.ts";
 import { slimTimeseriesRead } from "./clickhouse.slim-timeseries-query.mapper.ts";
 import {
@@ -139,7 +141,7 @@ function routeOf({
 }): TimeseriesRoute {
   const whole = wholeRouteOf({ table, input });
   if (whole.kind !== "text") return whole;
-  for (const split of [findPipelineParts, findRunParts]) {
+  for (const split of [findPipelineParts, findRunParts, findSeriesParts]) {
     const parts = split(input).map((part) => ({
       ...part,
       route: wholeRouteOf({ table, input: part.input }),
@@ -204,21 +206,24 @@ export class ClickHouseAnalyticsRepository extends AnalyticsRepository {
     if (!projectId.trim()) {
       throw new Error("Analytics timeseries projectId is required");
     }
-    const builderInput: TimeseriesQueryInput = {
-      projectId,
-      startDate: toDate(query.startDate),
-      endDate: toDate(query.endDate),
-      previousPeriodStartDate: toDate(query.previousPeriodStartDate),
-      series: query.input.series,
-      filters: query.input.filters,
-      groupBy: query.input.groupBy,
-      groupByKey: query.input.groupByKey,
-      timeScale: query.adjustedTimeScale,
-      timeZone: query.input.timeZone,
-      traceIds: query.input.traceIds,
-      negateFilters: query.input.negateFilters,
-      excludeOrigins: query.input.excludeOrigins,
-    };
+    const builderInput: TimeseriesQueryInput = withKnownGrouping({
+      table: query.table,
+      input: {
+        projectId,
+        startDate: toDate(query.startDate),
+        endDate: toDate(query.endDate),
+        previousPeriodStartDate: toDate(query.previousPeriodStartDate),
+        series: query.input.series,
+        filters: query.input.filters,
+        groupBy: query.input.groupBy,
+        groupByKey: query.input.groupByKey,
+        timeScale: query.adjustedTimeScale,
+        timeZone: query.input.timeZone,
+        traceIds: query.input.traceIds,
+        negateFilters: query.input.negateFilters,
+        excludeOrigins: query.input.excludeOrigins,
+      },
+    });
     const limits: Record<string, string> =
       query.maxResultRows === undefined
         ? {}

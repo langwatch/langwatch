@@ -24,6 +24,7 @@ import {
   servesPipelines,
 } from "../clickhouse.pipeline-timeseries-query.mapper.ts";
 import { rollupTimeseriesRead } from "../clickhouse.rollup-timeseries-query.mapper.ts";
+import { findSeriesParts, withKnownGrouping } from "../clickhouse.series-parts.mapper.ts";
 import { slimTimeseriesRead } from "../clickhouse.slim-timeseries-query.mapper.ts";
 import {
   servesSpanGrouped,
@@ -32,6 +33,7 @@ import {
 import type { TimeseriesRead } from "../clickhouse.timeseries-query-shared.mapper.ts";
 import {
   servesStandardTraceSummaries,
+  TRACE_ID_GROUPING,
   traceSummariesTimeseriesRead,
 } from "../clickhouse.trace-summaries-timeseries-query.mapper.ts";
 
@@ -838,17 +840,17 @@ describe("the trace_summaries pipeline read", () => {
     expect(serves({ groupBy: "metadata.user_id", timeScale: "full" })).toBe(true);
     expect(serves({ groupBy: "metadata.labels" })).toBe(false);
     expect(serves({ series: [series("performance.total_cost", "sum")] })).toBe(false);
-    expect(
-      serves({
-        series: [
-          {
-            ...series("evaluations.evaluation_score", "avg"),
-            key: "ev",
-            pipeline: { field: "user_id", aggregation: "avg" },
-          } as AnalyticsSeries,
-        ],
-      }),
-    ).toBe(false);
+    // Ruling 1 (Alex, 2026-11-17, "Port them"): a pipeline over its runs' or spans' metric.
+    const perUserScore = {
+      ...series("evaluations.evaluation_score", "avg"),
+      key: "ev",
+      pipeline: { field: "user_id", aggregation: "avg" },
+    } as AnalyticsSeries;
+    expect(serves({ series: [perUserScore] })).toBe(true);
+    // A span metric with no pipeline is the joined shape's.
+    expect(serves({ series: [perUserScore, series("events.event_type", "cardinality")] })).toBe(
+      false,
+    );
   });
 
   it("refuses a filtered per-entity series shown as a percentage", () => {
@@ -932,5 +934,60 @@ describe("a trace count under an aggregate proof (ruling 1a)", () => {
 
     expect(sql).toMatch(/uniqExact\(tuple\([\w.]*TenantId, [\w.]*TraceId\)\)/);
     expect(sql).not.toMatch(/\buniq\(/);
+  });
+});
+
+describe("a grouping no shape knows", () => {
+  const input = { ...dates, series: [series("performance.total_cost", "sum")], timeScale: 60 };
+
+  it("reads a trace_summaries query by the trace id, as main's default did", () => {
+    expect(
+      withKnownGrouping({ table: "trace_summaries", input: { ...input, groupBy: "no.such" } })
+        .groupBy,
+    ).toBe(TRACE_ID_GROUPING);
+  });
+
+  it("leaves the evaluation rollup's own groupings alone", () => {
+    expect(
+      withKnownGrouping({
+        table: "evaluation_analytics_rollup",
+        input: { ...input, groupBy: "evaluations.evaluator_type" },
+      }).groupBy,
+    ).toBe("evaluations.evaluator_type");
+  });
+
+  it("leaves a grouping a shape knows alone", () => {
+    expect(
+      withKnownGrouping({ table: "trace_summaries", input: { ...input, groupBy: "topics.topics" } })
+        .groupBy,
+    ).toBe("topics.topics");
+  });
+});
+
+describe("the per-series split", () => {
+  it("reads each series on its own, keeping its index", () => {
+    const parts = findSeriesParts({
+      ...dates,
+      series: [
+        series("threads.average_duration_per_thread", "avg"),
+        series("sentiment.thumbs_up_down", "sum"),
+      ],
+      timeScale: 60,
+    });
+
+    expect(parts.map((part) => [part.indexes, part.input.series.length])).toEqual([
+      [[0], 1],
+      [[1], 1],
+    ]);
+  });
+
+  it("has nothing to split in one series", () => {
+    expect(
+      findSeriesParts({
+        ...dates,
+        series: [series("performance.total_cost", "sum")],
+        timeScale: 60,
+      }),
+    ).toEqual([]);
   });
 });
