@@ -77,7 +77,10 @@ export function expectAnswered({ runs, context }: { runs: readonly Run[]; contex
 
 /** Fails unless every run ended with exactly the server's `code`. */
 export function expectRefused({ runs, code }: { runs: readonly Run[]; code: number }): void {
-  expect(runs.map((run) => run.exceptionCode), described(runs)).toEqual(runs.map(() => code));
+  expect(
+    runs.map((run) => run.exceptionCode),
+    described(runs),
+  ).toEqual(runs.map(() => code));
 }
 
 /** Runs queries as the service sends them and reads each one's cost from the query log. */
