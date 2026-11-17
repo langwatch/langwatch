@@ -154,10 +154,12 @@ export function isValidEventSelector(selector: string): boolean {
   return knownTypes.has(selector);
 }
 
+/** `*` matches every type except `ocsf.*`, which an endpoint must name to receive. */
 export function eventMatches(enabledEvents: readonly string[], eventType: string): boolean {
+  const isOcsfEvent = eventType.startsWith("ocsf.");
   return enabledEvents.some(
     (selector) =>
-      selector === "*" ||
+      (selector === "*" && !isOcsfEvent) ||
       selector === eventType ||
       (selector.endsWith(".*") && eventType.startsWith(selector.slice(0, -1))),
   );

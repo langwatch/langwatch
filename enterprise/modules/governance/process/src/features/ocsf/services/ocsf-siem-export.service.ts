@@ -7,11 +7,7 @@ import {
   encodeOcsfCursor,
   GovernanceValidationError,
   OCSF_EXPORT_SCHEMA_VERSION,
-  OCSF_INGEST_MAX_FUTURE_MS,
-  OCSF_PUSHED_SOURCE_TYPE,
   type OcsfEventsPage,
-  type OcsfIngestRequest,
-  type OcsfIngestResponse,
   type OcsfTracesCursor,
 } from "@langwatch/enterprise-governance-contract";
 import { PROJECT_KIND, type ProjectApi } from "@langwatch/project-contract";
@@ -19,15 +15,17 @@ import { Temporal } from "@langwatch/time";
 import type { TraceApi } from "@langwatch/trace-contract";
 
 import type {
-  GovernanceOcsfEvent,
   GovernanceOcsfEventSink,
   OcsfIngestOrderedReader,
 } from "../../../repositories/governance.repositories.ts";
+import { auditEntryToOcsfEvent } from "../rules/ocsf-v1-9-audit.rules.ts";
 import {
-  auditEntryToOcsfEvent,
   governanceRowToOcsfEvent,
   projectTraceToOcsfEvent,
 } from "../rules/ocsf-v1-9-event.rules.ts";
+
+/** Audit rows are stamped at commit and written later; a page reads only rows this old. */
+export const AUDIT_SETTLE_MS = 10 * 60 * 1000;
 
 /** Projects one traces page may step through when they hold nothing in the window. */
 const EMPTY_PROJECTS_PER_PAGE = 20;
@@ -36,10 +34,7 @@ type ExportWindow = { limit: number; since?: string; until?: string; cursor?: st
 
 type OcsfSiemExportDependencies = {
   events: OcsfIngestOrderedReader & GovernanceOcsfEventSink;
-  projects: Pick<
-    ProjectApi,
-    "findInternal" | "ensureInternal" | "findLiveNonGovernanceIdsByOrganization"
-  >;
+  projects: Pick<ProjectApi, "findInternal" | "findLiveNonGovernanceIdsByOrganization">;
   traces: Pick<TraceApi, "listTraceSummaries">;
   auditLog: Pick<AuditLogApi, "findForOrganization">;
   now: () => number;
@@ -211,14 +206,15 @@ export class OcsfSiemExportService {
     const projectIds = await this.deps.projects.findLiveNonGovernanceIdsByOrganization({
       organizationId: input.organizationId,
     });
-    const untilMs = input.until === undefined ? undefined : toEpochMs(input.until);
+    const settled = this.deps.now() - AUDIT_SETTLE_MS;
+    const untilMs = Math.min(settled, input.until === undefined ? settled : toEpochMs(input.until));
     const entries = await this.deps.auditLog.findForOrganization({
       organizationId: input.organizationId,
       projectIds,
       afterMs: watermark.t,
       afterId: watermark.i,
       limit: input.limit + 1,
-      ...(untilMs === undefined ? {} : { untilMs }),
+      untilMs,
     });
     const kept = entries.slice(0, input.limit);
     const last = kept.at(-1);
@@ -229,50 +225,6 @@ export class OcsfSiemExportService {
       cursor: last ? { t: last.createdAt.getTime(), i: last.id } : watermark,
       hasMore: entries.length > input.limit,
     });
-  }
-
-  /** OCSF events from another source, stored as sent; one row per (source, metadata.uid). */
-  async ingest(input: OcsfIngestRequest & { organizationId: string }): Promise<OcsfIngestResponse> {
-    const tenant = await this.deps.projects.ensureInternal({
-      organizationId: input.organizationId,
-      kind: PROJECT_KIND.INTERNAL_GOVERNANCE,
-    });
-    const latest = this.deps.now() + OCSF_INGEST_MAX_FUTURE_MS;
-    const ahead = input.events.findIndex((event) => event.time > latest);
-    if (ahead >= 0) {
-      const complaint = `events.${ahead}.time is more than a day in the future`;
-      throw new GovernanceValidationError(complaint, { formErrors: [complaint] });
-    }
-    const byUid = new Map(input.events.map((event) => [event.metadata.uid, event]));
-    const rows = [...byUid.values()].map((event): GovernanceOcsfEvent => {
-      const actor = (event.actor ?? {}) as { user?: { uid?: unknown; email_addr?: unknown } };
-      const api = (event.api ?? {}) as { operation?: unknown };
-      const target = (event.dst_endpoint ?? {}) as { name?: unknown; hostname?: unknown };
-      const text = (value: unknown) => (typeof value === "string" ? value.slice(0, 512) : "");
-      const activityId = event.activity_id ?? 0;
-      return {
-        tenantId: tenant.id,
-        eventId: `${OCSF_PUSHED_SOURCE_TYPE}:${input.source}:${event.metadata.uid}`,
-        classUid: event.class_uid,
-        categoryUid: event.category_uid ?? Math.floor(event.class_uid / 1000),
-        typeUid: event.type_uid ?? event.class_uid * 100 + activityId,
-        traceId: "",
-        sourceId: input.source,
-        sourceType: OCSF_PUSHED_SOURCE_TYPE,
-        activityId,
-        severityId: event.severity_id,
-        eventTime: Temporal.Instant.fromEpochMilliseconds(event.time),
-        actorUserId: text(actor.user?.uid),
-        actorEmail: text(actor.user?.email_addr),
-        actorEnduserId: "",
-        actionName: text(api.operation) || text(event.class_name) || `class_${event.class_uid}`,
-        targetName: text(target.name) || text(target.hostname),
-        anomalyAlertId: "",
-        rawOcsfJson: JSON.stringify(event),
-      };
-    });
-    await this.deps.events.insertEvents(rows);
-    return { accepted: rows.length };
   }
 
   private page({

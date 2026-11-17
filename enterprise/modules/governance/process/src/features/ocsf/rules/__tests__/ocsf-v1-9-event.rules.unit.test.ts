@@ -2,8 +2,8 @@
 import type { GovernanceOcsfExportRow } from "@langwatch/enterprise-governance-contract";
 import { describe, expect, it } from "vitest";
 
+import { auditEntryToOcsfEvent } from "../ocsf-v1-9-audit.rules.ts";
 import {
-  auditEntryToOcsfEvent,
   governanceRowToOcsfEvent,
   projectTraceToOcsfEvent,
   type ProjectTraceSummary,

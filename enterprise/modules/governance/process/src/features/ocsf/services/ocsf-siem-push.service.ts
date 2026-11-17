@@ -7,9 +7,10 @@ import {
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { WebhookApi } from "@langwatch/webhook-contract";
 
-import type {
-  GovernanceOcsfEvent,
-  GovernanceOcsfEventSink,
+import {
+  OCSF_STORED_SCHEMA_VERSION,
+  type GovernanceOcsfEvent,
+  type GovernanceOcsfEventSink,
 } from "../../../repositories/governance.repositories.ts";
 import type { OcsfPushIntent } from "../eventing/ocsf-push-delivery.process.ts";
 import { governanceRowToOcsfEvent } from "../rules/ocsf-v1-9-event.rules.ts";
@@ -36,7 +37,7 @@ function subscribesToOcsfEvents(enabledEvents: readonly string[]): boolean {
 function exportRowOf(row: GovernanceOcsfEvent): GovernanceOcsfExportRow {
   return {
     eventId: row.eventId,
-    ocsfSchemaVersion: "",
+    ocsfSchemaVersion: OCSF_STORED_SCHEMA_VERSION,
     traceId: row.traceId,
     sourceId: row.sourceId,
     sourceType: row.sourceType,

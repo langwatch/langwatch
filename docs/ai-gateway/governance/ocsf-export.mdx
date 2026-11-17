@@ -48,9 +48,10 @@ All three routes take the same paging parameters:
 |---|---|---|
 | `limit` | `500` | Page size, 1 to 1000 |
 | `cursor` | none | The `next_cursor` of the previous page |
-| `since`, `until` | none | ISO 8601 bounds for the first read. A cursor carries its own position |
+| `since` | none | ISO 8601 start of the first read. A cursor carries its own position |
+| `until` | none | ISO 8601 end bound. The cursor does not carry it, so send it again with every page |
 
-`/events` also takes `source_type` and `source_id`. `/traces` takes `project_id` to read one project.
+`/events` also takes `source_type` and `source_id`. `/traces` takes `project_id` to read one project. `/audit` returns an entry once it is ten minutes old, so an entry written late is not skipped by a cursor that already passed its time.
 
 Every page answers `next_cursor`, which is always set, and `has_more`. Store `next_cursor` after each page. While `has_more` is true, read again at once; when it is false, wait for your next scheduled run and pass the stored cursor. A trace updated after it was exported is exported again with the same `metadata.uid`, so deduplicate on it.
 
@@ -136,7 +137,7 @@ LangWatch queues each governance event when it is written. Deliveries use the st
 }
 ```
 
-Deliveries are signed with `X-LangWatch-Signature: t=<unix seconds>,v1=<hmac-sha256>`, retried with backoff, and logged per endpoint; see [verifying signatures](/features/webhooks#verifying-signatures). An event written again, for example when a trace is processed twice, keeps its idempotency key, so the endpoint receives it once.
+Deliveries are signed with `X-LangWatch-Signature: t=<unix seconds>,v1=<hmac-sha256>`, retried with backoff, and logged per endpoint; see [verifying signatures](/features/webhooks#verifying-signatures). An event written again, for example when a trace is processed twice, keeps its idempotency key, so it is queued once per endpoint. A retry after a lost acknowledgement can deliver it again, so deduplicate on `metadata.uid`.
 
 OCSF events go only to endpoints that name `ocsf.event` or `ocsf.*`. An endpoint subscribed to `*` does not receive them. The push carries the governance events stream. Project traces and the audit log are pulled.
 

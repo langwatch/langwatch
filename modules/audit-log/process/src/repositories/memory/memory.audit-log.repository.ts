@@ -25,6 +25,12 @@ type MemoryAuditLogRow = AuditLogEntry & {
 };
 
 /** The rows both memory twins share: an entry recorded through one is a touch the other reads. */
+/** Code-unit order, the same order the `id >` watermark uses. */
+function compareIds(left: string, right: string): number {
+  if (left === right) return 0;
+  return left < right ? -1 : 1;
+}
+
 export class MemoryAuditLogStore {
   readonly rows: MemoryAuditLogRow[] = [];
 }
@@ -131,7 +137,7 @@ export class MemoryAuditLogRepository implements AuditLogRepository {
       .toSorted(
         (left, right) =>
           Temporal.Instant.compare(left.createdAt, right.createdAt) ||
-          left.id.localeCompare(right.id),
+          compareIds(left.id, right.id),
       )
       .slice(0, input.limit)
       .map((row) =>

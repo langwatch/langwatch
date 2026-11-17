@@ -5,7 +5,6 @@
  * set; the cost and LangWatch's own ids sit under `unmapped.langwatch`. No prompt or response text.
  * Spec: enterprise/modules/governance/specs/ocsf-siem.feature
  */
-import type { AuditLogExportEntry } from "@langwatch/audit-log-contract";
 import {
   OCSF_EXPORT_SCHEMA_VERSION,
   OCSF_PUSHED_SOURCE_TYPE,
@@ -19,7 +18,7 @@ const API_ACTIVITY_CLASS_UID = 6003;
 const APPLICATION_ACTIVITY_CATEGORY_UID = 6;
 /** OCSF 1.1 stored LLM calls as activity 6; 1.9 API Activity has no Invoke, so it is Other. */
 const STORED_INVOKE_ACTIVITY = 6;
-const OTHER_ACTIVITY = 99;
+export const OTHER_ACTIVITY = 99;
 /** The stored rows' severity codes (`ocsf-codes.rules.ts`) on the OCSF 1.9 scale. */
 const STORED_SEVERITY_TO_OCSF: Record<number, number> = { 1: 1, 3: 2, 4: 3, 5: 4, 6: 5 };
 
@@ -137,7 +136,7 @@ function unmappedFields(facts: OcsfActivityFacts): Record<string, unknown> {
 }
 
 /** One OCSF 1.9.0 API Activity event from what LangWatch knows about the action. */
-function toOcsfApiActivity(facts: OcsfActivityFacts): OcsfEvent {
+export function toOcsfApiActivity(facts: OcsfActivityFacts): OcsfEvent {
   const activityId = facts.activityId in ACTIVITY_NAMES ? facts.activityId : OTHER_ACTIVITY;
   const activityName = facts.activityName ?? ACTIVITY_NAMES[activityId] ?? "Other";
   const severityId = facts.severityId in SEVERITY_NAMES ? facts.severityId : 0;
@@ -308,54 +307,5 @@ export function projectTraceToOcsfEvent({
     cost: { usd: summary.totalCost ?? undefined },
     failed: summary.containsErrorStatus,
     langwatch: { project_id: projectId, trace_id: summary.traceId },
-  });
-}
-
-const DELETE_VERBS = new Set(["delete", "deleted", "remove", "removed", "archive", "revoke"]);
-const CREATE_VERBS = new Set(["create", "created", "add", "added", "invite", "mint", "install"]);
-const READ_VERBS = new Set(["view", "read", "list", "get", "export", "viewworkspaceas"]);
-const UPDATE_VERBS = new Set(["update", "updated", "edit", "set", "rename", "change", "rotate"]);
-
-/** The OCSF activity an audit action names by its last verb-like segment, else Other. */
-function auditActivityId(action: string): number {
-  const segments = action.toLowerCase().split(/[.:/_-]/);
-  for (const segment of segments.toReversed()) {
-    if (DELETE_VERBS.has(segment)) return 4;
-    if (CREATE_VERBS.has(segment)) return 1;
-    if (UPDATE_VERBS.has(segment)) return 3;
-    if (READ_VERBS.has(segment)) return 2;
-  }
-  return OTHER_ACTIVITY;
-}
-
-/** One audit log row as an API Activity event; who acted is the real actor when one is named. */
-export function auditEntryToOcsfEvent({
-  entry,
-  organizationId,
-}: {
-  entry: AuditLogExportEntry;
-  organizationId: string;
-}): OcsfEvent {
-  const actor = entry.actorUserId ?? entry.userId ?? undefined;
-  const failed = entry.error !== null && entry.error !== "";
-  return toOcsfApiActivity({
-    uid: `audit:${entry.id}`,
-    timeMs: entry.createdAt.getTime(),
-    activityId: auditActivityId(entry.action),
-    severityId: failed ? 3 : 1,
-    operation: entry.action,
-    stream: "audit",
-    organizationId,
-    actor: { userUid: actor, subjectUserUid: entry.userId ?? undefined },
-    failed,
-    ...(failed ? { message: entry.error ?? undefined } : {}),
-    ...(entry.targetId
-      ? { resource: { uid: entry.targetId, type: entry.targetKind ?? undefined } }
-      : {}),
-    sourceEndpoint: {
-      ip: entry.ipAddress ?? undefined,
-      userAgent: entry.userAgent ?? undefined,
-    },
-    langwatch: { audit_log_id: entry.id, project_id: entry.projectId ?? undefined },
   });
 }

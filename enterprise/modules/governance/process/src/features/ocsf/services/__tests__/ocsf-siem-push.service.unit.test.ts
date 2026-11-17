@@ -97,6 +97,7 @@ describe("OcsfSiemPushService", () => {
         class_uid: 6003,
         metadata: { uid: "e-1", version: "1.9.0" },
       });
+      expect(JSON.stringify(recorded[0]!.body)).toContain('"stored_ocsf_version":"1.1.0"');
       const stored = await events.findAll({
         tenantId: TENANT,
         sinceMs: 0,

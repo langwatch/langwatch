@@ -224,3 +224,6 @@ interface GovernanceClickHouseTenantClient {
 export type GovernanceClickHouseTenantResolver = (
   tenantId: string,
 ) => Promise<GovernanceClickHouseTenantClient>;
+
+/** The OCSF schema version every stored governance row is written under. */
+export const OCSF_STORED_SCHEMA_VERSION = "1.1.0";

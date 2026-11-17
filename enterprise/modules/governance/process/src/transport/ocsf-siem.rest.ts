@@ -25,7 +25,7 @@ const TAGS = ["Governance / OCSF SIEM"];
 const BODY_LIMIT_BULK_BYTES = resolveRequestBound("bodyLimitBulkBytes", "ENTERPRISE");
 
 const PAGING =
-  "Pass `next_cursor` back as `cursor` to read on; it is always set, so a puller stores it between runs. `has_more` is true when more events are already waiting. `since` and `until` (ISO 8601) bound the first read; a cursor carries its own position.";
+  "Pass `next_cursor` back as `cursor` to read on; it is always set, so a puller stores it between runs. `has_more` is true when more events are already waiting. `since` (ISO 8601) starts the first read and a cursor carries its own position. `until` (ISO 8601) is not in the cursor: send it with every page.";
 
 export const ocsfSiemRest = defineRestRouter(GovernanceRestApi)
   .withNamespace("governance-ocsf")

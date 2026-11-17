@@ -304,6 +304,7 @@ import {
 } from "../features/ocsf/eventing/ocsf-push-delivery.intent.ts";
 import type { OcsfPushIntent } from "../features/ocsf/eventing/ocsf-push-delivery.process.ts";
 import { OcsfSiemExportService } from "../features/ocsf/services/ocsf-siem-export.service.ts";
+import { OcsfSiemIngestService } from "../features/ocsf/services/ocsf-siem-ingest.service.ts";
 import { OcsfSiemPushService } from "../features/ocsf/services/ocsf-siem-push.service.ts";
 import { PersonaHomeService } from "../features/personal/services/persona-home.service.ts";
 import { PersonalIngestionKeyService } from "../features/personal/services/personal-ingestion-key.service.ts";
@@ -649,6 +650,11 @@ export class GovernanceModule implements GovernanceRestApi {
           ),
       },
       outbox: () => this.#ocsfPushOutbox,
+    });
+    this.ocsfSiemIngest = OcsfSiemIngestService.create({
+      events: repositories.ocsfEvents,
+      projects: tenantHistory,
+      now: () => nowInstant().epochMilliseconds,
     });
     this.ocsfSiemExport = OcsfSiemExportService.create({
       events: repositories.ocsfEvents,
@@ -1160,6 +1166,7 @@ export class GovernanceModule implements GovernanceRestApi {
   #ocsfPushOutbox: OutboxOcsfPushDelivery | undefined;
   private readonly ocsfPush: OcsfSiemPushService;
   private readonly ocsfSiemExport: OcsfSiemExportService;
+  private readonly ocsfSiemIngest: OcsfSiemIngestService;
 
   /** A built pipeline means an outbox: written OCSF batches fan out to SIEM endpoints from here on. */
   connectOcsfPushOutbox({
@@ -1192,7 +1199,7 @@ export class GovernanceModule implements GovernanceRestApi {
   ingestOcsfEvents(
     input: OcsfIngestRequest & { organizationId: string },
   ): Promise<OcsfIngestResponse> {
-    return this.ocsfSiemExport.ingest(input);
+    return this.ocsfSiemIngest.ingest(input);
   }
 
   /** A built pipeline means an outbox: registry change events fan out through it from here on. */

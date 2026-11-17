@@ -7,6 +7,7 @@ import {
 import { createLogger } from "@langwatch/observability";
 import { toDate } from "@langwatch/time";
 
+import { OCSF_STORED_SCHEMA_VERSION } from "../governance.repositories.ts";
 import type {
   GovernanceOcsfEvent,
   GovernanceOcsfEventsReader,
@@ -58,7 +59,6 @@ const OCSF_CATEGORY_APPLICATION_ACTIVITY = 6;
  *
  * Migration: 00028_add_ocsf_schema_version.sql
  */
-const OCSF_SCHEMA_VERSION = "1.1.0" as const;
 
 /** Cursor-paginated read of `governance_ocsf_events`, ordered EventTime ASC. */
 export interface FindOcsfEventsInput {
@@ -250,7 +250,7 @@ function toExportRow(r: OcsfExportCHRow): GovernanceOcsfExportRow {
 function toOcsfEventValues(row: GovernanceOcsfEvent): Record<string, unknown> {
   return {
     TenantId: row.tenantId,
-    OcsfSchemaVersion: OCSF_SCHEMA_VERSION,
+    OcsfSchemaVersion: OCSF_STORED_SCHEMA_VERSION,
     EventId: row.eventId,
     TraceId: row.traceId,
     SourceId: row.sourceId,
@@ -347,13 +347,18 @@ export class ClickHouseOcsfEventsRepository
    */
   async findAll(input: FindOcsfEventsInput): Promise<GovernanceOcsfExportRow[]> {
     const client = await this.resolveClient(input.tenantId);
-    const filters = [
-      input.untilMs === undefined
-        ? ""
-        : "AND EventTime < fromUnixTimestamp64Milli({untilMs:UInt64})",
+    const sourceFilters = [
       input.sourceType === undefined ? "" : "AND SourceType = {sourceType:String}",
       input.sourceId === undefined ? "" : "AND SourceId = {sourceId:String}",
     ].join(" ");
+    const untilFilter =
+      input.untilMs === undefined
+        ? ""
+        : "AND EventTime < fromUnixTimestamp64Milli({untilMs:UInt64})";
+    const latestUntil =
+      input.untilMs === undefined
+        ? ""
+        : "HAVING LatestTime < fromUnixTimestamp64Milli({untilMs:UInt64})";
     const result = await client.query({
       query: `
         SELECT
@@ -379,15 +384,16 @@ export class ClickHouseOcsfEventsRepository
         WHERE TenantId = {tenantId:String}
           AND EventTime >= fromUnixTimestamp64Milli({sinceMs:UInt64})
           AND (EventTime, EventId) > (fromUnixTimestamp64Milli({sinceMs:UInt64}), {sinceEventId:String})
-          ${filters}
+          ${sourceFilters} ${untilFilter}
           AND (TenantId, EventId, LastUpdatedAt, EventTime) IN (
             SELECT TenantId, EventId, max(LastUpdatedAt), argMax(EventTime, LastUpdatedAt) AS LatestTime
             FROM ${TABLE_NAME}
             WHERE TenantId = {tenantId:String}
               AND EventTime >= fromUnixTimestamp64Milli({sinceMs:UInt64})
               AND (EventTime, EventId) > (fromUnixTimestamp64Milli({sinceMs:UInt64}), {sinceEventId:String})
-              ${filters}
+              ${sourceFilters}
             GROUP BY TenantId, EventId
+            ${latestUntil}
             ORDER BY LatestTime ASC, EventId ASC
             LIMIT {limit:UInt32}
           )
