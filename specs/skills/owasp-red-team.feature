@@ -65,9 +65,16 @@ Feature: OWASP red team pack for code scenario tests
     And both say the attacker and judge need an OpenAI-compatible chat model
 
   @unit
-  Scenario: Each TypeScript run carries its OWASP id as the scenario id
-    Given the TypeScript pack test
-    Then every scenario run sets an id that starts with the attack's OWASP id
+  Scenario: Each run carries its OWASP id as the scenario id in both languages
+    Given the run identity builders of the Python and TypeScript packs
+    Then every attack gets a scenario id that starts with its OWASP id
+    And both languages build the same id, name and metadata for the same attack
+
+  @unit
+  Scenario: An attacker early exit fails the run
+    Given the Python and TypeScript pack tests
+    Then the attacker's early exit on its own score is switched off
+    And a run that still ends in an attacker early exit fails as a breach
 
   @unit
   Scenario: The TypeScript adapter converts scenario messages to OpenAI chat messages and back

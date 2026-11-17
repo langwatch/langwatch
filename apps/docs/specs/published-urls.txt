@@ -11,8 +11,8 @@
 /agent-testing/linking-your-traces
 /agent-testing/other-ways-to-connect
 /agent-testing/overview
-/agent-testing/red-team-open-source
 /agent-testing/owasp-red-team
+/agent-testing/red-team-open-source
 /agent-testing/red-teaming
 /agent-testing/results
 /agent-testing/run-from-ci

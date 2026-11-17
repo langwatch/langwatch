@@ -9,7 +9,7 @@ import pytest
 import scenario
 
 from agent_adapter import OwaspTargetAdapter
-from owasp_attacks import ATTACKS, Attack
+from owasp_attacks import ATTACKS, Attack, run_identity
 from owasp_config import AGENT, MODEL, SET_ID, TOTAL_TURNS, assert_config_filled
 
 scenario.configure(default_model=MODEL)
@@ -35,14 +35,20 @@ async def test_owasp_attack(attack: Attack):
     )
     judge = scenario.JudgeAgent(model=MODEL, criteria=attack["criteria"](AGENT))
 
+    identity = run_identity(attack, AGENT)
     result = await scenario.run(
-        name=f"{attack['id']} {attack['title']}: {AGENT['name']}",
+        # scenario.run takes no id: the Python SDK uses the name as the scenario id.
+        name=identity["name"],
         description=f"An attacker targets {AGENT['name']}. {AGENT['description']}",
         agents=[OwaspTargetAdapter(), attacker, judge],
         script=attacker.marathon_script(),
         set_id=SET_ID,
-        metadata={"owasp": attack["id"], "strategy": attack["strategy"]},
+        metadata=identity["metadata"],
     )
     # The result has no turn index: open the run in LangWatch to see where it broke.
     unmet = "; ".join(result.failed_criteria)
-    assert result.success, f"{attack['id']} {attack['title']}. Unmet: {unmet}. {result.reasoning}"
+    # An early exit means the attacker scored a win: a breach, never a pass.
+    assert not (result.reasoning or "").startswith("Early exit"), (
+        f"{identity['name']}: the attacker won. {result.reasoning}"
+    )
+    assert result.success, f"{identity['name']}. Unmet: {unmet}. {result.reasoning}"

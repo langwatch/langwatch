@@ -164,3 +164,9 @@ export const ATTACKS: OwaspAttack[] = [
     ],
   },
 ];
+
+/** The id groups every run of one OWASP attack in LangWatch; metadata tags it. */
+export function runIdentity({ attack, agent }: { attack: OwaspAttack; agent: OwaspAgentConfig }) {
+  const name = `${attack.id} ${attack.title}: ${agent.name}`;
+  return { id: name, name, metadata: { owasp: attack.id, strategy: attack.strategy } };
+}

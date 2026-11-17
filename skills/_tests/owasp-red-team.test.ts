@@ -14,7 +14,10 @@ import {
   toOpenAIMessages,
   type ScenarioMessage,
 } from "../recipes/owasp-red-team/templates/typescript/agent-adapter.ts";
-import { ATTACKS } from "../recipes/owasp-red-team/templates/typescript/owasp-attacks.ts";
+import {
+  ATTACKS,
+  runIdentity,
+} from "../recipes/owasp-red-team/templates/typescript/owasp-attacks.ts";
 import {
   AGENT,
   EXAMPLE_AGENT,
@@ -51,14 +54,21 @@ interface PythonPack {
   config_values: Record<string, unknown>;
   example_keys: string[];
   fill_error: string;
-  attacks: { id: string; title: string; strategy: string; goal: string; criteria: string[] }[];
+  attacks: {
+    id: string;
+    title: string;
+    strategy: string;
+    goal: string;
+    criteria: string[];
+    identity: { id: string; name: string; metadata: Record<string, string> };
+  }[];
   name: string;
 }
 
 const PYTHON_DUMP = `
 import json, sys
 sys.path.insert(0, sys.argv[1])
-from owasp_attacks import ATTACKS
+from owasp_attacks import ATTACKS, run_identity
 from owasp_config import AGENT, EXAMPLE_AGENT, assert_config_filled
 try:
     assert_config_filled()
@@ -73,7 +83,8 @@ print(json.dumps({
     "name": EXAMPLE_AGENT["name"],
     "attacks": [
         {"id": a["id"], "title": a["title"], "strategy": a["strategy"],
-         "goal": a["goal"](EXAMPLE_AGENT), "criteria": a["criteria"](EXAMPLE_AGENT)}
+         "goal": a["goal"](EXAMPLE_AGENT), "criteria": a["criteria"](EXAMPLE_AGENT),
+         "identity": run_identity(a, EXAMPLE_AGENT)}
         for a in ATTACKS
     ],
 }))
@@ -84,6 +95,11 @@ function pythonPack(): PythonPack {
     encoding: "utf8",
   });
   return JSON.parse(out) as PythonPack;
+}
+
+function packTest(lang: "python" | "typescript"): string {
+  const file = lang === "python" ? "test_owasp_pack.py" : "owasp-pack.test.ts";
+  return fs.readFileSync(path.join(lang === "python" ? pythonDir : typescriptDir, file), "utf8");
 }
 
 function owaspSkill() {
@@ -232,13 +248,11 @@ describe("OWASP red team pack", () => {
     for (const value of Object.values(py.config_values))
       expect(Array.isArray(value) ? value : [value]).toEqual([FILL_ME]);
     expect(py.fill_error).toMatch(/owasp_config\.py.*name, description/);
-    const pyTest = fs.readFileSync(path.join(pythonDir, "test_owasp_pack.py"), "utf8");
-    expect(pyTest).toContain("assert_config_filled()");
+    expect(packTest("python")).toMatch(/\bassert_config_filled\(/);
     expect(fs.readFileSync(path.join(pythonDir, "conftest.py"), "utf8")).toContain(
       '"markers", "agent_test',
     );
-    const tsTest = fs.readFileSync(path.join(typescriptDir, "owasp-pack.test.ts"), "utf8");
-    expect(tsTest).toContain("beforeAll(() => assertConfigFilled())");
+    expect(packTest("typescript")).toMatch(/\bassertConfigFilled\(/);
   });
 
   /** @scenario "The skill pins the TypeScript model provider to the scenario SDK's ai version" */
@@ -255,11 +269,26 @@ describe("OWASP red team pack", () => {
     }
   });
 
-  /** @scenario "Each TypeScript run carries its OWASP id as the scenario id" */
-  it("sets the scenario id of every TypeScript run from the OWASP id", () => {
-    const tsTest = fs.readFileSync(path.join(typescriptDir, "owasp-pack.test.ts"), "utf8");
-    expect(tsTest).toContain("const name = `${attack.id} ${attack.title}: ${AGENT.name}`;");
-    expect(tsTest).toMatch(/scenario\.run\(\{[^}]*\bid: name,/);
+  /** @scenario "Each run carries its OWASP id as the scenario id in both languages" */
+  it("builds the same run id, name and metadata from the OWASP id in both languages", () => {
+    const py = pythonPack();
+    for (const attack of ATTACKS) {
+      const identity = runIdentity({ attack, agent: EXAMPLE_AGENT });
+      expect(identity.id.startsWith(`${attack.id} `)).toBe(true);
+      expect(identity.name).toContain(EXAMPLE_AGENT.name);
+      expect(identity.metadata).toEqual({ owasp: attack.id, strategy: attack.strategy });
+      expect(py.attacks.find((a) => a.id === attack.id)!.identity).toEqual(identity);
+    }
+    expect(packTest("python")).toMatch(/\brun_identity\(/);
+    expect(packTest("typescript")).toMatch(/\brunIdentity\(/);
+  });
+
+  /** @scenario "An attacker early exit fails the run" */
+  it("switches off the attacker early exit and fails a run that still ends in one", () => {
+    expect(packTest("python")).toMatch(/success_score\s*=\s*None/);
+    expect(packTest("typescript")).toMatch(/successScore:\s*undefined/);
+    for (const lang of ["python", "typescript"] as const)
+      expect(packTest(lang)).toMatch(/Early exit/);
   });
 
   /** @scenario "The TypeScript adapter converts scenario messages to OpenAI chat messages and back" */

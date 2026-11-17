@@ -181,3 +181,16 @@ ATTACKS: list[Attack] = [
         ],
     },
 ]
+
+
+def run_identity(attack: Attack, agent: dict) -> dict:
+    """The id groups every run of one OWASP attack in LangWatch; metadata tags it.
+
+    The Python SDK uses the name as the scenario id, so id and name match.
+    """
+    name = f"{attack['id']} {attack['title']}: {agent['name']}"
+    return {
+        "id": name,
+        "name": name,
+        "metadata": {"owasp": attack["id"], "strategy": attack["strategy"]},
+    }

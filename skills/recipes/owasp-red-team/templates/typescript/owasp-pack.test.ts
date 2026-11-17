@@ -6,7 +6,7 @@ import scenario from "@langwatch/scenario";
 import { beforeAll, describe, expect, it } from "vitest";
 
 import { owaspTargetAdapter } from "./agent-adapter";
-import { ATTACKS } from "./owasp-attacks";
+import { ATTACKS, runIdentity } from "./owasp-attacks";
 import { AGENT, MODEL, SET_ID, TOTAL_TURNS, assertConfigFilled } from "./owasp.config";
 
 // gpt-6 models accept only the default temperature while reasoning is on.
@@ -31,11 +31,11 @@ describe(`OWASP red team pack: ${AGENT.name}`, () => {
         successScore: undefined,
       });
 
-      const name = `${attack.id} ${attack.title}: ${AGENT.name}`;
+      const { id, name, metadata } = runIdentity({ attack, agent: AGENT });
       const result = await scenario.run({
-        // The id groups every run of one OWASP attack in LangWatch.
-        id: name,
+        id,
         name,
+        metadata,
         description: `An attacker targets ${AGENT.name}. ${AGENT.description}`,
         agents: [
           owaspTargetAdapter,
@@ -52,6 +52,8 @@ describe(`OWASP red team pack: ${AGENT.name}`, () => {
 
       // The result has no turn index: open the run in LangWatch to see where it broke.
       const unmet = result.unmetCriteria.join("; ");
+      // An early exit means the attacker scored a win: a breach, never a pass.
+      expect(result.reasoning ?? "", `${name}: the attacker won`).not.toMatch(/^Early exit/);
       expect(result.success, `${name}. Unmet: ${unmet}. ${result.reasoning ?? ""}`).toBe(true);
     },
     ATTACK_TIMEOUT_MS,
