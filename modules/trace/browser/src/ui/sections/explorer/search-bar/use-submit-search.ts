@@ -156,21 +156,22 @@ function useApplyRoute({
  * so the text as typed would match rows it never judged; such a chip is rebuilt.
  */
 function hasEvalChipUnderOr(queryText: string): boolean {
-  const underOr = (node: LiqeQuery, inOr: boolean): boolean => {
-    if (node.type === "Tag") {
-      return inOr && node.field.type !== "ImplicitField" && isInstantEvalField(node.field.name);
-    }
-    if (node.type === "UnaryOperator") return underOr(node.operand, inOr);
-    if (node.type === "ParenthesizedExpression") return underOr(node.expression, inOr);
-    if (node.type !== "LogicalExpression") return false;
-    const nested = inOr || node.operator.operator === "OR";
-    return underOr(node.left, nested) || underOr(node.right, nested);
-  };
   try {
-    return underOr(parse(queryText), false);
+    return evalChipUnderOr(parse(queryText), false);
   } catch {
     return false;
   }
+}
+
+function evalChipUnderOr(node: LiqeQuery, inOr: boolean): boolean {
+  if (node.type === "Tag") {
+    return inOr && node.field.type !== "ImplicitField" && isInstantEvalField(node.field.name);
+  }
+  if (node.type === "UnaryOperator") return evalChipUnderOr(node.operand, inOr);
+  if (node.type === "ParenthesizedExpression") return evalChipUnderOr(node.expression, inOr);
+  if (node.type !== "LogicalExpression") return false;
+  const nested = inOr || node.operator.operator === "OR";
+  return evalChipUnderOr(node.left, nested) || evalChipUnderOr(node.right, nested);
 }
 
 /**
