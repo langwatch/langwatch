@@ -73,6 +73,11 @@ function useSuiteTemplateFit() {
     setSuiteName,
     agentNameProblem,
     toRequest,
+    /** A new template starts with no suite name of its own and no stale error. */
+    resetForTemplate: () => {
+      setSuiteName("");
+      setAgentNameProblem(null);
+    },
   };
 }
 
@@ -86,7 +91,7 @@ export function useSuiteTemplateWizard({
   const [tab, setTab] = useState<SuiteTemplateKind>("archetype");
   const [step, setStep] = useState<SuiteTemplateStep>("browse");
   const [chosen, setChosen] = useState<SuiteTemplate | null>(null);
-  const { toRequest, ...fit } = useSuiteTemplateFit();
+  const { toRequest, resetForTemplate, ...fit } = useSuiteTemplateFit();
 
   const submit = () => {
     if (!chosen || isCreating) return;
@@ -101,6 +106,7 @@ export function useSuiteTemplateWizard({
     setStep,
     chosen,
     choose: (template: SuiteTemplate) => {
+      if (template.id !== chosen?.id) resetForTemplate();
       setChosen(template);
       setStep("preview");
     },

@@ -86,3 +86,27 @@ Feature: Create a test suite from a template
     Given a red team scenario tagged with OWASP id "LLM07"
     When the gallery shows the scenario in the preview
     Then its badge reads "LLM07 System Prompt Leakage"
+
+  @integration
+  Scenario: Choosing another template starts its fit afresh
+    Given I named the suite and saw the agent name error on one template's fit step
+    When I go back and choose another template
+    Then its fit step shows no suite name and no agent name error
+
+  @integration
+  Scenario: Closing the gallery while it creates opens nothing
+    Given I pressed Create suite
+    When I close the gallery before the create lands
+    Then the new suite is not opened
+
+  @integration
+  Scenario: Create suite is sent once while a create is in flight
+    Given a create is in flight
+    When I press Create suite again
+    Then no second create is sent and the button shows it is busy
+
+  @integration
+  Scenario: The preview fills only the placeholders the server fills
+    Given template copy with "{{agentName}}" and "{{ agentName }}"
+    When the gallery shows it before the fit step
+    Then only "{{agentName}}" reads as "your agent"

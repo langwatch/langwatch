@@ -15,12 +15,15 @@ export const TAB_LABELS: Record<SuiteTemplateKind, string> = {
   red_team_pack: "Red team",
 };
 
-/** Template copy names {{agentName}} and {{tools}}; before the fit step they read generically. */
-function withAgentPlaceholder(text: string): string {
+/**
+ * Template copy names {{agentName}} and {{tools}}; before the fit step they read generically.
+ * Only the exact spelling the server fills counts as a placeholder, so preview and result agree.
+ */
+export function withAgentPlaceholder(text: string): string {
   return text
-    .replace(/\{\{\s*agentName\s*\}\}/g, "your agent")
-    .replace(/\s*\(\{\{\s*tools\s*\}\}\)/g, "")
-    .replace(/\{\{\s*tools\s*\}\}/g, "its tools");
+    .replace(/\{\{agentName\}\}/g, "your agent")
+    .replace(/\s*\(\{\{tools\}\}\)/g, "")
+    .replace(/\{\{tools\}\}/g, "its tools");
 }
 
 function scenarioCount(template: SuiteTemplate): string {

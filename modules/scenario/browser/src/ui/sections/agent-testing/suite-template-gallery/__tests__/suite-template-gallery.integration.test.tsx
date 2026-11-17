@@ -3,6 +3,8 @@
  * @vitest-environment jsdom
  * @see modules/scenario/specs/suite-template-gallery.feature
  */
+import { markHandledGlobally } from "@langwatch/browser-host/errors";
+import { setUiFeedbackHost } from "@langwatch/browser-host/toaster";
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import type { SuiteTemplate } from "@langwatch/suite-contract";
 import { cleanup, screen, waitFor } from "@testing-library/react";
@@ -10,6 +12,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { SuiteRailAddMenu } from "../../suite-rail/suite-rail-add-menu.tsx";
+import { withAgentPlaceholder } from "../suite-template-cards.tsx";
 import { TEMPLATES_LOAD_FAILED } from "../suite-template-gallery-dialog.tsx";
 import { SuiteTemplateGallery } from "../suite-template-gallery.tsx";
 import { TEMPLATE_CREATE_FAILED } from "../use-suite-template-gallery.ts";
@@ -17,7 +20,13 @@ import { AGENT_NAME_REQUIRED } from "../use-suite-template-wizard.ts";
 
 const mockTemplatesQuery = vi.hoisted(() => vi.fn());
 const mockApply = vi.hoisted(() => vi.fn());
-const mockShowErrorToast = vi.hoisted(() => vi.fn());
+const feedbackHost = vi.hoisted(() => ({
+  succeeded: vi.fn(),
+  warned: vi.fn(),
+  informed: vi.fn(),
+  failed: vi.fn(),
+}));
+const mutation = vi.hoisted(() => ({ isPending: false }));
 const applyHooks = vi.hoisted(
   () => ({}) as { onSuccess?: (value: unknown) => unknown; onError?: (error: unknown) => void },
 );
@@ -34,7 +43,7 @@ vi.mock("../../../../../behavior/scenario-api.ts", () => ({
           useMutation: (options: typeof applyHooks) => {
             applyHooks.onSuccess = options.onSuccess;
             applyHooks.onError = options.onError;
-            return { mutate: mockApply, isPending: false };
+            return { mutate: mockApply, isPending: mutation.isPending };
           },
         },
       },
@@ -46,7 +55,6 @@ vi.mock("@langwatch/scenario-client", () => ({
     useUtils: () => ({ scenarios: { getAll: { invalidate: () => Promise.resolve() } } }),
   },
 }));
-vi.mock("@langwatch/browser-host/errors", () => ({ showErrorToast: mockShowErrorToast }));
 
 const ARCHETYPE: SuiteTemplate = {
   id: "support-agent",
@@ -124,9 +132,14 @@ async function goToFit(user: ReturnType<typeof userEvent.setup>) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mutation.isPending = false;
+  setUiFeedbackHost(feedbackHost);
   answer({ data: [ARCHETYPE, RED_TEAM] });
 });
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  setUiFeedbackHost(undefined);
+});
 
 describe("SuiteRailAddMenu", () => {
   /** @scenario "The add control offers a blank suite or a template" */
@@ -260,10 +273,9 @@ describe("SuiteTemplateGallery", () => {
     await user.click(screen.getByTestId("suite-template-create"));
     const error = new Error("nope");
     applyHooks.onError?.(error);
-    expect(mockShowErrorToast).toHaveBeenCalledWith({
-      error,
-      fallbackTitle: TEMPLATE_CREATE_FAILED,
-    });
+    expect(feedbackHost.failed).toHaveBeenCalledWith(
+      expect.objectContaining({ error, fallbackTitle: TEMPLATE_CREATE_FAILED }),
+    );
     expect(screen.getByTestId("suite-template-fit")).toBeInTheDocument();
     expect(onCreated).not.toHaveBeenCalled();
   });
@@ -276,8 +288,70 @@ describe("SuiteTemplateGallery", () => {
     await user.type(screen.getByTestId("suite-template-agent-name"), "Refunds bot");
     await user.click(screen.getByTestId("suite-template-create"));
     const limit = Object.assign(new Error("limit"), { data: { code: "limit_exceeded" } });
+    // The global handler marks the refusal once it has opened the upgrade dialog.
+    markHandledGlobally(limit);
     applyHooks.onError?.(limit);
-    expect(mockShowErrorToast).toHaveBeenCalledWith(expect.objectContaining({ error: limit }));
+    expect(feedbackHost.failed).not.toHaveBeenCalled();
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(screen.getByTestId("suite-template-fit")).toBeInTheDocument();
+  });
+
+  /** @scenario "Choosing another template starts its fit afresh" */
+  it("drops the suite name and the agent name error when another template is chosen", async () => {
+    const user = userEvent.setup();
+    renderGallery();
+    await goToFit(user);
+    await user.type(screen.getByTestId("suite-template-suite-name"), "X");
+    await user.click(screen.getByTestId("suite-template-create"));
+    expect(await screen.findByText(AGENT_NAME_REQUIRED)).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Back" }));
+    await user.click(await screen.findByRole("button", { name: "Back" }));
+    await user.click(await screen.findByTestId("suite-template-tab-archetype"));
+    await user.click(await screen.findByTestId(`suite-template-card-${ARCHETYPE.id}`));
+    await user.click(await screen.findByTestId("suite-template-next"));
+    await screen.findByTestId("suite-template-fit");
+
+    expect(screen.getByTestId("suite-template-suite-name")).toHaveValue("");
+    expect(screen.queryByText(AGENT_NAME_REQUIRED)).not.toBeInTheDocument();
+  });
+
+  /** @scenario "Closing the gallery while it creates opens nothing" */
+  it("does not open the new suite when the create lands after the gallery closed", async () => {
+    const user = userEvent.setup();
+    const { unmount } = renderGallery();
+    await goToFit(user);
+    await user.type(screen.getByTestId("suite-template-agent-name"), "Refunds bot");
+    await user.click(screen.getByTestId("suite-template-create"));
+    expect(mockApply).toHaveBeenCalledOnce();
+
+    unmount();
+    await applyHooks.onSuccess?.({ suiteId: "s1", slug: "s", name: "S", scenarioIds: [] });
+    expect(onCreated).not.toHaveBeenCalled();
+  });
+
+  /** @scenario "Create suite is sent once while a create is in flight" */
+  it("sends no second create while one is in flight and shows the button busy", async () => {
+    const user = userEvent.setup();
+    const { rerender } = renderGallery();
+    await goToFit(user);
+    await user.type(screen.getByTestId("suite-template-agent-name"), "Refunds bot");
+    await user.click(screen.getByTestId("suite-template-create"));
+    expect(mockApply).toHaveBeenCalledOnce();
+
+    mutation.isPending = true;
+    rerender(<SuiteTemplateGallery projectId="proj_1" onClose={vi.fn()} onCreated={onCreated} />);
+    const create = screen.getByTestId("suite-template-create");
+    expect(create).toHaveAttribute("data-loading");
+    await user.click(create);
+    expect(mockApply).toHaveBeenCalledOnce();
+  });
+
+  /** @scenario "The preview fills only the placeholders the server fills" */
+  it("fills only the exact placeholder spelling the server fills", () => {
+    expect(withAgentPlaceholder("Ask {{agentName}} for help")).toBe("Ask your agent for help");
+    expect(withAgentPlaceholder("Ask {{ agentName }} for help")).toBe(
+      "Ask {{ agentName }} for help",
+    );
   });
 });

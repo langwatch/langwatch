@@ -1,13 +1,13 @@
 /**
- * The gallery's reads and its one write: the templates the project may apply, and applying one
- * as a new test suite. A refusal goes to the shared error toast, which leaves a plan limit to the
- * upgrade message the global handler already opened.
+ * The gallery's reads and its one write. A refusal goes to the shared error toast, which leaves
+ * a plan limit to the upgrade message the global handler already opened.
  * @see modules/scenario/specs/suite-template-gallery.feature
  */
 
 import { showErrorToast } from "@langwatch/browser-host/errors";
 import { scenarioClient } from "@langwatch/scenario-client";
 import type { AppliedSuiteTemplate, SuiteTemplate } from "@langwatch/suite-contract";
+import { useEffect, useRef } from "react";
 
 import { api } from "../../../../behavior/scenario-api.ts";
 import type { SuiteTemplateCreateRequest } from "./use-suite-template-wizard.ts";
@@ -33,6 +33,14 @@ export function useSuiteTemplateGallery({
 }): SuiteTemplateGalleryModel {
   const utils = api.useUtils();
   const scenarioUtils = scenarioClient.useUtils();
+  // A create that lands after the dialog closed must not open the new suite.
+  const isMounted = useRef(true);
+  useEffect(() => {
+    isMounted.current = true;
+    return () => {
+      isMounted.current = false;
+    };
+  }, []);
 
   const templates = api.suites.testSuites.listTemplates.useQuery(
     { projectId: projectId ?? "" },
@@ -45,7 +53,7 @@ export function useSuiteTemplateGallery({
         void scenarioUtils.scenarios.getAll.invalidate({ projectId });
         await utils.suites.testSuites.getAll.invalidate({ projectId });
       }
-      onCreated(applied);
+      if (isMounted.current) onCreated(applied);
     },
     onError: (error: unknown) => showErrorToast({ error, fallbackTitle: TEMPLATE_CREATE_FAILED }),
   });
