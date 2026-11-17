@@ -46,6 +46,7 @@ import {
   type SimulationTextMessageEndEvent,
   type SimulationTextMessageStartEvent,
   RED_TEAM_REPORT_METADATA_KEY,
+  redTeamRunReportSchema,
   type RedTeamRunReport,
 } from "@langwatch/scenario-contract";
 
@@ -253,6 +254,22 @@ const TERMINAL_STATUSES = new Set([
   "CANCELLED",
   "STALLED",
 ]);
+
+/**
+ * A red team run the attacker broke is a failed run, whatever the judge said: the report and the
+ * finished event fold in either order, so both handlers settle the verdict through this.
+ * @see modules/scenario/specs/red-team-scenario.feature
+ */
+function withRedTeamOutcome(state: SimulationRunStateData): SimulationRunStateData {
+  const raw = parseMetadataObject(state.Metadata)[RED_TEAM_REPORT_METADATA_KEY];
+  const report = redTeamRunReportSchema.safeParse(raw);
+  if (!report.success || report.data.outcome !== "broke") return state;
+  return {
+    ...state,
+    Verdict: state.Verdict === "success" ? "failure" : state.Verdict,
+    Status: state.Status === ScenarioRunStatus.SUCCESS ? ScenarioRunStatus.FAILED : state.Status,
+  };
+}
 
 function isTerminalStatus(status: string): boolean {
   return TERMINAL_STATUSES.has(status);
@@ -705,7 +722,7 @@ export class SimulationRunStateFoldProjection
         ? event.occurredAt - state.StartedAt
         : null;
 
-    return {
+    return withRedTeamOutcome({
       ...state,
       ScenarioRunId: state.ScenarioRunId || event.data.scenarioRunId,
       Status: settled.status,
@@ -723,7 +740,7 @@ export class SimulationRunStateFoldProjection
       // The SDK ingest path never carries it; a supplied value still wins.
       DurationMs: event.data.durationMs ?? derivedDurationMs,
       FinishedAt: event.occurredAt,
-    };
+    });
   }
 
   handleSimulationRunEvaluated(
@@ -739,13 +756,13 @@ export class SimulationRunStateFoldProjection
             verdict: state.Verdict,
           })
         : state.Status;
-    return {
+    return withRedTeamOutcome({
       ...state,
       ScenarioRunId: state.ScenarioRunId || event.data.scenarioRunId,
       Evaluations: event.data.evaluations,
       Verdict: verdict ?? state.Verdict,
       Status: gatedStatus({ status: judgeStatus, verdict }),
-    };
+    });
   }
 
   handleSimulationRunMetricsComputed(
@@ -829,19 +846,19 @@ export class SimulationRunStateFoldProjection
     };
   }
 
-  /** The red team report lands under metadata `redTeam`; status, verdict and finish time stay. */
+  /** The red team report lands under metadata `redTeam`; a broke report fails a passed verdict. */
   handleSimulationRunRedTeamReportRecorded(
     event: SimulationRunRedTeamReportRecordedEvent,
     state: SimulationRunStateData,
   ): SimulationRunStateData {
-    return {
+    return withRedTeamOutcome({
       ...state,
       ScenarioRunId: state.ScenarioRunId || event.data.scenarioRunId,
       Metadata: SimulationRunStateFoldProjection.withRedTeamReport({
         metadata: state.Metadata,
         report: event.data.report,
       }),
-    };
+    });
   }
 
   /** The hook results land in `langwatch.hooks`; status, verdict and finish time stay. */

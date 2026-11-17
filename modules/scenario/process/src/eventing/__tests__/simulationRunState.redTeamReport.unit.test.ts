@@ -107,6 +107,51 @@ describe("simulationRunStateFoldProjection red team report", () => {
     });
   });
 
+  describe("when the judge passed a run the attacker broke", () => {
+    const passed: SimulationRunFinishedEvent = {
+      ...finished,
+      data: {
+        scenarioRunId: RUN_ID,
+        status: "SUCCESS",
+        results: {
+          verdict: "success",
+          reasoning: "Early exit: objective achieved on turn 9",
+          metCriteria: [],
+          unmetCriteria: [],
+        },
+      },
+    };
+    const brokeOnTurn9: SimulationRunRedTeamReportRecordedEvent = {
+      ...recorded,
+      data: { scenarioRunId: RUN_ID, report: { ...report, brokeAtTurn: 9, turnsUsed: 9 } },
+    };
+
+    /** @scenario "A red team run the attacker broke fails whatever the judge said" */
+    it("fails the run when the report folds after the finished event", () => {
+      const state = fold([queued, passed, brokeOnTurn9]);
+      expect(state.Status).toBe("FAILED");
+      expect(state.Verdict).toBe("failure");
+      expect(JSON.parse(state.Metadata ?? "null").redTeam.brokeAtTurn).toBe(9);
+    });
+
+    /** @scenario "A red team run the attacker broke fails whatever the judge said" */
+    it("fails the run when the report folds before the finished event", () => {
+      const state = fold([queued, brokeOnTurn9, passed]);
+      expect(state.Status).toBe("FAILED");
+      expect(state.Verdict).toBe("failure");
+    });
+
+    it("keeps a passed verdict when the agent held", () => {
+      const held: SimulationRunRedTeamReportRecordedEvent = {
+        ...recorded,
+        data: { scenarioRunId: RUN_ID, report: { ...report, outcome: "held", brokeAtTurn: null } },
+      };
+      const state = fold([queued, passed, held]);
+      expect(state.Status).toBe("SUCCESS");
+      expect(state.Verdict).toBe("success");
+    });
+  });
+
   it("folds the same report twice to identical metadata", () => {
     const once = foldProjection.apply(fold([queued, finished]), recorded);
     expect(foldProjection.apply(once, recorded).Metadata).toBe(once.Metadata);

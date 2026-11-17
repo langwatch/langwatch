@@ -11,6 +11,7 @@ import {
 /** The reasoning the library's marathon script ends a run with when the attacker's goal was met. */
 const EARLY_EXIT_REASONING_PREFIX = "Early exit: objective achieved";
 const HINT_MAX_CHARS = 2000;
+const EARLY_EXIT_TURN = /^Early exit: objective achieved on turn (\d+)/;
 
 /** Whether a job runs the attacker in place of the user simulator. */
 export function isRedTeamRun(scenario: ScenarioConfig): boolean {
@@ -83,14 +84,15 @@ export function buildRedTeamRunReport({
   const outcome = judgePassed && !endedEarly ? "held" : "broke";
   const lastTurn = turnScores.at(-1)?.turn ?? null;
   const firstBreak = turnScores.find((entry) => entry.score >= RED_TEAM_BREAK_SCORE)?.turn;
+  const earlyExitTurn = Number(reasoning?.match(EARLY_EXIT_TURN)?.[1]) || undefined;
   return {
     outcome,
-    brokeAtTurn: outcome === "held" ? null : (firstBreak ?? lastTurn),
+    brokeAtTurn: outcome === "held" ? null : (firstBreak ?? earlyExitTurn ?? lastTurn),
     strategy: config.strategy,
     owaspIds: config.owaspIds,
     attackGoal: config.attackGoal,
     maxTurns: totalTurns,
-    turnsUsed: lastTurn ?? 0,
+    turnsUsed: Math.max(lastTurn ?? 0, earlyExitTurn ?? 0),
     turnScores,
   };
 }

@@ -165,6 +165,18 @@ describe("buildRedTeamRunReport", () => {
     });
     expect(report).toMatchObject({ outcome: "broke", brokeAtTurn: 3 });
   });
+
+  /** @scenario "A run the attacker ended early broke" */
+  it("names the early exit turn when the attacker kept no scores", () => {
+    const report = buildRedTeamRunReport({
+      config,
+      totalTurns: 30,
+      judgePassed: true,
+      reasoning: "Early exit: objective achieved on turn 9 (score >= 9 for 2 consecutive turns)",
+      turnScores: [],
+    });
+    expect(report).toMatchObject({ outcome: "broke", brokeAtTurn: 9, turnsUsed: 9 });
+  });
 });
 
 describe("readRedTeamTurnScores", () => {

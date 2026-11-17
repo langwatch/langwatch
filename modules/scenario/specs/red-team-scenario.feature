@@ -68,6 +68,14 @@ Feature: A red team scenario runs an attacker against the agent
     Then the outcome is "broke"
 
   @unit
+  Scenario: A red team run the attacker broke fails whatever the judge said
+    Given a red team run whose judge passed it
+    And the attacker broke the agent on turn 9
+    When the run's finished event and red team report fold, in either order
+    Then the run's status is "FAILED" and its verdict is "failure"
+    And the report names turn 9 as the broken turn
+
+  @unit
   Scenario: Each turn's score is recorded on the run report
     Given the attacker scored each turn from 0 to 10 with a hint
     When the run report is built
