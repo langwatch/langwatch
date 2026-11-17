@@ -106,7 +106,7 @@ export class MemoryStoredObjectRecordRepository implements StoredObjectRecordRep
       [...this.#values.values()]
         .filter(
           (value) =>
-            (value.status === "pending" || value.status === "uploading") &&
+            isReapable(value) &&
             value.expiresAt !== null &&
             Temporal.Instant.compare(value.expiresAt, input.expiresBefore) <= 0 &&
             (afterTenantId === undefined || value.tenantId > afterTenantId),
@@ -120,6 +120,12 @@ export class MemoryStoredObjectRecordRepository implements StoredObjectRecordRep
   async delete(input: { tenantId: StoredObjectProjectId; id: StoredObjectId }): Promise<void> {
     this.#values.delete(key(input));
   }
+}
+
+/** An open upload, or a closed row whose bytes are still held. */
+function isReapable(value: StoredObjectRecord): boolean {
+  if (value.status === "pending" || value.status === "uploading") return true;
+  return (value.status === "failed" || value.status === "deleted") && value.storage !== null;
 }
 
 function statusMatches(

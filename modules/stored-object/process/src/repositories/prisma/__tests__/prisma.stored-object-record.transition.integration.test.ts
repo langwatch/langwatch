@@ -142,6 +142,31 @@ describe.skipIf(!databaseUrl)("Prisma stored-object record: conditional transiti
   });
 
   /** @scenario "Expired pending uploads are reaped on a schedule" */
+  it("finds closed rows that still hold bytes, and skips those whose bytes are gone", async () => {
+    const heldTenant = `${namespace}-held` as StoredObjectProjectId;
+    const goneTenant = `${namespace}-gone` as StoredObjectProjectId;
+    const deletedTenant = `${namespace}-deleted` as StoredObjectProjectId;
+    await repository.upsert(record({ tenantId: heldTenant, status: "failed" }));
+    await repository.upsert(record({ tenantId: goneTenant, status: "failed", storage: null }));
+    await repository.upsert(record({ tenantId: deletedTenant, status: "deleted" }));
+
+    try {
+      const projects = await repository.findTenantsWithExpiredUploads({
+        expiresBefore: now,
+        afterTenantId: `${namespace}-`,
+        limit: 50,
+      });
+      expect(projects).toContain(heldTenant);
+      expect(projects).toContain(deletedTenant);
+      expect(projects).not.toContain(goneTenant);
+    } finally {
+      for (const tenant of [heldTenant, goneTenant, deletedTenant]) {
+        await connection.client.storedObject.deleteMany({ where: { tenantId: tenant } });
+      }
+    }
+  });
+
+  /** @scenario "Expired pending uploads are reaped on a schedule" */
   it("finds expired uploads still streaming, by project and in a project's page", async () => {
     const uploading = record({
       tenantId: otherTenantId,

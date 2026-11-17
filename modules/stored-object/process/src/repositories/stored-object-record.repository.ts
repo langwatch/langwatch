@@ -77,7 +77,7 @@ export interface StoredObjectRecordRepository {
     limit: number;
   }): Promise<StoredObjectRecord[]>;
 
-  /** Projects holding a pending row expired by `expiresBefore`, after the cursor, any tenant. */
+  /** Projects with an expired open upload or leftover bytes, after the cursor, any tenant. */
   findTenantsWithExpiredUploads(input: {
     expiresBefore: Instant;
     afterTenantId?: StoredObjectProjectId;

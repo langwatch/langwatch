@@ -152,20 +152,30 @@ spec:
           {{- end }}
     {{- end }}
 {{- /*
-  Uploads through LangWatch (#9666) stream up to 5 GiB; ingress-nginx sets body size and
-  timeouts per Ingress, so the route gets its own. On for className nginx unless switched.
-  Annotations: the app's minus rewrites and snippets, the upload settings, then ingress.uploads.
+  Uploads (#9666) stream up to 5 GiB and ingress-nginx sizes per Ingress, so the route gets
+  its own; on for className nginx unless switched. Annotations: the app's minus rewrites and
+  server-snippet (host-scoped), the upload settings, then ingress.uploads.annotations.
 */}}
 {{- $uploadsPath := "/api/stored-objects/uploads" }}
 {{- $uploadsBlocked := false }}
 {{- range $blockedPaths }}
   {{- if hasPrefix (printf "%s/" .) (printf "%s/" $uploadsPath) }}{{ $uploadsBlocked = true }}{{ end }}
 {{- end }}
+{{- /* A host whose own paths already route the upload path keeps it: a repeat is rejected. */}}
+{{- $uploadsHosts := list }}
+{{- range $host := .Values.ingress.hosts }}
+  {{- $owned := false }}
+  {{- range $host.http.paths }}
+    {{- $p := trimSuffix "/" (toString .path) }}
+    {{- if or (eq $p $uploadsPath) (hasPrefix (printf "%s/" $uploadsPath) $p) }}{{ $owned = true }}{{ end }}
+  {{- end }}
+  {{- if not $owned }}{{ $uploadsHosts = append $uploadsHosts $host.host }}{{ end }}
+{{- end }}
 {{- $uploadsClass := toString (.Values.ingress.className | default "") }}
 {{- $uploadsOn := ternary $uploadsSwitch (eq $uploadsClass "nginx") (kindIs "bool" $uploadsSwitch) }}
-{{- if and $uploadsOn (not $uploadsBlocked) }}
+{{- if and $uploadsOn (not $uploadsBlocked) $uploadsHosts }}
 {{- $uploadsRoute := (.Values.ingress.uploads | default dict) }}
-{{- $uploadsAnnotations := omit (deepCopy $appAnnotations) "nginx.ingress.kubernetes.io/rewrite-target" "nginx.ingress.kubernetes.io/use-regex" "nginx.ingress.kubernetes.io/app-root" "nginx.ingress.kubernetes.io/server-snippet" "nginx.ingress.kubernetes.io/configuration-snippet" }}
+{{- $uploadsAnnotations := omit (deepCopy $appAnnotations) "nginx.ingress.kubernetes.io/rewrite-target" "nginx.ingress.kubernetes.io/use-regex" "nginx.ingress.kubernetes.io/app-root" "nginx.ingress.kubernetes.io/server-snippet" }}
 {{- /* An ingress-nginx class by name (nginx, nginx-internal) gets the settings; others none. */}}
 {{- if contains "nginx" $uploadsClass }}
 {{- $uploadsAnnotations = mergeOverwrite $uploadsAnnotations (dict
@@ -195,8 +205,8 @@ spec:
   {{- /* No tls: ingress-nginx serves each host's certificate from the app
          Ingress, and a second tls entry would have cert-manager issue it twice. */}}
   rules:
-    {{- range .Values.ingress.hosts }}
-    - host: {{ .host | quote }}
+    {{- range $uploadsHosts }}
+    - host: {{ . | quote }}
       http:
         paths:
           - path: {{ $uploadsPath }}

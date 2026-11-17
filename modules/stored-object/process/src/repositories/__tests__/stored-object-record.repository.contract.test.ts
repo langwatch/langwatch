@@ -253,7 +253,8 @@ describe.each(backends)("given the $name stored-object record repository", ({ cr
   });
 
   describe("when projects holding expired pending uploads are asked for", () => {
-    it("names each such project once, in order after the cursor, across tenants", async () => {
+    /** @scenario "Expired pending uploads are reaped on a schedule" */
+    it("names each project with an open upload or held bytes once, in order, across tenants", async () => {
       const repository = create();
       const expired = Temporal.Instant.from("2026-08-21T00:00:00.000Z");
       const later = Temporal.Instant.from("2026-08-23T00:00:00.000Z");
@@ -279,17 +280,32 @@ describe.each(backends)("given the $name stored-object record repository", ({ cr
           expiresAt: expired,
         }),
       );
+      await repository.upsert(
+        record({
+          tenantId: "project_reaped" as StoredObjectProjectId,
+          status: "failed",
+          storage: null,
+          expiresAt: expired,
+        }),
+      );
+      await repository.upsert(
+        record({
+          tenantId: "project_deleted_bytes" as StoredObjectProjectId,
+          status: "deleted",
+          expiresAt: expired,
+        }),
+      );
 
       await expect(
         repository.findTenantsWithExpiredUploads({ expiresBefore: AT, limit: 10 }),
-      ).resolves.toEqual([ACME, OTHER, "project_uploading"]);
+      ).resolves.toEqual([ACME, "project_deleted_bytes", OTHER, "project_uploading"]);
       await expect(
         repository.findTenantsWithExpiredUploads({
           expiresBefore: AT,
           afterTenantId: ACME,
           limit: 10,
         }),
-      ).resolves.toEqual([OTHER, "project_uploading"]);
+      ).resolves.toEqual(["project_deleted_bytes", OTHER, "project_uploading"]);
       await expect(
         repository.findTenantsWithExpiredUploads({ expiresBefore: AT, limit: 1 }),
       ).resolves.toEqual([ACME]);

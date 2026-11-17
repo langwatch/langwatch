@@ -117,7 +117,7 @@ export class StoredObjectCleanupService {
 
     await this.options.records.transition({
       expected: value,
-      next: { ...value, storage: null, updatedAt: this.options.now() },
+      next: { ...value, storage: null, expiresAt: null, updatedAt: this.options.now() },
     });
 
     return true;

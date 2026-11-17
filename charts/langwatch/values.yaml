@@ -1766,7 +1766,8 @@ ingress:
   # Upload route on the app hosts. The chart renders a second Ingress,
   # `<release>-uploads-ingress`, routing /api/stored-objects/uploads (Prefix)
   # on every ingress.hosts host to the app Service, with ingress.annotations
-  # (minus rewrites and server/configuration snippets). When className
+  # (minus rewrites and the host-scoped server-snippet). A host whose own
+  # paths already route /api/stored-objects/uploads is left out. When className
   # contains "nginx" it adds request buffering off, a 5121m body limit (the
   # 5 GiB upload limit and headroom) and 3600s read/send timeouts: nginx's 1m
   # default on the app Ingress would refuse almost every file. Other classes

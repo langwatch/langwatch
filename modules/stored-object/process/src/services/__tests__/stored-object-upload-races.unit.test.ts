@@ -26,6 +26,7 @@ import { StoredObjectService } from "../stored-object.service.ts";
 const PROJECT_ID = "project_1";
 const FILE = new TextEncoder().encode("a file whose upload races something");
 const SHA256 = createHash("sha256").update(FILE).digest("hex");
+const PAST_LANDED_WINDOW_MINUTES = 24 * 60 + 1;
 
 /** A gate a test opens by hand. */
 function gate() {
@@ -209,7 +210,7 @@ describe("upload lifecycle races", () => {
         const upload = await create();
         await send(upload);
         const address = (await row(upload.objectId)).storage;
-        later(16);
+        later(PAST_LANDED_WINDOW_MINUTES);
         beforeWritingAvailable(records, () => reaper.reap());
 
         await expect(confirm(upload.objectId)).rejects.toMatchObject({
@@ -228,7 +229,7 @@ describe("upload lifecycle races", () => {
         const { records, reaper, create, send, confirm, row, bytesOf, later } = fixture();
         const upload = await create();
         await send(upload);
-        later(16);
+        later(PAST_LANDED_WINDOW_MINUTES);
         const findPage = records.findPage.bind(records);
         let confirmed: unknown;
         vi.spyOn(records, "findPage").mockImplementationOnce(async (query) => {
@@ -326,23 +327,149 @@ describe("upload lifecycle races", () => {
   describe("given an expired pending upload whose bytes will not delete on the first try", () => {
     describe("when the reaper wakes twice", () => {
       /** @scenario "Expired pending uploads are reaped on a schedule" */
-      it("leaves it pending for the next wake, then reaps it", async () => {
-        const { reaper, deleteFailures, create, send, row, bytesOf, later } = fixture();
+      it("keeps it failed with its address, then deletes the bytes on the next wake", async () => {
+        const { reaper, deleteFailures, create, send, confirm, row, bytesOf, later } = fixture();
         const upload = await create();
         await send(upload);
-        const address = (await row(upload.objectId)).storage;
-        later(60);
+        later(PAST_LANDED_WINDOW_MINUTES);
         deleteFailures.remaining = 1;
 
         await expect(reaper.reap()).resolves.toBe(0);
         const kept = await row(upload.objectId);
-        expect(kept.status).toBe("pending");
+        expect(kept.status).toBe("failed");
         await expect(bytesOf(kept)).resolves.toBe(SHA256);
+        await expect(confirm(upload.objectId)).rejects.toMatchObject({
+          code: "upload_incomplete",
+        });
 
         await expect(reaper.reap()).resolves.toBe(1);
         const reaped = await row(upload.objectId);
         expect(reaped).toMatchObject({ status: "failed", storage: null });
-        await expect(bytesOf({ ...reaped, storage: address })).resolves.toBeNull();
+        await expect(bytesOf(kept)).resolves.toBeNull();
+      });
+    });
+  });
+
+  describe("given a failed row whose bytes were never deleted, as a reaper crash leaves it", () => {
+    describe("when the reaper wakes", () => {
+      /** @scenario "Expired pending uploads are reaped on a schedule" */
+      it("deletes the bytes and clears the address", async () => {
+        const { records, reaper, create, send, row, bytesOf, later } = fixture();
+        const upload = await create();
+        await send(upload);
+        const landed = await row(upload.objectId);
+        await records.transition({
+          expected: landed,
+          next: { ...landed, status: "failed", generation: landed.generation + 1 },
+        });
+        later(PAST_LANDED_WINDOW_MINUTES);
+
+        await expect(reaper.reap()).resolves.toBe(1);
+
+        const reaped = await row(upload.objectId);
+        expect(reaped).toMatchObject({ status: "failed", storage: null });
+        await expect(bytesOf(landed)).resolves.toBeNull();
+      });
+    });
+  });
+
+  describe("given a file that landed through the signed route", () => {
+    describe("when the client confirms two hours later, after a reaper pass", () => {
+      /** @scenario "A file that landed through LangWatch still confirms after the upload window" */
+      it("still confirms, its bytes intact", async () => {
+        const { reaper, create, send, confirm, row, bytesOf, later } = fixture();
+        const upload = await create();
+        await send(upload);
+        later(120);
+
+        await expect(reaper.reap()).resolves.toBe(0);
+        await expect(confirm(upload.objectId)).resolves.toMatchObject({ sha256: SHA256 });
+        await expect(bytesOf(await row(upload.objectId))).resolves.toBe(SHA256);
+      });
+    });
+
+    describe("when nobody confirms it within 24 hours", () => {
+      /** @scenario "Expired pending uploads are reaped on a schedule" */
+      it("is reaped, its bytes deleted", async () => {
+        const { reaper, create, send, row, bytesOf, later } = fixture();
+        const upload = await create();
+        await send(upload);
+        const landed = await row(upload.objectId);
+        later(PAST_LANDED_WINDOW_MINUTES);
+
+        await expect(reaper.reap()).resolves.toBe(1);
+        await expect(row(upload.objectId)).resolves.toMatchObject({ status: "failed" });
+        await expect(bytesOf(landed)).resolves.toBeNull();
+      });
+    });
+
+    describe("when the client sends a second file to the same signed address", () => {
+      /** @scenario "A file that landed through LangWatch still confirms after the upload window" */
+      it("refuses it before touching the bytes, and confirms the first file's digest", async () => {
+        const { service, create, send, confirm, row, bytesOf } = fixture();
+        const upload = await create();
+        await send(upload);
+        const other = new TextEncoder().encode("another file, the same length!!!!!!");
+        expect(other.byteLength).toBe(FILE.byteLength);
+
+        await expect(
+          service.writeUpload({
+            ...upload,
+            contentLength: other.byteLength,
+            body: new BreakingBody([other.subarray(0, 4)]),
+          }),
+        ).rejects.toMatchObject({ code: "upload_token_invalid" });
+
+        await expect(confirm(upload.objectId)).resolves.toMatchObject({ sha256: SHA256 });
+        await expect(bytesOf(await row(upload.objectId))).resolves.toBe(SHA256);
+      });
+    });
+
+    describe("when a first send broke off before anything landed", () => {
+      it("accepts the retry", async () => {
+        const { service, create, send, confirm } = fixture();
+        const upload = await create();
+        await expect(
+          service.writeUpload({
+            ...upload,
+            contentLength: FILE.byteLength,
+            body: new BreakingBody([FILE.subarray(0, 4)]),
+          }),
+        ).rejects.toMatchObject({ code: "upload_incomplete" });
+
+        await send(upload);
+
+        await expect(confirm(upload.objectId)).resolves.toMatchObject({ sha256: SHA256 });
+      });
+    });
+  });
+
+  describe("given a delete while the file is still arriving, and the writer's discard fails", () => {
+    describe("when the deleted-bytes cleanup runs", () => {
+      /** @scenario "A confirm and the reaper never both win" */
+      it("never leaves bytes on a row with no address, and the cleanup removes them", async () => {
+        const { service, inFlight, deleteFailures, create, send, remove, row, bytesOf } = fixture();
+        const upload = await create();
+        const address = (await row(upload.objectId)).storage;
+        const release = gate();
+        inFlight.hold = release.opened;
+
+        const sending = send(upload);
+        await inFlight.landed.opened;
+        await remove(upload.objectId);
+        deleteFailures.remaining = 1;
+        release.open();
+        await expect(sending).rejects.toMatchObject({ code: "stored_object_deleted" });
+
+        const afterRace = await row(upload.objectId);
+        expect(afterRace.status).toBe("deleted");
+        await expect(bytesOf({ ...afterRace, storage: address })).resolves.toBe(SHA256);
+        expect(afterRace.storage).toEqual(address);
+
+        await expect(service.cleanupDeletedObjects({ projectId: PROJECT_ID })).resolves.toBe(1);
+        const cleaned = await row(upload.objectId);
+        expect(cleaned.storage).toBeNull();
+        await expect(bytesOf({ ...cleaned, storage: address })).resolves.toBeNull();
       });
     });
   });

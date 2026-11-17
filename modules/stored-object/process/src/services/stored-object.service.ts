@@ -363,9 +363,19 @@ export class StoredObjectService {
       }
 
       const deletedAt = this.now();
-      const deleted = movedOn(value, deletedAt, { status: "deleted", deletedAt });
+      const deleted = movedOn({
+        value,
+        now: deletedAt,
+        // Expired, the reaper retries the bytes if this delete's own removal fails.
+        changes: {
+          status: "deleted",
+          deletedAt,
+          expiresAt: value.status === "uploading" ? value.expiresAt : deletedAt,
+        },
+      });
       if (await this.options.records.transition({ expected: value, next: deleted })) {
-        await this.cleanup.removeBytesOf(deleted);
+        // A write still streaming owns its bytes' fate: it discards them when it sees the delete.
+        if (value.status !== "uploading") await this.cleanup.removeBytesOf(deleted);
 
         return {
           id: deleted.id,

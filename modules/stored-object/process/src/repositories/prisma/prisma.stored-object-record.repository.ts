@@ -151,8 +151,11 @@ export class PrismaStoredObjectRecordRepository implements StoredObjectRecordRep
       })}
       SELECT DISTINCT "tenantId"
         FROM "StoredObject"
-       WHERE "status" IN ('pending', 'uploading')
-         AND "expiresAt" <= ${toDate(input.expiresBefore)}
+       WHERE "expiresAt" <= ${toDate(input.expiresBefore)}
+         AND (
+           "status" IN ('pending', 'uploading')
+           OR ("status" IN ('failed', 'deleted') AND "storageProvider" IS NOT NULL)
+         )
          AND "tenantId" > ${input.afterTenantId ?? ""}
        ORDER BY "tenantId"
        LIMIT ${input.limit}

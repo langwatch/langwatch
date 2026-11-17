@@ -162,12 +162,18 @@ test_nginx_upload_route_has_its_own_ingress() {
   else
     fail "uploads inherits" "the app Ingress annotations did not reach the uploads Ingress"
   fi
-  if printf '%s\n' "$doc" | grep -q 'server-snippet\|configuration-snippet'; then
-    fail "uploads no snippets" "the uploads Ingress copied an app snippet, which nginx would apply twice on the host"
-  elif printf '%s\n' "$app" | grep -q 'server-snippet' && printf '%s\n' "$app" | grep -q 'configuration-snippet'; then
-    ok "uploads no snippets" "the app snippets stay on the app Ingress only"
+  if printf '%s\n' "$doc" | grep -q 'server-snippet'; then
+    fail "uploads no server-snippet" "the uploads Ingress copied the host-scoped server-snippet, which nginx would apply twice"
+  elif printf '%s\n' "$app" | grep -q 'server-snippet'; then
+    ok "uploads no server-snippet" "the server-snippet stays on the app Ingress only"
   else
-    fail "uploads no snippets" "the app Ingress lost its snippets"
+    fail "uploads no server-snippet" "the app Ingress lost its server-snippet"
+  fi
+  if printf '%s\n' "$doc" | grep -q 'configuration-snippet: .*more_set_headers "X-A: b";' \
+      && printf '%s\n' "$app" | grep -q 'configuration-snippet'; then
+    ok "uploads configuration-snippet" "the location-scoped configuration-snippet also guards the upload route"
+  else
+    fail "uploads configuration-snippet" "the uploads Ingress dropped the app configuration-snippet, so uploads would bypass it"
   fi
   if printf '%s\n' "$doc" | grep -q 'rewrite-target\|^  tls:'; then
     fail "uploads no rewrite or tls" "the uploads Ingress inherited a rewrite-target or a tls entry"
@@ -260,8 +266,36 @@ test_uploads_ingress_switch() {
   fi
 }
 
+# @scenario "An nginx install routes LangWatch's upload route through its own Ingress"
+test_operator_owned_upload_path() {
+  local spelling doc
+  for spelling in /api/stored-objects/uploads /api/stored-objects/uploads/ /api/stored-objects/uploads/content; do
+    render owned --set ingress.enabled=true --set ingress.className=nginx \
+      --set 'ingress.hosts[0].host=langwatch.acme.com' \
+      --set 'ingress.hosts[0].http.paths[0].path=/' --set 'ingress.hosts[0].http.paths[0].pathType=Prefix' \
+      --set "ingress.hosts[0].http.paths[1].path=$spelling" --set 'ingress.hosts[0].http.paths[1].pathType=Prefix'
+    if [ -s "$tmp/owned.err" ] || ! grep -q 'name: lw-ingress$' "$tmp/owned.yaml"; then
+      fail "operator path $spelling" "the render failed: $(cat "$tmp/owned.err")"
+    elif grep -q 'lw-uploads-ingress' "$tmp/owned.yaml"; then
+      fail "operator path $spelling" "the uploads Ingress repeats a path the operator routes, which ingress-nginx admission rejects"
+    else
+      ok "operator path $spelling" "the operator's own route wins; no uploads Ingress"
+    fi
+  done
+
+  render owned-one "${APP_INGRESS[@]}" --set ingress.className=nginx \
+    --set 'ingress.hosts[1].http.paths[1].path=/api/stored-objects/uploads/' --set 'ingress.hosts[1].http.paths[1].pathType=Prefix'
+  doc=$(doc_named owned-one lw-uploads-ingress)
+  if printf '%s\n' "$doc" | grep -q 'host: "langwatch.acme.com"$' && ! printf '%s\n' "$doc" | grep -q 'langwatch.internal.acme.com'; then
+    ok "operator path one host" "only the host that routes the path itself is left out"
+  else
+    fail "operator path one host" "the uploads Ingress did not leave out just the operator's host: $(cat "$tmp/owned-one.err")"
+  fi
+}
+
 test_upload_setting_reaches_app_and_workers
 test_nginx_upload_route_has_its_own_ingress
+test_operator_owned_upload_path
 test_uploads_ingress_switch
 
 if [ "$failures" -gt 0 ]; then

@@ -44,6 +44,9 @@ import { movedOn } from "../rules/stored-object-lifecycle.rules.ts";
 import { storedObjectReferenceOf } from "../rules/stored-object-view.rules.ts";
 import type { StoredObjectUploadSignerService } from "./stored-object-upload-signer.service.ts";
 
+/** How long a landed upload waits for its confirm before the reaper takes it (ADR-158 §4). */
+const LANDED_CONFIRM_WINDOW_MS = 24 * 60 * 60 * 1000;
+
 /** How long the reaper leaves an "uploading" row alone: past the api's two-hour body limit. */
 const UPLOAD_RECEIVE_WINDOW_MS = 3 * 60 * 60 * 1000;
 
@@ -218,14 +221,20 @@ export class StoredObjectUploadService {
     });
     if (value?.status === "uploading") throw new UploadIncompleteError();
     if (value?.status !== "pending" || !value.storage) throw new UploadTokenInvalidError();
+    // The signed address was used: its bytes landed. A new file takes a new upload.
+    if (isLanded(value)) throw new UploadTokenInvalidError();
 
     if (!input.body) throw new UploadIncompleteError();
 
     const address = value.storage;
     const receivingAt = this.options.now();
-    const uploading = movedOn(value, receivingAt, {
-      status: "uploading",
-      expiresAt: receivingAt.add({ milliseconds: UPLOAD_RECEIVE_WINDOW_MS }),
+    const uploading = movedOn({
+      value,
+      now: receivingAt,
+      changes: {
+        status: "uploading",
+        expiresAt: receivingAt.add({ milliseconds: UPLOAD_RECEIVE_WINDOW_MS }),
+      },
     });
     if (!(await this.options.records.transition({ expected: value, next: uploading }))) {
       throw new UploadIncompleteError();
@@ -254,9 +263,10 @@ export class StoredObjectUploadService {
     uploading: StoredObjectRecord;
     expiresAt: Instant | null;
   }): Promise<void> {
-    const pending = movedOn(input.uploading, this.options.now(), {
-      status: "pending",
-      expiresAt: input.expiresAt,
+    const pending = movedOn({
+      value: input.uploading,
+      now: this.options.now(),
+      changes: { status: "pending", expiresAt: input.expiresAt },
     });
     await this.options.records.transition({ expected: input.uploading, next: pending });
   }
@@ -276,15 +286,19 @@ export class StoredObjectUploadService {
       StoredObjectUploadService.assertByteFacts(uploading, digest.byteLength);
     } catch (error) {
       await this.restorePending({ uploading, expiresAt: input.expiresAt });
-      await this.discard({ projectId: uploading.tenantId, address });
+      await this.discarded({ projectId: uploading.tenantId, address });
       throw error;
     }
 
     const now = this.options.now();
-    const landed = movedOn(uploading, now, {
-      status: "pending",
-      sha256: digest.sha256,
-      expiresAt: now.add({ milliseconds: this.options.uploadExpiryMs }),
+    const landed = movedOn({
+      value: uploading,
+      now,
+      changes: {
+        status: "pending",
+        sha256: digest.sha256,
+        expiresAt: now.add({ milliseconds: LANDED_CONFIRM_WINDOW_MS }),
+      },
     });
     if (await this.options.records.transition({ expected: uploading, next: landed })) return;
 
@@ -293,19 +307,43 @@ export class StoredObjectUploadService {
       tenantId: uploading.tenantId,
       id: uploading.id,
     });
-    if (current?.status === "available") throw new UploadIncompleteError();
-    await this.discard({ projectId: uploading.tenantId, address });
+    const isAbandoned = !current || current.status === "failed" || current.status === "deleted";
+    if (!isAbandoned) throw new UploadIncompleteError();
+    const isGone = await this.discarded({ projectId: uploading.tenantId, address });
+    if (current) await this.keepAddressUntilGone({ current, address, isGone });
     if (current?.status === "deleted") {
       throw new StoredObjectDeletedError(uploading.tenantId, uploading.id);
     }
     throw new UploadExpiredError();
   }
 
-  private async discard(input: {
+  /** A row whose bytes may still be held keeps their address, so a cleanup pass can retry. */
+  private async keepAddressUntilGone(input: {
+    current: StoredObjectRecord;
+    address: StoredObjectStorageAddress;
+    isGone: boolean;
+  }): Promise<void> {
+    const { current, address, isGone } = input;
+    const storage = isGone ? null : address;
+    const isRecorded = current.storage === storage || (!isGone && current.storage !== null);
+    if (isRecorded) return;
+
+    await this.options.records.transition({
+      expected: current,
+      next: { ...current, storage, updatedAt: this.options.now() },
+    });
+  }
+
+  private async discarded(input: {
     projectId: string;
     address: StoredObjectStorageAddress;
-  }): Promise<void> {
-    await StoredObjectUploadService.ignoreStorageFailure(() => this.options.storage.delete(input));
+  }): Promise<boolean> {
+    try {
+      await this.options.storage.delete(input);
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   async confirmUpload(input: ConfirmStoredObjectUploadInput): Promise<StoredObjectReference> {
@@ -324,12 +362,16 @@ export class StoredObjectUploadService {
 
     StoredObjectUploadService.assertByteFacts(value, digest.byteLength);
     const now = this.options.now();
-    const available = movedOn(value, now, {
-      status: "available",
-      sha256: digest.sha256,
-      mediaTypeVerified: true,
-      expiresAt: null,
-      availableAt: now,
+    const available = movedOn({
+      value,
+      now,
+      changes: {
+        status: "available",
+        sha256: digest.sha256,
+        mediaTypeVerified: true,
+        expiresAt: null,
+        availableAt: now,
+      },
     });
     if (await this.options.records.transition({ expected: value, next: available })) {
       return storedObjectReferenceOf(available);

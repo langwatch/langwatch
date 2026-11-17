@@ -184,7 +184,8 @@ confirmUpload(input: { projectId; objectId }): Promise<StoredObjectReference>
   - It reads `objectStorage.digest`: the backend's own SHA-256 where it holds one (the digest the local
     write computed), otherwise the object streamed back through the hash (S3 and Azure uploads).
     Amended 2026-11-17 (#9666): an upload that came through the signed route confirms on the digest
-    and length that route recorded, without reading the object back, even after its window.
+    and length that route recorded, without reading the object back, for 24 hours after its
+    bytes landed, past its 15-minute window. The signed address takes one landed file.
   - The stored size must equal the declared `byteLength`.
   - It records `sha256` and moves the record to `available`.
   - It is idempotent.

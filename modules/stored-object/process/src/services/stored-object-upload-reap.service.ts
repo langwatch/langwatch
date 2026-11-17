@@ -56,12 +56,12 @@ export class StoredObjectUploadReapService {
     return reaped;
   }
 
-  /** One page of a project's expired uploads; a row whose bytes would not delete waits. */
+  /** One page of a project's expired uploads and leftover bytes; undeletable bytes wait. */
   async reapProject(input: { projectId: string; limit?: number }): Promise<number> {
     const now = this.now();
     const page = await this.options.records.findPage({
       tenantId: input.projectId,
-      status: ["pending", "uploading"],
+      status: ["pending", "uploading", "failed", "deleted"],
       expiresBefore: now,
       limit: input.limit ?? this.batchSize,
     });
@@ -73,7 +73,7 @@ export class StoredObjectUploadReapService {
     return reaped;
   }
 
-  /** Claims the row as failed before touching bytes, so a racing confirm cannot also win. */
+  /** Claims an open upload as failed before touching bytes, so a racing confirm cannot also win. */
   private async reapOne({
     value,
     now,
@@ -81,10 +81,26 @@ export class StoredObjectUploadReapService {
     value: StoredObjectRecord;
     now: Instant;
   }): Promise<boolean> {
-    const claimed = movedOn(value, now, { status: "failed" });
-    if (!(await this.options.records.transition({ expected: value, next: claimed }))) return false;
+    if (value.status === "pending" || value.status === "uploading") {
+      const claimed = movedOn({ value, now, changes: { status: "failed" } });
+      if (!(await this.options.records.transition({ expected: value, next: claimed }))) {
+        return false;
+      }
+      return this.removeBytesOf({ value: claimed, now });
+    }
 
-    const address = claimed.storage;
+    return this.removeBytesOf({ value, now });
+  }
+
+  /** Deletes a closed row's bytes, then clears its address; a crash in between is retried. */
+  private async removeBytesOf({
+    value,
+    now,
+  }: {
+    value: StoredObjectRecord;
+    now: Instant;
+  }): Promise<boolean> {
+    const address = value.storage;
     if (address) {
       try {
         await this.options.storage.delete({ projectId: value.tenantId, address });
@@ -95,21 +111,17 @@ export class StoredObjectUploadReapService {
             objectId: value.id,
             error: error instanceof Error ? error.name : "unknown",
           },
-          "expired upload's bytes would not delete; left for the next reap",
+          "an expired upload's bytes would not delete; left for the next reap",
         );
-        // Bytes still held: hand the row back so the next wake retries it.
-        await this.options.records.transition({
-          expected: claimed,
-          next: movedOn(claimed, now, { status: value.status }),
-        });
         return false;
       }
     }
 
+    // A closed row with no address and no expiry drops out of every later pass.
     await this.options.records.transition({
-      expected: claimed,
-      next: movedOn(claimed, now, { storage: null }),
+      expected: value,
+      next: { ...value, storage: null, expiresAt: null, updatedAt: now },
     });
-    return true;
+    return address !== null;
   }
 }
