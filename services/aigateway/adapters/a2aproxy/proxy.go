@@ -171,19 +171,8 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 // refusal for a request that cannot be read as A2A.
 func parseCall(w http.ResponseWriter, r *http.Request) (*call, *refusal) {
 	c := &call{w: w, r: r, ctx: r.Context(), binding: bindingHTTPJSON, span: trace.SpanFromContext(context.Background())}
-	name, rest, decoded, pathErr := splitPath(r)
-	c.name, c.rest = name, rest
-	c.isCard = (decoded == cardPath || decoded == legacyCardPath) && r.Method == http.MethodGet
-	method, known := restMethod(r.Method, decoded)
-	c.method = method
-	if (decoded == "" || decoded == "/") && r.Method == http.MethodPost {
-		c.binding, known = bindingJSONRPC, true
-	}
-	if pathErr != nil {
-		return c, &refuseInvalidPath
-	}
-	if !known {
-		return c, &refuseUnsupported
+	if bad := parseRoute(c); bad != nil {
+		return c, bad
 	}
 	body, tooLarge, err := readLimited(r.Body)
 	c.body = body
@@ -196,18 +185,44 @@ func parseCall(w http.ResponseWriter, r *http.Request) (*call, *refusal) {
 	if c.binding != bindingJSONRPC {
 		return c, nil
 	}
-	var env struct {
+	return c, parseJSONRPC(c)
+}
+
+// parseRoute fills the target, binding and REST method from the path. It
+// returns the refusal for a path that is invalid or names no A2A method.
+func parseRoute(c *call) *refusal {
+	r := c.r
+	name, rest, decoded, pathErr := splitPath(r)
+	c.name, c.rest = name, rest
+	c.isCard = (decoded == cardPath || decoded == legacyCardPath) && r.Method == http.MethodGet
+	method, known := restMethod(r.Method, decoded)
+	c.method = method
+	if (decoded == "" || decoded == "/") && r.Method == http.MethodPost {
+		c.binding, known = bindingJSONRPC, true
+	}
+	if pathErr != nil {
+		return &refuseInvalidPath
+	}
+	if !known {
+		return &refuseUnsupported
+	}
+	return nil
+}
+
+// parseJSONRPC reads the JSON-RPC id and method from the body.
+func parseJSONRPC(c *call) *refusal {
+	var msg struct {
 		ID     json.RawMessage `json:"id"`
 		Method string          `json:"method"`
 	}
-	if json.Unmarshal(body, &env) != nil {
-		return c, &refuseInvalidRequest
+	if json.Unmarshal(c.body, &msg) != nil {
+		return &refuseInvalidRequest
 	}
-	c.id, c.method = env.ID, env.Method
-	if !jsonRPCMethods[env.Method] {
-		return c, &refuseUnsupported
+	c.id, c.method = msg.ID, msg.Method
+	if !jsonRPCMethods[msg.Method] {
+		return &refuseUnsupported
 	}
-	return c, nil
+	return nil
 }
 
 // readLimited reads at most maxBodyBytes. A body over the limit is reported,
