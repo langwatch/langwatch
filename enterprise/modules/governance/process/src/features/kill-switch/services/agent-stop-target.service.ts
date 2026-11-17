@@ -23,6 +23,7 @@ import type { ProviderSignInChannel } from "../../../channels/provider-sign-in.c
 import type { AgentStopTargetPriorStateRepository } from "../../../repositories/agent-stop-target-prior-state.repository.ts";
 import type { AgentStopRepository } from "../../../repositories/agent-stop.repository.ts";
 import type { GovernanceAwsConnectionRepository } from "../../../repositories/governance-aws-connection.repository.ts";
+import type { KillSwitchLockRepository } from "../../../repositories/kill-switch-lock.repository.ts";
 import type { SourceCredentialAccessService } from "../../ingestion-source/services/source-credential-access.service.ts";
 import type { AgentRegistryService } from "../../registry/services/agent-registry.service.ts";
 import {
@@ -36,7 +37,9 @@ import {
   BEDROCK_INVOCATION_STATES,
   errorCodeOf,
   isGoneErrorCode,
+  targetKeyOf,
 } from "../rules/agent-stop-target.rules.ts";
+import type { AgentStopPlanService } from "./agent-stop-plan.service.ts";
 import { AGENT_STOP_AUDIT_TARGET_KIND, type AgentStopCommandSend } from "./agent-stop.service.ts";
 
 /** The audit log takes an `audit` KSUID as a key, and reads the row's moment from it. */
@@ -97,6 +100,8 @@ interface AgentStopTargetDependencies {
   virtualKeys: Pick<GatewayApi, "findVirtualKeyById" | "disableVirtualKey" | "enableVirtualKey">;
   registry: Pick<AgentRegistryService, "announceStop">;
   stops: Pick<AgentStopRepository, "findAllByStatuses">;
+  plans: Pick<AgentStopPlanService, "findTargets">;
+  locks: KillSwitchLockRepository;
   auditLog: Pick<AuditLogApi, "record">;
   maxAttempts: number;
   now: () => number;
@@ -134,6 +139,7 @@ export class AgentStopTargetService implements AgentStopIntentExecutors {
   }
 
   async applyTarget(intent: AgentStopApplyIntent, context: IntentContext): Promise<void> {
+    if (!(await this.isInPlan(intent))) return;
     const outcome = await this.attempt({ intent, direction: "stop", context });
     const settled = {
       tenantId: intent.organizationId,
@@ -147,6 +153,16 @@ export class AgentStopTargetService implements AgentStopIntentExecutors {
       ...(outcome.gone ? { gone: true } : {}),
     };
     await this.deps.send(outcome.ok ? "recordTargetApplied" : "recordTargetFailed", settled);
+  }
+
+  /** A target taken out of the plan left the stop, so its queued apply writes nothing. */
+  private async isInPlan(intent: AgentStopApplyIntent): Promise<boolean> {
+    const plan = await this.deps.plans.findTargets({
+      organizationId: intent.organizationId,
+      agentId: intent.agentId,
+    });
+    const key = targetKeyOf(intent.target.target);
+    return plan.some((target) => targetKeyOf(target.target) === key);
   }
 
   async revertTarget(intent: AgentStopRevertIntent, context: IntentContext): Promise<void> {
@@ -288,7 +304,19 @@ export class AgentStopTargetService implements AgentStopIntentExecutors {
     return { changed: true };
   }
 
-  private async callVirtualKey({
+  /** The holder check and the key write run under one lock per key, so shared-key work never interleaves. */
+  private async callVirtualKey(input: {
+    intent: AgentStopTargetWork;
+    virtualKeyId: string;
+    direction: Direction;
+  }): Promise<CallOutcome> {
+    return this.deps.locks.withLock({
+      key: `virtual-key:${input.intent.organizationId}:${input.virtualKeyId}`,
+      run: () => this.callVirtualKeyLocked(input),
+    });
+  }
+
+  private async callVirtualKeyLocked({
     intent,
     virtualKeyId,
     direction,
@@ -300,7 +328,7 @@ export class AgentStopTargetService implements AgentStopIntentExecutors {
     const { organizationId } = intent;
     const command = { id: virtualKeyId, organizationId, actorUserId: intent.actorUserId };
     if (direction === "restore") {
-      if (await this.isKeyHeldByAnotherStop({ intent, virtualKeyId })) {
+      if (await this.isKeyHeldByAnotherStop({ intent, virtualKeyId, direction })) {
         return { changed: false, keptDisabled: true };
       }
       await this.deps.virtualKeys.enableVirtualKey(command);
@@ -308,11 +336,11 @@ export class AgentStopTargetService implements AgentStopIntentExecutors {
     }
     return this.stopUnlessAlreadyStopped({
       intent,
-      // A key another of our stops disabled counts as this stop's change too, so the last restore enables it.
+      // A key another stop disabled itself counts as this stop's change too, so the last restore enables it.
       isStopped: async () => {
         const key = await this.deps.virtualKeys.findVirtualKeyById(virtualKeyId, organizationId);
         if (key === null || key.status === "ACTIVE") return false;
-        return !(await this.isKeyHeldByAnotherStop({ intent, virtualKeyId }));
+        return !(await this.isKeyHeldByAnotherStop({ intent, virtualKeyId, direction }));
       },
       stop: () =>
         this.deps.virtualKeys.disableVirtualKey({
@@ -356,13 +384,18 @@ export class AgentStopTargetService implements AgentStopIntentExecutors {
     });
   }
 
-  /** True while another agent's open stop holds the same key stopped (or is about to stop it). */
+  /**
+   * Restoring: another open stop holds the key applied, or an approved stop is about to apply it.
+   * Stopping: another stop disabled the key itself; one that found it already disabled owns nothing.
+   */
   private async isKeyHeldByAnotherStop({
     intent,
     virtualKeyId,
+    direction,
   }: {
     intent: AgentStopTargetWork;
     virtualKeyId: string;
+    direction: Direction;
   }): Promise<boolean> {
     const open = await this.deps.stops.findAllByStatuses({
       organizationId: intent.organizationId,
@@ -375,7 +408,11 @@ export class AgentStopTargetService implements AgentStopIntentExecutors {
           (outcome) =>
             outcome.target.kind === "gateway_virtual_key" &&
             outcome.target.virtualKeyId === virtualKeyId &&
-            (outcome.state === "applied" || outcome.state === "pending"),
+            (outcome.state === "applied"
+              ? direction === "restore" || !outcome.alreadyStopped
+              : direction === "restore" &&
+                outcome.state === "pending" &&
+                stop.status === "stopping"),
         ),
     );
   }

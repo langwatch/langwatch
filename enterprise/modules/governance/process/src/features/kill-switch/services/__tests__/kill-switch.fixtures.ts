@@ -286,6 +286,7 @@ export async function killSwitchHarness({
       stops: repositories.agentStops,
     }),
     plans,
+    locks: repositories.killSwitchLock,
     registry: repositories.agentRegistry,
     audit: killSwitchAudit,
     send,
@@ -302,6 +303,8 @@ export async function killSwitchHarness({
     priorStates: repositories.agentStopTargetPriorStates,
     bedrock,
     virtualKeys: gateway,
+    plans,
+    locks: repositories.killSwitchLock,
     registry: {
       announceStop: async (input) => {
         announced.push(input);

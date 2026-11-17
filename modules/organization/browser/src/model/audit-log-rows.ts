@@ -199,6 +199,7 @@ type RunFields = Pick<
   | "action"
   | "targetKind"
   | "targetId"
+  | "targetName"
   | "projectId"
   | "error"
   | "source"
@@ -214,6 +215,7 @@ function runKey(log: RunFields): string {
     log.action,
     log.targetKind,
     log.targetId,
+    log.targetName,
     log.projectId,
     log.error,
     log.source,

@@ -29,6 +29,7 @@ import type {
   RegistryEntryPosition,
 } from "../../../repositories/agent-registry.repository.ts";
 import type { AgentStopRepository } from "../../../repositories/agent-stop.repository.ts";
+import type { KillSwitchLockRepository } from "../../../repositories/kill-switch-lock.repository.ts";
 import type { AgentStopCommandName } from "../eventing/agent-stop.commands.ts";
 import { targetKeyOf } from "../rules/agent-stop-target.rules.ts";
 import {
@@ -74,7 +75,8 @@ interface AgentStopDependencies {
     "getStop" | "findByAgent" | "findByStatuses" | "findAllByStatuses" | "seed"
   >;
   claims: Pick<AgentStopClaimService, "claim" | "markSent" | "release" | "withDecision">;
-  plans: Pick<AgentStopPlanService, "findTargets" | "findPlanCounts">;
+  plans: Pick<AgentStopPlanService, "findTargets" | "findPlanCounts" | "setPlan">;
+  locks: KillSwitchLockRepository;
   registry: Pick<AgentRegistryRepository, "getEntry" | "listEntries" | "findSourceKeys">;
   audit: Pick<KillSwitchAuditService, "record">;
   send: AgentStopCommandSend;
@@ -241,6 +243,24 @@ export class AgentStopService {
     const stop = retriedStop({ stop: current, data, at });
     await this.audit({ action: "governance.agent.stop_retried", stop, caller });
     return viewOfStop(stop);
+  }
+
+  /** Saves the plan and lets the open stop go of removed targets, one plan edit per agent at a time. */
+  async setPlan(
+    input: Parameters<AgentStopPlanService["setPlan"]>[0],
+  ): ReturnType<AgentStopPlanService["setPlan"]> {
+    return this.deps.locks.withLock({
+      key: `agent-stop-plan:${input.organizationId}:${input.agentId}`,
+      run: async () => {
+        const plan = await this.deps.plans.setPlan(input);
+        await this.dropRemovedTargets({
+          organizationId: input.organizationId,
+          agentId: input.agentId,
+          plan: plan.targets,
+        });
+        return plan;
+      },
+    });
   }
 
   /**

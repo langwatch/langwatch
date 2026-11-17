@@ -107,6 +107,22 @@ export function summariesByRowId(
  * The other agents whose open stop holds one of `stop`'s virtual keys disabled: restoring `stop`
  * leaves that key disabled until they are restored too.
  */
+/** Another open stop holds a key while its target is applied or an approved stop is about to apply it. */
+function holdsSharedKey({
+  holder,
+  outcome,
+  keys,
+}: {
+  holder: AgentStopView;
+  outcome: AgentStopView["targets"][number];
+  keys: ReadonlySet<string>;
+}): boolean {
+  if (outcome.target.kind !== "gateway_virtual_key") return false;
+  if (!keys.has(outcome.target.virtualKeyId)) return false;
+  if (outcome.state === "applied") return true;
+  return outcome.state === "pending" && holder.status === "stopping";
+}
+
 export function sharedKeyHoldersOf({
   stop,
   summaries,
@@ -121,13 +137,11 @@ export function sharedKeyHoldersOf({
     ),
   );
   if (keys.size === 0) return [];
-  const holdsKey = (outcome: AgentStopView["targets"][number]) => {
-    if (outcome.target.kind !== "gateway_virtual_key") return false;
-    if (!keys.has(outcome.target.virtualKeyId)) return false;
-    return outcome.state === "applied" || outcome.state === "pending";
-  };
   return summaries.flatMap(({ openStop }) => {
     if (!openStop || openStop.id === stop.id) return [];
-    return openStop.targets.some(holdsKey) ? [openStop.agentName] : [];
+    const holds = openStop.targets.some((outcome) =>
+      holdsSharedKey({ holder: openStop, outcome, keys }),
+    );
+    return holds ? [openStop.agentName] : [];
   });
 }

@@ -33,6 +33,7 @@ import { MemoryIngestionPullLifecycleRepository } from "./memory.ingestion-pull-
 import { MemoryIngestionPullRunRepository } from "./memory.ingestion-pull-run.repository.ts";
 import { MemoryIngestionSourceRepository } from "./memory.ingestion-source.repository.ts";
 import { MemoryIngestionTemplateRepository } from "./memory.ingestion-template.repository.ts";
+import { MemoryKillSwitchLockRepository } from "./memory.kill-switch-lock.repository.ts";
 import { MemoryOcsfEventsRepository } from "./memory.ocsf-events.repository.ts";
 import { MemoryOrganizationSupportContactRepository } from "./memory.organization-support-contact.repository.ts";
 import { MemoryRollupErasureRepository } from "./memory.rollup-erasure.repository.ts";
@@ -76,6 +77,7 @@ export class MemoryGovernanceRepositories {
       agentStops: MemoryAgentStopRepository.create(),
       awsConnections: MemoryGovernanceAwsConnectionRepository.create(),
       aggregateReconcileLock: MemoryAggregateReconcileLockRepository.create(),
+      killSwitchLock: MemoryKillSwitchLockRepository.create(),
       aiTools: MemoryAiToolCatalogRepository.create(),
       anomalyRules: MemoryAnomalyRuleRepository.create(store),
       costAttributionPolicies: MemoryCostAttributionPolicyRepository.create(),

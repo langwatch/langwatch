@@ -26,6 +26,7 @@ import { PrismaIngestionPullLifecycleRepository } from "./prisma.ingestion-pull-
 import { PrismaIngestionPullRunProjectionRepository } from "./prisma.ingestion-pull-run-projection.repository.ts";
 import { PrismaIngestionSourceRepository } from "./prisma.ingestion-source.repository.ts";
 import { PrismaIngestionTemplateRepository } from "./prisma.ingestion-template.repository.ts";
+import { PrismaKillSwitchLockRepository } from "./prisma.kill-switch-lock.repository.ts";
 import { PrismaOrganizationSupportContactRepository } from "./prisma.organization-support-contact.repository.ts";
 import { PrismaSpendSpikeAnomalyRepository } from "./prisma.spend-spike-anomaly.repository.ts";
 
@@ -61,6 +62,7 @@ export class PostgresGovernanceRepositories {
         cipher: encryption,
       }),
       aggregateReconcileLock: PrismaAggregateReconcileLockRepository.create(prisma),
+      killSwitchLock: PrismaKillSwitchLockRepository.create(prisma),
       aiTools: PrismaAiToolCatalogRepository.create(prisma),
       anomalyRules: PrismaAnomalyRuleRepository.create(prisma),
       costAttributionPolicies: PrismaCostAttributionPolicyRepository.create(prisma),

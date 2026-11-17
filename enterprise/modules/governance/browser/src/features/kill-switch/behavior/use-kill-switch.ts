@@ -35,6 +35,7 @@ export function useKillSwitchReads({
   const pendingApprovals = active && !pendingApprovalsError ? (pending.data ?? []) : [];
   return {
     byRowId: summariesByRowId(summaryRows),
+    summaries: summaryRows,
     pendingApprovals,
     summariesError,
     pendingApprovalsError,

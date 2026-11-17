@@ -976,6 +976,7 @@ export class GovernanceModule implements GovernanceRestApi {
         stops: repositories.agentStops,
       }),
       plans: this.agentStopPlans,
+      locks: repositories.killSwitchLock,
       registry: repositories.agentRegistry,
       audit: killSwitchAudit,
       send: sendAgentStop,
@@ -991,6 +992,8 @@ export class GovernanceModule implements GovernanceRestApi {
       virtualKeys: dependencies.gateway,
       registry: this.agentRegistry,
       stops: repositories.agentStops,
+      plans: this.agentStopPlans,
+      locks: repositories.killSwitchLock,
       auditLog: dependencies.auditLog,
     });
 
@@ -1935,13 +1938,7 @@ export class GovernanceModule implements GovernanceRestApi {
     agentId: string;
     targets: readonly AgentStopTarget[];
   }): Promise<AgentStopPlan> {
-    const plan = await this.agentStopPlans.setPlan(input);
-    await this.agentStops.dropRemovedTargets({
-      organizationId: input.organizationId,
-      agentId: input.agentId,
-      plan: plan.targets,
-    });
-    return plan;
+    return this.agentStops.setPlan(input);
   }
 
   findAwsConnections(input: { organizationId: string }): Promise<AwsConnectionView[]> {

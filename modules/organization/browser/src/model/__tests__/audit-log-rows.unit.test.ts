@@ -187,6 +187,7 @@ const row = (id: string, overrides: Record<string, unknown> = {}) => ({
   action: "authz.grants.attach",
   targetKind: null,
   targetId: null,
+  targetName: null,
   projectId: null,
   error: null,
   source: "platform" as const,

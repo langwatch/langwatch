@@ -82,7 +82,6 @@ export class MemoryGovernanceAwsConnectionRepository extends GovernanceAwsConnec
     externalId: string | null;
     audit: AuditLogIntent;
   }): Promise<GovernanceAwsConnectionRecord> {
-    this.commitAudit(input.audit);
     const row: MemoryAwsConnectionRow = {
       id: input.id,
       organizationId: input.organizationId,
@@ -94,6 +93,7 @@ export class MemoryGovernanceAwsConnectionRepository extends GovernanceAwsConnec
       encryptedExternalId: input.externalId === null ? null : this.cipher.encrypt(input.externalId),
       createdAt: stopTimestamp(nowInstant().epochMilliseconds),
     };
+    this.commitAudit(input.audit);
     this.rows.push(row);
     return recordOf(row);
   }

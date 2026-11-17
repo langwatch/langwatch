@@ -33,6 +33,7 @@ import type { IngestionPullLifecycleRepository } from "./ingestion-pull-lifecycl
 import type { IngestionPullRunRepository } from "./ingestion-pull-run.repository.ts";
 import type { IngestionSourceRepository } from "./ingestion-source.repository.ts";
 import type { IngestionTemplateRepository } from "./ingestion-template.repository.ts";
+import type { KillSwitchLockRepository } from "./kill-switch-lock.repository.ts";
 import type { OrganizationSupportContactRepository } from "./organization-support-contact.repository.ts";
 import type { RollupErasureRepository } from "./rollup-erasure.repository.ts";
 import type { SpendSpikeAnomalyRepository } from "./spend-spike-anomaly.repository.ts";
@@ -150,6 +151,7 @@ export interface GovernanceRepositories {
   readonly agentStops: AgentStopRepository;
   readonly awsConnections: GovernanceAwsConnectionRepository;
   readonly aggregateReconcileLock: AggregateReconcileLockRepository;
+  readonly killSwitchLock: KillSwitchLockRepository;
   readonly aiTools: AiToolCatalogRepository;
   readonly anomalyRules: AnomalyRuleRepository;
   readonly costAttributionPolicies: CostAttributionPolicyRepository;

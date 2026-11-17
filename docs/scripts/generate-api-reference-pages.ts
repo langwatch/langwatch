@@ -350,7 +350,7 @@ const ENDPOINT_GROUPS: EndpointGroup[] = [
     dirName: "governance-kill-switch",
     pathPrefixes: ["/api/governance/agents", "/api/governance/agent-stops"],
     overviewDescription:
-      "Stop a registry agent on the targets of its stop plan: Databricks serving endpoints, Amazon Bedrock agent aliases and gateway virtual keys. Set each agent's stop plan, request a stop, approve or deny it, read every target's outcome, retry a failed stop and restore the agent. Needs an organization API key on an Enterprise plan.",
+      "Stop a registry agent on the targets of its stop plan: Databricks serving endpoints, Amazon Bedrock agent aliases and gateway virtual keys. Set each agent's stop plan, request a stop, approve or deny it, read every target's outcome, retry a failed stop and restore the agent. Needs an organization API key on an Enterprise plan with the agent registry. Reads need the governance:view permission and changes need governance:manage.",
   },
   {
     name: "Coding Agents",

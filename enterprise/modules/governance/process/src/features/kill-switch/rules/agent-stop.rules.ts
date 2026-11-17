@@ -416,8 +416,9 @@ export function targetRevertFailedStop({
 }
 
 /**
- * A retry applies again what is not stopped: a failed or reverted target goes back to pending, a
- * target whose revert failed is still stopped, and plan targets added since join as pending.
+ * A retry applies again what is not surely stopped: a failed or reverted target, or one whose
+ * revert failed after it may have taken effect, goes back to pending; plan targets added since join
+ * as pending. A target that is still stopped is left unchanged by its apply.
  */
 export function retriedStop({
   stop,
@@ -451,8 +452,8 @@ export function retriedStop({
 }
 
 function retriedOutcome(target: AgentStopTargetOutcome): AgentStopTargetOutcome {
-  if (target.state === "revert_failed") return { ...target, state: "applied", errorCode: null };
-  if (target.state !== "failed" && target.state !== "reverted") return target;
+  const retried = ["failed", "reverted", "revert_failed"] as const;
+  if (!retried.some((state) => state === target.state)) return target;
   return {
     id: target.id,
     label: target.label,

@@ -135,7 +135,7 @@ describe("isGoneErrorCode", () => {
 
 describe("retriedStop", () => {
   describe("given a stop whose restore failed", () => {
-    it("keeps the target whose revert failed as stopped and settles quarantined", () => {
+    it("stops the target whose revert failed again, since the revert may have taken effect", () => {
       const { failed } = restoreFailedStop();
 
       const retried = retriedStop({
@@ -152,11 +152,11 @@ describe("retriedStop", () => {
       });
 
       expect(retried).toMatchObject({
-        status: "quarantined",
+        status: "stopping",
         retryRound: 1,
         retriedByUserId: "user-oncall",
       });
-      expect(retried.targets[0]).toMatchObject({ state: "applied", errorCode: null });
+      expect(retried.targets[0]).toMatchObject({ state: "pending", errorCode: null });
     });
   });
 

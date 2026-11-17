@@ -50,6 +50,7 @@ describe.skipIf(!connection)("the kill switch claim and prior state repositories
     const sent: string[] = [];
     let ids = 0;
     const service = AgentStopService.create({
+      locks: { withLock: ({ run }) => run() },
       stops: PrismaAgentStopRepository.create(prisma()),
       claims: AgentStopClaimService.create({
         claims: PrismaAgentStopClaimRepository.create(prisma()),

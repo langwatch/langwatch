@@ -450,7 +450,7 @@ function AgentsPage() {
                 organizationId={organizationId}
                 agentName={agent.name}
                 summary={summary}
-                summaries={[...killSwitch.byRowId.values()]}
+                summaries={killSwitch.summaries}
                 canManage={canManage}
               />
             ),
