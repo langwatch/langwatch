@@ -183,7 +183,9 @@ function idleBounded(body: Readable, key: string, idleMs: number): Readable {
     const stalled = new Error(
       `No bytes of "${key}" moved for ${idleMs} ms, so the body was closed to free its connection.`,
     );
-    body.destroy(Object.assign(stalled, { name: "TimeoutError" }));
+    body.destroy(
+      Object.assign(stalled, { name: "TimeoutError", code: "storage_body_idle_timeout" }),
+    );
   });
   return body;
 }
