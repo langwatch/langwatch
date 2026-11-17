@@ -36,7 +36,10 @@ const disabled = (userId: string): NurturingMembership => ({
 });
 
 describe("pickKeyRecipient", () => {
-  const recipient = (memberships: readonly NurturingMembership[], admin = ADMIN): string | null =>
+  const recipient = (
+    memberships: readonly NurturingMembership[],
+    admin: NurturingOrganizationAdmin = ADMIN,
+  ): string | null =>
     pickKeyRecipient({
       organizationId: "org-1",
       holders: ["user-holder", "user-creator"],

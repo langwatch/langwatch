@@ -51,7 +51,7 @@ function thresholdProperties(sent: readonly CioBatchCall[]) {
 
 /** Everything Customer.io was told of a key: a call's traits or properties, no recipient. */
 const attributesOf = (sent: readonly CioBatchCall[]) =>
-  JSON.stringify(sent.map((call) => ("traits" in call ? call.traits : call.properties)));
+  JSON.stringify(sent.map((call) => (call.type === "track" ? call.properties : call.traits)));
 
 const KEY_PROPERTIES = {
   key_name: "Jane's key",
