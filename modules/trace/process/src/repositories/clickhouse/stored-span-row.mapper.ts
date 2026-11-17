@@ -58,7 +58,7 @@ const VALID_STATUS_CODES = new Set(
   Object.values(NormalizedStatusCode).filter((v): v is number => typeof v === "number"),
 );
 
-function validateSpanKind(value: number): NormalizedSpanKind {
+export function validateSpanKind(value: number): NormalizedSpanKind {
   if (VALID_SPAN_KINDS.has(value)) return value as NormalizedSpanKind;
   logger.warn({ value }, "Unknown SpanKind from ClickHouse, defaulting to INTERNAL");
   return NormalizedSpanKind.INTERNAL;

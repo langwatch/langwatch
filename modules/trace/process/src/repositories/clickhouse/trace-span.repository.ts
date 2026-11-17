@@ -27,7 +27,12 @@ import {
   type TraceSpanPage,
   type TraceSpanSummaryRecord,
 } from "../trace-projected-read.repository.ts";
-import { AGENT_MARK_ATTRIBUTES_SELECT, chString, chStringMap } from "./stored-span-row.mapper.ts";
+import {
+  AGENT_MARK_ATTRIBUTES_SELECT,
+  chString,
+  chStringMap,
+  validateSpanKind,
+} from "./stored-span-row.mapper.ts";
 
 const STORED_SPANS_TABLE = "stored_spans";
 /** Where a tree read is bounded by the stored_spans id index (id-index plan §4). */
@@ -548,7 +553,7 @@ export class ClickHouseTraceSpanRepository extends TraceProjectedReadRepository 
       ...spanTreeAgentMarksOf({
         name: row.SpanName,
         attributes: row.AgentAttributes ?? {},
-        kind: row.AgentSpanKind ?? null,
+        kind: row.AgentSpanKind == null ? null : validateSpanKind(Number(row.AgentSpanKind)),
       }),
       ...braidedOwnerOf({ authorization, tenantId: row.TenantId }),
     };
