@@ -11,6 +11,7 @@ import { describe, expect, it, vi } from "vitest";
 import { HttpCustomerIoChannel } from "../../channels/http/http.customer-io.channel.ts";
 import { MemoryPostHogChannel } from "../../channels/memory/memory.posthog.channel.ts";
 import { PostHogChannel } from "../../channels/posthog.channel.ts";
+import { MemoryNurturingClaimRepository } from "../../repositories/memory/memory.nurturing.repositories.ts";
 import { NurturingDeliveryService } from "../nurturing-delivery.service.ts";
 import { NurturingService } from "../nurturing.service.ts";
 import { unplacedMemberFacts } from "./nurturing-member-facts.test-helpers.ts";
@@ -494,6 +495,35 @@ describe("NurturingDeliveryService", () => {
           },
         },
       ]);
+    });
+
+    it("gives its claim back when the admin read fails, so a redelivery sends", async () => {
+      const cio = customerIo();
+      const memberFacts = unplacedMemberFacts();
+      vi.spyOn(memberFacts, "adminOf").mockRejectedValueOnce(new Error("milestones unavailable"));
+      const delivery = NurturingDeliveryService.create({
+        claims: MemoryNurturingClaimRepository.create(),
+        users: users(),
+        memberFacts,
+        customerIo: cio.service,
+        posthog: undefined,
+      });
+      const signal: NurturingSignal = {
+        kind: "subscription_changed",
+        sourceEventId: "event-22",
+        ...source,
+        organizationId: "org-1",
+        memberUserIds: ["user-1"],
+        hasSubscription: true,
+      };
+
+      await expect(
+        delivery.deliver({ key: "subscription_changed:event-22", signal }),
+      ).resolves.toBeUndefined();
+      expect(cio.sent).toEqual([]);
+      await delivery.deliver({ key: "subscription_changed:event-22", signal });
+
+      expect(cio.sent.map(({ path }) => path)).toEqual(["/v1/batch"]);
     });
   });
 

@@ -17,6 +17,7 @@ import type Stripe from "stripe";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { MemoryStripeSubscriptionsChannel } from "../../channels/memory/memory.stripe-subscriptions.channel.ts";
+import { subscriptionChangedKeyOf } from "../../eventing/billing-lifecycle.commands.ts";
 import type { RecordSubscriptionChangedCommandData } from "../../eventing/billing-lifecycle.events.ts";
 import { MemoryBillingOrganizationRepository } from "../../repositories/memory/memory.billing-account-facts.repository.ts";
 import { MemoryBillingWebhookOrganizationRepository } from "../../repositories/memory/memory.billing-webhook-organization.repository.ts";
@@ -46,9 +47,10 @@ function recorder<Payload>(kept: Payload[] = []): EventingCommandSender<Payload>
 
 /**
  * Billing over memory twins: org-1 ("Acme") with two active members and the subscriptions held,
- * its lifecycle service and a real announcer recording the subscription_changed facts.
+ * its lifecycle service and a real announcer on clock `now`, recording the subscription_changed
+ * facts.
  */
-function billingOver(held: readonly Held[]) {
+function billingOver(held: readonly Held[], now: () => Temporal.Instant = () => AT) {
   const store = MemoryBillingStore.create();
   store.organizations.set("org-1", {
     id: "org-1",
@@ -115,7 +117,7 @@ function billingOver(held: readonly Held[]) {
     billingOrganizations: {
       getOrganizationForBilling: async () => ({ outcome: "not_usage_billed" }),
     },
-    now: () => AT,
+    now,
   });
   announcer.connect({
     recordSubscriptionChanged: recorder(changed),
@@ -266,10 +268,12 @@ describe("billing's subscription_changed fact, as nurturing's linked tests deliv
     /**
      * @scenario "A resync run records each organization's plan, name and members once and a second run sends the same values"
      */
-    it("records the same catch-up fact on each of two runs", async () => {
-      const { announcer, organizations, changed } = billingOver([
-        { id: "sub-1", status: "ACTIVE", plan: "LAUNCH", ageHours: 24 },
-      ]);
+    it("records the same catch-up fact on each of two runs, each under its own key", async () => {
+      let readAt = AT;
+      const { announcer, organizations, changed } = billingOver(
+        [{ id: "sub-1", status: "ACTIVE", plan: "LAUNCH", ageHours: 24 }],
+        () => readAt,
+      );
       const resync = CustomerIoPlanResyncService.create({
         peers: {
           organizations,
@@ -285,10 +289,15 @@ describe("billing's subscription_changed fact, as nurturing's linked tests deliv
         });
 
       const first = await run();
+      readAt = AT.add({ minutes: 5 });
       const second = await run();
 
       const { caughtUp } = subscriptionChangedFacts;
-      expect(changed).toEqual([caughtUp, caughtUp]);
+      expect(changed).toEqual([
+        { ...caughtUp, occurredAt: AT.epochMilliseconds },
+        { ...caughtUp, occurredAt: readAt.epochMilliseconds },
+      ]);
+      expect(new Set(changed.map(subscriptionChangedKeyOf)).size).toBe(2);
       expect(first).toEqual(second);
       expect(first).toMatchObject({ organizations: 1, members: 2, factsRecorded: 1 });
     });

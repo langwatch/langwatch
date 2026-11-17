@@ -124,7 +124,7 @@ export class NurturingDeliveryService {
     if (!(await this.deps.claims.claim(deliveredClaim, DELIVERED_WINDOW_SECONDS))) return;
     if (await this.withinCustomerIoDebounce(signal)) return this.toPostHogSafely(signal);
     const memberBatch = await this.memberBatchOf({ signal, deliveredClaim });
-    this.toCustomerIo(signal);
+    await this.toCustomerIo(signal, deliveredClaim);
     this.toPostHogSafely(signal);
     await this.identifyCodingAgentMembers(signal);
     await this.parts.ownCodingDelivery?.deliver(signal);
@@ -268,7 +268,7 @@ export class NurturingDeliveryService {
     }
   }
 
-  private toCustomerIo(signal: NurturingSignal): void {
+  private async toCustomerIo(signal: NurturingSignal, deliveredClaim: string): Promise<void> {
     if (!this.deps.customerIo) return;
     if (isCodingOrAppSignal(signal)) return this.sendCustomerIoCalls(fireCodingOrApp(signal));
     switch (signal.kind) {
@@ -316,7 +316,16 @@ export class NurturingDeliveryService {
       case "guided_onboarding_progress":
         return this.sendCustomerIoCalls(fireGuidedOnboardingProgress(signal));
       case "subscription_changed":
-        return void this.parts.planSync.planChanged(signal).catch(reportFailure);
+        // Its claim goes back before the failure is reported, so a redelivery sends the change.
+        return this.parts.planSync
+          .planChanged(signal)
+          .catch((error: unknown) =>
+            NurturingClaimReleaseService.create(this.deps.claims).rethrowAfterReleasing({
+              error,
+              keys: [deliveredClaim],
+            }),
+          )
+          .catch(reportFailure);
       case "self_hosted_crm":
         return this.selfHostedCrm(signal);
       default:

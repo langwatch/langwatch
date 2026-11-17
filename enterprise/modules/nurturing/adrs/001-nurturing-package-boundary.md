@@ -85,8 +85,8 @@ copies' subscribers always register. The per-project usage folds, the trace
 counting, the usage sync and the founder's group call on an organization's
 creation register only with a Customer.io channel. Owners
 send the command in any role; the subscribers run in the worker. The founder's
-call is skipped when the fact is more than a day old, so a replay never resets a
-paying organization to free.
+call carries the name and creation time but no plan, so a replay or retry never
+resets a paying organization's plan.
 
 ## Environment and configuration
 
