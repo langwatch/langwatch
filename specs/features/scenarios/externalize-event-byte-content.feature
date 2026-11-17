@@ -498,7 +498,57 @@ Feature: Externalize event byte content to stored_objects
     Then the region is never "auto"
     And a regional AWS endpoint such as s3.eu-west-1.amazonaws.com gives the region eu-west-1
     And so do the FIPS, dual-stack and PrivateLink (vpce) forms of a regional AWS host
-    And with no regional endpoint the SDK region chain (AWS_REGION) decides
+    And with no regional endpoint, AWS_REGION or the AWS profile decides, else the bucket's own region
+
+  @unit
+  Scenario: The stored-objects client finds an AWS bucket's region when none is set
+    Given an AWS bucket in eu-west-1, and no S3_REGION, S3_ENDPOINT, AWS_REGION or profile region
+    When the stored-objects client first talks to S3
+    Then it asks AWS once where the bucket lives
+    And every call uses eu-west-1, presigned upload and download URLs included
+
+  @unit
+  Scenario: Region discovery reads the region from a refused answer too
+    Given an access key that may not list the bucket
+    When AWS refuses the question and names the bucket's region in its answer
+    Then the stored-objects client uses that region
+
+  @unit
+  Scenario: A region set in the environment or profile is used without asking the bucket
+    Given no S3_REGION or S3_ENDPOINT, and AWS_REGION or the AWS profile names a region
+    When the stored-objects client first talks to S3
+    Then it uses that region and sends no extra question to AWS
+
+  @unit
+  Scenario: Concurrent first calls share one region lookup
+    Given the region is not known yet
+    When several calls start at once
+    Then AWS is asked where the bucket lives only once
+
+  @unit
+  Scenario: The host's region is the last resort when the bucket cannot be asked
+    Given no region is set, AWS cannot be reached, and the EC2 host names its region
+    When the stored-objects client first talks to S3
+    Then it uses the host's region, as releases before 3.24 did
+
+  @unit
+  Scenario: The host's region stands in only until the bucket answers
+    Given no region is set, the first question to AWS failed, and the client used the host's region
+    When AWS answers again, after a short pause
+    Then the bucket is asked again and its own region is used from then on
+
+  @unit
+  Scenario: A region that cannot be found names the setting that fixes it
+    Given AWS cannot be reached or names no region for the bucket, and the host names none either
+    When the stored-objects client talks to S3
+    Then the call fails with an error naming S3_REGION and the Helm value app.dataplane.providers.awsS3.region
+    And the lookup is tried again on a later call, after a short pause
+
+  @unit
+  Scenario: A bucket that does not exist is named, not blamed on the region
+    Given AWS answers that the bucket does not exist
+    When the stored-objects client talks to S3
+    Then the call fails with an error saying the bucket does not exist
 
   @unit
   Scenario: Every S3 client picks its region by the same rule
