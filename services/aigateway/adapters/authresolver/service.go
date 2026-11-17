@@ -226,6 +226,8 @@ type entry struct {
 	// authStartedAt is when the control-plane call that confirmed this key
 	// began. A revocation seen after it voids the entry (revocation.go).
 	authStartedAt time.Time
+	// reconfirmAt paces the key re-check a fail-closed refusal makes.
+	reconfirmAt atomic.Int64
 }
 
 // markBudgetChanged records that the spend this entry carries is behind.
@@ -667,6 +669,14 @@ func (s *Service) Resolve(ctx context.Context, key domain.PresentedKey) (*domain
 		return nil, err
 	}
 	bundle, err := s.admit(ctx, h, answer)
+	if errors.Is(err, domain.ErrAuthUpstream) && s.claimReconfirm(h) {
+		if fresh, ferr := s.resolveFresh(ctx, key, h); ferr == nil {
+			answer = fresh
+			bundle, err = s.admit(ctx, h, answer)
+		} else if classifyRefreshError(ferr) != classTransportFailure {
+			return nil, ferr
+		}
+	}
 	if err != nil {
 		return nil, err
 	}

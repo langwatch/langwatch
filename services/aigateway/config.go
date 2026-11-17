@@ -149,7 +149,8 @@ type AuthCacheConfig struct {
 	ConfigTTLSeconds int64 `env:"CONFIG_TTL_SECONDS"`
 	// FailClosedAfterSeconds, when positive, refuses a cached key whose last
 	// control-plane confirmation and whose org's last change-feed poll are both
-	// older than this. 0 (default) keeps serving through an outage.
+	// older than this. 0 (default) keeps serving through an outage; a
+	// negative value is refused at startup.
 	FailClosedAfterSeconds int64 `env:"FAIL_CLOSED_AFTER_SECONDS"`
 }
 
@@ -357,7 +358,7 @@ func validateSecondsFields(cfg Config) error {
 			return fmt.Errorf("%s is %d seconds; it is a wait, so it must be zero or positive. Use 0 for no wait at all", f.env, f.value)
 		}
 	}
-	if v := cfg.AuthCache.FailClosedAfterSeconds; v > 0 && v < MinFailClosedAfterSeconds {
+	if v := cfg.AuthCache.FailClosedAfterSeconds; v < 0 || (v > 0 && v < MinFailClosedAfterSeconds) {
 		return fmt.Errorf("LW_GATEWAY_AUTH_CACHE_FAIL_CLOSED_AFTER_SECONDS is %d seconds; it must be 0 (off) or at least %d, since a healthy change feed holds a poll open for about 10 seconds", v, MinFailClosedAfterSeconds)
 	}
 	return nil

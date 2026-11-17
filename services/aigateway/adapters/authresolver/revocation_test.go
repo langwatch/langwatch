@@ -378,7 +378,7 @@ func TestRevocation_RefusedStaleAnswerIsNotCountedAsServed(t *testing.T) {
 	}
 }
 
-// @scenario "a key confirmed after its re-enable serves again"
+// @scenario "a rotation keeps the old secret valid"
 func TestRevocation_RotationKeepsTheOldSecretValid(t *testing.T) {
 	res := &hookResolver{bundle: orgBundle("vk_rotated", time.Now().Add(time.Hour))}
 	svc, _ := newService(t, Options{Resolver: res, ConfigFetcher: res})
@@ -388,5 +388,57 @@ func TestRevocation_RotationKeepsTheOldSecretValid(t *testing.T) {
 
 	if _, err := svc.Resolve(context.Background(), domain.PresentedKey{Token: "vk-lw-old-secret"}); err != nil {
 		t.Fatalf("the old secret stays valid through the rotation grace: %v", err)
+	}
+}
+
+// @scenario "fail closed re-checks the key before it refuses"
+func TestRevocation_FailClosedRechecksKeyBeforeRefusing(t *testing.T) {
+	res := &hookResolver{bundle: orgBundle("vk_live", time.Now().Add(time.Hour))}
+	svc, _ := newService(t, Options{Resolver: res, ConfigFetcher: res, FailClosedAfter: time.Minute})
+	key := domain.PresentedKey{Token: "vk-lw-live"}
+	svc.publishL1(hashKey(key), svc.newEntry(orgBundle("vk_live", time.Now().Add(time.Hour)), "").authFrom(time.Now().Add(-2*time.Minute)))
+	cur, _ := svc.activeOrgs.Load("org_1")
+	cursor, _ := cur.(*orgCursor)
+	cursor.polledAt.Store(time.Now().Add(-2 * time.Minute).UnixNano())
+
+	for i := 0; i < 3; i++ {
+		if _, err := svc.Resolve(context.Background(), key); err != nil {
+			t.Fatalf("request %d: a key the control plane just confirmed must serve: %v", i, err)
+		}
+	}
+	if res.calls != 1 {
+		t.Fatalf("want one key check, got %d", res.calls)
+	}
+}
+
+// @scenario "fail closed paces its key re-checks during an outage"
+func TestRevocation_FailClosedPacesRechecks(t *testing.T) {
+	res := &hookResolver{err: errControlPlaneDown}
+	svc, _ := newService(t, Options{Resolver: res, ConfigFetcher: res, FailClosedAfter: time.Minute})
+	key := domain.PresentedKey{Token: "vk-lw-down"}
+	svc.publishL1(hashKey(key), svc.newEntry(orgBundle("vk_down", time.Now().Add(time.Hour)), "").authFrom(time.Now().Add(-2*time.Minute)))
+	cur, _ := svc.activeOrgs.Load("org_1")
+	cursor, _ := cur.(*orgCursor)
+	cursor.polledAt.Store(time.Now().Add(-2 * time.Minute).UnixNano())
+
+	for i := 0; i < 5; i++ {
+		if _, err := svc.Resolve(context.Background(), key); !errors.Is(err, domain.ErrAuthUpstream) {
+			t.Fatalf("request %d: want auth_upstream_unavailable, got %v", i, err)
+		}
+	}
+	if res.calls != 1 {
+		t.Fatalf("want one key check per interval, got %d", res.calls)
+	}
+}
+
+// @scenario "fail closed covers a key with no organization"
+func TestRevocation_FailClosedCoversKeyWithoutOrganization(t *testing.T) {
+	res := &hookResolver{err: errControlPlaneDown}
+	svc, _ := newService(t, Options{Resolver: res, ConfigFetcher: res, FailClosedAfter: time.Minute})
+	key := domain.PresentedKey{Token: "vk-lw-orgless"}
+	svc.publishL1(hashKey(key), svc.newEntry(freshBundle("vk_orgless", time.Now().Add(time.Hour)), "").authFrom(time.Now().Add(-2*time.Minute)))
+
+	if _, err := svc.Resolve(context.Background(), key); !errors.Is(err, domain.ErrAuthUpstream) {
+		t.Fatalf("a key with no change feed past the limit must be refused, got %v", err)
 	}
 }

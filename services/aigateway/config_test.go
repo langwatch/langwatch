@@ -264,7 +264,7 @@ func TestLoadConfig_AuthCacheSecondsFields(t *testing.T) {
 
 // @scenario "a fail-closed limit out of range or under the long-poll hold is refused"
 func TestLoadConfig_RefusesBadFailClosedLimit(t *testing.T) {
-	for _, v := range []string{"10", "9000000000000"} {
+	for _, v := range []string{"-1", "10", "9000000000000"} {
 		clearGatewayEnv(t)
 		t.Setenv("LW_GATEWAY_INTERNAL_SECRET", "internal-1")
 		t.Setenv("LW_GATEWAY_JWT_SECRET", "jwt-1")

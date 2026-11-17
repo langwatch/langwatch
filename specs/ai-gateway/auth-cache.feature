@@ -347,6 +347,12 @@ Feature: Gateway auth cache — hot path is zero RTT after first hit
     # its grace period.
 
     @unit
+    Scenario: a rotation keeps the old secret valid
+      Given a cached key whose old secret is still in its grace period
+      When the change feed reports the key rotated
+      Then a resolve with the old secret still serves the key
+
+    @unit
     Scenario: a revoked key is refused while the control plane is down
       Given a cached key past its JWT expiry
       When the change feed revokes it
@@ -415,6 +421,28 @@ Feature: Gateway auth cache — hot path is zero RTT after first hit
       Then the key serves
       When the org's change feed has not answered for 2 minutes
       Then the key is refused with auth_upstream_unavailable
+
+    @unit
+    Scenario: fail closed re-checks the key before it refuses
+      Given fail closed is on and the change feed has gone silent
+      And a cached key whose last key check is older than the limit
+      When the control plane still answers key checks
+      Then the key is checked once and served
+      And the next request is served from the cache without another check
+
+    @unit
+    Scenario: fail closed paces its key re-checks during an outage
+      Given fail closed is on and the control plane is down
+      And a cached key whose last key check is older than the limit
+      When many requests arrive within the re-check interval
+      Then the gateway makes one key check and refuses them all
+
+    @unit
+    Scenario: fail closed covers a key with no organization
+      Given fail closed is on and the control plane is down
+      And a cached key with no organization and no change feed
+      When its last key check is older than the limit
+      Then the gateway refuses it
 
     @unit
     Scenario: fail closed is off by default

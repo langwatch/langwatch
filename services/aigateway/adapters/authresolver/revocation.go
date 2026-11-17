@@ -221,7 +221,7 @@ func (s *Service) admit(ctx context.Context, h [64]byte, in served) (*domain.Bun
 			s.clearDenial(b.VirtualKeyID)
 		}
 	}
-	if s.failClosedAfter > 0 && b.OrganizationID != "" && s.feedSilent(b.OrganizationID) &&
+	if s.failClosedAfter > 0 && s.feedSilent(b.OrganizationID) &&
 		time.Since(authStart) > s.failClosedAfter {
 		s.countRefusal(b.VirtualKeyID, "fail_closed")
 		return nil, herr.New(ctx, domain.ErrAuthUpstream, herr.M{
@@ -230,6 +230,24 @@ func (s *Service) admit(ctx context.Context, h [64]byte, in served) (*domain.Bun
 	}
 	return b, nil
 }
+
+// claimReconfirm lets one request per FailClosedReconfirmInterval re-check a
+// cached key with the control plane before fail closed refuses it. A config
+// answer is no key check: the config route does not look at key status.
+func (s *Service) claimReconfirm(h [64]byte) bool {
+	e, ok := s.l1.Peek(h)
+	if !ok {
+		return false
+	}
+	now, last := time.Now().UnixNano(), e.reconfirmAt.Load()
+	if now-last < int64(FailClosedReconfirmInterval) {
+		return false
+	}
+	return e.reconfirmAt.CompareAndSwap(last, now)
+}
+
+// FailClosedReconfirmInterval bounds the re-checks fail closed makes per key.
+const FailClosedReconfirmInterval = 5 * time.Second
 
 // feedSilent reports whether the org's change feed has gone without an answer
 // for longer than FailClosedAfter.
