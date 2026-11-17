@@ -36,7 +36,7 @@ export interface ScenarioPlanRecord {
 
 export abstract class ScenarioRepository {
   abstract create(
-    input: ScenarioCreateInput & { id: string; actor: ScenarioActor },
+    input: ScenarioCreateInput & { id: string; actor: ScenarioActor; sourceTemplateId?: string },
   ): Promise<Scenario>;
   abstract findById(input: { id: string; projectId: string }): Promise<Scenario>;
   abstract findByIdIncludingArchived(input: { id: string; projectId: string }): Promise<Scenario>;
@@ -46,7 +46,7 @@ export abstract class ScenarioRepository {
   }): Promise<ScenarioLookup>;
   abstract findAll(input: { projectId: string }): Promise<Scenario[]>;
   abstract count(input: { projectId: string }): Promise<number>;
-  /** Live scenarios outside any test suite: the ones the Free scenario cap counts. */
+  /** Live scenarios no template apply created: the ones the Free scenario cap counts. */
   abstract countActiveByProjects(input: { projectIds: string[] }): Promise<number>;
   abstract update(input: ScenarioUpdateInput & { actor: ScenarioActor }): Promise<Scenario>;
   abstract findVersions(

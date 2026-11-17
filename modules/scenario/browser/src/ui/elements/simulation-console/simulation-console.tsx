@@ -92,8 +92,7 @@ export function SimulationConsole({
           width="100%"
         >
           <VStack align="start" gap={3} width="100%">
-            <StatusDisplay status={status} verdict={results?.verdict} />
-            {statusLine}
+            {statusLine ?? <StatusDisplay status={status} verdict={results?.verdict} />}
 
             {!isPending && <MetricsSummary results={results} durationInMs={durationInMs} />}
 

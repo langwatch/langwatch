@@ -2212,6 +2212,7 @@ export const prismaModelFieldCatalogue = {
     "testSuite",
     "kind",
     "redTeam",
+    "sourceTemplateId",
     "version",
     "versions",
     "lastUpdatedById",

@@ -310,12 +310,13 @@ export interface ScenarioApi {
   /** The same read, archived rows included; a miss is `found: false`, not a refusal. */
   readByIdIncludingArchived(input: ScenarioIdInput): Promise<ScenarioLookup>;
   /**
-   * A scenario filed in a test suite (a template's included) is never counted against the
-   * Free scenario cap: the plan caps suites, not the scenarios inside them.
+   * `sourceTemplateId` marks a scenario a suite template apply creates: the Free scenario cap
+   * skips the check and never counts it. Every other create, a copy included, counts.
    */
   create(
     input: Omit<ScenarioCreateInput, "lastUpdatedById">,
     by: ScenarioCaller,
+    options?: { sourceTemplateId?: string },
   ): Promise<Scenario>;
   update(
     input: Omit<ScenarioUpdateInput, "lastUpdatedById">,

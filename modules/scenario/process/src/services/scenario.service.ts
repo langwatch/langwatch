@@ -90,7 +90,10 @@ export class ScenarioService {
     this.cancellation = ScenarioRunCancellationService.create(options);
   }
 
-  async create(input: ScenarioCreateInput): Promise<Scenario> {
+  async create(
+    input: ScenarioCreateInput,
+    options: { sourceTemplateId?: string } = {},
+  ): Promise<Scenario> {
     const parsed = scenarioCreateInputSchema.parse(input);
     const kind = parsed.kind ?? "standard";
     if ((kind === "red_team") !== (parsed.redTeam !== undefined)) {
@@ -113,6 +116,7 @@ export class ScenarioService {
       testSuiteId,
       id: this.options.ids.next(),
       actor: parsed.actor ?? actorFor(parsed.lastUpdatedById),
+      ...(options.sourceTemplateId ? { sourceTemplateId: options.sourceTemplateId } : {}),
     });
   }
 

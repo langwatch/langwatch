@@ -1,3 +1,6 @@
+/**
+ * The suite feature's application: what both of its doors call.
+ */
 import { AgentApi, type AgentApi as AgentApiType } from "@langwatch/agent-contract";
 import { DataRetentionApi } from "@langwatch/data-retention-contract";
 import {
@@ -19,9 +22,6 @@ import { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { FeatureSetup } from "@langwatch/process";
 import { ProjectApi, type ProjectApi as ProjectApiType } from "@langwatch/project-contract";
 import { PromptApi, type PromptApi as PromptApiType } from "@langwatch/prompt-contract";
-/**
- * The suite feature's application: what both of its doors call.
- */
 import {
   loadRunAttachments,
   ScenarioApi,

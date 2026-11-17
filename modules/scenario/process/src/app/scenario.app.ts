@@ -701,20 +701,24 @@ export class ScenarioModule implements ScenarioApi {
   async create(
     input: Omit<ScenarioCreateInput, "lastUpdatedById">,
     by: ScenarioCaller,
+    options: { sourceTemplateId?: string } = {},
   ): Promise<Scenario> {
-    if (!input.testSuiteId) {
+    if (!options.sourceTemplateId) {
       await this.#dependencies.creationCaps.assertScenarioCreationAllowed({
         projectId: input.projectId,
         operatorId: by.label === "user" ? by.id : undefined,
       });
     }
-    const scenario = await this.#dependencies.scenarios.create({
-      ...input,
-      // REST can name an explicit actor when its credential names no person;
-      // `by.id` alone would answer "the key" or "the project", neither a
-      // `User` row. tRPC, always a signed-in person, keeps the old behavior.
-      lastUpdatedById: input.actor ? input.actor.userId : by.id,
-    });
+    const scenario = await this.#dependencies.scenarios.create(
+      {
+        ...input,
+        // REST can name an explicit actor when its credential names no person;
+        // `by.id` alone would answer "the key" or "the project", neither a
+        // `User` row. tRPC, always a signed-in person, keeps the old behavior.
+        lastUpdatedById: input.actor ? input.actor.userId : by.id,
+      },
+      options,
+    );
 
     this.reportScenarioCreated({ scenario, projectId: input.projectId, userId: by.id });
 
@@ -841,21 +845,15 @@ export class ScenarioModule implements ScenarioApi {
     return this.#dependencies.scenarios.moveToTestSuite(input);
   }
 
-  /** Copies a scenario for its caller; a copy filed in a test suite skips the Free cap. */
+  /** Copies a scenario, attributed to the caller who asked for it. */
   async duplicate(
     input: Omit<ScenarioDuplicateInput, "lastUpdatedById">,
     by: ScenarioCaller,
   ): Promise<Scenario> {
-    const original = await this.#dependencies.scenarios.getById({
-      id: input.scenarioId,
+    await this.#dependencies.creationCaps.assertScenarioCreationAllowed({
       projectId: input.projectId,
+      operatorId: by.label === "user" ? by.id : undefined,
     });
-    if (!original.testSuiteId) {
-      await this.#dependencies.creationCaps.assertScenarioCreationAllowed({
-        projectId: input.projectId,
-        operatorId: by.label === "user" ? by.id : undefined,
-      });
-    }
     return this.#dependencies.scenarios.duplicate({ ...input, lastUpdatedById: by.id });
   }
 

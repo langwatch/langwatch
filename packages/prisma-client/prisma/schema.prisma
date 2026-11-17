@@ -4608,9 +4608,12 @@ model Scenario {
   testSuite       SimulationSuite?  @relation("TestSuiteScenarios", fields: [testSuiteId], references: [id], onDelete: SetNull)
   // "standard" | "red_team" (scenarioKindSchema in the scenario contract). A
   // red team scenario runs an attacker in place of the user simulator and
-  // carries its config in redTeam. See modules/scenario/contract/src/red-team.ts.
+  // carries its config in redTeam. See modules/scenario/contract/src/scenario.ts.
   kind            String            @default("standard")
   redTeam         Json?
+  // The suite template whose apply created this scenario. The Free scenario
+  // cap leaves these out; a copy or a later create in that suite stays null.
+  sourceTemplateId String?
   // Counts one up on every save of the editable fields. Each number has a
   // ScenarioVersion row holding the state as saved; the unique constraint
   // there is what keeps two concurrent saves from sharing a number. See

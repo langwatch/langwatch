@@ -18731,6 +18731,15 @@
           "documentation": ""
         },
         {
+          "name": "sourceTemplateId",
+          "columnName": "sourceTemplateId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
           "name": "version",
           "columnName": "version",
           "type": "Int",

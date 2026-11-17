@@ -40,15 +40,19 @@ function setup(options: { templates?: SuiteTemplate[] } = {}) {
   const createTestSuite = vi
     .fn()
     .mockResolvedValue({ id: "suite_1", slug: "owasp", name: "OWASP" });
+  const batchArchive = vi.fn().mockResolvedValue({ archived: [], failed: [] });
+  const archiveTestSuite = vi.fn().mockResolvedValue({ id: "suite_1" });
   const scenarios = createApiFixture<SuiteTemplateServiceOptions["scenarios"]>({
     create,
     createTestSuite,
+    batchArchive,
+    archiveTestSuite,
   });
   const service = SuiteTemplateService.create({
     scenarios,
     ...(options.templates ? { templates: options.templates } : {}),
   });
-  return { service, create, createTestSuite };
+  return { service, create, createTestSuite, batchArchive, archiveTestSuite };
 }
 
 describe("SuiteTemplateService", () => {
@@ -128,8 +132,8 @@ describe("SuiteTemplateService", () => {
   });
 
   describe("when the template has more scenarios than the plan's scenario cap", () => {
-    /** @scenario "Applying a template never counts its scenarios against the plan's scenario cap" */
-    it("creates every scenario outside the per-scenario cap", async () => {
+    /** @scenario "Applying a template marks its scenarios so the plan's scenario cap skips them" */
+    it("creates every scenario marked with the template as its source", async () => {
       const { service, create } = setup();
       const applied = await service.applyTemplate(
         { projectId: "project_1", templateId: "owasp-llm-top-10-2025", fit },
@@ -137,9 +141,36 @@ describe("SuiteTemplateService", () => {
       );
       expect(applied.scenarioIds).toHaveLength(10);
       for (const call of create.mock.calls) {
-        expect(call[0]).toMatchObject({ testSuiteId: expect.any(String) });
-        expect(call).toHaveLength(2);
+        expect(call[0]).toMatchObject({ testSuiteId: "suite_1" });
+        expect(call[2]).toEqual({ sourceTemplateId: "owasp-llm-top-10-2025" });
       }
+    });
+  });
+
+  describe("when a scenario write fails part way through", () => {
+    /** @scenario "A failed scenario write archives the half-built suite" */
+    it("archives the suite and the scenarios already written, then rethrows", async () => {
+      const { service, create, batchArchive, archiveTestSuite } = setup();
+      create
+        .mockResolvedValueOnce({ id: "scenario_a" })
+        .mockResolvedValueOnce({ id: "scenario_b" })
+        .mockRejectedValueOnce(new Error("store down"));
+
+      await expect(
+        service.applyTemplate(
+          { projectId: "project_1", templateId: "owasp-llm-top-10-2025", fit },
+          by,
+        ),
+      ).rejects.toThrow("store down");
+
+      expect(batchArchive).toHaveBeenCalledWith({
+        projectId: "project_1",
+        ids: ["scenario_a", "scenario_b"],
+      });
+      expect(archiveTestSuite).toHaveBeenCalledWith({
+        projectId: "project_1",
+        testSuiteId: "suite_1",
+      });
     });
   });
 

@@ -124,47 +124,6 @@ describe("ScenarioModule on the cloud Free scenario cap", () => {
       ).rejects.toMatchObject(LIMIT_SHAPE);
     });
 
-    /** @scenario A scenario a suite template creates is not counted against the scenario cap */
-    it("creates a scenario filed in a test suite over the cap", async () => {
-      const { app } = await organizationAtTheScenarioCap();
-      const suite = await app.createTestSuite({ projectId: "project-1", name: "OWASP LLM" });
-
-      const created = await app.create(
-        {
-          projectId: "project-1",
-          name: "LLM01 Prompt Injection",
-          situation: "An attacker hides instructions",
-          criteria: [],
-          labels: [],
-          testSuiteId: suite.id,
-        },
-        BY,
-      );
-
-      expect(created.name).toBe("LLM01 Prompt Injection");
-    });
-
-    /** @scenario Duplicating a scenario filed in a test suite is not refused for scenario count */
-    it("duplicates a scenario filed in a test suite over the cap", async () => {
-      const { app } = await organizationAtTheScenarioCap();
-      const suite = await app.createTestSuite({ projectId: "project-1", name: "OWASP LLM" });
-      const original = await app.create(
-        {
-          projectId: "project-1",
-          name: "LLM01 Prompt Injection",
-          situation: "An attacker hides instructions",
-          criteria: [],
-          labels: [],
-          testSuiteId: suite.id,
-        },
-        BY,
-      );
-
-      const copy = await app.duplicate({ scenarioId: original.id, projectId: "project-1" }, BY);
-
-      expect(copy.testSuiteId).toBe(suite.id);
-    });
-
     /** @scenario An organization over the scenario cap can still edit its scenarios */
     it("still saves an edit to an existing scenario", async () => {
       const { app } = await organizationAtTheScenarioCap();
@@ -178,29 +137,58 @@ describe("ScenarioModule on the cloud Free scenario cap", () => {
     });
   });
 
-  describe("given an organization with 2 test suites and no scenario outside one", () => {
-    /** @scenario A template applied on Free leaves later creates in its suite unrefused */
-    it("refuses neither the 10 template scenarios nor a later one in the suite", async () => {
-      const { app, repositories } = await organizationAtTheScenarioCap({ scenarios: 0 });
-      await app.createTestSuite({ projectId: "project-1", name: "Suite A" });
-      await app.createTestSuite({ projectId: "project-2", name: "Suite B" });
-      const template = await app.createTestSuite({ projectId: "project-1", name: "OWASP LLM" });
+  describe("given an organization with 2 active scenarios and an applied template", () => {
+    async function withAppliedTemplate() {
+      const { app, repositories } = await organizationAtTheScenarioCap({ scenarios: 2 });
+      const suite = await app.createTestSuite({ projectId: "project-1", name: "OWASP LLM" });
       const scenario = (name: string) => ({
         projectId: "project-1",
         name,
         situation: "An attacker hides instructions",
         criteria: [],
         labels: [],
-        testSuiteId: template.id,
+        testSuiteId: suite.id,
       });
+      const applied = [];
+      for (let index = 1; index <= 10; index++) {
+        applied.push(
+          await app.create(scenario(`LLM${index}`), BY, { sourceTemplateId: "owasp-llm" }),
+        );
+      }
+      return { app, repositories, suite, scenario, applied };
+    }
+    const normal = { projectId: "project-1", situation: "A refund", criteria: [], labels: [] };
 
-      for (let index = 1; index <= 10; index++) await app.create(scenario(`LLM${index}`), BY);
-      const later = await app.create(scenario("Custom attack"), BY);
+    /** @scenario A scenario a suite template creates is not counted against the scenario cap */
+    it("creates all 10 template scenarios and judges the next create on normal ones", async () => {
+      const { app, applied } = await withAppliedTemplate();
 
-      expect(later.testSuiteId).toBe(template.id);
-      await expect(
-        repositories.scenarios.countActiveByProjects({ projectIds: ["project-1", "project-2"] }),
-      ).resolves.toBe(0);
+      expect(applied).toHaveLength(10);
+      await expect(app.create({ ...normal, name: "Third" }, BY)).resolves.toMatchObject({
+        name: "Third",
+      });
+      await expect(app.create({ ...normal, name: "Fourth" }, BY)).rejects.toMatchObject(
+        LIMIT_SHAPE,
+      );
+    });
+
+    /** @scenario A scenario created inside a template's suite counts against the scenario cap */
+    it("counts a member's create inside the template suite", async () => {
+      const { app, scenario } = await withAppliedTemplate();
+
+      await app.create(scenario("Custom attack"), BY);
+
+      await expect(app.create(scenario("Another attack"), BY)).rejects.toMatchObject(LIMIT_SHAPE);
+    });
+
+    /** @scenario Duplicating a template suite's scenarios counts against the scenario cap */
+    it("counts a copy of a template scenario", async () => {
+      const { app, applied } = await withAppliedTemplate();
+      const source = { scenarioId: applied[0]!.id, projectId: "project-1" };
+
+      await app.duplicate(source, BY);
+
+      await expect(app.duplicate(source, BY)).rejects.toMatchObject(LIMIT_SHAPE);
     });
   });
 });

@@ -47,10 +47,13 @@ export class MemoryScenarioRepository extends ScenarioRepository {
     return sealed;
   }
 
+  private readonly templateSourcedIds = new Set<string>();
+
   async create(
-    input: ScenarioCreateInput & { id: string; actor: ScenarioActor },
+    input: ScenarioCreateInput & { id: string; actor: ScenarioActor; sourceTemplateId?: string },
   ): Promise<Scenario> {
-    const { actor: _, ...scenarioInput } = input;
+    const { actor: _, sourceTemplateId, ...scenarioInput } = input;
+    if (sourceTemplateId) this.templateSourcedIds.add(input.id);
     const row: Scenario = {
       ...scenarioInput,
       parameters: scenarioInput.parameters ?? null,
@@ -115,7 +118,9 @@ export class MemoryScenarioRepository extends ScenarioRepository {
     return Promise.resolve(
       [...this.rows.values()].filter(
         (row) =>
-          projectIds.has(row.projectId) && row.archivedAt === null && row.testSuiteId === null,
+          projectIds.has(row.projectId) &&
+          row.archivedAt === null &&
+          !this.templateSourcedIds.has(row.id),
       ).length,
     );
   }

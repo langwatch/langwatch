@@ -1743,6 +1743,7 @@ export interface LwqlPrismaRows {
     readonly testSuiteId: "String?";
     readonly kind: "String";
     readonly redTeam: "Json?";
+    readonly sourceTemplateId: "String?";
     readonly version: "Int";
     readonly lastUpdatedById: "String?";
     readonly archivedAt: "DateTime?";

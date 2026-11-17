@@ -50,11 +50,18 @@ Feature: Suite templates
     Then the created test suite records template id "owasp-llm-top-10-2025" and template version 1
 
   @unit
-  Scenario: Applying a template never counts its scenarios against the plan's scenario cap
+  Scenario: Applying a template marks its scenarios so the plan's scenario cap skips them
     Given the organization's plan caps scenarios and has fewer free slots than the template's scenarios
     When the caller applies the template
     Then the test suite and every template scenario are created
-    And every scenario is filed in the new test suite, which the scenario cap never counts
+    And every scenario records the template as its source, which the scenario cap does not count
+
+  @unit
+  Scenario: A failed scenario write archives the half-built suite
+    Given a template apply has written its suite and two of its scenarios
+    When the next scenario write fails
+    Then the written scenarios and the suite are archived
+    And the apply fails with the original error
 
   # The Free plan limits test suites, not scenarios: a template is one suite, and
   # running it counts once against the simulation (suite) cap at run start.

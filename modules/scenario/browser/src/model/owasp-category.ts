@@ -35,3 +35,20 @@ export function owaspCategoryLabel({ id }: { id: string }): string {
   const name = owaspCategoryName({ id });
   return name ? `${id} ${name}` : id;
 }
+
+/** Folds `&` to `and` and drops bracketed asides, so "(RCE)" or "&" never reads as a new title. */
+function comparableTitle({ title }: { title: string }): string {
+  return title
+    .toLowerCase()
+    .replace(/&/g, " and ")
+    .replace(/\([^)]*\)/g, " ")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+/** Whether a category's label says the same as a scenario's name, so its badge would repeat it. */
+export function owaspLabelRepeatsName({ id, name }: { id: string; name: string }): boolean {
+  return (
+    comparableTitle({ title: owaspCategoryLabel({ id }) }) === comparableTitle({ title: name })
+  );
+}

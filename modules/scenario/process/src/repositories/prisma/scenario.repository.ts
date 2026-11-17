@@ -115,7 +115,7 @@ export class PrismaScenarioRepository extends ScenarioRepository {
   }
 
   async create(
-    input: ScenarioCreateInput & { id: string; actor: ScenarioActor },
+    input: ScenarioCreateInput & { id: string; actor: ScenarioActor; sourceTemplateId?: string },
   ): Promise<Scenario> {
     return this.database.$transaction(async (transaction) => {
       if (input.testSuiteId) {
@@ -196,7 +196,7 @@ export class PrismaScenarioRepository extends ScenarioRepository {
   async countActiveByProjects(input: { projectIds: string[] }): Promise<number> {
     if (input.projectIds.length === 0) return 0;
     return this.database.scenario.count({
-      where: { projectId: { in: input.projectIds }, archivedAt: null, testSuiteId: null },
+      where: { projectId: { in: input.projectIds }, archivedAt: null, sourceTemplateId: null },
     });
   }
 

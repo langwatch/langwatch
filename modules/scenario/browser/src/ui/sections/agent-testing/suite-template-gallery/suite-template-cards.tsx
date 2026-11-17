@@ -8,7 +8,7 @@ import { Card, CardGrid } from "@langwatch/design-system/card";
 import { Badge, EmptyState, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import type { SuiteTemplate, SuiteTemplateKind } from "@langwatch/suite-contract";
 
-import { owaspCategoryLabel } from "../../../../model/owasp-category.ts";
+import { owaspCategoryLabel, owaspLabelRepeatsName } from "../../../../model/owasp-category.ts";
 
 export const TAB_LABELS: Record<SuiteTemplateKind, string> = {
   archetype: "Archetypes",
@@ -90,7 +90,7 @@ export function TemplatePreview({ template }: { template: SuiteTemplate }) {
             scenario.attack ? (
               <HStack gap={1}>
                 {scenario.attack.owaspIds
-                  .filter((owaspId) => owaspCategoryLabel({ id: owaspId }) !== scenario.name)
+                  .filter((owaspId) => !owaspLabelRepeatsName({ id: owaspId, name: scenario.name }))
                   .map((owaspId) => (
                     <Badge key={owaspId} size="sm" colorPalette="red">
                       {owaspCategoryLabel({ id: owaspId })}
