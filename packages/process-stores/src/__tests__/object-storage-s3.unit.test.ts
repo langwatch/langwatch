@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { Readable } from "node:stream";
 
-import { NoSuchKey, S3ServiceException } from "@aws-sdk/client-s3";
+import { NoSuchKey, S3Client, S3ServiceException } from "@aws-sdk/client-s3";
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
@@ -107,6 +107,31 @@ describe("given an AWS bucket and no region named anywhere", () => {
       expect(url.host).toBe("s3.eu-west-1.amazonaws.com");
       expect(url.searchParams.get("X-Amz-Credential")).toContain("/eu-west-1/s3/aws4_request");
       expect(askBucket).toHaveBeenCalledTimes(1);
+    });
+  });
+});
+
+describe("given the client asks AWS where its bucket lives", () => {
+  describe("when the question is answered", () => {
+    it("closes the client that asked, so its sockets do not outlive the lookup", async () => {
+      const destroy = vi.spyOn(S3Client.prototype, "destroy");
+      const send = vi.spyOn(S3Client.prototype, "send").mockImplementation(async () => ({
+        BucketRegion: "eu-west-1",
+        $metadata: {},
+      }));
+      try {
+        const client = s3Client(
+          { bucket: "objects", credentials: account.credentials },
+          { configured: async () => undefined },
+        );
+
+        await expect(client.config.region()).resolves.toBe("eu-west-1");
+        expect(send).toHaveBeenCalledTimes(1);
+        expect(destroy).toHaveBeenCalledTimes(1);
+      } finally {
+        send.mockRestore();
+        destroy.mockRestore();
+      }
     });
   });
 });

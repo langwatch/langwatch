@@ -79,9 +79,7 @@ export function s3Client(account: ObjectStorageAccount, seams: S3RegionSeams = {
       region: account.region,
       endpoint,
       bucket: account.bucket,
-      askBucket:
-        seams.askBucket ??
-        (() => bucketRegionOf({ client: bucketRegionClient(account), bucket: account.bucket })),
+      askBucket: seams.askBucket ?? (() => askOnce(account)),
       configured: seams.configured,
     }),
     ...(endpoint === undefined ? {} : { endpoint }),
@@ -97,6 +95,16 @@ function credentialsOf(account: ObjectStorageAccount) {
   return account.roleArn
     ? fromTokenFile({ roleArn: account.roleArn })
     : account.credentials && { ...account.credentials };
+}
+
+/** One question from a client of its own, closed afterwards so its sockets do not linger. */
+async function askOnce(account: ObjectStorageAccount): Promise<S3BucketRegionAnswer> {
+  const client = bucketRegionClient(account);
+  try {
+    return await bucketRegionOf({ client, bucket: account.bucket });
+  } finally {
+    client.destroy();
+  }
 }
 
 /** AWS's global endpoint, one attempt, the store's timeouts: it only asks where a bucket lives. */

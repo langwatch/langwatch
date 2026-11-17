@@ -35,12 +35,15 @@ export type S3BucketRegionAnswer =
   | { kind: "missing" }
   | { kind: "unknown" };
 
-/** AWS answered that the bucket does not exist. */
+/** AWS's global endpoint knows no such bucket: a wrong name, or one in GovCloud or China. */
 export class S3BucketNotFoundError extends Error {
   readonly code = "s3_bucket_not_found";
 
   constructor(bucket: string) {
-    super(`S3 bucket "${bucket}" does not exist. Check S3_BUCKET_NAME.`);
+    super(
+      `AWS found no S3 bucket "${bucket}". Check S3_BUCKET_NAME; a GovCloud or China bucket ` +
+        "also needs S3_REGION (Helm: app.dataplane.providers.awsS3.region).",
+    );
     this.name = "S3BucketNotFoundError";
   }
 }

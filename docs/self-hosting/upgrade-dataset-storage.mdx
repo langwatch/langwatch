@@ -55,6 +55,7 @@ app:
     providers:
       awsS3:
         # Your bucket's region (rendered as S3_REGION). Recommended for AWS: unset,
+        # AWS_REGION or the AWS profile wins (so it must match the bucket), else
         # LangWatch asks AWS once where the bucket lives (GovCloud and China must set it). For MinIO
         # or other S3-compatible services, set the region the service expects, or
         # remove the whole region block (both lines) to sign as "auto".
