@@ -20,9 +20,9 @@ type LwqlKeyMapTarget = Readonly<{
 }>;
 
 /**
- * Writes a new project's LangWatchQL key-map row, analytics' reaction to project's created event
- * (ARCHITECTURE §9). A duplicate (KeyHash, TenantId) pair is harmless to the row policy, so a
- * redelivery writes again; a failed insert throws so the queue retries it.
+ * A project's LangWatchQL key-map row. `syncProject` writes it as the reaction to project's
+ * created event (ARCHITECTURE §9); a duplicate pair is harmless, and a failed insert throws so
+ * the queue retries. `ensureProject` checks for the row before a read and heals a missing one.
  */
 export class LwqlKeyMapService {
   private constructor(
