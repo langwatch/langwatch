@@ -5,10 +5,18 @@ import type {
   SuiteTemplateScenario,
 } from "@langwatch/suite-contract";
 
+import { owaspAgenticTop10Template } from "./owasp-agentic-top-10.rules.ts";
 import { owaspLlmTop10Template } from "./owasp-llm-top-10-2025.rules.ts";
+import { paymentsAgentTemplate } from "./payments-agent.rules.ts";
+import { supportAgentTemplate } from "./support-agent.rules.ts";
 
 /** Every shipped suite template, sorted by kind then title. */
-export const SUITE_TEMPLATES: readonly SuiteTemplate[] = [owaspLlmTop10Template].toSorted(
+export const SUITE_TEMPLATES: readonly SuiteTemplate[] = [
+  owaspLlmTop10Template,
+  owaspAgenticTop10Template,
+  supportAgentTemplate,
+  paymentsAgentTemplate,
+].toSorted(
   (left, right) => left.kind.localeCompare(right.kind) || left.title.localeCompare(right.title),
 );
 

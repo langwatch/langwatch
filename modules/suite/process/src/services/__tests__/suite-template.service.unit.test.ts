@@ -62,7 +62,8 @@ describe("SuiteTemplateService", () => {
     it("answers every shipped template with its scenarios", () => {
       const templates = setup().service.listTemplates();
       expect(templates.map((template) => template.id)).toContain("owasp-llm-top-10-2025");
-      expect(templates[0]?.scenarios[0]?.attack?.owaspIds).toEqual(["LLM01"]);
+      const llmPack = templates.find((template) => template.id === "owasp-llm-top-10-2025");
+      expect(llmPack?.scenarios[0]?.attack?.owaspIds).toEqual(["LLM01"]);
     });
   });
 
