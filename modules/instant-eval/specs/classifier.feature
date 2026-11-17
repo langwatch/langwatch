@@ -163,6 +163,26 @@ Feature: The Instant Evals classifier interface — one judged question, priced 
     And the row is skipped with the rate-limited reason
 
   @unit
+  Scenario: A classifier failing on every send stops being sent to until a probe is answered
+    Given a classifier answering 500 to every send
+    When sixteen sends in a row have failed
+    Then later attempts send nothing until a probe is due, ten seconds on
+    And each attempt still waits the usual backoff
+    And its text is skipped with the failed reason
+
+  @unit
+  Scenario: An answered probe lets every text be sent again
+    Given a classifier that has stopped being sent to after sixteen failed sends
+    When ten seconds have passed and the one probe sent is answered
+    Then the next text is sent and its verdict comes back
+
+  @unit
+  Scenario: One text failing on every attempt does not stop the others
+    Given a classifier answering 500 to all five attempts for one text
+    When the next text is classified
+    Then it is sent and its verdict comes back
+
+  @unit
   Scenario: A text the classifier refuses as too large is cut once and retried
     Given a classifier refusing the text as past its token cap, then answering
     When a question is asked
