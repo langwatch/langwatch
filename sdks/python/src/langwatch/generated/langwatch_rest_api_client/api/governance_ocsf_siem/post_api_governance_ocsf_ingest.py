@@ -116,10 +116,11 @@ def sync_detailed(
     """Push OCSF events in from another source
 
      Stores up to 500 OCSF events from another tool, named by `source`. Each event needs `class_uid`,
-    `severity_id`, `time` (epoch ms) and `metadata.uid` and `metadata.version`, and is at most 64 KiB.
-    An event is identified by `source` and `metadata.uid`: sending it again replaces it. Stored events
-    are returned by `GET /api/governance/ocsf/events` with `source_type=ocsf_push`, as received, and are
-    not pushed to webhook endpoints.
+    `severity_id`, `time` (epoch ms) and `metadata.uid` and `metadata.version`, and is at most 64 KiB as
+    UTF-8 JSON; the request body is at most 10 MiB. An event is identified by `source` and
+    `metadata.uid`: sending it again replaces it. Stored events are returned by `GET
+    /api/governance/ocsf/events` with `source_type=ocsf_push`, as received, and are not pushed to
+    webhook endpoints.
 
     Args:
         body (PostApiGovernanceOcsfIngestBody):
@@ -159,10 +160,11 @@ def sync(
     """Push OCSF events in from another source
 
      Stores up to 500 OCSF events from another tool, named by `source`. Each event needs `class_uid`,
-    `severity_id`, `time` (epoch ms) and `metadata.uid` and `metadata.version`, and is at most 64 KiB.
-    An event is identified by `source` and `metadata.uid`: sending it again replaces it. Stored events
-    are returned by `GET /api/governance/ocsf/events` with `source_type=ocsf_push`, as received, and are
-    not pushed to webhook endpoints.
+    `severity_id`, `time` (epoch ms) and `metadata.uid` and `metadata.version`, and is at most 64 KiB as
+    UTF-8 JSON; the request body is at most 10 MiB. An event is identified by `source` and
+    `metadata.uid`: sending it again replaces it. Stored events are returned by `GET
+    /api/governance/ocsf/events` with `source_type=ocsf_push`, as received, and are not pushed to
+    webhook endpoints.
 
     Args:
         body (PostApiGovernanceOcsfIngestBody):
@@ -196,10 +198,11 @@ async def asyncio_detailed(
     """Push OCSF events in from another source
 
      Stores up to 500 OCSF events from another tool, named by `source`. Each event needs `class_uid`,
-    `severity_id`, `time` (epoch ms) and `metadata.uid` and `metadata.version`, and is at most 64 KiB.
-    An event is identified by `source` and `metadata.uid`: sending it again replaces it. Stored events
-    are returned by `GET /api/governance/ocsf/events` with `source_type=ocsf_push`, as received, and are
-    not pushed to webhook endpoints.
+    `severity_id`, `time` (epoch ms) and `metadata.uid` and `metadata.version`, and is at most 64 KiB as
+    UTF-8 JSON; the request body is at most 10 MiB. An event is identified by `source` and
+    `metadata.uid`: sending it again replaces it. Stored events are returned by `GET
+    /api/governance/ocsf/events` with `source_type=ocsf_push`, as received, and are not pushed to
+    webhook endpoints.
 
     Args:
         body (PostApiGovernanceOcsfIngestBody):
@@ -237,10 +240,11 @@ async def asyncio(
     """Push OCSF events in from another source
 
      Stores up to 500 OCSF events from another tool, named by `source`. Each event needs `class_uid`,
-    `severity_id`, `time` (epoch ms) and `metadata.uid` and `metadata.version`, and is at most 64 KiB.
-    An event is identified by `source` and `metadata.uid`: sending it again replaces it. Stored events
-    are returned by `GET /api/governance/ocsf/events` with `source_type=ocsf_push`, as received, and are
-    not pushed to webhook endpoints.
+    `severity_id`, `time` (epoch ms) and `metadata.uid` and `metadata.version`, and is at most 64 KiB as
+    UTF-8 JSON; the request body is at most 10 MiB. An event is identified by `source` and
+    `metadata.uid`: sending it again replaces it. Stored events are returned by `GET
+    /api/governance/ocsf/events` with `source_type=ocsf_push`, as received, and are not pushed to
+    webhook endpoints.
 
     Args:
         body (PostApiGovernanceOcsfIngestBody):

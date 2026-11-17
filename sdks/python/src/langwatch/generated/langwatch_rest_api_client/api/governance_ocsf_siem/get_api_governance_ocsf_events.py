@@ -148,8 +148,8 @@ def sync_detailed(
     LangWatch event carries `ai_model`, `ai_agent` and `message_context` token counts when known, and
     the cost under `unmapped.langwatch`. Filter with `source_type` and `source_id`. Pass `next_cursor`
     back as `cursor` to read on; it is always set, so a puller stores it between runs. `has_more` is
-    true when more events are already waiting. `since` and `until` (ISO 8601) bound the first read; a
-    cursor carries its own position.
+    true when more events are already waiting. `since` (ISO 8601) starts the first read and a cursor
+    carries its own position. `until` (ISO 8601) is not in the cursor: send it with every page.
 
     Args:
         limit (int | Unset):  Default: 500.
@@ -209,8 +209,8 @@ def sync(
     LangWatch event carries `ai_model`, `ai_agent` and `message_context` token counts when known, and
     the cost under `unmapped.langwatch`. Filter with `source_type` and `source_id`. Pass `next_cursor`
     back as `cursor` to read on; it is always set, so a puller stores it between runs. `has_more` is
-    true when more events are already waiting. `since` and `until` (ISO 8601) bound the first read; a
-    cursor carries its own position.
+    true when more events are already waiting. `since` (ISO 8601) starts the first read and a cursor
+    carries its own position. `until` (ISO 8601) is not in the cursor: send it with every page.
 
     Args:
         limit (int | Unset):  Default: 500.
@@ -264,8 +264,8 @@ async def asyncio_detailed(
     LangWatch event carries `ai_model`, `ai_agent` and `message_context` token counts when known, and
     the cost under `unmapped.langwatch`. Filter with `source_type` and `source_id`. Pass `next_cursor`
     back as `cursor` to read on; it is always set, so a puller stores it between runs. `has_more` is
-    true when more events are already waiting. `since` and `until` (ISO 8601) bound the first read; a
-    cursor carries its own position.
+    true when more events are already waiting. `since` (ISO 8601) starts the first read and a cursor
+    carries its own position. `until` (ISO 8601) is not in the cursor: send it with every page.
 
     Args:
         limit (int | Unset):  Default: 500.
@@ -323,8 +323,8 @@ async def asyncio(
     LangWatch event carries `ai_model`, `ai_agent` and `message_context` token counts when known, and
     the cost under `unmapped.langwatch`. Filter with `source_type` and `source_id`. Pass `next_cursor`
     back as `cursor` to read on; it is always set, so a puller stores it between runs. `has_more` is
-    true when more events are already waiting. `since` and `until` (ISO 8601) bound the first read; a
-    cursor carries its own position.
+    true when more events are already waiting. `since` (ISO 8601) starts the first read and a cursor
+    carries its own position. `until` (ISO 8601) is not in the cursor: send it with every page.
 
     Args:
         limit (int | Unset):  Default: 500.

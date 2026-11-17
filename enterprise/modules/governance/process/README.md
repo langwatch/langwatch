@@ -1257,7 +1257,7 @@ type Response = z.infer<typeof meUsageResponseSchema>; // ../contract/src/featur
 
 |             |                                        |
 | ----------- | -------------------------------------- |
-| Declared at | `src/transport/ocsf-siem.rest.ts:28`   |
+| Declared at | `src/transport/ocsf-siem.rest.ts:30`   |
 | Base URL    | none: each route's path is its address |
 | Addressing  | literal                                |
 | Credential  | organization                           |
@@ -1266,7 +1266,7 @@ type Response = z.infer<typeof meUsageResponseSchema>; // ../contract/src/featur
 
 Export governance events as OCSF 1.9.0
 
-Permission `complianceExport:view`. Entitlement `enterprise` (feature `OCSF_EXPORT`). Declared at `src/transport/ocsf-siem.rest.ts:35`.
+Permission `complianceExport:view`. Entitlement `enterprise` (feature `OCSF_EXPORT`). Declared at `src/transport/ocsf-siem.rest.ts:37`.
 
 Answers at `/api/governance/ocsf/events`, `/api/v1/governance/ocsf/events`.
 
@@ -1293,7 +1293,7 @@ interface Response {
 
 Export project traces as OCSF 1.9.0
 
-Permission `complianceExport:view`. Entitlement `enterprise` (feature `OCSF_EXPORT`). Declared at `src/transport/ocsf-siem.rest.ts:59`.
+Permission `complianceExport:view`. Entitlement `enterprise` (feature `OCSF_EXPORT`). Declared at `src/transport/ocsf-siem.rest.ts:61`.
 
 Answers at `/api/governance/ocsf/traces`, `/api/v1/governance/ocsf/traces`.
 
@@ -1313,7 +1313,7 @@ type Response = z.infer<typeof ocsfEventsPageSchema>; // ../contract/src/feature
 
 Export the audit log as OCSF 1.9.0
 
-Permission `complianceExport:view`. Entitlement `enterprise` (feature `OCSF_EXPORT`). Declared at `src/transport/ocsf-siem.rest.ts:82`.
+Permission `complianceExport:view`. Entitlement `enterprise` (feature `OCSF_EXPORT`). Declared at `src/transport/ocsf-siem.rest.ts:84`.
 
 Answers at `/api/governance/ocsf/audit`, `/api/v1/governance/ocsf/audit`.
 
@@ -1332,13 +1332,13 @@ type Response = z.infer<typeof ocsfEventsPageSchema>; // ../contract/src/feature
 
 Push OCSF events in from another source
 
-Permission `governance:manage`. Entitlement `enterprise` (feature `OCSF_EXPORT`). Declared at `src/transport/ocsf-siem.rest.ts:104`.
+Permission `governance:manage`. Entitlement `enterprise` (feature `OCSF_EXPORT`). Declared at `src/transport/ocsf-siem.rest.ts:106`.
 
 Answers at `/api/governance/ocsf/ingest`, `/api/v1/governance/ocsf/ingest`.
 
 ```typescript
-type Body = z.infer<typeof ocsfIngestRequestSchema>; // ../contract/src/features/ocsf/ocsf-siem.ts:158
-// Response: ocsfIngestResponseSchema, ../contract/src/features/ocsf/ocsf-siem.ts:169
+type Body = z.infer<typeof ocsfIngestRequestSchema>; // ../contract/src/features/ocsf/ocsf-siem.ts:168
+// Response: ocsfIngestResponseSchema, ../contract/src/features/ocsf/ocsf-siem.ts:179
 interface Response {
   accepted: number;
 }
@@ -2496,7 +2496,7 @@ Declared at `src/features/registry/eventing/agent-registry.pipeline.ts:89`.
 
 | Kind   | Leaf                       | Environment variable                  | Declared at                               |
 | ------ | -------------------------- | ------------------------------------- | ----------------------------------------- |
-| secret | `–`                        | `GOVERNANCE_ERASURE_PSEUDONYM_SECRET` | `src/app/governance.app.ts:544`           |
+| secret | `–`                        | `GOVERNANCE_ERASURE_PSEUDONYM_SECRET` | `src/app/governance.app.ts:545`           |
 | config | `gatewayPublicUrl`         | `LW_GATEWAY_PUBLIC_URL`               | `../contract/src/governance.config.ts:41` |
 | config | `gatewayInternalUrl`       | `LW_GATEWAY_INTERNAL_URL`             | `../contract/src/governance.config.ts:42` |
 | config | `gatewayLegacyUrl`         | `LW_GATEWAY_BASE_URL`                 | `../contract/src/governance.config.ts:43` |

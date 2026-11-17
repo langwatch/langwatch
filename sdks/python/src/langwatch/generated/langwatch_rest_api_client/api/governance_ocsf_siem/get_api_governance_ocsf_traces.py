@@ -142,8 +142,9 @@ def sync_detailed(
     `ai_model`, `ai_agent`, token counts and cost. A trace updated again is exported again under the
     same `metadata.uid`; deduplicate on it. `project_id` limits the read to one project of the
     organisation. Pass `next_cursor` back as `cursor` to read on; it is always set, so a puller stores
-    it between runs. `has_more` is true when more events are already waiting. `since` and `until` (ISO
-    8601) bound the first read; a cursor carries its own position.
+    it between runs. `has_more` is true when more events are already waiting. `since` (ISO 8601) starts
+    the first read and a cursor carries its own position. `until` (ISO 8601) is not in the cursor: send
+    it with every page.
 
     Args:
         limit (int | Unset):  Default: 500.
@@ -198,8 +199,9 @@ def sync(
     `ai_model`, `ai_agent`, token counts and cost. A trace updated again is exported again under the
     same `metadata.uid`; deduplicate on it. `project_id` limits the read to one project of the
     organisation. Pass `next_cursor` back as `cursor` to read on; it is always set, so a puller stores
-    it between runs. `has_more` is true when more events are already waiting. `since` and `until` (ISO
-    8601) bound the first read; a cursor carries its own position.
+    it between runs. `has_more` is true when more events are already waiting. `since` (ISO 8601) starts
+    the first read and a cursor carries its own position. `until` (ISO 8601) is not in the cursor: send
+    it with every page.
 
     Args:
         limit (int | Unset):  Default: 500.
@@ -248,8 +250,9 @@ async def asyncio_detailed(
     `ai_model`, `ai_agent`, token counts and cost. A trace updated again is exported again under the
     same `metadata.uid`; deduplicate on it. `project_id` limits the read to one project of the
     organisation. Pass `next_cursor` back as `cursor` to read on; it is always set, so a puller stores
-    it between runs. `has_more` is true when more events are already waiting. `since` and `until` (ISO
-    8601) bound the first read; a cursor carries its own position.
+    it between runs. `has_more` is true when more events are already waiting. `since` (ISO 8601) starts
+    the first read and a cursor carries its own position. `until` (ISO 8601) is not in the cursor: send
+    it with every page.
 
     Args:
         limit (int | Unset):  Default: 500.
@@ -302,8 +305,9 @@ async def asyncio(
     `ai_model`, `ai_agent`, token counts and cost. A trace updated again is exported again under the
     same `metadata.uid`; deduplicate on it. `project_id` limits the read to one project of the
     organisation. Pass `next_cursor` back as `cursor` to read on; it is always set, so a puller stores
-    it between runs. `has_more` is true when more events are already waiting. `since` and `until` (ISO
-    8601) bound the first read; a cursor carries its own position.
+    it between runs. `has_more` is true when more events are already waiting. `since` (ISO 8601) starts
+    the first read and a cursor carries its own position. `until` (ISO 8601) is not in the cursor: send
+    it with every page.
 
     Args:
         limit (int | Unset):  Default: 500.
