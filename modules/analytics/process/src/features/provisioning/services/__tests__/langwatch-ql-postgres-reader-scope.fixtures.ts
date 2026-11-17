@@ -3,6 +3,7 @@
  * its own container through {@link startScopeHarness}, so no suite depends on another's state.
  */
 import { createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
 
 import { createLogger } from "@langwatch/observability";
 import {
@@ -26,8 +27,6 @@ import { LangWatchQLCatalogShapesService } from "../../../../services/langwatch-
 import type { LwqlConvergencePlan } from "../../../../tasks/lwql-provision.task.ts";
 import { LWQL_SCOPED_SCHEMA, scopedViewGuardCondition } from "../../rules/lwql-scoped-view.rules.ts";
 import {
-  DEFAULT_POSTGRES_READER_LIMITS,
-  LangWatchQLPostgresMappingService,
   LWQL_SCOPED_READER_GROUP,
   LWQL_SHARED_READER_ROLE,
 } from "../langwatch-ql-postgres-mapping.service.ts";
@@ -84,6 +83,16 @@ export const deployStatements = (): string[] => [
   ...provisioning.postgresScopedViewStatements({ schema: SCHEMA }),
   ...provisioning.postgresScopedReaderGrantStatements({ schema: SCHEMA }),
 ];
+
+/**
+ * The shared views and shared reader statements production's a6e68647 emits, frozen in the
+ * fixture beside this file; each follows a `-- statement N` line after the header.
+ */
+export const olderConvergeStatements = (): string[] =>
+  readFileSync(new URL("./fixtures/older-converge-a6e68647.sql", import.meta.url), "utf8")
+    .split(/^-- statement \d+$/m)
+    .slice(1)
+    .map((statement) => statement.trim());
 
 /** A convergence plan whose PostgreSQL half is real; its ClickHouse half is refused. */
 export function postgresOnlyPlan(): LwqlConvergencePlan {
@@ -163,9 +172,9 @@ export interface ScopeHarness {
   /** Each copy's stored definition and options, keyed by view, as one JSON text. */
   scopedCopyDefinitions: () => Promise<string>;
   /**
-   * An older version's converge, as origin/main runs it: a look-alike shared view forces the
-   * drop-and-create fallback, then the shared views and the shared reader role. Returns the
-   * view it replaced.
+   * An older version's converge, as production's a6e68647 runs it: a look-alike shared view
+   * forces the drop-and-create fallback, then that version's own frozen statements for the
+   * shared views and the shared reader role. Returns the view it replaced.
    */
   applyOlderConverge: () => Promise<string>;
   /** Relations `role` may select, outside the system schemas. */
@@ -295,18 +304,7 @@ export async function startScopeHarness({
     const view = VIEW_NAMES[0] as string;
     await admin(`DROP VIEW ${q(SCHEMA)}.${q(view)}`);
     await admin(`CREATE VIEW ${q(SCHEMA)}.${q(view)} AS SELECT 1 AS bogus_column`);
-    await applyAll([
-      ...provisioning.postgresApprovedViewStatements({ schema: SCHEMA, readerRole: SHARED_READER }),
-      ...LangWatchQLPostgresMappingService.create().readerRoleStatements({
-        reader: {
-          role: SHARED_READER,
-          password: LOGIN_PASSWORD,
-          schema: SCHEMA,
-          approvedViews: VIEW_NAMES,
-          ...DEFAULT_POSTGRES_READER_LIMITS,
-        },
-      }),
-    ]);
+    await applyAll(olderConvergeStatements());
     return view;
   }
 
