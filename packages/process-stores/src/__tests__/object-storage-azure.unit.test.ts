@@ -162,6 +162,10 @@ describe("given object storage on Azure Blob with an account key", () => {
         );
         expect(refusal).toMatchObject({ code: "storage_credentials_refused", fault: "platform" });
         expect(String((refusal as Error).message)).not.toContain(accountKey);
+        const tips = (refusal as { tips: readonly string[] }).tips.join("\n");
+        expect(tips).toContain("AZURE_BLOB_ACCOUNT_NAME");
+        expect(tips).toContain("AZURE_BLOB_ACCOUNT_KEY");
+        expect(tips).not.toContain("Storage Blob Data Contributor");
       }
     });
   });
@@ -176,6 +180,7 @@ describe("given object storage on Azure Blob with an account key", () => {
         await expect(backend().read(at)).rejects.toMatchObject({
           code: "storage_permission_denied",
           fault: "platform",
+          tips: expect.arrayContaining([expect.stringContaining("Storage Blob Data Contributor")]),
         });
       }
     });
