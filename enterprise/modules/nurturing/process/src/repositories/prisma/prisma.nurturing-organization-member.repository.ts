@@ -15,6 +15,14 @@ type NurturingOrganizationMemberDatabase = Pick<
 
 const dateOf = (at: number | null) => (at === null ? null : new Date(at));
 
+type MembershipRow = Readonly<{
+  organizationId: string;
+  userId: string;
+  joinedAt: Date | null;
+  leftAt: Date | null;
+  returnedAt: Date | null;
+}>;
+
 /** Nurturing's own `NurturingOrganizationMember` rows, from the owners' member facts. */
 export class PrismaNurturingOrganizationMemberRepository
   extends PrismaRepository.for("NurturingOrganizationMember")
@@ -79,13 +87,7 @@ export class PrismaNurturingOrganizationMemberRepository
     const rows = await this.#database.nurturingOrganizationMember.findMany({
       where: { userId: { in: members.map(({ userId }) => userId) } },
     });
-    return rows.map((row) => ({
-      organizationId: row.organizationId,
-      userId: row.userId,
-      joinedAt: row.joinedAt?.getTime() ?? null,
-      leftAt: row.leftAt?.getTime() ?? null,
-      returnedAt: row.returnedAt?.getTime() ?? null,
-    }));
+    return rows.map((row) => this.membershipOf(row));
   }
 
   /** A read by the named users, which the tenancy guard admits for a non-empty list. */
@@ -99,16 +101,18 @@ export class PrismaNurturingOrganizationMemberRepository
       const rows = await this.#database.nurturingOrganizationMember.findMany({
         where: { userId: { in: userIds.slice(start, start + usersPerRead) } },
       });
-      memberships.push(
-        ...rows.map((row) => ({
-          organizationId: row.organizationId,
-          userId: row.userId,
-          joinedAt: row.joinedAt?.getTime() ?? null,
-          leftAt: row.leftAt?.getTime() ?? null,
-          returnedAt: row.returnedAt?.getTime() ?? null,
-        })),
-      );
+      memberships.push(...rows.map((row) => this.membershipOf(row)));
     }
     return memberships;
+  }
+
+  private membershipOf(row: MembershipRow): NurturingMembership {
+    return {
+      organizationId: row.organizationId,
+      userId: row.userId,
+      joinedAt: row.joinedAt?.getTime() ?? null,
+      leftAt: row.leftAt?.getTime() ?? null,
+      returnedAt: row.returnedAt?.getTime() ?? null,
+    };
   }
 }

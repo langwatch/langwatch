@@ -4,9 +4,8 @@
  * a catch-up fact, a page of organizations at a time; nurturing sends each to Customer.io.
  * Spec: enterprise/modules/nurturing/specs/customer-io-plan-traits.feature
  */
-import { ORGANIZATION_ID_PAGE_LIMIT } from "@langwatch/organization-contract";
-
 import type { BillingAccountFactsRepository } from "../repositories/billing-account-facts.repository.ts";
+import { BillingOrganizationWalkService } from "./billing-organization-walk.service.ts";
 
 type CustomerIoPlanResyncPeers = Readonly<{
   /** Organization ids through organization's shared table (C2 B). */
@@ -26,7 +25,11 @@ export type CustomerIoPlanResyncTotals = {
 };
 
 export class CustomerIoPlanResyncService {
-  private constructor(private readonly peers: CustomerIoPlanResyncPeers) {}
+  private readonly pages: BillingOrganizationWalkService;
+
+  private constructor(private readonly peers: CustomerIoPlanResyncPeers) {
+    this.pages = BillingOrganizationWalkService.create({ peers });
+  }
 
   static create({ peers }: { peers: CustomerIoPlanResyncPeers }): CustomerIoPlanResyncService {
     return new CustomerIoPlanResyncService(peers);
@@ -55,49 +58,24 @@ export class CustomerIoPlanResyncService {
       plannedIdentifies: 0,
       skipped: { no_active_members: 0 },
     };
-    let cursor = after;
-    let hasMore = true;
-    while (hasMore && !signal.aborted) {
-      const page = await this.peers.organizations.listIds({
-        after: cursor,
-        limit: ORGANIZATION_ID_PAGE_LIMIT,
-      });
-      const completed = await this.recordPage({ ids: page.ids, dryRun, signal, totals });
-      const last = page.ids.at(-1);
-      if (completed && last !== undefined) {
-        cursor = last;
-        if (!dryRun) await onPage({ afterOrganizationId: last });
-      }
-      hasMore = completed && page.next !== null;
-    }
-    return { afterOrganizationId: cursor ?? null, ...totals };
-  }
-
-  /** One page's organizations; false when the signal stopped it part way. */
-  private async recordPage({
-    ids,
-    dryRun,
-    signal,
-    totals,
-  }: {
-    ids: readonly string[];
-    dryRun: boolean;
-    signal: AbortSignal;
-    totals: CustomerIoPlanResyncTotals;
-  }): Promise<boolean> {
-    for (const organizationId of ids) {
-      if (signal.aborted) return false;
-      const { members } = await this.peers.catchUp({ organizationId, isDryRun: dryRun });
-      totals.organizations += 1;
-      if (members === 0) {
-        totals.skipped.no_active_members += 1;
-        continue;
-      }
-      totals.members += members;
-      totals.plannedGroupCalls += 1;
-      totals.plannedIdentifies += members;
-      if (!dryRun) totals.factsRecorded += 1;
-    }
-    return true;
+    const { afterOrganizationId } = await this.pages.walk({
+      after,
+      dryRun,
+      signal,
+      onPage,
+      step: async (organizationId) => {
+        const { members } = await this.peers.catchUp({ organizationId, isDryRun: dryRun });
+        totals.organizations += 1;
+        if (members === 0) {
+          totals.skipped.no_active_members += 1;
+          return;
+        }
+        totals.members += members;
+        totals.plannedGroupCalls += 1;
+        totals.plannedIdentifies += members;
+        if (!dryRun) totals.factsRecorded += 1;
+      },
+    });
+    return { afterOrganizationId, ...totals };
   }
 }

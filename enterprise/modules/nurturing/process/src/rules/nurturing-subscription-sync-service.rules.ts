@@ -11,7 +11,7 @@ import type { PostHogEventInput } from "../channels/posthog.channel.ts";
 export type NurturingOrganizationAdmin = { kind: "admin"; userId: string } | { kind: "none" };
 
 /** Members per Customer.io request, so a large organization never sends one huge batch. */
-export const SUBSCRIPTION_MEMBERS_PER_REQUEST = 100;
+const SUBSCRIPTION_MEMBERS_PER_REQUEST = 100;
 
 /** Billing's plan type as Customer.io's `plan`: lower case, as sign-up's "free" already is. */
 export function customerIoPlanOf(plan: string): string {
