@@ -200,14 +200,24 @@ class LocalPromptLoader:
                     type="json_schema", json_schema=prompt_data["response_format"]
                 )
 
+            # The CLI writes sampling settings under `modelParameters`; a
+            # top-level key is still read for hand-written files.
+            model_parameters = prompt_data.get("modelParameters") or {}
+
             return PromptData(
                 handle=prompt_id,  # The prompt_id parameter is the handle
                 model=prompt_data["model"],  # Required field - let it fail if missing
                 messages=messages,
                 prompt=prompt_data.get("prompt"),
-                temperature=prompt_data.get("temperature"),
-                max_tokens=prompt_data.get("max_tokens"),
+                temperature=model_parameters.get(
+                    "temperature", prompt_data.get("temperature")
+                ),
+                max_tokens=model_parameters.get(
+                    "maxTokens",
+                    model_parameters.get("max_tokens", prompt_data.get("max_tokens")),
+                ),
                 response_format=response_format,
+                parameters=prompt_data.get("parameters") or {},
                 version=prompt_info.get("version"),
                 version_id=prompt_info.get("versionId"),
                 # id and scope are not available in local files

@@ -117,6 +117,53 @@ response_format:
     assert result.response_format.json_schema["schema"]["type"] == "object"
 
 
+def test_load_prompt_reads_cli_model_parameters_and_runtime_parameters():
+    """
+    GIVEN a prompt file as the CLI writes it, with modelParameters and parameters
+    WHEN LocalPromptLoader.load_prompt() is called
+    THEN temperature, max_tokens and parameters carry the file's values
+    """
+    with tempfile.TemporaryDirectory() as temp_dir:
+        temp_path = Path(temp_dir)
+
+        config = {"prompts": {"my-prompt": "file:prompts/my-prompt.prompt.yaml"}}
+        (temp_path / "prompts.json").write_text(json.dumps(config))
+
+        lock = {
+            "prompts": {
+                "my-prompt": {
+                    "version": 1,
+                    "versionId": "v1",
+                    "materialized": "prompts/my-prompt.prompt.yaml",
+                }
+            }
+        }
+        (temp_path / "prompts-lock.json").write_text(json.dumps(lock))
+
+        prompts_dir = temp_path / "prompts"
+        prompts_dir.mkdir()
+
+        prompt_content = """model: openai/gpt-4
+messages:
+  - role: user
+    content: Hello
+modelParameters:
+  temperature: 0.25
+  maxTokens: 432
+parameters:
+  seed: 7
+  environment: staging
+"""
+        (prompts_dir / "my-prompt.prompt.yaml").write_text(prompt_content)
+
+        result = LocalPromptLoader(temp_path).load_prompt("my-prompt")
+
+    assert result is not None
+    assert result.temperature == 0.25
+    assert result.max_tokens == 432
+    assert result.parameters == {"seed": 7, "environment": "staging"}
+
+
 def test_load_prompt_returns_none_when_no_prompts_json():
     """
     GIVEN no prompts.json file exists
