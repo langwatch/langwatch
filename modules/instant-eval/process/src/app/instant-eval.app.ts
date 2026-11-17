@@ -405,6 +405,7 @@ export class InstantEvalModule implements InstantEvalApiContract, InstantEvalBro
             budget,
             analytics,
             judgedSpend,
+            ownModels: judge,
           }),
           commands: () => dispatcher.outcomeCommands(),
         },
@@ -513,6 +514,7 @@ export class InstantEvalModule implements InstantEvalApiContract, InstantEvalBro
     budget,
     analytics,
     judgedSpend,
+    ownModels,
   }: {
     context: InstantEvalRunContextService;
     rowSource: InstantEvalRowSourceService;
@@ -523,6 +525,7 @@ export class InstantEvalModule implements InstantEvalApiContract, InstantEvalBro
     budget: InstantEvalFreeBudgetService;
     analytics: AnalyticsApi;
     judgedSpend: InstantEvalJudgedSpendService;
+    ownModels: Pick<InstantEvalDecisionModelJudgeService, "isOwnDecisionModel">;
   }): InstantEvalRunExecutor {
     const plans = InstantEvalPlanService.create({
       context,
@@ -538,6 +541,7 @@ export class InstantEvalModule implements InstantEvalApiContract, InstantEvalBro
       judgments,
       cancellation: cancellations,
       budget,
+      ownModels,
     });
     const finishes = InstantEvalFinishService.create({
       spend: judgedSpend,

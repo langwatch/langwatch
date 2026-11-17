@@ -292,6 +292,12 @@ Feature: The Instant Eval run on the queue, plan, judge page by page, finish
     Then the page is recorded with those rows as skips
 
   @unit
+  Scenario: A run page refused for LangWatch's own key is recorded, not blamed on the customer
+    Given a project on LangWatch's decision model whose key was refused for every row of a page
+    When the page is judged
+    Then the page is recorded with those rows as skips
+
+  @unit
   Scenario: A step failing with a refusal the outbox will not retry fails the run on that attempt
     Given a page step that throws a handled refusal the outbox will not retry, such as "connect_unreachable"
     When it fails on its first attempt

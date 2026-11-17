@@ -79,6 +79,11 @@ const EMPTY_INSTANT_EVAL_PAGE: InstantEvalPageOutcome = {
 
 type InstantEvalJudgePageInput = Parameters<InstantEvalRunExecutor["judgePage"]>[0];
 
+/** Whether a project judges on its own decision model rather than LangWatch's. */
+type InstantEvalOwnDecisionModels = {
+  isOwnDecisionModel(input: { projectId: string }): Promise<boolean>;
+};
+
 export class InstantEvalJudgePageService {
   private readonly context: InstantEvalRunContextService;
   private readonly rowSource: Pick<InstantEvalRowSourceService, "keys">;
@@ -89,6 +94,7 @@ export class InstantEvalJudgePageService {
   private readonly budget: Pick<InstantEvalFreeBudgetService, "assertWithinBudget">;
   private readonly readAhead: InstantEvalReadAheadService;
   private readonly judgeRows: InstantEvalJudgeRowsService;
+  private readonly ownModels: InstantEvalOwnDecisionModels;
   private readonly now: () => number;
 
   private constructor(options: {
@@ -100,6 +106,7 @@ export class InstantEvalJudgePageService {
     cancellation: InstantEvalCancellationRepository;
     budget: Pick<InstantEvalFreeBudgetService, "assertWithinBudget">;
     readAhead: InstantEvalReadAheadService;
+    ownModels: InstantEvalOwnDecisionModels;
     concurrency: number;
     now: () => number;
   }) {
@@ -111,6 +118,7 @@ export class InstantEvalJudgePageService {
     this.cancellation = options.cancellation;
     this.budget = options.budget;
     this.readAhead = options.readAhead;
+    this.ownModels = options.ownModels;
     this.judgeRows = InstantEvalJudgeRowsService.create({
       judge: options.judge,
       concurrency: options.concurrency,
@@ -127,6 +135,7 @@ export class InstantEvalJudgePageService {
     cancellation,
     budget,
     readAhead = InstantEvalReadAheadService.create(),
+    ownModels,
     concurrency = INSTANT_EVAL_JUDGE_CONCURRENCY,
     now = () => nowInstant().epochMilliseconds,
   }: {
@@ -139,6 +148,8 @@ export class InstantEvalJudgePageService {
     budget: Pick<InstantEvalFreeBudgetService, "assertWithinBudget">;
     /** The next page of each run, read while the current one judges. */
     readAhead?: InstantEvalReadAheadService;
+    /** Only an own model's refused key fails a run; LangWatch's is not the customer's to fix. */
+    ownModels: InstantEvalOwnDecisionModels;
     concurrency?: number;
     now?: () => number;
   }): InstantEvalJudgePageService {
@@ -151,6 +162,7 @@ export class InstantEvalJudgePageService {
       cancellation,
       budget,
       readAhead,
+      ownModels,
       concurrency,
       now,
     });
@@ -204,7 +216,12 @@ export class InstantEvalJudgePageService {
     const { judged, stop } = await this.#judgeKeys({ loaded, rows, input });
     // Every row refused for the own model's key is a run that cannot judge anything; skips
     // would read as "nothing matched". Runs only: a judged query keeps them as skips.
-    if (isEveryRowKeyRefused(judged.usage)) throw new InstantEvalDecisionModelKeyInvalidError();
+    if (
+      isEveryRowKeyRefused(judged.usage) &&
+      (await this.ownModels.isOwnDecisionModel({ projectId }))
+    ) {
+      throw new InstantEvalDecisionModelKeyInvalidError();
+    }
     const cut = cutPageAtStop({ judged, keys: keyPage.keys });
     const counters = await this.#write({
       loaded,

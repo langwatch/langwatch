@@ -196,6 +196,7 @@ async function judging({
   assertWithinBudget = async () => undefined,
   onInsert,
   runCostUsd = 0,
+  isOwnDecisionModel = true,
 }: {
   keyPage?: InstantEvalKeyPage;
   keySource?: Pick<InstantEvalRowSourceService, "keys">;
@@ -209,6 +210,8 @@ async function judging({
   onInsert?: () => void;
   /** The running row's routed cost so far; zero on an unrouted run, as on main. */
   runCostUsd?: number;
+  /** Whether the project judges on its own decision model rather than LangWatch's. */
+  isOwnDecisionModel?: boolean;
 }): Promise<{
   service: InstantEvalJudgePageService;
   judge: ScriptedJudge;
@@ -251,6 +254,7 @@ async function judging({
       judgments,
       cancellation,
       budget: { assertWithinBudget },
+      ownModels: { isOwnDecisionModel: async () => isOwnDecisionModel },
       concurrency,
       now,
     }),
@@ -447,6 +451,24 @@ describe("given an own decision model whose key is refused for only some rows", 
         { TraceId: "t1", Status: "judged" },
         { TraceId: "t2", Status: "skipped", Error: "classifier_key_invalid" },
       ]);
+    });
+  });
+});
+
+describe("given LangWatch's own decision model whose key is refused for every row", () => {
+  describe("when the page is judged", () => {
+    /** @scenario "A run page refused for LangWatch's own key is recorded, not blamed on the customer" */
+    it("records the rows as skips rather than failing the run", async () => {
+      const { service, judgments } = await judging({
+        ...TWO_ROWS,
+        answer: async () => KEY_REFUSED,
+        isOwnDecisionModel: false,
+      });
+
+      const outcome = await service.judgePage(INPUT);
+
+      expect(outcome).toMatchObject({ rows: 2, skipped: 2, failed: 0 });
+      expect(judgments.written).toHaveLength(1);
     });
   });
 });
