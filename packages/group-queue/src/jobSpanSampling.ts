@@ -200,7 +200,7 @@ class DeferredJobSpan implements Span {
   }
 }
 
-/** A sampled remote parent: ParentBased keeps its child whatever the process's root ratio. */
+/** A failure span's sampled remote parent: ParentBased keeps it whatever the root ratio. */
 function keptParent({ traceId, spanId }: { traceId: string; spanId: string }) {
   return trace.setSpanContext(ROOT_CONTEXT, {
     traceId,
@@ -215,9 +215,9 @@ function isTimeInput(value: Attributes | TimeInput | undefined): value is TimeIn
 }
 
 /**
- * Runs a job under its consumer span. A sampled job gets a real span with its custom attributes;
- * an unsampled one runs under a deferred span whose context is not sampled, so its children drop.
- * An error escaping the operation is recorded on the span before it is rethrown.
+ * Runs a job under its consumer span. A sampled job gets a real trace-root span with its custom
+ * attributes; an unsampled one runs under a deferred span whose context is not sampled, so its
+ * children drop. An escaping error is recorded on the span before it is rethrown.
  */
 export async function withJobSpan<T>({
   name,
@@ -237,11 +237,7 @@ export async function withJobSpan<T>({
   if (sampled) {
     const tracer = trace.getTracer("langwatch.group-queue");
     const options = { kind, attributes: { ...attributes, ...customAttributes() } };
-    const parent = keptParent({
-      traceId: randomBytes(16).toString("hex"),
-      spanId: randomBytes(8).toString("hex"),
-    });
-    const span = tracer.startSpan(name, options, parent);
+    const span = tracer.startSpan(name, options);
     try {
       return await otelContext.with(trace.setSpan(otelContext.active(), span), () =>
         operation(span),

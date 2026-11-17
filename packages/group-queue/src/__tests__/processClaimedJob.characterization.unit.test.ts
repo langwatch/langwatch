@@ -73,6 +73,7 @@ type Scenario = {
   onExhausted?: GroupQueueRuntimeDefinition<TestPayload>["onExhausted"];
   /** Sample no first attempt up front, so only a failure path builds the span. */
   unsampled?: boolean;
+  processGroups?: GroupQueueRuntimeDefinition<TestPayload>["processGroups"];
 };
 
 const connections: IORedis[] = [];
@@ -147,6 +148,7 @@ function recordingProcessor(scenario: Scenario): {
     groupKey: (payload) => payload.groupId,
     identify: (payload) => payload.id,
     ...(scenario.onExhausted ? { onExhausted: scenario.onExhausted } : {}),
+    ...(scenario.processGroups ? { processGroups: scenario.processGroups } : {}),
     ...(handleBatch
       ? {
           processBatch: async (payloads: TestPayload[]) => {
@@ -642,6 +644,93 @@ describe("given a first-attempt job whose span was not sampled", () => {
       retryable: false,
       process: async () => {
         throw new Error("handler failed");
+      },
+    });
+    expect(exported).toHaveLength(1);
+    expect(exported[0]?.status).toEqual({ code: SpanStatusCode.ERROR });
+  });
+
+  /** @scenario "A hand-back past its window is recorded on an unsampled job's span" */
+  it("exports an error span with the exception for a hand-back past its window", async () => {
+    installInMemoryTracing({ exported });
+    const { processor } = recordingProcessor({
+      unsampled: true,
+      process: async () => {
+        throw new HandBackGroupQueueError("no handler registered in this worker");
+      },
+    });
+    const since = nowInstant().epochMilliseconds - HAND_BACK_CONFIG.windowMs - 60_000;
+    await processor["processClaimedJob"]({
+      stagedJobId: "job-1",
+      groupId: GROUP,
+      jobDataJson: JSON.stringify({
+        id: "job-1",
+        groupId: GROUP,
+        __jobName: "job",
+        __attempt: 1,
+        __handedBackSince: since,
+      }),
+      originalScore: 1000,
+      claimToken: "claim-1",
+    });
+    expect(exported).toHaveLength(1);
+    expect(exported[0]?.events).toContain("exception");
+    expect(exported[0]?.status).toEqual({ code: SpanStatusCode.ERROR });
+  });
+});
+
+describe("given a cross-group batch whose span was not sampled", () => {
+  const exported: ExportedSpan[] = [];
+  const claimed = (groupId: string) => ({
+    groupId,
+    stagedJobId: `${groupId}-job`,
+    jobDataJson: JSON.stringify({ id: `${groupId}-job`, groupId, __jobName: "job", __attempt: 1 }),
+    originalScore: 1000,
+    claimToken: `${groupId}-claim`,
+    payload: { id: `${groupId}-job`, groupId },
+    contextMetadata: undefined,
+    attempt: 1,
+    jobAttempt: 1,
+    handedBackSince: undefined,
+    overloadAttempts: 0,
+    jobName: "job",
+    routingLabels: { queue_name: "q", pipeline_name: "p", job_type: "t", job_name: "job" },
+    batchPayloads: null,
+    batchJobIds: [],
+    drainedSiblings: [],
+  });
+  const runBatch = async (scenario: Scenario) => {
+    installInMemoryTracing({ exported });
+    const { processor } = recordingProcessor({ unsampled: true, ...scenario });
+    await processor["runGroupJobs"]([claimed("project_1/g1"), claimed("project_1/g2")]);
+  };
+
+  afterEach(() => {
+    exported.length = 0;
+    uninstallInMemoryTracing();
+  });
+
+  /** @scenario "An unsampled cross-group batch that succeeds exports no span" */
+  it("exports no span when every group succeeds", async () => {
+    let calls = 0;
+    await runBatch({
+      processGroups: async () => {
+        calls++;
+      },
+    });
+    expect(calls).toBe(1);
+    expect(exported).toEqual([]);
+  });
+
+  /** @scenario "An unsampled cross-group batch that fails exports one error span" */
+  it("exports one error span when the batch fails for good", async () => {
+    await runBatch({
+      retryable: false,
+      processGroups: async () => {
+        throw new NonRetryableGroupQueueError("never again");
+      },
+      process: async () => {
+        throw new NonRetryableGroupQueueError("never again");
       },
     });
     expect(exported).toHaveLength(1);

@@ -163,6 +163,7 @@ describe("job span sampling", () => {
     expect(loggedAfter).toBe(exported[0]?.traceId);
   });
 
+  /** @scenario "An unsampled job's failure span survives a process sampler that samples no root" */
   it("keeps an unsampled job's failure span when the process samples no root", async () => {
     uninstallInMemoryTracing();
     installInMemoryTracing({ exported, rootSampled: false });
@@ -173,15 +174,36 @@ describe("job span sampling", () => {
     expect(exported[0]?.parent).toMatchObject({ isRemote: true, traceFlags: TraceFlags.SAMPLED });
   });
 
-  /** @scenario "A kept span survives a process sampler that samples no root" */
-  it("keeps a sampled job's span when the process samples no root", async () => {
+  /** @scenario "A span kept up front starts its own trace" */
+  it("starts a sampled job's span as a trace root, which a root ratio of 0 drops", async () => {
+    await runJob(async () => {}, true);
+    expect(exported).toHaveLength(1);
+    expect(exported[0]?.parent).toBeUndefined();
+
+    exported.length = 0;
     uninstallInMemoryTracing();
     installInMemoryTracing({ exported, rootSampled: false });
     await runJob(async (span) => {
       span.setStatus({ code: SpanStatusCode.ERROR });
     }, true);
+    expect(exported).toEqual([]);
+  });
+
+  /** @scenario "A failure span keeps an attribute the job set over a custom attribute" */
+  it("lets the job's own attribute win over a custom attribute on a failure span", async () => {
+    await withJobSpan({
+      name: "q/j",
+      kind: SpanKind.CONSUMER,
+      attributes: BASE,
+      customAttributes: () => ({ "tenant.id": "custom" }),
+      sampled: false,
+      operation: async (span) => {
+        span.setAttribute("tenant.id", "project");
+        span.setStatus({ code: SpanStatusCode.ERROR });
+      },
+    });
     expect(exported).toHaveLength(1);
-    expect(exported[0]?.parent).toMatchObject({ isRemote: true, traceFlags: TraceFlags.SAMPLED });
+    expect(exported[0]?.attributes["tenant.id"]).toBe("project");
   });
 
   /** @scenario "An error escaping the job is recorded on its span" */
