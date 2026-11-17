@@ -53,9 +53,11 @@ const scenarioSchemaDefinition = z
     // still parse. See specs/features/agents/voice-agents-v1.feature.
     callerVoice: jsonValueSchema.nullable().default(null),
     testSuiteId: z.string().min(1).nullable().default(null),
-    // "red_team" runs an attacker against the target with the config in redTeam.
-    kind: scenarioKindSchema.default("standard"),
-    redTeam: z.preprocess((raw) => parseRedTeamConfig(raw), redTeamConfigSchema.nullable()),
+    // "red_team" runs an attacker with the config in redTeam; absent reads as "standard".
+    kind: scenarioKindSchema.optional(),
+    redTeam: z
+      .preprocess((raw) => parseRedTeamConfig(raw), redTeamConfigSchema.nullable())
+      .optional(),
     version: z.number().int().positive().default(1),
     lastUpdatedById: z.string().nullable(),
     archivedAt: z.date().nullable(),
@@ -88,6 +90,9 @@ const scenarioTestSuiteSchemaDefinition = z
     scope: jsonValueSchema.nullable(),
     fields: z.preprocess((raw) => parseSuiteFieldDefinitions(raw), suiteFieldDefinitionsSchema),
     evaluators: z.preprocess((raw) => parseEvaluatorAttachments(raw), evaluatorAttachmentsSchema),
+    // The suite template the suite was created from; null for a hand-built suite.
+    templateId: z.string().nullable().optional(),
+    templateVersion: z.number().int().nullable().optional(),
     archivedAt: z.date().nullable(),
     createdAt: z.date(),
     updatedAt: z.date(),
@@ -103,6 +108,8 @@ const scenarioTestSuiteCreateInputSchemaDefinition = z
     name: z.string().trim().min(1),
     fields: suiteFieldDefinitionsSchema.optional(),
     evaluators: evaluatorAttachmentsSchema.optional(),
+    templateId: z.string().min(1).optional(),
+    templateVersion: z.number().int().positive().optional(),
   })
   .strict();
 export interface ScenarioTestSuiteCreateInputSchema extends Named<

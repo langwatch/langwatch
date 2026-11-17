@@ -3,6 +3,7 @@ import { moduleApi } from "@langwatch/module";
 import type {
   EvaluatorAttachment,
   RunActor,
+  ScenarioCaller,
   ScenarioTestSuite,
   ScenarioTestSuiteCreateInput,
   ScenarioTestSuiteIdInput,
@@ -29,6 +30,11 @@ import type {
   SuiteRunPlanResult,
   UpdateSuiteCommand,
 } from "./index.ts";
+import type {
+  AppliedSuiteTemplate,
+  ApplySuiteTemplateTrpcInput,
+  SuiteTemplate,
+} from "./suite-template.ts";
 
 /** Callable capability exposed by the composed Suite application. */
 export interface SuiteApi {
@@ -64,6 +70,13 @@ export interface SuiteApi {
   ): Promise<SimulationExternalSetSummary[]>;
   create(input: CreateSuiteCommand): Promise<Suite>;
   createTestSuite(input: ScenarioTestSuiteCreateInput): Promise<ScenarioTestSuite>;
+  /** Every shipped suite template, sorted by kind then title. */
+  listTemplates(input: { projectId: string }): Promise<SuiteTemplate[]>;
+  /** Creates a test suite from a template fitted to the agent, with every scenario filed in it. */
+  applyTemplate(
+    input: ApplySuiteTemplateTrpcInput,
+    by: ScenarioCaller,
+  ): Promise<AppliedSuiteTemplate>;
   update(
     input: UpdateSuiteCommand,
   ): Promise<

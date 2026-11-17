@@ -1,7 +1,4 @@
 import { AgentApi, type AgentApi as AgentApiType } from "@langwatch/agent-contract";
-/**
- * The suite feature's application: what both of its doors call.
- */
 import { DataRetentionApi } from "@langwatch/data-retention-contract";
 import {
   EvaluatorApi,
@@ -22,6 +19,9 @@ import { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { FeatureSetup } from "@langwatch/process";
 import { ProjectApi, type ProjectApi as ProjectApiType } from "@langwatch/project-contract";
 import { PromptApi, type PromptApi as PromptApiType } from "@langwatch/prompt-contract";
+/**
+ * The suite feature's application: what both of its doors call.
+ */
 import {
   loadRunAttachments,
   ScenarioApi,
@@ -29,6 +29,7 @@ import {
   type EvaluatorAttachment,
   type ScenarioApi as ScenarioApiType,
   type RunActor,
+  type ScenarioCaller,
   type ScenarioRunConfig,
   type ScenarioTestSuite,
   type ScenarioTestSuiteCreateInput,
@@ -39,6 +40,9 @@ import {
 } from "@langwatch/scenario-contract";
 import {
   SuiteApi,
+  type AppliedSuiteTemplate,
+  type ApplySuiteTemplateTrpcInput,
+  type SuiteTemplate,
   SuiteNotFoundError,
   type SuiteRunParameters,
   type SuiteRunResult,
@@ -90,6 +94,7 @@ import {
   type SuiteRunModelsResolver,
 } from "../services/suite-run-models.service.ts";
 import { SuiteRunScenarioFactsService } from "../services/suite-run-scenario-facts.service.ts";
+import { SuiteTemplateService } from "../services/suite-template.service.ts";
 import { SuiteService } from "../services/suite.service.ts";
 
 /**
@@ -480,6 +485,20 @@ export class SuiteModule implements SuiteApi {
   /** A new, empty test-suite test suite. */
   createTestSuite(input: ScenarioTestSuiteCreateInput): Promise<ScenarioTestSuite> {
     return this.#dependencies.suites.createTestSuite(input);
+  }
+
+  async listTemplates(_input: { projectId: string }): Promise<SuiteTemplate[]> {
+    return SuiteTemplateService.create({ scenarios: this.#dependencies.scenarios }).listTemplates();
+  }
+
+  applyTemplate(
+    input: ApplySuiteTemplateTrpcInput,
+    by: ScenarioCaller,
+  ): Promise<AppliedSuiteTemplate> {
+    return SuiteTemplateService.create({ scenarios: this.#dependencies.scenarios }).applyTemplate(
+      input,
+      by,
+    );
   }
 
   /**

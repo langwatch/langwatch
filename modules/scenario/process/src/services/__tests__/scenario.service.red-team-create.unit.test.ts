@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { ScenarioService, type ScenarioServiceOptions } from "../scenario.service.ts";
 
-function serviceWith(create: ReturnType<typeof vi.fn>) {
+function serviceWith(create: ScenarioServiceOptions["repository"]["create"]) {
   return ScenarioService.create({
     repository: createApiFixture<ScenarioServiceOptions["repository"]>({
       create,

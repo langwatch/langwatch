@@ -445,6 +445,8 @@ export class PrismaScenarioRepository extends ScenarioRepository {
             labels: [],
             fields: input.fields ?? [],
             evaluators: input.evaluators ?? [],
+            templateId: input.templateId ?? null,
+            templateVersion: input.templateVersion ?? null,
           },
         });
         return mapTestSuite(row);

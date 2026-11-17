@@ -698,6 +698,18 @@ export class ScenarioModule implements ScenarioApi {
    * than in each door because "who last touched this" is a property of the act, not of the
    * transport it arrived over.
    */
+  async assertScenarioCreationAllowed(input: {
+    projectId: string;
+    additional: number;
+    by: ScenarioCaller;
+  }): Promise<void> {
+    await this.#dependencies.creationCaps.assertScenarioCreationAllowed({
+      projectId: input.projectId,
+      additional: input.additional,
+      operatorId: input.by.label === "user" ? input.by.id : undefined,
+    });
+  }
+
   async create(
     input: Omit<ScenarioCreateInput, "lastUpdatedById">,
     by: ScenarioCaller,

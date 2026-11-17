@@ -267,6 +267,8 @@ export class MemoryScenarioRepository extends ScenarioRepository {
       scope: null,
       fields: input.fields ?? [],
       evaluators: input.evaluators ?? [],
+      templateId: input.templateId ?? null,
+      templateVersion: input.templateVersion ?? null,
       archivedAt: null,
       createdAt: toDate(Temporal.Instant.fromEpochMilliseconds(0)),
       updatedAt: toDate(Temporal.Instant.fromEpochMilliseconds(0)),

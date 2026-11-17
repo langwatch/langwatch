@@ -313,6 +313,12 @@ export interface ScenarioApi {
     input: Omit<ScenarioCreateInput, "lastUpdatedById">,
     by: ScenarioCaller,
   ): Promise<Scenario>;
+  /** Refuses with `LimitExceededError` (`scenarios`) when `additional` more pass the plan cap. */
+  assertScenarioCreationAllowed(input: {
+    projectId: string;
+    additional: number;
+    by: ScenarioCaller;
+  }): Promise<void>;
   update(
     input: Omit<ScenarioUpdateInput, "lastUpdatedById">,
     by: ScenarioCaller,

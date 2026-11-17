@@ -107,3 +107,29 @@ export interface ApplySuiteTemplateInputSchema extends Named<
 export const applySuiteTemplateInputSchema: ApplySuiteTemplateInputSchema =
   applySuiteTemplateInputSchemaDefinition;
 export type ApplySuiteTemplateInput = z.infer<typeof applySuiteTemplateInputSchema>;
+
+const applySuiteTemplateTrpcInputSchemaDefinition = z
+  .object({ ...applySuiteTemplateInputSchemaDefinition.shape, projectId: z.string().min(1) })
+  .strict();
+export interface ApplySuiteTemplateTrpcInputSchema extends Named<
+  typeof applySuiteTemplateTrpcInputSchemaDefinition
+> {}
+export const applySuiteTemplateTrpcInputSchema: ApplySuiteTemplateTrpcInputSchema =
+  applySuiteTemplateTrpcInputSchemaDefinition;
+export type ApplySuiteTemplateTrpcInput = z.infer<typeof applySuiteTemplateTrpcInputSchema>;
+
+/** What applying a template created: the new test suite and the scenarios filed in it. */
+const appliedSuiteTemplateSchemaDefinition = z
+  .object({
+    suiteId: z.string().min(1),
+    slug: z.string().min(1),
+    name: z.string().min(1),
+    scenarioIds: z.array(z.string().min(1)),
+  })
+  .strict();
+export interface AppliedSuiteTemplateSchema extends Named<
+  typeof appliedSuiteTemplateSchemaDefinition
+> {}
+export const appliedSuiteTemplateSchema: AppliedSuiteTemplateSchema =
+  appliedSuiteTemplateSchemaDefinition;
+export type AppliedSuiteTemplate = z.infer<typeof appliedSuiteTemplateSchema>;

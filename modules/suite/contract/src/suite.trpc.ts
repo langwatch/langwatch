@@ -9,6 +9,11 @@ import { SIMULATION_RUN_EVENT_TYPES, scenarioTestSuiteSchema } from "@langwatch/
 import { z } from "zod";
 
 import {
+  applySuiteTemplateTrpcInputSchema,
+  appliedSuiteTemplateSchema,
+  suiteTemplateSchema,
+} from "./suite-template.ts";
+import {
   createSuiteTrpcInputSchema,
   createTestSuiteTrpcInputSchema,
   listSuitesTrpcInputSchema,
@@ -123,4 +128,13 @@ export const testSuiteTrpc = defineTrpcContract("suites.testSuites")
   .mutation("archive")
   .withInput(testSuiteTrpcIdInputSchema)
   .withOutput(scenarioTestSuiteSchema)
+
+  // Every shipped suite template, with full scenario data for a preview.
+  .query("listTemplates")
+  .withInput(suiteProjectInputSchema)
+  .withOutput(suiteTemplateSchema.array())
+
+  .mutation("applyTemplate")
+  .withInput(applySuiteTemplateTrpcInputSchema)
+  .withOutput(appliedSuiteTemplateSchema)
   .build();

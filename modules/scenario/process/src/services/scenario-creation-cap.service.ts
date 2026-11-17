@@ -38,6 +38,8 @@ export class ScenarioCreationCapService {
   async assertScenarioCreationAllowed(input: {
     projectId: string;
     operatorId?: string | undefined;
+    /** How many scenarios the caller is about to create; one by default. */
+    additional?: number;
   }): Promise<void> {
     const organizationId = await this.deps.projects.getOrganizationId(input.projectId);
     const plan = await this.deps.plans.getActivePlan({
@@ -49,7 +51,8 @@ export class ScenarioCreationCapService {
 
     const projectIds = await this.deps.projects.listIdsByOrganization({ organizationId });
     const current = await this.deps.scenarios.countActiveByProjects({ projectIds });
-    if (current >= cap.max) throw new LimitExceededError("scenarios", current, cap.max);
+    if (current + (input.additional ?? 1) > cap.max)
+      throw new LimitExceededError("scenarios", current, cap.max);
   }
 
   /**

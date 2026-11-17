@@ -13,36 +13,36 @@ Feature: Suite templates
     Then each one parses with suiteTemplateSchema
     And the OWASP LLM Top 10 2025 pack holds one attack per id LLM01 to LLM10 under its official name
 
-  @unimplemented
+  @unit
   Scenario: Listing templates answers every template sorted with full preview data
     When the caller lists templates
     Then every shipped template is returned sorted by kind then title
     And each carries its scenarios, attack goals and OWASP ids
 
-  @unimplemented
+  @unit
   Scenario: Applying a template creates a test suite with its scenarios
     When the caller applies "owasp-llm-top-10-2025" fitted to agent "ACME Support"
     Then a test suite named after the template is created
     And ten red team scenarios are filed in it, one per attack
     And the answer names the suite id, slug, name and scenario ids
 
-  @unimplemented
+  @unit
   Scenario: Applying fills the fit placeholders into every scenario's text
     When the caller applies a template with agent name "ACME Support", tools "refund" and "lookup_order", and must never "issue a refund above 100 EUR"
     Then no created scenario's name, situation, criteria or attack goal contains "{{agentName}}", "{{tools}}" or "{{mustNever}}"
     And the text names "ACME Support", "refund, lookup_order" and "issue a refund above 100 EUR"
 
-  @unimplemented
+  @unit
   Scenario: Each scenario carries its own criteria followed by the template's
     When the caller applies a template that declares template-wide criteria
     Then each created scenario's criteria are its own followed by the template's, without duplicates
 
-  @unimplemented
+  @unit
   Scenario: The suite records the template id and version it came from
     When the caller applies "owasp-llm-top-10-2025" version 1
     Then the created test suite records template id "owasp-llm-top-10-2025" and template version 1
 
-  @unimplemented
+  @unit
   Scenario: A plan creation cap that cannot take every scenario refuses before anything is written
     Given the organization's plan caps scenarios and has fewer free slots than the template's scenarios
     When the caller applies the template
@@ -55,13 +55,13 @@ Feature: Suite templates
     When the caller applies a template
     Then the request is refused by the route permission before the handler runs
 
-  @unimplemented
+  @unit
   Scenario: Applying an unknown template is refused as not found
     When the caller applies template "no-such-template"
     Then the apply is refused with code "suite_template_not_found"
     And nothing is created
 
-  @unimplemented
+  @unit
   Scenario: A fit without an agent name is refused as a validation error
     When the caller applies a template with an empty agent name
     Then the request is refused as a validation error naming the agent name field
