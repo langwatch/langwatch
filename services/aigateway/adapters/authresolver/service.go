@@ -75,6 +75,9 @@ const (
 	ChangeKindCacheRuleCreated       = "CACHE_RULE_CREATED"
 	ChangeKindCacheRuleUpdated       = "CACHE_RULE_UPDATED"
 	ChangeKindCacheRuleDeleted       = "CACHE_RULE_DELETED"
+	ChangeKindA2ATargetCreated       = "A2A_TARGET_CREATED"
+	ChangeKindA2ATargetUpdated       = "A2A_TARGET_UPDATED"
+	ChangeKindA2ATargetDeleted       = "A2A_TARGET_DELETED"
 )
 
 // CacheChange is one cache-invalidation hint surfaced by ChangePoller.
@@ -1464,6 +1467,13 @@ func (s *Service) applyFeedChange(organizationID string, ch CacheChange, pending
 	case ChangeKindCacheRuleCreated, ChangeKindCacheRuleUpdated, ChangeKindCacheRuleDeleted:
 		// Cache rules are org-scoped and baked into every bundle as a
 		// pre-sorted array, with no rule id left on the bundle to join on.
+		s.evictWhere(func(b *domain.Bundle) bool {
+			return b.OrganizationID == organizationID
+		}, evictScope{reason: evictReason(ch.Kind), target: organizationID, keepLastKnown: keepLastKnown, guard: []string{orgScope(organizationID)}})
+	case ChangeKindA2ATargetCreated, ChangeKindA2ATargetUpdated, ChangeKindA2ATargetDeleted:
+		// A2A targets ride every bundle of the organization (org-wide and
+		// project ones alike), and the block switch must reach callers now,
+		// not at the next revalidation.
 		s.evictWhere(func(b *domain.Bundle) bool {
 			return b.OrganizationID == organizationID
 		}, evictScope{reason: evictReason(ch.Kind), target: organizationID, keepLastKnown: keepLastKnown, guard: []string{orgScope(organizationID)}})
