@@ -6085,6 +6085,14 @@ const presentations = {
     title: "The session is invalid or has expired",
     describe: () => "Start the call again.",
   },
+  gateway_a2a_target_name_taken: {
+    title: "Agent target name taken",
+    describe: () => "Another agent target in this scope uses that name. Pick a different name.",
+  },
+  gateway_a2a_target_not_found: {
+    title: "Agent target not found",
+    describe: () => "It may have been deleted. Reload to see the current list.",
+  },
   gateway_cache_rule_not_found: {
     title: "Cache rule not found",
     describe: () => "It may have been deleted. Reload to see the current list.",

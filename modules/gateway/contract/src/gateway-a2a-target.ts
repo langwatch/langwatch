@@ -1,3 +1,4 @@
+import { HandledError } from "@langwatch/handled-error";
 import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
@@ -126,3 +127,45 @@ export interface GatewayA2aTargetWireSchema extends Named<
 export const gatewayA2aTargetWireSchema: GatewayA2aTargetWireSchema =
   gatewayA2aTargetWireSchemaDefinition;
 export type GatewayA2aTargetWire = z.infer<typeof gatewayA2aTargetWireSchema>;
+
+export class GatewayA2aTargetNotFoundError extends HandledError {
+  declare readonly code: "gateway_a2a_target_not_found";
+
+  constructor() {
+    super("gateway_a2a_target_not_found", "A2A target not found", {
+      httpStatus: 404,
+      fault: "customer",
+    });
+    this.name = "GatewayA2aTargetNotFoundError";
+  }
+}
+
+export class GatewayA2aTargetNameTakenError extends HandledError {
+  declare readonly code: "gateway_a2a_target_name_taken";
+
+  constructor(name: string) {
+    super(
+      "gateway_a2a_target_name_taken",
+      `An A2A target named "${name}" already exists in this scope`,
+      {
+        httpStatus: 409,
+        fault: "customer",
+      },
+    );
+    this.name = "GatewayA2aTargetNameTakenError";
+  }
+}
+
+const setGatewayA2aTargetBlockedInputSchemaDefinition = z.object({
+  id: z.string(),
+  organizationId: z.string(),
+  blocked: z.boolean(),
+  blockReason: z.string().max(512).nullable(),
+  actorUserId: z.string(),
+});
+export interface SetGatewayA2aTargetBlockedInputSchema extends Named<
+  typeof setGatewayA2aTargetBlockedInputSchemaDefinition
+> {}
+export const setGatewayA2aTargetBlockedInputSchema: SetGatewayA2aTargetBlockedInputSchema =
+  setGatewayA2aTargetBlockedInputSchemaDefinition;
+export type SetGatewayA2aTargetBlockedInput = z.infer<typeof setGatewayA2aTargetBlockedInputSchema>;
