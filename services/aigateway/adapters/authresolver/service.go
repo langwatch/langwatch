@@ -621,6 +621,18 @@ func New(opts Options) (*Service, error) {
 	if err != nil {
 		return nil, err
 	}
+	denied, err := lru.New[string, denial](denySetSize)
+	if err != nil {
+		return nil, err
+	}
+	deniedKeys, err := lru.New[[64]byte, string](denySetSize)
+	if err != nil {
+		return nil, err
+	}
+	recheckStates, err := lru.New[[64]byte, recheckState](denySetSize)
+	if err != nil {
+		return nil, err
+	}
 
 	logger := opts.Logger
 	if logger == nil {
@@ -631,10 +643,10 @@ func New(opts Options) (*Service, error) {
 		l1:                l1,
 		licenseRefusals:   licenseRefusals,
 		licenseRefusalTTL: opts.LicenseRefusalTTL,
-		denied:            newDenySet(),
-		deniedKeys:        newDeniedKeys(),
+		denied:            denied,
+		deniedKeys:        deniedKeys,
 		failClosedAfter:   opts.FailClosedAfter,
-		rechecks:          newDenialRechecks(opts.DenialRecheckInterval),
+		rechecks:          denialRechecks{interval: opts.DenialRecheckInterval, state: recheckStates},
 		lastKnown:         lastKnown,
 		lastKnownMaxAge:   DefaultLastKnownConfigMaxAge,
 
@@ -662,7 +674,7 @@ func (s *Service) Resolve(ctx context.Context, key domain.PresentedKey) (*domain
 	answer, err := s.resolveUngated(ctx, key, h)
 	if err != nil {
 		if classifyRefreshError(err) == classTransportFailure {
-			if denied := s.refuseDenied(ctx, h); denied != nil {
+			if denied := s.refusalIfDenied(ctx, h); denied != nil {
 				return nil, denied
 			}
 		}
@@ -699,7 +711,7 @@ func (s *Service) resolveUngated(ctx context.Context, key domain.PresentedKey, h
 		if err := s.admitLicenseToken(ctx, key, h); err != nil {
 			return served{}, err
 		}
-	} else if err := s.refuseDenied(ctx, h); err != nil {
+	} else if err := s.refusalIfDenied(ctx, h); err != nil {
 		// A license token's own refusal comes from the control plane and the
 		// license refusal cache, not this list.
 		s.scheduleRecheck(key, h)

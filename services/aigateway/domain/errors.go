@@ -215,14 +215,14 @@ const (
 // passed. One string in one place: the control plane's 403 and the auth
 // cache's own check are the same answer to the same person, and two copies of
 // it drift.
+const KeyExpiredMessage = "This key has expired. Extend its expiration date, or create a new key."
+
 // KeyDisabledMessage and KeyRevokedMessage are what a tenant reads for a key
 // refused by the control plane or by the gateway's revocation list.
 const (
 	KeyDisabledMessage = "This key is disabled. An administrator can re-enable it; the key material is unchanged."
 	KeyRevokedMessage  = "This key was revoked."
 )
-
-const KeyExpiredMessage = "This key has expired. Extend its expiration date, or create a new key."
 
 // noFallbackError marks a dispatch error the engine has already declared
 // terminal for the whole credential chain, carrying that verdict to the

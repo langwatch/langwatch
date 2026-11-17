@@ -47,14 +47,6 @@ type recheckState struct {
 	running bool
 }
 
-func newDenialRechecks(interval time.Duration) denialRechecks {
-	c, err := lru.New[[64]byte, recheckState](denySetSize)
-	if err != nil {
-		panic(err) // only fails for a non-positive size
-	}
-	return denialRechecks{interval: interval, state: c}
-}
-
 // begin claims the recheck of h when none runs and the last one, or the
 // denial itself, is at least one interval old.
 func (r *denialRechecks) begin(h [64]byte, deniedAt time.Time) bool {
@@ -117,22 +109,6 @@ func (s *Service) recheckDenied(key domain.PresentedKey, h [64]byte, vkID string
 	}
 	s.clearDenial(vkID)
 	s.logger.Info("auth_cache_denial_cleared", zap.String("vk_id", vkID), zap.String("source", "recheck"))
-}
-
-func newDenySet() *lru.Cache[string, denial] {
-	c, err := lru.New[string, denial](denySetSize)
-	if err != nil {
-		panic(err) // only fails for a non-positive size
-	}
-	return c
-}
-
-func newDeniedKeys() *lru.Cache[[64]byte, string] {
-	c, err := lru.New[[64]byte, string](denySetSize)
-	if err != nil {
-		panic(err) // only fails for a non-positive size
-	}
-	return c
 }
 
 func newOrgCursor() *orgCursor {
@@ -215,7 +191,7 @@ func (s *Service) admit(ctx context.Context, h [64]byte, in served) (*domain.Bun
 	if b.VirtualKeyID != "" {
 		if d, ok := s.denied.Peek(b.VirtualKeyID); ok {
 			if d.at.After(authStart) {
-				s.refuseDenial(h, b.VirtualKeyID, "denied_"+evictReason(d.kind))
+				s.dropAndCountDenied(h, b.VirtualKeyID, "denied_"+evictReason(d.kind))
 				return nil, denialError(ctx, d.kind)
 			}
 			s.clearDenial(b.VirtualKeyID)
@@ -329,10 +305,10 @@ func (s *Service) feedSilent(orgID string) bool {
 	return time.Since(time.Unix(0, c.polledAt.Load())) > s.failClosedAfter
 }
 
-// refuseDenied answers a credential the change feed denied, and that nothing
+// refusalIfDenied answers a credential the change feed denied, and that nothing
 // confirmed since, with that denial's error and no control-plane call. It
 // returns nil for any other.
-func (s *Service) refuseDenied(ctx context.Context, h [64]byte) error {
+func (s *Service) refusalIfDenied(ctx context.Context, h [64]byte) error {
 	vkID, ok := s.deniedKeys.Peek(h)
 	if !ok {
 		return nil
@@ -341,13 +317,13 @@ func (s *Service) refuseDenied(ctx context.Context, h [64]byte) error {
 	if !ok || !d.at.After(s.confirmedAt(h)) {
 		return nil
 	}
-	s.refuseDenial(h, vkID, "denied_"+evictReason(d.kind))
+	s.dropAndCountDenied(h, vkID, "denied_"+evictReason(d.kind))
 	return denialError(ctx, d.kind)
 }
 
-// refuseDenial drops every cached copy of h, remembers it as denied, and
-// counts the refusal.
-func (s *Service) refuseDenial(h [64]byte, vkID, reason string) {
+// dropAndCountDenied drops every cached copy of h, remembers it as denied,
+// and counts the refusal.
+func (s *Service) dropAndCountDenied(h [64]byte, vkID, reason string) {
 	s.l1.Remove(h)
 	s.lastKnown.Remove(h)
 	s.deniedKeys.Add(h, vkID)
@@ -356,8 +332,10 @@ func (s *Service) refuseDenial(h [64]byte, vkID, reason string) {
 
 // countRefusal logs and counts a refusal. A fail-closed refusal calls it
 // alone, so the cached entry stays for when the control plane answers again.
+// It logs at info like evictOnLookup: the request's own line reports the
+// refusal, and the counter is the alerting signal.
 func (s *Service) countRefusal(vkID, reason string) {
-	s.logger.Warn("auth_cache_refused", zap.String("vk_id", vkID), zap.String("reason", reason))
+	s.logger.Info("auth_cache_refused", zap.String("vk_id", vkID), zap.String("reason", reason))
 	if s.metrics != nil {
 		s.metrics.RecordAuthCacheRefusal(reason)
 	}

@@ -92,7 +92,7 @@ func TestRevocation_ReEnabledKeyServesThroughOutage(t *testing.T) {
 	}
 
 	res.bundle, res.err = nil, errControlPlaneDown
-	if denied := svc.refuseDenied(context.Background(), h); denied != nil {
+	if denied := svc.refusalIfDenied(context.Background(), h); denied != nil {
 		t.Fatalf("an outage after the re-enable must not answer the old denial: %v", denied)
 	}
 	if _, err := svc.Resolve(context.Background(), key); err != nil {
@@ -128,7 +128,7 @@ func TestRevocation_RecheckClearsDenialAfterInterval(t *testing.T) {
 		t.Fatalf("the key must serve after the recheck: %v", err)
 	}
 	res.bundle, res.err = nil, errControlPlaneDown
-	if denied := svc.refuseDenied(context.Background(), h); denied != nil {
+	if denied := svc.refusalIfDenied(context.Background(), h); denied != nil {
 		t.Fatalf("an outage after the recheck must not answer the old denial: %v", denied)
 	}
 }
@@ -315,6 +315,29 @@ func (m *revocationMetrics) RecordAuthCacheMiss(string)              {}
 func (m *revocationMetrics) RecordAuthCacheRefusal(reason string)    { m.refusals[reason]++ }
 func (m *revocationMetrics) RecordAuthCacheStaleServe(source string) { m.staleServes[source]++ }
 
+// @scenario "a normal key keeps serving from cache within the grace window"
+func TestRevocation_StaleServesAreCountedBySource(t *testing.T) {
+	res := &hookResolver{err: errControlPlaneDown}
+	m := newRevocationMetrics()
+	svc, _ := newService(t, Options{Resolver: res, ConfigFetcher: res, Metrics: m})
+
+	stale := domain.PresentedKey{Token: "vk-lw-stale-counted"}
+	svc.storeL1(hashKey(stale), orgBundle("vk_stale", time.Now().Add(-time.Minute)), "")
+	if _, err := svc.Resolve(context.Background(), stale); err != nil {
+		t.Fatalf("a stale cached key must serve through the outage: %v", err)
+	}
+
+	fallback := domain.PresentedKey{Token: "vk-lw-last-known-counted"}
+	svc.lastKnown.Add(hashKey(fallback), svc.newEntry(orgBundle("vk_last_known", time.Now().Add(time.Hour)), "").authFrom(time.Now()))
+	if _, err := svc.Resolve(context.Background(), fallback); err != nil {
+		t.Fatalf("a last-known key must serve through the outage: %v", err)
+	}
+
+	if m.staleServes["stale_while_error"] != 1 || m.staleServes["last_known"] != 1 {
+		t.Fatalf("want one stale_while_error and one last_known serve, got %v", m.staleServes)
+	}
+}
+
 // @scenario "a revoked key is refused while the control plane is down"
 func TestRevocation_RefusalsAreCountedOnEveryPath(t *testing.T) {
 	res := &hookResolver{err: errControlPlaneDown}
@@ -389,6 +412,23 @@ func TestRevocation_RotationKeepsTheOldSecretValid(t *testing.T) {
 
 	if _, err := svc.Resolve(context.Background(), domain.PresentedKey{Token: "vk-lw-old-secret"}); err != nil {
 		t.Fatalf("the old secret stays valid through the rotation grace: %v", err)
+	}
+}
+
+// @scenario "a rotation keeps the old secret valid"
+func TestRevocation_RotationDuringOutageIsNotADenial(t *testing.T) {
+	res := &hookResolver{err: errControlPlaneDown}
+	svc, _ := newService(t, Options{Resolver: res, ConfigFetcher: res})
+	key := domain.PresentedKey{Token: "vk-lw-rotated-outage"}
+	svc.storeL1(hashKey(key), orgBundle("vk_rotated_outage", time.Now().Add(-time.Minute)), "")
+	svc.applyChange("org_1", CacheChange{Kind: ChangeKindVirtualKeyRotated, VirtualKeyID: "vk_rotated_outage"})
+
+	_, err := svc.Resolve(context.Background(), key)
+	if errors.Is(err, domain.ErrKeyRevoked) || errors.Is(err, domain.ErrKeyDisabled) {
+		t.Fatalf("a rotation must not answer the old secret with a terminal denial, got %v", err)
+	}
+	if err == nil || classifyRefreshError(err) != classTransportFailure {
+		t.Fatalf("with the control plane down the old secret gets a retryable transport error, got %v", err)
 	}
 }
 
