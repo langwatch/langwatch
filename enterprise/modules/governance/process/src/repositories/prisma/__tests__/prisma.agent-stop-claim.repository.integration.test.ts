@@ -21,6 +21,7 @@ import {
   AGENT_ID,
   connection,
   killSwitchDatabase,
+  presentPlatforms,
   projectStop as projectStopIn,
   seedRegistry,
 } from "./prisma.kill-switch.fixtures.ts";
@@ -50,7 +51,7 @@ describe.skipIf(!connection)("the kill switch claim and prior state repositories
     const sent: string[] = [];
     let ids = 0;
     const service = AgentStopService.create({
-      locks: { withLock: ({ run }) => run() },
+      locks: { withLock: ({ run }) => run({ signal: new AbortController().signal }) },
       stops: PrismaAgentStopRepository.create(prisma()),
       claims: AgentStopClaimService.create({
         claims: PrismaAgentStopClaimRepository.create(prisma()),
@@ -61,6 +62,8 @@ describe.skipIf(!connection)("the kill switch claim and prior state repositories
         registry: memory.agentRegistry,
         sources: memory.ingestionSources,
         awsConnections: awsConnections(),
+        ...presentPlatforms({ memory }),
+        ...presentPlatforms({ memory }),
         virtualKeys: createApiFixture<GatewayApi>(),
       }),
       registry: memory.agentRegistry,

@@ -4,7 +4,7 @@ import type { AuditLogIntent } from "@langwatch/audit-log-contract";
 export const KILL_SWITCH_AUDIT_PROCESS_NAME = "killSwitchAudit" as const;
 export const KILL_SWITCH_AUDIT_RECORD_INTENT = "recordAudit" as const;
 /** The organisation's one audit outbox instance. */
-export const KILL_SWITCH_AUDIT_PROCESS_KEY = "kill-switch-audit";
+const KILL_SWITCH_AUDIT_PROCESS_KEY = "kill-switch-audit";
 
 type KillSwitchAuditAppend = {
   ref: { processName: string; projectId: string; processKey: string };

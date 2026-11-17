@@ -42,10 +42,15 @@ export function RetryStopDialog({
     }
   };
 
+  const close = () => {
+    if (!retry.isPending) onClose();
+  };
+
   return (
     <Dialog
       open={open}
-      onClose={onClose}
+      onClose={close}
+      role="alertdialog"
       placement="center"
       title={`${actionLabel} for ${agentName}?`}
       busy={retry.isPending}

@@ -265,6 +265,7 @@ const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
   AgentRegistryBaseline: {},
   // The kill switch: stop plans, AWS connections and stops, each read and written per organization.
   AgentStopPlanTarget: {},
+  AgentStopPlan: {},
   GovernanceAwsConnection: {},
   AgentStop: {},
   AgentStopClaim: {},

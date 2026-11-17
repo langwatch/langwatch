@@ -187,10 +187,46 @@ describe("the stop plan of an agent", () => {
           organizationId: "org-1",
           agentId: "a1",
           targets: [SUPPORT_BOT_PLAN.targets[0]?.target],
+          expectedVersion: 3,
         },
       },
     ]);
     expect(trpcDouble.invalidated).toContain("governanceKillSwitch.plan");
+  });
+
+  /** @scenario "Saving a stop plan someone else saved since shows their plan" */
+  it("says someone else saved the plan and shows their plan instead of overwriting it", async () => {
+    answerMutation("governanceKillSwitch.setPlan", () => {
+      throw handledError({ code: "agent_stop_plan_conflict", httpStatus: 409 });
+    });
+    const { dialog } = await openPlanDialog();
+    await userEvent.click(
+      await within(dialog).findByRole("button", { name: "Remove Support key" }),
+    );
+    const theirs = {
+      ...SUPPORT_BOT_PLAN,
+      version: 4,
+      targets: SUPPORT_BOT_PLAN.targets.slice(1),
+    };
+    answerQuery("governanceKillSwitch.plan", () => theirs);
+
+    await userEvent.click(within(dialog).getByRole("button", { name: "Save plan" }));
+
+    expect(await within(dialog).findByText("Someone else saved this stop plan")).toBeVisible();
+    await waitFor(() =>
+      expect(
+        within(dialog)
+          .getAllByTestId("stop-plan-target")
+          .map((row) => row.textContent),
+      ).toEqual([expect.stringContaining("Support key")]),
+    );
+    expect(trpcDouble.calls).toEqual([
+      {
+        procedure: "governanceKillSwitch.setPlan",
+        input: expect.objectContaining({ expectedVersion: 3 }),
+      },
+    ]);
+    expect(screen.getByRole("dialog", { name: "Stop plan for support-bot" })).toBeInTheDocument();
   });
 
   it("shows a failed plan read with Retry and never saves an empty plan", async () => {

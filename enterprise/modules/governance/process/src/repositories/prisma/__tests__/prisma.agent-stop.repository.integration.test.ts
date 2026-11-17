@@ -175,4 +175,65 @@ describe.skipIf(!connection)("the AgentStop Prisma repository", () => {
       expect(await repository.getStop({ organizationId, stopId: stop.id })).toEqual(approved);
     });
   });
+
+  describe("when the targets column is read back", () => {
+    /** @scenario "A stop row whose targets column does not match its schema is refused" */
+    it("round-trips both rounds and refuses a round that is not a number", async () => {
+      const organizationId = newOrganization();
+      const repository = PrismaAgentStopRepository.create(prisma());
+      const at = Date.parse("2026-11-16T10:00:00Z");
+      const stop = {
+        ...requestedStop({
+          data: {
+            stopId: `agentstop-${ns}-rounds`,
+            organizationId,
+            agentId: "agent-support-bot",
+            agentName: "support-bot",
+            severity: "critical",
+            approval: "immediate",
+            trigger: "user",
+            reason: "cost spike",
+            requestedByUserId: "user-ops",
+            requestedByApiKeyId: null,
+            targets: [
+              {
+                id: "target-vk",
+                label: "Virtual key vk-support-bot",
+                target: { kind: "gateway_virtual_key", virtualKeyId: "vk-support-bot" },
+              },
+            ],
+          },
+          at,
+        }),
+        restoreRound: 2,
+        retryRound: 1,
+        retriedByUserId: "user-ops",
+        retriedByApiKeyId: null,
+      };
+      await repository.store(
+        {
+          state: stop,
+          cursor: { acceptedAt: at, eventId: "event-rounds" },
+          occurredAt: at,
+          createdAt: at,
+          updatedAt: at,
+          version: "2026-11-16",
+        },
+        { tenantId: createTenantId(organizationId), aggregateId: stop.id },
+      );
+
+      expect(await repository.getStop({ organizationId, stopId: stop.id })).toEqual(stop);
+
+      const row = await prisma().agentStop.findFirstOrThrow({
+        where: { organizationId, id: stop.id },
+      });
+      await prisma().agentStop.updateMany({
+        where: { organizationId, id: stop.id },
+        data: { targets: { ...(row.targets as object), restoreRound: "2" } },
+      });
+      await expect(repository.getStop({ organizationId, stopId: stop.id })).rejects.toMatchObject({
+        name: "ZodError",
+      });
+    });
+  });
 });

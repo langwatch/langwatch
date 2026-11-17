@@ -3,12 +3,14 @@
  * Bedrock channel's refusal to sign as the deployment itself.
  * Spec: enterprise/modules/governance/specs/agent-kill-switch.feature
  */
+import { BedrockAgentClient } from "@aws-sdk/client-bedrock-agent";
 import { AwsClientConfiguration } from "@langwatch/aws-client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { GovernanceHttpClient, GovernanceHttpResponse } from "../governance-http.channel.ts";
 import { HttpBedrockAgentAliasChannel } from "../http/http.bedrock-agent-alias.channel.ts";
 import { HttpDatabricksServingEndpointChannel } from "../http/http.databricks-serving-endpoint.channel.ts";
+import { KillSwitchPlatformError } from "../kill-switch-platform.channel.ts";
 
 type Sent = { url: string; init: Parameters<GovernanceHttpClient["fetch"]>[1] };
 
@@ -153,5 +155,55 @@ describe("HttpBedrockAgentAliasChannel", () => {
         externalId: "langwatch-generated-0001",
       });
     });
+  });
+
+  describe("when Bedrock answers an invocation state LangWatch does not know", () => {
+    afterEach(() => vi.restoreAllMocks());
+
+    /** @scenario "A Bedrock alias in an invocation state LangWatch does not know is refused" */
+    it("refuses the read with bedrock_alias_state_unknown and sends no update", async () => {
+      vi.spyOn(AwsClientConfiguration.prototype, "build").mockImplementation(
+        ({ region }) =>
+          ({
+            region,
+            credentials: { accessKeyId: "AKIATESTONLY0000", secretAccessKey: "test-only-secret" },
+            maxAttempts: 1,
+          }) as ReturnType<AwsClientConfiguration["build"]>,
+      );
+      const send = vi.spyOn(BedrockAgentClient.prototype, "send").mockImplementation(async () => ({
+        agentAlias: { agentAliasName: "prod", aliasInvocationState: "PAUSE_INVOCATIONS" },
+      }));
+      const target = {
+        credentials: {
+          accessKeyId: "AKIATESTONLY0000",
+          secretAccessKey: "test-only-secret",
+          roleArn: null,
+          externalId: null,
+        },
+        region: "eu-west-1",
+        agentId: "AGENT00001",
+        agentAliasId: "ALIAS00001",
+      };
+      const channel = HttpBedrockAgentAliasChannel.create();
+
+      const read = await channel.getInvocationState(target).catch((thrown: unknown) => thrown);
+      const set = await channel
+        .setInvocationState({ ...target, state: "REJECT_INVOCATIONS" })
+        .catch((thrown: unknown) => thrown);
+
+      expect(read).toMatchObject({ code: "bedrock_alias_state_unknown" });
+      expect(set).toMatchObject({ code: "bedrock_alias_state_unknown" });
+      expect(send).toHaveBeenCalledTimes(2);
+    });
+  });
+});
+
+describe("KillSwitchPlatformError", () => {
+  it("takes a platform code and refuses free text at compile time", () => {
+    expect(new KillSwitchPlatformError({ code: "http_404", message: "gone" }).code).toBe(
+      "http_404",
+    );
+    // @ts-expect-error a free string is not a kill switch platform code
+    expect(new KillSwitchPlatformError({ code: "oops", message: "x" }).code).toBe("oops");
   });
 });

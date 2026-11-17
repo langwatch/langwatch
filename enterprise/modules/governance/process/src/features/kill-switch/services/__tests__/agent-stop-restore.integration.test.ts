@@ -311,34 +311,53 @@ describe("AgentStopService restore", () => {
     });
   });
 
-  describe("when the serving endpoint was deleted", () => {
-    /** @scenario "A target whose cloud resource is gone counts as stopped and as restored" */
-    it("quarantines and restores the stop, recording the endpoint as gone", async () => {
+  describe("when the serving endpoint was deleted after the stop", () => {
+    /** @scenario "A target whose cloud resource was deleted after the stop counts as restored" */
+    it("restores the stop, recording the endpoint as gone", async () => {
       const harness = await killSwitchHarness({ maxAttempts: 2 });
       await harness.setFullPlan();
-      for (const action of ["stop", "start"]) {
-        harness.servingEndpoints.refuse({
-          path: `/api/2.0/serving-endpoints/support-bot-prod/config:${action}`,
-          code: "http_404",
-        });
-      }
-
       const view = await request(harness);
-      const stopped = await settled(harness, view.id, "quarantined");
+      await settled(harness, view.id, "quarantined");
+      harness.servingEndpoints.refuse({
+        path: "/api/2.0/serving-endpoints/support-bot-prod/config:start",
+        code: "http_404",
+      });
+
       await harness.stops.restore({ organizationId: ORG, stopId: view.id, caller: PERSON });
       const restored = await settled(harness, view.id, "restored");
 
-      const endpointOf = (stop: typeof stopped) =>
-        stop.targets.find((target) => target.target.kind === "databricks_serving_endpoint");
-      expect(endpointOf(stopped)).toMatchObject({ state: "applied", gone: true });
-      expect(endpointOf(restored)).toMatchObject({ state: "reverted", gone: true });
+      expect(
+        restored.targets.find((target) => target.target.kind === "databricks_serving_endpoint"),
+      ).toMatchObject({ state: "reverted", gone: true });
       await vi.waitFor(() =>
         expect(harness.audit.map((row) => row.action)).toContain("governance.agent.restored"),
       );
-      const quarantined = harness.audit.find(
-        (row) => row.action === "governance.agent.quarantined",
-      );
-      expect(JSON.stringify(quarantined?.metadata)).toContain('"gone":true');
+      const audited = harness.audit.find((row) => row.action === "governance.agent.restored");
+      expect(JSON.stringify(audited?.metadata)).toContain('"gone":true');
+      await harness.eventing.close();
+    });
+  });
+
+  describe("when the platforms do not find a target on the stop's first call", () => {
+    /** @scenario "A target its platform does not find on the stop's first call fails as target_not_found" */
+    it("records the endpoint and the alias failed with target_not_found, never as gone", async () => {
+      const harness = await killSwitchHarness({ maxAttempts: 2 });
+      await harness.setFullPlan();
+      harness.servingEndpoints.refuse({
+        path: "/api/2.0/serving-endpoints/support-bot-prod/config:stop",
+        code: "http_404",
+      });
+      harness.bedrock.refuseWith("ResourceNotFoundException");
+
+      const view = await request(harness);
+      const failed = await settled(harness, view.id, "stop_failed");
+
+      const byKind = (kind: string) => failed.targets.find((target) => target.target.kind === kind);
+      for (const kind of ["databricks_serving_endpoint", "bedrock_agent_alias"]) {
+        expect(byKind(kind)).toMatchObject({ state: "failed", errorCode: "target_not_found" });
+        expect(byKind(kind)?.gone).toBeUndefined();
+      }
+      expect(byKind("gateway_virtual_key")?.state).toBe("applied");
       await harness.eventing.close();
     });
   });

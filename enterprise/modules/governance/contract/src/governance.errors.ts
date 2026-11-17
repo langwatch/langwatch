@@ -379,6 +379,21 @@ export class AgentStopTargetInvalidError extends HandledError {
   }
 }
 
+/** A plan target names a Bedrock alias or a serving endpoint its platform does not have. */
+export class AgentStopTargetNotFoundError extends HandledError {
+  declare readonly code: "agent_stop_target_not_found";
+
+  constructor(meta: { position: number; kind: string }) {
+    super("agent_stop_target_not_found", "A stop plan target does not exist on its platform.", {
+      httpStatus: 422,
+      fault: "customer",
+      meta,
+      ...remediation("agent_stop_target_not_found"),
+    });
+    this.name = "AgentStopTargetNotFoundError";
+  }
+}
+
 export class AgentStopPlanEmptyError extends HandledError {
   declare readonly code: "agent_stop_plan_empty";
 
@@ -405,6 +420,29 @@ export class AgentStopPlanChangedError extends HandledError {
       ...remediation("agent_stop_plan_changed"),
     });
     this.name = "AgentStopPlanChangedError";
+  }
+}
+
+/** The plan was saved by someone else after the caller read it; the newer plan is kept. */
+export class AgentStopPlanConflictError extends HandledError {
+  declare readonly code: "agent_stop_plan_conflict";
+
+  constructor({
+    agentId,
+    expectedVersion,
+    version,
+  }: {
+    agentId: string;
+    expectedVersion: number;
+    version: number;
+  }) {
+    super("agent_stop_plan_conflict", "The agent's stop plan was saved since it was read.", {
+      httpStatus: 409,
+      fault: "customer",
+      meta: { agentId, expectedVersion, version },
+      ...remediation("agent_stop_plan_conflict"),
+    });
+    this.name = "AgentStopPlanConflictError";
   }
 }
 

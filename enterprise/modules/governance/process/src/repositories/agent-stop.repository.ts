@@ -32,6 +32,16 @@ export abstract class AgentStopRepository implements StateProjectionStore<AgentS
    * back before the worker folds its request. The row's empty cursor lets every event fold onto it.
    */
   abstract seed(input: { stop: AgentStopRecord; at: number }): Promise<void>;
+  /** The stop with the id of the last event its row folded; throws as `getStop` does. */
+  abstract getStopWithCursor(input: {
+    organizationId: string;
+    stopId: string;
+  }): Promise<{ stop: AgentStopRecord; eventId: string }>;
+  /**
+   * Writes the fold of a request just sent onto the row, unless the projection folded another
+   * event since `eventId`; the cursor is left as it is, so the projection still folds that request.
+   */
+  abstract advance(input: { stop: AgentStopRecord; eventId: string }): Promise<void>;
   /** Throws `agent_stop_not_found` for an id outside the organisation. */
   abstract getStop(input: { organizationId: string; stopId: string }): Promise<AgentStopRecord>;
   /** The agent's stops, latest request first. */

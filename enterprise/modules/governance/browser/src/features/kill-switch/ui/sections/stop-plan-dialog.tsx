@@ -22,6 +22,7 @@ function StopPlanEditorBody({
   const { targets, awsConnections, sourcesFailure, connectionsFailure } = editor;
   return (
     <VStack align="stretch" gap={5}>
+      {editor.conflict ? <HandledErrorAlert error={editor.conflict} /> : null}
       {sourcesFailure && (
         <HandledErrorAlert
           error={sourcesFailure.error}

@@ -98,6 +98,64 @@ describe("AgentStopPlanService", () => {
     });
   });
 
+  describe("when the plan names a target its platform does not find", () => {
+    /** @scenario "A stop plan naming a target its platform does not find is refused" */
+    it("refuses an unknown Bedrock alias and a missing serving endpoint by position", async () => {
+      const harness = await killSwitchHarness();
+      const [endpoint, alias] = harness.fullPlan;
+      if (
+        endpoint?.kind !== "databricks_serving_endpoint" ||
+        alias?.kind !== "bedrock_agent_alias"
+      ) {
+        throw new Error("the full plan starts with the endpoint and the alias");
+      }
+      harness.probes.servingEndpoints.refuse({
+        path: "/api/2.0/serving-endpoints/support-bot-prod",
+        code: "http_404",
+      });
+
+      const missingEndpoint = await refusalOf(
+        harness.plans.setPlan({ organizationId: ORG, agentId: AGENT_ID, targets: [endpoint] }),
+      );
+      const wrongRegion = await refusalOf(
+        harness.plans.setPlan({
+          organizationId: ORG,
+          agentId: AGENT_ID,
+          targets: [
+            { kind: "gateway_virtual_key", virtualKeyId: VIRTUAL_KEY_ID },
+            { ...alias, agentAliasId: "ALIAS99999" },
+          ],
+        }),
+      );
+
+      expect(missingEndpoint).toMatchObject({
+        code: "agent_stop_target_not_found",
+        meta: { position: 0, kind: "databricks_serving_endpoint" },
+      });
+      expect(wrongRegion).toMatchObject({
+        code: "agent_stop_target_not_found",
+        meta: { position: 1, kind: "bedrock_agent_alias" },
+      });
+      expect(
+        (await harness.plans.getPlan({ organizationId: ORG, agentId: AGENT_ID })).targets,
+      ).toEqual([]);
+      await harness.eventing.close();
+    });
+
+    it("saves the plan when the platform fails for another reason", async () => {
+      const harness = await killSwitchHarness();
+      harness.probes.servingEndpoints.refuse({
+        path: "/api/2.0/serving-endpoints/support-bot-prod",
+        code: "http_503",
+      });
+
+      const plan = await harness.setFullPlan();
+
+      expect(plan.targets).toHaveLength(3);
+      await harness.eventing.close();
+    });
+  });
+
   describe("when another organisation writes the plan of this organisation's agent", () => {
     it("refuses it as outside its registry", async () => {
       const harness = await killSwitchHarness();

@@ -37,6 +37,31 @@ describe("given a recorded action slug", () => {
   });
 });
 
+describe("given an action recorded before the kill switch", () => {
+  /** @scenario An audit row reads as a sentence, with the recorded action kept beside it */
+  it.each([
+    ["organization.setMemberDisabled", "Set member disabled"],
+    ["aiTools.setEnabled", "Set enabled"],
+    ["virtualKeys.update", "Updated virtual key"],
+    ["apiKey.create", "Created api key"],
+    ["team.archive", "Archived team"],
+    ["secrets.delete", "Deleted secret"],
+    ["project.updateEmbeddingsModel", "Updated embeddings model"],
+    ["authz.grants.revoke", "Revoked grant"],
+    ["identity.joinRequests.setJoining", "Set joining"],
+    ["license.upload", "License upload"],
+  ])("keeps reading %s as %s", (action, phrase) => {
+    expect(auditActionPhrase(action)).toBe(phrase);
+  });
+
+  /** @scenario An audit row reads as a sentence, with the recorded action kept beside it */
+  it("reads a verb used as an adjective before a participle as written", () => {
+    expect(auditActionPhrase("user.email.duplicate_address_tagged")).toBe(
+      "Duplicate address tagged",
+    );
+  });
+});
+
 describe("given a row whose target is a braid", () => {
   /** @scenario A braid's entries read as braid changes */
   it.each([
@@ -216,6 +241,17 @@ describe("given consecutive identical events", () => {
   it("never folds a failed attempt into a successful one", () => {
     const runs = groupAuditRuns([row("a"), row("b", { error: "FORBIDDEN" })]);
     expect(runs).toHaveLength(2);
+  });
+
+  /** @scenario A burst of identical events by one actor reads as one row */
+  it("keeps events on one target apart when the target's recorded name changed", () => {
+    const named = { targetKind: "governance_aws_connection", targetId: "awsconn_1" };
+    const runs = groupAuditRuns([
+      row("a", { ...named, targetName: "ACME production" }),
+      row("b", { ...named, targetName: "ACME production" }),
+      row("c", { ...named, targetName: "ACME staging" }),
+    ]);
+    expect(runs.map((run) => run.entries.map((entry) => entry.id))).toEqual([["a", "b"], ["c"]]);
   });
 });
 

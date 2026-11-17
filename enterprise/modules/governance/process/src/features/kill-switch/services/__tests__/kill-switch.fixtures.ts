@@ -45,7 +45,7 @@ export const WORKSPACE_TOKEN = "dapi-workspace-token";
 export const VIRTUAL_KEY_ID = "vk-support-bot";
 export const PERSON: AgentStopCaller = { userId: "user-ops", apiKeyId: null };
 export const MACHINE: AgentStopCaller = { userId: "user-key-owner", apiKeyId: "key-trace-rule" };
-export const OTHER_MACHINE: AgentStopCaller = { userId: "user-key-owner", apiKeyId: "key-oncall" };
+export const OTHER_MACHINE: AgentStopCaller = { userId: "user-oncall", apiKeyId: "key-oncall" };
 
 function draft(name: string): RegistryDraft {
   const seen = Temporal.Instant.from("2026-11-01T00:00:00Z");
@@ -279,12 +279,35 @@ export async function killSwitchHarness({
     if (!sender) throw new Error(`no ${name} command`);
     await sender.send(payload);
   };
+  const sourceCredentials = SourceCredentialAccessService.create({
+    sources: repositories.ingestionSources,
+  });
+  const signIn = MemoryProviderSignInChannel.create();
+  // Plan saves probe the platforms on channels of their own, so stop-path calls stay countable.
+  const probes = {
+    servingEndpoints: MemoryDatabricksServingEndpointChannel.create(),
+    bedrock: MemoryBedrockAgentAliasChannel.create(),
+  };
+  probes.bedrock.seed({
+    agentId: "AGENT00001",
+    agentAliasId: "ALIAS00001",
+    alias: {
+      agentAliasName: "live",
+      description: "support-bot live alias",
+      routingConfiguration: [{ agentVersion: "7" }],
+      aliasInvocationState: "ACCEPT_INVOCATIONS",
+    },
+  });
   const plans = AgentStopPlanService.create({
     plans: repositories.agentStopPlans,
     registry: repositories.agentRegistry,
     sources: repositories.ingestionSources,
     awsConnections: repositories.awsConnections,
     virtualKeys: gateway,
+    sourceCredentials,
+    signIn,
+    servingEndpoints: probes.servingEndpoints,
+    bedrock: probes.bedrock,
   });
   const stops = AgentStopService.create({
     stops: repositories.agentStops,
@@ -301,10 +324,8 @@ export async function killSwitchHarness({
   });
   const targets = AgentStopTargetService.create({
     send,
-    sourceCredentials: SourceCredentialAccessService.create({
-      sources: repositories.ingestionSources,
-    }),
-    signIn: MemoryProviderSignInChannel.create(),
+    sourceCredentials,
+    signIn,
     servingEndpoints,
     awsConnections: repositories.awsConnections,
     priorStates: repositories.agentStopTargetPriorStates,
@@ -366,6 +387,7 @@ export async function killSwitchHarness({
     copilotSource,
     servingEndpoints,
     bedrock,
+    probes,
     audit,
     announced,
     virtualKeyCalls,

@@ -23,14 +23,16 @@ export function targetKeyOf(target: AgentStopTarget): string {
   }
 }
 
+/** The endpoint's stop or start path, or the endpoint itself without an action. */
 export function servingEndpointPath({
   endpointName,
   action,
 }: {
   endpointName: string;
-  action: "stop" | "start";
+  action?: "stop" | "start";
 }): string {
-  return `/api/2.0/serving-endpoints/${encodeURIComponent(endpointName)}/config:${action}`;
+  const endpoint = `/api/2.0/serving-endpoints/${encodeURIComponent(endpointName)}`;
+  return action ? `${endpoint}/config:${action}` : endpoint;
 }
 
 /** The invocation state a stop sets on a Bedrock agent alias, and the one a restore sets back. */
@@ -43,6 +45,11 @@ export type BedrockInvocationState =
 
 /** The codes a platform answers for a resource that no longer exists (Databricks, Bedrock). */
 const GONE_ERROR_CODES = new Set(["http_404", "ResourceNotFoundException"]);
+
+/** A stop's first call found no such resource: a wrong region, account, id or name. */
+export const TARGET_NOT_FOUND_ERROR_CODE = "target_not_found";
+/** The target left the plan before its apply ran, so the platform was not called. */
+export const TARGET_NOT_IN_PLAN_ERROR_CODE = "target_not_in_plan";
 
 /** True when the target's resource was deleted: nothing is left to stop or restore. */
 export function isGoneErrorCode(code: string): boolean {

@@ -52,7 +52,7 @@ describe("GovernanceAwsConnectionService", () => {
         },
       });
 
-      const [row] = repository.storedRows();
+      const [row] = repository.testing.storedRows();
       expect(row?.encryptedSecretAccessKey).not.toBeNull();
       expect(row?.encryptedSecretAccessKey).not.toContain("acme-secret-access-key-0001");
       expect(view).toEqual({
@@ -102,7 +102,7 @@ describe("GovernanceAwsConnectionService", () => {
       expect(await repository.getCredentials({ organizationId: ORG, id: view.id })).toMatchObject({
         externalId: "langwatch-generated-0001",
       });
-      const [row] = repository.storedRows();
+      const [row] = repository.testing.storedRows();
       expect(row?.accessKeyId).toBeNull();
       expect(row?.encryptedSecretAccessKey).toBeNull();
       expect(row?.encryptedExternalId).not.toContain("langwatch-generated-0001");
@@ -213,12 +213,86 @@ describe("GovernanceAwsConnectionService", () => {
     });
   });
 
+  describe("when a delete is refused because a stop plan still uses the connection", () => {
+    /** @scenario "A refused kill switch write is still audited" */
+    it("records the refused attempt with its error code and the person who asked", async () => {
+      const repository = MemoryGovernanceAwsConnectionRepository.create();
+      const plans = MemoryAgentStopPlanRepository.create();
+      const recorded: RecordAuditLogCommand[] = [];
+      const service = connectionService(repository, plans, undefined, recorded);
+      const view = await service.createConnection({
+        organizationId: ORG,
+        userId: "user-ops",
+        connection: { name: "ACME role", roleArn: "arn:aws:iam::123456789012:role/kill-switch" },
+      });
+      await plans.replaceTargets({
+        organizationId: ORG,
+        agentId: "agent-1",
+        targets: [
+          {
+            id: "target-1",
+            label: "live alias",
+            target: {
+              kind: "bedrock_agent_alias",
+              awsConnectionId: view.id,
+              region: "eu-west-1",
+              agentId: "AGENT00001",
+              agentAliasId: "ALIAS00001",
+            },
+          },
+        ],
+      });
+
+      await expect(
+        service.deleteConnection({
+          organizationId: ORG,
+          connectionId: view.id,
+          userId: "user-ops",
+        }),
+      ).rejects.toMatchObject({ code: "governance_aws_connection_in_use" });
+
+      expect(recorded).toEqual([
+        expect.objectContaining({
+          userId: "user-ops",
+          organizationId: ORG,
+          action: "governance.agent.aws_connection_deleted",
+          error: "governance_aws_connection_in_use",
+          targetKind: "governance_aws_connection",
+          targetId: view.id,
+        }),
+      ]);
+    });
+  });
+
+  describe("when an operator impersonating a person adds a connection", () => {
+    /** @scenario "An impersonated kill switch write names the operator in its audit row" */
+    it("names the person as the actor and the operator in the actor column and the metadata", async () => {
+      const repository = MemoryGovernanceAwsConnectionRepository.create();
+      const service = connectionService(repository);
+
+      await service.createConnection({
+        organizationId: ORG,
+        userId: "user-ops",
+        impersonatorId: "operator-1",
+        connection: { name: "ACME role", roleArn: "arn:aws:iam::123456789012:role/kill-switch" },
+      });
+
+      expect(repository.auditIntents).toEqual([
+        expect.objectContaining({
+          userId: "user-ops",
+          actorUserId: "operator-1",
+          metadata: expect.objectContaining({ impersonatorId: "operator-1" }),
+        }),
+      ]);
+    });
+  });
+
   describe("when the audit append of a delete fails", () => {
     /** @scenario "An AWS connection write commits only together with its audit row" */
     it("keeps the connection, and the retry deletes it with its audit row", async () => {
       const repository = MemoryGovernanceAwsConnectionRepository.create();
       const service = connectionService(repository);
-      repository.refuseNextAudit("outbox unavailable");
+      repository.testing.refuseNextAudit("outbox unavailable");
       await expect(
         service.createConnection({
           organizationId: ORG,
@@ -233,7 +307,7 @@ describe("GovernanceAwsConnectionService", () => {
         connection: { name: "ACME staging", roleArn: "arn:aws:iam::123456789012:role/acme" },
       });
 
-      repository.refuseNextAudit("outbox unavailable");
+      repository.testing.refuseNextAudit("outbox unavailable");
       const refused = service.deleteConnection({
         organizationId: ORG,
         connectionId: view.id,

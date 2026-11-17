@@ -128,8 +128,9 @@ describe("AgentStopService retry", () => {
     });
 
     /** @scenario "A target removed from the plan no longer holds a failed restore" */
-    it("restores the stop once the endpoint leaves the plan", async () => {
+    it("restores the stop once the deleted endpoint leaves the plan", async () => {
       const { harness, stopId } = await failedRestore();
+      harness.servingEndpoints.refuse({ path: START_PATH, code: "http_404" });
 
       const plan = await harness.plans.setPlan({
         organizationId: ORG,
@@ -197,10 +198,18 @@ describe("AgentStopService retry", () => {
       await settled(harness, view.id, "stop_failed");
       harness.servingEndpoints.allow({ path: STOP_PATH });
 
-      await Promise.all([
+      const answers = await Promise.allSettled([
         harness.stops.retryStop({ organizationId: ORG, stopId: view.id, caller: PERSON }),
         harness.stops.restore({ organizationId: ORG, stopId: view.id, caller: PERSON }),
       ]);
+      // The lock orders the two; the second is refused unless the first already settled.
+      expect(answers.filter((answer) => answer.status === "fulfilled").length).toBeGreaterThan(0);
+      const refused = answers.flatMap((answer) =>
+        answer.status === "rejected" ? [(answer.reason as { code?: string }).code] : [],
+      );
+      for (const code of refused) {
+        expect(["agent_stop_not_retryable", "agent_stop_not_restorable"]).toContain(code);
+      }
       const raced = await vi.waitFor(
         async () => {
           const stop = await harness.stopOf(view.id);

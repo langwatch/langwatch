@@ -7433,6 +7433,18 @@ model AgentStopPlanTarget {
   @@index([organizationId, agentId])
 }
 
+/// One agent's stop plan version: bumped by every save, so a save over a plan someone else saved
+/// since it was read is refused. No row means the plan was never saved (version 0).
+model AgentStopPlan {
+  organizationId String
+  /// The AgentRegistryEntry the plan belongs to.
+  agentId        String
+  version        Int
+  updatedAt      DateTime @default(now()) @updatedAt
+
+  @@id([organizationId, agentId])
+}
+
 /// An AWS credential a Bedrock kill switch target signs with: a static key pair, a role to assume,
 /// or both. The secret access key and the external id are stored sealed.
 model GovernanceAwsConnection {

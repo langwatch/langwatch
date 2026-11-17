@@ -225,16 +225,23 @@ describe("retriedStop", () => {
 
 describe("targetsDroppedStop", () => {
   describe("given a stop whose restore failed on its only target", () => {
-    it("restores the stop once that target leaves it", () => {
-      const { failed } = restoreFailedStop();
+    it("reverts that target again, and restores the stop once the revert lands", () => {
+      const { failed, settledOutcome } = restoreFailedStop();
 
       const dropped = targetsDroppedStop({
         stop: failed,
         data: { stopId: STOP_ID, organizationId: ORG, targetIds: [TARGET_ID], dropId: "drop-1" },
         at: 5_000,
       });
+      const reverted = targetRevertedStop({
+        stop: dropped,
+        data: { ...settledOutcome, errorCode: null, dropId: "drop-1" },
+        at: 6_000,
+      });
 
-      expect(dropped).toMatchObject({ status: "restored", targets: [] });
+      expect(dropped.status).toBe("restoring");
+      expect(dropped.targets[0]).toMatchObject({ state: "reverting", dropped: true });
+      expect(reverted).toMatchObject({ status: "restored", targets: [] });
     });
   });
   describe("when a restore arrives while the stop is still stopping", () => {

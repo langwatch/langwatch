@@ -68,13 +68,19 @@ const agentStopPlanSchemaDefinition = z.object({
   agentId: z.string(),
   targets: agentStopPlanTargetSchema.array(),
   updatedAt: z.string().nullable(),
+  /** Bumps on every save; 0 for an agent whose plan was never saved. */
+  version: z.number().int().nonnegative(),
 });
 export interface AgentStopPlanSchema extends Named<typeof agentStopPlanSchemaDefinition> {}
 export const agentStopPlanSchema: AgentStopPlanSchema = agentStopPlanSchemaDefinition;
 export type AgentStopPlan = z.infer<typeof agentStopPlanSchema>;
 
+/** The plan version the caller read; a save over a newer plan is refused. */
+const expectedPlanVersionSchema = z.number().int().nonnegative();
+
 const setAgentStopPlanInputSchemaDefinition = z.object({
   targets: agentStopTargetSchema.array().max(AGENT_STOP_PLAN_TARGETS_MAX),
+  expectedVersion: expectedPlanVersionSchema.optional(),
 });
 export interface SetAgentStopPlanInputSchema extends Named<
   typeof setAgentStopPlanInputSchemaDefinition
@@ -205,6 +211,10 @@ const agentStopTargetOutcomeSchemaDefinition = z.object({
   gone: z.boolean().optional(),
   /** On restore: a virtual key another agent's open stop still holds, so it stayed disabled. */
   keptDisabled: z.boolean().optional(),
+  /** Taken out of the plan: what the stop changed on it is reverted, then the target leaves the stop. */
+  dropped: z.boolean().optional(),
+  /** The plan change that took it out, so that revert records its own outcome. */
+  dropId: z.string().optional(),
 });
 export interface AgentStopTargetOutcomeSchema extends Named<
   typeof agentStopTargetOutcomeSchemaDefinition
@@ -231,6 +241,8 @@ const agentStopViewSchemaDefinition = z.object({
   quarantinedAt: z.string().nullable(),
   restoreRequestedAt: z.string().nullable(),
   restoredAt: z.string().nullable(),
+  /** The last restore or retry request the stop accepted; a caller polls the stop for its own. */
+  lastRequestId: z.string().optional(),
 });
 export interface AgentStopViewSchema extends Named<typeof agentStopViewSchemaDefinition> {}
 export const agentStopViewSchema: AgentStopViewSchema = agentStopViewSchemaDefinition;
@@ -258,6 +270,17 @@ export interface DecideAgentStopInputSchema extends Named<
 > {}
 export const decideAgentStopInputSchema: DecideAgentStopInputSchema =
   decideAgentStopInputSchemaDefinition;
+
+/** An approval names the stop's target ids the approver saw; a stop that changed since is refused. */
+const approveAgentStopInputSchemaDefinition = z.object({
+  ...decideAgentStopInputSchemaDefinition.shape,
+  expectedTargetIds: expectedTargetIdsSchema.optional(),
+});
+export interface ApproveAgentStopInputSchema extends Named<
+  typeof approveAgentStopInputSchemaDefinition
+> {}
+export const approveAgentStopInputSchema: ApproveAgentStopInputSchema =
+  approveAgentStopInputSchemaDefinition;
 
 /** A retry takes no fields: it applies again what the stop has not stopped. */
 const retryAgentStopInputSchemaDefinition = z.object({});
@@ -402,6 +425,8 @@ const agentStopTargetSettledEventDataSchemaDefinition = z.object({
   restoreRound: z.number().int().positive().optional(),
   /** On an apply outcome: the retry it answers, absent for the stop's first run. */
   retryRound: z.number().int().positive().optional(),
+  /** On a revert outcome: the plan change whose revert it answers, absent for a restore's. */
+  dropId: z.string().min(1).optional(),
 });
 export interface AgentStopTargetSettledEventDataSchema extends Named<
   typeof agentStopTargetSettledEventDataSchemaDefinition
@@ -515,8 +540,15 @@ export const AGENT_STOP_WEBHOOK_EVENT_TYPES = [
 ] as const;
 export type AgentStopWebhookEventType = (typeof AGENT_STOP_WEBHOOK_EVENT_TYPES)[number];
 
-/** Who asked: a person (userId only), or an organisation API key (its id and its owner, if any). */
-export type AgentStopCaller = { userId: string | null; apiKeyId: string | null };
+/**
+ * Who asked: a person (userId only), or an organisation API key (its id and its owner, if any).
+ * `impersonatorId` names the operator behind an impersonated person, as the generic trail does.
+ */
+export type AgentStopCaller = {
+  userId: string | null;
+  apiKeyId: string | null;
+  impersonatorId?: string;
+};
 
 // ── tRPC (the governance UI) ───────────────────────────────────────────────
 
@@ -559,7 +591,13 @@ export const governanceKillSwitchTrpc = defineTrpcContract("governanceKillSwitch
   .withOutput(agentStopPlanSchema)
 
   .mutation("setPlan")
-  .withInput(z.object({ ...agentScope, targets: setAgentStopPlanInputSchema.shape.targets }))
+  .withInput(
+    z.object({
+      ...agentScope,
+      targets: setAgentStopPlanInputSchema.shape.targets,
+      expectedVersion: expectedPlanVersionSchema.optional(),
+    }),
+  )
   .withOutput(agentStopPlanSchema)
 
   .query("awsConnections")
@@ -585,7 +623,13 @@ export const governanceKillSwitchTrpc = defineTrpcContract("governanceKillSwitch
   .withOutput(agentStopViewSchema)
 
   .mutation("approveStop")
-  .withInput(z.object({ ...stopScope, note: z.string().trim().max(2000).optional() }))
+  .withInput(
+    z.object({
+      ...stopScope,
+      note: z.string().trim().max(2000).optional(),
+      expectedTargetIds: expectedTargetIdsSchema.optional(),
+    }),
+  )
   .withOutput(agentStopViewSchema)
 
   .mutation("denyStop")

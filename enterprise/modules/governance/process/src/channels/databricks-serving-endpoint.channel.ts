@@ -9,6 +9,13 @@ export interface DatabricksServingEndpointChannel {
     endpointName: string;
     signal?: AbortSignal;
   }): Promise<void>;
+  /** GET `/api/2.0/serving-endpoints/{name}`: resolves when it exists, else throws (`http_404`). */
+  checkEndpoint(args: {
+    workspaceUrl: string;
+    token: string;
+    endpointName: string;
+    signal?: AbortSignal;
+  }): Promise<void>;
   /** POST `/api/2.0/serving-endpoints/{name}/config:start`; throws `KillSwitchPlatformError`. */
   startEndpoint(args: {
     workspaceUrl: string;

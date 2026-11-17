@@ -23,15 +23,21 @@ const targetAttributes = (data: { stopId: string; targetId: string }) => ({
   "payload.target_id": data.targetId,
 });
 
-/** A revert outcome carries its restore round, so each restore records its own. */
+/** A revert outcome carries its restore round or its drop, so each restore and drop records its own. */
 function revertKey({
   data,
   outcome,
 }: {
-  data: { stopId: string; targetId: string; restoreRound?: number | undefined };
+  data: {
+    stopId: string;
+    targetId: string;
+    restoreRound?: number | undefined;
+    dropId?: string | undefined;
+  };
   outcome: string;
 }): string {
-  return `${data.stopId}:${outcome}:${data.targetId}:${data.restoreRound ?? 1}`;
+  const key = `${data.stopId}:${outcome}:${data.targetId}`;
+  return data.dropId ? `${key}:drop:${data.dropId}` : `${key}:${data.restoreRound ?? 1}`;
 }
 
 /** An apply outcome carries its retry round once the stop was retried, so each run records its own. */

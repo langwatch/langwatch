@@ -3,30 +3,17 @@
 import { createHash } from "node:crypto";
 
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
-import {
-  AGENT_STOP_OPEN_STATUSES,
-  AGENT_STOP_STATUSES,
-  type AgentStopTarget,
-  type AgentStopTargetOutcome,
-  type AgentStopView,
-  type AgentStopWebhookEventType,
-  databricksGeniePullConfigSchema,
+import type {
+  AgentStopView,
+  AgentStopWebhookEventType,
 } from "@langwatch/enterprise-governance-contract";
 import type { IntentContext } from "@langwatch/eventing";
-import type { GatewayApi } from "@langwatch/gateway-contract";
 import { getEnvironment, Instance, Ksuid } from "@langwatch/ksuid";
 import { createLogger, type Logger } from "@langwatch/observability";
-import { type Instant, nowInstant, Temporal } from "@langwatch/time";
+import { nowInstant, Temporal } from "@langwatch/time";
 
-import type { BedrockAgentAliasChannel } from "../../../channels/bedrock-agent-alias.channel.ts";
-import type { DatabricksServingEndpointChannel } from "../../../channels/databricks-serving-endpoint.channel.ts";
-import { KillSwitchPlatformError } from "../../../channels/kill-switch-platform.channel.ts";
-import type { ProviderSignInChannel } from "../../../channels/provider-sign-in.channel.ts";
 import type { AgentStopTargetPriorStateRepository } from "../../../repositories/agent-stop-target-prior-state.repository.ts";
 import type { AgentStopRepository } from "../../../repositories/agent-stop.repository.ts";
-import type { GovernanceAwsConnectionRepository } from "../../../repositories/governance-aws-connection.repository.ts";
-import type { KillSwitchLockRepository } from "../../../repositories/kill-switch-lock.repository.ts";
-import type { SourceCredentialAccessService } from "../../ingestion-source/services/source-credential-access.service.ts";
 import type { AgentRegistryService } from "../../registry/services/agent-registry.service.ts";
 import {
   AGENT_STOP_MAX_ATTEMPTS,
@@ -36,13 +23,22 @@ import {
   type AgentStopRevertIntent,
 } from "../eventing/agent-stop.process.ts";
 import {
-  BEDROCK_INVOCATION_STATES,
   errorCodeOf,
   isGoneErrorCode,
+  TARGET_NOT_FOUND_ERROR_CODE,
+  TARGET_NOT_IN_PLAN_ERROR_CODE,
   targetKeyOf,
 } from "../rules/agent-stop-target.rules.ts";
+import { isApplySuperseded, isRevertSuperseded } from "../rules/agent-stop.rules.ts";
 import type { AgentStopPlanService } from "./agent-stop-plan.service.ts";
-import { AGENT_STOP_AUDIT_TARGET_KIND, type AgentStopCommandSend } from "./agent-stop.service.ts";
+import {
+  type AgentStopPlatformDependencies,
+  AgentStopPlatformService,
+  type AgentStopTargetWork,
+  type Direction,
+} from "./agent-stop-platform.service.ts";
+import { AGENT_STOP_AUDIT_TARGET_KIND } from "./agent-stop-request-audit.service.ts";
+import type { AgentStopCommandSend } from "./agent-stop.service.ts";
 
 /** The audit log takes an `audit` KSUID as a key, and reads the row's moment from it. */
 const AUDIT_KEY_RESOURCE = "audit";
@@ -93,51 +89,16 @@ export function milestoneAuditKeyOf({
 
 interface AgentStopTargetDependencies {
   send: AgentStopCommandSend;
-  sourceCredentials: Pick<SourceCredentialAccessService, "withSourceCredentials">;
-  signIn: Pick<ProviderSignInChannel, "getWorkspaceToken">;
-  servingEndpoints: DatabricksServingEndpointChannel;
-  awsConnections: Pick<GovernanceAwsConnectionRepository, "getCredentials">;
-  bedrock: BedrockAgentAliasChannel;
-  priorStates: AgentStopTargetPriorStateRepository;
-  virtualKeys: Pick<GatewayApi, "findVirtualKeyById" | "disableVirtualKey" | "enableVirtualKey">;
+  platform: Pick<AgentStopPlatformService, "call">;
+  priorStates: Pick<AgentStopTargetPriorStateRepository, "findPriorStates">;
   registry: Pick<AgentRegistryService, "announceStop">;
-  stops: Pick<AgentStopRepository, "findAllByStatuses">;
+  stops: Pick<AgentStopRepository, "getStop">;
   plans: Pick<AgentStopPlanService, "findTargets">;
-  locks: KillSwitchLockRepository;
   auditLog: Pick<AuditLogApi, "record">;
   maxAttempts: number;
   now: () => number;
   logger: Logger;
 }
-
-type Direction = "stop" | "restore";
-
-const AGENT_STOP_CLOSED_STATUSES = AGENT_STOP_STATUSES.filter(
-  (status) => !AGENT_STOP_OPEN_STATUSES.includes(status),
-);
-
-function isOnKey({
-  outcome,
-  virtualKeyId,
-}: {
-  outcome: AgentStopTargetOutcome;
-  virtualKeyId: string;
-}): boolean {
-  return (
-    outcome.target.kind === "gateway_virtual_key" && outcome.target.virtualKeyId === virtualKeyId
-  );
-}
-
-/** Applied, mid-restore, or an apply that may already have run; never failed or reverted. */
-function isHolding(outcome: AgentStopTargetOutcome): boolean {
-  return ["applied", "reverting", "revert_failed", "pending"].includes(outcome.state);
-}
-
-/** What every platform call reads off its intent, an apply or a revert. */
-type AgentStopTargetWork = Omit<AgentStopApplyIntent, "retryRound">;
-
-/** A call's outcome: whether it changed the platform, and whether a shared key was left disabled. */
-type CallOutcome = { changed: boolean; keptDisabled?: boolean };
 
 /**
  * The worker's half of a stop: one platform call per intent, then the outcome recorded as a
@@ -148,22 +109,52 @@ type CallOutcome = { changed: boolean; keptDisabled?: boolean };
 export class AgentStopTargetService implements AgentStopIntentExecutors {
   private constructor(private readonly deps: AgentStopTargetDependencies) {}
 
+  /** The platform calls are its own collaborator, built from the same dependencies. */
   static create({
     maxAttempts = AGENT_STOP_MAX_ATTEMPTS,
     now = () => nowInstant().epochMilliseconds,
     logger = createLogger("langwatch:governance:kill-switch"),
-    ...deps
-  }: Omit<AgentStopTargetDependencies, "maxAttempts" | "now" | "logger"> & {
-    maxAttempts?: number;
-    now?: () => number;
-    logger?: Logger;
-  }): AgentStopTargetService {
-    return new AgentStopTargetService({ ...deps, maxAttempts, now, logger });
+    send,
+    registry,
+    plans,
+    auditLog,
+    ...platform
+  }: Omit<
+    AgentStopTargetDependencies,
+    "maxAttempts" | "now" | "logger" | "platform" | "stops" | "priorStates"
+  > &
+    Omit<AgentStopPlatformDependencies, "now" | "stops"> & {
+      stops: Pick<AgentStopRepository, "getStop" | "findAllByStatuses">;
+      maxAttempts?: number;
+      now?: () => number;
+      logger?: Logger;
+    }): AgentStopTargetService {
+    return new AgentStopTargetService({
+      send,
+      registry,
+      plans,
+      auditLog,
+      stops: platform.stops,
+      priorStates: platform.priorStates,
+      platform: AgentStopPlatformService.create({ ...platform, now }),
+      maxAttempts,
+      now,
+      logger,
+    });
   }
 
   async applyTarget(intent: AgentStopApplyIntent, context: IntentContext): Promise<void> {
-    if (!(await this.isInPlan(intent))) return;
-    const outcome = await this.attempt({ intent, direction: "stop", context });
+    const stop = await this.deps.stops.getStop({
+      organizationId: intent.organizationId,
+      stopId: intent.stopId,
+    });
+    if (isApplySuperseded({ stop, retryRound: intent.retryRound })) {
+      this.skipSuperseded({ intent, direction: "stop" });
+      return;
+    }
+    const outcome = (await this.isInPlan(intent))
+      ? await this.attempt({ intent, direction: "stop", context })
+      : { ok: false, changed: false, gone: false, errorCode: TARGET_NOT_IN_PLAN_ERROR_CODE };
     const settled = {
       tenantId: intent.organizationId,
       occurredAt: this.deps.now(),
@@ -178,7 +169,7 @@ export class AgentStopTargetService implements AgentStopIntentExecutors {
     await this.deps.send(outcome.ok ? "recordTargetApplied" : "recordTargetFailed", settled);
   }
 
-  /** A target taken out of the plan left the stop, so its queued apply writes nothing. */
+  /** A target taken out of the plan left the stop: its queued apply is recorded failed, uncalled. */
   private async isInPlan(intent: AgentStopApplyIntent): Promise<boolean> {
     const plan = await this.deps.plans.findTargets({
       organizationId: intent.organizationId,
@@ -189,6 +180,20 @@ export class AgentStopTargetService implements AgentStopIntentExecutors {
   }
 
   async revertTarget(intent: AgentStopRevertIntent, context: IntentContext): Promise<void> {
+    const stop = await this.deps.stops.getStop({
+      organizationId: intent.organizationId,
+      stopId: intent.stopId,
+    });
+    const superseded = isRevertSuperseded({
+      stop,
+      targetId: intent.target.id,
+      restoreRound: intent.restoreRound,
+      dropId: intent.dropId,
+    });
+    if (superseded) {
+      this.skipSuperseded({ intent, direction: "restore" });
+      return;
+    }
     const outcome = await this.attempt({ intent, direction: "restore", context });
     const settled = {
       tenantId: intent.organizationId,
@@ -197,11 +202,33 @@ export class AgentStopTargetService implements AgentStopIntentExecutors {
       organizationId: intent.organizationId,
       targetId: intent.target.id,
       errorCode: outcome.errorCode,
-      restoreRound: intent.restoreRound,
+      ...(intent.dropId ? { dropId: intent.dropId } : { restoreRound: intent.restoreRound }),
       ...(outcome.gone ? { gone: true } : {}),
       ...(outcome.keptDisabled ? { keptDisabled: true } : {}),
     };
     await this.deps.send(outcome.ok ? "recordTargetReverted" : "recordTargetRevertFailed", settled);
+  }
+
+  /**
+   * A retried intent the stop moved past: the platform is left alone, since a newer round owns the
+   * target now, and nothing is recorded, since the fold would drop the stale outcome anyway.
+   */
+  private skipSuperseded({
+    intent,
+    direction,
+  }: {
+    intent: AgentStopApplyIntent | AgentStopRevertIntent;
+    direction: Direction;
+  }): void {
+    this.deps.logger.info(
+      {
+        direction,
+        stopId: intent.stopId,
+        targetId: intent.target.id,
+        organizationId: intent.organizationId,
+      },
+      "kill switch target intent superseded by a newer round; platform left alone",
+    );
   }
 
   /**
@@ -259,7 +286,7 @@ export class AgentStopTargetService implements AgentStopIntentExecutors {
     errorCode: string | null;
   }> {
     try {
-      const { changed, keptDisabled } = await this.call({
+      const { changed, keptDisabled } = await this.deps.platform.call({
         intent,
         target: intent.target.target,
         direction,
@@ -273,8 +300,13 @@ export class AgentStopTargetService implements AgentStopIntentExecutors {
       };
     } catch (error) {
       const errorCode = errorCodeOf(error);
-      if (isGoneErrorCode(errorCode))
-        return { ok: true, changed: false, gone: true, errorCode: null };
+      if (isGoneErrorCode(errorCode)) {
+        // On a stop's first contact a 404 is a wrong region, account or id, not a deleted resource.
+        if (direction === "restore" || (await this.hasTouched(intent))) {
+          return { ok: true, changed: false, gone: true, errorCode: null };
+        }
+        return { ok: false, changed: false, gone: false, errorCode: TARGET_NOT_FOUND_ERROR_CODE };
+      }
       if (context.attempt < this.deps.maxAttempts) throw error;
       this.deps.logger.warn(
         {
@@ -291,226 +323,13 @@ export class AgentStopTargetService implements AgentStopIntentExecutors {
     }
   }
 
-  /**
-   * Stops a key or alias unless it was already stopped before this stop first touched it. The
-   * prior state is recorded once, so a retry after a successful call still counts the change as
-   * the stop's own; a retry that finds it stopped does not call the platform again, so a later
-   * platform refusal cannot turn an applied change into a failure the restore would skip.
-   */
-  private async stopUnlessAlreadyStopped({
-    intent,
-    isStopped,
-    stop,
-  }: {
-    intent: AgentStopTargetWork;
-    isStopped: () => Promise<boolean>;
-    stop: () => Promise<unknown>;
-  }): Promise<{ changed: boolean }> {
-    const key = {
+  /** True once this stop recorded the target's prior state: an earlier call of it reached the platform. */
+  private async hasTouched(intent: AgentStopTargetWork): Promise<boolean> {
+    const recorded = await this.deps.priorStates.findPriorStates({
       organizationId: intent.organizationId,
       stopId: intent.stopId,
       targetId: intent.target.id,
-    };
-    const [recorded] = await this.deps.priorStates.findPriorStates(key);
-    if (recorded === undefined) {
-      const wasStopped = await this.deps.priorStates.recordOnce({
-        ...key,
-        wasStopped: await isStopped(),
-        recordedAt: this.deps.now(),
-      });
-      if (wasStopped) return { changed: false };
-      await stop();
-      return { changed: true };
-    }
-    if (recorded) return { changed: false };
-    if (!(await isStopped())) await stop();
-    return { changed: true };
-  }
-
-  /** The holder check and the key write run under one lock per key, so shared-key work never interleaves. */
-  private async callVirtualKey(input: {
-    intent: AgentStopTargetWork;
-    virtualKeyId: string;
-    direction: Direction;
-  }): Promise<CallOutcome> {
-    return this.deps.locks.withLock({
-      key: `virtual-key:${input.intent.organizationId}:${input.virtualKeyId}`,
-      run: () => this.callVirtualKeyLocked(input),
     });
-  }
-
-  private async callVirtualKeyLocked({
-    intent,
-    virtualKeyId,
-    direction,
-  }: {
-    intent: AgentStopTargetWork;
-    virtualKeyId: string;
-    direction: Direction;
-  }): Promise<CallOutcome> {
-    const { organizationId } = intent;
-    const command = { id: virtualKeyId, organizationId, actorUserId: intent.actorUserId };
-    if (direction === "restore") {
-      if (await this.isKeyHeldByAnotherStop({ intent, virtualKeyId })) {
-        return { changed: false, keptDisabled: true };
-      }
-      await this.deps.virtualKeys.enableVirtualKey(command);
-      return { changed: true };
-    }
-    return this.stopUnlessAlreadyStopped({
-      intent,
-      // A key another stop holds, or a closed stop's restore left disabled, is this stop's change too.
-      isStopped: async () => {
-        const key = await this.deps.virtualKeys.findVirtualKeyById(virtualKeyId, organizationId);
-        if (key === null || key.status === "ACTIVE") return false;
-        if (await this.isKeyHeldByAnotherStop({ intent, virtualKeyId })) return false;
-        return !(await this.isKeptDisabledByClosedStop({
-          intent,
-          virtualKeyId,
-          disabledAt: key.disabledAt,
-        }));
-      },
-      stop: () =>
-        this.deps.virtualKeys.disableVirtualKey({
-          ...command,
-          reason: `kill switch stop ${intent.stopId}: ${intent.reason}`,
-        }),
-    });
-  }
-
-  private async callBedrock({
-    intent,
-    target,
-    direction,
-  }: {
-    intent: AgentStopTargetWork;
-    target: Extract<AgentStopTarget, { kind: "bedrock_agent_alias" }>;
-    direction: Direction;
-  }): Promise<{ changed: boolean }> {
-    const alias = {
-      credentials: await this.deps.awsConnections.getCredentials({
-        organizationId: intent.organizationId,
-        id: target.awsConnectionId,
-      }),
-      region: target.region,
-      agentId: target.agentId,
-      agentAliasId: target.agentAliasId,
-    };
-    if (direction === "restore") {
-      await this.deps.bedrock.setInvocationState({
-        ...alias,
-        state: BEDROCK_INVOCATION_STATES.restore,
-      });
-      return { changed: true };
-    }
-    return this.stopUnlessAlreadyStopped({
-      intent,
-      isStopped: async () =>
-        (await this.deps.bedrock.getInvocationState(alias)) === BEDROCK_INVOCATION_STATES.stop,
-      stop: () =>
-        this.deps.bedrock.setInvocationState({ ...alias, state: BEDROCK_INVOCATION_STATES.stop }),
-    });
-  }
-
-  /**
-   * Another open stop holds the key once its apply ran: it recorded the key as not stopped before
-   * disabling it, and the target is not failed or reverted. A stop waiting for approval holds nothing.
-   */
-  private async isKeyHeldByAnotherStop({
-    intent,
-    virtualKeyId,
-  }: {
-    intent: AgentStopTargetWork;
-    virtualKeyId: string;
-  }): Promise<boolean> {
-    const open = await this.deps.stops.findAllByStatuses({
-      organizationId: intent.organizationId,
-      statuses: AGENT_STOP_OPEN_STATUSES,
-    });
-    const candidates = open.flatMap((stop) =>
-      stop.id === intent.stopId
-        ? []
-        : stop.targets
-            .filter((outcome) => isOnKey({ outcome, virtualKeyId }) && isHolding(outcome))
-            .map((outcome) => ({ stopId: stop.id, targetId: outcome.id })),
-    );
-    for (const candidate of candidates) {
-      const [wasStopped] = await this.deps.priorStates.findPriorStates({
-        organizationId: intent.organizationId,
-        ...candidate,
-      });
-      if (wasStopped === false) return true;
-    }
-    return false;
-  }
-
-  /**
-   * A closed stop's restore kept this disable for a holder that let it go, so nobody owns it now.
-   * A key disabled after that restore was disabled by someone else and stays theirs.
-   */
-  private async isKeptDisabledByClosedStop({
-    intent,
-    virtualKeyId,
-    disabledAt,
-  }: {
-    intent: AgentStopTargetWork;
-    virtualKeyId: string;
-    disabledAt: Instant | null;
-  }): Promise<boolean> {
-    if (disabledAt === null) return false;
-    const closed = await this.deps.stops.findAllByStatuses({
-      organizationId: intent.organizationId,
-      statuses: AGENT_STOP_CLOSED_STATUSES,
-    });
-    return closed.some((stop) =>
-      stop.targets.some(
-        (outcome) =>
-          isOnKey({ outcome, virtualKeyId }) &&
-          outcome.keptDisabled === true &&
-          outcome.revertedAt !== null &&
-          Temporal.Instant.compare(disabledAt, Temporal.Instant.from(outcome.revertedAt)) <= 0,
-      ),
-    );
-  }
-
-  private async call({
-    intent,
-    target,
-    direction,
-  }: {
-    intent: AgentStopTargetWork;
-    target: AgentStopTarget;
-    direction: Direction;
-  }): Promise<CallOutcome> {
-    const { organizationId } = intent;
-    switch (target.kind) {
-      case "databricks_serving_endpoint":
-        return this.deps.sourceCredentials.withSourceCredentials({
-          organizationId,
-          ingestionSourceId: target.ingestionSourceId,
-          use: async (context) => {
-            const config = databricksGeniePullConfigSchema.safeParse(context.config);
-            if (!config.success) {
-              throw new KillSwitchPlatformError({
-                code: "source_not_configured",
-                message: "The Databricks source holds no workspace URL",
-              });
-            }
-            const { workspaceUrl } = config.data;
-            const token = await this.deps.signIn.getWorkspaceToken({
-              credentials: context.credentials,
-              workspaceUrl,
-            });
-            const call = { workspaceUrl, token, endpointName: target.endpointName };
-            if (direction === "stop") await this.deps.servingEndpoints.stopEndpoint(call);
-            else await this.deps.servingEndpoints.startEndpoint(call);
-            return { changed: true };
-          },
-        });
-      case "bedrock_agent_alias":
-        return this.callBedrock({ intent, target, direction });
-      case "gateway_virtual_key":
-        return this.callVirtualKey({ intent, virtualKeyId: target.virtualKeyId, direction });
-    }
+    return recorded.length > 0;
   }
 }

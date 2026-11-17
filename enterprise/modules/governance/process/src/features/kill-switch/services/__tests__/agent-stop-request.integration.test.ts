@@ -67,6 +67,27 @@ describe("AgentStopService", () => {
     });
   });
 
+  describe("when an operator impersonating a person presses Stop", () => {
+    /** @scenario "An impersonated kill switch write names the operator in its audit row" */
+    it("names the person as the actor and the operator in the actor column and the metadata", async () => {
+      const harness = await killSwitchHarness();
+      await harness.setFullPlan();
+
+      await request(harness, { ...PERSON, impersonatorId: "operator-1" });
+
+      expect(
+        harness.audit.filter((row) => row.action === "governance.agent.stop_requested"),
+      ).toEqual([
+        expect.objectContaining({
+          userId: PERSON.userId,
+          actorUserId: "operator-1",
+          metadata: expect.objectContaining({ impersonatorId: "operator-1" }),
+        }),
+      ]);
+      await harness.eventing.close();
+    });
+  });
+
   describe("given a stop pending approval", () => {
     async function pending() {
       const harness = await killSwitchHarness();
@@ -126,6 +147,91 @@ describe("AgentStopService", () => {
       );
 
       expect(code).toBe("agent_stop_self_approval");
+      await harness.eventing.close();
+    });
+
+    /** @scenario "The person who owns the requesting API key cannot approve its stop" */
+    it("refuses the key's owner from the UI and with another key they own", async () => {
+      const { harness, stopId } = await pending();
+      const owner = MACHINE.userId;
+
+      const fromUi = await codeOf(
+        harness.stops.approveStop({
+          organizationId: ORG,
+          stopId,
+          caller: { userId: owner, apiKeyId: null },
+        }),
+      );
+      const fromOwnKey = await codeOf(
+        harness.stops.approveStop({
+          organizationId: ORG,
+          stopId,
+          caller: { userId: owner, apiKeyId: "key-owner-other" },
+        }),
+      );
+
+      expect([fromUi, fromOwnKey]).toEqual([
+        "agent_stop_self_approval",
+        "agent_stop_self_approval",
+      ]);
+      expect((await harness.stopOf(stopId)).status).toBe("pending_approval");
+      await harness.stops.approveStop({ organizationId: ORG, stopId, caller: OTHER_MACHINE });
+      await settled(harness, stopId, "quarantined");
+      await harness.eventing.close();
+    });
+
+    /** @scenario "An approval confirmed against targets that changed since is refused" */
+    it("refuses an approval naming targets a plan edit dropped since, and accepts the current ones", async () => {
+      const { harness, stopId } = await pending();
+      const read = (await harness.stopOf(stopId)).targets.map((target) => target.id);
+      await harness.stops.setPlan({
+        organizationId: ORG,
+        agentId: AGENT_ID,
+        targets: harness.fullPlan.slice(0, -1),
+      });
+      await vi.waitFor(
+        async () => expect((await harness.stopOf(stopId)).targets).toHaveLength(read.length - 1),
+        { timeout: 5_000 },
+      );
+
+      const code = await codeOf(
+        harness.stops.approveStop({
+          organizationId: ORG,
+          stopId,
+          expectedTargetIds: read,
+          caller: PERSON,
+        }),
+      );
+
+      expect(code).toBe("agent_stop_plan_changed");
+      expect((await harness.stopOf(stopId)).status).toBe("pending_approval");
+      const current = (await harness.stopOf(stopId)).targets.map((target) => target.id);
+      await harness.stops.approveStop({
+        organizationId: ORG,
+        stopId,
+        expectedTargetIds: current,
+        caller: PERSON,
+      });
+      await settled(harness, stopId, "quarantined");
+      await harness.eventing.close();
+    });
+
+    /** @scenario "A refused kill switch write is still audited" */
+    it("audits the refused self-approval with its code and the key that asked", async () => {
+      const { harness, stopId } = await pending();
+
+      await codeOf(harness.stops.approveStop({ organizationId: ORG, stopId, caller: MACHINE }));
+
+      expect(
+        harness.audit.filter((row) => row.action === "governance.agent.stop_approved"),
+      ).toEqual([
+        expect.objectContaining({
+          userId: MACHINE.userId,
+          organizationId: ORG,
+          error: "agent_stop_self_approval",
+          metadata: expect.objectContaining({ stopId, apiKeyId: MACHINE.apiKeyId }),
+        }),
+      ]);
       await harness.eventing.close();
     });
 
@@ -327,7 +433,9 @@ describe("AgentStopService", () => {
 
       const stale = read.targets.map((target) => target.id);
       expect(await codeOf(request(harness, PERSON, "high", stale))).toBe("agent_stop_plan_changed");
-      expect(harness.audit).toEqual([]);
+      expect(harness.audit.map((row) => [row.action, row.error])).toEqual([
+        ["governance.agent.stop_requested", "agent_stop_plan_changed"],
+      ]);
 
       const view = await request(
         harness,
@@ -342,7 +450,7 @@ describe("AgentStopService", () => {
 
   describe("when two reviewers decide one pending stop at once", () => {
     /** @scenario "Concurrent decisions on one pending stop accept only the first" */
-    it("accepts one decision, refuses the other and audits only the accepted one", async () => {
+    it("accepts one decision, refuses the other and audits the refusal as refused", async () => {
       const harness = await killSwitchHarness();
       await harness.setFullPlan();
       const view = await request(harness, MACHINE, "high");
@@ -365,7 +473,10 @@ describe("AgentStopService", () => {
       const decisions = harness.audit.filter((row) =>
         ["governance.agent.stop_approved", "governance.agent.stop_denied"].includes(row.action),
       );
-      expect(decisions).toHaveLength(1);
+      expect(decisions.filter((row) => row.error === undefined)).toHaveLength(1);
+      expect(decisions.filter((row) => row.error !== undefined).map((row) => row.error)).toEqual([
+        "agent_stop_not_pending",
+      ]);
       await harness.eventing.close();
     });
   });

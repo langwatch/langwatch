@@ -68,6 +68,24 @@ export class MemoryAgentStopRepository extends AgentStopRepository {
     });
   }
 
+  async getStopWithCursor({
+    organizationId,
+    stopId,
+  }: {
+    organizationId: string;
+    stopId: string;
+  }): Promise<{ stop: AgentStopRecord; eventId: string }> {
+    const row = this.rows.get(this.key(organizationId, stopId));
+    if (!row?.state) throw new AgentStopNotFoundError(stopId);
+    return { stop: structuredClone(row.state), eventId: row.cursor.eventId };
+  }
+
+  async advance({ stop, eventId }: { stop: AgentStopRecord; eventId: string }): Promise<void> {
+    const row = this.rows.get(this.key(stop.organizationId, stop.id));
+    if (!row || row.cursor.eventId !== eventId) return;
+    row.state = structuredClone(stop);
+  }
+
   private all(organizationId: string): AgentStopRecord[] {
     return [...this.rows.values()]
       .flatMap((row) => (row.state ? [row.state] : []))

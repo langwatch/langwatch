@@ -3,10 +3,12 @@
 import type { AuditLogIntent } from "@langwatch/audit-log-contract";
 import { GovernanceAwsConnectionNotFoundError } from "@langwatch/enterprise-governance-contract";
 import { PrismaProcessStore } from "@langwatch/eventing/server";
+import { skipTenantCheck } from "@langwatch/prisma-client";
 import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
 import type { Encryption } from "@langwatch/process-stores";
 import { nowInstant } from "@langwatch/time";
 
+import { awsConnectionsLockKey } from "../../features/kill-switch/rules/governance-aws-connection.rules.ts";
 import { killSwitchAuditAppend } from "../../features/kill-switch/rules/kill-switch-audit.rules.ts";
 import {
   type GovernanceAwsConnectionRecord,
@@ -179,12 +181,20 @@ export class PrismaGovernanceAwsConnectionRepository extends GovernanceAwsConnec
     organizationId,
     id,
     audit,
+    whileLocked,
   }: {
     organizationId: string;
     id: string;
     audit: AuditLogIntent;
+    whileLocked?: () => Promise<void>;
   }): Promise<boolean> {
     return this.prisma.$transaction(async (transaction) => {
+      await transaction.$executeRaw` ${skipTenantCheck({
+        // Advisory-lock helper, the key names one organisation's AWS connections.
+        SKIP_TENANT_CHECK: true,
+      })}
+SELECT pg_advisory_xact_lock(hashtextextended(${awsConnectionsLockKey(organizationId)}, 0))`;
+      await whileLocked?.();
       const { count } = await transaction.governanceAwsConnection.deleteMany({
         where: { organizationId, id },
       });

@@ -21,6 +21,7 @@ import {
   agentStopParamsSchema,
   agentStopPlanResponseSchema,
   agentStopResponseSchema,
+  approveAgentStopInputSchema,
   decideAgentStopInputSchema,
   GovernanceRestApi,
   requestAgentStopInputSchema,
@@ -84,11 +85,12 @@ export const agentKillSwitchRest = defineRestRouter(GovernanceRestApi)
     summary: "Replace an agent's stop plan",
     tags: TAGS,
     description:
-      "Replaces every target at once; an empty list clears the plan. Each target must name what the organisation holds: a Databricks governance source, a stored AWS connection or a gateway virtual key. Anything else is a 422 `agent_stop_target_invalid` naming the target's position. A target removed from the plan also leaves the agent's open stop, so it no longer holds that stop or its restore from finishing; a restore leaves it as it is.",
+      "Replaces every target at once; an empty list clears the plan. Each target must name what the organisation holds: a Databricks governance source, a stored AWS connection or a gateway virtual key. Anything else is a 422 `agent_stop_target_invalid` naming the target's position. Send `expectedVersion` with the `version` you read to refuse the save (409 `agent_stop_plan_conflict`) when someone else saved the plan since. A target removed from the plan also leaves the agent's open stop, so it no longer holds that stop or its restore from finishing; a restore leaves it as it is.",
     responses: {
       ...canonicalBaseResponses,
       ...canonicalUnprocessableResponses,
       ...canonicalNotFoundResponses,
+      ...conflictResponses,
     },
   })
   .handle(async ({ app, input, scope }) => ({
@@ -96,6 +98,7 @@ export const agentKillSwitchRest = defineRestRouter(GovernanceRestApi)
       organizationId: scope.id,
       agentId: input.agentId,
       targets: input.targets,
+      ...(input.expectedVersion === undefined ? {} : { expectedVersion: input.expectedVersion }),
     }),
   }))
 
@@ -181,7 +184,7 @@ export const agentKillSwitchRest = defineRestRouter(GovernanceRestApi)
   .withoutConfirmation("asked at the organization, where a Langy key holds no grant")
   .withCredential("organization", { key: true })
   .withParams(agentStopParamsSchema)
-  .withInput(decideAgentStopInputSchema)
+  .withInput(approveAgentStopInputSchema)
   .withPermission("governance:manage")
   .withEntitlement("enterprise", { feature: "AGENT_REGISTRY" })
   .withOutput(agentStopResponseSchema)
@@ -190,7 +193,7 @@ export const agentKillSwitchRest = defineRestRouter(GovernanceRestApi)
     summary: "Approve a pending stop",
     tags: TAGS,
     description:
-      "Approves a stop waiting for a decision; its targets are then applied. A stop that is no longer pending is a 409 `agent_stop_not_pending`; the key that requested the stop cannot approve it (409 `agent_stop_self_approval`).",
+      "Approves a stop waiting for a decision; its targets are then applied. Send `expectedTargetIds` with the stop's target ids you reviewed to refuse the approval (409 `agent_stop_plan_changed`) when its targets changed since. A stop that is no longer pending is a 409 `agent_stop_not_pending`; the key that requested the stop cannot approve it (409 `agent_stop_self_approval`).",
     responses: {
       ...canonicalBaseResponses,
       ...canonicalUnprocessableResponses,
@@ -203,6 +206,7 @@ export const agentKillSwitchRest = defineRestRouter(GovernanceRestApi)
       organizationId: scope.id,
       stopId: input.stopId,
       ...(input.note ? { note: input.note } : {}),
+      ...(input.expectedTargetIds ? { expectedTargetIds: input.expectedTargetIds } : {}),
       caller: agentStopCallerOfKey(key),
     }),
   }))

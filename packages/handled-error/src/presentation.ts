@@ -3815,6 +3815,10 @@ const presentations = {
     title: "The stop plan changed",
     describe: () => "Someone edited this agent's stop plan. Check the targets again, then confirm.",
   },
+  agent_stop_plan_conflict: {
+    title: "Someone else saved this stop plan",
+    describe: () => "Your changes were not saved. Reload the plan, then make your changes again.",
+  },
   agent_stop_plan_empty: {
     title: "This agent has no stop plan",
     describe: () =>
@@ -3828,6 +3832,11 @@ const presentations = {
     title: "A stop plan target is not valid",
     describe: () =>
       "Each target must name a Databricks source, an AWS connection or a virtual key of this organisation.",
+  },
+  agent_stop_target_not_found: {
+    title: "A stop plan target does not exist",
+    describe: () =>
+      "The Bedrock agent alias or serving endpoint was not found. Check its region, ids or name.",
   },
   governance_aws_connection_in_use: {
     title: "This AWS connection is still in use",

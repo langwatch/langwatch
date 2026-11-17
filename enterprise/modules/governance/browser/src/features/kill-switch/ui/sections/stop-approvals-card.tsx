@@ -12,6 +12,7 @@ import {
   VStack,
 } from "@langwatch/design-system/primitives";
 import type { AgentStopView } from "@langwatch/enterprise-governance-contract";
+import { HandledErrorAlert } from "@langwatch/error-views";
 import { useState } from "react";
 
 import { useStopDecisions } from "../../behavior/use-stop-decisions.ts";
@@ -20,6 +21,7 @@ import {
   STOP_SEVERITY_PALETTES,
   stopRequesterLabel,
 } from "../../model/kill-switch-copy.ts";
+import { StopPlanPreview } from "../blocks/stop-plan-preview.tsx";
 
 function DenyStopDialog({
   stop,
@@ -65,12 +67,15 @@ function ApprovalRow({
   stop,
   canManage,
   isApproving,
+  planChanged,
   onApprove,
   onDeny,
 }: {
   stop: AgentStopView;
   canManage: boolean;
   isApproving: boolean;
+  /** Why the last approval was refused: the stop's targets changed after they were shown. */
+  planChanged: unknown;
   onApprove: () => void;
   onDeny: () => void;
 }) {
@@ -96,10 +101,12 @@ function ApprovalRow({
           Requested by {stopRequesterLabel(stop)}{" "}
           <FormattedDate value={stop.requestedAt} display="relative" />
         </Text>
+        {planChanged ? <HandledErrorAlert error={planChanged} /> : null}
+        <StopPlanPreview targets={stop.targets} isLoading={false} error={null} onRetry={() => {}} />
       </VStack>
       {canManage ? (
         <HStack gap={2} flexShrink={0}>
-          <Button size="xs" variant="outline" onClick={onDeny}>
+          <Button size="xs" variant="outline" disabled={isApproving} onClick={onDeny}>
             Deny
           </Button>
           <Button size="xs" colorPalette="red" loading={isApproving} onClick={onApprove}>
@@ -112,8 +119,8 @@ function ApprovalRow({
 }
 
 /**
- * The stops waiting for a decision, at the top of the Agents page. Approving applies the plan;
- * a reader without governance:manage sees them without the buttons.
+ * The stops waiting for a decision, at the top of the Agents page, each with the targets it acts
+ * on. Approving applies exactly those; a reader without governance:manage sees no buttons.
  */
 export function StopApprovalsCard({
   organizationId,
@@ -145,7 +152,8 @@ export function StopApprovalsCard({
             key={stop.id}
             stop={stop}
             canManage={canManage}
-            isApproving={decisions.approvingStopId === stop.id}
+            isApproving={decisions.isApproving(stop.id)}
+            planChanged={decisions.planChangedOf(stop.id)}
             onApprove={() => void decisions.approveStop(stop)}
             onDeny={() => setDenying(stop)}
           />

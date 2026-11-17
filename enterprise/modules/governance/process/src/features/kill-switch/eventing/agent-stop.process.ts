@@ -42,7 +42,7 @@ export const AGENT_STOP_PROCESS_NAME = "agentStop" as const;
 /** A platform call that fails this many times is recorded failed with its error code. */
 export const AGENT_STOP_MAX_ATTEMPTS = 5;
 /** Deliveries past the platform budget, for recording an outcome whose first record failed. */
-export const AGENT_STOP_SETTLE_ATTEMPTS = 5;
+const AGENT_STOP_SETTLE_ATTEMPTS = 5;
 
 const AGENT_STOP_INTENT_TYPES = {
   APPLY: "applyTarget",
@@ -66,7 +66,9 @@ const agentStopApplyIntentSchema = z.object({
 });
 const agentStopRevertIntentSchema = z.object({
   ...targetWorkSchema.shape,
-  restoreRound: z.number().int().positive(),
+  restoreRound: z.number().int().nonnegative(),
+  /** Set when a plan change dropped the target: the revert answers that drop, not a restore. */
+  dropId: z.string().min(1).optional(),
 });
 const agentStopAnnounceIntentSchema = z.object({
   organizationId: z.string().min(1),
@@ -137,6 +139,45 @@ function work(stop: AgentStopRecord, target: AgentStopTargetOutcome, restoring: 
   };
 }
 
+function isRevertingIn({
+  stop,
+  target,
+}: {
+  stop: AgentStopRecord | null;
+  target: AgentStopTargetOutcome;
+}): boolean {
+  return (
+    stop?.targets.some(
+      (held) =>
+        held.id === target.id && held.state === "reverting" && held.dropId === target.dropId,
+    ) ?? false
+  );
+}
+
+/** A dropped target that just turned reverting: its revert answers the drop that took it out. */
+function dropRevertsOf({
+  before,
+  after,
+  context,
+}: {
+  before: AgentStopRecord | null;
+  after: AgentStopRecord;
+  context: Pick<Context, "intent">;
+}): ProcessIntent[] {
+  return after.targets.flatMap((target) => {
+    const { dropId } = target;
+    if (!target.dropped || target.state !== "reverting" || dropId === undefined) return [];
+    if (isRevertingIn({ stop: before, target })) return [];
+    return [
+      context.intent(AGENT_STOP_INTENT_TYPES.REVERT, `revert:${target.id}:drop:${dropId}`, {
+        ...work(after, target, false),
+        restoreRound: after.restoreRound,
+        dropId,
+      }),
+    ];
+  });
+}
+
 /** The intents one transition asks for: applies, reverts and a milestone. */
 function intentsOfTransition({
   before,
@@ -149,7 +190,9 @@ function intentsOfTransition({
 }): ProcessIntent[] {
   const intents: ProcessIntent[] = [];
   if (after.status === "stopping" && before?.status !== "stopping") {
-    for (const target of after.targets.filter((outcome) => outcome.state === "pending")) {
+    for (const target of after.targets.filter(
+      (outcome) => outcome.state === "pending" && outcome.dropped !== true,
+    )) {
       const key =
         after.retryRound > 0 ? `apply:${target.id}:${after.retryRound}` : `apply:${target.id}`;
       intents.push(
@@ -161,7 +204,11 @@ function intentsOfTransition({
     }
   }
   if (after.restoreRound > (before?.restoreRound ?? 0)) {
-    for (const target of after.targets.filter((outcome) => outcome.state === "reverting")) {
+    // A target already reverting has its revert in flight, a dropped one's included.
+    for (const target of after.targets.filter(
+      (outcome) =>
+        outcome.state === "reverting" && !isRevertingIn({ stop: before, target: outcome }),
+    )) {
       intents.push(
         context.intent(
           AGENT_STOP_INTENT_TYPES.REVERT,
@@ -174,6 +221,7 @@ function intentsOfTransition({
       );
     }
   }
+  intents.push(...dropRevertsOf({ before, after, context }));
   for (const milestone of milestonesReached({
     before: before?.status ?? null,
     after: after.status,

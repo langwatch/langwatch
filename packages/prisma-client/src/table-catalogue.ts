@@ -197,6 +197,7 @@ export const prismaTableCatalogue = {
   "AgentRegistryEvent": "AgentRegistryEvent",
   "AgentRegistryBaseline": "AgentRegistryBaseline",
   "AgentStopPlanTarget": "AgentStopPlanTarget",
+  "AgentStopPlan": "AgentStopPlan",
   "GovernanceAwsConnection": "GovernanceAwsConnection",
   "AgentStop": "AgentStop",
   "AgentStopClaim": "AgentStopClaim",
@@ -3210,6 +3211,12 @@ export const prismaModelFieldCatalogue = {
     "createdAt",
     "updatedAt"
   ],
+  "AgentStopPlan": [
+    "organizationId",
+    "agentId",
+    "version",
+    "updatedAt"
+  ],
   "GovernanceAwsConnection": [
     "id",
     "organizationId",
@@ -4037,6 +4044,7 @@ export const prismaRelationCatalogue = {
   "AgentRegistryEvent": {},
   "AgentRegistryBaseline": {},
   "AgentStopPlanTarget": {},
+  "AgentStopPlan": {},
   "GovernanceAwsConnection": {},
   "AgentStop": {},
   "AgentStopClaim": {},

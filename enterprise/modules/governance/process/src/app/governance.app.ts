@@ -949,12 +949,20 @@ export class GovernanceModule implements GovernanceRestApi {
       microsoftDirectory: channels.microsoftDirectory.create({ http, vendorBases }),
       databricksScimUsers: channels.databricksScimUsers.create({ http }),
     });
+    const servingEndpoints = killSwitchChannels.live.servingEndpoints.create({ http });
+    const bedrockAliases = killSwitchChannels.live.bedrockAliases.create({
+      endpoint: bedrockAgentEndpoint,
+    });
     this.agentStopPlans = AgentStopPlanService.create({
       plans: repositories.agentStopPlans,
       registry: repositories.agentRegistry,
       sources: repositories.ingestionSources,
       awsConnections: repositories.awsConnections,
       virtualKeys: dependencies.gateway,
+      sourceCredentials,
+      signIn,
+      servingEndpoints,
+      bedrock: bedrockAliases,
     });
     const killSwitchAudit = KillSwitchAuditService.create({
       auditLog: dependencies.auditLog,
@@ -985,10 +993,10 @@ export class GovernanceModule implements GovernanceRestApi {
       send: sendAgentStop,
       sourceCredentials,
       signIn,
-      servingEndpoints: killSwitchChannels.live.servingEndpoints.create({ http }),
+      servingEndpoints,
       awsConnections: repositories.awsConnections,
       priorStates: repositories.agentStopTargetPriorStates,
-      bedrock: killSwitchChannels.live.bedrockAliases.create({ endpoint: bedrockAgentEndpoint }),
+      bedrock: bedrockAliases,
       virtualKeys: dependencies.gateway,
       registry: this.agentRegistry,
       stops: repositories.agentStops,
@@ -1937,6 +1945,7 @@ export class GovernanceModule implements GovernanceRestApi {
     organizationId: string;
     agentId: string;
     targets: readonly AgentStopTarget[];
+    expectedVersion?: number;
   }): Promise<AgentStopPlan> {
     return this.agentStops.setPlan(input);
   }
@@ -1949,6 +1958,7 @@ export class GovernanceModule implements GovernanceRestApi {
     organizationId: string;
     connection: AwsConnectionInput;
     userId: string | null;
+    impersonatorId?: string;
   }): Promise<AwsConnectionView> {
     return this.awsConnections.createConnection(input);
   }
@@ -1957,6 +1967,7 @@ export class GovernanceModule implements GovernanceRestApi {
     organizationId: string;
     connectionId: string;
     userId: string | null;
+    impersonatorId?: string;
   }): Promise<{ deleted: boolean }> {
     return this.awsConnections.deleteConnection(input);
   }
@@ -1976,6 +1987,7 @@ export class GovernanceModule implements GovernanceRestApi {
     organizationId: string;
     stopId: string;
     note?: string;
+    expectedTargetIds?: readonly string[];
     caller: AgentStopCaller;
   }): Promise<AgentStopView> {
     return this.agentStops.approveStop(input);

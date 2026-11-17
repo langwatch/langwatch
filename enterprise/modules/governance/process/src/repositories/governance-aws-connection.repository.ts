@@ -49,10 +49,14 @@ export abstract class GovernanceAwsConnectionRepository {
     organizationId: string;
     id: string;
   }): Promise<GovernanceAwsCredentials>;
-  /** Whether a row was deleted; the audit intent is appended only with a deletion. */
+  /**
+   * Whether a row was deleted; the audit intent is appended only with a deletion. `whileLocked`
+   * runs under `awsConnectionsLockKey` right before the delete; a throw keeps the row.
+   */
   abstract delete(input: {
     organizationId: string;
     id: string;
     audit: AuditLogIntent;
+    whileLocked?: () => Promise<void>;
   }): Promise<boolean>;
 }

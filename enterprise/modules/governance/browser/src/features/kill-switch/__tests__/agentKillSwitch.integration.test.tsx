@@ -6,7 +6,8 @@
  * Only the tRPC binding is doubled. Spec: enterprise/modules/governance/specs/agent-kill-switch.feature
  */
 import "@testing-library/jest-dom/vitest";
-import { act, cleanup, screen, waitFor, within } from "@testing-library/react";
+import type { AgentStopView } from "@langwatch/enterprise-governance-contract";
+import { act, cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -116,7 +117,7 @@ describe("the Agents page with stops of its agents", () => {
 
       expect(trpcDouble.calls).toContainEqual({
         procedure: "governanceKillSwitch.approveStop",
-        input: { organizationId: "org-1", stopId: "stop-2" },
+        input: { organizationId: "org-1", stopId: "stop-2", expectedTargetIds: [] },
       });
       expect(trpcDouble.invalidated).toContain("governanceKillSwitch.pendingApprovals");
     });
@@ -177,7 +178,7 @@ describe("the Agents page with stops of its agents", () => {
 
       await openActions("support-bot");
       await userEvent.click(await screen.findByRole("menuitem", { name: /Restore/ }));
-      const dialog = await screen.findByRole("dialog", { name: "Restore support-bot?" });
+      const dialog = await screen.findByRole("alertdialog", { name: "Restore support-bot?" });
       await userEvent.click(within(dialog).getByRole("button", { name: "Restore agent" }));
 
       expect(trpcDouble.calls).toContainEqual({
@@ -219,7 +220,7 @@ describe("the agent row menu of an agent whose stop is open", () => {
 
     await openActions("support-bot");
     await userEvent.click(await screen.findByRole("menuitem", { name: /Retry stop/ }));
-    const dialog = await screen.findByRole("dialog", { name: "Retry stop for support-bot?" });
+    const dialog = await screen.findByRole("alertdialog", { name: "Retry stop for support-bot?" });
     await userEvent.click(within(dialog).getByRole("button", { name: "Retry stop" }));
 
     expect(trpcDouble.calls).toContainEqual({
@@ -238,7 +239,7 @@ describe("the Restore dialog when the agent's open stop changes under it", () =>
     renderAgentsPage({ permissions: MANAGER });
     await openActions("support-bot");
     await userEvent.click(await screen.findByRole("menuitem", { name: /Restore/ }));
-    await screen.findByRole("dialog", { name: "Restore support-bot?" });
+    await screen.findByRole("alertdialog", { name: "Restore support-bot?" });
 
     openStop = { ...QUARANTINED, id: "stop-3" };
     await act(async () => {
@@ -248,7 +249,7 @@ describe("the Restore dialog when the agent's open stop changes under it", () =>
     });
 
     await waitFor(() =>
-      expect(screen.queryByRole("dialog", { name: "Restore support-bot?" })).toBeNull(),
+      expect(screen.queryByRole("alertdialog", { name: "Restore support-bot?" })).toBeNull(),
     );
     expect(trpcDouble.calls).toEqual([]);
   });
@@ -276,26 +277,36 @@ describe("a Restore that completes after its stop was replaced", () => {
           ),
         );
       });
-    renderAgentsPage({ permissions: MANAGER });
+    const host = renderAgentsPage({ permissions: MANAGER });
     await openActions("support-bot");
     await userEvent.click(await screen.findByRole("menuitem", { name: /Restore/ }));
-    const first = await screen.findByRole("dialog", { name: "Restore support-bot?" });
+    const first = await screen.findByRole("alertdialog", { name: "Restore support-bot?" });
     await userEvent.click(within(first).getByRole("button", { name: "Restore agent" }));
     openStop = { ...QUARANTINED, id: "stop-3" };
     await reread();
     await waitFor(() =>
-      expect(screen.queryByRole("dialog", { name: "Restore support-bot?" })).toBeNull(),
+      expect(screen.queryByRole("alertdialog", { name: "Restore support-bot?" })).toBeNull(),
     );
 
     await openActions("support-bot");
     await userEvent.click(await screen.findByRole("menuitem", { name: /Restore/ }));
-    await screen.findByRole("dialog", { name: "Restore support-bot?" });
-    await act(async () => {
-      finish();
-      await new Promise((resolve) => setTimeout(resolve, 50));
-    });
+    await screen.findByRole("alertdialog", { name: "Restore support-bot?" });
+    const readsBefore = trpcDouble.reads.filter((read) => read.endsWith(".summaries")).length;
+    await act(async () => finish());
 
-    expect(screen.getByRole("dialog", { name: "Restore support-bot?" })).toBeInTheDocument();
+    // The first Restore's toast, then its re-read: its close runs right after that re-read.
+    await waitFor(() =>
+      expect(host.recording.successes.map((notice) => notice.title)).toContain(
+        "Restoring support-bot",
+      ),
+    );
+    await waitFor(() =>
+      expect(trpcDouble.reads.filter((read) => read.endsWith(".summaries")).length).toBe(
+        readsBefore + 1,
+      ),
+    );
+    await act(async () => undefined);
+    expect(screen.getByRole("alertdialog", { name: "Restore support-bot?" })).toBeInTheDocument();
   });
 });
 
@@ -414,5 +425,217 @@ describe("the Agents page after a stop is sent", () => {
 
     await act(() => vi.advanceTimersByTimeAsync(60_000));
     expect(summaryReads()).toBe(readsAfterStop);
+  });
+});
+
+type StopTargetOutcome = AgentStopView["targets"][number];
+
+const outcomeOf = ({
+  id,
+  label,
+  virtualKeyId,
+  state = "pending",
+}: {
+  id: string;
+  label: string;
+  virtualKeyId: string;
+  state?: StopTargetOutcome["state"];
+}): StopTargetOutcome => ({
+  id,
+  label,
+  target: { kind: "gateway_virtual_key", virtualKeyId },
+  state,
+  errorCode: null,
+  appliedAt: state === "applied" ? "2026-11-16T09:01:00.000Z" : null,
+  revertedAt: null,
+});
+
+const pendingWith = ({
+  id,
+  agentId,
+  agentName,
+  targets,
+}: {
+  id: string;
+  agentId: string;
+  agentName: string;
+  targets: StopTargetOutcome[];
+}): AgentStopView => ({
+  ...stopOf({ id, agentId, agentName, status: "pending_approval" }),
+  targets,
+});
+
+const approvalRowOf = async (name: string) => {
+  const card = await screen.findByTestId("stop-approvals-card");
+  const row = within(card)
+    .getAllByTestId("stop-approval-row")
+    .find((candidate) => candidate.getAttribute("data-agent") === name);
+  if (!row) throw new Error(`no approval row for ${name}`);
+  return row;
+};
+
+const approveOf = async (name: string) =>
+  within(await approvalRowOf(name)).getByRole("button", { name: "Approve" });
+
+describe("the approval card of a stop waiting for a decision", () => {
+  const PRICING = pendingWith({
+    id: "stop-2",
+    agentId: "a2",
+    agentName: "pricing-bot",
+    targets: [
+      outcomeOf({ id: "o1", label: "Pricing key", virtualKeyId: "vk-2" }),
+      outcomeOf({ id: "o2", label: "Pricing fallback key", virtualKeyId: "vk-3" }),
+    ],
+  });
+
+  /** @scenario "The approver sees the targets of the stop and approves exactly those" */
+  it("names the stop's targets and approves with their ids", async () => {
+    answerAgentsPage({
+      summaries: [summary({ agentId: "a1" }), summary({ agentId: "a2", openStop: PRICING })],
+      pendingApprovals: [PRICING],
+    });
+    answerMutation("governanceKillSwitch.approveStop", () => ({ ...PRICING, status: "stopping" }));
+    renderAgentsPage({ permissions: MANAGER });
+
+    const row = await approvalRowOf("pricing-bot");
+    const targets = within(row).getByTestId("stop-agent-targets");
+    expect(targets).toHaveTextContent("Pricing key (Gateway virtual key)");
+    expect(targets).toHaveTextContent("Pricing fallback key (Gateway virtual key)");
+    await userEvent.click(within(row).getByRole("button", { name: "Approve" }));
+
+    expect(trpcDouble.calls).toContainEqual({
+      procedure: "governanceKillSwitch.approveStop",
+      input: { organizationId: "org-1", stopId: "stop-2", expectedTargetIds: ["o1", "o2"] },
+    });
+  });
+
+  /** @scenario "The approver sees the targets of the stop and approves exactly those" */
+  it("says the stop changed, shows its targets now, and approves those on the next press", async () => {
+    let pending = PRICING;
+    let refused = false;
+    answerAgentsPage({
+      summaries: [summary({ agentId: "a1" }), summary({ agentId: "a2", openStop: PRICING })],
+    });
+    answerQuery("governanceKillSwitch.pendingApprovals", () => [pending]);
+    answerMutation("governanceKillSwitch.approveStop", () => {
+      if (refused) return { ...pending, status: "stopping" };
+      refused = true;
+      pending = { ...PRICING, targets: PRICING.targets.slice(0, 1) };
+      throw handledError({ code: "agent_stop_plan_changed", httpStatus: 409 });
+    });
+    const host = renderAgentsPage({ permissions: MANAGER });
+
+    await userEvent.click(await approveOf("pricing-bot"));
+
+    expect(
+      await within(await approvalRowOf("pricing-bot")).findByText("The stop plan changed"),
+    ).toBeVisible();
+    await waitFor(async () =>
+      expect(
+        within(await approvalRowOf("pricing-bot")).getByTestId("stop-agent-targets"),
+      ).not.toHaveTextContent("Pricing fallback key"),
+    );
+    expect(host.recording.failures).toEqual([]);
+    await userEvent.click(await approveOf("pricing-bot"));
+    expect(trpcDouble.calls.map((call) => call.input)).toEqual([
+      { organizationId: "org-1", stopId: "stop-2", expectedTargetIds: ["o1", "o2"] },
+      { organizationId: "org-1", stopId: "stop-2", expectedTargetIds: ["o1"] },
+    ]);
+  });
+
+  /** @scenario "Each approval holds its own row until it settles" */
+  it("keeps the first row busy and unpressable while a second row's approval settles", async () => {
+    const support = pendingWith({
+      id: "stop-1",
+      agentId: "a1",
+      agentName: "support-bot",
+      targets: [],
+    });
+    const pricing = { ...PRICING, targets: [] };
+    answerAgentsPage({
+      summaries: [
+        summary({ agentId: "a1", openStop: support }),
+        summary({ agentId: "a2", openStop: pricing }),
+      ],
+      pendingApprovals: [support, pricing],
+    });
+    const finish = new Map<string, () => void>();
+    answerMutation(
+      "governanceKillSwitch.approveStop",
+      (input) =>
+        new Promise((resolve) => {
+          const { stopId } = input as { stopId: string };
+          finish.set(stopId, () => resolve({ ...support, id: stopId, status: "stopping" }));
+        }),
+    );
+    renderAgentsPage({ permissions: MANAGER });
+    const approvalsOf = (stopId: string) =>
+      trpcDouble.calls.filter((call) => (call.input as { stopId: string }).stopId === stopId);
+
+    await userEvent.click(await approveOf("support-bot"));
+    await userEvent.click(await approveOf("pricing-bot"));
+    await act(async () => finish.get("stop-2")?.());
+    await waitFor(async () => expect(await approveOf("pricing-bot")).toBeEnabled());
+
+    expect(await approveOf("support-bot")).toBeDisabled();
+    fireEvent.click(await approveOf("support-bot"));
+    expect(approvalsOf("stop-1")).toHaveLength(1);
+
+    await act(async () => finish.get("stop-1")?.());
+    await waitFor(async () => expect(await approveOf("support-bot")).toBeEnabled());
+  });
+});
+
+describe("the Restore and Retry dialogs while their call runs", () => {
+  /** @scenario "The Restore and Retry dialogs stay open until their call settles" */
+  it.each([
+    ["restore", /Restore/, "Restore support-bot?", "Restore agent", "quarantined"],
+    ["retryStop", /Retry stop/, "Retry stop for support-bot?", "Retry stop", "stop_failed"],
+  ] as const)(
+    "keeps the %s confirm open on Escape",
+    async (procedure, menuItem, title, confirm, status) => {
+      answerAgentsPage({
+        summaries: [summary({ agentId: "a1", openStop: { ...QUARANTINED, status } })],
+      });
+      answerMutation(`governanceKillSwitch.${procedure}`, () => new Promise(() => undefined));
+      renderAgentsPage({ permissions: MANAGER });
+      await openActions("support-bot");
+      await userEvent.click(await screen.findByRole("menuitem", { name: menuItem }));
+      const dialog = await screen.findByRole("alertdialog", { name: title });
+
+      await userEvent.click(within(dialog).getByRole("button", { name: confirm }));
+      await userEvent.keyboard("{Escape}");
+
+      expect(screen.getByRole("alertdialog", { name: title })).toBeInTheDocument();
+      expect(within(dialog).getByRole("button", { name: "Cancel" })).toBeDisabled();
+    },
+  );
+});
+
+describe("the Restore dialog of an agent sharing a key with an agent no row backs", () => {
+  /** @scenario "The restore dialog names the stopped agents that keep a shared key disabled" */
+  it("names the other stopped agent", async () => {
+    const shared = (id: string) =>
+      outcomeOf({ id, label: "Shared key", virtualKeyId: "vk-1", state: "applied" });
+    const support = { ...QUARANTINED, targets: [shared("o1")] };
+    const billing = {
+      ...stopOf({ id: "stop-7", agentId: "a7", agentName: "billing-bot", status: "quarantined" }),
+      targets: [shared("o7")],
+    };
+    answerAgentsPage({
+      summaries: [
+        summary({ agentId: "a1", openStop: support }),
+        summary({ agentId: "a7", inventoryRowId: null, openStop: billing }),
+      ],
+    });
+    renderAgentsPage({ permissions: MANAGER });
+
+    await openActions("support-bot");
+    await userEvent.click(await screen.findByRole("menuitem", { name: /Restore/ }));
+    const dialog = await screen.findByRole("alertdialog", { name: "Restore support-bot?" });
+
+    expect(within(dialog).getByTestId("restore-shared-key-note")).toHaveTextContent(
+      "The virtual key stays disabled while billing-bot is still stopped.",
+    );
   });
 });

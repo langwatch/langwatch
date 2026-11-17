@@ -78,6 +78,7 @@ export const summary = (
 export const SUPPORT_BOT_PLAN: AgentStopPlan = {
   agentId: "a1",
   updatedAt: "2026-11-15T10:00:00.000Z",
+  version: 3,
   targets: [
     {
       id: "t1",

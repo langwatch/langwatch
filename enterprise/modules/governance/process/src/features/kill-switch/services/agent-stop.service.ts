@@ -8,19 +8,16 @@ import {
   AgentStopNotFoundError,
   type AgentStopPage,
   AgentStopNotPendingError,
-  AgentStopNotRestorableError,
-  AgentStopNotRetryableError,
-  type AgentStopPlanTarget,
   AgentStopPlanChangedError,
   AgentStopPlanEmptyError,
   type AgentStopRequestedEventData,
-  type AgentStopRestoreRequestedEventData,
-  type AgentStopRetryRequestedEventData,
   AgentStopSelfApprovalError,
   type AgentStopSeverity,
   type AgentStopStatus,
   type AgentStopView,
 } from "@langwatch/enterprise-governance-contract";
+import { ValidationError } from "@langwatch/eventing";
+import { HandledError } from "@langwatch/handled-error";
 import { generate } from "@langwatch/ksuid";
 import { nowInstant } from "@langwatch/time";
 
@@ -31,7 +28,6 @@ import type {
 import type { AgentStopRepository } from "../../../repositories/agent-stop.repository.ts";
 import type { KillSwitchLockRepository } from "../../../repositories/kill-switch-lock.repository.ts";
 import type { AgentStopCommandName } from "../eventing/agent-stop.commands.ts";
-import { targetKeyOf } from "../rules/agent-stop-target.rules.ts";
 import {
   type AgentStopRecord,
   approvalOf,
@@ -40,16 +36,13 @@ import {
   deniedStop,
   encodeStopCursor,
   inventoryRowIdsOf,
-  isOpenStatus,
-  isRestorableStatus,
-  isRetryableStatus,
   requestedStop,
-  restoreRequestedStop,
-  retriedStop,
   viewOfStop,
 } from "../rules/agent-stop.rules.ts";
 import type { AgentStopClaimService } from "./agent-stop-claim.service.ts";
+import { AgentStopLifecycleService, agentLockKey } from "./agent-stop-lifecycle.service.ts";
 import type { AgentStopPlanService } from "./agent-stop-plan.service.ts";
+import { AgentStopRequestAuditService } from "./agent-stop-request-audit.service.ts";
 import type { KillSwitchAuditService } from "./kill-switch-audit.service.ts";
 
 /** Sends one `agent_stop` command; the payload is the event data with tenant and moment merged in. */
@@ -57,9 +50,6 @@ export type AgentStopCommandSend = (
   name: AgentStopCommandName,
   payload: { tenantId: string; occurredAt: number } & Record<string, unknown>,
 ) => Promise<void>;
-
-/** The audit rows' target kind: the stop is about the registry agent. */
-export const AGENT_STOP_AUDIT_TARGET_KIND = "governance_agent";
 
 const READ_LIMIT = 200;
 
@@ -69,10 +59,34 @@ function isSamePlan(targetIds: readonly string[], expected: readonly string[]): 
   return held.size === new Set(expected).size && expected.every((id) => held.has(id));
 }
 
+/** A send refused by name or by its payload's schema never reached the queue. */
+function isRefusedBeforeSend(error: unknown): boolean {
+  return HandledError.isHandled(error) || error instanceof ValidationError;
+}
+
+/** The requesting key, or the person behind it (the key's owner, or another key they own). */
+function isRequester({
+  caller,
+  stop,
+}: {
+  caller: AgentStopCaller;
+  stop: AgentStopRecord;
+}): boolean {
+  if (caller.apiKeyId && caller.apiKeyId === stop.requestedByApiKeyId) return true;
+  return caller.userId !== null && caller.userId === stop.requestedByUserId;
+}
+
 interface AgentStopDependencies {
+  requestAudit: AgentStopRequestAuditService;
   stops: Pick<
     AgentStopRepository,
-    "getStop" | "findByAgent" | "findByStatuses" | "findAllByStatuses" | "seed"
+    | "getStop"
+    | "getStopWithCursor"
+    | "findByAgent"
+    | "findByStatuses"
+    | "findAllByStatuses"
+    | "seed"
+    | "advance"
   >;
   claims: Pick<AgentStopClaimService, "claim" | "markSent" | "release" | "withDecision">;
   plans: Pick<AgentStopPlanService, "findTargets" | "findPlanCounts" | "setPlan">;
@@ -92,22 +106,58 @@ interface AgentStopDependencies {
  * Spec: enterprise/modules/governance/specs/agent-kill-switch.feature
  */
 export class AgentStopService {
-  private constructor(private readonly deps: AgentStopDependencies) {}
+  private readonly lifecycle: AgentStopLifecycleService;
 
+  private constructor(private readonly deps: AgentStopDependencies) {
+    this.lifecycle = AgentStopLifecycleService.create({ ...deps, audit: deps.requestAudit });
+  }
+
+  /** The request trail and the lifecycle are collaborators, built from the same dependencies. */
   static create({
     newId = () => generate("agentstop").toString(),
     now = () => nowInstant().epochMilliseconds,
     pageSize = READ_LIMIT,
     ...deps
-  }: Omit<AgentStopDependencies, "newId" | "now" | "pageSize"> & {
+  }: Omit<AgentStopDependencies, "newId" | "now" | "pageSize" | "requestAudit"> & {
     newId?: () => string;
     now?: () => number;
     pageSize?: number;
   }): AgentStopService {
-    return new AgentStopService({ ...deps, newId, now, pageSize });
+    const requestAudit = AgentStopRequestAuditService.create({ audit: deps.audit });
+    return new AgentStopService({ ...deps, requestAudit, newId, now, pageSize });
   }
 
-  async requestStop({
+  requestStop(input: {
+    organizationId: string;
+    agentId: string;
+    reason: string;
+    severity: AgentStopSeverity;
+    expectedTargetIds?: readonly string[];
+    caller: AgentStopCaller;
+  }): Promise<AgentStopView> {
+    return this.deps.requestAudit.recordingRefusal({
+      action: "governance.agent.stop_requested",
+      ...input,
+      run: () => this.requestStopOnce(input),
+    });
+  }
+
+  /** Under the agent's lock, so a plan edit cannot drop a target between the plan read and the seed. */
+  private requestStopOnce(input: {
+    organizationId: string;
+    agentId: string;
+    reason: string;
+    severity: AgentStopSeverity;
+    expectedTargetIds?: readonly string[];
+    caller: AgentStopCaller;
+  }): Promise<AgentStopView> {
+    return this.deps.locks.withLock({
+      key: agentLockKey(input),
+      run: () => this.requestStopLocked(input),
+    });
+  }
+
+  private async requestStopLocked({
     organizationId,
     agentId,
     reason,
@@ -150,25 +200,34 @@ export class AgentStopService {
     try {
       await this.deps.send("request", { tenantId: organizationId, occurredAt: at, ...data });
     } catch (error) {
-      await this.deps.claims.release({ organizationId, agentId, stopId });
+      // An unclear failure may have landed: the claim stays until the stop shows up or is abandoned.
+      if (isRefusedBeforeSend(error)) {
+        await this.deps.claims.release({ organizationId, agentId, stopId });
+      }
       throw error;
     }
     const stop = requestedStop({ data, at });
     await Promise.all([
       this.deps.stops.seed({ stop, at }),
       this.deps.claims.markSent({ organizationId, agentId, stopId, sentAt: this.deps.now() }),
-      this.audit({ action: "governance.agent.stop_requested", stop, caller }),
+      this.deps.requestAudit.record({ action: "governance.agent.stop_requested", stop, caller }),
     ]);
     return viewOfStop(stop);
   }
 
+  /** Refused `agent_stop_plan_changed` when `expectedTargetIds` no longer names the stop's targets. */
   approveStop(input: {
     organizationId: string;
     stopId: string;
     note?: string;
+    expectedTargetIds?: readonly string[];
     caller: AgentStopCaller;
   }): Promise<AgentStopView> {
-    return this.decide({ ...input, approve: true });
+    return this.deps.requestAudit.recordingRefusal({
+      action: "governance.agent.stop_approved",
+      ...input,
+      run: () => this.decide({ ...input, approve: true }),
+    });
   }
 
   denyStop(input: {
@@ -177,34 +236,23 @@ export class AgentStopService {
     note?: string;
     caller: AgentStopCaller;
   }): Promise<AgentStopView> {
-    return this.decide({ ...input, approve: false });
+    return this.deps.requestAudit.recordingRefusal({
+      action: "governance.agent.stop_denied",
+      ...input,
+      run: () => this.decide({ ...input, approve: false }),
+    });
   }
 
-  async restore({
-    organizationId,
-    stopId,
-    caller,
-  }: {
+  restore(input: {
     organizationId: string;
     stopId: string;
     caller: AgentStopCaller;
   }): Promise<AgentStopView> {
-    const current = await this.deps.stops.getStop({ organizationId, stopId });
-    if (!isRestorableStatus(current.status)) {
-      throw new AgentStopNotRestorableError({ stopId, status: current.status });
-    }
-    const data: AgentStopRestoreRequestedEventData = {
-      stopId,
-      organizationId,
-      requestedByUserId: caller.userId,
-      requestedByApiKeyId: caller.apiKeyId,
-      requestId: this.deps.newId(),
-    };
-    const at = this.deps.now();
-    await this.deps.send("requestRestore", { tenantId: organizationId, occurredAt: at, ...data });
-    const stop = restoreRequestedStop({ stop: current, data, at });
-    await this.audit({ action: "governance.agent.restore_requested", stop, caller });
-    return viewOfStop(stop);
+    return this.deps.requestAudit.recordingRefusal({
+      action: "governance.agent.restore_requested",
+      ...input,
+      run: () => this.lifecycle.restore(input),
+    });
   }
 
   /**
@@ -212,37 +260,16 @@ export class AgentStopService {
    * back on, and the plan targets added since. Refused `agent_stop_not_retryable` unless the stop
    * is quarantined, stop_failed or restore_failed.
    */
-  async retryStop({
-    organizationId,
-    stopId,
-    caller,
-  }: {
+  retryStop(input: {
     organizationId: string;
     stopId: string;
     caller: AgentStopCaller;
   }): Promise<AgentStopView> {
-    const current = await this.deps.stops.getStop({ organizationId, stopId });
-    if (!isRetryableStatus(current.status)) {
-      throw new AgentStopNotRetryableError({ stopId, status: current.status });
-    }
-    const plan = await this.deps.plans.findTargets({
-      organizationId,
-      agentId: current.agentId,
+    return this.deps.requestAudit.recordingRefusal({
+      action: "governance.agent.stop_retried",
+      ...input,
+      run: () => this.lifecycle.retryStop(input),
     });
-    const held = new Set(current.targets.map((outcome) => targetKeyOf(outcome.target)));
-    const data: AgentStopRetryRequestedEventData = {
-      stopId,
-      organizationId,
-      requestedByUserId: caller.userId,
-      requestedByApiKeyId: caller.apiKeyId,
-      requestId: this.deps.newId(),
-      targets: plan.filter((target) => !held.has(targetKeyOf(target.target))),
-    };
-    const at = this.deps.now();
-    await this.deps.send("retry", { tenantId: organizationId, occurredAt: at, ...data });
-    const stop = retriedStop({ stop: current, data, at });
-    await this.audit({ action: "governance.agent.stop_retried", stop, caller });
-    return viewOfStop(stop);
   }
 
   /** Saves the plan and lets the open stop go of removed targets, one plan edit per agent at a time. */
@@ -250,10 +277,10 @@ export class AgentStopService {
     input: Parameters<AgentStopPlanService["setPlan"]>[0],
   ): ReturnType<AgentStopPlanService["setPlan"]> {
     return this.deps.locks.withLock({
-      key: `agent-stop-plan:${input.organizationId}:${input.agentId}`,
+      key: agentLockKey(input),
       run: async () => {
         const plan = await this.deps.plans.setPlan(input);
-        await this.dropRemovedTargets({
+        await this.lifecycle.dropRemovedTargets({
           organizationId: input.organizationId,
           agentId: input.agentId,
           plan: plan.targets,
@@ -263,34 +290,11 @@ export class AgentStopService {
     });
   }
 
-  /**
-   * After the agent's plan changed: the open stop lets go of every target the plan no longer
-   * holds, so a deleted resource taken out of the plan stops holding the stop or its restore.
-   */
-  async dropRemovedTargets({
-    organizationId,
-    agentId,
-    plan,
-  }: {
-    organizationId: string;
-    agentId: string;
-    plan: readonly AgentStopPlanTarget[];
-  }): Promise<void> {
-    const [latest] = await this.deps.stops.findByAgent({ organizationId, agentId, limit: 1 });
-    if (!latest || !isOpenStatus(latest.status)) return;
-    const kept = new Set(plan.map((target) => targetKeyOf(target.target)));
-    const targetIds = latest.targets
-      .filter((outcome) => !kept.has(targetKeyOf(outcome.target)))
-      .map((outcome) => outcome.id);
-    if (targetIds.length === 0) return;
-    await this.deps.send("dropTargets", {
-      tenantId: organizationId,
-      occurredAt: this.deps.now(),
-      stopId: latest.id,
-      organizationId,
-      targetIds,
-      dropId: this.deps.newId(),
-    });
+  /** After the agent's plan changed, the open stop lets go of what the plan no longer holds. */
+  dropRemovedTargets(
+    input: Parameters<AgentStopLifecycleService["dropRemovedTargets"]>[0],
+  ): Promise<void> {
+    return this.lifecycle.dropRemovedTargets(input);
   }
 
   /** The agent's latest stop; refused `agent_stop_not_found` when it was never stopped. */
@@ -417,12 +421,14 @@ export class AgentStopService {
     organizationId,
     stopId,
     note,
+    expectedTargetIds,
     caller,
     approve,
   }: {
     organizationId: string;
     stopId: string;
     note?: string;
+    expectedTargetIds?: readonly string[];
     caller: AgentStopCaller;
     approve: boolean;
   }): Promise<AgentStopView> {
@@ -430,8 +436,12 @@ export class AgentStopService {
     if (current.status !== "pending_approval") {
       throw new AgentStopNotPendingError({ stopId, status: current.status });
     }
-    if (approve && caller.apiKeyId && caller.apiKeyId === current.requestedByApiKeyId) {
+    if (approve && isRequester({ caller, stop: current })) {
       throw new AgentStopSelfApprovalError(stopId);
+    }
+    const stopTargetIds = current.targets.map((target) => target.id);
+    if (expectedTargetIds && !isSamePlan(stopTargetIds, expectedTargetIds)) {
+      throw new AgentStopPlanChangedError(current.agentId);
     }
     const data: AgentStopDecidedEventData = {
       stopId,
@@ -457,46 +467,12 @@ export class AgentStopService {
     const stop = approve
       ? approvedStop({ stop: current, data, at })
       : deniedStop({ stop: current, data, at });
-    await this.audit({
+    await this.deps.requestAudit.record({
       action: approve ? "governance.agent.stop_approved" : "governance.agent.stop_denied",
       stop,
       caller,
       note,
     });
     return viewOfStop(stop);
-  }
-
-  private async audit({
-    action,
-    stop,
-    caller,
-    note,
-  }: {
-    action: string;
-    stop: AgentStopRecord;
-    caller: AgentStopCaller;
-    note?: string;
-  }): Promise<void> {
-    // A service key has no user: the row names the key, as the door's own audit rows do.
-    const actor = caller.userId ?? (caller.apiKeyId ? `apikey:${caller.apiKeyId}` : null);
-    await this.deps.audit.record({
-      ...(actor ? { userId: actor } : {}),
-      organizationId: stop.organizationId,
-      action,
-      targetKind: AGENT_STOP_AUDIT_TARGET_KIND,
-      targetId: stop.agentId,
-      metadata: {
-        targetName: stop.agentName,
-        stopId: stop.id,
-        agentName: stop.agentName,
-        status: stop.status,
-        severity: stop.severity,
-        approval: stop.approval,
-        trigger: stop.trigger,
-        reason: stop.reason,
-        apiKeyId: caller.apiKeyId,
-        ...(note ? { note } : {}),
-      },
-    });
   }
 }

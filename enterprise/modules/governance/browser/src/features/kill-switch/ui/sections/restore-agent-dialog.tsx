@@ -48,10 +48,15 @@ export function RestoreAgentDialog({
     }
   };
 
+  const close = () => {
+    if (!restore.isPending) onClose();
+  };
+
   return (
     <Dialog
       open={open}
-      onClose={onClose}
+      onClose={close}
+      role="alertdialog"
       placement="center"
       title={`Restore ${agentName}?`}
       busy={restore.isPending}

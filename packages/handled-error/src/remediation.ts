@@ -599,6 +599,12 @@ const registry = {
     ],
     docsPath: "/governance/kill-switch",
   },
+  agent_stop_plan_conflict: {
+    tips: [
+      "Read the plan again with GET /api/governance/agents/{agentId}/stop-plan, apply your change to it and send its `version` as `expectedVersion`",
+    ],
+    docsPath: "/governance/kill-switch",
+  },
   agent_stop_plan_empty: {
     tips: ["Set the agent's targets with PUT /api/governance/agents/{agentId}/stop-plan"],
     docsPath: "/governance/kill-switch",
@@ -612,6 +618,13 @@ const registry = {
       "A serving endpoint target names a Databricks Genie governance source of this organisation",
       "A Bedrock target names an AWS connection of this organisation",
       "A virtual key target names a virtual key of this organisation",
+    ],
+    docsPath: "/governance/kill-switch",
+  },
+  agent_stop_target_not_found: {
+    tips: [
+      "A Bedrock target names the alias's region, agent id and alias id as the AWS console shows them",
+      "A serving endpoint target names an endpoint of the source's Databricks workspace",
     ],
     docsPath: "/governance/kill-switch",
   },

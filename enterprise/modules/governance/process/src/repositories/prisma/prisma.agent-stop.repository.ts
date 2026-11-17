@@ -11,6 +11,7 @@ import type {
   StoredProjectionRead,
 } from "@langwatch/eventing";
 import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
+import { z } from "zod";
 
 import type { AgentStopProjectionState } from "../../features/kill-switch/eventing/agent-stop.projection.ts";
 import {
@@ -23,27 +24,31 @@ import { type AgentStopPosition, AgentStopRepository } from "../agent-stop.repos
 type AgentStopDatabase = Pick<PrismaClient, "agentStop">;
 type Row = Prisma.AgentStopGetPayload<object>;
 
-/** The targets column holds the outcomes; the restore and retry rounds ride along beside them. */
-const storedTargetsSchema = agentStopTargetOutcomeSchema.array();
+/** The targets column, read and written through this one schema: the outcomes and both rounds. */
+const targetsColumnSchema = z.object({
+  outcomes: agentStopTargetOutcomeSchema.array(),
+  restoreRound: agentStopRecordSchema.shape.restoreRound,
+  retryRound: agentStopRecordSchema.shape.retryRound,
+  retriedByUserId: agentStopRecordSchema.shape.retriedByUserId,
+  retriedByApiKeyId: agentStopRecordSchema.shape.retriedByApiKeyId,
+  lastRequestId: agentStopRecordSchema.shape.lastRequestId,
+});
+type TargetsColumn = z.infer<typeof targetsColumnSchema>;
 
 function targetsColumnOf(stop: AgentStopRecord): Prisma.InputJsonValue {
-  return {
+  const column: TargetsColumn = {
     outcomes: stop.targets,
     restoreRound: stop.restoreRound,
     retryRound: stop.retryRound,
     retriedByUserId: stop.retriedByUserId,
     retriedByApiKeyId: stop.retriedByApiKeyId,
-  } as Prisma.InputJsonValue;
+    lastRequestId: stop.lastRequestId,
+  };
+  return targetsColumnSchema.parse(column) as Prisma.InputJsonValue;
 }
 
 function recordOf(row: Row): AgentStopRecord {
-  const column = (row.targets ?? {}) as {
-    outcomes?: unknown;
-    restoreRound?: unknown;
-    retryRound?: unknown;
-    retriedByUserId?: unknown;
-    retriedByApiKeyId?: unknown;
-  };
+  const column = targetsColumnSchema.parse(row.targets);
   return agentStopRecordSchema.parse({
     id: row.id,
     organizationId: row.organizationId,
@@ -60,17 +65,17 @@ function recordOf(row: Row): AgentStopRecord {
     decidedByApiKeyId: row.decidedByApiKeyId,
     restoredByUserId: row.restoredByUserId,
     restoredByApiKeyId: row.restoredByApiKeyId,
-    targets: storedTargetsSchema.parse(column.outcomes ?? []),
+    targets: column.outcomes,
     requestedAt: row.requestedAt.toISOString(),
     decidedAt: row.decidedAt?.toISOString() ?? null,
     quarantinedAt: row.quarantinedAt?.toISOString() ?? null,
     restoreRequestedAt: row.restoreRequestedAt?.toISOString() ?? null,
     restoredAt: row.restoredAt?.toISOString() ?? null,
-    restoreRound: typeof column.restoreRound === "number" ? column.restoreRound : 0,
-    retryRound: typeof column.retryRound === "number" ? column.retryRound : 0,
-    retriedByUserId: typeof column.retriedByUserId === "string" ? column.retriedByUserId : null,
-    retriedByApiKeyId:
-      typeof column.retriedByApiKeyId === "string" ? column.retriedByApiKeyId : null,
+    restoreRound: column.restoreRound,
+    retryRound: column.retryRound,
+    retriedByUserId: column.retriedByUserId,
+    retriedByApiKeyId: column.retriedByApiKeyId,
+    lastRequestId: column.lastRequestId,
   });
 }
 
@@ -174,6 +179,25 @@ export class PrismaAgentStopRepository extends AgentStopRepository {
         },
       ],
       skipDuplicates: true,
+    });
+  }
+
+  async getStopWithCursor({
+    organizationId,
+    stopId,
+  }: {
+    organizationId: string;
+    stopId: string;
+  }): Promise<{ stop: AgentStopRecord; eventId: string }> {
+    const row = await this.prisma.agentStop.findFirst({ where: { id: stopId, organizationId } });
+    if (!row) throw new AgentStopNotFoundError(stopId);
+    return { stop: recordOf(row), eventId: row.lastAppliedEventId };
+  }
+
+  async advance({ stop, eventId }: { stop: AgentStopRecord; eventId: string }): Promise<void> {
+    await this.prisma.agentStop.updateMany({
+      where: { id: stop.id, organizationId: stop.organizationId, lastAppliedEventId: eventId },
+      data: columnsOf(stop),
     });
   }
 

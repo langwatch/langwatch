@@ -2,7 +2,7 @@
 
 import { randomBytes } from "node:crypto";
 
-import type { AuditLogIntent } from "@langwatch/audit-log-contract";
+import type { AuditLogEntry, AuditLogIntent } from "@langwatch/audit-log-contract";
 import {
   AGENT_STOP_OPEN_STATUSES,
   AGENT_STOP_RESTORABLE_STATUSES,
@@ -25,13 +25,13 @@ interface GovernanceAwsConnectionDependencies {
   connections: GovernanceAwsConnectionRepository;
   plans: Pick<AgentStopPlanRepository, "findAgentIdsByAwsConnection">;
   stops: Pick<AgentStopRepository, "findAllByStatuses">;
-  audit: Pick<KillSwitchAuditService, "intentOf">;
+  audit: Pick<KillSwitchAuditService, "intentOf" | "record">;
   newId: () => string;
   newExternalId: () => string;
 }
 
 /** The audit target of a connection write; the row never carries the secret or external id. */
-export const AWS_CONNECTION_AUDIT_TARGET_KIND = "governance_aws_connection";
+const AWS_CONNECTION_AUDIT_TARGET_KIND = "governance_aws_connection";
 
 /** A read answers the access key id's last four characters and never a secret. */
 function viewOfAwsConnection(record: GovernanceAwsConnectionRecord): AwsConnectionView {
@@ -57,6 +57,35 @@ const STOP_STATUSES_HOLDING_CONNECTIONS = [
  * connection a plan target or an unrestored stop still names cannot be deleted. Adding and removing
  * one writes an audit row.
  */
+type AuditEntryInput = {
+  action: string;
+  organizationId: string;
+  userId: string | null;
+  impersonatorId?: string;
+  connectionId: string;
+  metadata: Record<string, string | boolean | null>;
+};
+
+/** A connection write's audit row; an impersonated person's operator is named as the generic trail names it. */
+function auditEntryOf({
+  action,
+  organizationId,
+  userId,
+  impersonatorId,
+  connectionId,
+  metadata,
+}: AuditEntryInput): AuditLogEntry {
+  return {
+    ...(userId ? { userId } : {}),
+    ...(impersonatorId ? { actorUserId: impersonatorId } : {}),
+    organizationId,
+    action,
+    targetKind: AWS_CONNECTION_AUDIT_TARGET_KIND,
+    targetId: connectionId,
+    metadata: { ...metadata, ...(impersonatorId ? { impersonatorId } : {}) },
+  };
+}
+
 export class GovernanceAwsConnectionService {
   private constructor(private readonly deps: GovernanceAwsConnectionDependencies) {}
 
@@ -75,10 +104,12 @@ export class GovernanceAwsConnectionService {
     organizationId,
     connection,
     userId,
+    impersonatorId,
   }: {
     organizationId: string;
     connection: AwsConnectionInput;
     userId: string | null;
+    impersonatorId?: string;
   }): Promise<AwsConnectionView> {
     const input = awsConnectionInputSchema.parse(connection);
     const id = this.deps.newId();
@@ -96,6 +127,7 @@ export class GovernanceAwsConnectionService {
         action: "governance.agent.aws_connection_created",
         organizationId,
         userId,
+        impersonatorId,
         connectionId: id,
         metadata: {
           targetName: input.name,
@@ -121,15 +153,13 @@ export class GovernanceAwsConnectionService {
     organizationId,
     connectionId,
     userId,
+    impersonatorId,
   }: {
     organizationId: string;
     connectionId: string;
     userId: string | null;
+    impersonatorId?: string;
   }): Promise<{ deleted: boolean }> {
-    const agentIds = await this.findAgentIdsUsing({ organizationId, connectionId });
-    if (agentIds.length > 0) {
-      throw new GovernanceAwsConnectionInUseError({ connectionId, agentIds });
-    }
     const [named] = await this.deps.connections.findByIds({ organizationId, ids: [connectionId] });
     const deleted = await this.deps.connections.delete({
       organizationId,
@@ -138,35 +168,50 @@ export class GovernanceAwsConnectionService {
         action: "governance.agent.aws_connection_deleted",
         organizationId,
         userId,
+        impersonatorId,
         connectionId,
         metadata: named ? { targetName: named.name } : {},
       }),
+      // Under the lock a plan write naming a Bedrock target takes, so no plan names it meanwhile.
+      whileLocked: () =>
+        this.refuseWhileInUse({ organizationId, connectionId, userId, impersonatorId }),
     });
     return { deleted };
   }
 
-  /** The write's audit row, keyed once; the repository commits it with the write. */
-  private auditOf({
-    action,
+  private async refuseWhileInUse({
     organizationId,
-    userId,
     connectionId,
-    metadata,
+    userId,
+    impersonatorId,
   }: {
-    action: string;
     organizationId: string;
-    userId: string | null;
     connectionId: string;
-    metadata: Record<string, string | boolean | null>;
-  }): AuditLogIntent {
-    return this.deps.audit.intentOf({
-      ...(userId ? { userId } : {}),
-      organizationId,
-      action,
-      targetKind: AWS_CONNECTION_AUDIT_TARGET_KIND,
-      targetId: connectionId,
-      metadata,
-    });
+    userId: string | null;
+    impersonatorId: string | undefined;
+  }): Promise<void> {
+    const agentIds = await this.findAgentIdsUsing({ organizationId, connectionId });
+    if (agentIds.length > 0) {
+      const refusal = new GovernanceAwsConnectionInUseError({ connectionId, agentIds });
+      // The transport leaves this call out of the generic trail, so the refused attempt is ours.
+      await this.deps.audit.record({
+        ...auditEntryOf({
+          action: "governance.agent.aws_connection_deleted",
+          organizationId,
+          userId,
+          impersonatorId,
+          connectionId,
+          metadata: {},
+        }),
+        error: refusal.code,
+      });
+      throw refusal;
+    }
+  }
+
+  /** The write's audit row, keyed once; the repository commits it with the write. */
+  private auditOf(entry: AuditEntryInput): AuditLogIntent {
+    return this.deps.audit.intentOf(auditEntryOf(entry));
   }
 
   private async findAgentIdsUsing({

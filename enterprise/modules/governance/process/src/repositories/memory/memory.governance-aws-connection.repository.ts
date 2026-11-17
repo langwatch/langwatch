@@ -55,21 +55,21 @@ export class MemoryGovernanceAwsConnectionRepository extends GovernanceAwsConnec
   readonly auditIntents: AuditLogIntent[] = [];
   #auditRefusal: string | null = null;
 
-  /** The next audit append throws `message`, so its write rolls back as a transaction would. */
-  refuseNextAudit(message: string): void {
-    this.#auditRefusal = message;
-  }
+  /** Test-only levers the repository interface never declares. */
+  readonly testing = {
+    /** The next audit append throws `message`, so its write rolls back as a transaction would. */
+    refuseNextAudit: (message: string): void => {
+      this.#auditRefusal = message;
+    },
+    /** The rows as stored, sealed values included, for a test to read. */
+    storedRows: (): MemoryAwsConnectionRow[] => structuredClone(this.rows),
+  };
 
   private commitAudit(audit: AuditLogIntent): void {
     const refusal = this.#auditRefusal;
     this.#auditRefusal = null;
     if (refusal) throw new Error(refusal);
     this.auditIntents.push(audit);
-  }
-
-  /** The rows as stored, sealed values included, for a test to read. */
-  storedRows(): MemoryAwsConnectionRow[] {
-    return structuredClone(this.rows);
   }
 
   async create(input: {
@@ -147,11 +147,14 @@ export class MemoryGovernanceAwsConnectionRepository extends GovernanceAwsConnec
     organizationId,
     id,
     audit,
+    whileLocked,
   }: {
     organizationId: string;
     id: string;
     audit: AuditLogIntent;
+    whileLocked?: () => Promise<void>;
   }): Promise<boolean> {
+    await whileLocked?.();
     const index = this.rows.findIndex(
       (row) => row.organizationId === organizationId && row.id === id,
     );

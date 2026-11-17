@@ -13,6 +13,10 @@ import { aesEncryption } from "@langwatch/process-stores";
 import { Temporal } from "@langwatch/time";
 import { nanoid } from "nanoid";
 
+import { MemoryBedrockAgentAliasChannel } from "../../../channels/memory/memory.bedrock-agent-alias.channel.ts";
+import { MemoryDatabricksServingEndpointChannel } from "../../../channels/memory/memory.databricks-serving-endpoint.channel.ts";
+import { MemoryProviderSignInChannel } from "../../../channels/memory/memory.provider-sign-in.channel.ts";
+import { SourceCredentialAccessService } from "../../../features/ingestion-source/services/source-credential-access.service.ts";
 import {
   type AgentStopRecord,
   requestedStop,
@@ -74,6 +78,31 @@ export async function seedRegistry({
   });
 }
 
+/** Platforms in memory where every target the suites name exists: the alias AGENT00001/ALIAS00001. */
+export function presentPlatforms({
+  memory,
+}: {
+  memory: ReturnType<typeof MemoryGovernanceRepositories.create>;
+}) {
+  const bedrock = MemoryBedrockAgentAliasChannel.create();
+  bedrock.seed({
+    agentId: "AGENT00001",
+    agentAliasId: "ALIAS00001",
+    alias: {
+      agentAliasName: "live",
+      description: undefined,
+      routingConfiguration: [{ agentVersion: "1" }],
+      aliasInvocationState: "ACCEPT_INVOCATIONS",
+    },
+  });
+  return {
+    sourceCredentials: SourceCredentialAccessService.create({ sources: memory.ingestionSources }),
+    signIn: MemoryProviderSignInChannel.create(),
+    servingEndpoints: MemoryDatabricksServingEndpointChannel.create(),
+    bedrock,
+  };
+}
+
 /** One suite's namespace, organisations and repositories; `cleanup` drops every row it wrote. */
 export function killSwitchDatabase() {
   const ns = `kill-switch-${nanoid(8)}`;
@@ -93,6 +122,7 @@ export function killSwitchDatabase() {
   const cleanup = async () => {
     const where = { organizationId: { in: organizations } };
     await prisma().agentStopPlanTarget.deleteMany({ where });
+    await prisma().agentStopPlan.deleteMany({ where });
     await prisma().governanceAwsConnection.deleteMany({ where });
     await prisma().agentStop.deleteMany({ where });
     await prisma().agentStopClaim.deleteMany({ where });

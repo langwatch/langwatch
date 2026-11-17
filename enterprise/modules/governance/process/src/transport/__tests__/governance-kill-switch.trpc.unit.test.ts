@@ -11,8 +11,15 @@ import { describe, expect, it } from "vitest";
 import { governanceKillSwitchTrpcTransport } from "../governance-kill-switch.trpc.ts";
 import { governanceTrpcMembers, governanceTrpcRuntime } from "./support/governance-trpc.fixture.ts";
 
-function mount({ holdsRegistry }: { holdsRegistry: boolean }) {
+function mount({
+  holdsRegistry,
+  impersonatorId,
+}: {
+  holdsRegistry: boolean;
+  impersonatorId?: string;
+}) {
   const asked: string[] = [];
+  const genericRows: unknown[] = [];
   const entitlementsAsked: string[] = [];
   const requests: unknown[] = [];
   const app = createApiFixture<GovernanceRestApi>({
@@ -32,8 +39,15 @@ function mount({ holdsRegistry }: { holdsRegistry: boolean }) {
       };
     },
   });
+  const members = governanceTrpcMembers({ permits: () => true, asked });
   const router = governanceTrpcRuntime({
-    ...governanceTrpcMembers({ permits: () => true, asked }),
+    ...members,
+    audit: {
+      ...members.audit,
+      record: async (row) => {
+        genericRows.push(row);
+      },
+    },
     entitlements: {
       holds: async ({ entitlement }) => {
         entitlementsAsked.push(entitlement);
@@ -43,8 +57,10 @@ function mount({ holdsRegistry }: { holdsRegistry: boolean }) {
         Object.assign(new Error(`plan lacks ${feature}`), { code: "plan_feature_unavailable" }),
     },
   }).mount(governanceKillSwitchTrpcTransport, () => app);
-  const caller = router.createCaller({ actor: { id: "user_1" } });
-  return { caller, asked, entitlementsAsked, requests };
+  const caller = router.createCaller({
+    actor: { id: "user_1", ...(impersonatorId ? { impersonatorId } : {}) },
+  });
+  return { caller, asked, entitlementsAsked, requests, genericRows };
 }
 
 const STOP = {
@@ -88,6 +104,30 @@ describe("the governanceKillSwitch tRPC namespace", () => {
           caller: { userId: "user_1", apiKeyId: null },
         },
       ]);
+    });
+  });
+
+  describe("when an operator impersonating a person stops an agent and adds a connection", () => {
+    /** @scenario "An impersonated kill switch write names the operator in its audit row" */
+    it("hands the service the operator beside the person, and writes no generic row", async () => {
+      const { caller, requests, genericRows } = mount({
+        holdsRegistry: true,
+        impersonatorId: "operator_1",
+      });
+
+      await caller.requestStop(STOP);
+      await caller.createAwsConnection({
+        organizationId: "org_1",
+        connection: { name: "ACME role", roleArn: "arn:aws:iam::123456789012:role/kill-switch" },
+      });
+
+      expect(requests).toEqual([
+        expect.objectContaining({
+          caller: { userId: "user_1", apiKeyId: null, impersonatorId: "operator_1" },
+        }),
+        expect.objectContaining({ userId: "user_1", impersonatorId: "operator_1" }),
+      ]);
+      expect(genericRows).toEqual([]);
     });
   });
 

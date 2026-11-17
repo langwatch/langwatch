@@ -6,13 +6,27 @@ import {
   UpdateAgentAliasCommand,
 } from "@aws-sdk/client-bedrock-agent";
 import { AwsClientConfiguration } from "@langwatch/aws-client";
+import { z } from "zod";
 
-import type { BedrockInvocationState } from "../../features/kill-switch/rules/agent-stop-target.rules.ts";
+import {
+  BEDROCK_INVOCATION_STATES,
+  type BedrockInvocationState,
+} from "../../features/kill-switch/rules/agent-stop-target.rules.ts";
 import type {
   BedrockAgentAliasChannel,
   BedrockAliasTarget,
 } from "../bedrock-agent-alias.channel.ts";
 import { KillSwitchPlatformError } from "../kill-switch-platform.channel.ts";
+
+/** An alias Bedrock answers with no state accepts invocations, as the console shows it. */
+const aliasInvocationStateSchema = z
+  .enum(
+    Object.values(BEDROCK_INVOCATION_STATES) as [
+      BedrockInvocationState,
+      ...BedrockInvocationState[],
+    ],
+  )
+  .default(BEDROCK_INVOCATION_STATES.restore);
 
 /**
  * The Bedrock Agents control plane, signed with the organisation's AWS connection: a static key
@@ -96,12 +110,20 @@ export class HttpBedrockAgentAliasChannel implements BedrockAgentAliasChannel {
         message: `Bedrock answered no alias name for ${agentId}/${agentAliasId}`,
       });
     }
+    const state = aliasInvocationStateSchema.safeParse(
+      agentAlias.aliasInvocationState ?? undefined,
+    );
+    if (!state.success) {
+      throw new KillSwitchPlatformError({
+        code: "bedrock_alias_state_unknown",
+        message: `Bedrock answered an unknown invocation state for ${agentId}/${agentAliasId}`,
+      });
+    }
     return {
       agentAliasName: agentAlias.agentAliasName,
       description: agentAlias.description,
       routingConfiguration: agentAlias.routingConfiguration,
-      aliasInvocationState: (agentAlias.aliasInvocationState ??
-        "ACCEPT_INVOCATIONS") as BedrockInvocationState,
+      aliasInvocationState: state.data,
     };
   }
 

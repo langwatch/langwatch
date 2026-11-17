@@ -41,6 +41,12 @@ Feature: Agent kill switch: stop a misbehaving agent where it runs, with approva
     When the plan names a Copilot Studio source for a serving endpoint target
     Then the write is refused with code "agent_stop_target_invalid"
 
+  @integration
+  Scenario: A stop plan naming a target its platform does not find is refused
+    When the plan names a serving endpoint its workspace answers 404 for, or a Bedrock alias AWS does not find
+    Then the write is refused with code "agent_stop_target_not_found" naming the target's position
+    And a platform failing for another reason lets the plan save
+
   @unit
   Scenario: Adding and removing an AWS connection is audited without its secrets
     Given a person with "governance:manage"
@@ -64,6 +70,21 @@ Feature: Agent kill switch: stop a misbehaving agent where it runs, with approva
     Given two people save a stop plan for "support-bot" at the same moment
     When both writes commit
     Then the plan holds the targets of exactly one write
+
+  @integration
+  Scenario: A plan saved over one someone else saved since is refused
+    Given two people read the stop plan of "support-bot" at the same version
+    And the first saves it
+    When the second saves it with the version they read
+    Then the save is refused with code "agent_stop_plan_conflict"
+    And the plan keeps the first person's targets and version
+
+  @integration
+  Scenario: Deleting an AWS connection and saving a plan that names it never interleave
+    Given an AWS connection no plan names yet
+    When its delete and a plan save naming it run at the same moment
+    Then either the delete is refused with code "governance_aws_connection_in_use"
+    Or the plan save is refused with code "agent_stop_target_invalid"
 
   @unit
   Scenario: An AWS connection a stop plan or an unrestored stop still uses cannot be deleted
@@ -120,6 +141,20 @@ Feature: Agent kill switch: stop a misbehaving agent where it runs, with approva
     Then the approval is refused with code "agent_stop_self_approval"
 
   @integration
+  Scenario: The person who owns the requesting API key cannot approve its stop
+    Given a stop of "support-bot" an API key requested, pending approval
+    When the key's owner approves it from the UI, or with another key they own
+    Then the approval is refused with code "agent_stop_self_approval"
+
+  @integration
+  Scenario: An approval confirmed against targets that changed since is refused
+    Given a reviewer read a pending stop of "support-bot" and its targets
+    And a plan edit dropped one of those targets from the stop since
+    When the reviewer approves it with the target ids they read
+    Then the approval is refused with code "agent_stop_plan_changed"
+    And the stop is still pending approval
+
+  @integration
   Scenario: A second stop while one is open is refused
     Given a stop of "support-bot" that is pending, stopping or quarantined
     When another stop of "support-bot" is requested
@@ -145,7 +180,19 @@ Feature: Agent kill switch: stop a misbehaving agent where it runs, with approva
     Given a stop of "support-bot" pending approval
     When one reviewer approves it while another denies it
     Then one decision is accepted and the other is refused with code "agent_stop_not_pending"
-    And the audit log records only the accepted decision
+    And the audit log records only the accepted decision as a decision, and the other as a refused attempt
+
+  @integration
+  Scenario: A stop request whose send failed unclearly keeps the agent's claim
+    Given sending a stop request of "support-bot" fails without a known cause
+    When another stop of "support-bot" is requested right after
+    Then it is refused with code "agent_stop_already_open"
+
+  @integration
+  Scenario: A stop request refused before it was sent gives the claim back
+    Given sending a stop request of "support-bot" is refused before it is queued
+    When another stop of "support-bot" is requested right after
+    Then the new stop is requested
 
   @unit
   Scenario: A sent stop keeps its agent's claim however long the worker lags
@@ -229,6 +276,13 @@ Feature: Agent kill switch: stop a misbehaving agent where it runs, with approva
     When the stop is applied
     Then the alias is read and updated with aliasInvocationState "REJECT_INVOCATIONS"
     And the update carries the alias's own name and routing configuration
+
+  @unit
+  Scenario: A Bedrock alias in an invocation state LangWatch does not know is refused
+    Given Bedrock answers an alias whose aliasInvocationState is neither accepting nor rejecting
+    When the alias's state is read
+    Then the read is refused with code "bedrock_alias_state_unknown"
+    And no update is sent
 
   @integration
   Scenario: A virtual key target disables the key with the stop's reason
@@ -329,19 +383,26 @@ Feature: Agent kill switch: stop a misbehaving agent where it runs, with approva
     Then the stop accepts the first, refuses the other, and numbers only accepted requests
     And a later restore reverts the targets, and a rebuilt stop matches the live one
 
-  @unit
+  @unit @integration
   Scenario: The restore dialog names the stopped agents that keep a shared key disabled
     Given "Finance close" and "Sales pipeline" are stopped and share one virtual key
     When Restore is opened for "Finance close"
     Then the dialog says the virtual key stays disabled while "Sales pipeline" is still stopped
+    And it names "Sales pipeline" even when no Agents page row backs that agent
 
   @integration
-  Scenario: A target whose cloud resource is gone counts as stopped and as restored
-    Given a stop plan whose serving endpoint was deleted, so Databricks answers 404
-    When the agent is stopped and later restored
-    Then the stop is "quarantined" and then "restored", never "stop_failed" or "restore_failed"
+  Scenario: A target whose cloud resource was deleted after the stop counts as restored
+    Given a quarantined stop whose serving endpoint was deleted since, so Databricks answers 404
+    When the agent is restored
+    Then the stop is "restored", never "restore_failed"
     And the endpoint target is recorded as gone in the audit rows and the webhook events
-    And a Bedrock ResourceNotFoundException counts as gone the same way
+
+  @integration
+  Scenario: A target its platform does not find on the stop's first call fails as target_not_found
+    Given a stop plan whose serving endpoint answers 404 and whose Bedrock alias answers ResourceNotFoundException
+    When the agent is stopped
+    Then both targets are recorded failed with code "target_not_found", not as gone
+    And the stop is "stop_failed", so a wrong region, account or id never reads as quarantined
 
   @integration
   Scenario: A second restore retries the reverts the first one could not do
@@ -357,6 +418,12 @@ Feature: Agent kill switch: stop a misbehaving agent where it runs, with approva
     When a revert outcome of the first restore arrives for that target
     Then the stop is unchanged
     And the second restore's own outcome still settles it
+
+  @integration
+  Scenario: A stop row whose targets column does not match its schema is refused
+    Given a stored stop whose targets column holds a round that is not a number
+    When the stop is read
+    Then the read fails instead of reading the round as 0
 
   @unit
   Scenario: An AWS connection write commits only together with its audit row
@@ -454,9 +521,60 @@ Feature: Agent kill switch: stop a misbehaving agent where it runs, with approva
 
   @integration
   Scenario: A target removed from the plan no longer holds a failed restore
-    Given a stop of "support-bot" whose restore failed on its serving endpoint
+    Given a stop of "support-bot" whose restore failed on its serving endpoint, since deleted
     When the serving endpoint is removed from the plan
-    Then the stop is restored
+    Then the drop reverts it again, finds it gone, and the stop is restored
+
+  @unit @integration
+  Scenario: A target the stop changed is reverted when the plan drops it
+    Given a quarantined stop of "support-bot"
+    When its plan is saved without the virtual key
+    Then the virtual key is enabled again and leaves the stop once reverted
+    And the stop stays quarantined on its other targets, and its restore leaves the key alone
+
+  @unit
+  Scenario: An apply in flight for a dropped target is reverted once it lands
+    Given a stop whose virtual key apply is in flight
+    When the plan drops the virtual key
+    Then the apply's outcome is kept, and the key is reverted once the apply lands
+    And a dropped target that was already stopped, or whose apply never ran, leaves at once
+
+  @unit @integration
+  Scenario: A stop whose plan lost every target closes as restored
+    Given a quarantined stop, or a stop waiting for approval
+    When the plan drops every target and what the stop changed is reverted
+    Then the stop is "restored", never "quarantined" with nothing stopped
+
+  @integration
+  Scenario: An apply for a target the plan no longer holds is recorded failed
+    Given an approved stop whose virtual key left the plan before its apply ran
+    When the apply runs
+    Then the key is not called and the target is recorded failed with code "target_not_in_plan"
+
+  @integration
+  Scenario: A restore or retry answers what the stop accepted, however far the worker lags
+    Given a quarantined stop and a worker that has not folded anything sent since
+    When a restore is asked and then a retry, or both at the same moment
+    Then only one is sent, its answer names its request id as "lastRequestId"
+    And the other is refused at once as the stop itself would refuse it
+
+  @integration
+  Scenario: Key work never runs after its lock may have ended
+    Given the lock around a shared virtual key is near the end of its transaction
+    When the stop would disable the key
+    Then the key is not called and the target is recorded failed
+
+  @integration
+  Scenario: A retried intent of an older round leaves the platform alone
+    Given a stop of "support-bot" that was restored, and a newer stop of "support-bot" that is quarantined
+    When the older stop's revert and apply intents run again
+    Then no platform is called and every target stays as the newer stop set it
+
+  @integration
+  Scenario: Two restores of stops sharing a virtual key enable it
+    Given "support-bot" and "sales-bot" are quarantined and share one virtual key
+    When "support-bot" reverts the key while "sales-bot" is being restored
+    Then the key is enabled, so restoring both at once never leaves it disabled
 
   @integration
   Scenario: Removing a target from the plan drops it from the open stop
@@ -471,6 +589,18 @@ Feature: Agent kill switch: stop a misbehaving agent where it runs, with approva
     And another key approves it right after the 202
 
   # Audit
+
+  @integration
+  Scenario: A refused kill switch write is still audited
+    Given the kill switch calls leave the generic audit trail out, because the service writes their rows
+    When a request, a decision, a restore, a retry or an AWS connection delete is refused, such as a self-approval
+    Then the audit log records the action that was asked with the refusal's code as its error, and who asked
+
+  @integration
+  Scenario: An impersonated kill switch write names the operator in its audit row
+    Given an operator impersonating a person in the governance UI
+    When the person's stop request or AWS connection write is audited
+    Then the row names the person as the actor and the operator as "actorUserId" and "metadata.impersonatorId", as the generic trail does
 
   @integration
   Scenario: Request, approval, denial and restore each write an audit row
@@ -615,3 +745,47 @@ Feature: Agent kill switch: stop a misbehaving agent where it runs, with approva
     Given a Databricks AI/BI Genie governance source in the organisation
     When a person opens the stop plan of "support-bot"
     Then the Databricks source picker of a serving endpoint target offers that source
+
+  @integration
+  Scenario: The approver sees the targets of the stop and approves exactly those
+    Given a stop of "pricing-bot" pending approval with two targets
+    When a person with governance:manage looks at its approval card
+    Then the card names both targets
+    And Approve sends the ids of the targets it shows
+    And when the stop's targets changed since, the card says so, shows the targets now and approves nothing
+
+  @integration
+  Scenario: Each approval holds its own row until it settles
+    Given stops of "support-bot" and "pricing-bot" pending approval
+    When a person approves both and the approval of "pricing-bot" settles first
+    Then Approve of "support-bot" stays busy and cannot be pressed again until its own approval settles
+
+  @integration
+  Scenario: The Restore and Retry dialogs stay open until their call settles
+    Given a person confirmed Restore or Retry stop for "support-bot"
+    When they press Escape before the call settles
+    Then the confirm dialog stays open and Cancel is off
+
+  @integration
+  Scenario: Saving a stop plan someone else saved since shows their plan
+    Given a person edits the stop plan of "support-bot"
+    And someone else saves that plan first
+    When the person saves
+    Then nothing is overwritten, the dialog says someone else saved the plan and shows their plan
+
+  @integration
+  Scenario: The Agents page follows a stop through its read hints
+    Given a stop of "support-bot" is stopping
+    When the worker moves it on and its read hint arrives
+    Then the Agents page reads the stop state again and shows the new status, with no timer
+    And a decided stop leaves the approvals card on its hint, while a hint for another read changes nothing
+
+  @integration
+  Scenario: Approving a stop reads the stop state and the approvals again
+    When a person approves a pending stop
+    Then its approval card goes and its agent row shows the stop's new status
+
+  @integration
+  Scenario: Saving a stop plan reads the plan and the stop state again
+    When a person saves the stop plan of "support-bot" without its targets
+    Then the plan and the agents' stop state are read again, and Stop asks for a stop plan first

@@ -524,11 +524,15 @@ export interface GovernanceRestApi {
   findPendingAgentStops(input: { organizationId: string }): Promise<AgentStopView[]>;
   /** Throws `agent_registry_entry_not_found` for an agent outside the organisation. */
   getAgentStopPlan(input: { organizationId: string; agentId: string }): Promise<AgentStopPlan>;
-  /** Throws `agent_stop_target_invalid` for a target the organisation does not hold. */
+  /**
+   * Throws `agent_stop_target_invalid` for a target the organisation does not hold, and
+   * `agent_stop_plan_conflict` when `expectedVersion` is given and the plan was saved since.
+   */
   setAgentStopPlan(input: {
     organizationId: string;
     agentId: string;
     targets: readonly AgentStopTarget[];
+    expectedVersion?: number;
   }): Promise<AgentStopPlan>;
   findAwsConnections(input: { organizationId: string }): Promise<AwsConnectionView[]>;
   /** Writes an audit row naming `userId`, the person who added it. */
@@ -536,6 +540,8 @@ export interface GovernanceRestApi {
     organizationId: string;
     connection: AwsConnectionInput;
     userId: string | null;
+    /** The operator behind an impersonated person, recorded beside `userId`. */
+    impersonatorId?: string;
   }): Promise<AwsConnectionView>;
   /**
    * Throws `governance_aws_connection_in_use` while a plan target or unrestored stop uses it; a
@@ -545,6 +551,8 @@ export interface GovernanceRestApi {
     organizationId: string;
     connectionId: string;
     userId: string | null;
+    /** The operator behind an impersonated person, recorded beside `userId`. */
+    impersonatorId?: string;
   }): Promise<{ deleted: boolean }>;
   requestAgentStop(input: {
     organizationId: string;
@@ -559,6 +567,8 @@ export interface GovernanceRestApi {
     organizationId: string;
     stopId: string;
     note?: string;
+    /** Throws `agent_stop_plan_changed` when given and the stop no longer holds exactly these. */
+    expectedTargetIds?: readonly string[];
     caller: AgentStopCaller;
   }): Promise<AgentStopView>;
   denyAgentStop(input: {
