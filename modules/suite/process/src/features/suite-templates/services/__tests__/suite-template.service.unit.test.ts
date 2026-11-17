@@ -3,7 +3,7 @@ import type { SuiteTemplate } from "@langwatch/suite-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
-import { owaspLlmTop10Template } from "../../features/suite-templates/rules/owasp-llm-top-10-2025.rules.ts";
+import { owaspLlmTop10Template } from "../../rules/owasp-llm-top-10-2025.rules.ts";
 import {
   SuiteTemplateService,
   type SuiteTemplateServiceOptions,

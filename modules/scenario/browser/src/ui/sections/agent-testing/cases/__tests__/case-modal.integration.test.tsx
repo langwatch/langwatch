@@ -1,10 +1,9 @@
-/** @vitest-environment jsdom * @see modules/scenario/specs/red-team-scenario.feature
- */
-
 /**
+ * @vitest-environment jsdom
  * The Agent Testing scenario dialog: fields, footer, chip drawers, Save/Run.
  * @see specs/features/agent-testing/cases-table.feature
  * @see specs/features/agents/voice-agents-v1.feature
+ * @see modules/scenario/specs/red-team-scenario.feature
  */
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import { Temporal } from "@langwatch/time";

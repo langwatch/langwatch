@@ -13,10 +13,7 @@ import {
   type SuiteTemplate,
 } from "@langwatch/suite-contract";
 
-import {
-  fillTemplateScenario,
-  SUITE_TEMPLATES,
-} from "../features/suite-templates/rules/suite-template-fill.rules.ts";
+import { fillTemplateScenario, SUITE_TEMPLATES } from "../rules/suite-template-fill.rules.ts";
 
 const logger = createLogger("langwatch:suite:template-apply");
 
