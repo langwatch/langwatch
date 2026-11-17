@@ -145,6 +145,24 @@ describe("findDeclaredModelsForProvider", () => {
     });
   });
 
+  describe("when the custom models were stored in the saved id, label and type shape", () => {
+    /** @scenario "The gateway routes a custom model stored in the saved shape" */
+    it("declares every stored model and drops none as unroutable", () => {
+      warned.mockClear();
+      const declared = assembly.findDeclaredModelsForProvider({
+        provider: "azure",
+        customModels: [
+          { id: "acme-gpt-5", label: "ACME GPT-5", type: "chat", maxTokens: 4096 },
+          { id: "acme-mini", label: "ACME Mini", type: "chat" },
+        ],
+        customEmbeddingsModels: [{ id: "acme-embed", label: "ACME Embed", type: "embedding" }],
+      });
+
+      expect(declared).toEqual(expect.arrayContaining(["acme-gpt-5", "acme-mini", "acme-embed"]));
+      expect(warned).not.toHaveBeenCalled();
+    });
+  });
+
   describe("when the same model is declared twice", () => {
     it("declares it once, sorted, so the payload does not move on its own", () => {
       const declared = assembly.findDeclaredModelsForProvider({

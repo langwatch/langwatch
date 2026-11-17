@@ -31,6 +31,7 @@ const mockApi = {
       getDefaultModelsForProject: {
         invalidate: vi.fn(),
       },
+      getModelOptionsForScopes: { invalidate: vi.fn() },
     },
   }),
   modelProvider: {

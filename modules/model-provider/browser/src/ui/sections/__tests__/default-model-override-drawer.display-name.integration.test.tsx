@@ -10,11 +10,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { FakeModelProviderHost, renderWithModelProviderHost } from "../../../testing.tsx";
 import { DefaultModelOverrideDrawer } from "../default-model-override-drawer.tsx";
+import { scopeAnswerFor } from "./scope-model-options.fixture.ts";
 
 const mockCloseDrawer = vi.fn();
 const mockGetDefaultModels = vi.fn();
 const mockGetInheritedValues = vi.fn();
-const mockListAllForProjectForFrontend = vi.fn();
+const mockScopeProviderRows = vi.fn();
 const mockSave = vi.fn();
 const mockInvalidate = vi.fn();
 
@@ -59,8 +60,12 @@ vi.mock("../../../behavior/model-provider-api.ts", () => ({
         useQuery: () => mockGetInheritedValues(),
       },
       listDecisionModelsForScopes: { useQuery: () => ({ data: [], isLoading: false }) },
+      getModelOptionsForScopes: { useQuery: () => scopeAnswerFor(mockScopeProviderRows()) },
+      listAllForOrganizationForFrontend: {
+        useQuery: () => ({ data: [], isLoading: false, isSuccess: true }),
+      },
       listAllForProjectForFrontend: {
-        useQuery: () => mockListAllForProjectForFrontend(),
+        useQuery: () => ({ data: [], isLoading: false, isSuccess: true }),
       },
       saveDefaultModelsConfig: {
         useMutation: () => ({ mutateAsync: mockSave, isPending: false }),
@@ -159,7 +164,7 @@ describe("<DefaultModelOverrideDrawer/>", () => {
       data: { inherited: {}, referenceScope: null },
       isLoading: false,
     });
-    mockListAllForProjectForFrontend.mockReturnValue({
+    mockScopeProviderRows.mockReturnValue({
       data: [PROVIDER_ROW],
       isLoading: false,
       isError: false,
@@ -208,7 +213,7 @@ describe("<DefaultModelOverrideDrawer/>", () => {
 
     describe("when the Embeddings role dropdown is expanded", () => {
       beforeEach(() => {
-        mockListAllForProjectForFrontend.mockReturnValue({
+        mockScopeProviderRows.mockReturnValue({
           data: [
             {
               ...PROVIDER_ROW,
@@ -266,7 +271,7 @@ describe("<DefaultModelOverrideDrawer/>", () => {
 
   describe("given a second custom model beside the renamed one", () => {
     beforeEach(() => {
-      mockListAllForProjectForFrontend.mockReturnValue({
+      mockScopeProviderRows.mockReturnValue({
         data: [
           {
             ...PROVIDER_ROW,
@@ -311,7 +316,7 @@ describe("<DefaultModelOverrideDrawer/>", () => {
 
   describe("given the same provider also offers registry models", () => {
     beforeEach(() => {
-      mockListAllForProjectForFrontend.mockReturnValue({
+      mockScopeProviderRows.mockReturnValue({
         data: [
           {
             ...PROVIDER_ROW,
@@ -370,7 +375,7 @@ describe("<DefaultModelOverrideDrawer/>", () => {
           data: { ...PAYLOAD, configs: [{ ...CONFIG_ROW, config: {} }] },
           isLoading: false,
         });
-        mockListAllForProjectForFrontend.mockReturnValue({
+        mockScopeProviderRows.mockReturnValue({
           data: [
             {
               ...PROVIDER_ROW,

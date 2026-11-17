@@ -12,12 +12,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { renderWithModelProviderHost } from "../../../testing.tsx";
 import { DefaultModelOverrideDrawer } from "../default-model-override-drawer.tsx";
+import { scopeAnswerFor } from "./scope-model-options.fixture.ts";
 import "@testing-library/jest-dom/vitest";
 
 const mockInstantEvalAccess = vi.fn();
 const mockGetDefaultModels = vi.fn();
 const mockGetInheritedValues = vi.fn();
-const mockListAllForProjectForFrontend = vi.fn();
+const mockScopeProviderRows = vi.fn();
 const mockListDecisionModels = vi.fn();
 const mockSave = vi.fn();
 
@@ -57,7 +58,13 @@ vi.mock("../../../behavior/model-provider-api.ts", () => ({
     modelProvider: {
       getDefaultModelsForProject: { useQuery: () => mockGetDefaultModels() },
       getInheritedValuesForScopes: { useQuery: () => mockGetInheritedValues() },
-      listAllForProjectForFrontend: { useQuery: () => mockListAllForProjectForFrontend() },
+      getModelOptionsForScopes: { useQuery: () => scopeAnswerFor(mockScopeProviderRows()) },
+      listAllForOrganizationForFrontend: {
+        useQuery: () => ({ data: [], isLoading: false, isSuccess: true }),
+      },
+      listAllForProjectForFrontend: {
+        useQuery: () => ({ data: [], isLoading: false, isSuccess: true }),
+      },
       listDecisionModelsForScopes: {
         useQuery: (input: unknown, options: unknown) => mockListDecisionModels(input, options),
       },
@@ -134,7 +141,7 @@ describe("<DefaultModelOverrideDrawer/> Instant Evals column", () => {
       data: { inherited: {}, referenceScope: null },
       isLoading: false,
     });
-    mockListAllForProjectForFrontend.mockReturnValue({
+    mockScopeProviderRows.mockReturnValue({
       data: [{ provider: "openai", enabled: true, customModels: [], customEmbeddingsModels: [] }],
       isLoading: false,
       isError: false,

@@ -1,5 +1,7 @@
 import {
+  ModelProviderScopesRequiredError,
   findModelProviderDefinition,
+  type ModelDefaultScope,
   type ModelProvider,
   type ModelProviderWriteInput,
 } from "@langwatch/model-provider-contract";
@@ -30,6 +32,25 @@ export function modelsForWrite(
         ? (existing?.customEmbeddingsModels ?? [])
         : (parsed.customEmbeddingsModels ?? []),
   };
+}
+
+/** A save naming no scopes never moves a stored row; the page project only seeds a new row. */
+export function scopesForWrite(
+  input: ModelProviderWriteInput,
+  existing: ModelProvider | null,
+): ModelDefaultScope[] {
+  if (input.scopes) return input.scopes;
+  if (existing) return existing.scopes;
+  if (input.projectId) return [{ scopeType: "PROJECT", scopeId: input.projectId }];
+
+  throw new ModelProviderScopesRequiredError();
+}
+
+/** A default model sent with the save lands on the page's project, so its write is asked too. */
+export function defaultScopeForWrite(input: ModelProviderWriteInput): ModelDefaultScope[] {
+  return input.defaultModel !== undefined && input.projectId
+    ? [{ scopeType: "PROJECT", scopeId: input.projectId }]
+    : [];
 }
 
 export function rateLimitsForWrite(

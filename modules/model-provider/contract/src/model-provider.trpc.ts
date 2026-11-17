@@ -40,6 +40,7 @@ import {
   modelProviderCodexStatusSchema,
   modelProviderCredentialVerdictSchema,
 } from "./model-provider.ts";
+import { scopeModelOptionsSchema } from "./scope-model-options.ts";
 
 export const modelProviderTrpc = defineTrpcContract("modelProvider")
   // Every read here answers the MASKED projection: a decrypted credential is
@@ -72,6 +73,11 @@ export const modelProviderTrpc = defineTrpcContract("modelProvider")
   .query("listDecisionModelsForScopes")
   .withInput(decisionModelsForScopesTrpcInputSchema)
   .withOutput(z.array(z.object({ value: z.string(), label: z.string() })))
+
+  /** The chat and embedding models every picked scope runs, and the providers that list none. */
+  .query("getModelOptionsForScopes")
+  .withInput(decisionModelsForScopesTrpcInputSchema)
+  .withOutput(scopeModelOptionsSchema)
 
   /** Org-wide variant: every provider anywhere in the organization, env-fed rows included. */
   .query("listAllForOrganizationForFrontend")

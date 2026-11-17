@@ -7,6 +7,8 @@ import {
   type ModelProviderApi,
   type ModelCostEstimateInput,
   type ModelProviderCredentialVerdict,
+  NO_SCOPE_MODEL_OPTIONS,
+  type ScopeModelOptions,
 } from "@langwatch/model-provider-contract";
 import { TraceCanonicalisationService } from "@langwatch/trace-contract";
 import {
@@ -223,6 +225,10 @@ export class TestModelProviderService implements ModelProviderApi {
 
   listDecisionModelsForScopes(): Promise<[]> {
     return Promise.resolve([]);
+  }
+
+  getModelOptionsForScopes(): Promise<ScopeModelOptions> {
+    return Promise.resolve(NO_SCOPE_MODEL_OPTIONS);
   }
 
   findAlternateModel(): Promise<never> {

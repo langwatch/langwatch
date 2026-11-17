@@ -1,6 +1,8 @@
 import { HandledError } from "@langwatch/handled-error";
 import {
+  ModelProviderInvalidError,
   ModelProviderNotFoundError,
+  NO_SCOPE_MODEL_OPTIONS,
   modelProviderExecutionSchema,
   modelProviderListOrganizationInputSchema,
   modelProviderListProjectInputSchema,
@@ -9,9 +11,11 @@ import {
   type ModelProvider,
   type ModelProviderExecution,
   type ModelProviderSummary,
+  type ScopeModelOptions,
 } from "@langwatch/model-provider-contract";
 
 import type { ModelProviderRepository } from "../repositories/model-provider.repository.ts";
+import { scopeModelOptionsOf, servingRowsOf } from "../rules/scope-model-options.rules.ts";
 import type { ModelProviderCredentialPolicy } from "./model-provider-keys.service.ts";
 import type { ModelProviderScopeService } from "./model-provider-scope.service.ts";
 import type { ModelProviderCatalog } from "./registry-model-provider-catalog.service.ts";
@@ -118,13 +122,11 @@ export class ModelProviderQueryService {
     provider?: string;
   }): Promise<Record<string, ModelProviderSummary>> {
     const { chain, saved, system } = await this.getProjectCandidates(input.projectId);
-    const stored = saved.filter((provider) => this.shouldKeep(provider, system));
-    const storedProviders = new Set(stored.map((provider) => provider.provider));
-    const providers = [
-      ...stored.map((provider) => this.toSummary({ provider, system })),
-      ...system.filter((provider) => !storedProviders.has(provider.provider)),
-    ];
-    const selected = this.selectProjectProviders(providers, chain, input.provider);
+    const selected = this.selectProjectProviders(
+      this.storedThenSystem({ saved, system }),
+      chain,
+      input.provider,
+    );
 
     return Object.fromEntries(selected.map((provider) => [provider.provider, provider]));
   }
@@ -168,6 +170,88 @@ export class ModelProviderQueryService {
     const organization: ModelDefaultScope = { scopeType: "ORGANIZATION", scopeId: organizationId };
     const chain = input.scope.scopeType === "TEAM" ? [input.scope, organization] : [organization];
     return this.bestRowInChain({ chain, provider: input.provider });
+  }
+
+  /**
+   * The models a Default models config on these scopes may pick: only those every scope runs.
+   * Scopes outside the project's organization are refused, as for the decision models.
+   */
+  async getModelOptionsForScopes({
+    projectId,
+    scopes,
+  }: {
+    projectId: string;
+    scopes: readonly ModelDefaultScope[];
+  }): Promise<ScopeModelOptions> {
+    if (scopes.length === 0) return NO_SCOPE_MODEL_OPTIONS;
+
+    const { organizationId } = await this.options.scopes.getProjectContext(projectId);
+    const scopesOrganizationId = await this.options.scopes.getOrganizationIdForScopes([...scopes]);
+    if (scopesOrganizationId !== organizationId) {
+      throw new ModelProviderInvalidError(
+        "Default scope does not belong to the project organization",
+      );
+    }
+
+    const rowsByScope = await Promise.all(
+      scopes.map((scope) => this.findProvidersForScope({ scope })),
+    );
+    return scopeModelOptionsOf({ rowsByScope });
+  }
+
+  /** The rows a Default models scope runs its models on, environment-fed ones included. */
+  private async findProvidersForScope({
+    scope,
+  }: {
+    scope: ModelDefaultScope;
+  }): Promise<ModelProviderSummary[]> {
+    const { chain, saved, system } = await this.getScopeCandidates(scope);
+    return servingRowsOf({
+      rows: this.storedThenSystem({ saved, system }),
+      compare: (left, right) => this.compareProjectProviders(left, right, chain),
+    });
+  }
+
+  /** Kept stored rows, then each environment-fed provider no stored row already covers. */
+  private storedThenSystem({
+    saved,
+    system,
+  }: {
+    saved: ModelProvider[];
+    system: ModelProviderSummary[];
+  }): ModelProviderSummary[] {
+    const stored = saved.filter((provider) => this.shouldKeep(provider, system));
+    const storedProviders = new Set(stored.map((provider) => provider.provider));
+    return [
+      ...stored.map((provider) => this.toSummary({ provider, system })),
+      ...system.filter((provider) => !storedProviders.has(provider.provider)),
+    ];
+  }
+
+  /** A team sees itself and its organization; an organization sees itself. */
+  private async getScopeCandidates(scope: ModelDefaultScope): Promise<{
+    chain: ModelDefaultScope[];
+    saved: ModelProvider[];
+    system: ModelProviderSummary[];
+  }> {
+    if (scope.scopeType === "PROJECT") return this.getProjectCandidates(scope.scopeId);
+
+    const organizationId = await this.options.scopes.getOrganizationIdForScope(scope);
+    const organization: ModelDefaultScope = { scopeType: "ORGANIZATION", scopeId: organizationId };
+    const chain = scope.scopeType === "TEAM" ? [scope, organization] : [organization];
+    const [saved, system] = await Promise.all([
+      this.options.repository.findForProject(chain),
+      this.options.scopes
+        .getOrganizationSystemReference(organizationId)
+        .then((referenceCreatedAt) =>
+          this.options.catalog.systemProviders({ organizationId, referenceCreatedAt }),
+        )
+        .catch((error: unknown) => {
+          if (HandledError.isHandled(error) && error.code === "project_not_found") return [];
+          throw error;
+        }),
+    ]);
+    return { chain, saved, system };
   }
 
   private async bestRowInChain({

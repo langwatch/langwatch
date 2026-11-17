@@ -16,26 +16,27 @@ import { Tooltip } from "@langwatch/design-system/tooltip";
 import { useFeatureFlag } from "@langwatch/feature-flag-client";
 import { FrontendFlags, NOT_TARGETED } from "@langwatch/feature-flag-contract";
 import {
-  buildCustomModelDisplayNames,
   isModelAllowedAsRoleDefault,
   isModelAllowedForFeature,
   LANGWATCH_DECISION_MODEL_ID,
-  LATEST_ALIAS_PROVIDERS,
   MODEL_ROLES,
   modelDisplayLabel,
   modelPickerOption,
-  modelSelectorOptions,
+  type EmptyScopeProvider,
   type ModelDefaultInheritedValues,
   type ModelDefaultSnapshot,
   type ModelPickerOption,
   type ModelRole,
+  type ScopeModelOptions,
   UNSET_ROLE_FALLBACK,
 } from "@langwatch/model-provider-contract";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import { modelProviderApi } from "../../behavior/model-provider-api.ts";
+import { useAllModelProvidersList } from "../../behavior/use-all-model-providers-list.ts";
 import { useHostedDecisionModelOffered } from "../../behavior/use-hosted-decision-model.ts";
+import { useScopeModelOptions } from "../../behavior/use-scope-model-options.ts";
 import {
   DECISION_MODEL_DISPLAY_NAMES,
   decisionModelPickerOptions,
@@ -43,6 +44,11 @@ import {
 } from "../../model/decision-model-options.ts";
 import { MODEL_ROLE_LABEL } from "../../model/default-model-cascade.ts";
 import { useModelProviderHost } from "../../model/model-provider-host.ts";
+import {
+  EmbeddingsModelsHint,
+  type ProviderOpener,
+  ScopeModelsNotice,
+} from "../elements/empty-scope-models-notice.tsx";
 
 /** The snapshot as the browser holds one: its instants are ISO strings. */
 type Payload = WireOf<ModelDefaultSnapshot>;
@@ -97,13 +103,6 @@ export function featureRowModelOptions({
 }
 
 type ConfigRow = Payload["configs"][number];
-/** Only what the pickers read off a provider row. */
-type ProviderRow = {
-  provider: string;
-  enabled?: boolean | null;
-  customModels?: ({ modelId?: string | null } | null)[] | null;
-  customEmbeddingsModels?: ({ modelId?: string | null } | null)[] | null;
-};
 
 function groupFeaturesByRole(
   features: FeatureProjection[],
@@ -185,107 +184,22 @@ function configProblems({
 }
 
 /**
- * Aliases sit at the top of the chat lists so the reader lands on "Latest" without
- * scrolling; pinning a specific model is the exceptional case. Embeddings get none, since
- * the latest embedding model isn't a moving target the way a chat flagship is.
+ * The server answers what every picked scope runs (aliases first); a failed or pending read
+ * offers nothing rather than models the scopes cannot run.
  */
-function aliasChatOptionsFor(enabledKeys: Set<string>): string[] {
-  const aliases: string[] = [];
-  for (const provider of LATEST_ALIAS_PROVIDERS) {
-    if (!enabledKeys.has(provider)) continue;
-
-    aliases.push(`${provider}/latest`);
-    aliases.push(`${provider}/latest-mini`);
-  }
-
-  return aliases;
-}
-
-/** User-defined entries on each enabled provider, custom ids first. */
-function customModelIdsFor({
-  enabledEntries,
-  mode,
-}: {
-  enabledEntries: [string, ProviderRow][];
-  mode: "chat" | "embedding";
-}): string[] {
-  const customModels: string[] = [];
-  for (const [providerKey, providerData] of enabledEntries) {
-    if (!providerData) continue;
-
-    const customList =
-      mode === "embedding"
-        ? (providerData.customEmbeddingsModels ?? [])
-        : (providerData.customModels ?? []);
-    for (const m of customList) {
-      if (m?.modelId) customModels.push(`${providerKey}/${m.modelId}`);
-    }
-  }
-
-  return customModels;
-}
-
-/**
- * Still loading: returns the full registry, so the dropdown isn't visually broken on first
- * paint. Once data lands, a project with no enabled providers (or a failed query) gets an
- * empty list rather than a picker that lies about what is available.
- */
-function modelOptionsForMode({
-  enabledEntries,
-  hasProviderLoadError,
-  isLoading,
-  mode,
-}: {
-  enabledEntries: [string, ProviderRow][];
-  hasProviderLoadError: boolean;
-  isLoading: boolean;
-  mode: "chat" | "embedding";
-}): string[] {
-  if (isLoading) {
-    return modelSelectorOptions.filter((o) => o.mode === mode).map((o) => o.value);
-  }
-  if (hasProviderLoadError || enabledEntries.length === 0) return [];
-
-  const enabledKeys = new Set(enabledEntries.map(([key]) => key));
-  // The registry is the broad pool; provider toggles narrow it, the same way
-  // ModelProviderDefaultSection reads it.
-  const registryModels = modelSelectorOptions
-    .filter((o) => o.mode === mode && enabledKeys.has(o.value.split("/")[0] ?? ""))
-    .map((o) => o.value);
-
-  return Array.from(new Set([...customModelIdsFor({ enabledEntries, mode }), ...registryModels]));
-}
-
 function modelOptionsByRoleFor({
   decisionOptions,
-  hasProviderLoadError,
-  isLoading,
-  providers,
+  scopeOptions,
 }: {
   decisionOptions: ModelPickerOption[];
-  hasProviderLoadError: boolean;
-  isLoading: boolean;
-  providers: ProviderRow[];
+  scopeOptions: ScopeModelOptions;
 }): Record<ModelRole, string[]> {
-  const enabledEntries: [string, ProviderRow][] = providers
-    .filter((p) => p.enabled === true)
-    .map((p) => [p.provider, p]);
-  const llmModels = [
-    ...aliasChatOptionsFor(new Set(enabledEntries.map(([key]) => key))),
-    ...modelOptionsForMode({ enabledEntries, hasProviderLoadError, isLoading, mode: "chat" }),
-  ];
-
   return {
-    DEFAULT: llmModels,
-    FAST: llmModels,
-    LANGY: llmModels,
-    JUDGE: llmModels,
-    EMBEDDINGS: modelOptionsForMode({
-      enabledEntries,
-      hasProviderLoadError,
-      isLoading,
-      mode: "embedding",
-    }),
+    DEFAULT: scopeOptions.chat,
+    FAST: scopeOptions.chat,
+    LANGY: scopeOptions.chat,
+    JUDGE: scopeOptions.chat,
+    EMBEDDINGS: scopeOptions.embedding,
     // Decision models only, never the chat catalogue (ADR-182 decision 2).
     INSTANT_EVALS: decisionOptions.map((option) => option.value),
   };
@@ -427,14 +341,12 @@ export function DefaultModelOverrideDrawer({ editingId }: Props) {
 
   const featuresByRole = groupFeaturesByRole(features);
 
-  // Narrow the picker to explicitly configured providers only. The legacy
-  // `getAllForProject` Record merges in env-fed defaults, surfacing unrelated
-  // providers just because their key is set on the host.
-  // `listAllForProjectForFrontend` returns stored rows only.
-  const projectProviders = modelProviderApi.modelProvider.listAllForProjectForFrontend.useQuery(
-    { projectId: projectId ?? "" },
-    { enabled: !!projectId && open, refetchOnMount: false },
-  );
+  const {
+    options: scopeOptions,
+    read: scopeRead,
+    retry: retryScopeOptions,
+  } = useScopeModelOptions({ projectId, scopes, enabled: open });
+  const isScopeAnswered = scopeRead === "answered";
 
   // The server weighs the flag and the keys of the picked scopes, not the page's project, so
   // the column offers only models every picked scope would run. No scope picked: LangWatch only.
@@ -466,19 +378,11 @@ export function DefaultModelOverrideDrawer({ editingId }: Props) {
     isOwnModelEnabled,
     isHostedOffered,
   });
-  const modelOptionsByRole = modelOptionsByRoleFor({
-    decisionOptions,
-    hasProviderLoadError: projectProviders.isError,
-    isLoading: projectProviders.isLoading,
-    providers: projectProviders.data ?? [],
-  });
+  const modelOptionsByRole = modelOptionsByRoleFor({ decisionOptions, scopeOptions });
 
-  // Configured custom-model display names for every provider row this
-  // project can see, keyed by `<provider>/<modelId>`, plus the decision models' labels.
-  const displayNames = {
-    ...buildCustomModelDisplayNames(projectProviders.data ?? []),
-    ...DECISION_MODEL_DISPLAY_NAMES,
-  };
+  // Custom-model display names at the picked scopes, plus the decision models' labels.
+  const displayNames = { ...scopeOptions.displayNames, ...DECISION_MODEL_DISPLAY_NAMES };
+  const openable = useProviderOpener({ host, projectId, organizationId });
   const pickerOptionFor = (modelValue: string): ModelPickerOption =>
     decisionOptions.find((option) => option.value === modelValue) ??
     modelPickerOption({ displayNames, modelValue });
@@ -561,6 +465,12 @@ export function DefaultModelOverrideDrawer({ editingId }: Props) {
               {problems.models}
             </Text>
           )}
+          <ScopeModelsNotice
+            read={scopeRead}
+            options={scopeOptions}
+            openable={openable}
+            onRetry={retryScopeOptions}
+          />
           {MODEL_ROLES.map((role) => (
             <RoleRow
               key={role}
@@ -576,12 +486,67 @@ export function DefaultModelOverrideDrawer({ editingId }: Props) {
               displayNames={displayNames}
               pickerOptionFor={pickerOptionFor}
               pickerFor={(llmOptions) => rolePickerOptions({ role, decisionOptions, llmOptions })}
+              emptyEmbeddings={
+                isScopeAnswered
+                  ? {
+                      providers: scopeOptions.emptyProviders.embedding,
+                      sharesNone: scopeOptions.sharesNone.embedding,
+                    }
+                  : undefined
+              }
+              openable={openable}
             />
           ))}
         </VStack>
       </VStack>
     </Drawer>
   );
+}
+
+/**
+ * Opens a named provider's editor. The editor looks a row up in the providers list, so only a
+ * listed row, or an environment-fed provider it adds as new, can be opened from here.
+ */
+function useProviderOpener({
+  host,
+  projectId,
+  organizationId,
+}: {
+  host: ReturnType<typeof useModelProviderHost>;
+  projectId: string | undefined;
+  organizationId: string | undefined;
+}): ProviderOpener {
+  const { providers: listed } = useAllModelProvidersList();
+  return {
+    find: (providers) =>
+      providers.find(
+        (provider) => provider.isSystem || listed.some((row) => row.id === provider.id),
+      ),
+    open: (provider) => openProviderEditor({ host, projectId, organizationId, provider }),
+  };
+}
+
+/** Opens the provider's editor in place of this drawer; an environment-fed one has no row yet. */
+function openProviderEditor({
+  host,
+  projectId,
+  organizationId,
+  provider,
+}: {
+  host: ReturnType<typeof useModelProviderHost>;
+  projectId: string | undefined;
+  organizationId: string | undefined;
+  provider: EmptyScopeProvider;
+}) {
+  host.openPlatformDrawer({
+    drawer: "editModelProvider",
+    params: {
+      projectId,
+      organizationId,
+      providerKey: provider.provider,
+      modelProviderId: provider.isSystem ? "new" : provider.id,
+    },
+  });
 }
 
 /** Moves focus to the first control inside a group, so a failed save lands the cursor there. */
@@ -604,6 +569,8 @@ function RoleRow({
   displayNames,
   pickerOptionFor,
   pickerFor,
+  emptyEmbeddings,
+  openable,
 }: {
   role: ModelRole;
   config: Record<string, string>;
@@ -622,6 +589,9 @@ function RoleRow({
   pickerOptionFor: (modelValue: string) => ModelPickerOption;
   /** This row's picker options from its LLM entries. */
   pickerFor: (llmOptions: ModelPickerOption[]) => ModelPickerOption[];
+  /** Set once the picked scopes answered: the providers that hold no embedding model yet. */
+  emptyEmbeddings?: { providers: readonly EmptyScopeProvider[]; sharesNone: boolean };
+  openable: ProviderOpener;
 }) {
   // A pinned Evals Preview the column no longer offers reads as unset, as the table cell does.
   const stored = config[role] ?? "";
@@ -640,11 +610,10 @@ function RoleRow({
   const canExpand = features.length > 0;
   const ChevronIcon = expanded ? ChevronDown : ChevronRight;
 
-  // EMBEDDINGS-specific: when no provider enabled at the picked scope
-  // ships an embedding API, the selector has nothing to offer. Dim
-  // the row and tell the user what would unlock it instead of
-  // pretending the field is functional.
-  const unsupportedAtScope = role === "EMBEDDINGS" && modelOptions.length === 0;
+  // Embeddings with nothing to offer at the picked scopes: dim the row and say what would
+  // unlock it, naming a provider that is only missing an added embedding model.
+  const unsupportedAtScope =
+    role === "EMBEDDINGS" && !!emptyEmbeddings && modelOptions.length === 0;
 
   return (
     <Box
@@ -691,16 +660,11 @@ function RoleRow({
         )}
       </HStack>
       {unsupportedAtScope && (
-        <Text
-          fontSize="xs"
-          color="fg.muted"
-          paddingLeft={1}
-          paddingBottom={1}
-          data-testid="role-row-embeddings-unsupported-hint"
-        >
-          No provider configured at this scope ships an embedding API. Add an embedding-capable
-          provider (OpenAI, Voyage, Cohere) to unlock topic clustering and semantic search.
-        </Text>
+        <EmbeddingsModelsHint
+          emptyProviders={emptyEmbeddings.providers}
+          sharesNone={emptyEmbeddings.sharesNone}
+          openable={openable}
+        />
       )}
       {canExpand && expanded && (
         <VStack

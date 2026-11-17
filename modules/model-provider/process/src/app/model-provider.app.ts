@@ -61,6 +61,7 @@ import {
   type ModelProviderListOrganizationInput,
   type ModelProviderListProjectInput,
   type BuiltInModel,
+  type ScopeModelOptions,
   type DecisionModelResolution,
   type ModelProviderResolution,
   type ModelProviderSummary,
@@ -791,6 +792,13 @@ export class ModelProviderModule implements ModelProviderApi {
     scopes: readonly ModelDefaultScope[];
   }): Promise<readonly BuiltInModel[]> {
     return this.#modelProviders.listDecisionModelsForScopes(input);
+  }
+
+  getModelOptionsForScopes(
+    input: { projectId: string; scopes: readonly ModelDefaultScope[] },
+    by: ModelProviderCaller,
+  ): Promise<ScopeModelOptions> {
+    return this.#modelProviders.getModelOptionsForScopes({ ...input, actorId: by.id });
   }
 
   findAlternateModel(input: {

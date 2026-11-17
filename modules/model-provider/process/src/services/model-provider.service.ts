@@ -41,6 +41,7 @@ import {
   type ModelProviderCustomKeys,
   type ModelProviderUsageCount,
   type BuiltInModel,
+  type ScopeModelOptions,
   type DecisionModelResolution,
 } from "@langwatch/model-provider-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
@@ -110,13 +111,14 @@ export class ModelProviderService {
   private readonly execution: ModelProviderExecutionService;
   private readonly query: ModelProviderQueryService;
   private readonly resolution: ModelProviderResolutionService;
+  private readonly readAuthorization: ModelProviderAuthorizationService;
   private readonly writeAuthorization: ModelProviderWriteAuthorizationService;
   private readonly scopes: ModelProviderScopeService;
 
   private constructor(private readonly options: ModelProviderServiceOptions) {
     const authorization = ModelProviderAuthorizationService.create(options.authorization);
-    const writeAuthorization = ModelProviderWriteAuthorizationService.create(authorization);
-    this.writeAuthorization = writeAuthorization;
+    this.readAuthorization = authorization;
+    this.writeAuthorization = ModelProviderWriteAuthorizationService.create(authorization);
     const scopes = ModelProviderScopeService.create({
       projects: options.projects,
       organizations: options.organizations,
@@ -149,7 +151,7 @@ export class ModelProviderService {
         secrets: options.secrets,
         execution: this.execution,
       }),
-      writeAuthorization,
+      writeAuthorization: this.writeAuthorization,
       onboardingDefaults: ModelProviderOnboardingDefaultsService.create({
         defaults: options.defaults,
         ids: options.ids,
@@ -183,7 +185,7 @@ export class ModelProviderService {
       defaults: options.defaults,
       catalog: options.catalog,
       decisionModels: this.decisionModels,
-      writeAuthorization,
+      writeAuthorization: this.writeAuthorization,
       ids: options.ids,
       scopes,
     });
@@ -361,6 +363,19 @@ export class ModelProviderService {
     scopes: readonly ModelDefaultScope[];
   }): Promise<readonly BuiltInModel[]> {
     return this.decisionModels.listPickableForScopes(input);
+  }
+
+  /** Every requested scope is checked for read before any of its providers is read. */
+  async getModelOptionsForScopes({
+    actorId,
+    ...input
+  }: {
+    projectId: string;
+    scopes: readonly ModelDefaultScope[];
+    actorId: string;
+  }): Promise<ScopeModelOptions> {
+    await this.readAuthorization.assertCanReadAll(actorId, input.scopes);
+    return this.query.getModelOptionsForScopes(input);
   }
 
   findAlternateModel(input: {

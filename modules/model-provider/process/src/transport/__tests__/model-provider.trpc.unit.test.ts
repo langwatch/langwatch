@@ -3,9 +3,14 @@
  * The `modelProvider.*` procedures over the real runtime and application.
  * @see specs/model-providers/provider-configuration.feature
  * @see specs/settings/model-provider-skip-permissions.feature
+ * @see modules/model-provider/specs/provider-save.feature
  */
 import { createTrpcRuntime } from "@langwatch/api/trpc";
-import { ModelNotConfiguredError, type ModelProviderApi } from "@langwatch/model-provider-contract";
+import {
+  ModelNotConfiguredError,
+  NO_SCOPE_MODEL_OPTIONS,
+  type ModelProviderApi,
+} from "@langwatch/model-provider-contract";
 import { initTRPC } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
 
@@ -95,6 +100,7 @@ describe("the modelProvider tRPC namespace", () => {
         "getAllForProjectForFrontend",
         "getDefaultModelsForProject",
         "getInheritedValuesForScopes",
+        "getModelOptionsForScopes",
         "getResolvedDefault",
         "isManagedProvider",
         "listAllForOrganizationForFrontend",
@@ -138,6 +144,63 @@ describe("the modelProvider tRPC namespace", () => {
         const providers = await caller.getAllForProject({ projectId: PROJECT_A });
 
         expect(providers.openai?.id).toBe("mp_openai");
+      });
+    });
+  });
+
+  describe("given the scope models read", () => {
+    const SCOPES = [{ scopeType: "PROJECT" as const, scopeId: PROJECT_A }];
+
+    /** @scenario "The models read is declared with the project view permission" */
+    it("refuses a caller without project:view before the application is asked", async () => {
+      const getModelOptionsForScopes = vi.fn(async () => NO_SCOPE_MODEL_OPTIONS);
+      const { caller } = mount({
+        modelProviders: { getModelOptionsForScopes },
+        permits: (permission) => permission !== "project:view",
+      });
+
+      await expect(
+        caller.getModelOptionsForScopes({ projectId: PROJECT_A, scopes: SCOPES }),
+      ).rejects.toMatchObject({ code: "FORBIDDEN" });
+      expect(getModelOptionsForScopes).not.toHaveBeenCalled();
+    });
+
+    it("answers the application's options to a caller holding project:view", async () => {
+      const options = { ...NO_SCOPE_MODEL_OPTIONS, chat: ["openai/gpt-5"] };
+      const { caller } = mount({
+        modelProviders: { getModelOptionsForScopes: async () => options },
+      });
+
+      const answer = await caller.getModelOptionsForScopes({
+        projectId: PROJECT_A,
+        scopes: SCOPES,
+      });
+
+      expect(answer.chat).toEqual(["openai/gpt-5"]);
+    });
+
+    describe("given a caller who may view project B but not project A", () => {
+      const viewsOnlyB: ModelProviderTestDecision = (_permission, scope) =>
+        scope.tier === "project" && scope.id === "project_b";
+
+      /** @scenario "Listing models for a scope the caller cannot view is refused" */
+      it("refuses scopes [A] asked for from project B", async () => {
+        const { caller } = mount({ permits: viewsOnlyB });
+
+        await expect(
+          caller.getModelOptionsForScopes({ projectId: "project_b", scopes: SCOPES }),
+        ).rejects.toMatchObject({ code: "FORBIDDEN" });
+      });
+
+      it("answers scopes [B] asked for from project B", async () => {
+        const { caller } = mount({ permits: viewsOnlyB });
+
+        const answer = await caller.getModelOptionsForScopes({
+          projectId: "project_b",
+          scopes: [{ scopeType: "PROJECT", scopeId: "project_b" }],
+        });
+
+        expect(answer.emptyProviders).toEqual({ chat: [], embedding: [] });
       });
     });
   });
@@ -362,6 +425,46 @@ describe("the modelProvider tRPC namespace", () => {
       expect(map.openai?.rateLimitTpm).toBeNull();
       expect(map.openai?.providerConfig).toEqual({ region: "us-east-1" });
       expect(list[0]?.fallbackPriorityGlobal).toBe(1);
+    });
+  });
+
+  describe("when a custom model stored with its settings is listed back", () => {
+    /** @scenario "A saved custom model reopens with its max tokens, parameters and inputs" */
+    it("carries its max tokens, parameters and inputs so the next save keeps them", async () => {
+      const saved = storedProvider({
+        customModels: [
+          {
+            id: "acme-chat",
+            label: "ACME Chat",
+            type: "chat",
+            maxTokens: 8192,
+            supportedParameters: ["temperature", "seed"],
+            multimodalInputs: ["image"],
+          },
+        ],
+        customEmbeddingsModels: [
+          { id: "acme-embed", label: "ACME Embed", type: "embedding", maxTokens: null },
+        ],
+      });
+      const { caller } = mount({
+        modelProviders: { listForProject: (async () => [saved]) as never },
+      });
+
+      const [listed] = await caller.listAllForProjectForFrontend({ projectId: PROJECT_A });
+
+      expect(listed?.customModels).toEqual([
+        {
+          modelId: "acme-chat",
+          displayName: "ACME Chat",
+          mode: "chat",
+          maxTokens: 8192,
+          supportedParameters: ["temperature", "seed"],
+          multimodalInputs: ["image"],
+        },
+      ]);
+      expect(listed?.customEmbeddingsModels).toEqual([
+        { modelId: "acme-embed", displayName: "ACME Embed", mode: "embedding", maxTokens: null },
+      ]);
     });
   });
 
