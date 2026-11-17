@@ -141,6 +141,17 @@ describe("the classifier breaker", () => {
     expect(allows(stale, probeEveryMs * 5)).toBe(false);
   });
 
+  /** @scenario "A text held behind a slow probe is sent once the probe is answered" */
+  it("says a held-back send awaits a probe only while one is unanswered", () => {
+    const open = after(downs(openAfterFailures));
+    const probe = classifierBreakerAllowsSend({ state: open, now: probeEveryMs });
+
+    expect(classifierBreakerAllowsSend({ state: open, now: 0 }).isAwaitingProbe).toBe(false);
+    expect(
+      classifierBreakerAllowsSend({ state: probe.state, now: probeEveryMs }).isAwaitingProbe,
+    ).toBe(true);
+  });
+
   /** @scenario "Rate limits and permanent refusals never stop sends" */
   it("neither opens nor resets on rate limits and permanent refusals", () => {
     expect(allows(after(Array.from({ length: 100 }, () => "neutral")), 0)).toBe(true);

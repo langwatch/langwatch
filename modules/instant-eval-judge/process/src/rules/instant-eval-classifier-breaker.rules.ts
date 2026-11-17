@@ -39,7 +39,10 @@ export const CLOSED_CLASSIFIER_BREAKER: ClassifierBreakerState = {
   probesSent: 0,
 };
 
-/** Whether this send may go out, the state once it does, and its probe number if it is one. */
+/**
+ * Whether this send may go out, the state once it does, and its probe number if it is one.
+ * `isAwaitingProbe` says a held-back send waits on a probe still unanswered.
+ */
 export function classifierBreakerAllowsSend({
   state,
   now,
@@ -50,17 +53,21 @@ export function classifierBreakerAllowsSend({
   readonly isAllowed: boolean;
   readonly state: ClassifierBreakerState;
   readonly probe: number | null;
+  readonly isAwaitingProbe: boolean;
 } {
-  if (state.openedAt === null) return { isAllowed: true, state, probe: null };
+  if (state.openedAt === null) {
+    return { isAllowed: true, state, probe: null, isAwaitingProbe: false };
+  }
   const { probeEveryMs } = INSTANT_EVAL_CLASSIFIER_BREAKER;
   if (state.probeInFlight !== null || now - state.openedAt < probeEveryMs) {
-    return { isAllowed: false, state, probe: null };
+    return { isAllowed: false, state, probe: null, isAwaitingProbe: state.probeInFlight !== null };
   }
   const probe = state.probesSent + 1;
   return {
     isAllowed: true,
     state: { ...state, openedAt: now, probeInFlight: probe, probesSent: probe },
     probe,
+    isAwaitingProbe: false,
   };
 }
 

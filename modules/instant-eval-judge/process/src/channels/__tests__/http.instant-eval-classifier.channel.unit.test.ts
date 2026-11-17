@@ -335,6 +335,55 @@ describe("given a judge that is down for every send", () => {
     });
   });
 
+  describe("when a text is held back while a slow probe is unanswered", () => {
+    /** @scenario "A text held behind a slow probe is sent once the probe is answered" */
+    it("keeps its attempts and is sent once the probe is answered", async () => {
+      const clock = { now: 0 };
+      const channel = HttpInstantEvalClassifierChannel.create({
+        apiKey: "test-key",
+        dispatcher: agent,
+        // Yields to the timers, so the slow probe can answer while the held text waits.
+        sleep: (ms: number) => {
+          waits.push(ms);
+          return new Promise((resolve) => setTimeout(resolve, 1));
+        },
+        now: () => clock.now,
+      });
+      const classify = (text: string) =>
+        channel.classify({
+          projectId: "project-1",
+          text,
+          questions: [QUESTION],
+          limiter: MemoryInstantEvalRateLimiter.create(),
+        });
+      endpoint()
+        .intercept({ path: "/v1/systemone", method: "POST" })
+        .reply(500, "upstream down")
+        .times(16);
+      for (let i = 0; i < 4; i++) await classify(`text ${i}`);
+
+      clock.now = 10_000;
+      waits = [];
+      let sends = 0;
+      endpoint()
+        .intercept({ path: "/v1/systemone", method: "POST" })
+        .reply(200, () => {
+          sends += 1;
+          return ANSWER;
+        })
+        .delay(50)
+        .times(2);
+
+      const probe = classify("probe");
+      const held = await classify("held");
+
+      expect((await probe).verdicts).toHaveLength(1);
+      expect(held.verdicts).toHaveLength(1);
+      expect(sends).toBe(2);
+      expect(waits.length).toBeGreaterThan(4);
+    });
+  });
+
   describe("when one text fails all five of its sends", () => {
     /** @scenario "One text failing on every attempt does not stop the others" */
     it("still sends the next text", async () => {
