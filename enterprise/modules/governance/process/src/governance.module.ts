@@ -21,6 +21,7 @@ import { ingestionPullEventing } from "./eventing/ingestion-pull.pipeline.ts";
 import { pulledUsageEventing } from "./eventing/pulled-usage.pipeline.ts";
 import { GOVERNANCE_SETTLING_WINDOW_DAYS } from "./features/cost/rules/governance-cost-summary.rules.ts";
 import { agentStopEventing } from "./features/kill-switch/eventing/agent-stop.pipeline.ts";
+import { ocsfPushEventing } from "./features/ocsf/eventing/ocsf-push.pipeline.ts";
 import { agentRegistryEventing } from "./features/registry/eventing/agent-registry.pipeline.ts";
 import { governanceRepositories } from "./repositories/governance-repositories.registry.ts";
 import { activityMonitorTrpcTransport } from "./transport/activity-monitor.trpc.ts";
@@ -41,6 +42,7 @@ import { ingestionKeyTrpcTransport } from "./transport/ingestion-key.trpc.ts";
 import { ingestionSourcesTrpcTransport } from "./transport/ingestion-sources.trpc.ts";
 import { ingestionTemplatesTrpcTransport } from "./transport/ingestion-templates.trpc.ts";
 import { meUsageRest } from "./transport/me-usage.rest.ts";
+import { ocsfSiemRest } from "./transport/ocsf-siem.rest.ts";
 import { personalSessionsTrpcTransport } from "./transport/personal-sessions.trpc.ts";
 import { sessionPolicyTrpcTransport } from "./transport/session-policy.trpc.ts";
 
@@ -79,6 +81,7 @@ export const governanceProcessModule: PublishedProcessModule<"governance", Gover
       governanceRest,
       agentRegistryRest,
       agentKillSwitchRest,
+      ocsfSiemRest,
       governanceCliRest,
       governanceIngestRest,
       meUsageRest,
@@ -139,6 +142,7 @@ export const governanceProcessModule: PublishedProcessModule<"governance", Gover
     .withEventing(codingAssistantBillingEventing)
     .withEventing(agentRegistryEventing)
     .withEventing(agentStopEventing)
+    .withEventing(ocsfPushEventing)
     // Background, after old writers are gone: an older image edits coding-assistant configs
     // without a fact and appends pulled usage without a charge (governance-deploy-steps.feature).
     .withMigrations(({ app, replayer }) => [

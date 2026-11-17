@@ -6,7 +6,7 @@ The server half of [governance](../README.md). AI governance: ingestion sources 
 
 ## Installation
 
-`defineProcessModule("governance").withRepositories(governanceRepositories).withApi(GovernanceModule).withTransports(governanceRest, agentRegistryRest, agentKillSwitchRest, governanceCliRest, governanceIngestRest, meUsageRest, departmentsTrpcTransport, ingestionTemplatesTrpcTransport, aiToolsTrpcTransport, ingestionSourcesTrpcTransport, governanceTrpcTransport, anomalyRulesTrpcTransport, activityMonitorTrpcTransport, governanceKillSwitchTrpcTransport, personalSessionsTrpcTransport, ingestionKeyTrpcTransport, sessionPolicyTrpcTransport, governancePeopleTrpcTransport, governanceAgentsTrpcTransport, governanceCostTrpcTransport).provideMiddlewareBindings(…).provideMiddlewareContext(…).withEventing(pulledUsageEventing).withEventing(ingestionPullEventing).withEventing(ingestionPullReconcileEventing).withEventing(governanceActivityMonitorEventing).withEventing(codingAssistantBillingEventing).withEventing(agentRegistryEventing).withEventing(agentStopEventing).withMigrations(…)`, `src/governance.module.ts:75`.
+`defineProcessModule("governance").withRepositories(governanceRepositories).withApi(GovernanceModule).withTransports(governanceRest, agentRegistryRest, agentKillSwitchRest, ocsfSiemRest, governanceCliRest, governanceIngestRest, meUsageRest, departmentsTrpcTransport, ingestionTemplatesTrpcTransport, aiToolsTrpcTransport, ingestionSourcesTrpcTransport, governanceTrpcTransport, anomalyRulesTrpcTransport, activityMonitorTrpcTransport, governanceKillSwitchTrpcTransport, personalSessionsTrpcTransport, ingestionKeyTrpcTransport, sessionPolicyTrpcTransport, governancePeopleTrpcTransport, governanceAgentsTrpcTransport, governanceCostTrpcTransport).provideMiddlewareBindings(…).provideMiddlewareContext(…).withEventing(pulledUsageEventing).withEventing(ingestionPullEventing).withEventing(ingestionPullReconcileEventing).withEventing(governanceActivityMonitorEventing).withEventing(codingAssistantBillingEventing).withEventing(agentRegistryEventing).withEventing(agentStopEventing).withEventing(ocsfPushEventing).withMigrations(…)`, `src/governance.module.ts:77`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 The ingestion-template operations the governance REST family calls.
 
-Peers call these through the token, declared at `../contract/src/governance.api.ts:197`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/governance.api.ts:202`; nothing else in this package is public.
 
 #### `registerMcpTools`
 
@@ -850,6 +850,38 @@ Latest request first, `limit` at a time; a cursor it never returned is a validat
 listAgentStops(input: { organizationId: string; statuses?: readonly AgentStopStatus[]; limit: number; cursor?: string; }): Promise<AgentStopPage>;
 ```
 
+#### `listOcsfEvents`
+
+The organisation's governance events as OCSF 1.9.0, after the cursor.
+
+```typescript
+listOcsfEvents(input: OcsfExportWindow & { sourceType?: string; sourceId?: string }): Promise<OcsfEventsPage>;
+```
+
+#### `listOcsfProjectTraces`
+
+The organisation's project traces as OCSF 1.9.0, one event per trace.
+
+```typescript
+listOcsfProjectTraces(input: OcsfExportWindow & { projectId?: string }): Promise<OcsfEventsPage>;
+```
+
+#### `listOcsfAudit`
+
+The organisation's audit log as OCSF 1.9.0, oldest first.
+
+```typescript
+listOcsfAudit(input: OcsfExportWindow): Promise<OcsfEventsPage>;
+```
+
+#### `ingestOcsfEvents`
+
+Stores OCSF events another source sent; one row per (source, metadata.uid).
+
+```typescript
+ingestOcsfEvents(input: OcsfIngestRequest & { organizationId: string }): Promise<OcsfIngestResponse>;
+```
+
 ## REST transport
 
 ### `agentKillSwitchRest`
@@ -1469,6 +1501,97 @@ interface Query {
   windowEndMs?: number;
 }
 type Response = z.infer<typeof meUsageResponseSchema>; // ../contract/src/features/personal/personal-usage.ts:168
+```
+
+### `ocsfSiemRest`
+
+|             |                                        |
+| ----------- | -------------------------------------- |
+| Declared at | `src/transport/ocsf-siem.rest.ts:30`   |
+| Base URL    | none: each route's path is its address |
+| Addressing  | literal                                |
+| Credential  | organization                           |
+
+#### `GET /api/governance/ocsf/events` · `listOcsfEvents`
+
+Export governance events as OCSF 1.9.0
+
+Permission `complianceExport:view`. Entitlement `enterprise` (feature `OCSF_EXPORT`). Declared at `src/transport/ocsf-siem.rest.ts:37`.
+
+Answers at `/api/governance/ocsf/events`, `/api/v1/governance/ocsf/events`.
+
+```typescript
+// Query: ocsfEventsQuerySchema, ../contract/src/features/ocsf/ocsf-siem.ts:87
+interface Query {
+  limit?: number;
+  since?: string;
+  until?: string;
+  cursor?: string;
+  source_type?: string;
+  source_id?: string;
+}
+// Response: ocsfEventsPageSchema, ../contract/src/features/ocsf/ocsf-siem.ts:122
+interface Response {
+  ocsf_version: string;
+  data: Record<string, unknown>[];
+  next_cursor: string;
+  has_more: boolean;
+}
+```
+
+#### `GET /api/governance/ocsf/traces` · `listOcsfProjectTraces`
+
+Export project traces as OCSF 1.9.0
+
+Permission `complianceExport:view`. Entitlement `enterprise` (feature `OCSF_EXPORT`). Declared at `src/transport/ocsf-siem.rest.ts:61`.
+
+Answers at `/api/governance/ocsf/traces`, `/api/v1/governance/ocsf/traces`.
+
+```typescript
+// Query: ocsfTracesQuerySchema, ../contract/src/features/ocsf/ocsf-siem.ts:96
+interface Query {
+  limit?: number;
+  since?: string;
+  until?: string;
+  cursor?: string;
+  project_id?: string;
+}
+type Response = z.infer<typeof ocsfEventsPageSchema>; // ../contract/src/features/ocsf/ocsf-siem.ts:122
+```
+
+#### `GET /api/governance/ocsf/audit` · `listOcsfAudit`
+
+Export the audit log as OCSF 1.9.0
+
+Permission `complianceExport:view`. Entitlement `enterprise` (feature `OCSF_EXPORT`). Declared at `src/transport/ocsf-siem.rest.ts:84`.
+
+Answers at `/api/governance/ocsf/audit`, `/api/v1/governance/ocsf/audit`.
+
+```typescript
+// Query: ocsfAuditQuerySchema, ../contract/src/features/ocsf/ocsf-siem.ts:104
+interface Query {
+  limit?: number;
+  since?: string;
+  until?: string;
+  cursor?: string;
+}
+type Response = z.infer<typeof ocsfEventsPageSchema>; // ../contract/src/features/ocsf/ocsf-siem.ts:122
+```
+
+#### `POST /api/governance/ocsf/ingest` · `ingestOcsfEvents`
+
+Push OCSF events in from another source
+
+Permission `governance:manage`. Entitlement `enterprise` (feature `OCSF_EXPORT`). Declared at `src/transport/ocsf-siem.rest.ts:106`.
+
+Answers at `/api/governance/ocsf/ingest`, `/api/v1/governance/ocsf/ingest`.
+
+```typescript
+type Body = z.infer<typeof ocsfIngestRequestSchema>; // ../contract/src/features/ocsf/ocsf-siem.ts:168
+// Response: ocsfIngestResponseSchema, ../contract/src/features/ocsf/ocsf-siem.ts:179
+interface Response {
+  accepted: number;
+}
 ```
 
 ## tRPC transport
@@ -2758,6 +2881,14 @@ Declared at `src/features/kill-switch/eventing/agent-stop.pipeline.ts:72`. Event
 | process manager     | `agentStop`                    | intents `announce`, `revertTarget`, `applyTarget` (outbox) | `src/features/kill-switch/eventing/agent-stop.pipeline.ts:99` |
 | Postgres projection | `≈ agentStopProjection(store)` | –                                                          | `src/features/kill-switch/eventing/agent-stop.pipeline.ts:88` |
 
+### Pipeline `governance_ocsf_push` (aggregate `global`)
+
+Declared at `src/features/ocsf/eventing/ocsf-push.pipeline.ts:40`.
+
+| Kind            | Name           | Handles                                                                                                               | Declared at                                           |
+| --------------- | -------------- | --------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------- |
+| process manager | `ocsfSiemPush` | every 1 d (`OCSF_PUSH_PRUNE_INTERVAL_MS = 24 * 60 * 60 * 1000`); intents `pruneDelivered`, `requestDelivery` (outbox) | `src/features/ocsf/eventing/ocsf-push.pipeline.ts:46` |
+
 ### Pipeline `governance_agent_registry` (aggregate `global`)
 
 Declared at `src/features/registry/eventing/agent-registry.pipeline.ts:107`.
@@ -2774,7 +2905,7 @@ Declared at `src/features/registry/eventing/agent-registry.pipeline.ts:107`.
 
 | Kind   | Leaf                       | Environment variable                  | Declared at                               |
 | ------ | -------------------------- | ------------------------------------- | ----------------------------------------- |
-| secret | `–`                        | `GOVERNANCE_ERASURE_PSEUDONYM_SECRET` | `src/app/governance.app.ts:565`           |
+| secret | `–`                        | `GOVERNANCE_ERASURE_PSEUDONYM_SECRET` | `src/app/governance.app.ts:577`           |
 | config | `gatewayPublicUrl`         | `LW_GATEWAY_PUBLIC_URL`               | `../contract/src/governance.config.ts:41` |
 | config | `gatewayInternalUrl`       | `LW_GATEWAY_INTERNAL_URL`             | `../contract/src/governance.config.ts:42` |
 | config | `gatewayLegacyUrl`         | `LW_GATEWAY_BASE_URL`                 | `../contract/src/governance.config.ts:43` |

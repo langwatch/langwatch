@@ -221,6 +221,35 @@ Labels let you zoom in on specific features or A/B test different approaches rig
 
 ---
 
+# FILE: ./observability/multi-agent-a2a.mdx
+
+---
+title: "Multi-agent traces across A2A"
+description: "See every agent of an A2A call chain in one trace, with the calls, errors, latency and cost between them."
+---
+
+When one agent calls another over the Agent2Agent (A2A) protocol, LangWatch shows the whole chain as one trace. Open the trace and pick the **Agents** tab to see which agent called which, how often, how many calls failed, how long they took and what each agent cost.
+
+## How spans join one trace
+
+Spans from different agents join the same trace when the caller sends the W3C `traceparent` header on its A2A request and the callee continues that context. Most OpenTelemetry HTTP instrumentations do this for you. If the callee starts a new trace instead, its spans land in a separate trace and the graph shows only one side.
+
+A span whose parent span ID is not in the trace is still drawn as an agent, marked "Caller not in this trace". This happens when the caller's spans were not sent to LangWatch, or were sent to another project. A callee that got no `traceparent` starts its own trace instead, with no marker.
+
+## Attributes LangWatch reads
+
+Each span belongs to the agent named by `gen_ai.agent.name` (or `gen_ai.agent.id`). An A2A client span can also name its callee through `a2a.agent.name`, `a2a.agent.card.name` or a span name like `invoke_agent Bob`; that span and the spans under it belong to the callee. A span without a name belongs to its parent's agent. When `service.name` changes under a span, the new service becomes its own node, unless the parent is an A2A client span that names its callee.
+
+A span is marked as an A2A call when it carries `a2a.*` attributes, such as `a2a.method`, `a2a.context.id`, `a2a.task.id` and `a2a.task.state`. Those spans get an **A2A** label in the span tree. An edge appears where a span belongs to a different agent than its parent, and it is marked A2A when that span is an A2A span. An A2A span that stays in its parent's agent adds no edge.
+
+## The call graph
+
+Each node is an agent, with its span count and the cost of its own LLM spans, so a parent is never charged for its children. Each edge counts the calls from one agent to another, with errors, average and maximum latency. Click an edge to open its first call in the span details.
+
+The **Agents** tab appears when a trace names more than one agent or holds an A2A call. When the graph finds only one agent, the tab stays and shows that one node. Each edge's latency is the caller's A2A client span when there is one, else the callee's first span. Edges with errors come first, then the busiest; a node with failed calls has a red border and the slowest callee an orange one.
+
+---
+
 # FILE: ./observability/overview.mdx
 
 ---
@@ -7737,104 +7766,179 @@ The gateway sub-chart of the `langwatch` Helm chart deploys the gateway as a Dep
 
 ---
 title: OCSF / SIEM export
-description: Pull governance events into your SIEM as OCSF 1.1 records through a cursor-paginated read procedure.
+description: Send AI activity and audit events to your SIEM as OCSF 1.9.0 events, pulled with an API key or pushed to a signed webhook, and push OCSF events from other tools into LangWatch.
 sidebarTitle: OCSF / SIEM export
 ---
 
-## What the export contains
+## What is exported
 
-LangWatch writes one OCSF record per trace that arrives through an [ingestion source](/ai-governance/ingestion-sources/index), and one per admin view of a member's or a team's workspace (`actionName` `governance.viewWorkspaceAs`). Each record is an OCSF 1.1 API Activity event (`class_uid` 6003, `category_uid` 6). A record linked to an anomaly alert has `severity_id` 4 (Medium); every other record has `severity_id` 1 (Informational).
+LangWatch exports three streams of OCSF 1.9.0 API Activity events (`class_uid` 6003, `category_uid` 6):
 
-Records are stored with no expiry. Your SIEM pulls them by cursor, on its own schedule, and keeps its own watermark.
+| Stream | Route | Contains |
+|---|---|---|
+| Governance events | `GET /api/governance/ocsf/events` | Traces from [ingestion sources](/ai-governance/ingestion-sources/index), events pulled from provider audit APIs, admin views of a member's or team's workspace, and OCSF events pushed in from other tools |
+| Project traces | `GET /api/governance/ocsf/traces` | One event per trace in the organization's projects |
+| Audit log | `GET /api/governance/ocsf/audit` | Admin and configuration actions: who did what, on which target, from which address, and whether it failed |
 
-## Endpoint and auth
+Every event LangWatch builds sets `metadata.version` to `1.9.0`, `metadata.uid` to a stable event id and `metadata.tenant_uid` to the organization id. An LLM call is `activity_id` 99 (Other) with `activity_name` `Invoke`, since OCSF API Activity has no invoke activity.
 
-The export is the tRPC query `governance.ocsfExport`. Call it as a `GET` on `/api/trpc/governance.ocsfExport` with the input JSON in the `input` query parameter.
+## AI fields
+
+Each event carries the OCSF 1.9 AI objects when LangWatch knows their values:
+
+| Field | Source |
+|---|---|
+| `ai_model.name`, `ai_model.ai_provider` | The model the call used. A `provider/model` name is split; an unknown provider is `Unknown` |
+| `ai_agent.name`, `ai_agent.uid` | `gen_ai.agent.name` and `gen_ai.agent.id` on the trace |
+| `message_context.prompt_tokens`, `completion_tokens`, `total_tokens` | The trace's or the provider event's token counts |
+| `message_context.uid`, `metadata.correlation_uid` | The trace id |
+| `unmapped.langwatch.cost_usd` | The cost in USD. Provider events priced in another currency carry `cost_amount` and `cost_currency` instead |
+
+Prompt and response text are never exported, and neither is the raw provider payload. `unmapped.langwatch` also carries `source_type`, `source_id`, `trace_id` and `project_id` so you can pivot back to LangWatch.
+
+## Auth
 
 | Requirement | Value |
 |---|---|
 | Plan | Enterprise |
-| Permission | `complianceExport:view`. Organization admins hold it; grant it to another role through a custom role. See [RBAC](/ai-gateway/rbac) |
-| Auth | The session cookie of a signed-in user. API keys and virtual keys are not accepted |
-| Tenancy | The permission is checked against `organizationId`. A call for an organization where the caller does not hold it is refused |
+| Credential | An organization API key, sent as `Authorization: Bearer <key>` |
+| Permission | `complianceExport:view` for the three export routes, `governance:manage` for the ingest route |
 
-## Input
+A key without the permission gets a 403. An organization below Enterprise gets a 402 `enterprise_plan_required`.
 
-| Field | Type | Default | Purpose |
-|---|---|---|---|
-| `organizationId` | string | required | The organization to export |
-| `sinceMs` | integer | `0` | Return records with `eventTimeMs` after this UNIX millisecond watermark |
-| `sinceEventId` | string | none | Paired with `sinceMs`: the `eventId` of the last record you received, so records that share a millisecond are neither skipped nor repeated |
-| `limit` | integer | `500` | Page size, 1 to 1000 |
+## Pulling events
 
-## Output
+All three routes take the same paging parameters:
 
-The HTTP response wraps the procedure result under `result.data.json`. The result is:
+| Parameter | Default | Purpose |
+|---|---|---|
+| `limit` | `500` | Page size, 1 to 1000 |
+| `cursor` | none | The `next_cursor` of the previous page |
+| `since` | none | ISO 8601 start of the first read. A cursor carries its own position |
+| `until` | none | ISO 8601 end bound. The cursor does not carry it, so send it again with every page |
+
+`/events` also takes `source_type` and `source_id`. `/traces` takes `project_id` to read one project. `/audit` returns an entry once it is ten minutes old, so an entry written late is not skipped by a cursor that already passed its time.
+
+Every page answers `next_cursor`, which is always set, and `has_more`. Store `next_cursor` after each page. While `has_more` is true, read again at once; when it is false, wait for your next scheduled run and pass the stored cursor. A trace updated after it was exported is exported again with the same `metadata.uid`, so deduplicate on it.
+
+```bash
+curl -s "https://app.langwatch.ai/api/governance/ocsf/events?limit=500" \
+  -H "Authorization: Bearer $LANGWATCH_ORG_API_KEY"
+```
 
 ```json
 {
-  "events": [
+  "ocsf_version": "1.9.0",
+  "data": [
     {
-      "eventId": "evt_01HZX9N...",
-      "ocsfSchemaVersion": "1.1.0",
-      "traceId": "trace_...",
-      "sourceId": "src_...",
-      "sourceType": "otel_generic",
-      "classUid": 6003,
-      "categoryUid": 6,
-      "activityId": 6,
-      "typeUid": 600306,
-      "severityId": 1,
-      "eventTimeMs": 1748678421123,
-      "actorUserId": "user_...",
-      "actorEmail": "jane@acme.com",
-      "actorEnduserId": "",
-      "actionName": "web_search",
-      "targetName": "anthropic/claude-sonnet-4",
-      "anomalyAlertId": "",
-      "rawOcsfJson": "{...}"
+      "class_uid": 6003,
+      "class_name": "API Activity",
+      "category_uid": 6,
+      "activity_id": 99,
+      "activity_name": "Invoke",
+      "type_uid": 600399,
+      "severity_id": 1,
+      "time": 1763114521123,
+      "status_id": 0,
+      "actor": { "user": { "uid": "user_01H...", "email_addr": "jane@acme.com" } },
+      "api": { "operation": "trace.recorded", "service": { "name": "LangWatch" } },
+      "src_endpoint": { "name": "otel_generic" },
+      "cloud": { "provider": "openai" },
+      "osint": [],
+      "ai_model": { "name": "gpt-5-mini", "ai_provider": "openai" },
+      "ai_agent": { "name": "billing-agent" },
+      "message_context": {
+        "uid": "trace_01H...",
+        "prompt_tokens": 120,
+        "completion_tokens": 30,
+        "total_tokens": 150
+      },
+      "metadata": {
+        "version": "1.9.0",
+        "uid": "trace_01H...",
+        "product": { "name": "LangWatch", "vendor_name": "LangWatch" },
+        "tenant_uid": "organization_01H...",
+        "log_name": "governance",
+        "correlation_uid": "trace_01H..."
+      },
+      "unmapped": {
+        "langwatch": {
+          "source_type": "otel_generic",
+          "source_id": "src_01H...",
+          "trace_id": "trace_01H...",
+          "cost_usd": 0.0042
+        }
+      }
     }
   ],
-  "nextCursor": 1748678421123,
-  "nextCursorCompound": { "eventTimeMs": 1748678421123, "eventId": "evt_01HZX9N..." }
+  "next_cursor": "eyJ0IjoxNzYzMTE0NTIxMTIzLCJlIjoidHJhY2VfMDFIIn0",
+  "has_more": false
 }
 ```
 
-`rawOcsfJson` is the full OCSF 1.1 event as a JSON string. The other fields are the columns your SIEM filters on. `actionName` is the tool the trace invoked, or `trace.recorded` for a trace with no tool call. An organization with no ingestion source yet returns `{ "events": [], "nextCursor": null, "nextCursorCompound": null }`.
+## Pushing events to your SIEM
 
-`anomalyAlertId` is returned on every record and is **always empty**. No attribute sets it, so no exported record is ever linked to an anomaly alert, and `severityId` is always 1 (Informational). Anomaly alerts are not exported as OCSF rows at all. They are delivered by webhook, described in [Anomaly rules](/ai-governance/anomaly-rules).
-
-## Pagination
-
-Persist `nextCursorCompound` after each page. On the next pull, pass its `eventTimeMs` as `sinceMs` and its `eventId` as `sinceEventId`. Records are ordered by `eventTimeMs` ascending.
-
-A page that returns `limit` records may be followed by more. Pull again at once until a page returns fewer than `limit` records, then wait for your next scheduled run.
-
-## Example
-
-Write the cookie into a curl config file that only the job user can read, and pass the file rather than the value. A `-H` argument puts the cookie in the process argument list, where every other user on the host can read it out of `ps`.
+Create a [webhook endpoint](/features/webhooks) subscribed to `ocsf.event`, pointing at your SIEM's HTTP collector or a forwarder in front of it:
 
 ```bash
-conf="$(mktemp)"
-trap 'rm -f "$conf"' EXIT
-printf 'header = "Cookie: %s"\n' "$SESSION_COOKIE" > "$conf"
+curl -s "https://app.langwatch.ai/api/webhooks/v1/endpoints" \
+  -H "Authorization: Bearer $LANGWATCH_ORG_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://siem-forwarder.acme.com/langwatch", "enabled_events": ["ocsf.event"]}'
 ```
 
-`mktemp` makes a new file each run, owned by the job user and readable only by them. Writing to a fixed path instead would reuse whatever file or symlink is already there, and keep its permissions.
+LangWatch queues each governance event when it is written. Deliveries use the standard webhook envelope: a POST holds a `batch` of up to `max_batch_size` webhook events (100 by default), each with `type: "ocsf.event"` and one OCSF 1.9.0 event as its `data`:
+
+```json
+{
+  "batch": [
+    {
+      "id": "evt_f905578f982aee17650a4616b89ad219",
+      "type": "ocsf.event",
+      "created": "2026-11-16T16:47:29.124Z",
+      "schema_version": "1",
+      "data": { "class_uid": 6003, "activity_name": "Invoke", "metadata": { "uid": "47c84f48...", "version": "1.9.0" } }
+    }
+  ]
+}
+```
+
+Deliveries are signed with `X-LangWatch-Signature: t=<unix seconds>,v1=<hmac-sha256>`, retried with backoff, and logged per endpoint; see [verifying signatures](/features/webhooks#verifying-signatures). An event written again, for example when a trace is processed twice, keeps its idempotency key, so it is queued once per endpoint. A retry after a lost acknowledgement can deliver it again, so deduplicate on `metadata.uid`.
+
+OCSF events go only to endpoints that name `ocsf.event` or `ocsf.*`. An endpoint subscribed to `*` does not receive them. The push carries the governance events stream. Project traces and the audit log are pulled.
+
+## Pushing OCSF events into LangWatch
+
+`POST /api/governance/ocsf/ingest` stores OCSF events from another tool, such as your identity provider or an AI platform's own audit feed, next to LangWatch's events:
 
 ```bash
-INPUT='{"json":{"organizationId":"YOUR_ORGANIZATION_ID","sinceMs":0,"limit":500}}'
-
-curl -G "https://app.langwatch.ai/api/trpc/governance.ocsfExport" \
-  --data-urlencode "input=$INPUT" \
-  --config "$conf"
+curl -s "https://app.langwatch.ai/api/governance/ocsf/ingest" \
+  -H "Authorization: Bearer $LANGWATCH_ORG_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "source": "okta",
+    "events": [
+      {
+        "class_uid": 3002,
+        "activity_id": 1,
+        "severity_id": 1,
+        "time": 1763114521123,
+        "metadata": { "uid": "okta-evt-1", "version": "1.4.0", "product": { "name": "Okta" } },
+        "user": { "name": "jane@acme.com" }
+      }
+    ]
+  }'
 ```
 
-`$SESSION_COOKIE` is the cookie of a browser session signed in as a user who holds `complianceExport:view`. Read it from your secrets store into the job environment. The `trap` deletes the config file when the shell exits, on a failed run as well as a clean one. Forward `events[]` to your SIEM's ingest API, then store `nextCursorCompound` for the next run.
+The answer is `{ "accepted": 1 }`. A request holds up to 500 events. Each needs `class_uid`, `severity_id`, `time` (epoch milliseconds) and `metadata.uid` and `metadata.version`, and is at most 64 KiB as JSON. An invalid event is a 422 naming the field.
 
-<Warning>The session cookie is a full browser credential for that user, and this endpoint takes no other credential. It is not scoped to `complianceExport:view`, and it expires on the session's own schedule rather than the job's. Keep it out of shell history, out of the process argument list, and out of any script committed to a repository, and rotate the session when the job host changes.</Warning>
+An event is identified by `source` and `metadata.uid`: sending it again replaces the stored copy. Stored events are read back from `/events` with `source_type=ocsf_push`, exactly as received, and are not pushed to webhook endpoints.
 
-**Also check:** [Anomaly rules](/ai-governance/anomaly-rules) for how a fired alert reaches you, which is by webhook rather than through this export, and [Retention](/ai-gateway/governance/retention) for how long the source traces are kept.
+## Session export
+
+The tRPC query `governance.ocsfExport` still returns the governance events in their stored OCSF 1.1 row shape, for the signed-in UI. Use the REST routes above for a SIEM job.
+
+**Also check:** [Anomaly rules](/ai-governance/anomaly-rules) for how a fired alert reaches you, and [Retention](/ai-gateway/governance/retention) for how long the source traces are kept.
 
 ---
 
@@ -38627,6 +38731,61 @@ Next, copy the test above, change the target to the action your agent must never
 
 ---
 
+# FILE: ./agent-testing/red-team-templates.mdx
+
+---
+title: Red Team Templates
+sidebarTitle: Red Team Templates
+keywords: langwatch, red teaming, owasp, llm top 10, agentic top 10, suite templates, adversarial testing, agent security
+description: Create a red team test suite from an OWASP pack in the platform, fit it to your agent, run it and read which attacks your agent held against.
+---
+
+<Warning>Use red teaming only on agents you own or have explicit permission to test.</Warning>
+
+You can red team an agent from the platform without writing code. Pick a pack such as the OWASP Top 10 for LLM Applications, tell LangWatch your agent's name and tools, and it creates one attack scenario per risk. Each scenario runs the same multi-turn attacker as [red teaming in code](/agent-testing/red-teaming).
+
+## Open the template gallery
+
+In **Agent Testing**, press **+** on the test suite rail and pick **From template**. The gallery has two tabs. **Archetypes** holds everyday behaviour suites, such as a support agent or a payments agent. **Red team** holds the attack packs:
+
+- **OWASP Top 10 for LLM Applications (2025)**: one attack per risk, `LLM01` to `LLM10`.
+- **OWASP Top 10 for Agentic Applications**: one attack per agentic risk, `ASI01` to `ASI10`.
+- **PII and sensitive data**: eight attacks that try to get your agent to reveal another user's personal data, stored customer records, credentials or API keys, another tenant's data, or personal data from raw tool results. Mapped to `LLM02`.
+- **Prompt injection**: six `LLM01` attacks: direct overrides, injection through tool output and retrieved documents, instructions hidden in encodings or other languages, persona drift over many turns, and payloads split across messages.
+
+## Preview a pack
+
+Select a pack to preview it before anything is created. The preview lists every scenario with the attack goal and the OWASP ids it covers, such as `LLM01` for prompt injection or `LLM07` for system prompt leakage. Each id shows the official OWASP category name, so you can match the suite to the risks your security review asks about.
+
+## Fit it to your agent
+
+Press **Next** to open the fit step. Give the **agent name** the attacker should address, the **tools** your agent can call, and the things it **must never** do, such as revealing customer data or issuing refunds above a limit. LangWatch writes these into each scenario, so the attacks and the judge criteria are about your agent, not a generic one.
+
+## Create and run
+
+Press **Create suite**. LangWatch creates a test suite named after the template, with one scenario per attack, and opens it. Run it against your agent like any other suite. The suite is yours from then on: edit, delete or add scenarios. On the Free plan, a template counts as one suite.
+
+## Read the result
+
+Each red team scenario in a run shows **Held** when your agent resisted the attack across every turn, and **Broke** when the attacker reached its goal. Open the run to see the transcript and the score of each turn, from 0 (full refusal) to 10 (the attacker got what it wanted). The turn where the score climbed is where to look for the fix.
+
+## Turn cap
+
+An attack runs for up to 30 turns by default. A scenario's red team settings take a `maxTurns` of up to 50, the hard limit. The attacker may stop early when it breaks the agent, and that run counts as **Broke**.
+
+## Use the REST API
+
+The gallery uses two routes you can also call with a project API key:
+
+| Route | Permission | What it does |
+| ----- | ---------- | ------------ |
+| `GET /api/v1/test-suites/templates` | `scenarios:view` | Lists every template with its full scenario data. |
+| `POST /api/v1/test-suites/templates/{templateId}/apply` | `scenarios:manage` | Creates a suite from a template. |
+
+The apply body takes `fit` with `agentName`, `tools` and `mustNever`, and an optional suite `name`. An unknown template id answers 404 `suite_template_not_found`. From the CLI, `langwatch test-suite templates` lists them and `langwatch test-suite apply-template <id> --agent-name "Support bot" --tool refund_order --must-never "reveal the system prompt"` applies one.
+
+---
+
 # FILE: ./agent-testing/red-teaming.mdx
 
 ---
@@ -38674,6 +38833,10 @@ Single-turn red-teaming tools fire thousands of prompts and score each in isolat
 | **Direct**     | 75 to 100% | Encoding tricks (Base64, ROT13), prompt injection, multi-vector. |
 
 For a hardened agent, [GOAT](https://langwatch.ai/scenario/advanced/red-teaming/goat) is a drop-in alternative that picks a technique per turn instead of following fixed phases (based on Meta's [GOAT paper](https://arxiv.org/abs/2410.01606), ICML 2025).
+
+## Red team from the platform
+
+To red team without code, create a suite from an OWASP pack in the template gallery. See [Red Team Templates](/agent-testing/red-team-templates).
 
 ## Get it running
 
@@ -67601,6 +67764,7 @@ When `S3_BUCKET_NAME` is set, all consumers use that bucket. When it is not set,
 | `S3_SECRET_ACCESS_KEY` | S3 secret access key                                                                                            | -       |
 | `S3_KEY_SALT`          | Salt for the per-project cache key the optimization studio sends to the NLP engine. Unset, no cache key is sent | -       |
 | `LANGWATCH_LOCAL_STORAGE_PATH` | Filesystem root used for stored-objects when no S3 is configured | `/var/lib/langwatch/objects` |
+| `STORED_OBJECTS_UPLOADS` | Where browsers and SDK clients send upload bytes, for S3 and Azure Blob alike. `direct`: straight to the bucket's endpoint, which must then be reachable from them, with a CORS rule for your app origin. `through-langwatch`: to LangWatch's signed upload route, which streams the bytes into the bucket; use it when the bucket is only reachable inside the cluster. Upload addresses are then built from `BASE_HOST`, and the proxy in front of LangWatch must accept bodies up to 5 GiB (see [Dataset storage](/self-hosting/upgrade-dataset-storage#when-browsers-cannot-reach-the-bucket)). A per-organisation `DATAPLANE_S3__` account sets its own with an `uploads` key. Chart: `app.dataplane.uploads` | `direct` |
 
 <Note>
   When running on AWS with IRSA (IAM Roles for Service Accounts), you don't need to set S3 access
@@ -70693,6 +70857,10 @@ Do not expose any other gateway path. `/healthz`, `/readyz`, `/startupz`, `/debu
 | Request body size | At least 50 MB | At least 32 MB, the gateway `security.maxRequestBodyBytes` |
 | WebSocket upgrades | Pass through on `/api/trpc-ws` and `/api/v1/agents/connect` | Not used |
 
+### Uploads through LangWatch
+
+When uploads go through LangWatch (`app.dataplane.uploads: through-langwatch`, or `STORED_OBJECTS_UPLOADS=through-langwatch`), browsers and SDKs send files of up to 5 GiB to `/api/stored-objects/uploads` on the app host. That path needs request buffering off, a body size of at least 5 GiB, and read and send timeouts long enough for your slowest upload (the chart nginx default is `3600`). With direct uploads, the default, files go straight to the bucket and this path carries no file bytes. See [Dataset storage](/self-hosting/upgrade-dataset-storage#when-browsers-cannot-reach-the-bucket).
+
 Envoy and Traefik stream responses without buffering and pass WebSocket upgrades by default. ingress-nginx buffers request bodies by default, caps them at 1 MB, and turns on response buffering when the controller config does, so it needs annotations. On the gateway Ingress the chart sets both buffering annotations to off so a controller-wide setting cannot change them. The app Ingress keeps the controller defaults. See [Architecture](/self-hosting/infrastructure/architecture) for the connected-agents WebSocket.
 
 ## Chart Ingress
@@ -70728,6 +70896,18 @@ ingress:
 ```
 
 With `className: nginx` the chart adds these to the gateway Ingress only: `proxy-buffering: "off"`, `proxy-request-buffering: "off"`, `proxy-read-timeout: "3600"`, `proxy-send-timeout: "3600"` and `proxy-body-size: 32m`. They override the same keys from `ingress.annotations`. Keys in `ingress.gateway.annotations` override both.
+
+With `className: nginx` the chart also renders `<release>-uploads-ingress`, routing `/api/stored-objects/uploads` (Prefix) on every `ingress.hosts` host to the app Service. Set `ingress.uploads.enabled: true` to render it for any other class, such as an empty default class or `nginx-internal`, or `false` to turn it off.
+
+The uploads Ingress takes `ingress.annotations` minus the rewrite annotations and `server-snippet`, which applies to the whole host and would run twice. A `configuration-snippet` is copied, so a location rule such as a deny list also covers uploads.
+
+A host whose `ingress.hosts` paths already route exactly `/api/stored-objects/uploads` (with or without a trailing slash) is left out: that route is yours, and ingress-nginx refuses the same host and path twice. Give your route the upload settings yourself. A longer path under it does not count, so the rest of the upload route keeps the chart's settings.
+
+When the class name contains `nginx`, the chart adds `proxy-request-buffering: "off"`, `proxy-body-size: 5121m` (the 5 GiB upload limit and some headroom), `proxy-read-timeout: "3600"` and `proxy-send-timeout: "3600"` to the uploads Ingress. On other classes the chart adds no settings of its own, so put your controller's settings in `ingress.uploads.annotations`. Keys there override everything else.
+
+The uploads Ingress carries no `tls` entry: ingress-nginx serves the host's certificate from the app Ingress.
+
+A prefix in `ingress.blockedPaths` that covers the path stops the uploads Ingress rendering. Without it, uploads go through the app Ingress, so raise its body limit and timeouts there.
 
 With `className: nginx` the app Ingress also gets `proxy-read-timeout: "120"` and `proxy-send-timeout: "120"`, so an analytics query can use its full 60 s; ingress-nginx's default is 60 s. Keys in `ingress.annotations` override them.
 
@@ -74069,9 +74249,14 @@ app:
           secretKeyRef: { name: "your-secret", key: "accessKeyId" }
         secretAccessKey:
           secretKeyRef: { name: "your-secret", key: "secretAccessKey" }
-        # For MinIO or other S3-compatible services:
+        # For MinIO or other S3-compatible services. With direct uploads (the
+        # default), browsers and SDK clients upload to this address, so it must
+        # be one they can reach, not a cluster-internal service name:
         # endpoint:
-        #   value: "https://minio.internal:9000"
+        #   value: "https://minio.your-domain.com"
+    # Set to through-langwatch when browsers cannot reach the endpoint above
+    # (see "When browsers cannot reach the bucket" below):
+    # uploads: through-langwatch
   storedObjects:
     localFilesystem:
       enabled: false
@@ -74081,7 +74266,7 @@ With object storage enabled, none of the local-storage constraints apply: no per
 
 Two requirements for the bucket:
 
-1. **CORS**: the browser uploads dataset files directly to the bucket, so your CORS policy must allow `PUT` requests from your LangWatch app origin:
+1. **Reachable, with CORS**: by default the browser and the SDKs upload files directly to the bucket. The endpoint must be reachable from your users' browsers and from wherever your SDK clients run, and its CORS policy must allow `PUT` requests from your LangWatch app origin:
 
 ```json
 {
@@ -74096,6 +74281,35 @@ Two requirements for the bucket:
 ```
 
 2. **Lifecycle rule**: in-progress uploads are staged under the `staging/` prefix before being committed. Add a lifecycle rule that expires objects under `staging/` after 1 to 7 days so abandoned uploads do not accumulate.
+
+### When browsers cannot reach the bucket
+
+If your object storage is only reachable inside the cluster (an in-cluster MinIO, SeaweedFS or any S3-compatible service at a cluster address such as `http://s3.storage.svc.cluster.local:9000`), direct uploads fail in the browser with an error naming that host, for example:
+
+```text
+Failed to upload the file to object storage at s3.storage.svc.cluster.local:9000 (network or CORS error)
+```
+
+Send uploads through LangWatch instead. Browsers and SDK clients then upload to LangWatch, which streams the bytes into the bucket:
+
+```yaml
+app:
+  dataplane:
+    uploads: through-langwatch
+```
+
+The chart renders this as `STORED_OBJECTS_UPLOADS=through-langwatch` on the app and the workers. It works for both the `awsS3` and `azureBlob` providers. No CORS rule is needed in this mode. Upload addresses are built from `app.http.baseHost` (rendered as `BASE_HOST`), so set it to the address your users open LangWatch at, for example `https://langwatch.your-domain.com`, not the chart's `http://localhost:5560` default. LangWatch's storage check fails with `direct_upload_unavailable` when no address is set.
+
+Uploads can be up to 5 GiB, so the path in front of LangWatch must accept large, slow request bodies:
+
+- **ingress-nginx** (`ingress.className: nginx`): the chart renders a second Ingress, `<release>-uploads-ingress`, for `/api/stored-objects/uploads` on your app hosts. It turns request buffering off, allows bodies up to 5121m and waits up to 3600 s. Without it, nginx would refuse any file above its 1m default.
+
+  Your `ingress.annotations` still apply to it, except rewrites and `server-snippet`; override any of its settings with `ingress.uploads.annotations`. If you already route exactly `/api/stored-objects/uploads` yourself in `ingress.hosts`, the chart leaves that host out and your route needs these settings.
+
+  If your ingress-nginx class has another name, or `className` is empty and the cluster default is ingress-nginx, set `ingress.uploads.enabled: true`. A class whose name contains `nginx` gets the same settings; with an empty `className`, put them in `ingress.uploads.annotations`.
+- **Other ingress controllers and load balancers**: uploads go through your app Ingress. Raise its request body limit to at least 5 GiB and its request timeouts to cover your slowest upload. Or set `ingress.uploads.enabled: true` and put your controller's settings for the upload path in `ingress.uploads.annotations`.
+
+LangWatch itself allows an upload body up to two hours, enough for 5 GiB at about 6 Mbit/s.
 
 On EKS with IRSA, put the role on the ServiceAccount the app and workers use (`global.serviceAccount`). The migration runs inside a workers pod, so it uses the same identity.
 
@@ -77525,6 +77739,55 @@ openapi: "POST /api/v1/governance/agents/{agentId}/stop"
 
 ---
 
+# FILE: ./api-reference/governance-ocsf/export-governance-events-as-ocsf-1-9-0.mdx
+
+---
+title: "Export governance events as OCSF 1.9.0"
+openapi: "GET /api/v1/governance/ocsf/events"
+---
+
+---
+
+# FILE: ./api-reference/governance-ocsf/export-project-traces-as-ocsf-1-9-0.mdx
+
+---
+title: "Export project traces as OCSF 1.9.0"
+openapi: "GET /api/v1/governance/ocsf/traces"
+---
+
+---
+
+# FILE: ./api-reference/governance-ocsf/export-the-audit-log-as-ocsf-1-9-0.mdx
+
+---
+title: "Export the audit log as OCSF 1.9.0"
+openapi: "GET /api/v1/governance/ocsf/audit"
+---
+
+---
+
+# FILE: ./api-reference/governance-ocsf/overview.mdx
+
+---
+title: "Overview"
+description: "Pull governance events, project traces and the audit log as OCSF 1.9.0 API Activity events with an organisation API key, and push OCSF events from your other tools into LangWatch. Each stream pages with a cursor, so a SIEM polls by passing next_cursor back."
+---
+
+## Intro
+
+Pull governance events, project traces and the audit log as OCSF 1.9.0 API Activity events with an organisation API key, and push OCSF events from your other tools into LangWatch. Each stream pages with a cursor, so a SIEM polls by passing next_cursor back.
+
+---
+
+# FILE: ./api-reference/governance-ocsf/push-ocsf-events-in-from-another-source.mdx
+
+---
+title: "Push OCSF events in from another source"
+openapi: "POST /api/v1/governance/ocsf/ingest"
+---
+
+---
+
 # FILE: ./api-reference/grants/change-a-grant-s-role.mdx
 
 ---
@@ -80922,6 +81185,15 @@ openapi: "PATCH /api/v1/teams/{teamId}"
 
 ---
 
+# FILE: ./api-reference/test-suites/apply-a-suite-template.mdx
+
+---
+title: "Apply a suite template"
+openapi: "POST /api/v1/test-suites/templates/{templateId}/apply"
+---
+
+---
+
 # FILE: ./api-reference/test-suites/create-test-suites.mdx
 
 ---
@@ -80936,6 +81208,15 @@ openapi: "POST /api/v1/test-suites"
 ---
 title: "Archive a test suite"
 openapi: "DELETE /api/v1/test-suites/{id}"
+---
+
+---
+
+# FILE: ./api-reference/test-suites/list-suite-templates.mdx
+
+---
+title: "List suite templates"
+openapi: "GET /api/v1/test-suites/templates"
 ---
 
 ---

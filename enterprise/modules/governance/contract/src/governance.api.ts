@@ -119,6 +119,11 @@ import type {
   AwsConnectionInput,
   AwsConnectionView,
 } from "./features/kill-switch/agent-kill-switch.ts";
+import type {
+  OcsfEventsPage,
+  OcsfIngestRequest,
+  OcsfIngestResponse,
+} from "./features/ocsf/ocsf-siem.ts";
 import type { PersonaResolution } from "./features/personal/persona-home.ts";
 import type { GovernanceBudgetOverviewForUser } from "./features/personal/personal-budget-overview.ts";
 import type {
@@ -600,6 +605,27 @@ export interface GovernanceRestApi {
     limit: number;
     cursor?: string;
   }): Promise<AgentStopPage>;
+  /** The organisation's governance events as OCSF 1.9.0, after the cursor. */
+  listOcsfEvents(
+    input: OcsfExportWindow & { sourceType?: string; sourceId?: string },
+  ): Promise<OcsfEventsPage>;
+  /** The organisation's project traces as OCSF 1.9.0, one event per trace. */
+  listOcsfProjectTraces(input: OcsfExportWindow & { projectId?: string }): Promise<OcsfEventsPage>;
+  /** The organisation's audit log as OCSF 1.9.0, oldest first. */
+  listOcsfAudit(input: OcsfExportWindow): Promise<OcsfEventsPage>;
+  /** Stores OCSF events another source sent; one row per (source, metadata.uid). */
+  ingestOcsfEvents(
+    input: OcsfIngestRequest & { organizationId: string },
+  ): Promise<OcsfIngestResponse>;
 }
+
+/** The window and cursor every OCSF export stream takes. */
+export type OcsfExportWindow = {
+  organizationId: string;
+  limit: number;
+  since?: string;
+  until?: string;
+  cursor?: string;
+};
 
 export const GovernanceRestApi = moduleApi<GovernanceRestApi>()("governance");

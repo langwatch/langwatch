@@ -349,6 +349,7 @@ describe("GovernanceModule as the module a process installs", () => {
         "rest",
         "rest",
         "rest",
+        "rest",
         "trpc",
         "trpc",
         "trpc",
@@ -371,6 +372,8 @@ describe("GovernanceModule as the module a process installs", () => {
       expect(typeof app.ingestWebhook).toBe("function");
       expect(typeof app.ingestOtlpLogs).toBe("function");
       expect(typeof app.ingestOtlpMetrics).toBe("function");
+      expect(typeof app.listOcsfEvents).toBe("function");
+      expect(typeof app.ingestOcsfEvents).toBe("function");
     });
 
     it("resolves the CLI caller through the auth peer", async () => {

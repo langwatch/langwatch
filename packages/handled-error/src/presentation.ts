@@ -229,6 +229,7 @@ const CREATION_LIMIT_LABELS: Record<string, string> = {
   scenarios: "scenarios",
   scenarioSets: "simulations",
   evaluators: "custom evaluators",
+  testSuites: "suites",
 };
 
 /**
@@ -2924,7 +2925,7 @@ const presentations = {
     // and it says the same thing.
     describe: (error) => {
       const limitType = str(error, "limitType", "");
-      const creationLabel = CREATION_LIMIT_LABELS[limitType];
+      const creationLabel = CREATION_LIMIT_LABELS[str(error, "countedAs", "") || limitType];
       if (creationLabel) {
         const max = num(error, "max", 0);
         const included = max > 0 ? `${max} ${creationLabel}` : creationLabel;
@@ -3119,6 +3120,11 @@ const presentations = {
     title: "This scenario's text couldn't be filled in",
     describe: (error) =>
       `${scenarioFieldLabel(error)} references a parameter in a way we can't read. Check it is written as params.name, then try again.`,
+  },
+  scenario_red_team_config_mismatch: {
+    title: "This scenario's red team settings don't match its kind",
+    describe: () =>
+      "A red team scenario needs an attack goal and OWASP ids, and a standard scenario takes none. Set the kind and the attack together, then try again.",
   },
   scenario_reserved_set_id: {
     title: "This run can't be saved to that set",
@@ -4524,6 +4530,10 @@ const presentations = {
   },
 
   // ---- suites (run plans) ----
+  suite_template_not_found: {
+    title: "That suite template doesn't exist",
+    describe: () => "Pick a template from the list of templates, then try again.",
+  },
   suite_not_found: {
     title: "Run plan not found",
     describe: () => "It may have been deleted. Reload to see the current list.",

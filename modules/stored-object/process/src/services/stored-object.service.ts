@@ -5,6 +5,7 @@ import { type AuthzApi } from "@langwatch/authz-contract";
 import { HandledError } from "@langwatch/handled-error";
 import { generate, KSUID_RESOURCES } from "@langwatch/ksuid";
 import {
+  StorageUnavailableError,
   StoredObjectBytesMissingError,
   StoredObjectDeletedError,
   StoredObjectNotFoundError,
@@ -44,6 +45,7 @@ import type {
   StoredObjectFileStreamRead,
   StoredObjectProbe,
 } from "../rules/stored-object-file-access.rules.ts";
+import { movedOn } from "../rules/stored-object-lifecycle.rules.ts";
 import { requiredPermissionForPurpose } from "../rules/stored-object-purpose-permission.rules.ts";
 import { storedObjectMetadataOf } from "../rules/stored-object-view.rules.ts";
 import { StoredObjectCleanupService } from "./stored-object-cleanup.service.ts";
@@ -55,6 +57,9 @@ import type { StoredObjectFileReader } from "./stored-objects.service.ts";
 
 /** The peer decision a probe asks once the row names its purpose. */
 export type StoredObjectPermissions = Pick<AuthzApi, "getDecision">;
+
+/** Reads a delete takes when other writes keep moving the row under it. */
+const MAX_DELETE_ATTEMPTS = 4;
 
 /** How long a signed read URL answers, as long as an upload URL does (ADR-158 §4). */
 const READ_URL_EXPIRY_MS = 15 * 60 * 1000;
@@ -345,40 +350,42 @@ export class StoredObjectService {
     return this.getById(input);
   }
 
+  /** Marks the row deleted from what it holds now, then removes its bytes and its address. */
   async delete(input: DeleteStoredObjectInput): Promise<StoredObjectsDeleteOutput> {
-    const value = await this.getStoredObject(input);
-    if (value.status === "deleted" && value.deletedAt) {
-      return {
-        id: value.id,
-        generation: value.generation,
-        deletedAt: toDate(value.deletedAt).toISOString(),
-      };
-    }
+    for (let attempt = 0; attempt < MAX_DELETE_ATTEMPTS; attempt += 1) {
+      const value = await this.getStoredObject(input);
+      if (value.status === "deleted" && value.deletedAt) {
+        return {
+          id: value.id,
+          generation: value.generation,
+          deletedAt: toDate(value.deletedAt).toISOString(),
+        };
+      }
 
-    const deletedAt = this.now();
-    const deleted = {
-      ...value,
-      status: "deleted" as const,
-      generation: value.generation + 1,
-      deletedAt,
-      updatedAt: deletedAt,
-    };
-    await this.options.records.upsert(deleted);
-    if (deleted.storage) {
-      const cleaned = await this.cleanup.deleteStorageBestEffort({
-        projectId: input.projectId,
-        address: deleted.storage,
+      const deletedAt = this.now();
+      const deleted = movedOn({
+        value,
+        now: deletedAt,
+        // Expired, the reaper retries the bytes if this delete's own removal fails.
+        changes: {
+          status: "deleted",
+          deletedAt,
+          expiresAt: value.status === "uploading" ? value.expiresAt : deletedAt,
+        },
       });
-      if (cleaned) {
-        await this.options.records.upsert({ ...deleted, storage: null });
+      if (await this.options.records.transition({ expected: value, next: deleted })) {
+        // A write still streaming owns its bytes' fate: it discards them when it sees the delete.
+        if (value.status !== "uploading") await this.cleanup.removeBytesOf(deleted);
+
+        return {
+          id: deleted.id,
+          generation: deleted.generation,
+          deletedAt: toDate(deletedAt).toISOString(),
+        };
       }
     }
 
-    return {
-      id: deleted.id,
-      generation: deleted.generation,
-      deletedAt: toDate(deletedAt).toISOString(),
-    };
+    throw new StorageUnavailableError();
   }
 
   async getStorageUsageByProject(input: {
@@ -408,8 +415,13 @@ export class StoredObjectService {
     return this.options.storage.resolveDestination(input);
   }
 
-  probeStorage(input: { projectId: string }): Promise<void> {
-    return this.options.storage.probe(input);
+  /** Writes and removes a probe, then refuses an account clients cannot be sent through. */
+  async probeStorage(input: { projectId: string }): Promise<void> {
+    await this.options.storage.probe(input);
+    const expiresAt = this.now().add({ minutes: 1 });
+    if (await this.options.storage.uploadsThroughProcess({ ...input, expiresAt })) {
+      this.options.signer.publicOrigin();
+    }
   }
 
   async deleteOwnedBy(input: { projectId: string }): Promise<DeleteProjectStoredObjectsResult> {

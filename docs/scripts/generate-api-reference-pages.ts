@@ -524,6 +524,19 @@ const ENDPOINT_GROUPS: EndpointGroup[] = [
       "Mint, list and revoke the bearer tokens an identity provider uses to reach the SCIM endpoints. Token values are shown once, when they are created, and never again.",
   },
   {
+    name: "OCSF SIEM Export",
+    dirName: "governance-ocsf",
+    pathPrefixes: ["/api/governance/ocsf"],
+    overviewDescription:
+      "Pull governance events, project traces and the audit log as OCSF 1.9.0 API Activity events with an organisation API key, and push OCSF events from your other tools into LangWatch. Each stream pages with a cursor, so a SIEM polls by passing next_cursor back.",
+    endpointOrder: [
+      "GET /api/v1/governance/ocsf/events",
+      "GET /api/v1/governance/ocsf/traces",
+      "GET /api/v1/governance/ocsf/audit",
+      "POST /api/v1/governance/ocsf/ingest",
+    ],
+  },
+  {
     name: "SCIM",
     dirName: "scim",
     pathPrefixes: ["/api/scim/v2"],

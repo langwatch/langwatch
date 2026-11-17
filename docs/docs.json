@@ -153,6 +153,7 @@
               },
               "agent-testing/voice-agents",
               "agent-testing/red-teaming",
+              "agent-testing/red-team-templates",
               "agent-testing/red-team-open-source"
             ]
           },
@@ -361,7 +362,8 @@
             "group": "Overview",
             "pages": [
               "integration/overview",
-              "observability/trace-vs-activity-ingestion"
+              "observability/trace-vs-activity-ingestion",
+              "observability/multi-agent-a2a"
             ]
           },
           {
@@ -1406,10 +1408,12 @@
             "pages": [
               "api-reference/test-suites/overview",
               "api-reference/test-suites/list-test-suites",
+              "api-reference/test-suites/list-suite-templates",
               "api-reference/test-suites/create-test-suites",
               "api-reference/test-suites/read-one-test-suite",
               "api-reference/test-suites/update-test-suites",
               "api-reference/test-suites/run-a-test-suite",
+              "api-reference/test-suites/apply-a-suite-template",
               "api-reference/test-suites/delete-test-suites"
             ]
           },
@@ -1730,6 +1734,16 @@
               "api-reference/scim-tokens/list-scim-tokens",
               "api-reference/scim-tokens/create-scim-token",
               "api-reference/scim-tokens/revoke-scim-token"
+            ]
+          },
+          {
+            "group": "OCSF SIEM Export",
+            "pages": [
+              "api-reference/governance-ocsf/overview",
+              "api-reference/governance-ocsf/export-governance-events-as-ocsf-1-9-0",
+              "api-reference/governance-ocsf/export-project-traces-as-ocsf-1-9-0",
+              "api-reference/governance-ocsf/export-the-audit-log-as-ocsf-1-9-0",
+              "api-reference/governance-ocsf/push-ocsf-events-in-from-another-source"
             ]
           },
           {

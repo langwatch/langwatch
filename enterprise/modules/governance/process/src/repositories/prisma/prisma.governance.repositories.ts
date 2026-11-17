@@ -27,6 +27,7 @@ import { PrismaIngestionPullRunProjectionRepository } from "./prisma.ingestion-p
 import { PrismaIngestionSourceRepository } from "./prisma.ingestion-source.repository.ts";
 import { PrismaIngestionTemplateRepository } from "./prisma.ingestion-template.repository.ts";
 import { PrismaKillSwitchLockRepository } from "./prisma.kill-switch-lock.repository.ts";
+import { PrismaOcsfPushIntentStore } from "./prisma.ocsf-push-intent.store.ts";
 import { PrismaOrganizationSupportContactRepository } from "./prisma.organization-support-contact.repository.ts";
 import { PrismaSpendSpikeAnomalyRepository } from "./prisma.spend-spike-anomaly.repository.ts";
 
@@ -79,6 +80,7 @@ export class PostgresGovernanceRepositories {
         cipher: encryption,
       }),
       ingestionTemplates: PrismaIngestionTemplateRepository.create(prisma),
+      ocsfPushIntents: PrismaOcsfPushIntentStore.create(prisma),
       setupState: PrismaGovernanceSetupStateRepository.create(prisma),
       spendSpikeAnomalies: PrismaSpendSpikeAnomalyRepository.create(prisma),
       supportContacts: PrismaOrganizationSupportContactRepository.create({ prisma }),

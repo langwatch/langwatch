@@ -165,6 +165,10 @@ import {
   type PeopleScreenSuggestion,
   type SessionCeilingApplied,
   type GovernanceMcpSessionTools,
+  type OcsfEventsPage,
+  type OcsfExportWindow,
+  type OcsfIngestRequest,
+  type OcsfIngestResponse,
 } from "@langwatch/enterprise-governance-contract";
 import { ScimApi } from "@langwatch/enterprise-scim-contract";
 import {
@@ -323,6 +327,14 @@ import {
 } from "../features/kill-switch/services/agent-stop.service.ts";
 import { GovernanceAwsConnectionService } from "../features/kill-switch/services/governance-aws-connection.service.ts";
 import { KillSwitchAuditService } from "../features/kill-switch/services/kill-switch-audit.service.ts";
+import {
+  OutboxOcsfPushDelivery,
+  requestOcsfPushDelivery,
+} from "../features/ocsf/eventing/ocsf-push-delivery.intent.ts";
+import type { OcsfPushIntent } from "../features/ocsf/eventing/ocsf-push-delivery.process.ts";
+import { OcsfSiemExportService } from "../features/ocsf/services/ocsf-siem-export.service.ts";
+import { OcsfSiemIngestService } from "../features/ocsf/services/ocsf-siem-ingest.service.ts";
+import { OcsfSiemPushService } from "../features/ocsf/services/ocsf-siem-push.service.ts";
 import { PersonaHomeService } from "../features/personal/services/persona-home.service.ts";
 import { PersonalIngestionKeyService } from "../features/personal/services/personal-ingestion-key.service.ts";
 import { PersonalUsageDashboardService } from "../features/personal/services/personal-usage-dashboard.service.ts";
@@ -461,7 +473,7 @@ interface GovernanceAppDependencies {
   >;
   users: Pick<UserApi, "findById" | "findByEmail" | "findLastHomePath" | "personalCallerFor">;
   /** Audit-log owns the AuditLog table: workspace-view rows are written and deduped there. */
-  auditLog: Pick<AuditLogApi, "record" | "hasRecordedSince">;
+  auditLog: Pick<AuditLogApi, "record" | "hasRecordedSince" | "findForOrganization">;
   /** Where a push source's OTLP logs and webhook envelopes are collected. */
   logs: Pick<LogApi, "collectOtlpLogs">;
   /** Where a push source's OTLP metrics are collected. */
@@ -662,6 +674,33 @@ export class GovernanceModule implements GovernanceRestApi {
       history: repositories.tenantHistory,
     });
     this.tenantHistory = tenantHistory;
+    const apiOcsfPushOutbox = repositories.ocsfPushIntents
+      ? OutboxOcsfPushDelivery.create(repositories.ocsfPushIntents)
+      : undefined;
+    this.ocsfPush = OcsfSiemPushService.create({
+      events: repositories.ocsfEvents,
+      projects: dependencies.projects,
+      webhooks: dependencies.webhooks,
+      entitlements: {
+        hasEnterprisePlan: async (organizationId) =>
+          isEnterpriseTier(
+            (await dependencies.entitlements.getActivePlan({ organizationId })).type,
+          ),
+      },
+      outbox: () => this.#ocsfPushOutbox ?? apiOcsfPushOutbox,
+    });
+    this.ocsfSiemIngest = OcsfSiemIngestService.create({
+      events: repositories.ocsfEvents,
+      projects: tenantHistory,
+      now: () => nowInstant().epochMilliseconds,
+    });
+    this.ocsfSiemExport = OcsfSiemExportService.create({
+      events: repositories.ocsfEvents,
+      projects: dependencies.projects,
+      traces: dependencies.traces,
+      auditLog: dependencies.auditLog,
+      now: () => nowInstant().epochMilliseconds,
+    });
     this.anomalyRules = AnomalyRuleService.create({ repository: repositories.anomalyRules });
     this.aggregateReconciler = AggregateReconcilerService.create({
       lock: repositories.aggregateReconcileLock,
@@ -842,7 +881,7 @@ export class GovernanceModule implements GovernanceRestApi {
       teams: dependencies.organizations,
       targets: dependencies.projects,
       projects: tenantHistory,
-      events: repositories.ocsfEvents,
+      events: this.ocsfPush,
       diagnostics: { warn: (message, context) => logger.warn(context, message) },
     });
     this.ocsfExport = DefaultGovernanceOcsfExportService.create({
@@ -858,7 +897,7 @@ export class GovernanceModule implements GovernanceRestApi {
     };
     this.traceFacts = GovernanceTraceFactsService.create({
       kpis: repositories.anomalySpend,
-      ocsf: repositories.ocsfEvents,
+      ocsf: this.ocsfPush,
       traces: dependencies.traces,
       projects: dependencies.projects,
       diagnostics: anomalyDiagnostics,
@@ -1241,6 +1280,44 @@ export class GovernanceModule implements GovernanceRestApi {
   #anomalyAlertOutbox: OutboxAnomalyAlertDelivery | undefined;
   #agentRegistryOutbox: OutboxAgentRegistryDelivery | undefined;
   #killSwitchAuditOutbox: OutboxKillSwitchAudit | undefined;
+  #ocsfPushOutbox: OutboxOcsfPushDelivery | undefined;
+  private readonly ocsfPush: OcsfSiemPushService;
+  private readonly ocsfSiemExport: OcsfSiemExportService;
+  private readonly ocsfSiemIngest: OcsfSiemIngestService;
+
+  /** A built pipeline means an outbox: written OCSF batches fan out to SIEM endpoints from here on. */
+  connectOcsfPushOutbox({
+    processStore,
+  }: {
+    processStore: Pick<ProcessStore, "appendIntents">;
+  }): void {
+    this.#ocsfPushOutbox = OutboxOcsfPushDelivery.create(processStore);
+  }
+
+  /** The OCSF push intent's handler: one WebhookApi.requestDelivery per batch and endpoint. */
+  requestOcsfPushDelivery(intent: OcsfPushIntent, context: IntentContext): Promise<void> {
+    return requestOcsfPushDelivery(this.dependencies.webhooks)(intent, context);
+  }
+
+  listOcsfEvents(
+    input: OcsfExportWindow & { sourceType?: string; sourceId?: string },
+  ): Promise<OcsfEventsPage> {
+    return this.ocsfSiemExport.listEvents(input);
+  }
+
+  listOcsfProjectTraces(input: OcsfExportWindow & { projectId?: string }): Promise<OcsfEventsPage> {
+    return this.ocsfSiemExport.listProjectTraces(input);
+  }
+
+  listOcsfAudit(input: OcsfExportWindow): Promise<OcsfEventsPage> {
+    return this.ocsfSiemExport.listAudit(input);
+  }
+
+  ingestOcsfEvents(
+    input: OcsfIngestRequest & { organizationId: string },
+  ): Promise<OcsfIngestResponse> {
+    return this.ocsfSiemIngest.ingest(input);
+  }
 
   /** A built pipeline means an outbox: registry change events fan out through it from here on. */
   connectAgentRegistryOutbox({
@@ -1422,7 +1499,7 @@ export class GovernanceModule implements GovernanceRestApi {
         ensureInternal: (input) => this.tenantHistory.ensureInternal(input),
         findWithTeam: (id) => dependencies.projects.findWithTeam(id),
       },
-      sink: repositories.ocsfEvents,
+      sink: this.ocsfPush,
       usageEntitlement: {
         isEnabled: (organizationId) =>
           dependencies.featureFlags.isEnabled("release_pulled_usage_cost_enabled", {

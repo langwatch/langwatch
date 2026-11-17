@@ -213,6 +213,7 @@ import {
   type TraceHeader,
   type TraceDrawerReadInput,
   type TraceResourceInfoDto,
+  type AgentCallGraph,
   type OwnedSpan,
   type TraceAgentSeen,
   type TraceWithholding,
@@ -3119,6 +3120,10 @@ export class TraceModule implements TraceApi, CollectorApp {
     return this.#drawer.spansFull(input);
   }
 
+  readAgentCallGraphForViewer(input: TraceDrawerReadInput): Promise<AgentCallGraph> {
+    return this.#drawer.agentCallGraph(input);
+  }
+
   readSpanResourcesForViewer(input: TraceDrawerReadInput): Promise<TraceResourceInfoDto> {
     return this.#drawer.resources(input);
   }
@@ -3365,6 +3370,25 @@ export class TraceModule implements TraceApi, CollectorApp {
       authorization: input.authorization,
       traceId: input.traceId,
       ...(input.reads !== undefined ? { reads: input.reads } : {}),
+      ...occurredAtHint(input.occurredAtMs),
+    });
+  }
+
+  /** A trace's spans and their resource rows, audited once for both. */
+  readSpansWithResources(input: {
+    authorization: Authorization;
+    traceId: string;
+    occurredAtMs?: number;
+    visibilityCutoffMs?: number | null;
+    reads?: TraceViewRead["reads"];
+  }): Promise<{ spans: OwnedSpan[]; resources: SpanResourceInfo[] }> {
+    return this.#spanReads.readSpansWithResources({
+      authorization: input.authorization,
+      traceId: input.traceId,
+      ...(input.reads !== undefined ? { reads: input.reads } : {}),
+      ...(input.visibilityCutoffMs !== undefined
+        ? { visibilityCutoffMs: input.visibilityCutoffMs }
+        : {}),
       ...occurredAtHint(input.occurredAtMs),
     });
   }
