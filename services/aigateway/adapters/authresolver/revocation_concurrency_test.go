@@ -42,7 +42,7 @@ func (r *slowResolver) FetchConfig(_ context.Context, _, _ string) (domain.Confi
 func failClosedService(t *testing.T, res *slowResolver, key domain.PresentedKey, vkID string) *Service {
 	t.Helper()
 	svc, _ := newService(t, Options{Resolver: res, ConfigFetcher: res, FailClosedAfter: time.Minute})
-	svc.publishL1(hashKey(key), svc.newEntry(orgBundle(vkID, time.Now().Add(time.Hour)), "").authFrom(time.Now().Add(-2*time.Minute)))
+	svc.publishL1(hashKey(key), svc.newEntry(orgBundle(vkID, time.Now().Add(time.Hour)), "", time.Now().Add(-2*time.Minute)))
 	cur, _ := svc.activeOrgs.Load("org_1")
 	cursor, _ := cur.(*orgCursor)
 	cursor.polledAt.Store(monoStamp(-2 * time.Minute))

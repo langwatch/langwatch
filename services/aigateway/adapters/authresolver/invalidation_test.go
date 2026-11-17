@@ -71,7 +71,7 @@ func TestInvalidation_ConfigChangeMidStaleRefreshIsNotCached(t *testing.T) {
 	h := hashKey(key)
 	stale := orgBundle("vk_stale", time.Now().Add(10*time.Minute))
 	stale.ExpiresAt = time.Now().Add(-30 * time.Second)
-	svc.storeL1(h, stale, "")
+	seedL1(svc, h, stale, "")
 	arm(svc, CacheChange{Kind: ChangeKindVirtualKeyConfigUpdate, VirtualKeyID: "vk_stale"})
 
 	_, err := svc.Resolve(context.Background(), key)
@@ -120,13 +120,13 @@ func TestInvalidation_BudgetDebitBurstStillPublishes(t *testing.T) {
 	svc.applyChange("org_1", CacheChange{Kind: ChangeKindBudgetUpdated})
 
 	h := hashKey(domain.PresentedKey{Token: "vk-lw-burst"})
-	require.True(t, svc.publishFetched(h, svc.newEntry(orgBundle("vk_burst", time.Now().Add(10*time.Minute)), ""), since),
+	require.True(t, svc.publishFetched(h, svc.newEntry(orgBundle("vk_burst", time.Now().Add(10*time.Minute)), "", time.Now()), since),
 		"budget debits only mark a publish behind, however many land")
 	e, _ := svc.l1.Peek(h)
 	assert.Equal(t, uint64(1), e.budgetChangeCount(), "the publish that raced the debits is marked behind")
 
 	h2 := hashKey(domain.PresentedKey{Token: "vk-lw-after"})
-	require.True(t, svc.publishFetched(h2, svc.newEntry(orgBundle("vk_after", time.Now().Add(10*time.Minute)), ""), svc.fetchGeneration()))
+	require.True(t, svc.publishFetched(h2, svc.newEntry(orgBundle("vk_after", time.Now().Add(10*time.Minute)), "", time.Now()), svc.fetchGeneration()))
 	e2, _ := svc.l1.Peek(h2)
 	assert.Zero(t, e2.budgetChangeCount(), "a fetch that began after the burst publishes caught up")
 }
@@ -138,15 +138,16 @@ func TestInvalidation_KeyChangeBlocksOnlyThatKey(t *testing.T) {
 	svc.applyChange("org_1", CacheChange{Kind: ChangeKindVirtualKeyConfigUpdate, VirtualKeyID: "vk_a"})
 
 	ha, hb := hashKey(domain.PresentedKey{Token: "vk-lw-a"}), hashKey(domain.PresentedKey{Token: "vk-lw-b"})
-	assert.False(t, svc.publishFetched(ha, svc.newEntry(orgBundle("vk_a", time.Now().Add(10*time.Minute)), ""), since),
+	assert.False(t, svc.publishFetched(ha, svc.newEntry(orgBundle("vk_a", time.Now().Add(10*time.Minute)), "", time.Now()), since),
 		"the changed key's earlier answer is not cached")
-	assert.True(t, svc.publishFetched(hb, svc.newEntry(orgBundle("vk_b", time.Now().Add(10*time.Minute)), ""), since),
+	assert.True(t, svc.publishFetched(hb, svc.newEntry(orgBundle("vk_b", time.Now().Add(10*time.Minute)), "", time.Now()), since),
 		"another key fetched over the same window is cached")
 }
 
+// @scenario "a change the in-flight guard cannot track reaches every fetch in flight"
 func TestInvalidation_EvictAllAndOverflowBumpTheEpoch(t *testing.T) {
 	svc, _ := newService(t, Options{Resolver: &fakeResolver{}, ConfigFetcher: &fakeResolver{}, LRUSize: 2})
-	bundle := func() *entry { return svc.newEntry(orgBundle("vk_x", time.Now().Add(10*time.Minute)), "") }
+	bundle := func() *entry { return svc.newEntry(orgBundle("vk_x", time.Now().Add(10*time.Minute)), "", time.Now()) }
 	h := hashKey(domain.PresentedKey{Token: "vk-lw-x"})
 
 	since := svc.fetchGeneration()
@@ -165,7 +166,9 @@ func TestInvalidation_EvictAllAndOverflowBumpTheEpoch(t *testing.T) {
 func TestInvalidation_ReplacementKeepsTheReconfirmClaim(t *testing.T) {
 	svc, _ := newService(t, Options{Resolver: &fakeResolver{}})
 	h := hashKey(domain.PresentedKey{Token: "vk-lw-paced"})
-	bundle := func() *entry { return svc.newEntry(orgBundle("vk_paced", time.Now().Add(10*time.Minute)), "") }
+	bundle := func() *entry {
+		return svc.newEntry(orgBundle("vk_paced", time.Now().Add(10*time.Minute)), "", time.Now())
+	}
 	require.True(t, svc.publishFetched(h, bundle(), svc.fetchGeneration()))
 	require.True(t, svc.claimReconfirm(h))
 

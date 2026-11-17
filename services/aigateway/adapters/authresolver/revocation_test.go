@@ -48,7 +48,7 @@ func TestRevocation_RevokedKeyRefusedWhileControlPlaneDown(t *testing.T) {
 	res := &hookResolver{err: errControlPlaneDown}
 	svc, _ := newService(t, Options{Resolver: res, ConfigFetcher: res})
 	key := domain.PresentedKey{Token: "vk-lw-killed"}
-	svc.storeL1(hashKey(key), orgBundle("vk_killed", time.Now().Add(-time.Minute)), "")
+	seedL1(svc, hashKey(key), orgBundle("vk_killed", time.Now().Add(-time.Minute)), "")
 
 	svc.applyChange("org_1", CacheChange{Kind: ChangeKindVirtualKeyRevoked, VirtualKeyID: "vk_killed"})
 
@@ -65,7 +65,7 @@ func TestRevocation_DisabledKeyAnswersDisabled(t *testing.T) {
 	res := &hookResolver{err: errControlPlaneDown}
 	svc, _ := newService(t, Options{Resolver: res, ConfigFetcher: res})
 	key := domain.PresentedKey{Token: "vk-lw-paused"}
-	svc.storeL1(hashKey(key), orgBundle("vk_paused", time.Now().Add(time.Minute)), "")
+	seedL1(svc, hashKey(key), orgBundle("vk_paused", time.Now().Add(time.Minute)), "")
 
 	svc.applyChange("org_1", CacheChange{Kind: ChangeKindVirtualKeyDisabled, VirtualKeyID: "vk_paused"})
 
@@ -83,7 +83,7 @@ func TestRevocation_ReEnabledKeyServesThroughOutage(t *testing.T) {
 	svc, _ := newService(t, Options{Resolver: res, ConfigFetcher: res})
 	key := domain.PresentedKey{Token: "vk-lw-again"}
 	h := hashKey(key)
-	svc.storeL1(h, orgBundle("vk_again", time.Now().Add(time.Hour)), "")
+	seedL1(svc, h, orgBundle("vk_again", time.Now().Add(time.Hour)), "")
 
 	svc.applyChange("org_1", CacheChange{Kind: ChangeKindVirtualKeyDisabled, VirtualKeyID: "vk_again"})
 	svc.applyChange("org_1", CacheChange{Kind: ChangeKindVirtualKeyEnabled, VirtualKeyID: "vk_again"})
@@ -107,7 +107,7 @@ func TestRevocation_RecheckClearsDenialAfterInterval(t *testing.T) {
 	svc, _ := newService(t, Options{Resolver: res, ConfigFetcher: res, DenialRecheckInterval: interval})
 	key := domain.PresentedKey{Token: "vk-lw-missed"}
 	h := hashKey(key)
-	svc.storeL1(h, orgBundle("vk_missed", time.Now().Add(time.Hour)), "")
+	seedL1(svc, h, orgBundle("vk_missed", time.Now().Add(time.Hour)), "")
 	svc.applyChange("org_1", CacheChange{Kind: ChangeKindVirtualKeyDisabled, VirtualKeyID: "vk_missed"})
 
 	if _, err := svc.Resolve(context.Background(), key); !errors.Is(err, domain.ErrKeyDisabled) {
@@ -140,7 +140,7 @@ func TestRevocation_RecheckKeepsDenialThatLandsInFlight(t *testing.T) {
 	svc, _ := newService(t, Options{Resolver: res, ConfigFetcher: res, DenialRecheckInterval: interval})
 	key := domain.PresentedKey{Token: "vk-lw-again"}
 	h := hashKey(key)
-	svc.storeL1(h, orgBundle("vk_again", time.Now().Add(time.Hour)), "")
+	seedL1(svc, h, orgBundle("vk_again", time.Now().Add(time.Hour)), "")
 	svc.applyChange("org_1", CacheChange{Kind: ChangeKindVirtualKeyDisabled, VirtualKeyID: "vk_again"})
 	time.Sleep(interval + 10*time.Millisecond)
 	res.during = func() {
@@ -168,7 +168,7 @@ func TestRevocation_ReEnableClearsDenialAtOnce(t *testing.T) {
 	res := &hookResolver{bundle: orgBundle("vk_flip", time.Now().Add(time.Hour))}
 	svc, _ := newService(t, Options{Resolver: res, ConfigFetcher: res, DenialRecheckInterval: time.Hour})
 	key := domain.PresentedKey{Token: "vk-lw-flip"}
-	svc.storeL1(hashKey(key), orgBundle("vk_flip", time.Now().Add(time.Hour)), "")
+	seedL1(svc, hashKey(key), orgBundle("vk_flip", time.Now().Add(time.Hour)), "")
 	svc.applyChange("org_1", CacheChange{Kind: ChangeKindVirtualKeyDisabled, VirtualKeyID: "vk_flip"})
 	if _, err := svc.Resolve(context.Background(), key); !errors.Is(err, domain.ErrKeyDisabled) {
 		t.Fatalf("want virtual_key_disabled before the re-enable, got %v", err)
@@ -203,7 +203,7 @@ func TestRevocation_DeniedKeyFloodMakesOneControlPlaneCall(t *testing.T) {
 	svc, _ := newService(t, Options{Resolver: res, ConfigFetcher: res, DenialRecheckInterval: interval})
 	key := domain.PresentedKey{Token: "vk-lw-leaked"}
 	h := hashKey(key)
-	svc.storeL1(h, orgBundle("vk_leaked", time.Now().Add(time.Hour)), "")
+	seedL1(svc, h, orgBundle("vk_leaked", time.Now().Add(time.Hour)), "")
 	svc.applyChange("org_1", CacheChange{Kind: ChangeKindVirtualKeyDisabled, VirtualKeyID: "vk_leaked"})
 	time.Sleep(interval + 10*time.Millisecond)
 
@@ -281,7 +281,7 @@ func TestRevocation_NormalKeyServesStaleWhileControlPlaneDown(t *testing.T) {
 	res := &hookResolver{err: errControlPlaneDown}
 	svc, _ := newService(t, Options{Resolver: res, ConfigFetcher: res})
 	key := domain.PresentedKey{Token: "vk-lw-normal"}
-	svc.storeL1(hashKey(key), orgBundle("vk_normal", time.Now().Add(-time.Minute)), "")
+	seedL1(svc, hashKey(key), orgBundle("vk_normal", time.Now().Add(-time.Minute)), "")
 	svc.applyChange("org_1", CacheChange{Kind: ChangeKindVirtualKeyRevoked, VirtualKeyID: "vk_other"})
 
 	if _, err := svc.Resolve(context.Background(), key); err != nil {
@@ -295,7 +295,7 @@ func TestRevocation_FailClosedRefusesUncheckedKey(t *testing.T) {
 	svc, _ := newService(t, Options{Resolver: res, ConfigFetcher: res, FailClosedAfter: time.Minute})
 	key := domain.PresentedKey{Token: "vk-lw-old"}
 	h := hashKey(key)
-	svc.publishL1(h, svc.newEntry(orgBundle("vk_old", time.Now().Add(time.Hour)), "").authFrom(time.Now().Add(-2*time.Minute)))
+	svc.publishL1(h, svc.newEntry(orgBundle("vk_old", time.Now().Add(time.Hour)), "", time.Now().Add(-2*time.Minute)))
 	cur, _ := svc.activeOrgs.Load("org_1")
 	cursor, _ := cur.(*orgCursor)
 
@@ -320,7 +320,7 @@ func TestRevocation_FailClosedOffByDefault(t *testing.T) {
 	res := &hookResolver{err: errControlPlaneDown}
 	svc, _ := newService(t, Options{Resolver: res, ConfigFetcher: res})
 	key := domain.PresentedKey{Token: "vk-lw-default"}
-	svc.publishL1(hashKey(key), svc.newEntry(orgBundle("vk_default", time.Now().Add(time.Hour)), "").authFrom(time.Now().Add(-3*time.Hour)))
+	svc.publishL1(hashKey(key), svc.newEntry(orgBundle("vk_default", time.Now().Add(time.Hour)), "", time.Now().Add(-3*time.Hour)))
 	cur, _ := svc.activeOrgs.Load("org_1")
 	cursor, _ := cur.(*orgCursor)
 	cursor.polledAt.Store(monoStamp(-3 * time.Hour))
@@ -352,13 +352,13 @@ func TestRevocation_StaleServesAreCountedBySource(t *testing.T) {
 	svc, _ := newService(t, Options{Resolver: res, ConfigFetcher: res, Metrics: m})
 
 	stale := domain.PresentedKey{Token: "vk-lw-stale-counted"}
-	svc.storeL1(hashKey(stale), orgBundle("vk_stale", time.Now().Add(-time.Minute)), "")
+	seedL1(svc, hashKey(stale), orgBundle("vk_stale", time.Now().Add(-time.Minute)), "")
 	if _, err := svc.Resolve(context.Background(), stale); err != nil {
 		t.Fatalf("a stale cached key must serve through the outage: %v", err)
 	}
 
 	fallback := domain.PresentedKey{Token: "vk-lw-last-known-counted"}
-	svc.lastKnown.Add(hashKey(fallback), svc.newEntry(orgBundle("vk_last_known", time.Now().Add(time.Hour)), "").authFrom(time.Now()))
+	svc.lastKnown.Add(hashKey(fallback), svc.newEntry(orgBundle("vk_last_known", time.Now().Add(time.Hour)), "", time.Now()))
 	if _, err := svc.Resolve(context.Background(), fallback); err != nil {
 		t.Fatalf("a last-known key must serve through the outage: %v", err)
 	}
@@ -374,7 +374,7 @@ func TestRevocation_RefusalsAreCountedOnEveryPath(t *testing.T) {
 	m := newRevocationMetrics()
 	svc, _ := newService(t, Options{Resolver: res, ConfigFetcher: res, Metrics: m})
 	key := domain.PresentedKey{Token: "vk-lw-counted"}
-	svc.storeL1(hashKey(key), orgBundle("vk_counted", time.Now().Add(-time.Minute)), "")
+	seedL1(svc, hashKey(key), orgBundle("vk_counted", time.Now().Add(-time.Minute)), "")
 	svc.applyChange("org_1", CacheChange{Kind: ChangeKindVirtualKeyRevoked, VirtualKeyID: "vk_counted"})
 
 	for i := 0; i < 2; i++ {
@@ -393,7 +393,7 @@ func TestRevocation_LastKnownCredentialIsDenied(t *testing.T) {
 	svc, _ := newService(t, Options{Resolver: res, ConfigFetcher: res})
 	key := domain.PresentedKey{Token: "vk-lw-fallback"}
 	h := hashKey(key)
-	svc.lastKnown.Add(h, svc.newEntry(orgBundle("vk_fallback", time.Now().Add(time.Hour)), "").authFrom(time.Now()))
+	svc.lastKnown.Add(h, svc.newEntry(orgBundle("vk_fallback", time.Now().Add(time.Hour)), "", time.Now()))
 
 	svc.applyChange("org_1", CacheChange{Kind: ChangeKindVirtualKeyRevoked, VirtualKeyID: "vk_fallback"})
 
@@ -419,7 +419,7 @@ func TestRevocation_RefusedStaleAnswerIsNotCountedAsServed(t *testing.T) {
 	m := newRevocationMetrics()
 	svc, _ := newService(t, Options{Resolver: res, ConfigFetcher: res, Metrics: m, FailClosedAfter: time.Minute})
 	key := domain.PresentedKey{Token: "vk-lw-stale"}
-	svc.publishL1(hashKey(key), svc.newEntry(orgBundle("vk_stale", time.Now().Add(-time.Minute)), "").authFrom(time.Now().Add(-2*time.Minute)))
+	svc.publishL1(hashKey(key), svc.newEntry(orgBundle("vk_stale", time.Now().Add(-time.Minute)), "", time.Now().Add(-2*time.Minute)))
 	cur, _ := svc.activeOrgs.Load("org_1")
 	cursor, _ := cur.(*orgCursor)
 	cursor.polledAt.Store(monoStamp(-2 * time.Minute))
@@ -450,7 +450,7 @@ func TestRevocation_RotationDuringOutageIsNotADenial(t *testing.T) {
 	res := &hookResolver{err: errControlPlaneDown}
 	svc, _ := newService(t, Options{Resolver: res, ConfigFetcher: res})
 	key := domain.PresentedKey{Token: "vk-lw-rotated-outage"}
-	svc.storeL1(hashKey(key), orgBundle("vk_rotated_outage", time.Now().Add(-time.Minute)), "")
+	seedL1(svc, hashKey(key), orgBundle("vk_rotated_outage", time.Now().Add(-time.Minute)), "")
 	svc.applyChange("org_1", CacheChange{Kind: ChangeKindVirtualKeyRotated, VirtualKeyID: "vk_rotated_outage"})
 
 	_, err := svc.Resolve(context.Background(), key)
@@ -467,7 +467,7 @@ func TestRevocation_FailClosedRechecksKeyBeforeRefusing(t *testing.T) {
 	res := &hookResolver{bundle: orgBundle("vk_live", time.Now().Add(time.Hour))}
 	svc, _ := newService(t, Options{Resolver: res, ConfigFetcher: res, FailClosedAfter: time.Minute})
 	key := domain.PresentedKey{Token: "vk-lw-live"}
-	svc.publishL1(hashKey(key), svc.newEntry(orgBundle("vk_live", time.Now().Add(time.Hour)), "").authFrom(time.Now().Add(-2*time.Minute)))
+	svc.publishL1(hashKey(key), svc.newEntry(orgBundle("vk_live", time.Now().Add(time.Hour)), "", time.Now().Add(-2*time.Minute)))
 	cur, _ := svc.activeOrgs.Load("org_1")
 	cursor, _ := cur.(*orgCursor)
 	cursor.polledAt.Store(monoStamp(-2 * time.Minute))
@@ -487,7 +487,7 @@ func TestRevocation_FailClosedPacesRechecks(t *testing.T) {
 	res := &hookResolver{err: errControlPlaneDown}
 	svc, _ := newService(t, Options{Resolver: res, ConfigFetcher: res, FailClosedAfter: time.Minute})
 	key := domain.PresentedKey{Token: "vk-lw-down"}
-	svc.publishL1(hashKey(key), svc.newEntry(orgBundle("vk_down", time.Now().Add(time.Hour)), "").authFrom(time.Now().Add(-2*time.Minute)))
+	svc.publishL1(hashKey(key), svc.newEntry(orgBundle("vk_down", time.Now().Add(time.Hour)), "", time.Now().Add(-2*time.Minute)))
 	cur, _ := svc.activeOrgs.Load("org_1")
 	cursor, _ := cur.(*orgCursor)
 	cursor.polledAt.Store(monoStamp(-2 * time.Minute))
@@ -507,7 +507,7 @@ func TestRevocation_FailClosedCoversKeyWithoutOrganization(t *testing.T) {
 	res := &hookResolver{err: errControlPlaneDown}
 	svc, _ := newService(t, Options{Resolver: res, ConfigFetcher: res, FailClosedAfter: time.Minute})
 	key := domain.PresentedKey{Token: "vk-lw-orgless"}
-	svc.publishL1(hashKey(key), svc.newEntry(freshBundle("vk_orgless", time.Now().Add(time.Hour)), "").authFrom(time.Now().Add(-2*time.Minute)))
+	svc.publishL1(hashKey(key), svc.newEntry(freshBundle("vk_orgless", time.Now().Add(time.Hour)), "", time.Now().Add(-2*time.Minute)))
 
 	if _, err := svc.Resolve(context.Background(), key); !errors.Is(err, domain.ErrAuthUpstream) {
 		t.Fatalf("a key with no change feed past the limit must be refused, got %v", err)
@@ -518,7 +518,7 @@ func TestRevocation_FailClosedCoversKeyWithoutOrganization(t *testing.T) {
 // fail-closed limit.
 func staleKeyCheck(t *testing.T, svc *Service, key domain.PresentedKey, vkID string) {
 	t.Helper()
-	svc.publishL1(hashKey(key), svc.newEntry(orgBundle(vkID, time.Now().Add(time.Hour)), "").authFrom(time.Now().Add(-2*time.Minute)))
+	svc.publishL1(hashKey(key), svc.newEntry(orgBundle(vkID, time.Now().Add(time.Hour)), "", time.Now().Add(-2*time.Minute)))
 	cur, _ := svc.activeOrgs.Load("org_1")
 	cursor, _ := cur.(*orgCursor)
 	cursor.polledAt.Store(monoStamp(-2 * time.Minute))
@@ -552,7 +552,7 @@ func TestRevocation_FailClosedRecheckRejectionEvicts(t *testing.T) {
 	res.err = herr.New(context.Background(), domain.ErrKeyRevoked, nil)
 	key := domain.PresentedKey{Token: "vk-lw-rejected"}
 	staleKeyCheck(t, svc, key, "vk_rejected")
-	svc.lastKnown.Add(hashKey(key), svc.newEntry(orgBundle("vk_rejected", time.Now().Add(time.Hour)), ""))
+	svc.lastKnown.Add(hashKey(key), svc.newEntry(orgBundle("vk_rejected", time.Now().Add(time.Hour)), "", time.Now()))
 
 	if _, err := svc.Resolve(context.Background(), key); !errors.Is(err, domain.ErrKeyRevoked) {
 		t.Fatalf("want virtual_key_revoked, got %v", err)
@@ -571,7 +571,7 @@ func TestRevocation_OldSecretEndsWhenGraceEnds(t *testing.T) {
 	svc, _ := newService(t, Options{Resolver: res, ConfigFetcher: res})
 	key := domain.PresentedKey{Token: "vk-lw-old-secret"}
 	svc.applyChange("org_1", CacheChange{Kind: ChangeKindVirtualKeyRotated, VirtualKeyID: "vk_rot"})
-	svc.storeL1(hashKey(key), orgBundle("vk_rot", time.Now().Add(-time.Minute)), "")
+	seedL1(svc, hashKey(key), orgBundle("vk_rot", time.Now().Add(-time.Minute)), "")
 	res.bundle, res.err = nil, herr.New(context.Background(), domain.ErrInvalidAPIKey, nil)
 
 	if _, err := svc.Resolve(context.Background(), key); !errors.Is(err, domain.ErrInvalidAPIKey) {
@@ -603,7 +603,7 @@ func TestRevocation_FailClosedRecheckSkipsDeadEntry(t *testing.T) {
 	key := domain.PresentedKey{Token: "vk-lw-dead"}
 	staleKeyCheck(t, svc, key, "vk_dead")
 	res.during = func() {
-		dead := svc.newEntry(orgBundle("vk_dead", time.Now().Add(-time.Hour)), "")
+		dead := svc.newEntry(orgBundle("vk_dead", time.Now().Add(-time.Hour)), "", time.Now())
 		dead.hardExpiresAt = time.Now().Add(-time.Second)
 		svc.publishL1(hashKey(key), dead)
 	}
@@ -619,8 +619,8 @@ func TestRevocation_FailClosedTreatsNeverPolledFeedAsSilent(t *testing.T) {
 	svc, _ := newService(t, Options{Resolver: res, ConfigFetcher: res, FailClosedAfter: time.Minute})
 	recent := domain.PresentedKey{Token: "vk-lw-recent"}
 	old := domain.PresentedKey{Token: "vk-lw-unpolled"}
-	svc.publishL1(hashKey(recent), svc.newEntry(orgBundle("vk_recent", time.Now().Add(time.Hour)), "").authFrom(time.Now()))
-	svc.publishL1(hashKey(old), svc.newEntry(orgBundle("vk_unpolled", time.Now().Add(time.Hour)), "").authFrom(time.Now().Add(-2*time.Minute)))
+	svc.publishL1(hashKey(recent), svc.newEntry(orgBundle("vk_recent", time.Now().Add(time.Hour)), "", time.Now()))
+	svc.publishL1(hashKey(old), svc.newEntry(orgBundle("vk_unpolled", time.Now().Add(time.Hour)), "", time.Now().Add(-2*time.Minute)))
 
 	if _, err := svc.Resolve(context.Background(), recent); err != nil {
 		t.Fatalf("a key confirmed within the limit serves before the first poll: %v", err)
@@ -635,7 +635,7 @@ func TestRevocation_ConfigFailureStaleServeKeepsFreshKeyCheck(t *testing.T) {
 	res := &hookResolver{bundle: orgBundle("vk_stalecfg", time.Now().Add(time.Hour)), cfgErr: errControlPlaneDown}
 	svc, _ := newService(t, Options{Resolver: res, ConfigFetcher: res, FailClosedAfter: time.Minute})
 	key := domain.PresentedKey{Token: "vk-lw-stalecfg"}
-	svc.publishL1(hashKey(key), svc.newEntry(orgBundle("vk_stalecfg", time.Now().Add(-time.Second)), "").authFrom(time.Now().Add(-2*time.Minute)))
+	svc.publishL1(hashKey(key), svc.newEntry(orgBundle("vk_stalecfg", time.Now().Add(-time.Second)), "", time.Now().Add(-2*time.Minute)))
 	cur, _ := svc.activeOrgs.Load("org_1")
 	cursor, _ := cur.(*orgCursor)
 	cursor.polledAt.Store(monoStamp(-2 * time.Minute))

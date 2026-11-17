@@ -128,9 +128,9 @@ func freshBundle(vkID string, exp time.Time) *domain.Bundle {
 	return &domain.Bundle{VirtualKeyID: vkID, ExpiresAt: exp}
 }
 
-// storeL1 seeds L1 with a bundle as if its config was just fetched.
-func (s *Service) storeL1(h [64]byte, bundle *domain.Bundle, configETag string) {
-	s.publishL1(h, s.newEntry(bundle, configETag))
+// seedL1 seeds L1 with a bundle as if its config was just fetched.
+func seedL1(svc *Service, h [64]byte, bundle *domain.Bundle, configETag string) {
+	svc.publishL1(h, svc.newEntry(bundle, configETag, time.Now()))
 }
 
 // seedExpiredEntry primes L1 with a vk whose JWT exp is `staleness` in the
@@ -138,7 +138,7 @@ func (s *Service) storeL1(h [64]byte, bundle *domain.Bundle, configETag string) 
 func seedExpiredEntry(t *testing.T, svc *Service, rawKey, vkID string, staleness time.Duration) {
 	t.Helper()
 	originalExp := time.Now().Add(-staleness)
-	svc.storeL1(hashKey(domain.PresentedKey{Token: rawKey}), freshBundle(vkID, originalExp), "")
+	seedL1(svc, hashKey(domain.PresentedKey{Token: rawKey}), freshBundle(vkID, originalExp), "")
 }
 
 // --- AuthRejection class -----------------------------------------------------
@@ -327,14 +327,14 @@ func TestApplyChange_ModelProviderUpdatedEvictsMatchingModelProvider(t *testing.
 
 	matchingKey := hashKey(domain.PresentedKey{Token: "vk-lw-matching-provider"})
 	otherKey := hashKey(domain.PresentedKey{Token: "vk-lw-other-provider"})
-	svc.storeL1(matchingKey, &domain.Bundle{
+	seedL1(svc, matchingKey, &domain.Bundle{
 		VirtualKeyID: "vk-matching",
 		Config: domain.BundleConfig{Credentials: []domain.Credential{{
 			ID:         "model-provider-1",
 			ProviderID: domain.ProviderOpenAI,
 		}}},
 	}, "")
-	svc.storeL1(otherKey, &domain.Bundle{
+	seedL1(svc, otherKey, &domain.Bundle{
 		VirtualKeyID: "vk-other",
 		Config: domain.BundleConfig{Credentials: []domain.Credential{{
 			ID:         "model-provider-2",
@@ -366,7 +366,7 @@ func TestApplyChange_ModelProviderCreatedEvictsItsOrganization(t *testing.T) {
 	// OpenAI provider id is in no cached bundle yet.
 	sameOrgKey := hashKey(domain.PresentedKey{Token: "vk-lw-langy-same-org"})
 	otherOrgKey := hashKey(domain.PresentedKey{Token: "vk-lw-other-org"})
-	svc.storeL1(sameOrgKey, &domain.Bundle{
+	seedL1(svc, sameOrgKey, &domain.Bundle{
 		VirtualKeyID:   "vk-langy",
 		OrganizationID: "org-acme",
 		Config: domain.BundleConfig{Credentials: []domain.Credential{{
@@ -374,7 +374,7 @@ func TestApplyChange_ModelProviderCreatedEvictsItsOrganization(t *testing.T) {
 			ProviderID: domain.ProviderBedrock,
 		}}},
 	}, "")
-	svc.storeL1(otherOrgKey, &domain.Bundle{
+	seedL1(svc, otherOrgKey, &domain.Bundle{
 		VirtualKeyID:   "vk-other",
 		OrganizationID: "org-other",
 		Config: domain.BundleConfig{Credentials: []domain.Credential{{
@@ -405,8 +405,8 @@ func TestApplyChange_BudgetMutationWithoutProjectIDEvictsOrganization(t *testing
 		t.Run(kind, func(t *testing.T) {
 			matchingKey := hashKey(domain.PresentedKey{Token: "vk-lw-budget-matching-" + kind})
 			otherKey := hashKey(domain.PresentedKey{Token: "vk-lw-budget-other-" + kind})
-			svc.storeL1(matchingKey, &domain.Bundle{OrganizationID: "org-1"}, "")
-			svc.storeL1(otherKey, &domain.Bundle{OrganizationID: "org-2"}, "")
+			seedL1(svc, matchingKey, &domain.Bundle{OrganizationID: "org-1"}, "")
+			seedL1(svc, otherKey, &domain.Bundle{OrganizationID: "org-2"}, "")
 
 			svc.applyChange("org-1", CacheChange{Kind: kind})
 
@@ -430,8 +430,8 @@ func TestApplyChange_VkDisableAndEnableEvictTheKey(t *testing.T) {
 		t.Run(kind, func(t *testing.T) {
 			matchingKey := hashKey(domain.PresentedKey{Token: "vk-lw-lifecycle-matching-" + kind})
 			otherKey := hashKey(domain.PresentedKey{Token: "vk-lw-lifecycle-other-" + kind})
-			svc.storeL1(matchingKey, &domain.Bundle{VirtualKeyID: "vk-flipped"}, "")
-			svc.storeL1(otherKey, &domain.Bundle{VirtualKeyID: "vk-untouched"}, "")
+			seedL1(svc, matchingKey, &domain.Bundle{VirtualKeyID: "vk-flipped"}, "")
+			seedL1(svc, otherKey, &domain.Bundle{VirtualKeyID: "vk-untouched"}, "")
 
 			svc.applyChange("org-1", CacheChange{Kind: kind, VirtualKeyID: "vk-flipped"})
 
@@ -450,8 +450,8 @@ func TestApplyChange_RoutingPolicyUpdatedEvictsOrganization(t *testing.T) {
 
 	matchingKey := hashKey(domain.PresentedKey{Token: "vk-lw-policy-matching"})
 	otherKey := hashKey(domain.PresentedKey{Token: "vk-lw-policy-other"})
-	svc.storeL1(matchingKey, &domain.Bundle{OrganizationID: "org-1"}, "")
-	svc.storeL1(otherKey, &domain.Bundle{OrganizationID: "org-2"}, "")
+	seedL1(svc, matchingKey, &domain.Bundle{OrganizationID: "org-1"}, "")
+	seedL1(svc, otherKey, &domain.Bundle{OrganizationID: "org-2"}, "")
 
 	svc.applyChange("org-1", CacheChange{Kind: ChangeKindRoutingPolicyUpdated})
 
@@ -468,8 +468,8 @@ func TestApplyChange_RoutingPolicyDeletedEvictsOrganization(t *testing.T) {
 
 	matchingKey := hashKey(domain.PresentedKey{Token: "vk-lw-policy-deleted-matching"})
 	otherKey := hashKey(domain.PresentedKey{Token: "vk-lw-policy-deleted-other"})
-	svc.storeL1(matchingKey, &domain.Bundle{OrganizationID: "org-1"}, "")
-	svc.storeL1(otherKey, &domain.Bundle{OrganizationID: "org-2"}, "")
+	seedL1(svc, matchingKey, &domain.Bundle{OrganizationID: "org-1"}, "")
+	seedL1(svc, otherKey, &domain.Bundle{OrganizationID: "org-2"}, "")
 
 	svc.applyChange("org-1", CacheChange{Kind: ChangeKindRoutingPolicyDeleted})
 
@@ -492,8 +492,8 @@ func TestApplyChange_CacheRuleMutationEvictsOrganization(t *testing.T) {
 		t.Run(kind, func(t *testing.T) {
 			matchingKey := hashKey(domain.PresentedKey{Token: "vk-lw-cache-rule-matching-" + kind})
 			otherKey := hashKey(domain.PresentedKey{Token: "vk-lw-cache-rule-other-" + kind})
-			svc.storeL1(matchingKey, &domain.Bundle{OrganizationID: "org-1"}, "")
-			svc.storeL1(otherKey, &domain.Bundle{OrganizationID: "org-2"}, "")
+			seedL1(svc, matchingKey, &domain.Bundle{OrganizationID: "org-1"}, "")
+			seedL1(svc, otherKey, &domain.Bundle{OrganizationID: "org-2"}, "")
 
 			svc.applyChange("org-1", CacheChange{Kind: kind})
 
@@ -547,7 +547,7 @@ func TestResolve_HardGrace_MovesTheCapNotTheExpiry(t *testing.T) {
 			rawKey := "vk-lw-grace-" + tc.name
 			cached := freshBundle("vk_cached", time.Now().Add(tc.expiresIn))
 			cached.Credentials = []domain.Credential{{ID: cachedCred}}
-			svc.storeL1(hashKey(domain.PresentedKey{Token: rawKey}), cached, "")
+			seedL1(svc, hashKey(domain.PresentedKey{Token: rawKey}), cached, "")
 
 			got, err := svc.Resolve(context.Background(), domain.PresentedKey{Token: rawKey})
 
@@ -570,7 +570,7 @@ func TestApplyChange_EveryKindTheControlPlaneCanEmitIsAccountedFor(t *testing.T)
 			svc, _ := newService(t, Options{
 				Resolver: resolver, ConfigFetcher: resolver, Logger: zap.New(core),
 			})
-			svc.storeL1(hashKey(domain.PresentedKey{Token: "vk-lw-accounted-" + kind}), &domain.Bundle{
+			seedL1(svc, hashKey(domain.PresentedKey{Token: "vk-lw-accounted-" + kind}), &domain.Bundle{
 				OrganizationID: "org-1",
 				VirtualKeyID:   "vk-accounted",
 			}, "")
@@ -605,7 +605,7 @@ func TestApplyChange_EvictLogNamesTheChangeKind(t *testing.T) {
 			svc, _ := newService(t, Options{
 				Resolver: resolver, ConfigFetcher: resolver, Logger: zap.New(core),
 			})
-			svc.storeL1(hashKey(domain.PresentedKey{Token: "vk-lw-reason-" + tc.kind}), &domain.Bundle{
+			seedL1(svc, hashKey(domain.PresentedKey{Token: "vk-lw-reason-" + tc.kind}), &domain.Bundle{
 				OrganizationID: "org-1",
 				VirtualKeyID:   "vk-reason",
 			}, "")
@@ -629,7 +629,7 @@ func TestRefreshBackground_TransportFailure_BumpsSoft(t *testing.T) {
 	rawKey := "vk-lw-bgtransport"
 	// Seed an entry near soft expiry but not past it (so background path is invoked).
 	originalExp := time.Now().Add(30 * time.Second)
-	svc.storeL1(hashKey(domain.PresentedKey{Token: rawKey}), freshBundle("vk_bgtransport", originalExp), "")
+	seedL1(svc, hashKey(domain.PresentedKey{Token: rawKey}), freshBundle("vk_bgtransport", originalExp), "")
 
 	beforeE, _ := svc.l1.Get(hashKey(domain.PresentedKey{Token: rawKey}))
 	_, beforeSoft, _ := beforeE.snapshot()
@@ -664,7 +664,7 @@ func TestRefreshBackground_AuthRejection_EvictsEntry(t *testing.T) {
 	svc, _ := newService(t, Options{Resolver: resolver, ConfigFetcher: resolver})
 	rawKey := "vk-lw-bgrevoked"
 	originalExp := time.Now().Add(30 * time.Second)
-	svc.storeL1(hashKey(domain.PresentedKey{Token: rawKey}), freshBundle("vk_bgrevoked", originalExp), "")
+	seedL1(svc, hashKey(domain.PresentedKey{Token: rawKey}), freshBundle("vk_bgrevoked", originalExp), "")
 
 	refreshCurrent(svc, domain.PresentedKey{Token: rawKey}, hashKey(domain.PresentedKey{Token: rawKey}))
 
@@ -852,7 +852,7 @@ func TestResolve_FreshEntry_ConfigPastTTL_RefreshesConfigInBackground(t *testing
 	rawKey := "vk-lw-cfgttl_001"
 	bundle := freshBundle("vk_cfg_001", time.Now().Add(1*time.Hour))
 	bundle.Credentials = []domain.Credential{{ID: "cred-old"}}
-	svc.storeL1(hashKey(domain.PresentedKey{Token: rawKey}), bundle, "")
+	seedL1(svc, hashKey(domain.PresentedKey{Token: rawKey}), bundle, "")
 	backdateConfig(t, svc, rawKey, 2*time.Minute)
 
 	got, err := svc.Resolve(context.Background(), domain.PresentedKey{Token: rawKey})
@@ -893,7 +893,7 @@ func TestResolve_FreshEntry_ConfigTTLDisabled_NeverRefreshes(t *testing.T) {
 	})
 
 	rawKey := "vk-lw-cfgttl_002"
-	svc.storeL1(hashKey(domain.PresentedKey{Token: rawKey}), freshBundle("vk_cfg_002", time.Now().Add(1*time.Hour)), "")
+	seedL1(svc, hashKey(domain.PresentedKey{Token: rawKey}), freshBundle("vk_cfg_002", time.Now().Add(1*time.Hour)), "")
 	backdateConfig(t, svc, rawKey, 10*time.Minute)
 
 	if _, err := svc.Resolve(context.Background(), domain.PresentedKey{Token: rawKey}); err != nil {
@@ -918,7 +918,7 @@ func TestResolve_FreshEntry_ConfigRefreshFailure_KeepsStaleAndWaitsFullTTL(t *te
 	rawKey := "vk-lw-cfgttl_003"
 	bundle := freshBundle("vk_cfg_003", time.Now().Add(1*time.Hour))
 	bundle.Credentials = []domain.Credential{{ID: "cred-old"}}
-	svc.storeL1(hashKey(domain.PresentedKey{Token: rawKey}), bundle, "")
+	seedL1(svc, hashKey(domain.PresentedKey{Token: rawKey}), bundle, "")
 	e := backdateConfig(t, svc, rawKey, 2*time.Minute)
 
 	if _, err := svc.Resolve(context.Background(), domain.PresentedKey{Token: rawKey}); err != nil {
@@ -1004,7 +1004,7 @@ func TestResolve_ConfigRefresh_EvictedMidFetch_NotResurrected(t *testing.T) {
 	h := hashKey(domain.PresentedKey{Token: rawKey})
 	bundle := freshBundle("vk_cfg_race", time.Now().Add(1*time.Hour))
 	bundle.Credentials = []domain.Credential{{ID: "cred-old"}}
-	svc.storeL1(h, bundle, "")
+	seedL1(svc, h, bundle, "")
 	e := backdateConfig(t, svc, rawKey, 2*time.Minute)
 
 	// Triggering request serves the stale bundle and kicks off the refresh.
@@ -1054,7 +1054,7 @@ func TestApplyChange_UnhandledKindIsReported(t *testing.T) {
 	svc, logs := newService(t, Options{Resolver: resolver, ConfigFetcher: resolver})
 
 	key := hashKey(domain.PresentedKey{Token: "vk-lw-unhandled-kind"})
-	svc.storeL1(key, &domain.Bundle{OrganizationID: "org-1"}, "")
+	seedL1(svc, key, &domain.Bundle{OrganizationID: "org-1"}, "")
 
 	svc.applyChange("org-1", CacheChange{Kind: "SOMETHING_THIS_BUILD_PREDATES"})
 

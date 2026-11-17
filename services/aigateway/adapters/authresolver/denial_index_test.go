@@ -57,13 +57,13 @@ func TestRevocation_CurrentSecretOutlivesTheRotationGrace(t *testing.T) {
 	}
 }
 
-// @scenario "a revoked key is refused while the control plane is down"
+// @scenario "a flood of credentials on a denied key keeps the denied list bounded"
 func TestRevocation_DeniedFloodKeepsOneEntryPerCredential(t *testing.T) {
 	res := &hookResolver{err: errControlPlaneDown}
 	svc, _ := newService(t, Options{Resolver: res, ConfigFetcher: res})
 	key := domain.PresentedKey{Token: "vk-lw-leaked"}
 	h := hashKey(key)
-	svc.storeL1(h, orgBundle("vk_leaked", time.Now().Add(time.Hour)), "")
+	seedL1(svc, h, orgBundle("vk_leaked", time.Now().Add(time.Hour)), "")
 	svc.applyChange("org_1", CacheChange{Kind: ChangeKindVirtualKeyRevoked, VirtualKeyID: "vk_leaked"})
 
 	for i := 0; i < 5000; i++ {

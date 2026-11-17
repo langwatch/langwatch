@@ -124,6 +124,12 @@ Feature: Gateway auth cache — hot path is zero RTT after first hit
       And the next request retries the control plane and succeeds once it recovers
 
     @unit
+    Scenario: a control plane that cannot answer resolve-key tells the client to retry
+      Given the control plane is unreachable, answers 5xx, or sends a body the gateway cannot read
+      When the gateway asks it to resolve a key
+      Then the error is auth_upstream_unavailable and marked retryable
+
+    @unit
     Scenario: config fetch succeeds with zero credentials -> the real no-provider answer stands
       Given the control plane resolves the key successfully
       And the config fetch succeeds carrying an empty credential list
@@ -428,6 +434,20 @@ Feature: Gateway auth cache — hot path is zero RTT after first hit
       When the change feed revokes the key before that call returns
       Then the request is refused with virtual_key_revoked
       And nothing is left in the cache for that key
+
+    @unit
+    Scenario: a flood of credentials on a denied key keeps the denied list bounded
+      Given the change feed revoked a cached key
+      When thousands of different credentials of that key are refused
+      Then the key keeps at most 8 denied credentials
+      And the first denied credential is still refused
+
+    @unit
+    Scenario: a change the in-flight guard cannot track reaches every fetch in flight
+      Given resolve-key calls are in flight
+      When an evict-all event lands or more keys change than the guard tracks
+      Then no answer from those calls is cached
+      And a fetch that starts after the change is cached
 
     @unit
     Scenario: a key confirmed after its re-enable serves again

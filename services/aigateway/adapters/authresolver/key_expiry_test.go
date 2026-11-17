@@ -45,7 +45,7 @@ func TestStoreL1_KeyExpiryCapsBothDeadlines(t *testing.T) {
 
 	t.Run("when the token already ends at the key's expiration date", func(t *testing.T) {
 		rawKey := "vk-lw-capped-clamped"
-		svc.storeL1(hashKey(domain.PresentedKey{Token: rawKey}), expiringBundle("vk_clamped", keyExpiry, keyExpiry), "")
+		seedL1(svc, hashKey(domain.PresentedKey{Token: rawKey}), expiringBundle("vk_clamped", keyExpiry, keyExpiry), "")
 
 		soft, hard := deadlines(t, svc, rawKey)
 		assert.True(t, soft.Equal(keyExpiry), "soft expiry tracks the token, which ends with the key")
@@ -55,7 +55,7 @@ func TestStoreL1_KeyExpiryCapsBothDeadlines(t *testing.T) {
 
 	t.Run("when the token outlives the key", func(t *testing.T) {
 		rawKey := "vk-lw-capped-longer-token"
-		svc.storeL1(hashKey(domain.PresentedKey{Token: rawKey}), expiringBundle("vk_longer", time.Now().Add(15*time.Minute), keyExpiry), "")
+		seedL1(svc, hashKey(domain.PresentedKey{Token: rawKey}), expiringBundle("vk_longer", time.Now().Add(15*time.Minute), keyExpiry), "")
 
 		soft, hard := deadlines(t, svc, rawKey)
 		assert.True(t, soft.Equal(keyExpiry), "no deadline may sit past the key's expiration date")
@@ -65,7 +65,7 @@ func TestStoreL1_KeyExpiryCapsBothDeadlines(t *testing.T) {
 	t.Run("when the key has no expiration date", func(t *testing.T) {
 		rawKey := "vk-lw-never-expires"
 		jwtExp := time.Now().Add(15 * time.Minute)
-		svc.storeL1(hashKey(domain.PresentedKey{Token: rawKey}), freshBundle("vk_never", jwtExp), "")
+		seedL1(svc, hashKey(domain.PresentedKey{Token: rawKey}), freshBundle("vk_never", jwtExp), "")
 
 		soft, hard := deadlines(t, svc, rawKey)
 		assert.True(t, soft.Equal(jwtExp), "a key with no date keeps the deadlines it always had")
@@ -85,7 +85,7 @@ func TestResolve_OutageAcrossKeyExpiry_FailsClosedWithTheKeysOwnError(t *testing
 	// The key ran out a minute ago, and its token with it. Without the cap
 	// this entry is stale rather than dead, so the grace window would serve it.
 	ranOut := time.Now().Add(-1 * time.Minute)
-	svc.storeL1(hashKey(domain.PresentedKey{Token: rawKey}), expiringBundle("vk_ran_out", ranOut, ranOut), "")
+	seedL1(svc, hashKey(domain.PresentedKey{Token: rawKey}), expiringBundle("vk_ran_out", ranOut, ranOut), "")
 
 	bundle, err := svc.Resolve(context.Background(), domain.PresentedKey{Token: rawKey})
 
@@ -115,7 +115,7 @@ func TestResolve_OutageBeforeKeyExpiry_StillServesStale(t *testing.T) {
 	}}
 	svc, _ := newService(t, Options{Resolver: resolver, ConfigFetcher: resolver})
 	rawKey := "vk-lw-outage-before-expiry"
-	svc.storeL1(hashKey(domain.PresentedKey{Token: rawKey}), expiringBundle(
+	seedL1(svc, hashKey(domain.PresentedKey{Token: rawKey}), expiringBundle(
 		"vk_still_good",
 		time.Now().Add(-30*time.Second),
 		time.Now().Add(1*time.Hour),
@@ -171,7 +171,7 @@ func newExpiryService(t *testing.T, fetcher *expiryConfigFetcher, rawKey string,
 		ConfigTTL:        60 * time.Second,
 		RefreshThreshold: time.Millisecond,
 	})
-	svc.storeL1(hashKey(domain.PresentedKey{Token: rawKey}), bundle, "42")
+	seedL1(svc, hashKey(domain.PresentedKey{Token: rawKey}), bundle, "42")
 	return svc, backdateConfig(t, svc, rawKey, 2*time.Minute)
 }
 

@@ -21,7 +21,7 @@ func seedServedKey(t *testing.T, svc *Service, rawKey, vkID string) [64]byte {
 	b := bundleWithCreds(vkID, time.Now().Add(10*time.Minute), "cred-known-good")
 	b.OrganizationID = "org-1"
 	b.ProjectID = "proj-1"
-	svc.storeL1(h, b, "etag-1")
+	seedL1(svc, h, b, "etag-1")
 	return h
 }
 
@@ -277,7 +277,7 @@ func TestRefresh_ConfigFetchFindsKeyDeleted_EvictsAtOnce(t *testing.T) {
 		fetcher.returns = []resolverReturn{{bundle: freshBundle("vk_gone", time.Now().Add(10*time.Minute))}}
 		svc, _ := newService(t, Options{Resolver: &fetcher.fakeResolver, ConfigFetcher: fetcher})
 		rawKey := "vk-lw-gone-fg"
-		svc.storeL1(hashKey(domain.PresentedKey{Token: rawKey}), bundleWithCreds("vk_gone", time.Now().Add(-30*time.Second), "cred-old"), "")
+		seedL1(svc, hashKey(domain.PresentedKey{Token: rawKey}), bundleWithCreds("vk_gone", time.Now().Add(-30*time.Second), "cred-old"), "")
 
 		_, err := svc.Resolve(context.Background(), domain.PresentedKey{Token: rawKey})
 
@@ -290,7 +290,7 @@ func TestRefresh_ConfigFetchFindsKeyDeleted_EvictsAtOnce(t *testing.T) {
 		svc, _ := newService(t, Options{Resolver: &fetcher.fakeResolver, ConfigFetcher: fetcher})
 		rawKey := "vk-lw-gone-bg"
 		h := hashKey(domain.PresentedKey{Token: rawKey})
-		svc.storeL1(h, bundleWithCreds("vk_gone", time.Now().Add(2*time.Minute), "cred-old"), "")
+		seedL1(svc, h, bundleWithCreds("vk_gone", time.Now().Add(2*time.Minute), "cred-old"), "")
 
 		refreshCurrent(svc, domain.PresentedKey{Token: rawKey}, h)
 

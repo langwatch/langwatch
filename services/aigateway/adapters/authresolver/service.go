@@ -877,7 +877,7 @@ func (s *Service) resolveFresh(ctx context.Context, key domain.PresentedKey, h [
 	}
 	etag, cfgErr := s.populateConfig(fetchCtx, bundle)
 	if cfgErr == nil {
-		s.publishFetched(h, s.newEntry(bundle, etag).authFrom(start), since)
+		s.publishFetched(h, s.newEntry(bundle, etag, start), since)
 		return served{bundle: bundle, authStart: start}, nil
 	}
 	return s.resolveFreshWithoutConfig(ctx, freshWithoutConfig{h: h, fallback: fallback, bundle: bundle, start: start, cfgErr: cfgErr, since: since})
@@ -1053,7 +1053,7 @@ func (s *Service) refreshOrServeStale(ctx context.Context, lk lookup, stale *ent
 			// serve the stale entry's known-good credentials instead.
 			return s.serveStaleAfterFailure(ctx, staleFailure{h: h, stale: stale, staleBundle: staleBundle, hardExpiresAt: hardExpiresAt, cls: cls, cause: cfgErr, authStart: start})
 		}
-		s.publishFetched(h, s.newEntry(bundle, etag).authFrom(start), since)
+		s.publishFetched(h, s.newEntry(bundle, etag, start), since)
 		return served{bundle: bundle, authStart: start}, nil
 
 	case classAuthRejection:
@@ -1214,8 +1214,9 @@ func (e *entry) carryBudgetChanges(from *entry, seenAtStart uint64) *entry {
 }
 
 // newEntry builds the cache entry for a bundle whose config was fetched under
-// configETag, without publishing it.
-func (s *Service) newEntry(bundle *domain.Bundle, configETag string) *entry {
+// configETag, without publishing it. authStartedAt is when the confirming
+// control-plane call began.
+func (s *Service) newEntry(bundle *domain.Bundle, configETag string, authStartedAt time.Time) *entry {
 	softExpiresAt, hardExpiresAt := entryDeadlines(bundle, s.hardGrace)
 	now := time.Now()
 	return &entry{
@@ -1226,7 +1227,7 @@ func (s *Service) newEntry(bundle *domain.Bundle, configETag string) *entry {
 		configConfirmedAt:  now,
 		configETag:         configETag,
 		budgetRollAckedFor: ackedBoundaryAtBuild(bundle, now),
-		authStartedAt:      now,
+		authStartedAt:      authStartedAt,
 	}
 }
 
@@ -1642,7 +1643,7 @@ func (s *Service) refreshBackground(key domain.PresentedKey, h [64]byte, started
 			s.logger.Debug("auth_cache_refresh_dropped_stale", zap.String("vk_id", bundle.VirtualKeyID))
 			return
 		}
-		s.publishFetched(h, s.newEntry(bundle, etag).authFrom(start).carryBudgetChanges(started, budgetChangesAtStart), since)
+		s.publishFetched(h, s.newEntry(bundle, etag, start).carryBudgetChanges(started, budgetChangesAtStart), since)
 		s.logger.Debug("auth_cache_refresh_success", zap.String("vk_id", bundle.VirtualKeyID))
 
 	case classAuthRejection:
@@ -1764,7 +1765,7 @@ func (s *Service) refreshConfigBackground(h [64]byte, e *entry) {
 		)
 		return
 	}
-	s.publishFetched(h, s.newEntry(&fresh, res.ETag).authFrom(e.authStart()).carryBudgetChanges(e, budgetChangesAtStart), since)
+	s.publishFetched(h, s.newEntry(&fresh, res.ETag, e.authStart()).carryBudgetChanges(e, budgetChangesAtStart), since)
 	s.logger.Debug("config_ttl_refresh_success", zap.String("vk_id", stale.VirtualKeyID))
 }
 

@@ -125,13 +125,6 @@ func (s *Service) recheckDenied(key domain.PresentedKey, h [64]byte, vkID string
 	s.liftDenialBefore(vkID, answer.authStart, "recheck")
 }
 
-// authFrom stamps when the confirming control-plane call began. Call it before
-// the entry is published.
-func (e *entry) authFrom(t time.Time) *entry {
-	e.authStartedAt = t
-	return e
-}
-
 func (e *entry) authStart() time.Time {
 	e.mu.Lock()
 	defer e.mu.Unlock()
@@ -152,7 +145,7 @@ func (s *Service) deny(vkID, kind string) {
 		}
 	}
 	for _, h := range s.lastKnown.Keys() {
-		if e, ok := s.lastKnown.Peek(h); ok && e.bundle != nil && e.bundle.VirtualKeyID == vkID {
+		if e, ok := s.lastKnown.Peek(h); ok && e.bundle.VirtualKeyID == vkID {
 			carried = append(carried, h)
 		}
 	}
@@ -347,7 +340,7 @@ func (s *Service) reconfirm(ctx context.Context, key domain.PresentedKey, h [64]
 	}
 	etag, cfgErr := s.populateConfig(ctx, bundle)
 	if cfgErr == nil {
-		s.publishFetched(h, s.newEntry(bundle, etag).authFrom(start), since)
+		s.publishFetched(h, s.newEntry(bundle, etag, start), since)
 		return served{bundle: bundle, authStart: start}, nil
 	}
 	if classifyRefreshError(cfgErr) == classAuthRejection {

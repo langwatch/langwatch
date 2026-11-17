@@ -87,7 +87,7 @@ func TestResolve_StaleEntry_ConfigFetchFailure_ServesStaleCredentials(t *testing
 
 	rawKey := "vk-lw-stale"
 	h := hashKey(domain.PresentedKey{Token: rawKey})
-	svc.storeL1(h, bundleWithCreds("vk_stale", time.Now().Add(-30*time.Second), "cred-old"), "")
+	seedL1(svc, h, bundleWithCreds("vk_stale", time.Now().Add(-30*time.Second), "cred-old"), "")
 
 	bundle, err := svc.Resolve(context.Background(), domain.PresentedKey{Token: rawKey})
 	if err != nil {
@@ -149,7 +149,7 @@ func TestRefreshBackground_ConfigFetchFailure_KeepsExistingEntry(t *testing.T) {
 
 	rawKey := "vk-lw-bg"
 	h := hashKey(domain.PresentedKey{Token: rawKey})
-	svc.storeL1(h, bundleWithCreds("vk_bg", time.Now().Add(5*time.Minute), "cred-old"), "")
+	seedL1(svc, h, bundleWithCreds("vk_bg", time.Now().Add(5*time.Minute), "cred-old"), "")
 
 	refreshCurrent(svc, domain.PresentedKey{Token: rawKey}, h)
 

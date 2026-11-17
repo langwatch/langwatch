@@ -138,7 +138,7 @@ func (c *Client) ResolveKey(ctx context.Context, key domain.PresentedKey) (*doma
 	endpoint, _ := url.JoinPath(c.baseURL, "/api/internal/gateway/resolve-key")
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(payload))
 	if err != nil {
-		return nil, herr.New(ctx, domain.ErrAuthUpstream, nil, err)
+		return nil, herr.New(ctx, domain.ErrAuthUpstream, nil, err).WithRetryable(true)
 	}
 	req.Header.Set("Content-Type", "application/json")
 	c.setCommonHeaders(req)
@@ -146,7 +146,7 @@ func (c *Client) ResolveKey(ctx context.Context, key domain.PresentedKey) (*doma
 
 	resp, err := c.client.Do(req)
 	if err != nil {
-		return nil, herr.New(ctx, domain.ErrAuthUpstream, nil, err)
+		return nil, herr.New(ctx, domain.ErrAuthUpstream, nil, err).WithRetryable(true)
 	}
 	defer func() { _ = resp.Body.Close() }()
 	respBody, _ := io.ReadAll(resp.Body)
@@ -161,19 +161,19 @@ func (c *Client) ResolveKey(ctx context.Context, key domain.PresentedKey) (*doma
 	case resp.StatusCode == http.StatusForbidden:
 		return nil, forbiddenKeyRefusal(ctx, respBody)
 	case resp.StatusCode != http.StatusOK:
-		return nil, herr.New(ctx, domain.ErrAuthUpstream, nil, fmt.Errorf("control plane returned %d", resp.StatusCode))
+		return nil, herr.New(ctx, domain.ErrAuthUpstream, nil, fmt.Errorf("control plane returned %d", resp.StatusCode)).WithRetryable(true)
 	}
 
 	var result struct {
 		Token string `json:"jwt"`
 	}
 	if err := json.Unmarshal(respBody, &result); err != nil {
-		return nil, herr.New(ctx, domain.ErrAuthUpstream, nil, err)
+		return nil, herr.New(ctx, domain.ErrAuthUpstream, nil, err).WithRetryable(true)
 	}
 
 	mapClaims, err := c.verifier.Verify(result.Token)
 	if err != nil {
-		return nil, herr.New(ctx, domain.ErrAuthUpstream, nil, err)
+		return nil, herr.New(ctx, domain.ErrAuthUpstream, nil, err).WithRetryable(true)
 	}
 
 	return claimsToBundle(extractClaims(mapClaims)), nil
