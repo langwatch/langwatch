@@ -1355,6 +1355,9 @@ export const LWQL_POSTGRES_CATALOGUE = defineLwqlCatalog({
       MinTurns: { source: "minTurns" },
       Fields: { source: "fields", content: "output" },
       CallerVoice: { source: "callerVoice", content: "output" },
+      Kind: { source: "kind" },
+      RedTeam: { source: "redTeam", content: "output" },
+      sourceTemplateId: "omit", // internal bookkeeping: the template a scenario came from
       TestSuiteId: { source: "testSuiteId" },
       Version: { source: "version" },
       LastUpdatedById: { source: "lastUpdatedById" },
@@ -1421,6 +1424,8 @@ export const LWQL_POSTGRES_CATALOGUE = defineLwqlCatalog({
       ScopeConfig: { source: "scope", content: "output" }, // not a scope label
       Fields: { source: "fields", content: "output" },
       Evaluators: { source: "evaluators", content: "output" },
+      TemplateId: { source: "templateId" },
+      TemplateVersion: { source: "templateVersion" },
       ArchivedAt: { source: "archivedAt" },
       CreatedAt: { source: "createdAt" },
       UpdatedAt: { source: "updatedAt" },

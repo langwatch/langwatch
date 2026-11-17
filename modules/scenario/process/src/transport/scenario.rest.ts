@@ -209,6 +209,8 @@ export function createScenarioRest(): Readonly<{
             ...(body.minTurns !== undefined && { minTurns: body.minTurns }),
             ...(body.testSuiteId !== undefined && { testSuiteId: body.testSuiteId }),
             ...(body.fields !== undefined && { fields: body.fields }),
+            ...(body.kind !== undefined && { kind: body.kind }),
+            ...(body.redTeam !== undefined && { redTeam: body.redTeam }),
           },
           { id: project.actorId, label },
         );

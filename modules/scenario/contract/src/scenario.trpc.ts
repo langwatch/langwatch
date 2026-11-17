@@ -52,7 +52,12 @@ import {
   scenarioRunScheduledSchema,
   scenarioVersionPageSchema,
 } from "./scenario.responses.ts";
-import { scenarioSchema } from "./scenario.ts";
+import {
+  redTeamConfigSchema,
+  scenarioKindSchema,
+  scenarioSchema,
+  scenarioTemplateMarkerRefusalSchema,
+} from "./scenario.ts";
 import { scenarioVersionDetailSchema } from "./scenario.version.ts";
 import { scenarioFieldValuesSchema } from "./suite-fields.ts";
 import { callerVoiceConfigSchema } from "./voice/caller-voice.config.ts";
@@ -97,6 +102,10 @@ const scenarioTrpcCreateSchemaDefinition = z.object({
   // send the default config to clear. Never null: a plain null is not a
   // valid Prisma JSON write.
   callerVoice: callerVoiceConfigSchema.optional(),
+  // A red_team scenario requires redTeam; a standard one refuses it.
+  kind: scenarioKindSchema.optional(),
+  redTeam: redTeamConfigSchema.optional(),
+  sourceTemplateId: scenarioTemplateMarkerRefusalSchema,
 });
 export interface ScenarioTrpcCreateSchema extends Named<
   typeof scenarioTrpcCreateSchemaDefinition

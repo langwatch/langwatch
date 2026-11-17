@@ -222,6 +222,7 @@ function braidedTrace({ withOwnerSpans = true } = {}) {
     spanTree: () => app.readSpanTreeForViewer(viewer),
     spansFull: () => app.readSpansFullForViewer(viewer),
     resources: () => app.readSpanResourcesForViewer(viewer),
+    agentCallGraph: () => app.readAgentCallGraphForViewer(viewer),
     traceEvents: () => app.readTraceEventsForViewer(viewer),
     // What the `spanLangwatchSignals` procedure calls, on the proof the trace honoured.
     spanLangwatchSignals: async () =>
@@ -239,6 +240,7 @@ const READS = [
   "spanTree",
   "spansFull",
   "resources",
+  "agentCallGraph",
   "traceEvents",
   "spanLangwatchSignals",
 ] as const;

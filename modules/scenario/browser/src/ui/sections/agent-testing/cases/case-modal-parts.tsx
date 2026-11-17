@@ -50,6 +50,7 @@ import { parameterPlaceholder } from "../run-parameters/parameter-suggestions.ts
 import { useAgentDeclaredParameters } from "../run-parameters/use-agent-declared-parameters.ts";
 import { CaseRecentRunsButton } from "./case-recent-runs-button.tsx";
 import { CaseVersionHistoryPopover } from "./case-version-history-popover.tsx";
+import { RedTeamConfigBlock } from "./red-team-config-block.tsx";
 import {
   criteriaOf,
   strayFieldValues,
@@ -447,6 +448,7 @@ export function CaseModalFields({
         titleError={problems.title}
       />
       <SituationAndCriteria draft={draft} setDraft={setDraft} criteriaError={problems.criteria} />
+      {editor.redTeam ? <RedTeamConfigBlock config={editor.redTeam} /> : null}
       <SuiteFieldsBlock editor={editor} />
       {/* A block a chip opened reads where the reader was looking when they
           opened it: straight under the criteria, in the order the chips sit

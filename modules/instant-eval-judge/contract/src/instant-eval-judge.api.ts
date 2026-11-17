@@ -331,6 +331,11 @@ export interface InstantEvalClassifierLimits {
   readonly transcriptFitBytesPerInputToken: number;
   /** Below any judged text measured; the too-large retry cuts at this ratio. */
   readonly retryBytesPerInputToken: number;
+  /**
+   * Tokens the judge bills on every request beyond the text and the questions.
+   * Provisional: read off e2e bills (190 to 220 per row), not yet measured alone.
+   */
+  readonly requestOverheadTokens: number;
 }
 
 /** The shipped classifier's caps, measured against the live API. */
@@ -344,4 +349,5 @@ export const INSTANT_EVAL_CLASSIFIER_LIMITS: InstantEvalClassifierLimits = {
   fitBytesPerInputToken: 2,
   transcriptFitBytesPerInputToken: 2.4,
   retryBytesPerInputToken: 1.5,
+  requestOverheadTokens: 200,
 };

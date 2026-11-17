@@ -16,7 +16,11 @@ import type { LicensingApi } from "@langwatch/enterprise-licensing-contract";
 import type { EntitlementApi, Plan } from "@langwatch/entitlement-contract";
 import { EventSourcing, InMemoryProcessStore } from "@langwatch/eventing";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
-import type { GatewayApi, GatewayPricedSpend } from "@langwatch/gateway-contract";
+import type {
+  GatewayApi,
+  GatewayBudgetCheckInput,
+  GatewayPricedSpend,
+} from "@langwatch/gateway-contract";
 import { HandledError } from "@langwatch/handled-error";
 import {
   InstantEvalApi,
@@ -242,7 +246,17 @@ function installation({
             ...(planType ? { type: planType } : {}),
           }),
         }),
-        gateway: createApiFixture<GatewayApi>(gateway),
+        // No gateway budget is reached unless a test says otherwise.
+        gateway: createApiFixture<GatewayApi>({
+          checkBudget: async () => ({
+            decision: "allow",
+            warnings: [],
+            blockReason: null,
+            blockedBy: [],
+            scopes: [],
+          }),
+          ...gateway,
+        }),
         licensing: createApiFixture<LicensingApi>({
           isConnectServiceEnabled: async () => isConnectOn,
         }),
@@ -352,6 +366,61 @@ describe("given a process that installs Instant Evals over the memory tier", () 
         });
 
         expect(run).toMatchObject({ limit: 50_000, status: "queued", sql: STATEMENT });
+      });
+    });
+  });
+
+  describe("when a paid plan's project budget is set to block and is reached", () => {
+    /** @scenario "A run is refused once a blocking budget is reached" */
+    it("refuses the run, asking the gateway for the project's own team and organization", async () => {
+      const asked: GatewayBudgetCheckInput[] = [];
+      const gateway: Partial<GatewayApi> = {
+        checkBudget: async (input) => {
+          asked.push(input);
+          return {
+            decision: "hard_block",
+            warnings: [],
+            blockReason: "Budget exceeded for scope=project window=month",
+            blockedBy: [
+              {
+                budgetId: "budget-1",
+                scope: "project",
+                scopeId: PROJECT,
+                window: "month",
+                limitUsd: "5",
+                spentUsd: "5.000000",
+              },
+            ],
+            scopes: [],
+          };
+        },
+      };
+
+      await withInstallation({ isFreePlan: false, gateway }, async (api) => {
+        const refusal = await refusalOf(
+          api.createRun({ projectId: PROJECT, actor: ACTOR, input: runOf() }),
+        );
+
+        expect(refusal.code).toBe("instant_eval_gateway_budget_exceeded");
+        expect(refusal.meta).toEqual({
+          budgetId: "budget-1",
+          scope: "project",
+          window: "month",
+          limitUsd: 5,
+          spentUsd: 5,
+        });
+        expect(asked).toEqual([
+          {
+            organizationId: ORGANIZATION,
+            teamId: "team-1",
+            projectId: PROJECT,
+            virtualKeyId: `_instant_eval_:project:${PROJECT}`,
+            principalUserId: null,
+            providerKey: null,
+            projectedCostUsd: 0,
+          },
+        ]);
+        await expect(api.findRuns({ projectId: PROJECT, limit: 10 })).resolves.toEqual([]);
       });
     });
   });
