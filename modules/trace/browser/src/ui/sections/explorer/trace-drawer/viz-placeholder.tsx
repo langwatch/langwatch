@@ -10,7 +10,12 @@ import {
 } from "@langwatch/design-system/primitives";
 import { shortcutAriaKeys } from "@langwatch/design-system/shortcut-hint";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import type { BraidedOwner, SpanTreeNode, TraceHeader } from "@langwatch/trace-contract";
+import type {
+  AgentCallGraph,
+  BraidedOwner,
+  SpanTreeNode,
+  TraceHeader,
+} from "@langwatch/trace-contract";
 import { lazy, Suspense, useMemo, useRef } from "react";
 import {
   LuChartGantt,
@@ -23,10 +28,12 @@ import {
   LuNetwork,
   LuPanelBottomOpen,
   LuPanelRightOpen,
+  LuWorkflow,
 } from "react-icons/lu";
 import { useShallow } from "zustand/react/shallow";
 
 import { useVizHeight } from "../../../../behavior/explorer/trace-drawer/use-viz-height.ts";
+import { useAgentCallGraph } from "../../../../behavior/explorer/use-agent-call-graph.ts";
 import { useOverflowVisibility } from "../../../../behavior/explorer/use-overflow-visibility.ts";
 // PeerCursorOverlay used to wrap just the viz pane (scoped to the
 // active viz tab). It was lifted to the drawer level (TraceDrawerShell)
@@ -39,7 +46,9 @@ import {
 } from "../../../../behavior/presence/presence-store.ts";
 import { useTraceDrawer } from "../../../../behavior/trace-drawer.ts";
 import { drawerShortcut } from "../../../../features/trace-drawer/behavior/trace-drawer-shortcut-table.ts";
+import { hasMultipleAgents } from "../../../../model/agent-call-graph-layout.ts";
 import type { VizTab } from "../../../../model/trace-drawer-params.ts";
+import { AgentCallGraphView } from "../../../blocks/agent-call-graph/agent-call-graph-view.tsx";
 import { SequenceSkeleton } from "../../../blocks/sequence/sequence-skeleton.tsx";
 import { TopologySkeleton } from "../../../blocks/sequence/topology-skeleton.tsx";
 import { OverflowMenu } from "../../../elements/explorer/shared/overflow-menu.tsx";
@@ -158,6 +167,15 @@ const TABS: VizTabDef[] = [
     description:
       "Chat-style turn order between actors: best for replaying multi-agent conversations.",
   },
+  {
+    value: "agents",
+    label: "Agents",
+    icon: LuWorkflow,
+    shortcut: "5",
+    palette: "green",
+    description:
+      "Which agent called which, across A2A hops, with calls, errors, latency and cost per agent.",
+  },
 ];
 
 /**
@@ -168,13 +186,19 @@ function VizTabStrip({
   vizTab,
   traceId,
   onVizTabChange,
+  showsAgents,
 }: {
   vizTab: VizTab;
   traceId: string | null;
   onVizTabChange: (tab: VizTab) => void;
+  showsAgents: boolean;
 }) {
   const tabScrollerRef = useRef<HTMLDivElement>(null);
-  const tabIds = useMemo(() => TABS.map((t) => t.value), []);
+  const tabs = useMemo(
+    () => (showsAgents ? TABS : TABS.filter((t) => t.value !== "agents")),
+    [showsAgents],
+  );
+  const tabIds = useMemo(() => tabs.map((t) => t.value), [tabs]);
   const hiddenTabIds = useOverflowVisibility({
     scrollerRef: tabScrollerRef,
     items: tabIds,
@@ -186,7 +210,7 @@ function VizTabStrip({
 
   return (
     <HStack ref={tabScrollerRef} gap={0} overflowX="hidden" flexWrap="nowrap" flex="1" minWidth={0}>
-      {TABS.map((tab) => (
+      {tabs.map((tab) => (
         <VizTabButton
           key={tab.value}
           tab={tab}
@@ -393,6 +417,14 @@ export function VizPlaceholder({
   const detailCollapsed = useTraceDrawer((s) => s.paneState.spanDetail.collapsed);
   const togglePaneCollapsed = useTraceDrawer((s) => s.togglePaneCollapsed);
 
+  const agentCallGraph = useAgentCallGraph().data;
+  const showsAgents = hasMultipleAgents({ graph: agentCallGraph });
+  const effectiveVizTab: VizTab = vizTab === "agents" && !showsAgents ? "waterfall" : vizTab;
+  const a2aSpanIds = useMemo(
+    () => new Set(agentCallGraph?.a2aSpans.map((mark) => mark.spanId) ?? []),
+    [agentCallGraph],
+  );
+
   const viz = useVizHeight({ fillParent, hasData: spans.length > 0 });
   const containerRef = useRef<HTMLDivElement>(null);
   const traceId = trace?.traceId ?? null;
@@ -428,7 +460,12 @@ export function VizPlaceholder({
           minHeight="38px"
           data-spotlight="viz-tabs"
         >
-          <VizTabStrip vizTab={vizTab} traceId={traceId} onVizTabChange={onVizTabChange} />
+          <VizTabStrip
+            vizTab={effectiveVizTab}
+            traceId={traceId}
+            onVizTabChange={onVizTabChange}
+            showsAgents={showsAgents}
+          />
           {!fillParent && (
             <ResizeCycleButton
               isMinimized={viz.isMinimized}
@@ -464,9 +501,11 @@ export function VizPlaceholder({
               onClearSpan={onClearSpan}
               onSelectSpan={onSelectSpan}
               promptSpanIds={promptSpanIds}
+              a2aSpanIds={a2aSpanIds}
+              agentCallGraph={agentCallGraph}
               selectedSpanId={selectedSpanId}
               spans={spans}
-              vizTab={vizTab}
+              vizTab={effectiveVizTab}
             />
             {/*
               The "Click to interact" scrim used to sit here. With the
@@ -591,6 +630,8 @@ function VizBody({
   onClearSpan,
   onSelectSpan,
   promptSpanIds,
+  a2aSpanIds,
+  agentCallGraph,
   selectedSpanId,
   spans,
   vizTab,
@@ -601,6 +642,8 @@ function VizBody({
   onClearSpan: () => void;
   onSelectSpan: (spanId: string) => void;
   promptSpanIds: Set<string>;
+  a2aSpanIds: ReadonlySet<string>;
+  agentCallGraph: AgentCallGraph | undefined;
   selectedSpanId: string | null;
   spans: SpanTreeNode[];
   vizTab: VizTab;
@@ -629,6 +672,9 @@ function VizBody({
       </Suspense>
     );
   }
+  if (vizTab === "agents" && agentCallGraph) {
+    return <AgentCallGraphView graph={agentCallGraph} onSelectSpan={onSelectSpan} />;
+  }
   if (vizTab === "flame") {
     return (
       <FlameView
@@ -650,6 +696,7 @@ function VizBody({
       braidedOwners={braidedOwners}
       selectedSpanId={selectedSpanId}
       promptSpanIds={promptSpanIds}
+      a2aSpanIds={a2aSpanIds}
       onSelectSpan={onSelectSpan}
       onClearSpan={onClearSpan}
     />

@@ -361,7 +361,8 @@
             "group": "Overview",
             "pages": [
               "integration/overview",
-              "observability/trace-vs-activity-ingestion"
+              "observability/trace-vs-activity-ingestion",
+              "observability/multi-agent-a2a"
             ]
           },
           {

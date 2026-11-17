@@ -27,7 +27,7 @@ function resources(services: Record<string, string>, root = "caller-svc"): Agent
       spanId,
       parentSpanId: null,
       resourceAttributes: { "service.name": service },
-      scope: { name: "test" },
+      scope: { name: "test", version: null },
     })),
   };
 }

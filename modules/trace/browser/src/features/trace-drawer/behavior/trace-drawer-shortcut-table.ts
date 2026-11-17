@@ -37,6 +37,7 @@ const SHORTCUT_IDS = [
   "flame",
   "topology",
   "sequence",
+  "agents",
   "summary",
   "trace",
   "conversation",
@@ -178,6 +179,13 @@ export const TRACE_DRAWER_SHORTCUTS: ShortcutEntry[] = [
     group: "Visualisation",
     description: "Sequence diagram",
     run: ({ store }) => store.setVizTab("sequence"),
+  },
+  {
+    id: "agents",
+    matchKeys: ["5"],
+    group: "Visualisation",
+    description: "Agents",
+    run: ({ store }) => store.setVizTab("agents"),
   },
   {
     // O used to jump to the trace Summary tab inside SpanTabBar. The

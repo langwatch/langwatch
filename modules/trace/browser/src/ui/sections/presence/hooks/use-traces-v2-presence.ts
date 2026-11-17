@@ -39,7 +39,7 @@ export function useTracesPresence(): void {
       viewMode === "conversation" ? "conversation" : "trace";
     const view: NonNullable<PresenceLocation["view"]> = {
       mode: wireMode,
-      panel: vizTab,
+      panel: vizTab === "agents" ? undefined : vizTab,
       ...(section ? { section } : {}),
     };
     return { lens: "traces", route, view };
