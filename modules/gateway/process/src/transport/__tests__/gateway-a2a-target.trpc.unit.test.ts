@@ -51,6 +51,12 @@ function fakeApp() {
       a2aTargetToDto(target({ blocked: true, blockReason: "incident" })),
     ),
     archiveA2aTarget: vi.fn(async () => a2aTargetToDto(target({ archivedAt: new Date() }))),
+    listProjectA2aTargets: vi.fn(async () => [a2aTargetToDto(target({ projectId: "p1" }))]),
+    updateProjectA2aTarget: vi.fn(async () => a2aTargetToDto(target({ projectId: "p1" }))),
+    setProjectA2aTargetBlocked: vi.fn(async () =>
+      a2aTargetToDto(target({ projectId: "p1", blocked: true })),
+    ),
+    archiveProjectA2aTarget: vi.fn(async () => a2aTargetToDto(target({ projectId: "p1" }))),
   };
 }
 
@@ -59,11 +65,13 @@ function mounted(app: ReturnType<typeof fakeApp>) {
   const permissions: Record<string, AuthzPermission | object> = {};
   const handlers: Record<string, Handler> = {};
   const audits: Record<string, unknown> = {};
+  const accesses: Record<string, unknown> = {};
   const api = createApiFixture<GatewayApi>(app);
   const runtime: TrpcProcedureFactory<object> = {
     procedure: ({ access, audit, handle, procedure }) => {
       const name = procedure.slice(procedure.indexOf(".") + 1);
       if (audit) audits[name] = audit;
+      accesses[name] = access;
       permissions[name] = access.kind === "permission" ? access.permission : access;
       handlers[name] = (args) =>
         Promise.resolve((handle as (given: unknown) => unknown)({ ...args, app: api }));
@@ -72,18 +80,77 @@ function mounted(app: ReturnType<typeof fakeApp>) {
     router: (record) => record,
   };
   gatewayA2aTargetTrpcTransport.router(runtime, () => api);
-  return { permissions, handlers, audits };
+  return { permissions, handlers, audits, accesses };
 }
 
 describe("the gatewayA2aTargets tRPC declaration", () => {
-  describe("given the five target procedures", () => {
+  describe("given the project-scoped target procedures", () => {
+    /** @scenario "a project admin manages the project's own targets" */
+    it("checks the permission on the project named in the input", () => {
+      const { accesses } = mounted(fakeApp());
+      const expected = {
+        listForProject: "virtualKeys:view",
+        updateForProject: "virtualKeys:manage",
+        setBlockedForProject: "virtualKeys:manage",
+        deleteForProject: "virtualKeys:manage",
+      };
+
+      for (const [name, permission] of Object.entries(expected)) {
+        expect(accesses[name]).toMatchObject({ kind: "permission", permission });
+        expect(JSON.stringify(accesses[name])).toContain("projectId");
+      }
+    });
+
+    it("hands each call the project and the calling user", async () => {
+      const app = fakeApp();
+      const { handlers } = mounted(app);
+      await handlers.listForProject!({ input: { projectId: "p1" }, actor });
+      await handlers.updateForProject!({
+        input: { projectId: "p1", id: "a2a_1", agentName: "Renamed" },
+        actor,
+      });
+      await handlers.setBlockedForProject!({
+        input: { projectId: "p1", id: "a2a_1", blocked: true, blockReason: null },
+        actor,
+      });
+      await handlers.deleteForProject!({ input: { projectId: "p1", id: "a2a_1" }, actor });
+
+      expect(app.listProjectA2aTargets).toHaveBeenCalledWith({ projectId: "p1" });
+      expect(app.updateProjectA2aTarget).toHaveBeenCalledWith({
+        projectId: "p1",
+        id: "a2a_1",
+        agentName: "Renamed",
+        actorUserId: "usr_1",
+      });
+      expect(app.setProjectA2aTargetBlocked).toHaveBeenCalledWith({
+        projectId: "p1",
+        id: "a2a_1",
+        blocked: true,
+        blockReason: null,
+        actorUserId: "usr_1",
+      });
+      expect(app.archiveProjectA2aTarget).toHaveBeenCalledWith({ projectId: "p1", id: "a2a_1" });
+    });
+  });
+
+  describe("given the organization target procedures", () => {
     it("lets viewers list and only managers write", () => {
       const { permissions } = mounted(fakeApp());
 
       expect(Object.keys(gatewayA2aTargetTrpc.members).toSorted()).toEqual(
-        ["create", "delete", "list", "setBlocked", "update"].toSorted(),
+        [
+          "create",
+          "delete",
+          "deleteForProject",
+          "list",
+          "listForProject",
+          "setBlocked",
+          "setBlockedForProject",
+          "update",
+          "updateForProject",
+        ].toSorted(),
       );
-      expect(permissions).toEqual({
+      expect(permissions).toMatchObject({
         list: "virtualKeys:view",
         create: "virtualKeys:manage",
         update: "virtualKeys:manage",

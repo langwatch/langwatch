@@ -20,6 +20,13 @@ Feature: A2A proxy on the gateway
     Then the gateway loads it with the project's configuration
 
   @unit
+  Scenario: a project admin manages the project's own targets
+    Given a user who may manage virtual keys of project "p1" only
+    When they list, edit, block or delete A2A targets of project "p1"
+    Then the permission is checked on project "p1"
+    And a target of another project or an org-wide target is not found
+
+  @unit
   Scenario: a target the gateway cannot call safely is left out of the configuration
     Given the configuration holds a target whose URL is not http or https, or whose header holds a line break
     Then the gateway leaves that target out

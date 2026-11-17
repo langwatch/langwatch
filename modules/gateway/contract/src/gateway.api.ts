@@ -49,7 +49,9 @@ import type {
   CreateGatewayA2aTargetInput,
   GatewayA2aTargetDto,
   SetGatewayA2aTargetBlockedInput,
+  SetProjectGatewayA2aTargetBlockedInput,
   UpdateGatewayA2aTargetInput,
+  UpdateProjectGatewayA2aTargetInput,
 } from "./gateway-a2a-target.ts";
 import type {
   ArchiveGatewayCacheRuleInput,
@@ -708,6 +710,13 @@ export interface GatewayApi extends GatewayInternalProtocol {
   /** The kill switch for one target: the gateway refuses calls to a blocked target. */
   setA2aTargetBlocked(input: SetGatewayA2aTargetBlockedInput): Promise<GatewayA2aTargetDto>;
   archiveA2aTarget(input: { id: string; organizationId: string }): Promise<GatewayA2aTargetDto>;
+  /** The project's own targets; org-wide ones stay with the organization. */
+  listProjectA2aTargets(input: { projectId: string }): Promise<GatewayA2aTargetDto[]>;
+  updateProjectA2aTarget(input: UpdateProjectGatewayA2aTargetInput): Promise<GatewayA2aTargetDto>;
+  setProjectA2aTargetBlocked(
+    input: SetProjectGatewayA2aTargetBlockedInput,
+  ): Promise<GatewayA2aTargetDto>;
+  archiveProjectA2aTarget(input: { id: string; projectId: string }): Promise<GatewayA2aTargetDto>;
 
   listGuardrails(projectId: string): Promise<GatewayGuardrailResource[]>;
   findGuardrail(input: { id: string; projectId: string }): Promise<GatewayGuardrailResource | null>;

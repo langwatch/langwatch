@@ -85,7 +85,9 @@ import {
   type CreateGatewayA2aTargetInput,
   type GatewayA2aTargetDto,
   type SetGatewayA2aTargetBlockedInput,
+  type SetProjectGatewayA2aTargetBlockedInput,
   type UpdateGatewayA2aTargetInput,
+  type UpdateProjectGatewayA2aTargetInput,
   type ArchiveGatewayGuardrailInput,
   type CreateGatewayBudgetInput,
   type CreateGatewayCacheRuleInput,
@@ -2122,6 +2124,43 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
   }): Promise<GatewayA2aTargetDto> {
     await this.#dependencies.assertOrganizationExists(input.organizationId);
     return a2aTargetToDto(await this.#dependencies.a2aTargets.archive(input));
+  }
+
+  async listProjectA2aTargets(input: { projectId: string }): Promise<GatewayA2aTargetDto[]> {
+    const organizationId = await this.#dependencies.organizationIdForProject(input.projectId);
+    const targets = await this.#dependencies.a2aTargets.listForProject({
+      organizationId,
+      projectId: input.projectId,
+    });
+    return targets.map(a2aTargetToDto);
+  }
+
+  async updateProjectA2aTarget(
+    input: UpdateProjectGatewayA2aTargetInput,
+  ): Promise<GatewayA2aTargetDto> {
+    const organizationId = await this.#dependencies.organizationIdForProject(input.projectId);
+    return a2aTargetToDto(
+      await this.#dependencies.a2aTargets.updateForProject({ ...input, organizationId }),
+    );
+  }
+
+  async setProjectA2aTargetBlocked(
+    input: SetProjectGatewayA2aTargetBlockedInput,
+  ): Promise<GatewayA2aTargetDto> {
+    const organizationId = await this.#dependencies.organizationIdForProject(input.projectId);
+    return a2aTargetToDto(
+      await this.#dependencies.a2aTargets.setBlockedForProject({ ...input, organizationId }),
+    );
+  }
+
+  async archiveProjectA2aTarget(input: {
+    id: string;
+    projectId: string;
+  }): Promise<GatewayA2aTargetDto> {
+    const organizationId = await this.#dependencies.organizationIdForProject(input.projectId);
+    return a2aTargetToDto(
+      await this.#dependencies.a2aTargets.archiveForProject({ ...input, organizationId }),
+    );
   }
 
   async findProjectOrganization(projectId: string): Promise<string | null> {
