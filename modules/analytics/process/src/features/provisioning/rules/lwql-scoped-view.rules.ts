@@ -91,9 +91,8 @@ export function scopedCopyLookup({ view }: { view: string }): string {
 
 /**
  * Creates the scoped schema, marked as `appSchema`'s, only when the reader group exists and the
- * schema is absent; an operator may pre-create it for a role without CREATE on the database. A
- * role without that privilege leaves it absent, so the copies and their grants are skipped (fail
- * closed).
+ * schema is absent. An operator may pre-create it for a role without CREATE on the database;
+ * without that privilege it stays absent and the copies and grants are skipped (fail closed).
  */
 export function scopedSchemaStatement({ appSchema }: { appSchema: string }): string {
   return [
