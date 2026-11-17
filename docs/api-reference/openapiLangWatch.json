@@ -106631,6 +106631,57 @@
                         }
                       ]
                     }
+                  },
+                  "kind": {
+                    "description": "Absent or \"standard\" plays a user simulator. \"red_team\" plays an attacker and requires redTeam; a standard scenario with redTeam answers 422 scenario_red_team_config_mismatch.",
+                    "type": "string",
+                    "enum": [
+                      "standard",
+                      "red_team"
+                    ]
+                  },
+                  "redTeam": {
+                    "description": "The attack a red_team scenario plays: goal, OWASP ids, strategy and turn budget.",
+                    "type": "object",
+                    "properties": {
+                      "attackGoal": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 4000
+                      },
+                      "owaspIds": {
+                        "minItems": 1,
+                        "maxItems": 10,
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "pattern": "^(LLM(0[1-9]|10)|ASI(0[1-9]|10))$"
+                        }
+                      },
+                      "strategy": {
+                        "default": "crescendo",
+                        "type": "string",
+                        "enum": [
+                          "crescendo",
+                          "goat"
+                        ]
+                      },
+                      "maxTurns": {
+                        "default": 30,
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 50
+                      }
+                    },
+                    "required": [
+                      "attackGoal",
+                      "owaspIds"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "sourceTemplateId": {
+                    "description": "Refused: only applying a suite template marks a scenario with its template.",
+                    "not": {}
                   }
                 },
                 "required": [

@@ -13238,6 +13238,25 @@ export interface operations {
                     fields?: {
                         [key: string]: string | number | boolean;
                     };
+                    /**
+                     * @description Absent or "standard" plays a user simulator. "red_team" plays an attacker and requires redTeam; a standard scenario with redTeam answers 422 scenario_red_team_config_mismatch.
+                     * @enum {string}
+                     */
+                    kind?: "standard" | "red_team";
+                    /** @description The attack a red_team scenario plays: goal, OWASP ids, strategy and turn budget. */
+                    redTeam?: {
+                        attackGoal: string;
+                        owaspIds: string[];
+                        /**
+                         * @default crescendo
+                         * @enum {string}
+                         */
+                        strategy?: "crescendo" | "goat";
+                        /** @default 30 */
+                        maxTurns?: number;
+                    };
+                    /** @description Refused: only applying a suite template marks a scenario with its template. */
+                    sourceTemplateId?: unknown;
                 };
             };
         };

@@ -31329,6 +31329,24 @@ func (e GetApiScenarios200JSONResponseBodyParametersType) Valid() bool {
 	}
 }
 
+// Defines values for PostApiScenariosJSONBodyKind.
+const (
+	RedTeam  PostApiScenariosJSONBodyKind = "red_team"
+	Standard PostApiScenariosJSONBodyKind = "standard"
+)
+
+// Valid indicates whether the value is a known member of the PostApiScenariosJSONBodyKind enum.
+func (e PostApiScenariosJSONBodyKind) Valid() bool {
+	switch e {
+	case RedTeam:
+		return true
+	case Standard:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for PostApiScenariosJSONBodyParametersType.
 const (
 	PostApiScenariosJSONBodyParametersTypeBoolean PostApiScenariosJSONBodyParametersType = "boolean"
@@ -31344,6 +31362,24 @@ func (e PostApiScenariosJSONBodyParametersType) Valid() bool {
 	case PostApiScenariosJSONBodyParametersTypeNumber:
 		return true
 	case PostApiScenariosJSONBodyParametersTypeString:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiScenariosJSONBodyRedTeamStrategy.
+const (
+	PostApiScenariosJSONBodyRedTeamStrategyCrescendo PostApiScenariosJSONBodyRedTeamStrategy = "crescendo"
+	PostApiScenariosJSONBodyRedTeamStrategyGoat      PostApiScenariosJSONBodyRedTeamStrategy = "goat"
+)
+
+// Valid indicates whether the value is a known member of the PostApiScenariosJSONBodyRedTeamStrategy enum.
+func (e PostApiScenariosJSONBodyRedTeamStrategy) Valid() bool {
+	switch e {
+	case PostApiScenariosJSONBodyRedTeamStrategyCrescendo:
+		return true
+	case PostApiScenariosJSONBodyRedTeamStrategyGoat:
 		return true
 	default:
 		return false
@@ -33626,16 +33662,16 @@ func (e ListSuiteTemplates200JSONResponseBodyKind) Valid() bool {
 
 // Defines values for ListSuiteTemplates200JSONResponseBodyScenariosAttackStrategy.
 const (
-	Crescendo ListSuiteTemplates200JSONResponseBodyScenariosAttackStrategy = "crescendo"
-	Goat      ListSuiteTemplates200JSONResponseBodyScenariosAttackStrategy = "goat"
+	ListSuiteTemplates200JSONResponseBodyScenariosAttackStrategyCrescendo ListSuiteTemplates200JSONResponseBodyScenariosAttackStrategy = "crescendo"
+	ListSuiteTemplates200JSONResponseBodyScenariosAttackStrategyGoat      ListSuiteTemplates200JSONResponseBodyScenariosAttackStrategy = "goat"
 )
 
 // Valid indicates whether the value is a known member of the ListSuiteTemplates200JSONResponseBodyScenariosAttackStrategy enum.
 func (e ListSuiteTemplates200JSONResponseBodyScenariosAttackStrategy) Valid() bool {
 	switch e {
-	case Crescendo:
+	case ListSuiteTemplates200JSONResponseBodyScenariosAttackStrategyCrescendo:
 		return true
-	case Goat:
+	case ListSuiteTemplates200JSONResponseBodyScenariosAttackStrategyGoat:
 		return true
 	default:
 		return false
@@ -53983,7 +54019,10 @@ type PostApiScenariosJSONBody struct {
 
 	// JudgeModel Model for the judge, e.g. openai/gpt-6-luna. Null uses the project default.
 	JudgeModel *PostApiScenariosJSONBody_JudgeModel `json:"judgeModel,omitempty"`
-	Labels     *[]string                            `json:"labels,omitempty"`
+
+	// Kind Absent or "standard" plays a user simulator. "red_team" plays an attacker and requires redTeam; a standard scenario with redTeam answers 422 scenario_red_team_config_mismatch.
+	Kind   *PostApiScenariosJSONBodyKind `json:"kind,omitempty"`
+	Labels *[]string                     `json:"labels,omitempty"`
 
 	// MaxTurns Maximum conversation turns for a run of this scenario. Null uses the default.
 	MaxTurns *PostApiScenariosJSONBody_MaxTurns `json:"maxTurns,omitempty"`
@@ -54003,9 +54042,20 @@ type PostApiScenariosJSONBody struct {
 		Type         *PostApiScenariosJSONBodyParametersType             `json:"type,omitempty"`
 	} `json:"parameters,omitempty"`
 
+	// RedTeam The attack a red_team scenario plays: goal, OWASP ids, strategy and turn budget.
+	RedTeam *struct {
+		AttackGoal string                                   `json:"attackGoal"`
+		MaxTurns   *int                                     `json:"maxTurns,omitempty"`
+		OwaspIds   []string                                 `json:"owaspIds"`
+		Strategy   *PostApiScenariosJSONBodyRedTeamStrategy `json:"strategy,omitempty"`
+	} `json:"redTeam,omitempty"`
+
 	// SimulatorModel Model for the simulated user, e.g. openai/gpt-6-luna. Null uses the project default.
 	SimulatorModel *PostApiScenariosJSONBody_SimulatorModel `json:"simulatorModel,omitempty"`
 	Situation      string                                   `json:"situation"`
+
+	// SourceTemplateId Refused: only applying a suite template marks a scenario with its template.
+	SourceTemplateId interface{} `json:"sourceTemplateId,omitempty"`
 
 	// TestSuiteId The test suite to file this scenario in. It must name a non-archived test suite of the same project. null files the scenario into the project's Default test suite.
 	TestSuiteId *string `json:"testSuiteId,omitempty"`
@@ -54032,6 +54082,9 @@ type PostApiScenariosJSONBodyJudgeModel0 = string
 type PostApiScenariosJSONBody_JudgeModel struct {
 	union json.RawMessage
 }
+
+// PostApiScenariosJSONBodyKind defines parameters for PostApiScenarios.
+type PostApiScenariosJSONBodyKind string
 
 // PostApiScenariosJSONBodyMaxTurns0 defines parameters for PostApiScenarios.
 type PostApiScenariosJSONBodyMaxTurns0 = int
@@ -54079,6 +54132,9 @@ type PostApiScenariosJSONBody_Parameters_Options_Item struct {
 
 // PostApiScenariosJSONBodyParametersType defines parameters for PostApiScenarios.
 type PostApiScenariosJSONBodyParametersType string
+
+// PostApiScenariosJSONBodyRedTeamStrategy defines parameters for PostApiScenarios.
+type PostApiScenariosJSONBodyRedTeamStrategy string
 
 // PostApiScenariosJSONBodySimulatorModel0 defines parameters for PostApiScenarios.
 type PostApiScenariosJSONBodySimulatorModel0 = string

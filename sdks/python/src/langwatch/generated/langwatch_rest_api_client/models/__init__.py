@@ -7542,8 +7542,11 @@ from .post_api_scenario_events_response_422 import PostApiScenarioEventsResponse
 from .post_api_scenario_events_response_500 import PostApiScenarioEventsResponse500
 from .post_api_scenarios_body import PostApiScenariosBody
 from .post_api_scenarios_body_fields import PostApiScenariosBodyFields
+from .post_api_scenarios_body_kind import PostApiScenariosBodyKind
 from .post_api_scenarios_body_parameters_item import PostApiScenariosBodyParametersItem
 from .post_api_scenarios_body_parameters_item_type import PostApiScenariosBodyParametersItemType
+from .post_api_scenarios_body_red_team import PostApiScenariosBodyRedTeam
+from .post_api_scenarios_body_red_team_strategy import PostApiScenariosBodyRedTeamStrategy
 from .post_api_scenarios_response_201 import PostApiScenariosResponse201
 from .post_api_scenarios_response_201_fields import PostApiScenariosResponse201Fields
 from .post_api_scenarios_response_201_parameters_item import PostApiScenariosResponse201ParametersItem
@@ -13800,8 +13803,11 @@ __all__ = (
     "PostApiScenarioEventsResponse500",
     "PostApiScenariosBody",
     "PostApiScenariosBodyFields",
+    "PostApiScenariosBodyKind",
     "PostApiScenariosBodyParametersItem",
     "PostApiScenariosBodyParametersItemType",
+    "PostApiScenariosBodyRedTeam",
+    "PostApiScenariosBodyRedTeamStrategy",
     "PostApiScenariosResponse201",
     "PostApiScenariosResponse201Fields",
     "PostApiScenariosResponse201ParametersItem",

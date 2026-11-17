@@ -161,6 +161,25 @@ Feature: A red team scenario runs an attacker against the agent
     And the job does not fail
 
   @unit
+  Scenario: Create over REST or tRPC stores a red team scenario with its attack
+    Given a create that names kind "red_team" and an attack config
+    When it is sent over REST or tRPC
+    Then the stored scenario is a red team scenario with that attack config
+
+  @unit
+  Scenario: Create over REST or tRPC refuses a red team scenario with a bad attack
+    Given a create naming kind "red_team" with no attack config, an unknown OWASP id or more than 50 turns
+    Or a standard scenario carrying an attack config
+    When it is sent over REST
+    Then it is refused with 422 and nothing is stored
+
+  @unit
+  Scenario: Create over REST or tRPC refuses the template marker
+    Given a create that names a sourceTemplateId
+    When it is sent over REST or tRPC
+    Then it is refused by name, since only applying a suite template marks a scenario
+
+  @unit
   Scenario: A duplicated red team scenario stays a red team scenario
     Given a red team scenario with its attack config
     When a member duplicates it
