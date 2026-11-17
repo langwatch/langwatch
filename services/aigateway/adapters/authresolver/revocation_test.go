@@ -3,6 +3,8 @@ package authresolver
 import (
 	"context"
 	"errors"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -97,28 +99,121 @@ func TestRevocation_ReEnabledKeyServesThroughOutage(t *testing.T) {
 	}
 }
 
-// @scenario "a confirmation after the denial clears it even without a re-enable event"
-func TestRevocation_LaterConfirmationClearsDenial(t *testing.T) {
+// @scenario "the background recheck lifts the denial when the control plane confirms the key"
+func TestRevocation_RecheckClearsDenialAfterInterval(t *testing.T) {
+	const interval = 50 * time.Millisecond
 	res := &hookResolver{bundle: orgBundle("vk_missed", time.Now().Add(time.Hour))}
-	svc, _ := newService(t, Options{Resolver: res, ConfigFetcher: res})
+	svc, _ := newService(t, Options{Resolver: res, ConfigFetcher: res, DenialRecheckInterval: interval})
 	key := domain.PresentedKey{Token: "vk-lw-missed"}
 	h := hashKey(key)
 	svc.storeL1(h, orgBundle("vk_missed", time.Now().Add(time.Hour)), "")
 	svc.applyChange("org_1", CacheChange{Kind: ChangeKindVirtualKeyDisabled, VirtualKeyID: "vk_missed"})
 
-	if _, err := svc.Resolve(context.Background(), key); err != nil {
-		t.Fatalf("a key the control plane confirmed after the denial must serve: %v", err)
+	if _, err := svc.Resolve(context.Background(), key); !errors.Is(err, domain.ErrKeyDisabled) {
+		t.Fatalf("a denied key must be refused before the interval: %v", err)
 	}
+	if res.calls != 0 {
+		t.Fatalf("a refusal inside the interval must not call the control plane; got %d calls", res.calls)
+	}
+	time.Sleep(interval + 10*time.Millisecond)
+	if _, err := svc.Resolve(context.Background(), key); !errors.Is(err, domain.ErrKeyDisabled) {
+		t.Fatalf("the request that starts the recheck is still refused locally: %v", err)
+	}
+	waitForRecheck(t, svc, h)
 	if _, ok := svc.denied.Peek("vk_missed"); ok {
-		t.Fatal("the confirmation must lift the denial")
+		t.Fatal("a recheck the control plane confirmed must lift the denial")
 	}
-	if _, ok := svc.deniedKeys.Peek(h); ok {
-		t.Fatal("the confirmation must forget the denied credential")
+	if _, err := svc.Resolve(context.Background(), key); err != nil {
+		t.Fatalf("the key must serve after the recheck: %v", err)
 	}
 	res.bundle, res.err = nil, errControlPlaneDown
 	if denied := svc.refuseDenied(context.Background(), h); denied != nil {
-		t.Fatalf("an outage after the confirmation must not answer the old denial: %v", denied)
+		t.Fatalf("an outage after the recheck must not answer the old denial: %v", denied)
 	}
+}
+
+// @scenario "a re-enable on the change feed lifts the denial at once"
+func TestRevocation_ReEnableClearsDenialAtOnce(t *testing.T) {
+	res := &hookResolver{bundle: orgBundle("vk_flip", time.Now().Add(time.Hour))}
+	svc, _ := newService(t, Options{Resolver: res, ConfigFetcher: res, DenialRecheckInterval: time.Hour})
+	key := domain.PresentedKey{Token: "vk-lw-flip"}
+	svc.storeL1(hashKey(key), orgBundle("vk_flip", time.Now().Add(time.Hour)), "")
+	svc.applyChange("org_1", CacheChange{Kind: ChangeKindVirtualKeyDisabled, VirtualKeyID: "vk_flip"})
+	if _, err := svc.Resolve(context.Background(), key); !errors.Is(err, domain.ErrKeyDisabled) {
+		t.Fatalf("want virtual_key_disabled before the re-enable, got %v", err)
+	}
+
+	svc.applyChange("org_1", CacheChange{Kind: ChangeKindVirtualKeyEnabled, VirtualKeyID: "vk_flip"})
+	if _, err := svc.Resolve(context.Background(), key); err != nil {
+		t.Fatalf("the re-enabled key must serve at once: %v", err)
+	}
+}
+
+// heldResolver holds every ResolveKey call until release closes, and counts them.
+type heldResolver struct {
+	release chan struct{}
+	calls   atomic.Int64
+}
+
+func (r *heldResolver) ResolveKey(_ context.Context, _ domain.PresentedKey) (*domain.Bundle, error) {
+	r.calls.Add(1)
+	<-r.release
+	return nil, errControlPlaneDown
+}
+
+func (r *heldResolver) FetchConfig(_ context.Context, _, _ string) (domain.ConfigFetchResult, error) {
+	return domain.ConfigFetchResult{}, nil
+}
+
+// @scenario "a denied key is refused locally with at most one recheck per interval"
+func TestRevocation_DeniedKeyFloodMakesOneControlPlaneCall(t *testing.T) {
+	const interval = 50 * time.Millisecond
+	res := &heldResolver{release: make(chan struct{})}
+	svc, _ := newService(t, Options{Resolver: res, ConfigFetcher: res, DenialRecheckInterval: interval})
+	key := domain.PresentedKey{Token: "vk-lw-leaked"}
+	h := hashKey(key)
+	svc.storeL1(h, orgBundle("vk_leaked", time.Now().Add(time.Hour)), "")
+	svc.applyChange("org_1", CacheChange{Kind: ChangeKindVirtualKeyDisabled, VirtualKeyID: "vk_leaked"})
+	time.Sleep(interval + 10*time.Millisecond)
+
+	var wg sync.WaitGroup
+	var served atomic.Int64
+	for i := 0; i < 1000; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if _, err := svc.Resolve(context.Background(), key); !errors.Is(err, domain.ErrKeyDisabled) {
+				served.Add(1)
+			}
+		}()
+	}
+	wg.Wait()
+	close(res.release)
+	waitForRecheck(t, svc, h)
+	if n := served.Load(); n != 0 {
+		t.Fatalf("every request on the denied key must be refused; %d were not", n)
+	}
+	if n := res.calls.Load(); n > 1 {
+		t.Fatalf("1000 requests in one interval must make at most 1 control-plane call; got %d", n)
+	}
+	if _, ok := svc.denied.Peek("vk_leaked"); !ok {
+		t.Fatal("a failed recheck must keep the denial")
+	}
+}
+
+func waitForRecheck(t *testing.T, svc *Service, h [64]byte) {
+	t.Helper()
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		svc.rechecks.mu.Lock()
+		st, _ := svc.rechecks.state.Peek(h)
+		svc.rechecks.mu.Unlock()
+		if !st.last.IsZero() && !st.running {
+			return
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	t.Fatal("the denial recheck did not finish")
 }
 
 // @scenario "a resolve that started before the revocation cannot put the key back"

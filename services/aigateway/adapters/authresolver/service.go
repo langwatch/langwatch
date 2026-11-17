@@ -162,6 +162,7 @@ type Service struct {
 	denied          *lru.Cache[string, denial]
 	deniedKeys      *lru.Cache[[64]byte, string]
 	failClosedAfter time.Duration
+	rechecks        denialRechecks
 
 	stopCh chan struct{}
 }
@@ -569,6 +570,9 @@ type Options struct {
 	// control-plane confirmation and its org's last change-feed poll are
 	// older than this. Zero (the default) keeps serving through an outage.
 	FailClosedAfter time.Duration
+	// DenialRecheckInterval is how often a denied key may be re-checked
+	// against the control plane in the background. Default 30s.
+	DenialRecheckInterval time.Duration
 }
 
 // New creates the auth service.
@@ -596,6 +600,9 @@ func New(opts Options) (*Service, error) {
 		opts.ConfigTTL = 0 // disabled
 	}
 
+	if opts.DenialRecheckInterval <= 0 {
+		opts.DenialRecheckInterval = DefaultDenialRecheckInterval
+	}
 	if opts.LicenseRefusalTTL == 0 {
 		opts.LicenseRefusalTTL = 30 * time.Second
 	}
@@ -625,6 +632,7 @@ func New(opts Options) (*Service, error) {
 		denied:            newDenySet(),
 		deniedKeys:        newDeniedKeys(),
 		failClosedAfter:   opts.FailClosedAfter,
+		rechecks:          newDenialRechecks(opts.DenialRecheckInterval),
 		lastKnown:         lastKnown,
 		lastKnownMaxAge:   DefaultLastKnownConfigMaxAge,
 
@@ -678,6 +686,11 @@ func (s *Service) resolveUngated(ctx context.Context, key domain.PresentedKey, h
 		if err := s.admitLicenseToken(ctx, key, h); err != nil {
 			return served{}, err
 		}
+	} else if err := s.refuseDenied(ctx, h); err != nil {
+		// A license token's own refusal comes from the control plane and the
+		// license refusal cache, not this list.
+		s.scheduleRecheck(key, h)
+		return served{}, err
 	}
 	s.recordLookup()
 

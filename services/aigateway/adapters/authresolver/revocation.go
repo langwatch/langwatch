@@ -2,6 +2,7 @@ package authresolver
 
 import (
 	"context"
+	"sync"
 	"time"
 
 	lru "github.com/hashicorp/golang-lru/v2"
@@ -24,6 +25,98 @@ const denySetSize = 1 << 16
 type denial struct {
 	at   time.Time
 	kind string
+}
+
+// DefaultDenialRecheckInterval is how often a denied key may be re-checked
+// against the control plane when no re-enable event arrives.
+const DefaultDenialRecheckInterval = 30 * time.Second
+
+// denialRecheckTimeout bounds one background recheck call.
+const denialRecheckTimeout = 10 * time.Second
+
+// denialRechecks paces background rechecks of denied credentials: at most one
+// per credential per interval, and never two at once for the same credential.
+type denialRechecks struct {
+	mu       sync.Mutex
+	interval time.Duration
+	state    *lru.Cache[[64]byte, recheckState]
+}
+
+type recheckState struct {
+	last    time.Time
+	running bool
+}
+
+func newDenialRechecks(interval time.Duration) denialRechecks {
+	c, err := lru.New[[64]byte, recheckState](denySetSize)
+	if err != nil {
+		panic(err) // only fails for a non-positive size
+	}
+	return denialRechecks{interval: interval, state: c}
+}
+
+// begin claims the recheck of h when none runs and the last one, or the
+// denial itself, is at least one interval old.
+func (r *denialRechecks) begin(h [64]byte, deniedAt time.Time) bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	st, _ := r.state.Peek(h)
+	since := deniedAt
+	if st.last.After(since) {
+		since = st.last
+	}
+	if st.running || time.Since(since) < r.interval {
+		return false
+	}
+	r.state.Add(h, recheckState{last: time.Now(), running: true})
+	return true
+}
+
+func (r *denialRechecks) end(h [64]byte) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if st, ok := r.state.Peek(h); ok {
+		st.running = false
+		r.state.Add(h, st)
+	}
+}
+
+// scheduleRecheck starts a background control-plane check of a denied
+// credential when one is due. Every other request is refused locally.
+func (s *Service) scheduleRecheck(key domain.PresentedKey, h [64]byte) {
+	vkID, ok := s.deniedKeys.Peek(h)
+	if !ok {
+		return
+	}
+	d, ok := s.denied.Peek(vkID)
+	if !ok || !s.rechecks.begin(h, d.at) {
+		return
+	}
+	go s.recheckDenied(key, h, vkID)
+}
+
+// recheckDenied asks the control plane about a denied credential and lifts
+// the denial when the key is confirmed and no newer denial landed meanwhile.
+func (s *Service) recheckDenied(key domain.PresentedKey, h [64]byte, vkID string) {
+	defer s.rechecks.end(h)
+	ctx, cancel := context.WithTimeout(context.Background(), denialRecheckTimeout)
+	defer cancel()
+	go func() {
+		select {
+		case <-s.stopCh:
+			cancel()
+		case <-ctx.Done():
+		}
+	}()
+	answer, err := s.resolveFresh(ctx, key, h)
+	if err != nil {
+		return
+	}
+	if d, ok := s.denied.Peek(vkID); ok && d.at.After(answer.authStart) {
+		return
+	}
+	s.clearDenial(vkID)
+	s.logger.Info("auth_cache_denial_cleared", zap.String("vk_id", vkID), zap.String("source", "recheck"))
 }
 
 func newDenySet() *lru.Cache[string, denial] {
@@ -80,7 +173,8 @@ func (s *Service) deny(vkID, kind string) {
 }
 
 // clearDenial lifts vkID's denial and forgets the credentials that carried
-// it. A re-enable or a confirmation that began after the denial calls it.
+// it. A re-enable, a confirmation that began after the denial, or a
+// background recheck calls it.
 func (s *Service) clearDenial(vkID string) {
 	s.denied.Remove(vkID)
 	for _, h := range s.deniedKeys.Keys() {
@@ -149,7 +243,8 @@ func (s *Service) feedSilent(orgID string) bool {
 }
 
 // refuseDenied answers a credential the change feed denied, and that nothing
-// confirmed since, with that denial's error. It returns nil for any other.
+// confirmed since, with that denial's error and no control-plane call. It
+// returns nil for any other.
 func (s *Service) refuseDenied(ctx context.Context, h [64]byte) error {
 	vkID, ok := s.deniedKeys.Peek(h)
 	if !ok {

@@ -339,9 +339,12 @@ Feature: Gateway auth cache — hot path is zero RTT after first hit
 
     # The change feed delivers VK_REVOKED and VK_DISABLED in one long poll. The
     # gateway records each in a revocation list kept apart from the key cache,
-    # so no stale-serve window or cache eviction expires it. VK_ENABLED lifts a
-    # denial, and so does any confirmation that began after it. VK_ROTATED is
-    # not a denial: the old secret stays valid through its grace period.
+    # so no stale-serve window or cache eviction expires it. A denied key is
+    # refused locally, without a control-plane call. VK_ENABLED lifts a denial
+    # at once; otherwise one background recheck per key per interval (30 s,
+    # shared by concurrent requests) lifts it when the control plane confirms
+    # the key. VK_ROTATED is not a denial: the old secret stays valid through
+    # its grace period.
 
     @unit
     Scenario: a revoked key is refused while the control plane is down
@@ -378,10 +381,24 @@ Feature: Gateway auth cache — hot path is zero RTT after first hit
       Then the key serves, not virtual_key_disabled
 
     @unit
-    Scenario: a confirmation after the denial clears it even without a re-enable event
+    Scenario: a denied key is refused locally with at most one recheck per interval
       Given the change feed disabled a cached key
-      When the control plane confirms the key on a later request
-      Then the denial is lifted
+      When 1000 requests arrive with that key
+      Then every request gets virtual_key_disabled
+      And the control plane gets at most one call for that key in the interval
+
+    @unit
+    Scenario: a re-enable on the change feed lifts the denial at once
+      Given the change feed disabled a cached key and the key was refused
+      When the change feed enables the key
+      Then the next request serves without waiting for a recheck
+
+    @unit
+    Scenario: the background recheck lifts the denial when the control plane confirms the key
+      Given the change feed disabled a cached key
+      And the re-enable event never arrived
+      When the recheck interval has passed and the control plane confirms the key
+      Then the denial is lifted and the key serves
       And a later outage does not answer the key with virtual_key_disabled
 
     @unit
