@@ -91,3 +91,27 @@ Feature: A red team scenario runs an attacker against the agent
   Scenario: The library writes no red team report files in the child
     Given the platform starts a scenario child
     Then the child's environment sets SCENARIO_REDTEAM_REPORT to "0"
+
+  # Run view
+
+  @integration
+  Scenario: The run view shows a held red team run
+    Given a finished red team run whose target held for 30 of 30 turns
+    When I open the run
+    Then I see a "Held" badge in the success colour instead of passed or failed
+    And I see the run's OWASP ids and attack goal
+    And I see "Held for 30 of 30 turns"
+
+  @integration
+  Scenario: The run view shows the turn a broken red team run broke on and each turn's score
+    Given a finished red team run that broke on turn 3 of 30
+    When I open the run
+    Then I see a "Broke" badge in the danger colour
+    And I see "Broke on turn 3 of 30"
+    And each turn lists the judge's score out of 10 and its hint
+
+  @integration
+  Scenario: A suite run row reads Held or Broke for a red team run
+    Given a suite run holding a red team run that broke
+    When I look at the run's row in the results list
+    Then the row reads "Broke" instead of a passed or failed label
