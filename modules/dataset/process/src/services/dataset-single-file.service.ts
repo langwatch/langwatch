@@ -85,20 +85,25 @@ export class DatasetSingleFileService implements Omit<
     generateId: () => string;
     converted?: ConvertedContent;
   }): DatasetSingleFileService {
-    return new DatasetSingleFileService(
-      options.files,
-      options.datasets,
-      options.generateId,
-      options.converted,
-    );
+    return new DatasetSingleFileService(options);
   }
 
-  private constructor(
-    private readonly files: DatasetSingleFileRepository,
-    private readonly datasets: DatasetContentRepository,
-    private readonly generateId: () => string,
-    private readonly converted: ConvertedContent | undefined,
-  ) {}
+  private readonly files: DatasetSingleFileRepository;
+  private readonly datasets: DatasetContentRepository;
+  private readonly generateId: () => string;
+  private readonly converted: ConvertedContent | undefined;
+
+  private constructor(options: {
+    files: DatasetSingleFileRepository;
+    datasets: DatasetContentRepository;
+    generateId: () => string;
+    converted?: ConvertedContent;
+  }) {
+    this.files = options.files;
+    this.datasets = options.datasets;
+    this.generateId = options.generateId;
+    this.converted = options.converted;
+  }
 
   async listRecords(input: {
     dataset: Dataset;

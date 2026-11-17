@@ -10,7 +10,9 @@ type DatasetStorageAuditDatabase = Pick<PrismaClient, "dataset" | "datasetRecord
 
 /** Counts one project's leftovers; every query names the project, archived datasets included. */
 export class PrismaDatasetStorageAuditRepository implements DatasetStorageAuditRepository {
-  static create(options: { database: DatasetStorageAuditDatabase }) {
+  static create(options: {
+    database: DatasetStorageAuditDatabase;
+  }): PrismaDatasetStorageAuditRepository {
     return new PrismaDatasetStorageAuditRepository(options.database);
   }
 

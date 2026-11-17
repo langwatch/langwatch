@@ -12,7 +12,9 @@ export class MemoryDatasetStorageAuditRepository implements DatasetStorageAuditR
     this.#database = database;
   }
 
-  static create(input: Readonly<{ database: MemoryDatasetDatabase }>) {
+  static create(
+    input: Readonly<{ database: MemoryDatasetDatabase }>,
+  ): MemoryDatasetStorageAuditRepository {
     return new MemoryDatasetStorageAuditRepository(input.database);
   }
 

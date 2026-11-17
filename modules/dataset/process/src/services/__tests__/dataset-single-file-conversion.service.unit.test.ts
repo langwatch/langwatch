@@ -2,6 +2,7 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
+import { MissingChunkError } from "@langwatch/dataset-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { MigrationStepReport } from "@langwatch/upgrade/step";
@@ -60,7 +61,7 @@ function install(storage: "object storage" | "local disk" = "object storage") {
 
   /** A single-file dataset as the previous release left it; `file: "none"` stores no file. */
   const singleFile = async (
-    input: { file?: unknown[] | string | "none"; recordedCount?: number; inProject?: string } = {},
+    input: { file?: unknown[] | string; recordedCount?: number; inProject?: string } = {},
   ) => {
     const file = input.file ?? threeRecords;
     const owner = input.inProject ?? projectId;
@@ -357,7 +358,7 @@ describe("the single-file conversion step", () => {
       expect((await row(first)).contentLayout).toBe("postgres");
       await expect(
         repositories.chunks.readChunk({ projectId, datasetId: first, index: 0 }),
-      ).rejects.toThrow();
+      ).rejects.toThrow(MissingChunkError);
       expect(args.saved).toEqual([]);
     });
   });

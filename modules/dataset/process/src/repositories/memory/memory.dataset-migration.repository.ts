@@ -1,5 +1,5 @@
 import type { DatasetRecord } from "@langwatch/dataset-contract";
-import { fromDate } from "@langwatch/time";
+import { fromDate, type Instant, Temporal } from "@langwatch/time";
 
 import type {
   DatasetMigrationFingerprint,
@@ -19,10 +19,9 @@ function byCodeUnit(left: string, right: string): number {
 }
 
 /**
- * The move's Postgres side over the memory twin's rows, by the same rules: a dataset is on the
- * records table when its layout is postgres without a single file, and rows are read by dataset
- * and project. One process holds this database, and `commit` checks and flips with no await
- * between, so the recheck the Postgres twin takes a lock for holds here as it is.
+ * The move's Postgres side over the memory twin's rows, by the same rules (records-table
+ * datasets, rows read by dataset and project). `commit` checks and flips with no await between,
+ * so the recheck the Postgres twin takes a lock for holds here as it is.
  */
 export class MemoryDatasetMigrationRepository implements DatasetMigrationRepository {
   #database: MemoryDatasetDatabase;
@@ -31,7 +30,9 @@ export class MemoryDatasetMigrationRepository implements DatasetMigrationReposit
     this.#database = database;
   }
 
-  static create(input: Readonly<{ database: MemoryDatasetDatabase }>) {
+  static create(
+    input: Readonly<{ database: MemoryDatasetDatabase }>,
+  ): MemoryDatasetMigrationRepository {
     return new MemoryDatasetMigrationRepository(input.database);
   }
 
@@ -135,10 +136,12 @@ export class MemoryDatasetMigrationRepository implements DatasetMigrationReposit
 
   #fingerprint(input: DatasetKey): DatasetMigrationFingerprint {
     const records = this.#records(input);
-    const newest = records.reduce<Date | null>(
-      (latest, record) => (latest && latest >= record.updatedAt ? latest : record.updatedAt),
-      null,
-    );
-    return { count: records.length, maxUpdatedAt: newest ? fromDate(newest) : null };
+    const newest = records
+      .map((record) => fromDate(record.updatedAt))
+      .reduce<Instant | null>(
+        (latest, at) => (latest && Temporal.Instant.compare(latest, at) >= 0 ? latest : at),
+        null,
+      );
+    return { count: records.length, maxUpdatedAt: newest };
   }
 }

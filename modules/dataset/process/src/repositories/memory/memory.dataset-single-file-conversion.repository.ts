@@ -10,7 +10,9 @@ export class MemoryDatasetSingleFileConversionRepository implements DatasetSingl
     this.#database = database;
   }
 
-  static create(input: Readonly<{ database: MemoryDatasetDatabase }>) {
+  static create(
+    input: Readonly<{ database: MemoryDatasetDatabase }>,
+  ): MemoryDatasetSingleFileConversionRepository {
     return new MemoryDatasetSingleFileConversionRepository(input.database);
   }
 

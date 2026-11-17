@@ -1,10 +1,7 @@
 /**
  * @vitest-environment node
- *
- * The remaining-content move, as the worker runs it: the dataset module booted over memory
- * stores, its declared steps swept by the background-steps service. The first move shipped in
- * 3.21.0 and is recorded done on every install that ran it, so the datasets created since are
- * moved by a step under a new id.
+ * The remaining-content move as the worker runs it: the dataset module over memory stores, its
+ * declared steps swept by the background-steps service (content-move-and-cleanup.feature).
  */
 import { AuthzApi } from "@langwatch/authz-contract";
 import { DatasetApi, datasetRecordSchema } from "@langwatch/dataset-contract";

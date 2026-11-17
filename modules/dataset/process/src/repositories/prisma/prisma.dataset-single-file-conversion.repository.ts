@@ -6,7 +6,9 @@ import type { DatasetSingleFileConversionRepository } from "../dataset-single-fi
 type DatasetSingleFileConversionDatabase = Pick<PrismaClient, "dataset">;
 
 export class PrismaDatasetSingleFileConversionRepository implements DatasetSingleFileConversionRepository {
-  static create(options: { database: DatasetSingleFileConversionDatabase }) {
+  static create(options: {
+    database: DatasetSingleFileConversionDatabase;
+  }): PrismaDatasetSingleFileConversionRepository {
     return new PrismaDatasetSingleFileConversionRepository(options.database);
   }
 

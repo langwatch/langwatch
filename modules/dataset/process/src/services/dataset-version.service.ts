@@ -445,10 +445,7 @@ export class DatasetVersionService {
     }
   }
 
-  /**
-   * Writes the version's rows as the dataset's chunks under its lock. A dataset still in the
-   * records table moves to object storage on the way: its table rows stay for the cleanup.
-   */
+  /** Writes the rows as chunks under the dataset's lock; a records-table dataset moves too. */
   async #replaceContent({
     dataset,
     columns,

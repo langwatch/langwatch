@@ -60,6 +60,7 @@ function postgresDataset(repository: MemoryDatasetRepository): Promise<Dataset> 
     name: "Golden Set",
     slug: "golden-set",
     columnTypes,
+    contentLayout: "postgres",
   });
 }
 

@@ -216,7 +216,7 @@ function remaining(summary: DatasetMigrationSummary): number {
   return summary.failed + summary.skippedConcurrentWrite;
 }
 
-/** What a moved dataset adds to the report: archived, empty, or rows it left under another project. */
+/** What a moved dataset adds to the report: archived, empty, or rows left under another project. */
 function note(
   summary: DatasetMigrationSummary,
   key: { datasetId: string; projectId: string },

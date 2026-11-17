@@ -14,6 +14,7 @@ const DATASET_PAGE_SIZE = 50;
 
 type ConversionProjects = Pick<ProjectApi, "listAllIds">;
 type DatasetKey = { datasetId: string; projectId: string };
+type ParsedSingleFile = Extract<ReturnType<typeof parseSingleFileRecords>, { outcome: "parsed" }>;
 
 /** What a run did, and the datasets it left as they were and why. */
 export type DatasetSingleFileConversionReport = {
@@ -97,10 +98,13 @@ export class DatasetSingleFileConversionService {
         dryRun ? Promise.resolve() : checkpoint.save({ report: progress }),
     });
     const problems = [
-      named("have no file but record rows, so they stay single-file datasets", report.missingFile),
-      named("are not a JSON array of records", report.unreadable),
-      named("failed to convert", report.failed),
-    ].filter((problem) => problem !== undefined);
+      ...problemLines(
+        "have no file but record rows, so they stay single-file datasets",
+        report.missingFile,
+      ),
+      ...problemLines("are not a JSON array of records", report.unreadable),
+      ...problemLines("failed to convert", report.failed),
+    ];
     if (problems.length > 0) {
       throw new Error(`Single-file datasets ${problems.join("; ")}; the step retries`);
     }
@@ -193,42 +197,66 @@ export class DatasetSingleFileConversionService {
       const current = await locked.findOne({ id: key.datasetId, projectId: key.projectId });
       if (!current || !isSingleFileDataset(current)) return { outcome: "already-converted" };
 
-      const file = await this.options.files.getSingleFile(key);
-      if (file.outcome === "too_large") return { outcome: "unreadable" };
       const recordedCount = current.s3RecordCount ?? 0;
-      // No file and nothing recorded is a dataset that was never written to: empty, not lost.
-      if (file.outcome === "missing" && recordedCount > 0) return { outcome: "missing-file" };
-      const parsed =
-        file.outcome === "missing"
-          ? { outcome: "parsed" as const, records: [] }
-          : parseSingleFileRecords(file.text);
-      if (parsed.outcome === "unreadable") return { outcome: "unreadable" };
-      if (options.dryRun) return { outcome: "would-convert", records: parsed.records.length };
+      const read = await this.readSingleFile({ key, recordedCount });
+      if (read.outcome !== "parsed") return read;
+      if (options.dryRun) return { outcome: "would-convert", records: read.records.length };
 
-      const writer = StreamingChunkWriterService.create({ storage: this.options.chunks, ...key });
-      for (const record of parsed.records) {
-        await writer.push(record.entry, record.id === undefined ? undefined : { id: record.id });
-      }
-      const meta = await writer.finalize();
-      await this.options.chunks.deleteChunksFrom({ ...key, fromIndex: meta.chunkCount });
-      await locked.update({
-        id: key.datasetId,
-        projectId: key.projectId,
-        data: {
-          contentLayout: "s3_jsonl",
-          useS3: false,
-          rowCount: meta.rowCount,
-          sizeBytes: BigInt(meta.sizeBytes),
-          chunkCount: meta.chunkCount,
-          chunkOffsets: meta.chunkOffsets,
-        },
-      });
-      logger.info(
-        { ...key, rowCount: meta.rowCount, chunkCount: meta.chunkCount },
-        "Converted single-file dataset to chunked JSONL",
-      );
-      return { outcome: "converted", wrongRecordedCount: recordedCount !== meta.rowCount };
+      const rowCount = await this.writeChunks({ key, locked, records: read.records });
+      return { outcome: "converted", wrongRecordedCount: recordedCount !== rowCount };
     });
+  }
+
+  private async readSingleFile({
+    key,
+    recordedCount,
+  }: {
+    key: DatasetKey;
+    recordedCount: number;
+  }): Promise<ParsedSingleFile | { outcome: "missing-file" | "unreadable" }> {
+    const file = await this.options.files.getSingleFile(key);
+    if (file.outcome === "too_large") return { outcome: "unreadable" };
+    // No file and nothing recorded is a dataset that was never written to: empty, not lost.
+    if (file.outcome === "missing") {
+      return recordedCount > 0 ? { outcome: "missing-file" } : { outcome: "parsed", records: [] };
+    }
+    const parsed = parseSingleFileRecords(file.text);
+    return parsed.outcome === "unreadable" ? { outcome: "unreadable" } : parsed;
+  }
+
+  /** Writes the records as the dataset's chunks and flips it, inside the caller's lock. */
+  private async writeChunks({
+    key,
+    locked,
+    records,
+  }: {
+    key: DatasetKey;
+    locked: DatasetContentRepository;
+    records: ParsedSingleFile["records"];
+  }): Promise<number> {
+    const writer = StreamingChunkWriterService.create({ storage: this.options.chunks, ...key });
+    for (const record of records) {
+      await writer.push(record.entry, record.id === undefined ? undefined : { id: record.id });
+    }
+    const meta = await writer.finalize();
+    await this.options.chunks.deleteChunksFrom({ ...key, fromIndex: meta.chunkCount });
+    await locked.update({
+      id: key.datasetId,
+      projectId: key.projectId,
+      data: {
+        contentLayout: "s3_jsonl",
+        useS3: false,
+        rowCount: meta.rowCount,
+        sizeBytes: BigInt(meta.sizeBytes),
+        chunkCount: meta.chunkCount,
+        chunkOffsets: meta.chunkOffsets,
+      },
+    });
+    logger.info(
+      { ...key, rowCount: meta.rowCount, chunkCount: meta.chunkCount },
+      "Converted single-file dataset to chunked JSONL",
+    );
+    return meta.rowCount;
   }
 }
 
@@ -237,6 +265,7 @@ function leftBehind(report: DatasetSingleFileConversionReport): number {
   return report.missingFile.length + report.unreadable.length + report.failed.length;
 }
 
-function named(problem: string, datasetIds: string[]): string | undefined {
-  return datasetIds.length > 0 ? `${datasetIds.join(", ")} ${problem}` : undefined;
+/** One line naming the datasets with a problem, or none when there are none. */
+function problemLines(problem: string, datasetIds: string[]): string[] {
+  return datasetIds.length > 0 ? [`${datasetIds.join(", ")} ${problem}`] : [];
 }
