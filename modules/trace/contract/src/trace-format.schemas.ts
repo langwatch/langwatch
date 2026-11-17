@@ -1,8 +1,6 @@
 import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
-import type { NormalizedSpanKind } from "./trace.spans.ts";
-
 // --------------------------------------------------------------------------- Tracer schemas
 // (Zod-first). Every shared trace/span/evaluation shape is defined as a Zod schema and its
 // TypeScript type is inferred with z.infer, so the schema and the type can never drift apart.
@@ -520,12 +518,6 @@ export interface LangWatchSpanSchema extends Named<typeof langWatchSpanSchemaDef
 export const langWatchSpanSchema: LangWatchSpanSchema = langWatchSpanSchemaDefinition;
 
 export type Span = z.infer<typeof langWatchSpanSchema>;
-
-/**
- * A span as the trace view reads it: `ownerProjectId` set only on a braided owner's span,
- * `kind` from the stored row when the read came from it.
- */
-export type OwnedSpan = Span & { ownerProjectId?: string; kind?: NormalizedSpanKind };
 
 const spanInputOutputValidatorSchema = spanInputOutputSchema.and(
   z.object({

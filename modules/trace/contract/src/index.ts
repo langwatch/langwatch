@@ -119,6 +119,7 @@ export {
   type NormalizedLink,
   type NormalizedSpan,
   type NormalizedSpanSchema,
+  type OwnedSpan,
 } from "./trace.spans.ts";
 export {
   ADD_ANNOTATION_COMMAND_TYPE,

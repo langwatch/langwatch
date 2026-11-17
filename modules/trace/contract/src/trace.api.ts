@@ -92,7 +92,8 @@ import type {
   ModelUsageStatsRow,
   ModelSpanSampleRow,
 } from "./features/span/trace-span-read-model.ts";
-import type { Trace, Span, OwnedSpan, ElasticSearchEvent } from "./trace-format.schemas.ts";
+import type { Trace, Span, ElasticSearchEvent } from "./trace-format.schemas.ts";
+import type { OwnedSpan } from "./trace.spans.ts";
 import type {
   TraceFullReadInput,
   TraceFullRecord,
