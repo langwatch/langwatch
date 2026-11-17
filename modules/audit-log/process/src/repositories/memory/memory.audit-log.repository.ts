@@ -24,13 +24,13 @@ type MemoryAuditLogRow = AuditLogEntry & {
   idempotencyKey?: string;
 };
 
-/** The rows both memory twins share: an entry recorded through one is a touch the other reads. */
 /** Code-unit order, the same order the `id >` watermark uses. */
 function compareIds(left: string, right: string): number {
   if (left === right) return 0;
   return left < right ? -1 : 1;
 }
 
+/** The rows both memory twins share: an entry recorded through one is a touch the other reads. */
 export class MemoryAuditLogStore {
   readonly rows: MemoryAuditLogRow[] = [];
 }

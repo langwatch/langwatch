@@ -14,10 +14,7 @@ import { PROJECT_KIND, type ProjectApi } from "@langwatch/project-contract";
 import { Temporal } from "@langwatch/time";
 import type { TraceApi } from "@langwatch/trace-contract";
 
-import type {
-  GovernanceOcsfEventSink,
-  OcsfIngestOrderedReader,
-} from "../../../repositories/governance.repositories.ts";
+import type { OcsfIngestOrderedReader } from "../../../repositories/governance.repositories.ts";
 import { auditEntryToOcsfEvent } from "../rules/ocsf-v1-9-audit.rules.ts";
 import {
   governanceRowToOcsfEvent,
@@ -33,7 +30,7 @@ const EMPTY_PROJECTS_PER_PAGE = 20;
 type ExportWindow = { limit: number; since?: string; until?: string; cursor?: string };
 
 type OcsfSiemExportDependencies = {
-  events: OcsfIngestOrderedReader & GovernanceOcsfEventSink;
+  events: OcsfIngestOrderedReader;
   projects: Pick<ProjectApi, "findInternal" | "findLiveNonGovernanceIdsByOrganization">;
   traces: Pick<TraceApi, "listTraceSummaries">;
   auditLog: Pick<AuditLogApi, "findForOrganization">;
@@ -185,7 +182,7 @@ export class OcsfSiemExportService {
     const walk = input.projectId === undefined ? projectIds : [input.projectId];
     const fromMs = cursor?.f ?? sinceMs(input.since);
     const toMs =
-      cursor?.t ?? (input.until === undefined ? this.deps.now() : toEpochMs(input.until));
+      input.until === undefined ? (cursor?.t ?? this.deps.now()) : toEpochMs(input.until);
     const { data, next } = await walkProjects({
       traces: this.deps.traces,
       walk,

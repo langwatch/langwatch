@@ -10,6 +10,7 @@ import {
   auditEntry,
   buildApi,
   type Page,
+  type TraceQuery,
   uids,
   okta,
 } from "./ocsf-siem.rest.fixtures.ts";
@@ -135,6 +136,28 @@ describe("the OCSF SIEM REST family", () => {
       expect(resume).toMatchObject({ p: null, f: Date.parse("2026-11-11T00:00:00Z") });
     });
 
+    /** @scenario A later page of the project traces stream reads up to the until it is sent */
+    it("bounds the next page by the until sent with it", async () => {
+      const traceQueries: TraceQuery[] = [];
+      const { get } = await buildApi({
+        traces: { "project-a": [summary("t-a")], "project-b": [summary("t-b")] },
+        traceQueries,
+      });
+
+      const first = (await (
+        await get("/api/governance/ocsf/traces?until=2026-11-11T00:00:00Z")
+      ).json()) as Page;
+      await get(
+        `/api/governance/ocsf/traces?until=2026-11-12T00:00:00Z&cursor=${first.next_cursor}`,
+      );
+
+      expect(first.has_more).toBe(true);
+      expect(traceQueries.map((query) => query.endDate)).toEqual([
+        Date.parse("2026-11-11T00:00:00Z"),
+        Date.parse("2026-11-12T00:00:00Z"),
+      ]);
+    });
+
     /** @scenario A project outside the organisation is refused on the project traces stream */
     it("refuses a project of another organisation with 422", async () => {
       const { get } = await buildApi();
@@ -172,6 +195,7 @@ describe("the OCSF SIEM REST family", () => {
   });
 
   describe("given an audit entry written a minute ago", () => {
+    /** @scenario The audit stream holds back entries younger than ten minutes */
     it("holds it back until it is ten minutes old", async () => {
       const recent = new Date(Date.now() - 60_000).toISOString();
       const { get } = await buildApi({

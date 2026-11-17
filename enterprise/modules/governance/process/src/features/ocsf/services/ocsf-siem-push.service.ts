@@ -5,7 +5,7 @@ import {
   type GovernanceOcsfExportRow,
 } from "@langwatch/enterprise-governance-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
-import type { WebhookApi } from "@langwatch/webhook-contract";
+import { eventMatches, type WebhookApi } from "@langwatch/webhook-contract";
 
 import {
   OCSF_STORED_SCHEMA_VERSION,
@@ -28,11 +28,6 @@ type OcsfSiemPushDependencies = {
   /** The pipeline's outbox in the worker, the Postgres intents in the api; memory-only stacks push nothing. */
   outbox: () => OcsfPushOutbox | undefined;
 };
-
-/** OCSF events go only to endpoints that name them: `*` and `governance.*` do not opt in. */
-function subscribesToOcsfEvents(enabledEvents: readonly string[]): boolean {
-  return enabledEvents.some((selector) => selector === OCSF_EVENT_TYPE || selector === "ocsf.*");
-}
 
 function exportRowOf(row: GovernanceOcsfEvent): GovernanceOcsfExportRow {
   return {
@@ -78,7 +73,9 @@ export class OcsfSiemPushService implements GovernanceOcsfEventSink {
     const byTenant = new Map<string, GovernanceOcsfEvent[]>();
     for (const row of rows) {
       if (row.sourceType === OCSF_PUSHED_SOURCE_TYPE) continue;
-      byTenant.set(row.tenantId, [...(byTenant.get(row.tenantId) ?? []), row]);
+      const bucket = byTenant.get(row.tenantId);
+      if (bucket) bucket.push(row);
+      else byTenant.set(row.tenantId, [row]);
     }
     for (const [tenantId, tenantRows] of byTenant) {
       await this.queue({ tenantId, rows: tenantRows });
@@ -96,7 +93,8 @@ export class OcsfSiemPushService implements GovernanceOcsfEventSink {
     if (!outbox || rows.length === 0) return;
     const organizationId = await this.deps.projects.getOrganizationId(tenantId);
     const endpoints = (await this.deps.webhooks.getAll({ organizationId })).filter(
-      (endpoint) => endpoint.status === "ACTIVE" && subscribesToOcsfEvents(endpoint.enabledEvents),
+      (endpoint) =>
+        endpoint.status === "ACTIVE" && eventMatches(endpoint.enabledEvents, OCSF_EVENT_TYPE),
     );
     if (endpoints.length === 0) return;
     if (!(await this.deps.entitlements.hasEnterprisePlan(organizationId))) return;

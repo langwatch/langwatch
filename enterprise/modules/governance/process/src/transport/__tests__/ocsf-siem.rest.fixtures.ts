@@ -85,6 +85,9 @@ export function governanceEvent(
   };
 }
 
+/** One traces query the export sends. */
+export type TraceQuery = Parameters<TraceApi["listTraceSummaries"]>[0]["query"];
+
 export function summary(traceId: string): TraceSummaryData {
   const at = Date.parse("2026-11-10T10:00:00Z");
   return {
@@ -153,11 +156,14 @@ export async function buildApi({
   grants = ["complianceExport:view", "governance:manage"],
   planType = "ENTERPRISE",
   traces = {},
+  traceQueries = [],
   audit = [],
 }: {
   grants?: string[];
   planType?: string;
   traces?: Record<string, TraceSummaryData[]>;
+  /** Every traces query the export sends, in order. */
+  traceQueries?: TraceQuery[];
   audit?: AuditLogExportEntry[];
 } = {}) {
   const repositories = MemoryGovernanceRepositories.create();
@@ -180,7 +186,10 @@ export async function buildApi({
       scim: createApiFixture<ScimApi>(),
       featureFlags: createApiFixture<FeatureFlagApi>(),
       traces: createApiFixture<TraceApi>({
-        listTraceSummaries: async ({ query }) => ({ summaries: traces[query.projectId] ?? [] }),
+        listTraceSummaries: async ({ query }) => {
+          traceQueries.push(query);
+          return { summaries: traces[query.projectId] ?? [] };
+        },
       }),
       apiKeys: createApiFixture<ApiKeyApi>(),
       gateway: createApiFixture<GatewayApi>(),

@@ -114,6 +114,12 @@ Feature: OCSF 1.9 SIEM export, push and ingest
       And the last next_cursor starts the next read where this window ended
 
     @integration
+    Scenario: A later page of the project traces stream reads up to the until it is sent
+      Given each of the two projects holds one trace
+      When a SIEM reads the first page with one until and the next page with a later until
+      Then the next page reads traces up to the later until
+
+    @integration
     Scenario: A project outside the organisation is refused on the project traces stream
       When a SIEM reads the project traces stream for a project of another organisation
       Then the answer is 422 with code "validation_error"
@@ -123,6 +129,12 @@ Feature: OCSF 1.9 SIEM export, push and ingest
       Given three audit entries for the organisation
       When a SIEM reads the audit stream two entries at a time
       Then it receives all three entries in order as OCSF events across two pages
+
+    @integration
+    Scenario: The audit stream holds back entries younger than ten minutes
+      Given an audit entry from yesterday and one written a minute ago
+      When a SIEM reads the audit stream
+      Then it receives only the entry from yesterday
 
   Rule: events are pushed to the webhook endpoints that subscribe to ocsf.event
 
