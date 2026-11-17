@@ -54,11 +54,12 @@ describe("buildRedTeamCast", () => {
   /** @scenario "A red team run plays the attacker in place of the user simulator" */
   it("casts the agent, a crescendo attacker on the simulator model and the judge", () => {
     const adapter = new TargetAgent();
+    const judge = ScenarioRunner.judgeAgent({ criteria: ["Stays safe"], model });
     const cast = buildRedTeamCast({
       adapter,
       scenario: scenarioWith({}),
       simulatorModel: model,
-      judgeModel: model,
+      judge,
     });
 
     expect(cast.agents).toHaveLength(3);
@@ -66,8 +67,7 @@ describe("buildRedTeamCast", () => {
     expect(cast.agents[1]).toBe(cast.redTeam.attacker);
     expect(ScenarioRunner.isRedTeamAgent(cast.agents[1])).toBe(true);
     expect(strategyOf(cast.redTeam.attacker)).toBeInstanceOf(ScenarioRunner.CrescendoStrategy);
-    expect(cast.agents[2]).toBeInstanceOf(ScenarioRunner.JudgeAgent);
-    expect(cast.agents[2]).toMatchObject({ criteria: scenarioWith({}).criteria });
+    expect(cast.agents[2]).toBe(judge);
     // A user turn, an agent turn and an early exit check per turn, then the judge.
     expect(cast.script).toHaveLength(12 * 3 + 1);
     expect(cast.redTeam.totalTurns).toBe(12);
@@ -79,7 +79,7 @@ describe("buildRedTeamCast", () => {
       adapter: new TargetAgent(),
       scenario: scenarioWith({ redTeam: { ...config, strategy: "goat" } }),
       simulatorModel: model,
-      judgeModel: model,
+      judge: ScenarioRunner.judgeAgent({ criteria: ["Stays safe"], model }),
     });
     expect(strategyOf(cast.redTeam.attacker)).toBeInstanceOf(ScenarioRunner.GoatStrategy);
   });
@@ -93,7 +93,7 @@ describe("buildRedTeamCast", () => {
         adapter: new TargetAgent(),
         scenario,
         simulatorModel: model,
-        judgeModel: model,
+        judge: ScenarioRunner.judgeAgent({ criteria: ["Stays safe"], model }),
       }),
     ).toThrow(/attack config/);
   });

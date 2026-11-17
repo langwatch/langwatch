@@ -559,8 +559,10 @@
 /api-reference/teams/remove-member
 /api-reference/teams/update-team
 /api-reference/test-suites
+/api-reference/test-suites/apply-a-suite-template
 /api-reference/test-suites/create-test-suites
 /api-reference/test-suites/delete-test-suites
+/api-reference/test-suites/list-suite-templates
 /api-reference/test-suites/list-test-suites
 /api-reference/test-suites/overview
 /api-reference/test-suites/read-one-test-suite

@@ -178,8 +178,9 @@ function buildRunCast({
     nlpServiceUrl,
     nlpInternalSecret,
   });
+  const baseJudge = ScenarioRunner.judgeAgent({ criteria: scenario.criteria, model: judgeModel });
   if (isRedTeamRun(scenario)) {
-    return buildRedTeamCast({ adapter, scenario, simulatorModel, judgeModel });
+    return buildRedTeamCast({ adapter, scenario, simulatorModel, judge: baseJudge });
   }
   // An inbound phone agent that greets on connect opens the run with its own
   // turn (so the greeting is captured first), then hands over to the
@@ -188,7 +189,7 @@ function buildRunCast({
   const agentGreetsFirstScript = buildAgentGreetsFirstScript(jobData.adapterData);
   const roles = {
     userSimulator: ScenarioRunner.userSimulatorAgent({ model: simulatorModel, ...voiceSimConfig }),
-    judge: ScenarioRunner.judgeAgent({ criteria: scenario.criteria, model: judgeModel }),
+    judge: baseJudge,
   };
   const { userSimulator, judge } = readState
     ? RunStateRolesService.create({ readState }).wrap(roles)
@@ -214,12 +215,12 @@ export function buildRedTeamCast({
   adapter,
   scenario,
   simulatorModel,
-  judgeModel,
+  judge,
 }: {
   adapter: ScenarioRunner.AgentAdapter;
   scenario: ChildProcessJobData["scenario"];
   simulatorModel: ScenarioRunner.RedTeamAgentConfig["model"];
-  judgeModel: ScenarioRunner.JudgeAgentConfig["model"];
+  judge: ScenarioRunner.AgentAdapter;
 }): {
   agents: ScenarioRunner.AgentAdapter[];
   script: ScenarioRunner.ScriptStep[];
@@ -238,7 +239,6 @@ export function buildRedTeamCast({
     config.strategy === "goat"
       ? ScenarioRunner.redTeamGoat(attackerConfig)
       : ScenarioRunner.redTeamCrescendo(attackerConfig);
-  const judge = ScenarioRunner.judgeAgent({ criteria: scenario.criteria, model: judgeModel });
   return {
     agents: [adapter, attacker, judge],
     script: attacker.marathonScript(),
