@@ -26,7 +26,7 @@ import { usePublishWidgetCompleteness } from "../../../../behavior/widget-comple
 import { projectAwaitsFirstTrace, useAnalyticsHost } from "../../../../model/analytics-host.ts";
 import {
   managedPromptVersionGate,
-  readsManagedPromptVersion,
+  readsManagedPromptVersionFromTraceMetrics,
 } from "../../../../model/dashboard-widget/managed-prompt-version-floor.ts";
 import { declaredParamDefaults } from "../../../../model/dashboard-widget/params-snapshot.ts";
 import {
@@ -146,7 +146,9 @@ export function DashboardWidgetFrameOverWindow(props: DashboardWidgetFrameOverWi
   const code = parsed.success ? parsed.data.code : "";
   const key = `${props.id}:${queries}:${code}:${props.periodKey}`;
   const body = <WidgetFrameOverWindow key={key} {...props} parsed={parsed} />;
-  if (!parsed.success || !readsManagedPromptVersion(parsed.data.queries)) return body;
+  if (!parsed.success || !readsManagedPromptVersionFromTraceMetrics(parsed.data.queries)) {
+    return body;
+  }
   return (
     <ManagedPromptVersionGate projectId={props.projectId} timeWindow={props.timeWindow}>
       {body}

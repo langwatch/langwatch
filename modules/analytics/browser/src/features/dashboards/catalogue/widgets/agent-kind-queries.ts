@@ -99,6 +99,18 @@ const TRACE_KEY = "sipHash128(TraceId)";
 const AFTER_EVERY_ROW = "toDateTime64('2200-01-01 00:00:00', 3)";
 
 /**
+ * Each trace's managed prompt version and time as `traces` holds them: its newest `trace_metrics`
+ * row's. Read from the floor with no upper bound, so the caller drops a newest row past the end;
+ * a newest row before the floor goes unseen: the one ruled difference (ADR-006, a falling anchor).
+ */
+const managedVersionPerTrace = ({ where = "" }: { where?: string } = {}) => `SELECT ${TRACE_KEY} AS trace,
+        argMax(LastUsedPromptVersionId, UpdatedAt) AS managed,
+        argMax(OccurredAt, UpdatedAt) AS anchored
+      FROM trace_metrics
+      WHERE OccurredAt >= ${PREVIOUS_START}${where}
+      GROUP BY trace`;
+
+/**
  * Judges' verdicts over both periods, dated by the trace on their own row: an evaluation may run
  * long after the answer, and no join to `trace_metrics` (analytics ADR-007). Guardrails guard.
  */
@@ -106,22 +118,24 @@ const JUDGED_IN_BOTH_PERIODS = `OccurredAt >= ${PREVIOUS_START} AND ${inPeriodAn
       AND Passed IS NOT NULL
       AND IsGuardrail = false`;
 
-/** Each judged trace once, with the unit and metadata version of its first evaluation row. */
+/**
+ * Each judged trace once, with the unit of its first evaluation row. No version: the pass rates
+ * never read one, and every column read widens the settled view's GROUP BY (analytics ADR-007).
+ */
 const JUDGED_UNIT_TRACES = `SELECT ${TRACE_KEY} AS trace,
     argMin(unit, TraceOccurredAt) AS unit,
-    argMin(MetadataPromptVersion, TraceOccurredAt) AS version,
     min(TraceOccurredAt) AS at,
     countIf(Passed = 1) AS passed,
     count() AS judged
-  FROM (SELECT TraceId, TraceOccurredAt, MetadataPromptVersion, Passed, ${METRICS_UNIT} AS unit
+  FROM (SELECT TraceId, TraceOccurredAt, Passed, ${METRICS_UNIT} AS unit
     FROM trace_evaluation_metrics
     WHERE ${JUDGED_IN_BOTH_PERIODS})
   GROUP BY trace`;
 
 /**
- * Each judged trace once, as {@link JUDGED_UNIT_TRACES}, with the managed prompt version
- * streamed in beside the verdicts, so no second join (analytics ADR-004); a trace with only a
- * managed-version row is no judged trace and is left out.
+ * Each judged trace once, with its metadata version and the managed one streamed in beside the
+ * verdicts from `trace_metrics`: no join (ADR-004), and floored, where `traces` reads all history
+ * (ADR-006). A trace with only a managed-version row is no judged trace and is left out.
  */
 const JUDGED_VERSION_TRACES = `SELECT t.trace AS trace,
     argMin(t.unit, t.at) AS unit,
@@ -137,11 +151,13 @@ const JUDGED_VERSION_TRACES = `SELECT t.trace AS trace,
     FROM trace_evaluation_metrics
     WHERE ${JUDGED_IN_BOTH_PERIODS}
     UNION ALL
-    SELECT ${TRACE_KEY} AS trace, '' AS unit, '' AS version, ${AFTER_EVERY_ROW} AS at,
-      LastUsedPromptVersionId AS managed, CAST(NULL AS Nullable(Bool)) AS passed, 0 AS judged
-    FROM traces
-    WHERE ${inPeriodAndPrevious("OccurredAt")}
-      AND LastUsedPromptVersionId != ''
+    SELECT trace, '' AS unit, '' AS version, ${AFTER_EVERY_ROW} AS at,
+      managed, CAST(NULL AS Nullable(Bool)) AS passed, 0 AS judged
+    FROM (
+      ${managedVersionPerTrace()}
+    )
+    WHERE anchored < ${END}
+      AND managed != ''
   ) AS t
   GROUP BY t.trace
   HAVING at < ${AFTER_EVERY_ROW}`;
@@ -205,6 +221,11 @@ const METADATA_VERSIONED = `SELECT cityHash64(TraceId)
         WHERE ${inPeriodAndPrevious("OccurredAt")}
           AND MetadataPromptVersion != ''`;
 
+/**
+ * Each version's first use inside both windows, never all history, as it was on `traces`: a
+ * version first used long ago and still in use dates from its first use in the window. A trace
+ * counts once, at the time and with the version of its newest `trace_metrics` row.
+ */
 const VERSIONS = `SELECT version, min(first_seen) AS first_seen
     FROM (
       SELECT MetadataPromptVersion AS version, min(OccurredAt) AS first_seen
@@ -213,13 +234,17 @@ const VERSIONS = `SELECT version, min(first_seen) AS first_seen
         AND MetadataPromptVersion != ''
       GROUP BY version
       UNION ALL
-      SELECT ifNull(LastUsedPromptVersionId, '') AS version, min(OccurredAt) AS first_seen
-      FROM traces
-      WHERE ${inPeriodAndPrevious("OccurredAt")}
-        AND LastUsedPromptVersionId != ''
+      SELECT managed AS version, min(anchored) AS first_seen
+      FROM (
+      ${managedVersionPerTrace({
+        where: `
         AND cityHash64(TraceId) NOT IN (
           ${METADATA_VERSIONED}
-        )
+        )`,
+      })}
+      )
+      WHERE anchored < ${END}
+        AND managed != ''
       GROUP BY version
     )
     GROUP BY version`;

@@ -1,6 +1,6 @@
 /**
- * Whether a widget that reads `LastUsedPromptVersionId` may show its rows. Older trace rows carry
- * the column only once the managed prompt version replay is done, so until then, and over a
+ * Whether a widget reading `LastUsedPromptVersionId` from trace_metrics may show its rows. Older
+ * rows carry it only once the managed prompt version replay is done, so until then, and over a
  * window reaching before the replay's since, the rows could be wrong: a notice replaces them.
  * @see specs/lwql/stock-widgets-on-trace-metrics.feature
  */
@@ -24,7 +24,11 @@ export const PROMPT_VERSION_HISTORY_REBUILDING_NOTICE =
   "Prompt version history is still being rebuilt";
 export const PROMPT_VERSION_HISTORY_UNKNOWN_NOTICE = "Prompt version history unknown";
 
-const READS_MANAGED_PROMPT_VERSION = /\bLastUsedPromptVersionId\b/;
+const MANAGED_PROMPT_VERSION = /\bLastUsedPromptVersionId\b/;
+const FROM_TRACE_METRICS = /\b(?:FROM|JOIN)\s+(?:analytics\.)?trace_metrics(?:__floor)?\b/i;
+const UNION = /\bUNION\s+(?:ALL|DISTINCT)\b/i;
+const OPENS_SUBQUERY = /^\s*(?:SELECT|WITH)\b/i;
+const LINE_COMMENT = /--[^\n]*/g;
 
 /** The day the notice names, as the span data notice does: "10 Oct 2026", in UTC. */
 const DAY = new Intl.DateTimeFormat("en-GB", {
@@ -36,9 +40,45 @@ const DAY = new Intl.DateTimeFormat("en-GB", {
 
 const BODY: ManagedPromptVersionGate = { kind: "body" };
 
-/** Whether any of a widget's queries reads `LastUsedPromptVersionId`. */
-export function readsManagedPromptVersion(queries: readonly { readonly sql: string }[]): boolean {
-  return queries.some((query) => READS_MANAGED_PROMPT_VERSION.test(query.sql));
+/**
+ * Each SELECT of a statement as its own text: a subquery's parentheses cut it out into its own
+ * entry, a function call's do not, and UNION branches split apart.
+ */
+function selectsOf(sql: string): string[] {
+  const text = sql.replace(LINE_COMMENT, "");
+  const open: string[] = [""];
+  const closed: string[] = [];
+  const opensSubquery: boolean[] = [];
+  for (let index = 0; index < text.length; index++) {
+    const char = text.charAt(index);
+    if (char === "(") {
+      const subquery = OPENS_SUBQUERY.test(text.slice(index + 1));
+      opensSubquery.push(subquery);
+      if (subquery) {
+        open.push("");
+        continue;
+      }
+    } else if (char === ")" && opensSubquery.pop() === true) {
+      closed.push(open.pop() ?? "");
+      continue;
+    }
+    open[open.length - 1] += char;
+  }
+  return [...closed, ...open].flatMap((select) => select.split(UNION));
+}
+
+/**
+ * Whether any of a widget's queries reads `LastUsedPromptVersionId` from `trace_metrics`, the
+ * only source the replay fills; a SELECT reading it from `traces` is complete without it.
+ */
+export function readsManagedPromptVersionFromTraceMetrics(
+  queries: readonly { readonly sql: string }[],
+): boolean {
+  return queries.some((query) =>
+    selectsOf(query.sql).some(
+      (select) => MANAGED_PROMPT_VERSION.test(select) && FROM_TRACE_METRICS.test(select),
+    ),
+  );
 }
 
 /**

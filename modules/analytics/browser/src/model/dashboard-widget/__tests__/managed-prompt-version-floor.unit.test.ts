@@ -10,7 +10,7 @@ import { describe, expect, it } from "vitest";
 import {
   managedPromptVersionGate,
   type ManagedPromptVersionFloorRead,
-  readsManagedPromptVersion,
+  readsManagedPromptVersionFromTraceMetrics,
 } from "../managed-prompt-version-floor.ts";
 
 const DAY_MS = 86_400_000;
@@ -103,13 +103,97 @@ describe("managedPromptVersionGate", () => {
   });
 });
 
-describe("readsManagedPromptVersion", () => {
+/** ck-trend's and ext-cost-per-doc's shape: the column from traces, beside trace_metrics reads. */
+const COLUMN_FROM_TRACES_BESIDE_TRACE_METRICS = `SELECT kind, name FROM (
+  SELECT 'model' AS kind, arrayJoin(Models) AS name FROM trace_metrics
+  UNION ALL
+  SELECT 'prompt' AS kind, name FROM (
+    SELECT LastUsedPromptVersionId AS name FROM traces WHERE LastUsedPromptVersionId != ''
+    UNION ALL
+    SELECT MetadataPromptVersion AS name FROM trace_metrics
+    WHERE cityHash64(TraceId) NOT IN (
+      SELECT cityHash64(TraceId) FROM traces WHERE LastUsedPromptVersionId != ''
+    )
+  )
+)
+WHERE first_at > (SELECT min(OccurredAt) FROM trace_metrics)`;
+
+/** att-change's shape: the column from trace_metrics in one UNION branch of a subquery. */
+const COLUMN_FROM_TRACE_METRICS_IN_A_UNION = `SELECT version FROM (
+  SELECT MetadataPromptVersion AS version FROM trace_metrics WHERE MetadataPromptVersion != ''
+  UNION ALL
+  SELECT LastUsedPromptVersionId AS version FROM trace_metrics
+  WHERE LastUsedPromptVersionId != ''
+    AND cityHash64(TraceId) NOT IN (SELECT cityHash64(TraceId) FROM trace_metrics)
+)`;
+
+describe("readsManagedPromptVersionFromTraceMetrics", () => {
   it.each([
     ["SELECT LastUsedPromptVersionId FROM trace_metrics", true],
     ["SELECT any(t.LastUsedPromptVersionId) AS v FROM trace_metrics AS t", true],
+    ["SELECT LastUsedPromptVersionId FROM analytics.trace_metrics", true],
+    ["SELECT m.LastUsedPromptVersionId FROM traces AS t JOIN trace_metrics AS m USING TraceId", true],
     ["SELECT MetadataPromptVersion FROM trace_metrics", false],
     ["SELECT LastUsedPromptVersionIds FROM trace_metrics", false],
+    ["SELECT LastUsedPromptVersionId FROM traces", false],
+    ["SELECT count() FROM trace_metrics -- not LastUsedPromptVersionId", false],
   ])("reads %s as %s", (sql, expected) => {
-    expect(readsManagedPromptVersion([{ sql }])).toBe(expected);
+    expect(readsManagedPromptVersionFromTraceMetrics([{ sql }])).toBe(expected);
+  });
+
+  it("does not gate a query reading the column only from traces, beside trace_metrics reads", () => {
+    expect(
+      readsManagedPromptVersionFromTraceMetrics([{ sql: COLUMN_FROM_TRACES_BESIDE_TRACE_METRICS }]),
+    ).toBe(false);
+  });
+
+  it("does not gate the column and trace_metrics in different UNION branches", () => {
+    const sql = `SELECT LastUsedPromptVersionId AS name FROM traces
+UNION ALL
+SELECT MetadataPromptVersion AS name FROM trace_metrics`;
+
+    expect(readsManagedPromptVersionFromTraceMetrics([{ sql }])).toBe(false);
+  });
+
+  it("does not gate the column and trace_metrics in different subqueries", () => {
+    const sql = `SELECT count() FROM trace_metrics WHERE TraceId IN (
+  SELECT TraceId FROM traces WHERE LastUsedPromptVersionId != ''
+)`;
+
+    expect(readsManagedPromptVersionFromTraceMetrics([{ sql }])).toBe(false);
+  });
+
+  it("gates a query reading the column from trace_metrics in one branch of a union", () => {
+    expect(
+      readsManagedPromptVersionFromTraceMetrics([{ sql: COLUMN_FROM_TRACE_METRICS_IN_A_UNION }]),
+    ).toBe(true);
+  });
+
+  it("treats a parenthesis inside a string literal as structure: known limit", () => {
+    const fromTracesJoinedToTraceMetrics = (filter: string) => `SELECT name FROM (
+  SELECT TraceId, LastUsedPromptVersionId AS name FROM traces WHERE ${filter}
+) AS t
+INNER JOIN trace_metrics AS m ON m.TraceId = t.TraceId`;
+
+    expect(
+      readsManagedPromptVersionFromTraceMetrics([
+        { sql: fromTracesJoinedToTraceMetrics("Name != ''") },
+      ]),
+    ).toBe(false);
+    // Errs gated (safe): the literal's '(' eats the subquery's ')', so the join reads as inside.
+    expect(
+      readsManagedPromptVersionFromTraceMetrics([
+        { sql: fromTracesJoinedToTraceMetrics("Name != '('") },
+      ]),
+    ).toBe(true);
+  });
+
+  it("gates a widget when any one of its queries reads the column from trace_metrics", () => {
+    expect(
+      readsManagedPromptVersionFromTraceMetrics([
+        { sql: COLUMN_FROM_TRACES_BESIDE_TRACE_METRICS },
+        { sql: COLUMN_FROM_TRACE_METRICS_IN_A_UNION },
+      ]),
+    ).toBe(true);
   });
 });

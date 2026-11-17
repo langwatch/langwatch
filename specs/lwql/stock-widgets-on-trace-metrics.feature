@@ -86,6 +86,39 @@ Feature: Stock trace widgets read the light trace table
 
   Rule: att-change reads the managed prompt version from trace_metrics
 
+    @unit
+    Scenario: att-change reads the managed version from trace_metrics' floored twin, never traces
+      Given trace_metrics exposes LastUsedPromptVersionId as a String column, read from trace_analytics
+      When att-change's two queries are sent the way the executor sends them
+      Then each reads LastUsedPromptVersionId and never names traces
+      And every trace_metrics read in them goes to its floored twin
+      And no other stock query reads the managed version from traces but the two changes queries
+
+    @integration
+    Scenario: A version first used 200 days ago keeps the first-seen time it had
+      Given a prompt version first used 200 days ago and used again inside the period
+      And the period's newest version before it was first used earlier in the period
+      When att-change/change runs as written and through the floored twin, under the application list and the langy list
+      Then it returns the rows its traces form returned
+      And the version, dated from its first use inside the period and the window before it, is the newest
+      And the version it replaced is the one before it
+
+    @integration
+    Scenario: A trace whose newest trace_metrics row changed its version reads the newest version
+      Given a judged trace written twice inside the window, the newer write with another anchor and another managed version
+      And each write reaching both trace_summaries and trace_analytics, the newer with the later UpdatedAt
+      When att-change's two queries run, under the application list and the langy list
+      Then each returns the rows its traces form returned
+      And the trace counts with the newer write's version, at the newer write's time
+
+    @integration
+    Scenario: A trace whose newest row anchored before the window counts with its in-window version
+      Given a trace whose older write is anchored inside the window and whose newer write is anchored before it
+      When att-change/change runs, as written and through the floored twin
+      Then it counts the trace with the older write's version, where its traces form leaves the trace out
+      And this is the one difference the floored read keeps, since the floor cuts off the newer write
+      But att-change/units returns its traces form's rows, as the evaluation moves to the newer anchor too
+
     @integration
     Scenario: att-change and passRates answer within the memory cap on 120 days, whatever the history
       Given a small project and a large project, each with 300 days of older history, and a large project with none

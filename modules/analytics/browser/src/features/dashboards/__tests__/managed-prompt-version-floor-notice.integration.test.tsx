@@ -1,8 +1,8 @@
 /**
  * @vitest-environment jsdom
- * A widget on a board that reads LastUsedPromptVersionId mounts its body only once its rows
- * cannot be wrong; otherwise a notice stands in its place. Only the sandboxed frame is stood in
- * for, since jsdom cannot run it.
+ * A widget reading LastUsedPromptVersionId from trace_metrics mounts its body only once its rows
+ * cannot be wrong, else a notice stands in; one reading it from traces is never gated. Only the
+ * sandboxed frame is stood in for, since jsdom cannot run it.
  * @see specs/lwql/stock-widgets-on-trace-metrics.feature
  */
 
@@ -15,6 +15,17 @@ vi.mock("../../dashboard-widget/ui/sections/sandboxed-chart-frame.tsx", () => ({
 }));
 
 import { StubAnalyticsHost } from "../../../testing.tsx";
+import {
+  LAST_CHANGE_SQL,
+  VERSION_PASS_RATES_SQL,
+} from "../catalogue/widgets/agent-kind-queries.ts";
+import {
+  CHANGES_SQL,
+  DOCUMENT_COST_HALVES_SQL,
+  DOCUMENT_COST_TREND_SQL,
+  OUTCOMES_SEEN_SQL,
+  RESOLVED_TREND_SQL,
+} from "../catalogue/widgets/flight-deck-costs-queries.ts";
 import type { BoardPeriod } from "../model/board-period.ts";
 import type { BoardWidget } from "../model/board-widgets.ts";
 import { BoardWidgetCard } from "../ui/sections/board-widget-card.tsx";
@@ -31,16 +42,43 @@ const VERSION_SQL =
   "SELECT LastUsedPromptVersionId AS version, count() AS n FROM trace_metrics GROUP BY version";
 const TRACE_SQL = "SELECT count() AS n FROM trace_metrics";
 
+const REBUILDING = { from: null, rebuilding: true, unknown: false };
+
 type Floor = { from: string | null; rebuilding: boolean; unknown: boolean };
 type FloorAnswer = Floor | "loading" | "failed";
+type WidgetQuery = { name: string; sql: string };
 
-const widgetWith = (sql: string): BoardWidget => ({
+/** The stock widgets reading the column, with the queries their catalogue entries run. */
+const ATT_CHANGE: WidgetQuery[] = [
+  { name: "change", sql: LAST_CHANGE_SQL },
+  { name: "units", sql: VERSION_PASS_RATES_SQL },
+];
+const FROM_TRACES_ONLY: [string, WidgetQuery[]][] = [
+  [
+    "ck-trend",
+    [
+      { name: "trend", sql: RESOLVED_TREND_SQL },
+      { name: "changes", sql: CHANGES_SQL },
+      { name: "seen", sql: OUTCOMES_SEEN_SQL },
+    ],
+  ],
+  [
+    "ext-cost-per-doc",
+    [
+      { name: "trend", sql: DOCUMENT_COST_TREND_SQL },
+      { name: "halves", sql: DOCUMENT_COST_HALVES_SQL },
+      { name: "changes", sql: CHANGES_SQL },
+    ],
+  ],
+];
+
+const widgetWith = (queries: WidgetQuery[]): BoardWidget => ({
   id: "w-1",
   name: "Prompt version changes",
   definition: {
     version: 1,
     code: "export default function Widget() { return null; }",
-    queries: [{ name: "main", sql }],
+    queries,
   },
   placement: { graphId: "w-1", gridColumn: 0, gridRow: 0, colSpan: 4, rowSpan: 4 },
 });
@@ -57,12 +95,20 @@ function floorDoor(floor: FloorAnswer) {
   return { answer, asked };
 }
 
-function renderCard({ sql = VERSION_SQL, floor }: { sql?: string; floor: FloorAnswer }) {
+function renderCard({
+  sql = VERSION_SQL,
+  queries = [{ name: "main", sql }],
+  floor,
+}: {
+  sql?: string;
+  queries?: WidgetQuery[];
+  floor: FloorAnswer;
+}) {
   const door = floorDoor(floor);
   renderDashboards({
     element: (
       <BoardWidgetCard
-        widget={widgetWith(sql)}
+        widget={widgetWith(queries)}
         projectId="proj-1"
         projectSlug="test-project"
         dashboardId="board-1"
@@ -91,7 +137,16 @@ describe("given a widget that reads LastUsedPromptVersionId", () => {
   describe("when the replay has not finished", () => {
     /** @scenario "A widget reading the managed version says history is rebuilding until the replay is done" */
     it("says history is being rebuilt and never mounts the body", async () => {
-      renderCard({ floor: { from: null, rebuilding: true, unknown: false } });
+      renderCard({ floor: REBUILDING });
+
+      expect(await noticeInPlaceOfBody()).toHaveTextContent(
+        "Prompt version history is still being rebuilt",
+      );
+    });
+
+    /** @scenario "A widget reading the managed version says history is rebuilding until the replay is done" */
+    it("gates att-change's own queries, which read the column from trace_metrics", async () => {
+      renderCard({ queries: ATT_CHANGE, floor: REBUILDING });
 
       expect(await noticeInPlaceOfBody()).toHaveTextContent(
         "Prompt version history is still being rebuilt",
@@ -159,5 +214,17 @@ describe("given a widget that reads no LastUsedPromptVersionId", () => {
 
     await screen.findByTestId("sandboxed-frame");
     expect(door.asked).not.toContain(FLOOR_PATH);
+  });
+});
+
+describe("given a stock widget that reads LastUsedPromptVersionId from traces only", () => {
+  describe("when the ledger says the replay is rebuilding", () => {
+    it.each(FROM_TRACES_ONLY)("%s renders its body with no notice", async (_, queries) => {
+      const door = renderCard({ queries, floor: REBUILDING });
+
+      await screen.findByTestId("sandboxed-frame");
+      expect(screen.queryByTestId("widget-prompt-version-notice")).toBeNull();
+      expect(door.asked).not.toContain(FLOOR_PATH);
+    });
   });
 });

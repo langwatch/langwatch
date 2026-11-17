@@ -10,6 +10,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 import { exposedCatalogueColumns } from "../../rules/lwql-catalogue.rules.ts";
+import { floorLangWatchQLDedup } from "../../rules/lwql-dedup-floor.rules.ts";
 import {
   LWQL_CLICKHOUSE_CATALOGUE,
   LWQL_VIEW_CATALOG,
@@ -111,5 +112,49 @@ describe("given the moved stock widget queries", () => {
       expect(sql, label).not.toContain("Attributes[");
       expect(sql, label).toContain("Source IN {dashboard_context_sources:Array(String)}");
     }
+  });
+});
+
+/** The att-change queries, which read the managed prompt version (goose 00133). */
+const ATT_CHANGE = ["att-change/change", "att-change/units"];
+/** Out of this change's scope: they look back 90 days on `traces`, unfloored (analytics ADR-006). */
+const MANAGED_VERSION_ON_TRACES = ["ck-trend/changes", "ext-cost-per-doc/changes"];
+
+const sqlOf = (label: string) => queries.find((query) => query.label === label)?.sql ?? "";
+
+describe("given the managed prompt version on trace_metrics", () => {
+  const view = LWQL_VIEW_CATALOG.find(({ name }) => name === "trace_metrics");
+
+  /** @scenario "att-change reads the managed version from trace_metrics' floored twin, never traces" */
+  it("exposes LastUsedPromptVersionId as text read from its own source column", () => {
+    const column = view?.columns.find(({ name }) => name === "LastUsedPromptVersionId");
+    expect(column).toMatchObject({ type: "String", sourceColumns: ["LastUsedPromptVersionId"] });
+    expect(LWQL_CLICKHOUSE_CATALOGUE.trace_metrics.columns.LastUsedPromptVersionId).toBe("inherit");
+  });
+
+  /** @scenario "att-change reads the managed version from trace_metrics' floored twin, never traces" */
+  it("reads att-change's managed version from trace_metrics, every read on its floored twin", () => {
+    for (const label of ATT_CHANGE) {
+      const sql = sqlOf(label);
+      const reads = sql.match(/FROM trace_metrics\b/g) ?? [];
+      const sent = floorLangWatchQLDedup({ sql, database: "lwql", views: LWQL_VIEW_CATALOG });
+
+      expect(sql, label).toContain("LastUsedPromptVersionId");
+      expect(namedViews(sql), label).not.toContain("traces");
+      expect(reads.length, label).toBeGreaterThan(0);
+      expect(sent.match(/FROM trace_metrics__floor\(lwql_floor = /g), label).toHaveLength(
+        reads.length,
+      );
+    }
+  });
+
+  /** @scenario "att-change reads the managed version from trace_metrics' floored twin, never traces" */
+  it("reads the managed version from traces in no stock query but the two named", () => {
+    const onTraces = queries
+      .filter(({ sql }) => sql.includes("LastUsedPromptVersionId"))
+      .filter(({ sql }) => namedViews(sql).includes("traces"))
+      .map(({ label }) => label);
+
+    expect(onTraces.toSorted()).toEqual(MANAGED_VERSION_ON_TRACES.toSorted());
   });
 });
