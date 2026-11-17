@@ -120,6 +120,16 @@ Feature: Stock trace widgets read the light trace table
       But att-change/units returns its traces form's rows, as the evaluation moves to the newer anchor too
 
     @integration
+    Scenario: A trace whose two rows carry different sources counts with the listed row's version
+      Given a trace written twice inside the window, the older write from application, the newer from langy
+      And each write carrying its own managed version
+      When att-change/change runs under the application list
+      Then it counts the trace with the application write's version, where its traces form leaves the trace out
+      And this is part of the trade the floored read makes for its newest-row rule
+      When att-change/change runs under the langy list
+      Then both forms count the trace with the langy write's version, at the langy write's time
+
+    @integration
     Scenario: att-change and passRates answer within the memory cap on 120 days, whatever the history
       Given a small project and a large project, each with 300 days of older history, and a large project with none
       And every trace judged twice, a tenth of them with an unmerged retraction pair

@@ -819,4 +819,37 @@ describe("given traces, spans and evaluations of each source that the stock quer
       expect((await run({ sql, list: ["langy"] })).rows).toBe(langy.rows);
     }
   });
+
+  /**
+   * Part of the anchor-move trade (advisor 43435): the new form filters rows by Source before argMax,
+   * so it counts S's older application row; `traces` drops a trace with any row from another source
+   * under application (stock-query-sources.ts:186-198). Under langy both read the langy row only.
+   * @scenario "A trace whose two rows carry different sources counts with the listed row's version"
+   */
+  it("counts a trace whose newest row is from another source with its listed row's version", async () => {
+    const s: TraceSeed = { trace: "s", day: 6.8, origin: "application", metadata: {} };
+    await writeTrace({ seed: { ...s, promptVersion: "pv-s-old" }, updated: 6.8 });
+    await writeTrace({
+      seed: { ...s, day: 6.9, origin: "langy", promptVersion: "pv-s-new" },
+      updated: 6.9,
+    });
+
+    // pv-b and pv-old come from earlier tests' traces (pv-9 from the seeds): fails alone under .only.
+    const forms = changeForms();
+    const main = await changeRows({ sql: forms.main, list: ["application"] });
+    expect(main).toEqual([expect.objectContaining({ version: "pv-200", previous: "pv-b" })]);
+    for (const sql of [forms.written, forms.floored]) {
+      const now = await changeRows({ sql, list: ["application"] });
+      expect(now).toEqual([expect.objectContaining({ version: "pv-s-old", previous: "pv-old" })]);
+      expect(now[0]?.changed_at.startsWith(onDay(6.8))).toBe(true);
+    }
+
+    // l1's pv-9 on day 1.5 is the only other langy version.
+    const langy = await changeRows({ sql: forms.main, list: ["langy"] });
+    expect(langy).toEqual([expect.objectContaining({ version: "pv-s-new", previous: "pv-9" })]);
+    expect(langy[0]?.changed_at.startsWith(onDay(6.9))).toBe(true);
+    for (const sql of [forms.written, forms.floored]) {
+      expect(await changeRows({ sql, list: ["langy"] })).toEqual(langy);
+    }
+  });
 });
