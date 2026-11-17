@@ -397,6 +397,15 @@ describe("given the text is an eval chip typed by hand", () => {
     });
 
     /** @scenario "A chip typed by hand starts its run on Enter" */
+    it("leaves a chip under an OR to be rebuilt, since its run judges only the other terms", () => {
+      const { result } = renderSubmit();
+      act(() => result.current.submitSearch('status:error OR eval:"the user is annoyed"'));
+      const run = handlers.onInstantEval.mock.calls.at(-1)?.[0];
+      expect(run).toMatchObject({ otherQuery: "status:error" });
+      expect(run).not.toHaveProperty("typedQuery");
+    });
+
+    /** @scenario "A chip typed by hand starts its run on Enter" */
     it("judges the unit a target spelling asked for, whatever the lens shows", () => {
       const { result } = renderSubmit();
       act(() => result.current.submitSearch('eval.conversation:"the user is annoyed"'));

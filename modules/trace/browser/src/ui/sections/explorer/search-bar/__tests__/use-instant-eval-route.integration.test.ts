@@ -249,6 +249,16 @@ describe("given the router answered instant_eval", () => {
 
     expect(mutations.start.mutate).toHaveBeenCalledTimes(1);
   });
+
+  /** @scenario "An Instant Eval route starts a run" */
+  it("still rebuilds the chip beside the other terms for a routed sentence", () => {
+    const { result } = renderHook(() => useInstantEvalRoute({ isInstantEvalAvailable: true }));
+    act(() => result.current.onInstantEvalRoute(payload));
+    act(() => estimateCallbacks().onSuccess?.({ rows: 120, isRowsCapped: false, priceUsd: 0.1 }));
+    act(() => startCallbacks().onSuccess?.({ id: "run-1" }));
+
+    expect(useFilterStore.getState().queryText).toBe(CHIP_QUERY);
+  });
 });
 
 describe("given a chip typed by hand under NOT", () => {
@@ -280,16 +290,6 @@ describe("given a chip typed by hand under NOT", () => {
 
     expect(result.current.refusal).toEqual({ kind: "model" });
     expect(useFilterStore.getState().queryText).toBe('NOT eval:"the user is annoyed"');
-  });
-
-  /** @scenario "A chip typed by hand starts its run on Enter" */
-  it("still rebuilds the chip beside the other terms for a routed sentence", () => {
-    const { result } = renderHook(() => useInstantEvalRoute({ isInstantEvalAvailable: true }));
-    act(() => result.current.onInstantEvalRoute(payload));
-    act(() => estimateCallbacks().onSuccess?.({ rows: 120, isRowsCapped: false, priceUsd: 0.1 }));
-    act(() => startCallbacks().onSuccess?.({ id: "run-1" }));
-
-    expect(useFilterStore.getState().queryText).toBe(CHIP_QUERY);
   });
 });
 

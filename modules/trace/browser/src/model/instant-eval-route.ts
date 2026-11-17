@@ -22,8 +22,8 @@ export interface InstantEvalRoutePayload {
   /** The explicit `field:value` terms typed alongside the sentence. */
   otherQuery: string;
   /**
-   * The bar text as typed, chip included. Set only for a chip typed by hand,
-   * so its run puts the text back as written, `NOT`, `OR` and grouping kept.
+   * The bar text as typed, chip included. Set only for a chip typed by hand and
+   * not under an `OR`, so its run puts the text back as written, `NOT` kept.
    */
   typedQuery?: string;
   /** The sentence quoted as one phrase, merged with `otherQuery`. */
