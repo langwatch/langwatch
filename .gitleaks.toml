@@ -615,3 +615,13 @@ condition = "AND"
 targetRules = ["generic-api-key"]
 paths = ['''^services/nlpgo/app/engine/blocks/codeblock/runner_stderr_test\.go$''']
 regexes = ['''^CAPSECRET-0123456789$''']
+
+# `vk-lw-a2a-matching-` and `vk-lw-a2a-other-` are made-up key prefixes in the
+# authresolver change-feed test, hashed to fill the L1 cache; they authenticate
+# against nothing. Scoped to those values in that file and to `generic-api-key`.
+[[allowlists]]
+description = "Made-up virtual key prefixes in the authresolver A2A change-feed test"
+condition = "AND"
+targetRules = ["generic-api-key"]
+paths = ['''^services/aigateway/adapters/authresolver/service_test\.go$''']
+regexes = ['''^vk-lw-a2a-(matching|other)-''']
