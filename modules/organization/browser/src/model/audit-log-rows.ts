@@ -134,15 +134,18 @@ export type AuditTargetLine = { kind: "words"; text: string } | { kind: "id"; id
 export function auditTargetLine({
   targetKind,
   targetId,
+  targetName = null,
   projectName,
 }: {
   targetKind: string | null | undefined;
   targetId: string | null | undefined;
+  targetName?: string | null;
   projectName: string | null;
 }): AuditTargetLine {
   if (targetKind === BRAID_AUDIT_TARGET_KIND) {
     return { kind: "words", text: projectName ? `Braid owned by ${projectName}` : "Braid" };
   }
+  if (targetName) return { kind: "words", text: targetName };
   return targetId ? { kind: "id", id: targetId } : null;
 }
 

@@ -990,6 +990,7 @@ export class GovernanceModule implements GovernanceRestApi {
       bedrock: killSwitchChannels.live.bedrockAliases.create({ endpoint: bedrockAgentEndpoint }),
       virtualKeys: dependencies.gateway,
       registry: this.agentRegistry,
+      stops: repositories.agentStops,
       auditLog: dependencies.auditLog,
     });
 

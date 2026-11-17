@@ -390,6 +390,7 @@ export class AgentStopService {
       targetKind: AGENT_STOP_AUDIT_TARGET_KIND,
       targetId: stop.agentId,
       metadata: {
+        targetName: stop.agentName,
         stopId: stop.id,
         agentName: stop.agentName,
         status: stop.status,

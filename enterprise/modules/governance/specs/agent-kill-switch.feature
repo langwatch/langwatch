@@ -168,7 +168,7 @@ Feature: Agent kill switch: stop a misbehaving agent where it runs, with approva
     Then it takes the decision
     And the first process's late release or sent mark leaves the new decision in place
 
-  @integration @unit
+  @integration
   Scenario: A sent decision is never taken over as abandoned
     Given a decision on a pending stop was taken and its command was sent
     When another decision arrives long after the first would count as abandoned
@@ -297,6 +297,28 @@ Feature: Agent kill switch: stop a misbehaving agent where it runs, with approva
     Given a stop in "stop_failed" whose serving endpoint answers an error on start
     When the agent is restored and the attempts are spent
     Then the stop's status is "restore_failed" and one "governance.agent.restore_failed" event is pushed
+
+  @integration
+  Scenario: Restoring one agent keeps a virtual key another stopped agent shares disabled
+    Given "support-bot" and "sales-bot" are both quarantined and their plans share one virtual key
+    When "support-bot" is restored
+    Then the key stays disabled and its target is recorded as kept disabled
+    When "sales-bot" is restored
+    Then the key is enabled again
+
+  @unit
+  Scenario: The restore dialog names the stopped agents that keep a shared key disabled
+    Given "Finance close" and "Sales pipeline" are stopped and share one virtual key
+    When Restore is opened for "Finance close"
+    Then the dialog says the virtual key stays disabled while "Sales pipeline" is still stopped
+
+  @integration
+  Scenario: A target whose cloud resource is gone counts as stopped and as restored
+    Given a stop plan whose serving endpoint was deleted, so Databricks answers 404
+    When the agent is stopped and later restored
+    Then the stop is "quarantined" and then "restored", never "stop_failed" or "restore_failed"
+    And the endpoint target is recorded as gone in the audit rows and the webhook events
+    And a Bedrock ResourceNotFoundException counts as gone the same way
 
   @integration
   Scenario: A second restore retries the reverts the first one could not do

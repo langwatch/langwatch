@@ -14,12 +14,15 @@ export function RestoreAgentDialog({
   organizationId,
   stopId,
   agentName,
+  sharedKeyHolders = [],
   open,
   onClose,
 }: {
   organizationId: string;
   stopId: string;
   agentName: string;
+  /** Other stopped agents sharing one of this stop's virtual keys. */
+  sharedKeyHolders?: readonly string[];
   open: boolean;
   onClose: () => void;
 }) {
@@ -31,7 +34,13 @@ export function RestoreAgentDialog({
   const confirm = async () => {
     try {
       await restore.mutateAsync({ organizationId, stopId });
-      toaster.create({ title: `Restoring ${agentName}`, type: "success" });
+      toaster.create({
+        title: `Restoring ${agentName}`,
+        ...(sharedKeyHolders.length > 0
+          ? { description: "The shared virtual key stays disabled." }
+          : {}),
+        type: "success",
+      });
       await refresh.afterStopChange();
       onClose();
     } catch (error) {
@@ -56,6 +65,11 @@ export function RestoreAgentDialog({
       <Text textStyle="sm" color="fg.muted">
         This turns back on what the stop turned off, so the agent takes traffic again.
       </Text>
+      {sharedKeyHolders.length > 0 ? (
+        <Text textStyle="sm" color="fg.muted" data-testid="restore-shared-key-note">
+          {`The virtual key stays disabled while ${sharedKeyHolders.join(", ")} is still stopped.`}
+        </Text>
+      ) : null}
     </Dialog>
   );
 }

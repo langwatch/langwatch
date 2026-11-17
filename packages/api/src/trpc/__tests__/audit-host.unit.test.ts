@@ -177,6 +177,9 @@ describe("given a mutation whose handler writes its own, richer audit row", () =
   it("leaves the generic row out, as main did, and still records every other mutation", () => {
     expect(isAuditLogExempt("identity.joinRequests.setJoining")).toBe(true);
     expect(isAuditLogExempt("identity.joinRequests.dismissOffer")).toBe(false);
+    expect(isAuditLogExempt("governanceKillSwitch.createAwsConnection")).toBe(true);
+    expect(isAuditLogExempt("governanceKillSwitch.restore")).toBe(true);
+    expect(isAuditLogExempt("governanceKillSwitch.setPlan")).toBe(false);
   });
 });
 

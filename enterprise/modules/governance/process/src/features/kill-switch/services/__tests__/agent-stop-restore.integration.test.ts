@@ -163,6 +163,77 @@ describe("AgentStopService restore", () => {
     });
   });
 
+  describe("given two agents whose plans share one virtual key", () => {
+    /** @scenario "Restoring one agent keeps a virtual key another stopped agent shares disabled" */
+    it("keeps the key disabled until the last agent holding it is restored", async () => {
+      const other = "agent-sales-bot";
+      const harness = await killSwitchHarness({ otherAgents: ["sales-bot"] });
+      const stopIds: string[] = [];
+      for (const agentId of [AGENT_ID, other]) {
+        await harness.plans.setPlan({
+          organizationId: ORG,
+          agentId,
+          targets: [{ kind: "gateway_virtual_key", virtualKeyId: VIRTUAL_KEY_ID }],
+        });
+        const view = await harness.stops.requestStop({
+          organizationId: ORG,
+          agentId,
+          reason: "prompt injection in production",
+          severity: "high",
+          caller: PERSON,
+        });
+        stopIds.push(view.id);
+        await settled(harness, view.id, "quarantined");
+      }
+      const [first = "", second = ""] = stopIds;
+
+      await harness.stops.restore({ organizationId: ORG, stopId: first, caller: PERSON });
+      const kept = await settled(harness, first, "restored");
+
+      expect(kept.targets[0]).toMatchObject({ state: "reverted", keptDisabled: true });
+      expect(harness.virtualKeyCalls.some((call) => call.action === "enable")).toBe(false);
+
+      await harness.stops.restore({ organizationId: ORG, stopId: second, caller: PERSON });
+      const last = await settled(harness, second, "restored");
+
+      expect(last.targets[0]?.keptDisabled).toBeUndefined();
+      expect(harness.virtualKeyCalls.filter((call) => call.action === "enable")).toHaveLength(1);
+      await harness.eventing.close();
+    });
+  });
+
+  describe("when the serving endpoint was deleted", () => {
+    /** @scenario "A target whose cloud resource is gone counts as stopped and as restored" */
+    it("quarantines and restores the stop, recording the endpoint as gone", async () => {
+      const harness = await killSwitchHarness({ maxAttempts: 2 });
+      await harness.setFullPlan();
+      for (const action of ["stop", "start"]) {
+        harness.servingEndpoints.refuse({
+          path: `/api/2.0/serving-endpoints/support-bot-prod/config:${action}`,
+          code: "http_404",
+        });
+      }
+
+      const view = await request(harness);
+      const stopped = await settled(harness, view.id, "quarantined");
+      await harness.stops.restore({ organizationId: ORG, stopId: view.id, caller: PERSON });
+      const restored = await settled(harness, view.id, "restored");
+
+      const endpointOf = (stop: typeof stopped) =>
+        stop.targets.find((target) => target.target.kind === "databricks_serving_endpoint");
+      expect(endpointOf(stopped)).toMatchObject({ state: "applied", gone: true });
+      expect(endpointOf(restored)).toMatchObject({ state: "reverted", gone: true });
+      await vi.waitFor(() =>
+        expect(harness.audit.map((row) => row.action)).toContain("governance.agent.restored"),
+      );
+      const quarantined = harness.audit.find(
+        (row) => row.action === "governance.agent.quarantined",
+      );
+      expect(JSON.stringify(quarantined?.metadata)).toContain('"gone":true');
+      await harness.eventing.close();
+    });
+  });
+
   describe("when a milestone announcement is delivered again", () => {
     /** @scenario "A redelivered milestone writes one audit row" */
     it("writes the quarantined row once", async () => {

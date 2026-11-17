@@ -4,6 +4,7 @@ import { createHash } from "node:crypto";
 
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import {
+  AGENT_STOP_OPEN_STATUSES,
   type AgentStopTarget,
   type AgentStopView,
   type AgentStopWebhookEventType,
@@ -20,6 +21,7 @@ import type { DatabricksServingEndpointChannel } from "../../../channels/databri
 import { KillSwitchPlatformError } from "../../../channels/kill-switch-platform.channel.ts";
 import type { ProviderSignInChannel } from "../../../channels/provider-sign-in.channel.ts";
 import type { AgentStopTargetPriorStateRepository } from "../../../repositories/agent-stop-target-prior-state.repository.ts";
+import type { AgentStopRepository } from "../../../repositories/agent-stop.repository.ts";
 import type { GovernanceAwsConnectionRepository } from "../../../repositories/governance-aws-connection.repository.ts";
 import type { SourceCredentialAccessService } from "../../ingestion-source/services/source-credential-access.service.ts";
 import type { AgentRegistryService } from "../../registry/services/agent-registry.service.ts";
@@ -30,7 +32,11 @@ import {
   type AgentStopIntentExecutors,
   type AgentStopRevertIntent,
 } from "../eventing/agent-stop.process.ts";
-import { BEDROCK_INVOCATION_STATES, errorCodeOf } from "../rules/agent-stop-target.rules.ts";
+import {
+  BEDROCK_INVOCATION_STATES,
+  errorCodeOf,
+  isGoneErrorCode,
+} from "../rules/agent-stop-target.rules.ts";
 import { AGENT_STOP_AUDIT_TARGET_KIND, type AgentStopCommandSend } from "./agent-stop.service.ts";
 
 /** The audit log takes an `audit` KSUID as a key, and reads the row's moment from it. */
@@ -78,6 +84,7 @@ interface AgentStopTargetDependencies {
   priorStates: AgentStopTargetPriorStateRepository;
   virtualKeys: Pick<GatewayApi, "findVirtualKeyById" | "disableVirtualKey" | "enableVirtualKey">;
   registry: Pick<AgentRegistryService, "announceStop">;
+  stops: Pick<AgentStopRepository, "findAllByStatuses">;
   auditLog: Pick<AuditLogApi, "record">;
   maxAttempts: number;
   now: () => number;
@@ -85,6 +92,9 @@ interface AgentStopTargetDependencies {
 }
 
 type Direction = "stop" | "restore";
+
+/** A call's outcome: whether it changed the platform, and whether a shared key was left disabled. */
+type CallOutcome = { changed: boolean; keptDisabled?: boolean };
 
 /**
  * The worker's half of a stop: one platform call per intent, then the outcome recorded as a
@@ -118,6 +128,7 @@ export class AgentStopTargetService implements AgentStopIntentExecutors {
       targetId: intent.target.id,
       errorCode: outcome.errorCode,
       ...(outcome.ok && !outcome.changed ? { alreadyStopped: true } : {}),
+      ...(outcome.gone ? { gone: true } : {}),
     };
     await this.deps.send(outcome.ok ? "recordTargetApplied" : "recordTargetFailed", settled);
   }
@@ -132,6 +143,8 @@ export class AgentStopTargetService implements AgentStopIntentExecutors {
       targetId: intent.target.id,
       errorCode: outcome.errorCode,
       restoreRound: intent.restoreRound,
+      ...(outcome.gone ? { gone: true } : {}),
+      ...(outcome.keptDisabled ? { keptDisabled: true } : {}),
     };
     await this.deps.send(outcome.ok ? "recordTargetReverted" : "recordTargetRevertFailed", settled);
   }
@@ -156,6 +169,7 @@ export class AgentStopTargetService implements AgentStopIntentExecutors {
       targetKind: AGENT_STOP_AUDIT_TARGET_KIND,
       targetId: stop.agentId,
       metadata: {
+        targetName: stop.agentName,
         stopId: stop.id,
         agentName: stop.agentName,
         status: stop.status,
@@ -165,6 +179,8 @@ export class AgentStopTargetService implements AgentStopIntentExecutors {
           label: target.label,
           state: target.state,
           errorCode: target.errorCode,
+          ...(target.gone ? { gone: true } : {}),
+          ...(target.keptDisabled ? { keptDisabled: true } : {}),
         })),
       },
     });
@@ -178,13 +194,31 @@ export class AgentStopTargetService implements AgentStopIntentExecutors {
     intent: AgentStopApplyIntent;
     direction: Direction;
     context: IntentContext;
-  }): Promise<{ ok: boolean; changed: boolean; errorCode: string | null }> {
+  }): Promise<{
+    ok: boolean;
+    changed: boolean;
+    gone: boolean;
+    keptDisabled?: boolean;
+    errorCode: string | null;
+  }> {
     try {
-      const { changed } = await this.call({ intent, target: intent.target.target, direction });
-      return { ok: true, changed, errorCode: null };
+      const { changed, keptDisabled } = await this.call({
+        intent,
+        target: intent.target.target,
+        direction,
+      });
+      return {
+        ok: true,
+        changed,
+        gone: false,
+        errorCode: null,
+        ...(keptDisabled ? { keptDisabled } : {}),
+      };
     } catch (error) {
-      if (context.attempt < this.deps.maxAttempts) throw error;
       const errorCode = errorCodeOf(error);
+      if (isGoneErrorCode(errorCode))
+        return { ok: true, changed: false, gone: true, errorCode: null };
+      if (context.attempt < this.deps.maxAttempts) throw error;
       this.deps.logger.warn(
         {
           error,
@@ -196,7 +230,7 @@ export class AgentStopTargetService implements AgentStopIntentExecutors {
         },
         "kill switch target call failed on its last attempt; recording the target failed",
       );
-      return { ok: false, changed: false, errorCode };
+      return { ok: false, changed: false, gone: false, errorCode };
     }
   }
 
@@ -244,18 +278,23 @@ export class AgentStopTargetService implements AgentStopIntentExecutors {
     intent: AgentStopApplyIntent;
     virtualKeyId: string;
     direction: Direction;
-  }): Promise<{ changed: boolean }> {
+  }): Promise<CallOutcome> {
     const { organizationId } = intent;
     const command = { id: virtualKeyId, organizationId, actorUserId: intent.actorUserId };
     if (direction === "restore") {
+      if (await this.isKeyHeldByAnotherStop({ intent, virtualKeyId })) {
+        return { changed: false, keptDisabled: true };
+      }
       await this.deps.virtualKeys.enableVirtualKey(command);
       return { changed: true };
     }
     return this.stopUnlessAlreadyStopped({
       intent,
+      // A key another of our stops disabled counts as this stop's change too, so the last restore enables it.
       isStopped: async () => {
         const key = await this.deps.virtualKeys.findVirtualKeyById(virtualKeyId, organizationId);
-        return key !== null && key.status !== "ACTIVE";
+        if (key === null || key.status === "ACTIVE") return false;
+        return !(await this.isKeyHeldByAnotherStop({ intent, virtualKeyId }));
       },
       stop: () =>
         this.deps.virtualKeys.disableVirtualKey({
@@ -299,6 +338,30 @@ export class AgentStopTargetService implements AgentStopIntentExecutors {
     });
   }
 
+  /** True while another agent's open stop holds the same key stopped (or is about to stop it). */
+  private async isKeyHeldByAnotherStop({
+    intent,
+    virtualKeyId,
+  }: {
+    intent: AgentStopApplyIntent;
+    virtualKeyId: string;
+  }): Promise<boolean> {
+    const open = await this.deps.stops.findAllByStatuses({
+      organizationId: intent.organizationId,
+      statuses: AGENT_STOP_OPEN_STATUSES,
+    });
+    return open.some(
+      (stop) =>
+        stop.id !== intent.stopId &&
+        stop.targets.some(
+          (outcome) =>
+            outcome.target.kind === "gateway_virtual_key" &&
+            outcome.target.virtualKeyId === virtualKeyId &&
+            (outcome.state === "applied" || outcome.state === "pending"),
+        ),
+    );
+  }
+
   private async call({
     intent,
     target,
@@ -307,7 +370,7 @@ export class AgentStopTargetService implements AgentStopIntentExecutors {
     intent: AgentStopApplyIntent;
     target: AgentStopTarget;
     direction: Direction;
-  }): Promise<{ changed: boolean }> {
+  }): Promise<CallOutcome> {
     const { organizationId } = intent;
     switch (target.kind) {
       case "databricks_serving_endpoint":

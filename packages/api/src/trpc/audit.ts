@@ -58,8 +58,16 @@ export function auditScopeIds(input: unknown): {
 const AUDIT_LOG_EXEMPT_PATHS = new Set(["user.updateLastLogin"]);
 const AUDIT_LOG_EXEMPT_PATH_PREFIXES = ["presence."] as const;
 
-/** Main's self-audited paths: the handler writes a richer row, with the previous value. */
-const SELF_AUDITED_PATHS = new Set(["identity.joinRequests.setJoining"]);
+/** Self-audited paths: the handler writes a richer row, with the previous value or the name. */
+const SELF_AUDITED_PATHS = new Set([
+  "identity.joinRequests.setJoining",
+  "governanceKillSwitch.createAwsConnection",
+  "governanceKillSwitch.deleteAwsConnection",
+  "governanceKillSwitch.requestStop",
+  "governanceKillSwitch.approveStop",
+  "governanceKillSwitch.denyStop",
+  "governanceKillSwitch.restore",
+]);
 
 export function isAuditLogExempt(path: string): boolean {
   if (AUDIT_LOG_EXEMPT_PATHS.has(path) || SELF_AUDITED_PATHS.has(path)) return true;

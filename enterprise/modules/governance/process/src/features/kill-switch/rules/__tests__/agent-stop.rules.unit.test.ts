@@ -5,6 +5,7 @@
 import { describe, expect, it } from "vitest";
 
 import { milestoneAuditKeyOf } from "../../services/agent-stop-target.service.ts";
+import { isGoneErrorCode } from "../agent-stop-target.rules.ts";
 import {
   requestedStop,
   restoreRequestedStop,
@@ -118,5 +119,13 @@ describe("milestoneAuditKeyOf", () => {
       expect(milestoneAuditKeyOf({ stop, milestone, restoreRound: 1 })).toBe(first);
       expect(milestoneAuditKeyOf({ stop, milestone, restoreRound: 2 })).not.toBe(first);
     });
+  });
+});
+
+describe("isGoneErrorCode", () => {
+  it("reads a Databricks 404 and a Bedrock ResourceNotFoundException as gone, a 503 not", () => {
+    expect(isGoneErrorCode("http_404")).toBe(true);
+    expect(isGoneErrorCode("ResourceNotFoundException")).toBe(true);
+    expect(isGoneErrorCode("http_503")).toBe(false);
   });
 });

@@ -189,6 +189,10 @@ const agentStopTargetOutcomeSchemaDefinition = z.object({
   revertedAt: z.string().nullable(),
   /** True when the platform was already stopped before this stop; a restore leaves it as it was. */
   alreadyStopped: z.boolean().optional(),
+  /** True when the cloud resource no longer exists: it counts as stopped, and as restored. */
+  gone: z.boolean().optional(),
+  /** On restore: a virtual key another agent's open stop still holds, so it stayed disabled. */
+  keptDisabled: z.boolean().optional(),
 });
 export interface AgentStopTargetOutcomeSchema extends Named<
   typeof agentStopTargetOutcomeSchemaDefinition
@@ -366,6 +370,10 @@ const agentStopTargetSettledEventDataSchemaDefinition = z.object({
   errorCode: z.string().nullable(),
   /** On an applied outcome: the platform was already stopped, so nothing was changed. */
   alreadyStopped: z.boolean().optional(),
+  /** The cloud resource no longer exists, so there was nothing to stop or restore. */
+  gone: z.boolean().optional(),
+  /** On a revert outcome: the key stayed disabled for another agent's open stop. */
+  keptDisabled: z.boolean().optional(),
   /** On a revert outcome: the restore it answers, so a second restore records its own outcome. */
   restoreRound: z.number().int().positive().optional(),
 });

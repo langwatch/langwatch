@@ -2,7 +2,7 @@
 import type { AgentKillSwitchSummary } from "@langwatch/enterprise-governance-contract";
 import { useState } from "react";
 
-import { isRestorableStop } from "../../model/kill-switch-copy.ts";
+import { isRestorableStop, sharedKeyHoldersOf } from "../../model/kill-switch-copy.ts";
 import {
   type KillSwitchAction,
   KillSwitchActionsMenu,
@@ -34,11 +34,14 @@ export function AgentKillSwitchMenu({
   organizationId,
   agentName,
   summary,
+  summaries = [],
   canManage,
 }: {
   organizationId: string;
   agentName: string;
   summary: AgentKillSwitchSummary;
+  /** Every agent's summary, so Restore can say which shared keys stay disabled. */
+  summaries?: readonly AgentKillSwitchSummary[];
   canManage: boolean;
 }) {
   const [dialog, setDialog] = useState<{
@@ -63,7 +66,11 @@ export function AgentKillSwitchMenu({
       />
       {dialog?.action === "stop" && <StopAgentDialog agentId={summary.agentId} {...dialogProps} />}
       {dialog?.action === "restore" && dialog.stopId !== null && openStop?.id === dialog.stopId && (
-        <RestoreAgentDialog stopId={dialog.stopId} {...dialogProps} />
+        <RestoreAgentDialog
+          stopId={dialog.stopId}
+          sharedKeyHolders={sharedKeyHoldersOf({ stop: openStop, summaries })}
+          {...dialogProps}
+        />
       )}
       {dialog?.action === "plan" && <StopPlanDialog agentId={summary.agentId} {...dialogProps} />}
     </>

@@ -308,6 +308,7 @@ export async function killSwitchHarness({
         return { id: input.eventId } as never;
       },
     },
+    stops: repositories.agentStops,
     auditLog,
     maxAttempts,
     ...(logger ? { logger } : {}),

@@ -23,6 +23,14 @@ export type BedrockInvocationState =
  * A stable code for what refused a target: the error's own `code` when it carries a string one
  * (`http_404`, a HandledError code), else its name (the AWS SDK names its exceptions), never prose.
  */
+/** The codes a platform answers for a resource that no longer exists (Databricks, Bedrock). */
+const GONE_ERROR_CODES = new Set(["http_404", "ResourceNotFoundException"]);
+
+/** True when the target's resource was deleted: nothing is left to stop or restore. */
+export function isGoneErrorCode(code: string): boolean {
+  return GONE_ERROR_CODES.has(code);
+}
+
 export function errorCodeOf(error: unknown): string {
   if (error !== null && typeof error === "object" && "code" in error) {
     const { code } = error;

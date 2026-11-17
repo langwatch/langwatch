@@ -95,3 +95,32 @@ export function summariesByRowId(
   }
   return byRow;
 }
+
+/**
+ * The other agents whose open stop holds one of `stop`'s virtual keys disabled: restoring `stop`
+ * leaves that key disabled until they are restored too.
+ */
+export function sharedKeyHoldersOf({
+  stop,
+  summaries,
+}: {
+  stop: AgentStopView | null;
+  summaries: readonly AgentKillSwitchSummary[];
+}): string[] {
+  if (!stop) return [];
+  const keys = new Set(
+    stop.targets.flatMap((outcome) =>
+      outcome.target.kind === "gateway_virtual_key" ? [outcome.target.virtualKeyId] : [],
+    ),
+  );
+  if (keys.size === 0) return [];
+  const holdsKey = (outcome: AgentStopView["targets"][number]) => {
+    if (outcome.target.kind !== "gateway_virtual_key") return false;
+    if (!keys.has(outcome.target.virtualKeyId)) return false;
+    return outcome.state === "applied" || outcome.state === "pending";
+  };
+  return summaries.flatMap(({ openStop }) => {
+    if (!openStop || openStop.id === stop.id) return [];
+    return openStop.targets.some(holdsKey) ? [openStop.agentName] : [];
+  });
+}

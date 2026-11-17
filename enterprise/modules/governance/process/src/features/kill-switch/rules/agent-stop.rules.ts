@@ -262,6 +262,7 @@ export function targetAppliedStop({
       errorCode: null,
       appliedAt: stopTimestamp(at),
       ...(data.alreadyStopped ? { alreadyStopped: true } : {}),
+      ...(data.gone ? { gone: true } : {}),
     }),
   });
   return settleStop({ stop: changed, at });
@@ -359,6 +360,8 @@ export function targetRevertedStop({
       state: "reverted",
       errorCode: null,
       revertedAt: stopTimestamp(at),
+      ...(data.gone ? { gone: true } : {}),
+      ...(data.keptDisabled ? { keptDisabled: true } : {}),
     }),
   });
   return settleRestore({ stop: changed, at });

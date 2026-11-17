@@ -190,6 +190,7 @@ describe("GovernanceAwsConnectionService", () => {
         ],
       ]);
       expect(audit[0]?.metadata).toEqual({
+        targetName: "ACME production",
         name: "ACME production",
         accessKeyIdLastFour: "0001",
         roleArn: null,

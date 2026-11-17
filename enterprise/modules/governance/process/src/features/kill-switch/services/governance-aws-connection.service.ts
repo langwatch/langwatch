@@ -90,6 +90,7 @@ export class GovernanceAwsConnectionService {
         userId,
         connectionId: id,
         metadata: {
+          targetName: input.name,
           name: input.name,
           accessKeyIdLastFour: input.accessKeyId ? input.accessKeyId.slice(-4) : null,
           roleArn: input.roleArn ?? null,
@@ -121,6 +122,7 @@ export class GovernanceAwsConnectionService {
     if (agentIds.length > 0) {
       throw new GovernanceAwsConnectionInUseError({ connectionId, agentIds });
     }
+    const [named] = await this.deps.connections.findByIds({ organizationId, ids: [connectionId] });
     const deleted = await this.deps.connections.delete({
       organizationId,
       id: connectionId,
@@ -129,7 +131,7 @@ export class GovernanceAwsConnectionService {
         organizationId,
         userId,
         connectionId,
-        metadata: {},
+        metadata: named ? { targetName: named.name } : {},
       }),
     });
     return { deleted };

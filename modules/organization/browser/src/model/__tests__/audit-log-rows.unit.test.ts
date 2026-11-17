@@ -82,6 +82,18 @@ describe("given the line under a row's phrase", () => {
     ).toEqual({ kind: "id", id: "rolebinding_1" });
     expect(auditTargetLine({ targetKind: null, targetId: null, projectName: null })).toBeNull();
   });
+
+  /** @scenario An entry row names its target by the name the row recorded */
+  it("reads a target by its recorded name rather than its id", () => {
+    expect(
+      auditTargetLine({
+        targetKind: "governance_agent",
+        targetId: "agentreg_1",
+        targetName: "Finance close",
+        projectName: null,
+      }),
+    ).toEqual({ kind: "words", text: "Finance close" });
+  });
 });
 
 describe("given a row's actor fields", () => {
