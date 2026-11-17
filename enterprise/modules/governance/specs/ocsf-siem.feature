@@ -133,6 +133,14 @@ Feature: OCSF 1.9 SIEM export, push and ingest
       Then the next page reads traces up to the later until
 
     @integration
+    Scenario: The next traces window opens where the reads covered, not at a later until
+      Given each of the two projects holds one trace
+      And every traces read covers updates only up to a moment before the requested until
+      When a SIEM reads the project traces stream until has_more is false
+      Then the last next_cursor starts the next window at the moment the reads covered
+      And no traces read asks for updates later than now
+
+    @integration
     Scenario: A project outside the organisation is refused on the project traces stream
       When a SIEM reads the project traces stream for a project of another organisation
       Then the answer is 422 with code "validation_error"

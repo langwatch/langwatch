@@ -11,7 +11,7 @@ The audit log: every module records who did what through it, and an entity's his
 | Classification | core (`modules/catalogue.json`)                                                                         |
 | Subjects       | audit-log                                                                                               |
 | Halves         | [contract](contract) · [process](process/README.md)                                                     |
-| Api token      | `AuditLogApi` = `moduleApi<AuditLogApi>()("audit-log")`, `contract/src/audit-log.ts:154` (5 operations) |
+| Api token      | `AuditLogApi` = `moduleApi<AuditLogApi>()("audit-log")`, `contract/src/audit-log.ts:162` (5 operations) |
 | Other token    | `AuditLogHomeApi`, `process/src/transport/home.trpc.ts:14`                                              |
 | Installed by   | api, worker, tasks (process)                                                                            |
 

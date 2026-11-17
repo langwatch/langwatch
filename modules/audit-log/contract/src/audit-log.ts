@@ -94,9 +94,13 @@ export const auditLogTargetEntrySchema: AuditLogTargetEntrySchema =
   auditLogTargetEntrySchemaDefinition;
 export type AuditLogTargetEntry = z.infer<typeof auditLogTargetEntrySchema>;
 
+/** The most rows one page of an organisation's audit export holds. */
+export const AUDIT_LOG_EXPORT_PAGE_MAX = 1_000;
+
 /**
  * One organisation's audit trail read in order for its SIEM export: rows naming the organisation
- * or one of its projects, oldest first, after the `(createdAt, id)` watermark.
+ * or one of its projects, oldest first, after the `(createdAt, id)` watermark. A read takes one
+ * row past the page to tell whether more follow.
  */
 const findAuditLogForOrganizationInputSchemaDefinition = z
   .object({
@@ -105,7 +109,11 @@ const findAuditLogForOrganizationInputSchemaDefinition = z
     afterMs: z.number().int().nonnegative(),
     afterId: z.string(),
     untilMs: z.number().int().nonnegative().optional(),
-    limit: z.number().int().positive().max(1001),
+    limit: z
+      .number()
+      .int()
+      .positive()
+      .max(AUDIT_LOG_EXPORT_PAGE_MAX + 1),
   })
   .strict();
 export interface FindAuditLogForOrganizationInputSchema extends Named<

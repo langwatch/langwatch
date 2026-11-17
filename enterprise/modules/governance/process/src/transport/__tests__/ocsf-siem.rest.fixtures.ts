@@ -157,6 +157,7 @@ export async function buildApi({
   planType = "ENTERPRISE",
   traces = {},
   traceQueries = [],
+  updatedThrough,
   audit = [],
 }: {
   grants?: string[];
@@ -164,6 +165,8 @@ export async function buildApi({
   traces?: Record<string, TraceSummaryData[]>;
   /** Every traces query the export sends, in order. */
   traceQueries?: TraceQuery[];
+  /** The bound every traces read reports as covered, as a scroll pinned before `until` does. */
+  updatedThrough?: number;
   audit?: AuditLogExportEntry[];
 } = {}) {
   const repositories = MemoryGovernanceRepositories.create();
@@ -188,7 +191,10 @@ export async function buildApi({
       traces: createApiFixture<TraceApi>({
         listTraceSummaries: async ({ query }) => {
           traceQueries.push(query);
-          return { summaries: traces[query.projectId] ?? [] };
+          return {
+            summaries: traces[query.projectId] ?? [],
+            ...(updatedThrough === undefined ? {} : { updatedThrough }),
+          };
         },
       }),
       apiKeys: createApiFixture<ApiKeyApi>(),

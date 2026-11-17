@@ -158,6 +158,36 @@ describe("the OCSF SIEM REST family", () => {
       ]);
     });
 
+    /** @scenario The next traces window opens where the reads covered, not at a later until */
+    it("opens the next window at the bound the reads covered", async () => {
+      const covered = Date.parse("2026-11-10T12:00:00Z");
+      const traceQueries: TraceQuery[] = [];
+      const { get } = await buildApi({
+        traces: { "project-a": [summary("t-a")], "project-b": [summary("t-b")] },
+        traceQueries,
+        updatedThrough: covered,
+      });
+
+      let cursor: string | undefined;
+      let page: Page;
+      do {
+        const query = cursor
+          ? `?until=2999-01-01T00:00:00Z&cursor=${cursor}`
+          : "?until=2999-01-01T00:00:00Z";
+        page = (await (await get(`/api/governance/ocsf/traces${query}`)).json()) as Page;
+        cursor = page.next_cursor;
+      } while (page.has_more);
+
+      const resume = JSON.parse(Buffer.from(page.next_cursor, "base64url").toString("utf8")) as {
+        f: number;
+        p: string | null;
+      };
+      expect(resume).toMatchObject({ p: null, f: covered });
+      for (const query of traceQueries) {
+        expect(query.endDate).toBeLessThanOrEqual(Date.now());
+      }
+    });
+
     /** @scenario A project outside the organisation is refused on the project traces stream */
     it("refuses a project of another organisation with 422", async () => {
       const { get } = await buildApi();

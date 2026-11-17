@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-import type { AuditLogApi } from "@langwatch/audit-log-contract";
+import { AUDIT_LOG_EXPORT_PAGE_MAX, type AuditLogApi } from "@langwatch/audit-log-contract";
 import {
   decodeOcsfAuditCursor,
   decodeOcsfGovernanceCursor,
@@ -70,8 +70,8 @@ function resumePoint({
 }
 
 /**
- * Reads the first project of the walk, from the cursor on, that holds traces in the window. When
- * the walk ends, the cursor opens the next window where this one ended.
+ * Reads the first project of the walk, from the cursor on, that holds traces in the window. Every
+ * cursor carries the lowest bound a read of this walk covered, and the next window opens there.
  */
 async function walkProjects({
   traces,
@@ -91,27 +91,33 @@ async function walkProjects({
   organizationId: string;
 }): Promise<{ data: OcsfEventsPage["data"]; next: OcsfTracesCursor }> {
   let { index, scrollId } = resumePoint({ walk, cursor });
-  const windowEnd: OcsfTracesCursor = { p: null, s: null, f: toMs, t: null };
+  let covered = Math.min(cursor?.t ?? toMs, toMs);
+  const resumeAt = (project: string, scroll: string | null): OcsfTracesCursor => ({
+    p: project,
+    s: scroll,
+    f: fromMs,
+    t: covered,
+  });
+  const windowEnd = (): OcsfTracesCursor => ({ p: null, s: null, f: covered, t: null });
   for (let visited = 0; visited < EMPTY_PROJECTS_PER_PAGE; visited += 1) {
     const projectId = walk[index];
-    if (projectId === undefined) return { data: [], next: windowEnd };
+    if (projectId === undefined) return { data: [], next: windowEnd() };
     const page = await traces.listTraceSummaries({
       query: { projectId, startDate: fromMs, endDate: toMs, pageSize: limit },
       options: { dateField: "updated", scrollId },
     });
+    covered = Math.min(covered, page.updatedThrough ?? toMs);
     const data = page.summaries.map((summary) =>
       projectTraceToOcsfEvent({ summary, projectId, organizationId }),
     );
     const nextProject = page.scrollId ? projectId : walk[index + 1];
-    const next: OcsfTracesCursor = nextProject
-      ? { p: nextProject, s: page.scrollId ?? null, f: fromMs, t: toMs }
-      : windowEnd;
+    const next = nextProject ? resumeAt(nextProject, page.scrollId ?? null) : windowEnd();
     if (data.length > 0 || !nextProject) return { data, next };
     index += 1;
     scrollId = null;
   }
   const resume = walk[index];
-  return { data: [], next: resume ? { p: resume, s: null, f: fromMs, t: toMs } : windowEnd };
+  return { data: [], next: resume ? resumeAt(resume, null) : windowEnd() };
 }
 
 /**
@@ -162,8 +168,9 @@ export class OcsfSiemExportService {
   }
 
   /**
-   * Project traces, one event per trace, walked project by project over a fixed window. When the
-   * walk ends, the cursor opens the next window where this one ended.
+   * Project traces, one event per trace, walked project by project over a window that ends no
+   * later than now. When the walk ends, the cursor opens the next window where every read of it
+   * was covered, so a trace updated after a project's read is picked up by the next window.
    */
   async listProjectTraces(
     input: ExportWindow & { organizationId: string; projectId?: string },
@@ -181,8 +188,9 @@ export class OcsfSiemExportService {
     }
     const walk = input.projectId === undefined ? projectIds : [input.projectId];
     const fromMs = cursor?.f ?? sinceMs(input.since);
-    const toMs =
-      input.until === undefined ? (cursor?.t ?? this.deps.now()) : toEpochMs(input.until);
+    const now = this.deps.now();
+    const requestedTo = input.until === undefined ? (cursor?.t ?? now) : toEpochMs(input.until);
+    const toMs = Math.min(requestedTo, now);
     const { data, next } = await walkProjects({
       traces: this.deps.traces,
       walk,
@@ -205,22 +213,23 @@ export class OcsfSiemExportService {
     });
     const settled = this.deps.now() - AUDIT_SETTLE_MS;
     const untilMs = Math.min(settled, input.until === undefined ? settled : toEpochMs(input.until));
+    const pageSize = Math.min(input.limit, AUDIT_LOG_EXPORT_PAGE_MAX);
     const entries = await this.deps.auditLog.findForOrganization({
       organizationId: input.organizationId,
       projectIds,
       afterMs: watermark.t,
       afterId: watermark.i,
-      limit: input.limit + 1,
+      limit: pageSize + 1,
       untilMs,
     });
-    const kept = entries.slice(0, input.limit);
+    const kept = entries.slice(0, pageSize);
     const last = kept.at(-1);
     return this.page({
       data: kept.map((entry) =>
         auditEntryToOcsfEvent({ entry, organizationId: input.organizationId }),
       ),
       cursor: last ? { t: last.createdAt.getTime(), i: last.id } : watermark,
-      hasMore: entries.length > input.limit,
+      hasMore: entries.length > pageSize,
     });
   }
 
