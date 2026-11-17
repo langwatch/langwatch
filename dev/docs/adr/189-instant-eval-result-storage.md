@@ -15,13 +15,13 @@
 
 ### Today
 
-| Trigger                                  | Stored?                       | Where                                                                    | On the trace page? |
-| ---------------------------------------- | ----------------------------- | ------------------------------------------------------------------------ | ------------------ |
-| Quick `eval()` in an LWQL query          | No, in memory for the call    | `instant-eval-judge-rows.service.ts:102` (a `Map`)                        | No                 |
+| Trigger                                  | Stored?                       | Where                                                                      | On the trace page? |
+| ---------------------------------------- | ----------------------------- | -------------------------------------------------------------------------- | ------------------ |
+| Quick `eval()` in an LWQL query          | No, in memory for the call    | `instant-eval-judge-rows.service.ts:102` (a `Map`)                         | No                 |
 | Instant Eval run (search bar, CLI, REST) | Yes, indefinitely             | `instant_eval_runs` and `instant_eval_judgments` (migrations 00098, 00097) | No                 |
-| Code widget with `eval()`                | No, judges on every run       | Same path as a quick `eval()` (`use-dashboard-widget-executor.ts:118-120`)    | No                 |
-| Saved-chart widget with `eval()`         | Cannot hold `eval()` today    | Save refuses it (`saved-workbench-chart-policy.service.ts:36-41`)        | No                 |
-| Monitor (online eval)                    | Yes, with the trace retention | `evaluation_runs` (00002), fed by `lw.evaluation.*` events               | Yes                |
+| Code widget with `eval()`                | No, judges on every run       | Same path as a quick `eval()` (`use-dashboard-widget-executor.ts:118-120`) | No                 |
+| Saved-chart widget with `eval()`         | Cannot hold `eval()` today    | Save refuses it (`saved-workbench-chart-policy.service.ts:36-41`)          | No                 |
+| Monitor (online eval)                    | Yes, with the trace retention | `evaluation_runs` (00002), fed by `lw.evaluation.*` events                 | Yes                |
 
 Facts the design rests on:
 
@@ -131,12 +131,12 @@ Before judging, the service looks up the rows that match tenant, trace, span, qu
 
 Each trigger uses the same path:
 
-| Trigger            | `Source`    | `SourceId`      | What recall gives                                         |
-| ------------------ | ----------- | --------------- | --------------------------------------------------------- |
-| Quick `eval()` ask | `ask`       | the query id    | A repeat question is free and stays the same answer.      |
-| Run                | `run`       | the run id      | A rerun pays only for traces it has not judged. A trace or span run writes both tables: `instant_eval_judgments` for its run page, `eval_results` for recall. |
-| Dashboard widget   | `dashboard` | the widget id   | A refresh pays only for new traces. All viewers agree.    |
-| Monitor, Instant Evals judge | `monitor` | the monitor id | A trace a monitor already judged with the same question is not judged again. A monitor hashes `{input, output, contexts}`, an ask hashes one column, so monitor rows and ask rows do not recall each other. |
+| Trigger                      | `Source`    | `SourceId`     | What recall gives                                                                                                                                                                                           |
+| ---------------------------- | ----------- | -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Quick `eval()` ask           | `ask`       | the query id   | A repeat question is free and stays the same answer.                                                                                                                                                        |
+| Run                          | `run`       | the run id     | A rerun pays only for traces it has not judged. A trace or span run writes both tables: `instant_eval_judgments` for its run page, `eval_results` for recall.                                               |
+| Dashboard widget             | `dashboard` | the widget id  | A refresh pays only for new traces. All viewers agree.                                                                                                                                                      |
+| Monitor, Instant Evals judge | `monitor`   | the monitor id | A trace a monitor already judged with the same question is not judged again. A monitor hashes `{input, output, contexts}`, an ask hashes one column, so monitor rows and ask rows do not recall each other. |
 
 ### 3. The trace page reads this table
 
@@ -192,12 +192,12 @@ Rejected for instant evals. A run of 100,000 rows and 10 questions is 1,000,000 
 
 From public documentation read on 2026-10-28. All four keep results beside the trace, linked by id, and none rewrites the judged data. None documents a cache-only mode.
 
-| Product   | Model                                                                         | Source                                                                                                  |
-| --------- | ----------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
-| Langfuse  | A score is its own object linked to a trace or observation, with a source.   | https://langfuse.com/docs/evaluation/scores/data-model                                                  |
-| Braintrust | Scores sit on the span, or in a scoring span added to the trace.             | https://www.braintrust.dev/docs/observe/score-online                                                    |
-| Phoenix   | Evaluations are span annotations keyed by `span_id`.                        | https://arize.com/docs/phoenix/tracing/how-to-tracing/feedback-and-annotations/llm-evaluations          |
-| Datadog   | Evaluations join on span and trace id and show on the span.                  | https://docs.datadoghq.com/llm_observability/evaluations/submit_evaluations/                            |
+| Product    | Model                                                                      | Source                                                                                         |
+| ---------- | -------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| Langfuse   | A score is its own object linked to a trace or observation, with a source. | https://langfuse.com/docs/evaluation/scores/data-model                                         |
+| Braintrust | Scores sit on the span, or in a scoring span added to the trace.           | https://www.braintrust.dev/docs/observe/score-online                                           |
+| Phoenix    | Evaluations are span annotations keyed by `span_id`.                       | https://arize.com/docs/phoenix/tracing/how-to-tracing/feedback-and-annotations/llm-evaluations |
+| Datadog    | Evaluations join on span and trace id and show on the span.                | https://docs.datadoghq.com/llm_observability/evaluations/submit_evaluations/                   |
 
 ## Decisions on the open questions
 
