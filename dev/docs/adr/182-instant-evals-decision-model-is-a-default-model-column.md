@@ -29,7 +29,7 @@
    - provider down, timed out or unreadable answer (5xx, network): `classifier_provider_unavailable`, "retry later";
    - the text too large (413): `classifier_input_too_large`, a skip and not an error, since the trace's size is nothing to fix;
    - any other refusal (400, 422): `classifier_failed`, "retry; if it keeps failing, pick another decision model".
-     For an LLM judge these are error results (ADR-174 decision 7). For a run or a judged query they are skips, counted by reason.
+     For an LLM judge these are error results (ADR-174 decision 7). For a run or a judged query they are skips, counted by reason. _Revised 2026-11-17:_ a run page where every row is `classifier_key_invalid` fails the run with `instant_eval_decision_model_key_invalid` instead, since the run's skips carry no reason and read as nothing matching; a judged query still skips.
 10. **The hosted path is untouched.** A project on LangWatch Evals Preview runs exactly as before: same classifier, same Connect choice off cloud, same meter, same cap.
 
 ## Invariants

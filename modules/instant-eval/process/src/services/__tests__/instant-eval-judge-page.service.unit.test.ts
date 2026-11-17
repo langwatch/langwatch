@@ -5,11 +5,13 @@
  */
 
 import { HandledError } from "@langwatch/handled-error";
+import { InstantEvalDecisionModelKeyInvalidError } from "@langwatch/instant-eval-contract";
 import {
   INSTANT_EVAL_PRICING,
   INSTANT_EVAL_CLASSIFIER_LIMITS,
   InstantEvalClassifierUnavailableError,
   InstantEvalFreeBudgetExhaustedError,
+  instantEvalSkipped,
   type InstantEvalJudgement,
 } from "@langwatch/instant-eval-judge-contract";
 import { Temporal } from "@langwatch/time";
@@ -392,6 +394,76 @@ describe("given a judge that declines every text", () => {
         Error: "classifier_not_configured",
         Probability: null,
       });
+    });
+  });
+});
+
+/** A unit the own decision model's provider refused for its key. */
+const KEY_REFUSED = instantEvalSkipped("classifier_key_invalid");
+
+const TWO_ROWS = {
+  keyPage: { keys: [rowKey("t1"), rowKey("t2")], hasMore: true },
+  rows: [
+    { TraceId: "t1", annoyed: "one" },
+    { TraceId: "t2", annoyed: "two" },
+  ],
+};
+
+describe("given an own decision model whose key is refused for every row", () => {
+  describe("when the page is judged", () => {
+    /** @scenario "A run page whose every row was refused for the decision model's key fails with that reason" */
+    it("throws the key refusal and writes nothing", async () => {
+      const { service, judgments } = await judging({
+        ...TWO_ROWS,
+        answer: async () => KEY_REFUSED,
+      });
+
+      const page = service.judgePage(INPUT);
+
+      await expect(page).rejects.toThrow(InstantEvalDecisionModelKeyInvalidError);
+      await expect(page).rejects.toMatchObject({
+        code: "instant_eval_decision_model_key_invalid",
+        fault: "customer",
+      });
+      expect(judgments.written).toEqual([]);
+    });
+  });
+});
+
+describe("given an own decision model whose key is refused for only some rows", () => {
+  describe("when the page is judged", () => {
+    /** @scenario "A run page with only some rows refused for the key, or skipped for another reason, is recorded" */
+    it("records the page with the refused rows as skips", async () => {
+      const { service, judgments } = await judging({
+        ...TWO_ROWS,
+        answer: async ({ index }) => (index === 0 ? judged(0.9) : KEY_REFUSED),
+        concurrency: 1,
+      });
+
+      const outcome = await service.judgePage(INPUT);
+
+      expect(outcome).toMatchObject({ rows: 2, matched: 1, skipped: 1, failed: 0 });
+      expect(judgments.written[0]).toMatchObject([
+        { TraceId: "t1", Status: "judged" },
+        { TraceId: "t2", Status: "skipped", Error: "classifier_key_invalid" },
+      ]);
+    });
+  });
+});
+
+describe("given a deployment with no classifier for every row", () => {
+  describe("when the page is judged", () => {
+    /** @scenario "A run page with only some rows refused for the key, or skipped for another reason, is recorded" */
+    it("records the rows as skips rather than failing the run", async () => {
+      const { service, judgments } = await judging({
+        ...TWO_ROWS,
+        answer: async () => instantEvalSkipped("classifier_not_configured"),
+      });
+
+      const outcome = await service.judgePage(INPUT);
+
+      expect(outcome).toMatchObject({ rows: 2, skipped: 2, failed: 0 });
+      expect(judgments.written).toHaveLength(1);
     });
   });
 });

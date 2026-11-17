@@ -3811,6 +3811,11 @@ const presentations = {
     title: "The judgements couldn't be made right now",
     describe: () => "The query ran, but nothing could be judged. Try again in a moment.",
   },
+  instant_eval_decision_model_key_invalid: {
+    title: "The Instant Evals model's key couldn't be used",
+    describe: () =>
+      "Your model provider refused the key for this project's Instant Evals model, or it has none. Check it in Settings > Model Providers.",
+  },
   instant_eval_estimate_unavailable: {
     title: "We couldn't work out the size of this run",
     describe: () => "The estimate failed on our side. Try again, or start the run without one.",

@@ -5,6 +5,7 @@
  * @see modules/instant-eval/specs/instant-eval-pipeline.feature
  */
 
+import { InstantEvalDecisionModelKeyInvalidError } from "@langwatch/instant-eval-contract";
 import {
   instantEvalSpentPriceUsd,
   isInstantEvalSpendBillable,
@@ -201,6 +202,9 @@ export class InstantEvalJudgePageService {
     if (keyPage.keys.length === 0) return EMPTY_INSTANT_EVAL_PAGE;
 
     const { judged, stop } = await this.#judgeKeys({ loaded, rows, input });
+    // Every row refused for the own model's key is a run that cannot judge anything; skips
+    // would read as "nothing matched". Runs only: a judged query keeps them as skips.
+    if (isEveryRowKeyRefused(judged.usage)) throw new InstantEvalDecisionModelKeyInvalidError();
     const cut = cutPageAtStop({ judged, keys: keyPage.keys });
     const counters = await this.#write({
       loaded,
@@ -453,6 +457,11 @@ export class InstantEvalJudgePageService {
 
     return mapping.counters;
   }
+}
+
+/** Whether the page sent rows and every one came back as a refused own-model key. */
+function isEveryRowKeyRefused(usage: InstantEvalJudgeUsage): boolean {
+  return usage.requests > 0 && usage.skipped.classifier_key_invalid === usage.requests;
 }
 
 /**
