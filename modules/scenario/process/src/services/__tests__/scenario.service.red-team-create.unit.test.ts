@@ -1,5 +1,8 @@
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-/** Spec: modules/suite/specs/suite-templates.feature */
+/**
+ * Spec: modules/suite/specs/suite-templates.feature,
+ * modules/scenario/specs/red-team-scenario.feature
+ */
 import { describe, expect, it, vi } from "vitest";
 
 import { ScenarioService, type ScenarioServiceOptions } from "../scenario.service.ts";
@@ -71,5 +74,43 @@ describe("ScenarioService.create with a scenario kind", () => {
       ).rejects.toMatchObject({ code: "scenario_red_team_config_mismatch" });
       expect(create).not.toHaveBeenCalled();
     });
+  });
+});
+
+describe("ScenarioService.duplicate of a red team scenario", () => {
+  /** @scenario "A duplicated red team scenario stays a red team scenario" */
+  it("copies the kind and the attack config", async () => {
+    const redTeam = { ...attack, strategy: "goat" as const, maxTurns: 12 };
+    const create = vi.fn().mockImplementation(async (row: unknown) => row);
+    const original = {
+      ...base,
+      id: "scenario_0",
+      name: "LLM07",
+      parameters: null,
+      simulatorModel: null,
+      judgeModel: null,
+      maxTurns: null,
+      minTurns: null,
+      kind: "red_team",
+      redTeam,
+    };
+    const service = ScenarioService.create({
+      repository: createApiFixture<ScenarioServiceOptions["repository"]>({
+        create,
+        findById: vi.fn().mockResolvedValue(original),
+        findTestSuites: vi.fn().mockResolvedValue([]),
+      }),
+      simulations: {} as ScenarioServiceOptions["simulations"],
+      ids: createApiFixture<ScenarioServiceOptions["ids"]>({ next: () => "scenario_1" }),
+      testSuiteIds: {} as ScenarioServiceOptions["testSuiteIds"],
+      clock: {} as ScenarioServiceOptions["clock"],
+    });
+
+    await service.duplicate({ scenarioId: "scenario_0", projectId: "project_1" });
+
+    expect(create).toHaveBeenCalledWith(
+      expect.objectContaining({ name: "LLM07 (copy)", kind: "red_team", redTeam }),
+    );
+    expect(create.mock.calls[0]![0]).not.toHaveProperty("sourceTemplateId");
   });
 });

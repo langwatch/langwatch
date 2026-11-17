@@ -240,6 +240,8 @@ export class ScenarioService {
       maxTurns: original.maxTurns,
       minTurns: original.minTurns,
       testSuiteId: original.testSuiteId,
+      ...(original.kind ? { kind: original.kind } : {}),
+      ...(original.redTeam ? { redTeam: original.redTeam } : {}),
       lastUpdatedById: parsed.lastUpdatedById ?? null,
     });
   }
