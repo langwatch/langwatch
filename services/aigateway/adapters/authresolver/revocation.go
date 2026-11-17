@@ -226,6 +226,7 @@ func (s *Service) claimReconfirm(h [64]byte) bool {
 // cached copies; a config fetch that fails after the key checked out keeps
 // the cached config and its deadlines, with the fresh key check stamped.
 func (s *Service) reconfirm(ctx context.Context, key domain.PresentedKey, h [64]byte) (served, error) {
+	since := s.fetchGeneration()
 	start := time.Now()
 	bundle, err := s.resolver.ResolveKey(ctx, key)
 	if err != nil {
@@ -236,7 +237,7 @@ func (s *Service) reconfirm(ctx context.Context, key domain.PresentedKey, h [64]
 	}
 	etag, cfgErr := s.populateConfig(ctx, bundle)
 	if cfgErr == nil {
-		s.publishL1(h, s.newEntry(bundle, etag).authFrom(start))
+		s.publishFetched(h, s.newEntry(bundle, etag).authFrom(start), since)
 		return served{bundle: bundle, authStart: start}, nil
 	}
 	if classifyRefreshError(cfgErr) == classAuthRejection {
@@ -247,7 +248,7 @@ func (s *Service) reconfirm(ctx context.Context, key domain.PresentedKey, h [64]
 		return served{}, herr.New(ctx, domain.ErrKeyExpired, herr.M{"message": domain.KeyExpiredMessage})
 	}
 	if e, ok := s.l1.Peek(h); ok && servableEntry(e) {
-		return s.keepCachedConfig(h, e, served{bundle: bundle, authStart: start}), nil
+		return s.keepCachedConfig(h, cachedConfigKeep{e: e, check: served{bundle: bundle, authStart: start}, since: since}), nil
 	}
 	return served{}, errConfigUnavailable(ctx, cfgErr)
 }
@@ -259,10 +260,19 @@ func servableEntry(e *entry) bool {
 	return state == entryFresh || state == entryStale
 }
 
+// cachedConfigKeep is the cached entry, the fresh key answer and the
+// generation the re-check started at.
+type cachedConfigKeep struct {
+	e     *entry
+	check served
+	since uint64
+}
+
 // keepCachedConfig re-stores e with the fresh key answer and e's config,
 // never past e's own deadlines.
-func (s *Service) keepCachedConfig(h [64]byte, e *entry, check served) served {
-	fresh, start := check.bundle, check.authStart
+func (s *Service) keepCachedConfig(h [64]byte, in cachedConfigKeep) served {
+	e, since := in.e, in.since
+	fresh, start := in.check.bundle, in.check.authStart
 	e.mu.Lock()
 	merged := *fresh
 	merged.Config, merged.Credentials = e.bundle.Config, e.bundle.Credentials
@@ -280,7 +290,7 @@ func (s *Service) keepCachedConfig(h [64]byte, e *entry, check served) served {
 		budgetChanges: e.budgetChanges, authStartedAt: start,
 	}
 	e.mu.Unlock()
-	s.publishL1(h, kept)
+	s.publishFetched(h, kept, since)
 	return served{bundle: &merged, authStart: start}
 }
 

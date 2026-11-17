@@ -887,3 +887,35 @@ Feature: Gateway auth cache — hot path is zero RTT after first hit
       When the change feed reports a new model provider for "acme"
       Then the "acme" key is evicted so its next request sees the new provider
       And the other organization's key stays cached
+
+  Rule: A fetch in flight across a change event does not cache what it read before it
+    The change feed only evicts entries already in the cache. A fetch that began
+    before a key, config or budget change answers after it with what the control
+    plane said before the change. That answer serves the request that made it,
+    and is not cached.
+
+    @unit @regression
+    Scenario: a revocation during a cold fetch keeps the key out of the cache
+      Given a request for a key misses the cache and asks the control plane
+      When the change feed reports the key revoked before the answer arrives
+      Then the answer is not cached
+
+    @unit @regression
+    Scenario: a config change during a fetch is not hidden by the earlier answer
+      Given a request for a key asks the control plane
+      When the change feed reports a config change for the key before the answer arrives
+      Then the request is answered and the answer is not cached
+      And no denial is recorded
+      And the next request fetches the changed config and caches it
+
+    @unit
+    Scenario: a change to another key does not stop a fetch from caching
+      Given a request for a key asks the control plane
+      When the change feed reports a change to a different key before the answer arrives
+      Then the answer is cached
+
+    @unit
+    Scenario: a budget debit during a fetch caches the answer marked for refresh
+      Given a request for a key asks the control plane
+      When the change feed reports a budget update for its organization before the answer arrives
+      Then the answer is cached and marked behind the update

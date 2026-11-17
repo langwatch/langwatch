@@ -163,6 +163,9 @@ type Service struct {
 	deniedKeys      *lru.Cache[[64]byte, string]
 	failClosedAfter time.Duration
 	rechecks        denialRechecks
+	// invalidations numbers change events so a fetch in flight across one
+	// cannot publish what it read before it (invalidation.go).
+	invalidations invalidationLog
 
 	stopCh chan struct{}
 }
@@ -820,6 +823,7 @@ func (s *Service) recordMiss() {
 // Used for cold misses; not on stale-entry refresh paths (those use
 // refreshOrServeStale for the served-stale fallback).
 func (s *Service) resolveFresh(ctx context.Context, key domain.PresentedKey, h [64]byte) (served, error) {
+	since := s.fetchGeneration()
 	start := time.Now()
 	fallback := s.lastKnownFor(h)
 	fetchCtx := ctx
@@ -831,7 +835,7 @@ func (s *Service) resolveFresh(ctx context.Context, key domain.PresentedKey, h [
 	bundle, err := s.resolver.ResolveKey(fetchCtx, key)
 	if err != nil {
 		if fallback != nil && classifyRefreshError(err) == classTransportFailure {
-			if answer := s.serveLastKnown(h, lastKnownServe{old: fallback, cause: err}); answer != nil {
+			if answer := s.serveLastKnown(h, lastKnownServe{old: fallback, cause: err, since: since}); answer != nil {
 				return *answer, nil
 			}
 		}
@@ -841,10 +845,10 @@ func (s *Service) resolveFresh(ctx context.Context, key domain.PresentedKey, h [
 	}
 	etag, cfgErr := s.populateConfig(fetchCtx, bundle)
 	if cfgErr == nil {
-		s.publishL1(h, s.newEntry(bundle, etag).authFrom(start))
+		s.publishFetched(h, s.newEntry(bundle, etag).authFrom(start), since)
 		return served{bundle: bundle, authStart: start}, nil
 	}
-	return s.resolveFreshWithoutConfig(ctx, freshWithoutConfig{h: h, fallback: fallback, bundle: bundle, cfgErr: cfgErr})
+	return s.resolveFreshWithoutConfig(ctx, freshWithoutConfig{h: h, fallback: fallback, bundle: bundle, cfgErr: cfgErr, since: since})
 }
 
 // freshWithoutConfig is a resolve-key answer whose config fetch failed.
@@ -853,6 +857,7 @@ type freshWithoutConfig struct {
 	fallback *entry
 	bundle   *domain.Bundle
 	cfgErr   error
+	since    uint64
 }
 
 // resolveFreshWithoutConfig is the tail of resolveFresh when resolve-key
@@ -865,7 +870,7 @@ func (s *Service) resolveFreshWithoutConfig(ctx context.Context, in freshWithout
 		return served{}, cfgErr
 	}
 	if fallback != nil {
-		if answer := s.serveLastKnown(h, lastKnownServe{old: fallback, fresh: bundle, cause: cfgErr}); answer != nil {
+		if answer := s.serveLastKnown(h, lastKnownServe{old: fallback, fresh: bundle, cause: cfgErr, since: in.since}); answer != nil {
 			return *answer, nil
 		}
 		if bundle.KeyExpired(time.Now()) {
@@ -909,6 +914,7 @@ type lastKnownServe struct {
 	old   *entry
 	fresh *domain.Bundle
 	cause error
+	since uint64
 }
 
 // serveLastKnown puts an evicted entry back in L1 after a failed refetch and
@@ -949,8 +955,7 @@ func (s *Service) serveLastKnown(h [64]byte, in lastKnownServe) *served {
 	if soft.After(hard) {
 		soft = hard
 	}
-	s.lastKnown.Remove(h)
-	s.l1.Add(h, &entry{
+	restored := &entry{
 		bundle:             bundle,
 		softExpiresAt:      soft,
 		hardExpiresAt:      hard,
@@ -958,7 +963,11 @@ func (s *Service) serveLastKnown(h [64]byte, in lastKnownServe) *served {
 		configConfirmedAt:  confirmedAt,
 		budgetRollAckedFor: acked,
 		authStartedAt:      authStart,
-	})
+	}
+	if !s.publishFetched(h, restored, in.since) {
+		s.lastKnown.Remove(h)
+		return nil
+	}
 	s.logger.Warn("auth_cache_serve_last_known",
 		zap.String("vk_id", bundle.VirtualKeyID),
 		zap.Duration("config_age", now.Sub(confirmedAt)),
@@ -973,6 +982,7 @@ func (s *Service) serveLastKnown(h [64]byte, in lastKnownServe) *served {
 // stale entry's soft expiry by SoftBump and serves the stale bundle. On
 // auth-class failure evicts the entry and returns the rejection.
 func (s *Service) refreshOrServeStale(ctx context.Context, lk lookup, stale *entry) (served, error) {
+	since := s.fetchGeneration()
 	start := time.Now()
 	h := lk.hash
 	bundle, err := s.resolver.ResolveKey(ctx, lk.key)
@@ -995,7 +1005,7 @@ func (s *Service) refreshOrServeStale(ctx context.Context, lk lookup, stale *ent
 			// serve the stale entry's known-good credentials instead.
 			return s.serveStaleAfterFailure(ctx, staleFailure{h: h, stale: stale, staleBundle: staleBundle, hardExpiresAt: hardExpiresAt, cls: cls, cause: cfgErr})
 		}
-		s.publishL1(h, s.newEntry(bundle, etag).authFrom(start))
+		s.publishFetched(h, s.newEntry(bundle, etag).authFrom(start), since)
 		return served{bundle: bundle, authStart: start}, nil
 
 	case classAuthRejection:
@@ -1421,6 +1431,12 @@ func budgetChangeMatch(organizationID string, ch CacheChange) (func(*domain.Bund
 // markBudgetChangedWhere marks every L1 entry whose bundle matches as behind
 // on spend, without removing any. Peek for the same reason as evictWhere.
 func (s *Service) markBudgetChangedWhere(match func(*domain.Bundle) bool, reason, target string) {
+	s.recordInvalidation(invalidation{match: match, budgetOnly: true}, func() { s.markMatching(match, reason, target) })
+}
+
+// markMatching is the L1 walk of markBudgetChangedWhere, run under the
+// invalidation lock.
+func (s *Service) markMatching(match func(*domain.Bundle) bool, reason, target string) {
 	marked := 0
 	for _, h := range s.l1.Keys() {
 		e, ok := s.l1.Peek(h)
@@ -1481,6 +1497,11 @@ func evictReason(kind string) string {
 // keepLastKnown sets the evicted entries aside as the outage fallback; a key
 // the change made unusable passes false, which also drops any fallback held.
 func (s *Service) evictWhere(match func(*domain.Bundle) bool, scope evictScope) {
+	s.recordInvalidation(invalidation{match: match}, func() { s.evictMatching(match, scope) })
+}
+
+// evictMatching is the L1 walk of evictWhere, run under the invalidation lock.
+func (s *Service) evictMatching(match func(*domain.Bundle) bool, scope evictScope) {
 	keepLastKnown, reason, target := scope.keepLastKnown, scope.reason, scope.target
 	evicted := 0
 	for _, h := range s.l1.Keys() {
@@ -1531,6 +1552,7 @@ func (s *Service) dropLastKnownWhere(match func(*domain.Bundle) bool) {
 // AuthRejection evicts; TransportFailure bumps the existing entry.
 func (s *Service) refreshBackground(key domain.PresentedKey, h [64]byte, started *entry) {
 	defer started.endAuthRefresh()
+	since := s.fetchGeneration()
 	start := time.Now()
 	budgetChangesAtStart := started.budgetChangeCount()
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
@@ -1559,7 +1581,7 @@ func (s *Service) refreshBackground(key domain.PresentedKey, h [64]byte, started
 			s.logger.Debug("auth_cache_refresh_dropped_stale", zap.String("vk_id", bundle.VirtualKeyID))
 			return
 		}
-		s.publishL1(h, s.newEntry(bundle, etag).authFrom(start).carryBudgetChanges(started, budgetChangesAtStart))
+		s.publishFetched(h, s.newEntry(bundle, etag).authFrom(start).carryBudgetChanges(started, budgetChangesAtStart), since)
 		s.logger.Debug("auth_cache_refresh_success", zap.String("vk_id", bundle.VirtualKeyID))
 
 	case classAuthRejection:
@@ -1633,6 +1655,7 @@ func (s *Service) refreshConfigBackground(h [64]byte, e *entry) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 
+	since := s.fetchGeneration()
 	stale, _, _ := e.snapshot()
 	budgetChangesAtStart := e.budgetChangeCount()
 	res, err := s.configFetcher.FetchConfig(ctx, stale.VirtualKeyID, e.refreshConfigETag())
@@ -1680,7 +1703,7 @@ func (s *Service) refreshConfigBackground(h [64]byte, e *entry) {
 		)
 		return
 	}
-	s.publishL1(h, s.newEntry(&fresh, res.ETag).authFrom(e.authStart()).carryBudgetChanges(e, budgetChangesAtStart))
+	s.publishFetched(h, s.newEntry(&fresh, res.ETag).authFrom(e.authStart()).carryBudgetChanges(e, budgetChangesAtStart), since)
 	s.logger.Debug("config_ttl_refresh_success", zap.String("vk_id", stale.VirtualKeyID))
 }
 
