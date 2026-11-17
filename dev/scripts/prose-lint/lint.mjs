@@ -353,17 +353,16 @@ function splitSentences(s) {
     .filter((x) => x.length > 0);
 }
 
-// Markup that is not prose and carries punctuation the regex rules would
-// otherwise count: an image's leading exclamation mark, a comment's arrow.
-// Both go entirely, an unclosed comment to the end, until none is left.
-function stripMarkup(s) {
+// Markup that is not prose: an image and a comment go entirely, an
+// unclosed comment to the end; a link keeps its text and drops its URL.
+export function stripMarkup(s) {
   let text = s;
   let previous;
   do {
     previous = text;
     text = text.replace(/<!--[\s\S]*?(?:-->|$)/g, "");
   } while (text !== previous);
-  return text.replace(/!\[[^\]]*\]\([^)]*\)/g, "");
+  return text.replace(/!\[[^\]]*\]\([^)]*\)/g, "").replace(/\[([^\]]*)\]\([^)]*\)/g, "$1");
 }
 
 function stripInlineCode(s) {
