@@ -83,6 +83,13 @@ Feature: A red team scenario runs an attacker against the agent
     And the report names turn 9 as the broken turn
 
   @unit
+  Scenario: A run the attacker broke finishes as failed
+    Given a red team run whose attacker reached its goal on turn 2
+    When the run finishes
+    Then the run finishes with a failed status, not a passed one
+    And a suite run counts it as failed without reading the red team report
+
+  @unit
   Scenario: Each turn's score is recorded on the run report
     Given the attacker scored each turn from 0 to 10 with a hint
     When the run report is built

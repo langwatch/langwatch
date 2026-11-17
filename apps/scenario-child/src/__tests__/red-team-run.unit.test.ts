@@ -5,7 +5,7 @@
  */
 import * as ScenarioRunner from "@langwatch/scenario";
 import type { ChildProcessJobData, RedTeamConfig } from "@langwatch/scenario-contract";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import {
   buildRedTeamRunReport,
@@ -13,7 +13,7 @@ import {
   readRedTeamTurnScores,
   redTeamTotalTurns,
 } from "../rules/red-team-run.rules.ts";
-import { buildRedTeamCast } from "../services/scenario-child-execution.service.ts";
+import { buildRedTeamCast, redTeamScript } from "../services/scenario-child-execution.service.ts";
 
 class TargetAgent extends ScenarioRunner.AgentAdapter {
   role = ScenarioRunner.AgentRole.AGENT;
@@ -199,5 +199,34 @@ describe("readRedTeamTurnScores", () => {
     ]);
     expect(readRedTeamTurnScores({})).toEqual([]);
     expect(readRedTeamTurnScores(null)).toEqual([]);
+  });
+});
+
+describe("redTeamScript", () => {
+  /** @scenario "A run the attacker broke finishes as failed" */
+  it("fails the run, never succeeds it, once the attacker reached its goal", async () => {
+    const script = redTeamScript({ attacker: { checkEarlyExit: () => true }, totalTurns: 3 });
+    const executor = { fail: vi.fn(), succeed: vi.fn() };
+    await script[2]?.({ currentTurn: 2 } as never, executor as never);
+
+    expect(executor.succeed).not.toHaveBeenCalled();
+    expect(executor.fail).toHaveBeenCalledWith("Early exit: objective achieved on turn 2");
+    const report = buildRedTeamRunReport({
+      config,
+      totalTurns: 3,
+      judgePassed: false,
+      reasoning: executor.fail.mock.calls[0]?.[0],
+      turnScores: [],
+    });
+    expect(report).toMatchObject({ outcome: "broke", brokeAtTurn: 2 });
+  });
+
+  it("goes on to the next turn while the attacker has not reached its goal", async () => {
+    const script = redTeamScript({ attacker: { checkEarlyExit: () => false }, totalTurns: 3 });
+    const executor = { fail: vi.fn(), succeed: vi.fn() };
+    await script[2]?.({ currentTurn: 1 } as never, executor as never);
+
+    expect(executor.fail).not.toHaveBeenCalled();
+    expect(script).toHaveLength(3 * 3 + 1);
   });
 });

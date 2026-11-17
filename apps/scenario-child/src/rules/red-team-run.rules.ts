@@ -9,7 +9,7 @@ import {
 } from "@langwatch/scenario-contract";
 
 /** The reasoning the library's marathon script ends a run with when the attacker's goal was met. */
-const EARLY_EXIT_REASONING_PREFIX = "Early exit: objective achieved";
+export const EARLY_EXIT_REASONING_PREFIX = "Early exit: objective achieved";
 const HINT_MAX_CHARS = 2000;
 const EARLY_EXIT_TURN = /^Early exit: objective achieved on turn (\d+)/;
 

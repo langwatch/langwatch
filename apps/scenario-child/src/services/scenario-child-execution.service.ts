@@ -42,6 +42,7 @@ import {
   isRedTeamRun,
   readRedTeamTurnScores,
   redTeamTotalTurns,
+  EARLY_EXIT_REASONING_PREFIX,
 } from "../rules/red-team-run.rules.ts";
 import { buildRemoteTraceRunConfig } from "../rules/remote-trace-run.rules.ts";
 import { selectRoleModelParams } from "../rules/scenario-role-model.rules.ts";
@@ -208,6 +209,28 @@ interface RedTeamCast {
 }
 
 /**
+ * The attack turns, then the judge. A break ends the run as failed on the spot, so the finished
+ * run already carries the failure for the suite and every other reader of it.
+ */
+export function redTeamScript({
+  attacker,
+  totalTurns,
+}: {
+  attacker: { checkEarlyExit(): boolean };
+  totalTurns: number;
+}): ScenarioRunner.ScriptStep[] {
+  const steps: ScenarioRunner.ScriptStep[] = [];
+  for (let turn = 0; turn < totalTurns; turn++) {
+    steps.push(ScenarioRunner.user(), ScenarioRunner.agent(), async (state, executor) => {
+      if (!attacker.checkEarlyExit()) return;
+      await executor.fail(`${EARLY_EXIT_REASONING_PREFIX} on turn ${state.currentTurn}`);
+    });
+  }
+  steps.push(ScenarioRunner.judge());
+  return steps;
+}
+
+/**
  * A red team run's cast: the attacker plays the user with the simulator's model for attacks and
  * its plan, the judge holds the scenario criteria, and the marathon script runs the turn budget.
  */
@@ -241,7 +264,7 @@ export function buildRedTeamCast({
       : ScenarioRunner.redTeamCrescendo(attackerConfig);
   return {
     agents: [adapter, attacker, judge],
-    script: attacker.marathonScript(),
+    script: redTeamScript({ attacker, totalTurns }),
     redTeam: { attacker, config, totalTurns },
   };
 }
