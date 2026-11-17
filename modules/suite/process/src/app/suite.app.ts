@@ -29,6 +29,7 @@ import {
   type EvaluatorAttachment,
   type ScenarioApi as ScenarioApiType,
   type RunActor,
+  type ScenarioActor,
   type ScenarioCaller,
   type ScenarioRunConfig,
   type ScenarioTestSuite,
@@ -494,10 +495,12 @@ export class SuiteModule implements SuiteApi {
   applyTemplate(
     input: ApplySuiteTemplateTrpcInput,
     by: ScenarioCaller,
+    author?: ScenarioActor,
   ): Promise<AppliedSuiteTemplate> {
     return SuiteTemplateService.create({ scenarios: this.#dependencies.scenarios }).applyTemplate(
       input,
       by,
+      author,
     );
   }
 

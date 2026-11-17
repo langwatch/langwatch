@@ -3,6 +3,7 @@ import {
   redTeamConfigSchema,
   type ScenarioApi,
   type ScenarioCaller,
+  type ScenarioActor,
 } from "@langwatch/scenario-contract";
 import {
   applySuiteTemplateTrpcInputSchema,
@@ -43,12 +44,14 @@ export class SuiteTemplateService {
   /**
    * Validates every filled scenario before writing anything, then creates the test suite and
    * files each scenario in it, marked with the template so the Free scenario cap skips them.
-   * A failed scenario write archives the suite and what it already holds, then rethrows.
+   * A failed scenario write archives the suite and what it already holds, then rethrows. `author`
+   * names the person each scenario is written by; a key with no person names none.
    * @throws SuiteTemplateNotFoundError
    */
   async applyTemplate(
     input: ApplySuiteTemplateTrpcInput,
     by: ScenarioCaller,
+    author?: ScenarioActor,
   ): Promise<AppliedSuiteTemplate> {
     const parsed = applySuiteTemplateTrpcInputSchema.parse(input);
     const template = this.templates.find((candidate) => candidate.id === parsed.templateId);
@@ -69,7 +72,12 @@ export class SuiteTemplateService {
     try {
       for (const scenario of filled) {
         const created = await this.options.scenarios.create(
-          { ...scenario, projectId: parsed.projectId, testSuiteId: suite.id },
+          {
+            ...scenario,
+            projectId: parsed.projectId,
+            testSuiteId: suite.id,
+            ...(author && { actor: author }),
+          },
           by,
           { sourceTemplateId: template.id },
         );

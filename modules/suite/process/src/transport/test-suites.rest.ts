@@ -308,6 +308,11 @@ export function createTestSuitesRest(): Readonly<{
           id: project.actorId,
           label: origin.surface?.toLowerCase() === "cli" ? "cli" : "api",
         },
+        // A key with no person behind it writes no author: its id is no `User` row.
+        {
+          userId: project.viewerUserId,
+          label: origin.surface?.toLowerCase() === "cli" ? "cli" : "api",
+        },
       ),
     )
 

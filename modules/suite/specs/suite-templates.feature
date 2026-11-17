@@ -67,6 +67,13 @@ Feature: Suite templates
   # running it counts once against the simulation (suite) cap at run start.
 
   @unit
+  Scenario: A template applied with a key that names no person writes no author
+    Given a legacy project key or an API key with no owner
+    When the key applies a template over REST
+    Then every scenario is written with no author
+    And no scenario names the key or the project as its author
+
+  @unit
   Scenario: A caller without scenario manage permission cannot apply a template
     Given a caller who may only view scenarios
     When the caller applies a template

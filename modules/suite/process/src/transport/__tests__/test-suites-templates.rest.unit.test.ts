@@ -110,6 +110,7 @@ describe("POST /api/v1/test-suites/templates/:templateId/apply", () => {
         fit: expect.objectContaining({ agentName: "Ava" }),
       }),
       { id: "user_lena", label: "cli" },
+      { userId: "user_lena", label: "cli" },
     );
   });
 

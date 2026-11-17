@@ -227,4 +227,21 @@ describe("SuiteTemplateService", () => {
       expect(createTestSuite).not.toHaveBeenCalled();
     });
   });
+
+  describe("when a key with no person behind it applies a template", () => {
+    /** @scenario "A template applied with a key that names no person writes no author" */
+    it("writes every scenario with no author instead of the key's id", async () => {
+      const { service, create } = setup({ templates: [archetype] });
+      await service.applyTemplate(
+        { projectId: "project_1", templateId: archetype.id, fit },
+        { id: "project_1", label: "api" },
+        { userId: null, label: "api" },
+      );
+
+      expect(create).toHaveBeenCalled();
+      for (const call of create.mock.calls) {
+        expect(call[0]).toMatchObject({ actor: { userId: null, label: "api" } });
+      }
+    });
+  });
 });
