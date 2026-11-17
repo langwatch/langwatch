@@ -350,25 +350,33 @@ jobs:
           cache-dependency-path: "*/go.sum"
 
       # langwatch-oss-pii-model-reader trusts only this workflow on a langwatch@v
-      # tag, and may only read langwatch-pii-redaction-model.
+      # tag, and may only read langwatch-pii-redaction-model. It lives in the
+      # artifacts account, which ARTIFACTS_ECR_OIDC_ROLE_ARN names, so the
+      # account id stays in that secret, as in publish-docker-ecr.yml.
+      - name: Name the role and the registry
+        id: account
+        env:
+          ARTIFACTS_ROLE_ARN: ${{ secrets.ARTIFACTS_ECR_OIDC_ROLE_ARN }}
+        run: |
+          set -euo pipefail
+          ACCOUNT_ID="$(printf '%s' "${ARTIFACTS_ROLE_ARN}" | cut -d: -f5)"
+          echo "::add-mask::${ACCOUNT_ID}"
+          echo "role=arn:aws:iam::${ACCOUNT_ID}:role/langwatch-oss-pii-model-reader" >> "$GITHUB_OUTPUT"
+          echo "registry=${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com" >> "$GITHUB_OUTPUT"
+
       - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c # v6.2.3
         with:
           aws-region: ${{ env.AWS_REGION }}
-          role-to-assume: ${{ secrets.PII_MODEL_ECR_ROLE_ARN }}
+          role-to-assume: ${{ steps.account.outputs.role }}
           role-session-name: publish-pii-redaction-model-${{ github.run_id }}
 
-      # The registry host comes from the role ARN, so the account id stays in a
-      # secret, as in publish-docker-ecr.yml.
       - name: Log in to Amazon ECR
         id: ecr
         env:
-          ROLE_ARN: ${{ secrets.PII_MODEL_ECR_ROLE_ARN }}
+          REGISTRY: ${{ steps.account.outputs.registry }}
         run: |
           set -euo pipefail
-          ACCOUNT_ID="$(printf '%s' "${ROLE_ARN}" | cut -d: -f5)"
-          echo "::add-mask::${ACCOUNT_ID}"
-          REGISTRY="${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
           echo "registry=${REGISTRY}" >> "$GITHUB_OUTPUT"
           aws ecr get-login-password --region "${AWS_REGION}" \
             | docker login --username AWS --password-stdin "${REGISTRY}"

@@ -49,7 +49,8 @@ func TestTheReleaseCopiesSignsAndAttestsTheModelImage(t *testing.T) {
 		}
 	}
 	all := strings.Join(runs, "\n")
-	assert.Equal(t, "${{ secrets.PII_MODEL_ECR_ROLE_ARN }}", role)
+	assert.Equal(t, "${{ steps.account.outputs.role }}", role)
+	assert.Contains(t, all, ":role/langwatch-oss-pii-model-reader")
 	for _, want := range []string{
 		"go run ./cmd/newestimage -prefix http-git-",
 		`docker buildx imagetools create -t "${REPO}:${VERSION}" "${SOURCE}"`,
