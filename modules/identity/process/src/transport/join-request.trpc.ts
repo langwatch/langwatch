@@ -187,6 +187,7 @@ export const joinRequestTrpcTransport: TrpcRouterDeclaration<
   )
 
   .procedure("setJoining")
+  .withoutAudit("the join request service records the row with the setting it replaced")
   .withPermission("organization:manage")
   .handle(({ app, input, actor }) =>
     app.joinRequestDoor().setJoining({

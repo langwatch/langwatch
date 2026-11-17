@@ -248,10 +248,11 @@ Feature: tRPC framework boundary
 
   @unit
   Scenario: A mutation that audits itself is recorded once
-    Given a mutation whose handler writes its own audit row with the value it replaced, such as an organization's joining setting
+    Given a mutation whose service writes its own audit rows, such as an organization's joining setting, declared withoutAudit with the reason
     When it is answered
-    Then the generic audit row stands down, as main's self-audited paths did, so the change is not recorded twice
+    Then the generic audit row stands down, so the change is not recorded twice
     And every other mutation still writes the generic row
+    And withoutAudit with an empty reason, on a query, twice or beside withAudit is refused when the router is declared
 
   @unit
   Scenario: A procedure chooses its permission from its parsed input

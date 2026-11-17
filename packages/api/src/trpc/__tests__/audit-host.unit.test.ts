@@ -13,7 +13,6 @@ import { createApiDouble } from "../../__tests__/api-double.ts";
 import type { Authorize } from "../../access/access.ts";
 import type { TrpcAuditSink } from "../../hosting/api-door.ts";
 import { SessionReader } from "../../hosting/session-reader.ts";
-import { isAuditLogExempt } from "../audit.ts";
 import { composeTrpcRouters } from "../compose.ts";
 import { TrpcHost } from "../host.ts";
 import { defineTrpcRouter } from "../runtime.ts";
@@ -172,14 +171,108 @@ describe("given a process whose door records through an installed audit trail, a
   });
 });
 
-describe("given a mutation whose handler writes its own, richer audit row", () => {
-  /** @scenario "A mutation that audits itself is recorded once" */
-  it("leaves the generic row out, as main did, and still records every other mutation", () => {
-    expect(isAuditLogExempt("identity.joinRequests.setJoining")).toBe(true);
-    expect(isAuditLogExempt("identity.joinRequests.dismissOffer")).toBe(false);
-    expect(isAuditLogExempt("governanceKillSwitch.createAwsConnection")).toBe(true);
-    expect(isAuditLogExempt("governanceKillSwitch.restore")).toBe(true);
-    expect(isAuditLogExempt("governanceKillSwitch.setPlan")).toBe(false);
+const selfAudited = defineTrpcContract("joinRequests")
+  .mutation("setJoining")
+  .withInput(z.object({ organizationId: z.string(), projectId: z.string() }))
+  .withOutput(z.object({ changed: z.boolean() }))
+
+  .mutation("dismissOffer")
+  .withInput(z.object({ organizationId: z.string(), projectId: z.string() }))
+  .withOutput(z.object({ changed: z.boolean() }))
+
+  .query("joining")
+  .withInput(z.object({ organizationId: z.string(), projectId: z.string() }))
+  .withOutput(z.object({ changed: z.boolean() }))
+  .build();
+
+const JoinApi = moduleApi<Record<string, never>>()("identity");
+
+function selfAuditedRouter() {
+  return defineTrpcRouter(JoinApi, selfAudited).procedure("setJoining");
+}
+
+/** Posts one mutation of the self-audited router through a host whose sink keeps the rows. */
+async function callSelfAudited(procedure: "setJoining" | "dismissOffer") {
+  const rows: Recorded[] = [];
+  const answer = async () => ({ changed: true });
+  const trpc = TrpcHost.create({
+    sessions: SessionReader.create({ verify: async () => ({ userId: "sam" }) }),
+    authz: createApiDouble<Authorize>({
+      getDecision: async (): Promise<PermissionDecision> => ({
+        permitted: true,
+        organizationRole: "ADMIN",
+      }),
+      checkScopeLineage: async () => ({ kind: "consistent" }),
+      organizationOf: async () => null,
+      projectKindOf: async () => "application",
+    }),
+    audit: { record: (entry) => void rows.push(entry) },
+  });
+  const declared = selfAuditedRouter()
+    .withoutAudit("the join request service records the row with the value it replaced")
+    .withPermission("project:update", { via: "projectId" })
+    .handle(answer)
+    .procedure("dismissOffer")
+    .withPermission("project:update", { via: "projectId" })
+    .handle(answer)
+    .procedure("joining")
+    .withPermission("project:view", { via: "projectId" })
+    .handle(answer)
+    .build();
+  trpc.mount(composeTrpcRouters("joinRequests", [declared]), () => ({}));
+  const request = new Request(`http://api.test${TrpcHost.path}/joinRequests.${procedure}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ organizationId: "organization-1", projectId: "project-1" }),
+  });
+  await fetchRequestHandler({
+    endpoint: TrpcHost.path,
+    req: request,
+    router: trpc.router,
+    createContext: () => trpc.context({ request }),
+  });
+
+  return rows;
+}
+
+describe("given a mutation declared withoutAudit because its service writes its own rows", () => {
+  describe("when it is answered", () => {
+    /** @scenario "A mutation that audits itself is recorded once" */
+    it("leaves the generic row out", async () => {
+      expect(await callSelfAudited("setJoining")).toEqual([]);
+    });
+
+    /** @scenario "A mutation that audits itself is recorded once" */
+    it("still records every other mutation of the same router", async () => {
+      expect(await callSelfAudited("dismissOffer")).toEqual([
+        expect.objectContaining({ userId: "sam", action: "joinRequests.dismissOffer" }),
+      ]);
+    });
+  });
+
+  describe("when the declaration is malformed", () => {
+    /** @scenario "A mutation that audits itself is recorded once" */
+    it("refuses an empty reason, a query, a second declaration and one beside withAudit", () => {
+      expect(() => selfAuditedRouter().withoutAudit(" ")).toThrow(/needs a reason/);
+      expect(() =>
+        defineTrpcRouter(JoinApi, selfAudited).procedure("joining").withoutAudit("a read"),
+      ).toThrow(/not a mutation/);
+      expect(() => selfAuditedRouter().withoutAudit("own row").withoutAudit("again")).toThrow(
+        /already declares withoutAudit/,
+      );
+      expect(() =>
+        defineTrpcRouter(RenameApi, contract)
+          .procedure("rename")
+          .withAudit({ target: "organization", via: "projectId" })
+          .withoutAudit("own row"),
+      ).toThrow(/already declares withAudit/);
+      expect(() =>
+        defineTrpcRouter(RenameApi, contract)
+          .procedure("rename")
+          .withoutAudit("own row")
+          .withAudit({ target: "organization", via: "projectId" }),
+      ).toThrow(/already declares withoutAudit/);
+    });
   });
 });
 
