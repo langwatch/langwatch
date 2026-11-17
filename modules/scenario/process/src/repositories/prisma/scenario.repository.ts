@@ -64,6 +64,12 @@ function slugify(value: string): string {
   );
 }
 
+/** `sourceTemplateId` is storage-only: it marks a template-made row for the Free cap count. */
+function mapScenario(row: unknown): Scenario {
+  const { sourceTemplateId: _, ...scenario } = row as Record<string, unknown>;
+  return scenarioSchema.parse(scenario);
+}
+
 function mapTestSuite(row: unknown): ScenarioTestSuite {
   return scenarioTestSuiteSchema.parse(row);
 }
@@ -130,7 +136,7 @@ export class PrismaScenarioRepository extends ScenarioRepository {
       const row = await transaction.scenario.create({
         data: { ...scenarioInput, parameters },
       });
-      const scenario = scenarioSchema.parse(row);
+      const scenario = mapScenario(row);
       await transaction.scenarioVersion.create({
         data: {
           scenarioId: scenario.id,
@@ -158,7 +164,7 @@ export class PrismaScenarioRepository extends ScenarioRepository {
       throw new ScenarioNotFoundError(input.id);
     }
 
-    return scenarioSchema.parse(row);
+    return mapScenario(row);
   }
 
   async findByIdIncludingArchived(input: ScenarioIdentity): Promise<Scenario> {
@@ -169,14 +175,14 @@ export class PrismaScenarioRepository extends ScenarioRepository {
       throw new ScenarioNotFoundError(input.id);
     }
 
-    return scenarioSchema.parse(row);
+    return mapScenario(row);
   }
 
   async readByIdIncludingArchived(input: ScenarioIdentity): Promise<ScenarioLookup> {
     const row = await this.database.scenario.findFirst({
       where: scenarioWhere(input, true),
     });
-    return row ? { found: true, scenario: scenarioSchema.parse(row) } : { found: false };
+    return row ? { found: true, scenario: mapScenario(row) } : { found: false };
   }
 
   async findAll(input: { projectId: string }): Promise<Scenario[]> {
@@ -184,7 +190,7 @@ export class PrismaScenarioRepository extends ScenarioRepository {
       where: { ...input, archivedAt: null },
       orderBy: { updatedAt: "desc" },
     });
-    return rows.map((row) => scenarioSchema.parse(row));
+    return rows.map((row) => mapScenario(row));
   }
 
   count(input: { projectId: string }): Promise<number> {
@@ -285,7 +291,7 @@ export class PrismaScenarioRepository extends ScenarioRepository {
     return this.database.$transaction(async (transaction) => {
       const found = await this.lockScenario(transaction, input.projectId, input.id);
       if (!found) throw new ScenarioNotFoundError(input.id);
-      if (found.archivedAt) return scenarioSchema.parse(found);
+      if (found.archivedAt) return mapScenario(found);
 
       const testSuites = await this.lockTestSuites(transaction, input.projectId, [
         found.testSuiteId,
@@ -299,7 +305,7 @@ export class PrismaScenarioRepository extends ScenarioRepository {
       if (found.testSuiteId && testSuite?.kind === "test_suite" && testSuite.archivedAt === null) {
         await this.reconcileLockedTestSuite(transaction, input.projectId, found.testSuiteId);
       }
-      return scenarioSchema.parse(row);
+      return mapScenario(row);
     });
   }
 
@@ -591,7 +597,7 @@ export class PrismaScenarioRepository extends ScenarioRepository {
       throw new ScenarioNotFoundError(input.id);
     }
 
-    return scenarioSchema.parse(row);
+    return mapScenario(row);
   }
 
   private assertExpectedVersion(input: ScenarioWriteInput, current: Scenario): void {
@@ -655,7 +661,7 @@ export class PrismaScenarioRepository extends ScenarioRepository {
         },
         data,
       });
-      return scenarioSchema.parse(row);
+      return mapScenario(row);
     } catch (error) {
       if (expectedVersion !== void 0 && this.isRecordNotFound(error)) {
         throw new ScenarioStaleVersionError(current.version);
