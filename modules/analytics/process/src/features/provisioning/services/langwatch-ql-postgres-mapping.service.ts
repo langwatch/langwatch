@@ -16,6 +16,7 @@ import {
 } from "../../../services/langwatch-ql-access-model.service.ts";
 import { LangWatchQLSqlTextService } from "../../../services/langwatch-ql-sql-text.service.ts";
 import type { PostgresApprovedViewJoin } from "../../lwql-catalogue/rules/lwql-tenant-paths.rules.ts";
+import { LWQL_ORG_SCOPE_FRAGMENT } from "../rules/lwql-scoped-view.rules.ts";
 
 const accessModel = LangWatchQLAccessModelService.create();
 
@@ -75,47 +76,27 @@ function assertNoDollarTagCollision({ view, body }: { view: string; body: string
 }
 
 /**
- * The NOLOGIN role whose members read the approved views through their per-reader row scope.
- * Granted `SELECT` only when it exists, so a deployment without it is unchanged.
+ * The NOLOGIN role whose members read the scoped copies of the approved views. The copies exist,
+ * and are granted, only when it exists, so a deployment without it is unchanged.
  */
 export const LWQL_SCOPED_READER_GROUP = "lwql_scoped_reader";
 
-/** Prefix of the per-organization role; the suffix is the md5 of the organization id. */
-const ORG_ROLE_PREFIX = "lwql_org_";
-
 /**
  * The shared reader login: the one role whose reads keep every row. One source for the
- * collection binding, self-provisioning and the view row scope.
+ * collection binding and self-provisioning.
  */
 export const LWQL_SHARED_READER_ROLE = "lwql_ro";
 
-/**
- * The canonical text of the row scope's org-role lookup. The view source spells it exactly so,
- * and PostgreSQL's `pg_get_viewdef` keeps it verbatim, so the scoped-reader-group grant can prove a
- * live view is the scoped one by finding this fragment in its stored definition.
- */
-export const LWQL_ORG_SCOPE_FRAGMENT = `${postgresLiteral(ORG_ROLE_PREFIX)}::text || md5(`;
-
-/**
- * Lower-cased fragments a scoped view's stored definition must also carry: the membership catalog
- * and the session-user comparison (deparsed upper-case, hence lower-cased matching). Without
- * both, the org-role lookup is not row-scoped to the reader.
- */
-export const LWQL_ORG_MEMBERSHIP_FRAGMENT = "pg_auth_members";
-export const LWQL_SESSION_USER_FRAGMENT = "rolname = current_user";
-
 /** Where the per-reader row scope reads each row's owning project. */
 export interface PostgresReaderRowScope {
-  /** The shared reader login, which keeps every row. */
-  sharedReaderRole: string;
   /** Alias and column carrying the row's project id. */
   tenant: { alias: string; column: string };
 }
 
 /**
- * The predicate ANDed into every approved view: the shared reader keeps every row, any other
- * login sees the projects of the organizations whose role it holds. Inner aliases are prefixed
- * so they cannot shadow the view body's own.
+ * The predicate ANDed into every scoped copy: a login sees the projects of the organizations whose
+ * role it holds, and no login is exempt. Inner aliases are prefixed so they cannot shadow the view
+ * body's own.
  */
 function readerRowScopePredicate({
   scope,
@@ -127,13 +108,13 @@ function readerRowScopePredicate({
   const tenant = `${sqlText.postgresQuoted(scope.tenant.alias)}.${sqlText.postgresQuoted(scope.tenant.column)}`;
 
   return (
-    `(current_user = ${postgresLiteral(scope.sharedReaderRole)} OR EXISTS (SELECT 1 ` +
+    `EXISTS (SELECT 1 ` +
     `FROM ${quotedSchema}."Project" lwql_p ` +
     `JOIN ${quotedSchema}."Team" lwql_t ON lwql_t.id = lwql_p."teamId" ` +
     `JOIN pg_roles lwql_g ON lwql_g.rolname = ${LWQL_ORG_SCOPE_FRAGMENT}lwql_t."organizationId") ` +
     `JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid ` +
     `JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user ` +
-    `WHERE lwql_p.id = ${tenant}))`
+    `WHERE lwql_p.id = ${tenant})`
   );
 }
 
@@ -329,7 +310,10 @@ export class LangWatchQLPostgresMappingService {
     rowFilter,
     readerRole,
     rowScope,
+    viewSchema = schema,
+    onlyWhen,
   }: {
+    /** The app schema: the base relation, the tenant-path hops and the row scope read it. */
     schema: string;
     /** Name of the view to create. */
     view: string;
@@ -363,10 +347,14 @@ export class LangWatchQLPostgresMappingService {
      * carries the scope predicate; the scoped-reader group is re-granted on the fallback path.
      */
     rowScope?: PostgresReaderRowScope;
+    /** The schema the view is created in; defaults to {@link schema}. */
+    viewSchema?: string;
+    /** SQL condition the whole statement runs under; absent, it always runs. */
+    onlyWhen?: string;
   }): string {
     const quotedSchema = sqlText.postgresQuoted(schema);
     const quotedView = sqlText.postgresQuoted(view);
-    const qualifiedView = `${quotedSchema}.${quotedView}`;
+    const qualifiedView = `${sqlText.postgresQuoted(viewSchema)}.${quotedView}`;
     if (columns.length === 0) {
       throw new Error(`lwql provisioning: approved view "${view}" needs at least one column`);
     }
@@ -416,14 +404,22 @@ export class LangWatchQLPostgresMappingService {
       qualifiedView,
     });
 
-    return (
-      `DO ${APPROVED_VIEW_DOLLAR_TAG}\n` +
+    const block =
       `BEGIN\n` +
       `  CREATE OR REPLACE VIEW ${qualifiedView}${viewOptions} AS\n${body};\n` +
       `EXCEPTION\n` +
       `  WHEN feature_not_supported OR invalid_table_definition THEN\n` +
       `    DROP VIEW IF EXISTS ${qualifiedView};\n` +
       `    CREATE VIEW ${qualifiedView}${viewOptions} AS\n${body};${regrant}\n` +
+      `END`;
+    if (onlyWhen === undefined) {
+      return `DO ${APPROVED_VIEW_DOLLAR_TAG}\n${block}\n${APPROVED_VIEW_DOLLAR_TAG}`;
+    }
+
+    return (
+      `DO ${APPROVED_VIEW_DOLLAR_TAG}\n` +
+      `BEGIN\n` +
+      `  IF ${onlyWhen} THEN\n${block};\n  END IF;\n` +
       `END\n${APPROVED_VIEW_DOLLAR_TAG}`
     );
   }

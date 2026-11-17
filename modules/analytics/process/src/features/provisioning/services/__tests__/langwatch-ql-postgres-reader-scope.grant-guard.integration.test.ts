@@ -1,17 +1,24 @@
 /**
- * The scoped-reader group's grants over live views: re-granted after a loss, re-granted on the
- * drop-and-create fallback, and never held on a view that is not the row-scoped one.
+ * The scoped-reader group's grants over live copies: re-granted after a loss, re-granted on the
+ * drop-and-create fallback, never held on a copy that is not row-scoped, and never on the app's.
  * @see ../langwatch-ql-production-provisioning.service.ts
  * @vitest-environment node
  */
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { convergeLwqlAccessModel } from "../../../../tasks/lwql-provision.task.ts";
+import type { LwqlPostgresGap } from "../langwatch-ql-self-provisioning.service.ts";
 import {
+  ADMIN,
+  deployStatements,
   GROUP,
+  postgresOnlyPlan,
   provisioning,
   q,
+  readPostgresGaps,
   SCHEMA,
+  SCOPED,
   type ScopeHarness,
   SHARED_READER,
   startScopeHarness,
@@ -21,14 +28,16 @@ import {
 describe("given the scoped-reader group and the app's view provisioning", () => {
   let harness: ScopeHarness;
   const admin = (sql: string) => harness.admin(sql);
-  const revokeAll = () => admin(`REVOKE ALL ON ALL TABLES IN SCHEMA ${SCHEMA} FROM ${GROUP}`);
+  const revokeAll = () => admin(`REVOKE ALL ON ALL TABLES IN SCHEMA ${SCOPED} FROM ${GROUP}`);
+  const copy = (view: string) => `${q(SCOPED)}.${q(view)}`;
   const canSelect = (view: string) =>
-    admin(`SELECT has_table_privilege('${GROUP}', '${q(SCHEMA)}.${q(view)}', 'SELECT')`);
+    admin(`SELECT has_table_privilege('${GROUP}', '${copy(view)}', 'SELECT')`);
   const grantAsApp = () =>
-    harness.applyAll([
-      ...provisioning.postgresReaderGrantStatements({ schema: SCHEMA, role: SHARED_READER }),
-      ...provisioning.postgresScopedReaderGrantStatements({ schema: SCHEMA }),
-    ]);
+    harness.applyAll(provisioning.postgresScopedReaderGrantStatements({ schema: SCHEMA }));
+  const replaceWithLookAlike = async (view: string, body = "SELECT 1 AS bogus_column") => {
+    await admin(`DROP VIEW ${copy(view)}`);
+    await admin(`CREATE VIEW ${copy(view)} AS ${body}`);
+  };
 
   beforeAll(async () => {
     harness = await startScopeHarness();
@@ -38,102 +47,92 @@ describe("given the scoped-reader group and the app's view provisioning", () => 
     await harness?.stop();
   });
 
-  describe("when the app provisions after the group lost its view grants", () => {
+  describe("when the app provisions after the group lost its copy grants", () => {
     beforeAll(async () => {
       await harness.provisionViews();
       await revokeAll();
       await harness.provisionViews();
     });
 
-    it("the group has SELECT on every view", async () => {
+    it("the group has SELECT on every copy", async () => {
       const missing = await admin(
-        `SELECT coalesce(string_agg(v, ','), '') FROM unnest(ARRAY[${VIEW_NAMES.map((n) => `'${n}'`).join(",")}]) v WHERE NOT has_table_privilege('${GROUP}', format('%I.%I', '${SCHEMA}', v), 'SELECT')`,
+        `SELECT coalesce(string_agg(v, ','), '') FROM unnest(ARRAY[${VIEW_NAMES.map((n) => `'${n}'`).join(",")}]) v WHERE NOT has_table_privilege('${GROUP}', format('%I.%I', '${SCOPED}', v), 'SELECT')`,
       );
 
       expect(missing).toBe("");
     });
+
+    it("the group has USAGE on the scoped schema and none on the app schema", async () => {
+      expect(await harness.directSchemaUsage(GROUP)).toEqual([SCOPED]);
+    });
   });
 
-  describe("when a view takes the drop-and-create fallback", () => {
+  describe("when a copy takes the drop-and-create fallback", () => {
     const view = VIEW_NAMES[0] as string;
 
     beforeAll(async () => {
       await harness.provisionViews();
-      await admin(`DROP VIEW ${q(SCHEMA)}.${q(view)}`);
-      await admin(`CREATE VIEW ${q(SCHEMA)}.${q(view)} AS SELECT 1 AS bogus_column`);
-      const statements = provisioning.postgresApprovedViewStatements({
-        schema: SCHEMA,
-        readerRole: SHARED_READER,
-      });
-      await admin(statements[0] as string);
+      await replaceWithLookAlike(view);
+      const [statement] = provisioning
+        .postgresScopedViewStatements({ schema: SCHEMA })
+        .filter((candidate) => candidate.includes(copy(view)));
+      await admin(statement as string);
     });
 
-    it("the group has SELECT on the recreated view", async () => {
+    it("the group has SELECT on the recreated copy", async () => {
       expect(await canSelect(view)).toBe("t");
     });
 
-    it("the recreated view has security_barrier=true", async () => {
+    it("the recreated copy has security_barrier=true", async () => {
       expect(
         await admin(
-          `SELECT 'security_barrier=true' = ANY(reloptions) FROM pg_class WHERE oid = '${q(SCHEMA)}.${q(view)}'::regclass`,
+          `SELECT 'security_barrier=true' = ANY(reloptions) FROM pg_class WHERE oid = '${copy(view)}'::regclass`,
         ),
       ).toBe("t");
     });
   });
 
-  describe("when a stale unscoped view exists and a gap run grants the scoped-reader group", () => {
+  describe("when a stale unscoped copy exists and the app grants the scoped-reader group", () => {
     const stale = VIEW_NAMES[0] as string;
     const scoped = VIEW_NAMES[1] as string;
 
     beforeAll(async () => {
       await harness.provisionViews();
-      // Start from no grants, so the scoped view's SELECT below can only come from the gap run.
+      // Start from no grants, so the scoped copy's SELECT below can only come from the grant run.
       await revokeAll();
-      // Not recreated by the app: only the gap run's guarded statements touch it. The group
-      // already holds SELECT on it, as after an earlier scoped run, so the run must revoke it.
-      await admin(`DROP VIEW ${q(SCHEMA)}.${q(stale)}`);
-      await admin(`CREATE VIEW ${q(SCHEMA)}.${q(stale)} AS SELECT 1 AS bogus_column`);
-      await admin(`GRANT SELECT ON ${q(SCHEMA)}.${q(stale)} TO ${GROUP}`);
+      // The group already holds SELECT on the look-alike, as after an earlier scoped run.
+      await replaceWithLookAlike(stale);
+      await admin(`GRANT SELECT ON ${copy(stale)} TO ${GROUP}`);
       await grantAsApp();
     });
 
     /** @scenario "The scoped-reader group is granted only a live view that is provably row-scoped" */
-    it("the group has no SELECT on the unscoped view, a stale grant included", async () => {
+    it("the group has no SELECT on the unscoped copy, a stale grant included", async () => {
       expect(await canSelect(stale)).toBe("f");
     });
 
-    it("the group still has SELECT on a scoped view", async () => {
+    it("the group still has SELECT on a scoped copy", async () => {
       expect(await canSelect(scoped)).toBe("t");
     });
   });
 
-  describe("when a look-alike replaces a granted view and a deploy restores it", () => {
+  describe("when a look-alike replaces a granted copy and a deploy restores it", () => {
     const view = VIEW_NAMES[0] as string;
-    const deployConverge = () =>
-      harness.applyAll([
-        ...provisioning.postgresApprovedViewStatements({
-          schema: SCHEMA,
-          readerRole: SHARED_READER,
-        }),
-        ...provisioning.postgresReaderGrantStatements({ schema: SCHEMA, role: SHARED_READER }),
-        ...provisioning.postgresScopedReaderGrantStatements({ schema: SCHEMA }),
-      ]);
     let afterGrant: string;
     let afterReplace: string;
 
     beforeAll(async () => {
       await harness.provisionViews();
       afterGrant = await canSelect(view);
-      await admin(`DROP VIEW ${q(SCHEMA)}.${q(view)}`);
-      await admin(`CREATE VIEW ${q(SCHEMA)}.${q(view)} AS SELECT 1 AS bogus_column`);
-      await admin(`GRANT SELECT ON ${q(SCHEMA)}.${q(view)} TO ${GROUP}`);
+      await replaceWithLookAlike(view);
+      await admin(`GRANT SELECT ON ${copy(view)} TO ${GROUP}`);
       await grantAsApp();
       afterReplace = await canSelect(view);
-      // No manual step: the deploy's own statements recreate the scoped view and re-grant it.
-      await deployConverge();
+      // No manual step: the deploy's own statements recreate the copy and re-grant it.
+      await harness.applyAll(deployStatements());
     });
 
-    it("the group has SELECT on the scoped view first", () => {
+    it("the group has SELECT on the scoped copy first", () => {
       expect(afterGrant).toBe("t");
     });
 
@@ -142,12 +141,12 @@ describe("given the scoped-reader group and the app's view provisioning", () => 
     });
 
     /** @scenario "A scoped view a deploy converge restores regains the scoped-reader group's SELECT" */
-    it("the group has SELECT again once the deploy converge restores the scoped view", async () => {
+    it("the group has SELECT again once the deploy converge restores the scoped copy", async () => {
       expect(await canSelect(view)).toBe("t");
     });
   });
 
-  describe("when look-alike views carry the org-role lookup but no membership tie to the session user", () => {
+  describe("when look-alike copies carry the org-role lookup but no membership tie to the session user", () => {
     const withoutMembership = VIEW_NAMES[2] as string;
     const withoutSessionTie = VIEW_NAMES[3] as string;
     const lookup = "g.rolname = 'lwql_org_'::text || md5('x')";
@@ -161,33 +160,84 @@ describe("given the scoped-reader group and the app's view provisioning", () => 
         [withoutSessionTie]: `EXISTS (SELECT 1 FROM pg_roles g JOIN pg_auth_members m ON m.roleid = g.oid WHERE ${lookup})`,
       };
       for (const [view, predicate] of Object.entries(decoys)) {
-        await admin(`DROP VIEW ${q(SCHEMA)}.${q(view)}`);
+        await admin(`DROP VIEW ${copy(view)}`);
         await admin(
-          `CREATE VIEW ${q(SCHEMA)}.${q(view)} WITH (security_barrier = true) AS SELECT 1 AS bogus_column WHERE ${predicate}`,
+          `CREATE VIEW ${copy(view)} WITH (security_barrier = true) AS SELECT 1 AS bogus_column WHERE ${predicate}`,
         );
-        await admin(`GRANT SELECT ON ${q(SCHEMA)}.${q(view)} TO ${GROUP}`);
+        await admin(`GRANT SELECT ON ${copy(view)} TO ${GROUP}`);
       }
       await grantAsApp();
     });
 
     /** @scenario "The scoped-reader group is granted only a live view that is provably row-scoped" */
-    it("the group has no SELECT on a view with no membership join, a stale grant included", async () => {
+    it("the group has no SELECT on a copy with no membership join, a stale grant included", async () => {
       expect(await canSelect(withoutMembership)).toBe("f");
     });
 
-    it("the group has no SELECT on a view with a membership join but no session-user comparison", async () => {
+    it("the group has no SELECT on a copy with a membership join but no session-user comparison", async () => {
       expect(await canSelect(withoutSessionTie)).toBe("f");
     });
 
-    it("the group still has SELECT on a scoped view", async () => {
+    it("the group still has SELECT on a scoped copy", async () => {
       expect(await canSelect(VIEW_NAMES[4] as string)).toBe("t");
+    });
+  });
+
+  describe("when the group holds a stale grant on a shared view and USAGE on the app schema", () => {
+    const shared = `${q(SCHEMA)}.${q(VIEW_NAMES[0] as string)}`;
+    const staleGrants = async () => {
+      await admin(`GRANT USAGE ON SCHEMA ${q(SCHEMA)} TO ${GROUP}`);
+      await admin(`GRANT SELECT ON ${shared} TO ${GROUP}`);
+    };
+    const reach = async () => {
+      const onShared = await admin(`SELECT has_table_privilege('${GROUP}', '${shared}', 'SELECT')`);
+      const onAppSchema = (await harness.directSchemaUsage(GROUP)).includes(SCHEMA);
+      return `${onShared === "t"},${onAppSchema}`;
+    };
+    let afterDeploy: string;
+    let gapsFound: LwqlPostgresGap[];
+    let afterCheck: string;
+
+    beforeAll(async () => {
+      await harness.provisionViews();
+      await staleGrants();
+      await harness.applyAll(deployStatements());
+      afterDeploy = await reach();
+      await staleGrants();
+      const connection = harness.connect(ADMIN);
+      try {
+        gapsFound = await readPostgresGaps(connection.database);
+        await convergeLwqlAccessModel({
+          database: connection.database,
+          plan: postgresOnlyPlan(),
+          failOnError: true,
+          only: { clickHouse: [], postgres: gapsFound, isKeyMapMissing: false },
+        });
+      } finally {
+        await connection.close();
+      }
+      afterCheck = await reach();
+    });
+
+    /** @scenario "The reconvergence check guards every scoped copy" */
+    it("a deploy revokes both", () => {
+      expect(afterDeploy).toBe("false,false");
+    });
+
+    it("the reconvergence check finds the shared grant", () => {
+      expect(gapsFound).toContainEqual({ kind: "group-on-shared", view: VIEW_NAMES[0] });
+    });
+
+    /** @scenario "The reconvergence check guards every scoped copy" */
+    it("the reconvergence check's converge revokes both", () => {
+      expect(afterCheck).toBe("false,false");
     });
   });
 });
 
 /**
- * Provisioning without the scoped-reader group is unchanged: no error, no group created, and
- * the shared reader still reads every view.
+ * Provisioning without the scoped-reader group is unchanged: no error, no group, no scoped schema,
+ * and the shared reader still reads every view. Once the group exists, a check builds the copies.
  * @see ../langwatch-ql-production-provisioning.service.ts
  */
 describe("given a deployment where the scoped-reader group does not exist", () => {
@@ -195,7 +245,7 @@ describe("given a deployment where the scoped-reader group does not exist", () =
   let outcome: "ok" | Error = "ok";
 
   beforeAll(async () => {
-    harness = await startScopeHarness();
+    harness = await startScopeHarness({ provision: false });
     await harness.admin(`DROP OWNED BY ${GROUP}`);
     await harness.admin(`DROP ROLE ${GROUP}`);
     try {
@@ -221,10 +271,61 @@ describe("given a deployment where the scoped-reader group does not exist", () =
       );
     });
 
+    /** @scenario "Scoped copies exist only where the scoped-reader group does" */
+    it("no scoped schema exists", async () => {
+      expect(await harness.admin(`SELECT to_regnamespace('${SCOPED}') IS NULL`)).toBe("t");
+    });
+
     it("the shared reader still reads every view", async () => {
-      const after = await harness.readAllViews(SHARED_READER);
+      const after = await harness.readAllViews({ user: SHARED_READER, schema: SCHEMA });
 
       expect(Object.keys(after).toSorted()).toEqual(VIEW_NAMES.toSorted());
+    });
+
+    /** @scenario "Scoped copies exist only where the scoped-reader group does" */
+    it("the reconvergence check reports no gap", async () => {
+      const connection = harness.connect(ADMIN);
+      try {
+        expect(await readPostgresGaps(connection.database)).toEqual([]);
+      } finally {
+        await connection.close();
+      }
+    });
+  });
+
+  describe("when the group is created and the next reconvergence check runs", () => {
+    let gapsFound: LwqlPostgresGap[];
+
+    beforeAll(async () => {
+      await harness.admin(`CREATE ROLE ${GROUP} NOLOGIN`);
+      const connection = harness.connect(ADMIN);
+      try {
+        gapsFound = await readPostgresGaps(connection.database);
+        await convergeLwqlAccessModel({
+          database: connection.database,
+          plan: postgresOnlyPlan(),
+          failOnError: true,
+          only: { clickHouse: [], postgres: gapsFound, isKeyMapMissing: false },
+        });
+      } finally {
+        await connection.close();
+      }
+    });
+
+    it("the check finds the scoped schema absent", () => {
+      expect(gapsFound).toEqual([{ kind: "scoped-schema-absent" }]);
+    });
+
+    /** @scenario "Scoped copies exist only where the scoped-reader group does" */
+    it("every copy exists and the group selects exactly the copies", async () => {
+      expect((await harness.selectableBy(GROUP)).toSorted()).toEqual(
+        VIEW_NAMES.map((view) => `${SCOPED}.${view}`).toSorted(),
+      );
+    });
+
+    /** @scenario "Scoped copies exist only where the scoped-reader group does" */
+    it("the group has USAGE on the scoped schema only", async () => {
+      expect(await harness.directSchemaUsage(GROUP)).toEqual([SCOPED]);
     });
   });
 });

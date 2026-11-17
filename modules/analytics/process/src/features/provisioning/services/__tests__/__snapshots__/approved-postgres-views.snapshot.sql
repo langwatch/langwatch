@@ -3,7 +3,7 @@
 -- view: lwql_agents
 DO $lwql$
 BEGIN
-  CREATE OR REPLACE VIEW "public"."lwql_agents" WITH (security_barrier=true) AS
+  CREATE OR REPLACE VIEW "public"."lwql_agents" AS
 SELECT
   "m"."projectId" AS "TenantId",
   "m"."id" AS "AgentId",
@@ -20,12 +20,11 @@ SELECT
   "m"."updatedById" AS "UpdatedById",
   "m"."createdAt" AS "CreatedAt",
   "m"."updatedAt" AS "UpdatedAt"
-FROM "public"."Agent" AS "m"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "m"."projectId"));
+FROM "public"."Agent" AS "m";
 EXCEPTION
   WHEN feature_not_supported OR invalid_table_definition THEN
     DROP VIEW IF EXISTS "public"."lwql_agents";
-    CREATE VIEW "public"."lwql_agents" WITH (security_barrier=true) AS
+    CREATE VIEW "public"."lwql_agents" AS
 SELECT
   "m"."projectId" AS "TenantId",
   "m"."id" AS "AgentId",
@@ -42,18 +41,14 @@ SELECT
   "m"."updatedById" AS "UpdatedById",
   "m"."createdAt" AS "CreatedAt",
   "m"."updatedAt" AS "UpdatedAt"
-FROM "public"."Agent" AS "m"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "m"."projectId"));
-    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'lwql_scoped_reader') THEN
-      GRANT SELECT ON "public"."lwql_agents" TO "lwql_scoped_reader";
-    END IF;
+FROM "public"."Agent" AS "m";
 END
 $lwql$;
 
 -- view: lwql_ai_tool_entries
 DO $lwql$
 BEGIN
-  CREATE OR REPLACE VIEW "public"."lwql_ai_tool_entries" WITH (security_barrier=true) AS
+  CREATE OR REPLACE VIEW "public"."lwql_ai_tool_entries" AS
 SELECT
   "p"."id" AS "TenantId",
   "m"."id" AS "AiToolEntryId",
@@ -73,12 +68,11 @@ SELECT
   "m"."updatedById" AS "UpdatedById"
 FROM "public"."AiToolEntry" AS "m"
 JOIN "public"."Team" AS "t" ON "m"."organizationId" = "t"."organizationId"
-JOIN "public"."Project" AS "p" ON "t"."id" = "p"."teamId"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "p"."id"));
+JOIN "public"."Project" AS "p" ON "t"."id" = "p"."teamId";
 EXCEPTION
   WHEN feature_not_supported OR invalid_table_definition THEN
     DROP VIEW IF EXISTS "public"."lwql_ai_tool_entries";
-    CREATE VIEW "public"."lwql_ai_tool_entries" WITH (security_barrier=true) AS
+    CREATE VIEW "public"."lwql_ai_tool_entries" AS
 SELECT
   "p"."id" AS "TenantId",
   "m"."id" AS "AiToolEntryId",
@@ -98,18 +92,14 @@ SELECT
   "m"."updatedById" AS "UpdatedById"
 FROM "public"."AiToolEntry" AS "m"
 JOIN "public"."Team" AS "t" ON "m"."organizationId" = "t"."organizationId"
-JOIN "public"."Project" AS "p" ON "t"."id" = "p"."teamId"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "p"."id"));
-    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'lwql_scoped_reader') THEN
-      GRANT SELECT ON "public"."lwql_ai_tool_entries" TO "lwql_scoped_reader";
-    END IF;
+JOIN "public"."Project" AS "p" ON "t"."id" = "p"."teamId";
 END
 $lwql$;
 
 -- view: lwql_ai_tool_entry_departments
 DO $lwql$
 BEGIN
-  CREATE OR REPLACE VIEW "public"."lwql_ai_tool_entry_departments" WITH (security_barrier=true) AS
+  CREATE OR REPLACE VIEW "public"."lwql_ai_tool_entry_departments" AS
 SELECT
   "p"."id" AS "TenantId",
   "m"."id" AS "AiToolEntryDepartmentId",
@@ -118,12 +108,11 @@ SELECT
 FROM "public"."AiToolEntryDepartment" AS "m"
 JOIN "public"."AiToolEntry" AS "j0" ON "m"."entryId" = "j0"."id"
 JOIN "public"."Team" AS "t" ON "j0"."organizationId" = "t"."organizationId"
-JOIN "public"."Project" AS "p" ON "t"."id" = "p"."teamId"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "p"."id"));
+JOIN "public"."Project" AS "p" ON "t"."id" = "p"."teamId";
 EXCEPTION
   WHEN feature_not_supported OR invalid_table_definition THEN
     DROP VIEW IF EXISTS "public"."lwql_ai_tool_entry_departments";
-    CREATE VIEW "public"."lwql_ai_tool_entry_departments" WITH (security_barrier=true) AS
+    CREATE VIEW "public"."lwql_ai_tool_entry_departments" AS
 SELECT
   "p"."id" AS "TenantId",
   "m"."id" AS "AiToolEntryDepartmentId",
@@ -132,46 +121,37 @@ SELECT
 FROM "public"."AiToolEntryDepartment" AS "m"
 JOIN "public"."AiToolEntry" AS "j0" ON "m"."entryId" = "j0"."id"
 JOIN "public"."Team" AS "t" ON "j0"."organizationId" = "t"."organizationId"
-JOIN "public"."Project" AS "p" ON "t"."id" = "p"."teamId"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "p"."id"));
-    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'lwql_scoped_reader') THEN
-      GRANT SELECT ON "public"."lwql_ai_tool_entry_departments" TO "lwql_scoped_reader";
-    END IF;
+JOIN "public"."Project" AS "p" ON "t"."id" = "p"."teamId";
 END
 $lwql$;
 
 -- view: lwql_ai_tool_entry_teams
 DO $lwql$
 BEGIN
-  CREATE OR REPLACE VIEW "public"."lwql_ai_tool_entry_teams" WITH (security_barrier=true) AS
+  CREATE OR REPLACE VIEW "public"."lwql_ai_tool_entry_teams" AS
 SELECT
   "p"."id" AS "TenantId",
   "m"."id" AS "AiToolEntryTeamId",
   "m"."entryId" AS "EntryId"
 FROM "public"."AiToolEntryTeam" AS "m"
-JOIN "public"."Project" AS "p" ON "m"."teamId" = "p"."teamId"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "p"."id"));
+JOIN "public"."Project" AS "p" ON "m"."teamId" = "p"."teamId";
 EXCEPTION
   WHEN feature_not_supported OR invalid_table_definition THEN
     DROP VIEW IF EXISTS "public"."lwql_ai_tool_entry_teams";
-    CREATE VIEW "public"."lwql_ai_tool_entry_teams" WITH (security_barrier=true) AS
+    CREATE VIEW "public"."lwql_ai_tool_entry_teams" AS
 SELECT
   "p"."id" AS "TenantId",
   "m"."id" AS "AiToolEntryTeamId",
   "m"."entryId" AS "EntryId"
 FROM "public"."AiToolEntryTeam" AS "m"
-JOIN "public"."Project" AS "p" ON "m"."teamId" = "p"."teamId"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "p"."id"));
-    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'lwql_scoped_reader') THEN
-      GRANT SELECT ON "public"."lwql_ai_tool_entry_teams" TO "lwql_scoped_reader";
-    END IF;
+JOIN "public"."Project" AS "p" ON "m"."teamId" = "p"."teamId";
 END
 $lwql$;
 
 -- view: lwql_analytics
 DO $lwql$
 BEGIN
-  CREATE OR REPLACE VIEW "public"."lwql_analytics" WITH (security_barrier=true) AS
+  CREATE OR REPLACE VIEW "public"."lwql_analytics" AS
 SELECT
   "m"."projectId" AS "TenantId",
   "m"."id" AS "AnalyticsId",
@@ -180,12 +160,11 @@ SELECT
   "m"."stringValue" AS "StringValue",
   "m"."boolValue" AS "BoolValue",
   "m"."createdAt" AS "CreatedAt"
-FROM "public"."Analytics" AS "m"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "m"."projectId"));
+FROM "public"."Analytics" AS "m";
 EXCEPTION
   WHEN feature_not_supported OR invalid_table_definition THEN
     DROP VIEW IF EXISTS "public"."lwql_analytics";
-    CREATE VIEW "public"."lwql_analytics" WITH (security_barrier=true) AS
+    CREATE VIEW "public"."lwql_analytics" AS
 SELECT
   "m"."projectId" AS "TenantId",
   "m"."id" AS "AnalyticsId",
@@ -194,18 +173,14 @@ SELECT
   "m"."stringValue" AS "StringValue",
   "m"."boolValue" AS "BoolValue",
   "m"."createdAt" AS "CreatedAt"
-FROM "public"."Analytics" AS "m"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "m"."projectId"));
-    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'lwql_scoped_reader') THEN
-      GRANT SELECT ON "public"."lwql_analytics" TO "lwql_scoped_reader";
-    END IF;
+FROM "public"."Analytics" AS "m";
 END
 $lwql$;
 
 -- view: lwql_annotation_queue_items
 DO $lwql$
 BEGIN
-  CREATE OR REPLACE VIEW "public"."lwql_annotation_queue_items" WITH (security_barrier=true) AS
+  CREATE OR REPLACE VIEW "public"."lwql_annotation_queue_items" AS
 SELECT
   "m"."projectId" AS "TenantId",
   "m"."id" AS "AnnotationQueueItemId",
@@ -217,12 +192,11 @@ SELECT
   "m"."traceId" AS "TraceId",
   "m"."doneAt" AS "DoneAt",
   "m"."markedForDatasetAt" AS "MarkedForDatasetAt"
-FROM "public"."AnnotationQueueItem" AS "m"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "m"."projectId"));
+FROM "public"."AnnotationQueueItem" AS "m";
 EXCEPTION
   WHEN feature_not_supported OR invalid_table_definition THEN
     DROP VIEW IF EXISTS "public"."lwql_annotation_queue_items";
-    CREATE VIEW "public"."lwql_annotation_queue_items" WITH (security_barrier=true) AS
+    CREATE VIEW "public"."lwql_annotation_queue_items" AS
 SELECT
   "m"."projectId" AS "TenantId",
   "m"."id" AS "AnnotationQueueItemId",
@@ -234,46 +208,37 @@ SELECT
   "m"."traceId" AS "TraceId",
   "m"."doneAt" AS "DoneAt",
   "m"."markedForDatasetAt" AS "MarkedForDatasetAt"
-FROM "public"."AnnotationQueueItem" AS "m"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "m"."projectId"));
-    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'lwql_scoped_reader') THEN
-      GRANT SELECT ON "public"."lwql_annotation_queue_items" TO "lwql_scoped_reader";
-    END IF;
+FROM "public"."AnnotationQueueItem" AS "m";
 END
 $lwql$;
 
 -- view: lwql_annotation_queue_scores
 DO $lwql$
 BEGIN
-  CREATE OR REPLACE VIEW "public"."lwql_annotation_queue_scores" WITH (security_barrier=true) AS
+  CREATE OR REPLACE VIEW "public"."lwql_annotation_queue_scores" AS
 SELECT
   "j0"."projectId" AS "TenantId",
   "m"."annotationQueueId" AS "AnnotationQueueId",
   "m"."annotationScoreId" AS "AnnotationScoreId"
 FROM "public"."AnnotationQueueScores" AS "m"
-JOIN "public"."AnnotationQueue" AS "j0" ON "m"."annotationQueueId" = "j0"."id"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "j0"."projectId"));
+JOIN "public"."AnnotationQueue" AS "j0" ON "m"."annotationQueueId" = "j0"."id";
 EXCEPTION
   WHEN feature_not_supported OR invalid_table_definition THEN
     DROP VIEW IF EXISTS "public"."lwql_annotation_queue_scores";
-    CREATE VIEW "public"."lwql_annotation_queue_scores" WITH (security_barrier=true) AS
+    CREATE VIEW "public"."lwql_annotation_queue_scores" AS
 SELECT
   "j0"."projectId" AS "TenantId",
   "m"."annotationQueueId" AS "AnnotationQueueId",
   "m"."annotationScoreId" AS "AnnotationScoreId"
 FROM "public"."AnnotationQueueScores" AS "m"
-JOIN "public"."AnnotationQueue" AS "j0" ON "m"."annotationQueueId" = "j0"."id"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "j0"."projectId"));
-    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'lwql_scoped_reader') THEN
-      GRANT SELECT ON "public"."lwql_annotation_queue_scores" TO "lwql_scoped_reader";
-    END IF;
+JOIN "public"."AnnotationQueue" AS "j0" ON "m"."annotationQueueId" = "j0"."id";
 END
 $lwql$;
 
 -- view: lwql_annotation_queues
 DO $lwql$
 BEGIN
-  CREATE OR REPLACE VIEW "public"."lwql_annotation_queues" WITH (security_barrier=true) AS
+  CREATE OR REPLACE VIEW "public"."lwql_annotation_queues" AS
 SELECT
   "m"."projectId" AS "TenantId",
   "m"."id" AS "AnnotationQueueId",
@@ -282,12 +247,11 @@ SELECT
   "m"."description" AS "Description",
   "m"."createdAt" AS "CreatedAt",
   "m"."updatedAt" AS "UpdatedAt"
-FROM "public"."AnnotationQueue" AS "m"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "m"."projectId"));
+FROM "public"."AnnotationQueue" AS "m";
 EXCEPTION
   WHEN feature_not_supported OR invalid_table_definition THEN
     DROP VIEW IF EXISTS "public"."lwql_annotation_queues";
-    CREATE VIEW "public"."lwql_annotation_queues" WITH (security_barrier=true) AS
+    CREATE VIEW "public"."lwql_annotation_queues" AS
 SELECT
   "m"."projectId" AS "TenantId",
   "m"."id" AS "AnnotationQueueId",
@@ -296,18 +260,14 @@ SELECT
   "m"."description" AS "Description",
   "m"."createdAt" AS "CreatedAt",
   "m"."updatedAt" AS "UpdatedAt"
-FROM "public"."AnnotationQueue" AS "m"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "m"."projectId"));
-    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'lwql_scoped_reader') THEN
-      GRANT SELECT ON "public"."lwql_annotation_queues" TO "lwql_scoped_reader";
-    END IF;
+FROM "public"."AnnotationQueue" AS "m";
 END
 $lwql$;
 
 -- view: lwql_annotation_scores
 DO $lwql$
 BEGIN
-  CREATE OR REPLACE VIEW "public"."lwql_annotation_scores" WITH (security_barrier=true) AS
+  CREATE OR REPLACE VIEW "public"."lwql_annotation_scores" AS
 SELECT
   "m"."projectId" AS "TenantId",
   "m"."id" AS "AnnotationScoreId",
@@ -321,12 +281,11 @@ SELECT
   "m"."options" AS "Options",
   "m"."defaultValue" AS "DefaultValue",
   "m"."global" AS "Global"
-FROM "public"."AnnotationScore" AS "m"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "m"."projectId"));
+FROM "public"."AnnotationScore" AS "m";
 EXCEPTION
   WHEN feature_not_supported OR invalid_table_definition THEN
     DROP VIEW IF EXISTS "public"."lwql_annotation_scores";
-    CREATE VIEW "public"."lwql_annotation_scores" WITH (security_barrier=true) AS
+    CREATE VIEW "public"."lwql_annotation_scores" AS
 SELECT
   "m"."projectId" AS "TenantId",
   "m"."id" AS "AnnotationScoreId",
@@ -340,18 +299,14 @@ SELECT
   "m"."options" AS "Options",
   "m"."defaultValue" AS "DefaultValue",
   "m"."global" AS "Global"
-FROM "public"."AnnotationScore" AS "m"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "m"."projectId"));
-    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'lwql_scoped_reader') THEN
-      GRANT SELECT ON "public"."lwql_annotation_scores" TO "lwql_scoped_reader";
-    END IF;
+FROM "public"."AnnotationScore" AS "m";
 END
 $lwql$;
 
 -- view: lwql_annotations
 DO $lwql$
 BEGIN
-  CREATE OR REPLACE VIEW "public"."lwql_annotations" WITH (security_barrier=true) AS
+  CREATE OR REPLACE VIEW "public"."lwql_annotations" AS
 SELECT
   "m"."projectId" AS "TenantId",
   "m"."id" AS "AnnotationId",
@@ -366,12 +321,11 @@ SELECT
   "m"."anchorKind" AS "AnchorKind",
   "m"."anchorId" AS "AnchorId",
   "m"."anchorPath" AS "AnchorPath"
-FROM "public"."Annotation" AS "m"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "m"."projectId"));
+FROM "public"."Annotation" AS "m";
 EXCEPTION
   WHEN feature_not_supported OR invalid_table_definition THEN
     DROP VIEW IF EXISTS "public"."lwql_annotations";
-    CREATE VIEW "public"."lwql_annotations" WITH (security_barrier=true) AS
+    CREATE VIEW "public"."lwql_annotations" AS
 SELECT
   "m"."projectId" AS "TenantId",
   "m"."id" AS "AnnotationId",
@@ -386,18 +340,14 @@ SELECT
   "m"."anchorKind" AS "AnchorKind",
   "m"."anchorId" AS "AnchorId",
   "m"."anchorPath" AS "AnchorPath"
-FROM "public"."Annotation" AS "m"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "m"."projectId"));
-    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'lwql_scoped_reader') THEN
-      GRANT SELECT ON "public"."lwql_annotations" TO "lwql_scoped_reader";
-    END IF;
+FROM "public"."Annotation" AS "m";
 END
 $lwql$;
 
 -- view: lwql_anomaly_alerts
 DO $lwql$
 BEGIN
-  CREATE OR REPLACE VIEW "public"."lwql_anomaly_alerts" WITH (security_barrier=true) AS
+  CREATE OR REPLACE VIEW "public"."lwql_anomaly_alerts" AS
 SELECT
   "p"."id" AS "TenantId",
   "m"."id" AS "AnomalyAlertId",
@@ -417,12 +367,11 @@ SELECT
   "m"."resolvedAt" AS "ResolvedAt"
 FROM "public"."AnomalyAlert" AS "m"
 JOIN "public"."Team" AS "t" ON "m"."organizationId" = "t"."organizationId"
-JOIN "public"."Project" AS "p" ON "t"."id" = "p"."teamId"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "p"."id"));
+JOIN "public"."Project" AS "p" ON "t"."id" = "p"."teamId";
 EXCEPTION
   WHEN feature_not_supported OR invalid_table_definition THEN
     DROP VIEW IF EXISTS "public"."lwql_anomaly_alerts";
-    CREATE VIEW "public"."lwql_anomaly_alerts" WITH (security_barrier=true) AS
+    CREATE VIEW "public"."lwql_anomaly_alerts" AS
 SELECT
   "p"."id" AS "TenantId",
   "m"."id" AS "AnomalyAlertId",
@@ -442,18 +391,14 @@ SELECT
   "m"."resolvedAt" AS "ResolvedAt"
 FROM "public"."AnomalyAlert" AS "m"
 JOIN "public"."Team" AS "t" ON "m"."organizationId" = "t"."organizationId"
-JOIN "public"."Project" AS "p" ON "t"."id" = "p"."teamId"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "p"."id"));
-    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'lwql_scoped_reader') THEN
-      GRANT SELECT ON "public"."lwql_anomaly_alerts" TO "lwql_scoped_reader";
-    END IF;
+JOIN "public"."Project" AS "p" ON "t"."id" = "p"."teamId";
 END
 $lwql$;
 
 -- view: lwql_anomaly_rules
 DO $lwql$
 BEGIN
-  CREATE OR REPLACE VIEW "public"."lwql_anomaly_rules" WITH (security_barrier=true) AS
+  CREATE OR REPLACE VIEW "public"."lwql_anomaly_rules" AS
 SELECT
   "p"."id" AS "TenantId",
   "m"."id" AS "AnomalyRuleId",
@@ -471,12 +416,11 @@ SELECT
   "m"."createdById" AS "CreatedById"
 FROM "public"."AnomalyRule" AS "m"
 JOIN "public"."Team" AS "t" ON "m"."organizationId" = "t"."organizationId"
-JOIN "public"."Project" AS "p" ON "t"."id" = "p"."teamId"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "p"."id"));
+JOIN "public"."Project" AS "p" ON "t"."id" = "p"."teamId";
 EXCEPTION
   WHEN feature_not_supported OR invalid_table_definition THEN
     DROP VIEW IF EXISTS "public"."lwql_anomaly_rules";
-    CREATE VIEW "public"."lwql_anomaly_rules" WITH (security_barrier=true) AS
+    CREATE VIEW "public"."lwql_anomaly_rules" AS
 SELECT
   "p"."id" AS "TenantId",
   "m"."id" AS "AnomalyRuleId",
@@ -494,18 +438,14 @@ SELECT
   "m"."createdById" AS "CreatedById"
 FROM "public"."AnomalyRule" AS "m"
 JOIN "public"."Team" AS "t" ON "m"."organizationId" = "t"."organizationId"
-JOIN "public"."Project" AS "p" ON "t"."id" = "p"."teamId"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "p"."id"));
-    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'lwql_scoped_reader') THEN
-      GRANT SELECT ON "public"."lwql_anomaly_rules" TO "lwql_scoped_reader";
-    END IF;
+JOIN "public"."Project" AS "p" ON "t"."id" = "p"."teamId";
 END
 $lwql$;
 
 -- view: lwql_batch_evaluations
 DO $lwql$
 BEGIN
-  CREATE OR REPLACE VIEW "public"."lwql_batch_evaluations" WITH (security_barrier=true) AS
+  CREATE OR REPLACE VIEW "public"."lwql_batch_evaluations" AS
 SELECT
   "m"."projectId" AS "TenantId",
   "m"."id" AS "BatchEvaluationId",
@@ -522,12 +462,11 @@ SELECT
   "m"."evaluation" AS "Evaluation",
   "m"."createdAt" AS "CreatedAt",
   "m"."updatedAt" AS "UpdatedAt"
-FROM "public"."BatchEvaluation" AS "m"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "m"."projectId"));
+FROM "public"."BatchEvaluation" AS "m";
 EXCEPTION
   WHEN feature_not_supported OR invalid_table_definition THEN
     DROP VIEW IF EXISTS "public"."lwql_batch_evaluations";
-    CREATE VIEW "public"."lwql_batch_evaluations" WITH (security_barrier=true) AS
+    CREATE VIEW "public"."lwql_batch_evaluations" AS
 SELECT
   "m"."projectId" AS "TenantId",
   "m"."id" AS "BatchEvaluationId",
@@ -544,18 +483,14 @@ SELECT
   "m"."evaluation" AS "Evaluation",
   "m"."createdAt" AS "CreatedAt",
   "m"."updatedAt" AS "UpdatedAt"
-FROM "public"."BatchEvaluation" AS "m"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "m"."projectId"));
-    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'lwql_scoped_reader') THEN
-      GRANT SELECT ON "public"."lwql_batch_evaluations" TO "lwql_scoped_reader";
-    END IF;
+FROM "public"."BatchEvaluation" AS "m";
 END
 $lwql$;
 
 -- view: lwql_costs
 DO $lwql$
 BEGIN
-  CREATE OR REPLACE VIEW "public"."lwql_costs" WITH (security_barrier=true) AS
+  CREATE OR REPLACE VIEW "public"."lwql_costs" AS
 SELECT
   "m"."projectId" AS "TenantId",
   "m"."id" AS "CostId",
@@ -568,12 +503,11 @@ SELECT
   "m"."createdAt" AS "CreatedAt",
   "m"."updatedAt" AS "UpdatedAt",
   "m"."extraInfo" AS "ExtraInfo"
-FROM "public"."Cost" AS "m"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "m"."projectId"));
+FROM "public"."Cost" AS "m";
 EXCEPTION
   WHEN feature_not_supported OR invalid_table_definition THEN
     DROP VIEW IF EXISTS "public"."lwql_costs";
-    CREATE VIEW "public"."lwql_costs" WITH (security_barrier=true) AS
+    CREATE VIEW "public"."lwql_costs" AS
 SELECT
   "m"."projectId" AS "TenantId",
   "m"."id" AS "CostId",
@@ -586,18 +520,14 @@ SELECT
   "m"."createdAt" AS "CreatedAt",
   "m"."updatedAt" AS "UpdatedAt",
   "m"."extraInfo" AS "ExtraInfo"
-FROM "public"."Cost" AS "m"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "m"."projectId"));
-    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'lwql_scoped_reader') THEN
-      GRANT SELECT ON "public"."lwql_costs" TO "lwql_scoped_reader";
-    END IF;
+FROM "public"."Cost" AS "m";
 END
 $lwql$;
 
 -- view: lwql_custom_graphs
 DO $lwql$
 BEGIN
-  CREATE OR REPLACE VIEW "public"."lwql_custom_graphs" WITH (security_barrier=true) AS
+  CREATE OR REPLACE VIEW "public"."lwql_custom_graphs" AS
 SELECT
   "m"."projectId" AS "TenantId",
   "m"."id" AS "CustomGraphId",
@@ -618,12 +548,11 @@ WHERE (("m"."kind" <> 'dashboard_srcdoc') AND ("m"."dashboardId" IS NULL OR NOT 
   WHERE "d"."id" = "m"."dashboardId"
     AND "d"."projectId" = "m"."projectId"
     AND "d"."scope" = 'PRIVATE'
-)))
-AND (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "m"."projectId"));
+)));
 EXCEPTION
   WHEN feature_not_supported OR invalid_table_definition THEN
     DROP VIEW IF EXISTS "public"."lwql_custom_graphs";
-    CREATE VIEW "public"."lwql_custom_graphs" WITH (security_barrier=true) AS
+    CREATE VIEW "public"."lwql_custom_graphs" AS
 SELECT
   "m"."projectId" AS "TenantId",
   "m"."id" AS "CustomGraphId",
@@ -644,18 +573,14 @@ WHERE (("m"."kind" <> 'dashboard_srcdoc') AND ("m"."dashboardId" IS NULL OR NOT 
   WHERE "d"."id" = "m"."dashboardId"
     AND "d"."projectId" = "m"."projectId"
     AND "d"."scope" = 'PRIVATE'
-)))
-AND (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "m"."projectId"));
-    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'lwql_scoped_reader') THEN
-      GRANT SELECT ON "public"."lwql_custom_graphs" TO "lwql_scoped_reader";
-    END IF;
+)));
 END
 $lwql$;
 
 -- view: lwql_custom_llm_model_costs
 DO $lwql$
 BEGIN
-  CREATE OR REPLACE VIEW "public"."lwql_custom_llm_model_costs" WITH (security_barrier=true) AS
+  CREATE OR REPLACE VIEW "public"."lwql_custom_llm_model_costs" AS
 SELECT
   "m"."projectId" AS "TenantId",
   "m"."id" AS "CustomLLMModelCostId",
@@ -666,12 +591,11 @@ SELECT
   "m"."regex" AS "Regex",
   "m"."createdAt" AS "CreatedAt",
   "m"."updatedAt" AS "UpdatedAt"
-FROM "public"."CustomLLMModelCost" AS "m"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "m"."projectId"));
+FROM "public"."CustomLLMModelCost" AS "m";
 EXCEPTION
   WHEN feature_not_supported OR invalid_table_definition THEN
     DROP VIEW IF EXISTS "public"."lwql_custom_llm_model_costs";
-    CREATE VIEW "public"."lwql_custom_llm_model_costs" WITH (security_barrier=true) AS
+    CREATE VIEW "public"."lwql_custom_llm_model_costs" AS
 SELECT
   "m"."projectId" AS "TenantId",
   "m"."id" AS "CustomLLMModelCostId",
@@ -682,18 +606,14 @@ SELECT
   "m"."regex" AS "Regex",
   "m"."createdAt" AS "CreatedAt",
   "m"."updatedAt" AS "UpdatedAt"
-FROM "public"."CustomLLMModelCost" AS "m"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "m"."projectId"));
-    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'lwql_scoped_reader') THEN
-      GRANT SELECT ON "public"."lwql_custom_llm_model_costs" TO "lwql_scoped_reader";
-    END IF;
+FROM "public"."CustomLLMModelCost" AS "m";
 END
 $lwql$;
 
 -- view: lwql_dashboard_widgets
 DO $lwql$
 BEGIN
-  CREATE OR REPLACE VIEW "public"."lwql_dashboard_widgets" WITH (security_barrier=true) AS
+  CREATE OR REPLACE VIEW "public"."lwql_dashboard_widgets" AS
 SELECT
   "m"."projectId" AS "TenantId",
   "m"."id" AS "DashboardWidgetId",
@@ -712,12 +632,11 @@ WHERE ("m"."dashboardId" IS NULL OR NOT EXISTS (
   WHERE "d"."id" = "m"."dashboardId"
     AND "d"."projectId" = "m"."projectId"
     AND "d"."scope" = 'PRIVATE'
-))
-AND (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "m"."projectId"));
+));
 EXCEPTION
   WHEN feature_not_supported OR invalid_table_definition THEN
     DROP VIEW IF EXISTS "public"."lwql_dashboard_widgets";
-    CREATE VIEW "public"."lwql_dashboard_widgets" WITH (security_barrier=true) AS
+    CREATE VIEW "public"."lwql_dashboard_widgets" AS
 SELECT
   "m"."projectId" AS "TenantId",
   "m"."id" AS "DashboardWidgetId",
@@ -736,18 +655,14 @@ WHERE ("m"."dashboardId" IS NULL OR NOT EXISTS (
   WHERE "d"."id" = "m"."dashboardId"
     AND "d"."projectId" = "m"."projectId"
     AND "d"."scope" = 'PRIVATE'
-))
-AND (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "m"."projectId"));
-    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'lwql_scoped_reader') THEN
-      GRANT SELECT ON "public"."lwql_dashboard_widgets" TO "lwql_scoped_reader";
-    END IF;
+));
 END
 $lwql$;
 
 -- view: lwql_dashboards
 DO $lwql$
 BEGIN
-  CREATE OR REPLACE VIEW "public"."lwql_dashboards" WITH (security_barrier=true) AS
+  CREATE OR REPLACE VIEW "public"."lwql_dashboards" AS
 SELECT
   "m"."projectId" AS "TenantId",
   "m"."id" AS "DashboardId",
@@ -767,12 +682,11 @@ WHERE (("m"."scope" <> 'PRIVATE') AND (NOT EXISTS (
   WHERE "g"."dashboardId" = "m"."id"
     AND "g"."projectId" = "m"."projectId"
     AND "g"."kind" <> 'dashboard_srcdoc'
-)))
-AND (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "m"."projectId"));
+)));
 EXCEPTION
   WHEN feature_not_supported OR invalid_table_definition THEN
     DROP VIEW IF EXISTS "public"."lwql_dashboards";
-    CREATE VIEW "public"."lwql_dashboards" WITH (security_barrier=true) AS
+    CREATE VIEW "public"."lwql_dashboards" AS
 SELECT
   "m"."projectId" AS "TenantId",
   "m"."id" AS "DashboardId",
@@ -792,18 +706,14 @@ WHERE (("m"."scope" <> 'PRIVATE') AND (NOT EXISTS (
   WHERE "g"."dashboardId" = "m"."id"
     AND "g"."projectId" = "m"."projectId"
     AND "g"."kind" <> 'dashboard_srcdoc'
-)))
-AND (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "m"."projectId"));
-    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'lwql_scoped_reader') THEN
-      GRANT SELECT ON "public"."lwql_dashboards" TO "lwql_scoped_reader";
-    END IF;
+)));
 END
 $lwql$;
 
 -- view: lwql_dashboards_v2
 DO $lwql$
 BEGIN
-  CREATE OR REPLACE VIEW "public"."lwql_dashboards_v2" WITH (security_barrier=true) AS
+  CREATE OR REPLACE VIEW "public"."lwql_dashboards_v2" AS
 SELECT
   "m"."projectId" AS "TenantId",
   "m"."id" AS "DashboardId",
@@ -814,12 +724,11 @@ SELECT
   "m"."createdAt" AS "CreatedAt",
   "m"."updatedAt" AS "UpdatedAt"
 FROM "public"."DashboardsV2" AS "m"
-WHERE ("m"."scope" <> 'PRIVATE')
-AND (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "m"."projectId"));
+WHERE ("m"."scope" <> 'PRIVATE');
 EXCEPTION
   WHEN feature_not_supported OR invalid_table_definition THEN
     DROP VIEW IF EXISTS "public"."lwql_dashboards_v2";
-    CREATE VIEW "public"."lwql_dashboards_v2" WITH (security_barrier=true) AS
+    CREATE VIEW "public"."lwql_dashboards_v2" AS
 SELECT
   "m"."projectId" AS "TenantId",
   "m"."id" AS "DashboardId",
@@ -830,18 +739,14 @@ SELECT
   "m"."createdAt" AS "CreatedAt",
   "m"."updatedAt" AS "UpdatedAt"
 FROM "public"."DashboardsV2" AS "m"
-WHERE ("m"."scope" <> 'PRIVATE')
-AND (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "m"."projectId"));
-    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'lwql_scoped_reader') THEN
-      GRANT SELECT ON "public"."lwql_dashboards_v2" TO "lwql_scoped_reader";
-    END IF;
+WHERE ("m"."scope" <> 'PRIVATE');
 END
 $lwql$;
 
 -- view: lwql_data_privacy_policies
 DO $lwql$
 BEGIN
-  CREATE OR REPLACE VIEW "public"."lwql_data_privacy_policies" WITH (security_barrier=true) AS
+  CREATE OR REPLACE VIEW "public"."lwql_data_privacy_policies" AS
 SELECT
   "p"."id" AS "TenantId",
   "m"."id" AS "DataPrivacyPolicyId",
@@ -853,12 +758,11 @@ SELECT
   "m"."updatedAt" AS "UpdatedAt"
 FROM "public"."DataPrivacyPolicy" AS "m"
 JOIN "public"."Team" AS "t" ON "m"."organizationId" = "t"."organizationId"
-JOIN "public"."Project" AS "p" ON "t"."id" = "p"."teamId"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "p"."id"));
+JOIN "public"."Project" AS "p" ON "t"."id" = "p"."teamId";
 EXCEPTION
   WHEN feature_not_supported OR invalid_table_definition THEN
     DROP VIEW IF EXISTS "public"."lwql_data_privacy_policies";
-    CREATE VIEW "public"."lwql_data_privacy_policies" WITH (security_barrier=true) AS
+    CREATE VIEW "public"."lwql_data_privacy_policies" AS
 SELECT
   "p"."id" AS "TenantId",
   "m"."id" AS "DataPrivacyPolicyId",
@@ -870,18 +774,14 @@ SELECT
   "m"."updatedAt" AS "UpdatedAt"
 FROM "public"."DataPrivacyPolicy" AS "m"
 JOIN "public"."Team" AS "t" ON "m"."organizationId" = "t"."organizationId"
-JOIN "public"."Project" AS "p" ON "t"."id" = "p"."teamId"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "p"."id"));
-    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'lwql_scoped_reader') THEN
-      GRANT SELECT ON "public"."lwql_data_privacy_policies" TO "lwql_scoped_reader";
-    END IF;
+JOIN "public"."Project" AS "p" ON "t"."id" = "p"."teamId";
 END
 $lwql$;
 
 -- view: lwql_dataset_records
 DO $lwql$
 BEGIN
-  CREATE OR REPLACE VIEW "public"."lwql_dataset_records" WITH (security_barrier=true) AS
+  CREATE OR REPLACE VIEW "public"."lwql_dataset_records" AS
 SELECT
   "m"."projectId" AS "TenantId",
   "m"."id" AS "DatasetRecordId",
@@ -889,12 +789,11 @@ SELECT
   "m"."entry" AS "Entry",
   "m"."createdAt" AS "CreatedAt",
   "m"."updatedAt" AS "UpdatedAt"
-FROM "public"."DatasetRecord" AS "m"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "m"."projectId"));
+FROM "public"."DatasetRecord" AS "m";
 EXCEPTION
   WHEN feature_not_supported OR invalid_table_definition THEN
     DROP VIEW IF EXISTS "public"."lwql_dataset_records";
-    CREATE VIEW "public"."lwql_dataset_records" WITH (security_barrier=true) AS
+    CREATE VIEW "public"."lwql_dataset_records" AS
 SELECT
   "m"."projectId" AS "TenantId",
   "m"."id" AS "DatasetRecordId",
@@ -902,18 +801,14 @@ SELECT
   "m"."entry" AS "Entry",
   "m"."createdAt" AS "CreatedAt",
   "m"."updatedAt" AS "UpdatedAt"
-FROM "public"."DatasetRecord" AS "m"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "m"."projectId"));
-    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'lwql_scoped_reader') THEN
-      GRANT SELECT ON "public"."lwql_dataset_records" TO "lwql_scoped_reader";
-    END IF;
+FROM "public"."DatasetRecord" AS "m";
 END
 $lwql$;
 
 -- view: lwql_datasets
 DO $lwql$
 BEGIN
-  CREATE OR REPLACE VIEW "public"."lwql_datasets" WITH (security_barrier=true) AS
+  CREATE OR REPLACE VIEW "public"."lwql_datasets" AS
 SELECT
   "m"."projectId" AS "TenantId",
   "m"."id" AS "DatasetId",
@@ -935,12 +830,11 @@ SELECT
   "m"."sizeBytes" AS "SizeBytes",
   "m"."chunkCount" AS "ChunkCount",
   "m"."chunkOffsets" AS "ChunkOffsets"
-FROM "public"."Dataset" AS "m"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "m"."projectId"));
+FROM "public"."Dataset" AS "m";
 EXCEPTION
   WHEN feature_not_supported OR invalid_table_definition THEN
     DROP VIEW IF EXISTS "public"."lwql_datasets";
-    CREATE VIEW "public"."lwql_datasets" WITH (security_barrier=true) AS
+    CREATE VIEW "public"."lwql_datasets" AS
 SELECT
   "m"."projectId" AS "TenantId",
   "m"."id" AS "DatasetId",
@@ -962,18 +856,14 @@ SELECT
   "m"."sizeBytes" AS "SizeBytes",
   "m"."chunkCount" AS "ChunkCount",
   "m"."chunkOffsets" AS "ChunkOffsets"
-FROM "public"."Dataset" AS "m"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "m"."projectId"));
-    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'lwql_scoped_reader') THEN
-      GRANT SELECT ON "public"."lwql_datasets" TO "lwql_scoped_reader";
-    END IF;
+FROM "public"."Dataset" AS "m";
 END
 $lwql$;
 
 -- view: lwql_department_membership_histories
 DO $lwql$
 BEGIN
-  CREATE OR REPLACE VIEW "public"."lwql_department_membership_histories" WITH (security_barrier=true) AS
+  CREATE OR REPLACE VIEW "public"."lwql_department_membership_histories" AS
 SELECT
   "p"."id" AS "TenantId",
   "m"."id" AS "DepartmentMembershipHistoryId",
@@ -984,12 +874,11 @@ SELECT
   "m"."createdAt" AS "CreatedAt"
 FROM "public"."DepartmentMembershipHistory" AS "m"
 JOIN "public"."Team" AS "t" ON "m"."organizationId" = "t"."organizationId"
-JOIN "public"."Project" AS "p" ON "t"."id" = "p"."teamId"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "p"."id"));
+JOIN "public"."Project" AS "p" ON "t"."id" = "p"."teamId";
 EXCEPTION
   WHEN feature_not_supported OR invalid_table_definition THEN
     DROP VIEW IF EXISTS "public"."lwql_department_membership_histories";
-    CREATE VIEW "public"."lwql_department_membership_histories" WITH (security_barrier=true) AS
+    CREATE VIEW "public"."lwql_department_membership_histories" AS
 SELECT
   "p"."id" AS "TenantId",
   "m"."id" AS "DepartmentMembershipHistoryId",
@@ -1000,18 +889,14 @@ SELECT
   "m"."createdAt" AS "CreatedAt"
 FROM "public"."DepartmentMembershipHistory" AS "m"
 JOIN "public"."Team" AS "t" ON "m"."organizationId" = "t"."organizationId"
-JOIN "public"."Project" AS "p" ON "t"."id" = "p"."teamId"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "p"."id"));
-    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'lwql_scoped_reader') THEN
-      GRANT SELECT ON "public"."lwql_department_membership_histories" TO "lwql_scoped_reader";
-    END IF;
+JOIN "public"."Project" AS "p" ON "t"."id" = "p"."teamId";
 END
 $lwql$;
 
 -- view: lwql_departments
 DO $lwql$
 BEGIN
-  CREATE OR REPLACE VIEW "public"."lwql_departments" WITH (security_barrier=true) AS
+  CREATE OR REPLACE VIEW "public"."lwql_departments" AS
 SELECT
   "p"."id" AS "TenantId",
   "m"."id" AS "DepartmentId",
@@ -1021,12 +906,11 @@ SELECT
   "m"."archivedAt" AS "ArchivedAt"
 FROM "public"."Department" AS "m"
 JOIN "public"."Team" AS "t" ON "m"."organizationId" = "t"."organizationId"
-JOIN "public"."Project" AS "p" ON "t"."id" = "p"."teamId"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "p"."id"));
+JOIN "public"."Project" AS "p" ON "t"."id" = "p"."teamId";
 EXCEPTION
   WHEN feature_not_supported OR invalid_table_definition THEN
     DROP VIEW IF EXISTS "public"."lwql_departments";
-    CREATE VIEW "public"."lwql_departments" WITH (security_barrier=true) AS
+    CREATE VIEW "public"."lwql_departments" AS
 SELECT
   "p"."id" AS "TenantId",
   "m"."id" AS "DepartmentId",
@@ -1036,18 +920,14 @@ SELECT
   "m"."archivedAt" AS "ArchivedAt"
 FROM "public"."Department" AS "m"
 JOIN "public"."Team" AS "t" ON "m"."organizationId" = "t"."organizationId"
-JOIN "public"."Project" AS "p" ON "t"."id" = "p"."teamId"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "p"."id"));
-    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'lwql_scoped_reader') THEN
-      GRANT SELECT ON "public"."lwql_departments" TO "lwql_scoped_reader";
-    END IF;
+JOIN "public"."Project" AS "p" ON "t"."id" = "p"."teamId";
 END
 $lwql$;
 
 -- view: lwql_discovered_agents
 DO $lwql$
 BEGIN
-  CREATE OR REPLACE VIEW "public"."lwql_discovered_agents" WITH (security_barrier=true) AS
+  CREATE OR REPLACE VIEW "public"."lwql_discovered_agents" AS
 SELECT
   "p"."id" AS "TenantId",
   "m"."id" AS "DiscoveredAgentId",
@@ -1061,12 +941,11 @@ SELECT
   "m"."updatedAt" AS "UpdatedAt"
 FROM "public"."DiscoveredAgent" AS "m"
 JOIN "public"."Team" AS "t" ON "m"."organizationId" = "t"."organizationId"
-JOIN "public"."Project" AS "p" ON "t"."id" = "p"."teamId"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "p"."id"));
+JOIN "public"."Project" AS "p" ON "t"."id" = "p"."teamId";
 EXCEPTION
   WHEN feature_not_supported OR invalid_table_definition THEN
     DROP VIEW IF EXISTS "public"."lwql_discovered_agents";
-    CREATE VIEW "public"."lwql_discovered_agents" WITH (security_barrier=true) AS
+    CREATE VIEW "public"."lwql_discovered_agents" AS
 SELECT
   "p"."id" AS "TenantId",
   "m"."id" AS "DiscoveredAgentId",
@@ -1080,18 +959,14 @@ SELECT
   "m"."updatedAt" AS "UpdatedAt"
 FROM "public"."DiscoveredAgent" AS "m"
 JOIN "public"."Team" AS "t" ON "m"."organizationId" = "t"."organizationId"
-JOIN "public"."Project" AS "p" ON "t"."id" = "p"."teamId"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "p"."id"));
-    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'lwql_scoped_reader') THEN
-      GRANT SELECT ON "public"."lwql_discovered_agents" TO "lwql_scoped_reader";
-    END IF;
+JOIN "public"."Project" AS "p" ON "t"."id" = "p"."teamId";
 END
 $lwql$;
 
 -- view: lwql_discovered_persons
 DO $lwql$
 BEGIN
-  CREATE OR REPLACE VIEW "public"."lwql_discovered_persons" WITH (security_barrier=true) AS
+  CREATE OR REPLACE VIEW "public"."lwql_discovered_persons" AS
 SELECT
   "p"."id" AS "TenantId",
   "m"."id" AS "DiscoveredPersonId",
@@ -1109,12 +984,11 @@ SELECT
   "m"."updatedAt" AS "UpdatedAt"
 FROM "public"."DiscoveredPerson" AS "m"
 JOIN "public"."Team" AS "t" ON "m"."organizationId" = "t"."organizationId"
-JOIN "public"."Project" AS "p" ON "t"."id" = "p"."teamId"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "p"."id"));
+JOIN "public"."Project" AS "p" ON "t"."id" = "p"."teamId";
 EXCEPTION
   WHEN feature_not_supported OR invalid_table_definition THEN
     DROP VIEW IF EXISTS "public"."lwql_discovered_persons";
-    CREATE VIEW "public"."lwql_discovered_persons" WITH (security_barrier=true) AS
+    CREATE VIEW "public"."lwql_discovered_persons" AS
 SELECT
   "p"."id" AS "TenantId",
   "m"."id" AS "DiscoveredPersonId",
@@ -1132,48 +1006,39 @@ SELECT
   "m"."updatedAt" AS "UpdatedAt"
 FROM "public"."DiscoveredPerson" AS "m"
 JOIN "public"."Team" AS "t" ON "m"."organizationId" = "t"."organizationId"
-JOIN "public"."Project" AS "p" ON "t"."id" = "p"."teamId"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "p"."id"));
-    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'lwql_scoped_reader') THEN
-      GRANT SELECT ON "public"."lwql_discovered_persons" TO "lwql_scoped_reader";
-    END IF;
+JOIN "public"."Project" AS "p" ON "t"."id" = "p"."teamId";
 END
 $lwql$;
 
 -- view: lwql_email_suppressions
 DO $lwql$
 BEGIN
-  CREATE OR REPLACE VIEW "public"."lwql_email_suppressions" WITH (security_barrier=true) AS
+  CREATE OR REPLACE VIEW "public"."lwql_email_suppressions" AS
 SELECT
   "m"."projectId" AS "TenantId",
   "m"."id" AS "EmailSuppressionId",
   "m"."triggerId" AS "TriggerId",
   "m"."reason" AS "Reason",
   "m"."createdAt" AS "CreatedAt"
-FROM "public"."EmailSuppression" AS "m"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "m"."projectId"));
+FROM "public"."EmailSuppression" AS "m";
 EXCEPTION
   WHEN feature_not_supported OR invalid_table_definition THEN
     DROP VIEW IF EXISTS "public"."lwql_email_suppressions";
-    CREATE VIEW "public"."lwql_email_suppressions" WITH (security_barrier=true) AS
+    CREATE VIEW "public"."lwql_email_suppressions" AS
 SELECT
   "m"."projectId" AS "TenantId",
   "m"."id" AS "EmailSuppressionId",
   "m"."triggerId" AS "TriggerId",
   "m"."reason" AS "Reason",
   "m"."createdAt" AS "CreatedAt"
-FROM "public"."EmailSuppression" AS "m"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "m"."projectId"));
-    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'lwql_scoped_reader') THEN
-      GRANT SELECT ON "public"."lwql_email_suppressions" TO "lwql_scoped_reader";
-    END IF;
+FROM "public"."EmailSuppression" AS "m";
 END
 $lwql$;
 
 -- view: lwql_erased_identifier_suppressions
 DO $lwql$
 BEGIN
-  CREATE OR REPLACE VIEW "public"."lwql_erased_identifier_suppressions" WITH (security_barrier=true) AS
+  CREATE OR REPLACE VIEW "public"."lwql_erased_identifier_suppressions" AS
 SELECT
   "p"."id" AS "TenantId",
   "m"."id" AS "ErasedIdentifierSuppressionId",
@@ -1181,12 +1046,11 @@ SELECT
   "m"."erasedAt" AS "ErasedAt"
 FROM "public"."ErasedIdentifierSuppression" AS "m"
 JOIN "public"."Team" AS "t" ON "m"."organizationId" = "t"."organizationId"
-JOIN "public"."Project" AS "p" ON "t"."id" = "p"."teamId"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "p"."id"));
+JOIN "public"."Project" AS "p" ON "t"."id" = "p"."teamId";
 EXCEPTION
   WHEN feature_not_supported OR invalid_table_definition THEN
     DROP VIEW IF EXISTS "public"."lwql_erased_identifier_suppressions";
-    CREATE VIEW "public"."lwql_erased_identifier_suppressions" WITH (security_barrier=true) AS
+    CREATE VIEW "public"."lwql_erased_identifier_suppressions" AS
 SELECT
   "p"."id" AS "TenantId",
   "m"."id" AS "ErasedIdentifierSuppressionId",
@@ -1194,18 +1058,14 @@ SELECT
   "m"."erasedAt" AS "ErasedAt"
 FROM "public"."ErasedIdentifierSuppression" AS "m"
 JOIN "public"."Team" AS "t" ON "m"."organizationId" = "t"."organizationId"
-JOIN "public"."Project" AS "p" ON "t"."id" = "p"."teamId"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "p"."id"));
-    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'lwql_scoped_reader') THEN
-      GRANT SELECT ON "public"."lwql_erased_identifier_suppressions" TO "lwql_scoped_reader";
-    END IF;
+JOIN "public"."Project" AS "p" ON "t"."id" = "p"."teamId";
 END
 $lwql$;
 
 -- view: lwql_evaluators
 DO $lwql$
 BEGIN
-  CREATE OR REPLACE VIEW "public"."lwql_evaluators" WITH (security_barrier=true) AS
+  CREATE OR REPLACE VIEW "public"."lwql_evaluators" AS
 SELECT
   "m"."projectId" AS "TenantId",
   "m"."id" AS "EvaluatorId",
@@ -1220,12 +1080,11 @@ SELECT
   "m"."updatedById" AS "UpdatedById",
   "m"."createdAt" AS "CreatedAt",
   "m"."updatedAt" AS "UpdatedAt"
-FROM "public"."Evaluator" AS "m"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "m"."projectId"));
+FROM "public"."Evaluator" AS "m";
 EXCEPTION
   WHEN feature_not_supported OR invalid_table_definition THEN
     DROP VIEW IF EXISTS "public"."lwql_evaluators";
-    CREATE VIEW "public"."lwql_evaluators" WITH (security_barrier=true) AS
+    CREATE VIEW "public"."lwql_evaluators" AS
 SELECT
   "m"."projectId" AS "TenantId",
   "m"."id" AS "EvaluatorId",
@@ -1240,18 +1099,14 @@ SELECT
   "m"."updatedById" AS "UpdatedById",
   "m"."createdAt" AS "CreatedAt",
   "m"."updatedAt" AS "UpdatedAt"
-FROM "public"."Evaluator" AS "m"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "m"."projectId"));
-    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'lwql_scoped_reader') THEN
-      GRANT SELECT ON "public"."lwql_evaluators" TO "lwql_scoped_reader";
-    END IF;
+FROM "public"."Evaluator" AS "m";
 END
 $lwql$;
 
 -- view: lwql_experiment_versions
 DO $lwql$
 BEGIN
-  CREATE OR REPLACE VIEW "public"."lwql_experiment_versions" WITH (security_barrier=true) AS
+  CREATE OR REPLACE VIEW "public"."lwql_experiment_versions" AS
 SELECT
   "m"."projectId" AS "TenantId",
   "m"."id" AS "ExperimentVersionId",
@@ -1267,12 +1122,11 @@ SELECT
   "m"."schemaVersion" AS "SchemaVersion",
   "m"."createdAt" AS "CreatedAt",
   "m"."updatedAt" AS "UpdatedAt"
-FROM "public"."ExperimentVersion" AS "m"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "m"."projectId"));
+FROM "public"."ExperimentVersion" AS "m";
 EXCEPTION
   WHEN feature_not_supported OR invalid_table_definition THEN
     DROP VIEW IF EXISTS "public"."lwql_experiment_versions";
-    CREATE VIEW "public"."lwql_experiment_versions" WITH (security_barrier=true) AS
+    CREATE VIEW "public"."lwql_experiment_versions" AS
 SELECT
   "m"."projectId" AS "TenantId",
   "m"."id" AS "ExperimentVersionId",
@@ -1288,18 +1142,14 @@ SELECT
   "m"."schemaVersion" AS "SchemaVersion",
   "m"."createdAt" AS "CreatedAt",
   "m"."updatedAt" AS "UpdatedAt"
-FROM "public"."ExperimentVersion" AS "m"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "m"."projectId"));
-    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'lwql_scoped_reader') THEN
-      GRANT SELECT ON "public"."lwql_experiment_versions" TO "lwql_scoped_reader";
-    END IF;
+FROM "public"."ExperimentVersion" AS "m";
 END
 $lwql$;
 
 -- view: lwql_experiments
 DO $lwql$
 BEGIN
-  CREATE OR REPLACE VIEW "public"."lwql_experiments" WITH (security_barrier=true) AS
+  CREATE OR REPLACE VIEW "public"."lwql_experiments" AS
 SELECT
   "m"."projectId" AS "TenantId",
   "m"."id" AS "ExperimentId",
@@ -1312,12 +1162,11 @@ SELECT
   "m"."archivedAt" AS "ArchivedAt",
   "m"."workbenchState" AS "WorkbenchState",
   "m"."workbenchVersion" AS "WorkbenchVersion"
-FROM "public"."Experiment" AS "m"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "m"."projectId"));
+FROM "public"."Experiment" AS "m";
 EXCEPTION
   WHEN feature_not_supported OR invalid_table_definition THEN
     DROP VIEW IF EXISTS "public"."lwql_experiments";
-    CREATE VIEW "public"."lwql_experiments" WITH (security_barrier=true) AS
+    CREATE VIEW "public"."lwql_experiments" AS
 SELECT
   "m"."projectId" AS "TenantId",
   "m"."id" AS "ExperimentId",
@@ -1330,18 +1179,14 @@ SELECT
   "m"."archivedAt" AS "ArchivedAt",
   "m"."workbenchState" AS "WorkbenchState",
   "m"."workbenchVersion" AS "WorkbenchVersion"
-FROM "public"."Experiment" AS "m"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "m"."projectId"));
-    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'lwql_scoped_reader') THEN
-      GRANT SELECT ON "public"."lwql_experiments" TO "lwql_scoped_reader";
-    END IF;
+FROM "public"."Experiment" AS "m";
 END
 $lwql$;
 
 -- view: lwql_gateway_budget_bucket_boundaries
 DO $lwql$
 BEGIN
-  CREATE OR REPLACE VIEW "public"."lwql_gateway_budget_bucket_boundaries" WITH (security_barrier=true) AS
+  CREATE OR REPLACE VIEW "public"."lwql_gateway_budget_bucket_boundaries" AS
 SELECT
   "p"."id" AS "TenantId",
   "m"."id" AS "GatewayBudgetBucketBoundaryId",
@@ -1352,12 +1197,11 @@ SELECT
   "m"."updatedAt" AS "UpdatedAt"
 FROM "public"."GatewayBudgetBucketBoundary" AS "m"
 JOIN "public"."Team" AS "t" ON "m"."organizationId" = "t"."organizationId"
-JOIN "public"."Project" AS "p" ON "t"."id" = "p"."teamId"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "p"."id"));
+JOIN "public"."Project" AS "p" ON "t"."id" = "p"."teamId";
 EXCEPTION
   WHEN feature_not_supported OR invalid_table_definition THEN
     DROP VIEW IF EXISTS "public"."lwql_gateway_budget_bucket_boundaries";
-    CREATE VIEW "public"."lwql_gateway_budget_bucket_boundaries" WITH (security_barrier=true) AS
+    CREATE VIEW "public"."lwql_gateway_budget_bucket_boundaries" AS
 SELECT
   "p"."id" AS "TenantId",
   "m"."id" AS "GatewayBudgetBucketBoundaryId",
@@ -1368,18 +1212,14 @@ SELECT
   "m"."updatedAt" AS "UpdatedAt"
 FROM "public"."GatewayBudgetBucketBoundary" AS "m"
 JOIN "public"."Team" AS "t" ON "m"."organizationId" = "t"."organizationId"
-JOIN "public"."Project" AS "p" ON "t"."id" = "p"."teamId"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "p"."id"));
-    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'lwql_scoped_reader') THEN
-      GRANT SELECT ON "public"."lwql_gateway_budget_bucket_boundaries" TO "lwql_scoped_reader";
-    END IF;
+JOIN "public"."Project" AS "p" ON "t"."id" = "p"."teamId";
 END
 $lwql$;
 
 -- view: lwql_gateway_budget_ledgers
 DO $lwql$
 BEGIN
-  CREATE OR REPLACE VIEW "public"."lwql_gateway_budget_ledgers" WITH (security_barrier=true) AS
+  CREATE OR REPLACE VIEW "public"."lwql_gateway_budget_ledgers" AS
 SELECT
   "p"."id" AS "TenantId",
   "m"."id" AS "GatewayBudgetLedgerId",
@@ -1399,12 +1239,11 @@ SELECT
 FROM "public"."GatewayBudgetLedger" AS "m"
 JOIN "public"."GatewayBudget" AS "j0" ON "m"."budgetId" = "j0"."id"
 JOIN "public"."Team" AS "t" ON "j0"."organizationId" = "t"."organizationId"
-JOIN "public"."Project" AS "p" ON "t"."id" = "p"."teamId"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "p"."id"));
+JOIN "public"."Project" AS "p" ON "t"."id" = "p"."teamId";
 EXCEPTION
   WHEN feature_not_supported OR invalid_table_definition THEN
     DROP VIEW IF EXISTS "public"."lwql_gateway_budget_ledgers";
-    CREATE VIEW "public"."lwql_gateway_budget_ledgers" WITH (security_barrier=true) AS
+    CREATE VIEW "public"."lwql_gateway_budget_ledgers" AS
 SELECT
   "p"."id" AS "TenantId",
   "m"."id" AS "GatewayBudgetLedgerId",
@@ -1424,18 +1263,14 @@ SELECT
 FROM "public"."GatewayBudgetLedger" AS "m"
 JOIN "public"."GatewayBudget" AS "j0" ON "m"."budgetId" = "j0"."id"
 JOIN "public"."Team" AS "t" ON "j0"."organizationId" = "t"."organizationId"
-JOIN "public"."Project" AS "p" ON "t"."id" = "p"."teamId"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "p"."id"));
-    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'lwql_scoped_reader') THEN
-      GRANT SELECT ON "public"."lwql_gateway_budget_ledgers" TO "lwql_scoped_reader";
-    END IF;
+JOIN "public"."Project" AS "p" ON "t"."id" = "p"."teamId";
 END
 $lwql$;
 
 -- view: lwql_gateway_budgets
 DO $lwql$
 BEGIN
-  CREATE OR REPLACE VIEW "public"."lwql_gateway_budgets" WITH (security_barrier=true) AS
+  CREATE OR REPLACE VIEW "public"."lwql_gateway_budgets" AS
 SELECT
   "p"."id" AS "TenantId",
   "m"."id" AS "GatewayBudgetId",
@@ -1461,12 +1296,11 @@ SELECT
   "m"."managedByVirtualKeyId" AS "ManagedByVirtualKeyId"
 FROM "public"."GatewayBudget" AS "m"
 JOIN "public"."Team" AS "t" ON "m"."organizationId" = "t"."organizationId"
-JOIN "public"."Project" AS "p" ON "t"."id" = "p"."teamId"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "p"."id"));
+JOIN "public"."Project" AS "p" ON "t"."id" = "p"."teamId";
 EXCEPTION
   WHEN feature_not_supported OR invalid_table_definition THEN
     DROP VIEW IF EXISTS "public"."lwql_gateway_budgets";
-    CREATE VIEW "public"."lwql_gateway_budgets" WITH (security_barrier=true) AS
+    CREATE VIEW "public"."lwql_gateway_budgets" AS
 SELECT
   "p"."id" AS "TenantId",
   "m"."id" AS "GatewayBudgetId",
@@ -1492,18 +1326,14 @@ SELECT
   "m"."managedByVirtualKeyId" AS "ManagedByVirtualKeyId"
 FROM "public"."GatewayBudget" AS "m"
 JOIN "public"."Team" AS "t" ON "m"."organizationId" = "t"."organizationId"
-JOIN "public"."Project" AS "p" ON "t"."id" = "p"."teamId"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "p"."id"));
-    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'lwql_scoped_reader') THEN
-      GRANT SELECT ON "public"."lwql_gateway_budgets" TO "lwql_scoped_reader";
-    END IF;
+JOIN "public"."Project" AS "p" ON "t"."id" = "p"."teamId";
 END
 $lwql$;
 
 -- view: lwql_gateway_cache_rules
 DO $lwql$
 BEGIN
-  CREATE OR REPLACE VIEW "public"."lwql_gateway_cache_rules" WITH (security_barrier=true) AS
+  CREATE OR REPLACE VIEW "public"."lwql_gateway_cache_rules" AS
 SELECT
   "p"."id" AS "TenantId",
   "m"."id" AS "GatewayCacheRuleId",
@@ -1520,12 +1350,11 @@ SELECT
   "m"."createdById" AS "CreatedById"
 FROM "public"."GatewayCacheRule" AS "m"
 JOIN "public"."Team" AS "t" ON "m"."organizationId" = "t"."organizationId"
-JOIN "public"."Project" AS "p" ON "t"."id" = "p"."teamId"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "p"."id"));
+JOIN "public"."Project" AS "p" ON "t"."id" = "p"."teamId";
 EXCEPTION
   WHEN feature_not_supported OR invalid_table_definition THEN
     DROP VIEW IF EXISTS "public"."lwql_gateway_cache_rules";
-    CREATE VIEW "public"."lwql_gateway_cache_rules" WITH (security_barrier=true) AS
+    CREATE VIEW "public"."lwql_gateway_cache_rules" AS
 SELECT
   "p"."id" AS "TenantId",
   "m"."id" AS "GatewayCacheRuleId",
@@ -1542,18 +1371,14 @@ SELECT
   "m"."createdById" AS "CreatedById"
 FROM "public"."GatewayCacheRule" AS "m"
 JOIN "public"."Team" AS "t" ON "m"."organizationId" = "t"."organizationId"
-JOIN "public"."Project" AS "p" ON "t"."id" = "p"."teamId"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "p"."id"));
-    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'lwql_scoped_reader') THEN
-      GRANT SELECT ON "public"."lwql_gateway_cache_rules" TO "lwql_scoped_reader";
-    END IF;
+JOIN "public"."Project" AS "p" ON "t"."id" = "p"."teamId";
 END
 $lwql$;
 
 -- view: lwql_gateway_change_events
 DO $lwql$
 BEGIN
-  CREATE OR REPLACE VIEW "public"."lwql_gateway_change_events" WITH (security_barrier=true) AS
+  CREATE OR REPLACE VIEW "public"."lwql_gateway_change_events" AS
 SELECT
   "m"."projectId" AS "TenantId",
   "m"."revision" AS "Revision",
@@ -1564,12 +1389,11 @@ SELECT
   "m"."modelProviderId" AS "ModelProviderId",
   "m"."payload" AS "Payload",
   "m"."createdAt" AS "CreatedAt"
-FROM "public"."GatewayChangeEvent" AS "m"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "m"."projectId"));
+FROM "public"."GatewayChangeEvent" AS "m";
 EXCEPTION
   WHEN feature_not_supported OR invalid_table_definition THEN
     DROP VIEW IF EXISTS "public"."lwql_gateway_change_events";
-    CREATE VIEW "public"."lwql_gateway_change_events" WITH (security_barrier=true) AS
+    CREATE VIEW "public"."lwql_gateway_change_events" AS
 SELECT
   "m"."projectId" AS "TenantId",
   "m"."revision" AS "Revision",
@@ -1580,18 +1404,14 @@ SELECT
   "m"."modelProviderId" AS "ModelProviderId",
   "m"."payload" AS "Payload",
   "m"."createdAt" AS "CreatedAt"
-FROM "public"."GatewayChangeEvent" AS "m"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "m"."projectId"));
-    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'lwql_scoped_reader') THEN
-      GRANT SELECT ON "public"."lwql_gateway_change_events" TO "lwql_scoped_reader";
-    END IF;
+FROM "public"."GatewayChangeEvent" AS "m";
 END
 $lwql$;
 
 -- view: lwql_gateway_guardrails
 DO $lwql$
 BEGIN
-  CREATE OR REPLACE VIEW "public"."lwql_gateway_guardrails" WITH (security_barrier=true) AS
+  CREATE OR REPLACE VIEW "public"."lwql_gateway_guardrails" AS
 SELECT
   "m"."projectId" AS "TenantId",
   "m"."id" AS "GatewayGuardrailId",
@@ -1605,12 +1425,11 @@ SELECT
   "m"."updatedAt" AS "UpdatedAt",
   "m"."createdById" AS "CreatedById",
   "m"."updatedById" AS "UpdatedById"
-FROM "public"."GatewayGuardrail" AS "m"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "m"."projectId"));
+FROM "public"."GatewayGuardrail" AS "m";
 EXCEPTION
   WHEN feature_not_supported OR invalid_table_definition THEN
     DROP VIEW IF EXISTS "public"."lwql_gateway_guardrails";
-    CREATE VIEW "public"."lwql_gateway_guardrails" WITH (security_barrier=true) AS
+    CREATE VIEW "public"."lwql_gateway_guardrails" AS
 SELECT
   "m"."projectId" AS "TenantId",
   "m"."id" AS "GatewayGuardrailId",
@@ -1624,18 +1443,14 @@ SELECT
   "m"."updatedAt" AS "UpdatedAt",
   "m"."createdById" AS "CreatedById",
   "m"."updatedById" AS "UpdatedById"
-FROM "public"."GatewayGuardrail" AS "m"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "m"."projectId"));
-    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'lwql_scoped_reader') THEN
-      GRANT SELECT ON "public"."lwql_gateway_guardrails" TO "lwql_scoped_reader";
-    END IF;
+FROM "public"."GatewayGuardrail" AS "m";
 END
 $lwql$;
 
 -- view: lwql_gateway_realtime_sessions
 DO $lwql$
 BEGIN
-  CREATE OR REPLACE VIEW "public"."lwql_gateway_realtime_sessions" WITH (security_barrier=true) AS
+  CREATE OR REPLACE VIEW "public"."lwql_gateway_realtime_sessions" AS
 SELECT
   "m"."projectId" AS "TenantId",
   "m"."id" AS "GatewayRealtimeSessionId",
@@ -1661,12 +1476,11 @@ SELECT
   "m"."reportCount" AS "ReportCount",
   "m"."createdAt" AS "CreatedAt",
   "m"."updatedAt" AS "UpdatedAt"
-FROM "public"."GatewayRealtimeSession" AS "m"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "m"."projectId"));
+FROM "public"."GatewayRealtimeSession" AS "m";
 EXCEPTION
   WHEN feature_not_supported OR invalid_table_definition THEN
     DROP VIEW IF EXISTS "public"."lwql_gateway_realtime_sessions";
-    CREATE VIEW "public"."lwql_gateway_realtime_sessions" WITH (security_barrier=true) AS
+    CREATE VIEW "public"."lwql_gateway_realtime_sessions" AS
 SELECT
   "m"."projectId" AS "TenantId",
   "m"."id" AS "GatewayRealtimeSessionId",
@@ -1692,18 +1506,14 @@ SELECT
   "m"."reportCount" AS "ReportCount",
   "m"."createdAt" AS "CreatedAt",
   "m"."updatedAt" AS "UpdatedAt"
-FROM "public"."GatewayRealtimeSession" AS "m"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "m"."projectId"));
-    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'lwql_scoped_reader') THEN
-      GRANT SELECT ON "public"."lwql_gateway_realtime_sessions" TO "lwql_scoped_reader";
-    END IF;
+FROM "public"."GatewayRealtimeSession" AS "m";
 END
 $lwql$;
 
 -- view: lwql_github_branch_pull_request_checks
 DO $lwql$
 BEGIN
-  CREATE OR REPLACE VIEW "public"."lwql_github_branch_pull_request_checks" WITH (security_barrier=true) AS
+  CREATE OR REPLACE VIEW "public"."lwql_github_branch_pull_request_checks" AS
 SELECT
   "p"."id" AS "TenantId",
   "m"."id" AS "GithubBranchPullRequestCheckId",
@@ -1720,12 +1530,11 @@ SELECT
   "m"."updatedAt" AS "UpdatedAt"
 FROM "public"."GithubBranchPullRequestCheck" AS "m"
 JOIN "public"."Team" AS "t" ON "m"."organizationId" = "t"."organizationId"
-JOIN "public"."Project" AS "p" ON "t"."id" = "p"."teamId"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "p"."id"));
+JOIN "public"."Project" AS "p" ON "t"."id" = "p"."teamId";
 EXCEPTION
   WHEN feature_not_supported OR invalid_table_definition THEN
     DROP VIEW IF EXISTS "public"."lwql_github_branch_pull_request_checks";
-    CREATE VIEW "public"."lwql_github_branch_pull_request_checks" WITH (security_barrier=true) AS
+    CREATE VIEW "public"."lwql_github_branch_pull_request_checks" AS
 SELECT
   "p"."id" AS "TenantId",
   "m"."id" AS "GithubBranchPullRequestCheckId",
@@ -1742,18 +1551,14 @@ SELECT
   "m"."updatedAt" AS "UpdatedAt"
 FROM "public"."GithubBranchPullRequestCheck" AS "m"
 JOIN "public"."Team" AS "t" ON "m"."organizationId" = "t"."organizationId"
-JOIN "public"."Project" AS "p" ON "t"."id" = "p"."teamId"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "p"."id"));
-    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'lwql_scoped_reader') THEN
-      GRANT SELECT ON "public"."lwql_github_branch_pull_request_checks" TO "lwql_scoped_reader";
-    END IF;
+JOIN "public"."Project" AS "p" ON "t"."id" = "p"."teamId";
 END
 $lwql$;
 
 -- view: lwql_github_installations
 DO $lwql$
 BEGIN
-  CREATE OR REPLACE VIEW "public"."lwql_github_installations" WITH (security_barrier=true) AS
+  CREATE OR REPLACE VIEW "public"."lwql_github_installations" AS
 SELECT
   "p"."id" AS "TenantId",
   "m"."id" AS "GithubInstallationId",
@@ -1767,12 +1572,11 @@ SELECT
   "m"."updatedAt" AS "UpdatedAt"
 FROM "public"."GithubInstallation" AS "m"
 JOIN "public"."Team" AS "t" ON "m"."organizationId" = "t"."organizationId"
-JOIN "public"."Project" AS "p" ON "t"."id" = "p"."teamId"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "p"."id"));
+JOIN "public"."Project" AS "p" ON "t"."id" = "p"."teamId";
 EXCEPTION
   WHEN feature_not_supported OR invalid_table_definition THEN
     DROP VIEW IF EXISTS "public"."lwql_github_installations";
-    CREATE VIEW "public"."lwql_github_installations" WITH (security_barrier=true) AS
+    CREATE VIEW "public"."lwql_github_installations" AS
 SELECT
   "p"."id" AS "TenantId",
   "m"."id" AS "GithubInstallationId",
@@ -1786,18 +1590,14 @@ SELECT
   "m"."updatedAt" AS "UpdatedAt"
 FROM "public"."GithubInstallation" AS "m"
 JOIN "public"."Team" AS "t" ON "m"."organizationId" = "t"."organizationId"
-JOIN "public"."Project" AS "p" ON "t"."id" = "p"."teamId"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "p"."id"));
-    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'lwql_scoped_reader') THEN
-      GRANT SELECT ON "public"."lwql_github_installations" TO "lwql_scoped_reader";
-    END IF;
+JOIN "public"."Project" AS "p" ON "t"."id" = "p"."teamId";
 END
 $lwql$;
 
 -- view: lwql_github_pull_requests
 DO $lwql$
 BEGIN
-  CREATE OR REPLACE VIEW "public"."lwql_github_pull_requests" WITH (security_barrier=true) AS
+  CREATE OR REPLACE VIEW "public"."lwql_github_pull_requests" AS
 SELECT
   "p"."id" AS "TenantId",
   "m"."id" AS "GithubPullRequestId",
@@ -1819,12 +1619,11 @@ SELECT
   "m"."updatedAt" AS "UpdatedAt"
 FROM "public"."GithubPullRequest" AS "m"
 JOIN "public"."Team" AS "t" ON "m"."organizationId" = "t"."organizationId"
-JOIN "public"."Project" AS "p" ON "t"."id" = "p"."teamId"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "p"."id"));
+JOIN "public"."Project" AS "p" ON "t"."id" = "p"."teamId";
 EXCEPTION
   WHEN feature_not_supported OR invalid_table_definition THEN
     DROP VIEW IF EXISTS "public"."lwql_github_pull_requests";
-    CREATE VIEW "public"."lwql_github_pull_requests" WITH (security_barrier=true) AS
+    CREATE VIEW "public"."lwql_github_pull_requests" AS
 SELECT
   "p"."id" AS "TenantId",
   "m"."id" AS "GithubPullRequestId",
@@ -1846,18 +1645,14 @@ SELECT
   "m"."updatedAt" AS "UpdatedAt"
 FROM "public"."GithubPullRequest" AS "m"
 JOIN "public"."Team" AS "t" ON "m"."organizationId" = "t"."organizationId"
-JOIN "public"."Project" AS "p" ON "t"."id" = "p"."teamId"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "p"."id"));
-    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'lwql_scoped_reader') THEN
-      GRANT SELECT ON "public"."lwql_github_pull_requests" TO "lwql_scoped_reader";
-    END IF;
+JOIN "public"."Project" AS "p" ON "t"."id" = "p"."teamId";
 END
 $lwql$;
 
 -- view: lwql_governance_tenant_histories
 DO $lwql$
 BEGIN
-  CREATE OR REPLACE VIEW "public"."lwql_governance_tenant_histories" WITH (security_barrier=true) AS
+  CREATE OR REPLACE VIEW "public"."lwql_governance_tenant_histories" AS
 SELECT
   "p"."id" AS "TenantId",
   "m"."id" AS "GovernanceTenantHistoryId",
@@ -1865,12 +1660,11 @@ SELECT
   "m"."lastUsedAt" AS "LastUsedAt"
 FROM "public"."GovernanceTenantHistory" AS "m"
 JOIN "public"."Team" AS "t" ON "m"."organizationId" = "t"."organizationId"
-JOIN "public"."Project" AS "p" ON "t"."id" = "p"."teamId"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "p"."id"));
+JOIN "public"."Project" AS "p" ON "t"."id" = "p"."teamId";
 EXCEPTION
   WHEN feature_not_supported OR invalid_table_definition THEN
     DROP VIEW IF EXISTS "public"."lwql_governance_tenant_histories";
-    CREATE VIEW "public"."lwql_governance_tenant_histories" WITH (security_barrier=true) AS
+    CREATE VIEW "public"."lwql_governance_tenant_histories" AS
 SELECT
   "p"."id" AS "TenantId",
   "m"."id" AS "GovernanceTenantHistoryId",
@@ -1878,18 +1672,14 @@ SELECT
   "m"."lastUsedAt" AS "LastUsedAt"
 FROM "public"."GovernanceTenantHistory" AS "m"
 JOIN "public"."Team" AS "t" ON "m"."organizationId" = "t"."organizationId"
-JOIN "public"."Project" AS "p" ON "t"."id" = "p"."teamId"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "p"."id"));
-    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'lwql_scoped_reader') THEN
-      GRANT SELECT ON "public"."lwql_governance_tenant_histories" TO "lwql_scoped_reader";
-    END IF;
+JOIN "public"."Project" AS "p" ON "t"."id" = "p"."teamId";
 END
 $lwql$;
 
 -- view: lwql_identity_match_suggestions
 DO $lwql$
 BEGIN
-  CREATE OR REPLACE VIEW "public"."lwql_identity_match_suggestions" WITH (security_barrier=true) AS
+  CREATE OR REPLACE VIEW "public"."lwql_identity_match_suggestions" AS
 SELECT
   "p"."id" AS "TenantId",
   "m"."id" AS "IdentityMatchSuggestionId",
@@ -1899,12 +1689,11 @@ SELECT
   "m"."computedAt" AS "ComputedAt"
 FROM "public"."IdentityMatchSuggestion" AS "m"
 JOIN "public"."Team" AS "t" ON "m"."organizationId" = "t"."organizationId"
-JOIN "public"."Project" AS "p" ON "t"."id" = "p"."teamId"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "p"."id"));
+JOIN "public"."Project" AS "p" ON "t"."id" = "p"."teamId";
 EXCEPTION
   WHEN feature_not_supported OR invalid_table_definition THEN
     DROP VIEW IF EXISTS "public"."lwql_identity_match_suggestions";
-    CREATE VIEW "public"."lwql_identity_match_suggestions" WITH (security_barrier=true) AS
+    CREATE VIEW "public"."lwql_identity_match_suggestions" AS
 SELECT
   "p"."id" AS "TenantId",
   "m"."id" AS "IdentityMatchSuggestionId",
@@ -1914,18 +1703,14 @@ SELECT
   "m"."computedAt" AS "ComputedAt"
 FROM "public"."IdentityMatchSuggestion" AS "m"
 JOIN "public"."Team" AS "t" ON "m"."organizationId" = "t"."organizationId"
-JOIN "public"."Project" AS "p" ON "t"."id" = "p"."teamId"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "p"."id"));
-    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'lwql_scoped_reader') THEN
-      GRANT SELECT ON "public"."lwql_identity_match_suggestions" TO "lwql_scoped_reader";
-    END IF;
+JOIN "public"."Project" AS "p" ON "t"."id" = "p"."teamId";
 END
 $lwql$;
 
 -- view: lwql_identity_matches
 DO $lwql$
 BEGIN
-  CREATE OR REPLACE VIEW "public"."lwql_identity_matches" WITH (security_barrier=true) AS
+  CREATE OR REPLACE VIEW "public"."lwql_identity_matches" AS
 SELECT
   "p"."id" AS "TenantId",
   "m"."id" AS "IdentityMatchId",
@@ -1937,12 +1722,11 @@ SELECT
   "m"."createdAt" AS "CreatedAt"
 FROM "public"."IdentityMatch" AS "m"
 JOIN "public"."Team" AS "t" ON "m"."organizationId" = "t"."organizationId"
-JOIN "public"."Project" AS "p" ON "t"."id" = "p"."teamId"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "p"."id"));
+JOIN "public"."Project" AS "p" ON "t"."id" = "p"."teamId";
 EXCEPTION
   WHEN feature_not_supported OR invalid_table_definition THEN
     DROP VIEW IF EXISTS "public"."lwql_identity_matches";
-    CREATE VIEW "public"."lwql_identity_matches" WITH (security_barrier=true) AS
+    CREATE VIEW "public"."lwql_identity_matches" AS
 SELECT
   "p"."id" AS "TenantId",
   "m"."id" AS "IdentityMatchId",
@@ -1954,18 +1738,14 @@ SELECT
   "m"."createdAt" AS "CreatedAt"
 FROM "public"."IdentityMatch" AS "m"
 JOIN "public"."Team" AS "t" ON "m"."organizationId" = "t"."organizationId"
-JOIN "public"."Project" AS "p" ON "t"."id" = "p"."teamId"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "p"."id"));
-    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'lwql_scoped_reader') THEN
-      GRANT SELECT ON "public"."lwql_identity_matches" TO "lwql_scoped_reader";
-    END IF;
+JOIN "public"."Project" AS "p" ON "t"."id" = "p"."teamId";
 END
 $lwql$;
 
 -- view: lwql_ingestion_pull_run_projections
 DO $lwql$
 BEGIN
-  CREATE OR REPLACE VIEW "public"."lwql_ingestion_pull_run_projections" WITH (security_barrier=true) AS
+  CREATE OR REPLACE VIEW "public"."lwql_ingestion_pull_run_projections" AS
 SELECT
   "m"."projectId" AS "TenantId",
   "m"."id" AS "IngestionPullRunProjectionId",
@@ -2000,12 +1780,11 @@ SELECT
   "m"."acceptedAt" AS "AcceptedAt",
   "m"."lastEventId" AS "LastEventId",
   "m"."projectionVersion" AS "ProjectionVersion"
-FROM "public"."IngestionPullRunProjection" AS "m"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "m"."projectId"));
+FROM "public"."IngestionPullRunProjection" AS "m";
 EXCEPTION
   WHEN feature_not_supported OR invalid_table_definition THEN
     DROP VIEW IF EXISTS "public"."lwql_ingestion_pull_run_projections";
-    CREATE VIEW "public"."lwql_ingestion_pull_run_projections" WITH (security_barrier=true) AS
+    CREATE VIEW "public"."lwql_ingestion_pull_run_projections" AS
 SELECT
   "m"."projectId" AS "TenantId",
   "m"."id" AS "IngestionPullRunProjectionId",
@@ -2040,18 +1819,14 @@ SELECT
   "m"."acceptedAt" AS "AcceptedAt",
   "m"."lastEventId" AS "LastEventId",
   "m"."projectionVersion" AS "ProjectionVersion"
-FROM "public"."IngestionPullRunProjection" AS "m"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "m"."projectId"));
-    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'lwql_scoped_reader') THEN
-      GRANT SELECT ON "public"."lwql_ingestion_pull_run_projections" TO "lwql_scoped_reader";
-    END IF;
+FROM "public"."IngestionPullRunProjection" AS "m";
 END
 $lwql$;
 
 -- view: lwql_ingestion_sources
 DO $lwql$
 BEGIN
-  CREATE OR REPLACE VIEW "public"."lwql_ingestion_sources" WITH (security_barrier=true) AS
+  CREATE OR REPLACE VIEW "public"."lwql_ingestion_sources" AS
 SELECT
   "p"."id" AS "TenantId",
   "m"."id" AS "IngestionSourceId",
@@ -2075,12 +1850,11 @@ SELECT
   "m"."updatedAt" AS "UpdatedAt",
   "m"."createdById" AS "CreatedById"
 FROM "public"."IngestionSource" AS "m"
-JOIN "public"."Project" AS "p" ON "m"."teamId" = "p"."teamId"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "p"."id"));
+JOIN "public"."Project" AS "p" ON "m"."teamId" = "p"."teamId";
 EXCEPTION
   WHEN feature_not_supported OR invalid_table_definition THEN
     DROP VIEW IF EXISTS "public"."lwql_ingestion_sources";
-    CREATE VIEW "public"."lwql_ingestion_sources" WITH (security_barrier=true) AS
+    CREATE VIEW "public"."lwql_ingestion_sources" AS
 SELECT
   "p"."id" AS "TenantId",
   "m"."id" AS "IngestionSourceId",
@@ -2104,18 +1878,14 @@ SELECT
   "m"."updatedAt" AS "UpdatedAt",
   "m"."createdById" AS "CreatedById"
 FROM "public"."IngestionSource" AS "m"
-JOIN "public"."Project" AS "p" ON "m"."teamId" = "p"."teamId"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "p"."id"));
-    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'lwql_scoped_reader') THEN
-      GRANT SELECT ON "public"."lwql_ingestion_sources" TO "lwql_scoped_reader";
-    END IF;
+JOIN "public"."Project" AS "p" ON "m"."teamId" = "p"."teamId";
 END
 $lwql$;
 
 -- view: lwql_ingestion_templates
 DO $lwql$
 BEGIN
-  CREATE OR REPLACE VIEW "public"."lwql_ingestion_templates" WITH (security_barrier=true) AS
+  CREATE OR REPLACE VIEW "public"."lwql_ingestion_templates" AS
 SELECT
   "p"."id" AS "TenantId",
   "m"."id" AS "IngestionTemplateId",
@@ -2134,12 +1904,11 @@ SELECT
   "m"."updatedById" AS "UpdatedById"
 FROM "public"."IngestionTemplate" AS "m"
 JOIN "public"."Team" AS "t" ON "m"."organizationId" = "t"."organizationId"
-JOIN "public"."Project" AS "p" ON "t"."id" = "p"."teamId"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "p"."id"));
+JOIN "public"."Project" AS "p" ON "t"."id" = "p"."teamId";
 EXCEPTION
   WHEN feature_not_supported OR invalid_table_definition THEN
     DROP VIEW IF EXISTS "public"."lwql_ingestion_templates";
-    CREATE VIEW "public"."lwql_ingestion_templates" WITH (security_barrier=true) AS
+    CREATE VIEW "public"."lwql_ingestion_templates" AS
 SELECT
   "p"."id" AS "TenantId",
   "m"."id" AS "IngestionTemplateId",
@@ -2158,18 +1927,14 @@ SELECT
   "m"."updatedById" AS "UpdatedById"
 FROM "public"."IngestionTemplate" AS "m"
 JOIN "public"."Team" AS "t" ON "m"."organizationId" = "t"."organizationId"
-JOIN "public"."Project" AS "p" ON "t"."id" = "p"."teamId"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "p"."id"));
-    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'lwql_scoped_reader') THEN
-      GRANT SELECT ON "public"."lwql_ingestion_templates" TO "lwql_scoped_reader";
-    END IF;
+JOIN "public"."Project" AS "p" ON "t"."id" = "p"."teamId";
 END
 $lwql$;
 
 -- view: lwql_langy_active_turns
 DO $lwql$
 BEGIN
-  CREATE OR REPLACE VIEW "public"."lwql_langy_active_turns" WITH (security_barrier=true) AS
+  CREATE OR REPLACE VIEW "public"."lwql_langy_active_turns" AS
 SELECT
   "m"."projectId" AS "TenantId",
   "m"."id" AS "LangyActiveTurnId",
@@ -2188,12 +1953,11 @@ WHERE (EXISTS (
   WHERE "c"."projectId" = "m"."projectId"
     AND "c"."conversationId" = "m"."conversationId"
     AND "c"."isShared" = true
-))
-AND (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "m"."projectId"));
+));
 EXCEPTION
   WHEN feature_not_supported OR invalid_table_definition THEN
     DROP VIEW IF EXISTS "public"."lwql_langy_active_turns";
-    CREATE VIEW "public"."lwql_langy_active_turns" WITH (security_barrier=true) AS
+    CREATE VIEW "public"."lwql_langy_active_turns" AS
 SELECT
   "m"."projectId" AS "TenantId",
   "m"."id" AS "LangyActiveTurnId",
@@ -2212,18 +1976,14 @@ WHERE (EXISTS (
   WHERE "c"."projectId" = "m"."projectId"
     AND "c"."conversationId" = "m"."conversationId"
     AND "c"."isShared" = true
-))
-AND (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "m"."projectId"));
-    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'lwql_scoped_reader') THEN
-      GRANT SELECT ON "public"."lwql_langy_active_turns" TO "lwql_scoped_reader";
-    END IF;
+));
 END
 $lwql$;
 
 -- view: lwql_langy_conversation_projections
 DO $lwql$
 BEGIN
-  CREATE OR REPLACE VIEW "public"."lwql_langy_conversation_projections" WITH (security_barrier=true) AS
+  CREATE OR REPLACE VIEW "public"."lwql_langy_conversation_projections" AS
 SELECT
   "m"."projectId" AS "TenantId",
   "m"."id" AS "LangyConversationProjectionId",
@@ -2250,12 +2010,11 @@ SELECT
   "m"."lastEventId" AS "LastEventId",
   "m"."projectionVersion" AS "ProjectionVersion"
 FROM "public"."LangyConversationProjection" AS "m"
-WHERE ("m"."isShared" = true)
-AND (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "m"."projectId"));
+WHERE ("m"."isShared" = true);
 EXCEPTION
   WHEN feature_not_supported OR invalid_table_definition THEN
     DROP VIEW IF EXISTS "public"."lwql_langy_conversation_projections";
-    CREATE VIEW "public"."lwql_langy_conversation_projections" WITH (security_barrier=true) AS
+    CREATE VIEW "public"."lwql_langy_conversation_projections" AS
 SELECT
   "m"."projectId" AS "TenantId",
   "m"."id" AS "LangyConversationProjectionId",
@@ -2282,18 +2041,14 @@ SELECT
   "m"."lastEventId" AS "LastEventId",
   "m"."projectionVersion" AS "ProjectionVersion"
 FROM "public"."LangyConversationProjection" AS "m"
-WHERE ("m"."isShared" = true)
-AND (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "m"."projectId"));
-    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'lwql_scoped_reader') THEN
-      GRANT SELECT ON "public"."lwql_langy_conversation_projections" TO "lwql_scoped_reader";
-    END IF;
+WHERE ("m"."isShared" = true);
 END
 $lwql$;
 
 -- view: lwql_langy_conversation_turn_projections
 DO $lwql$
 BEGIN
-  CREATE OR REPLACE VIEW "public"."lwql_langy_conversation_turn_projections" WITH (security_barrier=true) AS
+  CREATE OR REPLACE VIEW "public"."lwql_langy_conversation_turn_projections" AS
 SELECT
   "m"."projectId" AS "TenantId",
   "m"."id" AS "LangyConversationTurnProjectionId",
@@ -2319,12 +2074,11 @@ WHERE (EXISTS (
   WHERE "c"."projectId" = "m"."projectId"
     AND "c"."conversationId" = "m"."conversationId"
     AND "c"."isShared" = true
-))
-AND (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "m"."projectId"));
+));
 EXCEPTION
   WHEN feature_not_supported OR invalid_table_definition THEN
     DROP VIEW IF EXISTS "public"."lwql_langy_conversation_turn_projections";
-    CREATE VIEW "public"."lwql_langy_conversation_turn_projections" WITH (security_barrier=true) AS
+    CREATE VIEW "public"."lwql_langy_conversation_turn_projections" AS
 SELECT
   "m"."projectId" AS "TenantId",
   "m"."id" AS "LangyConversationTurnProjectionId",
@@ -2350,18 +2104,14 @@ WHERE (EXISTS (
   WHERE "c"."projectId" = "m"."projectId"
     AND "c"."conversationId" = "m"."conversationId"
     AND "c"."isShared" = true
-))
-AND (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "m"."projectId"));
-    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'lwql_scoped_reader') THEN
-      GRANT SELECT ON "public"."lwql_langy_conversation_turn_projections" TO "lwql_scoped_reader";
-    END IF;
+));
 END
 $lwql$;
 
 -- view: lwql_langy_message_projections
 DO $lwql$
 BEGIN
-  CREATE OR REPLACE VIEW "public"."lwql_langy_message_projections" WITH (security_barrier=true) AS
+  CREATE OR REPLACE VIEW "public"."lwql_langy_message_projections" AS
 SELECT
   "m"."projectId" AS "TenantId",
   "m"."id" AS "LangyMessageProjectionId",
@@ -2380,12 +2130,11 @@ WHERE (EXISTS (
   WHERE "c"."projectId" = "m"."projectId"
     AND "c"."conversationId" = "m"."conversationId"
     AND "c"."isShared" = true
-))
-AND (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "m"."projectId"));
+));
 EXCEPTION
   WHEN feature_not_supported OR invalid_table_definition THEN
     DROP VIEW IF EXISTS "public"."lwql_langy_message_projections";
-    CREATE VIEW "public"."lwql_langy_message_projections" WITH (security_barrier=true) AS
+    CREATE VIEW "public"."lwql_langy_message_projections" AS
 SELECT
   "m"."projectId" AS "TenantId",
   "m"."id" AS "LangyMessageProjectionId",
@@ -2404,18 +2153,14 @@ WHERE (EXISTS (
   WHERE "c"."projectId" = "m"."projectId"
     AND "c"."conversationId" = "m"."conversationId"
     AND "c"."isShared" = true
-))
-AND (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "m"."projectId"));
-    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'lwql_scoped_reader') THEN
-      GRANT SELECT ON "public"."lwql_langy_message_projections" TO "lwql_scoped_reader";
-    END IF;
+));
 END
 $lwql$;
 
 -- view: lwql_langy_turn_requests
 DO $lwql$
 BEGIN
-  CREATE OR REPLACE VIEW "public"."lwql_langy_turn_requests" WITH (security_barrier=true) AS
+  CREATE OR REPLACE VIEW "public"."lwql_langy_turn_requests" AS
 SELECT
   "m"."projectId" AS "TenantId",
   "m"."id" AS "LangyTurnRequestId",
@@ -2434,12 +2179,11 @@ WHERE (EXISTS (
   WHERE "c"."projectId" = "m"."projectId"
     AND "c"."conversationId" = "m"."conversationId"
     AND "c"."isShared" = true
-))
-AND (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "m"."projectId"));
+));
 EXCEPTION
   WHEN feature_not_supported OR invalid_table_definition THEN
     DROP VIEW IF EXISTS "public"."lwql_langy_turn_requests";
-    CREATE VIEW "public"."lwql_langy_turn_requests" WITH (security_barrier=true) AS
+    CREATE VIEW "public"."lwql_langy_turn_requests" AS
 SELECT
   "m"."projectId" AS "TenantId",
   "m"."id" AS "LangyTurnRequestId",
@@ -2458,18 +2202,14 @@ WHERE (EXISTS (
   WHERE "c"."projectId" = "m"."projectId"
     AND "c"."conversationId" = "m"."conversationId"
     AND "c"."isShared" = true
-))
-AND (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "m"."projectId"));
-    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'lwql_scoped_reader') THEN
-      GRANT SELECT ON "public"."lwql_langy_turn_requests" TO "lwql_scoped_reader";
-    END IF;
+));
 END
 $lwql$;
 
 -- view: lwql_model_default_config_scopes
 DO $lwql$
 BEGIN
-  CREATE OR REPLACE VIEW "public"."lwql_model_default_config_scopes" WITH (security_barrier=true) AS
+  CREATE OR REPLACE VIEW "public"."lwql_model_default_config_scopes" AS
 SELECT
   "p"."id" AS "TenantId",
   "m"."id" AS "ModelDefaultConfigScopeId",
@@ -2480,12 +2220,11 @@ SELECT
 FROM "public"."ModelDefaultConfigScope" AS "m"
 JOIN "public"."ModelDefaultConfig" AS "j0" ON "m"."configId" = "j0"."id"
 JOIN "public"."Team" AS "t" ON "j0"."organizationId" = "t"."organizationId"
-JOIN "public"."Project" AS "p" ON "t"."id" = "p"."teamId"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "p"."id"));
+JOIN "public"."Project" AS "p" ON "t"."id" = "p"."teamId";
 EXCEPTION
   WHEN feature_not_supported OR invalid_table_definition THEN
     DROP VIEW IF EXISTS "public"."lwql_model_default_config_scopes";
-    CREATE VIEW "public"."lwql_model_default_config_scopes" WITH (security_barrier=true) AS
+    CREATE VIEW "public"."lwql_model_default_config_scopes" AS
 SELECT
   "p"."id" AS "TenantId",
   "m"."id" AS "ModelDefaultConfigScopeId",
@@ -2496,18 +2235,14 @@ SELECT
 FROM "public"."ModelDefaultConfigScope" AS "m"
 JOIN "public"."ModelDefaultConfig" AS "j0" ON "m"."configId" = "j0"."id"
 JOIN "public"."Team" AS "t" ON "j0"."organizationId" = "t"."organizationId"
-JOIN "public"."Project" AS "p" ON "t"."id" = "p"."teamId"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "p"."id"));
-    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'lwql_scoped_reader') THEN
-      GRANT SELECT ON "public"."lwql_model_default_config_scopes" TO "lwql_scoped_reader";
-    END IF;
+JOIN "public"."Project" AS "p" ON "t"."id" = "p"."teamId";
 END
 $lwql$;
 
 -- view: lwql_model_default_configs
 DO $lwql$
 BEGIN
-  CREATE OR REPLACE VIEW "public"."lwql_model_default_configs" WITH (security_barrier=true) AS
+  CREATE OR REPLACE VIEW "public"."lwql_model_default_configs" AS
 SELECT
   "p"."id" AS "TenantId",
   "m"."id" AS "ModelDefaultConfigId",
@@ -2517,12 +2252,11 @@ SELECT
   "m"."updatedAt" AS "UpdatedAt"
 FROM "public"."ModelDefaultConfig" AS "m"
 JOIN "public"."Team" AS "t" ON "m"."organizationId" = "t"."organizationId"
-JOIN "public"."Project" AS "p" ON "t"."id" = "p"."teamId"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "p"."id"));
+JOIN "public"."Project" AS "p" ON "t"."id" = "p"."teamId";
 EXCEPTION
   WHEN feature_not_supported OR invalid_table_definition THEN
     DROP VIEW IF EXISTS "public"."lwql_model_default_configs";
-    CREATE VIEW "public"."lwql_model_default_configs" WITH (security_barrier=true) AS
+    CREATE VIEW "public"."lwql_model_default_configs" AS
 SELECT
   "p"."id" AS "TenantId",
   "m"."id" AS "ModelDefaultConfigId",
@@ -2532,18 +2266,14 @@ SELECT
   "m"."updatedAt" AS "UpdatedAt"
 FROM "public"."ModelDefaultConfig" AS "m"
 JOIN "public"."Team" AS "t" ON "m"."organizationId" = "t"."organizationId"
-JOIN "public"."Project" AS "p" ON "t"."id" = "p"."teamId"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "p"."id"));
-    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'lwql_scoped_reader') THEN
-      GRANT SELECT ON "public"."lwql_model_default_configs" TO "lwql_scoped_reader";
-    END IF;
+JOIN "public"."Project" AS "p" ON "t"."id" = "p"."teamId";
 END
 $lwql$;
 
 -- view: lwql_model_provider_scopes
 DO $lwql$
 BEGIN
-  CREATE OR REPLACE VIEW "public"."lwql_model_provider_scopes" WITH (security_barrier=true) AS
+  CREATE OR REPLACE VIEW "public"."lwql_model_provider_scopes" AS
 SELECT
   "p"."id" AS "TenantId",
   "m"."id" AS "ModelProviderScopeId",
@@ -2554,12 +2284,11 @@ SELECT
 FROM "public"."ModelProviderScope" AS "m"
 JOIN "public"."ModelProvider" AS "j0" ON "m"."modelProviderId" = "j0"."id"
 JOIN "public"."Team" AS "t" ON "j0"."organizationId" = "t"."organizationId"
-JOIN "public"."Project" AS "p" ON "t"."id" = "p"."teamId"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "p"."id"));
+JOIN "public"."Project" AS "p" ON "t"."id" = "p"."teamId";
 EXCEPTION
   WHEN feature_not_supported OR invalid_table_definition THEN
     DROP VIEW IF EXISTS "public"."lwql_model_provider_scopes";
-    CREATE VIEW "public"."lwql_model_provider_scopes" WITH (security_barrier=true) AS
+    CREATE VIEW "public"."lwql_model_provider_scopes" AS
 SELECT
   "p"."id" AS "TenantId",
   "m"."id" AS "ModelProviderScopeId",
@@ -2570,18 +2299,14 @@ SELECT
 FROM "public"."ModelProviderScope" AS "m"
 JOIN "public"."ModelProvider" AS "j0" ON "m"."modelProviderId" = "j0"."id"
 JOIN "public"."Team" AS "t" ON "j0"."organizationId" = "t"."organizationId"
-JOIN "public"."Project" AS "p" ON "t"."id" = "p"."teamId"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "p"."id"));
-    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'lwql_scoped_reader') THEN
-      GRANT SELECT ON "public"."lwql_model_provider_scopes" TO "lwql_scoped_reader";
-    END IF;
+JOIN "public"."Project" AS "p" ON "t"."id" = "p"."teamId";
 END
 $lwql$;
 
 -- view: lwql_model_providers
 DO $lwql$
 BEGIN
-  CREATE OR REPLACE VIEW "public"."lwql_model_providers" WITH (security_barrier=true) AS
+  CREATE OR REPLACE VIEW "public"."lwql_model_providers" AS
 SELECT
   "p"."id" AS "TenantId",
   "m"."id" AS "ModelProviderId",
@@ -2607,12 +2332,11 @@ SELECT
   "m"."updatedAt" AS "UpdatedAt"
 FROM "public"."ModelProvider" AS "m"
 JOIN "public"."Team" AS "t" ON "m"."organizationId" = "t"."organizationId"
-JOIN "public"."Project" AS "p" ON "t"."id" = "p"."teamId"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "p"."id"));
+JOIN "public"."Project" AS "p" ON "t"."id" = "p"."teamId";
 EXCEPTION
   WHEN feature_not_supported OR invalid_table_definition THEN
     DROP VIEW IF EXISTS "public"."lwql_model_providers";
-    CREATE VIEW "public"."lwql_model_providers" WITH (security_barrier=true) AS
+    CREATE VIEW "public"."lwql_model_providers" AS
 SELECT
   "p"."id" AS "TenantId",
   "m"."id" AS "ModelProviderId",
@@ -2638,18 +2362,14 @@ SELECT
   "m"."updatedAt" AS "UpdatedAt"
 FROM "public"."ModelProvider" AS "m"
 JOIN "public"."Team" AS "t" ON "m"."organizationId" = "t"."organizationId"
-JOIN "public"."Project" AS "p" ON "t"."id" = "p"."teamId"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "p"."id"));
-    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'lwql_scoped_reader') THEN
-      GRANT SELECT ON "public"."lwql_model_providers" TO "lwql_scoped_reader";
-    END IF;
+JOIN "public"."Project" AS "p" ON "t"."id" = "p"."teamId";
 END
 $lwql$;
 
 -- view: lwql_monitors
 DO $lwql$
 BEGIN
-  CREATE OR REPLACE VIEW "public"."lwql_monitors" WITH (security_barrier=true) AS
+  CREATE OR REPLACE VIEW "public"."lwql_monitors" AS
 SELECT
   "m"."projectId" AS "TenantId",
   "m"."id" AS "MonitorId",
@@ -2673,12 +2393,11 @@ SELECT
   "m"."evaluatorLabel" AS "EvaluatorLabel",
   "m"."createdById" AS "CreatedById",
   "m"."updatedById" AS "UpdatedById"
-FROM "public"."Monitor" AS "m"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "m"."projectId"));
+FROM "public"."Monitor" AS "m";
 EXCEPTION
   WHEN feature_not_supported OR invalid_table_definition THEN
     DROP VIEW IF EXISTS "public"."lwql_monitors";
-    CREATE VIEW "public"."lwql_monitors" WITH (security_barrier=true) AS
+    CREATE VIEW "public"."lwql_monitors" AS
 SELECT
   "m"."projectId" AS "TenantId",
   "m"."id" AS "MonitorId",
@@ -2702,18 +2421,14 @@ SELECT
   "m"."evaluatorLabel" AS "EvaluatorLabel",
   "m"."createdById" AS "CreatedById",
   "m"."updatedById" AS "UpdatedById"
-FROM "public"."Monitor" AS "m"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "m"."projectId"));
-    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'lwql_scoped_reader') THEN
-      GRANT SELECT ON "public"."lwql_monitors" TO "lwql_scoped_reader";
-    END IF;
+FROM "public"."Monitor" AS "m";
 END
 $lwql$;
 
 -- view: lwql_notifications
 DO $lwql$
 BEGIN
-  CREATE OR REPLACE VIEW "public"."lwql_notifications" WITH (security_barrier=true) AS
+  CREATE OR REPLACE VIEW "public"."lwql_notifications" AS
 SELECT
   "m"."projectId" AS "TenantId",
   "m"."id" AS "NotificationId",
@@ -2722,12 +2437,11 @@ SELECT
   "m"."createdAt" AS "CreatedAt",
   "m"."updatedAt" AS "UpdatedAt",
   "m"."sentAt" AS "SentAt"
-FROM "public"."Notification" AS "m"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "m"."projectId"));
+FROM "public"."Notification" AS "m";
 EXCEPTION
   WHEN feature_not_supported OR invalid_table_definition THEN
     DROP VIEW IF EXISTS "public"."lwql_notifications";
-    CREATE VIEW "public"."lwql_notifications" WITH (security_barrier=true) AS
+    CREATE VIEW "public"."lwql_notifications" AS
 SELECT
   "m"."projectId" AS "TenantId",
   "m"."id" AS "NotificationId",
@@ -2736,18 +2450,14 @@ SELECT
   "m"."createdAt" AS "CreatedAt",
   "m"."updatedAt" AS "UpdatedAt",
   "m"."sentAt" AS "SentAt"
-FROM "public"."Notification" AS "m"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "m"."projectId"));
-    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'lwql_scoped_reader') THEN
-      GRANT SELECT ON "public"."lwql_notifications" TO "lwql_scoped_reader";
-    END IF;
+FROM "public"."Notification" AS "m";
 END
 $lwql$;
 
 -- view: lwql_pinned_traces
 DO $lwql$
 BEGIN
-  CREATE OR REPLACE VIEW "public"."lwql_pinned_traces" WITH (security_barrier=true) AS
+  CREATE OR REPLACE VIEW "public"."lwql_pinned_traces" AS
 SELECT
   "m"."projectId" AS "TenantId",
   "m"."id" AS "PinnedTraceId",
@@ -2756,12 +2466,11 @@ SELECT
   "m"."source" AS "Source",
   "m"."reason" AS "Reason",
   "m"."createdAt" AS "CreatedAt"
-FROM "public"."PinnedTrace" AS "m"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "m"."projectId"));
+FROM "public"."PinnedTrace" AS "m";
 EXCEPTION
   WHEN feature_not_supported OR invalid_table_definition THEN
     DROP VIEW IF EXISTS "public"."lwql_pinned_traces";
-    CREATE VIEW "public"."lwql_pinned_traces" WITH (security_barrier=true) AS
+    CREATE VIEW "public"."lwql_pinned_traces" AS
 SELECT
   "m"."projectId" AS "TenantId",
   "m"."id" AS "PinnedTraceId",
@@ -2770,48 +2479,39 @@ SELECT
   "m"."source" AS "Source",
   "m"."reason" AS "Reason",
   "m"."createdAt" AS "CreatedAt"
-FROM "public"."PinnedTrace" AS "m"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "m"."projectId"));
-    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'lwql_scoped_reader') THEN
-      GRANT SELECT ON "public"."lwql_pinned_traces" TO "lwql_scoped_reader";
-    END IF;
+FROM "public"."PinnedTrace" AS "m";
 END
 $lwql$;
 
 -- view: lwql_process_manager_inboxes
 DO $lwql$
 BEGIN
-  CREATE OR REPLACE VIEW "public"."lwql_process_manager_inboxes" WITH (security_barrier=true) AS
+  CREATE OR REPLACE VIEW "public"."lwql_process_manager_inboxes" AS
 SELECT
   "m"."projectId" AS "TenantId",
   "m"."id" AS "ProcessManagerInboxId",
   "m"."processName" AS "ProcessName",
   "m"."sourceEventId" AS "SourceEventId",
   "m"."consumedAt" AS "ConsumedAt"
-FROM "public"."ProcessManagerInbox" AS "m"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "m"."projectId"));
+FROM "public"."ProcessManagerInbox" AS "m";
 EXCEPTION
   WHEN feature_not_supported OR invalid_table_definition THEN
     DROP VIEW IF EXISTS "public"."lwql_process_manager_inboxes";
-    CREATE VIEW "public"."lwql_process_manager_inboxes" WITH (security_barrier=true) AS
+    CREATE VIEW "public"."lwql_process_manager_inboxes" AS
 SELECT
   "m"."projectId" AS "TenantId",
   "m"."id" AS "ProcessManagerInboxId",
   "m"."processName" AS "ProcessName",
   "m"."sourceEventId" AS "SourceEventId",
   "m"."consumedAt" AS "ConsumedAt"
-FROM "public"."ProcessManagerInbox" AS "m"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "m"."projectId"));
-    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'lwql_scoped_reader') THEN
-      GRANT SELECT ON "public"."lwql_process_manager_inboxes" TO "lwql_scoped_reader";
-    END IF;
+FROM "public"."ProcessManagerInbox" AS "m";
 END
 $lwql$;
 
 -- view: lwql_process_manager_instances
 DO $lwql$
 BEGIN
-  CREATE OR REPLACE VIEW "public"."lwql_process_manager_instances" WITH (security_barrier=true) AS
+  CREATE OR REPLACE VIEW "public"."lwql_process_manager_instances" AS
 SELECT
   "m"."projectId" AS "TenantId",
   "m"."id" AS "ProcessManagerInstanceId",
@@ -2821,12 +2521,11 @@ SELECT
   "m"."revision" AS "Revision",
   "m"."nextWakeAt" AS "NextWakeAt",
   "m"."updatedAt" AS "UpdatedAt"
-FROM "public"."ProcessManagerInstance" AS "m"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "m"."projectId"));
+FROM "public"."ProcessManagerInstance" AS "m";
 EXCEPTION
   WHEN feature_not_supported OR invalid_table_definition THEN
     DROP VIEW IF EXISTS "public"."lwql_process_manager_instances";
-    CREATE VIEW "public"."lwql_process_manager_instances" WITH (security_barrier=true) AS
+    CREATE VIEW "public"."lwql_process_manager_instances" AS
 SELECT
   "m"."projectId" AS "TenantId",
   "m"."id" AS "ProcessManagerInstanceId",
@@ -2836,18 +2535,14 @@ SELECT
   "m"."revision" AS "Revision",
   "m"."nextWakeAt" AS "NextWakeAt",
   "m"."updatedAt" AS "UpdatedAt"
-FROM "public"."ProcessManagerInstance" AS "m"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "m"."projectId"));
-    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'lwql_scoped_reader') THEN
-      GRANT SELECT ON "public"."lwql_process_manager_instances" TO "lwql_scoped_reader";
-    END IF;
+FROM "public"."ProcessManagerInstance" AS "m";
 END
 $lwql$;
 
 -- view: lwql_process_manager_outbox_attempts
 DO $lwql$
 BEGIN
-  CREATE OR REPLACE VIEW "public"."lwql_process_manager_outbox_attempts" WITH (security_barrier=true) AS
+  CREATE OR REPLACE VIEW "public"."lwql_process_manager_outbox_attempts" AS
 SELECT
   "m"."projectId" AS "TenantId",
   "m"."id" AS "ProcessManagerOutboxAttemptId",
@@ -2858,12 +2553,11 @@ SELECT
   "m"."errorType" AS "ErrorType",
   "m"."errorMessage" AS "ErrorMessage",
   "m"."retryAfterMs" AS "RetryAfterMs"
-FROM "public"."ProcessManagerOutboxAttempt" AS "m"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "m"."projectId"));
+FROM "public"."ProcessManagerOutboxAttempt" AS "m";
 EXCEPTION
   WHEN feature_not_supported OR invalid_table_definition THEN
     DROP VIEW IF EXISTS "public"."lwql_process_manager_outbox_attempts";
-    CREATE VIEW "public"."lwql_process_manager_outbox_attempts" WITH (security_barrier=true) AS
+    CREATE VIEW "public"."lwql_process_manager_outbox_attempts" AS
 SELECT
   "m"."projectId" AS "TenantId",
   "m"."id" AS "ProcessManagerOutboxAttemptId",
@@ -2874,18 +2568,14 @@ SELECT
   "m"."errorType" AS "ErrorType",
   "m"."errorMessage" AS "ErrorMessage",
   "m"."retryAfterMs" AS "RetryAfterMs"
-FROM "public"."ProcessManagerOutboxAttempt" AS "m"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "m"."projectId"));
-    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'lwql_scoped_reader') THEN
-      GRANT SELECT ON "public"."lwql_process_manager_outbox_attempts" TO "lwql_scoped_reader";
-    END IF;
+FROM "public"."ProcessManagerOutboxAttempt" AS "m";
 END
 $lwql$;
 
 -- view: lwql_process_manager_outboxes
 DO $lwql$
 BEGIN
-  CREATE OR REPLACE VIEW "public"."lwql_process_manager_outboxes" WITH (security_barrier=true) AS
+  CREATE OR REPLACE VIEW "public"."lwql_process_manager_outboxes" AS
 SELECT
   "m"."projectId" AS "TenantId",
   "m"."id" AS "ProcessManagerOutboxId",
@@ -2902,12 +2592,11 @@ SELECT
   "m"."dispatchedAt" AS "DispatchedAt",
   "m"."createdAt" AS "CreatedAt",
   "m"."updatedAt" AS "UpdatedAt"
-FROM "public"."ProcessManagerOutbox" AS "m"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "m"."projectId"));
+FROM "public"."ProcessManagerOutbox" AS "m";
 EXCEPTION
   WHEN feature_not_supported OR invalid_table_definition THEN
     DROP VIEW IF EXISTS "public"."lwql_process_manager_outboxes";
-    CREATE VIEW "public"."lwql_process_manager_outboxes" WITH (security_barrier=true) AS
+    CREATE VIEW "public"."lwql_process_manager_outboxes" AS
 SELECT
   "m"."projectId" AS "TenantId",
   "m"."id" AS "ProcessManagerOutboxId",
@@ -2924,18 +2613,14 @@ SELECT
   "m"."dispatchedAt" AS "DispatchedAt",
   "m"."createdAt" AS "CreatedAt",
   "m"."updatedAt" AS "UpdatedAt"
-FROM "public"."ProcessManagerOutbox" AS "m"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "m"."projectId"));
-    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'lwql_scoped_reader') THEN
-      GRANT SELECT ON "public"."lwql_process_manager_outboxes" TO "lwql_scoped_reader";
-    END IF;
+FROM "public"."ProcessManagerOutbox" AS "m";
 END
 $lwql$;
 
 -- view: lwql_projects
 DO $lwql$
 BEGIN
-  CREATE OR REPLACE VIEW "public"."lwql_projects" WITH (security_barrier=true) AS
+  CREATE OR REPLACE VIEW "public"."lwql_projects" AS
 SELECT
   "m"."id" AS "TenantId",
   "m"."name" AS "ProjectName",
@@ -2961,12 +2646,11 @@ SELECT
   "m"."langyEgressAllowlist" AS "LangyEgressAllowlist",
   "m"."lastCodingAgentSessionAt" AS "LastCodingAgentSessionAt",
   "m"."lastCodingAgentPullRequestAt" AS "LastCodingAgentPullRequestAt"
-FROM "public"."Project" AS "m"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "m"."id"));
+FROM "public"."Project" AS "m";
 EXCEPTION
   WHEN feature_not_supported OR invalid_table_definition THEN
     DROP VIEW IF EXISTS "public"."lwql_projects";
-    CREATE VIEW "public"."lwql_projects" WITH (security_barrier=true) AS
+    CREATE VIEW "public"."lwql_projects" AS
 SELECT
   "m"."id" AS "TenantId",
   "m"."name" AS "ProjectName",
@@ -2992,18 +2676,14 @@ SELECT
   "m"."langyEgressAllowlist" AS "LangyEgressAllowlist",
   "m"."lastCodingAgentSessionAt" AS "LastCodingAgentSessionAt",
   "m"."lastCodingAgentPullRequestAt" AS "LastCodingAgentPullRequestAt"
-FROM "public"."Project" AS "m"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "m"."id"));
-    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'lwql_scoped_reader') THEN
-      GRANT SELECT ON "public"."lwql_projects" TO "lwql_scoped_reader";
-    END IF;
+FROM "public"."Project" AS "m";
 END
 $lwql$;
 
 -- view: lwql_prompt_tag_assignments
 DO $lwql$
 BEGIN
-  CREATE OR REPLACE VIEW "public"."lwql_prompt_tag_assignments" WITH (security_barrier=true) AS
+  CREATE OR REPLACE VIEW "public"."lwql_prompt_tag_assignments" AS
 SELECT
   "m"."projectId" AS "TenantId",
   "m"."id" AS "PromptTagAssignmentId",
@@ -3014,12 +2694,11 @@ SELECT
   "m"."updatedAt" AS "UpdatedAt",
   "m"."createdById" AS "CreatedById",
   "m"."updatedById" AS "UpdatedById"
-FROM "public"."PromptTagAssignment" AS "m"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "m"."projectId"));
+FROM "public"."PromptTagAssignment" AS "m";
 EXCEPTION
   WHEN feature_not_supported OR invalid_table_definition THEN
     DROP VIEW IF EXISTS "public"."lwql_prompt_tag_assignments";
-    CREATE VIEW "public"."lwql_prompt_tag_assignments" WITH (security_barrier=true) AS
+    CREATE VIEW "public"."lwql_prompt_tag_assignments" AS
 SELECT
   "m"."projectId" AS "TenantId",
   "m"."id" AS "PromptTagAssignmentId",
@@ -3030,18 +2709,14 @@ SELECT
   "m"."updatedAt" AS "UpdatedAt",
   "m"."createdById" AS "CreatedById",
   "m"."updatedById" AS "UpdatedById"
-FROM "public"."PromptTagAssignment" AS "m"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "m"."projectId"));
-    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'lwql_scoped_reader') THEN
-      GRANT SELECT ON "public"."lwql_prompt_tag_assignments" TO "lwql_scoped_reader";
-    END IF;
+FROM "public"."PromptTagAssignment" AS "m";
 END
 $lwql$;
 
 -- view: lwql_prompt_tags
 DO $lwql$
 BEGIN
-  CREATE OR REPLACE VIEW "public"."lwql_prompt_tags" WITH (security_barrier=true) AS
+  CREATE OR REPLACE VIEW "public"."lwql_prompt_tags" AS
 SELECT
   "p"."id" AS "TenantId",
   "m"."id" AS "PromptTagId",
@@ -3052,12 +2727,11 @@ SELECT
   "m"."updatedById" AS "UpdatedById"
 FROM "public"."PromptTag" AS "m"
 JOIN "public"."Team" AS "t" ON "m"."organizationId" = "t"."organizationId"
-JOIN "public"."Project" AS "p" ON "t"."id" = "p"."teamId"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "p"."id"));
+JOIN "public"."Project" AS "p" ON "t"."id" = "p"."teamId";
 EXCEPTION
   WHEN feature_not_supported OR invalid_table_definition THEN
     DROP VIEW IF EXISTS "public"."lwql_prompt_tags";
-    CREATE VIEW "public"."lwql_prompt_tags" WITH (security_barrier=true) AS
+    CREATE VIEW "public"."lwql_prompt_tags" AS
 SELECT
   "p"."id" AS "TenantId",
   "m"."id" AS "PromptTagId",
@@ -3068,18 +2742,14 @@ SELECT
   "m"."updatedById" AS "UpdatedById"
 FROM "public"."PromptTag" AS "m"
 JOIN "public"."Team" AS "t" ON "m"."organizationId" = "t"."organizationId"
-JOIN "public"."Project" AS "p" ON "t"."id" = "p"."teamId"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "p"."id"));
-    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'lwql_scoped_reader') THEN
-      GRANT SELECT ON "public"."lwql_prompt_tags" TO "lwql_scoped_reader";
-    END IF;
+JOIN "public"."Project" AS "p" ON "t"."id" = "p"."teamId";
 END
 $lwql$;
 
 -- view: lwql_prompt_versions
 DO $lwql$
 BEGIN
-  CREATE OR REPLACE VIEW "public"."lwql_prompt_versions" WITH (security_barrier=true) AS
+  CREATE OR REPLACE VIEW "public"."lwql_prompt_versions" AS
 SELECT
   "m"."projectId" AS "TenantId",
   "m"."id" AS "PromptVersionId",
@@ -3091,12 +2761,11 @@ SELECT
   "m"."schemaVersion" AS "SchemaVersion",
   "m"."runtimeParameters" AS "RuntimeParameters",
   "m"."createdAt" AS "CreatedAt"
-FROM "public"."LlmPromptConfigVersion" AS "m"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "m"."projectId"));
+FROM "public"."LlmPromptConfigVersion" AS "m";
 EXCEPTION
   WHEN feature_not_supported OR invalid_table_definition THEN
     DROP VIEW IF EXISTS "public"."lwql_prompt_versions";
-    CREATE VIEW "public"."lwql_prompt_versions" WITH (security_barrier=true) AS
+    CREATE VIEW "public"."lwql_prompt_versions" AS
 SELECT
   "m"."projectId" AS "TenantId",
   "m"."id" AS "PromptVersionId",
@@ -3108,18 +2777,14 @@ SELECT
   "m"."schemaVersion" AS "SchemaVersion",
   "m"."runtimeParameters" AS "RuntimeParameters",
   "m"."createdAt" AS "CreatedAt"
-FROM "public"."LlmPromptConfigVersion" AS "m"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "m"."projectId"));
-    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'lwql_scoped_reader') THEN
-      GRANT SELECT ON "public"."lwql_prompt_versions" TO "lwql_scoped_reader";
-    END IF;
+FROM "public"."LlmPromptConfigVersion" AS "m";
 END
 $lwql$;
 
 -- view: lwql_prompts
 DO $lwql$
 BEGIN
-  CREATE OR REPLACE VIEW "public"."lwql_prompts" WITH (security_barrier=true) AS
+  CREATE OR REPLACE VIEW "public"."lwql_prompts" AS
 SELECT
   "m"."projectId" AS "TenantId",
   "m"."id" AS "PromptId",
@@ -3131,12 +2796,11 @@ SELECT
   "m"."organizationId" AS "OrganizationId",
   "m"."scope" AS "Scope",
   "m"."copiedFromPromptId" AS "CopiedFromPromptId"
-FROM "public"."LlmPromptConfig" AS "m"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "m"."projectId"));
+FROM "public"."LlmPromptConfig" AS "m";
 EXCEPTION
   WHEN feature_not_supported OR invalid_table_definition THEN
     DROP VIEW IF EXISTS "public"."lwql_prompts";
-    CREATE VIEW "public"."lwql_prompts" WITH (security_barrier=true) AS
+    CREATE VIEW "public"."lwql_prompts" AS
 SELECT
   "m"."projectId" AS "TenantId",
   "m"."id" AS "PromptId",
@@ -3148,18 +2812,14 @@ SELECT
   "m"."organizationId" AS "OrganizationId",
   "m"."scope" AS "Scope",
   "m"."copiedFromPromptId" AS "CopiedFromPromptId"
-FROM "public"."LlmPromptConfig" AS "m"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "m"."projectId"));
-    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'lwql_scoped_reader') THEN
-      GRANT SELECT ON "public"."lwql_prompts" TO "lwql_scoped_reader";
-    END IF;
+FROM "public"."LlmPromptConfig" AS "m";
 END
 $lwql$;
 
 -- view: lwql_retention_policies
 DO $lwql$
 BEGIN
-  CREATE OR REPLACE VIEW "public"."lwql_retention_policies" WITH (security_barrier=true) AS
+  CREATE OR REPLACE VIEW "public"."lwql_retention_policies" AS
 SELECT
   "p"."id" AS "TenantId",
   "m"."id" AS "RetentionPolicyId",
@@ -3171,12 +2831,11 @@ SELECT
   "m"."updatedAt" AS "UpdatedAt"
 FROM "public"."RetentionPolicy" AS "m"
 JOIN "public"."Team" AS "t" ON "m"."organizationId" = "t"."organizationId"
-JOIN "public"."Project" AS "p" ON "t"."id" = "p"."teamId"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "p"."id"));
+JOIN "public"."Project" AS "p" ON "t"."id" = "p"."teamId";
 EXCEPTION
   WHEN feature_not_supported OR invalid_table_definition THEN
     DROP VIEW IF EXISTS "public"."lwql_retention_policies";
-    CREATE VIEW "public"."lwql_retention_policies" WITH (security_barrier=true) AS
+    CREATE VIEW "public"."lwql_retention_policies" AS
 SELECT
   "p"."id" AS "TenantId",
   "m"."id" AS "RetentionPolicyId",
@@ -3188,18 +2847,14 @@ SELECT
   "m"."updatedAt" AS "UpdatedAt"
 FROM "public"."RetentionPolicy" AS "m"
 JOIN "public"."Team" AS "t" ON "m"."organizationId" = "t"."organizationId"
-JOIN "public"."Project" AS "p" ON "t"."id" = "p"."teamId"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "p"."id"));
-    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'lwql_scoped_reader') THEN
-      GRANT SELECT ON "public"."lwql_retention_policies" TO "lwql_scoped_reader";
-    END IF;
+JOIN "public"."Project" AS "p" ON "t"."id" = "p"."teamId";
 END
 $lwql$;
 
 -- view: lwql_routing_policies
 DO $lwql$
 BEGIN
-  CREATE OR REPLACE VIEW "public"."lwql_routing_policies" WITH (security_barrier=true) AS
+  CREATE OR REPLACE VIEW "public"."lwql_routing_policies" AS
 SELECT
   "p"."id" AS "TenantId",
   "m"."id" AS "RoutingPolicyId",
@@ -3216,12 +2871,11 @@ SELECT
   "m"."updatedById" AS "UpdatedById"
 FROM "public"."RoutingPolicy" AS "m"
 JOIN "public"."Team" AS "t" ON "m"."organizationId" = "t"."organizationId"
-JOIN "public"."Project" AS "p" ON "t"."id" = "p"."teamId"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "p"."id"));
+JOIN "public"."Project" AS "p" ON "t"."id" = "p"."teamId";
 EXCEPTION
   WHEN feature_not_supported OR invalid_table_definition THEN
     DROP VIEW IF EXISTS "public"."lwql_routing_policies";
-    CREATE VIEW "public"."lwql_routing_policies" WITH (security_barrier=true) AS
+    CREATE VIEW "public"."lwql_routing_policies" AS
 SELECT
   "p"."id" AS "TenantId",
   "m"."id" AS "RoutingPolicyId",
@@ -3238,18 +2892,14 @@ SELECT
   "m"."updatedById" AS "UpdatedById"
 FROM "public"."RoutingPolicy" AS "m"
 JOIN "public"."Team" AS "t" ON "m"."organizationId" = "t"."organizationId"
-JOIN "public"."Project" AS "p" ON "t"."id" = "p"."teamId"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "p"."id"));
-    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'lwql_scoped_reader') THEN
-      GRANT SELECT ON "public"."lwql_routing_policies" TO "lwql_scoped_reader";
-    END IF;
+JOIN "public"."Project" AS "p" ON "t"."id" = "p"."teamId";
 END
 $lwql$;
 
 -- view: lwql_routing_policy_scopes
 DO $lwql$
 BEGIN
-  CREATE OR REPLACE VIEW "public"."lwql_routing_policy_scopes" WITH (security_barrier=true) AS
+  CREATE OR REPLACE VIEW "public"."lwql_routing_policy_scopes" AS
 SELECT
   "p"."id" AS "TenantId",
   "m"."id" AS "RoutingPolicyScopeId",
@@ -3260,12 +2910,11 @@ SELECT
 FROM "public"."RoutingPolicyScope" AS "m"
 JOIN "public"."RoutingPolicy" AS "j0" ON "m"."routingPolicyId" = "j0"."id"
 JOIN "public"."Team" AS "t" ON "j0"."organizationId" = "t"."organizationId"
-JOIN "public"."Project" AS "p" ON "t"."id" = "p"."teamId"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "p"."id"));
+JOIN "public"."Project" AS "p" ON "t"."id" = "p"."teamId";
 EXCEPTION
   WHEN feature_not_supported OR invalid_table_definition THEN
     DROP VIEW IF EXISTS "public"."lwql_routing_policy_scopes";
-    CREATE VIEW "public"."lwql_routing_policy_scopes" WITH (security_barrier=true) AS
+    CREATE VIEW "public"."lwql_routing_policy_scopes" AS
 SELECT
   "p"."id" AS "TenantId",
   "m"."id" AS "RoutingPolicyScopeId",
@@ -3276,18 +2925,14 @@ SELECT
 FROM "public"."RoutingPolicyScope" AS "m"
 JOIN "public"."RoutingPolicy" AS "j0" ON "m"."routingPolicyId" = "j0"."id"
 JOIN "public"."Team" AS "t" ON "j0"."organizationId" = "t"."organizationId"
-JOIN "public"."Project" AS "p" ON "t"."id" = "p"."teamId"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "p"."id"));
-    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'lwql_scoped_reader') THEN
-      GRANT SELECT ON "public"."lwql_routing_policy_scopes" TO "lwql_scoped_reader";
-    END IF;
+JOIN "public"."Project" AS "p" ON "t"."id" = "p"."teamId";
 END
 $lwql$;
 
 -- view: lwql_saved_views
 DO $lwql$
 BEGIN
-  CREATE OR REPLACE VIEW "public"."lwql_saved_views" WITH (security_barrier=true) AS
+  CREATE OR REPLACE VIEW "public"."lwql_saved_views" AS
 SELECT
   "m"."projectId" AS "TenantId",
   "m"."id" AS "SavedViewId",
@@ -3300,12 +2945,11 @@ SELECT
   "m"."kind" AS "Kind",
   "m"."createdAt" AS "CreatedAt",
   "m"."updatedAt" AS "UpdatedAt"
-FROM "public"."SavedView" AS "m"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "m"."projectId"));
+FROM "public"."SavedView" AS "m";
 EXCEPTION
   WHEN feature_not_supported OR invalid_table_definition THEN
     DROP VIEW IF EXISTS "public"."lwql_saved_views";
-    CREATE VIEW "public"."lwql_saved_views" WITH (security_barrier=true) AS
+    CREATE VIEW "public"."lwql_saved_views" AS
 SELECT
   "m"."projectId" AS "TenantId",
   "m"."id" AS "SavedViewId",
@@ -3318,18 +2962,14 @@ SELECT
   "m"."kind" AS "Kind",
   "m"."createdAt" AS "CreatedAt",
   "m"."updatedAt" AS "UpdatedAt"
-FROM "public"."SavedView" AS "m"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "m"."projectId"));
-    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'lwql_scoped_reader') THEN
-      GRANT SELECT ON "public"."lwql_saved_views" TO "lwql_scoped_reader";
-    END IF;
+FROM "public"."SavedView" AS "m";
 END
 $lwql$;
 
 -- view: lwql_scenario_versions
 DO $lwql$
 BEGIN
-  CREATE OR REPLACE VIEW "public"."lwql_scenario_versions" WITH (security_barrier=true) AS
+  CREATE OR REPLACE VIEW "public"."lwql_scenario_versions" AS
 SELECT
   "m"."projectId" AS "TenantId",
   "m"."id" AS "ScenarioVersionId",
@@ -3341,12 +2981,11 @@ SELECT
   "m"."snapshot" AS "Snapshot",
   "m"."schemaVersion" AS "SchemaVersion",
   "m"."createdAt" AS "CreatedAt"
-FROM "public"."ScenarioVersion" AS "m"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "m"."projectId"));
+FROM "public"."ScenarioVersion" AS "m";
 EXCEPTION
   WHEN feature_not_supported OR invalid_table_definition THEN
     DROP VIEW IF EXISTS "public"."lwql_scenario_versions";
-    CREATE VIEW "public"."lwql_scenario_versions" WITH (security_barrier=true) AS
+    CREATE VIEW "public"."lwql_scenario_versions" AS
 SELECT
   "m"."projectId" AS "TenantId",
   "m"."id" AS "ScenarioVersionId",
@@ -3358,18 +2997,14 @@ SELECT
   "m"."snapshot" AS "Snapshot",
   "m"."schemaVersion" AS "SchemaVersion",
   "m"."createdAt" AS "CreatedAt"
-FROM "public"."ScenarioVersion" AS "m"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "m"."projectId"));
-    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'lwql_scoped_reader') THEN
-      GRANT SELECT ON "public"."lwql_scenario_versions" TO "lwql_scoped_reader";
-    END IF;
+FROM "public"."ScenarioVersion" AS "m";
 END
 $lwql$;
 
 -- view: lwql_scenarios
 DO $lwql$
 BEGIN
-  CREATE OR REPLACE VIEW "public"."lwql_scenarios" WITH (security_barrier=true) AS
+  CREATE OR REPLACE VIEW "public"."lwql_scenarios" AS
 SELECT
   "m"."projectId" AS "TenantId",
   "m"."id" AS "ScenarioId",
@@ -3390,12 +3025,11 @@ SELECT
   "m"."archivedAt" AS "ArchivedAt",
   "m"."createdAt" AS "CreatedAt",
   "m"."updatedAt" AS "UpdatedAt"
-FROM "public"."Scenario" AS "m"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "m"."projectId"));
+FROM "public"."Scenario" AS "m";
 EXCEPTION
   WHEN feature_not_supported OR invalid_table_definition THEN
     DROP VIEW IF EXISTS "public"."lwql_scenarios";
-    CREATE VIEW "public"."lwql_scenarios" WITH (security_barrier=true) AS
+    CREATE VIEW "public"."lwql_scenarios" AS
 SELECT
   "m"."projectId" AS "TenantId",
   "m"."id" AS "ScenarioId",
@@ -3416,18 +3050,14 @@ SELECT
   "m"."archivedAt" AS "ArchivedAt",
   "m"."createdAt" AS "CreatedAt",
   "m"."updatedAt" AS "UpdatedAt"
-FROM "public"."Scenario" AS "m"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "m"."projectId"));
-    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'lwql_scoped_reader') THEN
-      GRANT SELECT ON "public"."lwql_scenarios" TO "lwql_scoped_reader";
-    END IF;
+FROM "public"."Scenario" AS "m";
 END
 $lwql$;
 
 -- view: lwql_scheduled_jobs
 DO $lwql$
 BEGIN
-  CREATE OR REPLACE VIEW "public"."lwql_scheduled_jobs" WITH (security_barrier=true) AS
+  CREATE OR REPLACE VIEW "public"."lwql_scheduled_jobs" AS
 SELECT
   "m"."projectId" AS "TenantId",
   "m"."id" AS "ScheduledJobId",
@@ -3443,12 +3073,11 @@ SELECT
   "m"."active" AS "Active",
   "m"."createdAt" AS "CreatedAt",
   "m"."updatedAt" AS "UpdatedAt"
-FROM "public"."ScheduledJob" AS "m"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "m"."projectId"));
+FROM "public"."ScheduledJob" AS "m";
 EXCEPTION
   WHEN feature_not_supported OR invalid_table_definition THEN
     DROP VIEW IF EXISTS "public"."lwql_scheduled_jobs";
-    CREATE VIEW "public"."lwql_scheduled_jobs" WITH (security_barrier=true) AS
+    CREATE VIEW "public"."lwql_scheduled_jobs" AS
 SELECT
   "m"."projectId" AS "TenantId",
   "m"."id" AS "ScheduledJobId",
@@ -3464,18 +3093,14 @@ SELECT
   "m"."active" AS "Active",
   "m"."createdAt" AS "CreatedAt",
   "m"."updatedAt" AS "UpdatedAt"
-FROM "public"."ScheduledJob" AS "m"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "m"."projectId"));
-    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'lwql_scoped_reader') THEN
-      GRANT SELECT ON "public"."lwql_scheduled_jobs" TO "lwql_scoped_reader";
-    END IF;
+FROM "public"."ScheduledJob" AS "m";
 END
 $lwql$;
 
 -- view: lwql_share_links
 DO $lwql$
 BEGIN
-  CREATE OR REPLACE VIEW "public"."lwql_share_links" WITH (security_barrier=true) AS
+  CREATE OR REPLACE VIEW "public"."lwql_share_links" AS
 SELECT
   "m"."projectId" AS "TenantId",
   "m"."id" AS "ShareLinkId",
@@ -3489,12 +3114,11 @@ SELECT
   "m"."viewCount" AS "ViewCount",
   "m"."createdAt" AS "CreatedAt",
   "m"."updatedAt" AS "UpdatedAt"
-FROM "public"."ShareLink" AS "m"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "m"."projectId"));
+FROM "public"."ShareLink" AS "m";
 EXCEPTION
   WHEN feature_not_supported OR invalid_table_definition THEN
     DROP VIEW IF EXISTS "public"."lwql_share_links";
-    CREATE VIEW "public"."lwql_share_links" WITH (security_barrier=true) AS
+    CREATE VIEW "public"."lwql_share_links" AS
 SELECT
   "m"."projectId" AS "TenantId",
   "m"."id" AS "ShareLinkId",
@@ -3508,18 +3132,14 @@ SELECT
   "m"."viewCount" AS "ViewCount",
   "m"."createdAt" AS "CreatedAt",
   "m"."updatedAt" AS "UpdatedAt"
-FROM "public"."ShareLink" AS "m"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "m"."projectId"));
-    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'lwql_scoped_reader') THEN
-      GRANT SELECT ON "public"."lwql_share_links" TO "lwql_scoped_reader";
-    END IF;
+FROM "public"."ShareLink" AS "m";
 END
 $lwql$;
 
 -- view: lwql_simulation_suites
 DO $lwql$
 BEGIN
-  CREATE OR REPLACE VIEW "public"."lwql_simulation_suites" WITH (security_barrier=true) AS
+  CREATE OR REPLACE VIEW "public"."lwql_simulation_suites" AS
 SELECT
   "m"."projectId" AS "TenantId",
   "m"."id" AS "SimulationSuiteId",
@@ -3539,12 +3159,11 @@ SELECT
   "m"."archivedAt" AS "ArchivedAt",
   "m"."createdAt" AS "CreatedAt",
   "m"."updatedAt" AS "UpdatedAt"
-FROM "public"."SimulationSuite" AS "m"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "m"."projectId"));
+FROM "public"."SimulationSuite" AS "m";
 EXCEPTION
   WHEN feature_not_supported OR invalid_table_definition THEN
     DROP VIEW IF EXISTS "public"."lwql_simulation_suites";
-    CREATE VIEW "public"."lwql_simulation_suites" WITH (security_barrier=true) AS
+    CREATE VIEW "public"."lwql_simulation_suites" AS
 SELECT
   "m"."projectId" AS "TenantId",
   "m"."id" AS "SimulationSuiteId",
@@ -3564,18 +3183,14 @@ SELECT
   "m"."archivedAt" AS "ArchivedAt",
   "m"."createdAt" AS "CreatedAt",
   "m"."updatedAt" AS "UpdatedAt"
-FROM "public"."SimulationSuite" AS "m"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "m"."projectId"));
-    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'lwql_scoped_reader') THEN
-      GRANT SELECT ON "public"."lwql_simulation_suites" TO "lwql_scoped_reader";
-    END IF;
+FROM "public"."SimulationSuite" AS "m";
 END
 $lwql$;
 
 -- view: lwql_topic_clustering_run_history_projections
 DO $lwql$
 BEGIN
-  CREATE OR REPLACE VIEW "public"."lwql_topic_clustering_run_history_projections" WITH (security_barrier=true) AS
+  CREATE OR REPLACE VIEW "public"."lwql_topic_clustering_run_history_projections" AS
 SELECT
   "m"."projectId" AS "TenantId",
   "m"."id" AS "TopicClusteringRunHistoryProjectionId",
@@ -3586,12 +3201,11 @@ SELECT
   "m"."acceptedAt" AS "AcceptedAt",
   "m"."lastEventId" AS "LastEventId",
   "m"."projectionVersion" AS "ProjectionVersion"
-FROM "public"."TopicClusteringRunHistoryProjection" AS "m"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "m"."projectId"));
+FROM "public"."TopicClusteringRunHistoryProjection" AS "m";
 EXCEPTION
   WHEN feature_not_supported OR invalid_table_definition THEN
     DROP VIEW IF EXISTS "public"."lwql_topic_clustering_run_history_projections";
-    CREATE VIEW "public"."lwql_topic_clustering_run_history_projections" WITH (security_barrier=true) AS
+    CREATE VIEW "public"."lwql_topic_clustering_run_history_projections" AS
 SELECT
   "m"."projectId" AS "TenantId",
   "m"."id" AS "TopicClusteringRunHistoryProjectionId",
@@ -3602,18 +3216,14 @@ SELECT
   "m"."acceptedAt" AS "AcceptedAt",
   "m"."lastEventId" AS "LastEventId",
   "m"."projectionVersion" AS "ProjectionVersion"
-FROM "public"."TopicClusteringRunHistoryProjection" AS "m"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "m"."projectId"));
-    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'lwql_scoped_reader') THEN
-      GRANT SELECT ON "public"."lwql_topic_clustering_run_history_projections" TO "lwql_scoped_reader";
-    END IF;
+FROM "public"."TopicClusteringRunHistoryProjection" AS "m";
 END
 $lwql$;
 
 -- view: lwql_topic_clustering_run_projections
 DO $lwql$
 BEGIN
-  CREATE OR REPLACE VIEW "public"."lwql_topic_clustering_run_projections" WITH (security_barrier=true) AS
+  CREATE OR REPLACE VIEW "public"."lwql_topic_clustering_run_projections" AS
 SELECT
   "m"."projectId" AS "TenantId",
   "m"."id" AS "TopicClusteringRunProjectionId",
@@ -3640,12 +3250,11 @@ SELECT
   "m"."acceptedAt" AS "AcceptedAt",
   "m"."lastEventId" AS "LastEventId",
   "m"."projectionVersion" AS "ProjectionVersion"
-FROM "public"."TopicClusteringRunProjection" AS "m"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "m"."projectId"));
+FROM "public"."TopicClusteringRunProjection" AS "m";
 EXCEPTION
   WHEN feature_not_supported OR invalid_table_definition THEN
     DROP VIEW IF EXISTS "public"."lwql_topic_clustering_run_projections";
-    CREATE VIEW "public"."lwql_topic_clustering_run_projections" WITH (security_barrier=true) AS
+    CREATE VIEW "public"."lwql_topic_clustering_run_projections" AS
 SELECT
   "m"."projectId" AS "TenantId",
   "m"."id" AS "TopicClusteringRunProjectionId",
@@ -3672,18 +3281,14 @@ SELECT
   "m"."acceptedAt" AS "AcceptedAt",
   "m"."lastEventId" AS "LastEventId",
   "m"."projectionVersion" AS "ProjectionVersion"
-FROM "public"."TopicClusteringRunProjection" AS "m"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "m"."projectId"));
-    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'lwql_scoped_reader') THEN
-      GRANT SELECT ON "public"."lwql_topic_clustering_run_projections" TO "lwql_scoped_reader";
-    END IF;
+FROM "public"."TopicClusteringRunProjection" AS "m";
 END
 $lwql$;
 
 -- view: lwql_topic_model_projections
 DO $lwql$
 BEGIN
-  CREATE OR REPLACE VIEW "public"."lwql_topic_model_projections" WITH (security_barrier=true) AS
+  CREATE OR REPLACE VIEW "public"."lwql_topic_model_projections" AS
 SELECT
   "m"."projectId" AS "TenantId",
   "m"."id" AS "TopicModelProjectionId",
@@ -3693,12 +3298,11 @@ SELECT
   "m"."acceptedAt" AS "AcceptedAt",
   "m"."lastEventId" AS "LastEventId",
   "m"."projectionVersion" AS "ProjectionVersion"
-FROM "public"."TopicModelProjection" AS "m"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "m"."projectId"));
+FROM "public"."TopicModelProjection" AS "m";
 EXCEPTION
   WHEN feature_not_supported OR invalid_table_definition THEN
     DROP VIEW IF EXISTS "public"."lwql_topic_model_projections";
-    CREATE VIEW "public"."lwql_topic_model_projections" WITH (security_barrier=true) AS
+    CREATE VIEW "public"."lwql_topic_model_projections" AS
 SELECT
   "m"."projectId" AS "TenantId",
   "m"."id" AS "TopicModelProjectionId",
@@ -3708,18 +3312,14 @@ SELECT
   "m"."acceptedAt" AS "AcceptedAt",
   "m"."lastEventId" AS "LastEventId",
   "m"."projectionVersion" AS "ProjectionVersion"
-FROM "public"."TopicModelProjection" AS "m"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "m"."projectId"));
-    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'lwql_scoped_reader') THEN
-      GRANT SELECT ON "public"."lwql_topic_model_projections" TO "lwql_scoped_reader";
-    END IF;
+FROM "public"."TopicModelProjection" AS "m";
 END
 $lwql$;
 
 -- view: lwql_topics
 DO $lwql$
 BEGIN
-  CREATE OR REPLACE VIEW "public"."lwql_topics" WITH (security_barrier=true) AS
+  CREATE OR REPLACE VIEW "public"."lwql_topics" AS
 SELECT
   "m"."projectId" AS "TenantId",
   "m"."id" AS "TopicId",
@@ -3728,12 +3328,11 @@ SELECT
   "m"."automaticallyGenerated" AS "AutomaticallyGenerated",
   "m"."createdAt" AS "CreatedAt",
   "m"."updatedAt" AS "UpdatedAt"
-FROM "public"."Topic" AS "m"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "m"."projectId"));
+FROM "public"."Topic" AS "m";
 EXCEPTION
   WHEN feature_not_supported OR invalid_table_definition THEN
     DROP VIEW IF EXISTS "public"."lwql_topics";
-    CREATE VIEW "public"."lwql_topics" WITH (security_barrier=true) AS
+    CREATE VIEW "public"."lwql_topics" AS
 SELECT
   "m"."projectId" AS "TenantId",
   "m"."id" AS "TopicId",
@@ -3742,18 +3341,14 @@ SELECT
   "m"."automaticallyGenerated" AS "AutomaticallyGenerated",
   "m"."createdAt" AS "CreatedAt",
   "m"."updatedAt" AS "UpdatedAt"
-FROM "public"."Topic" AS "m"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "m"."projectId"));
-    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'lwql_scoped_reader') THEN
-      GRANT SELECT ON "public"."lwql_topics" TO "lwql_scoped_reader";
-    END IF;
+FROM "public"."Topic" AS "m";
 END
 $lwql$;
 
 -- view: lwql_trace_edit_overlays
 DO $lwql$
 BEGIN
-  CREATE OR REPLACE VIEW "public"."lwql_trace_edit_overlays" WITH (security_barrier=true) AS
+  CREATE OR REPLACE VIEW "public"."lwql_trace_edit_overlays" AS
 SELECT
   "m"."projectId" AS "TenantId",
   "m"."id" AS "TraceEditOverlayId",
@@ -3763,12 +3358,11 @@ SELECT
   "m"."updatedById" AS "UpdatedById",
   "m"."createdAt" AS "CreatedAt",
   "m"."updatedAt" AS "UpdatedAt"
-FROM "public"."TraceEditOverlay" AS "m"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "m"."projectId"));
+FROM "public"."TraceEditOverlay" AS "m";
 EXCEPTION
   WHEN feature_not_supported OR invalid_table_definition THEN
     DROP VIEW IF EXISTS "public"."lwql_trace_edit_overlays";
-    CREATE VIEW "public"."lwql_trace_edit_overlays" WITH (security_barrier=true) AS
+    CREATE VIEW "public"."lwql_trace_edit_overlays" AS
 SELECT
   "m"."projectId" AS "TenantId",
   "m"."id" AS "TraceEditOverlayId",
@@ -3778,18 +3372,14 @@ SELECT
   "m"."updatedById" AS "UpdatedById",
   "m"."createdAt" AS "CreatedAt",
   "m"."updatedAt" AS "UpdatedAt"
-FROM "public"."TraceEditOverlay" AS "m"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "m"."projectId"));
-    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'lwql_scoped_reader') THEN
-      GRANT SELECT ON "public"."lwql_trace_edit_overlays" TO "lwql_scoped_reader";
-    END IF;
+FROM "public"."TraceEditOverlay" AS "m";
 END
 $lwql$;
 
 -- view: lwql_trigger_sents
 DO $lwql$
 BEGIN
-  CREATE OR REPLACE VIEW "public"."lwql_trigger_sents" WITH (security_barrier=true) AS
+  CREATE OR REPLACE VIEW "public"."lwql_trigger_sents" AS
 SELECT
   "m"."projectId" AS "TenantId",
   "m"."id" AS "TriggerSentId",
@@ -3799,12 +3389,11 @@ SELECT
   "m"."resolvedAt" AS "ResolvedAt",
   "m"."createdAt" AS "CreatedAt",
   "m"."updatedAt" AS "UpdatedAt"
-FROM "public"."TriggerSent" AS "m"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "m"."projectId"));
+FROM "public"."TriggerSent" AS "m";
 EXCEPTION
   WHEN feature_not_supported OR invalid_table_definition THEN
     DROP VIEW IF EXISTS "public"."lwql_trigger_sents";
-    CREATE VIEW "public"."lwql_trigger_sents" WITH (security_barrier=true) AS
+    CREATE VIEW "public"."lwql_trigger_sents" AS
 SELECT
   "m"."projectId" AS "TenantId",
   "m"."id" AS "TriggerSentId",
@@ -3814,18 +3403,14 @@ SELECT
   "m"."resolvedAt" AS "ResolvedAt",
   "m"."createdAt" AS "CreatedAt",
   "m"."updatedAt" AS "UpdatedAt"
-FROM "public"."TriggerSent" AS "m"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "m"."projectId"));
-    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'lwql_scoped_reader') THEN
-      GRANT SELECT ON "public"."lwql_trigger_sents" TO "lwql_scoped_reader";
-    END IF;
+FROM "public"."TriggerSent" AS "m";
 END
 $lwql$;
 
 -- view: lwql_triggers
 DO $lwql$
 BEGIN
-  CREATE OR REPLACE VIEW "public"."lwql_triggers" WITH (security_barrier=true) AS
+  CREATE OR REPLACE VIEW "public"."lwql_triggers" AS
 SELECT
   "m"."projectId" AS "TenantId",
   "m"."id" AS "TriggerId",
@@ -3848,12 +3433,11 @@ SELECT
   "m"."notificationCadence" AS "NotificationCadence",
   "m"."traceDebounceMs" AS "TraceDebounceMs",
   "m"."customGraphId" AS "CustomGraphId"
-FROM "public"."Trigger" AS "m"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "m"."projectId"));
+FROM "public"."Trigger" AS "m";
 EXCEPTION
   WHEN feature_not_supported OR invalid_table_definition THEN
     DROP VIEW IF EXISTS "public"."lwql_triggers";
-    CREATE VIEW "public"."lwql_triggers" WITH (security_barrier=true) AS
+    CREATE VIEW "public"."lwql_triggers" AS
 SELECT
   "m"."projectId" AS "TenantId",
   "m"."id" AS "TriggerId",
@@ -3876,18 +3460,14 @@ SELECT
   "m"."notificationCadence" AS "NotificationCadence",
   "m"."traceDebounceMs" AS "TraceDebounceMs",
   "m"."customGraphId" AS "CustomGraphId"
-FROM "public"."Trigger" AS "m"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "m"."projectId"));
-    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'lwql_scoped_reader') THEN
-      GRANT SELECT ON "public"."lwql_triggers" TO "lwql_scoped_reader";
-    END IF;
+FROM "public"."Trigger" AS "m";
 END
 $lwql$;
 
 -- view: lwql_virtual_key_scopes
 DO $lwql$
 BEGIN
-  CREATE OR REPLACE VIEW "public"."lwql_virtual_key_scopes" WITH (security_barrier=true) AS
+  CREATE OR REPLACE VIEW "public"."lwql_virtual_key_scopes" AS
 SELECT
   "p"."id" AS "TenantId",
   "m"."id" AS "VirtualKeyScopeId",
@@ -3898,12 +3478,11 @@ SELECT
 FROM "public"."VirtualKeyScope" AS "m"
 JOIN "public"."VirtualKey" AS "j0" ON "m"."virtualKeyId" = "j0"."id"
 JOIN "public"."Team" AS "t" ON "j0"."organizationId" = "t"."organizationId"
-JOIN "public"."Project" AS "p" ON "t"."id" = "p"."teamId"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "p"."id"));
+JOIN "public"."Project" AS "p" ON "t"."id" = "p"."teamId";
 EXCEPTION
   WHEN feature_not_supported OR invalid_table_definition THEN
     DROP VIEW IF EXISTS "public"."lwql_virtual_key_scopes";
-    CREATE VIEW "public"."lwql_virtual_key_scopes" WITH (security_barrier=true) AS
+    CREATE VIEW "public"."lwql_virtual_key_scopes" AS
 SELECT
   "p"."id" AS "TenantId",
   "m"."id" AS "VirtualKeyScopeId",
@@ -3914,18 +3493,14 @@ SELECT
 FROM "public"."VirtualKeyScope" AS "m"
 JOIN "public"."VirtualKey" AS "j0" ON "m"."virtualKeyId" = "j0"."id"
 JOIN "public"."Team" AS "t" ON "j0"."organizationId" = "t"."organizationId"
-JOIN "public"."Project" AS "p" ON "t"."id" = "p"."teamId"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "p"."id"));
-    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'lwql_scoped_reader') THEN
-      GRANT SELECT ON "public"."lwql_virtual_key_scopes" TO "lwql_scoped_reader";
-    END IF;
+JOIN "public"."Project" AS "p" ON "t"."id" = "p"."teamId";
 END
 $lwql$;
 
 -- view: lwql_virtual_keys
 DO $lwql$
 BEGIN
-  CREATE OR REPLACE VIEW "public"."lwql_virtual_keys" WITH (security_barrier=true) AS
+  CREATE OR REPLACE VIEW "public"."lwql_virtual_keys" AS
 SELECT
   "p"."id" AS "TenantId",
   "m"."id" AS "VirtualKeyId",
@@ -3956,12 +3531,11 @@ SELECT
   "m"."licenseExpiresAt" AS "LicenseExpiresAt"
 FROM "public"."VirtualKey" AS "m"
 JOIN "public"."Team" AS "t" ON "m"."organizationId" = "t"."organizationId"
-JOIN "public"."Project" AS "p" ON "t"."id" = "p"."teamId"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "p"."id"));
+JOIN "public"."Project" AS "p" ON "t"."id" = "p"."teamId";
 EXCEPTION
   WHEN feature_not_supported OR invalid_table_definition THEN
     DROP VIEW IF EXISTS "public"."lwql_virtual_keys";
-    CREATE VIEW "public"."lwql_virtual_keys" WITH (security_barrier=true) AS
+    CREATE VIEW "public"."lwql_virtual_keys" AS
 SELECT
   "p"."id" AS "TenantId",
   "m"."id" AS "VirtualKeyId",
@@ -3992,18 +3566,14 @@ SELECT
   "m"."licenseExpiresAt" AS "LicenseExpiresAt"
 FROM "public"."VirtualKey" AS "m"
 JOIN "public"."Team" AS "t" ON "m"."organizationId" = "t"."organizationId"
-JOIN "public"."Project" AS "p" ON "t"."id" = "p"."teamId"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "p"."id"));
-    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'lwql_scoped_reader') THEN
-      GRANT SELECT ON "public"."lwql_virtual_keys" TO "lwql_scoped_reader";
-    END IF;
+JOIN "public"."Project" AS "p" ON "t"."id" = "p"."teamId";
 END
 $lwql$;
 
 -- view: lwql_webhook_endpoint_deliveries
 DO $lwql$
 BEGIN
-  CREATE OR REPLACE VIEW "public"."lwql_webhook_endpoint_deliveries" WITH (security_barrier=true) AS
+  CREATE OR REPLACE VIEW "public"."lwql_webhook_endpoint_deliveries" AS
 SELECT
   "m"."projectId" AS "TenantId",
   "m"."id" AS "WebhookEndpointDeliveryId",
@@ -4021,12 +3591,11 @@ SELECT
   "m"."outcome" AS "Outcome",
   "m"."firedAt" AS "FiredAt",
   "m"."createdAt" AS "CreatedAt"
-FROM "public"."WebhookEndpointDelivery" AS "m"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "m"."projectId"));
+FROM "public"."WebhookEndpointDelivery" AS "m";
 EXCEPTION
   WHEN feature_not_supported OR invalid_table_definition THEN
     DROP VIEW IF EXISTS "public"."lwql_webhook_endpoint_deliveries";
-    CREATE VIEW "public"."lwql_webhook_endpoint_deliveries" WITH (security_barrier=true) AS
+    CREATE VIEW "public"."lwql_webhook_endpoint_deliveries" AS
 SELECT
   "m"."projectId" AS "TenantId",
   "m"."id" AS "WebhookEndpointDeliveryId",
@@ -4044,18 +3613,14 @@ SELECT
   "m"."outcome" AS "Outcome",
   "m"."firedAt" AS "FiredAt",
   "m"."createdAt" AS "CreatedAt"
-FROM "public"."WebhookEndpointDelivery" AS "m"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "m"."projectId"));
-    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'lwql_scoped_reader') THEN
-      GRANT SELECT ON "public"."lwql_webhook_endpoint_deliveries" TO "lwql_scoped_reader";
-    END IF;
+FROM "public"."WebhookEndpointDelivery" AS "m";
 END
 $lwql$;
 
 -- view: lwql_workflow_versions
 DO $lwql$
 BEGIN
-  CREATE OR REPLACE VIEW "public"."lwql_workflow_versions" WITH (security_barrier=true) AS
+  CREATE OR REPLACE VIEW "public"."lwql_workflow_versions" AS
 SELECT
   "m"."projectId" AS "TenantId",
   "m"."id" AS "WorkflowVersionId",
@@ -4068,12 +3633,11 @@ SELECT
   "m"."createdAt" AS "CreatedAt",
   "m"."updatedAt" AS "UpdatedAt",
   "m"."dsl" AS "Dsl"
-FROM "public"."WorkflowVersion" AS "m"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "m"."projectId"));
+FROM "public"."WorkflowVersion" AS "m";
 EXCEPTION
   WHEN feature_not_supported OR invalid_table_definition THEN
     DROP VIEW IF EXISTS "public"."lwql_workflow_versions";
-    CREATE VIEW "public"."lwql_workflow_versions" WITH (security_barrier=true) AS
+    CREATE VIEW "public"."lwql_workflow_versions" AS
 SELECT
   "m"."projectId" AS "TenantId",
   "m"."id" AS "WorkflowVersionId",
@@ -4086,18 +3650,14 @@ SELECT
   "m"."createdAt" AS "CreatedAt",
   "m"."updatedAt" AS "UpdatedAt",
   "m"."dsl" AS "Dsl"
-FROM "public"."WorkflowVersion" AS "m"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "m"."projectId"));
-    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'lwql_scoped_reader') THEN
-      GRANT SELECT ON "public"."lwql_workflow_versions" TO "lwql_scoped_reader";
-    END IF;
+FROM "public"."WorkflowVersion" AS "m";
 END
 $lwql$;
 
 -- view: lwql_workflows
 DO $lwql$
 BEGIN
-  CREATE OR REPLACE VIEW "public"."lwql_workflows" WITH (security_barrier=true) AS
+  CREATE OR REPLACE VIEW "public"."lwql_workflows" AS
 SELECT
   "m"."projectId" AS "TenantId",
   "m"."id" AS "WorkflowId",
@@ -4114,12 +3674,11 @@ SELECT
   "m"."isEvaluator" AS "IsEvaluator",
   "m"."isComponent" AS "IsComponent",
   "m"."copiedFromWorkflowId" AS "CopiedFromWorkflowId"
-FROM "public"."Workflow" AS "m"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "m"."projectId"));
+FROM "public"."Workflow" AS "m";
 EXCEPTION
   WHEN feature_not_supported OR invalid_table_definition THEN
     DROP VIEW IF EXISTS "public"."lwql_workflows";
-    CREATE VIEW "public"."lwql_workflows" WITH (security_barrier=true) AS
+    CREATE VIEW "public"."lwql_workflows" AS
 SELECT
   "m"."projectId" AS "TenantId",
   "m"."id" AS "WorkflowId",
@@ -4136,10 +3695,6 @@ SELECT
   "m"."isEvaluator" AS "IsEvaluator",
   "m"."isComponent" AS "IsComponent",
   "m"."copiedFromWorkflowId" AS "CopiedFromWorkflowId"
-FROM "public"."Workflow" AS "m"
-WHERE (current_user = 'lwql_ro' OR EXISTS (SELECT 1 FROM "public"."Project" lwql_p JOIN "public"."Team" lwql_t ON lwql_t.id = lwql_p."teamId" JOIN pg_roles lwql_g ON lwql_g.rolname = 'lwql_org_'::text || md5(lwql_t."organizationId") JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user WHERE lwql_p.id = "m"."projectId"));
-    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'lwql_scoped_reader') THEN
-      GRANT SELECT ON "public"."lwql_workflows" TO "lwql_scoped_reader";
-    END IF;
+FROM "public"."Workflow" AS "m";
 END
 $lwql$;

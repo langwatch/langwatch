@@ -8,7 +8,10 @@
 import { createHash } from "node:crypto";
 
 import type { LangWatchQLConnection } from "../../../repositories/langwatch-ql-executor.repository.ts";
-import type { LwqlPostgresViewFound } from "../../../repositories/langwatch-ql-postgres.repository.ts";
+import type {
+  LwqlPostgresViewFound,
+  LwqlScopedViewState,
+} from "../../../repositories/langwatch-ql-postgres.repository.ts";
 import type { LwqlCollectionState } from "../../../repositories/langwatch-ql-provisioning.repository.ts";
 import { flooredViewName, flooredViewNames } from "../../../rules/lwql-dedup-floor.rules.ts";
 import { LWQL_VIEW_CATALOG } from "../../../rules/lwql-view-catalog.rules.ts";
@@ -87,10 +90,50 @@ interface LwqlClickHouseDrift {
   readonly isKeyMapMissing: boolean;
 }
 
-/** An approved view the check repairs: created when absent, then granted to the reader. */
-export interface LwqlPostgresGap {
-  readonly view: string;
-  readonly absent: boolean;
+/**
+ * What the check repairs in PostgreSQL. `shared`: an approved view absent, or not granted to the
+ * shared reader. The rest exist only with the scoped-reader group: its grant on a shared view, its
+ * scoped schema absent, or one copy absent, unscoped (fails the scoped-view check) or ungranted.
+ */
+export type LwqlPostgresGap =
+  | { readonly kind: "shared"; readonly view: string; readonly absent: boolean }
+  | { readonly kind: "group-on-shared"; readonly view: string }
+  | { readonly kind: "scoped-schema-absent" }
+  | {
+      readonly kind: "scoped";
+      readonly view: string;
+      readonly repair: "absent" | "unscoped" | "ungranted";
+    };
+
+/** A gap on a shared approved view, which the shared reader reads. */
+export type LwqlSharedPostgresGap = Extract<LwqlPostgresGap, { kind: "shared" }>;
+
+/** How a copy falls short, checked in order; none when the group can read it. */
+function copyRepair({ copy }: { copy: LwqlScopedViewState["copies"][number] }) {
+  if (!copy.exists) return "absent";
+  if (!copy.passesGuard) return "unscoped";
+  if (!copy.granted) return "ungranted";
+  return undefined;
+}
+
+/** The scoped-reader group's gaps; none without the group or in another installation's schema. */
+function scopedGaps({ scoped }: { scoped: LwqlScopedViewState }): LwqlPostgresGap[] {
+  if (!scoped.groupExists) return [];
+  const onShared = scoped.groupOnShared.map((view): LwqlPostgresGap => ({
+    kind: "group-on-shared",
+    view,
+  }));
+  if (scoped.scopedSchema === "absent") {
+    return [...onShared, { kind: "scoped-schema-absent" }];
+  }
+  if (scoped.scopedSchema === "foreign") return onShared;
+  return [
+    ...onShared,
+    ...scoped.copies.flatMap((copy): LwqlPostgresGap[] => {
+      const repair = copyRepair({ copy });
+      return repair === undefined ? [] : [{ kind: "scoped", view: copy.view, repair }];
+    }),
+  ];
 }
 
 /**
@@ -409,12 +452,40 @@ export class LangWatchQLSelfProvisioningService {
     return postgresViews.approvedViewNames();
   }
 
-  /** Each approved view absent, or present but not selectable by the reader. */
-  findPostgresGaps({ found }: { found: readonly LwqlPostgresViewFound[] }): LwqlPostgresGap[] {
+  /**
+   * Each approved view absent, or present but not selectable by the reader; then, only where the
+   * scoped-reader group exists, its grant on a shared view and each copy it cannot read.
+   */
+  findPostgresGaps({
+    found,
+    scoped,
+  }: {
+    found: readonly LwqlPostgresViewFound[];
+    scoped: LwqlScopedViewState;
+  }): LwqlPostgresGap[] {
     const byName = new Map(found.map((view) => [view.view, view]));
-    return this.approvedPostgresViews()
+    const shared = this.approvedPostgresViews()
       .filter((view) => byName.get(view)?.granted !== true)
-      .map((view) => ({ view, absent: !byName.has(view) }));
+      .map((view): LwqlPostgresGap => ({ kind: "shared", view, absent: !byName.has(view) }));
+    return [...shared, ...scopedGaps({ scoped })];
+  }
+
+  /** The gaps on shared approved views alone. */
+  sharedPostgresGaps({ gaps }: { gaps: readonly LwqlPostgresGap[] }): LwqlSharedPostgresGap[] {
+    return gaps.filter((gap): gap is LwqlSharedPostgresGap => gap.kind === "shared");
+  }
+
+  /**
+   * The copies a check rewrites: every one once the scoped schema was found absent, else each
+   * absent or unscoped copy. An ungranted copy needs only its grant.
+   */
+  scopedCopiesToRebuild({ gaps }: { gaps: readonly LwqlPostgresGap[] }): string[] {
+    if (gaps.some((gap) => gap.kind === "scoped-schema-absent")) {
+      return this.approvedPostgresViews();
+    }
+    return gaps.flatMap((gap) =>
+      gap.kind === "scoped" && gap.repair !== "ungranted" ? [gap.view] : [],
+    );
   }
 
   /** A failed statement echoes its DDL, which embeds passwords; every logged error passes here. */

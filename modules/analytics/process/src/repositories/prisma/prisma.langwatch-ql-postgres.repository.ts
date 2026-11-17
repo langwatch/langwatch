@@ -2,9 +2,15 @@ import { skipTenantCheck } from "@langwatch/prisma-client";
 import { z } from "zod";
 
 import {
+  LWQL_SCOPED_SCHEMA,
+  scopedSchemaOwnedCondition,
+  scopedViewGuardCondition,
+} from "../../features/provisioning/rules/lwql-scoped-view.rules.ts";
+import {
   LangWatchQLPostgresRepository,
   type LwqlPostgresViewFound,
   type LwqlProvisioningDatabase,
+  type LwqlScopedViewState,
 } from "../langwatch-ql-postgres.repository.ts";
 
 const CATALOG = skipTenantCheck({
@@ -12,7 +18,40 @@ const CATALOG = skipTenantCheck({
   SKIP_TENANT_CHECK: true,
 }).sql;
 const approvedViewRowsSchema = z.array(z.object({ view: z.string(), granted: z.boolean() }));
-const missingViewRowsSchema = z.array(z.object({ view: z.string() }));
+const scopedHeaderRowsSchema = z.tuple([
+  z.object({
+    groupExists: z.boolean(),
+    scopedSchemaExists: z.boolean(),
+    scopedSchemaOwned: z.boolean(),
+  }),
+]);
+const scopedViewRowsSchema = z.array(
+  z.object({
+    view: z.string(),
+    groupOnShared: z.boolean(),
+    copyExists: z.boolean(),
+    copyPassesGuard: z.boolean(),
+    copyGranted: z.boolean(),
+  }),
+);
+
+/** Whether the scoped schema exists, and whose it is by its comment. */
+function scopedSchemaOf({
+  scopedSchemaExists,
+  scopedSchemaOwned,
+}: {
+  scopedSchemaExists: boolean;
+  scopedSchemaOwned: boolean;
+}): LwqlScopedViewState["scopedSchema"] {
+  if (!scopedSchemaExists) return "absent";
+  return scopedSchemaOwned ? "owned" : "foreign";
+}
+
+/** The relation the row's `v` names in `schema`, as a lateral join aliased `alias`. */
+const relationNamed = ({ schema, alias }: { schema: string; alias: string }) =>
+  `LEFT JOIN LATERAL (SELECT k.oid, k.relkind, k.reloptions, k.relnamespace FROM pg_class k ` +
+  `JOIN pg_namespace kn ON kn.oid = k.relnamespace ` +
+  `WHERE kn.nspname = ${schema} AND k.relname = v) ${alias} ON true `;
 const BOOT_LOCK = skipTenantCheck({
   // The self-provision boot lock and its session setting are global, with no tenant scope.
   SKIP_TENANT_CHECK: true,
@@ -58,32 +97,60 @@ export class PrismaLangWatchQLPostgresRepository extends LangWatchQLPostgresRepo
   }
 
   /**
-   * CASE fixes the evaluation order an AND list leaves to the planner: `has_table_privilege`
-   * raises on an unknown role name, so it runs only once the role and the view are known to exist.
+   * The per-view read runs only once the group is known to exist: `has_table_privilege` raises on
+   * an unknown role name. Catalog lookups by name, never `to_regclass`, which raises without
+   * USAGE on a scoped schema another installation owns.
    */
-  async findScopedReaderMissingViews({
-    schema,
-    role,
+  async findScopedViewState({
+    appSchema,
+    group,
     views,
   }: {
-    schema: string;
-    role: string;
+    appSchema: string;
+    group: string;
     views: readonly string[];
-  }): Promise<string[]> {
-    const rows = await this.database.$queryRawUnsafe(
-      `${CATALOG}\nSELECT v AS view ` +
-        `FROM unnest($3::text[]) AS v, to_regclass(format('%I.%I', $1::text, v)) AS rel ` +
-        `WHERE CASE ` +
-        `WHEN NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = $2::text) THEN false ` +
-        `WHEN rel IS NULL THEN false ` +
-        `ELSE NOT has_table_privilege($2::text, rel, 'SELECT') ` +
-        `END ` +
-        `ORDER BY v`,
-      schema,
-      role,
-      [...views],
+  }): Promise<LwqlScopedViewState> {
+    const scopedSchema = `'${LWQL_SCOPED_SCHEMA}'`;
+    const [header] = scopedHeaderRowsSchema.parse(
+      await this.database.$queryRawUnsafe(
+        `${CATALOG}\nSELECT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = $1::text) AS "groupExists", ` +
+          `to_regnamespace(${scopedSchema}) IS NOT NULL AS "scopedSchemaExists", ` +
+          `coalesce(${scopedSchemaOwnedCondition({ appSchema })}, false) AS "scopedSchemaOwned"`,
+        group,
+      ),
     );
-    return missingViewRowsSchema.parse(rows).map((row) => row.view);
+    const scopedSchemaState = scopedSchemaOf(header);
+    if (!header.groupExists) {
+      return { groupExists: false, scopedSchema: scopedSchemaState, groupOnShared: [], copies: [] };
+    }
+    const rows = scopedViewRowsSchema.parse(
+      await this.database.$queryRawUnsafe(
+        `${CATALOG}\nSELECT v AS view, ` +
+          `coalesce(has_table_privilege($1::text, s.oid, 'SELECT'), false) AS "groupOnShared", ` +
+          `c.oid IS NOT NULL AS "copyExists", ` +
+          `coalesce(${scopedViewGuardCondition({ relation: "c" })}, false) AS "copyPassesGuard", ` +
+          `coalesce(has_schema_privilege($1::text, c.relnamespace, 'USAGE') ` +
+          `AND has_table_privilege($1::text, c.oid, 'SELECT'), false) AS "copyGranted" ` +
+          `FROM unnest($3::text[]) AS v ` +
+          relationNamed({ schema: "$2::text", alias: "s" }) +
+          relationNamed({ schema: scopedSchema, alias: "c" }) +
+          `ORDER BY v`,
+        group,
+        appSchema,
+        [...views],
+      ),
+    );
+    return {
+      groupExists: true,
+      scopedSchema: scopedSchemaState,
+      groupOnShared: rows.filter((row) => row.groupOnShared).map((row) => row.view),
+      copies: rows.map((row) => ({
+        view: row.view,
+        exists: row.copyExists,
+        passesGuard: row.copyPassesGuard,
+        granted: row.copyGranted,
+      })),
+    };
   }
 
   withAdvisoryLock<T>({

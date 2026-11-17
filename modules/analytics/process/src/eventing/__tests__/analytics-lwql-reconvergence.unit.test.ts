@@ -150,7 +150,9 @@ function fleet({
 }) {
   const world = { now: FIRST_SLOT, converged: false };
   const unconfirmedSince = MemoryLwqlUnconfirmedSinceRepository.create();
-  const postgres = postgresRefuses ? [{ view: "lwql_agents", absent: true }] : [];
+  const postgres = postgresRefuses
+    ? [{ kind: "shared" as const, view: "lwql_agents", absent: true }]
+    : [];
   const checks = Array.from({ length: workers }, () =>
     runLwqlReconvergence({
       probe: () => Promise.resolve("config_store"),
@@ -486,7 +488,7 @@ describe("given a check over the app-owned objects", () => {
   describe("when PostgreSQL refuses its half", () => {
     const refusal = () =>
       Object.assign(new Error("permission denied"), { code: "P2010", meta: { code: "42501" } });
-    const gap = { view: "lwql_agents", absent: true };
+    const gap = { kind: "shared" as const, view: "lwql_agents", absent: true };
 
     /** @scenario "A failed converge is retried by the next check and alerts once per change of failure" */
     it("alerts with the PostgreSQL message and its SQLSTATE, and still converges ClickHouse", async () => {

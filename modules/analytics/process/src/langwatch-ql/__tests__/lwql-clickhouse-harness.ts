@@ -2165,10 +2165,7 @@ export async function startLangWatchQLPostgres(): Promise<LangWatchQLPostgresHar
     ...POSTGRES_LOAD_FIXTURE_STATEMENTS,
     // The shipped generator, not a hand-copy: a catalog column the approved
     // view forgot would be a failure here rather than a silent exposure.
-    ...postgresViews.approvedViewStatements({
-      schema: PG_SCHEMA,
-      sharedReaderRole: PG_READER_ROLE,
-    }),
+    ...postgresViews.approvedViewStatements({ schema: PG_SCHEMA }),
   ]);
   await applyAsAdmin(
     postgresMapping.readerRoleStatements({

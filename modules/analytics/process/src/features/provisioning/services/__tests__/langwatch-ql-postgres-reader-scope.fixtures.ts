@@ -4,29 +4,52 @@
  */
 import { createHash } from "node:crypto";
 
+import { createLogger } from "@langwatch/observability";
+import {
+  PrismaConfigService,
+  PrismaConnectionService,
+  PrismaQueryGuard,
+  type PrismaQueryContext,
+  type PrismaQueryExecutor,
+} from "@langwatch/prisma-client";
+
 import {
   type LangWatchQLPostgresHarness,
   startLangWatchQLPostgres,
   TENANT_A,
   TENANT_B,
 } from "../../../../langwatch-ql/__tests__/lwql-clickhouse-harness.ts";
+import type { LwqlProvisioningDatabase } from "../../../../repositories/langwatch-ql-postgres.repository.ts";
+import { PrismaLangWatchQLPostgresRepository } from "../../../../repositories/prisma/prisma.langwatch-ql-postgres.repository.ts";
 import { LWQL_VIEW_CATALOG } from "../../../../rules/lwql-view-catalog.rules.ts";
 import { LangWatchQLCatalogShapesService } from "../../../../services/langwatch-ql-catalog-shapes.service.ts";
+import type { LwqlConvergencePlan } from "../../../../tasks/lwql-provision.task.ts";
+import { LWQL_SCOPED_SCHEMA, scopedViewGuardCondition } from "../../rules/lwql-scoped-view.rules.ts";
 import {
+  DEFAULT_POSTGRES_READER_LIMITS,
+  LangWatchQLPostgresMappingService,
   LWQL_SCOPED_READER_GROUP,
   LWQL_SHARED_READER_ROLE,
 } from "../langwatch-ql-postgres-mapping.service.ts";
 import { LangWatchQLPostgresViewsService } from "../langwatch-ql-postgres-views.service.ts";
 import { LangWatchQLProductionProvisioningService } from "../langwatch-ql-production-provisioning.service.ts";
+import {
+  type LwqlPostgresGap,
+  LangWatchQLSelfProvisioningService,
+} from "../langwatch-ql-self-provisioning.service.ts";
 
 export const provisioning = LangWatchQLProductionProvisioningService.create();
+const selfProvisioning = LangWatchQLSelfProvisioningService.create();
 
 export const SCHEMA = "public";
+export const SCOPED = LWQL_SCOPED_SCHEMA;
 export const SHARED_READER = LWQL_SHARED_READER_ROLE;
 export const GROUP = LWQL_SCOPED_READER_GROUP;
 const DATABASE = "lwtest";
-const ADMIN = "test";
-const PASSWORD = "scope-test-pw";
+/** The container's superuser: the app's statements run as it unless a suite says otherwise. */
+export const ADMIN = "test";
+/** Every login the suites create shares it, so any of them can connect over TCP. */
+export const LOGIN_PASSWORD = "scope-test-pw";
 
 export const ORG_A = `${TENANT_A.tenantId}-org`;
 export const ORG_B = `${TENANT_B.tenantId}-org`;
@@ -50,19 +73,108 @@ export const ownedBy =
   (organizations: Record<string, string>, organizationId: string) => (row: Row) =>
     organizations[row.TenantId] === organizationId;
 
+/**
+ * A deploy's PostgreSQL statements in production order: the group's revokes, the shared views
+ * and the shared reader's grants, then the scoped schema, the copies and the group's grants.
+ */
+export const deployStatements = (): string[] => [
+  ...provisioning.postgresScopedReaderRevokeFirstStatements({ schema: SCHEMA }),
+  ...provisioning.postgresApprovedViewStatements({ schema: SCHEMA, readerRole: SHARED_READER }),
+  ...provisioning.postgresReaderGrantStatements({ schema: SCHEMA, role: SHARED_READER }),
+  ...provisioning.postgresScopedViewStatements({ schema: SCHEMA }),
+  ...provisioning.postgresScopedReaderGrantStatements({ schema: SCHEMA }),
+];
+
+/** A convergence plan whose PostgreSQL half is real; its ClickHouse half is refused. */
+export function postgresOnlyPlan(): LwqlConvergencePlan {
+  return {
+    request: {
+      requested: true,
+      complete: true,
+      connection: {
+        url: "http://127.0.0.1:8123",
+        username: "lwql_scope_test",
+        password: "restricted-scope-secret",
+        database: "langwatch",
+        tenantSetting: "custom_api_key_hash",
+      },
+      postgresReaderPassword: LOGIN_PASSWORD,
+      endpoint: { host: "postgres", port: 5432, database: DATABASE },
+    },
+    names: {
+      database: "langwatch",
+      restrictedUser: "lwql_scope_test",
+      settingsProfile: "lwql_scope_test_profile",
+      keyMapTable: "lwql_api_key_tenant_map",
+      tenantSetting: "custom_api_key_hash",
+    },
+    sourceDatabase: () => "langwatch",
+    schema: SCHEMA,
+    settings: {},
+    openRepository: () => {
+      throw new Error("the reader-scope suites run no ClickHouse");
+    },
+  };
+}
+
+/** The gaps the reconvergence check reads from PostgreSQL, by the task's own reads. */
+export async function readPostgresGaps(
+  database: LwqlProvisioningDatabase,
+): Promise<LwqlPostgresGap[]> {
+  const repository = PrismaLangWatchQLPostgresRepository.create(database);
+  const found = await repository.findApprovedViews({
+    schema: SCHEMA,
+    role: SHARED_READER,
+    views: VIEW_NAMES,
+  });
+  const scoped = await repository.findScopedViewState({
+    appSchema: SCHEMA,
+    group: GROUP,
+    views: VIEW_NAMES,
+  });
+  return selfProvisioning.findPostgresGaps({ found, scoped });
+}
+
+class AllowTestQueries extends PrismaQueryGuard {
+  execute(context: PrismaQueryContext, next: PrismaQueryExecutor): Promise<unknown> {
+    return next(context.args);
+  }
+}
+
+/** A Prisma connection as one login: the way the task reaches PostgreSQL. */
+export interface ScopeConnection {
+  database: LwqlProvisioningDatabase;
+  close: () => Promise<void>;
+}
+
 /** One isolated container, seeded and provisioned, with the queries the suites share. */
 export interface ScopeHarness {
   /** Runs SQL as the superuser, or as another login over its own connection. */
   runAs: (args: { user: string; sql: string }) => Promise<string>;
   admin: (sql: string) => Promise<string>;
   applyAll: (statements: string[]) => Promise<void>;
-  /** The app's own statements: the views, then the shared reader's and the group's grants. */
+  /** The app's own statements, in a deploy's order. */
   provisionViews: () => Promise<void>;
-  /** Every view's full rows, as one login sees them, in one round trip. */
-  readAllViews: (user: string) => Promise<RowsByView>;
-  /** TenantIds the pre-change views expose, derived from base tables and the catalogue paths. */
+  /** Every view's full rows in `schema`, as one login sees them, in one round trip. */
+  readAllViews: (args: { user: string; schema: string }) => Promise<RowsByView>;
+  /** TenantIds the shared views expose, derived from base tables and the catalogue paths. */
   baselineTenantIds: () => Promise<Record<string, string[]>>;
   projectOrganizations: () => Promise<Record<string, string>>;
+  /** Each copy's stored definition and options, keyed by view, as one JSON text. */
+  scopedCopyDefinitions: () => Promise<string>;
+  /**
+   * An older version's converge, as origin/main runs it: a look-alike shared view forces the
+   * drop-and-create fallback, then the shared views and the shared reader role. Returns the
+   * view it replaced.
+   */
+  applyOlderConverge: () => Promise<string>;
+  /** Relations `role` may select, outside the system schemas. */
+  selectableBy: (role: string) => Promise<string[]>;
+  /** {@link selectableBy}, less the copies that pass the scoped-view check. */
+  unscopedSelectable: (role: string) => Promise<string[]>;
+  /** Schemas granted USAGE to `role` itself; PUBLIC's USAGE on `public` is not counted. */
+  directSchemaUsage: (role: string) => Promise<string[]>;
+  connect: (user: string) => ScopeConnection;
   stop: () => Promise<void>;
 }
 
@@ -71,7 +183,10 @@ export const READER_A = "reader_a";
 export const READER_B = "reader_b";
 export const READER_NONE = "reader_none";
 
-export async function startScopeHarness(): Promise<ScopeHarness> {
+/** `provision: false` leaves the views as the base harness made them, for suites that converge. */
+export async function startScopeHarness({
+  provision = true,
+}: { provision?: boolean } = {}): Promise<ScopeHarness> {
   const pg: LangWatchQLPostgresHarness = await startLangWatchQLPostgres();
 
   async function runAs({ user, sql }: { user: string; sql: string }): Promise<string> {
@@ -92,7 +207,7 @@ export async function startScopeHarness(): Promise<ScopeHarness> {
               "-tAc",
               sql,
             ],
-            { env: { PGPASSWORD: PASSWORD } },
+            { env: { PGPASSWORD: LOGIN_PASSWORD } },
           );
     if (result.exitCode !== 0) {
       throw new Error(
@@ -111,17 +226,18 @@ export async function startScopeHarness(): Promise<ScopeHarness> {
     }
   }
 
-  const provisionViews = () =>
-    applyAll([
-      ...provisioning.postgresApprovedViewStatements({ schema: SCHEMA, readerRole: SHARED_READER }),
-      ...provisioning.postgresReaderGrantStatements({ schema: SCHEMA, role: SHARED_READER }),
-      ...provisioning.postgresScopedReaderGrantStatements({ schema: SCHEMA }),
-    ]);
+  const provisionViews = () => applyAll(deployStatements());
 
-  async function readAllViews(user: string): Promise<RowsByView> {
+  async function readAllViews({
+    user,
+    schema,
+  }: {
+    user: string;
+    schema: string;
+  }): Promise<RowsByView> {
     const union = VIEW_NAMES.map(
       (name) =>
-        `SELECT '${name}' AS n, (SELECT coalesce(jsonb_agg(to_jsonb(x)), '[]'::jsonb) FROM ${q(SCHEMA)}.${q(name)} x) AS r`,
+        `SELECT '${name}' AS n, (SELECT coalesce(jsonb_agg(to_jsonb(x)), '[]'::jsonb) FROM ${q(schema)}.${q(name)} x) AS r`,
     ).join(" UNION ALL ");
 
     return JSON.parse(
@@ -167,13 +283,85 @@ export async function startScopeHarness(): Promise<ScopeHarness> {
     return JSON.parse(out);
   }
 
+  const scopedCopyDefinitions = () =>
+    admin(
+      `SELECT coalesce(jsonb_object_agg(c.relname, jsonb_build_object(` +
+        `'definition', pg_get_viewdef(c.oid), 'options', c.reloptions)), '{}'::jsonb)::text ` +
+        `FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace ` +
+        `WHERE n.nspname = '${SCOPED}'`,
+    );
+
+  async function applyOlderConverge(): Promise<string> {
+    const view = VIEW_NAMES[0] as string;
+    await admin(`DROP VIEW ${q(SCHEMA)}.${q(view)}`);
+    await admin(`CREATE VIEW ${q(SCHEMA)}.${q(view)} AS SELECT 1 AS bogus_column`);
+    await applyAll([
+      ...provisioning.postgresApprovedViewStatements({ schema: SCHEMA, readerRole: SHARED_READER }),
+      ...LangWatchQLPostgresMappingService.create().readerRoleStatements({
+        reader: {
+          role: SHARED_READER,
+          password: LOGIN_PASSWORD,
+          schema: SCHEMA,
+          approvedViews: VIEW_NAMES,
+          ...DEFAULT_POSTGRES_READER_LIMITS,
+        },
+      }),
+    ]);
+    return view;
+  }
+
+  async function selectable({
+    role,
+    exceptScopedCopies,
+  }: {
+    role: string;
+    exceptScopedCopies: boolean;
+  }): Promise<string[]> {
+    const exception = exceptScopedCopies
+      ? ` AND NOT (n.nspname = '${SCOPED}' AND ${scopedViewGuardCondition({ relation: "c" })})`
+      : "";
+    const out = await admin(
+      `SELECT coalesce(string_agg(format('%I.%I', n.nspname, c.relname), ',' ` +
+        `ORDER BY n.nspname, c.relname), '') ` +
+        `FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace ` +
+        `WHERE n.nspname NOT LIKE 'pg\\_%' AND n.nspname <> 'information_schema' ` +
+        `AND c.relkind IN ('r', 'p', 'v', 'm', 'f', 'S') ` +
+        `AND has_table_privilege('${role}', c.oid, 'SELECT')${exception}`,
+    );
+    return out === "" ? [] : out.split(",");
+  }
+
+  async function directSchemaUsage(role: string): Promise<string[]> {
+    const out = await admin(
+      `SELECT coalesce(string_agg(n.nspname, ',' ORDER BY n.nspname), '') ` +
+        `FROM pg_namespace n, aclexplode(n.nspacl) a ` +
+        `WHERE a.grantee = '${role}'::regrole AND a.privilege_type = 'USAGE'`,
+    );
+    return out === "" ? [] : out.split(",");
+  }
+
+  function connect(user: string): ScopeConnection {
+    const url = new URL(pg.container.getConnectionUri());
+    if (user !== ADMIN) {
+      url.username = user;
+      url.password = LOGIN_PASSWORD;
+    }
+    url.searchParams.set("schema", SCHEMA);
+    const connection = PrismaConnectionService.create({
+      guard: new AllowTestQueries(),
+      logger: createLogger("langwatch:analytics:lwql-reader-scope-test"),
+    }).connect(PrismaConfigService.create().resolve({ databaseUrl: url.toString(), log: ["error"] }));
+
+    return { database: connection.client, close: () => connection.closeOnce() };
+  }
+
   const stop = async () => {
     await pg.stop();
   };
 
   try {
     await admin(`CREATE ROLE ${GROUP} NOLOGIN`);
-    await admin(`CREATE ROLE ${SHARED_READER} LOGIN PASSWORD '${PASSWORD}'`);
+    await admin(`CREATE ROLE ${SHARED_READER} LOGIN PASSWORD '${LOGIN_PASSWORD}'`);
     for (const org of [ORG_A, ORG_B]) {
       await admin(`CREATE ROLE ${q(orgRole(org))} NOLOGIN`);
     }
@@ -183,15 +371,13 @@ export async function startScopeHarness(): Promise<ScopeHarness> {
       [READER_NONE, undefined],
     ] as const;
     for (const [login, org] of logins) {
-      await admin(`CREATE ROLE ${login} LOGIN PASSWORD '${PASSWORD}'`);
+      await admin(`CREATE ROLE ${login} LOGIN PASSWORD '${LOGIN_PASSWORD}'`);
       await admin(`GRANT ${GROUP} TO ${login} WITH INHERIT TRUE, SET FALSE`);
       if (org) {
         await admin(`GRANT ${q(orgRole(org))} TO ${login} WITH INHERIT FALSE, SET FALSE`);
       }
     }
-    await provisionViews();
-    // The app's grants name the views; the group reaches only them, never a base table.
-    await admin(`GRANT USAGE ON SCHEMA ${SCHEMA} TO ${GROUP}`);
+    if (provision) await provisionViews();
   } catch (error) {
     await stop();
     throw error;
@@ -205,6 +391,12 @@ export async function startScopeHarness(): Promise<ScopeHarness> {
     readAllViews,
     baselineTenantIds,
     projectOrganizations,
+    scopedCopyDefinitions,
+    applyOlderConverge,
+    selectableBy: (role) => selectable({ role, exceptScopedCopies: false }),
+    unscopedSelectable: (role) => selectable({ role, exceptScopedCopies: true }),
+    directSchemaUsage,
+    connect,
     stop,
   };
 }

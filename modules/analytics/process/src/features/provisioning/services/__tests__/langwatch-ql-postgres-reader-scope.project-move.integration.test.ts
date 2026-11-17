@@ -20,6 +20,7 @@ import {
   type RowsByView,
   type ScopeHarness,
   SCHEMA,
+  SCOPED,
   SHARED_READER,
   startScopeHarness,
   tenantsOf,
@@ -43,7 +44,7 @@ describe("given per-reader row scoping over every generated Postgres view", () =
     let ungrouped: RowsByView;
 
     beforeAll(async () => {
-      ungrouped = await harness.readAllViews(READER_NONE);
+      ungrouped = await harness.readAllViews({ user: READER_NONE, schema: SCOPED });
     });
 
     /** @scenario "A Postgres reader login with no organization role sees no rows" */
@@ -61,8 +62,8 @@ describe("given per-reader row scoping over every generated Postgres view", () =
 
     beforeAll(async () => {
       [shared, readerB] = await Promise.all([
-        harness.readAllViews(SHARED_READER),
-        harness.readAllViews(READER_B),
+        harness.readAllViews({ user: SHARED_READER, schema: SCHEMA }),
+        harness.readAllViews({ user: READER_B, schema: SCOPED }),
       ]);
       const teamB = await admin(
         `SELECT "teamId" FROM ${q(SCHEMA)}."Project" WHERE id = '${PROJECT_B}'`,
@@ -75,8 +76,8 @@ describe("given per-reader row scoping over every generated Postgres view", () =
       );
       try {
         [movedA, movedB, movedOrganizations] = await Promise.all([
-          harness.readAllViews(READER_A),
-          harness.readAllViews(READER_B),
+          harness.readAllViews({ user: READER_A, schema: SCOPED }),
+          harness.readAllViews({ user: READER_B, schema: SCOPED }),
           harness.projectOrganizations(),
         ]);
       } finally {

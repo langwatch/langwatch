@@ -1,6 +1,6 @@
 /**
- * Barrier and pushdown guards: every view is a security barrier, and a TenantId filter still
- * lands on the tenant relation's scan on the widest join paths.
+ * Barrier and pushdown guards: every scoped copy is a security barrier, and an org login's
+ * TenantId filter still lands on the tenant relation's scan on the widest join paths.
  * @see ../langwatch-ql-postgres-views.service.ts
  * @vitest-environment node
  */
@@ -10,9 +10,9 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   PROJECT_A,
   q,
-  SCHEMA,
+  READER_A,
+  SCOPED,
   type ScopeHarness,
-  SHARED_READER,
   startScopeHarness,
   VIEW_NAMES,
   VIEWS,
@@ -44,19 +44,22 @@ describe("given the generated Postgres views", () => {
     await harness?.stop();
   });
 
-  describe("when the views are inspected", () => {
-    /** @scenario "Every approved Postgres view is a security barrier and keeps the tenant filter pushed down" */
-    it("every view has security_barrier=true", async () => {
+  describe("when the copies are inspected", () => {
+    /** @scenario "Every scoped copy is a security barrier and keeps the tenant filter pushed down" */
+    it("every copy has security_barrier=true", async () => {
       const list = VIEW_NAMES.map((n) => `'${n}'`).join(",");
       const offenders = await admin(
-        `SELECT coalesce(string_agg(relname, ','), '') FROM pg_class WHERE relnamespace = '${SCHEMA}'::regnamespace AND relname IN (${list}) AND NOT ('security_barrier=true' = ANY(coalesce(reloptions, '{}')))`,
+        `SELECT coalesce(string_agg(relname, ','), '') FROM pg_class WHERE relnamespace = '${SCOPED}'::regnamespace AND relname IN (${list}) AND NOT ('security_barrier=true' = ANY(coalesce(reloptions, '{}')))`,
+      );
+      const copies = await admin(
+        `SELECT count(*) FROM pg_class WHERE relnamespace = '${SCOPED}'::regnamespace AND relname IN (${list})`,
       );
 
-      expect(offenders).toBe("");
+      expect([offenders, copies]).toEqual(["", String(VIEW_NAMES.length)]);
     });
   });
 
-  describe("when the shared reader filters one tenant on the widest join paths (pushdown performance guard)", () => {
+  describe("when an org login filters one tenant on the widest join paths (pushdown performance guard)", () => {
     const widest = VIEWS.toSorted(
       (a, b) =>
         depth(b) - depth(a) || a.postgres.approvedView.localeCompare(b.postgres.approvedView),
@@ -64,8 +67,8 @@ describe("given the generated Postgres views", () => {
 
     const planOf = async (view: string): Promise<PlanNode[]> => {
       const out = await harness.runAs({
-        user: SHARED_READER,
-        sql: `EXPLAIN (FORMAT JSON) SELECT * FROM ${q(SCHEMA)}.${q(view)} WHERE "TenantId" = '${PROJECT_A}'`,
+        user: READER_A,
+        sql: `EXPLAIN (FORMAT JSON) SELECT * FROM ${q(SCOPED)}.${q(view)} WHERE "TenantId" = '${PROJECT_A}'`,
       });
 
       return flatten(JSON.parse(out)[0].Plan);
@@ -82,7 +85,7 @@ describe("given the generated Postgres views", () => {
       async (view) => {
         expect(
           await admin(
-            `SELECT 'security_barrier=true' = ANY(reloptions) FROM pg_class WHERE oid = '${q(SCHEMA)}.${q(view)}'::regclass`,
+            `SELECT 'security_barrier=true' = ANY(reloptions) FROM pg_class WHERE oid = '${q(SCOPED)}.${q(view)}'::regclass`,
           ),
         ).toBe("t");
       },
@@ -92,7 +95,7 @@ describe("given the generated Postgres views", () => {
     // project): each is the most likely place for the barrier to keep the filter above a join.
     // The filter must land on the scan of the relation that carries the project column: the
     // last hop's relation, or the base itself when the path is empty.
-    /** @scenario "Every approved Postgres view is a security barrier and keeps the tenant filter pushed down" */
+    /** @scenario "Every scoped copy is a security barrier and keeps the tenant filter pushed down" */
     it.each(widest.map((view) => [view.postgres.approvedView, depth(view)] as const))(
       "%s (%i hops): pushdown guard: the TenantId filter is applied on the tenant relation's scan",
       async (name) => {

@@ -1,6 +1,6 @@
 /**
- * Row isolation per approved view: the shared reader keeps every row, an org-role login sees
- * only its organization's projects.
+ * Row isolation per approved view: the shared reader keeps every row of the shared view, an
+ * org-role login sees only its organization's projects through the scoped copy.
  * @see ../langwatch-ql-postgres-views.service.ts
  * @vitest-environment node
  */
@@ -16,6 +16,8 @@ import {
   READER_B,
   type Row,
   type RowsByView,
+  SCHEMA,
+  SCOPED,
   type ScopeHarness,
   SHARED_READER,
   startScopeHarness,
@@ -34,9 +36,9 @@ describe("given per-reader row scoping over every generated Postgres view", () =
   beforeAll(async () => {
     harness = await startScopeHarness();
     [shared, readerA, readerB, baseline, organizations] = await Promise.all([
-      harness.readAllViews(SHARED_READER),
-      harness.readAllViews(READER_A),
-      harness.readAllViews(READER_B),
+      harness.readAllViews({ user: SHARED_READER, schema: SCHEMA }),
+      harness.readAllViews({ user: READER_A, schema: SCOPED }),
+      harness.readAllViews({ user: READER_B, schema: SCOPED }),
       harness.baselineTenantIds(),
       harness.projectOrganizations(),
     ]);

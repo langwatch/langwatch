@@ -15,10 +15,14 @@ import { LangWatchQLCapabilityService } from "../../../services/langwatch-ql-cap
 import type { LangWatchQLViewDefinition } from "../../../services/langwatch-ql-catalog-shapes.service.ts";
 import { LangWatchQLSqlTextService } from "../../../services/langwatch-ql-sql-text.service.ts";
 import {
-  LWQL_ORG_MEMBERSHIP_FRAGMENT,
-  LWQL_ORG_SCOPE_FRAGMENT,
+  LWQL_SCOPED_SCHEMA,
+  scopedCopyLookup,
+  scopedSchemaOwnedCondition,
+  scopedSchemaStatement,
+  scopedViewGuardCondition,
+} from "../rules/lwql-scoped-view.rules.ts";
+import {
   LWQL_SCOPED_READER_GROUP,
-  LWQL_SESSION_USER_FRAGMENT,
   LWQL_SHARED_READER_ROLE,
 } from "./langwatch-ql-postgres-mapping.service.ts";
 import { LangWatchQLPostgresViewsService } from "./langwatch-ql-postgres-views.service.ts";
@@ -47,32 +51,41 @@ const LWQL_POSTGRES_SCHEMA = "public";
  */
 export const LWQL_POSTGRES_READER_ROLE = LWQL_SHARED_READER_ROLE;
 
-/**
- * Grants only on a live security-barrier view carrying the org-role lookup, `pg_auth_members`
- * and `rolname = current_user`; any other view has `SELECT` revoked, so none goes unscoped.
- */
-function scopedViewGuard({
-  qualifiedView,
-  grant,
-  revoke,
-}: {
-  qualifiedView: string;
-  grant: string;
-  revoke: string;
-}): string {
-  const definition = "pg_get_viewdef(c.oid)";
+const QUOTED_GROUP = sqlText.postgresQuoted(LWQL_SCOPED_READER_GROUP);
+
+/** The scoped-reader group's guarded block: `body` runs only when the group exists. */
+function whenGroupExists({ body }: { body: readonly string[] }): string {
+  return (
+    `DO $$\nBEGIN\n` +
+    `  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = ${postgresLiteral(LWQL_SCOPED_READER_GROUP)}) THEN\n` +
+    body.join("") +
+    `  END IF;\nEND\n$$`
+  );
+}
+
+/** The group's grant on one copy: SELECT when it passes the scoped-view check, else revoked. */
+function scopedCopyGrant({ view }: { view: string }): string {
+  const copy = `${sqlText.postgresQuoted(LWQL_SCOPED_SCHEMA)}.${sqlText.postgresQuoted(view)}`;
+  const lookup = scopedCopyLookup({ view });
 
   return (
-    `    IF EXISTS (SELECT 1 FROM pg_class c WHERE c.oid = to_regclass(${postgresLiteral(qualifiedView)}) ` +
-    `AND c.relkind = 'v' ` +
-    `AND 'security_barrier=true' = ANY(coalesce(c.reloptions, '{}')) ` +
-    `AND position(${postgresLiteral(LWQL_ORG_SCOPE_FRAGMENT)} in ${definition}) > 0 ` +
-    `AND position(${postgresLiteral(LWQL_ORG_MEMBERSHIP_FRAGMENT)} in lower(${definition})) > 0 ` +
-    `AND position(${postgresLiteral(LWQL_SESSION_USER_FRAGMENT)} in lower(${definition})) > 0) THEN\n` +
-    `      EXECUTE ${postgresLiteral(grant)};\n` +
-    `    ELSIF to_regclass(${postgresLiteral(qualifiedView)}) IS NOT NULL THEN\n` +
-    `      EXECUTE ${postgresLiteral(revoke)};\n` +
-    `    END IF;\n`
+    `      IF EXISTS (SELECT 1 ${lookup} AND ${scopedViewGuardCondition({ relation: "c" })}) THEN\n` +
+    `        EXECUTE ${postgresLiteral(`GRANT SELECT ON ${copy} TO ${QUOTED_GROUP}`)};\n` +
+    `      ELSIF EXISTS (SELECT 1 ${lookup}) THEN\n` +
+    `        EXECUTE ${postgresLiteral(`REVOKE SELECT ON ${copy} FROM ${QUOTED_GROUP}`)};\n` +
+    `      END IF;\n`
+  );
+}
+
+/** Revokes the group's SELECT on one copy that fails the scoped-view check; grants nothing. */
+function scopedCopyRevoke({ view }: { view: string }): string {
+  const copy = `${sqlText.postgresQuoted(LWQL_SCOPED_SCHEMA)}.${sqlText.postgresQuoted(view)}`;
+  const guard = scopedViewGuardCondition({ relation: "c" });
+
+  return (
+    `      IF EXISTS (SELECT 1 ${scopedCopyLookup({ view })} AND NOT ${guard}) THEN\n` +
+    `        EXECUTE ${postgresLiteral(`REVOKE SELECT ON ${copy} FROM ${QUOTED_GROUP}`)};\n` +
+    `      END IF;\n`
   );
 }
 
@@ -189,12 +202,90 @@ export class LangWatchQLProductionProvisioningService {
     role?: string;
     views?: readonly LangWatchQLViewDefinition[];
   } = {}): string[] {
-    return this.guardedGrantStatements({ schema, role, views });
+    const approvedViews = postgresViews.approvedViewNames(views);
+    if (approvedViews.length === 0) {
+      return [];
+    }
+
+    const quotedSchema = sqlText.postgresQuoted(schema);
+    const quotedRole = sqlText.postgresQuoted(role);
+    const grants = [
+      `GRANT USAGE ON SCHEMA ${quotedSchema} TO ${quotedRole}`,
+      ...approvedViews.map(
+        (view) =>
+          `GRANT SELECT ON ${quotedSchema}.${sqlText.postgresQuoted(view)} TO ${quotedRole}`,
+      ),
+    ];
+
+    // One guarded block rather than a probe followed by grants: the check and
+    // the grants have to be the same statement, or a role dropped between them
+    // turns a no-op into a failed deploy.
+    return [
+      `DO $$\nBEGIN\n` +
+        `  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = ${postgresLiteral(role)}) THEN\n` +
+        grants.map((grant) => `    EXECUTE ${postgresLiteral(grant)};\n`).join("") +
+        `  END IF;\nEND\n$$`,
+    ];
   }
 
   /**
-   * Grants the scoped-reader group SELECT on every approved view, only when the group exists.
-   * Separate from the shared reader's grants because the full deploy converges those itself.
+   * Run before any view DDL, so no rewrite can leave the scoped-reader group a grant: revokes its
+   * USAGE on the app schema, its SELECT on every shared view, and its SELECT on every copy in
+   * this installation's scoped schema that fails the scoped-view check. Revokes only.
+   */
+  postgresScopedReaderRevokeFirstStatements({
+    schema = LWQL_POSTGRES_SCHEMA,
+    views = LWQL_VIEW_CATALOG,
+  }: {
+    schema?: string;
+    views?: readonly LangWatchQLViewDefinition[];
+  } = {}): string[] {
+    const quotedSchema = sqlText.postgresQuoted(schema);
+    const approvedViews = postgresViews.approvedViewNames(views);
+    const sharedRevokes = approvedViews.map((view) => {
+      const shared = `${quotedSchema}.${sqlText.postgresQuoted(view)}`;
+      return (
+        `    IF to_regclass(${postgresLiteral(shared)}) IS NOT NULL THEN\n` +
+        `      EXECUTE ${postgresLiteral(`REVOKE SELECT ON ${shared} FROM ${QUOTED_GROUP}`)};\n` +
+        `    END IF;\n`
+      );
+    });
+
+    return [
+      whenGroupExists({
+        body: [
+          `    EXECUTE ${postgresLiteral(`REVOKE USAGE ON SCHEMA ${quotedSchema} FROM ${QUOTED_GROUP}`)};\n`,
+          ...sharedRevokes,
+          // Another installation's copies are its own to guard; this one's role cannot read them.
+          `    IF ${scopedSchemaOwnedCondition({ appSchema: schema })} THEN\n`,
+          ...approvedViews.map((view) => scopedCopyRevoke({ view })),
+          `    END IF;\n`,
+        ],
+      }),
+    ];
+  }
+
+  /**
+   * The scoped schema when absent, then the copies of `views` in it. All of it runs only when the
+   * scoped-reader group exists, and the copies only in this installation's scoped schema.
+   */
+  postgresScopedViewStatements({
+    schema = LWQL_POSTGRES_SCHEMA,
+    views = LWQL_VIEW_CATALOG,
+  }: {
+    schema?: string;
+    views?: readonly LangWatchQLViewDefinition[];
+  } = {}): string[] {
+    return [
+      scopedSchemaStatement({ appSchema: schema, group: LWQL_SCOPED_READER_GROUP }),
+      ...postgresViews.scopedViewStatements({ schema, views }),
+    ];
+  }
+
+  /**
+   * Grants the scoped-reader group USAGE on this installation's scoped schema, and SELECT on each
+   * copy that passes the scoped-view check; a copy that fails it has SELECT revoked. Nothing runs
+   * without the group, or when the scoped schema is absent or another installation's.
    */
   postgresScopedReaderGrantStatements({
     schema = LWQL_POSTGRES_SCHEMA,
@@ -203,55 +294,17 @@ export class LangWatchQLProductionProvisioningService {
     schema?: string;
     views?: readonly LangWatchQLViewDefinition[];
   } = {}): string[] {
-    return this.guardedGrantStatements({
-      schema,
-      role: LWQL_SCOPED_READER_GROUP,
-      views,
-      onlyRowScoped: true,
-    });
-  }
+    const usage = `GRANT USAGE ON SCHEMA ${sqlText.postgresQuoted(LWQL_SCOPED_SCHEMA)} TO ${QUOTED_GROUP}`;
 
-  private guardedGrantStatements({
-    schema,
-    role,
-    views,
-    onlyRowScoped = false,
-  }: {
-    schema: string;
-    role: string;
-    views: readonly LangWatchQLViewDefinition[];
-    /** Grant `SELECT` only on a live view that is provably the row-scoped one. */
-    onlyRowScoped?: boolean;
-  }): string[] {
-    const approvedViews = postgresViews.approvedViewNames(views);
-    if (approvedViews.length === 0) {
-      return [];
-    }
-
-    const quotedSchema = sqlText.postgresQuoted(schema);
-    const quotedRole = sqlText.postgresQuoted(role);
-    const usage = `GRANT USAGE ON SCHEMA ${quotedSchema} TO ${quotedRole}`;
-    const viewGrants = approvedViews.map((view) => {
-      const qualifiedView = `${quotedSchema}.${sqlText.postgresQuoted(view)}`;
-      const grant = `GRANT SELECT ON ${qualifiedView} TO ${quotedRole}`;
-      return onlyRowScoped
-        ? scopedViewGuard({
-            qualifiedView,
-            grant,
-            revoke: `REVOKE SELECT ON ${qualifiedView} FROM ${quotedRole}`,
-          })
-        : `    EXECUTE ${postgresLiteral(grant)};\n`;
-    });
-
-    // One guarded block rather than a probe followed by grants: the check and
-    // the grants have to be the same statement, or a role dropped between them
-    // turns a no-op into a failed deploy.
     return [
-      `DO $$\nBEGIN\n` +
-        `  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = ${postgresLiteral(role)}) THEN\n` +
-        `    EXECUTE ${postgresLiteral(usage)};\n` +
-        viewGrants.join("") +
-        `  END IF;\nEND\n$$`,
+      whenGroupExists({
+        body: [
+          `    IF ${scopedSchemaOwnedCondition({ appSchema: schema })} THEN\n`,
+          `      EXECUTE ${postgresLiteral(usage)};\n`,
+          ...postgresViews.approvedViewNames(views).map((view) => scopedCopyGrant({ view })),
+          `    END IF;\n`,
+        ],
+      }),
     ];
   }
 
