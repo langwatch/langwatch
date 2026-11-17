@@ -12,6 +12,7 @@ import type {
   SeatRequestRepository,
   SeatRequestRow,
 } from "../repositories/seat-request.repository.ts";
+import { assertSeatFree } from "../rules/payment-hold.rules.ts";
 import { readSeatRefusal } from "../rules/seat-limit-refusal.rules.ts";
 import type {
   OrganizationSeatLicense,
@@ -243,11 +244,7 @@ export class SeatRequestApprovalService {
       resource: "members",
       user: by,
     });
-    if (!result.allowed) {
-      throw new MemberSeatLimitReachedError({
-        meta: { limitType: result.limitType, current: result.current, max: result.max },
-      });
-    }
+    assertSeatFree(result);
   }
 
   /** Lite becomes full, a held row becomes full and is enabled, an address alone is invited. */

@@ -16,6 +16,12 @@ import {
   TEST_CONSTANTS,
 } from "../../services/__tests__/testHelpers.ts";
 import { type JobRegistryEntry, QueueManager } from "../../services/queues/queueManager.ts";
+import {
+  compareEventLogPageOrder,
+  compareEventLogPagePositions,
+  type EventLogPageCursor,
+  eventLogPagePositionOf,
+} from "../../stores/event-log-page-order.ts";
 import { MAX_APPLIED_EVENT_IDS } from "../foldCache/foldCacheEntry.ts";
 import { FoldProjectionExecutor } from "../foldProjectionExecutor.ts";
 import type { ProjectionStoreContext } from "../projectionStoreContext.ts";
@@ -136,32 +142,28 @@ describe("rebuilding a fold's aggregate for a missed hand-off", () => {
 
   describe("given a fold that does not depend on event order and reads its history in pages", () => {
     /**
-     * A paged reader that serves the log like the real store: (createdAt, id)
-     * order, the strict `after` cursor, the `limit`, and the `upToEvent` bound.
+     * A paged reader that serves the log like the real store: page order, the
+     * strict `after` cursor, the `limit`, and the `upToEvent` bound.
      */
     function pagedReader({ log }: { log: () => Event[] }) {
       return vi.fn(
         async (ctx: {
           upToEvent: Event;
-          after: { timestamp: number; eventId: string } | undefined;
+          after: EventLogPageCursor | undefined;
           limit: number;
         }): Promise<Event[]> => {
-          const ordered = log()
+          const { after } = ctx;
+          return log()
             .filter(
               (e) =>
                 e.createdAt < ctx.upToEvent.createdAt ||
                 (e.createdAt === ctx.upToEvent.createdAt && e.id <= ctx.upToEvent.id),
             )
-            .toSorted((a, b) => a.createdAt - b.createdAt || (a.id < b.id ? -1 : 1));
-          const { after } = ctx;
-          const start = after
-            ? ordered.findIndex(
-                (e) =>
-                  e.createdAt > after.timestamp ||
-                  (e.createdAt === after.timestamp && e.id > after.eventId),
-              )
-            : 0;
-          return start === -1 ? [] : ordered.slice(start, start + ctx.limit);
+            .toSorted(compareEventLogPageOrder)
+            .filter(
+              (e) => !after || compareEventLogPagePositions(eventLogPagePositionOf(e), after) > 0,
+            )
+            .slice(0, ctx.limit);
         },
       );
     }
@@ -203,6 +205,24 @@ describe("rebuilding a fold's aggregate for a missed hand-off", () => {
 
         expect(current()?.state.count).toBe(log.length);
         expect(current()?.applied).toEqual(log.slice(-MAX_APPLIED_EVENT_IDS).map((e) => e.id));
+      });
+
+      /** @scenario "A paged history read seeks through the event log's sort key" */
+      it("keeps the newest applied ids by arrival when the pages come in key order", async () => {
+        // Keys run against arrival, so the last page read holds the OLDEST events.
+        const log = Array.from({ length: 2 * MAX_APPLIED_EVENT_IDS + 1 }, (_, i) => ({
+          ...at(i + 1),
+          idempotencyKey: `key-${String(1_000_000 - i).padStart(7, "0")}`,
+        }));
+        const { fold, current } = pagedCountingFold({ log: () => log });
+        await executor.execute(fold, log[0]!, context);
+
+        await executor.rebuild(fold, log[1]!, context);
+
+        expect(current()?.state.count).toBe(log.length);
+        expect(current()?.applied).toEqual(
+          log.slice(-MAX_APPLIED_EVENT_IDS).map((e) => e.idempotencyKey),
+        );
       });
 
       /** @scenario "A live event arriving during the rebuild is not lost" */

@@ -34,6 +34,7 @@ import {
   assertAssignmentsWithinInvitedSeat,
   classifyInvitesByMemberType,
 } from "../../../rules/invite-memberships.rules.ts";
+import { assertAdditionsNotHeldForPayment } from "../../../rules/payment-hold.rules.ts";
 import { InviteTeamAssignmentService } from "./invite-team-assignment.service.ts";
 
 const logger = createLogger("langwatch:invites");
@@ -126,6 +127,7 @@ export class InviteCreationService {
       organizationId,
       user,
     });
+    if (newInvites.length > 0) assertAdditionsNotHeldForPayment(subscriptionLimits);
 
     const currentFullMembers = await this.deps.seats.getMemberCount(organizationId);
     const currentMembersLite = await this.deps.seats.getMembersLiteCount(organizationId);

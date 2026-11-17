@@ -56,7 +56,8 @@ const TRACES: UngatedViewDefinition = {
   timeColumn: "OccurredAt",
   freshness: PROJECTION_FRESHNESS,
   // Not grouped on `OccurredAt`: a row folded before the anchor froze (ADR-071) may have moved
-  // it, and the view keeps one row per trace (analytics ADR-006).
+  // it, and the view keeps one row per trace (analytics ADR-006). No floor: a newer version may
+  // carry an earlier anchor (analytics ADR-006, amendment 2026-11-16).
   dedup: {
     keyColumns: ["TenantId", "TraceId"],
     versionColumn: "UpdatedAt",
@@ -552,6 +553,8 @@ const EVALUATIONS: UngatedViewDefinition = {
   joinKeys: ["TenantId", "TraceId"],
   timeColumn: "ScheduledAt",
   freshness: PROJECTION_FRESHNESS,
+  // No floor: a newer version may carry an earlier ScheduledAt (analytics ADR-006, amendment
+  // 2026-11-16).
   dedup: {
     keyColumns: ["TenantId", "EvaluationId"],
     versionColumn: "UpdatedAt",
@@ -839,6 +842,8 @@ const TRACE_METRICS: UngatedViewDefinition = {
     versionColumn: "UpdatedAt",
     strategy: "latest-in-order",
     tieBreakColumns: ["Version"],
+    // In the key: a floor keeps or drops a key's versions together (analytics ADR-006).
+    floorColumn: "OccurredAt",
   },
   columns: [
     {
