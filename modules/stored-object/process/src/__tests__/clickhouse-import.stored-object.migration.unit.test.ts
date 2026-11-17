@@ -7,8 +7,11 @@ import {
   type LegacyStoredObjectRow,
   StoredObjectLegacySourceRepository,
 } from "../repositories/stored-object-legacy-source.repository.ts";
+import type { StoredObjectRecordRepository } from "../repositories/stored-object-record.repository.ts";
 
 class OneLegacyObject extends StoredObjectLegacySourceRepository {
+  sizeBytes = 3;
+
   constructor(
     private readonly storageUri = "s3://bucket/project_1/so_legacy",
     private readonly purpose = "trace_content",
@@ -26,7 +29,7 @@ class OneLegacyObject extends StoredObjectLegacySourceRepository {
         ownerKind: "trace",
         ownerId: "trace_1",
         mediaType: "application/octet-stream",
-        sizeBytes: 3,
+        sizeBytes: this.sizeBytes,
         sha256: "a".repeat(64),
         storageUri: this.storageUri,
         createdAt: Temporal.Instant.from("2026-08-21T00:00:00.000Z"),
@@ -34,6 +37,29 @@ class OneLegacyObject extends StoredObjectLegacySourceRepository {
       },
     ];
   }
+}
+
+/** The memory twin, with a delete landing between the import's read of a row and its write. */
+function deleteLandsAfterRead(
+  records: MemoryStoredObjectRecordRepository,
+): StoredObjectRecordRepository {
+  return {
+    findById: async (input) => {
+      const read = await records.findById(input);
+      if (read?.status === "available") {
+        const deleted = { ...read, status: "deleted" as const, generation: read.generation + 1 };
+        await records.transition({ expected: read, next: deleted });
+      }
+      return read;
+    },
+    upsert: (value) => records.upsert(value),
+    transition: (input) => records.transition(input),
+    countActive: (input) => records.countActive(input),
+    findPage: (input) => records.findPage(input),
+    findPageByPurpose: (input) => records.findPageByPurpose(input),
+    findTenantsWithExpiredUploads: (input) => records.findTenantsWithExpiredUploads(input),
+    delete: (input) => records.delete(input),
+  };
 }
 
 describe("ClickHouseImportStoredObjectMigration.step", () => {
@@ -110,6 +136,49 @@ describe("ClickHouseImportStoredObjectMigration.step", () => {
       status: "finalized",
       report: { imported: 0, unchanged: 1 },
     });
+  });
+
+  /** @scenario "A Stored Objects import copies again a legacy row that changed" */
+  it("copies a changed legacy row again under a new generation", async () => {
+    const legacy = new OneLegacyObject();
+    const records = MemoryStoredObjectRecordRepository.create();
+    const step = ClickHouseImportStoredObjectMigration.create({ legacy, records }).step();
+    await step.migrateTenant({ tenantId: "project_1" });
+    const first = await records.findById({ tenantId: "project_1", id: "so_legacy" });
+
+    legacy.sizeBytes = 4;
+
+    await expect(step.migrateTenant({ tenantId: "project_1" })).resolves.toMatchObject({
+      status: "finalized",
+      report: { imported: 1, unchanged: 0 },
+    });
+    await expect(
+      records.findById({ tenantId: "project_1", id: "so_legacy" }),
+    ).resolves.toMatchObject({ byteLength: 4, generation: (first?.generation ?? 0) + 1 });
+  });
+
+  /** @scenario "A Stored Objects import leaves a row another writer moved" */
+  it("reports a row a delete moved after the read unchanged and leaves it deleted", async () => {
+    const legacy = new OneLegacyObject();
+    const records = MemoryStoredObjectRecordRepository.create();
+    await ClickHouseImportStoredObjectMigration.create({ legacy, records })
+      .step()
+      .migrateTenant({ tenantId: "project_1" });
+    const deletedGeneration =
+      ((await records.findById({ tenantId: "project_1", id: "so_legacy" }))?.generation ?? 0) + 1;
+    legacy.sizeBytes = 4;
+    const step = ClickHouseImportStoredObjectMigration.create({
+      legacy,
+      records: deleteLandsAfterRead(records),
+    }).step();
+
+    await expect(step.migrateTenant({ tenantId: "project_1" })).resolves.toMatchObject({
+      status: "finalized",
+      report: { imported: 0, unchanged: 1 },
+    });
+    await expect(
+      records.findById({ tenantId: "project_1", id: "so_legacy" }),
+    ).resolves.toMatchObject({ status: "deleted", byteLength: 3, generation: deletedGeneration });
   });
 
   /** @scenario "A legacy row stored outside its project fails the Stored Objects import" */
