@@ -42,6 +42,7 @@ import {
 import { instantEvalHydrationPlan } from "../rules/instant-eval-run-sizing.rules.ts";
 import type { InstantEvalTextSource } from "./instant-eval-estimate.service.ts";
 import type { InstantEvalFreeBudgetService } from "./instant-eval-free-budget.service.ts";
+import type { InstantEvalGatewayBudgetService } from "./instant-eval-gateway-budget.service.ts";
 import {
   INSTANT_EVAL_JUDGE_CONCURRENCY,
   InstantEvalJudgeRowsService,
@@ -86,6 +87,10 @@ export class InstantEvalJudgePageService {
   private readonly judgments: Pick<InstantEvalJudgmentsRepository, "insert">;
   private readonly cancellation: InstantEvalCancellationRepository;
   private readonly budget: Pick<InstantEvalFreeBudgetService, "assertWithinBudget">;
+  private readonly gatewayBudget: Pick<
+    InstantEvalGatewayBudgetService,
+    "assertWithinGatewayBudget"
+  >;
   private readonly readAhead: InstantEvalReadAheadService;
   private readonly judgeRows: InstantEvalJudgeRowsService;
   private readonly now: () => number;
@@ -98,6 +103,7 @@ export class InstantEvalJudgePageService {
     judgments: Pick<InstantEvalJudgmentsRepository, "insert">;
     cancellation: InstantEvalCancellationRepository;
     budget: Pick<InstantEvalFreeBudgetService, "assertWithinBudget">;
+    gatewayBudget: Pick<InstantEvalGatewayBudgetService, "assertWithinGatewayBudget">;
     readAhead: InstantEvalReadAheadService;
     concurrency: number;
     now: () => number;
@@ -109,6 +115,7 @@ export class InstantEvalJudgePageService {
     this.judgments = options.judgments;
     this.cancellation = options.cancellation;
     this.budget = options.budget;
+    this.gatewayBudget = options.gatewayBudget;
     this.readAhead = options.readAhead;
     this.judgeRows = InstantEvalJudgeRowsService.create({
       judge: options.judge,
@@ -125,6 +132,7 @@ export class InstantEvalJudgePageService {
     judgments,
     cancellation,
     budget,
+    gatewayBudget,
     readAhead = InstantEvalReadAheadService.create(),
     concurrency = INSTANT_EVAL_JUDGE_CONCURRENCY,
     now = () => nowInstant().epochMilliseconds,
@@ -136,6 +144,7 @@ export class InstantEvalJudgePageService {
     judgments: Pick<InstantEvalJudgmentsRepository, "insert">;
     cancellation: InstantEvalCancellationRepository;
     budget: Pick<InstantEvalFreeBudgetService, "assertWithinBudget">;
+    gatewayBudget: Pick<InstantEvalGatewayBudgetService, "assertWithinGatewayBudget">;
     /** The next page of each run, read while the current one judges. */
     readAhead?: InstantEvalReadAheadService;
     concurrency?: number;
@@ -149,6 +158,7 @@ export class InstantEvalJudgePageService {
       judgments,
       cancellation,
       budget,
+      gatewayBudget,
       readAhead,
       concurrency,
       now,
@@ -190,11 +200,9 @@ export class InstantEvalJudgePageService {
     // Thrown rather than answered empty: a run stopped by the budget did not
     // finish its selection, and recording it as complete would report a
     // partial answer as the whole one.
-    await this.budget.assertWithinBudget({
-      projectId,
-      reservationId: runId,
-      inFlightUsd: this.#spentSoFarUsd(loaded.row),
-    });
+    const inFlightUsd = this.#spentSoFarUsd(loaded.row);
+    await this.budget.assertWithinBudget({ projectId, reservationId: runId, inFlightUsd });
+    await this.gatewayBudget.assertWithinGatewayBudget({ projectId, inFlightUsd });
 
     const startedPage = this.now();
     const { keyPage, rows, isReadAhead } = await this.#takePageAndReadAhead({ loaded, input });

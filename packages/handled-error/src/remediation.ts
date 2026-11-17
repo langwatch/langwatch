@@ -1053,6 +1053,13 @@ const registry = {
       "Upgrade the organization to a paid plan under Settings, Plan & billing; judged queries and runs are then billed per input token",
     ],
   },
+  instant_eval_gateway_budget_exceeded: {
+    tips: [
+      "Read `meta.scope` and `meta.budgetId`; that gateway budget is set to block, and Instant Evals count against it like gateway traffic",
+      "Compare `meta.spentUsd` with `meta.limitUsd`, then raise or remove the budget under AI Gateway, Budgets, or wait for its `meta.window` to reset",
+    ],
+    docsPath: "/features/instant-evals/limits-and-cost",
+  },
   instant_eval_not_enabled: {
     tips: [
       "Instant Evals are off for this organization; a self-serve organization on the hosted service is switched on by an organization admin from the search bar, and any other organization or install asks LangWatch to",

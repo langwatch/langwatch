@@ -409,6 +409,7 @@ export const APP_ERROR_CODES = [
   "instant_eval_classifier_unavailable",
   "instant_eval_estimate_unavailable",
   "instant_eval_free_budget_exhausted",
+  "instant_eval_gateway_budget_exceeded",
   "instant_eval_memory_judge_in_production",
   "instant_eval_not_enabled",
   "instant_eval_not_found",
