@@ -85,12 +85,23 @@ Feature: Single-file datasets are converted to chunks
       And the next run of the single-file conversion step is recorded done
       And the step's report names it as marked lost by the operator
 
+    # A file that is there but not a list of records fails every retry of the step, so it needs
+    # the same way out; its file is kept for the operator to inspect.
     # becomes @unit
     @unimplemented
-    Scenario: A dataset is only marked lost when its file is really missing
-      Given a single-file dataset whose file is there and readable
+    Scenario: An operator marks a dataset whose file is not a list of records as lost
+      Given a single-file dataset whose file is there but is not a JSON array of records
+      When the operator marks that dataset's content as lost, naming the dataset
+      Then the dataset is kept with its name and columns, holds no rows and is shown as content lost
+      And its file is left where it was
+      And the next run of the single-file conversion step is recorded done
+
+    # becomes @unit
+    @unimplemented
+    Scenario: A dataset is only marked lost when its file cannot be converted
+      Given a single-file dataset whose file is there and is a list of records
       When the operator marks that dataset's content as lost
-      Then it refuses, saying the file is readable and the dataset can be converted
+      Then it refuses, saying the dataset can be converted
       And the dataset stays a single-file dataset
 
     @unit

@@ -3,14 +3,15 @@
 #
 # A scenario still tagged @unimplemented is planned, not built, and names the tag it becomes in a
 # comment above it; the commit that makes it pass swaps the tag and adds the `@scenario`
-# annotation in the same change.
+# annotation in the same change. A file's first bound scenario also removes the file from
+# LEGACY_INERT in both packages/architecture-enforcer/src/tools/check-feature-parity.ts and
+# tools/featureparity/lists.go, which must stay equal.
 #
-# Out of this file on purpose: create and copy. They are fixed on their own branch, with scenarios
-# in specs/datasets/large-dataset-storage.feature ("A new dataset is created directly in object
-# storage", "A failed create leaves no dataset behind", "A copy of a dataset is created directly in
-# object storage"). From the module split (#7536, shipped in 3.21.0) until #9351,
-# DatasetUpsertService.create inserted a Postgres-layout row and wrote DatasetRecord rows; create
-# now goes through content.createDataset, which writes object storage directly.
+# Where create and copy store rows is out of this file: specs/datasets/large-dataset-storage.feature
+# ("A new dataset is created directly in object storage", "A failed create leaves no dataset
+# behind", "A copy of a dataset is created directly in object storage"). From the module split
+# (#7536, shipped in 3.21.0) until #9351, a create wrote records-table rows. The one create
+# scenario below pins only the public answer a create gives, which this epic must not change.
 
 Feature: Every write puts dataset rows in object storage
   As a LangWatch operator
@@ -57,7 +58,8 @@ Feature: Every write puts dataset rows in object storage
       And after the next pass the dataset reads 5 rows from object storage
 
     # Version rows already live in object storage, so the restore writes them as the dataset's
-    # chunks and flips it (services/dataset-version.service.ts).
+    # chunks and flips it (services/dataset-version.service.ts). The table rows it leaves go to the
+    # records-table cleanup, which deletes those the chunks hold and archives the rest.
     @unit
     Scenario: Restoring a version of a dataset still in the records table moves it to object storage
       Given a dataset whose rows are still in the records table
@@ -65,7 +67,7 @@ Feature: Every write puts dataset rows in object storage
       When version 2 is restored
       Then the dataset reads the 4 rows of version 2 from object storage
       And the dataset is marked as stored in object storage
-      And the records-table rows it had are left for the records-table cleanup to delete
+      And the records-table rows it had are kept in the records table
 
   Rule: Nothing creates a dataset in the records table by default
 

@@ -1,7 +1,8 @@
 # Epic: dataset content lives only in object storage; Postgres keeps dataset metadata.
 #
-# EVERY SCENARIO HERE IS @unimplemented ON PURPOSE, and only until it binds (see write-paths.feature
-# in this folder for the convention).
+# The remaining-content move and the storage audit are bound. The cleanup scenarios are
+# @unimplemented on purpose, only until they bind (see write-paths.feature in this folder for the
+# convention).
 #
 # Why a second move step. "dataset:move-content-to-object-storage" shipped in 3.21.0
 # (modules/dataset/process/src/dataset.module.ts:42-54; packages/upgrade/releases/3.21.0.json:740-746).
@@ -100,14 +101,19 @@ Feature: Remaining dataset rows move to object storage and leave the records tab
       Then the 3 records-table rows of that dataset are deleted
       And the dataset still reads its 3 rows from object storage
 
+    # A row edited, deleted or replaced by a version restore after the move no longer matches the
+    # chunks. Only rows the chunks hold unchanged are provably in object storage; the rest are
+    # archive-bound, so an edited dataset cannot keep the cleanup from finishing.
     # becomes @unit
     @unimplemented
-    Scenario: A moved dataset whose chunks disagree with its records-table rows keeps them
-      Given a dataset stored in object storage whose records-table rows hold an id its chunks do not
+    Scenario: A moved dataset's rows that its chunks do not hold unchanged are kept for the archive
+      Given a dataset stored in object storage with 3 rows left in the records table under its own project
+      And its chunks hold 2 of those ids with the same entries, and not the third
       When the operator runs the records-table cleanup
-      Then none of that dataset's records-table rows are deleted
-      And the cleanup's report names the dataset and the id its chunks lack
-      And the cleanup is not recorded done
+      Then the 2 rows its chunks hold are deleted
+      And the third row is kept
+      And the cleanup's report names the dataset and the kept id as left for the archive
+      And the cleanup is recorded done
 
     # becomes @unit
     @unimplemented
@@ -128,6 +134,7 @@ Feature: Remaining dataset rows move to object storage and leave the records tab
       When the operator runs the records-table cleanup
       Then those rows are kept
       And the cleanup's report counts them as left for the archive
+      And they do not keep the cleanup from being recorded done
 
     # becomes @unit
     @unimplemented
