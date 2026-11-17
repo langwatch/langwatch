@@ -134,15 +134,19 @@ type call struct {
 }
 
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	c := &call{w: w, r: r, ctx: r.Context(), binding: bindingHTTPJSON, span: trace.SpanFromContext(context.Background())}
+	bad := parseRoute(c)
 	if b := h.cfg.Bundle(r.Context()); b != nil {
 		if !h.inflight.acquire(b.VirtualKeyID) {
-			busy := &call{w: w, binding: bindingHTTPJSON, span: trace.SpanFromContext(r.Context())}
-			busy.refuse(refuseBusy)
+			c.span = trace.SpanFromContext(r.Context())
+			c.refuse(refuseBusy)
 			return
 		}
 		defer h.inflight.release(b.VirtualKeyID)
 	}
-	c, bad := parseCall(w, r)
+	if bad == nil {
+		bad = parseBody(c)
+	}
 	c.bundle = h.cfg.Bundle(c.ctx)
 	if c.bundle == nil {
 		c.refuse(refuseUnauthenticated)
@@ -167,41 +171,38 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	h.forward(c, target)
 }
 
-// parseCall reads the target, binding, method and body. It returns the
-// refusal for a request that cannot be read as A2A.
-func parseCall(w http.ResponseWriter, r *http.Request) (*call, *refusal) {
-	c := &call{w: w, r: r, ctx: r.Context(), binding: bindingHTTPJSON, span: trace.SpanFromContext(context.Background())}
-	if bad := parseRoute(c); bad != nil {
-		return c, bad
-	}
-	body, tooLarge, err := readLimited(r.Body)
+// parseBody reads the body and, for JSON-RPC, its id and method. It returns
+// the refusal for a body that cannot be read as A2A.
+func parseBody(c *call) *refusal {
+	body, tooLarge, err := readLimited(c.r.Body)
 	c.body = body
 	if tooLarge {
-		return c, &refuseTooLarge
+		return &refuseTooLarge
 	}
 	if err != nil {
-		return c, &refuseInvalidRequest
+		return &refuseInvalidRequest
 	}
 	if c.binding != bindingJSONRPC {
-		return c, nil
+		return nil
 	}
-	return c, parseJSONRPC(c)
+	return parseJSONRPC(c)
 }
 
 // parseRoute fills the target, binding and REST method from the path. It
-// returns the refusal for a path that is invalid or names no A2A method.
+// returns the refusal for a path that is invalid or names no A2A method. A
+// path that fails to split keeps the HTTP+JSON binding.
 func parseRoute(c *call) *refusal {
 	r := c.r
 	name, rest, decoded, pathErr := splitPath(r)
 	c.name, c.rest = name, rest
+	if pathErr != nil {
+		return &refuseInvalidPath
+	}
 	c.isCard = (decoded == cardPath || decoded == legacyCardPath) && r.Method == http.MethodGet
 	method, known := restMethod(r.Method, decoded)
 	c.method = method
 	if (decoded == "" || decoded == "/") && r.Method == http.MethodPost {
 		c.binding, known = bindingJSONRPC, true
-	}
-	if pathErr != nil {
-		return &refuseInvalidPath
 	}
 	if !known {
 		return &refuseUnsupported

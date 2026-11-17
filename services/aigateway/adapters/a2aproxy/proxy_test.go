@@ -30,7 +30,7 @@ type upstreamCall struct {
 type fixture struct {
 	t        *testing.T
 	upstream *httptest.Server
-	registry *StaticRegistry
+	registry Registry
 	bundle   *domain.Bundle
 	scanner  Scanner
 	spans    *tracetest.SpanRecorder
@@ -41,7 +41,7 @@ type fixture struct {
 
 func newFixture(t *testing.T) *fixture {
 	t.Helper()
-	f := &fixture{t: t, registry: NewStaticRegistry(), spans: tracetest.NewSpanRecorder()}
+	f := &fixture{t: t, registry: BundleRegistry{}, spans: tracetest.NewSpanRecorder()}
 	f.bundle = &domain.Bundle{VirtualKeyID: "vk_support", ProjectID: "p1"}
 	f.reply = func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -58,18 +58,21 @@ func newFixture(t *testing.T) *fixture {
 		f.reply(w, r)
 	}))
 	t.Cleanup(f.upstream.Close)
-	f.registry.Put("p1", domain.A2ATarget{
+	f.bundle.Config.A2ATargets = []domain.A2ATarget{{
 		Name: "billing", AgentName: "Billing Agent", UpstreamURL: f.upstream.URL + "/a2a",
 		UpstreamHeaders: map[string]string{"X-Billing-Token": "upstream-secret"},
-	})
+	}}
 	return f
 }
 
 func (f *fixture) setTarget(mut func(*domain.A2ATarget)) {
-	t, err := f.registry.Lookup(context.Background(), f.bundle, "billing")
-	require.NoError(f.t, err)
-	mut(&t)
-	f.registry.Put("p1", t)
+	for i := range f.bundle.Config.A2ATargets {
+		if f.bundle.Config.A2ATargets[i].Name == "billing" {
+			mut(&f.bundle.Config.A2ATargets[i])
+			return
+		}
+	}
+	f.t.Fatal("no billing target in the fixture bundle")
 }
 
 func (f *fixture) do(method, path, body string, headers ...string) *httptest.ResponseRecorder {

@@ -189,23 +189,35 @@ export class GatewayConfigMaterialiserService {
    */
   async versionToken(vk: VirtualKeyWithScopes): Promise<string> {
     const token = await this.assembly.versionToken(vk, await this.upstreamOf(vk.organizationId));
+    const traceProject = await this.traceProjectOf(vk);
     const keyIds =
-      vk.traceProjectId && this.traceExportKeys
-        ? await this.traceExportKeys.findKeyIds(vk.traceProjectId)
+      traceProject && this.traceExportKeys
+        ? await this.traceExportKeys.findKeyIds(traceProject.id)
         : [];
-    const a2a = this.a2aTargets ? await this.a2aTargets.bundleFingerprint(this.a2aScopeOf(vk)) : "";
+    const a2a = this.a2aTargets
+      ? await this.a2aTargets.bundleFingerprint(this.a2aScopeOf(vk, traceProject))
+      : "";
     return [token, ...keyIds, ...(a2a ? [a2a] : [])].join(".");
   }
 
-  /** The A2A registry slice a key reads: its trace project's targets and the org-wide ones. */
-  private a2aScopeOf(vk: VirtualKeyWithScopes): {
+  /** The key's trace project as materialise resolves it; versionToken reads the same one. */
+  private async traceProjectOf(vk: VirtualKeyWithScopes) {
+    if (!vk.traceProjectId) return null;
+    return this.projects.findTraceDestination(vk.traceProjectId);
+  }
+
+  /** The A2A registry slice a key reads: its resolved trace project's targets and org-wide ones. */
+  private a2aScopeOf(
+    vk: VirtualKeyWithScopes,
+    traceProject: { id: string } | null,
+  ): {
     organizationId: string;
     projectId: string | null;
     virtualKeyId: string;
   } {
     return {
       organizationId: vk.organizationId,
-      projectId: vk.traceProjectId ?? null,
+      projectId: traceProject?.id ?? null,
       virtualKeyId: vk.id,
     };
   }
@@ -231,9 +243,7 @@ export class GatewayConfigMaterialiserService {
 
   async materialise(vk: VirtualKeyWithScopes): Promise<GatewayConfigPayload> {
     const eligibleProviders = await this.scopeResolution.eligibleModelProvidersForVk(vk);
-    const traceProject = vk.traceProjectId
-      ? await this.projects.findTraceDestination(vk.traceProjectId)
-      : null;
+    const traceProject = await this.traceProjectOf(vk);
     const budgets = await this.applicableBudgets(vk, traceProject);
     const spendByBudgetId = await this.loadCurrentSpend(vk, budgets);
     const config = parseVirtualKeyConfig(vk.config);
@@ -318,10 +328,7 @@ export class GatewayConfigMaterialiserService {
     });
     const otlpToken = await this.traceExportToken(vk, traceProject);
     const a2aTargets = this.a2aTargets
-      ? await this.a2aTargets.bundleFor({
-          ...this.a2aScopeOf(vk),
-          projectId: traceProject?.id ?? null,
-        })
+      ? await this.a2aTargets.bundleFor(this.a2aScopeOf(vk, traceProject))
       : [];
     return { bundle, otlpToken, a2aTargets };
   }
