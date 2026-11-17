@@ -133,12 +133,19 @@ func TestBusyKeyIsRefused(t *testing.T) {
 	for range maxInFlightPerKey {
 		require.True(t, h.inflight.acquire(f.bundle.VirtualKeyID))
 	}
-	req := httptest.NewRequest(http.MethodPost, "http://gw.acme.test/a2a/billing", strings.NewReader(sendMessage("SendMessage", "hi")))
+	req := httptest.NewRequest(http.MethodPost, "http://gw.acme.test/a2a/billing/message:send", strings.NewReader(`{"message":{"parts":[{"text":"hi"}]}}`))
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, req)
 
 	assert.Equal(t, http.StatusTooManyRequests, rec.Code)
 	assert.Equal(t, "a2a_too_many_requests", httpError(t, rec))
+
+	rec = httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "http://gw.acme.test/a2a/billing", strings.NewReader(sendMessage("SendMessage", "hi"))))
+	assert.Equal(t, http.StatusOK, rec.Code, "a JSON-RPC caller gets the JSON-RPC error shape")
+	code, reason, _ := rpcError(t, rec)
+	assert.Equal(t, -32020, code)
+	assert.Equal(t, "a2a_too_many_requests", reason)
 	assert.Empty(t, f.upstreamCalls())
 
 	h.inflight.release(f.bundle.VirtualKeyID)

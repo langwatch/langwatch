@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"strings"
-	"sync"
 
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/propagation"
@@ -125,36 +124,6 @@ func proxyBase(public string, r *http.Request, target string) string {
 		scheme = p
 	}
 	return scheme + "://" + r.Host + strings.TrimSuffix(PathPrefix, "/") + "/" + target
-}
-
-// StaticRegistry holds targets per project in memory. It backs tests and a
-// gateway with no control-plane registry yet.
-type StaticRegistry struct {
-	mu      sync.RWMutex
-	targets map[string]domain.A2ATarget
-}
-
-// NewStaticRegistry returns an empty registry.
-func NewStaticRegistry() *StaticRegistry {
-	return &StaticRegistry{targets: map[string]domain.A2ATarget{}}
-}
-
-// Put registers or replaces a target for a project.
-func (s *StaticRegistry) Put(projectID string, target domain.A2ATarget) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.targets[projectID+"/"+target.Name] = target
-}
-
-// Lookup implements Registry.
-func (s *StaticRegistry) Lookup(_ context.Context, bundle *domain.Bundle, name string) (domain.A2ATarget, error) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	t, ok := s.targets[bundle.ProjectID+"/"+name]
-	if !ok {
-		return domain.A2ATarget{}, domain.ErrA2ATargetNotFound
-	}
-	return t, nil
 }
 
 // BundleRegistry finds targets in the caller's config bundle, which the

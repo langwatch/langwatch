@@ -82,11 +82,13 @@ func TestPathThatLeavesTheBaseIsRefused(t *testing.T) {
 		"/a2a/billing/tasks/x%5C..",
 	} {
 		t.Run(path, func(t *testing.T) {
-			f := newFixture(t)
-			rec := f.do(http.MethodGet, path, "")
-			assert.Equal(t, http.StatusBadRequest, rec.Code, rec.Body.String())
-			assert.Equal(t, "a2a_invalid_request", httpError(t, rec))
-			assert.Empty(t, f.upstreamCalls())
+			for _, method := range []string{http.MethodGet, http.MethodPost} {
+				f := newFixture(t)
+				rec := f.do(method, path, sendMessage("SendMessage", "hi"))
+				assert.Equal(t, http.StatusBadRequest, rec.Code, method+" "+rec.Body.String())
+				assert.Equal(t, "a2a_invalid_request", httpError(t, rec))
+				assert.Empty(t, f.upstreamCalls())
+			}
 		})
 	}
 }

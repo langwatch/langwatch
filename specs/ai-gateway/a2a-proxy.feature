@@ -151,8 +151,10 @@ Feature: A2A proxy on the gateway
   @unit
   Scenario: a virtual key with too many calls in flight is refused
     Given the caller's virtual key already has 8 A2A calls in flight
-    When it sends another call
+    When it sends another call over HTTP+JSON
     Then the caller receives HTTP 429 with reason "a2a_too_many_requests"
+    When it sends another call over JSON-RPC
+    Then the caller receives a JSON-RPC error with code -32020 and reason "a2a_too_many_requests"
     And the upstream is not called
 
   @unit
@@ -205,9 +207,9 @@ Feature: A2A proxy on the gateway
 
   @unit
   Scenario: a path that could leave the upstream base path is refused
-    When the caller sends a path with a dot segment, or an encoded slash, backslash, "?" or "#"
+    When the caller sends a GET or a POST on a path with a dot segment, or an encoded slash, backslash, "?" or "#"
     Then the upstream is not called
-    And the caller receives HTTP 400 with reason "a2a_invalid_request"
+    And the caller receives HTTP 400 with reason "a2a_invalid_request" in the HTTP+JSON error shape
 
   @unit
   Scenario: a request the scanner cannot read is refused when the key scans requests
@@ -246,6 +248,12 @@ Feature: A2A proxy on the gateway
     When the target's upstream resolves to a loopback, private, link-local or metadata address
     Then the upstream is not called
     And the caller receives HTTP 502 with reason "a2a_upstream_unreachable"
+
+  @unit
+  Scenario: the config version token reads the same A2A targets as the bundle
+    Given a virtual key whose trace project no longer resolves
+    When the gateway asks for the key's config version token
+    Then the token fingerprints the A2A targets of the same scope the bundle carries
 
   @unit
   Scenario: a change to an A2A target reaches the gateway on the change feed

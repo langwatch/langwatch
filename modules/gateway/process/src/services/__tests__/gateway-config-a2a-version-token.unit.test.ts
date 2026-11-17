@@ -1,0 +1,82 @@
+/**
+ * The config version token must fingerprint the same A2A slice the bundle
+ * carries, or a 304 confirms a stale bundle. Covers
+ * specs/ai-gateway/a2a-proxy.feature.
+ */
+
+import type { ModelProviderApi } from "@langwatch/model-provider-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { describe, expect, it } from "vitest";
+
+import { memoryGatewayService } from "../../__tests__/support/memory.gateway-service.ts";
+import { virtualKeyRow } from "../../app/__tests__/gateway-virtual-key.fixture.ts";
+import { MemoryGatewayA2aTargetRepository } from "../../repositories/memory/memory.gateway-a2a-target.repository.ts";
+import { MemoryGatewayChangeEventsRepository } from "../../repositories/memory/memory.gateway-change-event.repository.ts";
+import { MemoryGatewayScopeResolutionRepository } from "../../repositories/memory/memory.gateway-scope-resolution.repository.ts";
+import { MemoryGatewayStore } from "../../repositories/memory/memory.gateway.store.ts";
+import type { GatewayConfigAssembly } from "../../rules/gateway-config-wire.rules.ts";
+import { GatewayA2aTargetService } from "../gateway-a2a-target.service.ts";
+import { GatewayConfigMaterialiserService } from "../gateway-config-materialisation.service.ts";
+import { GatewayScopeResolutionService } from "../gateway-scope-resolution.service.ts";
+
+const notReached = (): never => {
+  throw new Error("the version token reads only the key's token, trace project and targets");
+};
+
+const assembly: GatewayConfigAssembly = {
+  versionToken: async () => "cfg-1",
+  withTierFallthrough: notReached,
+  findDeclaredModelsForProvider: notReached,
+  buildCredentials: notReached,
+};
+
+describe("GatewayConfigMaterialiserService.versionToken", () => {
+  describe("given a key whose trace project no longer resolves", () => {
+    /** @scenario "the config version token reads the same A2A targets as the bundle" */
+    it("fingerprints the A2A targets of the scope the bundle carries", async () => {
+      const vk = { ...virtualKeyRow(), traceProjectId: "p_gone" };
+      const target = {
+        organizationId: vk.organizationId,
+        agentName: "Billing agent",
+        cardUrl: "https://billing.acme.test/.well-known/agent-card.json",
+        upstreamUrl: "https://billing.acme.test/a2a",
+        actorUserId: "user_1",
+        name: "billing",
+      };
+      const a2aTargets = GatewayA2aTargetService.create({
+        repository: MemoryGatewayA2aTargetRepository.create(),
+        changeEvents: MemoryGatewayChangeEventsRepository.create(),
+        transactions: { run: (work) => work({}) },
+      });
+      await a2aTargets.create({ ...target, projectId: null });
+      await a2aTargets.create({ ...target, projectId: "p_gone", agentName: "Shadowing agent" });
+      const projects = createApiFixture<ProjectApi>({
+        findTraceDestination: async () => null,
+      });
+      const store = MemoryGatewayStore.create();
+      const materialiser = GatewayConfigMaterialiserService.create({
+        scopeResolution: GatewayScopeResolutionService.create({
+          repository: MemoryGatewayScopeResolutionRepository.create(store),
+          platformProviders: createApiFixture<ModelProviderApi>(),
+          projects,
+        }),
+        projects,
+        chRepo: null,
+        budgetDecisions: memoryGatewayService({ store, projects }).service,
+        modelProviders: createApiFixture<ModelProviderApi>(),
+        assembly,
+        a2aTargets,
+      });
+
+      const bundleScope = {
+        organizationId: vk.organizationId,
+        projectId: null,
+        virtualKeyId: vk.id,
+      };
+      expect(await materialiser.versionToken(vk)).toBe(
+        `cfg-1.${await a2aTargets.bundleFingerprint(bundleScope)}`,
+      );
+    });
+  });
+});
