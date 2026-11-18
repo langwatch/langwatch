@@ -276,9 +276,43 @@ function buildWindowPredicates({
       ...datedPicks({ view, key, reach }),
     ];
     const tenanted = view.columns.some((column) => column.name === TENANT_COLUMN);
-    predicates.set(key, !tenanted || picks.length === 0 ? NO_ROWS : `(${picks.join(" OR ")})`);
+    predicates.set(
+      key,
+      !tenanted || picks.length === 0
+        ? NO_ROWS
+        : windowPredicate({ view, database, picks, memberWindows }),
+    );
   }
   return predicates;
+}
+
+/**
+ * The members' picks as one predicate on a view's rows. A fanned-out PostgreSQL view keeps one
+ * copy of a row, the lowest in-scope project's (tasks#1212), so a pick read on that copy alone
+ * would drop a row a sibling member's window admits. Its picks run on the engine table's
+ * per-project copies, under the same row policy, and admit the row's keys. The members' plain
+ * `IN` list leads so the engine can hand PostgreSQL a tenant bound, not a whole-table read.
+ */
+function windowPredicate({
+  view,
+  database,
+  picks,
+  memberWindows,
+}: {
+  view: LangWatchQLViewDefinition;
+  database: string;
+  picks: readonly string[];
+  memberWindows: readonly LangWatchQLMemberWindow[];
+}): string {
+  const either = `(${picks.join(" OR ")})`;
+  const keys = view.postgres?.entityKeyColumns ?? [];
+  if (keys.length === 0) return either;
+  const keyList = keys.join(", ");
+  const members = memberWindows.map((window) => clickHouseLiteral(window.projectId)).join(", ");
+  return (
+    `(${keyList}) IN (SELECT ${keyList} FROM ${database}.${view.sourceTable} ` +
+    `WHERE ${TENANT_COLUMN} IN (${members}) AND ${either})`
+  );
 }
 
 /** What a view's dated-member windows are built from, the same for every view. */

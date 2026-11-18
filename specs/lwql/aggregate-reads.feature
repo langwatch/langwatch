@@ -66,6 +66,24 @@ Feature: LangWatchQL on an aggregate project reads its members inside their gran
     When ana runs a statement that reads the same view twice
     Then both references are narrowed to the members' windows
 
+  # tasks#1212: a fanned-out PostgreSQL view keeps one copy of a team- or organization-level
+  # row, the lowest in-scope project's. That copy's window alone must not decide the row.
+  @unit @integration
+  Scenario: A member window on the kept copy does not hide a row a sibling's window admits
+    Given two sibling projects of one organization and an organization-level row
+    And the project whose copy the view keeps is shared only from after the row was created
+    And its sibling is shared for its whole history
+    When ana runs a statement reading that row's view over both
+    Then the row is read once
+
+  @integration
+  Scenario: A member window cannot admit a row through a project the caller cannot read
+    Given an organization with an organization-level row and three projects
+    And the caller's key set holds only two of them, each shared only from after the row was created
+    And the window list names the third project as shared for its whole history
+    When ana runs a statement reading that row's view over the two readable projects
+    Then the row is not read
+
   @unit
   Scenario: A view with no time column reads only members shared for their whole history
     Given project B is shared from a point in time

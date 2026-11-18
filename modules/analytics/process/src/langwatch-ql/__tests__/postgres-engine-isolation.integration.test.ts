@@ -10,6 +10,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
 import { type ClickHouseClient, createClient } from "@clickhouse/client";
+import type { LangWatchQLMemberWindow } from "@langwatch/analytics-contract";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import {
@@ -1042,8 +1043,11 @@ describe("when a caller reads two sibling projects of one organization in one qu
     id: `lwql-fanout-project-${index}`,
     lwqlKey: `raw-lwql-key-FANOUT-DO-NOT-LOG-${index}`,
   }));
+  /** A third project of the same organization, in the key map but never in the caller's key set. */
+  const UNREADABLE = { id: "lwql-fanout-project-3", lwqlKey: "raw-lwql-key-FANOUT-DO-NOT-LOG-3" };
+  const SEEDED = [...SIBLINGS, UNREADABLE];
   const keyHashes = () =>
-    SIBLINGS.map(({ lwqlKey }) => lwqlCapability.tenantCapability({ secret: lwqlKey }));
+    SEEDED.map(({ lwqlKey }) => lwqlCapability.tenantCapability({ secret: lwqlKey }));
   const keyMapTable = () => `${harness.factDatabase}.${harness.names.keyMapTable}`;
 
   const seedStatements = (): string[] => [
@@ -1053,7 +1057,7 @@ describe("when a caller reads two sibling projects of one organization in one qu
       `VALUES ('${TEAM_ID}', 'Fan-out team', '${TEAM_ID}-slug', '${ORGANIZATION_ID}')`,
     `INSERT INTO "Project" ` +
       `("id", "name", "slug", "apiKey", "lwqlKey", "teamId", "language", "framework") VALUES ` +
-      SIBLINGS.map(
+      SEEDED.map(
         ({ id }) =>
           `('${id}', 'Project ${id}', '${id}-slug', 'excluded-apikey-of-${id}', ` +
           `'excluded-lwqlkey-of-${id}', '${TEAM_ID}', 'python', 'openai')`,
@@ -1089,9 +1093,13 @@ describe("when a caller reads two sibling projects of one organization in one qu
 
   let service: LangWatchQLService;
 
-  const sumBudget = async (projects: typeof SIBLINGS) => {
+  const sumBudget = async (
+    projects: typeof SIBLINGS,
+    memberWindows?: readonly LangWatchQLMemberWindow[],
+  ) => {
     const result = await service.executeForProjects({
       projects,
+      ...(memberWindows ? { memberWindows } : {}),
       protections: {
         catalogue: EVERY_CATALOGUE_PERMISSION,
         canSeeCosts: true,
@@ -1126,7 +1134,7 @@ describe("when a caller reads two sibling projects of one organization in one qu
     await harness.admin.insert({
       table: keyMapTable(),
       format: "JSONEachRow",
-      values: SIBLINGS.map(({ id }, index) => ({ KeyHash: keyHashes()[index], TenantId: id })),
+      values: SEEDED.map(({ id }, index) => ({ KeyHash: keyHashes()[index], TenantId: id })),
     });
   }, 60_000);
 
@@ -1155,4 +1163,31 @@ describe("when a caller reads two sibling projects of one organization in one qu
     },
     60_000,
   );
+
+  /** @scenario "A member window on the kept copy does not hide a row a sibling's window admits" */
+  it("reads the budget once when only the sibling whose copy is not kept admits it", async () => {
+    // The view keeps the lowest project's copy, here project 1, whose window opens after the
+    // budget was created; project 2 is shared for its whole history and so admits it.
+    const [kept, sibling] = SIBLINGS;
+    if (!kept || !sibling) throw new Error("the fan-out suite needs two sibling projects");
+    const rows = await sumBudget(SIBLINGS, [
+      { projectId: kept.id, from: Date.parse("2100-01-01T00:00:00.000Z") },
+      { projectId: sibling.id, from: 0 },
+    ]);
+    expect(rows, `got ${JSON.stringify(rows)}`).toEqual([{ total: LIMIT_USD, n: 1 }]);
+  }, 60_000);
+
+  /** @scenario "A member window cannot admit a row through a project the caller cannot read" */
+  it("reads nothing when only an unreadable sibling's window would admit the budget", async () => {
+    // Both readable siblings open after the budget was created; only project 3's window, read
+    // for its whole history, would admit it. The row policy must drop project 3's copy from the
+    // engine-table read the window predicate makes, so the budget stays out.
+    const opensAfterTheBudget = Date.parse("2100-01-01T00:00:00.000Z");
+    const rows = await sumBudget(SIBLINGS, [
+      ...SIBLINGS.map(({ id }) => ({ projectId: id, from: opensAfterTheBudget })),
+      { projectId: UNREADABLE.id, from: 0 },
+    ]);
+    // An aggregate with no GROUP BY answers one row even over no input rows.
+    expect(rows, `got ${JSON.stringify(rows)}`).toEqual([{ total: 0, n: 0 }]);
+  }, 60_000);
 });

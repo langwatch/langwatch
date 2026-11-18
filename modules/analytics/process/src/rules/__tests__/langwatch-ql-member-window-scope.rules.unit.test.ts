@@ -108,6 +108,24 @@ describe("scopeLangWatchQL with member windows", () => {
       );
     });
 
+    /** @scenario "A member window on the kept copy does not hide a row a sibling's window admits" */
+    it("picks a fanned-out view's rows by key from the engine table's per-project copies", () => {
+      const budgets = VIEWS.find((view) => view.name === "gateway_budgets");
+      if (!budgets?.timeColumn) throw new Error("gateway_budgets has no time column");
+      const picks =
+        `(TenantId IN ('project_a') OR (TenantId = 'project_b' AND ` +
+        `${budgets.timeColumn} >= fromUnixTimestamp64Milli(toInt64(${SHARED_FROM}))))`;
+
+      expect(
+        scope({ sql: "SELECT count() FROM gateway_budgets", memberWindows: [WHOLE_A, DATED_B] }),
+      ).toBe(
+        "SELECT count() FROM (SELECT * FROM gateway_budgets WHERE (GatewayBudgetId) IN " +
+          "(SELECT GatewayBudgetId FROM analytics.gateway_budgets_pg " +
+          `WHERE TenantId IN ('project_a', 'project_b') AND ${picks})) ` +
+          "AS gateway_budgets",
+      );
+    });
+
     it("reads nothing from a view with no time column when every member is dated", () => {
       expect(scope({ sql: "SELECT count() FROM undated", memberWindows: [DATED_B] })).toBe(
         "SELECT count() FROM (SELECT * FROM undated WHERE 0) AS undated",
