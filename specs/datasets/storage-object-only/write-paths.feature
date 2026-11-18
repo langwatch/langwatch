@@ -23,7 +23,7 @@ Feature: Every write puts dataset rows in object storage
 
   Rule: A dataset in object storage never gains rows in the records table
 
-    # createMany, update and replaceAll read the dataset's layout first, under the caller's lock
+    # createMany, update, deleteMany and replaceAll read the dataset's layout first, under the caller's lock
     # when it holds one (rules/dataset-records-table.rules.ts). ADR-032 I-PG.
     @unit
     Scenario: A records-table write for a dataset kept in object storage is refused
@@ -57,17 +57,27 @@ Feature: Every write puts dataset rows in object storage
       Then the move leaves the dataset where it is for its next pass
       And after the next pass the dataset reads 5 rows from object storage
 
-    # Version rows already live in object storage, so the restore writes them as the dataset's
-    # chunks and flips it (services/dataset-version.service.ts). The table rows it leaves go to the
-    # records-table cleanup, which deletes those the chunks hold and archives the rest.
+    # The restore replaces the table rows under the lock (services/dataset-restore-content.service.ts),
+    # so the move's change check sees it. Writing chunks for a dataset the move has not flipped
+    # would race the move's own chunk writes, which run before it takes the lock.
     @unit
-    Scenario: Restoring a version of a dataset still in the records table moves it to object storage
+    Scenario: Restoring a version of a dataset still in the records table keeps it there for the move
       Given a dataset whose rows are still in the records table
       And a saved version 2 of that dataset with 4 rows
       When version 2 is restored
-      Then the dataset reads the 4 rows of version 2 from object storage
-      And the dataset is marked as stored in object storage
-      And the records-table rows it had are kept in the records table
+      Then the dataset reads the 4 rows of version 2 from the records table
+      And when the move flips the dataset while a restore waits, the restore writes the chunks instead
+
+    # The record service decides where rows live before it takes the lock; the table refuses a
+    # write the move beat to the lock, and the write goes to the chunks
+    # (services/dataset-locked-records.service.ts).
+    @unit
+    Scenario: A record write that waited while the dataset moved goes to object storage
+      Given a dataset whose 3 rows are still in the records table
+      And the move flips it while a record write waits for the dataset's lock
+      When a row is deleted, added or edited
+      Then the change is in the dataset's chunks
+      And no deleted row comes back
 
   Rule: Nothing creates a dataset in the records table by default
 

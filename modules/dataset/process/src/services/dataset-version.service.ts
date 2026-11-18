@@ -8,7 +8,6 @@ import {
   DatasetVersionNotFoundError,
   DatasetVersionRestoreUnsupportedError,
   type Dataset,
-  type DatasetColumns,
   type DatasetVersion,
   type DatasetVersionAuthor,
   type DatasetVersionComparison,
@@ -21,7 +20,6 @@ import {
   type DatasetVersionSavedEventData,
   type DatasetVersionTrigger,
 } from "@langwatch/dataset-contract";
-import { createLogger } from "@langwatch/observability";
 
 import type { DatasetChunkRepository } from "../repositories/dataset-chunk.repository.ts";
 import type { DatasetContentRepository } from "../repositories/dataset-content.repository.ts";
@@ -40,10 +38,8 @@ import {
   versionChunksOfPage,
   versionRowOf,
 } from "../rules/dataset-version.rules.ts";
-import { StreamingChunkWriterService } from "./dataset-chunk-writer.service.ts";
 import { DatasetContentHasherService } from "./dataset-content-hasher.service.ts";
-
-const logger = createLogger("langwatch:dataset:versions");
+import { DatasetRestoreContentService } from "./dataset-restore-content.service.ts";
 
 /** Rows read per page of a postgres-layout dataset while snapshotting it. */
 const RECORD_PAGE_SIZE = 500;
@@ -240,7 +236,11 @@ export class DatasetVersionService {
 
     const rows = await this.readWhole(target);
     await this.snapshot({ ...input, datasetId: dataset.id, trigger: "autosave" });
-    await this.#replaceContent({ dataset, columns: target.columnTypes, rows });
+    await DatasetRestoreContentService.create(this.deps).replace({
+      dataset,
+      columns: target.columnTypes,
+      rows,
+    });
     const restored = await this.snapshot({
       ...input,
       datasetId: dataset.id,
@@ -442,52 +442,6 @@ export class DatasetVersionService {
       for (const record of page) yield { id: record.id, entry: record.entry };
       more = page.length === RECORD_PAGE_SIZE;
       cursorId = page.at(-1)?.id;
-    }
-  }
-
-  /** Writes the rows as chunks under the dataset's lock; a records-table dataset moves too. */
-  async #replaceContent({
-    dataset,
-    columns,
-    rows,
-  }: {
-    dataset: Dataset;
-    columns: DatasetColumns;
-    rows: readonly DatasetVersionRow[];
-  }): Promise<void> {
-    const { projectId, id: datasetId } = dataset;
-    const moves = dataset.contentLayout !== "s3_jsonl";
-    await this.deps.content.withDatasetLock(datasetId, async (tx) => {
-      const writer = StreamingChunkWriterService.create({
-        storage: this.deps.chunks,
-        projectId,
-        datasetId,
-      });
-      for (const row of rows) await writer.push(row.entry, { id: row.id });
-      const meta = await writer.finalize();
-      await this.deps.chunks.deleteChunksFrom({ projectId, datasetId, fromIndex: meta.chunkCount });
-      const content = {
-        rowCount: meta.rowCount,
-        sizeBytes: BigInt(meta.sizeBytes),
-        chunkCount: meta.chunkCount,
-        chunkOffsets: meta.chunkOffsets,
-        columnTypes: columns,
-      };
-      if (moves) {
-        await tx.update({
-          id: datasetId,
-          projectId,
-          data: { ...content, contentLayout: "s3_jsonl" },
-        });
-        return;
-      }
-      await tx.updateContent({ id: datasetId, projectId, content });
-    });
-    if (moves) {
-      logger.info(
-        { projectId, datasetId, rows: rows.length },
-        "Restored a dataset version into object storage",
-      );
     }
   }
 

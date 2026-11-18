@@ -15,6 +15,7 @@ import type { DatasetRepositories } from "../../repositories/dataset.repositorie
 import { MemoryDatasetVersionRepository } from "../../repositories/memory/memory.dataset-version.repository.ts";
 import { MemoryDatasetRepositories } from "../../repositories/memory/memory.dataset.repositories.ts";
 import { StreamingChunkWriterService } from "../../services/dataset-chunk-writer.service.ts";
+import { DatasetMigrationService } from "../../services/dataset-migration.service.ts";
 import type { DatasetModule } from "../dataset.app.ts";
 import {
   createDatasetTestApp,
@@ -590,8 +591,8 @@ describe("when a version is restored", () => {
       return datasetId;
     }
 
-    /** @scenario "Restoring a version of a dataset still in the records table moves it to object storage" */
-    it("writes the version's rows to object storage and leaves the table's rows", async () => {
+    /** Version 2 holds a, b, c and d; the table then loses c, so the restore has work to do. */
+    async function withSavedVersion2() {
       const datasetId = await recordsTableDataset([
         { id: "a", input: "first" },
         { id: "b", input: "second" },
@@ -607,29 +608,45 @@ describe("when a version is restored", () => {
       });
       await save(datasetId);
       await app.deleteRecords({ projectId: PROJECT, slugOrId: datasetId, recordIds: ["c"] });
+      return datasetId;
+    }
+
+    const currentIds = async (datasetId: string) =>
+      (
+        await app.getDatasetWithRecords({ projectId: PROJECT, slugOrId: datasetId, limitMb: null })
+      ).records.map((record) => record.id);
+
+    /** @scenario "Restoring a version of a dataset still in the records table keeps it there for the move" */
+    it("writes the version's rows to the records table, where the move's change check sees them", async () => {
+      const datasetId = await withSavedVersion2();
 
       await app.restoreVersion({ projectId: PROJECT, datasetId, version: 2 });
 
       const stored = await repositories.content.getOne({ id: datasetId, projectId: PROJECT });
-      expect(stored).toMatchObject({ contentLayout: "s3_jsonl", useS3: false, rowCount: 4 });
-      const chunkRows = await repositories.chunks.readChunks({
-        projectId: PROJECT,
-        datasetId,
-        chunkCount: stored.chunkCount ?? 0,
-      });
-      expect(chunkRows).toEqual([
-        { id: "a", entry: { input: "first" } },
-        { id: "b", entry: { input: "second" } },
-        { id: "c", entry: { input: "third" } },
-        { id: "d", entry: { input: "fourth" } },
-      ]);
-      const current = await app.getDatasetWithRecords({
-        projectId: PROJECT,
-        slugOrId: datasetId,
-        limitMb: null,
-      });
-      expect(current.records.map((record) => record.id)).toEqual(["a", "b", "c", "d"]);
-      await expect(repositories.records.count({ datasetId, projectId: PROJECT })).resolves.toBe(3);
+      expect(stored).toMatchObject({ contentLayout: "postgres" });
+      await expect(currentIds(datasetId)).resolves.toEqual(["a", "b", "c", "d"]);
+      await expect(repositories.records.count({ datasetId, projectId: PROJECT })).resolves.toBe(4);
+    });
+
+    /** @scenario "Restoring a version of a dataset still in the records table keeps it there for the move" */
+    it("writes the version as chunks when the move flipped the dataset while the restore waited", async () => {
+      const datasetId = await withSavedVersion2();
+      const lock = repositories.records.withDatasetLock.bind(repositories.records);
+      repositories.records.withDatasetLock = async (key, write) => {
+        repositories.records.withDatasetLock = lock;
+        await DatasetMigrationService.create({
+          repository: repositories.migration,
+          storage: repositories.migrationChunks,
+          projects: { listAllIds: async () => ({ ids: [PROJECT], next: null }) },
+        }).run();
+        return lock(key, write);
+      };
+
+      await app.restoreVersion({ projectId: PROJECT, datasetId, version: 2 });
+
+      const stored = await repositories.content.getOne({ id: datasetId, projectId: PROJECT });
+      expect(stored).toMatchObject({ contentLayout: "s3_jsonl", rowCount: 4 });
+      await expect(currentIds(datasetId)).resolves.toEqual(["a", "b", "c", "d"]);
     });
   });
 
