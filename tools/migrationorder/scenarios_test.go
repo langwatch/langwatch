@@ -315,7 +315,7 @@ func TestStepsFreezesAReleasedIdIndexStepInItsDeclaringCall(t *testing.T) {
 		gatewayCall = ".withIdIndexes(GATEWAY_ID_INDEXES, {\n  after: [\"coding-agent:fill-id-indexes\"],\n  description: \"Fills gateway.\",\n})"
 		opsCall     = ".withIdIndexes([EVENT_LOG_ID_INDEX], {\n  step: \"fill-event-log-id-index\",\n  after: [\"gateway:fill-id-indexes\"],\n})"
 		gateway     = "export const gateway = defineProcessModule(\"gateway\")\n  " + gatewayCall + ";\n"
-		ops         = "export const ops = defineProcessModule(\"ops\")\n  .withEventing(usageEventing)\n  " + opsCall + ";\n"
+		ops         = "export const ops = defineProcessModule(\"ops\")\n  .withEventing(usageEventing)\n  // reads the event log\n  " + opsCall + ";\n"
 	)
 	findingsAfter := func(t *testing.T, gatewayHead, opsHead string) []migrationorder.Finding {
 		t.Helper()
@@ -360,6 +360,10 @@ func TestStepsReadsAReleasedIdIndexStepFromItsOwnersCallInCode(t *testing.T) {
 		removed     = "export const gateway = defineProcessModule(\"gateway\");\n"
 		other       = "// mirrors defineProcessModule(\"gateway\")\nexport const other = defineProcessModule(\"other\")\n  " + gatewayCall + ";\n"
 	)
+	edited := strings.Replace(ops, "[EVENT_LOG_ID_INDEX]", "[EVENT_LOG_ID_INDEX, MORE]", 1)
+	quotedKey := func(quote, file string) string {
+		return strings.Replace(file, "  step:", "  "+quote+"step"+quote+":", 1)
+	}
 	cases := []struct {
 		name, problem, entry string
 		files                map[string][2]string
@@ -368,13 +372,19 @@ func TestStepsReadsAReleasedIdIndexStepFromItsOwnersCallInCode(t *testing.T) {
 			gatewayFile: {gateway, strings.Replace(gateway, "Fills gateway.", "Fills more.", 1)}, opsFile: {ops, ops},
 		}},
 		{"a comment naming another step", "declares ops:fill-event-log-id-index", opsFile, map[string][2]string{
-			gatewayFile: {gateway, gateway}, opsFile: {ops, strings.Replace(ops, "[EVENT_LOG_ID_INDEX]", "[EVENT_LOG_ID_INDEX, MORE]", 1)},
+			gatewayFile: {gateway, gateway}, opsFile: {ops, edited},
 		}},
 		{"the call commented out", "released step gateway:fill-id-indexes was removed", gatewayFile, map[string][2]string{
 			gatewayFile: {gateway, strings.Replace(gateway, gatewayCall, "/* "+gatewayCall+" */", 1)}, opsFile: {ops, ops},
 		}},
 		{"another module's identical call", "released step gateway:fill-id-indexes was removed", gatewayFile, map[string][2]string{
 			gatewayFile: {gateway, removed}, opsFile: {ops, ops}, otherFile: {other, other},
+		}},
+		{"a double-quoted step key", "declares ops:fill-event-log-id-index", opsFile, map[string][2]string{
+			gatewayFile: {gateway, gateway}, opsFile: {quotedKey(`"`, ops), quotedKey(`"`, edited)},
+		}},
+		{"a single-quoted step key", "declares ops:fill-event-log-id-index", opsFile, map[string][2]string{
+			gatewayFile: {gateway, gateway}, opsFile: {quotedKey(`'`, ops), quotedKey(`'`, edited)},
 		}},
 	}
 	for _, c := range cases {
@@ -387,13 +397,34 @@ func TestStepsReadsAReleasedIdIndexStepFromItsOwnersCallInCode(t *testing.T) {
 	}
 }
 
-// @scenario "An after list with a comment before its bracket is still a reference"
+// @scenario "An after list with a comment before its colon or its bracket is still a reference"
 func TestStepsTreatsAnAfterListBehindACommentAsAReference(t *testing.T) {
 	const file = "modules/gateway/process/src/gateway.module.ts"
-	base := "export const gateway = defineProcessModule(\"gateway\")\n  .withIdIndexes(GATEWAY_ID_INDEXES, {\n    after: /* dependency */ [\"coding-agent:fill-id-indexes\"],\n  });\n"
-	head := "import { more } from \"./more\";\n" + base
-	if findings := idIndexFindings(t, map[string][2]string{file: {base, head}}); len(findings) != 0 {
-		t.Errorf("an unrelated line beside a commented after list, want no finding, got %+v", findings)
+	for _, after := range []string{"after: /* dependency */ [", "after /* dependency */: [", "after // dependency\n    : ["} {
+		t.Run(after, func(t *testing.T) {
+			base := "export const gateway = defineProcessModule(\"gateway\")\n  .withIdIndexes(GATEWAY_ID_INDEXES, {\n    " + after + "\"coding-agent:fill-id-indexes\"],\n  });\n"
+			head := "import { more } from \"./more\";\n" + base
+			if findings := idIndexFindings(t, map[string][2]string{file: {base, head}}); len(findings) != 0 {
+				t.Errorf("an unrelated line beside a commented after list, want no finding, got %+v", findings)
+			}
+		})
+	}
+}
+
+// @scenario "After-list text in a comment or a string is not an after list"
+func TestStepsIgnoresAfterListTextInACommentOrAString(t *testing.T) {
+	const file = "modules/gateway/process/src/fill.ts"
+	for name, base := range map[string]string{
+		"a comment": "const steps = { // after: [\n  fill: customStep(\"coding-agent:fill-id-indexes\") };\n",
+		"a string":  "const steps = { note: \"after: [\", // \"\n  fill: customStep(\"coding-agent:fill-id-indexes\") };\n",
+	} {
+		t.Run(name, func(t *testing.T) {
+			head := "import { more } from \"./more\";\n" + base
+			findings := idIndexFindings(t, map[string][2]string{file: {base, head}})
+			if len(findings) != 1 || findings[0].Entry != file || !strings.Contains(findings[0].Problem, "declares coding-agent:fill-id-indexes") {
+				t.Errorf("an edit to a file naming the step outside an after list, want one finding, got %+v", findings)
+			}
+		})
 	}
 }
 
