@@ -229,11 +229,21 @@ describe("braided spans and the organisation's plan", () => {
 
     /** @scenario Turning Braids on again resumes the braids it paused */
     it("honours the same braid again for a proof minted after Braids is turned back on", async () => {
-      const paused = detailApp({ planType: "ENTERPRISE", braidsEnabled: false });
-      const resumed = detailApp({ planType: "ENTERPRISE", braidsEnabled: true });
+      vi.useFakeTimers({ toFake: ["Date"] });
+      try {
+        const start = Date.now();
+        const { open, settings } = detailApp({ planType: "ENTERPRISE", braidsEnabled: false });
+        expect(readsBraidedSpans(await open(braided()))).toBe(false);
 
-      expect(readsBraidedSpans(await paused.open(braided()))).toBe(false);
-      expect(spanFenceOf(await resumed.open(braided())).braids?.clauses).toHaveLength(1);
+        settings.braidsEnabled = true;
+        vi.setSystemTime(start + TEST_PROOF_LIFETIME_MS + 1);
+        const proof = await open(braided());
+
+        expect(spanFenceOf(proof).braids?.clauses).toHaveLength(1);
+        expect(settings.asked).toBe(2);
+      } finally {
+        vi.useRealTimers();
+      }
     });
   });
 

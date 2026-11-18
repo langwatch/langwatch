@@ -172,6 +172,10 @@ describe("braid management behind release_braids", () => {
 
       expect(settings).toMatchObject({ braidsEnabled: true });
       expect(turnedOff).toMatchObject({ braidsEnabled: false, updatedByUserId: ANA });
+      await expect(made.as(ANA).getBraidsPolicy({ organizationId: ORG })).resolves.toMatchObject({
+        braidsEnabled: false,
+        updatedByUserId: ANA,
+      });
     });
 
     /** @scenario "A trace read still shows an existing braid's matched conditions while braids are off" */

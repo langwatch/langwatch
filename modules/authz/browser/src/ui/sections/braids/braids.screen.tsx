@@ -40,6 +40,7 @@ import { BraidsTable } from "../../blocks/braids/braids-table.tsx";
 import { RemoveBraidDialog } from "../../blocks/braids/remove-braid-dialog.tsx";
 import { BraidsNotEnabledBanner } from "../../elements/braids-not-enabled-banner.tsx";
 import { BraidsPageLinks } from "../../elements/braids-page-links.tsx";
+import { BraidsPlanPausedBanner } from "../../elements/braids-plan-paused-banner.tsx";
 import { BraidsTitle } from "../../elements/braids-title.tsx";
 import { NO_RULE_UNDER_HEADER } from "../../elements/no-rule-under-header.ts";
 import { SectionErrorNotice } from "../../elements/section-error-notice.tsx";
@@ -161,23 +162,6 @@ function BraidsSectionBand({
   );
 }
 
-function PausedBanner({ total }: { total: number }) {
-  return (
-    <Banner
-      status="warning"
-      title="Braids are paused"
-      action={
-        <BannerAction asChild>
-          <Link href="/settings/plans">See plans</Link>
-        </BannerAction>
-      }
-    >
-      Braids need the Enterprise plan. Your {total === 1 ? "braid is" : `${total} braids are`} kept
-      and start working again when you upgrade.
-    </Banner>
-  );
-}
-
 /** The organisation has Braids turned off: who can turn it on, and what happened to the braids. */
 function TurnedOffBanner({
   total,
@@ -231,6 +215,7 @@ function KeptToAdminsBanner() {
 function BraidsNotices({
   released,
   turnedOff,
+  turnedOn,
   paused,
   total,
   keptToAdmins,
@@ -238,6 +223,8 @@ function BraidsNotices({
 }: {
   released: boolean;
   turnedOff: boolean;
+  /** Known on; undefined while the setting is unread. */
+  turnedOn: boolean | undefined;
   paused: boolean;
   total: number;
   keptToAdmins: boolean;
@@ -250,7 +237,13 @@ function BraidsNotices({
       {released && turnedOff ? (
         <TurnedOffBanner total={total} isOrganizationAdmin={isOrganizationAdmin} />
       ) : null}
-      {paused ? <PausedBanner total={total} /> : null}
+      {paused ? (
+        <BraidsPlanPausedBanner
+          kept={total === 1 ? "Your braid is" : `Your ${total} braids are`}
+          single={total === 1}
+          turnedOn={turnedOn}
+        />
+      ) : null}
       {keptToAdmins ? <KeptToAdminsBanner /> : null}
     </Stack>
   );
@@ -314,7 +307,7 @@ export default function BraidsScreen() {
   const releasedFlag = useBraidsReleased();
   const released = releasedFlag === true;
   const braids = useProjectBraids({ projectId });
-  const { keptToAdmins, turnedOff } = useBraidsSettings({ organizationId });
+  const { keptToAdmins, turnedOff, turnedOn } = useBraidsSettings({ organizationId });
   const [removing, setRemoving] = useState<BraidRow | null>(null);
   const removal = useRemoveBraid({ onRemoved: () => setRemoving(null) });
   const activity = useBraidActivity({
@@ -413,6 +406,7 @@ export default function BraidsScreen() {
         <BraidsNotices
           released={released}
           turnedOff={pausedByOrganization}
+          turnedOn={turnedOn}
           paused={paused}
           total={total}
           keptToAdmins={can.showKeptToAdminsNote}

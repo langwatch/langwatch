@@ -41,6 +41,7 @@ beforeEach(() => {
   braidsFake.state.keptToAdmins = false;
   braidsFake.state.braidsEnabled = true;
   braidsFake.state.policyFails = false;
+  braidsFake.state.saveError = undefined;
   braidsFake.state.policyRefetch.mockClear();
   braidsFake.state.setPolicy.mockClear();
   braidsFake.state.setEnabled.mockClear();
@@ -85,6 +86,17 @@ describe("OrganizationBraidsScreen", () => {
       );
       expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
       expect(screen.getByText("Braids are paused")).toBeInTheDocument();
+    });
+
+    /** @scenario After leaving Enterprise the page says braids are paused and kept */
+    it("says an organisation admin must also turn Braids on when it is off", () => {
+      braidsFake.state.braidsEnabled = false;
+      renderAs({ isEnterprise: false });
+      const banner = screen.getByTestId("braids-plan-paused");
+      expect(banner).toHaveTextContent(
+        /once you upgrade and an organisation admin turns Braids on/,
+      );
+      expect(banner).not.toHaveTextContent(/when you upgrade\./);
     });
   });
 
@@ -173,12 +185,27 @@ describe("OrganizationBraidsScreen", () => {
     });
 
     it("offers the Enable Braids switch only while Braids is on, so it can be turned off", async () => {
-      renderAs({ braidsReleased: false });
+      const { unmount } = renderAs({ braidsReleased: false });
       await userEvent.setup().click(screen.getByRole("checkbox", { name: "Enable Braids" }));
       expect(braidsFake.state.setEnabled).toHaveBeenCalledWith({
         organizationId: "org-1",
         braidsEnabled: false,
       });
+
+      unmount();
+      renderAs({ braidsReleased: false });
+      expect(screen.queryByRole("checkbox", { name: "Enable Braids" })).toBeNull();
+    });
+
+    it("keeps the Enable Braids switch when turning Braids off is refused", async () => {
+      braidsFake.state.saveError = new Error("network down");
+      const { unmount, host } = renderAs({ braidsReleased: false });
+      await userEvent.setup().click(screen.getByRole("checkbox", { name: "Enable Braids" }));
+      expect(host.successes).toHaveLength(0);
+
+      unmount();
+      renderAs({ braidsReleased: false });
+      expect(screen.getByRole("checkbox", { name: "Enable Braids" })).toBeChecked();
     });
 
     it("offers no Enable Braids switch once Braids is off", () => {

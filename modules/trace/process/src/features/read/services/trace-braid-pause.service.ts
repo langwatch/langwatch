@@ -9,6 +9,11 @@ import { readsBraidedSpans } from "../../braid/rules/braided-span-owner.rules.ts
 
 type BraidPlans = Pick<EntitlementApi, "getActivePlan">;
 type BraidSettings = Pick<AuthzApi, "getOrganizationPolicy">;
+type TraceBraidPauseDeps = {
+  plans: BraidPlans;
+  settings: BraidSettings;
+  logger: Pick<Logger, "error">;
+};
 
 /**
  * Braids pause below Enterprise and while the organisation has Braids turned off (ADR-201 §9).
@@ -16,21 +21,13 @@ type BraidSettings = Pick<AuthzApi, "getOrganizationPolicy">;
  * a failed setting read drops the braids for that read alone and keeps the own-project grant.
  */
 export class TraceBraidPauseService {
-  static create(deps: {
-    plans: BraidPlans;
-    settings: BraidSettings;
-    logger: Pick<Logger, "error">;
-  }): TraceBraidPauseService {
-    return new TraceBraidPauseService(deps.plans, deps.settings, deps.logger);
+  static create(deps: TraceBraidPauseDeps): TraceBraidPauseService {
+    return new TraceBraidPauseService(deps);
   }
 
   readonly #honours = TraceTtlCacheService.create<boolean>(0);
 
-  private constructor(
-    private readonly plans: BraidPlans,
-    private readonly settings: BraidSettings,
-    private readonly logger: Pick<Logger, "error">,
-  ) {}
+  private constructor(private readonly deps: TraceBraidPauseDeps) {}
 
   /** The proof as the read may honour it: braids honoured when on, stripped while paused. */
   async honoured({ authorization }: { authorization: Authorization }): Promise<Authorization> {
@@ -55,13 +52,16 @@ export class TraceBraidPauseService {
   }: {
     organizationId: string;
   }): Promise<{ honours: boolean; known: boolean }> {
-    const plan = await this.plans.getActivePlan({ organizationId });
+    const plan = await this.deps.plans.getActivePlan({ organizationId });
     if (!isEnterpriseTier(plan.type)) return { honours: false, known: true };
     try {
-      const policy = await this.settings.getOrganizationPolicy({ organizationId });
+      const policy = await this.deps.settings.getOrganizationPolicy({ organizationId });
       return { honours: policy.braidsEnabled, known: true };
     } catch (error) {
-      this.logger.error({ error, organizationId }, "braids setting read failed; braids dropped");
+      this.deps.logger.error(
+        { error, organizationId },
+        "braids setting read failed; braids dropped",
+      );
       return { honours: false, known: false };
     }
   }

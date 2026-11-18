@@ -11,7 +11,7 @@ Feature: The Braids screen
   So that I can decide what leaves a project and see what arrives in it
 
   Background:
-    Given an Enterprise organisation with plain projects "orchestrator" and "specialists"
+    Given an Enterprise organisation with Braids turned on and plain projects "orchestrator" and "specialists"
     And an organisation admin named ana viewing the settings of "specialists"
 
   Rule: The page explains braids before there are any
@@ -332,6 +332,8 @@ Feature: The Braids screen
       And the organisation has left Enterprise
       When ana opens Braids
       Then a banner above the sections says braids are paused and start again on upgrade
+      And while the organisation has Braids turned off it says an organisation admin must also turn it on
+      And while that setting can't be read it says upgrading resumes braids only if Braids is on
       And each braid row is marked paused once, where its activity would be
       And the Signing keys section says signing keys need the Enterprise plan, with no New signing key
 

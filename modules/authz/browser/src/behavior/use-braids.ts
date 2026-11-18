@@ -31,6 +31,8 @@ export function useBraidsSettings({ organizationId }: { organizationId: string |
   return {
     keptToAdmins: policy.data?.braidsOrganizationAdminsOnly ?? false,
     turnedOff: policy.data?.braidsEnabled === false,
+    /** The setting as read; undefined until it answers or when the read fails. */
+    turnedOn: policy.data?.braidsEnabled,
   };
 }
 

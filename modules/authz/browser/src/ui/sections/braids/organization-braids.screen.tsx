@@ -5,7 +5,6 @@
  */
 
 import { Link } from "@langwatch/browser-host/link";
-import { Banner } from "@langwatch/design-system/banner";
 import { FeatureMark } from "@langwatch/design-system/feature-mark";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { PageLayout } from "@langwatch/design-system/page-layout";
@@ -26,6 +25,7 @@ import { BRAIDS_GUIDE_HREF, organizationBraidRows } from "../../../model/braids/
 import { OrganizationBraidsTable } from "../../blocks/braids/organization-braids-table.tsx";
 import { BraidsNotEnabledBanner } from "../../elements/braids-not-enabled-banner.tsx";
 import { BraidsPageLinks } from "../../elements/braids-page-links.tsx";
+import { BraidsPlanPausedBanner } from "../../elements/braids-plan-paused-banner.tsx";
 import { BraidsTitle } from "../../elements/braids-title.tsx";
 import { NO_RULE_UNDER_HEADER } from "../../elements/no-rule-under-header.ts";
 import { SectionErrorNotice } from "../../elements/section-error-notice.tsx";
@@ -218,10 +218,11 @@ export default function OrganizationBraidsScreen() {
         )}
         {paused ? (
           <Box paddingBottom={4}>
-            <Banner status="warning" title="Braids are paused">
-              Braids need the Enterprise plan. They are kept and start working again when you
-              upgrade.
-            </Banner>
+            <BraidsPlanPausedBanner
+              kept="They are"
+              single={false}
+              turnedOn={policy.data?.braidsEnabled}
+            />
           </Box>
         ) : null}
         {released || policy.data?.braidsEnabled === true ? (

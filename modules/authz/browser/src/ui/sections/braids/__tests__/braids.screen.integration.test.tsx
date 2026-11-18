@@ -65,6 +65,7 @@ beforeEach(() => {
   state.project = { intoOtherProjects: [], fromOtherProjects: [] };
   state.keptToAdmins = false;
   state.braidsEnabled = true;
+  state.policyFails = false;
   state.remove.mockClear();
 });
 
@@ -358,6 +359,25 @@ describe("BraidsScreen", () => {
       expect(screen.getByTestId("braids-none-from")).toBeInTheDocument();
       expect(screen.getByTestId("braids-signing-keys-paused")).toBeInTheDocument();
       expect(screen.queryByTestId("new-signing-key")).not.toBeInTheDocument();
+    });
+
+    /** @scenario After leaving Enterprise the page says braids are paused and kept */
+    it("says upgrading alone does not resume braids the organisation turned off", () => {
+      braidsFake.state.project = { intoOtherProjects: [liveBraid()], fromOtherProjects: [] };
+      braidsFake.state.braidsEnabled = false;
+      renderAs({ isEnterprise: false });
+      expect(screen.getByTestId("braids-plan-paused")).toHaveTextContent(
+        /Your braid is kept and starts working again once you upgrade and an organisation admin/,
+      );
+    });
+
+    it("says upgrading resumes braids only if Braids is on while the setting is unread", () => {
+      braidsFake.state.project = { intoOtherProjects: [liveBraid()], fromOtherProjects: [] };
+      braidsFake.state.policyFails = true;
+      renderAs({ isEnterprise: false });
+      expect(screen.getByTestId("braids-plan-paused")).toHaveTextContent(
+        /if Braids is on for your organisation/,
+      );
     });
   });
 

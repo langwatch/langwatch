@@ -429,7 +429,7 @@ getOrganizationPolicy(args: Braids.AuthzOrganizationInput): Promise<Braids.Authz
 
 #### `getOrganizationPolicyForScreen`
 
-The Braids screen's policy: refuses `braids_not_enabled` while `release_braids` is off.
+The Braids screen's policy; answers while `release_braids` is off, so it can be turned off.
 
 ```typescript
 getOrganizationPolicyForScreen(args: Braids.AuthzOrganizationInput): Promise<Braids.AuthzOrganizationPolicy>;

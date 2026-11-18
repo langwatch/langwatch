@@ -51,7 +51,7 @@ Feature: Braids
 
     @integration
     Scenario: Braids need the Enterprise plan
-      Given an organisation below Enterprise
+      Given an organisation below Enterprise that has Braids turned on
       When ana asks to create or change a braid
       Then each is refused with enterprise_plan_required naming the Braids feature
       And removing a braid and listing the organisation's braids are not refused
