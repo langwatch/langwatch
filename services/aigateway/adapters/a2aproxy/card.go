@@ -15,8 +15,8 @@ import (
 // serveCard fetches the target's Agent Card and points every interface URL
 // at the gateway, so a client that reads the card keeps calling through it.
 func (h *Handler) serveCard(c *call, target domain.A2ATarget) {
-	card, ok := h.fetchCard(c, target)
-	if !ok {
+	card, raw, ok := h.fetchCard(c, target)
+	if !ok || !h.scan(c, DirectionResponse, raw) {
 		return
 	}
 	if target.AgentName == "" {
@@ -31,8 +31,9 @@ func (h *Handler) serveCard(c *call, target domain.A2ATarget) {
 	_, _ = c.w.Write(out)
 }
 
-// fetchCard reads the upstream Agent Card, refusing the call when it cannot.
-func (h *Handler) fetchCard(c *call, target domain.A2ATarget) (map[string]any, bool) {
+// fetchCard reads the upstream Agent Card, parsed and raw, refusing the call
+// when it cannot.
+func (h *Handler) fetchCard(c *call, target domain.A2ATarget) (map[string]any, []byte, bool) {
 	cardURL := target.CardURL
 	if cardURL == "" {
 		cardURL = upstreamEndpoint(target.UpstreamURL, cardPath, "")
@@ -40,7 +41,7 @@ func (h *Handler) fetchCard(c *call, target domain.A2ATarget) (map[string]any, b
 	req, err := http.NewRequestWithContext(c.ctx, http.MethodGet, cardURL, nil)
 	if err != nil {
 		c.refuse(refuseUpstream.withMessage("the Agent Card URL is invalid"))
-		return nil, false
+		return nil, nil, false
 	}
 	for k, v := range target.UpstreamHeaders {
 		req.Header.Set(k, v)
@@ -49,20 +50,20 @@ func (h *Handler) fetchCard(c *call, target domain.A2ATarget) (map[string]any, b
 	resp, err := h.cfg.Client.Do(req)
 	if err != nil {
 		c.refuse(upstreamRefusal(err))
-		return nil, false
+		return nil, nil, false
 	}
 	defer func() { _ = resp.Body.Close() }()
 	raw, tooLarge, err := readLimited(resp.Body)
 	if tooLarge {
 		c.refuse(refuseReplyTooLarge)
-		return nil, false
+		return nil, nil, false
 	}
 	var card map[string]any
 	if err != nil || resp.StatusCode != http.StatusOK || json.Unmarshal(raw, &card) != nil {
 		c.refuse(refuseUpstream.withMessage("the A2A agent has no readable Agent Card"))
-		return nil, false
+		return nil, nil, false
 	}
-	return card, true
+	return card, raw, true
 }
 
 // rewriteCard points the card at the proxy. The proxy serves one endpoint per

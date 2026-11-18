@@ -360,7 +360,7 @@ func (h *Handler) forward(c *call, target domain.A2ATarget) {
 	if !h.scan(c, DirectionResponse, respBody) {
 		return
 	}
-	if c.method == "GetExtendedAgentCard" {
+	if c.method == "GetExtendedAgentCard" || c.method == "agent/getAuthenticatedExtendedCard" {
 		respBody = rewriteReplyCard(respBody, target.UpstreamURL, proxyBase(h.cfg.PublicBaseURL, c.r, target.Name))
 	}
 	copyHeader(c.w.Header(), resp.Header)

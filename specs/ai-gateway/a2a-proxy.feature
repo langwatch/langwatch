@@ -200,6 +200,26 @@ Feature: A2A proxy on the gateway
     And the caller receives reason "a2a_content_blocked"
 
   @unit
+  Scenario: text under a protocol field name inside a data part or metadata is scanned
+    Given the caller's key has a request guardrail that denies a token
+    When the token sits under a key named id, role, kind, state or timestamp inside a data part or a metadata object
+    Then the upstream is not called
+    And the caller receives reason "a2a_content_blocked"
+
+  @unit
+  Scenario: the extended Agent Card reply points at the gateway in v1.0 and v0.3
+    When the caller calls GetExtendedAgentCard or the v0.3 agent/getAuthenticatedExtendedCard
+    Then the card in the reply points at the gateway's /a2a/billing
+    And the reply does not name the upstream URL
+
+  @unit
+  Scenario: the Agent Card is scanned before it reaches the caller
+    Given the caller's key has a response guardrail that denies a token
+    When the upstream Agent Card carries the token in its description
+    Then the caller receives reason "a2a_content_blocked"
+    And the card text does not reach the caller
+
+  @unit
   Scenario: a stream line that is not an SSE data, event, id or retry field never reaches the caller
     When the upstream streams a comment line or a line with no field name
     Then the caller receives the event without that line
@@ -232,7 +252,7 @@ Feature: A2A proxy on the gateway
 
   @unit
   Scenario: an overlong streamed event ends the stream with an error event
-    When the upstream streams an event over 4 MiB
+    When the upstream streams an event over 1 MiB
     Then the caller receives the events before it
     And then one error event with reason "a2a_payload_too_large"
 

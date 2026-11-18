@@ -154,3 +154,26 @@ func TestBusyKeyIsRefused(t *testing.T) {
 	h.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "http://gw.acme.test/a2a/billing", strings.NewReader(sendMessage("SendMessage", "hi"))))
 	assert.Contains(t, rec.Body.String(), "TASK_STATE_COMPLETED")
 }
+
+// @scenario "text under a protocol field name inside a data part or metadata is scanned"
+func TestContentUnderProtocolNamedKeysIsScanned(t *testing.T) {
+	for name, params := range map[string]string{
+		"data part id":        `{"message":{"messageId":"m1","parts":[{"data":{"id":"wire the money"}}]}}`,
+		"data part nested":    `{"message":{"messageId":"m1","parts":[{"data":{"rows":[{"role":"wire the money"}]}}]}}`,
+		"message metadata":    `{"message":{"messageId":"m1","parts":[{"text":"hi"}],"metadata":{"state":"wire the money"}}}`,
+		"params metadata key": `{"message":{"messageId":"m1","parts":[{"text":"hi"}]},"metadata":{"timestamp":{"kind":"wire the money"}}}`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			f := newFixture(t)
+			f.bundle.Config.Guardrails.Pre = []domain.GuardrailEntry{{ID: "g1"}}
+			f.scanner = GuardrailScanner{Evaluator: fakeEvaluator{deny: "wire the money"}}
+			rec := f.do(http.MethodPost, "/a2a/billing", rpcBody(params))
+
+			_, reason, _ := rpcError(t, rec)
+			assert.Equal(t, "a2a_content_blocked", reason)
+			assert.Empty(t, f.upstreamCalls())
+		})
+	}
+	p := collectTexts([]byte(rpcBody(`{"message":{"messageId":"m1","role":"user","parts":[{"kind":"data","data":{"id":"x1"}}]}}`)))
+	assert.Equal(t, []string{"id", "x1"}, p.texts)
+}

@@ -222,16 +222,21 @@ func TestCardURLWithDotSegmentsBecomesTheProxyBase(t *testing.T) {
 	assert.Equal(t, []any{map[string]any{"url": "https://gw/a2a/billing"}}, card["supportedInterfaces"])
 }
 
+// @scenario "the extended Agent Card reply points at the gateway in v1.0 and v0.3"
 func TestExtendedCardReplyIsRewritten(t *testing.T) {
-	f := newFixture(t)
-	f.reply = func(w http.ResponseWriter, _ *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = io.WriteString(w, `{"jsonrpc":"2.0","id":7,"result":{"name":"Billing","url":"`+f.upstream.URL+`/a2a","supportedInterfaces":[{"url":"`+f.upstream.URL+`/a2a"},{"url":"`+f.upstream.URL+`/a2a/rest"}]}}`)
-	}
-	rec := f.do(http.MethodPost, "/a2a/billing", `{"jsonrpc":"2.0","id":7,"method":"GetExtendedAgentCard"}`)
+	for _, method := range []string{"GetExtendedAgentCard", "agent/getAuthenticatedExtendedCard"} {
+		t.Run(method, func(t *testing.T) {
+			f := newFixture(t)
+			f.reply = func(w http.ResponseWriter, _ *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = io.WriteString(w, `{"jsonrpc":"2.0","id":7,"result":{"name":"Billing","url":"`+f.upstream.URL+`/a2a","supportedInterfaces":[{"url":"`+f.upstream.URL+`/a2a"},{"url":"`+f.upstream.URL+`/a2a/rest"}]}}`)
+			}
+			rec := f.do(http.MethodPost, "/a2a/billing", `{"jsonrpc":"2.0","id":7,"method":"`+method+`"}`)
 
-	assert.NotContains(t, rec.Body.String(), f.upstream.URL)
-	assert.Contains(t, rec.Body.String(), `"supportedInterfaces":[{"url":"http://gw.acme.test/a2a/billing"}]`)
+			assert.NotContains(t, rec.Body.String(), f.upstream.URL)
+			assert.Contains(t, rec.Body.String(), `"supportedInterfaces":[{"url":"http://gw.acme.test/a2a/billing"}]`)
+		})
+	}
 }
 
 // @scenario "an overlong streamed event ends the stream with an error event"

@@ -141,8 +141,14 @@ func collectTexts(body []byte) payload {
 
 type jsonFrame struct {
 	object, wantKey bool
-	key             string
+	// content is true inside a data part's data or a metadata object, where
+	// every key and value is the sender's own text.
+	content bool
+	key     string
 }
+
+// contentKeys open sender-authored objects: nothing under them is protocol.
+var contentKeys = map[string]bool{"data": true, "metadata": true}
 
 // tokenWalker collects the text of one JSON value, one token at a time.
 type tokenWalker struct {
@@ -184,7 +190,7 @@ func (w *tokenWalker) step(tok json.Token) (bool, error) {
 		w.stack = w.stack[:top] // an array's closing bracket
 	default:
 		if s, ok := tok.(string); ok {
-			appendValue(frameKey(w.stack), s, w.out)
+			w.appendValue(s)
 		}
 	}
 	return w.valueDone(), nil
@@ -193,7 +199,7 @@ func (w *tokenWalker) step(tok json.Token) (bool, error) {
 func (w *tokenWalker) key(k string) {
 	top := &w.stack[len(w.stack)-1]
 	top.key, top.wantKey = k, false
-	if !protocolKeys[k] && !protocolValueKeys[k] {
+	if top.content || (!protocolKeys[k] && !protocolValueKeys[k]) {
 		*w.out = append(*w.out, k)
 	}
 }
@@ -202,8 +208,18 @@ func (w *tokenWalker) open(d json.Delim) error {
 	if len(w.stack) >= maxJSONDepth {
 		return errTooDeep
 	}
-	w.stack = append(w.stack, jsonFrame{object: d == '{', wantKey: d == '{', key: frameKey(w.stack)})
+	content := w.inContent()
+	w.stack = append(w.stack, jsonFrame{object: d == '{', wantKey: d == '{', content: content, key: frameKey(w.stack)})
 	return nil
+}
+
+// inContent reports whether the next value sits in sender-authored content.
+func (w *tokenWalker) inContent() bool {
+	if len(w.stack) == 0 {
+		return false
+	}
+	top := w.stack[len(w.stack)-1]
+	return top.content || contentKeys[top.key]
 }
 
 // valueDone marks a finished value: the enclosing object now wants a key.
@@ -226,8 +242,9 @@ func frameKey(stack []jsonFrame) string {
 
 // appendValue keeps a string value as text. File bytes count as the text
 // they decode to when that is valid UTF-8.
-func appendValue(key, s string, out *[]string) {
-	if s == "" || protocolValueKeys[key] {
+func (w *tokenWalker) appendValue(s string) {
+	key := frameKey(w.stack)
+	if s == "" || (!w.inContent() && protocolValueKeys[key]) {
 		return
 	}
 	if key == "bytes" || key == "raw" {
@@ -235,7 +252,7 @@ func appendValue(key, s string, out *[]string) {
 			s = string(b)
 		}
 	}
-	*out = append(*out, s)
+	*w.out = append(*w.out, s)
 }
 
 func setString(span trace.Span, key, v string) {
