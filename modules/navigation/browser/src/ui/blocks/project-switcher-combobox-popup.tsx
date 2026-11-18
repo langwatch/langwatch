@@ -28,9 +28,22 @@ export function ProjectComboboxPopup({
   return (
     <Portal>
       <Combobox.Positioner>
-        <Combobox.Content minWidth="260px" maxHeight="360px" overflowY="auto" padding={0}>
-          {header}
-          <ProjectSearchHeader />
+        <Combobox.Content
+          minWidth="260px"
+          maxHeight="min(480px, 70vh)"
+          overflowY="auto"
+          padding={0}
+        >
+          <Box
+            ref={padScrollUnderPinned}
+            position="sticky"
+            top={0}
+            zIndex={1}
+            background="bg.panel"
+          >
+            {header}
+            <ProjectSearchHeader />
+          </Box>
           <Combobox.Empty paddingX={3} paddingY={2} color="fg.muted" textStyle="bodySm">
             {`No projects match "${query.trim()}"`}
           </Combobox.Empty>
@@ -62,19 +75,21 @@ export function ProjectComboboxPopup({
   );
 }
 
-/** The focused search field pinned to the top of the popup. */
+/** Keeps a keyboard-highlighted row from scrolling under the pinned header and search. */
+function padScrollUnderPinned(pinned: HTMLDivElement | null) {
+  const content = pinned?.parentElement;
+  if (!pinned || !content) return;
+  const sync = () => content.style.setProperty("scroll-padding-top", `${pinned.offsetHeight}px`);
+  sync();
+  const observer = new ResizeObserver(sync);
+  observer.observe(pinned);
+  return () => observer.disconnect();
+}
+
+/** The focused search field, pinned to the top of the popup with the header. */
 function ProjectSearchHeader() {
   return (
-    <Box
-      position="sticky"
-      top={0}
-      zIndex={1}
-      background="bg.panel"
-      paddingX={2.5}
-      paddingY={1.5}
-      borderBottomWidth="1px"
-      borderColor="border"
-    >
+    <Box paddingX={2.5} paddingY={1.5} borderBottomWidth="1px" borderColor="border">
       <HStack gap={2} color="fg.muted">
         <Search size={14} aria-hidden />
         <Combobox.Input
