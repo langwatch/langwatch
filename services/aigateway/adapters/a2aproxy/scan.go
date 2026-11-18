@@ -294,18 +294,29 @@ func frameKey(stack []jsonFrame) string {
 // they decode to when that is valid UTF-8.
 func (w *tokenWalker) appendValue(s string) {
 	key := frameKey(w.stack)
-	if w.withParts && s != "" && !w.inContent() {
+	content := w.inContent()
+	if w.withParts && s != "" && !content {
 		w.notePart(key, s)
 	}
-	if s == "" || (!w.inContent() && protocolValueKeys[key]) {
+	if s == "" || (!content && protocolValueKeys[key]) {
 		return
 	}
-	if (key == "bytes" || key == "raw") && !w.inContent() {
-		if b, err := base64.StdEncoding.DecodeString(s); err == nil && utf8.Valid(b) {
-			s = string(b)
-		}
+	if !content {
+		s = fileText(key, s)
 	}
 	*w.out = append(*w.out, s)
+}
+
+// fileText is the text a file part's bytes decode to when that is valid
+// UTF-8; any other value is returned as written.
+func fileText(key, s string) string {
+	if key != "bytes" && key != "raw" {
+		return s
+	}
+	if b, err := base64.StdEncoding.DecodeString(s); err == nil && utf8.Valid(b) {
+		return string(b)
+	}
+	return s
 }
 
 // notePart files an artifact's id and text-part text under its group. Text
