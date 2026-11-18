@@ -1,5 +1,6 @@
 import {
   HandledError,
+  remediation,
   type HandledErrorFault,
   handledErrorFaultSchema,
 } from "@langwatch/handled-error";
@@ -85,6 +86,7 @@ abstract class StoredObjectHandledError extends HandledError {
       fault?: HandledErrorFault;
       retryable?: boolean;
       tips?: readonly string[];
+      docsUrl?: string;
     } = {},
   ) {
     super(code, message, {
@@ -272,7 +274,7 @@ export class StoredObjectWriteConflictError extends StoredObjectHandledError {
     super("stored_object_write_conflict", "The stored object kept changing while it was written.", {
       meta: { projectId, objectId },
       retryable: true,
-      tips: ["Retry the request."],
+      ...remediation("stored_object_write_conflict"),
     });
   }
 }

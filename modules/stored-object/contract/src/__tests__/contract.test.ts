@@ -1,4 +1,4 @@
-import { HandledError } from "@langwatch/handled-error";
+import { HandledError, remediation } from "@langwatch/handled-error";
 import { describe, expect, expectTypeOf, it } from "vitest";
 import { ZodError } from "zod";
 
@@ -185,6 +185,14 @@ describe("Stored Objects errors and portable service capability", () => {
         message: error.message,
       }),
     ).toMatchObject({ code, fault: error.fault });
+  });
+
+  /** @scenario "A delete that keeps losing its row write reports a write conflict" */
+  it("takes the write conflict's tips from the remediation registry", () => {
+    const error = new StoredObjectWriteConflictError("project_1", "prod_so_1");
+
+    expect(error.serialize().tips).toEqual(remediation("stored_object_write_conflict").tips);
+    expect(error.retryable).toBe(true);
   });
 
   describe("when a serialized problem crosses the transport boundary", () => {

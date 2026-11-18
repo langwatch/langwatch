@@ -5,6 +5,7 @@
  * @see modules/stored-object/specs/uploads-through-langwatch.feature
  */
 import { memoryObjectStorage, type ObjectStorage } from "@langwatch/process-stores";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -49,18 +50,26 @@ function throughLangWatch(): StoredObjectBytesRepository {
   return ObjectStorageStoredObjectBytesRepository.create({ objectStorage: memoryObjectStorage() });
 }
 
-/** The memory twin under a given upload setting, recording each upload it is asked to sign. */
-function memberUnder(route: "direct" | "through-process", { refusesToSign = false } = {}) {
+/**
+ * A member under a given upload setting that answers only what a checkup may ask: the probe's
+ * write and remove, the upload route, and signing. Each signed key is recorded.
+ */
+function memberUnder(route: "direct" | "through-process", { refusal }: { refusal?: Error } = {}) {
   const signed: string[] = [];
-  const objectStorage: ObjectStorage = {
-    ...memoryObjectStorage(),
-    uploadRoute: async () => route,
-    signUpload: async (at) => {
-      signed.push(at.key);
-      if (refusesToSign) throw new Error("This member's credentials cannot sign an upload.");
-      return { kind: "direct", url: `https://bucket.example/${at.key}`, headers: {} };
+  const twin = memoryObjectStorage();
+  const objectStorage = createApiFixture<ObjectStorage>(
+    {
+      write: (at, body, facts) => twin.write(at, body, facts),
+      remove: (at) => twin.remove(at),
+      uploadRoute: async () => route,
+      signUpload: async (at) => {
+        signed.push(at.key);
+        if (refusal) throw refusal;
+        return { kind: "direct", url: `https://bucket.example/${at.key}`, headers: {} };
+      },
     },
-  };
+    "objectStorage",
+  );
 
   return { signed, storage: ObjectStorageStoredObjectBytesRepository.create({ objectStorage }) };
 }
@@ -105,7 +114,9 @@ describe("StoredObjectService.probeStorage", () => {
     describe("when the account is set to upload through LangWatch and no public base URL is named", () => {
       /** @scenario "The storage checkup reads where uploads go from the account's setting" */
       it("still names the missing address, from the setting alone", async () => {
-        const { signed, storage } = memberUnder("through-process", { refusesToSign: true });
+        const { signed, storage } = memberUnder("through-process", {
+          refusal: new Error("This member's credentials cannot sign an upload."),
+        });
         const service = serviceOver({ storage, publicBaseUrl: undefined });
 
         await expect(service.probeStorage({ projectId: PROJECT_ID })).rejects.toMatchObject({
@@ -118,12 +129,11 @@ describe("StoredObjectService.probeStorage", () => {
     describe("when the account is set to upload directly", () => {
       /** @scenario "The storage checkup reads where uploads go from the account's setting" */
       it("fails, since clients could not be handed an upload address", async () => {
-        const { signed, storage } = memberUnder("direct", { refusesToSign: true });
+        const refusal = new Error("This member's credentials cannot sign an upload.");
+        const { signed, storage } = memberUnder("direct", { refusal });
         const service = serviceOver({ storage, publicBaseUrl: undefined });
 
-        await expect(service.probeStorage({ projectId: PROJECT_ID })).rejects.toThrow(
-          "cannot sign an upload",
-        );
+        await expect(service.probeStorage({ projectId: PROJECT_ID })).rejects.toBe(refusal);
         expect(signed).toHaveLength(1);
       });
     });
