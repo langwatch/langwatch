@@ -262,7 +262,6 @@ export const sql = \`INSERT INTO \${B} (TenantId) VALUES (1)\`;
     it("cuts a cycle through a file a reused constant set already visited", () => {
       const workspace = fixture();
       chain(workspace.write, ["d1", "d2", "d3", "d4", "d5", "b", "a"]);
-      chain(workspace.write, ["c1", "c2", "c3", "a"]);
       chain(workspace.write, ["m", "b"]);
       workspace.write(
         "lib/a.ts",

@@ -556,6 +556,7 @@ type ConstantScope = {
 type Bounded = {
   constants: ReadonlyMap<string, string>;
   visited: ReadonlySet<string>;
+  /** `scope.scopes.size` at the last check; sound because `scopes` only ever grows. */
   checkedAt: number;
 };
 
