@@ -374,7 +374,8 @@ describe("explicit Prisma lifecycle", () => {
 
     it("puts the reason first and the call after, not Prisma's invocation header", () => {
       const message = readablePrismaMessage(
-        "\nInvalid `prisma.grantUsage.update()` invocation:\n\n\nNo record was found for an update.",
+        "\nInvalid `prisma.grantUsage.update()` invocation:\n\n\n" +
+          "No record was found for an update.",
       );
 
       expect(message).toBe("No record was found for an update. (prisma.grantUsage.update)");
