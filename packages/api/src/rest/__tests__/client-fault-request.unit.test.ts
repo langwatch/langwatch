@@ -6,10 +6,10 @@ import { moduleApi } from "@langwatch/module";
 import type * as Observability from "@langwatch/observability";
 import { SpanStatusCode, trace } from "@opentelemetry/api";
 import {
-  BasicTracerProvider,
+  TracerProvider,
   InMemorySpanExporter,
   SimpleSpanProcessor,
-} from "@opentelemetry/sdk-trace-base";
+} from "@opentelemetry/sdk-trace";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
@@ -89,7 +89,7 @@ const headers = { authorization: "Bearer internal-marker" };
 describe("a REST request the caller's credential fails", () => {
   beforeAll(() => {
     trace.setGlobalTracerProvider(
-      new BasicTracerProvider({ spanProcessors: [new SimpleSpanProcessor(exporter)] }),
+      new TracerProvider({ spanProcessors: [new SimpleSpanProcessor({ exporter })] }),
     );
   });
   afterAll(() => trace.disable());

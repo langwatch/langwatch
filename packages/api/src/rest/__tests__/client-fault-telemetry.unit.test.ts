@@ -3,10 +3,10 @@
 import { createRecordingMeterProvider } from "@langwatch/observability/metrics/testing";
 import { SpanStatusCode } from "@opentelemetry/api";
 import {
-  BasicTracerProvider,
+  TracerProvider,
   InMemorySpanExporter,
   SimpleSpanProcessor,
-} from "@opentelemetry/sdk-trace-base";
+} from "@opentelemetry/sdk-trace";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { ProjectInvalidCredentialsError } from "../../errors.ts";
@@ -18,8 +18,8 @@ import {
 
 /** A real tracer, so the asserted status is what the SDK records, not what a double claims. */
 const exporter = new InMemorySpanExporter();
-const tracer = new BasicTracerProvider({
-  spanProcessors: [new SimpleSpanProcessor(exporter)],
+const tracer = new TracerProvider({
+  spanProcessors: [new SimpleSpanProcessor({ exporter })],
 }).getTracer("client-fault-telemetry-test");
 
 function recordedFailure({ error, answeredStatus }: { error: unknown; answeredStatus?: number }) {

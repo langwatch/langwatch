@@ -9,7 +9,7 @@ import {
   type Sampler,
   SamplingDecision,
   type SamplingResult,
-} from "@opentelemetry/sdk-trace-base";
+} from "@opentelemetry/sdk-trace";
 
 import { currentSessionId } from "./session.ts";
 

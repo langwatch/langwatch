@@ -1,7 +1,16 @@
 /** @see modules/auth/specs/request-credential-census.feature */
 import { context, propagation, trace } from "@opentelemetry/api";
-import { InMemorySpanExporter, SimpleSpanProcessor } from "@opentelemetry/sdk-trace-base";
-import { NodeTracerProvider } from "@opentelemetry/sdk-trace-node";
+import { AsyncLocalStorageContextManager } from "@opentelemetry/context-async-hooks";
+import {
+  CompositePropagator,
+  W3CBaggagePropagator,
+  W3CTraceContextPropagator,
+} from "@opentelemetry/core";
+import {
+  InMemorySpanExporter,
+  SimpleSpanProcessor,
+  TracerProvider,
+} from "@opentelemetry/sdk-trace";
 import pino from "pino";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
@@ -186,10 +195,16 @@ describe("censusClientOf()", () => {
 
 describe("noteRequestCredential()", () => {
   const exporter = new InMemorySpanExporter();
-  const provider = new NodeTracerProvider({ spanProcessors: [new SimpleSpanProcessor(exporter)] });
+  const provider = new TracerProvider({ spanProcessors: [new SimpleSpanProcessor({ exporter })] });
 
   beforeAll(() => {
-    provider.register();
+    trace.setGlobalTracerProvider(provider);
+    context.setGlobalContextManager(new AsyncLocalStorageContextManager().enable());
+    propagation.setGlobalPropagator(
+      new CompositePropagator({
+        propagators: [new W3CTraceContextPropagator(), new W3CBaggagePropagator()],
+      }),
+    );
   });
 
   afterAll(async () => {

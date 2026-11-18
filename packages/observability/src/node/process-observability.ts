@@ -1,5 +1,5 @@
 import { context, propagation, trace, type Context } from "@opentelemetry/api";
-import type { ReadableSpan, Span, SpanProcessor } from "@opentelemetry/sdk-trace-base";
+import type { ReadableSpan, Span, SpanProcessor } from "@opentelemetry/sdk-trace";
 import { getLangWatchTracer } from "langwatch";
 import {
   setupObservability,

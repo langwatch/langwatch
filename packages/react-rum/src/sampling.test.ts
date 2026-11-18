@@ -4,7 +4,7 @@
  * See ADR-058 and specs/observability/browser-rum-trace-correlation.feature.
  */
 import { ROOT_CONTEXT, SpanKind, trace } from "@opentelemetry/api";
-import { SamplingDecision, type Sampler } from "@opentelemetry/sdk-trace-base";
+import { SamplingDecision, type Sampler } from "@opentelemetry/sdk-trace";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { createBrowserSampler, SessionRatioSampler } from "./sampling.ts";

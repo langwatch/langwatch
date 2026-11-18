@@ -14,10 +14,10 @@ import type * as Census from "@langwatch/observability/credential-census";
 import { noteRequestCredential } from "@langwatch/observability/credential-census";
 import { trace } from "@opentelemetry/api";
 import {
-  BasicTracerProvider,
+  TracerProvider,
   InMemorySpanExporter,
   SimpleSpanProcessor,
-} from "@opentelemetry/sdk-trace-base";
+} from "@opentelemetry/sdk-trace";
 import type { Context } from "hono";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
@@ -334,8 +334,8 @@ describe("the credential census on the REST runtime", () => {
     /** @scenario "The request span carries the credential and client attributes" */
     it("tags its span with the credential and the client", async () => {
       const exporter = new InMemorySpanExporter();
-      const provider = new BasicTracerProvider({
-        spanProcessors: [new SimpleSpanProcessor(exporter)],
+      const provider = new TracerProvider({
+        spanProcessors: [new SimpleSpanProcessor({ exporter })],
       });
       const span = provider.getTracer("test").startSpan("request");
       vi.spyOn(trace, "getActiveSpan").mockReturnValue(span);

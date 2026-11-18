@@ -14,8 +14,17 @@ import {
   ProcessRuntime,
 } from "@langwatch/eventing";
 import { context, propagation, SpanKind, trace } from "@opentelemetry/api";
-import { InMemorySpanExporter, SimpleSpanProcessor } from "@opentelemetry/sdk-trace-base";
-import { NodeTracerProvider } from "@opentelemetry/sdk-trace-node";
+import { AsyncLocalStorageContextManager } from "@opentelemetry/context-async-hooks";
+import {
+  CompositePropagator,
+  W3CBaggagePropagator,
+  W3CTraceContextPropagator,
+} from "@opentelemetry/core";
+import {
+  InMemorySpanExporter,
+  SimpleSpanProcessor,
+  TracerProvider,
+} from "@opentelemetry/sdk-trace";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { createStubLangyEffectPorts } from "../../app/__tests__/langy.fixture.ts";
@@ -50,16 +59,22 @@ const subscriberContext: EventSubscriberContext = {
 };
 
 describe("Langy process trace continuity", () => {
-  let provider: NodeTracerProvider;
+  let provider: TracerProvider;
   let exporter: InMemorySpanExporter;
   let store: InMemoryProcessStore;
 
   beforeAll(() => {
     exporter = new InMemorySpanExporter();
-    provider = new NodeTracerProvider({
-      spanProcessors: [new SimpleSpanProcessor(exporter)],
+    provider = new TracerProvider({
+      spanProcessors: [new SimpleSpanProcessor({ exporter })],
     });
-    provider.register();
+    trace.setGlobalTracerProvider(provider);
+    context.setGlobalContextManager(new AsyncLocalStorageContextManager().enable());
+    propagation.setGlobalPropagator(
+      new CompositePropagator({
+        propagators: [new W3CTraceContextPropagator(), new W3CBaggagePropagator()],
+      }),
+    );
   });
 
   afterAll(async () => {

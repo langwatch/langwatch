@@ -5,12 +5,18 @@
  * a stub can agree with a wrapper that is wrong.
  */
 import { context, propagation, SpanStatusCode, trace } from "@opentelemetry/api";
+import { AsyncLocalStorageContextManager } from "@opentelemetry/context-async-hooks";
+import {
+  CompositePropagator,
+  W3CBaggagePropagator,
+  W3CTraceContextPropagator,
+} from "@opentelemetry/core";
 import {
   InMemorySpanExporter,
   type ReadableSpan,
   SimpleSpanProcessor,
-} from "@opentelemetry/sdk-trace-base";
-import { NodeTracerProvider } from "@opentelemetry/sdk-trace-node";
+  TracerProvider,
+} from "@opentelemetry/sdk-trace";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
 import { traced } from "../traced.ts";
@@ -87,15 +93,21 @@ class ExampleService {
 }
 
 describe("traced()", () => {
-  let provider: NodeTracerProvider;
+  let provider: TracerProvider;
   let exporter: InMemorySpanExporter;
 
   beforeAll(() => {
     exporter = new InMemorySpanExporter();
-    provider = new NodeTracerProvider({
-      spanProcessors: [new SimpleSpanProcessor(exporter)],
+    provider = new TracerProvider({
+      spanProcessors: [new SimpleSpanProcessor({ exporter })],
     });
-    provider.register();
+    trace.setGlobalTracerProvider(provider);
+    context.setGlobalContextManager(new AsyncLocalStorageContextManager().enable());
+    propagation.setGlobalPropagator(
+      new CompositePropagator({
+        propagators: [new W3CTraceContextPropagator(), new W3CBaggagePropagator()],
+      }),
+    );
   });
 
   afterAll(async () => {

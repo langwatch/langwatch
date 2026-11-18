@@ -11,7 +11,7 @@ import {
 import type { Attributes, HrTime, SpanContext, SpanStatus } from "@opentelemetry/api";
 import { SpanKind, SpanStatusCode, TraceFlags } from "@opentelemetry/api";
 import { emptyResource } from "@opentelemetry/resources";
-import type { ReadableSpan } from "@opentelemetry/sdk-trace-base";
+import type { ReadableSpan } from "@opentelemetry/sdk-trace";
 
 import { rankSpansForExpansion } from "./bounded-spans-digest.rules.ts";
 

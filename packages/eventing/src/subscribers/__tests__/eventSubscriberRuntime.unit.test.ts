@@ -2,13 +2,19 @@
  * @vitest-environment node
  * Runtime-boundary proofs for the event-subscriber seam (ADR-049 §3). These
  */
-import { context, SpanKind, trace } from "@opentelemetry/api";
+import { context, propagation, SpanKind, trace } from "@opentelemetry/api";
+import { AsyncLocalStorageContextManager } from "@opentelemetry/context-async-hooks";
+import {
+  CompositePropagator,
+  W3CBaggagePropagator,
+  W3CTraceContextPropagator,
+} from "@opentelemetry/core";
 import {
   InMemorySpanExporter,
   type ReadableSpan,
   SimpleSpanProcessor,
-} from "@opentelemetry/sdk-trace-base";
-import { NodeTracerProvider } from "@opentelemetry/sdk-trace-node";
+  TracerProvider,
+} from "@opentelemetry/sdk-trace";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
 import type { Event } from "../../domain/types.ts";
@@ -73,21 +79,28 @@ const aggregateType = createTestAggregateType();
 const tenantId = createTestTenantId();
 const context_ = createTestEventStoreReadContext(tenantId);
 
-let provider: NodeTracerProvider;
+let provider: TracerProvider;
 let exporter: InMemorySpanExporter;
 
 beforeAll(() => {
   exporter = new InMemorySpanExporter();
-  provider = new NodeTracerProvider({
-    spanProcessors: [new SimpleSpanProcessor(exporter)],
+  provider = new TracerProvider({
+    spanProcessors: [new SimpleSpanProcessor({ exporter })],
   });
-  provider.register();
+  trace.setGlobalTracerProvider(provider);
+  context.setGlobalContextManager(new AsyncLocalStorageContextManager().enable());
+  propagation.setGlobalPropagator(
+    new CompositePropagator({
+      propagators: [new W3CTraceContextPropagator(), new W3CBaggagePropagator()],
+    }),
+  );
 });
 
 afterAll(async () => {
   await provider.shutdown();
   trace.disable();
   context.disable();
+  propagation.disable();
 });
 
 afterEach(() => {
