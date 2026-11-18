@@ -8,7 +8,11 @@ import { createLogger } from "@langwatch/observability";
 import { toDate } from "@langwatch/time";
 
 import { type GovernanceSeatReportRow, seatReportsOf } from "../../rules/ocsf-seat-report.rules.ts";
-import { OCSF_STORED_SCHEMA_VERSION } from "../governance.repositories.ts";
+import {
+  OCSF_API_ACTIVITY_CLASS_UID,
+  OCSF_APPLICATION_ACTIVITY_CATEGORY_UID,
+  OCSF_STORED_SCHEMA_VERSION,
+} from "../governance.repositories.ts";
 import type {
   GovernanceOcsfEvent,
   GovernanceOcsfEventsReader,
@@ -47,9 +51,6 @@ const INSERT_CHUNK_SIZE = 500;
 const INSERT_SETTINGS = { async_insert: 1, wait_for_async_insert: 1 } as const;
 
 const logger = createLogger("langwatch:governance:clickhouse-ocsf-events-repository");
-
-const OCSF_CLASS_API_ACTIVITY = 6003;
-const OCSF_CATEGORY_APPLICATION_ACTIVITY = 6;
 
 /** Cursor-paginated read of `governance_ocsf_events`, ordered EventTime ASC. */
 export interface FindOcsfEventsInput {
@@ -90,8 +91,6 @@ export interface FindOcsfEventsByIngestInput {
 export interface OcsfIngestOrderedReader {
   findAllByIngest(input: FindOcsfEventsByIngestInput): Promise<GovernanceOcsfIngestOrderedRow[]>;
 }
-
-export type { GovernanceSeatReportRow };
 
 /** The licence-seat read `governanceCost.service.ts`'s seats screen needs. */
 export interface OcsfSeatReportReader {
@@ -153,10 +152,10 @@ function toOcsfEventValues(row: GovernanceOcsfEvent): Record<string, unknown> {
     TraceId: row.traceId,
     SourceId: row.sourceId,
     SourceType: row.sourceType,
-    ClassUid: row.classUid ?? OCSF_CLASS_API_ACTIVITY,
-    CategoryUid: row.categoryUid ?? OCSF_CATEGORY_APPLICATION_ACTIVITY,
+    ClassUid: row.classUid ?? OCSF_API_ACTIVITY_CLASS_UID,
+    CategoryUid: row.categoryUid ?? OCSF_APPLICATION_ACTIVITY_CATEGORY_UID,
     ActivityId: row.activityId,
-    TypeUid: row.typeUid ?? (row.classUid ?? OCSF_CLASS_API_ACTIVITY) * 100 + row.activityId,
+    TypeUid: row.typeUid ?? (row.classUid ?? OCSF_API_ACTIVITY_CLASS_UID) * 100 + row.activityId,
     SeverityId: row.severityId,
     // `eventTime` is a Temporal Instant on this branch; the client wants a Date.
     EventTime: toDate(row.eventTime),
