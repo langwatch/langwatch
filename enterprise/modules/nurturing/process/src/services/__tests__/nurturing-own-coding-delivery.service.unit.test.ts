@@ -37,6 +37,14 @@ class FlakyChannel extends CustomerIoChannel {
   }
 }
 
+/** Like the HTTP channel: batch swallows a failed send, only batchOrThrow rejects. */
+class SwallowingChannel extends FlakyChannel {
+  override async batch(): Promise<void> {}
+  override async batchOrThrow(): Promise<void> {
+    throw new Error("Customer.io rejected the batch");
+  }
+}
+
 function deliveryOver() {
   const channel = new FlakyChannel();
   const claims = MemoryNurturingClaimRepository.create();
@@ -70,6 +78,20 @@ describe("NurturingOwnCodingDeliveryService", () => {
         userId: "owner-1",
         traits: { own_coding_first_session_at: Math.floor(T0 / 1000) },
       });
+    });
+  });
+
+  describe("when the channel swallows batch failures and only batchOrThrow rejects", () => {
+    it("still gives the first-session claim back and does not throw", async () => {
+      const claims = MemoryNurturingClaimRepository.create();
+      const delivery = NurturingOwnCodingDeliveryService.create({
+        claims,
+        customerIo: NurturingService.create({ channel: new SwallowingChannel() }),
+      });
+
+      await expect(delivery.deliver(ownSession)).resolves.toBeUndefined();
+
+      expect(await claims.claim(FIRST_CLAIM, 60)).toBe(true);
     });
   });
 
