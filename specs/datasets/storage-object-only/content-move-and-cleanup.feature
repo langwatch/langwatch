@@ -158,3 +158,13 @@ Feature: Remaining dataset rows move to object storage and leave the records tab
       When the operator runs the dataset storage audit
       Then it shows, for that organization, 2 datasets and 7 rows not yet moved, 1 single-file dataset and 5 rows awaiting cleanup
       And no dataset, chunk or records-table row is changed
+
+    # The project pages come from the project module (listAllWithOrganization), which names the
+    # projects whose team is gone apart (services/dataset-storage-audit.service.ts).
+    @unit
+    Scenario: The dataset storage audit sums each organization's projects across pages
+      Given two organizations whose projects are read over two pages, and a project whose team is gone
+      When the operator runs the dataset storage audit
+      Then each organization shows the leftovers of all its projects summed
+      And the project whose team is gone is shown under no organization
+      And an organization with nothing left is not shown, and the totals add up the rest

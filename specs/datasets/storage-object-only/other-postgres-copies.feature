@@ -1,7 +1,7 @@
 # Epic: dataset content lives only in object storage; Postgres keeps dataset metadata.
 #
-# EVERY SCENARIO HERE IS @unimplemented ON PURPOSE, and only until it binds (see write-paths.feature
-# in this folder for the convention).
+# The organization erasure scenario is bound (@unit). Every other scenario here is @unimplemented
+# on purpose, and only until it binds (see write-paths.feature in this folder for the convention).
 #
 # Copies of dataset rows outside the records table, found in a sweep of origin/main:
 #   - Experiment.workbenchState / ExperimentVersion.state: inline datasets keep every cell

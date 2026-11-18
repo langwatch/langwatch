@@ -1,3 +1,8 @@
+/**
+ * Dataset versions: snapshots saved by autosave, by hand, by experiment runs and
+ * by restores; reads, comparisons and restores of them.
+ * Spec: modules/dataset/specs/dataset-versioning.feature.
+ */
 import {
   DatasetNotReadyError,
   DatasetVersionNotFoundError,
@@ -15,11 +20,6 @@ import {
   type DatasetVersionSavedEventData,
   type DatasetVersionTrigger,
 } from "@langwatch/dataset-contract";
-/**
- * Dataset versions: snapshots saved by autosave, by hand, by experiment runs and
- * by restores; reads, comparisons and restores of them.
- * Spec: modules/dataset/specs/dataset-versioning.feature.
- */
 import { createLogger } from "@langwatch/observability";
 
 import type { DatasetChunkRepository } from "../repositories/dataset-chunk.repository.ts";

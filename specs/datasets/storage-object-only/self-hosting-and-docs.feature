@@ -1,8 +1,9 @@
 # Epic: dataset content lives only in object storage; Postgres keeps dataset metadata.
 #
-# The docker compose volume scenario is bound (@unit, compose-local-storage-volume.unit.test.ts).
-# EVERY OTHER SCENARIO HERE IS @unimplemented ON PURPOSE, and only until it binds (see write-paths.feature
-# in this folder for the convention). Docs and chart text are already bound this way elsewhere
+# Two scenarios are bound (@unit): the docker compose volume (compose-local-storage-volume.unit.test.ts)
+# and the environment example (dataset-self-hosting-surface.unit.test.ts). Every other scenario here
+# is @unimplemented on purpose, and only until it binds (see write-paths.feature in this folder for
+# the convention). Docs and chart text are already bound this way elsewhere
 # (modules/stored-object/process/src/__tests__/stored-object-helm-and-docs-shape.unit.test.ts).
 #
 # With no object storage configured, every install writes datasets under

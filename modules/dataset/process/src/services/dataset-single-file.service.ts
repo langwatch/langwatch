@@ -77,7 +77,7 @@ class DatasetConvertedDuringWriteError extends Error {
 
 export class DatasetSingleFileService implements Omit<
   DatasetContent,
-  "createDataset" | "copyDataset" | "updateColumns" | "appendRecords"
+  "createDataset" | "copyDataset" | "updateColumns"
 > {
   static create(options: {
     files: DatasetSingleFileRepository;
