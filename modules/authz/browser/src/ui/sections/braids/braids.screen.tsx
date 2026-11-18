@@ -246,8 +246,8 @@ function BraidsNotices({
   if (released && !turnedOff && !paused && !keptToAdmins) return null;
   return (
     <Stack gap={4} paddingBottom={4}>
-      {released ? null : <BraidsNotEnabledBanner removeHere />}
-      {turnedOff ? (
+      {released ? null : <BraidsNotEnabledBanner removeHere paused={turnedOff} />}
+      {released && turnedOff ? (
         <TurnedOffBanner total={total} isOrganizationAdmin={isOrganizationAdmin} />
       ) : null}
       {paused ? <PausedBanner total={total} /> : null}
@@ -314,7 +314,7 @@ export default function BraidsScreen() {
   const releasedFlag = useBraidsReleased();
   const released = releasedFlag === true;
   const braids = useProjectBraids({ projectId });
-  const { keptToAdmins, turnedOff } = useBraidsSettings({ organizationId, released });
+  const { keptToAdmins, turnedOff } = useBraidsSettings({ organizationId });
   const [removing, setRemoving] = useState<BraidRow | null>(null);
   const removal = useRemoveBraid({ onRemoved: () => setRemoving(null) });
   const activity = useBraidActivity({

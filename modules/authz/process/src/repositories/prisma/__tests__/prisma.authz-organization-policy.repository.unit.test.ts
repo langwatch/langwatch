@@ -118,7 +118,7 @@ describe("PrismaAuthzOrganizationPolicyRepository", () => {
         rows: [
           {
             braidsOrganizationAdminsOnly: true,
-            braidsEnabled: true,
+            braidsEnabled: false,
             updatedByUserId: "user_ana",
             updatedAt,
           },
@@ -128,7 +128,7 @@ describe("PrismaAuthzOrganizationPolicyRepository", () => {
       await expect(repository.getPolicy({ organizationId: ORGANIZATION_ID })).resolves.toEqual({
         organizationId: ORGANIZATION_ID,
         braidsOrganizationAdminsOnly: true,
-        braidsEnabled: true,
+        braidsEnabled: false,
         updatedByUserId: "user_ana",
         updatedAtMs: updatedAt.getTime(),
       });

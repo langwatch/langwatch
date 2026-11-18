@@ -168,7 +168,7 @@ export function braidsPauses({
 }): { byPlan: boolean; byOrganization: boolean } {
   return {
     byPlan: released && planState === "paused",
-    byOrganization: released && turnedOff && planState === "enterprise",
+    byOrganization: turnedOff && planState === "enterprise",
   };
 }
 

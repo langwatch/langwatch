@@ -25,7 +25,9 @@ Feature: Braid management behind the release_braids kill switch
     Scenario: release_braids is on by default
       Given an organisation LangWatch has not switched off
       When release_braids is read for it
-      Then it is on, and the organisation's own Braids setting decides whether Braids is used
+      Then it is on
+      # Whether the organisation uses Braids is its own setting, bound in braids.feature under
+      # "An organisation turns Braids on in settings".
 
   Rule: Off, the Braids screens list existing braids read-only so an admin can end them
     # Decided by Alex, 2026-11-18 (option 2a): braids keep applying while the flag is off, so
@@ -37,6 +39,15 @@ Feature: Braid management behind the release_braids kill switch
       When ana opens the project Braids page or the organisation Braids page
       Then each opens instead of answering not-found
       And it says Braids is not enabled, existing braids still apply, and they can be removed here
+
+    @integration
+    Scenario: With release_braids off and Braids turned off the pages say the braids are paused
+      Given release_braids is off for the organisation
+      And the organisation has Braids turned off
+      And a live braid from "specialists" into "orchestrator"
+      When ana opens the project Braids page or the organisation Braids page
+      Then it says Braids is not enabled, existing braids are paused and kept, and they can be removed
+      And each braid is marked paused
 
     @integration
     Scenario: With release_braids off the project Braids page lists braids with only Remove

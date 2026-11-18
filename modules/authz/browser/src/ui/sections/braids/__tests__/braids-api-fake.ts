@@ -16,6 +16,7 @@ export type BraidsApiState = {
   braidsEnabled: boolean;
   /** When set, reading the organisation's settings fails. */
   policyFails: boolean;
+  policyRefetch: Mock<() => void>;
   remove: Mock<(input: unknown) => void>;
   setPolicy: Mock<(input: unknown) => void>;
   setEnabled: Mock<(input: unknown) => void>;
@@ -59,6 +60,7 @@ export function braidsApiFake() {
     keptToAdmins: false,
     braidsEnabled: true,
     policyFails: false,
+    policyRefetch: vi.fn(),
     remove: vi.fn(),
     setPolicy: vi.fn(),
     setEnabled: vi.fn(),
@@ -105,7 +107,15 @@ export function braidsApiFake() {
       authz: {
         listBraids: { invalidate: vi.fn() },
         listOrganizationBraids: { invalidate: vi.fn() },
-        getBraidsPolicy: { invalidate: vi.fn() },
+        getBraidsPolicy: {
+          setData: (
+            _input: unknown,
+            policy: { braidsOrganizationAdminsOnly: boolean; braidsEnabled: boolean },
+          ) => {
+            state.keptToAdmins = policy.braidsOrganizationAdminsOnly;
+            state.braidsEnabled = policy.braidsEnabled;
+          },
+        },
       },
     }),
     authz: {
@@ -114,7 +124,7 @@ export function braidsApiFake() {
       getBraidsPolicy: {
         useQuery: () =>
           state.policyFails
-            ? { data: undefined, isLoading: false, isError: true }
+            ? { data: undefined, isLoading: false, isError: true, refetch: state.policyRefetch }
             : {
                 data: {
                   organizationId: "org-1",
@@ -125,6 +135,7 @@ export function braidsApiFake() {
                 },
                 isLoading: false,
                 isError: false,
+                refetch: state.policyRefetch,
               },
       },
       removeBraid: mutation(

@@ -886,7 +886,7 @@ const presentations = {
   braids_not_enabled: {
     title: "Braids aren't switched on here",
     describe: () =>
-      "This organisation can't manage braids yet. Braids it already has keep showing their spans.",
+      "This organisation can't manage braids yet. Removing a braid and revoking a signing key still work.",
   },
   braids_turned_off: {
     title: "Braids is turned off",

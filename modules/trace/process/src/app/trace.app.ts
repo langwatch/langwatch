@@ -1555,6 +1555,7 @@ export class TraceModule implements TraceApi, CollectorApp {
     this.#braidPause = TraceBraidPauseService.create({
       plans: dependencies.braidPlans,
       settings: dependencies.braidSettings,
+      logger,
     });
     this.#braidDetail = TraceBraidDetailService.create({ directory: dependencies.braidDirectory });
     // The one holder of the span store and the braid reads: each returns an owner's span, or

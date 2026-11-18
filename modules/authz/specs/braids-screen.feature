@@ -347,10 +347,11 @@ Feature: The Braids screen
       And turning it on saves the setting and says Braids is on
 
     @integration
-    Scenario: The Enable Braids switch can't be flipped while the setting can't be read
+    Scenario: The Enable Braids row offers Retry while the setting can't be read
       Given reading the organisation's Braids settings fails
       When ana opens Braids in the organisation settings
-      Then the Enable Braids switch is disabled rather than showing a guess
+      Then the Enable Braids row says the setting couldn't be read and shows no switch
+      And Retry reads the setting again
 
     @integration
     Scenario: Below Enterprise the organisation Braids page offers the upsell instead of the switch

@@ -3,7 +3,7 @@ import { fenceFor } from "@langwatch/clickhouse-client";
 import { planSchema } from "@langwatch/entitlement-contract";
 import type { PlanType } from "@langwatch/plans";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import {
   braidedProof,
@@ -33,12 +33,13 @@ function detailApp({
 }) {
   const asked: string[] = [];
   const counted: Authorization[] = [];
-  const settings = { braidsEnabled, asked: 0 };
+  const settings = { braidsEnabled, asked: 0, fails: false };
   const app = createTraceAppHarness({
     braidSettings: createApiFixture<TraceAppDependencies["braidSettings"]>(
       {
         getOrganizationPolicy: async ({ organizationId }) => {
           settings.asked++;
+          if (settings.fails) throw new Error("settings read failed");
           return {
             organizationId,
             braidsOrganizationAdminsOnly: false,
@@ -181,23 +182,26 @@ describe("braided spans and the organisation's plan", () => {
   describe("given an Enterprise organisation with Braids turned off in settings", () => {
     /** @scenario Turning Braids off pauses braids within thirty seconds and keeps them */
     it("asks the setting again once the proof that cached the answer has expired", async () => {
-      const { open, settings } = detailApp({ planType: "ENTERPRISE" });
-      // The answer lives no longer than the asking proof, itself within the 30 s proof bound.
-      const shortLived = braidedProof({
-        projectId: READER,
-        braids: [{ owner: OWNER }],
-        honoured: false,
-        now: Date.now() - TEST_PROOF_LIFETIME_MS + 5,
-      });
-      expect(readsBraidedSpans(await open(shortLived))).toBe(true);
+      vi.useFakeTimers({ toFake: ["Date"] });
+      try {
+        const start = Date.now();
+        const { open, settings } = detailApp({ planType: "ENTERPRISE" });
+        expect(readsBraidedSpans(await open(braided()))).toBe(true);
 
-      settings.braidsEnabled = false;
-      await new Promise((resolve) => setTimeout(resolve, 20));
-      const proof = await open(braided());
+        settings.braidsEnabled = false;
+        // The answer lives no longer than the asking proof, itself within the 30 s proof bound.
+        expect(readsBraidedSpans(await open(braided()))).toBe(true);
+        expect(settings.asked).toBe(1);
 
-      expect(readsBraidedSpans(proof)).toBe(false);
-      expect(spanFenceOf(proof).braids).toBeUndefined();
-      expect(settings.asked).toBe(2);
+        vi.setSystemTime(start + TEST_PROOF_LIFETIME_MS + 1);
+        const proof = await open(braided());
+
+        expect(readsBraidedSpans(proof)).toBe(false);
+        expect(spanFenceOf(proof).braids).toBeUndefined();
+        expect(settings.asked).toBe(2);
+      } finally {
+        vi.useRealTimers();
+      }
     });
 
     it("strips the braids for a proof minted after the setting was turned off", async () => {
@@ -208,6 +212,19 @@ describe("braided spans and the organisation's plan", () => {
       expect(readsBraidedSpans(proof)).toBe(false);
       expect(proof.grants.map((grant) => grant.projectId)).toEqual([READER]);
       expect(spanFenceOf(proof).braids).toBeUndefined();
+    });
+
+    it("reads the own project without its braids while the setting can't be read", async () => {
+      const { open, settings } = detailApp({ planType: "ENTERPRISE" });
+      settings.fails = true;
+
+      const proof = await open(braided());
+
+      expect(readsBraidedSpans(proof)).toBe(false);
+      expect(proof.grants.map((grant) => grant.projectId)).toEqual([READER]);
+      settings.fails = false;
+      expect(readsBraidedSpans(await open(braided()))).toBe(true);
+      expect(settings.asked).toBe(2);
     });
 
     /** @scenario Turning Braids on again resumes the braids it paused */

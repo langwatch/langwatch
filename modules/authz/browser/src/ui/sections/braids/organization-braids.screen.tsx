@@ -40,15 +40,44 @@ function EnableBraids({
   enabled,
   isReading,
   unread,
+  onRetry,
 }: {
   organizationId: string;
   isEnterprise: boolean;
   enabled: boolean;
   isReading: boolean;
-  /** The setting couldn't be read: the switch shows no guess and can't be flipped. */
+  /** The setting couldn't be read: no switch, so no guess, and Retry asks again. */
   unread: boolean;
+  onRetry: () => void;
 }) {
   const setting = useSetBraidsEnabled({ organizationId });
+  const unknown = isEnterprise && unread;
+  let hint = "Braids is included in Enterprise.";
+  let control = (
+    <Button asChild colorPalette="orange" size="xs">
+      <Link href="/settings/plans">See plans</Link>
+    </Button>
+  );
+  if (unknown) {
+    hint = "Couldn't read whether Braids is on for this organisation.";
+    control = (
+      <Button size="xs" variant="outline" onClick={onRetry} data-testid="braids-enabled-retry">
+        Retry
+      </Button>
+    );
+  } else if (isEnterprise) {
+    hint =
+      "Turn it on and projects can braid. Turning it off pauses every braid and keeps it: the spans stop showing within 30 seconds and come back when you turn Braids on again.";
+    control = (
+      <Switch
+        checked={enabled}
+        disabled={isReading || setting.isSaving}
+        onCheckedChange={({ checked }) => setting.set(checked)}
+        inputProps={{ "aria-label": ENABLE_BRAIDS }}
+        data-testid="braids-enabled-switch"
+      />
+    );
+  }
   return (
     <SettingsSection
       title={ENABLE_BRAIDS}
@@ -56,27 +85,11 @@ function EnableBraids({
     >
       <ToggleRow
         label={ENABLE_BRAIDS}
-        on={isEnterprise && enabled}
-        hint={
-          isEnterprise
-            ? "Turn it on and projects can braid. Turning it off pauses every braid and keeps it: the spans stop showing within 30 seconds and come back when you turn Braids on again."
-            : "Braids is included in Enterprise."
-        }
+        on={isEnterprise && !unknown && enabled}
+        hint={hint}
         data-testid="braids-enabled-row"
       >
-        {isEnterprise ? (
-          <Switch
-            checked={enabled}
-            disabled={isReading || unread || setting.isSaving}
-            onCheckedChange={({ checked }) => setting.set(checked)}
-            inputProps={{ "aria-label": ENABLE_BRAIDS }}
-            data-testid="braids-enabled-switch"
-          />
-        ) : (
-          <Button asChild colorPalette="orange" size="xs">
-            <Link href="/settings/plans">See plans</Link>
-          </Button>
-        )}
+        {control}
       </ToggleRow>
     </SettingsSection>
   );
@@ -191,8 +204,8 @@ export default function OrganizationBraidsScreen() {
     projects: host.organizationStructure().projects,
   });
   const paused = released && !isEnterprise && rows.length > 0;
-  // Known off, never assumed: the setting pauses braids on Enterprise too.
-  const turnedOff = released && isEnterprise && policy.data?.braidsEnabled === false;
+  // Known off, never assumed: the setting pauses braids on Enterprise, released or not.
+  const turnedOff = isEnterprise && policy.data?.braidsEnabled === false;
 
   return (
     <>
@@ -200,7 +213,7 @@ export default function OrganizationBraidsScreen() {
       <Stack gap={0} css={NO_RULE_UNDER_HEADER}>
         {released ? null : (
           <Box paddingBottom={4}>
-            <BraidsNotEnabledBanner removeHere={false} />
+            <BraidsNotEnabledBanner removeHere={false} paused={turnedOff} />
           </Box>
         )}
         {paused ? (
@@ -218,6 +231,7 @@ export default function OrganizationBraidsScreen() {
             enabled={policy.data?.braidsEnabled ?? false}
             isReading={policy.isLoading}
             unread={policy.isError}
+            onRetry={() => void policy.refetch()}
           />
         ) : null}
         {released ? (

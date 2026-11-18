@@ -387,6 +387,20 @@ describe("BraidsScreen", () => {
       expect(await screen.findByRole("menuitem", { name: "Remove braid" })).toBeInTheDocument();
       expect(screen.queryByRole("menuitem", { name: "Edit" })).not.toBeInTheDocument();
     });
+
+    /** @scenario With release_braids off and Braids turned off the pages say the braids are paused */
+    it("says the braids are paused rather than applying, and marks each paused", () => {
+      braidsFake.state.braidsEnabled = false;
+      braidsFake.state.project = { intoOtherProjects: [liveBraid()], fromOtherProjects: [] };
+      renderAs({ braidsReleased: false });
+
+      const banner = screen.getByTestId("braids-not-enabled");
+      expect(banner).toHaveTextContent(/paused and kept.*remove them here/);
+      expect(banner).not.toHaveTextContent(/still apply/);
+      expect(screen.queryByTestId("braids-turned-off")).toBeNull();
+      const row = within(screen.getByTestId("braids-section-into")).getByTestId("braid-row");
+      expect(within(row).getByTestId("braid-paused")).toBeInTheDocument();
+    });
   });
 
   describe("given the organisation has Braids turned off", () => {
@@ -427,6 +441,7 @@ describe("BraidsScreen", () => {
       braidsFake.state.braidsEnabled = false;
       renderAs({ isEnterprise: false });
 
+      expect(screen.getByTestId("braids-enterprise-upsell")).toBeVisible();
       expect(screen.queryByTestId("braids-turned-off")).toBeNull();
     });
   });

@@ -413,7 +413,9 @@ and both Braids pages still open as a read-only list under a notice that Braids 
 (decided by Alex, 2026-11-18): the project page with Remove, the organisation page with "View in audit
 log" and a notice sending admins to the project page to remove one. Creating, changing, the preview, the "who may braid" setting and
 signing-key management refuse `braids_not_enabled`; listing and removing do not, so an admin can find
-and end a braid. The settings menu shows Braids with the flag off only once braids exist.
+and end a braid. An organisation admin can still turn the organisation's Braids setting off:
+`setBraidsEnabled` asks the flag only to turn it on, so existing braids can be paused without
+waiting for the flag. The settings menu shows Braids with the flag off only once braids exist.
 
 **The organisation turns Braids on** (decided by Alex, 2026-11-18: "Braids is on by default, but has
 to be enabled in settings"). `release_braids` defaults on and stays LangWatch's kill switch, its off
@@ -422,7 +424,7 @@ behaviour as above. Each organisation also holds "Braids enabled", `braidsEnable
 organisation starts off. Changing it is `setBraidsEnabled`: `organization:manage`, Enterprise, audited
 as `authz.organization_policy.braids_enabled_changed`, and it bumps the epoch. While it is off,
 creating and changing braids, the dialog's reads and issuing or rotating signing keys refuse
-`braids_turned_off`; listing, removing, revoking and reading the settings do not. Off also **pauses**
+`braids_turned_off` (with `release_braids` also off, `braids_not_enabled` answers first); listing, removing, revoking and reading the settings do not. Off also **pauses**
 braids the way leaving Enterprise does: the trace module's pause service asks the plan and then
 `AuthzApi.getOrganizationPolicy`, cached per organisation for no longer than the asking proof, so the
 spans stop showing within the proof bound and come back when it is turned on.
@@ -765,5 +767,6 @@ not operations.
   `release_braids` defaults on as a kill switch; a new organisation setting, "Braids enabled"
   (`AuthzOrganizationPolicy.braidsEnabled`, default false, expand-only migration
   `20261118140000_braids_authz_organization_enabled`), is changed by an organisation admin on
-  Enterprise and audited. Off refuses management with `braids_turned_off` and pauses braids in the
+  Enterprise and audited. Off refuses management with `braids_turned_off` (`braids_not_enabled` first
+  while the release flag is off too) and pauses braids in the
   trace read, as leaving Enterprise does; on resumes them (§9, "The organisation turns Braids on").

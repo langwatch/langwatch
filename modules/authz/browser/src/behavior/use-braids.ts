@@ -24,19 +24,13 @@ export function useBraidsPolicy({ organizationId }: { organizationId: string | u
 
 /**
  * The organisation's braid settings as the project page reads them. Off is known, never assumed:
- * an unread setting leaves the server to refuse by name.
+ * an unread setting leaves the server to refuse by name. Off holds with the release flag off too.
  */
-export function useBraidsSettings({
-  organizationId,
-  released,
-}: {
-  organizationId: string | undefined;
-  released: boolean;
-}) {
+export function useBraidsSettings({ organizationId }: { organizationId: string | undefined }) {
   const policy = useBraidsPolicy({ organizationId });
   return {
     keptToAdmins: policy.data?.braidsOrganizationAdminsOnly ?? false,
-    turnedOff: released && policy.data?.braidsEnabled === false,
+    turnedOff: policy.data?.braidsEnabled === false,
   };
 }
 
@@ -78,7 +72,7 @@ export function useSetBraidsPolicy({ organizationId }: { organizationId: string 
   const utils = authzApi.useUtils();
   const setting = authzApi.authz.setBraidsPolicy.useMutation({
     onSuccess: (policy) => {
-      void utils.authz.getBraidsPolicy.invalidate();
+      utils.authz.getBraidsPolicy.setData({ organizationId }, policy);
       host.succeeded({
         title: policy.braidsOrganizationAdminsOnly
           ? "Braids are kept to organisation admins"
@@ -100,7 +94,7 @@ export function useSetBraidsEnabled({ organizationId }: { organizationId: string
   const utils = authzApi.useUtils();
   const setting = authzApi.authz.setBraidsEnabled.useMutation({
     onSuccess: (policy) => {
-      void utils.authz.getBraidsPolicy.invalidate();
+      utils.authz.getBraidsPolicy.setData({ organizationId }, policy);
       host.succeeded({
         title: policy.braidsEnabled ? "Braids is on" : "Braids is off",
         description: policy.braidsEnabled

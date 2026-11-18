@@ -40,9 +40,9 @@ function randomBase62({ length }: { length: number }): string {
 }
 
 /**
- * A project's braid signing keys (ADR-201 §4): issued, rotated, revoked, listed with 24h counts.
- * The door asks permission and plan; another project's key reads as not found. All but revoke
- * refuse while `release_braids` is off; issuing and rotating also while Braids is turned off.
+ * A project's braid signing keys (ADR-201 §4); another project's key reads as not found. Listing
+ * and revoking ask no flag; `findProjectSigning`, issuing and rotating refuse while
+ * `release_braids` is off, and issuing and rotating also while Braids is turned off.
  */
 export class SigningKeyService {
   private readonly keys: SigningKeyRepository;

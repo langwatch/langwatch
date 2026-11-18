@@ -41,6 +41,7 @@ beforeEach(() => {
   braidsFake.state.keptToAdmins = false;
   braidsFake.state.braidsEnabled = true;
   braidsFake.state.policyFails = false;
+  braidsFake.state.policyRefetch.mockClear();
   braidsFake.state.setPolicy.mockClear();
   braidsFake.state.setEnabled.mockClear();
 });
@@ -109,12 +110,16 @@ describe("OrganizationBraidsScreen", () => {
       expect(host.successes[0]?.title).toBe("Braids is on");
     });
 
-    /** @scenario The Enable Braids switch can't be flipped while the setting can't be read */
-    it("disables the switch when the setting fails to load", () => {
+    /** @scenario The Enable Braids row offers Retry while the setting can't be read */
+    it("shows no switch and offers Retry when the setting fails to load", async () => {
       braidsFake.state.policyFails = true;
       renderAs();
 
-      expect(screen.getByRole("checkbox", { name: "Enable Braids" })).toBeDisabled();
+      const row = screen.getByTestId("braids-enabled-row");
+      expect(row).toHaveTextContent(/Couldn't read whether Braids is on/);
+      expect(screen.queryByRole("checkbox", { name: "Enable Braids" })).toBeNull();
+      await userEvent.setup().click(within(row).getByRole("button", { name: "Retry" }));
+      expect(braidsFake.state.policyRefetch).toHaveBeenCalledOnce();
     });
 
     /** @scenario While Braids is off the organisation page lists its braids as paused */
@@ -152,6 +157,19 @@ describe("OrganizationBraidsScreen", () => {
       expect(screen.getByTestId("organization-braids")).toBeInTheDocument();
       expect(screen.queryByText("Who may braid")).not.toBeInTheDocument();
       expect(screen.queryByText("Braids are paused")).not.toBeInTheDocument();
+    });
+
+    /** @scenario With release_braids off and Braids turned off the pages say the braids are paused */
+    it("says the braids are paused and kept, and lists each paused", () => {
+      braidsFake.state.braidsEnabled = false;
+      renderAs({ braidsReleased: false });
+
+      const banner = screen.getByTestId("braids-not-enabled");
+      expect(banner).toHaveTextContent(/paused and kept/);
+      expect(banner).not.toHaveTextContent(/still apply/);
+      for (const row of screen.getAllByTestId("organization-braid-row")) {
+        expect(row).toHaveTextContent(/Paused · /);
+      }
     });
 
     it("offers the Enable Braids switch only while Braids is on, so it can be turned off", async () => {
