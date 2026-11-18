@@ -181,7 +181,10 @@ Feature: Migration order check
     When the gateway's call has a space before its bracket and the PR edits it
     Or a comment naming another step sits above the ops call's step option and the PR edits that call
     Or the ops call's step option key is quoted, as "step" or 'step', and the PR edits that call
+    Or the gateway's defineProcessModule call is wrapped across lines with a trailing comma and the PR edits its call
     Then the check fails for that step
+    When one module's chain holds two .withIdIndexes calls, one with no step option and one with its own
+    Then an edit to either call fails the check only when that call's own step was released
     When the PR comments the gateway's call out
     Or another module's file names the gateway module in a comment beside an identical call
     Then removing the gateway's call still fails the check as a removed step

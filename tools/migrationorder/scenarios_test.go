@@ -281,6 +281,45 @@ func TestStepsFreezesOnlyAReleasedReplayStepCall(t *testing.T) {
 	}
 }
 
+// @scenario "A released id-index step is read from its owner's call in code"
+func TestStepsFreezesEachIdIndexCallOfOneChainOnItsOwn(t *testing.T) {
+	const (
+		gatewayFile = "modules/gateway/process/src/gateway.module.ts"
+		opsFile     = "modules/ops/process/src/ops.module.ts"
+		gatewayOwn  = ".withIdIndexes(GATEWAY_ID_INDEXES, {\n  description: \"Fills gateway.\",\n})"
+		gatewayNext = ".withIdIndexes(SECOND_ID_INDEXES, {\n  step: \"fill-second-id-indexes\",\n  description: \"Fills second.\",\n})"
+		opsOwn      = ".withIdIndexes(OPS_ID_INDEXES, {\n  description: \"Fills ops.\",\n})"
+		opsLog      = ".withIdIndexes([EVENT_LOG_ID_INDEX], {\n  step: \"fill-event-log-id-index\",\n  description: \"Fills the event log.\",\n})"
+		gateway     = "export const gateway = defineProcessModule(\"gateway\")\n  " + gatewayOwn + "\n  " + gatewayNext + ";\n"
+		ops         = "export const ops = defineProcessModule(\"ops\")\n  " + opsOwn + "\n  " + opsLog + ";\n"
+	)
+	// Released: gateway:fill-id-indexes (no step option) and ops:fill-event-log-id-index.
+	// Not released: gateway:fill-second-id-indexes and ops:fill-id-indexes.
+	cases := []struct {
+		name, gateway, ops, want string
+	}{
+		{"the gateway's unreleased second call edited", gateway, ops, ""},
+		{"the gateway's released call edited", strings.Replace(gateway, "Fills gateway.", "Fills more.", 1), ops, "declares gateway:fill-id-indexes"},
+		{"the ops module's unreleased call edited", gateway, strings.Replace(ops, "Fills ops.", "Fills more.", 1), ""},
+		{"the ops module's released call edited", gateway, strings.Replace(ops, "Fills the event log.", "Fills more.", 1), "declares ops:fill-event-log-id-index"},
+	}
+	cases[0].gateway = strings.Replace(gateway, "Fills second.", "Fills more.", 1)
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			findings := idIndexFindings(t, map[string][2]string{gatewayFile: {gateway, c.gateway}, opsFile: {ops, c.ops}})
+			if c.want == "" {
+				if len(findings) != 0 {
+					t.Errorf("want no finding, got %+v", findings)
+				}
+				return
+			}
+			if len(findings) != 1 || !strings.Contains(findings[0].Problem, c.want) {
+				t.Errorf("want one finding %q, got %+v", c.want, findings)
+			}
+		})
+	}
+}
+
 // idIndexFindings commits each file's base on main, under a manifest
 // releasing the gateway, ops and coding-agent id-index steps, then each
 // changed head on a branch, and returns the step findings.
