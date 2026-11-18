@@ -243,11 +243,14 @@ export async function buildKillSwitchRest({
   const repositories = MemoryGovernanceRepositories.create();
   const { app, disabled } = await governanceAppOf({ repositories, planType });
   await seedAgent(repositories);
+  const processStore = InMemoryProcessStore.createForTesting();
   const eventing = new EventSourcing({
     eventStore: EventStoreMemory.createForTesting(),
-    processStore: InMemoryProcessStore.createForTesting(),
+    processStore,
   });
-  const pipeline = eventing.register(app.agentStopPipeline({ participation: "consume" }));
+  const pipeline = eventing.register(
+    app.agentStopPipeline({ participation: "consume", processStore }),
+  );
   app.connectAgentStop(pipeline.commands);
   const call = mountKillSwitchRest({ app, grants, planType });
   return { app, repositories, eventing, disabled, call };

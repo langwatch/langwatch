@@ -2,8 +2,10 @@
 /**
  * The agent kill switch's eventing: one `agent_stop` aggregate per stop, its AgentStop Postgres
  * projection, its commands and, in the worker, the process manager that applies and reverts
- * targets. The api only sends. Spec: enterprise/modules/governance/specs/agent-kill-switch.feature
+ * targets, and the kill switch's audit outbox. The api only sends.
+ * Spec: enterprise/modules/governance/specs/agent-kill-switch.feature
  */
+import { type AuditLogIntent, auditLogIntentSchema } from "@langwatch/audit-log-contract";
 import {
   AGENT_STOP_AGGREGATE_TYPE,
   agentStopApprovedEventSchema,
@@ -22,6 +24,7 @@ import {
   defineEventingModule,
   definePipeline,
   type EventingSetup,
+  type ProcessStore,
   type Projection,
   type RegisteredCommand,
   type StateProjectionStore,
@@ -31,6 +34,10 @@ import type { z } from "zod";
 
 import type { GovernanceModule } from "../../../app/governance.app.ts";
 import type { GovernanceRepositories } from "../../../repositories/governance.repositories.ts";
+import {
+  KILL_SWITCH_AUDIT_PROCESS_NAME,
+  KILL_SWITCH_AUDIT_RECORD_INTENT,
+} from "../rules/kill-switch-audit.rules.ts";
 import { AGENT_STOP_COMMANDS } from "./agent-stop.commands.ts";
 import {
   AGENT_STOP_PROCESS_NAME,
@@ -38,6 +45,16 @@ import {
   agentStopProcessManager,
 } from "./agent-stop.process.ts";
 import { type AgentStopProjectionState, agentStopProjection } from "./agent-stop.projection.ts";
+import { pruneKillSwitchAudits } from "./kill-switch-audit.intent.ts";
+import {
+  KILL_SWITCH_AUDIT_INITIAL_STATE,
+  KILL_SWITCH_AUDIT_MAX_ATTEMPTS,
+  KILL_SWITCH_AUDIT_PRUNE_INTENT,
+  KILL_SWITCH_AUDIT_PRUNE_INTERVAL_MS,
+  killSwitchAuditPruneSchema,
+  killSwitchAuditPruneWake,
+  killSwitchAuditStateSchema,
+} from "./kill-switch-audit.process.ts";
 
 const AGENT_STOP_PIPELINE_NAME = "governance_agent_stop" as const;
 
@@ -59,14 +76,22 @@ export type AgentStopPipelineDefinition = StaticPipelineDefinition<
   RegisteredCommand
 >;
 
-/** The process manager is declared everywhere; only a consuming process (the worker) runs it. */
+/** Writes one audit intent to the audit log, and prunes the outbox's delivered rows. */
+export interface KillSwitchAuditOutboxHost {
+  record: (intent: AuditLogIntent) => Promise<void>;
+  processStore: Pick<ProcessStore, "deleteDispatchedBefore">;
+}
+
+/** The process managers are declared everywhere; only a consuming process (the worker) runs them. */
 export function buildAgentStopPipeline({
   store,
   executors,
+  audit,
   retryDelayMs,
 }: {
   store: StateProjectionStore<AgentStopProjectionState>;
   executors: AgentStopIntentExecutors;
+  audit: KillSwitchAuditOutboxHost;
   retryDelayMs?: (params: { attempt: number }) => number;
 }): AgentStopPipelineDefinition {
   return definePipeline({
@@ -100,12 +125,33 @@ export function buildAgentStopPipeline({
       AGENT_STOP_PROCESS_NAME,
       agentStopProcessManager({ executors, ...(retryDelayMs ? { retryDelayMs } : {}) }),
     )
+    .withProcessManager(KILL_SWITCH_AUDIT_PROCESS_NAME, (pm) =>
+      pm
+        .state(killSwitchAuditStateSchema, KILL_SWITCH_AUDIT_INITIAL_STATE)
+        .intent(KILL_SWITCH_AUDIT_RECORD_INTENT, auditLogIntentSchema, (intent) =>
+          audit.record(intent),
+        )
+        .intent(
+          KILL_SWITCH_AUDIT_PRUNE_INTENT,
+          killSwitchAuditPruneSchema,
+          pruneKillSwitchAudits(audit.processStore),
+        )
+        .schedule({ everyMs: KILL_SWITCH_AUDIT_PRUNE_INTERVAL_MS })
+        .onWake(killSwitchAuditPruneWake)
+        .outbox({ maxAttempts: KILL_SWITCH_AUDIT_MAX_ATTEMPTS }),
+    )
     .build();
 }
 
 export const agentStopEventing = defineEventingModule({
   pipeline: AGENT_STOP_PIPELINE_NAME,
-  build: ({ app, participation }: EventingSetup<GovernanceRepositories, GovernanceModule>) =>
-    app.agentStopPipeline({ participation }),
+  build: ({
+    app,
+    participation,
+    processStore,
+  }: EventingSetup<GovernanceRepositories, GovernanceModule>) => {
+    app.connectKillSwitchAuditOutbox({ processStore });
+    return app.agentStopPipeline({ participation, processStore });
+  },
   connect: ({ app, commands }) => app.connectAgentStop(commands),
 });

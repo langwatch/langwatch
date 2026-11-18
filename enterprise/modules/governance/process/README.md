@@ -2864,22 +2864,23 @@ Declared at `src/eventing/pulled-usage.pipeline.ts:167`. Events: `pulledUsageObs
 
 ### Pipeline `governance_agent_stop` (aggregate `agent_stop`)
 
-Declared at `src/features/kill-switch/eventing/agent-stop.pipeline.ts:72`. Events: `agentStopRequestedEventSchema`, `agentStopApprovedEventSchema`, `agentStopDeniedEventSchema`, `agentStopTargetAppliedEventSchema`, `agentStopTargetFailedEventSchema`, `agentStopRestoreRequestedEventSchema`, `agentStopTargetRevertedEventSchema`, `agentStopTargetRevertFailedEventSchema`, `agentStopRetryRequestedEventSchema`, `agentStopTargetsDroppedEventSchema`.
+Declared at `src/features/kill-switch/eventing/agent-stop.pipeline.ts:97`. Events: `agentStopRequestedEventSchema`, `agentStopApprovedEventSchema`, `agentStopDeniedEventSchema`, `agentStopTargetAppliedEventSchema`, `agentStopTargetFailedEventSchema`, `agentStopRestoreRequestedEventSchema`, `agentStopTargetRevertedEventSchema`, `agentStopTargetRevertFailedEventSchema`, `agentStopRetryRequestedEventSchema`, `agentStopTargetsDroppedEventSchema`.
 
-| Kind                | Name                           | Handles                                                    | Declared at                                                   |
-| ------------------- | ------------------------------ | ---------------------------------------------------------- | ------------------------------------------------------------- |
-| command             | `request`                      | –                                                          | `src/features/kill-switch/eventing/agent-stop.pipeline.ts:89` |
-| command             | `approve`                      | –                                                          | `src/features/kill-switch/eventing/agent-stop.pipeline.ts:90` |
-| command             | `deny`                         | –                                                          | `src/features/kill-switch/eventing/agent-stop.pipeline.ts:91` |
-| command             | `recordTargetApplied`          | –                                                          | `src/features/kill-switch/eventing/agent-stop.pipeline.ts:92` |
-| command             | `recordTargetFailed`           | –                                                          | `src/features/kill-switch/eventing/agent-stop.pipeline.ts:93` |
-| command             | `requestRestore`               | –                                                          | `src/features/kill-switch/eventing/agent-stop.pipeline.ts:94` |
-| command             | `recordTargetReverted`         | –                                                          | `src/features/kill-switch/eventing/agent-stop.pipeline.ts:95` |
-| command             | `recordTargetRevertFailed`     | –                                                          | `src/features/kill-switch/eventing/agent-stop.pipeline.ts:96` |
-| command             | `retry`                        | –                                                          | `src/features/kill-switch/eventing/agent-stop.pipeline.ts:97` |
-| command             | `dropTargets`                  | –                                                          | `src/features/kill-switch/eventing/agent-stop.pipeline.ts:98` |
-| process manager     | `agentStop`                    | intents `announce`, `revertTarget`, `applyTarget` (outbox) | `src/features/kill-switch/eventing/agent-stop.pipeline.ts:99` |
-| Postgres projection | `≈ agentStopProjection(store)` | –                                                          | `src/features/kill-switch/eventing/agent-stop.pipeline.ts:88` |
+| Kind                | Name                           | Handles                                                                                                               | Declared at                                                    |
+| ------------------- | ------------------------------ | --------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
+| command             | `request`                      | –                                                                                                                     | `src/features/kill-switch/eventing/agent-stop.pipeline.ts:114` |
+| command             | `approve`                      | –                                                                                                                     | `src/features/kill-switch/eventing/agent-stop.pipeline.ts:115` |
+| command             | `deny`                         | –                                                                                                                     | `src/features/kill-switch/eventing/agent-stop.pipeline.ts:116` |
+| command             | `recordTargetApplied`          | –                                                                                                                     | `src/features/kill-switch/eventing/agent-stop.pipeline.ts:117` |
+| command             | `recordTargetFailed`           | –                                                                                                                     | `src/features/kill-switch/eventing/agent-stop.pipeline.ts:118` |
+| command             | `requestRestore`               | –                                                                                                                     | `src/features/kill-switch/eventing/agent-stop.pipeline.ts:119` |
+| command             | `recordTargetReverted`         | –                                                                                                                     | `src/features/kill-switch/eventing/agent-stop.pipeline.ts:120` |
+| command             | `recordTargetRevertFailed`     | –                                                                                                                     | `src/features/kill-switch/eventing/agent-stop.pipeline.ts:121` |
+| command             | `retry`                        | –                                                                                                                     | `src/features/kill-switch/eventing/agent-stop.pipeline.ts:122` |
+| command             | `dropTargets`                  | –                                                                                                                     | `src/features/kill-switch/eventing/agent-stop.pipeline.ts:123` |
+| process manager     | `agentStop`                    | intents `announce`, `revertTarget`, `applyTarget` (outbox)                                                            | `src/features/kill-switch/eventing/agent-stop.pipeline.ts:124` |
+| process manager     | `killSwitchAudit`              | every 1 d (`KILL_SWITCH_AUDIT_PRUNE_INTERVAL_MS = 24 * 60 * 60 * 1000`); intents `pruneAudit`, `recordAudit` (outbox) | `src/features/kill-switch/eventing/agent-stop.pipeline.ts:128` |
+| Postgres projection | `≈ agentStopProjection(store)` | –                                                                                                                     | `src/features/kill-switch/eventing/agent-stop.pipeline.ts:113` |
 
 ### Pipeline `governance_ocsf_push` (aggregate `global`)
 
@@ -2891,15 +2892,14 @@ Declared at `src/features/ocsf/eventing/ocsf-push.pipeline.ts:40`.
 
 ### Pipeline `governance_agent_registry` (aggregate `global`)
 
-Declared at `src/features/registry/eventing/agent-registry.pipeline.ts:107`.
+Declared at `src/features/registry/eventing/agent-registry.pipeline.ts:89`.
 
 | Kind            | Name                                    | Handles                                                                                                                             | Declared at                                                     |
 | --------------- | --------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
-| process manager | `agentRegistryDelivery`                 | every 1 d (`AGENT_REGISTRY_DELIVERY_PRUNE_INTERVAL_MS = 24 * 60 * 60 * 1000`); intents `pruneDelivered`, `requestDelivery` (outbox) | `src/features/registry/eventing/agent-registry.pipeline.ts:125` |
-| process manager | `killSwitchAudit`                       | every 1 d (`KILL_SWITCH_AUDIT_PRUNE_INTERVAL_MS = 24 * 60 * 60 * 1000`); intents `pruneAudit`, `recordAudit` (outbox)               | `src/features/registry/eventing/agent-registry.pipeline.ts:142` |
-| process manager | `agentRegistryTraffic`                  | every 15 min (`AGENT_REGISTRY_TRAFFIC_INTERVAL_MS = 15 * 60 * 1000`); intents `pass` (outbox)                                       | `src/features/registry/eventing/agent-registry.pipeline.ts:157` |
-| peer subscriber | `reconcileAgentRegistryOnAgentChanged`  | `lw.agent.changed` from [agent](../../../../modules/agent/README.md)                                                                | `src/features/registry/eventing/agent-registry.pipeline.ts:113` |
-| peer subscriber | `reconcileAgentRegistryOnAgentArchived` | `lw.agent.archived` from [agent](../../../../modules/agent/README.md)                                                               | `src/features/registry/eventing/agent-registry.pipeline.ts:119` |
+| process manager | `agentRegistryDelivery`                 | every 1 d (`AGENT_REGISTRY_DELIVERY_PRUNE_INTERVAL_MS = 24 * 60 * 60 * 1000`); intents `pruneDelivered`, `requestDelivery` (outbox) | `src/features/registry/eventing/agent-registry.pipeline.ts:107` |
+| process manager | `agentRegistryTraffic`                  | every 15 min (`AGENT_REGISTRY_TRAFFIC_INTERVAL_MS = 15 * 60 * 1000`); intents `pass` (outbox)                                       | `src/features/registry/eventing/agent-registry.pipeline.ts:124` |
+| peer subscriber | `reconcileAgentRegistryOnAgentChanged`  | `lw.agent.changed` from [agent](../../../../modules/agent/README.md)                                                                | `src/features/registry/eventing/agent-registry.pipeline.ts:95`  |
+| peer subscriber | `reconcileAgentRegistryOnAgentArchived` | `lw.agent.archived` from [agent](../../../../modules/agent/README.md)                                                               | `src/features/registry/eventing/agent-registry.pipeline.ts:101` |
 
 ## Configuration
 

@@ -10,7 +10,6 @@ import {
   agentArchivedEventDataSchema,
   agentChangedEventDataSchema,
 } from "@langwatch/agent-contract";
-import { auditLogIntentSchema } from "@langwatch/audit-log-contract";
 import {
   defineAggregate,
   defineEventingModule,
@@ -24,20 +23,6 @@ import { z } from "zod";
 
 import type { GovernanceModule } from "../../../app/governance.app.ts";
 import type { GovernanceRepositories } from "../../../repositories/governance.repositories.ts";
-import { pruneKillSwitchAudits } from "../../kill-switch/eventing/kill-switch-audit.intent.ts";
-import {
-  KILL_SWITCH_AUDIT_INITIAL_STATE,
-  KILL_SWITCH_AUDIT_MAX_ATTEMPTS,
-  KILL_SWITCH_AUDIT_PRUNE_INTENT,
-  KILL_SWITCH_AUDIT_PRUNE_INTERVAL_MS,
-  killSwitchAuditPruneSchema,
-  killSwitchAuditPruneWake,
-  killSwitchAuditStateSchema,
-} from "../../kill-switch/eventing/kill-switch-audit.process.ts";
-import {
-  KILL_SWITCH_AUDIT_PROCESS_NAME,
-  KILL_SWITCH_AUDIT_RECORD_INTENT,
-} from "../../kill-switch/rules/kill-switch-audit.rules.ts";
 import { pruneAgentRegistryDeliveries } from "./agent-registry-delivery.intent.ts";
 import {
   AGENT_REGISTRY_DELIVERY_INITIAL_STATE,
@@ -84,8 +69,6 @@ function settlePerProject(lane: string) {
 type AgentRegistryApp = Pick<
   GovernanceModule,
   | "connectAgentRegistryOutbox"
-  | "connectKillSwitchAuditOutbox"
-  | "recordKillSwitchAudit"
   | "requestAgentRegistryDelivery"
   | "reconcileAgentRegistryForProject"
   | "reconcileAgentRegistryTraffic"
@@ -96,7 +79,6 @@ export function buildAgentRegistryPipeline({
   processStore,
 }: EventingSetup<unknown, AgentRegistryApp>): StaticPipelineDefinition<never> {
   app.connectAgentRegistryOutbox({ processStore });
-  app.connectKillSwitchAuditOutbox({ processStore });
   const runTraffic = runAgentRegistryTraffic({
     reconcile: (input) => app.reconcileAgentRegistryTraffic(input),
     deleteDispatchedBefore: (params) => processStore.deleteDispatchedBefore(params),
@@ -138,21 +120,6 @@ export function buildAgentRegistryPipeline({
         .schedule({ everyMs: AGENT_REGISTRY_DELIVERY_PRUNE_INTERVAL_MS })
         .onWake(agentRegistryDeliveryPruneWake)
         .outbox({ maxAttempts: AGENT_REGISTRY_DELIVERY_MAX_ATTEMPTS }),
-    )
-    .withProcessManager(KILL_SWITCH_AUDIT_PROCESS_NAME, (pm) =>
-      pm
-        .state(killSwitchAuditStateSchema, KILL_SWITCH_AUDIT_INITIAL_STATE)
-        .intent(KILL_SWITCH_AUDIT_RECORD_INTENT, auditLogIntentSchema, (intent) =>
-          app.recordKillSwitchAudit(intent),
-        )
-        .intent(
-          KILL_SWITCH_AUDIT_PRUNE_INTENT,
-          killSwitchAuditPruneSchema,
-          pruneKillSwitchAudits(processStore),
-        )
-        .schedule({ everyMs: KILL_SWITCH_AUDIT_PRUNE_INTERVAL_MS })
-        .onWake(killSwitchAuditPruneWake)
-        .outbox({ maxAttempts: KILL_SWITCH_AUDIT_MAX_ATTEMPTS }),
     )
     .withProcessManager(AGENT_REGISTRY_TRAFFIC_PROCESS_NAME, (pm) =>
       pm

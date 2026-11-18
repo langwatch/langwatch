@@ -86,6 +86,13 @@ Feature: Agent kill switch: stop a misbehaving agent where it runs, with approva
     Then either the delete is refused with code "governance_aws_connection_in_use"
     Or the plan save is refused with code "agent_stop_target_invalid"
 
+  @integration
+  Scenario: A plan save checks its platforms before it takes the agent's lock
+    Given a plan save for "support-bot" is waiting on a slow platform answer
+    When a person stops "support-bot" meanwhile
+    Then the stop goes through without waiting for the plan save
+    And the plan save then commits under the agent's lock, refused if the plan moved past its version
+
   @unit
   Scenario: An AWS connection a stop plan or an unrestored stop still uses cannot be deleted
     Given a stop plan target or a stop that is not restored yet signs with an AWS connection

@@ -240,7 +240,7 @@ export async function killSwitchHarness({
       aliasInvocationState: "ACCEPT_INVOCATIONS",
     },
   });
-  // No pipeline hosts the audit outbox here, so each row is written at once under its key.
+  // The service writes each row at once under its key; the pipeline's audit outbox stays empty.
   const killSwitchAudit = KillSwitchAuditService.create({ auditLog, outbox: () => undefined });
   const connections = GovernanceAwsConnectionService.create({
     connections: repositories.awsConnections,
@@ -261,10 +261,8 @@ export async function killSwitchHarness({
   audit.length = 0;
 
   const eventStore = EventStoreMemory.createForTesting();
-  const eventing = new EventSourcing({
-    eventStore,
-    processStore: InMemoryProcessStore.createForTesting(),
-  });
+  const processStore = InMemoryProcessStore.createForTesting();
+  const eventing = new EventSourcing({ eventStore, processStore });
   let commands: Record<string, { send(payload: unknown): Promise<unknown> }> = {};
   /** How many more times recording each target's outcome is refused, by target id. */
   const recordRefusals = new Map<string, number>();
@@ -348,6 +346,7 @@ export async function killSwitchHarness({
     buildAgentStopPipeline({
       store: repositories.agentStops,
       executors: targets,
+      audit: { record: (intent) => auditLog.record(intent).then(() => undefined), processStore },
       retryDelayMs: () => 0,
     }),
   );

@@ -156,6 +156,56 @@ describe("AgentStopPlanService", () => {
     });
   });
 
+  describe("when a plan save waits on a slow platform", () => {
+    /** @scenario "A plan save checks its platforms before it takes the agent's lock" */
+    it("lets a stop of the same agent through while the platform answers", async () => {
+      const harness = await killSwitchHarness();
+      await harness.plans.setPlan({
+        organizationId: ORG,
+        agentId: AGENT_ID,
+        targets: [{ kind: "gateway_virtual_key", virtualKeyId: VIRTUAL_KEY_ID }],
+      });
+      let answer: () => void = () => undefined;
+      const answered = new Promise<void>((resolve) => {
+        answer = resolve;
+      });
+      let asked: () => void = () => undefined;
+      const platformAsked = new Promise<void>((resolve) => {
+        asked = resolve;
+      });
+      const probe = harness.probes.bedrock.getInvocationState.bind(harness.probes.bedrock);
+      vi.spyOn(harness.probes.bedrock, "getInvocationState").mockImplementation(async (input) => {
+        asked();
+        await answered;
+        return probe(input);
+      });
+
+      const save = harness.stops.setPlan({
+        organizationId: ORG,
+        agentId: AGENT_ID,
+        targets: harness.fullPlan,
+      });
+      await platformAsked;
+      const stop = await Promise.race([
+        harness.stops.requestStop({
+          organizationId: ORG,
+          agentId: AGENT_ID,
+          reason: "prompt injection in production",
+          severity: "high",
+          caller: PERSON,
+        }),
+        new Promise<"blocked">((resolve) => setTimeout(() => resolve("blocked"), 2_000)),
+      ]);
+      answer();
+      const plan = await save;
+
+      expect(stop).not.toBe("blocked");
+      expect(stop).toMatchObject({ agentId: AGENT_ID });
+      expect(plan.targets).toHaveLength(3);
+      await harness.eventing.close();
+    });
+  });
+
   describe("when another organisation writes the plan of this organisation's agent", () => {
     it("refuses it as outside its registry", async () => {
       const harness = await killSwitchHarness();

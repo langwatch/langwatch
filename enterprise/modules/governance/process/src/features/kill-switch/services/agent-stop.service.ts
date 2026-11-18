@@ -7,6 +7,7 @@ import {
   type AgentStopDecidedEventData,
   AgentStopNotFoundError,
   type AgentStopPage,
+  type AgentStopPlan,
   AgentStopNotPendingError,
   AgentStopPlanChangedError,
   AgentStopPlanEmptyError,
@@ -41,7 +42,7 @@ import {
 } from "../rules/agent-stop.rules.ts";
 import type { AgentStopClaimService } from "./agent-stop-claim.service.ts";
 import { AgentStopLifecycleService, agentLockKey } from "./agent-stop-lifecycle.service.ts";
-import type { AgentStopPlanService } from "./agent-stop-plan.service.ts";
+import type { AgentStopPlanInput, AgentStopPlanService } from "./agent-stop-plan.service.ts";
 import { AgentStopRequestAuditService } from "./agent-stop-request-audit.service.ts";
 import type { KillSwitchAuditService } from "./kill-switch-audit.service.ts";
 
@@ -89,7 +90,7 @@ interface AgentStopDependencies {
     | "advance"
   >;
   claims: Pick<AgentStopClaimService, "claim" | "markSent" | "release" | "withDecision">;
-  plans: Pick<AgentStopPlanService, "findTargets" | "findPlanCounts" | "setPlan">;
+  plans: Pick<AgentStopPlanService, "findTargets" | "findPlanCounts" | "checkPlan" | "savePlan">;
   locks: KillSwitchLockRepository;
   registry: Pick<AgentRegistryRepository, "getEntry" | "listEntries" | "findSourceKeys">;
   audit: Pick<KillSwitchAuditService, "record">;
@@ -272,14 +273,16 @@ export class AgentStopService {
     });
   }
 
-  /** Saves the plan and lets the open stop go of removed targets, one plan edit per agent at a time. */
-  async setPlan(
-    input: Parameters<AgentStopPlanService["setPlan"]>[0],
-  ): ReturnType<AgentStopPlanService["setPlan"]> {
+  /**
+   * Saves the plan and lets the open stop go of removed targets, one plan edit per agent at a time.
+   * The platform check runs before the lock; under it only database work runs.
+   */
+  async setPlan(input: AgentStopPlanInput): Promise<AgentStopPlan> {
+    await this.deps.plans.checkPlan(input);
     return this.deps.locks.withLock({
       key: agentLockKey(input),
       run: async () => {
-        const plan = await this.deps.plans.setPlan(input);
+        const plan = await this.deps.plans.savePlan(input);
         await this.lifecycle.dropRemovedTargets({
           organizationId: input.organizationId,
           agentId: input.agentId,

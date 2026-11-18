@@ -88,7 +88,6 @@ function setup({ reconciled }: { reconciled: string[] }): PipelineSetup {
     processStore: InMemoryProcessStore.createForTesting(),
     app: createApiFixture<PipelineSetup["app"]>({
       connectAgentRegistryOutbox: () => undefined,
-      connectKillSwitchAuditOutbox: () => undefined,
       reconcileAgentRegistryForProject: async ({ projectId }) => {
         reconciled.push(projectId);
       },

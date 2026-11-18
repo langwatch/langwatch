@@ -43,6 +43,14 @@ function viewOfPlan({
   };
 }
 
+/** One plan save: the full target list, and optionally the version the caller last read. */
+export interface AgentStopPlanInput {
+  organizationId: string;
+  agentId: string;
+  targets: readonly AgentStopTarget[];
+  expectedVersion?: number;
+}
+
 interface AgentStopPlanDependencies {
   plans: AgentStopPlanRepository;
   registry: Pick<AgentRegistryRepository, "getEntry">;
@@ -105,19 +113,28 @@ export class AgentStopPlanService {
   }
 
   /** Refused `agent_stop_plan_conflict` when `expectedVersion` is given and the plan moved past it. */
-  async setPlan({
+  async setPlan(input: AgentStopPlanInput): Promise<AgentStopPlan> {
+    await this.checkPlan(input);
+    return this.savePlan(input);
+  }
+
+  /**
+   * The slow half of a save: the registry entry and every target's platform. A caller holding the
+   * agent's lock runs it before taking the lock, so no platform call holds it.
+   */
+  async checkPlan({ organizationId, agentId, targets }: AgentStopPlanInput): Promise<void> {
+    await this.deps.registry.getEntry({ organizationId, id: agentId });
+    await this.checkOnPlatform({ organizationId, targets });
+  }
+
+  /** Database work only: ownership is checked again and `expectedVersion` refuses a moved plan. */
+  async savePlan({
     organizationId,
     agentId,
     targets,
     expectedVersion,
-  }: {
-    organizationId: string;
-    agentId: string;
-    targets: readonly AgentStopTarget[];
-    expectedVersion?: number;
-  }): Promise<AgentStopPlan> {
+  }: AgentStopPlanInput): Promise<AgentStopPlan> {
     await this.deps.registry.getEntry({ organizationId, id: agentId });
-    await this.checkOnPlatform({ organizationId, targets });
     const replaced = await this.deps.plans.replaceTargets({
       organizationId,
       agentId,
@@ -163,7 +180,7 @@ export class AgentStopPlanService {
     }
   }
 
-  /** Before the plan's lock, so no platform call holds it; an unowned target is refused there. */
+  /** Before any lock, so no platform call holds one; an unowned target is refused under the lock. */
   private async checkOnPlatform({
     organizationId,
     targets,

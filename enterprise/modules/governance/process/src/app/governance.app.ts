@@ -1249,11 +1249,17 @@ export class GovernanceModule implements GovernanceRestApi {
     this.ingestionPullCommands = commands;
   }
 
-  /** The kill switch's `agent_stop` pipeline; its process manager runs only where it consumes. */
-  agentStopPipeline(_input: { participation: EventingParticipation }): AgentStopPipelineDefinition {
+  /** The kill switch's `agent_stop` pipeline; its process managers run only where it consumes. */
+  agentStopPipeline({
+    processStore,
+  }: {
+    participation: EventingParticipation;
+    processStore: Pick<ProcessStore, "deleteDispatchedBefore">;
+  }): AgentStopPipelineDefinition {
     return buildAgentStopPipeline({
       store: this.repositories.agentStops,
       executors: this.agentStopTargets,
+      audit: { record: (intent) => this.recordKillSwitchAudit(intent), processStore },
     });
   }
 
