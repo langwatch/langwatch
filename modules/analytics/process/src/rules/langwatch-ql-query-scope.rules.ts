@@ -287,11 +287,10 @@ function buildWindowPredicates({
 }
 
 /**
- * The members' picks as one predicate on a view's rows. A fanned-out PostgreSQL view keeps one
- * copy of a row, the lowest in-scope project's (tasks#1212), so a pick read on that copy alone
- * would drop a row a sibling member's window admits. Its picks run on the engine table's
- * per-project copies, under the same row policy, and admit the row's keys. The members' plain
- * `IN` list leads so the engine can hand PostgreSQL a tenant bound, not a whole-table read.
+ * The members' picks as one predicate on a view's rows. A fanned-out view keeps only the lowest
+ * project's copy (tasks#1212), so a pick on that copy would drop a row a sibling's window admits:
+ * its picks run on the per-project copies, under the same row policy, and admit the row's keys.
+ * The plain `IN` list leads.
  */
 function windowPredicate({
   view,

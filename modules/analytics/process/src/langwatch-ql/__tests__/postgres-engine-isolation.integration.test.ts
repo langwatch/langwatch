@@ -1134,7 +1134,7 @@ describe("when a caller reads two sibling projects of one organization in one qu
     });
     for (const sql of seedStatements()) {
       const seeded = await postgres.asAdmin(sql);
-      expect(seeded.exitCode, `seeding failed: ${sql}\n${seeded.stderr}`).toBe(0);
+      if (seeded.exitCode !== 0) throw new Error(`seeding failed: ${sql}\n${seeded.stderr}`);
     }
     await harness.admin.insert({
       table: keyMapTable(),

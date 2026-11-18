@@ -130,8 +130,8 @@ describe("given the derived Postgres catalog", () => {
 
     /** @scenario "A fanned-out view keyed on its scope field keeps its fan-out" */
     it("names no entity key when the primary key holds the consumed scope field", () => {
-      const membership = (name: string, primaryKey: readonly string[]) =>
-        defineCatalogModel({
+      const membership = (name: string, primaryKey: readonly string[]) => {
+        const view = defineCatalogModel({
           name,
           table: {
             sourceTable: "FakeOrgMembership",
@@ -147,7 +147,9 @@ describe("given the derived Postgres catalog", () => {
             primaryKey,
             fields: ["id", "organizationId", "userId"],
           }),
-        }).postgres!.entityKeyColumns;
+        });
+        return view.postgres!.entityKeyColumns;
+      };
 
       expect(membership("fake_by_scope", ["organizationId", "userId"])).toBeUndefined();
       expect(membership("fake_by_id", ["id"])).toEqual(["FakeOrgMembershipId"]);

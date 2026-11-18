@@ -110,10 +110,8 @@ function postgresTenantPredicate({
 }
 
 /**
- * Keeps one copy of a row the approved view repeats once per project of its team or
- * organization. The row policy on the engine table has already dropped every copy outside the
- * caller's key set, so a single-project read keeps its own copy and a multi-project read keeps
- * one, not one per project (tasks#1212). The lowest project wins, so `TenantId` is stable
+ * Keeps one copy of a row the view repeats per project (tasks#1212); the row policy has already
+ * dropped copies outside the caller's key set. The lowest project wins, so `TenantId` is stable
  * across reads. "" for a view with no fan-out.
  */
 function postgresFanOutCollapse(view: LangWatchQLViewDefinition): string {
