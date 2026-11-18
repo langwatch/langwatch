@@ -6,6 +6,8 @@
 
 import { BatchSpanProcessor, type ReadableSpan, type SpanExporter } from "@opentelemetry/sdk-trace";
 
+import { getBatchSpanProcessorOptionsFromEnv } from "../otel-env";
+
 /**
  * A rule for excluding spans from export, matched on `fieldName` by
  * `matchOperation` against `matchValue`.
@@ -30,7 +32,7 @@ export class FilterableBatchSpanProcessor extends BatchSpanProcessor {
    * @param filters - An array of rules for excluding spans from export.
    */
   constructor(exporter: SpanExporter, filters: SpanProcessingExcludeRule[]) {
-    super({ exporter });
+    super({ ...getBatchSpanProcessorOptionsFromEnv(), exporter });
     this._filters = filters;
   }
 

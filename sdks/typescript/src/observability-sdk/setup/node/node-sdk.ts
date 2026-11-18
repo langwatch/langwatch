@@ -44,6 +44,7 @@ import {
 } from "@opentelemetry/sdk-trace";
 
 import { type Logger } from "../../../logger";
+import { getSamplerFromEnv, getSpanLimitsFromEnv } from "../../otel-env";
 import { ATTR_SERVICE_NAME } from "../../semconv/otel";
 import { loadInstrumentation, loadSdkMetrics } from "./optional-peers";
 
@@ -257,8 +258,9 @@ export class NodeSdk {
     if (spanProcessors.length === 0) return;
 
     this.tracerProvider = new TracerProvider({
-      sampler: this.configuration.sampler,
-      spanLimits: this.configuration.spanLimits,
+      sampler:
+        this.configuration.sampler ?? getSamplerFromEnv({ logger: this.configuration.logger }),
+      spanLimits: getSpanLimitsFromEnv(this.configuration.spanLimits),
       resource,
       idGenerator: this.configuration.idGenerator,
       spanProcessors,

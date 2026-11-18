@@ -23,6 +23,10 @@ import { initializeObservabilitySdkConfig } from "../../config";
 import { LangWatchLogsExporter, LangWatchTraceExporter } from "../../exporters";
 import { setLangWatchLoggerProvider } from "../../logger";
 import {
+  getBatchLogRecordProcessorOptionsFromEnv,
+  getBatchSpanProcessorOptionsFromEnv,
+} from "../../otel-env";
+import {
   callMember,
   createMergedResource,
   getConcreteProvider,
@@ -403,7 +407,10 @@ function setupDedicatedProvider(
 
     const processor =
       langwatch.processorType === "batch"
-        ? new BatchSpanProcessor({ exporter: traceExporter })
+        ? new BatchSpanProcessor({
+            ...getBatchSpanProcessorOptionsFromEnv(),
+            exporter: traceExporter,
+          })
         : new SimpleSpanProcessor({ exporter: traceExporter });
 
     addedProcessors.push(processor);
@@ -486,7 +493,10 @@ function attachToExistingProvider(
 
     const processor =
       langwatch.processorType === "batch"
-        ? new BatchSpanProcessor({ exporter: traceExporter })
+        ? new BatchSpanProcessor({
+            ...getBatchSpanProcessorOptionsFromEnv(),
+            exporter: traceExporter,
+          })
         : new SimpleSpanProcessor({ exporter: traceExporter });
 
     addedProcessors.push(processor);
@@ -598,8 +608,18 @@ export function createAndStartNodeSdk(
     });
 
     if (langwatch.processorType === "batch") {
-      spanProcessors.push(new BatchSpanProcessor({ exporter: traceExporter }));
-      logProcessors.push(new BatchLogRecordProcessor({ exporter: logExporter }));
+      spanProcessors.push(
+        new BatchSpanProcessor({
+          ...getBatchSpanProcessorOptionsFromEnv(),
+          exporter: traceExporter,
+        }),
+      );
+      logProcessors.push(
+        new BatchLogRecordProcessor({
+          ...getBatchLogRecordProcessorOptionsFromEnv(),
+          exporter: logExporter,
+        }),
+      );
       logger.debug(
         `Added LangWatch ${langwatch.processorType} SpanProcessor and LogRecordProcessor to SDK`,
       );
