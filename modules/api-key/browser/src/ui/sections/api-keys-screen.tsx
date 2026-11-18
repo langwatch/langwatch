@@ -463,6 +463,21 @@ export default function ApiKeysScreen() {
     [serviceApiKeys, scopeFilter, hierarchy, scope.teamId, scope.projectId],
   );
 
+  // A legacy key is bound to its own project, so it follows the filter like any key there.
+  // The banner above keeps naming every project that still holds one.
+  const filteredLegacyKeys = useMemo(
+    () =>
+      filterRowsByScope(
+        legacyKeys.keys.map((key) => ({
+          ...key,
+          scopes: [{ scopeType: "PROJECT", scopeId: key.projectId }],
+        })),
+        scopeFilter,
+        { hierarchy, currentTeamId: scope.teamId, currentProjectId: scope.projectId },
+      ),
+    [legacyKeys.keys, scopeFilter, hierarchy, scope.teamId, scope.projectId],
+  );
+
   // Deep links land on `#api-key-<id>`, but the rows only exist once the keys
   // query resolves, long after the browser has given up on the fragment.
   const isLoadingKeys = apiKeys.isLoading || legacyKeys.isLoading;
@@ -656,7 +671,7 @@ export default function ApiKeysScreen() {
               </ListTable.Header>
               <ListTable.Body>
                 {isLoadingKeys && <ListTable.LoadingRows rows={3} columns={KEY_COLUMNS} />}
-                {legacyKeys.keys.map((legacyKey) => (
+                {filteredLegacyKeys.map((legacyKey) => (
                   <LegacyKeyTableRow
                     key={legacyKey.projectId}
                     legacyKey={legacyKey}
@@ -676,7 +691,7 @@ export default function ApiKeysScreen() {
                   />
                 ))}
 
-                {!isLoadingKeys && filteredKeys.length === 0 && legacyKeys.keys.length === 0 && (
+                {!isLoadingKeys && filteredKeys.length === 0 && filteredLegacyKeys.length === 0 && (
                   <NoMatchingKeysRow
                     onClearFilters={() => handleScopeFilterChange({ kind: "all" })}
                   />

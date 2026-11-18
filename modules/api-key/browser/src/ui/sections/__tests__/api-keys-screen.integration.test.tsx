@@ -1099,3 +1099,56 @@ describe("given a key is being created", () => {
     });
   });
 });
+
+describe("given legacy keys on projects under different teams", () => {
+  const scopes = {
+    organization: { id: "org-1", name: "ACME" },
+    teams: [
+      { id: "team-1", name: "Platform" },
+      { id: "team-2", name: "Growth" },
+    ],
+    projects: [
+      { id: "proj-1", name: "Web App", teamId: "team-1" },
+      { id: "proj-2", name: "Checkout", teamId: "team-2" },
+    ],
+  };
+  const openFiltered = (scope: string) =>
+    renderWithApiKeyHost(
+      <ApiKeysScreen />,
+      new FakeApiKeyHost({ availableScopes: scopes, query: { [API_KEY_SCOPE_QUERY_KEY]: scope } }),
+    );
+  const legacyRowProjects = () =>
+    screen
+      .queryAllByTestId("legacy-key-row")
+      .map((row) => (within(row).queryByText("Web App") ? "Web App" : "Checkout"));
+
+  beforeEach(() => {
+    state.members = ADMIN;
+    state.legacyKeys = [LIVE_LEGACY_KEY, OTHER_LIVE_LEGACY_KEY];
+  });
+
+  describe("when the filter names one project or one team", () => {
+    /** @scenario A legacy project key follows the scope filter like a key bound to its project */
+    it("lists only the legacy keys on that branch, and the banner still names both", () => {
+      const { unmount } = openFiltered("PROJECT:proj-1");
+      expect(legacyRowProjects()).toEqual(["Web App"]);
+      unmount();
+
+      openFiltered("TEAM:team-2");
+      expect(legacyRowProjects()).toEqual(["Checkout"]);
+      const banner = screen.getByTestId("legacy-project-key-banner");
+      expect(banner).toHaveTextContent("Web App");
+      expect(banner).toHaveTextContent("Checkout");
+    });
+  });
+
+  describe("when the filter leaves only another project's legacy key", () => {
+    /** @scenario A filter that leaves only other projects' legacy keys shows the empty state */
+    it("shows the no-match row", () => {
+      state.legacyKeys = [OTHER_LIVE_LEGACY_KEY];
+      openFiltered("PROJECT:proj-1");
+      expect(legacyRowProjects()).toEqual([]);
+      expect(screen.getByText(/No keys match the current scope/)).toBeInTheDocument();
+    });
+  });
+});
