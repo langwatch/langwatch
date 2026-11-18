@@ -44,28 +44,17 @@ export function findLangyPromptLink({ search }: { search: string }): LangyPrompt
   return [{ prompt: prompt ?? "" }];
 }
 
-/**
- * The address with the link's parameters removed, everything else kept. A `langyConversation`
- * beside them goes too: the question opens a new conversation, so that link is superseded.
- */
-export function withoutLangyPromptLink({ search }: { search: string }): string {
-  const params = new URLSearchParams(search);
-  params.delete(LANGY_OPEN_PARAM);
-  params.delete(LANGY_PROMPT_PARAM);
-  params.delete(LANGY_CONVERSATION_PARAM);
-  const rest = params.toString();
-  return rest ? `?${rest}` : "";
+/** A non-blank question opens a new conversation, so a `langyConversation` beside it gives way. */
+export function supersedesConversationLink({ search }: { search: string }): boolean {
+  return findLangyPromptLink({ search }).some((link) => link.prompt.trim() !== "");
 }
 
-/** A project page address that opens Langy with `prompt` typed in. */
-export function buildLangyPromptLink({ path, prompt }: { path: string; prompt: string }): string {
-  const hashAt = path.indexOf("#");
-  const beforeHash = hashAt === -1 ? path : path.slice(0, hashAt);
-  const hash = hashAt === -1 ? "" : path.slice(hashAt);
-  const queryAt = beforeHash.indexOf("?");
-  const pathname = queryAt === -1 ? beforeHash : beforeHash.slice(0, queryAt);
-  const params = new URLSearchParams(queryAt === -1 ? "" : beforeHash.slice(queryAt));
-  params.set(LANGY_OPEN_PARAM, "open");
-  params.set(LANGY_PROMPT_PARAM, prompt);
-  return `${pathname}?${params.toString()}${hash}`;
+/** The address with the link's parameters removed, and any `langyConversation` it supersedes. */
+export function withoutLangyPromptLink({ search }: { search: string }): string {
+  const params = new URLSearchParams(search);
+  if (supersedesConversationLink({ search })) params.delete(LANGY_CONVERSATION_PARAM);
+  params.delete(LANGY_OPEN_PARAM);
+  params.delete(LANGY_PROMPT_PARAM);
+  const rest = params.toString();
+  return rest ? `?${rest}` : "";
 }

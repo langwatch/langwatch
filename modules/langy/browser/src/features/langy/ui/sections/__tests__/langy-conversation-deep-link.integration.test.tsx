@@ -84,6 +84,20 @@ describe("useLangyConversationDeepLink", () => {
     });
   });
 
+  describe("given a blank question beside the conversation link", () => {
+    /** @scenario "A blank question beside a conversation link still opens that conversation" */
+    it("opens the named conversation", async () => {
+      searchParams.current = new URLSearchParams(
+        "langyConversation=langyconv_1&langy=open&langyPrompt=",
+      );
+      detailResult.current = { data: { id: "langyconv_1" }, isSuccess: true, isError: false };
+
+      renderHook(() => useLangyConversationDeepLink());
+
+      await waitFor(() => expect(selectConversation).toHaveBeenCalledWith("langyconv_1"));
+    });
+  });
+
   describe("given a link to a conversation I cannot see", () => {
     /** @scenario "A link to a conversation I cannot see is refused silently" */
     it("switches nothing and still drops the parameter", async () => {

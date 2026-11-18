@@ -1,10 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  buildLangyPromptLink,
-  findLangyPromptLink,
-  withoutLangyPromptLink,
-} from "../langy.deep-link.ts";
+import { findLangyPromptLink, withoutLangyPromptLink } from "../langy.deep-link.ts";
 
 /** Spec: specs/langy/langy-prompt-link.feature */
 
@@ -36,33 +32,15 @@ describe("withoutLangyPromptLink", () => {
     expect(withoutLangyPromptLink({ search: "?langy=open&langyPrompt=hi" })).toBe("");
   });
 
+  it("keeps a langyConversation link when the question is blank", () => {
+    expect(
+      withoutLangyPromptLink({ search: "?langyConversation=c1&langy=open&langyPrompt=" }),
+    ).toBe("?langyConversation=c1");
+  });
+
   it("drops a langyConversation link the question supersedes", () => {
     expect(
       withoutLangyPromptLink({ search: "?langyConversation=c1&langyPrompt=hi&tab=traces" }),
     ).toBe("?tab=traces");
-  });
-});
-
-describe("buildLangyPromptLink", () => {
-  it("adds the parameters before the Explorer's hash and round-trips the question", () => {
-    const href = buildLangyPromptLink({
-      path: "/acme/traces#all-traces?q=trace.attribute.laze.agent.id:agent_1",
-      prompt: "What spent the most tokens & why?",
-    });
-
-    expect(href.endsWith("#all-traces?q=trace.attribute.laze.agent.id:agent_1")).toBe(true);
-    const search = href.slice(href.indexOf("?"), href.indexOf("#"));
-    expect(findLangyPromptLink({ search })).toEqual([
-      { prompt: "What spent the most tokens & why?" },
-    ]);
-  });
-
-  it("keeps every existing parameter, including values that hold a question mark", () => {
-    const href = buildLangyPromptLink({ path: "/p?next=/a?x=1&tab=traces#frag", prompt: "hi" });
-    const params = new URLSearchParams(href.slice(href.indexOf("?"), href.indexOf("#")));
-
-    expect(params.get("next")).toBe("/a?x=1");
-    expect(params.get("tab")).toBe("traces");
-    expect(href.endsWith("#frag")).toBe(true);
   });
 });

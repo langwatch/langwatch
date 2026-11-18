@@ -118,6 +118,10 @@ describe("useLangyPromptLink", () => {
       expect(result.current.search).toBe("?langyPrompt=hello");
 
       project.current = { id: "project_1" };
+      rerender();
+      expect(useLangyStore.getState().draft).toBe("");
+      expect(result.current.search).toBe("?langyPrompt=hello");
+
       act(() => useLangyStore.getState().resetForScope(SCOPE));
       rerender();
 

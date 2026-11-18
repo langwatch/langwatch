@@ -771,6 +771,7 @@ export const useLangyStore = defineSlice<LangyState>({
     askLangy: (prompt) =>
       set(() => ({
         isOpen: true,
+        savedOpenBeforeLink: null,
         // A fresh ask starts a clean conversation like startNewConversation, but the context the
         // user just grabbed rides along.
         activeConversationId: null,
@@ -795,6 +796,7 @@ export const useLangyStore = defineSlice<LangyState>({
     queueGuidedKickoff: (kickoff) =>
       set(() => ({
         isOpen: true,
+        savedOpenBeforeLink: null,
         // The kickoff lands where the caller's conversation is: the attached
         // one when there is one, a fresh one otherwise.
         activeConversationId: kickoff.conversationId ?? null,

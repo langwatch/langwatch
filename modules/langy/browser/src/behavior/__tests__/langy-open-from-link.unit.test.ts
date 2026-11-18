@@ -36,6 +36,18 @@ describe("openFromLink", () => {
     });
   });
 
+  describe("given a link opened Langy and I then ask Langy something", () => {
+    it("saves the panel as open, since asking was my own choice", () => {
+      langy().openFromLink("hello");
+      expect(savedIsOpen()).toBe(false);
+
+      langy().askLangy("what failed?");
+
+      expect(langy().savedOpenBeforeLink).toBeNull();
+      expect(savedIsOpen()).toBe(true);
+    });
+  });
+
   describe("given another reader signs in after a link opened Langy", () => {
     it("saves the new reader's own open state, not the link's kept one", () => {
       langy().openFromLink("hello");

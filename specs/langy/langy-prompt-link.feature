@@ -58,3 +58,8 @@ Feature: A link opens Langy with a question ready to send
     Then the Langy panel is open on a new conversation
     And the composer holds "hello"
     And the address no longer has "langyConversation"
+
+  @integration
+  Scenario: A blank question beside a conversation link still opens that conversation
+    When I open a link with "langyConversation=<id>&langy=open&langyPrompt="
+    Then the Langy panel is open on that conversation
