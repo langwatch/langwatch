@@ -31,28 +31,30 @@ import {
   a2aTargetsForProject,
 } from "../rules/gateway-a2a-target.rules.ts";
 
+type GatewayA2aTargetServiceDependencies = {
+  repository: GatewayA2aTargetRepository;
+  changeEvents: GatewayChangeEventsRepository;
+  auditLog: GatewayAuditRepository;
+  transactions: GatewayTransactionRepository;
+};
+
 /** The A2A target registry: one name per scope (org-wide or one project). */
 export class GatewayA2aTargetService {
-  static create(input: {
-    repository: GatewayA2aTargetRepository;
-    changeEvents: GatewayChangeEventsRepository;
-    auditLog: GatewayAuditRepository;
-    transactions: GatewayTransactionRepository;
-  }): GatewayA2aTargetService {
-    return new GatewayA2aTargetService(
-      input.repository,
-      input.changeEvents,
-      input.auditLog,
-      input.transactions,
-    );
+  static create(input: GatewayA2aTargetServiceDependencies): GatewayA2aTargetService {
+    return new GatewayA2aTargetService(input);
   }
 
-  private constructor(
-    private readonly repository: GatewayA2aTargetRepository,
-    private readonly changeEvents: GatewayChangeEventsRepository,
-    private readonly auditLog: GatewayAuditRepository,
-    private readonly transactions: GatewayTransactionRepository,
-  ) {}
+  private readonly repository: GatewayA2aTargetRepository;
+  private readonly changeEvents: GatewayChangeEventsRepository;
+  private readonly auditLog: GatewayAuditRepository;
+  private readonly transactions: GatewayTransactionRepository;
+
+  private constructor(input: GatewayA2aTargetServiceDependencies) {
+    this.repository = input.repository;
+    this.changeEvents = input.changeEvents;
+    this.auditLog = input.auditLog;
+    this.transactions = input.transactions;
+  }
 
   /**
    * Writes the target, bumps the change feed so gateways refetch, and audits the write, all in

@@ -37,7 +37,7 @@ function service(
   });
 }
 
-/** A repository that fails the test the moment anything asks it to unseal every target's headers. */
+/** A repository that fails the test once anything asks it to unseal every target's headers. */
 function sealedRepository() {
   const repository = MemoryGatewayA2aTargetRepository.create();
   const findAll = repository.findAll.bind(repository);
