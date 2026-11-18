@@ -66,14 +66,15 @@ async function settle(): Promise<void> {
   for (let tick = 0; tick < 3; tick++) await new Promise((resolve) => setTimeout(resolve, 0));
 }
 
+type ErasureMarks = Pick<NurturingErasedUserRepository, "findErased">;
+
 /**
  * A delivery over memory PostHog and a recording Customer.io; `members` is nurturing's copy and
  * `erasedUsers` its erasure marks.
  */
 function deliveryOverBothSinks(
   members = MemoryNurturingOrganizationMemberRepository.create(),
-  erasedUsers: Pick<NurturingErasedUserRepository, "findErased"> =
-    MemoryNurturingErasedUserRepository.create(),
+  erasedUsers: ErasureMarks = MemoryNurturingErasedUserRepository.create(),
 ) {
   const posthog = MemoryPostHogChannel.create();
   const cio = customerIo();
@@ -88,7 +89,7 @@ function deliveryOverBothSinks(
     customerIo: cio.service,
     posthog,
   });
-  return { posthog, cio, delivery, claims: claimed };
+  return { posthog, cio, delivery, claimed };
 }
 
 const source = { tenantId: "project-1", occurredAt: Date.UTC(2026, 8, 29) };
@@ -203,9 +204,8 @@ describe("NurturingDeliveryService", () => {
     /** @scenario "A signal whose erasure marks cannot be read fails before any claim or send" */
     it("rejects, takes no claim and sends nothing, so the fact is retried", async () => {
       const down = new Error("the database is down");
-      const { posthog, cio, delivery, claims: claimed } = deliveryOverBothSinks(undefined, {
-        findErased: () => Promise.reject(down),
-      });
+      const unreadable: ErasureMarks = { findErased: () => Promise.reject(down) };
+      const { posthog, cio, delivery, claimed } = deliveryOverBothSinks(undefined, unreadable);
 
       await expect(
         delivery.deliver({ key: "scenario_created:event-1", signal: scenarioCreated }),
