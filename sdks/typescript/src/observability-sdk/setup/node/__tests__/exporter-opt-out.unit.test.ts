@@ -7,8 +7,7 @@ import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { resolve } from "node:path";
 
-import { context, propagation, trace } from "@opentelemetry/api";
-import { logs } from "@opentelemetry/api";
+import { context, logs, propagation, trace } from "@opentelemetry/api";
 import { ExportResultCode, type ExportResult } from "@opentelemetry/core";
 import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-proto";
 import {

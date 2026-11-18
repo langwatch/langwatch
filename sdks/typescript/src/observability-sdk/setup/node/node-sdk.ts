@@ -2,13 +2,13 @@ import {
   context,
   diag,
   DiagConsoleLogger,
+  logs,
   metrics,
   propagation,
   trace,
   type ContextManager,
   type TextMapPropagator,
 } from "@opentelemetry/api";
-import { logs } from "@opentelemetry/api";
 import { AsyncLocalStorageContextManager } from "@opentelemetry/context-async-hooks";
 import {
   CompositePropagator,
