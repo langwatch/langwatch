@@ -80,6 +80,7 @@ function bootPage({
       posts.push({ body: typeof init.body === "string" ? init.body : "", init });
       return new Response(null, { status: 202 });
     }
+    if (servedRelease === "hang") return new Promise<Response>(() => undefined);
     return new Response(
       `<html><head><script type="module" crossorigin src="https://cdn.test/${servedRelease}/assets/index-b2.js"></script></head></html>`,
     );
@@ -249,6 +250,23 @@ describe("the boot report", () => {
     });
   });
 
+  describe("when the page draws while the stall's release lookup is still out", () => {
+    /** @scenario "A stalled boot that later draws is reported as recovered" */
+    it("sends the stall as it stood at the threshold, before the recovery", async () => {
+      const page = bootPage({ session: UNSAMPLED_SESSION, servedRelease: "hang" });
+      page.showLoadingScreen("organizations");
+      await passStallThreshold();
+      page.drawn();
+
+      const [stalled, recovered] = page.spans();
+      expect(attributeOf(stalled, ATTR_BOOT_OUTCOME)).toBe("stalled");
+      expect(attributeOf(stalled, "langwatch.boot.loading_screen")).toBe("organizations");
+      expect(attributeOf(stalled, "langwatch.boot.drawn_ms")).toBeUndefined();
+      expect(attributeOf(stalled, "langwatch.boot.current_release")).toBe("unknown");
+      expect(attributeOf(recovered, ATTR_BOOT_OUTCOME)).toBe("recovered");
+    });
+  });
+
   describe("given browser tracing is off", () => {
     /** @scenario "Nothing is reported while browser tracing is off" */
     it("sends nothing, even for a stall", async () => {
@@ -275,14 +293,15 @@ describe("the boot report", () => {
     /** @scenario "The report carries the path without ids or query values" */
     it("replaces the id and keeps only the query's names", async () => {
       const page = bootPage({
-        pathname: "/acme-agent-o0Xo5T/messages/trace_8f3a9b2c",
+        pathname: "/acme/messages/trace_8f3a9b2c",
         search: "?langy=open&langyPrompt=why%20the%20zebra%20stalls",
       });
       await passStallThreshold();
       const [span] = page.spans();
-      expect(attributeOf(span, "url.path")).toBe("/:id/messages/:id");
+      expect(attributeOf(span, "url.path")).toBe("/:project/messages/:trace");
       expect(attributeOf(span, "langwatch.boot.query_keys")).toBe("langy,langyPrompt");
       expect(JSON.stringify(span)).not.toContain("zebra");
+      expect(JSON.stringify(span)).not.toContain("acme");
     });
   });
 

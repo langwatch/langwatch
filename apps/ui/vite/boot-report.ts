@@ -13,6 +13,8 @@ import {
   SESSION_INACTIVITY_MS,
 } from "@langwatch/react-rum/constants";
 
+import routePatterns from "../src/shell/route-patterns.generated.json" with { type: "json" };
+
 /** Events the splash and the entry module send the report; window events are UI_BOOT_EVENTS. */
 export const BOOT_REPORT_EVENTS = {
   /** The entry module started running: every file it imports loaded and evaluated. */
@@ -36,7 +38,8 @@ const BOOT_ATTEMPT_KEY = "ui-boot-attempt";
 // Plain ES5: it runs before any module and on every browser that opens the page. Each outcome
 // is sent once; a sampled session also reports a fast boot, every session reports the rest.
 const SCRIPT = `(function () {
-  var left = false, sent = {}, stalled = false;
+  var ROUTES = ${JSON.stringify(routePatterns)};
+  var left = false, sent = {}, stalled = false, pendingStall = null;
   var traceId = hex(16);
   var drawn = -1, entry = -1, mounted = -1, health = "not_asked", healthMs = -1;
   var failed = [], chunkFailures = 0, wasHidden = document.visibilityState === "hidden";
@@ -107,15 +110,25 @@ const SCRIPT = `(function () {
     var entryTag = document.querySelector('script[type="module"][src]');
     return releaseOf(entryTag && entryTag.getAttribute("src"));
   }
-  // Ids and query values never leave the page: a segment with digits or a long one is ":id".
+  // The route pattern the address matches ("/:project/messages"), never the address itself.
+  function matchScore(pattern, parts) {
+    var segments = pattern.split("/").filter(Boolean), score = 0;
+    for (var i = 0; i < segments.length; i++) {
+      if (segments[i] === "*") return score;
+      if (i >= parts.length) return -1;
+      if (segments[i].charAt(0) === ":") continue;
+      if (segments[i] !== parts[i]) return -1;
+      score += 1;
+    }
+    return segments.length === parts.length ? score + 0.5 : -1;
+  }
   function pathPattern() {
-    var previous = "";
-    return location.pathname.split("/").map(function (segment) {
-      var shown = previous === "share" || segment.length > 24 ||
-        (segment.length >= 6 && /\\d/.test(segment)) ? ":id" : segment;
-      previous = segment;
-      return shown;
-    }).join("/").slice(0, 200);
+    var parts = location.pathname.split("/").filter(Boolean), best = "unmatched", bestScore = -1;
+    for (var i = 0; i < ROUTES.length; i++) {
+      var score = matchScore(ROUTES[i], parts);
+      if (score > bestScore) { best = ROUTES[i]; bestScore = score; }
+    }
+    return best;
   }
   function queryKeys() {
     return location.search.slice(1).split("&").map(function (pair) {
@@ -165,7 +178,7 @@ const SCRIPT = `(function () {
     var origin = performance.timeOrigin || Date.now() - performance.now();
     return String(Math.round(origin + ms)) + "000000";
   }
-  function spanOf(outcome, extra, environment, sessionId) {
+  function spanOf(outcome, environment, sessionId) {
     var at = now(), slowest = slowestFile(), timing = navigationTiming();
     var values = [
       ["${ATTR_BOOT_OUTCOME}", outcome],
@@ -196,7 +209,6 @@ const SCRIPT = `(function () {
       values.push(["langwatch.boot.slowest_file", fileOf(slowest.name)]);
       values.push(["langwatch.boot.slowest_file_ms", slowest.duration]);
     }
-    for (var key in extra) values.push([key, extra[key]]);
     var resource = [attribute("service.name", "${RUM_SERVICE_NAME}")];
     if (environment) resource.push(attribute("deployment.environment.name", environment));
     var trouble = outcome === "stalled" || outcome === "reloaded";
@@ -222,14 +234,31 @@ const SCRIPT = `(function () {
         credentials: "same-origin" }).catch(function () {});
     } catch (e) {}
   }
-  function report(outcome, extra) {
-    if (sent[outcome] || !document.getElementById("root")) return;
+  // Built now, sent when ready: a stall's span is what the page waited on at the threshold.
+  function build(outcome) {
+    if (sent[outcome] || !document.getElementById("root")) return null;
     var settings = config();
-    if (!settings) return;
+    if (!settings) return null;
     var sessionId = session();
-    if (outcome === "drawn" && !sampled(sessionId, settings.ratio)) return;
+    if (outcome === "drawn" && !sampled(sessionId, settings.ratio)) return null;
     sent[outcome] = true;
-    send(JSON.stringify(spanOf(outcome, extra || {}, settings.environment, sessionId)), sessionId);
+    return { sessionId: sessionId, body: spanOf(outcome, settings.environment, sessionId) };
+  }
+  function dispatch(built) {
+    if (built) send(JSON.stringify(built.body), built.sessionId);
+  }
+  // A held stall leaves first, so the reports arrive in the order the boot went.
+  function flushStall(release) {
+    if (!pendingStall) return;
+    var held = pendingStall;
+    pendingStall = null;
+    held.body.resourceSpans[0].scopeSpans[0].spans[0].attributes.push(
+      attribute("langwatch.boot.current_release", release));
+    dispatch(held);
+  }
+  function report(outcome) {
+    flushStall("unknown");
+    dispatch(build(outcome));
   }
   // The release the server hands a fresh page now, to tell a stale page from a slow one.
   function currentRelease(then) {
@@ -277,9 +306,8 @@ const SCRIPT = `(function () {
   setTimeout(function () {
     if (drawn >= 0) return;
     stalled = true;
-    currentRelease(function (release) {
-      report("stalled", { "langwatch.boot.current_release": release });
-    });
+    pendingStall = build("stalled");
+    if (pendingStall) currentRelease(flushStall);
   }, Math.max(${BOOT_STALL_MS} - now(), 0));
 })();`;
 

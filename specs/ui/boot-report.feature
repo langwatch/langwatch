@@ -44,6 +44,7 @@ Feature: Every first load reports how its boot ended
       Given a boot that was reported as stalled
       When the app draws its first page
       Then a "boot" span with outcome "recovered" is sent in the same trace
+      And the stalled span, sent first, describes the boot as it stood at the threshold
 
     @unit
     Scenario: A code file that failed to load is named in the report
@@ -55,7 +56,7 @@ Feature: Every first load reports how its boot ended
     Scenario: The report carries the path without ids or query values
       Given the page was opened at an address with an id in its path and a query
       When the boot stalls
-      Then the report carries the path with the id replaced and only the query's names
+      Then the report carries the route pattern the address matched and only the query's names
 
   Rule: A boot the person leaves is reported before the page goes
 
