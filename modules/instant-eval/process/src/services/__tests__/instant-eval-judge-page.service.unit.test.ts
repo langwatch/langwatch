@@ -422,6 +422,7 @@ const TWO_ROWS = {
 describe("given an own decision model whose key is refused for every row", () => {
   describe("when the page is judged", () => {
     /** @scenario "A run page whose every row was refused for the decision model's key fails with that reason" */
+    /** @scenario "A run whose own decision model refused the key for every row fails" */
     it("throws the key refusal and writes nothing", async () => {
       const { service, judgments } = await judging({
         ...TWO_ROWS,
