@@ -24,12 +24,13 @@ import {
   type BatchTargetAggregate,
   computeAllBatchAggregates,
 } from "../batch-evaluation-results.aggregates.ts";
-import type {
-  BatchComparisonColumn,
-  BatchDatasetColumn,
-  BatchEvaluationData,
-  BatchResultRow,
-  BatchTargetColumn,
+import {
+  type BatchComparisonColumn,
+  type BatchDatasetColumn,
+  type BatchEvaluationData,
+  type BatchResultRow,
+  type BatchTargetColumn,
+  rowsInRun,
 } from "../batch-evaluation-results.types.ts";
 import { BatchTargetCell } from "./batch-target-cell.tsx";
 import { BatchTargetHeader } from "./batch-target-header.tsx";
@@ -146,7 +147,7 @@ const buildColumns = ({
       size: 32,
       cell: ({ row }) => (
         <Text textStyle="caption" color="fg.muted" textAlign="right" paddingRight={1}>
-          {row.index + 1}
+          {row.original.index + 1}
         </Text>
       ),
     }),
@@ -368,9 +369,11 @@ export function SingleRunTable({
   // Memoize getCoreRowModel to prevent React scheduling loops
   const coreRowModel = useMemo(() => getCoreRowModel(), []);
 
+  const heldRows = useMemo(() => (data ? rowsInRun(data.rows) : []), [data]);
+
   // Create table instance
   const table = useReactTable({
-    data: data?.rows ?? [],
+    data: heldRows,
     columns,
     getCoreRowModel: coreRowModel,
   });
@@ -384,7 +387,7 @@ export function SingleRunTable({
   }, []);
 
   // Get row count from source data to avoid React scheduling loops
-  const rowCount = data?.rows?.length ?? 0;
+  const rowCount = heldRows.length;
   // const rowCount = table.getRowModel().rows.length;
 
   // Stable callbacks for virtualizer

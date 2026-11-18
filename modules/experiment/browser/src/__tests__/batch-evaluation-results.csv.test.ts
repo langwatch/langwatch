@@ -107,6 +107,25 @@ describe("csvExport", () => {
   });
 
   describe("buildCsvData()", () => {
+    describe("given a run that holds rows 1 to 5 of the dataset", () => {
+      /** @scenario "CSV holds only the rows a run holds" */
+      it("writes those 5 rows under their dataset positions", () => {
+        const data = transformBatchEvaluationData({
+          experimentId: "exp-1",
+          runId: "run-1",
+          projectId: "project-1",
+          completeness: WHOLE_RUN_COMPLETENESS,
+          dataset: [1, 2, 3, 4, 5].map((index) => ({ index, entry: { input: `row${index}` } })),
+          evaluations: [],
+          timestamps: { createdAt: 0, updatedAt: 0 },
+        });
+
+        const { rows } = buildCsvData(data);
+
+        expect(rows.map((row) => row[0])).toEqual(["1", "2", "3", "4", "5"]);
+      });
+    });
+
     it("handles empty data with just index header", () => {
       const data = createMinimalData();
       const { headers, rows } = buildCsvData(data);
