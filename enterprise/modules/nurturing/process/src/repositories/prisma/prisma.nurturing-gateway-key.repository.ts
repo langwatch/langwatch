@@ -10,7 +10,6 @@ import type {
 import type { NurturingErasedUserRepository } from "../nurturing-erased-user.repository.ts";
 import type { NurturingVirtualKeyRepository } from "../nurturing-gateway-key.repository.ts";
 import {
-  erasedMarkExists,
   type NurturingErasedUserDatabase,
   PrismaNurturingErasedUserRepository,
 } from "./prisma.nurturing-erased-user.repository.ts";
@@ -72,6 +71,8 @@ export class PrismaNurturingVirtualKeyRepository
     const principalAt = atWhen(fact.principalUserId !== null);
     const purposeAt = atWhen(fact.purpose !== null);
     const creatorUserId = created ? fact.actorUserId : null;
+    const creatorMarked = PrismaNurturingErasedUserRepository.markExists(creatorUserId);
+    const holderMarked = PrismaNurturingErasedUserRepository.markExists(fact.principalUserId);
     await this.#database.$executeRaw`
       INSERT INTO "NurturingVirtualKey" AS known
         ("virtualKeyId", "organizationId", "name", "occurredAt", "keyCreatedAt", "creatorUserId",
@@ -80,9 +81,8 @@ export class PrismaNurturingVirtualKeyRepository
       VALUES (${virtualKeyId}, ${organizationId}, ${name},
               (${at}::timestamptz AT TIME ZONE 'UTC')::timestamp(3),
               (${atWhen(created)}::timestamptz AT TIME ZONE 'UTC')::timestamp(3),
-              CASE WHEN ${erasedMarkExists(creatorUserId)} THEN NULL ELSE ${creatorUserId} END,
-              CASE WHEN ${erasedMarkExists(fact.principalUserId)} THEN NULL
-                   ELSE ${fact.principalUserId} END,
+              CASE WHEN ${creatorMarked} THEN NULL ELSE ${creatorUserId} END,
+              CASE WHEN ${holderMarked} THEN NULL ELSE ${fact.principalUserId} END,
               (${principalAt}::timestamptz AT TIME ZONE 'UTC')::timestamp(3),
               ${fact.purpose},
               (${purposeAt}::timestamptz AT TIME ZONE 'UTC')::timestamp(3),
@@ -139,10 +139,11 @@ export class PrismaNurturingVirtualKeyRepository
     holderUserId: string | null;
   }>): Promise<void> {
     if (creatorUserId === null && holderUserId === null) return;
-    const namesErased = (column: "creatorUserId" | "principalUserId", userId: string | null) =>
-      userId === null
-        ? Prisma.sql`false`
-        : Prisma.sql`(${Prisma.raw(`"${column}"`)} = ${userId} AND ${erasedMarkExists(userId)})`;
+    const namesErased = (column: "creatorUserId" | "principalUserId", userId: string | null) => {
+      if (userId === null) return Prisma.sql`false`;
+      const marked = PrismaNurturingErasedUserRepository.markExists(userId);
+      return Prisma.sql`(${Prisma.raw(`"${column}"`)} = ${userId} AND ${marked})`;
+    };
     const creatorErased = namesErased("creatorUserId", creatorUserId);
     const holderErased = namesErased("principalUserId", holderUserId);
     await this.#database.$executeRaw`

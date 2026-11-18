@@ -9,7 +9,6 @@ import type {
 import type { NurturingErasedUserRepository } from "../nurturing-erased-user.repository.ts";
 import type { NurturingOrganizationMemberRepository } from "../nurturing-organization-member.repository.ts";
 import {
-  erasedMarkExists,
   type NurturingErasedUserDatabase,
   PrismaNurturingErasedUserRepository,
 } from "./prisma.nurturing-erased-user.repository.ts";
@@ -78,7 +77,7 @@ export class PrismaNurturingOrganizationMemberRepository
     at: number;
   }>): Promise<void> {
     const timeOf = (column: NurturingMembershipChange) => dateOf(change === column ? at : null);
-    const marked = erasedMarkExists(userId);
+    const marked = PrismaNurturingErasedUserRepository.markExists(userId);
     // The fact's own organization, compared with its bound id: the tenancy guard reads no tenant
     // from an INSERT ... SELECT's column list, only from a comparison.
     await this.#database.$executeRaw`

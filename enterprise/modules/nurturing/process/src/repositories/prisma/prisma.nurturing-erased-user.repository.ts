@@ -10,18 +10,6 @@ export type NurturingErasedUserDatabase = Pick<PrismaClient, "nurturingErasedUse
 /** Bounds each IN list, as the member copy's reads do, so a large list never sends one query. */
 const USERS_PER_READ = 1000;
 
-/**
- * Whether an id is marked erased, in SQL, for a write that checks the mark in its own statement.
- * Such a check only shortens how long a row naming the person is visible; the write's re-check
- * after it is what keeps them off.
- */
-export function erasedMarkExists(userId: string | null): Prisma.Sql {
-  return userId === null
-    ? Prisma.sql`false`
-    : Prisma.sql`EXISTS (SELECT 1 FROM "NurturingErasedUser"
-                          WHERE "userIdHash" = ${erasedUserHashOf(userId)})`;
-}
-
 /** Nurturing's own `NurturingErasedUser` marks, the one place they are written and read. */
 export class PrismaNurturingErasedUserRepository
   extends PrismaRepository.for("NurturingErasedUser")
@@ -31,6 +19,18 @@ export class PrismaNurturingErasedUserRepository
     prisma,
   }: Readonly<{ prisma: NurturingErasedUserDatabase }>): PrismaNurturingErasedUserRepository {
     return new PrismaNurturingErasedUserRepository(prisma);
+  }
+
+  /**
+   * Whether an id is marked erased, in SQL, for a write that checks the mark in its own statement.
+   * Such a check only shortens how long a row naming the person is visible; the write's re-check
+   * after it is what keeps them off.
+   */
+  static markExists(userId: string | null): Prisma.Sql {
+    return userId === null
+      ? Prisma.sql`false`
+      : Prisma.sql`EXISTS (SELECT 1 FROM "NurturingErasedUser"
+                            WHERE "userIdHash" = ${erasedUserHashOf(userId)})`;
   }
 
   readonly #database: NurturingErasedUserDatabase;

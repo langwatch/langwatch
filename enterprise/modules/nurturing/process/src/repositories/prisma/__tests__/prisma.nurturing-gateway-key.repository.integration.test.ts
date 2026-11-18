@@ -51,6 +51,14 @@ const fact = (overrides: Partial<NurturingVirtualKeyFact>): NurturingVirtualKeyF
   ...overrides,
 });
 
+/** Runs the same steps on Postgres and then on the memory twin, so both hold the same facts. */
+async function onEach<Repository>(
+  repositories: readonly Repository[],
+  steps: (repository: Repository) => Promise<void>,
+): Promise<void> {
+  for (const repository of repositories) await steps(repository);
+}
+
 describe.skipIf(!databaseUrl)("given nurturing's key copy in Postgres", () => {
   let connection: PrismaConnection;
   let keys: PrismaNurturingVirtualKeyRepository;
@@ -188,11 +196,11 @@ describe.skipIf(!databaseUrl)("given nurturing's key copy in Postgres", () => {
         fact({ virtualKeyId, action: "rotated", principalUserId: lateErased, occurredAt });
       const twin = MemoryNurturingVirtualKeyRepository.create();
       // T1 < T2, both stamped in 1970.
-      for (const repository of [keys, twin]) {
+      await onEach([keys, twin], async (repository) => {
         await repository.recordKeyFact({ fact: stamped(1_000) });
         await repository.forgetUser({ userId: lateErased });
         await repository.recordKeyFact({ fact: stamped(2_000) });
-      }
+      });
       const where = { organizationId: firstOrganization, virtualKeyId };
 
       await expect(keys.findKey(where)).resolves.toMatchObject([{ principalUserId: null }]);
@@ -207,10 +215,10 @@ describe.skipIf(!databaseUrl)("given nurturing's key copy in Postgres", () => {
       const virtualKeyId = keyId("copied-after-erasure");
       const created = fact({ virtualKeyId, actorUserId: person, principalUserId: person });
       const twin = MemoryNurturingVirtualKeyRepository.create();
-      for (const repository of [keys, twin]) {
+      await onEach([keys, twin], async (repository) => {
         await repository.forgetUser({ userId: person });
         await repository.recordKeyFact({ fact: created });
-      }
+      });
       const where = { organizationId: firstOrganization, virtualKeyId };
 
       const held = await keys.findKey(where);
@@ -233,7 +241,7 @@ describe.skipIf(!databaseUrl)("given nurturing's key copy in Postgres", () => {
       const person = erasedPerson("erased-holder");
       const virtualKeyId = keyId("holderless");
       const twin = MemoryNurturingVirtualKeyRepository.create();
-      for (const repository of [keys, twin]) {
+      await onEach([keys, twin], async (repository) => {
         await repository.recordKeyFact({ fact: fact({ virtualKeyId, principalUserId: null }) });
         await repository.forgetUser({ userId: person });
         const holderChange = fact({
@@ -243,7 +251,7 @@ describe.skipIf(!databaseUrl)("given nurturing's key copy in Postgres", () => {
           occurredAt: 2_000,
         });
         await repository.recordKeyFact({ fact: holderChange });
-      }
+      });
       const where = { organizationId: firstOrganization, virtualKeyId };
 
       const held = await keys.findKey(where);
@@ -267,11 +275,11 @@ describe.skipIf(!databaseUrl)("given nurturing's key copy in Postgres", () => {
         occurredAt: 2_000,
       });
       const twin = MemoryNurturingVirtualKeyRepository.create();
-      for (const repository of [keys, twin]) {
+      await onEach([keys, twin], async (repository) => {
         await repository.recordKeyFact({ fact: rotated });
         await repository.forgetUser({ userId: person });
         await repository.recordKeyFact({ fact: fact({ virtualKeyId, actorUserId: person }) });
-      }
+      });
       const where = { organizationId: firstOrganization, virtualKeyId };
 
       const held = await keys.findKey(where);
@@ -292,7 +300,7 @@ describe.skipIf(!databaseUrl)("given nurturing's key copy in Postgres", () => {
       const holderChange = (virtualKeyId: string) =>
         fact({ virtualKeyId, action: "rotated", principalUserId: person, occurredAt: 2_000 });
       const twin = MemoryNurturingVirtualKeyRepository.create();
-      for (const repository of [keys, twin]) {
+      await onEach([keys, twin], async (repository) => {
         await repository.recordKeyFact({ fact: fact({ virtualKeyId: firstKey }) });
         await repository.recordKeyFact({ fact: holderChange(firstKey) });
         await repository.recordKeyFact({ fact: fact({ virtualKeyId: thenKey }) });
@@ -300,7 +308,7 @@ describe.skipIf(!databaseUrl)("given nurturing's key copy in Postgres", () => {
         await repository.recordKeyFact({ fact: holderChange(thenKey) });
         // Gateway's created fact, naming the earlier holder, redelivered after both.
         await repository.recordKeyFact({ fact: fact({ virtualKeyId: thenKey }) });
-      }
+      });
       const where = (virtualKeyId: string) => ({ organizationId: firstOrganization, virtualKeyId });
 
       for (const virtualKeyId of [firstKey, thenKey]) {
@@ -318,7 +326,7 @@ describe.skipIf(!databaseUrl)("given nurturing's key copy in Postgres", () => {
       const person = erasedPerson("erased-then-replaced");
       const virtualKeyId = keyId("replaced-after-erasure");
       const twin = MemoryNurturingVirtualKeyRepository.create();
-      for (const repository of [keys, twin]) {
+      await onEach([keys, twin], async (repository) => {
         await repository.recordKeyFact({ fact: fact({ virtualKeyId, principalUserId: person }) });
         await repository.forgetUser({ userId: person });
         const handedOver = fact({
@@ -328,7 +336,7 @@ describe.skipIf(!databaseUrl)("given nurturing's key copy in Postgres", () => {
           occurredAt: 2_000,
         });
         await repository.recordKeyFact({ fact: handedOver });
-      }
+      });
       const where = { organizationId: firstOrganization, virtualKeyId };
 
       const held = await keys.findKey(where);
@@ -347,13 +355,13 @@ describe.skipIf(!databaseUrl)("given nurturing's key copy in Postgres", () => {
       const naming = (virtualKeyId: string, principalUserId: string) =>
         fact({ virtualKeyId, action: "rotated", principalUserId, occurredAt: 2_000 });
       const twin = MemoryNurturingVirtualKeyRepository.create();
-      for (const repository of [keys, twin]) {
+      await onEach([keys, twin], async (repository) => {
         await repository.forgetUser({ userId: person });
         await repository.recordKeyFact({ fact: naming(erasedFirst, person) });
         await repository.recordKeyFact({ fact: naming(erasedFirst, "user-next") });
         await repository.recordKeyFact({ fact: naming(otherFirst, "user-next") });
         await repository.recordKeyFact({ fact: naming(otherFirst, person) });
-      }
+      });
       const where = (virtualKeyId: string) => ({ organizationId: firstOrganization, virtualKeyId });
 
       for (const virtualKeyId of [erasedFirst, otherFirst]) {

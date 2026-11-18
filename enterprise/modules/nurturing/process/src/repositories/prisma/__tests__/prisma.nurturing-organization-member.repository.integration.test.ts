@@ -151,9 +151,9 @@ describe.skipIf(!databaseUrl)("given nurturing's member and organization creatio
 
     await joined(2_000);
 
-    await expect(
-      members.findMembershipsOfUsers({ userIds: [erasedMidCommit] }),
-    ).resolves.toEqual([]);
+    await expect(members.findMembershipsOfUsers({ userIds: [erasedMidCommit] })).resolves.toEqual(
+      [],
+    );
   });
 
   /** @scenario "A member fact for a marked account writes no row even if its re-check never runs" */
