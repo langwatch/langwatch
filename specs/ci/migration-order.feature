@@ -160,6 +160,18 @@ Feature: Migration order check
     Then the check passes
     And an edit inside the replay step's call still fails the check
 
+  # .withIdIndexes declares its step without quoting the id; another module's
+  # `after: [...]` list may quote it, and that reference is not a declaration.
+  @unit
+  Scenario: A released id-index step is frozen in its declaring call, not where another step orders after it
+    Given a release manifest on the base branch names "gateway:fill-id-indexes" and "ops:fill-event-log-id-index"
+    And the gateway module file declares the first with .withIdIndexes and no step option
+    And the ops module file declares the second with .withIdIndexes, after "gateway:fill-id-indexes"
+    When the PR adds an unrelated line to the ops module file
+    Then the check passes
+    And an edit inside either .withIdIndexes call still fails the check for that step
+    And removing the gateway's .withIdIndexes call fails the check as a removed step
+
   @unit
   Scenario: A code step no release manifest names yet may still change
     Given a module file declares the code step "topic:seed-clusters"

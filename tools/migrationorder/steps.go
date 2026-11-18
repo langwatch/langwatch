@@ -146,8 +146,9 @@ func (r Repo) Steps(ctx context.Context, baseRef string, releasedRefs ...string)
 	return in, nil
 }
 
-// baseDeclarations returns the base branch files declaring id in a
-// step call (stepCalls); when none does, every file naming it, whole.
+// baseDeclarations returns the base branch files declaring id in a step
+// call (stepBlock); when none does, every file naming it other than in an
+// after list, whole.
 func (reader *fileReader) baseDeclarations(ref, id string, declared []declaration) ([]ReleasedStep, error) {
 	var steps, wholeFiles []ReleasedStep
 	for _, d := range declared {
@@ -158,7 +159,9 @@ func (reader *fileReader) baseDeclarations(ref, id string, declared []declaratio
 		if err != nil {
 			return nil, err
 		}
-		wholeFiles = append(wholeFiles, ReleasedStep{ID: id, Path: d.path, Base: content, wholeFile: true})
+		if !referencesOnly(content, id) {
+			wholeFiles = append(wholeFiles, ReleasedStep{ID: id, Path: d.path, Base: content, wholeFile: true})
+		}
 		if block := stepBlock(content, id); block != "" {
 			steps = append(steps, ReleasedStep{ID: id, Path: d.path, Base: block})
 		}
@@ -225,17 +228,25 @@ func (reader *fileReader) read(ref, file string) (string, error) {
 
 // idProperty matches the id property of a step declaration, any quote style.
 func idProperty(id string) *regexp.Regexp {
-	quoted := regexp.QuoteMeta(id)
-	return regexp.MustCompile(`\bid\s*:\s*(?:"` + quoted + `"|'` + quoted + `'|` + "`" + quoted + "`" + `)`)
+	return regexp.MustCompile(`\bid\s*:\s*` + quotedLiteral(id))
 }
 
 // stepCalls are the calls a module declares a code step with. A replay step
 // is one too: missing it froze its whole module file.
 var stepCalls = []string{"defineMigrationStep(", "defineProjectionReplayStep("}
 
-// stepBlock returns the step call (stepCalls) whose id property is id, found
-// by balanced brackets from the call start; empty when none is.
+// stepBlock returns the call declaring id: a step call (stepCalls) whose id
+// property is id, else the id-index fill naming it (idIndexBlock).
 func stepBlock(content, id string) string {
+	if block := stepCallBlock(content, id); block != "" {
+		return block
+	}
+	return idIndexBlock(content, id)
+}
+
+// stepCallBlock returns the step call (stepCalls) whose id property is id,
+// found by balanced brackets from the call start; empty when none is.
+func stepCallBlock(content, id string) string {
 	for _, loc := range idProperty(id).FindAllStringIndex(content, -1) {
 		for _, call := range stepCalls {
 			for start := strings.LastIndex(content[:loc[0]], call); start >= 0; start = strings.LastIndex(content[:start], call) {
@@ -246,6 +257,74 @@ func stepBlock(content, id string) string {
 		}
 	}
 	return ""
+}
+
+// idIndexCall declares a step without its id: `<module>:<step option>`, or
+// `<module>:fill-id-indexes` with no step option (id-index-fill-step.ts).
+const (
+	idIndexCall        = ".withIdIndexes("
+	defaultIDIndexStep = "fill-id-indexes"
+)
+
+var idIndexStepOption = regexp.MustCompile("\\bstep\\s*:\\s*[\"'`]([^\"'`]+)[\"'`]")
+
+// idIndexBlock returns the idIndexCall in a module file whose step id is id;
+// empty when the file defines another module or no call has that step name.
+func idIndexBlock(content, id string) string {
+	owner, name, _ := strings.Cut(id, ":")
+	if !definesModule(content, owner) {
+		return ""
+	}
+	for offset := 0; ; {
+		found := strings.Index(content[offset:], idIndexCall)
+		if found < 0 {
+			return ""
+		}
+		start := offset + found
+		end := closingParen(content, start+len(idIndexCall)-1)
+		if end < 0 {
+			return ""
+		}
+		if block := content[start : end+1]; idIndexStepName(block) == name {
+			return block
+		}
+		offset = end
+	}
+}
+
+func idIndexStepName(block string) string {
+	if match := idIndexStepOption.FindStringSubmatch(block); match != nil {
+		return match[1]
+	}
+	return defaultIDIndexStep
+}
+
+func definesModule(content, owner string) bool {
+	return regexp.MustCompile(`defineProcessModule\(\s*` + quotedLiteral(owner) + `\s*\)`).MatchString(content)
+}
+
+// quotedLiteral matches value in any quote style.
+func quotedLiteral(value string) string {
+	quoted := regexp.QuoteMeta(value)
+	return `(?:"` + quoted + `"|'` + quoted + `'|` + "`" + quoted + "`" + `)`
+}
+
+var afterList = regexp.MustCompile(`\bafter\s*:\s*\[`)
+
+// referencesOnly reports whether every quoted id in content sits in an
+// `after: [...]` list: another step ordering itself after id, not declaring it.
+func referencesOnly(content, id string) bool {
+	var lists [][2]int
+	for _, loc := range afterList.FindAllStringIndex(content, -1) {
+		lists = append(lists, [2]int{loc[1] - 1, closingParen(content, loc[1]-1)})
+	}
+	for _, loc := range regexp.MustCompile(quotedLiteral(id)).FindAllStringIndex(content, -1) {
+		inList := func(list [2]int) bool { return list[0] < loc[0] && loc[1] <= list[1] }
+		if !slices.ContainsFunc(lists, inList) {
+			return false
+		}
+	}
+	return true
 }
 
 // closingParen returns the index of the bracket closing the one at open,
@@ -346,13 +425,46 @@ type declaration struct {
 }
 
 // declaringFiles finds the non-test files under StepRoots on ref that hold a
-// step id as a quoted literal, the form defineMigrationStep({ id }) takes.
+// step id as a quoted literal, the form defineMigrationStep({ id }) takes, and
+// those holding an idIndexCall, which declares its id without quoting it.
 func (r Repo) declaringFiles(ctx context.Context, ref string, ids []string) ([]declaration, error) {
-	args := []string{"grep", "-o", "-F", "--full-name"}
+	var patterns []string
 	for _, id := range ids {
 		for _, quote := range []string{`"`, `'`, "`"} {
-			args = append(args, "-e", quote+id+quote)
+			patterns = append(patterns, quote+id+quote)
 		}
+	}
+	quoted, err := r.grep(ctx, ref, patterns)
+	if err != nil {
+		return nil, err
+	}
+	calls, err := r.grep(ctx, ref, []string{idIndexCall})
+	if err != nil {
+		return nil, err
+	}
+	var found []declaration
+	for _, line := range quoted {
+		if d, ok := parseDeclaration(ref, line); ok {
+			found = append(found, d)
+		}
+	}
+	for _, line := range calls {
+		if d, ok := parseDeclaration(ref, line); ok {
+			for _, id := range ids {
+				found = append(found, declaration{id: id, path: d.path})
+			}
+		}
+	}
+	slices.SortFunc(found, func(a, b declaration) int { return strings.Compare(a.path+a.id, b.path+b.id) })
+	return slices.Compact(found), nil
+}
+
+// grep returns `git grep -o` lines for the fixed patterns under StepRoots
+// on ref; no match is no lines, not an error.
+func (r Repo) grep(ctx context.Context, ref string, patterns []string) ([]string, error) {
+	args := []string{"grep", "-o", "-F", "--full-name"}
+	for _, pattern := range patterns {
+		args = append(args, "-e", pattern)
 	}
 	args = append(args, ref, "--")
 	args = append(args, StepRoots...)
@@ -361,14 +473,7 @@ func (r Repo) declaringFiles(ctx context.Context, ref string, ids []string) ([]d
 	if err != nil && (!errors.As(err, &exit) || exit.ExitCode() != 1) {
 		return nil, err
 	}
-	var found []declaration
-	for _, line := range lines(out) {
-		if d, ok := parseDeclaration(ref, line); ok {
-			found = append(found, d)
-		}
-	}
-	slices.SortFunc(found, func(a, b declaration) int { return strings.Compare(a.path+a.id, b.path+b.id) })
-	return slices.Compact(found), nil
+	return lines(out), nil
 }
 
 // parseDeclaration reads one `git grep -o` line, <ref>:<path>:<quoted id>,
