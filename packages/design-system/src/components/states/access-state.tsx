@@ -76,7 +76,14 @@ export function AccessState({
           </Text>
         </Stack>
       </Stack>
-      {children && <Box width={centered ? "full" : undefined}>{children}</Box>}
+      {children &&
+        (centered ? (
+          <Stack width="full" align="center">
+            {children}
+          </Stack>
+        ) : (
+          <Box>{children}</Box>
+        ))}
       {actions && (
         <HStack gap={3} flexWrap="wrap" justify={centered ? "center" : undefined}>
           {actions}
