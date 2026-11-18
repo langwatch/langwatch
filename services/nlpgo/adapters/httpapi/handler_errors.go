@@ -51,6 +51,22 @@ func writeHandlerError(ctx context.Context, w http.ResponseWriter, e herr.E) {
 	if msg, ok := e.Meta["message"].(string); ok {
 		fields = append(fields, zap.String("message", msg))
 	}
+	if reasons := reasonTexts(e); len(reasons) > 0 {
+		fields = append(fields, zap.Strings("reasons", reasons))
+	}
 	clog.Get(ctx).Log(level, "request_failed", fields...)
 	herr.WriteHTTP(w, e)
+}
+
+// reasonTexts is the text of every error e wraps. The response names a wrapped
+// error that is not an herr only as "unknown", so this log line is the one
+// place an operator can read what actually failed, such as a provider's 400.
+func reasonTexts(e herr.E) []string {
+	texts := make([]string, 0, len(e.Reasons))
+	for _, reason := range e.Reasons {
+		if reason != nil {
+			texts = append(texts, reason.Error())
+		}
+	}
+	return texts
 }

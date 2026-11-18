@@ -69,3 +69,10 @@ Feature: Workflow and evaluation failures are logged with fault attribution
     Given a workflow or evaluation request fails at the HTTP layer
     When the error response is written
     Then the failure is logged with its error code and fault attribution
+
+  @unit
+  Scenario: A failed request logs the errors it wraps
+    Given a request fails because of an error that is not a handled error
+    When the error response is written
+    Then the log line carries the wrapped error's own text
+    And the response still names it only as unknown
