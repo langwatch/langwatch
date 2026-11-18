@@ -331,6 +331,14 @@ Feature: Gateway auth cache — hot path is zero RTT after first hit
       Then the request is rejected with that answer
       And the last known config is discarded
 
+    @unit
+    Scenario: the fallback never serves a rotated old secret past its grace
+      Given the cache evicted a key presented with its old secret after a rotation
+      And the old secret's grace ended while the entry was held as the last known config
+      When the control plane is unreachable on the refetch
+      Then the request is rejected rather than served from the last known config
+      And the last known config is discarded
+
   Rule: Short-lived JWT is refreshed before expiry
 
     @unit @unimplemented

@@ -140,6 +140,33 @@ func TestResolve_RevokingChange_LeavesNoFallback(t *testing.T) {
 	}
 }
 
+// @scenario "the fallback never serves a rotated old secret past its grace"
+func TestResolve_LastKnown_OldSecretPastItsGrace_IsNotServed(t *testing.T) {
+	fetcher := &fakeConfigFetcher{}
+	fetcher.returns = []resolverReturn{{err: herr.New(context.Background(), domain.ErrAuthUpstream, nil)}}
+	svc, _ := newService(t, Options{Resolver: &fetcher.fakeResolver, ConfigFetcher: fetcher})
+	rawKey := "vk-lw-old-secret"
+	h := hashKey(domain.PresentedKey{Token: rawKey})
+	b := bundleWithCreds("vk_rotated", time.Now().Add(10*time.Minute), "cred-known-good")
+	b.OrganizationID = "org-1"
+	b.ProjectID = "proj-1"
+	b.SecretValidUntil = time.Now().Add(10 * time.Minute)
+	seedL1(svc, h, b, "etag-1")
+	budgetCreated(svc)
+
+	e, ok := svc.lastKnown.Peek(h)
+	require.True(t, ok)
+	e.mu.Lock()
+	e.bundle.SecretValidUntil = time.Now().Add(-time.Second)
+	hard := e.hardExpiresAt
+	e.mu.Unlock()
+	require.True(t, hard.After(time.Now()), "only the secret's grace has ended, not the entry's hard cap")
+
+	_, err := svc.Resolve(context.Background(), domain.PresentedKey{Token: rawKey})
+	require.Error(t, err, "an old secret past its grace must not come back as a fallback")
+	assert.Zero(t, svc.lastKnown.Len(), "and its last known entry is dropped")
+}
+
 // @scenario "a definitive rejection from the control plane is never overridden by the fallback"
 func TestResolve_LastKnown_AuthRejectionWins(t *testing.T) {
 	invalid := herr.New(context.Background(), domain.ErrInvalidAPIKey, nil)
