@@ -557,7 +557,7 @@ const WATERFALL_ROWS = [
 
 function WaterfallSkeleton() {
   return (
-    <Flex direction="row" height="full" position="relative">
+    <Flex direction="row" height="full" position="relative" data-testid="waterfall-skeleton">
       <VStack
         align="stretch"
         gap={1.5}
@@ -629,8 +629,26 @@ function CollapsedOverview({ spans }: { spans: SpanTreeNode[] }) {
   );
 }
 
+/** The Agents tab reads its own graph, so it renders without waiting for the span tree. */
+function AgentsPane({
+  agentsTab,
+  onSelectSpan,
+}: {
+  agentsTab: AgentsTab;
+  onSelectSpan: (spanId: string) => void;
+}) {
+  return (
+    <AgentCallGraphPane
+      graph={agentsTab.graph}
+      isError={agentsTab.isGraphError}
+      onRetry={agentsTab.retryGraph}
+      onSelectSpan={onSelectSpan}
+    />
+  );
+}
+
 /** Whichever visualisation the current tab asks for, once spans have arrived. */
-function VizBody({
+export function VizBody({
   braidedOwners,
   isCollapsed,
   isLoading,
@@ -656,6 +674,8 @@ function VizBody({
   vizTab: VizTab;
 }) {
   if (spans.length === 0) {
+    if (isLoading && vizTab === "agents")
+      return <AgentsPane agentsTab={agentsTab} onSelectSpan={onSelectSpan} />;
     if (isLoading) return <VizSkeleton vizTab={vizTab} />;
     return (
       <Flex align="center" justify="center" height="full">
@@ -679,16 +699,7 @@ function VizBody({
       </Suspense>
     );
   }
-  if (vizTab === "agents") {
-    return (
-      <AgentCallGraphPane
-        graph={agentsTab.graph}
-        isError={agentsTab.isGraphError}
-        onRetry={agentsTab.retryGraph}
-        onSelectSpan={onSelectSpan}
-      />
-    );
-  }
+  if (vizTab === "agents") return <AgentsPane agentsTab={agentsTab} onSelectSpan={onSelectSpan} />;
   if (vizTab === "flame") {
     return (
       <FlameView
