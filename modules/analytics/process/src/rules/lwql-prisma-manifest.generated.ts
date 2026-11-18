@@ -1886,8 +1886,22 @@ export interface LwqlPrismaRows {
   readonly AuthzOrganizationPolicy: {
     readonly organizationId: "String";
     readonly braidsOrganizationAdminsOnly: "Boolean";
+    readonly braidsEnabled: "Boolean";
     readonly updatedByUserId: "String";
     readonly updatedAt: "DateTime";
+  };
+  readonly AuthzBraidWrite: {
+    readonly organizationId: "String";
+    readonly commandId: "String";
+    readonly grantId: "String";
+    readonly readerProjectId: "String";
+    readonly ownerProjectId: "String";
+    readonly termsKey: "String";
+    readonly condition: "Json";
+    readonly expiresAt: "DateTime?";
+    readonly replacesGrantId: "String?";
+    readonly createdByUserId: "String?";
+    readonly createdAt: "DateTime";
   };
   readonly RoleBinding: {
     readonly id: "String";
