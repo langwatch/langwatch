@@ -8,6 +8,7 @@ import { nurturingProjectUsageEventing } from "./eventing/nurturing-project-usag
 import { nurturingTraceWindowEndEventing } from "./eventing/nurturing-trace-window-end.pipeline.ts";
 import { nurturingEventing } from "./eventing/nurturing.pipeline.ts";
 import { nurturingRepositories } from "./repositories/nurturing-repositories.registry.ts";
+import { NurturingMemberBackfillTask } from "./tasks/nurturing-member-backfill.task.ts";
 
 export const nurturingProcessModule: PublishedProcessModule<
   "nurturing",
@@ -19,4 +20,10 @@ export const nurturingProcessModule: PublishedProcessModule<
   .withApi(NurturingModule)
   .withEventing(nurturingEventing)
   .withEventing(nurturingProjectUsageEventing)
-  .withEventing(nurturingTraceWindowEndEventing);
+  .withEventing(nurturingTraceWindowEndEventing)
+  // Hand-run after the rollout, dry run unless --execute: the member copy was never backfilled.
+  .withTasks(({ repositories }) => [
+    NurturingMemberBackfillTask.create({
+      peers: { source: repositories.memberSource, members: repositories.members },
+    }),
+  ]);

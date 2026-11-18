@@ -3,6 +3,7 @@ import { prismaRepositories } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
 import type { NurturingRepositories } from "../nurturing.repositories.ts";
+import { PrismaNurturingMemberSourceRepository } from "./prisma.nurturing-member-source.repository.ts";
 import { PrismaNurturingMilestonesRepository } from "./prisma.nurturing-milestones.repository.ts";
 import { PrismaNurturingOrganizationCreatedRepository } from "./prisma.nurturing-organization-created.repository.ts";
 import { PrismaNurturingOrganizationMemberRepository } from "./prisma.nurturing-organization-member.repository.ts";
@@ -44,6 +45,7 @@ export class PostgresNurturingRepositories {
     return {
       ...ownedRepositories.create({ prisma }),
       projects: PrismaNurturingProjectDirectoryRepository.create({ prisma }),
+      memberSource: PrismaNurturingMemberSourceRepository.create({ prisma }),
     };
   }
 }

@@ -6,6 +6,7 @@ import type {
   NurturingOrganizationAdminRepository,
   NurturingTraceMilestonesRepository,
 } from "./nurturing-milestones.repository.ts";
+import type { NurturingMemberSourceRepository } from "./nurturing-member-source.repository.ts";
 import type { NurturingOrganizationCreatedRepository } from "./nurturing-organization-created.repository.ts";
 import type { NurturingOrganizationMemberRepository } from "./nurturing-organization-member.repository.ts";
 import type { NurturingOrganizationPlanRepository } from "./nurturing-organization-plan.repository.ts";
@@ -24,6 +25,8 @@ export interface NurturingRepositories {
     NurturingTraceMilestonesRepository &
     NurturingOrganizationAdminRepository;
   readonly projects: NurturingProjectDirectoryRepository;
+  /** The owners' organizations and active members, read only by the member backfill task. */
+  readonly memberSource: NurturingMemberSourceRepository;
   /** Nurturing's own copy of each project's organization, from project's created event. */
   readonly placements: NurturingProjectPlacementRepository;
   /** Nurturing's own copy of each organization's creation, from organization's created event. */

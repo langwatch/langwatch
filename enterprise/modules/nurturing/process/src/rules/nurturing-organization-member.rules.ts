@@ -58,7 +58,7 @@ export function membersWhoseLatestOrganizationIs({
 /**
  * The people whose current membership with the latest join is another organization than
  * `organizationId`: that one's traits are theirs. Someone the copy holds no current membership
- * for is not among them, since the copy was never backfilled.
+ * for is not among them: a member from before the copy needs the nurturing-member-backfill task.
  */
 export function membersWhoseLatestOrganizationIsElsewhere({
   memberships,

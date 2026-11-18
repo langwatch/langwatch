@@ -133,3 +133,9 @@ Declared at `src/eventing/nurturing.pipeline.ts:315`. Events: `nurturingSignalRe
 | config | `posthogHost`       | `POSTHOG_HOST`         | `../contract/src/nurturing.config.ts:12` |
 
 <!-- readme:generated:end -->
+
+## Hand-run tasks
+
+| Task                       | When and how                                                                                                                                      |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `nurturing-member-backfill` | Run after the rollout, so existing members have a member row; dry run unless `--execute`; running it against production needs the owner's go. |
