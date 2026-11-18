@@ -45488,7 +45488,7 @@ Both Azure models use the Azure OpenAI provider, with its API key (`AZURE_OPENAI
 - **Decisions deployment** (`AZURE_OPENAI_DECISIONS_DEPLOYMENT`): your `gpt-6-luna` deployment name. Leave empty if it is `gpt-6-luna`.
 - **Microsoft Decision 1 deployment** (`AZURE_DECISION_1_DEPLOYMENT`): your Microsoft Decision 1 deployment name on Azure AI Foundry. Leave empty if it keeps the model's name.
 
-Keep **Use API Gateway** off. With it on, the endpoint and deployment fields are hidden and every row is skipped as `classifier_key_invalid`.
+Keep **Use API Gateway** off. With it on, the endpoint and deployment fields are hidden and every row is refused for the key, so a run fails with `instant_eval_decision_model_key_invalid`.
 
 Deploy the model on your resource before you pick it, in the Azure portal, Azure AI Foundry or the Azure CLI:
 
@@ -45503,11 +45503,11 @@ Without the deployment, every row is skipped as `classifier_not_configured`.
 
 ## When your model cannot answer
 
-A run on your own model never falls back to LangWatch Evals Preview. Rows it cannot judge are marked `skipped` with the reason in `error`, and the run carries on. List them with `langwatch instant-eval results <run-id> --status skipped`.
+A run on your own model never falls back to LangWatch Evals Preview. Rows it cannot judge are marked `skipped` with the reason in `error`, and the run carries on. When the key is refused for every row of a page, the run fails with `instant_eval_decision_model_key_invalid` instead, so it does not read as a run where no row matched. List skipped rows with `langwatch instant-eval results <run-id> --status skipped`.
 
 | `error`                           | Why                                                                                                         | Fix                                                                         |
 | --------------------------------- | ----------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
-| `classifier_key_invalid`          | The provider refused the key (401, 402 or 403), or the scope has no enabled provider row, no key, or an endpoint outside Azure | Check the row and its key at **Settings > Model Providers**                 |
+| `classifier_key_invalid`          | The provider refused the key (401, 402 or 403), or the scope has no enabled provider row, no key, or an endpoint outside Azure | Check the row and its key at **Settings > Model Providers**. If every row is refused, the run fails with `instant_eval_decision_model_key_invalid` |
 | `classifier_not_configured`       | The provider answered 404: the account does not hold the model, or the Azure deployment does not exist      | Deploy the model, or set the deployment name on the Azure row               |
 | `classifier_rate_limited`         | The provider answered 429 on every retry                                                                    | Raise the rate limit or quota on your provider account                     |
 | `classifier_provider_unavailable` | The provider answered 5xx on every retry                                                                    | Try again later                                                             |
