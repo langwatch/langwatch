@@ -1,6 +1,7 @@
 import type { DatasetRecord } from "@langwatch/dataset-contract";
 import { fromDate, type Instant, Temporal } from "@langwatch/time";
 
+import { recordSetDigest } from "../../rules/dataset-record-set.rules.ts";
 import type {
   DatasetMigrationFingerprint,
   DatasetMigrationMetadata,
@@ -97,7 +98,8 @@ export class MemoryDatasetMigrationRepository implements DatasetMigrationReposit
     const recheck = this.#fingerprint(input);
     if (
       recheck.count !== input.baseline.count ||
-      recheck.maxUpdatedAt?.epochMilliseconds !== input.baseline.maxUpdatedAt?.epochMilliseconds
+      recheck.maxUpdatedAt?.epochMilliseconds !== input.baseline.maxUpdatedAt?.epochMilliseconds ||
+      recheck.digest !== input.baseline.digest
     ) {
       return "skipped-concurrent-write";
     }
@@ -142,6 +144,12 @@ export class MemoryDatasetMigrationRepository implements DatasetMigrationReposit
         (latest, at) => (latest && Temporal.Instant.compare(latest, at) >= 0 ? latest : at),
         null,
       );
-    return { count: records.length, maxUpdatedAt: newest };
+    return {
+      count: records.length,
+      maxUpdatedAt: newest,
+      digest: recordSetDigest(
+        records.map((record) => ({ id: record.id, updatedAt: fromDate(record.updatedAt) })),
+      ),
+    };
   }
 }

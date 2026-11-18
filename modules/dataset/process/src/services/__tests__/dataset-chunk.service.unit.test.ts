@@ -4,7 +4,7 @@ import { DatasetStaleColumnsError, type DatasetColumns } from "@langwatch/datase
  * The s3_jsonl chunk mutations: each case asserts the counter write lands on
  * the TRANSACTIONAL repository (ADR-032 Decision 9, I-COUNT), not the root one.
  */
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 
 import type { DatasetChunkRepository } from "../../repositories/dataset-chunk.repository.ts";
 import type {
@@ -298,18 +298,25 @@ describe("DatasetChunkService", () => {
   });
 
   describe("when an edit names a column a column edit already removed", () => {
-    /** @scenario "A record write that arrives during a column edit waits for it and is refused when keyed by a removed column" */
-    it("refuses the edit as stale and writes nothing", async () => {
-      const dataset = readyDataset({
+    let dataset: DatasetMutationRecord;
+    let chunks: ReturnType<typeof fakeRepository>["chunks"];
+    let storage: ReturnType<typeof fakeStorage>["storage"];
+    let stored: unknown[][];
+
+    beforeEach(() => {
+      dataset = readyDataset({
         chunkCount: 1,
         rowCount: 1,
         sizeBytes: 10n,
         chunkOffsets: [{ index: 0, start: 0, rowCount: 1, byteSize: 10 }],
         columnTypes: [{ name: "a", type: "number" }],
       });
-      const { chunks } = fakeRepository(dataset);
-      const { storage, chunks: stored } = fakeStorage([[{ id: "r1", entry: { a: 1 } }]]);
+      chunks = fakeRepository(dataset).chunks;
+      ({ storage, chunks: stored } = fakeStorage([[{ id: "r1", entry: { a: 1 } }]]));
+    });
 
+    /** @scenario "A record write that arrives during a column edit waits for it and is refused when keyed by a removed column" */
+    it("refuses the edit as stale and writes nothing", async () => {
       const refusal = await chunks
         .editRecord({
           dataset,
@@ -323,6 +330,16 @@ describe("DatasetChunkService", () => {
 
       expect(refusal).toMatchObject({ code: "dataset_stale_columns", httpStatus: 409 });
       expect(stored[0]).toEqual([{ id: "r1", entry: { a: 1 } }]);
+    });
+
+    /** @scenario "A record write that arrives during a column edit waits for it and is refused when keyed by a removed column" */
+    it("refuses an append keyed by the removed column and writes nothing", async () => {
+      const refusal = await chunks
+        .append({ dataset, projectId, entries: [{ gone: 2 }], columns: ["gone"], storage })
+        .catch((error: unknown) => error);
+
+      expect(refusal).toMatchObject({ code: "dataset_stale_columns", httpStatus: 409 });
+      expect(stored).toEqual([[{ id: "r1", entry: { a: 1 } }]]);
     });
   });
 

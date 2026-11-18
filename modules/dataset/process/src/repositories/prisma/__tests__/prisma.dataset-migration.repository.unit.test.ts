@@ -74,12 +74,13 @@ function fixture(input: {
   }
   const misfiledCount = vi.fn(async () => [{ count: 0n }]);
   const recordAggregate = vi.fn(async () => fingerprintRow({ count: 0, maxUpdatedAt: null }));
+  const recordFindMany = vi.fn(async (): Promise<{ id: string; updatedAt: Date }[]> => []);
   const update = vi.fn(async () => {});
   const executeRaw = vi.fn(async () => 1);
   const transaction = {
     $executeRaw: executeRaw,
     dataset: { findFirst: lockedDatasetFindFirst, update },
-    datasetRecord: { aggregate: recordAggregate },
+    datasetRecord: { aggregate: recordAggregate, findMany: recordFindMany },
   };
   async function runTransaction<TResult>(
     operation: (database: typeof transaction) => Promise<TResult>,
@@ -95,6 +96,7 @@ function fixture(input: {
     },
     datasetRecord: {
       aggregate: recordAggregate,
+      findMany: recordFindMany,
     },
     // The move's two raw reads: its count of rows filed under another project, and record pages.
     $queryRaw: (strings: TemplateStringsArray, ...values: unknown[]) =>
@@ -121,6 +123,7 @@ function fixture(input: {
     lockedDatasetFindFirst,
     migration,
     recordAggregate,
+    recordFindMany,
     recordPageQuery,
     storage,
     update,
@@ -245,6 +248,29 @@ describe("PrismaDatasetMigrationRepository", () => {
         datasetId: "dataset_1",
         projectId: "project_1",
       }),
+    ).resolves.toBe("skipped-concurrent-write");
+    expect(subject.update).not.toHaveBeenCalled();
+  });
+
+  it("leaves Postgres live when a record is edited without moving the count or the newest time", async () => {
+    const subject = fixture({
+      recordPages: [[{ id: "record_1", entry: { value: 1 } }], []],
+    });
+    const unchanged = fingerprintRow({ count: 2, maxUpdatedAt: new Date(9) });
+    subject.recordAggregate.mockResolvedValueOnce(unchanged).mockResolvedValueOnce(unchanged);
+    // record_1 is edited by a writer whose clock runs behind record_2's stored time.
+    subject.recordFindMany
+      .mockResolvedValueOnce([
+        { id: "record_1", updatedAt: new Date(1) },
+        { id: "record_2", updatedAt: new Date(9) },
+      ])
+      .mockResolvedValueOnce([
+        { id: "record_1", updatedAt: new Date(5) },
+        { id: "record_2", updatedAt: new Date(9) },
+      ]);
+
+    await expect(
+      subject.migration.migrateDataset({ datasetId: "dataset_1", projectId: "project_1" }),
     ).resolves.toBe("skipped-concurrent-write");
     expect(subject.update).not.toHaveBeenCalled();
   });

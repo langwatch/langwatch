@@ -73,7 +73,7 @@ Feature: Single-file datasets are converted to chunks
       And the step's report names it as missing its file
       And the step is not recorded done
 
-    # Without a way out, a file that is gone for good would block the step, the blocking move
+    # Without a way out, a file that is gone for good would block the step, the serving gate
     # (postgres-layout-code-removal.feature) and the records-table drop forever.
     # becomes @unit
     @unimplemented

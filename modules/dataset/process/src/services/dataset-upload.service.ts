@@ -29,7 +29,6 @@ import {
   type StoredObjectApi,
   type StoredObjectMetadata,
 } from "@langwatch/stored-object-contract";
-import { nowInstant } from "@langwatch/time";
 
 import type { DatasetUpload } from "../app/dataset.app.ts";
 import type { DatasetChunkRepository } from "../repositories/dataset-chunk.repository.ts";
@@ -62,6 +61,7 @@ const IMPORTABLE_FILENAME = /\.(csv|json|jsonl)$/i;
  * written to storage, so it belongs with the writer.
  */
 const DATASET_KSUID_RESOURCE = "dataset";
+const RECORD_KSUID_RESOURCE = "record";
 
 type DatasetUploadServiceOptions = {
   datasets: DatasetContentRepository;
@@ -157,24 +157,33 @@ export class DatasetUploadService implements DatasetUpload {
     }
     if (!dataset) throw new UploadValidationError("File contains no data rows", "empty_file");
 
-    const stamped = entries.map((entry, index) => ({
-      id: `${nowInstant().epochMilliseconds}-${index}`,
+    const stamped = entries.map((entry) => ({
+      id: generate(RECORD_KSUID_RESOURCE).toString(),
       entry,
     }));
+    // The columns the rows were checked against: each locked write refuses them when one is gone.
+    const checked = columns.map((column) => column.name);
     if (isSingleFileDataset(dataset) && this.singleFile) {
       // Converted to chunks while the append waited for the dataset's lock: append there.
-      if ((await this.singleFile.appendRecords({ dataset, records: stamped })) === "converted") {
+      const outcome = await this.singleFile.appendRecords({
+        dataset,
+        records: stamped,
+        columns: checked,
+      });
+      if (outcome === "converted") {
         await this.appendToChunks({
           dataset: await this.findDataset(dataset.id, projectId),
           stamped,
+          columns: checked,
         });
       }
     } else if (dataset.contentLayout === "s3_jsonl") {
-      await this.appendToChunks({ dataset, stamped });
+      await this.appendToChunks({ dataset, stamped, columns: checked });
     } else if ((await this.appendToRecordsTable({ dataset, stamped })) === "moved") {
       await this.appendToChunks({
         dataset: await this.findDataset(dataset.id, projectId),
         stamped,
+        columns: checked,
       });
     }
 
@@ -184,9 +193,11 @@ export class DatasetUploadService implements DatasetUpload {
   private async appendToChunks({
     dataset,
     stamped,
+    columns,
   }: {
     dataset: DatasetRow;
     stamped: { id: string; entry: Record<string, unknown> }[];
+    columns: readonly string[];
   }): Promise<void> {
     await this.chunks.append({
       dataset,
@@ -194,6 +205,7 @@ export class DatasetUploadService implements DatasetUpload {
       entries: stamped.map(({ entry }) => entry),
       forcedIds: stamped.map(({ id }) => id),
       storage: this.storage,
+      columns,
     });
   }
 

@@ -25,9 +25,12 @@
 #
 # A background step's finishBy is shown in Ops but not enforced by the runner
 # (packages/upgrade/src/step/migration-step.ts:37; only the reader keeps it,
-# packages/upgrade/src/reader/step-view.ts:98). So the release that removes the serving path adds a
-# blocking step that runs the move and the conversion to completion before the new image serves.
-# On an install with nothing left on an old layout it finds nothing and finishes at once.
+# packages/upgrade/src/reader/step-view.ts:98). A blocking step is frozen SQL and cannot read a
+# file or write a chunk (.claude/skills/migration-data-step). So the release that removes the
+# serving path first needs an upgrade-framework change: the new image serves only once named
+# background steps are recorded done, and until then the previous image, which still reads the old
+# layouts, keeps serving. That change is a prerequisite of the removal (ADR-032 v20). On an install
+# with nothing left on an old layout the steps find nothing and the new image serves at once.
 
 Feature: Dataset code keeps one way of storing rows
   As a LangWatch developer
@@ -72,8 +75,8 @@ Feature: Dataset code keeps one way of storing rows
 
     # becomes @integration
     @unimplemented
-    Scenario: The blocking move finishes at once when nothing is left on an old layout
+    Scenario: The new release serves at once when nothing is left on an old layout
       Given an installation whose datasets are all in object storage
       When it upgrades to the release that removes the old serving path
-      Then the blocking move is recorded done with nothing moved
+      Then the move and the conversion steps are recorded done with nothing moved
       And the new release serves without waiting

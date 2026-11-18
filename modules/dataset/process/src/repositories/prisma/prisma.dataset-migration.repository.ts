@@ -4,6 +4,7 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { fromDate } from "@langwatch/time";
 import { z } from "zod";
 
+import { recordSetDigest } from "../../rules/dataset-record-set.rules.ts";
 import type {
   DatasetMigrationFingerprint,
   DatasetMigrationMetadata,
@@ -146,7 +147,8 @@ SELECT pg_advisory_xact_lock(hashtextextended(${`dataset:${input.datasetId}`}, 0
         const recordSetChanged =
           recheck.count !== input.baseline.count ||
           recheck.maxUpdatedAt?.epochMilliseconds !==
-            input.baseline.maxUpdatedAt?.epochMilliseconds;
+            input.baseline.maxUpdatedAt?.epochMilliseconds ||
+          recheck.digest !== input.baseline.digest;
         if (recordSetChanged) {
           logger.warn(input, "Dataset records changed during migration; leaving Postgres live");
           return "skipped-concurrent-write";
@@ -196,6 +198,13 @@ async function fingerprintOf(
     _count: { _all: true },
     _max: { updatedAt: true },
   });
+  const changes = await records.findMany({ where: input, select: { id: true, updatedAt: true } });
   const maxUpdatedAt = result._max.updatedAt;
-  return { count: result._count._all, maxUpdatedAt: maxUpdatedAt ? fromDate(maxUpdatedAt) : null };
+  return {
+    count: result._count._all,
+    maxUpdatedAt: maxUpdatedAt ? fromDate(maxUpdatedAt) : null,
+    digest: recordSetDigest(
+      changes.map((change) => ({ id: change.id, updatedAt: fromDate(change.updatedAt) })),
+    ),
+  };
 }

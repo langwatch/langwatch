@@ -42,5 +42,12 @@ describe("given the environment example", () => {
       expect(section).toMatch(/persistent/i);
       expect(section).toMatch(/only copy/i);
     });
+
+    /** @scenario "The environment example no longer offers the dead dataset migration opt-out" */
+    it("says a changed local storage path is mounted by both the app and the workers", () => {
+      const section = datasetsSection(example);
+      expect(section).toMatch(/app and the workers/);
+      expect(section).toMatch(/change that\s+(#\s*)?path and change their shared volume mount/);
+    });
   });
 });

@@ -67,6 +67,7 @@ Feature: Self-hosted installs keep dataset files safe once Postgres holds no cop
       When the environment example is read
       Then it does not mention SKIP_DATASET_S3_MIGRATE
       And it says datasets need either object storage or a persistent local storage path
+      And it says a changed local storage path must be mounted by both the app and the workers
 
   Rule: The upgrade lab proves the move, the conversion and the cleanup
 

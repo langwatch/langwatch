@@ -41,7 +41,7 @@ type ConversionRunInput = {
 };
 
 type ConversionOutcome =
-  | { outcome: "converted"; wrongRecordedCount: boolean }
+  | { outcome: "converted"; wrongRecordedCount: boolean; oldFileLeft: boolean }
   | { outcome: "would-convert"; records: number }
   | { outcome: "already-converted" | "missing-file" | "unreadable" };
 
@@ -177,7 +177,7 @@ export class DatasetSingleFileConversionService {
     }
     if (result.outcome === "converted") {
       report.converted += 1;
-      report.oldFilesLeft += 1;
+      if (result.oldFileLeft) report.oldFilesLeft += 1;
       if (result.wrongRecordedCount) report.wrongRecordedCount.push(key.datasetId);
     }
     if (result.outcome === "would-convert") {
@@ -203,7 +203,11 @@ export class DatasetSingleFileConversionService {
       if (options.dryRun) return { outcome: "would-convert", records: read.records.length };
 
       const rowCount = await this.writeChunks({ key, locked, records: read.records });
-      return { outcome: "converted", wrongRecordedCount: recordedCount !== rowCount };
+      return {
+        outcome: "converted",
+        wrongRecordedCount: recordedCount !== rowCount,
+        oldFileLeft: read.fileFound,
+      };
     });
   }
 
@@ -213,15 +217,21 @@ export class DatasetSingleFileConversionService {
   }: {
     key: DatasetKey;
     recordedCount: number;
-  }): Promise<ParsedSingleFile | { outcome: "missing-file" | "unreadable" }> {
+  }): Promise<
+    (ParsedSingleFile & { fileFound: boolean }) | { outcome: "missing-file" | "unreadable" }
+  > {
     const file = await this.options.files.getSingleFile(key);
     if (file.outcome === "too_large") return { outcome: "unreadable" };
     // No file and nothing recorded is a dataset that was never written to: empty, not lost.
     if (file.outcome === "missing") {
-      return recordedCount > 0 ? { outcome: "missing-file" } : { outcome: "parsed", records: [] };
+      return recordedCount > 0
+        ? { outcome: "missing-file" }
+        : { outcome: "parsed", records: [], fileFound: false };
     }
     const parsed = parseSingleFileRecords(file.text);
-    return parsed.outcome === "unreadable" ? { outcome: "unreadable" } : parsed;
+    return parsed.outcome === "unreadable"
+      ? { outcome: "unreadable" }
+      : { ...parsed, fileFound: true };
   }
 
   /** Writes the records as the dataset's chunks and flips it, inside the caller's lock. */

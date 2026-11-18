@@ -387,7 +387,7 @@ export class DatasetRecordService {
     });
     const content = this.contentOf(dataset);
     if (content) {
-      return content.batchCreateRecords({ dataset, input: parsed });
+      return content.batchCreateRecords({ dataset, input: parsed, columns });
     }
 
     return this.locked.write(
@@ -401,7 +401,7 @@ export class DatasetRecordService {
             ...sanitizedEntry(Object.fromEntries(columns.map((c) => [c, entry[c] ?? null]))),
           })),
         }),
-      (moved, current) => moved.batchCreateRecords({ dataset: current, input: parsed }),
+      (moved, current) => moved.batchCreateRecords({ dataset: current, input: parsed, columns }),
     );
   }
 

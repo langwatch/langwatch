@@ -146,18 +146,22 @@ export class DatasetChunkService {
     entries,
     forcedIds,
     storage,
+    columns,
   }: {
     dataset: DatasetMutationRecord;
     projectId: string;
     entries: unknown[];
     forcedIds?: (string | undefined)[];
     storage: DatasetChunkRepository;
+    /** The columns the caller checked the entries against; refused when one is gone. */
+    columns?: readonly string[] | undefined;
   }): Promise<{ appended: number }> {
     const datasetStorage = storage;
 
     return this.datasets.withDatasetLock(dataset.id, async (tx) => {
       const current = await tx.getOne({ id: dataset.id, projectId });
       assertReady(current);
+      assertColumnsCurrent({ columns, columnTypes: current.columnTypes });
 
       return this.appendLines({
         tx,

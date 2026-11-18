@@ -1080,6 +1080,8 @@ export abstract class DatasetContent {
   abstract batchCreateRecords(input: {
     dataset: Dataset;
     input: CreateDatasetRecordsInput;
+    /** The columns the entries were checked against; the append is refused when one is gone. */
+    columns?: readonly string[] | undefined;
   }): Promise<DatasetRecord[]>;
   abstract deleteRecords(input: {
     dataset: Dataset;

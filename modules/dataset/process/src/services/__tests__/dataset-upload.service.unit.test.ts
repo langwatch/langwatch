@@ -272,6 +272,20 @@ describe("DatasetUploadService", () => {
         ]);
       });
 
+      /** @scenario "Upload a CSV file to an existing dataset" */
+      it("gives every uploaded row its own record id, across uploads too", async () => {
+        const { adapter, inlineRecords } = harness({ row: datasetRow() });
+        const content = "input,output\nhello,Hi there!\n";
+
+        await upload(adapter, { slugOrId: "user-feedback", filename: "a.csv", content });
+        await upload(adapter, { slugOrId: "user-feedback", filename: "b.csv", content });
+
+        const ids = inlineRecords.map((record) => record.id);
+        expect(new Set(ids).size).toBe(2);
+        // A KSUID, not the upload's clock time: two uploads in one millisecond never share one.
+        for (const id of ids) expect(id).not.toMatch(/^\d+-\d+$/);
+      });
+
       /** @scenario "Upload a JSONL file to an existing dataset" */
       it("reads one record per JSONL line", async () => {
         const row = datasetRow({

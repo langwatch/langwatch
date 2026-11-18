@@ -33,10 +33,11 @@ export type DatasetMigrationRunResult =
   | { status: "incomplete"; summary: DatasetMigrationSummary }
   | { status: "schema-pending" };
 
-/** How many records a dataset holds and when the newest changed: the concurrent-write check. */
+/** How many records a dataset holds, when the newest changed, and a digest of every change. */
 export type DatasetMigrationFingerprint = {
   count: number;
   maxUpdatedAt: Instant | null;
+  digest: string;
 };
 
 /** The chunk layout a migrated dataset's row is committed with. */

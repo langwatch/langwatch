@@ -100,7 +100,7 @@ function step(
       afterId ? [] : [`dataset_of_${projectId}`],
     isPostgresLayout: async () => true,
     findMoveNotes: async () => ({ archived: false, rowsUnderOtherProject: 0 }),
-    getFingerprint: async () => ({ count: 1, maxUpdatedAt: null }),
+    getFingerprint: async () => ({ count: 1, maxUpdatedAt: null, digest: "" }),
     findRecordPage: async ({ afterId }) => (afterId ? [] : [{ id: "record_1", entry: { a: 1 } }]),
     commit,
     isSchemaPending: () => false,

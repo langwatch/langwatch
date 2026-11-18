@@ -210,10 +210,12 @@ describe("the single-file conversion step", () => {
       const { conversion, singleFile, row, read } = install();
       const datasetId = await singleFile({ file: "none", recordedCount: 0 });
 
-      await conversion.runStep(stepArgs());
+      const result = await conversion.run();
 
       expect(await row(datasetId)).toMatchObject({ contentLayout: "s3_jsonl", rowCount: 0 });
       expect(await read(datasetId)).toEqual([]);
+      // There was no file, so none is left for an operator to clean up.
+      expect(result).toMatchObject({ report: { converted: 1, oldFilesLeft: 0 } });
     });
   });
 
@@ -321,6 +323,33 @@ describe("the single-file conversion step", () => {
         { question: "three" },
         { question: "uploaded" },
       ]);
+    });
+
+    /** @scenario "A write to a single-file dataset waits while it is converted" */
+    it("answers an edit with the value the chunks stored, its null byte scrubbed", async () => {
+      const { repositories, conversion, app, singleFile, read } = install();
+      const datasetId = await singleFile();
+      const lock = repositories.content.withDatasetLock.bind(repositories.content);
+      let converting = true;
+      vi.spyOn(repositories.content, "withDatasetLock").mockImplementation(async (id, mutate) => {
+        if (converting) {
+          converting = false;
+          await conversion.runStep(stepArgs());
+        }
+        return lock(id, mutate);
+      });
+
+      const answer = await app.upsertRecord({
+        slugOrId: datasetId,
+        projectId,
+        recordId: "r1",
+        updatedRecord: { question: "a\u0000b" },
+      });
+
+      expect(answer.record.entry).toEqual({ question: "ab" });
+      expect((await read(datasetId)).find((record) => record.id === "r1")?.entry).toEqual({
+        question: "ab",
+      });
     });
   });
 

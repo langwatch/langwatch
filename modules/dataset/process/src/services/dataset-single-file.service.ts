@@ -195,7 +195,11 @@ export class DatasetSingleFileService implements Omit<
     return this.orConverted(
       input.dataset,
       () => this.upsertInFile(input),
-      (content, dataset) => content.upsertRecord({ dataset, input: input.input }),
+      (content, dataset) =>
+        content.upsertRecord({
+          dataset,
+          input: { ...input.input, updatedRecord: sanitizedEntry(input.input.updatedRecord) },
+        }),
     );
   }
 
@@ -225,8 +229,11 @@ export class DatasetSingleFileService implements Omit<
   async batchCreateRecords(input: {
     dataset: Dataset;
     input: CreateDatasetRecordsInput;
+    /** The columns the entries were checked against; the append is refused when one is gone. */
+    columns?: readonly string[] | undefined;
   }): Promise<DatasetRecord[]> {
     const { dataset } = input;
+    const columns = input.columns ?? dataset.columnTypes.map((column) => column.name);
     const added = input.input.entries.map(({ id, ...entry }) => ({
       id: id ?? this.generateId(),
       entry,
@@ -234,12 +241,13 @@ export class DatasetSingleFileService implements Omit<
     return this.orConverted(
       dataset,
       async () => {
-        await this.appendToFile({ dataset, records: added });
+        await this.appendToFile({ dataset, records: added, columns });
         return added.map((record) =>
           this.toDatasetRecord({ id: record.id, entry: sanitizedEntry(record.entry) }, dataset),
         );
       },
-      (content, fresh) => content.batchCreateRecords({ dataset: fresh, input: input.input }),
+      (content, fresh) =>
+        content.batchCreateRecords({ dataset: fresh, input: input.input, columns }),
     );
   }
 
@@ -250,6 +258,7 @@ export class DatasetSingleFileService implements Omit<
   async appendRecords(input: {
     dataset: DatasetRef;
     records: readonly { id: string; entry: Record<string, unknown> }[];
+    columns?: readonly string[] | undefined;
   }): Promise<"appended" | "converted"> {
     try {
       await this.appendToFile(input);
@@ -263,16 +272,20 @@ export class DatasetSingleFileService implements Omit<
   private async appendToFile(input: {
     dataset: DatasetRef;
     records: readonly { id: string; entry: Record<string, unknown> }[];
+    columns?: readonly string[] | undefined;
   }): Promise<void> {
     const { dataset } = input;
     const added = input.records.map((record) => ({
       id: record.id,
       entry: sanitizedEntry(record.entry),
     }));
-    await this.rewrite(dataset, (records, now) => ({
-      records: appendSingleFileRecords({ ...keyOf(dataset), records, added, now }),
-      answer: undefined,
-    }));
+    await this.rewrite(dataset, (records, now, current) => {
+      assertColumnsCurrent({ columns: input.columns, columnTypes: current.columnTypes });
+      return {
+        records: appendSingleFileRecords({ ...keyOf(dataset), records, added, now }),
+        answer: undefined,
+      };
+    });
   }
 
   async deleteRecords(input: {
