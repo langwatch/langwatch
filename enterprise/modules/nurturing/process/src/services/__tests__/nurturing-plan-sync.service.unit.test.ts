@@ -173,6 +173,33 @@ describe("NurturingPlanSyncService", () => {
     });
   });
 
+  describe("when a catch-up fact meets a member whose row for this organization records a stale leave", () => {
+    it("still identifies them: billing lists them active", async () => {
+      const members = MemoryNurturingOrganizationMemberRepository.create();
+      for (const [userId, change] of [
+        ["user-1", "joined"],
+        ["user-2", "joined"],
+        ["user-2", "left"],
+      ] as const) {
+        await members.recordMembershipChange({
+          organizationId: "org-1",
+          userId,
+          change,
+          at: change === "left" ? 2_000 : 1_000,
+        });
+      }
+      const { planSync, sent } = planSyncOver(members);
+
+      await planSync.planCaughtUp({ ...change, fromCatchUp: true });
+
+      expect(sent.flat().map(({ type, userId }) => [type, userId])).toEqual([
+        ["group", "admin-1"],
+        ["identify", "user-1"],
+        ["identify", "user-2"],
+      ]);
+    });
+  });
+
   describe("when a person is in a paid team and their own free organization", () => {
     /** @scenario "A person whose paid team is their latest join is never told free by the resync" */
     it.each([

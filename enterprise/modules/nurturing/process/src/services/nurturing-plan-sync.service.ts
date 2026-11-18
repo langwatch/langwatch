@@ -5,7 +5,6 @@ import { createLogger } from "@langwatch/observability";
 import type { NurturingOrganizationMemberRepository } from "../repositories/nurturing-organization-member.repository.ts";
 import type { NurturingOrganizationPlanRepository } from "../repositories/nurturing-organization-plan.repository.ts";
 import {
-  isCurrentMembership,
   type NurturingMembership,
   membersWhoseLatestOrganizationIsElsewhere,
 } from "../rules/nurturing-organization-member.rules.ts";
@@ -104,7 +103,8 @@ export class NurturingPlanSyncService {
       memberships,
       organizationId,
     });
-    // A catch-up fact is only trusted for members the copy holds a current row for: without the
+    // A catch-up fact is only trusted for members the copy holds a row for (any row, even a stale leave
+    // the backfill never rewrites): without the
     // member backfill a paid-team member with their own free org would be told free. Live facts
     // keep identifying every member.
     const noCopyRowMemberUserIds = signal.fromCatchUp
@@ -119,7 +119,7 @@ export class NurturingPlanSyncService {
     return fireSubscriptionSync({
       ...signal,
       admin,
-      elsewhereMemberUserIds: [...elsewhereMemberUserIds, ...noCopyRowMemberUserIds],
+      skippedMemberUserIds: [...elsewhereMemberUserIds, ...noCopyRowMemberUserIds],
     });
   }
 
@@ -135,7 +135,6 @@ export class NurturingPlanSyncService {
     const withRow = new Set(
       memberships
         .filter((membership) => membership.organizationId === organizationId)
-        .filter(isCurrentMembership)
         .map(({ userId }) => userId),
     );
     return memberUserIds.filter((userId) => !withRow.has(userId));

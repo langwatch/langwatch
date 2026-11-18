@@ -21,7 +21,7 @@ const change = {
   memberUserIds: ["user-1", "user-2"],
   hasSubscription: true,
   admin,
-  elsewhereMemberUserIds: [],
+  skippedMemberUserIds: [],
 };
 
 describe("fireSubscriptionSync", () => {
@@ -51,7 +51,7 @@ describe("fireSubscriptionSync", () => {
       const requests = fireSubscriptionSync({
         ...change,
         plan: "LAUNCH",
-        elsewhereMemberUserIds: ["user-2"],
+        skippedMemberUserIds: ["user-2"],
       });
 
       expect(requests.flat().map(({ type, userId }) => [type, userId])).toEqual([

@@ -6,7 +6,8 @@ Feature: Customer.io knows each team's real plan
 
   Run nurturing-member-backfill --execute first. If the resync runs first, it identifies no member
   without a member-copy row (the org's group call still carries the plan), so the wrong order sends
-  nothing wrong.
+  nothing wrong. To repair it, run the backfill and then the resync again; skipped members otherwise
+  get no plan until the next live fact.
 
   @unit
   Scenario: A started subscription tells Customer.io the plan on members and company
@@ -167,7 +168,7 @@ Feature: Customer.io knows each team's real plan
 
   @unit
   Scenario: A catch-up fact identifies no member without a member-copy row, a live one still does
-    Given an organization with two members, one with a current member-copy row and one without
+    Given an organization with two members, one with a member-copy row and one without
     When the resync's catch-up fact for it is delivered
     Then only the member with a row is identified
     And the group call still carries the plan to the organization's admin

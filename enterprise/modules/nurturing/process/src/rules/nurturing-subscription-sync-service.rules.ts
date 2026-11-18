@@ -24,13 +24,16 @@ type SubscriptionSyncInput = Pick<
 > & {
   /** The admin nurturing's copy names; without one, the first member carries the company call. */
   admin: NurturingOrganizationAdmin;
-  /** Members whose latest organization is another one: that one's plan is theirs, not this. */
-  elsewhereMemberUserIds: readonly string[];
+  /**
+   * Members not told this plan: their latest organization is another one (that plan is theirs), or
+   * a catch-up fact met no member-copy row for this organization.
+   */
+  skippedMemberUserIds: readonly string[];
 };
 
 /**
  * Decides a subscription change's requests, in order: one group call carrying the plan to the
- * admin, then the identifies of every member whose latest organization is not another one, at
+ * admin, then the identifies of every member not skipped, at
  * most 100 a request. A fact with no plan sends has_subscription only and no group call; no
  * member, nothing.
  */
@@ -40,7 +43,7 @@ export function fireSubscriptionSync({
   hasSubscription,
   plan,
   admin,
-  elsewhereMemberUserIds,
+  skippedMemberUserIds,
 }: SubscriptionSyncInput): CioBatchCall[][] {
   const groupUserId = admin.kind === "admin" ? admin.userId : memberUserIds[0];
   if (groupUserId === undefined || memberUserIds.length === 0) return [];
@@ -58,8 +61,8 @@ export function fireSubscriptionSync({
     requests.push([group]);
   }
 
-  const elsewhere = new Set(elsewhereMemberUserIds);
-  const told = memberUserIds.filter((userId) => !elsewhere.has(userId));
+  const skipped = new Set(skippedMemberUserIds);
+  const told = memberUserIds.filter((userId) => !skipped.has(userId));
   const size = SUBSCRIPTION_MEMBERS_PER_REQUEST;
   for (let start = 0; start < told.length; start += size) {
     const batch = told.slice(start, start + size);
