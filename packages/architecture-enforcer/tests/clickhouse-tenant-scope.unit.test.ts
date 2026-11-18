@@ -385,8 +385,10 @@ describe("ClickHouse repositories", () => {
 
     expect(blind, "the scan no longer reaches these files' statements").toEqual([]);
     expect(undeclared, "the scan no longer reads these files' skip flags").toEqual([]);
-    expect(sites.filter((site) => site.verdict === "scoped").length).toBeGreaterThanOrEqual(
-      Math.min(1, sending.length),
+    // A statement built elsewhere (`built.sql`) is unresolvable here; only SQL it reads counts.
+    const readable = sites.filter((site) => site.verdict !== "unresolvable");
+    expect(readable.filter((site) => site.verdict === "scoped").length).toBeGreaterThanOrEqual(
+      Math.min(1, readable.length),
     );
   });
 

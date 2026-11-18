@@ -1,3 +1,4 @@
+import { CLICKHOUSE_COLUMNS_QUERY } from "@langwatch/clickhouse-client";
 import {
   idIndexedClientDouble,
   type ScriptedStatements,
@@ -15,6 +16,8 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 const NOW_MS = Date.UTC(2026, 9, 10, 12);
 
 const isResolve = (sql: string) => sql.includes("count() AS rowCount");
+/** The target's column list (NO-HOLDS): answered empty, so every column reads, and not a lookup. */
+const isColumnList = (sql: string) => sql === CLICKHOUSE_COLUMNS_QUERY;
 const isBounded = (sql: string) => sql.includes("OccurredAt >= fromUnixTimestamp64Milli");
 
 /** One stored trace_summaries row, answered only when a read's bounds cover its OccurredAt. */
@@ -71,6 +74,7 @@ function storeOver({ storedAtMs }: { storedAtMs: number }) {
     indexes: TRACE_ID_INDEXES,
     driver: {
       execute: vi.fn<ScriptedStatements["execute"]>(async ({ sql, params }) => {
+        if (isColumnList(sql)) return { rows: [] };
         reads.push({ sql, params: params ?? {} });
         if (isResolve(sql)) return { rows: [{ rowCount: "1", occurredAtMs: String(storedAtMs) }] };
         if (!isBounded(sql)) return { rows: [row] };

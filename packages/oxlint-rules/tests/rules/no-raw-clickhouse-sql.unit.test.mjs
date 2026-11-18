@@ -73,7 +73,8 @@ describe("given module process code that reaches ClickHouse", () => {
       ]);
       expect(found[0].message).toBe(
         "`.query({ sql })` hands ClickHouse a hand-written statement. Hand-written SQL can drop its tenant predicate; a built read renders it from its scope." +
-          " Build it with `clickhouseRead` from `@langwatch/clickhouse-client/builder` under a `tenantScope`, and send it with `client.read({ statement })`.",
+          " Build it with `clickhouseRead` from `@langwatch/clickhouse-client/builder` under a `tenantScope`, and send it with `client.read({ statement })`." +
+          " Read the `backend` skill.",
       );
       expect(vendor.map((finding) => finding.data.key)).toEqual(["query"]);
     });

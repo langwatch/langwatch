@@ -56,8 +56,8 @@ def sync_detailed(
 ) -> Response[Any]:
     """Explain a ClickHouse query as the read-only operator account
 
-     the operator tool reads a status and a message: 401, 400, 502 and 503 and the EXPLAIN rows all keep
-    the exact bodies the agent already parses
+     the operator tool reads a status and a message: 401 and 400 keep main's bodies; an accepted EXPLAIN
+    answers 202 with a request id the tool polls, as the worker runs it (ADR-202 Decided 14)
 
     Args:
         body (ExplainClickHouseQueryBody):
@@ -88,8 +88,8 @@ async def asyncio_detailed(
 ) -> Response[Any]:
     """Explain a ClickHouse query as the read-only operator account
 
-     the operator tool reads a status and a message: 401, 400, 502 and 503 and the EXPLAIN rows all keep
-    the exact bodies the agent already parses
+     the operator tool reads a status and a message: 401 and 400 keep main's bodies; an accepted EXPLAIN
+    answers 202 with a request id the tool polls, as the worker runs it (ADR-202 Decided 14)
 
     Args:
         body (ExplainClickHouseQueryBody):

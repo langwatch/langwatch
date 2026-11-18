@@ -131853,6 +131853,9 @@ type ClientInterface interface {
 
 	ExplainClickHouseQuery(ctx context.Context, body ExplainClickHouseQueryJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// GetClickHouseExplainResult request
+	GetClickHouseExplainResult(ctx context.Context, requestId string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// PostApiOptimizationByWorkflowIdByVersionIdWithBody request with any body
 	PostApiOptimizationByWorkflowIdByVersionIdWithBody(ctx context.Context, workflowId string, versionId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -137019,6 +137022,18 @@ func (c *Client) ExplainClickHouseQueryWithBody(ctx context.Context, contentType
 
 func (c *Client) ExplainClickHouseQuery(ctx context.Context, body ExplainClickHouseQueryJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewExplainClickHouseQueryRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) GetClickHouseExplainResult(ctx context.Context, requestId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetClickHouseExplainResultRequest(c.Server, requestId)
 	if err != nil {
 		return nil, err
 	}
@@ -152157,6 +152172,40 @@ func NewExplainClickHouseQueryRequestWithBody(server string, contentType string,
 	return req, nil
 }
 
+// NewGetClickHouseExplainResultRequest generates requests for GetClickHouseExplainResult
+func NewGetClickHouseExplainResultRequest(server string, requestId string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "requestId", requestId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/ops/clickhouse/explain/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewPostApiOptimizationByWorkflowIdByVersionIdRequest calls the generic PostApiOptimizationByWorkflowIdByVersionId builder with application/json body
 func NewPostApiOptimizationByWorkflowIdByVersionIdRequest(server string, workflowId string, versionId string, body PostApiOptimizationByWorkflowIdByVersionIdJSONRequestBody) (*http.Request, error) {
 	var bodyReader io.Reader
@@ -160263,6 +160312,9 @@ type ClientWithResponsesInterface interface {
 	ExplainClickHouseQueryWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ExplainClickHouseQueryResponse, error)
 
 	ExplainClickHouseQueryWithResponse(ctx context.Context, body ExplainClickHouseQueryJSONRequestBody, reqEditors ...RequestEditorFn) (*ExplainClickHouseQueryResponse, error)
+
+	// GetClickHouseExplainResultWithResponse request
+	GetClickHouseExplainResultWithResponse(ctx context.Context, requestId string, reqEditors ...RequestEditorFn) (*GetClickHouseExplainResultResponse, error)
 
 	// PostApiOptimizationByWorkflowIdByVersionIdWithBodyWithResponse request with any body
 	PostApiOptimizationByWorkflowIdByVersionIdWithBodyWithResponse(ctx context.Context, workflowId string, versionId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostApiOptimizationByWorkflowIdByVersionIdResponse, error)
@@ -179198,6 +179250,35 @@ func (r ExplainClickHouseQueryResponse) ContentType() string {
 	return ""
 }
 
+type GetClickHouseExplainResultResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+}
+
+// Status returns HTTPResponse.Status
+func (r GetClickHouseExplainResultResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetClickHouseExplainResultResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetClickHouseExplainResultResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 type PostApiOptimizationByWorkflowIdByVersionIdResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -192656,6 +192737,15 @@ func (c *ClientWithResponses) ExplainClickHouseQueryWithResponse(ctx context.Con
 		return nil, err
 	}
 	return ParseExplainClickHouseQueryResponse(rsp)
+}
+
+// GetClickHouseExplainResultWithResponse request returning *GetClickHouseExplainResultResponse
+func (c *ClientWithResponses) GetClickHouseExplainResultWithResponse(ctx context.Context, requestId string, reqEditors ...RequestEditorFn) (*GetClickHouseExplainResultResponse, error) {
+	rsp, err := c.GetClickHouseExplainResult(ctx, requestId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetClickHouseExplainResultResponse(rsp)
 }
 
 // PostApiOptimizationByWorkflowIdByVersionIdWithBodyWithResponse request with arbitrary body returning *PostApiOptimizationByWorkflowIdByVersionIdResponse
@@ -214679,6 +214769,22 @@ func ParseExplainClickHouseQueryResponse(rsp *http.Response) (*ExplainClickHouse
 	}
 
 	response := &ExplainClickHouseQueryResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	return response, nil
+}
+
+// ParseGetClickHouseExplainResultResponse parses an HTTP response from a GetClickHouseExplainResultWithResponse call
+func ParseGetClickHouseExplainResultResponse(rsp *http.Response) (*GetClickHouseExplainResultResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetClickHouseExplainResultResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}

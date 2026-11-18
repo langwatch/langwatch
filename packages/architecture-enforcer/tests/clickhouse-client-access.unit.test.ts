@@ -80,6 +80,8 @@ const MAY_CONSTRUCT = new Set([
   "modules/analytics/process/scripts/generate-lwql-columns-manifest.ts",
   "packages/clickhouse-client/src/clickhouse-test-endpoints.ts",
   "packages/test-harness/src/client-doubles/clickhouse.double.ts",
+  // A suite's own container, as its admin and as the app reader it provisions there (ADR-202).
+  "packages/test-harness/src/clickhouse-app-reader.ts",
 ]);
 
 /**

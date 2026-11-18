@@ -69,7 +69,4 @@ export {
   renderAppReaderDdl,
   renderAppReaderUsersD,
 } from "./access-model/app-access-model.ts";
-export type {
-  AppAccessModelInput,
-  AppWriterInput,
-} from "./access-model/app-access-model.ts";
+export type { AppAccessModelInput, AppWriterInput } from "./access-model/app-access-model.ts";

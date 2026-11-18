@@ -197,7 +197,7 @@ type PageOps = Pick<
   "and" | "eq" | "gt" | "gte" | "lt" | "lte" | "or"
 >;
 
-/** The page's range: after `cursor` up to `maxCutoff`, pruned by the bounds; the ids filter apart. */
+/** The page's range: after `cursor` up to `maxCutoff`, pruned by the bounds; ids filter apart. */
 function eventPageCondition({
   maxCutoff,
   cursor,

@@ -71,7 +71,7 @@ export class ShadowSampler {
     try {
       const { rows } = await this.driver.execute<{ enforced: string | number }>({
         ...request,
-        sql: `SELECT count() AS enforced FROM (${request.sql.trim().replace(/;+$/, "")})`,
+        sql: `SELECT count() AS enforced FROM (${withoutTrailingSemicolons(request.sql.trim())})`,
         signal: undefined,
       });
       const enforced = Number(rows[0]?.enforced ?? 0);
@@ -80,4 +80,11 @@ export class ShadowSampler {
       this.onFailure({ table, error });
     }
   }
+}
+
+/** `sql` without its trailing semicolons, in one pass: `/;+$/` is quadratic on a long `;` run. */
+function withoutTrailingSemicolons(sql: string): string {
+  let end = sql.length;
+  while (end > 0 && sql[end - 1] === ";") end -= 1;
+  return sql.slice(0, end);
 }

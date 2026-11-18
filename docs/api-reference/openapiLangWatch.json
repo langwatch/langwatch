@@ -96779,7 +96779,7 @@
             }
           }
         },
-        "description": "the operator tool reads a status and a message: 401, 400, 502 and 503 and the EXPLAIN rows all keep the exact bodies the agent already parses",
+        "description": "the operator tool reads a status and a message: 401 and 400 keep main's bodies; an accepted EXPLAIN answers 202 with a request id the tool polls, as the worker runs it (ADR-202 Decided 14)",
         "summary": "Explain a ClickHouse query as the read-only operator account",
         "security": [
           {
@@ -96823,6 +96823,45 @@
             }
           }
         }
+      }
+    },
+    "/api/v1/ops/clickhouse/explain/{requestId}": {
+      "get": {
+        "operationId": "getClickHouseExplainResult",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {}
+            }
+          }
+        },
+        "description": "200 with status pending, done (type and rows) or failed (error code and message); 404 when the request id is unknown or its result expired; 401 without the operator secret",
+        "summary": "Read one accepted ClickHouse EXPLAIN's answer by its request id",
+        "security": [
+          {
+            "internal_secret": []
+          }
+        ],
+        "x-access-policy": {
+          "kind": "handlerManaged",
+          "credential": [
+            "internal_secret"
+          ],
+          "permissions": []
+        },
+        "parameters": [
+          {
+            "in": "path",
+            "name": "requestId",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64
+            },
+            "required": true
+          }
+        ]
       }
     },
     "/api/v1/checkup": {

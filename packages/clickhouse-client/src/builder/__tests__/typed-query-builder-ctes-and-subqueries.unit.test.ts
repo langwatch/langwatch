@@ -1,6 +1,6 @@
 /**
- * ADR-202, "The typed builder": the shapes evaluation's and scenario's reads need: nullable and listed ids, shared id parameters, derived join sides, zoned day starts,
- * CTEs reading earlier CTEs and scalar subqueries, each carrying the tenant predicate.
+ * ADR-202 typed builder shapes for evaluation and scenario reads, each tenant-scoped: nullable
+ * and listed ids, shared ids, derived join sides, zoned days, CTEs over CTEs, scalar subqueries.
  * @see specs/clickhouse/typed-query-builder.feature
  */
 import { describe, expect, it } from "vitest";

@@ -8,6 +8,10 @@ import { createClient, type ClickHouseClient } from "@clickhouse/client";
 import type { AnalyticsEvaluationRow } from "@langwatch/analytics-contract";
 import { afterAll, describe, expect, it } from "vitest";
 
+import {
+  clickHouseQueryClientOver,
+  deferredVendor,
+} from "../repositories/clickhouse/__tests__/support/clickhouse-query-client.support.ts";
 import { ClickHouseAnalyticsEvaluationRepository } from "../repositories/clickhouse/clickhouse.analytics-persistence.repository.ts";
 
 const configuredClickHouseUrl = process.env.TEST_CLICKHOUSE_URL ?? process.env.CI_CLICKHOUSE_URL;
@@ -72,6 +76,7 @@ function repository(): ClickHouseAnalyticsEvaluationRepository {
   return ClickHouseAnalyticsEvaluationRepository.create({
     resolveClient: async () => client ?? null,
     defaultRetentionDays: () => 30,
+    clickhouse: clickHouseQueryClientOver(deferredVendor(async () => client ?? null)),
   });
 }
 

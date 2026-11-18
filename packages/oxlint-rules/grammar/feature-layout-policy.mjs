@@ -34,7 +34,7 @@ const ARTIFACT_TABLE = {
   service: { side: "contract", canonical: true, subject: true },
   store: { side: "process", canonical: true, subject: true, qualified: true },
   subscriber: { side: "process", canonical: true, subject: true },
-  // A typed ClickHouse table descriptor the builder reads through (ADR-202), beside its repositories.
+  // A typed ClickHouse table descriptor the builder reads through (ADR-202), by its repositories.
   table: { side: "process", qualified: true },
   task: { side: "process", canonical: true },
 };
