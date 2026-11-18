@@ -44,7 +44,7 @@
     "@langwatch/time": "workspace:*",
     "@opentelemetry/api": "catalog:",
     "ioredis": "catalog:",
-    "langwatch": "workspace:*",
+    "langwatch": "catalog:",
     "nanoid": "catalog:",
     "zod": "catalog:"
   },

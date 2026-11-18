@@ -56,7 +56,6 @@
     "@trpc/react-query": "catalog:",
     "@xyflow/react": "catalog:",
     "fast-deep-equal": "catalog:",
-    "langwatch": "workspace:*",
     "liquidjs": "catalog:",
     "lodash-es": "catalog:",
     "lucide-react": "catalog:",

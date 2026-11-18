@@ -77,7 +77,7 @@
     "@trpc/server": "catalog:",
     "ai": "catalog:",
     "hono": "catalog:",
-    "langwatch": "workspace:*",
+    "langwatch": "catalog:",
     "nanoid": "catalog:",
     "ws": "catalog:",
     "zod": "catalog:"

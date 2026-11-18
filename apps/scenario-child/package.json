@@ -49,7 +49,7 @@
     "@prisma/client": "catalog:",
     "ai": "catalog:",
     "jsonpath-plus": "catalog:",
-    "langwatch": "workspace:*",
+    "langwatch": "catalog:",
     "pino": "catalog:",
     "undici": "catalog:",
     "zod": "catalog:"

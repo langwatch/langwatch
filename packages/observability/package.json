@@ -81,7 +81,7 @@
     "@opentelemetry/sdk-metrics": "catalog:",
     "@opentelemetry/sdk-trace-base": "catalog:",
     "@pyroscope/nodejs": "0.6.2",
-    "langwatch": "workspace:*",
+    "langwatch": "catalog:",
     "pino": "catalog:",
     "pino-opentelemetry-transport": "catalog:",
     "pino-pretty": "catalog:",

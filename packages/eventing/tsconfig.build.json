@@ -29,9 +29,6 @@
   ],
   "references": [
     {
-      "path": "../../sdks/typescript"
-    },
-    {
       "path": "../time/tsconfig.build.json"
     },
     {
@@ -50,10 +47,10 @@
       "path": "../group-queue/tsconfig.build.json"
     },
     {
-      "path": "../authorization/tsconfig.build.json"
+      "path": "../clickhouse-client/tsconfig.build.json"
     },
     {
-      "path": "../clickhouse-client/tsconfig.build.json"
+      "path": "../authorization/tsconfig.build.json"
     }
   ],
   // Dependencies the build does not import get no reference; tsconfig.test.json holds test-only ones (tsconfig-shape-codemod).

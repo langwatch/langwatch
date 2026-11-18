@@ -43,7 +43,8 @@ catalog:
   '@modelcontextprotocol/sdk': 1.32.0
   '@monaco-editor/react': ^4.7.0
   '@noble/hashes': ^2.4.0
-  '@opentelemetry/api': ^1.9.1
+  # OpenTelemetry JS 2.x peers api <1.10, so the platform stays on api 1.9.x.
+  '@opentelemetry/api': ~1.9.1
   '@opentelemetry/api-logs': 0.221.0
   '@opentelemetry/context-async-hooks': 2.10.0
   '@opentelemetry/core': 2.10.0
@@ -124,6 +125,8 @@ catalog:
   jsonpath-plus: ^10.4.0
   jsonwebtoken: ^9.0.2
   knip: ^6.35.1
+  # The platform is on OpenTelemetry JS 2.x; langwatch 3.x needs 3.x, so the platform stays on 2.x.
+  langwatch: 2.2.0
   libphonenumber-js: ^1.13.7
   lighthouse: 13.5.0
   lightningcss: 1.33.0
@@ -284,7 +287,8 @@ overrides:
   '@langchain/community>fast-xml-parser': ^5.7.0
   '@langchain/core@<0.3.80': '>=0.3.80'
   '@langwatch/scenario': file:./vendor/langwatch-scenario-1.7.0-dev.voice10.tgz
-  '@langwatch/scenario@1.7.0-dev.voice10>langwatch': workspace:*
+  '@langwatch/scenario@1.7.0-dev.voice10>langwatch': 2.2.0
+  '@langwatch/scenario@1.7.0-dev.voice10>@opentelemetry/api': ~1.9.1
   '@modelcontextprotocol/client@>=2.0.0 <2.2.0': '>=2.2.0 <3'
   '@modelcontextprotocol/sdk>@hono/node-server': '>=2.0.10'
   '@modelcontextprotocol/sdk@>=1.10.0 <1.32.0': '>=1.32.0 <2'

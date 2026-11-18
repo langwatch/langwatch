@@ -83,7 +83,7 @@
     "ai": "catalog:",
     "hono": "catalog:",
     "hono-openapi": "catalog:",
-    "langwatch": "workspace:*",
+    "langwatch": "catalog:",
     "papaparse": "catalog:",
     "tiktoken": "^1.0.22",
     "ts-pattern": "catalog:",
