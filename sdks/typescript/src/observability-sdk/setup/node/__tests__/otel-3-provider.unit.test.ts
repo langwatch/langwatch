@@ -13,6 +13,7 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { type Logger } from "../../../../logger";
 import { resetObservabilitySdkConfig } from "../../../config";
+import { getLangWatchTracer } from "../../../tracer";
 import { getConcreteProvider, listProcessorRegistryCandidates } from "../../utils";
 import { setupObservability } from "../setup";
 import { type ObservabilityHandle, type SetupObservabilityOptions } from "../types";
@@ -163,6 +164,34 @@ describe("given a Node process LangWatch sets up on its own", () => {
       expect(exporter.getFinishedSpans().map((span) => span.name)).toEqual([
         "through-the-global-provider",
       ]);
+    });
+  });
+});
+
+describe("given the default setup's context manager", () => {
+  describe("when a child span starts after an await inside an active parent span", () => {
+    /** @scenario "A child span started after an await keeps its parent" */
+    it("parents the child on the active span", async () => {
+      const exporter = new InMemorySpanExporter();
+      start(
+        { langwatch: "disabled", spanProcessors: [new SimpleSpanProcessor({ exporter })] },
+        createRecordingLogger(),
+      );
+      const tracer = getLangWatchTracer("otel-3");
+
+      await tracer.withActiveSpan("parent", async () => {
+        await new Promise((done) => setTimeout(done, 1));
+        await tracer.withActiveSpan("child", async () => {
+          await Promise.resolve();
+        });
+      });
+
+      await (getConcreteProvider(trace.getTracerProvider()) as TracerProvider).forceFlush();
+
+      const byName = new Map(exporter.getFinishedSpans().map((span) => [span.name, span]));
+      const parentSpanId = byName.get("parent")?.spanContext().spanId;
+      expect(parentSpanId).toBeDefined();
+      expect(byName.get("child")?.parentSpanContext?.spanId).toBe(parentSpanId);
     });
   });
 });

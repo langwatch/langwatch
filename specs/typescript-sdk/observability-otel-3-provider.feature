@@ -56,3 +56,9 @@ Feature: Joining an OpenTelemetry JS 3.x tracer provider
     And a provider registered later through the other module build of @opentelemetry/api
     When the tracer starts spans
     Then the registered provider records them
+
+  @unit
+  Scenario: A child span started after an await keeps its parent
+    Given LangWatch sets up observability on its own, with its default context manager
+    When a child span starts after an await inside an active parent span
+    Then the child's parent span id is the parent's span id
