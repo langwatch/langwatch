@@ -3,6 +3,7 @@ import { fenceFor } from "@langwatch/clickhouse-client";
 import { planSchema } from "@langwatch/entitlement-contract";
 import type { PlanType } from "@langwatch/plans";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import type * as Time from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
 import {
@@ -14,6 +15,13 @@ import { MemoryNullTraceBraidReadsRepository } from "../../features/braid/reposi
 import { readsBraidedSpans } from "../../features/braid/rules/braided-span-owner.rules.ts";
 import type { TraceAppDependencies } from "../trace.app.ts";
 import { createTraceAppHarness } from "./support/trace-app.harness.ts";
+
+// The pause cache reads `nowInstant()`, which a native Temporal keeps off the fake `Date`:
+// pin it to `Date.now()` so `vi.setSystemTime` moves the proof and the cache together.
+vi.mock("@langwatch/time", async (importOriginal) => {
+  const time = await importOriginal<typeof Time>();
+  return { ...time, nowInstant: () => time.Temporal.Instant.fromEpochMilliseconds(Date.now()) };
+});
 
 const READER = "proj_orchestrator";
 const OWNER = "proj_specialists";

@@ -9,17 +9,17 @@ import { Banner, BannerAction } from "@langwatch/design-system/banner";
 
 export function BraidsPlanPausedBanner({
   kept,
-  single,
+  isSingleBraid,
   turnedOn,
 }: {
   /** The subject of the sentence, such as "Your 2 braids are". */
   kept: string;
   /** The subject is one braid, so the verb agrees with it. */
-  single: boolean;
+  isSingleBraid: boolean;
   /** The organisation's Braids setting: undefined while it is unread. */
   turnedOn: boolean | undefined;
 }) {
-  const starts = single ? "starts" : "start";
+  const starts = isSingleBraid ? "starts" : "start";
   let resume = `${starts} working again when you upgrade.`;
   if (turnedOn === false) {
     resume = `${starts} working again once you upgrade and an organisation admin turns Braids on.`;

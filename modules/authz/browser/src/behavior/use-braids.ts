@@ -112,6 +112,21 @@ export function useSetBraidsEnabled({ organizationId }: { organizationId: string
   };
 }
 
+/**
+ * Both organisation settings for the organisation screen. Each save answers with the whole policy
+ * and writes it to the cache, so a late answer could undo the other switch's newer value: while
+ * either save is pending, `isSaving` holds both switches.
+ */
+export function useSetBraidsSettings({ organizationId }: { organizationId: string }) {
+  const keepToAdmins = useSetBraidsPolicy({ organizationId });
+  const enable = useSetBraidsEnabled({ organizationId });
+  return {
+    isSaving: keepToAdmins.isSaving || enable.isSaving,
+    setKeptToAdmins: keepToAdmins.set,
+    setEnabled: enable.set,
+  };
+}
+
 /** Each braid's spans over the last 24 hours, by braid id; undefined until it answers. */
 export function useBraidActivity({
   projectId,

@@ -67,6 +67,8 @@ beforeEach(() => {
   state.braidsEnabled = true;
   state.policyFails = false;
   state.policyLoading = false;
+  state.policyRefreshFails = false;
+  state.pendingSave = undefined;
   state.remove.mockClear();
 });
 

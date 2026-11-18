@@ -174,16 +174,25 @@ export function braidsPauses({
   };
 }
 
-/** What the not-enabled notice names as pausing the braids; the setting before the plan. */
-export function braidsPausedBy({
+/** What the not-enabled notice says of existing braids: applying, paused by whom, or unknown. */
+export type BraidsStatus = "applying" | "organization" | "plan" | "unknown";
+
+/**
+ * The setting before the plan. The plan pauses whatever the setting says, so only an unread
+ * setting with no plan pause leaves the status unknown: never "applying" on a guess.
+ */
+export function braidsStatus({
   byPlan,
   byOrganization,
+  settingRead,
 }: {
   byPlan: boolean;
   byOrganization: boolean;
-}): "organization" | "plan" | undefined {
+  settingRead: boolean;
+}): BraidsStatus {
   if (byOrganization) return "organization";
-  return byPlan ? "plan" : undefined;
+  if (byPlan) return "plan";
+  return settingRead ? "applying" : "unknown";
 }
 
 export type BraidAffordances = {

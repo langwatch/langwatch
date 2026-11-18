@@ -42,6 +42,8 @@ beforeEach(() => {
   braidsFake.state.braidsEnabled = true;
   braidsFake.state.policyFails = false;
   braidsFake.state.policyLoading = false;
+  braidsFake.state.policyRefreshFails = false;
+  braidsFake.state.pendingSave = undefined;
   braidsFake.state.saveError = undefined;
   braidsFake.state.policyRefetch.mockClear();
   braidsFake.state.setPolicy.mockClear();
@@ -67,6 +69,19 @@ describe("OrganizationBraidsScreen", () => {
         braidsOrganizationAdminsOnly: true,
       });
       expect(host.successes[0]?.title).toBe("Braids are kept to organisation admins");
+    });
+
+    it.each([
+      { saving: "who may braid", pendingSave: "policy" as const },
+      { saving: "Enable Braids", pendingSave: "enabled" as const },
+    ])("holds both switches while the $saving save is pending", ({ pendingSave }) => {
+      braidsFake.state.pendingSave = pendingSave;
+      renderAs();
+
+      expect(screen.getByRole("checkbox", { name: "Enable Braids" })).toBeDisabled();
+      expect(
+        screen.getByRole("checkbox", { name: "Keep braids to organisation admins" }),
+      ).toBeDisabled();
     });
 
     /** @scenario An organisation admin chooses who may braid */
@@ -131,6 +146,20 @@ describe("OrganizationBraidsScreen", () => {
       const row = screen.getByTestId("braids-enabled-row");
       expect(row).toHaveTextContent(/Couldn't read whether Braids is on/);
       expect(screen.queryByRole("checkbox", { name: "Enable Braids" })).toBeNull();
+      await userEvent.setup().click(within(row).getByRole("button", { name: "Retry" }));
+      expect(braidsFake.state.policyRefetch).toHaveBeenCalledOnce();
+    });
+
+    it("keeps the setting as last read, held, with Retry when a refresh fails", async () => {
+      braidsFake.state.braidsEnabled = true;
+      braidsFake.state.policyRefreshFails = true;
+      renderAs();
+
+      const row = screen.getByTestId("braids-enabled-row");
+      expect(row).toHaveTextContent(/Couldn't refresh whether Braids is on/);
+      const toggle = within(row).getByRole("checkbox", { name: "Enable Braids" });
+      expect(toggle).toBeChecked();
+      expect(toggle).toBeDisabled();
       await userEvent.setup().click(within(row).getByRole("button", { name: "Retry" }));
       expect(braidsFake.state.policyRefetch).toHaveBeenCalledOnce();
     });
@@ -213,7 +242,14 @@ describe("OrganizationBraidsScreen", () => {
       braidsFake.state.saveError = new Error("network down");
       const { unmount, host } = renderAs({ braidsReleased: false });
       await userEvent.setup().click(screen.getByRole("checkbox", { name: "Enable Braids" }));
+      expect(braidsFake.state.setEnabled).toHaveBeenCalledWith({
+        organizationId: "org-1",
+        braidsEnabled: false,
+      });
       expect(host.successes).toHaveLength(0);
+      expect(host.failures).toEqual([
+        { error: braidsFake.state.saveError, fallbackTitle: "Couldn't turn Braids on or off" },
+      ]);
 
       unmount();
       renderAs({ braidsReleased: false });
@@ -237,6 +273,16 @@ describe("OrganizationBraidsScreen", () => {
       expect(screen.queryByRole("checkbox", { name: "Enable Braids" })).toBeNull();
       await userEvent.setup().click(within(row).getByRole("button", { name: "Retry" }));
       expect(braidsFake.state.policyRefetch).toHaveBeenCalledOnce();
+    });
+
+    it("says neither that braids apply nor that they are paused while the setting is unread", () => {
+      braidsFake.state.policyFails = true;
+      renderAs({ braidsReleased: false });
+
+      const banner = screen.getByTestId("braids-not-enabled");
+      expect(banner).toHaveTextContent(/Couldn't read whether your organisation has Braids on/);
+      expect(banner).not.toHaveTextContent(/still apply/);
+      expect(banner).toHaveTextContent(/remove them from each project's Braids page/);
     });
 
     describe.each([

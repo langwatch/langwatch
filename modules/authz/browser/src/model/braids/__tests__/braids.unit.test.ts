@@ -7,10 +7,10 @@ import {
   braidAuditHref,
   braidRowActionsLabel,
   braidProject,
-  braidsPausedBy,
   braidsPauses,
   braidsPlanState,
   braidsSigningKeysHref,
+  braidsStatus,
   braidsSectionOf,
   organizationBraidRows,
   projectBraidRows,
@@ -72,7 +72,9 @@ describe("plan state", () => {
         byOrganization: false,
       });
     }
-    expect(braidsPausedBy({ byPlan: true, byOrganization: false })).toBe("plan");
+    for (const settingRead of [false, true]) {
+      expect(braidsStatus({ byPlan: true, byOrganization: false, settingRead })).toBe("plan");
+    }
   });
 
   it("pauses an Enterprise organisation's braids only when its setting is off", () => {
@@ -80,8 +82,18 @@ describe("plan state", () => {
       byPlan: false,
       byOrganization: true,
     });
-    expect(braidsPausedBy({ byPlan: false, byOrganization: true })).toBe("organization");
-    expect(braidsPausedBy({ byPlan: false, byOrganization: false })).toBeUndefined();
+    expect(braidsStatus({ byPlan: false, byOrganization: true, settingRead: true })).toBe(
+      "organization",
+    );
+    expect(braidsStatus({ byPlan: false, byOrganization: false, settingRead: true })).toBe(
+      "applying",
+    );
+  });
+
+  it("never says braids apply while the setting is unread and the plan pauses nothing", () => {
+    expect(braidsStatus({ byPlan: false, byOrganization: false, settingRead: false })).toBe(
+      "unknown",
+    );
   });
 });
 

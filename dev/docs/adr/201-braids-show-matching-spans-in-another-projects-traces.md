@@ -412,8 +412,8 @@ a new read that skips the plan check shows none.
 and both Braids pages still open as a read-only list under a notice that Braids is not enabled
 (decided by Alex, 2026-11-18): the project page with Remove, the organisation page with "View in audit
 log" and a notice sending admins to the project page to remove one. Creating, changing, the preview, the "who may braid" setting and
-signing-key management refuse `braids_not_enabled`; listing and removing do not, so an admin can find
-and end a braid. An organisation admin can still turn the organisation's Braids setting off:
+issuing or rotating a signing key refuse `braids_not_enabled`; listing and removing braids do not, so an
+admin can find and end a braid. Listing and revoking signing keys work whatever either switch says. An organisation admin can still turn the organisation's Braids setting off:
 `setBraidsEnabled` asks the flag only to turn it on, so existing braids can be paused without
 waiting for the flag. The settings menu shows Braids with the flag off only once braids exist.
 
@@ -424,7 +424,8 @@ behaviour as above. Each organisation also holds "Braids enabled", `braidsEnable
 organisation starts off. Changing it is `setBraidsEnabled`: `organization:manage`, Enterprise, audited
 as `authz.organization_policy.braids_enabled_changed`, and it bumps the epoch. While it is off,
 creating and changing braids, the dialog's reads and issuing or rotating signing keys refuse
-`braids_turned_off` (with `release_braids` also off, `braids_not_enabled` answers first); listing, removing, revoking and reading the settings do not. Off also **pauses**
+`braids_turned_off` (with `release_braids` also off, `braids_not_enabled` answers first); listing and
+removing braids, listing and revoking signing keys, and reading the settings do not. Off also **pauses**
 braids the way leaving Enterprise does: the trace module's pause service asks the plan and then
 `AuthzApi.getOrganizationPolicy`, cached per organisation for no longer than the asking proof, so the
 spans stop showing within the proof bound and come back when it is turned on.

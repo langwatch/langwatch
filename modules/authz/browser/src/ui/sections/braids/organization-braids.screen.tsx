@@ -17,15 +17,14 @@ import {
   useBraidsPolicy,
   useBraidsReleased,
   useOrganizationBraids,
-  useSetBraidsEnabled,
-  useSetBraidsPolicy,
+  useSetBraidsSettings,
 } from "../../../behavior/use-braids.ts";
 import { useAuthzHost } from "../../../model/authz-host.ts";
 import {
   BRAIDS_GUIDE_HREF,
-  braidsPausedBy,
   braidsPauses,
   braidsPlanState,
+  braidsStatus,
   organizationBraidRows,
 } from "../../../model/braids/braids.ts";
 import { OrganizationBraidsTable } from "../../blocks/braids/organization-braids-table.tsx";
@@ -41,23 +40,33 @@ const ENABLE_BRAIDS = "Enable Braids";
 
 /** The organisation's own switch for Braids (Alex, 2026-11-18): off by default, off pauses. */
 function EnableBraids({
-  organizationId,
   isEnterprise,
   enabled,
   isReading,
   unread,
+  stale,
+  isSaving,
+  onChange,
   onRetry,
 }: {
-  organizationId: string;
   isEnterprise: boolean;
   enabled: boolean;
   isReading: boolean;
-  /** The setting couldn't be read: no switch, so no guess, and Retry asks again. */
+  /** The setting has never been read: no switch, so no guess, and Retry asks again. */
   unread: boolean;
+  /** A refresh failed over a value read before: that value shows, held, beside Retry. */
+  stale: boolean;
+  /** Either organisation setting is saving, so neither switch can race the other. */
+  isSaving: boolean;
+  onChange: (braidsEnabled: boolean) => void;
   onRetry: () => void;
 }) {
-  const setting = useSetBraidsEnabled({ organizationId });
   const unknown = isEnterprise && unread;
+  const retry = (
+    <Button size="xs" variant="outline" onClick={onRetry} data-testid="braids-enabled-retry">
+      Retry
+    </Button>
+  );
   let hint = "Braids is included in Enterprise.";
   let control = (
     <Button asChild colorPalette="orange" size="xs">
@@ -66,10 +75,19 @@ function EnableBraids({
   );
   if (unknown) {
     hint = "Couldn't read whether Braids is on for this organisation.";
+    control = retry;
+  } else if (isEnterprise && stale) {
+    hint = "Couldn't refresh whether Braids is on, so this is the setting as last read.";
     control = (
-      <Button size="xs" variant="outline" onClick={onRetry} data-testid="braids-enabled-retry">
-        Retry
-      </Button>
+      <Stack direction="row" gap={2} align="center">
+        {retry}
+        <Switch
+          checked={enabled}
+          disabled
+          inputProps={{ "aria-label": ENABLE_BRAIDS }}
+          data-testid="braids-enabled-switch"
+        />
+      </Stack>
     );
   } else if (isEnterprise) {
     hint =
@@ -85,8 +103,8 @@ function EnableBraids({
     ) : (
       <Switch
         checked={enabled}
-        disabled={setting.isSaving}
-        onCheckedChange={({ checked }) => setting.set(checked)}
+        disabled={isSaving}
+        onCheckedChange={({ checked }) => onChange(checked)}
         inputProps={{ "aria-label": ENABLE_BRAIDS }}
         data-testid="braids-enabled-switch"
       />
@@ -125,17 +143,19 @@ function OrganizationBraidsHeader({ locked = false }: { locked?: boolean }) {
 }
 
 function WhoMayBraid({
-  organizationId,
   isEnterprise,
   keptToAdmins,
   isReading,
+  isSaving,
+  onChange,
 }: {
-  organizationId: string;
   isEnterprise: boolean;
   keptToAdmins: boolean;
   isReading: boolean;
+  /** Either organisation setting is saving, so neither switch can race the other. */
+  isSaving: boolean;
+  onChange: (keptToAdmins: boolean) => void;
 }) {
-  const setting = useSetBraidsPolicy({ organizationId });
   return (
     <SettingsSection
       title="Who may braid"
@@ -154,8 +174,8 @@ function WhoMayBraid({
         {isEnterprise ? (
           <Switch
             checked={keptToAdmins}
-            disabled={isReading || setting.isSaving}
-            onCheckedChange={({ checked }) => setting.set(checked)}
+            disabled={isReading || isSaving}
+            onCheckedChange={({ checked }) => onChange(checked)}
             inputProps={{ "aria-label": KEEP_TO_ADMINS }}
             data-testid="braids-policy-switch"
           />
@@ -200,6 +220,7 @@ export default function OrganizationBraidsScreen() {
   const released = releasedFlag === true;
   const braids = useOrganizationBraids({ organizationId });
   const policy = useBraidsPolicy({ organizationId });
+  const saves = useSetBraidsSettings({ organizationId: organizationId ?? "" });
 
   if (!organizationId || isPlanLoading || releasedFlag === undefined || braids.isLoading) {
     return (
@@ -222,8 +243,10 @@ export default function OrganizationBraidsScreen() {
     planState: braidsPlanState({ isEnterprise, braidCount: rows.length }),
     turnedOff: policy.data?.braidsEnabled === false,
   });
-  // Unreleased, the row shows only to turn Braids off, or to say the setting couldn't be read.
+  // Unread means never read: a failed refresh keeps the value already held.
   const unread = policy.isError && !policy.data;
+  const stale = policy.isError && !!policy.data;
+  // Unreleased, the row shows only to turn Braids off, or to say the setting couldn't be read.
   const showsSwitchRow = released || policy.data?.braidsEnabled === true || unread;
 
   return (
@@ -234,7 +257,11 @@ export default function OrganizationBraidsScreen() {
           <Box paddingBottom={4}>
             <BraidsNotEnabledBanner
               removeHere={false}
-              pausedBy={braidsPausedBy({ byOrganization: turnedOff, byPlan: paused })}
+              status={braidsStatus({
+                byOrganization: turnedOff,
+                byPlan: paused,
+                settingRead: policy.data !== undefined,
+              })}
             />
           </Box>
         )}
@@ -242,27 +269,30 @@ export default function OrganizationBraidsScreen() {
           <Box paddingBottom={4}>
             <BraidsPlanPausedBanner
               kept="They are"
-              single={false}
+              isSingleBraid={false}
               turnedOn={policy.data?.braidsEnabled}
             />
           </Box>
         ) : null}
         {showsSwitchRow ? (
           <EnableBraids
-            organizationId={organizationId}
             isEnterprise={isEnterprise}
             enabled={policy.data?.braidsEnabled ?? false}
             isReading={policy.isLoading}
-            unread={policy.isError}
+            unread={unread}
+            stale={stale}
+            isSaving={saves.isSaving}
+            onChange={saves.setEnabled}
             onRetry={() => void policy.refetch()}
           />
         ) : null}
         {released ? (
           <WhoMayBraid
-            organizationId={organizationId}
             isEnterprise={isEnterprise}
             keptToAdmins={policy.data?.braidsOrganizationAdminsOnly ?? false}
             isReading={policy.isLoading}
+            isSaving={saves.isSaving}
+            onChange={saves.setKeptToAdmins}
           />
         ) : null}
         <SettingsSection

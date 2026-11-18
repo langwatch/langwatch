@@ -28,9 +28,9 @@ import {
   type BraidsPlanState,
   type BraidsSection,
   braidAffordances,
-  braidsPausedBy,
   braidsPauses,
   braidsPlanState,
+  braidsStatus,
   braidsSectionOf,
   ORGANIZATION_BRAIDS_HREF,
   projectBraidRows,
@@ -237,7 +237,11 @@ function BraidsNotices({
       {released ? null : (
         <BraidsNotEnabledBanner
           removeHere
-          pausedBy={braidsPausedBy({ byOrganization: turnedOff, byPlan: paused })}
+          status={braidsStatus({
+            byOrganization: turnedOff,
+            byPlan: paused,
+            settingRead: turnedOn !== undefined,
+          })}
         />
       )}
       {released && turnedOff ? (
@@ -246,7 +250,7 @@ function BraidsNotices({
       {paused ? (
         <BraidsPlanPausedBanner
           kept={total === 1 ? "Your braid is" : `Your ${total} braids are`}
-          single={total === 1}
+          isSingleBraid={total === 1}
           turnedOn={turnedOn}
         />
       ) : null}
