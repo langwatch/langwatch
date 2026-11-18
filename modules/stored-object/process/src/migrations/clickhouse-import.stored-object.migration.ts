@@ -24,6 +24,9 @@ import type {
 } from "../repositories/stored-object-record.repository.ts";
 import { legacyStorageAddressOf } from "../rules/legacy-storage-address.rules.ts";
 
+// IRREVERSIBLE: no down step. The import only copies: ClickHouse keeps every legacy row and
+// legacy reads keep working, while a copied row may since be confirmed, moved or deleted, so
+// removing it would lose writes made after the import.
 type ClickHouseImportStoredObjectMigrationOptions = Readonly<{
   legacy: StoredObjectLegacySourceRepository;
   records: StoredObjectRecordRepository;
@@ -145,11 +148,8 @@ export class ClickHouseImportStoredObjectMigration {
       now,
       address,
     });
-    if (!current) {
-      await this.options.records.upsert(imported);
-      return "imported";
-    }
-    // A row a delete or another import moved since the read is left as that writer left it.
+    // A row a delete or another import wrote since the read is left as that writer left it.
+    if (!current) return (await this.options.records.insert(imported)) ? "imported" : "unchanged";
     const moved = await this.options.records.transition({ expected: current, next: imported });
     if (!moved) return "unchanged";
     return "imported";

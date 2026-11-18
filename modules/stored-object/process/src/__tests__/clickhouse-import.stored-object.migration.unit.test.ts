@@ -7,7 +7,10 @@ import {
   type LegacyStoredObjectRow,
   StoredObjectLegacySourceRepository,
 } from "../repositories/stored-object-legacy-source.repository.ts";
-import type { StoredObjectRecordRepository } from "../repositories/stored-object-record.repository.ts";
+import type {
+  StoredObjectRecord,
+  StoredObjectRecordRepository,
+} from "../repositories/stored-object-record.repository.ts";
 
 class OneLegacyObject extends StoredObjectLegacySourceRepository {
   sizeBytes = 3;
@@ -43,16 +46,62 @@ class OneLegacyObject extends StoredObjectLegacySourceRepository {
 function deleteLandsAfterRead(
   records: MemoryStoredObjectRecordRepository,
 ): StoredObjectRecordRepository {
+  return racingAfterRead({
+    records,
+    race: async (read) => {
+      if (read?.status !== "available") return;
+      const deleted = { ...read, status: "deleted" as const, generation: read.generation + 1 };
+      await records.transition({ expected: read, next: deleted });
+    },
+  });
+}
+
+/**
+ * The memory twin, with another run of the import creating the row between this run's read and
+ * its write, and a delete then removing it, as when a stalled run outlives its lease.
+ */
+function anotherRunCreatesAfterRead({
+  records,
+  legacy,
+}: {
+  records: MemoryStoredObjectRecordRepository;
+  legacy: StoredObjectLegacySourceRepository;
+}): StoredObjectRecordRepository {
+  return racingAfterRead({
+    records,
+    race: async (read) => {
+      if (read !== null) return;
+      await ClickHouseImportStoredObjectMigration.create({ legacy, records })
+        .step()
+        .migrateTenant({ tenantId: "project_1" });
+      const created = await records.findById({ tenantId: "project_1", id: "so_legacy" });
+      if (!created) throw new Error("the other run created nothing");
+      const deleted = {
+        ...created,
+        status: "deleted" as const,
+        generation: created.generation + 1,
+      };
+      await records.transition({ expected: created, next: deleted });
+    },
+  });
+}
+
+/** The memory twin, running `race` after each read and before handing the read back. */
+function racingAfterRead({
+  records,
+  race,
+}: {
+  records: MemoryStoredObjectRecordRepository;
+  race: (read: StoredObjectRecord | null) => Promise<void>;
+}): StoredObjectRecordRepository {
   return {
     findById: async (input) => {
       const read = await records.findById(input);
-      if (read?.status === "available") {
-        const deleted = { ...read, status: "deleted" as const, generation: read.generation + 1 };
-        await records.transition({ expected: read, next: deleted });
-      }
+      await race(read);
       return read;
     },
     upsert: (value) => records.upsert(value),
+    insert: (value) => records.insert(value),
     transition: (input) => records.transition(input),
     countActive: (input) => records.countActive(input),
     findPage: (input) => records.findPage(input),
@@ -145,6 +194,8 @@ describe("ClickHouseImportStoredObjectMigration.step", () => {
     const step = ClickHouseImportStoredObjectMigration.create({ legacy, records }).step();
     await step.migrateTenant({ tenantId: "project_1" });
     const first = await records.findById({ tenantId: "project_1", id: "so_legacy" });
+    if (!first) throw new Error("the first pass imported nothing");
+    expect(first.byteLength).toBe(3);
 
     legacy.sizeBytes = 4;
 
@@ -154,7 +205,27 @@ describe("ClickHouseImportStoredObjectMigration.step", () => {
     });
     await expect(
       records.findById({ tenantId: "project_1", id: "so_legacy" }),
-    ).resolves.toMatchObject({ byteLength: 4, generation: (first?.generation ?? 0) + 1 });
+    ).resolves.toMatchObject({ byteLength: 4, generation: first.generation + 1 });
+  });
+
+  describe("when another run creates the row between this run's read and its write", () => {
+    /** @scenario "A Stored Objects import never writes over a row another run created" */
+    it("reports the row unchanged and leaves it as the other run and a delete left it", async () => {
+      const legacy = new OneLegacyObject();
+      const records = MemoryStoredObjectRecordRepository.create();
+      const step = ClickHouseImportStoredObjectMigration.create({
+        legacy,
+        records: anotherRunCreatesAfterRead({ records, legacy }),
+      }).step();
+
+      await expect(step.migrateTenant({ tenantId: "project_1" })).resolves.toMatchObject({
+        status: "finalized",
+        report: { imported: 0, unchanged: 1 },
+      });
+      await expect(
+        records.findById({ tenantId: "project_1", id: "so_legacy" }),
+      ).resolves.toMatchObject({ status: "deleted" });
+    });
   });
 
   /** @scenario "A Stored Objects import leaves a row another writer moved" */

@@ -52,8 +52,8 @@ function throughLangWatch(): StoredObjectBytesRepository {
 
 /**
  * A member under a given upload setting that answers only what a checkup may ask: the probe's
- * write and remove, the upload route, and signing. Each signed key is recorded; the route is
- * held for the checked project only, so a lookup for any other project fails the test.
+ * write and remove, the upload route, and signing. Each signed key is recorded; route and
+ * signing answer for the checked project only, so a call for any other project fails the test.
  */
 function memberUnder(route: "direct" | "through-process", { refusal }: { refusal?: Error } = {}) {
   const signed: string[] = [];
@@ -67,6 +67,7 @@ function memberUnder(route: "direct" | "through-process", { refusal }: { refusal
         return route;
       },
       signUpload: async (at) => {
+        if (at.projectId !== PROJECT_ID) throw new Error(`Signed for ${at.projectId}.`);
         signed.push(at.key);
         if (refusal) throw refusal;
         return { kind: "direct", url: `https://bucket.example/${at.key}`, headers: {} };
