@@ -5,20 +5,19 @@
  */
 
 import { trace } from "@opentelemetry/api";
-import { SimpleSpanProcessor, ConsoleSpanExporter } from "@opentelemetry/sdk-trace-base";
-import { NodeTracerProvider } from "@opentelemetry/sdk-trace-node";
+import { ConsoleSpanExporter, SimpleSpanProcessor, TracerProvider } from "@opentelemetry/sdk-trace";
 
 // ── Step 1: Simulate another OTel SDK initializing first ────────────
-const externalProvider = new NodeTracerProvider({
-  spanProcessors: [new SimpleSpanProcessor(new ConsoleSpanExporter())],
+const externalProvider = new TracerProvider({
+  spanProcessors: [new SimpleSpanProcessor({ exporter: new ConsoleSpanExporter() })],
 });
-externalProvider.register();
+trace.setGlobalTracerProvider(externalProvider);
 console.log("[External SDK] Global TracerProvider registered.\n");
 
 // ── Step 2: Create a dedicated provider for LangWatch ───────────────
 import { setupObservability } from "langwatch/observability/node";
 
-const lwProvider = new NodeTracerProvider();
+const lwProvider = new TracerProvider();
 
 const { shutdown } = setupObservability({
   tracerProvider: lwProvider,
