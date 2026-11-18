@@ -1,0 +1,36 @@
+SDK versions: langwatch TS 2.2.0 (dist build of sdks/typescript, via langwatch/observability/node and /observability), OTel sdk-trace-node 2.10.0, exporter-trace-otlp-proto 0.221.0; Python langwatch 2.0.0 (editable); Go sdks/go 1.0.0 (otel v1.45.0)
+Model: tracer provider A -> P2 (ingest key), provider B + braid copy processor -> P1; signed case + tampered case (baggage overwritten to 'cli' after signing). Secrets truncated.
+
+Program: .claude/tmp/braids-qa/r3-py/run.py (uv venv, pip -e sdks/python)
+
+RUN 1: export failed on TLS trust in my harness (self-signed cert), not an SDK defect; keys revoked.
+
+RUN 2 (exporter certificate_file = stack's self-signed chain, fresh keys):
+api keys: P1 sk-lw-Jv… id=6weyCQA-78v-fnd0p72e6 ; P2 sk-lw-MG… id=EnfAzBqIiVCPQ0NPBX9Ui (create result keys: token,apiKey)
+signing key id=signingkey_000000DRbKcArWoAelq56aM6NOhj6 publicId=bMR6Ep7qsM0AUEVw secret=lwsk_bMR…
+== py exit=0
+stdout: {"signed": "0dacd13915a510de7424ced566e0291b", "tampered": "92f42f482770908a6b36863ff3cf6e0b"}
+
+stderr: 
+trace ids: {"py":{"signed":"0dacd13915a510de7424ced566e0291b","tampered":"92f42f482770908a6b36863ff3cf6e0b"}}
+CH rows (SpanName | TenantId | verified.orchestrator | hasSignature | orchestrator attr), poll took 0s
+
+py/signed trace 0dacd13915a510de7424ced566e0291b
+  r3 sdk py specialist signed | local_project_000000DRbAKDN1J2egqSbioXnKoUj | local_project_000000DRbAKDN1J2egqSbioXnKoUl | 1 | web
+  r3 sdk py orchestrator signed | local_project_000000DRbAKDN1J2egqSbioXnKoUl |  | 0
+  CH verdict: P1 span verified=true -> PASS
+  reader spanTree(P2) http=200 spans=["r3 sdk py orchestrator signed(owner )","r3 sdk py specialist signed(owner nKoUj)"]
+  reader sees P1 span=true -> PASS
+
+py/tampered trace 92f42f482770908a6b36863ff3cf6e0b
+  r3 sdk py specialist tampered | local_project_000000DRbAKDN1J2egqSbioXnKoUj |  | 1 | cli
+  r3 sdk py orchestrator tampered | local_project_000000DRbAKDN1J2egqSbioXnKoUl |  | 0
+  CH verdict: P1 span verified=false -> PASS
+  reader spanTree(P2) http=200 spans=["r3 sdk py orchestrator tampered(owner )"]
+  reader sees P1 span=false -> PASS
+CLEANUP
+signingKeys.revoke signingkey_000000DRbKcArWoAelq56aM6NOhj6 -> 200 {"result":{"data":{"id":"signingkey_000000DRbKcArWoAelq56aM6NOhj6","name":"r3 sdk signer","publicId":"bMR6Ep7qsM0AUEVw","projectId":"local_project_000
+apiKey.revoke 6weyCQA-78v-fnd0p72e6 -> 200 {"result":{"data":{"success":true}}}
+apiKey.revoke EnfAzBqIiVCPQ0NPBX9Ui -> 200 {"result":{"data":{"success":true}}}
+
+Verdict: PASS

@@ -1,0 +1,11 @@
+SDK versions: langwatch TS 2.2.0 (dist build of sdks/typescript, via langwatch/observability/node and /observability), OTel sdk-trace-node 2.10.0, exporter-trace-otlp-proto 0.221.0; Python langwatch 2.0.0 (editable); Go sdks/go 1.0.0 (otel v1.45.0)
+Model: tracer provider A -> P2 (ingest key), provider B + braid copy processor -> P1; signed case + tampered case (baggage overwritten to 'cli' after signing). Secrets truncated.
+
+Program: .claude/tmp/braids-qa/r3-ts/run.mjs
+== ts exit=0
+stdout: {"signed":"71445e8a85db1b9757c0234603d331a3","tampered":"fd93e36be15b511a2875f269c52e8a18"}
+
+stderr: (node:12847) Warning: Setting the NODE_TLS_REJECT_UNAUTHORIZED environment variable to '0' makes TLS connections and HTTPS requests insecure by disabling certificate verification.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+Verdict: PASS (see r3-3-04-verify.txt)

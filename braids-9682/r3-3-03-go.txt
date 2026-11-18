@@ -1,0 +1,9 @@
+SDK versions: langwatch TS 2.2.0 (dist build of sdks/typescript, via langwatch/observability/node and /observability), OTel sdk-trace-node 2.10.0, exporter-trace-otlp-proto 0.221.0; Python langwatch 2.0.0 (editable); Go sdks/go 1.0.0 (otel v1.45.0)
+Model: tracer provider A -> P2 (ingest key), provider B + braid copy processor -> P1; signed case + tampered case (baggage overwritten to 'cli' after signing). Secrets truncated.
+
+Program: .claude/tmp/braids-qa/r3-go/main.go (go.mod replace -> sdks/go, GOWORK=off)
+== go exit=0
+stdout: {"signed":"fd1d942078520ac3bbfd8007928af436","tampered":"5b9ca8dc646203dd6d831d89e8144bf9"}
+
+stderr: 
+Verdict: PASS (see r3-3-04-verify.txt)

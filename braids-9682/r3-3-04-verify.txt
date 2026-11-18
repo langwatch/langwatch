@@ -1,0 +1,58 @@
+Columns: SpanName | TenantId | langwatch.reserved.verified.orchestrator | has langwatch.signature | orchestrator attr
+RUN 1 (ts, go; its py leg is void: my harness did not trust the self-signed cert)
+ts/signed trace 71445e8a85db1b9757c0234603d331a3
+  r3 sdk ts specialist signed | local_project_000000DRbAKDN1J2egqSbioXnKoUj | local_project_000000DRbAKDN1J2egqSbioXnKoUl | 1 | web
+  r3 sdk ts orchestrator signed | local_project_000000DRbAKDN1J2egqSbioXnKoUl |  | 0
+  CH verdict: P1 span verified=true -> PASS
+  reader spanTree(P2) http=200 spans=["r3 sdk ts orchestrator signed(owner )","r3 sdk ts specialist signed(owner nKoUj)"]
+  reader sees P1 span=true -> PASS
+
+ts/tampered trace fd93e36be15b511a2875f269c52e8a18
+  r3 sdk ts specialist tampered | local_project_000000DRbAKDN1J2egqSbioXnKoUj |  | 1 | cli
+  r3 sdk ts orchestrator tampered | local_project_000000DRbAKDN1J2egqSbioXnKoUl |  | 0
+  CH verdict: P1 span verified=false -> PASS
+  reader spanTree(P2) http=200 spans=["r3 sdk ts orchestrator tampered(owner )"]
+  reader sees P1 span=false -> PASS
+
+go/signed trace fd1d942078520ac3bbfd8007928af436
+  r3 sdk go specialist signed | local_project_000000DRbAKDN1J2egqSbioXnKoUj | local_project_000000DRbAKDN1J2egqSbioXnKoUl | 1 | web
+  r3 sdk go orchestrator signed | local_project_000000DRbAKDN1J2egqSbioXnKoUl |  | 0
+  CH verdict: P1 span verified=true -> PASS
+  reader spanTree(P2) http=200 spans=["r3 sdk go orchestrator signed(owner )","r3 sdk go specialist signed(owner nKoUj)"]
+  reader sees P1 span=true -> PASS
+
+go/tampered trace 5b9ca8dc646203dd6d831d89e8144bf9
+  r3 sdk go orchestrator tampered | local_project_000000DRbAKDN1J2egqSbioXnKoUl |  | 0 | 
+  r3 sdk go specialist tampered | local_project_000000DRbAKDN1J2egqSbioXnKoUj |  | 1 | cli
+  CH verdict: P1 span verified=false -> PASS
+  reader spanTree(P2) http=200 spans=["r3 sdk go orchestrator tampered(owner )"]
+  reader sees P1 span=false -> PASS
+
+RUN 2 (py only, fresh keys)
+py/signed trace 0dacd13915a510de7424ced566e0291b
+  r3 sdk py specialist signed | local_project_000000DRbAKDN1J2egqSbioXnKoUj | local_project_000000DRbAKDN1J2egqSbioXnKoUl | 1 | web
+  r3 sdk py orchestrator signed | local_project_000000DRbAKDN1J2egqSbioXnKoUl |  | 0
+  CH verdict: P1 span verified=true -> PASS
+  reader spanTree(P2) http=200 spans=["r3 sdk py orchestrator signed(owner )","r3 sdk py specialist signed(owner nKoUj)"]
+  reader sees P1 span=true -> PASS
+
+py/tampered trace 92f42f482770908a6b36863ff3cf6e0b
+  r3 sdk py specialist tampered | local_project_000000DRbAKDN1J2egqSbioXnKoUj |  | 1 | cli
+  r3 sdk py orchestrator tampered | local_project_000000DRbAKDN1J2egqSbioXnKoUl |  | 0
+  CH verdict: P1 span verified=false -> PASS
+  reader spanTree(P2) http=200 spans=["r3 sdk py orchestrator tampered(owner )"]
+  reader sees P1 span=false -> PASS
+
+CLEANUP run 1
+CLEANUP
+signingKeys.revoke signingkey_000000DRbJwKxx1VqhwFd3Zq5lOfZ -> 200 {"result":{"data":{"id":"signingkey_000000DRbJwKxx1VqhwFd3Zq5lOfZ","name":"r3 sdk signer","publicId":"M
+apiKey.revoke OVDwW2oiMw4JO1I8gH_5K -> 200 {"result":{"data":{"success":true}}}
+apiKey.revoke sqCTjiKy_rzEaOApUE0VW -> 200 {"result":{"data":{"success":true}}}
+
+[exited with code 0]
+CLEANUP run 2
+CLEANUP
+signingKeys.revoke signingkey_000000DRbKcArWoAelq56aM6NOhj6 -> 200 {"result":{"data":{"id":"signingkey_000000DRbKcArWoAelq56aM6NOhj6","name":"r3 sdk signer","publicId":"b
+apiKey.revoke 6weyCQA-78v-fnd0p72e6 -> 200 {"result":{"data":{"success":true}}}
+apiKey.revoke EnfAzBqIiVCPQ0NPBX9Ui -> 200 {"result":{"data":{"success":true}}}
+Also revoked manually after an aborted run: signingkey_000000DRbKNtdyS9WXiLUSc6iw2Hr, apiKey n8gs9GVgnTT2YtSPrsmvw, uPvRGt_qEX4kWmlnj6UC8 (all 200).
