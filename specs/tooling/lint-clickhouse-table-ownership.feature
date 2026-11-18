@@ -100,6 +100,27 @@ Feature: The clickhouse-table-ownership lint rule
     Then the rule finishes and resolves the constant that is defined
 
   @unit
+  Scenario: A depth-cut constant set is not reused across a cycle it would close
+    Given a file reached at the import depth limit whose constants were kept from a first read
+    And a second read reaches it with a file it visited already on the import chain
+    When the clickhouse-table-ownership rule runs over the workspace
+    Then the second read cuts that cycle and does not resolve the constant through it
+
+  @unit
+  Scenario: A depth-cut constant set is refreshed once a file below it resolves in full
+    Given a file reached at the import depth limit whose constants were kept without a deeper file's constant
+    And a shallower read resolves that deeper file in full
+    When a later read reaches the kept file at the same depth
+    Then the later read resolves the deeper file's constant
+
+  @unit
+  Scenario: A depth-cut constant set is refreshed when a file below it resolves in full during the same read
+    Given a file whose first import reaches a deeper file at the import depth limit
+    And whose later import resolves that deeper file in full within the same read
+    When a later read reaches the first file at the same depth
+    Then the later read resolves the deeper file's constant
+
+  @unit
   Scenario: A table only a materialised view fills belongs to the module writing the view's source
     Given a materialised view copies a table the trace module writes into a second table
     And no module inserts into the second table

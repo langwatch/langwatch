@@ -35,6 +35,7 @@ describe("given a strict feature contract module", () => {
       ["agent.repository.ts", "`repositories/`"],
       ["agent.channel.ts", "`channels/`"],
       ["agent.subscriber.ts", "`eventing/`"],
+      ["agent.annotations.table.ts", "`.table` under `repositories/`"],
     ])("reports contractProcessArtifact for %s and names its process home", (name, home) => {
       const found = report(`modules/agent/contract/src/${name}`);
 

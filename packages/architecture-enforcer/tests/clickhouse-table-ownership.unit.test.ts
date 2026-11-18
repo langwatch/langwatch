@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   clickhouseTables,
   clickhouseViewFeeds,
+  collectAccess,
   collectClickhouseOwnershipFindings,
   lintClickhouseTableOwnershipAt,
 } from "../src/policies/persistence/clickhouse-table-ownership.ts";
@@ -49,7 +50,23 @@ function fixture() {
     messages: () =>
       collectClickhouseOwnershipFindings(root, CATALOGUE).map((finding) => finding.message),
     lint: () => lintClickhouseTableOwnershipAt({ root, catalogue: CATALOGUE }),
+    readers: () =>
+      collectAccess(root, CATALOGUE, clickhouseTables(root)).map((access) =>
+        access.file.slice(root.length + 1),
+      ),
   };
+}
+
+/** `lib/<from>.ts` re-exporting `T` from `lib/<to>.ts`, one file per link. */
+function chain(write: (file: string, content: string) => void, links: string[]): void {
+  for (const [index, from] of links.slice(0, -1).entries())
+    write(`lib/${from}.ts`, `export { T } from "./${links[index + 1]}.ts";\n`);
+}
+
+function importingReader(name: string, from: string): string {
+  return `import { ${name} } from "../../../../lib/${from}.ts";
+export const sql = \`SELECT TenantId FROM \${${name}}\`;
+`;
 }
 
 function writer(table: string): string {
@@ -233,6 +250,57 @@ export const sql = \`INSERT INTO \${B} (TenantId) VALUES (1)\`;
       );
 
       expect(workspace.messages()).toEqual([]);
+    });
+  });
+
+  describe("given constants reached at the import depth limit", () => {
+    const first = "modules/analytics/process/src/a-first.ts";
+    const second = "modules/analytics/process/src/b-second.ts";
+    const third = "modules/analytics/process/src/c-third.ts";
+
+    /** @scenario "A depth-cut constant set is not reused across a cycle it would close" */
+    it("cuts a cycle through a file a reused constant set already visited", () => {
+      const workspace = fixture();
+      chain(workspace.write, ["d1", "d2", "d3", "d4", "d5", "b", "a"]);
+      chain(workspace.write, ["m", "b"]);
+      workspace.write(
+        "lib/a.ts",
+        `export const T = "trace_summaries";\nexport { T as T2 } from "./m.ts";\n`,
+      );
+      workspace.write("lib/c3.ts", `export { T2 } from "./a.ts";\n`);
+      workspace.write("lib/c2.ts", `export { T2 } from "./c3.ts";\n`);
+      workspace.write("lib/c1.ts", `export { T2 } from "./c2.ts";\n`);
+      workspace.write(first, importingReader("T", "d1"));
+      workspace.write(second, importingReader("T2", "c1"));
+
+      expect(workspace.readers()).toEqual([first]);
+    });
+
+    /** @scenario "A depth-cut constant set is refreshed once a file below it resolves in full" */
+    it("re-reads a depth-cut file once a shallower read resolved it", () => {
+      const workspace = fixture();
+      chain(workspace.write, ["e1", "e2", "e3", "e4", "e5", "b", "q", "y"]);
+      workspace.write("lib/y.ts", `export const T = "trace_summaries";\n`);
+      workspace.write(first, importingReader("T", "e1"));
+      workspace.write(second, importingReader("T", "y"));
+      workspace.write(third, importingReader("T", "e1"));
+
+      expect(workspace.readers()).toEqual([second, third]);
+    });
+
+    /** @scenario "A depth-cut constant set is refreshed when a file below it resolves in full during the same read" */
+    it("re-reads a depth-cut file whose later import resolved the cut file in full", () => {
+      const workspace = fixture();
+      chain(workspace.write, ["e1", "e2", "e3", "e4", "e5", "b", "q", "y"]);
+      workspace.write(
+        "lib/e5.ts",
+        `export { T } from "./b.ts";\nimport { T as Direct } from "./y.ts";\n`,
+      );
+      workspace.write("lib/y.ts", `export const T = "trace_summaries";\n`);
+      workspace.write(first, importingReader("T", "e1"));
+      workspace.write(second, importingReader("T", "e1"));
+
+      expect(workspace.readers()).toEqual([second]);
     });
   });
 
