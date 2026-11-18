@@ -189,6 +189,7 @@ export class MemoryDatasetRecordRepository implements DatasetRecordRepository {
     projectId: string;
     recordIds: string[];
   }): Promise<number> {
+    this.#refuseObjectStorageDataset(input);
     return this.#database.removeRecords(input);
   }
 

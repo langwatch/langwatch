@@ -69,6 +69,9 @@ function contractCases(backend: Backend): void {
         }),
       ).rejects.toMatchObject(refused);
       await expect(
+        backend.records().deleteMany({ datasetId: dataset.id, projectId, recordIds: ["moved-1"] }),
+      ).rejects.toMatchObject(refused);
+      await expect(
         backend
           .records()
           .withDatasetLock({ datasetId: dataset.id, projectId }, (locked) =>

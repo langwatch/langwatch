@@ -79,6 +79,15 @@ describe("given a dataset whose rows are kept in object storage", () => {
   });
 
   /** @scenario "A records-table write for a dataset kept in object storage is refused" */
+  it("refuses to delete rows of it", async () => {
+    const datasetId = await datasetIn({ contentLayout: "s3_jsonl" });
+
+    await expect(
+      records.deleteMany({ datasetId, projectId: PROJECT, recordIds: ["r1"] }),
+    ).rejects.toMatchObject({ code: "dataset_records_table_write_refused" });
+  });
+
+  /** @scenario "A records-table write for a dataset kept in object storage is refused" */
   it("refuses a write made under the dataset's lock", async () => {
     const datasetId = await datasetIn({ contentLayout: "s3_jsonl" });
 

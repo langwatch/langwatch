@@ -204,6 +204,7 @@ SELECT pg_advisory_xact_lock(hashtextextended(${`dataset:${input.datasetId}`}, 0
     projectId: string;
     recordIds: string[];
   }): Promise<number> {
+    await refuseObjectStorageDataset(this.database, input);
     const result = await this.database.datasetRecord.deleteMany({
       where: {
         id: { in: input.recordIds },
