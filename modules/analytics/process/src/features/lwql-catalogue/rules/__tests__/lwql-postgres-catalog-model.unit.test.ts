@@ -2,6 +2,7 @@
 
 import { describe, expect, it } from "vitest";
 
+import type { LwqlCatalogue, LwqlColumnEntry } from "../../../../rules/lwql-catalogue.rules.ts";
 import {
   LWQL_PRISMA_MANIFEST,
   prismaManifestModel,
@@ -13,7 +14,10 @@ import {
   resolveTenantScope,
   sanitizeDescription,
 } from "../lwql-postgres-catalog-model.rules.ts";
-import { LWQL_POSTGRES_CATALOG } from "../lwql-postgres-view-catalog.rules.ts";
+import {
+  LWQL_POSTGRES_CATALOG,
+  LWQL_POSTGRES_CATALOGUE,
+} from "../lwql-postgres-view-catalog.rules.ts";
 import type { PrismaField, PrismaManifest } from "../lwql-prisma-schema.rules.ts";
 import { organizationTenantPath, teamTenantPath } from "../lwql-tenant-paths.rules.ts";
 
@@ -21,6 +25,13 @@ const catalog = LWQL_POSTGRES_CATALOG as readonly DerivedPostgresView[];
 const byModel = new Map(catalog.map((view) => [view.postgres!.baseRelation, view]));
 const byName = new Map(catalog.map((view) => [view.name, view]));
 const SCOPE_FIELDS = new Set(["organizationId", "teamId", "projectId"]);
+const POSTGRES_CATALOGUE: LwqlCatalogue = LWQL_POSTGRES_CATALOGUE;
+
+/** The Prisma field an exposed column reads: its `source`, else its own name. */
+function sourceField(exposed: string, entry: LwqlColumnEntry | undefined): string {
+  if (entry === undefined || entry === "omit") throw new Error(`${exposed} is not exposed`);
+  return entry === "inherit" ? exposed : (entry.source ?? exposed);
+}
 
 /** A one-model manifest whose fields are all required strings. */
 function fakeManifest({
@@ -108,12 +119,11 @@ describe("given the derived Postgres catalog", () => {
       const collapsing = catalog.filter((view) => view.postgres!.entityKeyColumns !== undefined);
       expect(collapsing.length).toBeGreaterThan(0);
       for (const view of collapsing) {
-        const { baseRelation } = view.postgres!;
+        const { baseRelation, entityKeyColumns } = view.postgres!;
         const { primaryKey } = prismaManifestModel(LWQL_PRISMA_MANIFEST, baseRelation);
-        expect({ view: view.name, keys: view.postgres!.entityKeyColumns!.length }).toEqual({
-          view: view.name,
-          keys: primaryKey.length,
-        });
+        const { columns } = POSTGRES_CATALOGUE[view.name]!;
+        const keyFields = entityKeyColumns!.map((key) => sourceField(key, columns[key]));
+        expect({ view: view.name, keyFields }).toEqual({ view: view.name, keyFields: primaryKey });
         expect(primaryKey.filter((field) => SCOPE_FIELDS.has(field)), view.name).toEqual([]);
       }
     });

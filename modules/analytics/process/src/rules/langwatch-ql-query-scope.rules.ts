@@ -403,7 +403,7 @@ export function scopeLangWatchQL({
   database,
   views,
   timeWindow,
-  memberWindows,
+  memberWindows: requestedWindows,
   projectIds,
 }: {
   sql: string;
@@ -417,9 +417,17 @@ export function scopeLangWatchQL({
    * project without a window, so every project when the list is empty, admits no row.
    */
   memberWindows?: readonly LangWatchQLMemberWindow[];
-  /** The projects the caller's key set reads; absent, the windows are taken not to cover it. */
+  /**
+   * The projects the caller's key set reads; a window naming any other is dropped. Absent, no
+   * window is dropped and the windows are taken not to cover the projects: the read is rewritten.
+   */
   projectIds?: readonly string[];
 }): string {
+  // The service drops these too; dropping them here means no caller widens the key set.
+  const memberWindows =
+    requestedWindows && projectIds
+      ? windowsNaming({ memberWindows: requestedWindows, projectIds })
+      : requestedWindows;
   // Whole-history members need no rewrite when each project has exactly its own window: the row
   // policy bounds them exactly. A project without a window must read nothing, so it is rewritten.
   const isWindowed =
@@ -494,7 +502,18 @@ export function readableMemberWindows({
   projects: readonly LangWatchQLCaller[];
   memberWindows: readonly LangWatchQLMemberWindow[];
 }): readonly LangWatchQLMemberWindow[] {
-  const readable = new Set(projects.map((project) => project.id));
+  return windowsNaming({ memberWindows, projectIds: projects.map((project) => project.id) });
+}
+
+/** The windows naming one of `projectIds`. */
+function windowsNaming({
+  memberWindows,
+  projectIds,
+}: {
+  memberWindows: readonly LangWatchQLMemberWindow[];
+  projectIds: readonly string[];
+}): readonly LangWatchQLMemberWindow[] {
+  const readable = new Set(projectIds);
   return memberWindows.filter((window) => readable.has(window.projectId));
 }
 

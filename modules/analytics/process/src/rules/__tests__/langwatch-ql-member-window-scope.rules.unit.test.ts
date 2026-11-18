@@ -501,6 +501,24 @@ describe("readableMemberWindows", () => {
     ).toEqual([WHOLE_A, DATED_B]);
   });
 
+  /** @scenario "A member window for a project the caller cannot read is dropped" */
+  it("builds no predicate from a foreign window handed straight to the scope", () => {
+    const datedA: LangWatchQLMemberWindow = { projectId: "project_a", from: SHARED_FROM };
+    const outsider: LangWatchQLMemberWindow = { projectId: "project_c", from: 0 };
+
+    const scoped = scope({
+      sql: "SELECT count() FROM traces",
+      memberWindows: [datedA, outsider],
+      projectIds: READERS,
+    });
+
+    expect(scoped).not.toContain("project_c");
+    expect(scoped).toContain(
+      "(TenantId = 'project_a' AND " +
+        `OccurredAt >= fromUnixTimestamp64Milli(toInt64(${SHARED_FROM})))`,
+    );
+  });
+
   /** @scenario "A project with no member window reads nothing once windows are given" */
   it("reads only the project whose window is given, never its windowless sibling", () => {
     const memberWindows = readableMemberWindows({
