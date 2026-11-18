@@ -1,0 +1,7 @@
+Run 3 item 2: Playwright (library, storage state from `haven browser login --as`), script .claude/tmp/braids-qa/r3-viewport.mjs
+Elements whose right edge passes the viewport (first 5). document scrollWidth stayed at the viewport width on every page, so tables scroll inside their own container.
+r3-2-01-braids-390 {"scrollW":390,"innerW":390,"url":"/settings/braids","wide":["TABLE right=835","THEAD right=835","TR right=835","TH right=411","TH right=664"]}
+r3-2-02-org-braids-390 {"scrollW":390,"innerW":390,"url":"/settings/organization-braids","wide":["TABLE right=1269","THEAD right=1269","TR right=1269","TH right=599","TH right=764"]}
+r3-2-04-reader-trace-390 {"scrollW":390,"innerW":390,"url":"/platform-2-XnKoUl/traces?drawer.open=traceV2Details&drawer.traceId=8c0130089dc1f25c886a1d61320528fb","wide":["DIV.chakra-stack right=578","BUTTON menu trigger right=445","BUTTON menu trigger right=554"]}
+r3-2-07-dialog-390: dialog open with orchestrator picked and a typed condition; left column clipped at the right edge (Into picker, Help link, editor, signed-calls card). Cause: braid-dialog.tsx:286 templateColumns base "1fr" (min-content minimum), not "minmax(0, 1fr)".
+r3-2-03/05/06: taken after Escape in the condition editor with no suggest list open; Escape closed the whole dialog and dropped the typed condition (so these show the page, not the dialog). Kept as evidence of that, retaken as r3-2-07/08/09.
