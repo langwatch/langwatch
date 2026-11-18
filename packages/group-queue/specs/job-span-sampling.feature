@@ -86,6 +86,12 @@ Feature: A claimed job keeps its consumer span for 1 in 10 successes and every f
     Then the exported span carries the handler's value
 
   @unit
+  Scenario: A failure span keeps the events recorded before the failure
+    Given a job the sampler leaves out
+    When its handler records an event with attributes at a known time and then fails
+    Then the exported span carries that event with its attributes and its time
+
+  @unit
   Scenario: A hand-back past its window is recorded on an unsampled job's span
     Given a first attempt the sampler leaves out, first handed back longer ago than the window
     When its handler hands it back again

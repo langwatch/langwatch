@@ -1,6 +1,7 @@
 /** Which claimed jobs keep their consumer span. specs/job-span-sampling.feature */
 import { getLogContext } from "@langwatch/observability/context";
 import { type Span, SpanKind, SpanStatusCode, TraceFlags, trace } from "@opentelemetry/api";
+import type { InMemorySpanExporter } from "@opentelemetry/sdk-trace-base";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import {
@@ -10,7 +11,7 @@ import {
   withJobSpan,
 } from "../jobSpanSampling.ts";
 import {
-  type ExportedSpan,
+  hrTimeToEpochMs,
   installInMemoryTracing,
   uninstallInMemoryTracing,
 } from "./in-memory-tracing.ts";
@@ -19,7 +20,8 @@ const TRACE = "4bf92f3577b34da6a3ce929d0e0e4736";
 const BASE = { "queue.name": "q", "queue.job_name": "j" };
 
 describe("job span sampling", () => {
-  const exported: ExportedSpan[] = [];
+  let exporter: InMemorySpanExporter;
+  const exported = () => exporter.getFinishedSpans();
   let customCalls = 0;
   const customAttributes = () => {
     customCalls++;
@@ -27,9 +29,8 @@ describe("job span sampling", () => {
   };
 
   beforeEach(() => {
-    exported.length = 0;
     customCalls = 0;
-    installInMemoryTracing({ exported });
+    exporter = installInMemoryTracing();
   });
 
   afterEach(() => {
@@ -53,14 +54,14 @@ describe("job span sampling", () => {
       span.setAttribute("organization.id", "org");
       span.addEvent("queue.group_batch_bisected");
     });
-    expect(exported).toEqual([]);
+    expect(exported()).toEqual([]);
     expect(customCalls).toBe(0);
   });
 
   it("exports a sampled success with its custom attributes", async () => {
     await runJob(async () => {}, true);
-    expect(exported).toHaveLength(1);
-    expect(exported[0]?.attributes).toMatchObject({ ...BASE, "tenant.custom": "x" });
+    expect(exported()).toHaveLength(1);
+    expect(exported()[0]?.attributes).toMatchObject({ ...BASE, "tenant.custom": "x" });
   });
 
   /** @scenario "A failed job always has a span carrying its error" */
@@ -75,13 +76,16 @@ describe("job span sampling", () => {
       span.recordException(new Error("boom"));
       span.setStatus({ code: SpanStatusCode.ERROR });
     });
-    expect(exported).toHaveLength(1);
-    const [failed] = exported;
-    expect(failed?.parent?.isRemote).toBe(true);
-    expect(failed?.startTime).toBeLessThanOrEqual(startedBefore);
+    expect(exported()).toHaveLength(1);
+    const [failed] = exported();
+    expect(failed?.parentSpanContext?.isRemote).toBe(true);
+    expect(hrTimeToEpochMs(failed!.startTime)).toBeLessThanOrEqual(startedBefore);
     expect(failed?.status).toEqual({ code: SpanStatusCode.ERROR });
-    expect(failed?.events).toEqual(["queue.group_batch_bisected", "exception"]);
-    expect(failed?.links).toEqual([link]);
+    expect(failed?.events.map((event) => event.name)).toEqual([
+      "queue.group_batch_bisected",
+      "exception",
+    ]);
+    expect(failed?.links).toMatchObject([link]);
     expect(failed?.attributes).toMatchObject({
       ...BASE,
       "tenant.custom": "x",
@@ -138,15 +142,15 @@ describe("job span sampling", () => {
         span.end();
       });
     });
-    expect(exported).toEqual([]);
+    expect(exported()).toEqual([]);
   });
 
   it("parents a sampled job's child spans on the job span", async () => {
     await runJob(async () => {
       trace.getTracer("handler").startSpan("child").end();
     }, true);
-    expect(exported.map((span) => span.name)).toEqual(["child", "q/j"]);
-    expect(exported[0]?.parent).toBeDefined();
+    expect(exported().map((span) => span.name)).toEqual(["child", "q/j"]);
+    expect(exported()[0]?.parentSpanContext?.spanId).toBe(exported()[1]?.spanContext().spanId);
   });
 
   /** @scenario "A failed job's span joins the logs written before the failure" */
@@ -158,35 +162,37 @@ describe("job span sampling", () => {
       span.recordException(new Error("boom"));
       loggedAfter = getLogContext().traceId;
     });
-    expect(exported).toHaveLength(1);
-    expect(loggedTraceId).toBe(exported[0]?.traceId);
-    expect(loggedAfter).toBe(exported[0]?.traceId);
+    expect(exported()).toHaveLength(1);
+    expect(loggedTraceId).toBe(exported()[0]?.spanContext().traceId);
+    expect(loggedAfter).toBe(exported()[0]?.spanContext().traceId);
   });
 
   /** @scenario "An unsampled job's failure span survives a process sampler that samples no root" */
   it("keeps an unsampled job's failure span when the process samples no root", async () => {
     uninstallInMemoryTracing();
-    installInMemoryTracing({ exported, rootSampled: false });
+    exporter = installInMemoryTracing({ rootSampled: false });
     await runJob(async (span) => {
       span.setStatus({ code: SpanStatusCode.ERROR });
     });
-    expect(exported).toHaveLength(1);
-    expect(exported[0]?.parent).toMatchObject({ isRemote: true, traceFlags: TraceFlags.SAMPLED });
+    expect(exported()).toHaveLength(1);
+    expect(exported()[0]?.parentSpanContext).toMatchObject({
+      isRemote: true,
+      traceFlags: TraceFlags.SAMPLED,
+    });
   });
 
   /** @scenario "A span kept up front starts its own trace" */
   it("starts a sampled job's span as a trace root, which a root ratio of 0 drops", async () => {
     await runJob(async () => {}, true);
-    expect(exported).toHaveLength(1);
-    expect(exported[0]?.parent).toBeUndefined();
+    expect(exported()).toHaveLength(1);
+    expect(exported()[0]?.parentSpanContext).toBeUndefined();
 
-    exported.length = 0;
     uninstallInMemoryTracing();
-    installInMemoryTracing({ exported, rootSampled: false });
+    exporter = installInMemoryTracing({ rootSampled: false });
     await runJob(async (span) => {
       span.setStatus({ code: SpanStatusCode.ERROR });
     }, true);
-    expect(exported).toEqual([]);
+    expect(exported()).toEqual([]);
   });
 
   /** @scenario "A failure span keeps an attribute the job set over a custom attribute" */
@@ -202,22 +208,42 @@ describe("job span sampling", () => {
         span.setStatus({ code: SpanStatusCode.ERROR });
       },
     });
-    expect(exported).toHaveLength(1);
-    expect(exported[0]?.attributes["tenant.id"]).toBe("project");
+    expect(exported()).toHaveLength(1);
+    expect(exported()[0]?.attributes["tenant.id"]).toBe("project");
+  });
+
+  /** @scenario "A failure span keeps the events recorded before the failure" */
+  it("replays a buffered event's attributes and time onto the failure span", async () => {
+    const at = Date.now() + 5;
+    let before = 0;
+    let after = 0;
+    await runJob(async (span) => {
+      span.addEvent("queue.group_batch_bisected", { "queue.group_batch_size": 4 }, at);
+      before = Date.now();
+      span.addEvent("queue.untimed");
+      after = Date.now();
+      span.setStatus({ code: SpanStatusCode.ERROR });
+    });
+    const [bisected, untimed] = exported()[0]?.events ?? [];
+    expect(bisected?.name).toBe("queue.group_batch_bisected");
+    expect(bisected?.attributes).toEqual({ "queue.group_batch_size": 4 });
+    expect(hrTimeToEpochMs(bisected!.time)).toBe(at);
+    expect(hrTimeToEpochMs(untimed!.time)).toBeGreaterThanOrEqual(before);
+    expect(hrTimeToEpochMs(untimed!.time)).toBeLessThanOrEqual(after);
   });
 
   /** @scenario "An error escaping the job is recorded on its span" */
   it("records an error that escapes the job on its span and rethrows it", async () => {
     const boom = new Error("escaped");
     await expect(runJob(async () => Promise.reject(boom))).rejects.toBe(boom);
-    expect(exported).toHaveLength(1);
-    expect(exported[0]?.events).toEqual(["exception"]);
-    expect(exported[0]?.status).toEqual({ code: SpanStatusCode.ERROR });
+    expect(exported()).toHaveLength(1);
+    expect(exported()[0]?.events.map((event) => event.name)).toEqual(["exception"]);
+    expect(exported()[0]?.status).toEqual({ code: SpanStatusCode.ERROR });
   });
 
   it("records an escaping error on a sampled job's span too", async () => {
     await expect(runJob(async () => Promise.reject(new Error("x")), true)).rejects.toThrow("x");
-    expect(exported[0]?.status).toEqual({ code: SpanStatusCode.ERROR });
+    expect(exported()[0]?.status).toEqual({ code: SpanStatusCode.ERROR });
   });
 
   it("ignores an error recorded after the deferred span ended", async () => {
@@ -227,7 +253,7 @@ describe("job span sampling", () => {
     });
     held?.recordException(new Error("late"));
     held?.setStatus({ code: SpanStatusCode.ERROR });
-    expect(exported).toEqual([]);
+    expect(exported()).toEqual([]);
     expect(customCalls).toBe(0);
   });
 });

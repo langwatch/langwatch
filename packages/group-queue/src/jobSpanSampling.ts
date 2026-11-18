@@ -234,22 +234,11 @@ export async function withJobSpan<T>({
   sampled: boolean;
   operation: (span: Span) => Promise<T>;
 }): Promise<T> {
-  if (sampled) {
-    const tracer = trace.getTracer("langwatch.group-queue");
-    const options = { kind, attributes: { ...attributes, ...customAttributes() } };
-    const span = tracer.startSpan(name, options);
-    try {
-      return await otelContext.with(trace.setSpan(otelContext.active(), span), () =>
-        operation(span),
-      );
-    } catch (err) {
-      recordEscapedError({ span, err });
-      throw err;
-    } finally {
-      span.end();
-    }
-  }
-  const span = new DeferredJobSpan({ name, kind, attributes, customAttributes });
+  const span = sampled
+    ? trace
+        .getTracer("langwatch.group-queue")
+        .startSpan(name, { kind, attributes: { ...attributes, ...customAttributes() } })
+    : new DeferredJobSpan({ name, kind, attributes, customAttributes });
   try {
     return await otelContext.with(trace.setSpan(otelContext.active(), span), () => operation(span));
   } catch (err) {

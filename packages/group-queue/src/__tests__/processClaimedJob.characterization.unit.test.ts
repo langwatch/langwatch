@@ -2,6 +2,7 @@
 
 import { nowInstant } from "@langwatch/time";
 import { SpanStatusCode } from "@opentelemetry/api";
+import type { InMemorySpanExporter } from "@opentelemetry/sdk-trace-base";
 import { Redis as IORedis } from "ioredis";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -17,11 +18,7 @@ import {
 import { PayloadTooLargeError } from "../jobEnvelope.ts";
 import { type DrainedJob, GroupStagingScripts } from "../scripts.ts";
 import { TransientBlobStoreError } from "../tieredBlobStore.ts";
-import {
-  type ExportedSpan,
-  installInMemoryTracing,
-  uninstallInMemoryTracing,
-} from "./in-memory-tracing.ts";
+import { installInMemoryTracing, uninstallInMemoryTracing } from "./in-memory-tracing.ts";
 
 vi.mock("../dispatcher.ts", () => ({
   GroupQueueDispatcher: class {
@@ -614,7 +611,8 @@ describe("given a claimed job this worker has no handler for", () => {
 });
 
 describe("given a first-attempt job whose span was not sampled", () => {
-  const exported: ExportedSpan[] = [];
+  let exporter: InMemorySpanExporter;
+  const exported = () => exporter.getFinishedSpans();
   const handedBack = async () => {
     await runClaimed({
       unsampled: true,
@@ -625,20 +623,19 @@ describe("given a first-attempt job whose span was not sampled", () => {
   };
 
   afterEach(() => {
-    exported.length = 0;
     uninstallInMemoryTracing();
   });
 
   /** @scenario "A hand-back is not recorded on an unsampled job's span" */
   it("exports no span for an unsampled job that is handed back", async () => {
-    installInMemoryTracing({ exported });
+    exporter = installInMemoryTracing();
     await handedBack();
     await handedBack();
-    expect(exported).toEqual([]);
+    expect(exported()).toEqual([]);
   });
 
   it("exports an error span for a failing job", async () => {
-    installInMemoryTracing({ exported });
+    exporter = installInMemoryTracing();
     await runClaimed({
       unsampled: true,
       retryable: false,
@@ -646,13 +643,13 @@ describe("given a first-attempt job whose span was not sampled", () => {
         throw new Error("handler failed");
       },
     });
-    expect(exported).toHaveLength(1);
-    expect(exported[0]?.status).toEqual({ code: SpanStatusCode.ERROR });
+    expect(exported()).toHaveLength(1);
+    expect(exported()[0]?.status).toEqual({ code: SpanStatusCode.ERROR });
   });
 
   /** @scenario "A hand-back past its window is recorded on an unsampled job's span" */
   it("exports an error span with the exception for a hand-back past its window", async () => {
-    installInMemoryTracing({ exported });
+    exporter = installInMemoryTracing();
     const { processor } = recordingProcessor({
       unsampled: true,
       process: async () => {
@@ -673,14 +670,15 @@ describe("given a first-attempt job whose span was not sampled", () => {
       originalScore: 1000,
       claimToken: "claim-1",
     });
-    expect(exported).toHaveLength(1);
-    expect(exported[0]?.events).toContain("exception");
-    expect(exported[0]?.status).toEqual({ code: SpanStatusCode.ERROR });
+    expect(exported()).toHaveLength(1);
+    expect(exported()[0]?.events.map((event) => event.name)).toContain("exception");
+    expect(exported()[0]?.status).toEqual({ code: SpanStatusCode.ERROR });
   });
 });
 
 describe("given a cross-group batch whose span was not sampled", () => {
-  const exported: ExportedSpan[] = [];
+  let exporter: InMemorySpanExporter;
+  const exported = () => exporter.getFinishedSpans();
   const claimed = (groupId: string) => ({
     groupId,
     stagedJobId: `${groupId}-job`,
@@ -700,13 +698,12 @@ describe("given a cross-group batch whose span was not sampled", () => {
     drainedSiblings: [],
   });
   const runBatch = async (scenario: Scenario) => {
-    installInMemoryTracing({ exported });
+    exporter = installInMemoryTracing();
     const { processor } = recordingProcessor({ unsampled: true, ...scenario });
     await processor["runGroupJobs"]([claimed("project_1/g1"), claimed("project_1/g2")]);
   };
 
   afterEach(() => {
-    exported.length = 0;
     uninstallInMemoryTracing();
   });
 
@@ -719,7 +716,7 @@ describe("given a cross-group batch whose span was not sampled", () => {
       },
     });
     expect(calls).toBe(1);
-    expect(exported).toEqual([]);
+    expect(exported()).toEqual([]);
   });
 
   /** @scenario "An unsampled cross-group batch that fails exports one error span" */
@@ -733,8 +730,8 @@ describe("given a cross-group batch whose span was not sampled", () => {
         throw new NonRetryableGroupQueueError("never again");
       },
     });
-    expect(exported).toHaveLength(1);
-    expect(exported[0]?.status).toEqual({ code: SpanStatusCode.ERROR });
+    expect(exported()).toHaveLength(1);
+    expect(exported()[0]?.status).toEqual({ code: SpanStatusCode.ERROR });
   });
 });
 
