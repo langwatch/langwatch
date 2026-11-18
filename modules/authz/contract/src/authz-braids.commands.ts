@@ -18,6 +18,14 @@ const braidTermsShape = {
   fromMs: z.number().int().nonnegative(),
   /** When the reader stops seeing the spans; absent never ends. */
   expiresAtMs: z.number().int().positive().optional(),
+  /**
+   * Minted once per submit and resent on every retry of it (ADR-201 §1): a repeat answers the
+   * braid that command saved instead of writing again. Absent, the server mints one.
+   */
+  commandId: z
+    .string()
+    .regex(/^[A-Za-z0-9_-]{16,64}$/, "A command id is 16 to 64 letters, digits, - or _")
+    .optional(),
 };
 
 const authzCreateBraidInputSchemaDefinition = z

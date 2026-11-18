@@ -109,13 +109,13 @@ function completionProvider(monaco: Monaco): languages.CompletionItemProvider {
       });
       const from = model.getPositionAt(replaceFrom);
       const to = model.getPositionAt(replaceTo);
-      const insert = {
+      // One range for both accept modes: the default (insert) must swallow an auto-closed `]` too.
+      const range = {
         startLineNumber: from.lineNumber,
         startColumn: from.column,
-        endLineNumber: position.lineNumber,
-        endColumn: position.column,
+        endLineNumber: to.lineNumber,
+        endColumn: to.column,
       };
-      const replace = { ...insert, endLineNumber: to.lineNumber, endColumn: to.column };
       return {
         suggestions: items.map((item) => ({
           label: item.label,
@@ -130,7 +130,7 @@ function completionProvider(monaco: Monaco): languages.CompletionItemProvider {
           command: item.retrigger
             ? { id: "editor.action.triggerSuggest", title: "Suggest" }
             : undefined,
-          range: { insert, replace },
+          range,
         })),
       };
     },

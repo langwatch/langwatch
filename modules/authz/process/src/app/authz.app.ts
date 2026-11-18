@@ -369,6 +369,7 @@ export class AuthzModule implements AuthzApi {
       reads: repositories.ledgerReads,
       lineage: repositories.read,
       locks: repositories.braidLocks,
+      writes: repositories.braidWrites,
       epoch,
       permissions,
     });
@@ -712,14 +713,10 @@ export class AuthzModule implements AuthzApi {
     return this.#memberships;
   }
 
-  // Braid management asks `release_braids` first. General reads peers ask (trace reads list
-  // braids) do not, and nor does removing a braid, which only narrows access; the screen's
-  // routes call the `*ForScreen` twins. modules/authz/specs/braids-release-flag.feature
+  // Braid management asks `release_braids` first. Listing and removing do not, so an admin can
+  // find and end a braid that still applies (Alex, 2026-11-18); the screen's other reads call
+  // the `*ForScreen` twins. modules/authz/specs/braids-release-flag.feature
   listBraids: AuthzApi["listBraids"] = (a) => this.braids().listBraids(a);
-  listBraidsForScreen: AuthzApi["listBraidsForScreen"] = async (a) => {
-    await this.braidRelease().assertEnabledForProject(a);
-    return this.braids().listBraids(a);
-  };
   createBraid: AuthzApi["createBraid"] = async (a) => {
     await this.braidRelease().assertEnabledForProject(a);
     return this.braids().createBraid(a);
@@ -733,10 +730,8 @@ export class AuthzModule implements AuthzApi {
   recordBraidedSpansView: AuthzApi["recordBraidedSpansView"] = (a) =>
     this.braidedReads().recordBraidedSpansView(a);
 
-  listOrganizationBraids: AuthzApi["listOrganizationBraids"] = async (a) => {
-    await this.braidRelease().assertEnabledForOrganization(a);
-    return this.braids().listOrganizationBraids(a);
-  };
+  listOrganizationBraids: AuthzApi["listOrganizationBraids"] = (a) =>
+    this.braids().listOrganizationBraids(a);
   countProjectMembersHolding: AuthzApi["countProjectMembersHolding"] = (a) =>
     this.projectMembers().countProjectMembersHolding(a);
   /** The braid dialog's "<n> people will see these spans". */
@@ -746,6 +741,9 @@ export class AuthzModule implements AuthzApi {
     await this.braidRelease().assertEnabledForProject(a);
     return this.projectMembers().countProjectMembersHolding(a);
   };
+  /** The braid dialog's reads another module answers ask this first (`traces.braidPreview`). */
+  assertBraidsReleased: AuthzApi["assertBraidsReleased"] = (a) =>
+    this.braidRelease().assertEnabledForProject(a);
   listBraidTargets: AuthzApi["listBraidTargets"] = async (a) => {
     await this.braidRelease().assertEnabledForProject(a);
     return this.braidTargets().listBraidTargets(a);

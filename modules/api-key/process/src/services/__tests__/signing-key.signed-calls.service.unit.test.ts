@@ -84,7 +84,7 @@ describe("the API key module's answer to a span's signature", () => {
 
   describe("given a key issued before release_braids was switched off", () => {
     /** @scenario "Signed calls are still verified while release_braids is off" */
-    it("still verifies its signature, while managing the key refuses", async () => {
+    it("still verifies its signature, while issuing a key refuses", async () => {
       const issued = await issue();
       flags.withhold({ flag: BRAIDS_FLAG, organizationId: ORGANIZATION });
 
@@ -93,7 +93,9 @@ describe("the API key module's answer to a span's signature", () => {
         signingProjectId: "orchestrator",
         keys: ["orchestrator"],
       });
-      await expect(signingKeys.find({ projectId: "orchestrator" })).rejects.toMatchObject({
+      await expect(
+        signingKeys.create({ projectId: "orchestrator", name: "Second", userId: "ana" }),
+      ).rejects.toMatchObject({
         code: "braids_not_enabled",
       });
     });

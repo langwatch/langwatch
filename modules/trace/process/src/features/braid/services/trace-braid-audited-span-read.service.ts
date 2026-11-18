@@ -128,6 +128,8 @@ const noBraidedOwner = (): Owners => [];
  */
 const BRAID_OWNERS_OF: { readonly [K in TraceBraidRead]: BraidOwnerRule<K> } = {
   findReaderTraceIds: noBraidedOwner,
+  findOutsideParents: noBraidedOwner,
+  findTracesHoldingSpans: noBraidedOwner,
   countOwnerSpansInTraces: noBraidedOwner,
   findAttributeKeys: noBraidedOwner,
   countOwnerBraidActivity: noBraidedOwner,
@@ -179,6 +181,8 @@ export class TraceBraidAuditedSpanReadService {
     this.#audit = deps.audit;
     this.braidReads = {
       findReaderTraceIds: (params) => this.#readBraid("findReaderTraceIds", params),
+      findOutsideParents: (params) => this.#readBraid("findOutsideParents", params),
+      findTracesHoldingSpans: (params) => this.#readBraid("findTracesHoldingSpans", params),
       countOwnerSpansInTraces: (params) => this.#readBraid("countOwnerSpansInTraces", params),
       findAttributeKeys: (params) => this.#readBraid("findAttributeKeys", params),
       countOwnerBraidActivity: (params) => this.#readBraid("countOwnerBraidActivity", params),
