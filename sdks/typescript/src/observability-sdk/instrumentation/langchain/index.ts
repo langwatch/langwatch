@@ -1,3 +1,4 @@
+import "../../../internal/otel-api-guard";
 import type { AgentAction, AgentFinish } from "@langchain/core/agents";
 import { BaseCallbackHandler } from "@langchain/core/callbacks/base";
 import { type DocumentInterface } from "@langchain/core/documents";

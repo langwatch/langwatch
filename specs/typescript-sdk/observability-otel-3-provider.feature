@@ -62,3 +62,10 @@ Feature: Joining an OpenTelemetry JS 3.x tracer provider
     Given LangWatch sets up observability on its own, with its default context manager
     When a child span starts after an await inside an active parent span
     Then the child's parent span id is the parent's span id
+
+  @unit
+  Scenario: An OpenTelemetry API older than 1.10 is refused with a message saying what to install
+    Given @opentelemetry/api older than 1.10 is installed
+    When the SDK loads
+    Then it refuses with an error naming the supported range ">=1.10.0 <1.11.0"
+    And the error says to stay on langwatch 2.x while the app runs OpenTelemetry JS 2.x
