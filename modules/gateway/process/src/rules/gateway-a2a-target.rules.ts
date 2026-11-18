@@ -2,6 +2,7 @@ import type {
   GatewayA2aTargetDto,
   GatewayA2aTargetResource,
   GatewayA2aTargetWire,
+  VirtualKeyWithScopes,
 } from "@langwatch/gateway-contract";
 
 /** Targets a key of `projectId` reaches: its project's, then org-wide ones it does not shadow. */
@@ -53,5 +54,21 @@ export function a2aTargetAdmitsKey({
 }): boolean {
   return (
     target.allowed_virtual_key_ids === null || target.allowed_virtual_key_ids.includes(virtualKeyId)
+  );
+}
+
+/** Whether a key's own scope entries reach a project: its organization, its team or itself. */
+export function keyScopesReachProject({
+  vk,
+  project,
+}: {
+  vk: VirtualKeyWithScopes;
+  project: { id: string; teamId: string };
+}): boolean {
+  return vk.scopes.some(
+    (scope) =>
+      (scope.scopeType === "ORGANIZATION" && scope.scopeId === vk.organizationId) ||
+      (scope.scopeType === "TEAM" && scope.scopeId === project.teamId) ||
+      (scope.scopeType === "PROJECT" && scope.scopeId === project.id),
   );
 }

@@ -22,6 +22,7 @@ import { createLogger } from "@langwatch/observability";
 import type { ProjectApi } from "@langwatch/project-contract";
 
 import type { GatewayBudgetSpendRepository } from "../repositories/gateway-budget-spend.repository.ts";
+import { keyScopesReachProject } from "../rules/gateway-a2a-target.rules.ts";
 import {
   type GatewayConfigAssembly,
   type GatewayModelProviderCredentials,
@@ -481,20 +482,4 @@ async function settleBefore<T>({
   } finally {
     signal.removeEventListener("abort", onAbort);
   }
-}
-
-/** Whether a key's own scope entries reach a project: its organization, its team or itself. */
-function keyScopesReachProject({
-  vk,
-  project,
-}: {
-  vk: VirtualKeyWithScopes;
-  project: { id: string; teamId: string };
-}): boolean {
-  return vk.scopes.some(
-    (scope) =>
-      (scope.scopeType === "ORGANIZATION" && scope.scopeId === vk.organizationId) ||
-      (scope.scopeType === "TEAM" && scope.scopeId === project.teamId) ||
-      (scope.scopeType === "PROJECT" && scope.scopeId === project.id),
-  );
 }
