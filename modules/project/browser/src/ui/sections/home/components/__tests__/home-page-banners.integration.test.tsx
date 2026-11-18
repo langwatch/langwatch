@@ -79,7 +79,6 @@ class StubProjectHomeHost extends ProjectHomeHost {
   }
 }
 
-const RED_TEAM_KEY = "langwatch:red-team-home-banner-dismissed:v1:project-1";
 const AUTOMATIONS_KEY = "langwatch:automations-home-banner-dismissed:v1:project-1";
 
 /** The shell's analytics destination, keeping each event instead of sending it. */
@@ -236,9 +235,9 @@ describe("<HomePageBanners />", () => {
     // There is no dismissal any more, so a stale key from when there was one
     // must not keep an announcement off the page forever.
     localStorage.setItem(AUTOMATIONS_KEY, String(Date.now() + 60_000));
-    localStorage.setItem(RED_TEAM_KEY, String(Date.now() + 60_000));
     renderWithProviders(<HomePageBanners />);
-    expect(screen.getByText("Red-team your agent against the OWASP LLM Top 10")).toBeDefined();
+    fireEvent.click(screen.getByRole("button", { name: "Show announcement 4 of 4" }));
+    expect(screen.getByText("React the moment it matters")).toBeDefined();
   });
 
   describe("when a banner's link is followed", () => {
@@ -249,7 +248,7 @@ describe("<HomePageBanners />", () => {
 
       // Still on screen: following a link is interest, not "seen it, thanks".
       expect(screen.getByText("Red-team your agent against the OWASP LLM Top 10")).toBeDefined();
-      expect(localStorage.getItem(RED_TEAM_KEY)).toBeNull();
+      expect(localStorage).toHaveLength(0);
     });
 
     it("offers no way to hide an announcement at all", () => {
