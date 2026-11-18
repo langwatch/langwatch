@@ -56,6 +56,15 @@ Feature: Every catalogued Postgres model is queryable through LangWatchQL
       When a caller in the first project queries the virtual_keys view
       Then they see only keys belonging to their own organization
 
+    # tasks#1212: the fan-out above emits the row once per project, so a query
+    # over two sibling projects would see an organization's budget twice (per the code; this test checks it).
+    @integration
+    Scenario: An organization-level row is counted once in a multi-project query
+      Given an organization with two projects and one gateway budget with a known limit
+      When a caller who can read both projects sums the budget limit and counts budgets in one query over both
+      Then the sum equals the budget's own limit
+      And the count is one
+
     @unit
     Scenario: A team-scoped model fans out to one row per project in the team
       Given a model whose tenant column is teamId

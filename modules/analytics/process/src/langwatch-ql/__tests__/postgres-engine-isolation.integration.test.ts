@@ -2,6 +2,7 @@
  * Isolation proof, part 2: PG-resident data reached via engine tables stays row-policed.
  * @see specs/lwql/api.feature
  * @see specs/lwql/isolation.feature
+ * @see specs/lwql/postgres-catalog.feature
  * @vitest-environment node
  */
 
@@ -11,12 +12,20 @@ import { fileURLToPath } from "node:url";
 import { type ClickHouseClient, createClient } from "@clickhouse/client";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import {
+  ADMIT_EVERY_PLACEMENT,
+  EVERY_CATALOGUE_PERMISSION,
+  TEST_RUN_TELEMETRY,
+} from "../../app/__tests__/analytics.fixture.ts";
 import { DEFAULT_POSTGRES_ENGINE_POOL_SIZE } from "../../features/provisioning/services/langwatch-ql-postgres-mapping.service.ts";
 import { LangWatchQLPostgresViewsService } from "../../features/provisioning/services/langwatch-ql-postgres-views.service.ts";
 import { LangWatchQLViewProvisioningService } from "../../features/provisioning/services/langwatch-ql-view-provisioning.service.ts";
 import { SHIPPED_LWQL_DEDUP } from "../../features/provisioning/services/langwatch-ql-view-statements.service.ts";
+import { ClickHouseLangWatchQLExecutorRepository } from "../../repositories/clickhouse/clickhouse.langwatch-ql-executor.repository.ts";
 import { LWQL_VIEW_CATALOG } from "../../rules/lwql-view-catalog.rules.ts";
+import { LangWatchQLCapabilityService } from "../../services/langwatch-ql-capability.service.ts";
 import { LangWatchQLCatalogShapesService } from "../../services/langwatch-ql-catalog-shapes.service.ts";
+import { LangWatchQLService } from "../../services/langwatch-ql.service.ts";
 import {
   CLICKHOUSE_ERROR_CODE,
   expectClickHouseError,
@@ -48,6 +57,7 @@ import {
 
 const postgresViews = LangWatchQLPostgresViewsService.create();
 const viewProvisioning = LangWatchQLViewProvisioningService.create();
+const lwqlCapability = LangWatchQLCapabilityService.create();
 
 const catalogShapes = LangWatchQLCatalogShapesService.create();
 
@@ -208,6 +218,105 @@ describe("given the PostgreSQL-resident catalog mapped into ClickHouse through t
         [harness.tenantB.tenantId, `VK ${harness.tenantB.tenantId}`],
       ]);
     });
+  });
+
+  describe("when a caller reads two sibling projects of one organization in one query", () => {
+    /**
+     * The organization fan-out emits one row per project, so the budget appears once per sibling
+     * the caller reads. tasks#1212: a multi-project SUM must still count it once.
+     */
+    const ORGANIZATION_ID = "lwql-fanout-org";
+    const TEAM_ID = "lwql-fanout-team";
+    const BUDGET_ID = "lwql-fanout-budget";
+    const LIMIT_USD = 250;
+    const SIBLINGS = [1, 2].map((index) => ({
+      id: `lwql-fanout-project-${index}`,
+      lwqlKey: `raw-lwql-key-FANOUT-DO-NOT-LOG-${index}`,
+    }));
+    const keyHashes = () =>
+      SIBLINGS.map(({ lwqlKey }) => lwqlCapability.tenantCapability({ secret: lwqlKey }));
+    const keyMapTable = () => `${harness.factDatabase}.${harness.names.keyMapTable}`;
+
+    const seedStatements = (): string[] => [
+      `INSERT INTO "Organization" ("id", "name", "slug") ` +
+        `VALUES ('${ORGANIZATION_ID}', 'Fan-out org', '${ORGANIZATION_ID}-slug')`,
+      `INSERT INTO "Team" ("id", "name", "slug", "organizationId") ` +
+        `VALUES ('${TEAM_ID}', 'Fan-out team', '${TEAM_ID}-slug', '${ORGANIZATION_ID}')`,
+      `INSERT INTO "Project" ` +
+        `("id", "name", "slug", "apiKey", "lwqlKey", "teamId", "language", "framework") VALUES ` +
+        SIBLINGS.map(
+          ({ id }) =>
+            `('${id}', 'Project ${id}', '${id}-slug', 'excluded-apikey-of-${id}', ` +
+            `'excluded-lwqlkey-of-${id}', '${TEAM_ID}', 'python', 'openai')`,
+        ).join(", "),
+      `INSERT INTO "GatewayBudget" ` +
+        `("id", "organizationId", "scopeType", "scopeId", "name", "window", "limitUsd", ` +
+        `"resetsAt", "createdById") VALUES ('${BUDGET_ID}', '${ORGANIZATION_ID}', ` +
+        `'ORGANIZATION', '${ORGANIZATION_ID}', 'Fan-out budget', 'MONTH', ${LIMIT_USD}, ` +
+        `'2027-01-01T00:00:00Z', 'lwql-fanout-user')`,
+    ];
+
+    const deleteSeed = async (): Promise<void> => {
+      await postgres.asAdmin(`DELETE FROM "GatewayBudget" WHERE "id" = '${BUDGET_ID}'`);
+      await postgres.asAdmin(`DELETE FROM "Project" WHERE "teamId" = '${TEAM_ID}'`);
+      await postgres.asAdmin(`DELETE FROM "Team" WHERE "id" = '${TEAM_ID}'`);
+      await postgres.asAdmin(`DELETE FROM "Organization" WHERE "id" = '${ORGANIZATION_ID}'`);
+      await harness.applyAsAdmin([
+        `ALTER TABLE ${keyMapTable()} DELETE WHERE KeyHash IN ` +
+          `(${keyHashes()
+            .map((hash) => `'${hash}'`)
+            .join(", ")}) SETTINGS mutations_sync = 2`,
+      ]);
+    };
+
+    /** @scenario "An organization-level row is counted once in a multi-project query" */
+    it("sums the organization's budget limit once and counts one budget", async () => {
+      const service = LangWatchQLService.create({
+        runTelemetry: TEST_RUN_TELEMETRY,
+        placement: ADMIT_EVERY_PLACEMENT,
+        executor: ClickHouseLangWatchQLExecutorRepository.create({
+          connection: {
+            ...harness.restrictedConnection(),
+            database,
+            tenantSetting: harness.names.tenantSetting,
+          },
+        }),
+        database,
+        views: POSTGRES_VIEWS,
+      });
+
+      try {
+        for (const sql of seedStatements()) {
+          const seeded = await postgres.asAdmin(sql);
+          expect(seeded.exitCode, `seeding failed: ${sql}\n${seeded.stderr}`).toBe(0);
+        }
+        await harness.admin.insert({
+          table: keyMapTable(),
+          format: "JSONEachRow",
+          values: SIBLINGS.map(({ id }, index) => ({ KeyHash: keyHashes()[index], TenantId: id })),
+        });
+
+        const result = await service.executeForProjects({
+          projects: SIBLINGS,
+          protections: {
+            catalogue: EVERY_CATALOGUE_PERMISSION,
+            canSeeCosts: true,
+            canSeeCapturedInput: true,
+            canSeeCapturedOutput: true,
+          },
+          sql:
+            "SELECT sum(LimitUsd) AS total, count() AS n FROM gateway_budgets " +
+            `WHERE GatewayBudgetId = '${BUDGET_ID}'`,
+        });
+
+        expect(
+          result.rows.map((row) => ({ total: Number(row.total), n: Number(row.n) })),
+        ).toEqual([{ total: LIMIT_USD, n: 1 }]);
+      } finally {
+        await service.close();
+        await deleteSeed();
+      }
+    }, 60_000);
   });
 
   describe("when a caller asks for traffic by topic name", () => {
