@@ -701,7 +701,9 @@ describe("given PostgreSQL-resident views that repeat a row per project", () => 
     it("keeps one row per budget, the lowest project's, after the tenant predicate", () => {
       const sql = render("gateway_budgets");
 
-      expect(sql.indexOf("WHERE src.`TenantId` >=")).toBeGreaterThan(-1);
+      const tenantAt = sql.indexOf("WHERE src.`TenantId` >=");
+      expect(tenantAt).toBeGreaterThan(-1);
+      expect(tenantAt).toBeLessThan(sql.indexOf("\nORDER BY"));
       expect(sql).toMatch(
         /\nORDER BY src\.`GatewayBudgetId`, src\.`TenantId`\nLIMIT 1 BY src\.`GatewayBudgetId`$/,
       );

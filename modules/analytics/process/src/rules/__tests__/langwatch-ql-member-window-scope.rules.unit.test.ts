@@ -127,11 +127,56 @@ describe("scopeLangWatchQL with member windows", () => {
       expect(
         scope({ sql: "SELECT count() FROM gateway_budgets", memberWindows: [WHOLE_A, DATED_B] }),
       ).toBe(
-        "SELECT count() FROM (SELECT * FROM gateway_budgets WHERE (GatewayBudgetId) IN " +
-          "(SELECT GatewayBudgetId FROM analytics.gateway_budgets_pg " +
+        "SELECT count() FROM (SELECT * FROM gateway_budgets WHERE (`GatewayBudgetId`) IN " +
+          "(SELECT `GatewayBudgetId` FROM analytics.gateway_budgets_pg " +
           `WHERE TenantId IN ('project_a', 'project_b') AND ${picks})) ` +
           "AS gateway_budgets",
       );
+    });
+
+    /** @scenario "A member window on the kept copy does not hide a row a sibling's window admits" */
+    it("picks a fanned-out view keyed on more than one column by the whole key", () => {
+      const budgets = VIEWS.find((view) => view.name === "gateway_budgets");
+      if (!budgets?.postgres) throw new Error("gateway_budgets is not a PostgreSQL view");
+      const shares: LangWatchQLViewDefinition = {
+        ...budgets,
+        name: "budget_shares",
+        sourceTable: "budget_shares_pg",
+        postgres: { ...budgets.postgres, entityKeyColumns: ["GatewayBudgetId", "ScopeId"] },
+      };
+
+      const scoped = scopeLangWatchQL({
+        sql: "SELECT count() FROM budget_shares",
+        database: "analytics",
+        views: [...VIEWS, shares],
+        memberWindows: [WHOLE_A, DATED_B],
+        projectIds: ["project_a", "project_b"],
+      });
+
+      expect(scoped).toContain(
+        "WHERE (`GatewayBudgetId`, `ScopeId`) IN (SELECT `GatewayBudgetId`, `ScopeId` " +
+          "FROM analytics.budget_shares_pg WHERE TenantId IN ('project_a', 'project_b') AND ",
+      );
+    });
+
+    it("refuses a fanned-out view whose key is not a plain identifier", () => {
+      const budgets = VIEWS.find((view) => view.name === "gateway_budgets");
+      if (!budgets?.postgres) throw new Error("gateway_budgets is not a PostgreSQL view");
+      const tampered: LangWatchQLViewDefinition = {
+        ...budgets,
+        name: "tampered_budgets",
+        postgres: { ...budgets.postgres, entityKeyColumns: ["Id`; DROP"] },
+      };
+
+      expect(() =>
+        scopeLangWatchQL({
+          sql: "SELECT count() FROM tampered_budgets",
+          database: "analytics",
+          views: [...VIEWS, tampered],
+          memberWindows: [WHOLE_A, DATED_B],
+          projectIds: ["project_a", "project_b"],
+        }),
+      ).toThrow(/entity key must match/);
     });
 
     it("reads nothing from a view with no time column when every member is dated", () => {

@@ -7,17 +7,45 @@ import {
   prismaManifestModel,
 } from "../../../../rules/lwql-prisma-manifest.rules.ts";
 import {
+  defineCatalogModel,
   type DerivedPostgresView,
   detectDefaultStripReason,
   resolveTenantScope,
   sanitizeDescription,
 } from "../lwql-postgres-catalog-model.rules.ts";
 import { LWQL_POSTGRES_CATALOG } from "../lwql-postgres-view-catalog.rules.ts";
+import type { PrismaField, PrismaManifest } from "../lwql-prisma-schema.rules.ts";
 import { organizationTenantPath, teamTenantPath } from "../lwql-tenant-paths.rules.ts";
 
 const catalog = LWQL_POSTGRES_CATALOG as readonly DerivedPostgresView[];
 const byModel = new Map(catalog.map((view) => [view.postgres!.baseRelation, view]));
 const byName = new Map(catalog.map((view) => [view.name, view]));
+const SCOPE_FIELDS = new Set(["organizationId", "teamId", "projectId"]);
+
+/** A one-model manifest whose fields are all required strings. */
+function fakeManifest({
+  name,
+  primaryKey,
+  fields,
+}: {
+  name: string;
+  primaryKey: readonly string[];
+  fields: readonly string[];
+}): PrismaManifest {
+  const field = (fieldName: string): PrismaField => ({
+    name: fieldName,
+    columnName: fieldName,
+    type: "String",
+    kind: "scalar",
+    isList: false,
+    isOptional: false,
+    documentation: "",
+  });
+  return {
+    enums: [],
+    models: [{ name, tableName: name, documentation: "", primaryKey, fields: fields.map(field) }],
+  };
+}
 
 describe("given the derived Postgres catalog", () => {
   describe("when a model carries a projectId column", () => {
@@ -73,6 +101,46 @@ describe("given the derived Postgres catalog", () => {
       expect(entityKeys("gateway_budgets")).toEqual(["GatewayBudgetId"]);
       expect(entityKeys("ingestion_sources")).toEqual(["IngestionSourceId"]);
       expect(entityKeys("topics")).toBeUndefined();
+    });
+
+    /** @scenario "A fanned-out view collapses only on a key that names one row in its table" */
+    it("keys each collapsing view by its model's whole primary key, with no scope field", () => {
+      const collapsing = catalog.filter((view) => view.postgres!.entityKeyColumns !== undefined);
+      expect(collapsing.length).toBeGreaterThan(0);
+      for (const view of collapsing) {
+        const { baseRelation } = view.postgres!;
+        const { primaryKey } = prismaManifestModel(LWQL_PRISMA_MANIFEST, baseRelation);
+        expect({ view: view.name, keys: view.postgres!.entityKeyColumns!.length }).toEqual({
+          view: view.name,
+          keys: primaryKey.length,
+        });
+        expect(primaryKey.filter((field) => SCOPE_FIELDS.has(field)), view.name).toEqual([]);
+      }
+    });
+
+    /** @scenario "A fanned-out view keyed on its scope field keeps its fan-out" */
+    it("names no entity key when the primary key holds the consumed scope field", () => {
+      const membership = (name: string, primaryKey: readonly string[]) =>
+        defineCatalogModel({
+          name,
+          table: {
+            sourceTable: "FakeOrgMembership",
+            columns: {
+              TenantId: { source: "organizationId" },
+              FakeOrgMembershipId: { source: "id" },
+              UserId: { source: "userId" },
+            },
+          },
+          override: {},
+          manifest: fakeManifest({
+            name: "FakeOrgMembership",
+            primaryKey,
+            fields: ["id", "organizationId", "userId"],
+          }),
+        }).postgres!.entityKeyColumns;
+
+      expect(membership("fake_by_scope", ["organizationId", "userId"])).toBeUndefined();
+      expect(membership("fake_by_id", ["id"])).toEqual(["FakeOrgMembershipId"]);
     });
   });
 

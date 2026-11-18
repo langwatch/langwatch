@@ -11,7 +11,7 @@ import {
 import type { LangWatchQLViewDefinition } from "../services/langwatch-ql-catalog-shapes.service.ts";
 import { clickHouseSqlParser, type SqlAstNode } from "./langwatch-ql-parser.rules.ts";
 import { qualifyTableName } from "./langwatch-ql-policy.rules.ts";
-import { clickHouseLiteral } from "./langwatch-ql-sql-literal.rules.ts";
+import { clickHouseLiteral, SAFE_IDENTIFIER } from "./langwatch-ql-sql-literal.rules.ts";
 import { METADATA_FIELDS } from "./langwatch-ql-validation-shape.rules.ts";
 
 /**
@@ -307,12 +307,23 @@ function windowPredicate({
   const either = `(${picks.join(" OR ")})`;
   const keys = view.postgres?.entityKeyColumns ?? [];
   if (keys.length === 0) return either;
-  const keyList = keys.join(", ");
+  // Checked as the view DDL checks them: a catalogue name never reaches SQL unchecked.
+  const keyList = keys.map((key) => `\`${identifier(key, "entity key")}\``).join(", ");
+  const table =
+    `${identifier(database, "database")}.${identifier(view.sourceTable, "sourceTable")}`;
   const members = memberWindows.map((window) => clickHouseLiteral(window.projectId)).join(", ");
   return (
-    `(${keyList}) IN (SELECT ${keyList} FROM ${database}.${view.sourceTable} ` +
+    `(${keyList}) IN (SELECT ${keyList} FROM ${table} ` +
     `WHERE ${TENANT_COLUMN} IN (${members}) AND ${either})`
   );
+}
+
+/** `value` when it is a plain identifier; anything else is a catalogue bug, so it throws. */
+function identifier(value: string, role: string): string {
+  if (!SAFE_IDENTIFIER.test(value)) {
+    throw new Error(`lwql: ${role} must match ${String(SAFE_IDENTIFIER)}, got "${value}"`);
+  }
+  return value;
 }
 
 /** What a view's dated-member windows are built from, the same for every view. */

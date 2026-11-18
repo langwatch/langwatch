@@ -80,6 +80,21 @@ Feature: Every catalogued Postgres model is queryable through LangWatchQL
       And a project-scoped view is rendered without that step
 
     @unit
+    Scenario: A fanned-out view keyed on its scope field keeps its fan-out
+      Given an organization-scoped model whose primary key holds organizationId
+      When its LangWatchQL view is derived
+      Then the view names no entity key, so no step collapses its rows
+      And the same model keyed by id alone names that id as its entity key
+
+    # tasks#1212: collapsing keeps one copy per key, so the key must name one row in its table.
+    @unit
+    Scenario: A fanned-out view collapses only on a key that names one row in its table
+      Given every view in the catalog that collapses its fan-out
+      When its entity key is compared with its model's primary key
+      Then the entity key is the whole primary key
+      And the primary key holds no organizationId, teamId or projectId
+
+    @unit
     Scenario: A team-scoped model fans out to one row per project in the team
       Given a model whose tenant column is teamId
       When the Postgres catalog is derived

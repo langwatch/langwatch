@@ -1077,7 +1077,7 @@ describe("when a caller reads two sibling projects of one organization in one qu
     `DELETE FROM "Organization" WHERE "id" = '${ORGANIZATION_ID}'`,
   ];
 
-  /** Runs every delete before asserting, so one failed delete still lets the rest clean up. */
+  /** Runs every delete, the key map's too, before asserting, so one failure hides no other. */
   const deleteSeed = async (): Promise<void> => {
     const failures: string[] = [];
     for (const sql of cleanupStatements()) {
@@ -1085,10 +1085,14 @@ describe("when a caller reads two sibling projects of one organization in one qu
       if (result.exitCode !== 0) failures.push(`cleanup failed: ${sql}\n${result.stderr}`);
     }
     const quotedHashes = keyHashes().map((hash) => `'${hash}'`);
-    await harness.applyAsAdmin([
-      `ALTER TABLE ${keyMapTable()} DELETE WHERE KeyHash IN (${quotedHashes.join(", ")}) ` +
-        "SETTINGS mutations_sync = 2",
-    ]);
+    try {
+      await harness.applyAsAdmin([
+        `ALTER TABLE ${keyMapTable()} DELETE WHERE KeyHash IN (${quotedHashes.join(", ")}) ` +
+          "SETTINGS mutations_sync = 2",
+      ]);
+    } catch (error) {
+      failures.push(`key-map cleanup failed: ${String(error)}`);
+    }
     expect(failures, "seed cleanup left rows behind").toEqual([]);
   };
 
