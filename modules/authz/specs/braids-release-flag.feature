@@ -71,9 +71,18 @@ Feature: Braid management behind the release_braids kill switch
     @integration
     Scenario: With release_braids off every braid management procedure refuses with braids_not_enabled
       Given release_braids is off for the organisation
-      When ana creates or changes braids, lists braid targets, counts who would see the spans, or reads or sets who may braid
+      When ana creates or changes braids, lists braid targets, counts who would see the spans, sets who may braid or turns Braids on
       Then each call is refused with braids_not_enabled
       And no braid is written
+
+    @integration
+    Scenario: With release_braids off an organisation admin can still turn Braids off
+      # The kill switch leaves braids applying; turning the setting off only narrows access.
+      Given a live braid from "specialists" into "orchestrator" with Braids turned on
+      And release_braids is then switched off for the organisation
+      When ana reads the organisation's Braids settings and turns Braids off
+      Then the settings answer Braids on, and turning it off is accepted
+      And the organisation Braids page offers the Enable Braids switch only while Braids is on
 
     @unit
     Scenario: With release_braids off the braid dialog's trace reads refuse with braids_not_enabled
@@ -104,7 +113,7 @@ Feature: Braid management behind the release_braids kill switch
       Given release_braids is off for the organisation
       When another module reads the organisation's authz settings or counts a project's members holding a permission
       Then each answers as it does with the flag on
-      And the Braids screen's own reads of the same are refused with braids_not_enabled
+      And the Braids screen's count of who would see the spans is refused with braids_not_enabled
 
     @unit
     Scenario: release_braids is answered for each organisation on its own

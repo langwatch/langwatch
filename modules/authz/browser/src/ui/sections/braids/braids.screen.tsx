@@ -448,7 +448,7 @@ export default function BraidsScreen() {
         <SigningKeysBand
           projectId={projectId}
           planState={planState}
-          canIssue={released}
+          canIssue={released && !pausedByOrganization}
           onNewKey={
             can.canCreate
               ? () => host.setQuery({ ...query, [SIGNING_KEY_QUERY_KEY]: "new" })

@@ -15,16 +15,10 @@ export function useBraidsReleased(): boolean | undefined {
 }
 
 /** Whether only organisation admins may braid; off until it answers, never asked unreleased. */
-export function useBraidsPolicy({
-  organizationId,
-  released,
-}: {
-  organizationId: string | undefined;
-  released: boolean;
-}) {
+export function useBraidsPolicy({ organizationId }: { organizationId: string | undefined }) {
   return authzApi.authz.getBraidsPolicy.useQuery(
     { organizationId: organizationId ?? "" },
-    { enabled: !!organizationId && released, retry: false },
+    { enabled: !!organizationId, retry: false },
   );
 }
 
@@ -39,7 +33,7 @@ export function useBraidsSettings({
   organizationId: string | undefined;
   released: boolean;
 }) {
-  const policy = useBraidsPolicy({ organizationId, released });
+  const policy = useBraidsPolicy({ organizationId });
   return {
     keptToAdmins: policy.data?.braidsOrganizationAdminsOnly ?? false,
     turnedOff: released && policy.data?.braidsEnabled === false,
@@ -110,7 +104,7 @@ export function useSetBraidsEnabled({ organizationId }: { organizationId: string
       host.succeeded({
         title: policy.braidsEnabled ? "Braids is on" : "Braids is off",
         description: policy.braidsEnabled
-          ? "Projects can braid again, and paused braids show their spans again."
+          ? "Projects can now braid, and any paused braids show their spans again."
           : "Existing braids are paused and kept. The change is in the audit log.",
       });
     },

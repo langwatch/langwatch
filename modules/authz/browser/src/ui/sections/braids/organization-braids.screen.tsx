@@ -39,11 +39,14 @@ function EnableBraids({
   isEnterprise,
   enabled,
   isReading,
+  unread,
 }: {
   organizationId: string;
   isEnterprise: boolean;
   enabled: boolean;
   isReading: boolean;
+  /** The setting couldn't be read: the switch shows no guess and can't be flipped. */
+  unread: boolean;
 }) {
   const setting = useSetBraidsEnabled({ organizationId });
   return (
@@ -64,7 +67,7 @@ function EnableBraids({
         {isEnterprise ? (
           <Switch
             checked={enabled}
-            disabled={isReading || setting.isSaving}
+            disabled={isReading || unread || setting.isSaving}
             onCheckedChange={({ checked }) => setting.set(checked)}
             inputProps={{ "aria-label": ENABLE_BRAIDS }}
             data-testid="braids-enabled-switch"
@@ -165,11 +168,11 @@ export default function OrganizationBraidsScreen() {
   const host = useAuthzHost();
   const { organizationId } = host.scope();
   const { isEnterprise, isLoading: isPlanLoading } = host.plan();
-  // Off, the page lists existing braids and no setting (Alex, 2026-11-18).
+  // Unreleased, the page lists existing braids, and offers the switch only to turn Braids off.
   const releasedFlag = useBraidsReleased();
   const released = releasedFlag === true;
   const braids = useOrganizationBraids({ organizationId });
-  const policy = useBraidsPolicy({ organizationId, released });
+  const policy = useBraidsPolicy({ organizationId });
 
   if (!organizationId || isPlanLoading || releasedFlag === undefined || braids.isLoading) {
     return (
@@ -208,12 +211,13 @@ export default function OrganizationBraidsScreen() {
             </Banner>
           </Box>
         ) : null}
-        {released ? (
+        {released || policy.data?.braidsEnabled === true ? (
           <EnableBraids
             organizationId={organizationId}
             isEnterprise={isEnterprise}
             enabled={policy.data?.braidsEnabled ?? false}
             isReading={policy.isLoading}
+            unread={policy.isError}
           />
         ) : null}
         {released ? (

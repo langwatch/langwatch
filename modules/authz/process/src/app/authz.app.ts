@@ -751,17 +751,16 @@ export class AuthzModule implements AuthzApi {
   };
   getOrganizationPolicy: AuthzApi["getOrganizationPolicy"] = (a) =>
     this.organizationPolicies().getOrganizationPolicy(a);
-  /** The Braids screen's settings; answered while Braids is turned off, so it can be turned on. */
-  getOrganizationPolicyForScreen: AuthzApi["getOrganizationPolicyForScreen"] = async (a) => {
-    await this.braidRelease().assertReleasedForOrganization(a);
-    return this.organizationPolicies().getOrganizationPolicy(a);
-  };
+  /** The Braids screen's settings, read while the release is off so Braids can be turned off. */
+  getOrganizationPolicyForScreen: AuthzApi["getOrganizationPolicyForScreen"] = (a) =>
+    this.organizationPolicies().getOrganizationPolicy(a);
   setBraidsPolicy: AuthzApi["setBraidsPolicy"] = async (a) => {
     await this.braidRelease().assertReleasedForOrganization(a);
     return this.organizationPolicies().setBraidsPolicy(a);
   };
+  /** Turning Braids off only narrows reads, so it is answered while the release is off too. */
   setBraidsEnabled: AuthzApi["setBraidsEnabled"] = async (a) => {
-    await this.braidRelease().assertReleasedForOrganization(a);
+    if (a.braidsEnabled) await this.braidRelease().assertReleasedForOrganization(a);
     return this.organizationPolicies().setBraidsEnabled(a);
   };
 

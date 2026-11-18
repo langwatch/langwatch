@@ -40,6 +40,7 @@ beforeEach(() => {
   ];
   braidsFake.state.keptToAdmins = false;
   braidsFake.state.braidsEnabled = true;
+  braidsFake.state.policyFails = false;
   braidsFake.state.setPolicy.mockClear();
   braidsFake.state.setEnabled.mockClear();
 });
@@ -108,6 +109,14 @@ describe("OrganizationBraidsScreen", () => {
       expect(host.successes[0]?.title).toBe("Braids is on");
     });
 
+    /** @scenario The Enable Braids switch can't be flipped while the setting can't be read */
+    it("disables the switch when the setting fails to load", () => {
+      braidsFake.state.policyFails = true;
+      renderAs();
+
+      expect(screen.getByRole("checkbox", { name: "Enable Braids" })).toBeDisabled();
+    });
+
     /** @scenario While Braids is off the organisation page lists its braids as paused */
     it("lists every braid marked paused", () => {
       braidsFake.state.braidsEnabled = false;
@@ -143,6 +152,22 @@ describe("OrganizationBraidsScreen", () => {
       expect(screen.getByTestId("organization-braids")).toBeInTheDocument();
       expect(screen.queryByText("Who may braid")).not.toBeInTheDocument();
       expect(screen.queryByText("Braids are paused")).not.toBeInTheDocument();
+    });
+
+    it("offers the Enable Braids switch only while Braids is on, so it can be turned off", async () => {
+      renderAs({ braidsReleased: false });
+      await userEvent.setup().click(screen.getByRole("checkbox", { name: "Enable Braids" }));
+      expect(braidsFake.state.setEnabled).toHaveBeenCalledWith({
+        organizationId: "org-1",
+        braidsEnabled: false,
+      });
+    });
+
+    it("offers no Enable Braids switch once Braids is off", () => {
+      braidsFake.state.braidsEnabled = false;
+      renderAs({ braidsReleased: false });
+
+      expect(screen.queryByRole("checkbox", { name: "Enable Braids" })).toBeNull();
     });
   });
 

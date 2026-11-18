@@ -347,6 +347,12 @@ Feature: The Braids screen
       And turning it on saves the setting and says Braids is on
 
     @integration
+    Scenario: The Enable Braids switch can't be flipped while the setting can't be read
+      Given reading the organisation's Braids settings fails
+      When ana opens Braids in the organisation settings
+      Then the Enable Braids switch is disabled rather than showing a guess
+
+    @integration
     Scenario: Below Enterprise the organisation Braids page offers the upsell instead of the switch
       Given an organisation below Enterprise
       When ana opens Braids in the organisation settings

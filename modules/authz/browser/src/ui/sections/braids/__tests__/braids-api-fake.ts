@@ -14,6 +14,8 @@ export type BraidsApiState = {
   keptToAdmins: boolean;
   /** The organisation's "Braids enabled" setting; a fixture organisation has it on. */
   braidsEnabled: boolean;
+  /** When set, reading the organisation's settings fails. */
+  policyFails: boolean;
   remove: Mock<(input: unknown) => void>;
   setPolicy: Mock<(input: unknown) => void>;
   setEnabled: Mock<(input: unknown) => void>;
@@ -56,6 +58,7 @@ export function braidsApiFake() {
     organization: [],
     keptToAdmins: false,
     braidsEnabled: true,
+    policyFails: false,
     remove: vi.fn(),
     setPolicy: vi.fn(),
     setEnabled: vi.fn(),
@@ -108,13 +111,22 @@ export function braidsApiFake() {
     authz: {
       listBraids: query(() => state.project),
       listOrganizationBraids: query(() => state.organization),
-      getBraidsPolicy: query(() => ({
-        organizationId: "org-1",
-        braidsOrganizationAdminsOnly: state.keptToAdmins,
-        braidsEnabled: state.braidsEnabled,
-        updatedByUserId: null,
-        updatedAtMs: null,
-      })),
+      getBraidsPolicy: {
+        useQuery: () =>
+          state.policyFails
+            ? { data: undefined, isLoading: false, isError: true }
+            : {
+                data: {
+                  organizationId: "org-1",
+                  braidsOrganizationAdminsOnly: state.keptToAdmins,
+                  braidsEnabled: state.braidsEnabled,
+                  updatedByUserId: null,
+                  updatedAtMs: null,
+                },
+                isLoading: false,
+                isError: false,
+              },
+      },
       removeBraid: mutation(
         () => state.remove,
         (input: { braidId: string }) => ({ braidId: input.braidId }),
