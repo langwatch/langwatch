@@ -44,15 +44,16 @@
     "@langwatch/time": "workspace:*",
     "@opentelemetry/api": "catalog:",
     "ioredis": "catalog:",
-    "langwatch": "catalog:",
+    "langwatch": "workspace:*",
     "nanoid": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {
     "@langwatch/test-harness": "workspace:*",
     "@langwatch/vitest-config": "workspace:*",
-    "@opentelemetry/sdk-trace-base": "catalog:",
-    "@opentelemetry/sdk-trace-node": "catalog:",
+    "@opentelemetry/context-async-hooks": "catalog:",
+    "@opentelemetry/core": "catalog:",
+    "@opentelemetry/sdk-trace": "catalog:",
     "@types/node": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"

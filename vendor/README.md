@@ -5,42 +5,26 @@ known bits and can carry an unreleased build when one is needed.
 
 ## @langwatch/scenario
 
-**File:** `langwatch-scenario-1.7.0-dev.voice10.tgz`
-**sha256:** `1e06a22a6929781b01cf153ac1ef7e4ffe4c6f6f4b85c41a8d9d9adf2e25ddaf`
+**File:** `langwatch-scenario-1.7.1-dev.otel3.tgz`
+**sha256:** `09114ce5594e9536d40740b37ac59e935d6461166fdf636056309ea855b08ae2`
 
 An unreleased build of [langwatch/scenario](https://github.com/langwatch/scenario)
-at `55de2020`, which is its main with scenario PR #1001 merged: the judge maps
-each criterion by its schema key rather than by position, reports inconclusive
-criteria apart from unmet ones, waits out a quiet period before a trace counts
-as settled, and retries an empty user-simulator answer. It is stamped as the
-prerelease `1.7.0-dev.voice10`; the stamp is set locally before `pnpm buildpack`
-and is not committed in the scenario repo, where main stays on its released
-version.
+at `71626704`: its main after the 1.7.0 release (`50abd232`) plus the move to
+OpenTelemetry JS 3.x. It depends on `@opentelemetry/sdk-trace` 3.1.1 instead of
+the deprecated `sdk-trace-base` and `sdk-trace-node`, takes `@opentelemetry/api`
+`>=1.10.0 <1.11.0`, and accepts `langwatch` up to `<4.0.0`, so it runs beside
+this repository's SDK on the same OpenTelemetry. It is stamped as the prerelease
+`1.7.1-dev.otel3`; the stamp is set locally before `pnpm buildpack` and is not
+committed in the scenario repo, where main stays on its released version.
 
-It is the build this repository's voice code is written against: the voice
-transports read `voice.openTwilioTunnel` and `voice.twilioAgent` off the SDK's
-`voice` namespace.
+The voice transports this repository's voice code is written against
+(`voice.openTwilioTunnel`, `voice.twilioAgent`), per-criterion judge verdicts on
+the run finished event, and the Claude Code watchdog's dash-safe
+`kill -TERM "-$child"` are all in that source, so the tarball carries no edit
+over the build.
 
-Swap it for the published npm 1.7.0 once that exists, so the same code is not
-vendored twice.
-
-This build sends `inconclusiveCriteria` but not the per-criterion `criteria`
-array (status, requirement and reasoning for each criterion) on the run
-finished event. The platform already ingests, stores and shows that array
-(`specs/scenarios/judge-criterion-verdicts.feature`), and suite runs post their
-events through the same `/api/scenario-events` path as any SDK, so bumping to a
-scenario release that carries per-criterion verdicts needs no platform change.
-Until then the run view derives each criterion from the met, unmet and
-inconclusive lists, without reasoning.
-
-The tarball carries one edit over that build, in `dist/index.js` and
-`dist/index.mjs`: the Claude Code watchdog kills the child's process group
-with `kill -TERM "-$child"` instead of `kill -TERM -- "-$child"`. It runs
-under `/bin/sh`, which is dash on Debian and Ubuntu, and dash refuses the
-`--` with "Illegal number", so a killed worker left its Claude Code child
-running. The same edit is needed in scenario's
-`javascript/src/agents/claude-code/process-lifecycle.ts` before the next
-build replaces this one.
+Swap it for the published npm release that carries OpenTelemetry JS 3.x once
+that exists, so the same code is not vendored twice.
 
 ## Updating
 

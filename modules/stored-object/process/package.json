@@ -57,7 +57,7 @@
     "@trpc/server": "catalog:",
     "hono": "catalog:",
     "ioredis": "catalog:",
-    "langwatch": "catalog:",
+    "langwatch": "workspace:*",
     "zod": "catalog:"
   },
   "devDependencies": {

@@ -89,8 +89,7 @@
   "devDependencies": {
     "@langwatch/vitest-config": "workspace:*",
     "@opentelemetry/core": "catalog:",
-    "@opentelemetry/sdk-trace-base": "catalog:",
-    "@opentelemetry/sdk-trace-web": "catalog:",
+    "@opentelemetry/sdk-trace": "catalog:",
     "@types/node": "catalog:",
     "@types/react": "catalog:",
     "@types/ws": "catalog:",

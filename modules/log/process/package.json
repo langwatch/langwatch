@@ -38,7 +38,7 @@
     "@opentelemetry/api": "catalog:",
     "@opentelemetry/otlp-transformer": "catalog:",
     "hono": "catalog:",
-    "langwatch": "catalog:",
+    "langwatch": "workspace:*",
     "zod": "catalog:"
   },
   "devDependencies": {

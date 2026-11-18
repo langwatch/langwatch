@@ -54,7 +54,7 @@
     "@langwatch/workflow-contract": "workspace:*",
     "@monaco-editor/react": "catalog:",
     "@xyflow/react": "catalog:",
-    "langwatch": "catalog:",
+    "langwatch": "workspace:*",
     "lodash-es": "catalog:",
     "lucide-react": "catalog:",
     "monaco-editor": "catalog:",

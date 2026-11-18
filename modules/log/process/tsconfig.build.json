@@ -24,6 +24,9 @@
   ],
   "references": [
     {
+      "path": "../../../sdks/typescript"
+    },
+    {
       "path": "../../trace/contract/tsconfig.build.json"
     },
     {

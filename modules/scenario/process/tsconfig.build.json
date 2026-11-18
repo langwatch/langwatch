@@ -28,6 +28,9 @@
   ],
   "references": [
     {
+      "path": "../../../sdks/typescript"
+    },
+    {
       "path": "../../workflow/contract/tsconfig.build.json"
     },
     {

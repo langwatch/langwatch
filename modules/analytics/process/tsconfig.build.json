@@ -32,6 +32,9 @@
   ],
   "references": [
     {
+      "path": "../../../sdks/typescript"
+    },
+    {
       "path": "../../../packages/upgrade/tsconfig.build.json"
     },
     {

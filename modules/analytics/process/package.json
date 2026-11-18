@@ -71,7 +71,7 @@
     "@trpc/server": "catalog:",
     "hono": "catalog:",
     "hono-openapi": "catalog:",
-    "langwatch": "catalog:",
+    "langwatch": "workspace:*",
     "nanoid": "catalog:",
     "zod": "catalog:"
   },

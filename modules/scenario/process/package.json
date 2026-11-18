@@ -76,7 +76,7 @@
     "ai": "catalog:",
     "hono": "catalog:",
     "hono-openapi": "catalog:",
-    "langwatch": "catalog:",
+    "langwatch": "workspace:*",
     "liquidjs": "catalog:",
     "nanoid": "catalog:",
     "papaparse": "catalog:",
