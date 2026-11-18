@@ -4897,6 +4897,26 @@ model AuthzOrganizationPolicy {
   updatedAt                    DateTime @updatedAt
 }
 
+// ADR-201 §1: every braid write the authz service sent, recorded before its attach command and
+// outside the reader lock's transaction. A retry with the same command id answers the braid it
+// saved; a write the grant projection has not landed still counts in the reader's checks.
+model AuthzBraidWrite {
+  organizationId  String
+  commandId       String
+  grantId         String
+  readerProjectId String
+  ownerProjectId  String
+  termsKey        String
+  condition       Json
+  expiresAt       DateTime?
+  replacesGrantId String?
+  createdByUserId String?
+  createdAt       DateTime  @default(now())
+
+  @@id([organizationId, commandId])
+  @@index([organizationId, readerProjectId, createdAt])
+}
+
 model RoleBinding {
   id             String       @id @default(nanoid())
   organizationId String

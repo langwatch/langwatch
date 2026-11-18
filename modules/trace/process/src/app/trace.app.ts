@@ -233,6 +233,7 @@ import { TraceSummaryStore } from "../eventing/trace-summary.store.ts";
 import { EventingTraceTopicAssignment } from "../eventing/trace-topic-assignment.commands.ts";
 import type { TraceBraidReadsRepository } from "../features/braid/repositories/trace-braid-reads.repository.ts";
 import {
+  ownerAudienceNamed,
   selectedSpanOwnerOf,
   verifiedMarksOf,
 } from "../features/braid/rules/braided-span-owner.rules.ts";
@@ -2038,10 +2039,17 @@ export class TraceModule implements TraceApi, CollectorApp {
     const selected = selectedSpanOwnerOf({ authorization, ownerProjectId: input.ownerProjectId });
     const braidOwner = selected.kind === "braid" ? selected.ownerProjectId : undefined;
     // A braided span: its owner's policy, the viewer's standing on the owner (ADR-201 §5).
-    const protections = await this.resolveViewerProtections({
+    const resolved = await this.resolveViewerProtections({
       projectId: braidOwner ?? input.projectId,
       userId: input.viewerUserId,
     });
+    const protections =
+      braidOwner === undefined
+        ? resolved
+        : ownerAudienceNamed({
+            protections: resolved,
+            ownerName: await this.#braidDetail.ownerName({ ownerProjectId: braidOwner }),
+          });
     await this.assertTraceNotWithheld({
       authorization,
       traceId: input.traceId,
@@ -3130,6 +3138,10 @@ export class TraceModule implements TraceApi, CollectorApp {
 
   readTraceEventsForViewer(input: TraceDrawerReadInput): Promise<DerivedTraceEvent[]> {
     return this.#drawer.traceEvents(input);
+  }
+
+  readLangwatchSignalsForViewer(input: TraceDrawerReadInput): Promise<SpanLangwatchSignals[]> {
+    return this.#drawer.langwatchSignals(input);
   }
 
   /** One trace's summary fold, read from the named member when the header names one. */

@@ -171,6 +171,12 @@ Feature: The Instant Eval run over REST, one LWQL statement, judged as a job
     When its input tokens are estimated
     Then the count uses the ratio the classifier publishes rather than a prose rule
 
+  @unit
+  Scenario: A request is priced with the envelope the judge bills on every call
+    Given a judged text of known length and one question
+    When its input tokens are estimated
+    Then the count is the text plus the questions plus the classifier's request overhead
+
   # ---------------------------------------------------------------------------
   # Reading a run
   # ---------------------------------------------------------------------------

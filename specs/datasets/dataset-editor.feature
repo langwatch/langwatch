@@ -370,6 +370,15 @@ Feature: Dataset editor
       # rather than reading on to the end.
 
     @unit
+    Scenario: A search counts the bytes storage handed it, not a re-encoding of the rows
+      Given a chunked dataset whose chunks storage reports in bytes as it reads them
+      When a search is run against it
+      Then the bytes the scan is held to are the ones storage read
+      And no chunk is re-serialised to weigh it
+      # The file in storage is JSONL; weighing the parsed rows as one JSON array
+      # measured a different encoding and cost more CPU than the parse itself.
+
+    @unit
     Scenario: The refusal has its own words, not the export refusal's
       Given a search was refused because the dataset is too large
       Then the user is told the dataset is too large to search

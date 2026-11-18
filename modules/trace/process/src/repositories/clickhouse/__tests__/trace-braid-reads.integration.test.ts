@@ -38,6 +38,7 @@ const trace = {
   empty: `trace-empty-${nanoid()}`,
   old: `trace-old-${nanoid()}`,
   ownerOnly: `trace-owner-only-${nanoid()}`,
+  unlinked: `trace-unlinked-${nanoid()}`,
 };
 const web = { orchestrator: "web" };
 const app = { orchestrator: "app" };
@@ -63,6 +64,7 @@ function spanRow(input: {
   spanId: string;
   at?: number;
   attributes?: Record<string, string>;
+  parentSpanId?: string;
 }) {
   const start = new Date(input.at ?? base);
   return {
@@ -70,7 +72,7 @@ function spanRow(input: {
     TenantId: input.tenantId,
     TraceId: input.traceId,
     SpanId: input.spanId,
-    ParentSpanId: null,
+    ParentSpanId: input.parentSpanId ?? null,
     ParentTraceId: null,
     ParentIsRemote: null,
     Sampled: 1,
@@ -154,6 +156,7 @@ function pairSpanRows() {
       spanId,
       at: at(minutes),
       attributes: { ...attributes },
+      parentSpanId: `root-${traceId}`,
     });
   return [
     ...[pair.older, pair.newer, pair.nothing].map((traceId) =>
@@ -167,6 +170,13 @@ function pairSpanRows() {
     owned(pair.nothing, "p-nothing-app", 5, app),
   ];
 }
+
+const linked = (traceId: string) => ({ tenantId: owner, traceId, parentSpanId: `root-${traceId}` });
+const child = (traceId: string, parentSpanId: string) => ({
+  tenantId: owner,
+  traceId,
+  parentSpanId,
+});
 
 const braid: AuthzBraid = {
   braidId: "braid_web",
@@ -194,24 +204,29 @@ beforeAll(async () => {
         intoOtherProjects: projectId === owner ? [braid] : [],
         fromOtherProjects: projectId === reader ? [braid] : [],
       }),
+      assertBraidsReleased: async () => {},
     },
   });
   const old = now - EIGHT_DAYS_MS;
   const spanRows = [
-    ...[trace.every, trace.some, trace.none, trace.empty].map((traceId) =>
+    ...[trace.every, trace.some, trace.none, trace.empty, trace.unlinked].map((traceId) =>
       spanRow({ tenantId: reader, traceId, spanId: `root-${traceId}` }),
     ),
-    spanRow({ tenantId: owner, traceId: trace.every, spanId: "o-web-1", attributes: signed }),
-    spanRow({ tenantId: owner, traceId: trace.every, spanId: "o-web-2", attributes: web }),
-    spanRow({ tenantId: owner, traceId: trace.some, spanId: "o-web-3", attributes: web }),
-    spanRow({ tenantId: owner, traceId: trace.some, spanId: "o-app-1", attributes: app }),
-    spanRow({ tenantId: owner, traceId: trace.none, spanId: "o-app-2", attributes: app }),
+    // Each counted trace is held: its first owner span is a child of the reader's root.
+    spanRow({ ...linked(trace.every), spanId: "o-web-1", attributes: signed }),
+    spanRow({ ...child(trace.every, "o-web-1"), spanId: "o-web-2", attributes: web }),
+    spanRow({ ...linked(trace.some), spanId: "o-web-3", attributes: web }),
+    spanRow({ ...child(trace.some, "o-web-3"), spanId: "o-app-1", attributes: app }),
+    spanRow({ ...linked(trace.none), spanId: "o-app-2", attributes: app }),
+    spanRow({ ...child(trace.unlinked, "o-elsewhere"), spanId: "o-unlinked", attributes: web }),
     spanRow({ tenantId: owner, traceId: trace.old, spanId: "o-old", at: old, attributes: web }),
     spanRow({ tenantId: owner, traceId: trace.ownerOnly, spanId: "o-alone", attributes: web }),
     ...pairSpanRows(),
   ];
   const summaryRows = [
-    ...[trace.every, trace.some, trace.none, trace.empty].map((traceId) => summaryRow({ traceId })),
+    ...[trace.every, trace.some, trace.none, trace.empty, trace.unlinked].map((traceId) =>
+      summaryRow({ traceId }),
+    ),
     summaryRow({ traceId: trace.old, at: old }),
     ...[pair.older, pair.newer, pair.nothing].map((traceId) =>
       summaryRow({ traceId, tenantId: pair.reader, at: base - 5 * MINUTE_MS }),
@@ -255,12 +270,27 @@ describe.skipIf(!clickHouseConfigured)("braid reads against ClickHouse", () => {
 
       expect(preview).toMatchObject({
         refusal: null,
-        traces: { every: 1, some: 1, none: 2, total: 4, capped: false },
+        traces: { every: 1, some: 1, none: 3, total: 5, capped: false },
         spans: 3,
         live: { braids: 0, spans: 0 },
         unsignedHidden: null,
       });
       expect([trace.every, trace.some]).toContain(preview.example?.traceId);
+    });
+
+    /** @scenario "Testing a trace renders it exactly as the reader will see it" */
+    it("marks nothing braided in a trace sharing only its id with the owner", async () => {
+      const tested = await service.testTrace({
+        ...proofs(),
+        where: WEB_TEXT,
+        fromMs: 0,
+        traceId: trace.unlinked,
+      });
+
+      expect(tested.found).toBe(true);
+      expect(tested.nodes).toContainEqual(
+        expect.objectContaining({ spanId: "o-unlinked", braided: false }),
+      );
     });
 
     /** @scenario "The preview counts calls that would stay hidden for want of a valid signature" */
@@ -271,7 +301,7 @@ describe.skipIf(!clickHouseConfigured)("braid reads against ClickHouse", () => {
         fromMs: 0,
       });
 
-      expect(preview.traces).toMatchObject({ every: 0, some: 1, none: 3, total: 4 });
+      expect(preview.traces).toMatchObject({ every: 0, some: 1, none: 4, total: 5 });
       expect(preview.unsignedHidden).toBe(2);
     });
   });
@@ -398,7 +428,7 @@ describe.skipIf(!clickHouseConfigured)("braid reads against ClickHouse", () => {
       const preview = await service.preview({ ...proofs(), where: WEB_TEXT, fromMs: 0 });
 
       expect(tested).toEqual({ found: false, nodes: [] });
-      expect(preview.traces.total).toBe(4);
+      expect(preview.traces.total).toBe(5);
     });
   });
 
@@ -409,7 +439,7 @@ describe.skipIf(!clickHouseConfigured)("braid reads against ClickHouse", () => {
         authorization: ownProof({ projectId: owner }),
       });
 
-      expect(keys[0]).toEqual({ key: "orchestrator", spanCount: 6 });
+      expect(keys[0]).toEqual({ key: "orchestrator", spanCount: 7 });
       expect(keys.map(({ key }) => key).filter((key) => key.startsWith("langwatch."))).toEqual([]);
     });
   });
@@ -431,8 +461,8 @@ describe.skipIf(!clickHouseConfigured)("braid reads against ClickHouse", () => {
         braidIds: [braid.braidId],
       });
 
-      expect(onOwnerPage).toEqual({ activity: [{ braidId: braid.braidId, spanCount: 4 }] });
-      // o-alone matches but sits in trace.ownerOnly, which the reader does not hold (ADR-201 §3).
+      expect(onOwnerPage).toEqual({ activity: [{ braidId: braid.braidId, spanCount: 5 }] });
+      // o-alone sits in a trace the reader lacks, o-unlinked in one it shares only by id (§3).
       expect(onReaderPage).toEqual({ activity: [{ braidId: braid.braidId, spanCount: 3 }] });
     });
   });

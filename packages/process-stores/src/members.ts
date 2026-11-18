@@ -10,6 +10,8 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { RedisConnection } from "@langwatch/redis-client";
 import type { Instant } from "@langwatch/time";
 
+export { readableBody } from "./object-storage-backend.ts";
+
 /** Now, read from one place, so a test moves time without touching a module. */
 export interface Clock {
   now(): Instant;
