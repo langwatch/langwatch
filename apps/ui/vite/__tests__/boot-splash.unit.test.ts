@@ -7,6 +7,7 @@ import { runInNewContext } from "node:vm";
 
 import { describe, expect, it } from "vitest";
 
+import { shellCarriesPublicConfig } from "../../src/shell/ui-waiting-for-api-page";
 import { BOOT_REPORT_EVENTS, BOOT_REPORT_HEAD } from "../boot-report";
 import { BOOT_SPLASH_BODY, bootSplash, brandFallbackPage, bundleBootGround } from "../boot-splash";
 
@@ -61,6 +62,11 @@ describe("the boot splash", () => {
       );
       expect(html.indexOf(BOOT_REPORT_HEAD)).toBeGreaterThan(-1);
       expect(html.indexOf(BOOT_REPORT_HEAD)).toBeLessThan(html.indexOf("</head>"));
+    });
+
+    it("leaves a shell served without its public config reading as unconfigured", async () => {
+      const html = await transform('<html><head></head><body><div id="root"></div></body></html>');
+      expect(shellCarriesPublicConfig(html)).toBe(false);
     });
 
     it("holds the screen while the app shows its own loading screen", async () => {

@@ -60,7 +60,8 @@ const SCRIPT = `(function () {
   }
   // The page's public config: whether browser tracing is on, and its session sample ratio.
   function config() {
-    var meta = document.querySelector('meta[name="${PUBLIC_APP_CONFIG_META_NAME}"]');
+    // By name: a selector here would make the waiting page read this shell as configured.
+    var meta = document.getElementsByName("${PUBLIC_APP_CONFIG_META_NAME}")[0];
     if (!meta) return null;
     try {
       var b64 = String(meta.getAttribute("content")).replace(/-/g, "+").replace(/_/g, "/");
