@@ -8,14 +8,12 @@
   "type": "module",
   "main": "index.js",
   "scripts": {
-    "start:langwatch": "tsc && dotenv -- node dist/index.js",
-    "start:vercel": "tsc && dotenv -- node dist/using-vercel-otel.js",
+    "start": "tsc && dotenv -- node dist/index.js",
     "build": "tsc",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "dependencies": {
     "@ai-sdk/openai": "2.0.116",
-    "@vercel/otel": "^1.13.0",
     "ai": "5.0.222",
     "cli-markdown": "^3.5.1",
     "dotenv-cli": "^10.0.0",
