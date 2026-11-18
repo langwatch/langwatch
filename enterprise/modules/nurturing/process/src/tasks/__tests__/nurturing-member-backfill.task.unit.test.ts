@@ -56,9 +56,27 @@ describe("runNurturingMemberBackfill", () => {
       const outcome = await runNurturingMemberBackfill({ peers, execute: true, signal });
 
       expect(await rows(members)).toEqual([
-        { organizationId: "org-1", userId: "user-1", joinedAt: 1_000, leftAt: null, returnedAt: null },
-        { organizationId: "org-1", userId: "user-2", joinedAt: 2_000, leftAt: null, returnedAt: null },
-        { organizationId: "org-2", userId: "user-1", joinedAt: 3_000, leftAt: null, returnedAt: null },
+        {
+          organizationId: "org-1",
+          userId: "user-1",
+          joinedAt: 1_000,
+          leftAt: null,
+          returnedAt: null,
+        },
+        {
+          organizationId: "org-1",
+          userId: "user-2",
+          joinedAt: 2_000,
+          leftAt: null,
+          returnedAt: null,
+        },
+        {
+          organizationId: "org-2",
+          userId: "user-1",
+          joinedAt: 3_000,
+          leftAt: null,
+          returnedAt: null,
+        },
       ]);
       expect(outcome.executed).toEqual({
         organizations: 2,
@@ -84,8 +102,9 @@ describe("runNurturingMemberBackfill", () => {
       const second = await runNurturingMemberBackfill({ peers, execute: true, signal });
 
       expect(first.executed).toMatchObject({ created: 2, alreadyPresent: 1 });
-      expect(afterFirst.find((row) => row.organizationId === "org-1" && row.userId === "user-1"))
-        .toMatchObject({ joinedAt: 500 });
+      expect(
+        afterFirst.find((row) => row.organizationId === "org-1" && row.userId === "user-1"),
+      ).toMatchObject({ joinedAt: 500 });
       expect(second.executed).toMatchObject({ created: 0, alreadyPresent: 3 });
       expect(await rows(members)).toEqual(afterFirst);
     });
@@ -93,8 +112,16 @@ describe("runNurturingMemberBackfill", () => {
     /** @scenario "The member backfill does not bring back a member who left" */
     it("does not touch a member whose latest record is a leave", async () => {
       const { peers, members } = setup();
-      for (const [change, at] of [["joined", 100], ["left", 5_000]] as const) {
-        await members.recordMembershipChange({ organizationId: "org-1", userId: "user-2", change, at });
+      for (const [change, at] of [
+        ["joined", 100],
+        ["left", 5_000],
+      ] as const) {
+        await members.recordMembershipChange({
+          organizationId: "org-1",
+          userId: "user-2",
+          change,
+          at,
+        });
       }
       const before = await rows(members);
 

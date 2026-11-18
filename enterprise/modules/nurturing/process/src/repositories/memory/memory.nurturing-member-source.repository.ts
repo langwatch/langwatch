@@ -15,15 +15,17 @@ export class MemoryNurturingMemberSourceRepository implements NurturingMemberSou
   }
 
   private constructor(
-    private readonly membersByOrganization: Readonly<Record<string, readonly NurturingSourceMember[]>>,
+    private readonly membersByOrganization: Readonly<
+      Record<string, readonly NurturingSourceMember[]>
+    >,
   ) {}
 
-  async listOrganizationIds({
+  async findOrganizationIds({
     after,
     limit,
   }: Readonly<{ after?: string; limit: number }>): Promise<string[]> {
     return Object.keys(this.membersByOrganization)
-      .sort()
+      .toSorted()
       .filter((id) => after === undefined || id > after)
       .slice(0, limit);
   }

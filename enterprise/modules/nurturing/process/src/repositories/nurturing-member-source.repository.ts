@@ -13,9 +13,7 @@ export type NurturingSourceMember = Readonly<{
  */
 export interface NurturingMemberSourceRepository {
   /** Up to `limit` organization ids after `after`, in id order. */
-  listOrganizationIds(input: Readonly<{ after?: string; limit: number }>): Promise<string[]>;
+  findOrganizationIds(input: Readonly<{ after?: string; limit: number }>): Promise<string[]>;
   /** Members neither disabled nor deactivated: the ones nurturing's copy holds as current. */
-  findActiveMembers(
-    input: Readonly<{ organizationId: string }>,
-  ): Promise<NurturingSourceMember[]>;
+  findActiveMembers(input: Readonly<{ organizationId: string }>): Promise<NurturingSourceMember[]>;
 }

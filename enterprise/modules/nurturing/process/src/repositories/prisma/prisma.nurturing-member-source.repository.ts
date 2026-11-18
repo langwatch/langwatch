@@ -21,7 +21,7 @@ export class PrismaNurturingMemberSourceRepository implements NurturingMemberSou
     return new PrismaNurturingMemberSourceRepository(prisma);
   }
 
-  async listOrganizationIds({
+  async findOrganizationIds({
     after,
     limit,
   }: Readonly<{ after?: string; limit: number }>): Promise<string[]> {

@@ -202,7 +202,7 @@ describe("NurturingPlanSyncService", () => {
 
   describe("when a person is in a paid team and their own free organization", () => {
     /** @scenario "A person whose paid team is their latest join is never told free by the resync" */
-    it.each([
+    it.each<[string, ("org-a" | "org-b")[]]>([
       ["paid team's fact first", ["org-a", "org-b"]],
       ["free organization's fact first", ["org-b", "org-a"]],
     ])("never tells them free after the member backfill (%s)", async (_order, order) => {
@@ -221,7 +221,7 @@ describe("NurturingPlanSyncService", () => {
         signal: new AbortController().signal,
       });
       const { planSync, sent } = planSyncOver(members);
-      const facts = {
+      const facts: Record<"org-a" | "org-b", NurturingSignalOf<"subscription_changed">> = {
         "org-a": { ...change, organizationId: "org-a", memberUserIds: ["alice"], plan: "LAUNCH" },
         "org-b": {
           ...change,
@@ -230,11 +230,11 @@ describe("NurturingPlanSyncService", () => {
           plan: "FREE",
           hasSubscription: false,
         },
-      } as const;
+      };
 
       for (const organizationId of order) {
         await planSync.planCaughtUp({
-          ...facts[organizationId as keyof typeof facts],
+          ...facts[organizationId],
           fromCatchUp: true,
         });
       }

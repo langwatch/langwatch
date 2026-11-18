@@ -27,7 +27,11 @@ export type NurturingMemberBackfillTotals = {
 };
 
 export class NurturingMemberBackfillService {
-  static create({ peers }: { peers: NurturingMemberBackfillPeers }): NurturingMemberBackfillService {
+  static create({
+    peers,
+  }: {
+    peers: NurturingMemberBackfillPeers;
+  }): NurturingMemberBackfillService {
     return new NurturingMemberBackfillService(peers);
   }
 
@@ -53,8 +57,9 @@ export class NurturingMemberBackfillService {
       alreadyPresent: 0,
     };
     let after: string | undefined;
-    for (;;) {
-      const ids = await this.peers.source.listOrganizationIds({
+    let ids: string[];
+    do {
+      ids = await this.peers.source.findOrganizationIds({
         after,
         limit: ORGANIZATIONS_PER_PAGE,
       });
@@ -62,9 +67,9 @@ export class NurturingMemberBackfillService {
         if (signal.aborted) return totals;
         await this.#backfillOrganization({ organizationId, dryRun, totals });
       }
-      if (ids.length < ORGANIZATIONS_PER_PAGE) return totals;
       after = ids.at(-1);
-    }
+    } while (ids.length >= ORGANIZATIONS_PER_PAGE);
+    return totals;
   }
 
   async #backfillOrganization({

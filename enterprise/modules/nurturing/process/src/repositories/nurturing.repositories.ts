@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import type { NurturingClaimRepository } from "./nurturing-claim.repository.ts";
+import type { NurturingMemberSourceRepository } from "./nurturing-member-source.repository.ts";
 import type {
   NurturingCodingMilestonesRepository,
   NurturingMilestonesRepository,
   NurturingOrganizationAdminRepository,
   NurturingTraceMilestonesRepository,
 } from "./nurturing-milestones.repository.ts";
-import type { NurturingMemberSourceRepository } from "./nurturing-member-source.repository.ts";
 import type { NurturingOrganizationCreatedRepository } from "./nurturing-organization-created.repository.ts";
 import type { NurturingOrganizationMemberRepository } from "./nurturing-organization-member.repository.ts";
 import type { NurturingOrganizationPlanRepository } from "./nurturing-organization-plan.repository.ts";
