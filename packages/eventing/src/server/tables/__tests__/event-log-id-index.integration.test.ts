@@ -271,7 +271,7 @@ describe("the event log's aggregate index", () => {
       if (bounded === undefined) throw new Error("the replay sent no event read");
       const unbounded = {
         ...bounded,
-        sql: bounded.sql.replace(/AND \(\s*EventOccurredAt = 0[\s\S]*?\)\s*\)/, ""),
+        sql: bounded.sql.replace(/AND \(\s*EventOccurredAt = \{\w+:\w+\}[\s\S]*?\)\s*\)/, ""),
       };
       // Exactly the parts of its three weeks and the unknown-time partition, never a decoy's week.
       expect(await partsAfterPartitionPruning({ query: sql, request: bounded })).toBe(
@@ -402,7 +402,7 @@ describe("the event log's aggregate index", () => {
       expect(
         statements.some(
           (each) =>
-            each.sql.includes("FROM event_log\n") && each.sql.includes("min(EventOccurredAt)"),
+            each.sql.includes("FROM event_log WHERE") && each.sql.includes("min(EventOccurredAt)"),
         ),
       ).toBe(true);
       expect(applied).toHaveLength(2);

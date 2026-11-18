@@ -51,8 +51,14 @@ describe("experiment's descriptors against the migrated schema", () => {
       });
       const stored = Object.fromEntries(
         ((await result.json()) as { name: string; type: string }[])
-          // `_retention_days` is retention plumbing (ADR-024); `_size_bytes` the meter reads.
-          .filter((each) => each.name === "_size_bytes" || !each.name.startsWith("_"))
+          // `_` columns are retention plumbing (ADR-024) unless a read declares them;
+          // the meter reads `_size_bytes`.
+          .filter(
+            (each) =>
+              each.name === "_size_bytes" ||
+              !each.name.startsWith("_") ||
+              table.$table.columns.includes(each.name),
+          )
           .map((each) => [each.name, bindingOf(each.type)]),
       );
       const declared = Object.fromEntries(

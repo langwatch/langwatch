@@ -17,7 +17,12 @@ import { traceAnalyticsRollup } from "../clickhouse.trace-analytics-rollup.table
 import { traceAnalytics } from "../clickhouse.trace-analytics.table.ts";
 import { traceEvaluationAnalytics } from "../clickhouse.trace-evaluation-analytics.table.ts";
 import { traceSummaries } from "../clickhouse.trace-summaries.table.ts";
-import { startMigratedTraceClickHouse } from "./support/clickhouse-endpoint.support.ts";
+import {
+  startMigratedTraceClickHouse,
+  testClickHouseConfigured,
+} from "./support/clickhouse-endpoint.support.ts";
+
+const clickHouseConfigured = testClickHouseConfigured();
 
 const DESCRIPTORS: readonly { readonly $table: ClickHouseTableFacts }[] = [
   storedSpans,
@@ -49,7 +54,7 @@ const bindingOf = (type: string): string =>
     .replaceAll(/DateTime64\(\d\)/g, "Int64")
     .replace(/^FixedString\(\d+\)$/, "String");
 
-describe("trace's descriptors against the migrated schema", () => {
+describe.skipIf(!clickHouseConfigured)("trace's descriptors against the migrated schema", () => {
   it.each(DESCRIPTORS.map((table) => [table.$table.stored, table] as const))(
     "declares only %s columns the schema has, binding as their stored types",
     async (name, table) => {
