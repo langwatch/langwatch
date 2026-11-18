@@ -339,7 +339,7 @@ Feature: Token Created modal command snippets
   Scenario: An inline copy button that unmounts does not reset after it is gone
     Given a copy button that has just copied successfully
     When it is closed and 2 seconds pass
-    Then the tick is cleared and nothing breaks
+    Then nothing is left waiting to reset the tick and nothing breaks
 
   @integration
   Scenario: An inline copy button returns to its copy icon after 2 seconds
@@ -357,4 +357,4 @@ Feature: Token Created modal command snippets
   Scenario: The Copy API key button that closes with the dialog does not reset after it is gone
     Given the dialog's Copy API key button has just copied successfully
     When the dialog closes and 2 seconds pass
-    Then the tick is cleared and nothing breaks
+    Then nothing is left waiting to reset the tick and nothing breaks

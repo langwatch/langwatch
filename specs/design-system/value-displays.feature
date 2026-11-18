@@ -52,7 +52,7 @@ Feature: Code, money and dates read the one way
   Scenario: A snippet copy button that unmounts does not reset after it is gone
     Given a copy button that has just copied successfully
     When it is closed and 2 seconds pass
-    Then the tick is cleared and nothing breaks
+    Then nothing is left waiting to reset the tick and nothing breaks
 
   @integration
   Scenario: A snippet copy button returns to its copy icon after 2 seconds

@@ -283,7 +283,7 @@ function SnippetCopyButton({
   const resetTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const mounted = useRef(true);
 
-  // The reset timer must not outlive the button: a late setState after teardown throws.
+  // The reset timer must not outlive the button: a late setState can run in a torn-down test environment.
   useEffect(() => {
     mounted.current = true;
     return () => {

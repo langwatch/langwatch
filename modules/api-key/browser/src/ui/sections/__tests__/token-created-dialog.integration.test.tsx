@@ -497,29 +497,40 @@ describe("given a key has just been minted with a name", () => {
 
     /** @scenario The Copy API key button that closes with the dialog does not reset after it is gone */
     it("leaves no reset timer behind when the dialog closes within 2 seconds of a copy", async () => {
+      // jsdom lays nothing out, so the focus trap would treat every element as hidden.
+      const rect = new DOMRect(0, 0, 10, 10);
+      const layout = vi.spyOn(Element.prototype, "getClientRects").mockReturnValue({
+        0: rect,
+        length: 1,
+        item: (index: number) => (index === 0 ? rect : null),
+        [Symbol.iterator]: () => [rect][Symbol.iterator](),
+      });
       renderDialog({ keyName: "Deploy pipeline" });
       const errors = vi.spyOn(console, "error").mockImplementation(() => undefined);
+      const copyButton = screen.getByRole("button", { name: "Copy API key" });
+      // The focus trap sets up on real animation frames; let them run before faking timers.
+      await vi.waitFor(() => expect(document.activeElement).toBe(copyButton));
 
       vi.useFakeTimers();
       try {
-        fireEvent.click(screen.getByRole("button", { name: "Copy API key" }));
+        fireEvent.click(copyButton);
         await act(async () => {
           await vi.advanceTimersByTimeAsync(0);
         });
         expect(screen.getByRole("button", { name: "Copy API key" })).toHaveTextContent("Copied");
 
         cleanup();
-        // Checked before advancing: an uncleared timer would have fired by 2000 ms.
-        expect(vi.getTimerCount()).toBe(0);
+        // Library teardown timers are short; an uncleared 2000 ms reset would still be pending at 1999 ms.
         await act(async () => {
-          await vi.advanceTimersByTimeAsync(2000);
+          await vi.advanceTimersByTimeAsync(1999);
         });
+        expect(vi.getTimerCount()).toBe(0);
 
         expect(errors).not.toHaveBeenCalled();
-        expect(vi.getTimerCount()).toBe(0);
       } finally {
         vi.useRealTimers();
         errors.mockRestore();
+        layout.mockRestore();
       }
     });
 
