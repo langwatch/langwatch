@@ -371,7 +371,7 @@ describe("BraidsScreen", () => {
     });
 
     /** @scenario "With release_braids off the project Braids page lists braids with only Remove" */
-    it("lists the braid with Remove and offers no New braid, Edit, signing keys or setting", async () => {
+    it("lists the braid with Remove and the keys section, with no New braid, Edit, New key or setting", async () => {
       braidsFake.state.project = { intoOtherProjects: [liveBraid()], fromOtherProjects: [] };
       renderAs({ braidsReleased: false });
 
@@ -379,7 +379,8 @@ describe("BraidsScreen", () => {
         within(screen.getByTestId("braids-section-into")).getByTestId("braid-row"),
       ).toBeVisible();
       expect(screen.queryByRole("button", { name: /New braid/ })).not.toBeInTheDocument();
-      expect(screen.queryByTestId("braids-section-keys")).not.toBeInTheDocument();
+      expect(screen.getByTestId("braids-section-keys")).toBeInTheDocument();
+      expect(screen.queryByTestId("new-signing-key")).not.toBeInTheDocument();
       expect(screen.queryByTestId("braids-who-may-braid")).not.toBeInTheDocument();
       await openRowMenu();
       expect(await screen.findByRole("menuitem", { name: "Remove braid" })).toBeInTheDocument();

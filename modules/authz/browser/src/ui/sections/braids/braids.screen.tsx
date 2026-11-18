@@ -218,10 +218,12 @@ function BraidsNotices({
 function SigningKeysBand({
   projectId,
   planState,
+  canIssue,
   onNewKey,
 }: {
   projectId: string;
   planState: BraidsPlanState;
+  canIssue: boolean;
   onNewKey: (() => void) | undefined;
 }) {
   return (
@@ -238,7 +240,7 @@ function SigningKeysBand({
       }
       data-testid="braids-section-keys"
     >
-      <BraidsSigningKeys projectId={projectId} planState={planState} />
+      <BraidsSigningKeys projectId={projectId} planState={planState} canIssue={canIssue} />
     </SettingsSection>
   );
 }
@@ -396,20 +398,18 @@ export default function BraidsScreen() {
             </BraidsSectionBand>
           </>
         )}
-        {released ? (
-          <>
-            <SigningKeysBand
-              projectId={projectId}
-              planState={planState}
-              onNewKey={
-                can.canCreate
-                  ? () => host.setQuery({ ...query, [SIGNING_KEY_QUERY_KEY]: "new" })
-                  : undefined
-              }
-            />
-            <WhoMayBraidHint keptToAdmins={keptToAdmins} />
-          </>
-        ) : null}
+        {/* Off, keys list with Revoke only: a leaked key still verifies (Alex, 2026-11-18). */}
+        <SigningKeysBand
+          projectId={projectId}
+          planState={planState}
+          canIssue={released}
+          onNewKey={
+            can.canCreate
+              ? () => host.setQuery({ ...query, [SIGNING_KEY_QUERY_KEY]: "new" })
+              : undefined
+          }
+        />
+        {released ? <WhoMayBraidHint keptToAdmins={keptToAdmins} /> : null}
       </Stack>
       {dialogOpen ? (
         <BraidDialog

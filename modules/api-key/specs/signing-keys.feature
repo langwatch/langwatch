@@ -150,16 +150,32 @@ Feature: Signing keys
       Then the answer names the key used an hour ago
       And a project with only revoked keys signs nothing
 
-  Rule: Signing keys are braid management, behind release_braids, except revoking
-    # The flag itself: modules/authz/specs/braids-release-flag.feature.
+  Rule: Signing keys are braid management, behind release_braids, except listing and revoking
+    # The flag itself: modules/authz/specs/braids-release-flag.feature. Decided by Alex, 2026-11-18
+    # (option 1a): keys still verify while the flag is off, so a leaked key must be found to revoke.
 
     @unit
-    Scenario: With release_braids off every signing key procedure but revoke refuses with braids_not_enabled
+    Scenario: With release_braids off issuing and reading signing refuse with braids_not_enabled
       Given "orchestrator" holds a signing key
       And release_braids is off for the organisation
-      When its keys are listed, its signing is asked, or a key is created or rotated
+      When its signing is asked, or a key is created or rotated
       Then each call is refused with braids_not_enabled
       And no key is issued
+
+    @unit
+    Scenario: Listing signing keys still works while release_braids is off
+      Given "orchestrator" holds a signing key
+      And release_braids is off for the organisation
+      When its keys are listed
+      Then the key is listed, so a leaked key can be found and revoked
+
+    @integration
+    Scenario: With release_braids off the keys panel offers Revoke but not Rotate or New key
+      Given "orchestrator" holds a signing key
+      And release_braids is off for the organisation
+      When ana opens the key's actions on the Braids page, which was linked to New signing key
+      Then Revoke is offered and Rotate is not
+      And the New signing key form does not open
 
     @unit
     Scenario: Revoking a signing key still works while release_braids is off

@@ -74,8 +74,9 @@ export class SigningKeyService {
     return new SigningKeyService({ ...input, now: input.now ?? nowInstant });
   }
 
+  /** Asks no release flag, as revoke: a leaked key must be found to be revoked (Alex, 11-18). */
   async find({ projectId }: { projectId: string }): Promise<SigningKey[]> {
-    const organizationId = await this.releasedOrganizationOf({ projectId });
+    const organizationId = await this.projects.getOrganizationId(projectId);
     return this.listed({ rows: await this.keys.findByProject({ organizationId, projectId }) });
   }
 

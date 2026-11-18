@@ -32,7 +32,8 @@ Feature: Braid management behind the release_braids flag
       And a live braid from "specialists" into "orchestrator"
       When ana opens the Braids page of "specialists"
       Then the braid is listed with Remove
-      And there is no New braid, no Edit, no signing keys section and no setting of who may braid
+      And its signing keys are listed with only Revoke, since a leaked key still verifies
+      And there is no New braid, no Edit, no New signing key and no setting of who may braid
 
     @integration
     Scenario: With release_braids on the Braids pages are past the flag
