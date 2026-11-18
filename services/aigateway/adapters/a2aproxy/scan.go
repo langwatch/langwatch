@@ -89,9 +89,15 @@ func (s GuardrailScanner) Scan(ctx context.Context, in ScanInput) (domain.Guardr
 // body could be read at all.
 type payload struct {
 	texts []string
+	// parts is the text-part text by artifact, collected for streams only.
+	parts []partText
 	// parsed is false for a non-empty body that is not JSON.
 	parsed bool
 }
+
+// partText is the text-part text of one artifact, joined. An empty id holds
+// the text outside any artifact, such as a status message's.
+type partText struct{ id, text string }
 
 // maxJSONDepth bounds how deep the scan walks one body.
 const maxJSONDepth = 64
@@ -124,19 +130,30 @@ var protocolKeys = map[string]bool{
 // LLM routes send it the whole messages array. The body is read token by
 // token, so no tree of it is ever held. An empty body is parsed and has no text.
 func collectTexts(body []byte) payload {
+	return collect(body, false)
+}
+
+// collectStreamTexts is collectTexts plus the text-part text of each artifact,
+// which a stream scans joined to the same artifact's earlier text.
+func collectStreamTexts(body []byte) payload {
+	return collect(body, true)
+}
+
+func collect(body []byte, withParts bool) payload {
 	if len(bytes.TrimSpace(body)) == 0 {
 		return payload{parsed: true}
 	}
 	dec := json.NewDecoder(bytes.NewReader(body))
 	dec.UseNumber()
 	var texts []string
-	if walkTokens(dec, &texts) != nil {
+	w := tokenWalker{out: &texts, withParts: withParts, outside: -1}
+	if w.walk(dec) != nil {
 		return payload{}
 	}
 	if _, err := dec.Token(); !errors.Is(err, io.EOF) {
 		return payload{}
 	}
-	return payload{parsed: true, texts: texts}
+	return payload{parsed: true, texts: texts, parts: w.partTexts()}
 }
 
 type jsonFrame struct {
@@ -145,6 +162,10 @@ type jsonFrame struct {
 	// every key and value is the sender's own text.
 	content bool
 	key     string
+	// group indexes the artifact this frame sits in, -1 for none; artifact
+	// marks the frame of the artifact object itself.
+	group    int
+	artifact bool
 }
 
 // contentKeys open sender-authored objects: nothing under them is protocol.
@@ -154,11 +175,20 @@ var contentKeys = map[string]bool{"data": true, "metadata": true}
 type tokenWalker struct {
 	stack []jsonFrame
 	out   *[]string
+	// withParts also groups text-part text by artifact into groups; outside
+	// indexes the group for text outside any artifact, -1 until there is some.
+	withParts bool
+	groups    []partGroup
+	outside   int
 }
 
-// walkTokens reads one JSON value and appends its text.
-func walkTokens(dec *json.Decoder, out *[]string) error {
-	w := tokenWalker{out: out}
+type partGroup struct {
+	id     string
+	pieces []string
+}
+
+// walk reads one JSON value and appends its text.
+func (w *tokenWalker) walk(dec *json.Decoder) error {
 	for {
 		tok, err := dec.Token()
 		if err != nil {
@@ -209,7 +239,15 @@ func (w *tokenWalker) open(d json.Delim) error {
 		return errTooDeep
 	}
 	content := w.inContent()
-	w.stack = append(w.stack, jsonFrame{object: d == '{', wantKey: d == '{', content: content, key: frameKey(w.stack)})
+	f := jsonFrame{object: d == '{', wantKey: d == '{', content: content, key: frameKey(w.stack), group: -1}
+	if len(w.stack) > 0 {
+		f.group = w.stack[len(w.stack)-1].group
+	}
+	if w.withParts && d == '{' && !content && (f.key == "artifact" || f.key == "artifacts") {
+		w.groups = append(w.groups, partGroup{})
+		f.group, f.artifact = len(w.groups)-1, true
+	}
+	w.stack = append(w.stack, f)
 	return nil
 }
 
@@ -244,6 +282,9 @@ func frameKey(stack []jsonFrame) string {
 // they decode to when that is valid UTF-8.
 func (w *tokenWalker) appendValue(s string) {
 	key := frameKey(w.stack)
+	if w.withParts && s != "" && !w.inContent() {
+		w.notePart(key, s)
+	}
 	if s == "" || (!w.inContent() && protocolValueKeys[key]) {
 		return
 	}
@@ -253,6 +294,41 @@ func (w *tokenWalker) appendValue(s string) {
 		}
 	}
 	*w.out = append(*w.out, s)
+}
+
+// notePart files an artifact's id and text-part text under its group. Text
+// is matched in any case, so a case variant a lenient client reads still joins.
+// A bare top-level string is all content and counts as text.
+func (w *tokenWalker) notePart(key, s string) {
+	top := jsonFrame{group: -1}
+	if len(w.stack) > 0 {
+		top = w.stack[len(w.stack)-1]
+	}
+	switch {
+	case key == "artifactId" && top.artifact:
+		w.groups[top.group].id = s
+	case strings.EqualFold(key, "text") || len(w.stack) == 0:
+		g := top.group
+		if g < 0 {
+			if w.outside < 0 {
+				w.groups = append(w.groups, partGroup{})
+				w.outside = len(w.groups) - 1
+			}
+			g = w.outside
+		}
+		w.groups[g].pieces = append(w.groups[g].pieces, s)
+	}
+}
+
+// partTexts joins each group's text, leaving out groups with none.
+func (w *tokenWalker) partTexts() []partText {
+	var out []partText
+	for _, g := range w.groups {
+		if len(g.pieces) > 0 {
+			out = append(out, partText{id: g.id, text: strings.Join(g.pieces, "")})
+		}
+	}
+	return out
 }
 
 func setString(span trace.Span, key, v string) {
