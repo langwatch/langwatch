@@ -38,6 +38,7 @@
     "@langwatch/time": "workspace:*",
     "@langwatch/trace-client": "workspace:*",
     "@monaco-editor/react": "catalog:",
+    "@tanstack/react-query": "catalog:",
     "lucide-react": "catalog:",
     "monaco-editor": "catalog:",
     "react-feather": "catalog:",
