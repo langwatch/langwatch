@@ -203,6 +203,12 @@ Feature: Coding agent terminal view
   # walking a long session back still happens turn by turn as the reader asks
   # for it, not all at once.
 
+  @unit
+  Scenario: The terminal screen stays dark in both colour modes
+    When the Terminal tab renders the session in light mode and in dark mode
+    Then the screen is the same dark terminal in both
+    And its text colours stay readable on that screen
+
 Rule: The terminal reads back the whole session
 
   @integration

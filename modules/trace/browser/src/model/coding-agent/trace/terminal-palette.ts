@@ -21,7 +21,6 @@ export const TERMINAL_TOKENS = {
   border: "terminal.border",
   faint: "terminal.faint",
   accent: "terminal.accent",
-  accentStrong: "terminal.accentStrong",
   selection: "terminal.blue/33",
   red: "terminal.red",
   green: "terminal.green",

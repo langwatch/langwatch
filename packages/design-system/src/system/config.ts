@@ -157,7 +157,6 @@ export const designSystemConfig = defineConfig({
           border: { value: { _light: "#2A2A2A", _dark: "#2A2A2A" } },
           faint: { value: { _light: "#8A8A8A", _dark: "#8A8A8A" } },
           accent: { value: { _light: "#E8926A", _dark: "#E8926A" } },
-          accentStrong: { value: { _light: "#DA7756", _dark: "#DA7756" } },
           diffAddBg: { value: { _light: "#0F2E1C", _dark: "#0F2E1C" } },
           diffRemoveBg: { value: { _light: "#3A1418", _dark: "#3A1418" } },
           black: { value: { _light: "#6B6B6B", _dark: "#6B6B6B" } },

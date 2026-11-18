@@ -170,16 +170,19 @@ describe("terminal screen", () => {
   const terminal = entry(semantic, "terminal") as TokenTree;
   const names = leaves(terminal, "terminal.").map(([name]) => name);
 
+  /** @scenario "The terminal screen stays dark in both colour modes" */
   it.each(names)("keeps %s identical in light and dark mode", (name) => {
     expect(resolve(name, "_light")).toBe(resolve(name, "_dark"));
   });
 
+  /** @scenario "The terminal screen stays dark in both colour modes" */
   it("stays a dark screen whatever the app's colour mode", () => {
     for (const mode of ["_light", "_dark"] satisfies Mode[]) {
       expect(luminance(resolve("terminal.bg", mode))).toBeLessThan(0.01);
     }
   });
 
+  /** @scenario "The terminal screen stays dark in both colour modes" */
   it.each(["fg", "faint", "red", "green", "yellow", "blue", "accent"])(
     "keeps terminal.%s readable on the terminal screen",
     (role) => {
