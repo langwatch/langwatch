@@ -393,6 +393,7 @@ export function scopeLangWatchQL({
   views,
   timeWindow,
   memberWindows,
+  projectIds,
 }: {
   sql: string;
   /** Where unqualified view names resolve. */
@@ -400,11 +401,20 @@ export function scopeLangWatchQL({
   views: readonly LangWatchQLViewDefinition[];
   /** The period the statement is bound to; absent, the trace lookup reads all history. */
   timeWindow?: LangWatchQLTimeWindow;
-  /** The members an aggregate reads and where each window opens; absent on a plain project. */
+  /**
+   * The members an aggregate reads and where each window opens; absent on a plain project. A
+   * project without a window, so every project when the list is empty, admits no row.
+   */
   memberWindows?: readonly LangWatchQLMemberWindow[];
+  /** The projects the caller's key set reads; absent, the windows are taken not to cover it. */
+  projectIds?: readonly string[];
 }): string {
-  // Whole-history members need no rewrite: the row policy bounds them exactly.
-  const isWindowed = memberWindows?.some((window) => window.from > 0) === true;
+  // Whole-history members need no rewrite when each project has exactly its own window: the row
+  // policy bounds them exactly. A project without a window must read nothing, so it is rewritten.
+  const isWindowed =
+    memberWindows !== undefined &&
+    (memberWindows.some((window) => window.from > 0) ||
+      !windowsCoverProjects({ memberWindows, projectIds }));
   if (!isWindowed) {
     assertNoUnsupportedTableModifiers({ sql, views, database });
     return sql;
@@ -443,6 +453,38 @@ export function scopeLangWatchQL({
       scoped.slice(reference.end);
   }
   return scoped;
+}
+
+/** Whether each project the caller reads has exactly one window, and each window one project. */
+function windowsCoverProjects({
+  memberWindows,
+  projectIds,
+}: {
+  memberWindows: readonly LangWatchQLMemberWindow[];
+  projectIds: readonly string[] | undefined;
+}): boolean {
+  if (projectIds === undefined) return false;
+  const windowed = new Set(memberWindows.map((window) => window.projectId));
+  return (
+    windowed.size === memberWindows.length &&
+    windowed.size === projectIds.length &&
+    projectIds.every((projectId) => windowed.has(projectId))
+  );
+}
+
+/**
+ * The member windows naming a project the caller reads. A window never widens the key set: one
+ * for any other project is dropped before a predicate is built from it (tasks#1212).
+ */
+export function readableMemberWindows({
+  projects,
+  memberWindows,
+}: {
+  projects: readonly LangWatchQLCaller[];
+  memberWindows: readonly LangWatchQLMemberWindow[];
+}): readonly LangWatchQLMemberWindow[] {
+  const readable = new Set(projects.map((project) => project.id));
+  return memberWindows.filter((window) => readable.has(window.projectId));
 }
 
 /**

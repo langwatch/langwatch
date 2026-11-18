@@ -23,6 +23,7 @@ import { LangWatchQLPostgresViewsService } from "../../features/provisioning/ser
 import { LangWatchQLViewProvisioningService } from "../../features/provisioning/services/langwatch-ql-view-provisioning.service.ts";
 import { SHIPPED_LWQL_DEDUP } from "../../features/provisioning/services/langwatch-ql-view-statements.service.ts";
 import { ClickHouseLangWatchQLExecutorRepository } from "../../repositories/clickhouse/clickhouse.langwatch-ql-executor.repository.ts";
+import { scopeLangWatchQL } from "../../rules/langwatch-ql-query-scope.rules.ts";
 import { LWQL_VIEW_CATALOG } from "../../rules/lwql-view-catalog.rules.ts";
 import { LangWatchQLCapabilityService } from "../../services/langwatch-ql-capability.service.ts";
 import { LangWatchQLCatalogShapesService } from "../../services/langwatch-ql-catalog-shapes.service.ts";
@@ -1179,15 +1180,38 @@ describe("when a caller reads two sibling projects of one organization in one qu
 
   /** @scenario "A member window cannot admit a row through a project the caller cannot read" */
   it("reads nothing when only an unreadable sibling's window would admit the budget", async () => {
-    // Both readable siblings open after the budget was created; only project 3's window, read
-    // for its whole history, would admit it. The row policy must drop project 3's copy from the
-    // engine-table read the window predicate makes, so the budget stays out.
+    // Below the service, which drops a window outside the caller's projects: here project 3's
+    // window reaches the predicate, so only the engine table's row policy keeps its copy out.
+    // Both readable siblings open after the budget was created; project 3 would admit it.
     const opensAfterTheBudget = Date.parse("2100-01-01T00:00:00.000Z");
-    const rows = await sumBudget(SIBLINGS, [
-      ...SIBLINGS.map(({ id }) => ({ projectId: id, from: opensAfterTheBudget })),
-      { projectId: UNREADABLE.id, from: 0 },
-    ]);
-    // An aggregate with no GROUP BY answers one row even over no input rows.
-    expect(rows, `got ${JSON.stringify(rows)}`).toEqual([{ total: 0, n: 0 }]);
+    const sql = scopeLangWatchQL({
+      sql:
+        `SELECT sum(LimitUsd) AS total, count() AS n FROM ${database}.gateway_budgets ` +
+        `WHERE GatewayBudgetId = '${BUDGET_ID}'`,
+      database,
+      views: POSTGRES_VIEWS,
+      memberWindows: [
+        ...SIBLINGS.map(({ id }) => ({ projectId: id, from: opensAfterTheBudget })),
+        { projectId: UNREADABLE.id, from: 0 },
+      ],
+    });
+    expect(sql, "the window predicate must name the unreadable project").toContain(
+      `TenantId IN ('${UNREADABLE.id}')`,
+    );
+    const reader = await harness.restrictedClient({
+      keyHash: lwqlCapability.tenantCapabilitySet({
+        secrets: SIBLINGS.map(({ lwqlKey }) => lwqlKey),
+      }),
+    });
+    try {
+      const rows = (await selectRows<{ total: unknown; n: unknown }>(reader, sql)).map((row) => ({
+        total: Number(row.total),
+        n: Number(row.n),
+      }));
+      // An aggregate with no GROUP BY answers one row even over no input rows.
+      expect(rows, `got ${JSON.stringify(rows)}`).toEqual([{ total: 0, n: 0 }]);
+    } finally {
+      await reader.close();
+    }
   }, 60_000);
 });

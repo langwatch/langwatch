@@ -29,7 +29,10 @@ import type {
   LangWatchQLResultLimits,
 } from "../repositories/langwatch-ql-executor.repository.ts";
 import { langWatchQLPassSql } from "../rules/langwatch-ql-pass-sql.rules.ts";
-import { assertNoUnsupportedTableModifiers } from "../rules/langwatch-ql-query-scope.rules.ts";
+import {
+  assertNoUnsupportedTableModifiers,
+  readableMemberWindows,
+} from "../rules/langwatch-ql-query-scope.rules.ts";
 import { assertNoReservedNameAssigned } from "../rules/langwatch-ql-reserved-names.rules.ts";
 import { DEFAULT_LWQL_RESULT_LIMITS } from "../rules/langwatch-ql-result-limits.rules.ts";
 import { runNotes } from "../rules/langwatch-ql-run-notes.rules.ts";
@@ -398,7 +401,7 @@ export class LangWatchQLService {
     granularitySeconds,
     onBudgetOverflow,
     sources,
-    memberWindows,
+    memberWindows: requestedWindows,
     isInstantEvalsEnabled,
     signal,
     telemetry,
@@ -406,6 +409,9 @@ export class LangWatchQLService {
     LangWatchQLEvalGate &
     LangWatchQLMemberScope): Promise<LangWatchQLQueryResult> {
     const projectIds = projects.map((project) => project.id);
+    // Both the run and its completeness read take their windows from here, never the request's.
+    const memberWindows =
+      requestedWindows && readableMemberWindows({ projects, memberWindows: requestedWindows });
     const boundSources = resolveRunSources(sources);
     const validation = this.validate({
       projectId: projectIds.join(",") || "(none)",
