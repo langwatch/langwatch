@@ -2,10 +2,12 @@ import type { Authorization } from "@langwatch/authorization";
 import {
   type ClickHouseQueryClient,
   type IdBoundOptions,
+  ownProjectIdOf,
   tenantScopeKey,
 } from "@langwatch/clickhouse-client";
-import { clickhouseRead, fn, tenantScope } from "@langwatch/clickhouse-client/builder";
+import { clickhouseRead, column, fn, tenantScope } from "@langwatch/clickhouse-client/builder";
 import { EventUtils } from "@langwatch/eventing";
+import { KSUID_LAYOUTS, type KsuidLayout } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 import type { TraceSummaryData } from "@langwatch/trace-contract";
@@ -139,6 +141,8 @@ interface ClickHouseSummaryRecord extends TraceSummaryFieldsBase {
    * this too; ADR-087 split them. Absent pre-00072 (version gate handles it).
    */
   EarliestSpanStartMs?: number | string;
+  /** KSUID byte layout of ProjectionId; NULL on rows written before goose 00130. */
+  IdLayout: KsuidLayout | null;
   _retention_days: number;
 }
 
@@ -190,6 +194,7 @@ const summaryReadRowSchema = z.looseObject({
   AnnotationIds: z.array(chString),
   HasAnnotation: chBoolean.nullable(),
   TraceName: chString,
+  IdLayout: z.enum(KSUID_LAYOUTS).nullable().optional(),
 });
 
 const summaryReadRowsSchema = z.array(summaryReadRowSchema);
@@ -301,14 +306,23 @@ const SUMMARY_READ_SELECTION = {
 function summaryByTraceIdStatement({
   authorization,
   traceId,
+  holds,
 }: {
   authorization: Authorization;
   traceId: string;
+  holds: (name: string) => boolean;
 }) {
   return clickhouseRead({ scope: summaryScope(authorization) })
     .from(traceSummaries)
     .withinWindows()
-    .select(SUMMARY_READ_SELECTION)
+    .select({
+      ...SUMMARY_READ_SELECTION,
+      // Goose 00130's column reads as NULL ("v1-legacy") until the target holds it (NO-HOLDS).
+      IdLayout: fn.heldOr(traceSummaries.IdLayout, {
+        holds,
+        otherwise: fn.nullAs(column.nullable(column.string())),
+      }),
+    })
     .where(({ idBound }) => idBound(traceSummaries.TraceId, traceId))
     .latestVersion()
     .orderBy(traceSummaries.TenantId, "ASC")
@@ -336,18 +350,22 @@ function logSummaryReadFailure({
   );
 }
 
+/** Reads go through `read`; `columns` names what the target holds (NO-HOLDS), all when absent. */
+type TraceSummaryReader = Pick<ClickHouseQueryClient, "read"> &
+  Partial<Pick<ClickHouseQueryClient, "columns">>;
+
 export class TraceSummaryClickHouseRepository implements TraceSummaryRepository {
   /** Writes resolve the tenant's own client; reads are built under the proof (ADR-202). */
   private constructor(
     private readonly options: {
       resolveClient: TraceClickHouseWriteResolver;
-      reader: Pick<ClickHouseQueryClient, "read">;
+      reader: TraceSummaryReader;
     },
   ) {}
 
   static create(options: {
     resolveClient: TraceClickHouseWriteResolver;
-    reader: Pick<ClickHouseQueryClient, "read">;
+    reader: TraceSummaryReader;
   }): TraceSummaryClickHouseRepository {
     return new TraceSummaryClickHouseRepository(options);
   }
@@ -355,18 +373,11 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
   async upsert(data: TraceSummaryData, tenantId: string, retentionDays: number): Promise<void> {
     EventUtils.validateTenantId({ tenantId }, "TraceSummaryClickHouseRepository.upsert");
 
-    const projectionId = createTraceSummaryProjectionId({
-      tenantId,
-      traceId: data.traceId,
-      occurredAtMs: data.occurredAt,
-    });
-
     try {
       const client = await this.options.resolveClient(tenantId);
       const record = this.toClickHouseRecord({
         data,
         tenantId,
-        projectionId,
         version: TRACE_SUMMARY_PROJECTION_VERSION_LATEST,
         retentionDays,
       });
@@ -400,20 +411,14 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
 
     try {
       const client = await this.options.resolveClient(tenantId);
-      const records = entries.map(({ data, tenantId: tid, retentionDays: rd }) => {
-        const projectionId = createTraceSummaryProjectionId({
-          tenantId: tid,
-          traceId: data.traceId,
-          occurredAtMs: data.occurredAt,
-        });
-        return this.toClickHouseRecord({
+      const records = entries.map(({ data, tenantId: tid, retentionDays: rd }) =>
+        this.toClickHouseRecord({
           data,
           tenantId: tid,
-          projectionId,
           version: TRACE_SUMMARY_PROJECTION_VERSION_LATEST,
           retentionDays: rd,
-        });
-      });
+        }),
+      );
 
       await client.insert({
         table: TABLE_NAME,
@@ -558,8 +563,9 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
     traceId: string;
     idBound: IdBoundOptions;
   }): Promise<TraceSummaryRead | null> {
+    const holds = await this.summaryColumnsHeld({ authorization });
     const result = await this.options.reader.read({
-      statement: summaryByTraceIdStatement({ authorization, traceId }),
+      statement: summaryByTraceIdStatement({ authorization, traceId, holds }),
       table: traceSummaries.$table.name,
       idBound,
     });
@@ -568,6 +574,22 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
     const row = rows[0];
     if (!row) return null;
     return { ...this.fromClickHouseRecord(row), tenantId: row.TenantId };
+  }
+
+  /** The summary columns the proof's own target holds; a cross-owner proof names them all. */
+  private async summaryColumnsHeld({
+    authorization,
+  }: {
+    authorization: Authorization;
+  }): Promise<(name: string) => boolean> {
+    const held = await Promise.resolve()
+      .then(() =>
+        this.options.reader
+          .columns?.({ tenantId: ownProjectIdOf({ authorization, reads: "traces" }) })
+          .holds({ table: traceSummaries.$table.name }),
+      )
+      .catch(() => undefined);
+    return held ?? (() => true);
   }
 
   private fromClickHouseRecord(record: SummaryReadRow): TraceSummaryData {
@@ -620,24 +642,30 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
       createdAt: record.CreatedAtMs,
       updatedAt: record.UpdatedAtMs,
       LastEventOccurredAt: Number(record.LastEventOccurredAt ?? 0),
+      idLayout: record.IdLayout ?? "v1-legacy",
     };
   }
 
+  /** The row's id keeps the layout it was stored with; a state without one is pre-00130. */
   private toClickHouseRecord({
     data,
     tenantId,
-    projectionId,
     version,
     retentionDays,
   }: {
     data: TraceSummaryData;
     tenantId: string;
-    projectionId: string;
     version: string;
     retentionDays: number;
   }): ClickHouseSummaryWriteRecord {
+    const idLayout = data.idLayout ?? "v1-legacy";
     return {
-      ProjectionId: projectionId,
+      ProjectionId: createTraceSummaryProjectionId({
+        tenantId,
+        traceId: data.traceId,
+        occurredAtMs: data.occurredAt,
+        layout: idLayout,
+      }),
       TenantId: tenantId,
       TraceId: data.traceId,
       Version: version,
@@ -689,6 +717,7 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
       AnnotationIds: data.annotationIds,
       HasAnnotation: data.annotationIds.length > 0 ? 1 : 0,
       TraceName: data.traceName,
+      IdLayout: idLayout,
       _retention_days: retentionDays,
     };
   }
@@ -706,7 +735,7 @@ export class TraceSummaryProjectionClickHouseRepository extends TraceSummaryProj
 
   static create(options: {
     resolveClient: TraceClickHouseWriteResolver;
-    reader: Pick<ClickHouseQueryClient, "read">;
+    reader: TraceSummaryReader;
   }): TraceSummaryProjectionClickHouseRepository {
     return new TraceSummaryProjectionClickHouseRepository(
       TraceSummaryClickHouseRepository.create(options),

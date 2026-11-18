@@ -76,7 +76,7 @@ export class RedisSuiteRunProcessingRepository implements SuiteRunProcessingRepo
   }
 
   /** Reads ClickHouse directly: the meter counts stored rows, not the fold cache. */
-  getStoredBytes(input: { tenantId: string }): Promise<number> {
+  getStoredBytes(input: { tenantId: string; beforeMs?: number | undefined }): Promise<number> {
     return ClickHouseSuiteRunRepository.create({
       clickhouse: this.options.clickhouse,
       defaultRetentionDays: () => 0,

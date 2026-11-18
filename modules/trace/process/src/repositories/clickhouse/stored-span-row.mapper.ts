@@ -2,13 +2,17 @@
  * Stored_spans row codec: normalize span↔ClickHouse columns. Pure mapping,
  * moved here from app so coding-agent-server can import without path aliases.
  */
+import { cond, fn } from "@langwatch/clickhouse-client/builder";
 import { createLogger } from "@langwatch/observability";
+import { ATTR_KEYS } from "@langwatch/span-normalisation";
 import {
   NormalizedSpanKind,
   NormalizedStatusCode,
   type NormalizedSpan,
 } from "@langwatch/trace-contract";
 import { z } from "zod";
+
+import { storedSpans } from "./clickhouse.stored-spans.table.ts";
 
 const NUMERIC = /^-?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?$/;
 
@@ -25,6 +29,29 @@ export const chBoolean = z
 
 /** A Map(String, String) column, which ClickHouse writes as a JSON object. */
 export const chStringMap = z.record(z.string(), z.string());
+
+const AGENT_MARK_KEYS: readonly string[] = [
+  ATTR_KEYS.GEN_AI_AGENT_NAME,
+  ATTR_KEYS.GEN_AI_AGENT_ID,
+  ATTR_KEYS.RPC_METHOD,
+  ATTR_KEYS.RPC_SERVICE,
+  ATTR_KEYS.SPAN_KIND,
+];
+
+/** The span attributes the tree marks agents and A2A calls from, each value cut to 256 chars. */
+export const AGENT_MARK_ATTRIBUTES_SELECT = `mapApply((k, v) -> (k, substring(v, 1, 256)), mapFilter((k, v) -> startsWith(k, 'a2a.') OR k IN (${AGENT_MARK_KEYS.map((key) => `'${key}'`).join(", ")}), SpanAttributes)) AS AgentAttributes, SpanKind AS AgentSpanKind`;
+
+/** `AGENT_MARK_ATTRIBUTES_SELECT` as a built selection, each value cut to 256 chars as there. */
+export const AGENT_MARK_SELECTION = {
+  AgentAttributes: fn.mapApply(
+    (key, value) => [key, fn.substring(value, 1, 256)],
+    fn.mapFilter(
+      (key) => cond.or(fn.startsWith(key, "a2a."), cond.oneOf(key, AGENT_MARK_KEYS)),
+      storedSpans.SpanAttributes,
+    ),
+  ),
+  AgentSpanKind: storedSpans.SpanKind,
+};
 
 const DECIMAL_NUMBER_RE = /^-?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?$/;
 
@@ -44,7 +71,7 @@ const VALID_STATUS_CODES = new Set(
   Object.values(NormalizedStatusCode).filter((v): v is number => typeof v === "number"),
 );
 
-function validateSpanKind(value: number): NormalizedSpanKind {
+export function validateSpanKind(value: number): NormalizedSpanKind {
   if (VALID_SPAN_KINDS.has(value)) return value as NormalizedSpanKind;
   logger.warn({ value }, "Unknown SpanKind from ClickHouse, defaulting to INTERNAL");
   return NormalizedSpanKind.INTERNAL;

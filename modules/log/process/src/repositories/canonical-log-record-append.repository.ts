@@ -7,5 +7,8 @@ export abstract class CanonicalLogRecordAppendRepository {
   abstract ensureLogRecords(records: CanonicalLogRecord[], retentionDays?: number): Promise<void>;
 
   /** One tenant's stored bytes over its log records, every stored row counted. */
-  abstract getStoredBytes(input: { tenantId: string }): Promise<number>;
+  abstract getStoredBytes(input: {
+    tenantId: string;
+    beforeMs?: number | undefined;
+  }): Promise<number>;
 }

@@ -195,6 +195,8 @@ export interface AuthzApi {
   revokeSharedProjectGrants(args: Commands.AuthzRevokeSharedProjectGrantsInput): Promise<string[]>;
   /** ADR-201: the live braids out of a project and into it; a downgraded organisation lists too. */
   listBraids(args: Braids.AuthzListBraidsInput): Promise<Braids.AuthzProjectBraids>;
+  /** The Braids screen's list: refuses `braids_not_enabled` while `release_braids` is off. */
+  listBraidsForScreen(args: Braids.AuthzListBraidsInput): Promise<Braids.AuthzProjectBraids>;
   /** A braid from the owner (`projectId`) into the reader, its condition compiled on save. */
   createBraid(args: Braids.AuthzCreateBraidInput): Promise<Braids.AuthzBraid>;
   /** Attaches the changed braid naming the one it replaces, then revokes that one. */
@@ -210,6 +212,10 @@ export interface AuthzApi {
   getOrganizationPolicy(
     args: Braids.AuthzOrganizationInput,
   ): Promise<Braids.AuthzOrganizationPolicy>;
+  /** The Braids screen's policy: refuses `braids_not_enabled` while `release_braids` is off. */
+  getOrganizationPolicyForScreen(
+    args: Braids.AuthzOrganizationInput,
+  ): Promise<Braids.AuthzOrganizationPolicy>;
   /** Keeps braids to organisation admins or opens them again; audited, and bumps the epoch. */
   setBraidsPolicy(args: Braids.AuthzSetBraidsPolicyInput): Promise<Braids.AuthzOrganizationPolicy>;
   /** Every live braid in the organisation. */
@@ -218,6 +224,10 @@ export interface AuthzApi {
   ): Promise<Braids.AuthzOrganizationBraids>;
   /** ADR-201 §7: the organisation's active members holding `permission` at the project. */
   countProjectMembersHolding(
+    args: Braids.AuthzCountProjectMembersHoldingInput,
+  ): Promise<Braids.AuthzProjectMembersHolding>;
+  /** The braid dialog's count: refuses `braids_not_enabled` while `release_braids` is off. */
+  countProjectMembersHoldingForScreen(
     args: Braids.AuthzCountProjectMembersHoldingInput,
   ): Promise<Braids.AuthzProjectMembersHolding>;
   /** The braid dialog's picker: which projects the caller may braid into, one batched decision. */
@@ -304,17 +314,21 @@ export interface AuthzApi {
     permission: AuthzPermission;
   }): Promise<boolean>;
   /**
-   * Deterministic grant id to deduplicate replays and prevent drift from
-   * reimplementation across modules (ADR-092 s13).
+   * The deterministic grant id a writer that may run twice attaches under (ADR-092 s13): the
+   * stored one when a grant already holds either layout's id, revoked or not, else a new v2 id.
+   * A revoked grant is never minted afresh beside itself.
    */
-  deriveGrantId(input: {
-    organizationId: string;
-    principal: authzGrantEventsModule.LedgerPrincipal;
-    scope: authzGrantEventsModule.LedgerScope;
-    resourceToken?: string;
-    occurredAtMs: number;
-  }): string;
+  resolveGrantId(input: AuthzGrantIdInput): Promise<string>;
 }
+
+/** What a deterministic grant id is derived from. */
+export type AuthzGrantIdInput = {
+  organizationId: string;
+  principal: authzGrantEventsModule.LedgerPrincipal;
+  scope: authzGrantEventsModule.LedgerScope;
+  resourceToken?: string;
+  occurredAtMs: number;
+};
 
 export const AuthzApi = moduleApi<AuthzApi>()("authz");
 

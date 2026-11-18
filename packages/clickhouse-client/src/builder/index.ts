@@ -24,6 +24,7 @@ export {
 export {
   aliasOf,
   defineClickHouseTable,
+  everyReplica,
   SERVER_METADATA_TABLES,
   SYSTEM_IDENTITY_TABLES,
   systemIdentityTable,

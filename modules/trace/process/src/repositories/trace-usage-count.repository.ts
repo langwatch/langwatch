@@ -26,5 +26,14 @@ export abstract class TraceUsageCountRepository {
     groupByKey: string;
   }): Promise<{ value: string; count: number }[]>;
   /** The sum of `_size_bytes` over the tenant's spans and trace summaries (ADR-202 Decided 20). */
-  abstract getStoredBytes(input: { tenantId: string }): Promise<number>;
+  abstract getStoredBytes(input: {
+    tenantId: string;
+    beforeMs?: number | undefined;
+  }): Promise<number>;
+  /** Distinct traces started before `beforeMs` whose rows are kept longer than `retentionDays`. */
+  abstract countStoredPastRetention(input: {
+    tenantId: string;
+    beforeMs: number;
+    retentionDays: number;
+  }): Promise<number>;
 }

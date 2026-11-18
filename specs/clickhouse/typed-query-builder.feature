@@ -258,6 +258,13 @@ Feature: A typed ClickHouse read builder renders the tenant predicate and the te
     And an all-tenants scope naming a server-metadata table or a system table on neither list is refused the same way
 
   @unit
+  Scenario: An all-tenants read names a system table on every replica of a cluster
+    Given an all-tenants scope and a plain cluster name
+    When it reads system.backup_log or system.tables on every replica
+    Then the text reads clusterAllReplicas over the table with the cluster a bound identifier
+    And a non-plain name, a table off the system identity's list or any reader scope is refused
+
+  @unit
   Scenario: An all-tenants read over a derived system read or a system CTE names a system table
     Given an all-tenants scope stating its reason
     When it reads from a derived read, or selects beside a CTE, whose own read names system.parts_columns
@@ -330,6 +337,20 @@ Feature: A typed ClickHouse read builder renders the tenant predicate and the te
     When it is built
     Then each lambda parameter takes a name the builder gives it, distinct across nested lambdas, and is typed by the array it ranges over
     And a parameter read outside its lambda is refused by code
+
+  @unit
+  Scenario: A map's entries are rewritten by a lambda and a string is cut at bound offsets
+    Given main's agent-mark read, which cuts each kept span attribute value to 256 bytes
+    When a read calls mapApply over mapFilter with a lambda returning the key and substring(value, 1, 256)
+    Then the lambda's parameters are named by the builder, its pair renders as a tuple, and the offset and length are bound Int64 values
+    And the map is typed by the value the lambda returns, and substring keeps a nullable string nullable
+
+  @unit
+  Scenario: A conditional per-key sum is ordered by a lambda over two arrays
+    Given main's agent traffic read, which keeps each agent's id and model on most spans
+    When a read calls sumMapIf over array literals and arrayReverseSort with a lambda over the sum's keys and counts
+    Then sumMapIf renders its keys, values and condition with every value bound
+    And the sort's lambda takes one parameter per array, typed by its array, and the result is typed as the first array
 
   @unit
   Scenario: The census functions render with every value bound

@@ -304,7 +304,7 @@ export default function UsageScreen() {
         )}
         {isSaaS === false && actionFor({ href: actionHref, label: selfHostedActionLabel })}
       </PageLayout.Header>
-      <VStack gap={4} width="full" align="stretch" paddingTop={4}>
+      <VStack gap={4} width="full" align="stretch">
         <Text color="fg.muted">
           What this organization used this month, against what its plan includes.
         </Text>

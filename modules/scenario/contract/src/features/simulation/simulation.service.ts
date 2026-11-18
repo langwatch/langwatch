@@ -4,6 +4,7 @@ import type {
   SimulationRecordAgentInstance,
   SimulationRecordCutAtLimit,
   SimulationRecordHooks,
+  SimulationRecordRedTeamReport,
   SimulationFinishRun,
   SimulationMessageSnapshot,
   SimulationQueueRun,
@@ -169,7 +170,16 @@ export abstract class SimulationService {
   /** Lifetime runs across one organization's projects, in one read: they share one route. */
   abstract countOrganizationRuns(input: { projectIds: readonly string[] }): Promise<number>;
   /** One project's `_size_bytes` in `simulation_runs`, every stored row version counted. */
-  abstract getStoredBytes(input: { projectId: string }): Promise<number>;
+  abstract getStoredBytes(input: {
+    projectId: string;
+    beforeMs?: number | undefined;
+  }): Promise<number>;
+  /** Distinct runs started before `beforeMs` whose rows are kept longer than `retentionDays`. */
+  abstract countStoredPastRetention(input: {
+    projectId: string;
+    beforeMs: number;
+    retentionDays: number;
+  }): Promise<number>;
   abstract listRunsForExport(
     input: SimulationExportRunsInput,
   ): Promise<{ runs: SimulationExportRun[]; nextCursor?: string; hasMore: boolean }>;
@@ -185,4 +195,5 @@ export abstract class SimulationService {
   abstract recordAgentInstance(input: SimulationRecordAgentInstance): Promise<void>;
   abstract recordCutAtLimit(input: SimulationRecordCutAtLimit): Promise<void>;
   abstract recordHooks(input: SimulationRecordHooks): Promise<void>;
+  abstract recordRedTeamReport(input: SimulationRecordRedTeamReport): Promise<void>;
 }

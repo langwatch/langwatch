@@ -31,7 +31,7 @@ export default function SubscriptionScreen() {
       <PageLayout.Header>
         <PageLayout.Heading>Plan & billing</PageLayout.Heading>
       </PageLayout.Header>
-      <VStack width="full" gap={6} align="stretch" paddingTop={4}>
+      <VStack width="full" gap={6} align="stretch">
         {isSettled ? (
           <Text color="fg.muted">What running LangWatch yourself means for billing.</Text>
         ) : (

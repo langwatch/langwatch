@@ -9,5 +9,5 @@ export interface SuiteRunProcessingRepository {
   /** One tenant's suite runs not yet finished (PENDING or IN_PROGRESS), latest state each. */
   findOpenRuns(input: { tenantId: string }): Promise<SuiteRunStateData[]>;
   /** One tenant's stored `_size_bytes` across the suite's own tables. */
-  getStoredBytes(input: { tenantId: string }): Promise<number>;
+  getStoredBytes(input: { tenantId: string; beforeMs?: number | undefined }): Promise<number>;
 }

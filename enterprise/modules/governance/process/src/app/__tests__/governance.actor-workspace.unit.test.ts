@@ -118,7 +118,7 @@ async function buildApp(options: {
   return { app, findByEmail, isOrganizationMember, getPersonalWorkspace };
 }
 
-describe("GovernanceModule.tryResolveActorWorkspace", () => {
+describe("GovernanceModule.getActorWorkspace", () => {
   describe("given an actor token that names a member with a personal workspace", () => {
     it("answers where that workspace lives", async () => {
       const { app, findByEmail } = await buildApp({
@@ -128,16 +128,19 @@ describe("GovernanceModule.tryResolveActorWorkspace", () => {
       });
 
       await expect(
-        app.findActorWorkspace({
+        app.getActorWorkspace({
           organizationId: ORGANIZATION_ID,
           actor: "ariana@acme.com",
         }),
       ).resolves.toEqual({
-        userId: "user-1",
-        displayName: "Ariana",
-        teamId: "team-personal-1",
-        projectId: "project-personal-1",
-        projectSlug: "ariana-personal",
+        status: "found",
+        workspace: {
+          userId: "user-1",
+          displayName: "Ariana",
+          teamId: "team-personal-1",
+          projectId: "project-personal-1",
+          projectSlug: "ariana-personal",
+        },
       });
       expect(findByEmail).toHaveBeenCalledWith({ email: "ariana@acme.com" });
     });
@@ -149,8 +152,8 @@ describe("GovernanceModule.tryResolveActorWorkspace", () => {
         workspace,
       });
       await expect(
-        app.findActorWorkspace({ organizationId: ORGANIZATION_ID, actor: "user-1" }),
-      ).resolves.toMatchObject({ displayName: "ariana@acme.com" });
+        app.getActorWorkspace({ organizationId: ORGANIZATION_ID, actor: "user-1" }),
+      ).resolves.toMatchObject({ workspace: { displayName: "ariana@acme.com" } });
 
       const nameless = await buildApp({
         user: { id: "user-1", name: null, email: null },
@@ -158,33 +161,33 @@ describe("GovernanceModule.tryResolveActorWorkspace", () => {
         workspace,
       });
       await expect(
-        nameless.app.findActorWorkspace({
+        nameless.app.getActorWorkspace({
           organizationId: ORGANIZATION_ID,
           actor: "user-1",
         }),
-      ).resolves.toMatchObject({ displayName: "user-1" });
+      ).resolves.toMatchObject({ workspace: { displayName: "user-1" } });
     });
   });
 
   describe("given a token that names nobody", () => {
-    it("answers null without asking about membership", async () => {
+    it("answers undisclosed without asking about membership", async () => {
       const { app, isOrganizationMember, getPersonalWorkspace } = await buildApp({
         user: null,
       });
 
       await expect(
-        app.findActorWorkspace({
+        app.getActorWorkspace({
           organizationId: ORGANIZATION_ID,
           actor: "stranger@example.com",
         }),
-      ).resolves.toBeNull();
+      ).resolves.toEqual({ status: "undisclosed" });
       expect(isOrganizationMember).not.toHaveBeenCalled();
       expect(getPersonalWorkspace).not.toHaveBeenCalled();
     });
   });
 
   describe("given a person who is not in this organization", () => {
-    it("answers null without reading their workspace", async () => {
+    it("answers undisclosed without reading their workspace", async () => {
       const { app, getPersonalWorkspace } = await buildApp({
         user: { id: "user-2", name: "Ben", email: "ben@other.com" },
         isMember: false,
@@ -192,17 +195,17 @@ describe("GovernanceModule.tryResolveActorWorkspace", () => {
       });
 
       await expect(
-        app.findActorWorkspace({
+        app.getActorWorkspace({
           organizationId: ORGANIZATION_ID,
           actor: "ben@other.com",
         }),
-      ).resolves.toBeNull();
+      ).resolves.toEqual({ status: "undisclosed" });
       expect(getPersonalWorkspace).not.toHaveBeenCalled();
     });
   });
 
   describe("given a member who has no personal workspace yet", () => {
-    it("answers null rather than a half-resolved link", async () => {
+    it("answers undisclosed rather than a half-resolved link", async () => {
       const { app } = await buildApp({
         user: { id: "user-3", name: "Cara", email: "cara@acme.com" },
         isMember: true,
@@ -210,11 +213,11 @@ describe("GovernanceModule.tryResolveActorWorkspace", () => {
       });
 
       await expect(
-        app.findActorWorkspace({
+        app.getActorWorkspace({
           organizationId: ORGANIZATION_ID,
           actor: "cara@acme.com",
         }),
-      ).resolves.toBeNull();
+      ).resolves.toEqual({ status: "undisclosed" });
     });
   });
 });

@@ -6,6 +6,11 @@ import {
   scenarioParameterDefinitionSchema,
   scenarioParameterDefinitionsSchema,
 } from "./scenario.parameters.ts";
+import {
+  redTeamConfigSchema,
+  scenarioKindSchema,
+  scenarioTemplateMarkerRefusalSchema,
+} from "./scenario.ts";
 import { scenarioFieldValuesSchema } from "./suite-fields.ts";
 
 /** The shared bare `{ error }` body the pre-conversion scenario families answer a miss with. */
@@ -203,6 +208,15 @@ const scenarioRestCreateSchemaDefinition = z.object({
     .describe(
       "The value for each field the test suite declares, keyed by field identifier: text, a number or a boolean, in the field's own type. A field the suite does not declare answers 422 scenario_field_unknown; a value of the wrong type answers 422 scenario_field_type_invalid. An empty value clears the field.",
     ),
+  kind: scenarioKindSchema
+    .optional()
+    .describe(
+      'Absent or "standard" plays a user simulator. "red_team" plays an attacker and requires redTeam; a standard scenario with redTeam answers 422 scenario_red_team_config_mismatch.',
+    ),
+  redTeam: redTeamConfigSchema
+    .optional()
+    .describe("The attack a red_team scenario plays: goal, OWASP ids, strategy and turn budget."),
+  sourceTemplateId: scenarioTemplateMarkerRefusalSchema,
 });
 export interface ScenarioRestCreateSchema extends Named<
   typeof scenarioRestCreateSchemaDefinition

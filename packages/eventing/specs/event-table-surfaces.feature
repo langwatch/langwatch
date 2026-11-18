@@ -26,6 +26,13 @@ Feature: Eventing's own surfaces over its tables
       And it touches only rows of that category's aggregate types that may expire
       And it carries the category's marker
 
+    @unit
+    Scenario: A category's raise only lengthens its rows
+      Given a classification naming each aggregate type's retention class
+      When a category's retention is raised for a tenant
+      Then the rewrite touches only that category's finite rows kept for less than the new retention
+      And a row kept forever is never touched
+
     # Only customer telemetry expires (Alex, 2026-10-09): an unlisted aggregate type is kept forever.
     @unit
     Scenario: An aggregate type mapped to no category is never rewritten
@@ -75,6 +82,11 @@ Feature: Eventing's own surfaces over its tables
       Given events stored for this tenant and for other tenants
       When the storage meter asks for this tenant's event-log stored bytes
       Then the answer equals the sum of `_size_bytes` over this tenant's rows alone
+
+    @unit
+    Scenario: The event log's stored bytes before a cutoff count only events that occurred earlier
+      When the storage meter asks for a tenant's event-log stored bytes before a cutoff
+      Then the read keeps only events whose `EventOccurredAt` is before the cutoff
 
   Rule: Eventing declares its tables' LWQL entries as plain data
 

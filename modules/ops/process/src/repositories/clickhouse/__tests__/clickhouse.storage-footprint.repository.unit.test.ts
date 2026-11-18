@@ -7,7 +7,7 @@ import { ClickHouseStorageFootprintRepository } from "../clickhouse.storage-foot
 
 type Sent = Parameters<ClickHouseQueryClient["read"]>[0];
 
-/** The routed client's read, answering every statement with `rows` and recording it. */
+/** The routed client, answering every built read with `rows`, recording each. */
 function repoAnswering(rows: Record<string, string>[], backupLogPresent = "1") {
   const sent: Sent[] = [];
   const clickhouse = clickHouseQueryClientDouble({
@@ -18,6 +18,32 @@ function repoAnswering(rows: Record<string, string>[], backupLogPresent = "1") {
     },
   });
   return { repo: ClickHouseStorageFootprintRepository.create({ clickhouse }), sent };
+}
+
+/** A repository whose reads of `table` on every replica fail with `code`; local reads answer. */
+function repoRefusingEveryReplica({ table, code }: { table: string; code: string }) {
+  const sent: Sent[] = [];
+  const clickhouse = clickHouseQueryClientDouble({
+    read: async (built: Sent) => {
+      sent.push(built);
+      if (built.table === table && readsEveryReplica(built)) {
+        throw Object.assign(new Error(`refused with ${code}`), { code });
+      }
+      if (built.table === "system.tables") return { rows: [{ present: "1" }] };
+      return { rows: [] };
+    },
+  });
+  return { repo: ClickHouseStorageFootprintRepository.create({ clickhouse }), sent };
+}
+
+const readsEveryReplica = (built: Sent | undefined) =>
+  built?.statement.sql.includes("clusterAllReplicas(") ?? false;
+
+/** The read reaches `table` on the local node only, with no replica setting. */
+function expectLocalRead(built: Sent | undefined, table: string) {
+  expect(built?.statement.sql).toContain(`FROM ${table}`);
+  expect(readsEveryReplica(built)).toBe(false);
+  expect(built?.statement.sql).not.toContain("skip_unavailable_shards");
 }
 
 /** Each footprint read is all-tenants, on the system identity, with no tenant setting. */
@@ -80,19 +106,76 @@ describe("given an endpoint's system tables", () => {
           lastSuccessSizeBytes: 4096,
         },
       ]);
-      expect(sent[0]?.table).toBe("system.tables");
-      expect(sent[1]?.statement.sql).toContain("FROM system.backup_log");
-      expectSystemRead(sent[0]);
+      expect(sent[1]?.table).toBe("system.backup_log");
+      expectLocalRead(sent[1], "system.backup_log");
       expectSystemRead(sent[1]);
+    });
+
+    /** @scenario "A named cluster reads every replica's backup history" */
+    it("reads every replica's log when a cluster is named, so another replica's backup counts", async () => {
+      const { repo, sent } = repoAnswering([]);
+
+      await repo.findBackupStatuses({ cluster: "default" });
+
+      expect(sent.map((built) => built.table)).toEqual(["system.tables", "system.backup_log"]);
+      expect(sent[0]?.statement.sql).toMatch(
+        /clusterAllReplicas\(\{v\d+:Identifier\}, system\.tables\)/,
+      );
+      expect(sent[1]?.statement.sql).toMatch(
+        /clusterAllReplicas\(\{v\d+:Identifier\}, system\.backup_log\)/,
+      );
+      for (const built of sent) {
+        expect(Object.values(built.statement.params)).toContain("default");
+        expect(built.statement.sql).not.toContain("default");
+        expect(built.statement.sql).toContain("SETTINGS skip_unavailable_shards = 1");
+        expectSystemRead(built);
+      }
+    });
+
+    /** @scenario "A cluster the server does not know falls back to the local node" */
+    it.each([
+      ["the table probe", "system.tables"],
+      ["the backup read", "system.backup_log"],
+    ])("falls back to the local node when the cluster is unknown at %s", async (_label, table) => {
+      const { repo, sent } = repoRefusingEveryReplica({ table, code: "170" });
+
+      await expect(repo.findBackupStatuses({ cluster: "default" })).resolves.toEqual([]);
+
+      expect(sent.at(-1)?.table).toBe("system.backup_log");
+      expectLocalRead(sent.at(-1), "system.backup_log");
+    });
+
+    /** @scenario "Any other cluster-wide failure is reported, not hidden" */
+    it.each([
+      ["a timeout at the backup read", "system.backup_log", "159"],
+      ["a missing table at the backup read", "system.backup_log", "60"],
+      ["missing rights at the table probe", "system.tables", "497"],
+      ["missing rights at the backup read", "system.backup_log", "497"],
+    ])("throws %s instead of reading the local node", async (_label, table, code) => {
+      const { repo, sent } = repoRefusingEveryReplica({ table, code });
+
+      await expect(repo.findBackupStatuses({ cluster: "default" })).rejects.toThrow(code);
+      expect(sent.every(readsEveryReplica)).toBe(true);
+    });
+
+    /** @scenario "A cluster name that is not a plain identifier reads the local node" */
+    it("reads the local log with no cluster, or one that is not a plain name", async () => {
+      for (const cluster of [undefined, "", "x'); DROP TABLE t; --"]) {
+        const { repo, sent } = repoAnswering([]);
+
+        await repo.findBackupStatuses({ cluster });
+
+        expect(sent.map((built) => built.table)).toEqual(["system.tables", "system.backup_log"]);
+        expectLocalRead(sent[0], "system.tables");
+        expectLocalRead(sent[1], "system.backup_log");
+      }
     });
 
     it("skips the query, so nothing errors, on a server without the table", async () => {
       const { repo, sent } = repoAnswering([], "0");
 
       expect(await repo.findBackupStatuses()).toEqual([]);
-      expect(sent.map(({ statement }) => statement.sql).join()).not.toContain(
-        "FROM system.backup_log",
-      );
+      expect(sent.map((built) => built.table)).toEqual(["system.tables"]);
     });
   });
 });

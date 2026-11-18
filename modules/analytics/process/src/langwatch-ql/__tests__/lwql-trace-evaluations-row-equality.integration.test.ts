@@ -479,12 +479,30 @@ async function provisionOneRowPerTrace({
   return database;
 }
 
-/** The SQL with every FROM or JOIN of trace_metrics pointed at the one-row-per-trace view. */
+/**
+ * The SQL with every FROM or JOIN of trace_metrics, or of its floored twin call, pointed at the
+ * one-row-per-trace view, which reads the whole history: the floor rewrite already ran.
+ */
 function readingOneRowPerTrace({ sql, database }: { sql: string; database: string }): string {
-  return sql.replace(
+  const target = `${database}.trace_metrics`;
+  const unfloored = sql.replace(
     /\b(FROM|JOIN)(\s+)(?:analytics\.)?trace_metrics\b(?!\.)/gi,
-    (_match, keyword: string, space: string) => `${keyword}${space}${database}.trace_metrics`,
+    (_match, keyword: string, space: string) => `${keyword}${space}${target}`,
   );
+  let read = "";
+  let from = 0;
+  for (const call of unfloored.matchAll(
+    /\b(FROM|JOIN)(\s+)(?:analytics\.)?trace_metrics__floor\(/gi,
+  )) {
+    let end = call.index + call[0].length;
+    for (let depth = 1; depth > 0 && end < unfloored.length; end++) {
+      if (unfloored[end] === "(") depth++;
+      if (unfloored[end] === ")") depth--;
+    }
+    read += `${unfloored.slice(from, call.index)}${call[1]}${call[2]}${target}`;
+    from = end;
+  }
+  return read + unfloored.slice(from);
 }
 
 type SpanSeed = { trace: string; span: string; parent: string | null; contexts?: number };
@@ -792,6 +810,26 @@ describe("given trace evaluations with unmerged retraction pairs beside main's f
     await moveTrace({ trace: "mv1", day: 4.5 });
     await expectTwoAnalyticsRows("mv1");
     await expectMovedQueriesMatchBaseline();
+  });
+
+  // Runs after both moves above: the helper they compare through reads the whole history.
+  /** @scenario "A moved trace reads the same rows through the floored trace_metrics twin as through the view" */
+  it("reads the moved traces' rows the same through trace_metrics' floored twin", async () => {
+    await expectTwoAnalyticsRows("a1");
+    await expectTwoAnalyticsRows("mv1");
+    const floored = MOVED.filter((label) => sent(label).includes("trace_metrics__floor("));
+    expect(floored.length, "queries reading trace_metrics' twin").toBeGreaterThan(0);
+    const differing: string[] = [];
+    for (const { list } of LISTS) {
+      for (const label of floored) {
+        const now = await run({ sql: sent(label), list });
+        const written = await run({ sql: STOCK.get(label) ?? "", list });
+        expect(now.error, `${label} as sent under ${list.join(", ")}`).toBeUndefined();
+        expect(written.error, `${label} as written under ${list.join(", ")}`).toBeUndefined();
+        if (now.rows !== written.rows) differing.push(`${label} under ${list.join(", ")}`);
+      }
+    }
+    expect(differing).toEqual([]);
   });
 
   /** The query's one row under the application list; each expected key as a number. */

@@ -29,6 +29,7 @@ import type { OpsMetricsRepository } from "./ops-metrics.repository.ts";
 import type { OpsMigrationRepository } from "./ops-migration.repository.ts";
 import type { OpsSnapshotRepository } from "./ops-snapshot.repository.ts";
 import type { PipelineDefinitionsRepository } from "./pipeline-definitions.repository.ts";
+import type { ProcessFleetReadingsRepository } from "./process-fleet-readings.repository.ts";
 import type { ProcessManagerPurgeRepository } from "./process-manager-purge.repository.ts";
 import type { ProcessOpsRepository } from "./process-ops.repository.ts";
 import type { QueueRepository } from "./queue.repository.ts";
@@ -95,6 +96,8 @@ export interface OpsRepositories {
   /** Operator EXPLAIN requests and their answers, kept for a short time to live. */
   readonly explainResults: OpsExplainResultsRepository;
   readonly eventLogSearchResults: OpsEventLogSearchResultsRepository;
+  /** The fleet counts the scheduled collector shares for every process's `pm_*` gauges. */
+  readonly processFleetReadings: ProcessFleetReadingsRepository;
   /** The newest release cloud named in the last usage-report reply. */
   readonly cloudLatestRelease: CloudLatestReleaseRepository;
   /** The notices cloud named in the last usage-report reply. */

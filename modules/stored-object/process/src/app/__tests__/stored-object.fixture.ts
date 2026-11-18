@@ -4,6 +4,7 @@ import { memoryObjectStorage } from "@langwatch/process-stores";
 import {
   StoredObjectNotFoundError,
   type StoredObjectDeliveryCapability,
+  type StoredObjectFileRow,
   type StoredObjectStorageDestination,
 } from "@langwatch/stored-object-contract";
 /**
@@ -43,6 +44,10 @@ export const storedObjectTestAddress: StoredObjectStorageAddress = {
 
 export class MemoryStoredObjectStorage extends StoredObjectBytesRepository {
   bytes = new Uint8Array([1, 2, 3]);
+  held = true;
+  opened = 0;
+  /** A stream to hand over instead of `bytes`, as the object-storage member does. */
+  stream: AsyncIterable<Uint8Array> | null = null;
   deleted = false;
   deleteFailuresRemaining = 0;
 
@@ -68,7 +73,13 @@ export class MemoryStoredObjectStorage extends StoredObjectBytesRepository {
     return { byteLength: 3, sha256: STORED_OBJECT_TEST_SHA256 };
   }
 
+  async exists() {
+    return this.held;
+  }
+
   async getBytes() {
+    this.opened += 1;
+    if (this.stream) return this.stream;
     const bytes = this.bytes;
 
     return (async function* () {
@@ -92,6 +103,10 @@ export class MemoryStoredObjectStorage extends StoredObjectBytesRepository {
 
   async probe(): Promise<void> {
     this.probes += 1;
+  }
+
+  async uploadsThroughProcess(): Promise<boolean> {
+    return this.signed === "through-process";
   }
 }
 
@@ -135,13 +150,20 @@ export class FixedStoredObjectDelivery extends StoredObjectDelivery {
 export class MemoryStoredObjectFiles implements StoredObjectFileReader {
   head: StoredObjectProbe = { status: "not_found" };
   read: StoredObjectFileStreamRead | null = null;
+  /** How many reads opened the object's bytes. */
+  opened = 0;
 
   async headById(): Promise<StoredObjectProbe> {
     return this.head;
   }
 
+  async findRowById(): Promise<StoredObjectFileRow | null> {
+    return this.read?.row ?? null;
+  }
+
   async getById(): Promise<StoredObjectFileStreamRead> {
     if (!this.read) throw new StoredObjectNotFoundError();
+    this.opened += 1;
     return this.read;
   }
 }

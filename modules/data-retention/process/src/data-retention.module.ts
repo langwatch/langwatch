@@ -8,9 +8,12 @@ import { defineMigrationStep } from "@langwatch/upgrade/step";
 import { DataRetentionModule } from "./app/data-retention.app.ts";
 import { dataRetentionChannels } from "./channels/data-retention-channels.registry.ts";
 import { dataRetentionSeatPolicyEventing } from "./eventing/data-retention-seat-policy.pipeline.ts";
+import { retentionExtensionEventing } from "./eventing/retention-extension.pipeline.ts";
+import { retentionStorageReportEventing } from "./eventing/retention-storage-report.pipeline.ts";
 import { retroactiveRetentionEventing } from "./eventing/retroactive-retention.pipeline.ts";
 import { dataRetentionRepositories } from "./repositories/data-retention-repositories.registry.ts";
 import { EventLogKeepForeverService } from "./services/event-log-keep-forever.service.ts";
+import { RetentionStorageReportTask } from "./tasks/retention-storage-report.task.ts";
 import { dataRetentionTrpcTransport } from "./transport/data-retention.trpc.ts";
 
 export const dataRetentionProcessModule: PublishedProcessModule<
@@ -24,6 +27,9 @@ export const dataRetentionProcessModule: PublishedProcessModule<
   .withTransports(dataRetentionTrpcTransport)
   .withEventing(dataRetentionSeatPolicyEventing)
   .withEventing(retroactiveRetentionEventing)
+  .withEventing(retentionExtensionEventing)
+  .withEventing(retentionStorageReportEventing)
+  .withTasks(({ app }) => [RetentionStorageReportTask.create({ requests: app })])
   .withMigrations(({ repositories }) => [
     defineMigrationStep({
       id: "data-retention:keep-control-plane-events-forever",

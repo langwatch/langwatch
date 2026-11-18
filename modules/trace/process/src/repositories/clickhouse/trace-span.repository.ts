@@ -23,6 +23,7 @@ import {
   braidedOwnerOf,
   readsBraidedSpans,
 } from "../../features/braid/rules/braided-span-owner.rules.ts";
+import { spanTreeAgentMarksOf } from "../../rules/agent-call-graph.rules.ts";
 import {
   TraceProjectedReadRepository,
   type TraceIngestLagSample,
@@ -31,7 +32,13 @@ import {
 } from "../trace-projected-read.repository.ts";
 import { storedSpans as spans } from "./clickhouse.stored-spans.table.ts";
 import { traceSummaries } from "./clickhouse.trace-summaries.table.ts";
-import { chString, chStringMap } from "./stored-span-row.mapper.ts";
+import {
+  AGENT_MARK_ATTRIBUTES_SELECT,
+  AGENT_MARK_SELECTION,
+  chString,
+  chStringMap,
+  validateSpanKind,
+} from "./stored-span-row.mapper.ts";
 
 const evaluationTraceSpansSchema = evaluationTraceSpanSchema.array();
 const evaluationTraceEventsSchema = evaluationTraceEventSchema.array();
@@ -70,6 +77,8 @@ const spanSummaryRowSchema = z.looseObject({
   DurationMs: numeric,
   UpdatedAtMs: numeric,
   StatusCode: numeric.nullable(),
+  AgentAttributes: chStringMap.optional(),
+  AgentSpanKind: numeric.optional(),
   TenantId: chString.optional(),
 });
 
@@ -105,7 +114,8 @@ const summarySelect = `
   DurationMs,
   toUnixTimestamp64Milli(StartTime) AS StartTimeMs,
   toUnixTimestamp64Milli(UpdatedAt) AS UpdatedAtMs,
-  StatusCode
+  StatusCode,
+  ${AGENT_MARK_ATTRIBUTES_SELECT}
 `;
 
 const attribute = (key: string) => fn.mapGet(spans.SpanAttributes, key);
@@ -142,6 +152,7 @@ const SUMMARY_SELECTION = {
   StartTimeMs: fn.toUnixTimestamp64Milli(spans.StartTime),
   UpdatedAtMs: fn.toUnixTimestamp64Milli(spans.UpdatedAt),
   StatusCode: spans.StatusCode,
+  ...AGENT_MARK_SELECTION,
 };
 
 /** A braided read names each span's owner; a read without braids keeps today's columns. */
@@ -594,6 +605,11 @@ export class ClickHouseTraceSpanRepository extends TraceProjectedReadRepository 
       cacheCreationTokens: ClickHouseTraceSpanRepository.numberOrNull(row.CacheCreationTokens),
       updatedAtMs: Number(row.UpdatedAtMs),
       costInput: ClickHouseTraceSpanRepository.costInputOf(row),
+      ...spanTreeAgentMarksOf({
+        name: row.SpanName,
+        attributes: row.AgentAttributes ?? {},
+        kind: row.AgentSpanKind == null ? null : validateSpanKind(Number(row.AgentSpanKind)),
+      }),
       ...braidedOwnerOf({ authorization, tenantId: row.TenantId }),
     };
   }

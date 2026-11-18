@@ -11,3 +11,10 @@ Feature: Log answers the storage meter with its own stored bytes
     Given log records stored for this project and for another project
     When the storage meter asks log for this project's stored bytes
     Then the answer equals the sum of `_size_bytes` over this project's rows alone
+
+  @unit
+  Scenario: Log's stored bytes before a cutoff count only rows whose partition time is earlier
+    Given the storage meter asks log for one project's stored bytes before a cutoff
+    When log builds the read
+    Then it keeps only rows whose `TimeUnixMs` is before the cutoff
+    And without a cutoff it filters on no time

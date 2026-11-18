@@ -42,6 +42,8 @@ export const experimentRuns = defineClickHouseTable({
     ExpectedTargetResults: column.nullable(column.uint32()),
     ExpectedEvaluatorResults: column.nullable(column.uint32()),
     Concurrency: column.nullable(column.uint16()),
+    /** The row's kept period in days; 0 keeps it forever. */
+    _retention_days: column.uint16(),
     _size_bytes: column.uint32(),
   },
 });

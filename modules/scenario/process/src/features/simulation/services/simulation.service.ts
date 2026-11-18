@@ -5,6 +5,7 @@ import {
   simulationRecordAgentInstanceSchema,
   simulationRecordCutAtLimitSchema,
   simulationRecordHooksSchema,
+  simulationRecordRedTeamReportSchema,
   simulationFinishRunSchema,
   recordEvaluationsCommandDataSchema,
   simulationMessageSnapshotSchema,
@@ -26,6 +27,7 @@ import type {
   SimulationRecordAgentInstance,
   SimulationRecordCutAtLimit,
   SimulationRecordHooks,
+  SimulationRecordRedTeamReport,
   SimulationExportFilterInput,
   SimulationExportRunsInput,
   SimulationExternalSetCountInput,
@@ -154,8 +156,16 @@ export class SimulationService extends SimulationServiceContract {
     return this.repository.countOrganizationRuns(input);
   }
 
-  getStoredBytes(input: { projectId: string }): Promise<number> {
+  getStoredBytes(input: { projectId: string; beforeMs?: number | undefined }): Promise<number> {
     return this.repository.getStoredBytes(input);
+  }
+
+  countStoredPastRetention(input: {
+    projectId: string;
+    beforeMs: number;
+    retentionDays: number;
+  }): Promise<number> {
+    return this.repository.countStoredPastRetention(input);
   }
 
   listRunsForExport(
@@ -210,5 +220,9 @@ export class SimulationService extends SimulationServiceContract {
 
   recordHooks(input: SimulationRecordHooks): Promise<void> {
     return this.execution.recordHooks(simulationRecordHooksSchema.parse(input));
+  }
+
+  recordRedTeamReport(input: SimulationRecordRedTeamReport): Promise<void> {
+    return this.execution.recordRedTeamReport(simulationRecordRedTeamReportSchema.parse(input));
   }
 }

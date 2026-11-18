@@ -89,3 +89,24 @@ describe("LangyAnalyticsEventClickHouseRepository.storedBytesRead", () => {
     expect(statement.sql).toContain("SETTINGS max_threads = 2, max_execution_time = 45");
   });
 });
+
+describe("LangyAnalyticsEventClickHouseRepository.storedBytesRead before a cutoff", () => {
+  const beforeMs = Date.UTC(2026, 7, 1);
+
+  /** @scenario "Langy's stored bytes before a cutoff count only rows whose partition time is earlier" */
+  it("keeps only rows whose `OccurredAt` is before the cutoff", () => {
+    const statement = LangyAnalyticsEventClickHouseRepository.storedBytesRead({
+      tenantId: "project_1",
+      beforeMs: beforeMs,
+    });
+
+    expect(statement.sql).toMatch(/OccurredAt\)? < /);
+    expect(Object.values(statement.params)).toContain(beforeMs);
+  });
+
+  it("filters on no time without a cutoff", () => {
+    expect(
+      LangyAnalyticsEventClickHouseRepository.storedBytesRead({ tenantId: "project_1" }).sql,
+    ).not.toMatch(/OccurredAt\)? < /);
+  });
+});

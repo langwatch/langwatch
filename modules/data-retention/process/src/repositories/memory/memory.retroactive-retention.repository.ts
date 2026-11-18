@@ -78,6 +78,13 @@ export class MemoryRetroactiveRetentionRepository implements RetroactiveRetentio
   refuseTarget: string | undefined;
   /** The parts each new mutation starts with. */
   partsPerRewrite = 1;
+  /** Each raise this twin was asked for, in order; tests read it. */
+  readonly raises: { projectId: string; category: RetentionCategory; retentionDays: number }[] = [];
+  /** Raises to refuse as a running rewrite would, before any is applied; tests set it. */
+  refuseNextRaises = 0;
+  /** Each exact rewrite this twin was asked for, in order; tests read it. */
+  readonly applies: { projectId: string; category: RetentionCategory; retentionDays: number }[] =
+    [];
 
   #plan(category: RetentionCategory): RetroactiveApplyPlan {
     return retroactiveApplyPlan({
@@ -129,13 +136,46 @@ export class MemoryRetroactiveRetentionRepository implements RetroactiveRetentio
     category: RetentionCategory;
     newRetentionDays: number;
   }): Promise<{ tables: string[] }> {
+    const result = await this.#apply({ ...input, raiseOnly: false });
+    this.applies.push({
+      projectId: input.projectId,
+      category: input.category,
+      retentionDays: input.newRetentionDays,
+    });
+    return result;
+  }
+
+  async raiseRetention(input: {
+    projectId: string;
+    category: RetentionCategory;
+    newRetentionDays: number;
+  }): Promise<{ tables: string[] }> {
+    if (this.refuseNextRaises > 0) {
+      this.refuseNextRaises -= 1;
+      throw new RetroactiveMutationInProgressError([]);
+    }
+    const result = await this.#apply({ ...input, raiseOnly: true });
+    this.raises.push({
+      projectId: input.projectId,
+      category: input.category,
+      retentionDays: input.newRetentionDays,
+    });
+    return result;
+  }
+
+  async #apply(input: {
+    projectId: string;
+    category: RetentionCategory;
+    newRetentionDays: number;
+    raiseOnly: boolean;
+  }): Promise<{ tables: string[] }> {
     if (this.refuseRewrites) throw this.refuseRewrites;
     const active = await this.findActiveMutations(input);
     if (active.length > 0) throw new RetroactiveMutationInProgressError(active);
     const plan = this.#plan(input.category);
     const rewritten: string[] = [];
     for (const target of plan.targets) {
-      rewritten.push(...(await this.rewriteTarget({ ...input, target })));
+      rewritten.push(...(await this.#rewriteTarget({ ...input, target })));
     }
     const eventingTables: readonly string[] = this.#eventLogRetention.tables;
     const heldIndexes = rewritten.filter(
@@ -146,11 +186,21 @@ export class MemoryRetroactiveRetentionRepository implements RetroactiveRetentio
     return { tables: [...new Set([...plan.mappedTables, ...heldIndexes, ...eventingRewritten])] };
   }
 
-  async rewriteTarget(input: {
+  rewriteTarget(input: {
     projectId: string;
     category: RetentionCategory;
     newRetentionDays: number;
     target: string;
+  }): Promise<string[]> {
+    return this.#rewriteTarget({ ...input, raiseOnly: false });
+  }
+
+  async #rewriteTarget(input: {
+    projectId: string;
+    category: RetentionCategory;
+    newRetentionDays: number;
+    target: string;
+    raiseOnly: boolean;
   }): Promise<string[]> {
     if (this.refuseRewrites) throw this.refuseRewrites;
     if (this.refuseTarget === input.target) {
@@ -178,6 +228,7 @@ export class MemoryRetroactiveRetentionRepository implements RetroactiveRetentio
     category: RetentionCategory;
     newRetentionDays: number;
     target: string;
+    raiseOnly: boolean;
   }): Promise<string[]> {
     const raise = (index: string) =>
       this.#raise({
@@ -187,11 +238,14 @@ export class MemoryRetroactiveRetentionRepository implements RetroactiveRetentio
         retentionDays: input.newRetentionDays,
       });
     if (input.target === EVENTING_APPLY_TARGET) {
-      const eventingRewritten = await this.#eventLogRetention.retainCategory({
+      const eventLogRewrite = {
         tenantId: input.projectId,
         category: input.category,
         retentionDays: input.newRetentionDays,
-      });
+      };
+      const eventingRewritten = input.raiseOnly
+        ? await this.#eventLogRetention.raiseCategory(eventLogRewrite)
+        : await this.#eventLogRetention.retainCategory(eventLogRewrite);
       for (const table of eventingRewritten) {
         if (table === this.#eventLogRetention.idIndexTable) raise(table);
       }

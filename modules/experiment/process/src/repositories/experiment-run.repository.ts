@@ -24,5 +24,14 @@ export abstract class ExperimentRunRepository {
     versionIds: string[],
   ): Promise<Record<string, ExperimentRunWorkflowVersion>>;
   /** One project's `_size_bytes` over experiment's tables; a store failure throws. */
-  abstract getStoredBytes(input: { projectId: string }): Promise<number>;
+  abstract getStoredBytes(input: {
+    projectId: string;
+    beforeMs?: number | undefined;
+  }): Promise<number>;
+  /** Distinct runs started before `beforeMs` whose rows are kept longer than `retentionDays`. */
+  abstract countStoredPastRetention(input: {
+    projectId: string;
+    beforeMs: number;
+    retentionDays: number;
+  }): Promise<number>;
 }

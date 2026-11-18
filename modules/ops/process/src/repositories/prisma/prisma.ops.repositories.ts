@@ -72,6 +72,7 @@ type NotPostgres =
   | "storageReadings"
   | "explainResults"
   | "eventLogSearchResults"
+  | "processFleetReadings"
   | "redisHealth"
   | "clickhouseHealth"
   | "events"

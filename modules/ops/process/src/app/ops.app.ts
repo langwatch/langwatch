@@ -36,6 +36,10 @@ import type {
   RegisteredStateProjection,
   ReplayService as EventingReplayService,
 } from "@langwatch/eventing";
+import {
+  bindProcessFleetMetricsSource,
+  unbindProcessFleetMetricsSource,
+} from "@langwatch/eventing";
 import { ExperimentApi } from "@langwatch/experiment-contract";
 import {
   FeatureFlagApi,
@@ -262,6 +266,9 @@ import {
   type OpsUpgradeStepPage,
   type OpsUpgradeTenantPage,
   type OpsUpgradeTargetSummary,
+  type OpsFeatureFlagTarget,
+  type OpsFindFeatureFlagTargetsInput,
+  type OpsSearchFeatureFlagTargetsInput,
 } from "@langwatch/ops-contract";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import type { FeatureSetup, ResourceOwnership, ServerRole } from "@langwatch/process";
@@ -297,6 +304,7 @@ import { UpgradeDiagnosticsService } from "#features/upgrades/services/upgrade-d
 import { OpsExplainClickHouseRepository } from "#repositories/clickhouse/clickhouse.ops-explain.repository";
 import type { OpsExplainClients } from "#repositories/ops-explain.repository";
 import type { OpsRepositories } from "#repositories/ops.repositories";
+import { installationOf, installationPageOf } from "#rules/installation-name.rules";
 import { toCallerKey, toDoorStatus, toExplainDoorAnswer } from "#rules/ops-door.rules";
 import { OPS_OPERATOR_DOOR } from "#rules/ops-intake-refusal.rules";
 import { BugReportInboxService } from "#services/bug-report-inbox.service";
@@ -338,6 +346,7 @@ import { OpsQueueMetricsSourceRepository } from "../repositories/ops-queue-metri
 import type { StorageFootprintRepository } from "../repositories/storage-footprint.repository.ts";
 import { decideCloudOps } from "../rules/cloud-ops.rules.ts";
 import { buildExplainQuery, redactQueryForAudit } from "../rules/ops-clickhouse-explain.rules.ts";
+import { grantsAreStaffOnly } from "../rules/platform-operator-staff.rules.ts";
 import { MOVED_TO_OWNERS } from "../rules/system-migration-support.rules.ts";
 import {
   type AdminAccess,
@@ -349,6 +358,7 @@ import { AnomalyDetectorService } from "../services/anomaly-detector.service.ts"
 import { BlobStoreService } from "../services/blob-store.service.ts";
 import { EventExplorerService } from "../services/event-explorer.service.ts";
 import { EventingIntrospectionService } from "../services/eventing-introspection.service.ts";
+import { FeatureFlagTargetDirectoryService } from "../services/feature-flag-target-directory.service.ts";
 import { GroupQueueReaperService } from "../services/group-queue-reaper.service.ts";
 import {
   type AdminAuditSink,
@@ -372,6 +382,7 @@ import {
   type PlatformOperatorSeedSettings,
 } from "../services/platform-operators.service.ts";
 import { ProcessAuditService } from "../services/process-audit.service.ts";
+import { ProcessFleetCollectionService } from "../services/process-fleet-collection.service.ts";
 import { QueueAuditService } from "../services/queue-audit.service.ts";
 import { QueueService } from "../services/queue.service.ts";
 import { SchedulerAuditService } from "../services/scheduler-audit.service.ts";
@@ -739,12 +750,15 @@ type OpsRuntimeDependencies = Readonly<{
   intake: BugReportIntakeService;
   explain: OpsExplainService;
   eventLogSearch: OpsEventLogSearchService;
+  /** The rules dialog's target search; absent where a composition built none. */
+  featureFlagTargets: FeatureFlagTargetDirectoryService | undefined;
   /** Settings, Checkup and the usage report; absent where a composition built none. */
   checkup: OpsCheckupService | undefined;
   /** The detector `ops_anomaly_detection` ticks; absent where a composition built none. */
   anomalies: AnomalyDetectorService | undefined;
   /** The measurement `ops_storage_stats` runs; absent where a composition built none. */
   storageStats: StorageStatsCollectionService | undefined;
+  processFleet: ProcessFleetCollectionService | undefined;
   /** The daily check `ops_seat_sharing` runs; absent where a composition built none. */
   seatSharing: SeatSharingCheckService | undefined;
   /** The stranded-group reap `ops_group_queue_reaper` and the operator action run. */
@@ -858,6 +872,11 @@ export class OpsModule implements OpsApi {
     // One tracker: the queue-metrics writer records into it, the detector reads it.
     const { rateTracker } = setup.repositories;
     const logger = createLogger("langwatch:ops");
+    const processFleet = ProcessFleetCollectionService.create({
+      fleet: setup.repositories.processFleet,
+      readings: setup.repositories.processFleetReadings,
+      logger,
+    });
     const infrastructure = buildOpsInfrastructure({
       bugReportNotifier: setup.channels.bugReportNotifier,
       declaredMigrationSteps: setup.declaredMigrationSteps,
@@ -865,6 +884,8 @@ export class OpsModule implements OpsApi {
       runListedWork: setup.role === "worker" ? setup.runListedWork : undefined,
       // Only the worker runs an EXPLAIN: the api holds no cross-tenant identity (ADR-202 D14).
       opensOpsClickHouse: setup.role === "worker",
+      reportsFleetGauges: setup.role === "worker",
+      processFleet,
       logger,
       config: setup.config,
       resources: setup.resources,
@@ -926,9 +947,16 @@ export class OpsModule implements OpsApi {
       resolveInstances: async () => [sharedStorageStatsInstance(repositories.storageFootprint)],
       readings: storageReadings,
       collectBackups: setup.config.collectClickHouseBackupMetrics,
+      clusterName: setup.config.clickhouseCluster,
       logger,
     });
 
+    const featureFlagTargets = FeatureFlagTargetDirectoryService.create({
+      organizations: dependencies.organizations,
+      projects: dependencies.projects,
+      users: dependencies.users,
+      plans: dependencies.entitlement,
+    });
     const seatSharing = SeatSharingCheckService.create({
       organizationIds: repositories.organizationTenants,
       peers: {
@@ -952,6 +980,10 @@ export class OpsModule implements OpsApi {
       },
       automaticDisabled: config.upgradeDiagnosticsAutoSendDisabled,
     });
+    const operatorsPage = installationPageOf({
+      baseUrl: config.publicBaseUrl,
+      path: "/ops/operators",
+    });
     const platformOperators = PlatformOperatorsService.create({
       authz: dependencies.authz,
       users: dependencies.users,
@@ -961,6 +993,12 @@ export class OpsModule implements OpsApi {
         cloud: config.isSaas || cloudOps,
         isLocalDevelopment: config.nodeEnvironment === "development",
       },
+      notice: {
+        mail: dependencies.notifications,
+        renderer: ReactEmailMailRenderer.create(),
+        installation: installationOf(config.publicBaseUrl),
+        operatorsUrl: operatorsPage.kind === "web" ? operatorsPage.url.toString() : null,
+      },
     });
     const app = OpsModule.fromInfrastructure({
       infrastructure,
@@ -969,6 +1007,7 @@ export class OpsModule implements OpsApi {
       checkup,
       anomalies,
       storageStats,
+      processFleet,
       seatSharing,
       signUpHealth: SignUpHealthService.create({
         organizations: dependencies.organizations,
@@ -985,6 +1024,7 @@ export class OpsModule implements OpsApi {
         ...(isCloud ? {} : { diagnostics: upgradeDiagnostics }),
       }),
       upgradeDiagnostics,
+      featureFlagTargets,
     });
     return app;
   }
@@ -1000,11 +1040,13 @@ export class OpsModule implements OpsApi {
     checkup?: OpsCheckupService;
     anomalies?: AnomalyDetectorService;
     storageStats?: StorageStatsCollectionService;
+    processFleet?: ProcessFleetCollectionService;
     seatSharing?: SeatSharingCheckService;
     signUpHealth?: SignUpHealthService;
     platformOperators?: PlatformOperatorsService;
     upgradeAlerts?: UpgradeAlertsService;
     upgradeDiagnostics?: UpgradeDiagnosticsService;
+    featureFlagTargets?: FeatureFlagTargetDirectoryService;
   }): OpsModule {
     const { infrastructure: members, dependencies, repositories } = setup;
 
@@ -1058,6 +1100,7 @@ export class OpsModule implements OpsApi {
       }),
       anomalies: setup.anomalies,
       storageStats: setup.storageStats,
+      processFleet: setup.processFleet,
       seatSharing: setup.seatSharing,
       groupQueueReaper: GroupQueueReaperService.create({
         repository: repositories.groupQueueReaper,
@@ -1067,6 +1110,7 @@ export class OpsModule implements OpsApi {
       platformOperators: setup.platformOperators,
       upgradeAlerts: setup.upgradeAlerts,
       upgradeDiagnostics: setup.upgradeDiagnostics,
+      featureFlagTargets: setup.featureFlagTargets,
       operatorSeed: members.operatorSeed,
       findOpsApiKey: () => members.findOpsApiKey(),
       findProductAnalyticsTargets: () => members.findProductAnalyticsTargets(),
@@ -1180,6 +1224,22 @@ export class OpsModule implements OpsApi {
 
   async featureFlagCatalogue(): Promise<OperatorFeatureFlagCatalogue> {
     return this.#dependencies.featureFlags.listOperatorCatalogue();
+  }
+
+  searchFeatureFlagTargets(
+    input: OpsSearchFeatureFlagTargetsInput,
+  ): Promise<OpsFeatureFlagTarget[]> {
+    return this.#featureFlagTargets().search(input);
+  }
+
+  findFeatureFlagTargets(input: OpsFindFeatureFlagTargetsInput): Promise<OpsFeatureFlagTarget[]> {
+    return this.#featureFlagTargets().find(input);
+  }
+
+  #featureFlagTargets(): FeatureFlagTargetDirectoryService {
+    const service = this.#dependencies.featureFlagTargets;
+    if (!service) throw new OpsCapabilityUnavailableError("the feature flag target directory");
+    return service;
   }
 
   /** Turns one registered flag on or off. */
@@ -2304,11 +2364,15 @@ export class OpsModule implements OpsApi {
     await upgradeAlerts.check(input);
   }
 
-  /** One pass of `ops_storage_stats`: measures every endpoint and saves the readings. */
-  measureStorage(): Promise<void> {
-    const { storageStats } = this.#dependencies;
+  /**
+   * One pass of `ops_storage_stats`: measures every endpoint and saves the readings, then
+   * counts the process-manager fleet and shares those counts for the pm_* gauges.
+   */
+  async measureStorage(): Promise<void> {
+    const { storageStats, processFleet } = this.#dependencies;
     if (!storageStats) throw new OpsCapabilityUnavailableError("storage stats");
-    return storageStats.collect();
+    await storageStats.collect();
+    await processFleet?.collect();
   }
 
   /** The last seat sharing check, Cloud admin only; empty before the first one. */
@@ -2536,6 +2600,10 @@ function buildOpsInfrastructure(input: {
   declaredMigrationSteps: (() => readonly unknown[]) | undefined;
   runListedWork: SystemMigrationRunnerDeps["runListedWork"];
   opensOpsClickHouse: boolean;
+  /** Only the worker binds the pm_* gauges, so api and tasks pods never read the fleet counts. */
+  reportsFleetGauges: boolean;
+  /** The one fleet service: ops_storage_stats collects through it, the gauges read it. */
+  processFleet: ProcessFleetCollectionService;
 }): OpsAppInfrastructure {
   const { logger, config, resources, repositories } = input;
   const introspection = EventingIntrospectionService.create(() =>
@@ -2569,8 +2637,17 @@ function buildOpsInfrastructure(input: {
     stop: () => queueMetricsWriter.stop(),
   });
 
+  // pm_instances / pm_outbox_* report nothing until a source is bound. The source reads the
+  // counts `ops_storage_stats` shares, never the tables, and refuses them once stale.
+  if (input.reportsFleetGauges) {
+    const { processFleet } = input;
+    bindProcessFleetMetricsSource(() => processFleet.currentReadings());
+    resources.own("process fleet metrics source", () => unbindProcessFleetMetricsSource());
+  }
+
   const explainRuntime = OpsClickHouseRuntime.create({
     url: input.opensOpsClickHouse ? config.clickhouseOpsUrl : undefined,
+    passwordFile: config.clickhouseOpsPasswordFile,
     buildTime: false,
   });
   resources.own("worker ops explain client", () => explainRuntime.close());
@@ -2579,6 +2656,10 @@ function buildOpsInfrastructure(input: {
     createCapability: (dependencies: OpsAppDependencies): OpsCapability => {
       return OpsOperations.create({
         authz: dependencies.authz,
+        operatorAddressesFixed: grantsAreStaffOnly({
+          cloud: config.isSaas || input.cloudOps,
+          isLocalDevelopment: config.nodeEnvironment === "development",
+        }),
         repositories,
         // Where an organization's connection decides its sign-in, editing
         // the legacy `ssoDomain`/`ssoProvider` strings changes nothing a
@@ -2691,6 +2772,8 @@ function organizationSsoRouting(identity: OpsAppDependencies["identity"]): Organ
 
 interface OpsOperationsOptions {
   authz: AdminAccessServiceOptions["authz"];
+  /** Where only staff may operate, the Back office never changes an operator's address. */
+  operatorAddressesFixed: boolean;
   /** The stores the operations read and edit, as the registry built them. */
   repositories: Pick<
     OpsRepositories,
@@ -2750,6 +2833,7 @@ export class OpsOperations {
         projects: this.options.scheduler.projects,
         shares: this.options.shares,
         ssoRouting: this.options.ssoRouting,
+        operatorAddressesFixed: this.options.operatorAddressesFixed,
       }),
       blobStore: BlobStoreService.create(repositories.blobStore),
       impersonation: ImpersonationService.create({

@@ -6,6 +6,7 @@ import {
   DataRetentionApi,
   PLATFORM_DEFAULT_RETENTION_DAYS,
 } from "@langwatch/data-retention-contract";
+import { BillingApi } from "@langwatch/enterprise-billing-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
 import { EvaluationApi } from "@langwatch/evaluation-contract";
 import { ExperimentApi } from "@langwatch/experiment-contract";
@@ -25,6 +26,7 @@ import { describe, expect, it } from "vitest";
 import { dataRetentionProcessModule } from "../../data-retention.module.ts";
 import {
   createDataRetentionTestAuthz,
+  createDataRetentionTestBilling,
   createDataRetentionTestEntitlement,
   createDataRetentionTestUsers,
   retentionTestGraph,
@@ -57,6 +59,7 @@ function process(
       testPeer({ token: ScenarioApi, instance: createApiFixture<ScenarioApi>() }),
       testPeer({ token: SuiteApi, instance: createApiFixture<SuiteApi>() }),
       testPeer({ token: LangyApi, instance: createApiFixture<LangyApi>() }),
+      testPeer({ token: BillingApi, instance: createDataRetentionTestBilling() }),
     ],
   });
 }

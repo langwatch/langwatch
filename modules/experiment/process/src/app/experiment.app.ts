@@ -44,6 +44,7 @@ import {
   type ExperimentRunAggregate,
   type ExperimentRunListInput,
   type ExperimentStoredBytesInput,
+  type ExperimentStoredPastRetentionInput,
   type ExperimentRunLookup,
   type ExperimentRunPageInput,
   type ExperimentRunSlugPageInput,
@@ -493,6 +494,10 @@ export class ExperimentModule implements ExperimentApi {
 
   getStoredBytes(input: ExperimentStoredBytesInput): Promise<number> {
     return this.#dependencies.experiments.getStoredBytes(input);
+  }
+
+  countStoredPastRetention(input: ExperimentStoredPastRetentionInput): Promise<number> {
+    return this.#dependencies.experiments.countStoredPastRetention(input);
   }
 
   /** One page of an experiment's runs, addressed by id. */

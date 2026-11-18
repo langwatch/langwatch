@@ -313,6 +313,9 @@ class MemoryExperimentRunRepository extends ExperimentRunRepository {
   async getStoredBytes() {
     return 0;
   }
+  async countStoredPastRetention() {
+    return 0;
+  }
 }
 
 class MemoryExperimentExecution extends ExperimentExecution {

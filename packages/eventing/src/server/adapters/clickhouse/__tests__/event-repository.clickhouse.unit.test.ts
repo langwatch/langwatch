@@ -252,6 +252,65 @@ describe("EventRepositoryClickHouse read projections", () => {
   });
 });
 
+/**
+ * event_log is ORDER BY (TenantId, AggregateType, AggregateId, IdempotencyKey). A page ordered
+ * by EventTimestamp cannot seek, so every page of a long session read the whole session.
+ */
+describe("EventRepositoryClickHouse paged history read", () => {
+  const upTo = {
+    tenantId: "tenant",
+    aggregateType: "coding_agent_session",
+    aggregateId: "session-1",
+    upToTimestamp: 1700000000001,
+    upToEventId: "evt",
+  };
+
+  /** The built statement of the repository's one paged read. */
+  function pagedCall(client: ReturnType<typeof createMockClient>) {
+    return sentOf({ client }).statement;
+  }
+
+  describe("given the first page", () => {
+    /** @scenario "A paged history read seeks through the event log's sort key" */
+    it("orders by the sort key's last column and keeps the upper bound as a filter", async () => {
+      const client = createMockClient({});
+
+      await repositoryFor(client).getEventRecordsUpToPaged({
+        ...upTo,
+        after: undefined,
+        limit: 10,
+      });
+
+      const { sql } = pagedCall(client);
+      expect(sql).toContain("ORDER BY IdempotencyKey ASC, EventTimestamp ASC, EventId ASC");
+      expect(sql).not.toContain("ORDER BY EventTimestamp");
+      expect(sql).toMatch(/EventTimestamp < \{v\d+:UInt64\}/);
+      expect(sql).not.toContain("IdempotencyKey >");
+    });
+  });
+
+  describe("given a later page", () => {
+    /** @scenario "A paged history read seeks through the event log's sort key" */
+    it("resumes from the cursor's key, with a conjunct the primary index can seek on", async () => {
+      const client = createMockClient({});
+
+      await repositoryFor(client).getEventRecordsUpToPaged({
+        ...upTo,
+        after: { idempotencyKey: "key-7", timestamp: 1700000000000, eventId: "evt-7" },
+        limit: 10,
+      });
+
+      const { sql, params } = pagedCall(client);
+      expect(sql).toMatch(/AND IdempotencyKey >= \{v\d+:String\}/);
+      expect(sql).toMatch(/IdempotencyKey > \{v\d+:String\}/);
+      expect(sql).toMatch(/LIMIT 10$/);
+      expect(Object.values(params)).toEqual(
+        expect.arrayContaining(["key-7", 1700000000000, "evt-7"]),
+      );
+    });
+  });
+});
+
 describe("EventRepositoryClickHouse full-scan declarations", () => {
   const history = { tenantId: "tenant", aggregateType: "user", aggregateId: "id" };
   const upTo = { ...history, upToTimestamp: 1700000000001, upToEventId: "evt" };

@@ -50,7 +50,7 @@ describe("ClickHouseOcsfEventsRepository.findAll", () => {
 
     const statement = expectOneTenantRead(statements);
     expect(statement.sql).toContain(
-      "(TenantId, EventId, LastUpdatedAt) IN (SELECT TenantId, EventId, max(LastUpdatedAt) FROM governance_ocsf_events WHERE TenantId = {tenantId:String} AND tuple(EventTime, EventId) > tuple(",
+      "tuple(TenantId, EventId, LastUpdatedAt, EventTime) IN (SELECT TenantId, EventId, max(LastUpdatedAt) AS Latest, argMax(EventTime, LastUpdatedAt) AS LatestTime FROM governance_ocsf_events WHERE TenantId = {tenantId:String} AND (EventTime >= fromUnixTimestamp64Milli(",
     );
     expect(statement.sql).toContain("ORDER BY EventTime ASC, EventId ASC LIMIT 50");
     expect(Object.values(statement.params)).toEqual(

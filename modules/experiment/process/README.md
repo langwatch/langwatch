@@ -12,7 +12,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 ## Module API (`ExperimentApi`)
 
-Peers call these through the token, declared at `../contract/src/experiment.api.ts:144`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/experiment.api.ts:145`; nothing else in this package is public.
 
 #### `getById`
 
@@ -154,6 +154,14 @@ One project's summed `_size_bytes` over experiment's own tables; a store failure
 
 ```typescript
 getStoredBytes(input: ExperimentStoredBytesInput): Promise<number>;
+```
+
+#### `countStoredPastRetention`
+
+Distinct runs started before `beforeMs` and kept longer than `retentionDays`, or forever.
+
+```typescript
+countStoredPastRetention(input: ExperimentStoredPastRetentionInput): Promise<number>;
 ```
 
 #### `getRunsPage`

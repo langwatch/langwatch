@@ -119,6 +119,7 @@ export {
   type NormalizedLink,
   type NormalizedSpan,
   type NormalizedSpanSchema,
+  type OwnedSpan,
 } from "./trace.spans.ts";
 export {
   ADD_ANNOTATION_COMMAND_TYPE,
@@ -187,12 +188,19 @@ export {
   TRACE_SUMMARY_PROJECTION_VERSION_PRE_STORAGE_ANCHOR,
   TRACE_SUMMARY_PROJECTION_VERSIONS,
   isStorageAnchoredVersion,
+  A2A_V0_METHODS,
+  A2A_V1_METHODS,
+  a2aSpanNameMatch,
+  isA2aSpanName,
+  isAgentCallSpanName,
+  type A2aSpanNameMatch,
   type TraceProcessingCommandType,
   type TraceProcessingEventType,
 } from "./trace.constants.ts";
 export * from "./features/edit-overlay/trace-edit-overlay-apply.ts";
 export * from "./features/content/trace-python-repr.ts";
 export * from "./features/analytics/trace-model-spend.ts";
+export * from "./features/analytics/trace-agent-traffic.ts";
 export * from "./features/ingest/trace-collector-common.ts";
 export * from "./features/content/trace-rag-chunks.ts";
 export * from "./features/content/trace-rag-extraction.ts";

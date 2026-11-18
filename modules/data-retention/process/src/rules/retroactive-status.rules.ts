@@ -12,7 +12,6 @@ import {
   type RetroactiveMutationRecord,
   type RetroactiveProgressRecordedData,
 } from "@langwatch/data-retention-contract";
-import { freshnessOf } from "@langwatch/eventing";
 import { Temporal } from "@langwatch/time";
 
 import type {
@@ -86,24 +85,14 @@ function close(status: RetroactiveStatus, requestId: string): RetroactiveStatus 
   };
 }
 
-/**
- * Folds one fact into the status, or answers null when the status already applied it or a newer
- * one: a redelivery never rewinds progress. The applied id becomes the row's version.
- */
+/** Folds one fact into the status; the applied id becomes the row's version. */
 export function foldRetroactiveStatus({
   status,
   fact,
 }: {
   status: RetroactiveStatus;
   fact: RetroactiveFact;
-}): RetroactiveStatus | null {
-  if (
-    status.lastAppliedEventId !== "" &&
-    freshnessOf({ answerId: status.lastAppliedEventId, hintId: fact.id, scope: "aggregate" }) ===
-      "fresh"
-  ) {
-    return null;
-  }
+}): RetroactiveStatus {
   const next = foldFact({ status, fact });
   return { ...next, lastAppliedEventId: fact.id };
 }

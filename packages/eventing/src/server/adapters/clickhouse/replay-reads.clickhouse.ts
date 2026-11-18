@@ -182,63 +182,136 @@ export function cutoffEventsRead({
   return { statement: pruned.groupBy(eventLog.AggregateType, eventLog.AggregateId).build() };
 }
 
-/** One page of a batch's events up to the max cutoff, strictly after the cursor. */
-export function aggregateEventsPageRead({
-  tenantId,
-  aggregateIds,
-  eventTypes,
-  maxCutoff,
-  cursor,
-  batchSize,
-  occurredAtBounds,
-}: {
+/** A page of a batch's events: up to the max cutoff, strictly after the cursor. */
+interface EventPageRange {
   tenantId: string;
   aggregateIds: readonly string[];
   eventTypes: readonly string[];
   maxCutoff: CutoffInfo;
   cursor: CutoffInfo | undefined;
-  batchSize: number;
   occurredAtBounds: OccurredAtBounds | undefined;
-}) {
-  const upTo = clickhouseRead({ scope: tenantScope.single({ tenantId }) })
-    .from(eventLog)
-    .select(REPLAY_ROW)
-    .where(({ and, eq, lt, lte, oneOf, or }) =>
+}
+
+type PageOps = Pick<
+  ConditionOps<"event_log", never>,
+  "and" | "eq" | "gt" | "gte" | "lt" | "lte" | "or"
+>;
+
+/** The page's range: after `cursor` up to `maxCutoff`, pruned by the bounds; the ids filter apart. */
+function eventPageCondition({
+  maxCutoff,
+  cursor,
+  occurredAtBounds,
+}: EventPageRange): (ops: PageOps) => Condition {
+  return (ops) => {
+    const { and, eq, gt, lt, lte, or } = ops;
+    const upTo = or(
+      lt(eventLog.EventTimestamp, maxCutoff.timestamp),
       and(
-        oneOf(eventLog.EventType, eventTypes),
-        oneOf(eventLog.AggregateId, aggregateIds),
-        or(
-          lt(eventLog.EventTimestamp, maxCutoff.timestamp),
-          and(
-            eq(eventLog.EventTimestamp, maxCutoff.timestamp),
-            lte(eventLog.EventId, maxCutoff.eventId),
-          ),
-        ),
+        eq(eventLog.EventTimestamp, maxCutoff.timestamp),
+        lte(eventLog.EventId, maxCutoff.eventId),
       ),
     );
-  const after =
-    cursor === undefined
-      ? upTo
-      : upTo.where(({ and, eq, gt, or }) =>
-          or(
-            gt(eventLog.EventTimestamp, cursor.timestamp),
-            and(
-              eq(eventLog.EventTimestamp, cursor.timestamp),
-              gt(eventLog.EventId, cursor.eventId),
+    const after =
+      cursor === undefined
+        ? upTo
+        : and(
+            upTo,
+            or(
+              gt(eventLog.EventTimestamp, cursor.timestamp),
+              and(
+                eq(eventLog.EventTimestamp, cursor.timestamp),
+                gt(eventLog.EventId, cursor.eventId),
+              ),
             ),
-          ),
-        );
+          );
+    return occurredAtBounds === undefined
+      ? after
+      : and(after, occurredWithin(ops, occurredAtBounds));
+  };
+}
+
+/**
+ * One page of a batch's events in event order, capped at `batchSize` rows; with no cap the
+ * range is read whole, so no LIMIT cuts a tied position the cursor would then skip.
+ */
+export function aggregateEventsPageRead({
+  batchSize,
+  ...range
+}: EventPageRange & { batchSize: number | undefined }) {
+  const ordered = clickhouseRead({ scope: tenantScope.single({ tenantId: range.tenantId }) })
+    .from(eventLog)
+    .select(REPLAY_ROW)
+    .where(({ and, oneOf }) =>
+      and(
+        oneOf(eventLog.EventType, range.eventTypes),
+        oneOf(eventLog.AggregateId, range.aggregateIds),
+      ),
+    )
+    .where((ops) => eventPageCondition(range)(ops))
+    .orderBy(eventLog.EventTimestamp)
+    .orderBy(eventLog.EventId);
+  return {
+    statement: (batchSize === undefined ? ordered : ordered.limit(batchSize)).build(),
+  };
+}
+
+/** A page's positions and payload sizes alone, so the read that sizes a page sorts no payload. */
+export function eventPagePositionsRead({
+  batchSize,
+  ...range
+}: EventPageRange & { batchSize: number }) {
+  const statement = clickhouseRead({ scope: tenantScope.single({ tenantId: range.tenantId }) })
+    .from(eventLog)
+    .select({
+      EventTimestamp: eventLog.EventTimestamp,
+      EventId: eventLog.EventId,
+      payloadBytes: fn.length(eventLog.EventPayload),
+    })
+    .where(({ and, oneOf }) =>
+      and(
+        oneOf(eventLog.EventType, range.eventTypes),
+        oneOf(eventLog.AggregateId, range.aggregateIds),
+      ),
+    )
+    .where((ops) => eventPageCondition(range)(ops))
+    .orderBy(eventLog.EventTimestamp)
+    .orderBy(eventLog.EventId)
+    .limit(batchSize)
+    .build();
+  return { statement };
+}
+
+/**
+ * Each aggregate's event count and payload bytes, aggregated without a sort; on a server that
+ * serves `length` from the String's size subcolumn it reads no payload bytes at all.
+ */
+export function aggregateSizesRead({
+  tenantId,
+  aggregateIds,
+  eventTypes,
+  occurredAtBounds,
+}: {
+  tenantId: string;
+  aggregateIds: readonly string[];
+  eventTypes: readonly string[];
+  occurredAtBounds: OccurredAtBounds | undefined;
+}) {
+  const read = clickhouseRead({ scope: tenantScope.single({ tenantId }) })
+    .from(eventLog)
+    .select({
+      aggregateId: eventLog.AggregateId,
+      events: fn.count(),
+      payloadBytes: fn.sum(fn.length(eventLog.EventPayload)),
+    })
+    .where(({ and, oneOf }) =>
+      and(oneOf(eventLog.EventType, eventTypes), oneOf(eventLog.AggregateId, aggregateIds)),
+    );
   const pruned =
     occurredAtBounds === undefined
-      ? after
-      : after.where((ops) => occurredWithin(ops, occurredAtBounds));
-  return {
-    statement: pruned
-      .orderBy(eventLog.EventTimestamp)
-      .orderBy(eventLog.EventId)
-      .limit(batchSize)
-      .build(),
-  };
+      ? read
+      : read.where((ops) => occurredWithin(ops, occurredAtBounds));
+  return { statement: pruned.groupBy(eventLog.AggregateId).build() };
 }
 
 /** Every event of a batch's aggregates in per-aggregate replay order, streamed batch by batch. */

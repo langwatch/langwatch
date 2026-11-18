@@ -90,7 +90,7 @@ export const evaluationOutcomesQuerySchema: EvaluationOutcomesQuerySchema =
 export type EvaluationOutcomesQuery = z.infer<typeof evaluationOutcomesQuerySchema>;
 
 const evaluationStoredBytesInputSchemaDefinition = z
-  .object({ projectId: z.string().min(1) })
+  .object({ projectId: z.string().min(1), beforeMs: z.number().int().nonnegative().optional() })
   .strict();
 export interface EvaluationStoredBytesInputSchema extends Named<
   typeof evaluationStoredBytesInputSchemaDefinition

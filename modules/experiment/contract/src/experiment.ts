@@ -105,7 +105,7 @@ export type FindOrCreateWorkflowExperimentInput = z.infer<
 >;
 
 const experimentStoredBytesInputSchemaDefinition = z
-  .object({ projectId: z.string().min(1) })
+  .object({ projectId: z.string().min(1), beforeMs: z.number().int().nonnegative().optional() })
   .strict();
 export interface ExperimentStoredBytesInputSchema extends Named<
   typeof experimentStoredBytesInputSchemaDefinition
@@ -114,3 +114,20 @@ export interface ExperimentStoredBytesInputSchema extends Named<
 export const experimentStoredBytesInputSchema: ExperimentStoredBytesInputSchema =
   experimentStoredBytesInputSchemaDefinition;
 export type ExperimentStoredBytesInput = z.infer<typeof experimentStoredBytesInputSchema>;
+
+const experimentStoredPastRetentionInputSchemaDefinition = z
+  .object({
+    projectId: z.string().min(1),
+    beforeMs: z.number().int().nonnegative(),
+    retentionDays: z.number().int().min(1).max(65_535),
+  })
+  .strict();
+export interface ExperimentStoredPastRetentionInputSchema extends Named<
+  typeof experimentStoredPastRetentionInputSchemaDefinition
+> {}
+/** Data retention's question: the runs a period of `retentionDays` would remove now. */
+export const experimentStoredPastRetentionInputSchema: ExperimentStoredPastRetentionInputSchema =
+  experimentStoredPastRetentionInputSchemaDefinition;
+export type ExperimentStoredPastRetentionInput = z.infer<
+  typeof experimentStoredPastRetentionInputSchema
+>;

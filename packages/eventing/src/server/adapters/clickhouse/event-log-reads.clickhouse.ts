@@ -8,6 +8,7 @@ import {
   tenantScope,
 } from "@langwatch/clickhouse-client/builder";
 
+import type { EventLogPageCursor } from "../../../stores/event-log-page-order.ts";
 import type { EventOccurredAtWindow } from "../../../stores/repositories/eventRepository.types.ts";
 import { eventLog } from "./event-log-table.clickhouse.ts";
 
@@ -133,8 +134,9 @@ export function eventsOfAggregatesRead({
 }
 
 /**
- * One aggregate's events up to and including an event, in acceptance order. A page adds a strict
- * `after` cursor and a row cap, so a re-fold streams a huge aggregate's history.
+ * One aggregate's events up to and including an event, in acceptance order. A page reads in
+ * page order (see {@link EventLogPageCursor}) from a strict `after` cursor under a row cap, so
+ * a re-fold streams a huge aggregate's history through the primary index.
  */
 export function aggregateEventsUpToRead({
   tenantId,
@@ -151,7 +153,7 @@ export function aggregateEventsUpToRead({
   upToTimestamp: number;
   upToEventId: string;
   occurredAtFromMs: number | undefined;
-  page?: { after: { timestamp: number; eventId: string } | undefined; limit: number };
+  page?: { after: EventLogPageCursor | undefined; limit: number };
 }) {
   const upTo = aggregateRead({ tenantId, aggregateType, aggregateId, occurredAtFromMs }).where(
     ({ and, eq, lt, lte, or }) =>
@@ -160,20 +162,34 @@ export function aggregateEventsUpToRead({
         and(eq(eventLog.EventTimestamp, upToTimestamp), lte(eventLog.EventId, upToEventId)),
       ),
   );
-  const after = page?.after;
+  if (page === undefined) {
+    return fullScanUnless(occurredAtFromMs, {
+      statement: upTo.orderBy(eventLog.EventTimestamp).orderBy(eventLog.EventId).build(),
+    });
+  }
+  // The `>=` conjunct is the one the primary index seeks on; arrival and id only order copies
+  // of one key that are not merged yet, so none is skipped.
+  const after = page.after;
   const paged =
     after === undefined
       ? upTo
-      : upTo.where(({ and, eq, gt, or }) =>
-          or(
-            gt(eventLog.EventTimestamp, after.timestamp),
-            and(eq(eventLog.EventTimestamp, after.timestamp), gt(eventLog.EventId, after.eventId)),
-          ),
-        );
-  const ordered = paged.orderBy(eventLog.EventTimestamp).orderBy(eventLog.EventId);
-  return fullScanUnless(occurredAtFromMs, {
-    statement: (page === undefined ? ordered : ordered.limit(page.limit)).build(),
-  });
+      : upTo
+          .where(({ gte }) => gte(eventLog.IdempotencyKey, after.idempotencyKey))
+          .where(({ and, eq, gt, or }) =>
+            or(
+              gt(eventLog.IdempotencyKey, after.idempotencyKey),
+              gt(eventLog.EventTimestamp, after.timestamp),
+              and(
+                eq(eventLog.EventTimestamp, after.timestamp),
+                gt(eventLog.EventId, after.eventId),
+              ),
+            ),
+          );
+  const ordered = paged
+    .orderBy(eventLog.IdempotencyKey)
+    .orderBy(eventLog.EventTimestamp)
+    .orderBy(eventLog.EventId);
+  return fullScanUnless(occurredAtFromMs, { statement: ordered.limit(page.limit).build() });
 }
 
 /** The distinct events of an aggregate accepted strictly before an event. */
@@ -214,6 +230,60 @@ export function eventCountBeforeRead({
         ),
       )
       .build(),
+  };
+}
+
+/**
+ * The two existence checks a fold asks after a store miss, each stopping at its first row: the
+ * delivered event, and an event accepted before it other than the ignored ones.
+ */
+export function eventProbeReads({
+  tenantId,
+  aggregateType,
+  aggregateId,
+  eventTimestamp,
+  eventId,
+  occurredAtFromMs,
+  ignoreEventIds,
+}: {
+  tenantId: string;
+  aggregateType: string;
+  aggregateId: string;
+  eventTimestamp: number;
+  eventId: string;
+  occurredAtFromMs: number | undefined;
+  ignoreEventIds: readonly string[];
+}) {
+  const keyed = clickhouseRead({ scope: tenantScope.single({ tenantId }) })
+    .from(eventLog)
+    .select({ EventId: eventLog.EventId })
+    .where(({ and, eq }) =>
+      and(eq(eventLog.AggregateType, aggregateType), eq(eventLog.AggregateId, aggregateId)),
+    );
+  const bounded = hasLowerBound(occurredAtFromMs)
+    ? keyed.where((ops) => occurredSince(ops, occurredAtFromMs))
+    : keyed;
+  const earlier = bounded.where(({ and, eq, lt, ne, or }) =>
+    and(
+      or(
+        lt(eventLog.EventTimestamp, eventTimestamp),
+        and(eq(eventLog.EventTimestamp, eventTimestamp), lt(eventLog.EventId, eventId)),
+      ),
+      ne(eventLog.EventId, eventId),
+    ),
+  );
+  const unignored =
+    ignoreEventIds.length === 0
+      ? earlier
+      : earlier.where(({ not, oneOf }) => not(oneOf(eventLog.EventId, ignoreEventIds)));
+  return {
+    event: fullScanUnless(occurredAtFromMs, {
+      statement: bounded
+        .where(({ eq }) => eq(eventLog.EventId, eventId))
+        .limit(1)
+        .build(),
+    }),
+    earlier: fullScanUnless(occurredAtFromMs, { statement: unignored.limit(1).build() }),
   };
 }
 

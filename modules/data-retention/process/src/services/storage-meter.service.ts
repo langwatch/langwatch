@@ -122,6 +122,22 @@ export class StorageMeterService {
   }
 
   /**
+   * The bytes in rows older than `beforeMs`, which billing charges for: never cached, and asked of
+   * one owner at a time. An owner that cannot answer fails the measurement rather than bill a
+   * partial figure as the day's.
+   */
+  async getStoredBytesBefore(input: { tenantId: string; beforeMs: number }): Promise<number> {
+    const { tenantId, beforeMs } = input;
+    let total = 0;
+    for (const api of Object.values(this.owners)) {
+      total += storedBytesSchema.parse(await api.getStoredBytes({ projectId: tenantId, beforeMs }));
+    }
+    return (
+      total + storedBytesSchema.parse(await this.eventLog.getEventLogBytes({ tenantId, beforeMs }))
+    );
+  }
+
+  /**
    * One owner that cannot answer is a gap in the total, logged by name. Every owner refusing is
    * the store being unreachable: reporting that as zero bytes would be cached as a measurement.
    */

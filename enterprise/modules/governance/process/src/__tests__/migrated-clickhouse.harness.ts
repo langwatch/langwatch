@@ -60,6 +60,8 @@ export interface MigratedClickHouseAsReader {
   client: ClickHouseClient;
   /** As a worker holds it: tenant reads as the app reader, inserts and commands as the system. */
   queryClient: ClickHouseQueryClient;
+  /** The reader's own URL, for a suite that stamps its own connection, as a cost read does. */
+  readerUrl: string;
   close(): Promise<void>;
 }
 
@@ -73,5 +75,10 @@ export async function startMigratedClickHouseAsReader({
   suite: string;
 }): Promise<MigratedClickHouseAsReader> {
   const opened = await startMigratedAppReaderClickHouse({ suite, environment: process.env });
-  return { client: opened.admin, queryClient: opened.worker, close: () => opened.close() };
+  return {
+    client: opened.admin,
+    queryClient: opened.worker,
+    readerUrl: opened.readerUrl,
+    close: () => opened.close(),
+  };
 }

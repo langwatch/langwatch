@@ -192,6 +192,19 @@ describe("given ClickHouse 26.8, two tenants' tables, a table the reader is not 
     });
 
     /** @scenario "The system-table reads run on 26.8 as main's raw queries do" */
+    it("reads the backup log on every replica of a cluster bound by name, and names an unknown one", async () => {
+      const cluster = "default";
+
+      expect(await builtRows({ statement: reads.hasBackupLogRead({ cluster }) })).toEqual(["1"]);
+      expect(await builtRows({ statement: reads.backupStatusesRead({ cluster }) })).toEqual(
+        await builtRows({ statement: reads.backupStatusesRead() }),
+      );
+      await expect(
+        builtRows({ statement: reads.hasBackupLogRead({ cluster: "no_such_cluster" }) }),
+      ).rejects.toMatchObject({ type: "CLUSTER_DOESNT_EXIST" });
+    });
+
+    /** @scenario "The system-table reads run on 26.8 as main's raw queries do" */
     it("returns the held tables, the event log the reader cannot see included", async () => {
       const tables = ["event_log", "stored_spans_id_index", "absent_id_index"];
       const built = await builtRows({ statement: reads.heldTablesRead({ tables }) });

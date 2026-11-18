@@ -10,6 +10,8 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { RedisConnection } from "@langwatch/redis-client";
 import type { Instant } from "@langwatch/time";
 
+export { readableBody } from "./object-storage-backend.ts";
+
 /** Now, read from one place, so a test moves time without touching a module. */
 export interface Clock {
   now(): Instant;
@@ -83,6 +85,8 @@ export interface ObjectStorage {
   ): Promise<ObjectDigest>;
   /** The object's bytes; an absent object refuses with StoredObjectNotFoundError. */
   read(at: StoredObjectAddress): Promise<AsyncIterable<Uint8Array>>;
+  /** Whether an object is stored at the address, asked of its headers alone: no body is opened. */
+  exists(at: StoredObjectAddress): Promise<boolean>;
   /** The backend's SHA-256 where it holds one, else the object streamed back through the hash. */
   digest(at: StoredObjectAddress): Promise<ObjectDigest>;
   /** Removes the object; an absent one is already removed. */

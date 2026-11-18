@@ -23,6 +23,7 @@
   "dependencies": {
     "@clickhouse/client": "catalog:",
     "@langwatch/api": "workspace:*",
+    "@langwatch/clickhouse-client": "workspace:*",
     "@langwatch/data-privacy-contract": "workspace:*",
     "@langwatch/data-retention-contract": "workspace:*",
     "@langwatch/eventing": "workspace:*",
@@ -43,7 +44,6 @@
     "zod": "catalog:"
   },
   "devDependencies": {
-    "@langwatch/clickhouse-client": "workspace:*",
     "@langwatch/clickhouse-migrations": "workspace:*",
     "@langwatch/process-stores": "workspace:*",
     "@langwatch/test-harness": "workspace:*",

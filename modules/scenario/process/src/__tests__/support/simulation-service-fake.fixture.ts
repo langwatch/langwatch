@@ -26,6 +26,7 @@ const servedReads = {
   countUsage: "countUsage",
   countOrganizationRuns: "countOrganizationRuns",
   getStoredBytes: "getStoredBytes",
+  countStoredPastRetention: "countStoredPastRetention",
   listRunsForExport: "listRunsForExport",
 } as const satisfies Record<keyof SimulationRepository, keyof SimulationService>;
 
@@ -43,6 +44,7 @@ const sentWrites = [
   "recordAgentInstance",
   "recordCutAtLimit",
   "recordHooks",
+  "recordRedTeamReport",
 ] as const satisfies readonly (keyof SimulationService)[];
 
 /** The registry's simulation reads, answered by a service-shaped fake; any other read throws. */

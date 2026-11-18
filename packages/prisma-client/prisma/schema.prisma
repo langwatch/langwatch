@@ -1285,6 +1285,15 @@ model Organization {
   /// session, ever. Turning it on signs nobody out.
   /// Spec: specs/identity/mfa-and-session-shape.feature.
   mfaRequired                Boolean              @default(false)
+  /// Whether members may connect the documentation playground to their own access with a
+  /// short-lived docs session key (ADR-185, amendment of 2026-11-13). On by default; turned off,
+  /// no key is minted and live ones stop authenticating. The pasted-key path is untouched.
+  /// Spec: modules/api-key/specs/docs-session-keys.feature.
+  docsPlaygroundSessionsEnabled Boolean           @default(true)
+  /// When the docs playground was last turned off, written in the same update as the switch. A
+  /// docs session key minted at or before it never authenticates again, nor any key minted under
+  /// one, so turning it back on revives none of them (ADR-185, amendment of 2026-11-14).
+  docsPlaygroundSessionsDisabledAt DateTime?
   /// How many consecutive failed sign-ins lock an account (GAC-09).
   /// 0 = never lock, which is the default and what every organization that
   /// has not asked for this keeps. Counts EVERY credential together - a
@@ -1462,6 +1471,8 @@ model IssuedLicense {
   maxMembersLite   Int?
   /// True when the license sells unlimited lite seats; maxMembersLite is then null.
   liteSeatsUnlimited Boolean   @default(false)
+  /// The Developer seats sold: null when not stated, which sells none.
+  maxMembersDeveloper Int?
   issuedAt         DateTime
   expiresAt        DateTime
 
@@ -1562,6 +1573,8 @@ model ActivationCode {
   maxMembersLite   Int?     @default(0)
   /// True when the minted license carries unlimited lite seats; maxMembersLite is then null.
   liteSeatsUnlimited Boolean @default(false)
+  /// The Developer seats the minted license carries: null when not stated, which sells none.
+  maxMembersDeveloper Int?
   /// How long the license this code mints runs for.
   licenseTermDays  Int
   /// Hosted services the minted license may call.
@@ -4606,6 +4619,14 @@ model Scenario {
   // See specs/suites/test-suite-membership-invariant.feature.
   testSuiteId     String?
   testSuite       SimulationSuite?  @relation("TestSuiteScenarios", fields: [testSuiteId], references: [id], onDelete: SetNull)
+  // "standard" | "red_team" (scenarioKindSchema in the scenario contract). A
+  // red team scenario runs an attacker in place of the user simulator and
+  // carries its config in redTeam. See modules/scenario/contract/src/scenario.ts.
+  kind            String            @default("standard")
+  redTeam         Json?
+  // The suite template whose apply created this scenario. The Free scenario
+  // cap leaves these out; a copy or a later create in that suite stays null.
+  sourceTemplateId String?
   // Counts one up on every save of the editable fields. Each number has a
   // ScenarioVersion row holding the state as saved; the unique constraint
   // there is what keeps two concurrent saves from sharing a number. See
@@ -4704,6 +4725,10 @@ model SimulationSuite {
   // reads as none. See server/scenarios/evaluator-attachments.ts.
   evaluators         Json?
   testSuiteScenarios Scenario[] @relation("TestSuiteScenarios")
+  // The suite template this test suite was created from, and its version.
+  // Null for a suite built by hand. See modules/suite/specs/suite-templates.feature.
+  templateId         String?
+  templateVersion    Int?
   archivedAt         DateTime?
   createdAt          DateTime   @default(now())
   updatedAt          DateTime   @default(now()) @updatedAt
@@ -4770,6 +4795,15 @@ model Subscription {
   /// The lease a seat change or seat line repair holds while it reads and moves the seat line.
   seatLineLeaseToken    String?
   seatLineLeaseUntil    DateTime?
+  /// An open failed payment recovery case: the unpaid renewal invoice, day 0 (its first failed
+  /// charge) and the last notice sent (3, 7, 14 or 21). Cleared when the case closes.
+  paymentRecoveryInvoiceId String?
+  paymentRecoveryStartedAt DateTime?
+  paymentRecoveryNoticeDay Int?
+  /// The over-plan mark: traces recorded from overPlanSince are withheld while it is open and the
+  /// organization is on Free with more members than Free allows; ended once that no longer holds.
+  overPlanSince         DateTime?
+  overPlanEndedAt       DateTime?
 
   organization Organization @relation(fields: [organizationId], references: [id])
   invoices     Invoice[]
@@ -7364,6 +7398,56 @@ model DiscoveredAgent {
 
   @@unique([organizationId, provider, rawAgentId])
   @@index([organizationId, lastSeenAt])
+}
+
+/// One agent in the organisation's governance registry, from any source governance reads
+/// (enterprise/modules/governance/specs/agent-registry.feature). `entry` is the latest
+/// machine-readable snapshot; `version` grows by one on every material change.
+model AgentRegistryEntry {
+  id             String    @id @default(nanoid())
+  organizationId String
+  /// Where the agent came from and its id there, e.g. `langwatch:<agentId>`.
+  sourceKey      String
+  source         String
+  status         String
+  version        Int
+  fingerprint    String
+  entry          Json
+  firstSeenAt    DateTime
+  lastSeenAt     DateTime?
+  removedAt      DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @default(now()) @updatedAt
+
+  @@unique([organizationId, sourceKey])
+  @@index([organizationId, updatedAt])
+}
+
+/// The registry's append-only change feed: one row per registered, versioned, removed or
+/// tool-deprecated fact. `sequence` is the pull cursor; `deliveryRecordedAt` marks the webhook
+/// fan-out as recorded in governance's outbox.
+model AgentRegistryEvent {
+  id                 String    @id @default(nanoid())
+  organizationId     String
+  sequence           BigInt    @default(autoincrement())
+  type               String
+  entryId            String
+  fromVersion        Int?
+  toVersion          Int?
+  payload            Json
+  occurredAt         DateTime
+  deliveryRecordedAt DateTime?
+
+  @@unique([organizationId, sequence])
+  @@index([organizationId, deliveryRecordedAt])
+  @@index([organizationId, entryId])
+}
+
+/// An organisation's registry baseline: its first reconcile, written as already pushed so the
+/// agents it already had are not announced. Every reconcile after it pushes its changes.
+model AgentRegistryBaseline {
+  organizationId String   @id
+  baselinedAt    DateTime
 }
 
 /// The dated match table: "`user_abc123` on Anthropic is platform user #42,

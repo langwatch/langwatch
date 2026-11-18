@@ -3,6 +3,7 @@ import type { InstantEvalRunReference } from "@langwatch/instant-eval-contract";
 import { moduleApi } from "@langwatch/module";
 
 import type { ConversationView } from "./conversation/conversation-steps.ts";
+import type { TraceAgentSeen } from "./features/analytics/trace-agent-traffic.ts";
 import type {
   TraceAttributedRecency,
   TraceAttributedSpendComparison,
@@ -92,7 +93,7 @@ import type {
   ModelUsageStatsRow,
   ModelSpanSampleRow,
 } from "./features/span/trace-span-read-model.ts";
-import type { Trace, Span, OwnedSpan, ElasticSearchEvent } from "./trace-format.schemas.ts";
+import type { Trace, Span, ElasticSearchEvent } from "./trace-format.schemas.ts";
 import type {
   TraceFullReadInput,
   TraceFullRecord,
@@ -101,6 +102,7 @@ import type {
 import type { TraceDateField } from "./trace-legacy-read.types.ts";
 import type { CheckPreconditions } from "./trace-precondition.schemas.ts";
 import type {
+  AgentCallGraph,
   TraceCost,
   TraceLegacyListInput,
   TraceSummaryListRequestOptions,
@@ -121,7 +123,8 @@ import type {
   TraceHeader,
   TraceResourceInfoDto,
 } from "./trace-view.contract.ts";
-import type { Protections } from "./trace-viewer-protections.contract.ts";
+import type { Protections, TraceWithholding } from "./trace-viewer-protections.contract.ts";
+import type { TracePageSizeBound } from "./trace.errors.ts";
 import type {
   SpanTreeDeltaInput,
   SpanTreeInput,
@@ -129,6 +132,7 @@ import type {
   TraceByIdInput,
   TraceDerivedEventsInput,
   TraceStoredBytesInput,
+  TraceStoredPastRetentionInput,
   TraceSummaryLookupInput,
 } from "./trace.queries.ts";
 import type {
@@ -136,7 +140,7 @@ import type {
   TracesConversationContext,
   TracesSessionsPage,
 } from "./trace.responses.ts";
-import type { NormalizedSpan } from "./trace.spans.ts";
+import type { NormalizedSpan, OwnedSpan } from "./trace.spans.ts";
 import type { SpanTreeNode, SpanTreePage } from "./trace.ts";
 import type { TraceSessionGroupsInput } from "./traces.trpc.ts";
 
@@ -272,8 +276,8 @@ export interface TraceApi extends TraceOtlpIngestApi {
       scrollId?: string | null;
       /** The v1 REST search's filter as written; trace compiles it into the read (Decided 25). */
       filter?: TraceListFilter;
-      /** Refuse above this plan bound instead of clamping to the list bound. */
-      refuseAbove?: "tracesPageSizeMax" | "tracesDownloadPageSizeMax";
+      /** Refuse above this plan bound instead of clamping; a spans read takes the spans bound. */
+      refuseAbove?: TracePageSizeBound;
     };
   }): Promise<TracesForProjectResult>;
   /**
@@ -383,6 +387,8 @@ export interface TraceApi extends TraceOtlpIngestApi {
   readSpanTreeForViewer(input: TraceDrawerReadInput): Promise<SpanTreeNode[]>;
   /** Every span's detail, protected and described by its owner (ADR-201 §5). */
   readSpansFullForViewer(input: TraceDrawerReadInput): Promise<SpanDetail[]>;
+  /** Agents in one trace, the calls between them and each agent's tokens and cost. */
+  readAgentCallGraphForViewer(input: TraceDrawerReadInput): Promise<AgentCallGraph>;
   /** The resource pane, each braided span's resources gated by its owner. */
   readSpanResourcesForViewer(input: TraceDrawerReadInput): Promise<TraceResourceInfoDto>;
   /** The drawer timeline, each braided span's events protected by its owner. */
@@ -622,6 +628,15 @@ export interface TraceApi extends TraceOtlpIngestApi {
     /** `spans`: the trace view's read, where the proof's braids show owners' spans (ADR-201 §5). */
     reads?: "spans" | "traces";
   }): Promise<SpanResourceInfo[]>;
+  /** A trace's spans and their resource rows in one read, audited once for both. */
+  readSpansWithResources(input: {
+    authorization: Authorization;
+    traceId: string;
+    occurredAtMs?: number;
+    visibilityCutoffMs?: number | null;
+    /** `spans`: the trace view's read, where the proof's braids show owners' spans (ADR-201 §5). */
+    reads?: "spans" | "traces";
+  }): Promise<{ spans: OwnedSpan[]; resources: SpanResourceInfo[] }>;
   readTraceEvents(input: {
     authorization: Authorization;
     traceId: string;
@@ -817,6 +832,8 @@ export interface TraceApi extends TraceOtlpIngestApi {
     /** The filter as written; trace compiles it inside the read (ADR-202 Decided 25). */
     filter?: TraceListFilter;
     visibilityCutoffMs?: number | null;
+    /** Over-plan withholding: later rows are left out and counted on `withheld`. */
+    withholding?: TraceWithholding;
   }): Promise<TraceListPage>;
   /**
    * One page of the Sessions lens through the viewer's protections: content redacted and spend
@@ -882,8 +899,18 @@ export interface TraceApi extends TraceOtlpIngestApi {
     tenantId?: string | undefined;
     occurredAtMs?: number;
     visibilityCutoffMs?: number | null;
+    /** Refuses a summary the over-plan cutoff withholds (`trace_withheld_over_plan`). */
+    withholding?: TraceWithholding;
     full?: boolean;
   }): Promise<unknown>;
+  /** Throws `trace_withheld_over_plan` when the viewer's plan withholds this trace. */
+  assertTraceNotWithheld(input: {
+    authorization: Authorization;
+    traceId: string;
+    tenantId?: string | undefined;
+    occurredAtMs?: number;
+    protections: Protections;
+  }): Promise<void>;
   isTraceWindowRedacted(input: {
     authorization: Authorization;
     traceId: string;
@@ -1030,8 +1057,10 @@ export interface TraceApi extends TraceOtlpIngestApi {
   readTopicClusteringPage(input: TraceTopicClusteringPageInput): Promise<TraceTopicClusteringPage>;
   /** The project's distinct traces over the last 24 hours. */
   countTracesInLastDay(input: { projectId: string }): Promise<number>;
-  /** The project's stored bytes over spans and trace summaries, as the storage meter counts. */
+  /** The project's stored bytes over spans and trace summaries; `beforeMs`: older rows only. */
   getStoredBytes(input: TraceStoredBytesInput): Promise<number>;
+  /** Distinct traces started before `beforeMs` and kept longer than `retentionDays`, or forever. */
+  countStoredPastRetention(input: TraceStoredPastRetentionInput): Promise<number>;
   /** Whether any trace carrying `attribute` landed for the project at or after `sinceMs`. */
   hasTraceWithAttribute(input: {
     projectId: string;
@@ -1045,6 +1074,12 @@ export interface TraceApi extends TraceOtlpIngestApi {
     attribute: TraceAttributeMatch;
     groupByKey: string;
   }): Promise<{ value: string; count: number }[]>;
+  /** Distinct `gen_ai.agent.name` values in the project's spans since `sinceMs`, busiest first. */
+  findAgentsSeen(input: {
+    projectId: string;
+    sinceMs: number;
+    limit: number;
+  }): Promise<TraceAgentSeen[]>;
 }
 
 export type TracePreconditionSampleInput = {

@@ -17,6 +17,7 @@ import {
   type SimulationRecordAgentInstance,
   type SimulationRecordCutAtLimit,
   type SimulationRecordHooks,
+  type SimulationRecordRedTeamReport,
   type RecordEvaluationsCommandData,
   type SimulationStartRun,
   type SimulationTextMessageEnd,
@@ -133,6 +134,10 @@ export class TestSimulationService extends SimulationService {
     return 0;
   }
 
+  async countStoredPastRetention(): Promise<number> {
+    return 0;
+  }
+
   async listRunsForExport(): Promise<{
     runs: SimulationExportRun[];
     nextCursor?: string;
@@ -166,6 +171,8 @@ export class TestSimulationService extends SimulationService {
   async recordCutAtLimit(_input: SimulationRecordCutAtLimit): Promise<void> {}
 
   async recordHooks(_input: SimulationRecordHooks): Promise<void> {}
+
+  async recordRedTeamReport(_input: SimulationRecordRedTeamReport): Promise<void> {}
 
   async recordEvaluations(input: RecordEvaluationsCommandData): Promise<void> {
     await this.options.recordEvaluations?.(input);

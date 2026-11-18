@@ -81,11 +81,15 @@ export type PasswordHolderRow = Readonly<{
 export interface UserRepository {
   findProfiles(userIds: string[]): Promise<UserFullProfile[]>;
   findById(id: string): Promise<UserProfile | null>;
+  /** Accounts whose id, name or address holds the query, case aside, by address. */
+  searchProfiles(input: { query: string; limit: number }): Promise<UserProfile[]>;
   /** The account holding exactly this address; addresses are stored lower-cased. */
   findByEmail(email: string): Promise<UserProfile[]>;
   /** Every account on this address, case aside, oldest first: rows stored before lower-casing. */
   findByEmailAnyCase(email: string): Promise<UserProfile[]>;
   create(input: CreateUserInput): Promise<UserProfile>;
+  /** The created fact for a row written outside these mints, stamped with its stored creation. */
+  appendCreatedFact(id: string): Promise<void>;
   createCredentialUser(input: CreateCredentialUserRow): Promise<CreatedCredentialUser>;
   createPasskeyUser(input: CreatePasskeyUserRow): Promise<CreatedUser>;
   hasPassword(id: string): Promise<boolean>;

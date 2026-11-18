@@ -37,6 +37,7 @@
     "@langwatch/authorization": "workspace:*",
     "@langwatch/authz-contract": "workspace:*",
     "@langwatch/aws-client": "workspace:*",
+    "@langwatch/clickhouse-client": "workspace:*",
     "@langwatch/data-retention-contract": "workspace:*",
     "@langwatch/egress": "workspace:*",
     "@langwatch/enterprise-gateway-contract": "workspace:*",
@@ -76,7 +77,6 @@
   },
   "devDependencies": {
     "@clickhouse/client": "catalog:",
-    "@langwatch/clickhouse-client": "workspace:*",
     "@langwatch/clickhouse-migrations": "workspace:*",
     "@langwatch/gateway-process": "workspace:*",
     "@langwatch/secrets": "workspace:*",

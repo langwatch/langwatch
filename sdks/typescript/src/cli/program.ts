@@ -1081,7 +1081,7 @@ function registerGovernanceCommands(program: Command): void {
   const templatesCmd = governanceCmd
     .command("ingestion-templates")
     .description(
-      "CRUD on IngestionTemplate rows. Reads use aiTools:view; mutations use aiTools:manage.",
+      "CRUD on IngestionTemplate rows, with your device login. Every verb needs aiTools:manage.",
     );
 
   templatesCmd
@@ -4150,6 +4150,47 @@ function registerTestSuiteCommands(program: Command): void {
     async (suite: string) => {
       const { archiveTestSuiteCommand: impl } = await import("./commands/test-suites/archive.js");
       return impl(suite);
+    },
+  );
+
+  emitsResult(
+    testSuiteCmd
+      .command("templates")
+      .description("List the suite templates: everyday archetypes and red team packs")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async () => {
+      const { listSuiteTemplatesCommand: impl } =
+        await import("./commands/test-suites/templates.js");
+      return impl();
+    },
+  );
+
+  emitsResult(
+    testSuiteCmd
+      .command("apply-template <templateId>")
+      .description("Create a test suite from a template, fitted to the agent under test")
+      .requiredOption("--agent-name <name>", "The name of the agent under test")
+      .option("--tool <tool>", "A tool the agent can call. Repeat for more.", collectParam)
+      .option(
+        "--must-never <rule>",
+        "Something the agent must never do. Repeat for more.",
+        collectParam,
+      )
+      .option("--name <name>", "The suite name. Defaults to the template title.")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (
+      templateId: string,
+      options: { agentName: string; tool?: string[]; mustNever?: string[]; name?: string },
+    ) => {
+      const { applySuiteTemplateCommand: impl } =
+        await import("./commands/test-suites/templates.js");
+      return impl({
+        templateId,
+        agentName: options.agentName,
+        tools: options.tool,
+        mustNever: options.mustNever,
+        name: options.name,
+      });
     },
   );
 

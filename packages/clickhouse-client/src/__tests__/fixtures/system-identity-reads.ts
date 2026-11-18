@@ -5,7 +5,7 @@
 import { column, cond, param } from "../../builder/expression.ts";
 import { fn } from "../../builder/functions.ts";
 import { clickhouseRead } from "../../builder/read.ts";
-import { defineClickHouseTable } from "../../builder/table.ts";
+import { defineClickHouseTable, everyReplica } from "../../builder/table.ts";
 import { tenantScope } from "../../builder/scope.ts";
 import {
   systemBackupLog,
@@ -49,19 +49,26 @@ export const footprintDisksRead = () =>
     })
     .build();
 
-export const hasBackupLogRead = () =>
+/** With a cluster, on every replica of it; an unreachable replica is skipped, as ops reads it. */
+const replicaSettings = (cluster: string | undefined): Record<string, number> =>
+  cluster === undefined ? {} : { skip_unavailable_shards: 1 };
+
+export const hasBackupLogRead = ({ cluster }: { cluster?: string } = {}) =>
   systemRead({ reason: "whether the server keeps a backup log" })
-    .from(systemTables)
+    .from(cluster === undefined ? systemTables : everyReplica({ table: systemTables, cluster }))
     .select({ present: fn.count() })
     .where(({ and, eq }) =>
       and(eq(systemTables.database, "system"), eq(systemTables.name, "backup_log")),
     )
+    .settings(replicaSettings(cluster))
     .build();
 
-export const backupStatusesRead = () => {
+export const backupStatusesRead = ({ cluster }: { cluster?: string } = {}) => {
   const created = cond.eq(systemBackupLog.status, "BACKUP_CREATED");
+  const source =
+    cluster === undefined ? systemBackupLog : everyReplica({ table: systemBackupLog, cluster });
   return systemRead({ reason: "the instance's backup history" })
-    .from(systemBackupLog)
+    .from(source)
     .select({
       status: systemBackupLog.status,
       cnt: fn.count(),
@@ -69,6 +76,7 @@ export const backupStatusesRead = () => {
       last_success_size: fn.argMaxIf(systemBackupLog.total_size, systemBackupLog.end_time, created),
     })
     .groupBy(systemBackupLog.status)
+    .settings(replicaSettings(cluster))
     .build();
 };
 

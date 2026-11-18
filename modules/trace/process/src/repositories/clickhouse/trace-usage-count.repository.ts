@@ -124,30 +124,86 @@ export class TraceUsageCountClickHouseRepository extends TraceUsageCountReposito
   }
 
   /** One project's `_size_bytes` over spans and trace summaries, every stored version counted. */
-  async getStoredBytes({ tenantId }: { tenantId: string }): Promise<number> {
+  async getStoredBytes({
+    tenantId,
+    beforeMs,
+  }: {
+    tenantId: string;
+    beforeMs?: number | undefined;
+  }): Promise<number> {
     const { rows } = await this.#clickhouse.read({
-      statement: TraceUsageCountClickHouseRepository.storedBytesRead({ tenantId }),
+      statement: TraceUsageCountClickHouseRepository.storedBytesRead({ tenantId, beforeMs }),
       declaresFullScan: true,
     });
     return Number(rows[0]?.bytes ?? 0);
   }
 
-  /** The two tables' sums in one union, then summed, under the meter's caps. */
+  /**
+   * The two tables' sums in one union, then summed, under the meter's caps. `beforeMs` keeps rows
+   * whose partition time is earlier: a span's `StartTime`, a summary's `OccurredAt`.
+   */
   static storedBytesRead({
     tenantId,
+    beforeMs,
   }: {
     tenantId: string;
+    beforeMs?: number | undefined;
   }): ReaderReadStatement<{ bytes: number | string }> {
     const scope = tenantScope.single({ tenantId });
-    const parts = clickhouseRead({ scope })
+    const spanBytes = clickhouseRead({ scope })
       .from(spans)
-      .select({ bytes: fn.sum(spans._size_bytes) })
-      .unionAll((arm) => arm.from(summaries).select({ bytes: fn.sum(summaries._size_bytes) }))
+      .select({ bytes: fn.sum(spans._size_bytes) });
+    const parts = (
+      beforeMs === undefined
+        ? spanBytes
+        : spanBytes.where(({ lt }) => lt(spans.StartTime, beforeMs))
+    )
+      .unionAll((arm) => {
+        const summaryBytes = arm.from(summaries).select({ bytes: fn.sum(summaries._size_bytes) });
+        return beforeMs === undefined
+          ? summaryBytes
+          : summaryBytes.where(({ lt }) => lt(summaries.OccurredAt, beforeMs));
+      })
       .as("parts");
     return clickhouseRead({ scope })
       .from(parts)
       .select({ bytes: fn.sum(parts.bytes) })
       .settings(STORAGE_METER_READ_SETTINGS)
+      .build();
+  }
+
+  async countStoredPastRetention(input: {
+    tenantId: string;
+    beforeMs: number;
+    retentionDays: number;
+  }): Promise<number> {
+    const { rows } = await this.#clickhouse.read({
+      statement: TraceUsageCountClickHouseRepository.storedPastRetentionCountRead(input),
+      table: summaries.$table.name,
+      declaresFullScan: true,
+    });
+    return Number(rows[0]?.total ?? 0);
+  }
+
+  /** Distinct traces before the cutoff that a period of `retentionDays` would remove. */
+  static storedPastRetentionCountRead({
+    tenantId,
+    beforeMs,
+    retentionDays,
+  }: {
+    tenantId: string;
+    beforeMs: number;
+    retentionDays: number;
+  }): ReaderReadStatement<{ total: number | string }> {
+    return clickhouseRead({ scope: tenantScope.single({ tenantId }) })
+      .from(summaries)
+      .select({ total: fn.uniqExact(summaries.TraceId) })
+      .where(({ and, eq, gt, lt, or }) =>
+        and(
+          lt(summaries.OccurredAt, beforeMs),
+          or(eq(summaries._retention_days, 0), gt(summaries._retention_days, retentionDays)),
+        ),
+      )
       .build();
   }
 }

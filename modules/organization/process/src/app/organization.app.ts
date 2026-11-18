@@ -29,6 +29,7 @@ import {
   LiteMemberViewerOnlyError,
   OrganizationApi,
   type OrganizationIdPage,
+  type OrganizationOperatorSummary,
   type OrganizationIdPageInput,
   type OrganizationUsageCount,
   type OrganizationApiCreateInvitationsInput,
@@ -124,6 +125,7 @@ import {
   type PendingInvitationsForCaller,
   type SignUpVerdict,
   type SignInSecurityPolicy,
+  type DocsPlaygroundPolicy,
   type OrganizationApiSeatCheckoutInput,
   type OrganizationSeatCheckoutRedirect,
   type OrganizationAdmission,
@@ -197,6 +199,7 @@ import { OrganizationLifecycleNoticeService } from "../services/organization-lif
 import type { OrganizationLifecycleSenders } from "../services/organization-lifecycle-notice.service.ts";
 import type { OrganizationGrantCache } from "../services/organization-member-role.service.ts";
 import { OrganizationMembershipService } from "../services/organization-membership.service.ts";
+import { OrganizationOperatorDirectoryService } from "../services/organization-operator-directory.service.ts";
 import { OrganizationScopeGraphService } from "../services/organization-scope-graph.service.ts";
 import { OrganizationSeatLeaseService } from "../services/organization-seat-lease.service.ts";
 import { OrganizationSeatLicenseService } from "../services/organization-seat-license.service.ts";
@@ -426,6 +429,10 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
       createAndAssign: (input, by) => application.createAndAssign(input, by),
       ensurePersonalWorkspace: (input, by) => application.ensurePersonalWorkspace(input, by),
     });
+    application.#operatorDirectory = OrganizationOperatorDirectoryService.create({
+      organizations: setup.repositories.organization,
+      membership,
+    });
     application.#privateDataplanes = PrivateDataplaneRecordService.create({
       routes: setup.repositories.privateClickHouseRoutes,
       accounts: setup.repositories.privateS3Accounts,
@@ -644,6 +651,7 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
   #joinRequests!: OrganizationJoinRequests;
   #initialization!: OrganizationInitializationService;
   #privateDataplanes!: PrivateDataplaneRecordService;
+  #operatorDirectory!: OrganizationOperatorDirectoryService;
   #seatRequests!: SeatRequestService;
   #seatPeak!: SeatPeakService;
   #seatPeakCorrections!: SeatPeakCorrectionService;
@@ -861,6 +869,34 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
 
   getSessionPolicy(input: { organizationId: string }): Promise<{ maxSessionDurationDays: number }> {
     return this.#dependencies.signInPolicies.getSessionPolicy(input);
+  }
+
+  getDocsPlaygroundPolicy(input: { organizationId: string }): Promise<DocsPlaygroundPolicy> {
+    return this.#dependencies.signInPolicies.getDocsPlaygroundPolicy(input);
+  }
+
+  /**
+   * Off records the fact api-key revokes every live docs session key on (ADR-185), so turning
+   * it on again revives none of them. The record is awaited: a lost one would leave keys live.
+   */
+  async saveDocsPlaygroundPolicy({
+    organizationId,
+    docsPlaygroundSessionsEnabled,
+    changedByUserId = null,
+  }: {
+    organizationId: string;
+    docsPlaygroundSessionsEnabled: boolean;
+    changedByUserId?: string | null;
+  }): Promise<void> {
+    await this.#dependencies.signInPolicies.saveDocsPlaygroundPolicy({
+      organizationId,
+      docsPlaygroundSessionsEnabled,
+    });
+    if (docsPlaygroundSessionsEnabled) return;
+    await this.#infrastructure.lifecycle.docsPlaygroundSessionsDisabled({
+      organizationId,
+      changedByUserId,
+    });
   }
 
   getSignInSecurityPolicy(input: { organizationId: string }): Promise<SignInSecurityPolicy> {
@@ -1120,6 +1156,19 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
    */
   listAllIds(input?: OrganizationIdPageInput): Promise<OrganizationIdPage> {
     return this.#dependencies.organizations.listAllIds(input);
+  }
+
+  searchForOperators(input: {
+    query: string;
+    limit: number;
+  }): Promise<OrganizationOperatorSummary[]> {
+    return this.#operatorDirectory.search(input);
+  }
+
+  findForOperators(input: {
+    organizationIds: readonly string[];
+  }): Promise<OrganizationOperatorSummary[]> {
+    return this.#operatorDirectory.find(input);
   }
 
   countUsage(input: { organizationIds: readonly string[] }): Promise<OrganizationUsageCount> {

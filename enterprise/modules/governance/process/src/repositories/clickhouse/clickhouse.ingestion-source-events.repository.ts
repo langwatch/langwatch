@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import { clickhouseRead, fn, tenantScope } from "@langwatch/clickhouse-client/builder";
+import { clickhouseRead, cond, fn, tenantScope } from "@langwatch/clickhouse-client/builder";
 import {
   type ActivityEventDetailRow,
   GOVERNANCE_ATTR,
@@ -58,6 +58,15 @@ type WindowCountRow = {
 
 /** A pulled event is one a puller wrote under the synthetic `pull:` trace id. */
 const PULLED_TRACE_PREFIX = "pull:";
+
+/** One source's pulled events from before the drawer's cursor, outside and inside the election. */
+function pulledFromSourceBefore(input: { sourceId: string; beforeMs: number }) {
+  return [
+    fn.startsWith(events.TraceId, PULLED_TRACE_PREFIX),
+    cond.eq(events.SourceId, input.sourceId),
+    cond.lt(events.EventTime, input.beforeMs),
+  ] as const;
+}
 
 type WindowCountArgs = {
   ch: GovernanceClickHouseReadClient;
@@ -148,7 +157,11 @@ export class ClickHouseIngestionSourceEventsRepository implements IngestionSourc
     return (await args.ch.read({ statement })).rows;
   }
 
-  /** Rows a puller wrote to `governance_ocsf_events` under the synthetic `pull:` trace id. */
+  /**
+   * Rows a puller wrote to `governance_ocsf_events` under the synthetic `pull:` trace id.
+   * The dedup set is the page's keys only (its LIMIT), and carrying each key's
+   * EventTime prunes the outer, payload-reading scan to the page's months.
+   */
   async findPulledEventsForSource(input: {
     organizationId: string;
     tenantId: string;
@@ -171,15 +184,28 @@ export class ClickHouseIngestionSourceEventsRepository implements IngestionSourc
         createdMs: fn.toString(fn.toUnixTimestamp64Milli(events.CreatedAt)),
         rawPayload: events.RawOcsfJson,
       })
-      .where(({ and, eq, lt }) =>
+      .where(({ and, within }) =>
         and(
-          fn.startsWith(events.TraceId, PULLED_TRACE_PREFIX),
-          eq(events.SourceId, input.sourceId),
-          lt(events.EventTime, input.beforeMs),
+          ...pulledFromSourceBefore(input),
+          within(
+            fn.tuple(events.TenantId, events.EventId, events.LastUpdatedAt, events.EventTime),
+            (sub) =>
+              sub
+                .from(events)
+                .select({
+                  TenantId: events.TenantId,
+                  EventId: events.EventId,
+                  Latest: fn.max(events.LastUpdatedAt),
+                  LatestTime: fn.argMax(events.EventTime, events.LastUpdatedAt),
+                })
+                .where(({ and }) => and(...pulledFromSourceBefore(input)))
+                .groupBy(events.TenantId, events.EventId)
+                .orderBy("LatestTime", "DESC")
+                .orderBy(events.EventId, "DESC")
+                .limit(input.limit),
+          ),
         ),
       )
-      // TraceId, SourceId and EventTime are the event's own: they never change across versions.
-      .latestVersion({ repeat: [events.TraceId, events.SourceId, events.EventTime] })
       .orderBy(events.EventTime, "DESC")
       .orderBy(events.EventId, "DESC")
       .limit(input.limit)

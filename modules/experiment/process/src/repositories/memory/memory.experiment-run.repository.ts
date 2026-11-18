@@ -51,4 +51,9 @@ export class MemoryExperimentRunRepository extends ExperimentRunRepository {
   getStoredBytes(): Promise<number> {
     return Promise.resolve(0);
   }
+
+  /** No run rows here, so none is past any period. */
+  countStoredPastRetention(): Promise<number> {
+    return Promise.resolve(0);
+  }
 }

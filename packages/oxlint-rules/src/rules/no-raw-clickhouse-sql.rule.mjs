@@ -14,7 +14,7 @@ const MARKER_PACKAGE = "@langwatch/clickhouse-markers";
 const VENDOR_CLIENTS = new Set(["@clickhouse/client", "@clickhouse/client-web"]);
 const BASELINE_COMMAND = "pnpm --filter @langwatch/oxlint-rules baseline:no-raw-clickhouse-sql";
 const BUILD_FIX =
-  "Build it with `clickhouseRead` from `@langwatch/clickhouse-client/builder` under a `tenantScope`, and send it with `client.read({ statement })`.";
+  "Build it with `clickhouseRead` from `@langwatch/clickhouse-client/builder` under a `tenantScope`, and send it with `client.read({ statement })`. Read the `backend` skill.";
 
 /** Files that send SQL text by design; each reason says why the builder cannot express it. */
 export const EXEMPT_FILES = new Map([
@@ -196,22 +196,22 @@ export const noRawClickhouseSqlRule = defineRule({
     skipMarker: {
       what: "`{{name}}` opts a hand-written ClickHouse request out of a check the builder makes by construction.",
       why: "A built read states all-tenant or full-scan intent in its scope, not in a request flag.",
-      fix: "Use `tenantScope.allTenants({ reason })` on a built read for `SKIP_TENANT_CHECK`, or `client.read({ statement, declaresFullScan: true })` for `SKIP_COLD_SCAN_CHECK`.",
+      fix: "Use `tenantScope.allTenants({ reason })` on a built read for `SKIP_TENANT_CHECK`, or `client.read({ statement, declaresFullScan: true })` for `SKIP_COLD_SCAN_CHECK`. Read the `backend` skill.",
     },
     fenceMarker: {
       what: "This file imports `@langwatch/clickhouse-markers`, the fence markers that only work inside hand-written SQL.",
       why: "The builder renders the fence's scope, windows and latest-version reads itself.",
-      fix: "Use `tenantScope.fromProof(...)` and the read's `.withinWindows()`, `.latestVersion()` or `.braided()` instead of the markers.",
+      fix: "Use `tenantScope.fromProof(...)` and the read's `.withinWindows()`, `.latestVersion()` or `.braided()` instead of the markers. Read the `backend` skill.",
     },
     vendorClient: {
       what: "This file imports `{{source}}`, the vendor ClickHouse client.",
       why: "The vendor client skips the house client's tenant routing and the tenant setting the row policies read.",
-      fix: "Send built statements through the module store's `ClickHouseQueryClient` with `client.read({ statement })`.",
+      fix: "Send built statements through the module store's `ClickHouseQueryClient` with `client.read({ statement })`. Read the `backend` skill.",
     },
     baselineStale: {
       what: "`{{file}}` holds {{found}} raw ClickHouse sites but the baseline lists {{listed}}.",
       why: "The baseline only shrinks, so a removed site lowers it in the same change.",
-      fix: `Run \`${BASELINE_COMMAND}\` and commit the lowered baseline.`,
+      fix: `Run \`${BASELINE_COMMAND}\` and commit the lowered baseline. Read the \`backend\` skill.`,
     },
   },
   create(context, file, options) {

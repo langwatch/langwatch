@@ -39,6 +39,19 @@ Feature: Audit logging
     Then the read is refused as invalid input before the repository is asked
 
   @unit
+  Scenario: An organisation's trail reads its own and its projects' entries oldest first after a watermark
+    Given audit entries naming the organisation, entries naming one of its projects and entries of another organisation
+    When the SIEM export reads the organisation's trail after a watermark with a limit
+    Then only the organisation's and its projects' entries after the watermark come back, oldest first
+    And entries sharing a millisecond are ordered by id, so a page boundary between them loses none
+
+  @integration
+  Scenario: A persisted organisation trail pages by its watermark and leaves other organisations out
+    Given persisted audit entries for two organisations
+    When the organisation's trail is read two entries at a time
+    Then every entry of that organisation is read once, in order, and none of the other
+
+  @unit
   Scenario: A memory process's trail lists what its own audit log recorded
     Given a process that installed the audit log over memory stores
     When operator acts are recorded through the audit log

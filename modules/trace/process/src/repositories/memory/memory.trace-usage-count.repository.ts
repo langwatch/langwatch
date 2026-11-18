@@ -10,6 +10,8 @@ type CountedTrace = {
   traceId: string;
   createdAt: string;
   occurredAtMs?: number;
+  /** The row's kept period in days; absent or 0 keeps it forever. */
+  retentionDays?: number;
   attributes?: Readonly<Record<string, string>>;
 };
 
@@ -87,10 +89,29 @@ export class MemoryTraceUsageCountRepository extends TraceUsageCountRepository {
   }
 
   /** The JSON byte length of the tenant's recorded traces, the twin's stored bytes. */
-  async getStoredBytes(input: { tenantId: string }): Promise<number> {
+  async getStoredBytes(input: {
+    tenantId: string;
+    beforeMs?: number | undefined;
+  }): Promise<number> {
+    const { beforeMs } = input;
     return this.#traces
       .filter((trace) => trace.tenantId === input.tenantId)
+      .filter((trace) => beforeMs === undefined || (trace.occurredAtMs ?? beforeMs) < beforeMs)
       .reduce((bytes, trace) => bytes + Buffer.byteLength(JSON.stringify(trace)), 0);
+  }
+
+  async countStoredPastRetention(input: {
+    tenantId: string;
+    beforeMs: number;
+    retentionDays: number;
+  }): Promise<number> {
+    const past = this.#traces.filter(
+      (trace) =>
+        trace.tenantId === input.tenantId &&
+        (trace.occurredAtMs ?? input.beforeMs) < input.beforeMs &&
+        (!trace.retentionDays || trace.retentionDays > input.retentionDays),
+    );
+    return new Set(past.map((trace) => trace.traceId)).size;
   }
 
   #since(input: { tenantId: string; sinceMs: number }): CountedTrace[] {

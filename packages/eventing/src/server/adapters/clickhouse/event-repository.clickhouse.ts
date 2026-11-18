@@ -1,7 +1,9 @@
 import { createLogger } from "@langwatch/observability";
 
 import { ConfigurationError, EventNotFoundError } from "../../../services/errorHandling.ts";
+import type { EventLogPageCursor } from "../../../stores/event-log-page-order.ts";
 import type {
+  EventLogProbe,
   EventOccurredAtWindow,
   EventRecord,
   EventRepository,
@@ -17,6 +19,7 @@ import {
   aggregateEventsRead,
   aggregateEventsUpToRead,
   eventCountBeforeRead,
+  eventProbeReads,
   eventRecordRead,
   eventsOfAggregatesRead,
 } from "./event-log-reads.clickhouse.ts";
@@ -430,9 +433,9 @@ export class EventingClickHouseEventRepository implements EventRepository {
   }
 
   /**
-   * Cursor-paginated `getEventRecordsUpTo`. Same upper bound and order, plus a
-   * strict `after` cursor and `LIMIT`, so a re-fold of a huge aggregate streams
-   * history a page at a time instead of OOMing on every EventPayload blob at once.
+   * Cursor-paginated `getEventRecordsUpTo` in page order (see {@link EventLogPageCursor}), so
+   * a re-fold of a huge aggregate streams history a page at a time instead of running out of
+   * memory on every EventPayload blob at once.
    */
   async getEventRecordsUpToPaged(request: {
     tenantId: string;
@@ -440,7 +443,7 @@ export class EventingClickHouseEventRepository implements EventRepository {
     aggregateId: string;
     upToTimestamp: number;
     upToEventId: string;
-    after: { timestamp: number; eventId: string } | undefined;
+    after: EventLogPageCursor | undefined;
     limit: number;
     occurredAtFromMs?: number;
   }): Promise<EventRecord[]> {
@@ -453,7 +456,7 @@ export class EventingClickHouseEventRepository implements EventRepository {
         occurredAtFromMs: request.occurredAtFromMs,
       });
       const client = await this.getClient(tenantId);
-      // The cursor and upper bound are on EventTimestamp, not the partition key: neither prunes.
+      // The upper bound is on EventTimestamp, not the partition key: it only filters.
       const { rows } = await client.read(
         aggregateEventsUpToRead({
           tenantId,
@@ -520,6 +523,56 @@ export class EventingClickHouseEventRepository implements EventRepository {
           error,
         },
         "Failed to count event records from ClickHouse",
+      );
+      throw error;
+    }
+  }
+
+  async probeEventRecordsBefore(request: {
+    tenantId: string;
+    aggregateType: string;
+    aggregateId: string;
+    eventTimestamp: number;
+    eventId: string;
+    occurredAtFromMs?: number;
+    ignoreEventIds?: readonly string[];
+  }): Promise<EventLogProbe> {
+    const { tenantId, aggregateType, aggregateId, eventTimestamp, eventId } = request;
+    try {
+      const occurredAtFromMs = await this.occurredAtFloor({
+        tenantId,
+        aggregateType,
+        aggregateId,
+        occurredAtFromMs: request.occurredAtFromMs,
+      });
+      const client = await this.getClient(tenantId);
+      // Two existence checks, each stopping at its first row: the WHERE fixes the sort key's
+      // prefix, so neither reads past the aggregate's own granules.
+      const reads = eventProbeReads({
+        tenantId,
+        aggregateType,
+        aggregateId: String(aggregateId),
+        eventTimestamp,
+        eventId,
+        occurredAtFromMs,
+        ignoreEventIds: request.ignoreEventIds ?? [],
+      });
+      const [event, earlier] = await Promise.all([
+        client.read(reads.event),
+        client.read(reads.earlier),
+      ]);
+      return { hasEvent: event.rows.length > 0, hasEarlierEvents: earlier.rows.length > 0 };
+    } catch (error) {
+      this.logger.warn(
+        {
+          tenantId,
+          aggregateType,
+          aggregateId: String(aggregateId),
+          eventTimestamp,
+          eventId,
+          error,
+        },
+        "Failed to probe event records from ClickHouse",
       );
       throw error;
     }

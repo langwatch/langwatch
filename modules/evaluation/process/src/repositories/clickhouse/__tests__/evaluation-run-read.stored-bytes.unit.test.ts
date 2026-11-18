@@ -21,3 +21,24 @@ describe("EvaluationRunClickHouseReadRepository.storedBytesRead()", () => {
     expect(statement.sql).toContain("SETTINGS max_threads = 2, max_execution_time = 45");
   });
 });
+
+describe("EvaluationRunClickHouseReadRepository.storedBytesRead before a cutoff", () => {
+  const beforeMs = Date.UTC(2026, 7, 1);
+
+  /** @scenario "Evaluation's stored bytes before a cutoff count only rows whose partition time is earlier" */
+  it("keeps only rows whose `ScheduledAt` is before the cutoff", () => {
+    const statement = EvaluationRunClickHouseReadRepository.storedBytesRead({
+      tenantId: "project_1",
+      beforeMs: beforeMs,
+    });
+
+    expect(statement.sql).toMatch(/ScheduledAt\)? < /);
+    expect(Object.values(statement.params)).toContain(beforeMs);
+  });
+
+  it("filters on no time without a cutoff", () => {
+    expect(
+      EvaluationRunClickHouseReadRepository.storedBytesRead({ tenantId: "project_1" }).sql,
+    ).not.toMatch(/ScheduledAt\)? < /);
+  });
+});

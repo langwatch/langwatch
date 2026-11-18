@@ -1097,14 +1097,34 @@ export class SimulationClickHouseRepository extends SimulationRepository {
   }
 
   /** One project's `_size_bytes` in `simulation_runs`, every stored row counted. */
-  async getStoredBytes({ projectId }: { projectId: string }): Promise<number> {
+  async getStoredBytes({
+    projectId,
+    beforeMs,
+  }: {
+    projectId: string;
+    beforeMs?: number | undefined;
+  }): Promise<number> {
     const client = await this.getClient(projectId);
     const { rows } = await client.read({
-      statement: SimulationClickHouseRepository.storedBytesRead({ projectId }),
+      statement: SimulationClickHouseRepository.storedBytesRead({ projectId, beforeMs }),
       table: simulationRuns.$table.name,
       declaresFullScan: true,
     });
     return Number(rows[0]?.bytes ?? 0);
+  }
+
+  async countStoredPastRetention(input: {
+    projectId: string;
+    beforeMs: number;
+    retentionDays: number;
+  }): Promise<number> {
+    const client = await this.getClient(input.projectId);
+    const { rows } = await client.read({
+      statement: SimulationClickHouseRepository.storedPastRetentionCountRead(input),
+      table: simulationRuns.$table.name,
+      declaresFullScan: true,
+    });
+    return Number(rows[0]?.total ?? 0);
   }
 
   /** One read over the organization's projects, which the caller holds. */
@@ -1556,16 +1576,46 @@ export class SimulationClickHouseRepository extends SimulationRepository {
     return usageCountReadOf(input);
   }
 
-  /** The project's summed `_size_bytes`, under the meter's thread and time caps. */
+  /** The tenant's summed `_size_bytes` under the meter's caps; `beforeMs` keeps older rows only. */
   static storedBytesRead({
     projectId,
+    beforeMs,
   }: {
     projectId: string;
+    beforeMs?: number | undefined;
   }): ReaderReadStatement<{ bytes: number | string }> {
+    const read = clickhouseRead({ scope: tenantScope.single({ tenantId: projectId }) })
+      .from(simulationRuns)
+      .select({ bytes: fn.sum(simulationRuns._size_bytes) });
+    return (
+      beforeMs === undefined ? read : read.where(({ lt }) => lt(simulationRuns.StartedAt, beforeMs))
+    )
+      .settings(STORAGE_METER_READ_SETTINGS)
+      .build();
+  }
+
+  /** Distinct runs before the cutoff that a period of `retentionDays` would remove. */
+  static storedPastRetentionCountRead({
+    projectId,
+    beforeMs,
+    retentionDays,
+  }: {
+    projectId: string;
+    beforeMs: number;
+    retentionDays: number;
+  }): ReaderReadStatement<{ total: number | string }> {
     return clickhouseRead({ scope: tenantScope.single({ tenantId: projectId }) })
       .from(simulationRuns)
-      .select({ bytes: fn.sum(simulationRuns._size_bytes) })
-      .settings(STORAGE_METER_READ_SETTINGS)
+      .select({ total: fn.uniqExact(simulationRuns.ScenarioRunId) })
+      .where(({ and, eq, gt, lt, or }) =>
+        and(
+          lt(simulationRuns.StartedAt, beforeMs),
+          or(
+            eq(simulationRuns._retention_days, 0),
+            gt(simulationRuns._retention_days, retentionDays),
+          ),
+        ),
+      )
       .build();
   }
 

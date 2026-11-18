@@ -1,5 +1,6 @@
 import type { AuthzApi, AuthzCanBatchByIdsInput } from "@langwatch/authz-contract";
 import type { ScopeAssignment } from "@langwatch/data-retention-contract";
+import type { BillingApi } from "@langwatch/enterprise-billing-contract";
 import type { EntitlementApi, Plan } from "@langwatch/entitlement-contract";
 import { ResourceScope } from "@langwatch/process";
 import { ScopedSecrets } from "@langwatch/secrets";
@@ -8,7 +9,11 @@ import type { UserApi, UserProfile } from "@langwatch/user-contract";
 import { vi } from "vitest";
 
 import { emptyStoredBytesOwners } from "../../__tests__/support/stored-bytes-owners.fixture.ts";
-import type { StoredBytesOwners } from "../../channels/data-retention.channels.ts";
+import { emptyStoredPastRetentionOwners } from "../../__tests__/support/stored-past-retention-owners.fixture.ts";
+import type {
+  StoredBytesOwners,
+  StoredPastRetentionOwners,
+} from "../../channels/data-retention.channels.ts";
 import type { DataRetentionProjectPlacement } from "../../repositories/data-retention-project-scope.repository.ts";
 import type { DataRetentionRepositories } from "../../repositories/data-retention.repositories.ts";
 import { MemoryDataRetentionProjectScopeRepository } from "../../repositories/memory/memory.data-retention-project-scope.repository.ts";
@@ -86,6 +91,12 @@ export class MemoryRetentionDirectory implements DataRetentionDirectoryReader {
 
   async findScopeProjects(): Promise<readonly { id: string; teamId: string }[]> {
     return [{ id: this.graph.projectId, teamId: this.graph.teamId }];
+  }
+
+  async findOrganizationCreatedAt(): ReturnType<
+    DataRetentionDirectoryReader["findOrganizationCreatedAt"]
+  > {
+    return [];
   }
 }
 
@@ -175,6 +186,13 @@ function testPlan(plan: Readonly<{ free: boolean; type: string }>): Plan {
   };
 }
 
+/** Billing that holds no Growth subscription: every storage report is skipped. */
+export function createDataRetentionTestBilling(): BillingApi {
+  return createApiFixture<BillingApi>({
+    recordRetentionStorage: async () => ({ line: "skipped", reportedGbMonths: null }),
+  });
+}
+
 export function createDataRetentionTestApp(
   input: Readonly<{
     repositories?: DataRetentionRepositories;
@@ -183,9 +201,11 @@ export function createDataRetentionTestApp(
       permissions: AuthzApi;
       users: UserApi;
       entitlement: EntitlementApi;
+      billing: BillingApi;
     }>;
     platformDefaultRetentionDays?: number;
     storedBytesOwners?: StoredBytesOwners;
+    storedPastRetentionOwners?: StoredPastRetentionOwners;
   }> = {},
 ): DataRetentionModule {
   return DataRetentionModule.create({
@@ -194,11 +214,16 @@ export function createDataRetentionTestApp(
       directory: input.directory ?? MemoryRetentionDirectory.create(),
       projectScopes: createDataRetentionTestProjectScopes(),
     },
-    channels: { storedBytesOwners: input.storedBytesOwners ?? emptyStoredBytesOwners() },
+    channels: {
+      storedBytesOwners: input.storedBytesOwners ?? emptyStoredBytesOwners(),
+      storedPastRetentionOwners:
+        input.storedPastRetentionOwners ?? emptyStoredPastRetentionOwners(),
+    },
     dependencies: {
       permissions: input.dependencies?.permissions ?? createDataRetentionTestAuthz(),
       users: input.dependencies?.users ?? createDataRetentionTestUsers(),
       entitlement: input.dependencies?.entitlement ?? createDataRetentionTestEntitlement(),
+      billing: input.dependencies?.billing ?? createDataRetentionTestBilling(),
     },
     config: {
       platformDefaultDays: input.platformDefaultRetentionDays?.toString(),

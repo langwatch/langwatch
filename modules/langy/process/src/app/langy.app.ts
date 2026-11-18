@@ -716,6 +716,7 @@ export class LangyModule implements LangyApiContract {
   getStoredBytes(input: langyContractModule.LangyStoredBytesInput): Promise<number> {
     return this.dependencies.repositories.analyticsEvents.getStoredBytes({
       tenantId: input.projectId,
+      beforeMs: input.beforeMs,
     });
   }
 

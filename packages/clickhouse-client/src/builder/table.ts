@@ -6,6 +6,7 @@
 import type { TenantScopeTimeColumn } from "@langwatch/clickhouse-markers";
 
 import { type ColumnRef, type ColumnType, columnRef, isExpression, refOf } from "./expression.ts";
+import { QueryBuilderError } from "./query-builder-error.ts";
 
 export type ColumnsSpec = Readonly<Record<string, ColumnType<unknown>>>;
 type ValueOfColumn<C> = C extends ColumnType<infer Value> ? Value : never;
@@ -28,6 +29,8 @@ export type ClickHouseTableFacts = {
   readonly versionColumn: string | undefined;
   readonly sortKey: readonly string[];
   readonly columns: readonly string[];
+  /** The cluster whose every replica a system-identity table is read on (`everyReplica`). */
+  readonly cluster?: string;
 };
 
 export type ClickHouseTable<
@@ -192,4 +195,25 @@ export function systemIdentityTable<
     Columns,
     "systemIdentity"
   >;
+}
+
+/**
+ * A system-identity table read on every replica of a cluster, so a log one replica keeps reads the
+ * same from any other: `clusterAllReplicas({cluster:Identifier}, system.<table>)`, the name bound.
+ */
+export function everyReplica<Name extends SystemIdentityTableName, Columns extends ColumnsSpec>({
+  table,
+  cluster,
+}: {
+  table: ClickHouseTable<Name, Columns, "systemIdentity">;
+  cluster: string;
+}): ClickHouseTable<Name, Columns, "systemIdentity"> {
+  const facts = table.$table;
+  const listed = (SYSTEM_IDENTITY_TABLES as readonly string[]).includes(facts.stored);
+  if (facts.kind !== "systemIdentity" || !listed) {
+    throw new QueryBuilderError({ kind: "not-every-replica-table", table: facts.stored });
+  }
+  if (!IDENTIFIER.test(cluster))
+    throw new QueryBuilderError({ kind: "bad-cluster", name: cluster });
+  return { ...table, $table: { ...facts, cluster } };
 }

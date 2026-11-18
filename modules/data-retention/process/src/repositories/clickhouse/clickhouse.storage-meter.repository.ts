@@ -18,7 +18,17 @@ export class ClickHouseStorageMeterRepository implements StorageMeterRepository 
 
   private constructor(private readonly eventLog: EventLogRetention) {}
 
-  getEventLogBytes({ tenantId }: { tenantId: string }): Promise<number> {
-    return this.eventLog.getStoredBytes({ tenantId, settings: STORAGE_METER_READ_SETTINGS });
+  getEventLogBytes({
+    tenantId,
+    beforeMs,
+  }: {
+    tenantId: string;
+    beforeMs?: number | undefined;
+  }): Promise<number> {
+    return this.eventLog.getStoredBytes({
+      tenantId,
+      settings: STORAGE_METER_READ_SETTINGS,
+      beforeMs,
+    });
   }
 }

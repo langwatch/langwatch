@@ -57,6 +57,10 @@ export const traceSummaries = defineClickHouseTable({
     SourceType: column.lowCardinalityString(),
     SourceId: column.string(),
     EarliestSpanStartMs: column.uint64(),
+    /** Goose 00130: the KSUID layout of ProjectionId; NULL on rows written before it. */
+    IdLayout: column.nullable(column.lowCardinalityString()),
+    /** The row's kept period in days; 0 keeps it forever. */
+    _retention_days: column.uint16(),
     /** MATERIALIZED (goose 00032): read by the size facet and filter, never inserted. */
     _size_bytes: column.uint32(),
   },

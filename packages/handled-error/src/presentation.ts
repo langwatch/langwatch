@@ -229,6 +229,7 @@ const CREATION_LIMIT_LABELS: Record<string, string> = {
   scenarios: "scenarios",
   scenarioSets: "simulations",
   evaluators: "custom evaluators",
+  testSuites: "suites",
 };
 
 /**
@@ -432,6 +433,11 @@ const presentations = {
     title: "Attribute values withheld",
     describe: () =>
       "This project hides captured input or output from you, or an attribute policy restricts this key to an audience you are not in. Facet a named field instead, such as model, status or evaluator, or call the facets endpoint with no field to see what this project has.",
+  },
+  trace_withheld_over_plan: {
+    title: "Trace held until your plan is sorted",
+    describe: () =>
+      "This trace was recorded while your organization has more members than its plan covers. It is saved and will show once you upgrade your plan or remove members.",
   },
   trace_id_ambiguous: {
     title: "Trace ID is ambiguous",
@@ -883,6 +889,11 @@ const presentations = {
     describe: () =>
       "A braid can only be removed from the project its spans come from or the project that shows them.",
   },
+  braids_not_enabled: {
+    title: "Braids aren't switched on here",
+    describe: () =>
+      "This organisation can't manage braids yet. Braids it already has keep showing their spans.",
+  },
   broadcaster_not_active: {
     title: "Live updates disconnected",
     describe: () => "Refresh the page to reconnect.",
@@ -951,6 +962,13 @@ const presentations = {
     // configured wrong. The engine's statusText stays in the server log.
     title: "The workflow couldn't run",
     describe: () => "We've been notified. Try running it again in a moment.",
+  },
+  workflow_result_too_large: {
+    // fault: customer. The run finished but returned more than one synchronous
+    // answer can carry (6 MB), so the workflow's own output is what to shrink.
+    title: "The workflow's result is too large",
+    describe: () =>
+      "Make the workflow return less data, for example fewer rows or shorter text, and run it again.",
   },
 
   // ---- agent dev tunnel ----
@@ -1516,6 +1534,11 @@ const presentations = {
     describe: () =>
       "The documentation site that opened this page is not registered with this LangWatch installation. Paste an API key into the playground instead.",
   },
+  docs_playground_sessions_disabled: {
+    title: "Your organisation turned this off",
+    describe: () =>
+      "Your organisation does not let the documentation playground use your account. Paste an API key into the playground instead.",
+  },
   api_key_scope_violation: {
     title: "You don't have access for this",
     describe: () =>
@@ -1732,6 +1755,15 @@ const presentations = {
     title: "This model provider is turned off",
     describe: () =>
       "Turn it back on in your project's model settings, or pick a different provider.",
+  },
+  model_provider_unavailable: {
+    // A model named outright (not picked by the cascade) whose provider row is
+    // missing or switched off; `meta.reason` says which, so the copy names the fix.
+    title: "This model's provider isn't available",
+    describe: (error) =>
+      strEq(error, "reason", "disabled")
+        ? "Its provider is turned off. Turn it back on in Settings, then Model Providers, or pick a different model."
+        : "Its provider isn't set up for this project. Add it in Settings, then Model Providers, or pick a different model.",
   },
   model_provider_scope_forbidden: {
     // Deliberate refusal, not a mistake to correct: the provider is managed
@@ -2221,6 +2253,18 @@ const presentations = {
   member_seat_limit_reached: {
     title: "All member seats are in use",
     describe: () => "Free a seat by disabling a membership, or upgrade the plan to add more.",
+  },
+  member_additions_held_for_payment: {
+    // fault: customer. A renewal charge failed and is unpaid; members already in keep working.
+    title: "A payment failed, so new members can't be added",
+    describe: () =>
+      "Update the card on the billing page to pay the open invoice, then add them. Ask an admin if you can't.",
+  },
+  seats_held_for_payment: {
+    // fault: customer. Buying seats while an invoice is unpaid would charge the same failing card.
+    title: "A payment failed, so seats can't be added",
+    describe: () =>
+      "Update the card on the billing page to pay the open invoice, then add seats. Nothing was charged.",
   },
   membership_disabled: {
     // The person IS a member, so nothing here may suggest they are not, and
@@ -2828,6 +2872,11 @@ const presentations = {
     title: "This account is deactivated",
     describe: () => "Its sessions were revoked on purpose. Reactivate the account first.",
   },
+  user_platform_operator_email_locked: {
+    title: "An operator's email address can't change",
+    describe: () =>
+      "Revoke their platform operator role on the Operators page first, then change the address.",
+  },
   user_to_impersonate_not_found: {
     title: "User not found",
     describe: () => "They may have been removed since this page loaded.",
@@ -2882,7 +2931,7 @@ const presentations = {
     // and it says the same thing.
     describe: (error) => {
       const limitType = str(error, "limitType", "");
-      const creationLabel = CREATION_LIMIT_LABELS[limitType];
+      const creationLabel = CREATION_LIMIT_LABELS[str(error, "countedAs", "") || limitType];
       if (creationLabel) {
         const max = num(error, "max", 0);
         const included = max > 0 ? `${max} ${creationLabel}` : creationLabel;
@@ -3078,6 +3127,11 @@ const presentations = {
     describe: (error) =>
       `${scenarioFieldLabel(error)} references a parameter in a way we can't read. Check it is written as params.name, then try again.`,
   },
+  scenario_red_team_config_mismatch: {
+    title: "This scenario's red team settings don't match its kind",
+    describe: () =>
+      "A red team scenario needs an attack goal and OWASP ids, and a standard scenario takes none. Set the kind and the attack together, then try again.",
+  },
   scenario_reserved_set_id: {
     title: "This run can't be saved to that set",
     describe: () =>
@@ -3230,14 +3284,15 @@ const presentations = {
     describe: () => "Nothing was charged. Try again in a moment.",
   },
   seat_quantity_below_in_use: {
-    // fault: customer. The seat count asked for is below the minimum (the full
-    // seats in use, and never below one), so nothing changed or was charged.
+    // fault: customer. The seat count asked for is below the seats of that kind
+    // in use (full seats never below one), so nothing changed or was charged.
     title: "That's too few seats",
     describe: (error) => {
       const minimum = num(error, "minimum", 0);
+      const kind = strEq(error, "seat", "developer") ? "developer " : "";
       return minimum > 0
-        ? `Nothing changed. Choose at least ${minimum} ${minimum === 1 ? "seat" : "seats"}.`
-        : "Nothing changed. Choose at least as many seats as are in use.";
+        ? `Nothing changed. Choose at least ${minimum} ${kind}${minimum === 1 ? "seat" : "seats"}.`
+        : `Nothing changed. Choose at least as many ${kind}seats as are in use.`;
     },
   },
   subscription_already_active: {
@@ -3760,6 +3815,10 @@ const presentations = {
   },
 
   // ---- governance ----
+  agent_registry_entry_not_found: {
+    title: "Agent not found in the registry",
+    describe: () => "No agent in this organisation's registry has that id.",
+  },
   anomaly_rule_not_found: {
     title: "Anomaly rule not found",
     describe: () => "It may have been deleted. Reload to see the current list.",
@@ -3795,6 +3854,17 @@ const presentations = {
       const allowance = typeof budget === "number" ? `$${budget.toFixed(2)}` : "the free";
       return `Organizations without a paid plan can judge up to ${allowance} of text in total. Upgrade your plan under Settings, Plan & billing to keep running Instant Evals.`;
     },
+  },
+  instant_eval_gateway_budget_exceeded: {
+    title: "A gateway budget stopped Instant Evals",
+    // The budget is one the customer set to block, so the way out is theirs:
+    // raise or remove it. The scope says whose budget it is.
+    titleFor: (error) => {
+      const owner = budgetMetaWord(error, "scope", BUDGET_SCOPE_OWNERS);
+      return owner ? `${owner} gateway budget stopped Instant Evals` : undefined;
+    },
+    describe: () =>
+      "The budget is set to block once it is reached, and Instant Evals count against it. Raise or remove it under AI Gateway, Budgets to keep judging.",
   },
   instant_eval_memory_judge_in_production: {
     title: "This installation's Instant Evals judge is for development only",
@@ -3877,6 +3947,12 @@ const presentations = {
     describe: () =>
       "Leave impersonation first. How this account signs in can only be changed by its owner.",
   },
+  impersonation_cannot_mint_credential: {
+    // No permission unlocks this, so the copy must not name one to ask for.
+    title: "Not available while impersonating",
+    describe: () =>
+      "Leave impersonation first. Only the member can create or rotate their own keys.",
+  },
   ingestion_key_not_found: {
     title: "Ingestion key not found",
     describe: () =>
@@ -3914,6 +3990,11 @@ const presentations = {
   ingestion_source_cap_reached: {
     title: "You've hit the limit for ingestion sources",
     describe: () => "Archive one you no longer use, or upgrade your plan to raise the limit.",
+  },
+  ingestion_source_disabled: {
+    title: "This ingestion source is disabled",
+    describe: () =>
+      "An admin turned this source off, so it takes no new events. Set it back to active to resume.",
   },
   ingestion_source_unauthorized: {
     title: "That ingestion source secret wasn't recognized",
@@ -4094,6 +4175,16 @@ const presentations = {
       const need = permission ? `You need ${permission} here.` : "";
       return `${need} Ask an administrator, or set the length on a scope you manage.`.trim();
     },
+  },
+  data_retention_billed_through_billing: {
+    title: "This retention length is billed",
+    describe: () =>
+      "Keeping data longer than 90 days adds storage to the organization's bill, so it needs subscription:manage. Ask a billing administrator, or pick 90 days or less.",
+  },
+  data_retention_not_billed: {
+    title: "This retention length isn't billed",
+    describe: () =>
+      "Only a length that adds storage to the bill is set through billing. Save this length from the data retention settings instead.",
   },
   data_retention_disable_forbidden: {
     title: "Keeping data forever isn't available",
@@ -4346,6 +4437,20 @@ const presentations = {
     describe: () =>
       "Nothing was saved. An administrator has to set up storage before rows can be added.",
   },
+  storage_credentials_refused: {
+    // fault: platform. The deployment's own storage key or identity was turned
+    // away; only an administrator can change it, and the tips say where.
+    title: "Storage turned this workspace's credentials away",
+    describe: () =>
+      "Nothing was read or saved. An administrator has to check the storage credentials this deployment uses.",
+  },
+  storage_permission_denied: {
+    // fault: platform. The identity signs in but holds no data access; the
+    // role to grant is in the tips, for the administrator.
+    title: "Storage won't let this workspace read or save files",
+    describe: () =>
+      "Nothing was read or saved. An administrator has to give this deployment's storage identity access to its files.",
+  },
   export_failed: {
     // fault: platform. The export ran on our side and did not finish, so the
     // copy has to say nothing was changed — an export that half-worked is the
@@ -4399,6 +4504,10 @@ const presentations = {
   },
 
   // ---- suites (run plans) ----
+  suite_template_not_found: {
+    title: "That suite template doesn't exist",
+    describe: () => "Pick a template from the list of templates, then try again.",
+  },
   suite_not_found: {
     title: "Run plan not found",
     describe: () => "It may have been deleted. Reload to see the current list.",

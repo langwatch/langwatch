@@ -33,6 +33,8 @@ export type QueryBuilderViolation =
   | { kind: "bad-constant"; value: number }
   | { kind: "foreign-scope" }
   | { kind: "table-outside-scope"; table: string; scope: string }
+  | { kind: "not-every-replica-table"; table: string }
+  | { kind: "bad-cluster"; name: string }
   | { kind: "unjoinable"; table: string }
   | { kind: "prewhere-in-join" }
   | { kind: "id-bound-in-join" }
@@ -117,6 +119,10 @@ function describe(violation: QueryBuilderViolation): string {
       return "A derived table was built under another scope; a read and its parts share one scope.";
     case "table-outside-scope":
       return `Table "${violation.table}" cannot be read under a ${violation.scope} scope.`;
+    case "not-every-replica-table":
+      return `"${violation.table}" is not a system table only the system identity reads, so it is not read on every replica.`;
+    case "bad-cluster":
+      return `"${violation.name}" is not a plain identifier naming a cluster.`;
     case "unjoinable":
       return `"${violation.table}" is neither a stored tenant table, a derived read selecting its tenant column nor a derived read of no tenant table, so it cannot be a join side.`;
     case "prewhere-in-join":

@@ -115,6 +115,8 @@ import {
   type SimulationScenarioSetRunsInput,
   type ScenarioUsageCount,
   type ScenarioStoredBytesInput,
+  type ScenarioStoredPastRetentionInput,
+  scenarioStoredPastRetentionInputSchema,
   type SimulationService as SimulationServiceContract,
   type SimulationSetData,
   withActor,
@@ -651,8 +653,16 @@ export class ScenarioModule implements ScenarioApi {
     return this.#dependencies.scenarios.findTestSuite(input);
   }
 
-  createTestSuite(input: ScenarioTestSuiteCreateInput): Promise<ScenarioTestSuite> {
-    return this.#dependencies.scenarios.createTestSuite(input);
+  /** A suite a template apply makes passes the Free suite cap before anything is written. */
+  async createTestSuite(input: ScenarioTestSuiteCreateInput): Promise<ScenarioTestSuite> {
+    const cap = await this.#dependencies.creationCaps.testSuiteCreationCap({
+      projectId: input.projectId,
+      templateId: input.templateId,
+    });
+    return this.#dependencies.scenarios.createTestSuite(
+      input,
+      cap.kind === "capped" ? cap.cap : undefined,
+    );
   }
 
   updateTestSuite(input: ScenarioTestSuiteUpdateInput): Promise<ScenarioTestSuite> {
@@ -702,18 +712,23 @@ export class ScenarioModule implements ScenarioApi {
   async create(
     input: Omit<ScenarioCreateInput, "lastUpdatedById">,
     by: ScenarioCaller,
+    options: { sourceTemplateId?: string } = {},
   ): Promise<Scenario> {
     await this.#dependencies.creationCaps.assertScenarioCreationAllowed({
       projectId: input.projectId,
       operatorId: by.label === "user" ? by.id : undefined,
+      sourceTemplateId: options.sourceTemplateId,
     });
-    const scenario = await this.#dependencies.scenarios.create({
-      ...input,
-      // REST can name an explicit actor when its credential names no person;
-      // `by.id` alone would answer "the key" or "the project", neither a
-      // `User` row. tRPC, always a signed-in person, keeps the old behavior.
-      lastUpdatedById: input.actor ? input.actor.userId : by.id,
-    });
+    const scenario = await this.#dependencies.scenarios.create(
+      {
+        ...input,
+        // REST can name an explicit actor when its credential names no person;
+        // `by.id` alone would answer "the key" or "the project", neither a
+        // `User` row. tRPC, always a signed-in person, keeps the old behavior.
+        lastUpdatedById: input.actor ? input.actor.userId : by.id,
+      },
+      options,
+    );
 
     this.reportScenarioCreated({ scenario, projectId: input.projectId, userId: by.id });
 
@@ -1236,8 +1251,15 @@ export class ScenarioModule implements ScenarioApi {
   }
 
   /** Scenario's stored bytes for one project (ADR-202 Decided 20). */
-  getStoredBytes({ projectId }: ScenarioStoredBytesInput): Promise<number> {
-    return this.#dependencies.simulations.getStoredBytes({ projectId });
+  getStoredBytes(input: ScenarioStoredBytesInput): Promise<number> {
+    return this.#dependencies.simulations.getStoredBytes(input);
+  }
+
+  /** Scenario runs a period of `retentionDays` would remove now, for data-retention's count. */
+  countStoredPastRetention(input: ScenarioStoredPastRetentionInput): Promise<number> {
+    return this.#dependencies.simulations.countStoredPastRetention(
+      scenarioStoredPastRetentionInputSchema.parse(input),
+    );
   }
 }
 
@@ -1265,6 +1287,8 @@ export interface ScenarioChildEnvironment {
   callerEnv?: Record<string, string>;
   /** The target declares scenario hooks, which only the Node child calls (ADR-180). */
   callsHooks?: boolean;
+  /** The scenario is a red team attack, which only the Node child plays. */
+  runsRedTeam?: boolean;
 }
 
 export interface ScenarioChildExecutionSession {

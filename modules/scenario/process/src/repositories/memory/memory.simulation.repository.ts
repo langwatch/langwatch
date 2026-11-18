@@ -920,10 +920,34 @@ export class MemorySimulationRepository extends SimulationRepository {
   }
 
   /** The JSON byte length of the project's held runs, standing in for `_size_bytes`. */
-  async getStoredBytes({ projectId }: { projectId: string }): Promise<number> {
-    return this.runs
-      .findForTenants({ tenantIds: [projectId] })
-      .reduce((total, run) => total + Buffer.byteLength(JSON.stringify(run)), 0);
+  async getStoredBytes({
+    projectId,
+    beforeMs,
+  }: {
+    projectId: string;
+    beforeMs?: number | undefined;
+  }): Promise<number> {
+    if (beforeMs === undefined) {
+      return this.runs
+        .findForTenants({ tenantIds: [projectId] })
+        .reduce((total, run) => total + Buffer.byteLength(JSON.stringify(run)), 0);
+    }
+    return this.runsOf([projectId])
+      .filter((run) => run.startedAt < beforeMs)
+      .reduce((total, run) => total + Buffer.byteLength(JSON.stringify(run.state)), 0);
+  }
+
+  /** Held runs carry no kept period, so every run before the cutoff is kept forever here. */
+  async countStoredPastRetention({
+    projectId,
+    beforeMs,
+  }: {
+    projectId: string;
+    beforeMs: number;
+    retentionDays: number;
+  }): Promise<number> {
+    const past = this.runsOf([projectId]).filter((run) => run.startedAt < beforeMs);
+    return new Set(past.map((run) => run.scenarioRunId)).size;
   }
 
   async listRunsForExport({

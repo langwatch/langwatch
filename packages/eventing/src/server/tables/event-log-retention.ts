@@ -21,6 +21,13 @@ const EVENT_LOG_ID_INDEX_TABLE = EVENT_TABLES[1].table;
 const MUTATION_CATEGORY_MARKER_PREFIX = "langwatch:event-log-retention-category:";
 const MAX_RETENTION_DAYS = 65_535;
 
+/**
+ * The rows a raise to `{retentionDays:UInt16}` rewrites: finite ones kept for less, or every finite
+ * one when the new retention is forever (0). A row already kept forever is never touched.
+ */
+export const RETENTION_RAISE_ONLY_ROW_FILTER =
+  "_retention_days != 0 AND ({retentionDays:UInt16} = 0 OR _retention_days < {retentionDays:UInt16})";
+
 /** The statements the operation runs, in the routed ClickHouse member's own vocabulary. */
 export interface EventLogRetentionClient extends Pick<ClickHouseQueryClient, "read"> {
   command(request: {
@@ -82,16 +89,21 @@ export class EventLogRetention {
     private readonly classification: EventLogRetentionClassification,
   ) {}
 
-  /** One tenant's `_size_bytes` in `event_log`, every stored row counted, for the storage meter. */
+  /**
+   * One tenant's `_size_bytes` in `event_log`, every stored row counted, for the storage meter.
+   * `beforeMs` keeps events that occurred earlier (ADR-202 Decided 22).
+   */
   async getStoredBytes({
     tenantId,
     settings,
+    beforeMs,
   }: {
     tenantId: string;
     settings: Readonly<Record<string, number | string>>;
+    beforeMs?: number | undefined;
   }): Promise<number> {
     const { rows } = await this.client.read({
-      statement: EventLogRetention.storedBytesRead({ tenantId, settings }),
+      statement: EventLogRetention.storedBytesRead({ tenantId, settings, beforeMs }),
       table: EVENT_LOG_TABLE,
       declaresFullScan: true,
     });
@@ -102,13 +114,18 @@ export class EventLogRetention {
   static storedBytesRead({
     tenantId,
     settings,
+    beforeMs,
   }: {
     tenantId: string;
     settings: Readonly<Record<string, number | string>>;
+    beforeMs?: number | undefined;
   }): ReaderReadStatement<{ bytes: number | string }> {
-    return clickhouseRead({ scope: tenantScope.single({ tenantId }) })
+    const read = clickhouseRead({ scope: tenantScope.single({ tenantId }) })
       .from(eventLog)
-      .select({ bytes: fn.sum(eventLog._size_bytes) })
+      .select({ bytes: fn.sum(eventLog._size_bytes) });
+    return (
+      beforeMs === undefined ? read : read.where(({ lt }) => lt(eventLog.EventOccurredAt, beforeMs))
+    )
       .settings(settings)
       .build();
   }
@@ -118,14 +135,39 @@ export class EventLogRetention {
    * index rows where the target holds the index; answers the tables the rewrite covers. An empty
    * category runs nothing.
    */
-  async retainCategory({
+  retainCategory(input: {
+    tenantId: string;
+    category: string;
+    retentionDays: number;
+  }): Promise<string[]> {
+    return this.rewriteCategory({
+      ...input,
+      rowFilter: "_retention_days != {retentionDays:UInt16}",
+    });
+  }
+
+  /**
+   * As {@link retainCategory}, but only lengthens: a row kept forever (0) or already kept at
+   * least `retentionDays` keeps its retention, and `0` raises every finite row to forever.
+   */
+  raiseCategory(input: {
+    tenantId: string;
+    category: string;
+    retentionDays: number;
+  }): Promise<string[]> {
+    return this.rewriteCategory({ ...input, rowFilter: RETENTION_RAISE_ONLY_ROW_FILTER });
+  }
+
+  private async rewriteCategory({
     tenantId,
     category,
     retentionDays,
+    rowFilter,
   }: {
     tenantId: string;
     category: string;
     retentionDays: number;
+    rowFilter: string;
   }): Promise<string[]> {
     this.assertCategory(category);
     assertRetentionDays(retentionDays);
@@ -141,7 +183,7 @@ export class EventLogRetention {
         `ALTER TABLE ${EVENT_LOG_TABLE} ` +
         "UPDATE _retention_days = {retentionDays:UInt16} " +
         "WHERE TenantId = {tenantId:String} " +
-        "AND _retention_days != {retentionDays:UInt16}" +
+        `AND ${rowFilter}` +
         ` AND (${predicate})` +
         ` AND length(${sqlString(markerOf(category))}) > 0`,
       params: { tenantId, retentionDays },

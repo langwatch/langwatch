@@ -99,7 +99,9 @@ export const traceDerivedEventsInputSchema: TraceDerivedEventsInputSchema =
 
 export type TraceDerivedEventsInput = z.infer<typeof traceDerivedEventsInputSchema>;
 
-const traceStoredBytesInputSchemaDefinition = z.object({ projectId: z.string().min(1) }).strict();
+const traceStoredBytesInputSchemaDefinition = z
+  .object({ projectId: z.string().min(1), beforeMs: z.number().int().nonnegative().optional() })
+  .strict();
 export interface TraceStoredBytesInputSchema extends Named<
   typeof traceStoredBytesInputSchemaDefinition
 > {}
@@ -107,3 +109,18 @@ export interface TraceStoredBytesInputSchema extends Named<
 export const traceStoredBytesInputSchema: TraceStoredBytesInputSchema =
   traceStoredBytesInputSchemaDefinition;
 export type TraceStoredBytesInput = z.infer<typeof traceStoredBytesInputSchema>;
+
+const traceStoredPastRetentionInputSchemaDefinition = z
+  .object({
+    projectId: z.string().min(1),
+    beforeMs: z.number().int().nonnegative(),
+    retentionDays: z.number().int().min(1).max(65_535),
+  })
+  .strict();
+export interface TraceStoredPastRetentionInputSchema extends Named<
+  typeof traceStoredPastRetentionInputSchemaDefinition
+> {}
+/** Data retention's question: the traces a period of `retentionDays` would remove now. */
+export const traceStoredPastRetentionInputSchema: TraceStoredPastRetentionInputSchema =
+  traceStoredPastRetentionInputSchemaDefinition;
+export type TraceStoredPastRetentionInput = z.infer<typeof traceStoredPastRetentionInputSchema>;

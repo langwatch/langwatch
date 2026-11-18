@@ -229,23 +229,63 @@ export function runCountRead({
     .build();
 }
 
-/** One project's `_size_bytes` over experiment's three tables, every stored row counted. */
+/**
+ * One project's `_size_bytes` over experiment's three tables, every stored row counted.
+ * `beforeMs` keeps rows whose partition time is earlier (`StartedAt`, `OccurredAt`, `CreatedAt`).
+ */
 export function storedBytesRead({
   projectId,
+  beforeMs,
 }: {
   projectId: string;
+  beforeMs?: number | undefined;
 }): ReaderReadStatement<{ bytes: number | string }> {
   const scope = tenantScope.single({ tenantId: projectId });
-  const parts = clickhouseRead({ scope })
+  const runBytes = clickhouseRead({ scope })
     .from(runs)
-    .select({ bytes: fn.sum(runs._size_bytes) })
-    .unionAll((arm) => arm.from(items).select({ bytes: fn.sum(items._size_bytes) }))
-    .unionAll((arm) => arm.from(dspySteps).select({ bytes: fn.sum(dspySteps._size_bytes) }))
+    .select({ bytes: fn.sum(runs._size_bytes) });
+  const parts = (
+    beforeMs === undefined ? runBytes : runBytes.where(({ lt }) => lt(runs.StartedAt, beforeMs))
+  )
+    .unionAll((arm) => {
+      const itemBytes = arm.from(items).select({ bytes: fn.sum(items._size_bytes) });
+      return beforeMs === undefined
+        ? itemBytes
+        : itemBytes.where(({ lt }) => lt(items.OccurredAt, beforeMs));
+    })
+    .unionAll((arm) => {
+      const stepBytes = arm.from(dspySteps).select({ bytes: fn.sum(dspySteps._size_bytes) });
+      return beforeMs === undefined
+        ? stepBytes
+        : stepBytes.where(({ lt }) => lt(dspySteps.CreatedAt, beforeMs));
+    })
     .as("parts");
   return clickhouseRead({ scope })
     .from(parts)
     .select({ bytes: fn.sum(parts.bytes) })
     .settings(STORAGE_METER_READ_SETTINGS)
+    .build();
+}
+
+/** Distinct runs before the cutoff that a period of `retentionDays` would remove. */
+export function storedPastRetentionCountRead({
+  projectId,
+  beforeMs,
+  retentionDays,
+}: {
+  projectId: string;
+  beforeMs: number;
+  retentionDays: number;
+}): ReaderReadStatement<{ total: number | string }> {
+  return clickhouseRead({ scope: tenantScope.single({ tenantId: projectId }) })
+    .from(runs)
+    .select({ total: fn.uniqExact(runs.RunId) })
+    .where(({ and, eq, gt, lt, or }) =>
+      and(
+        lt(runs.StartedAt, beforeMs),
+        or(eq(runs._retention_days, 0), gt(runs._retention_days, retentionDays)),
+      ),
+    )
     .build();
 }
 

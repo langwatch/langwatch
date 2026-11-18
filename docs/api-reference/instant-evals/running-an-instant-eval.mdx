@@ -51,6 +51,8 @@ GROUP BY TraceId, ConversationId
 
 An organization without a paid plan also gets `freeBudgetRemainingUsd`, what is left of its $1 free budget. Once that is spent, a new run and a judged query answer `402` with `instant_eval_free_budget_exhausted`, carrying `spentUsd` and `budgetUsd` in `meta`, until the organization upgrades. The rate is on [Pricing](/pricing#instant-evals).
 
+On any plan, a [gateway budget](/ai-gateway/budgets) set to block on the project, its team or the organization also applies. Once it is reached, a new run and a judged query answer `402` with `instant_eval_gateway_budget_exceeded`, carrying `budgetId`, `scope`, `window`, `limitUsd` and `spentUsd` in `meta`. A run under way stops before its next page and keeps the verdicts it wrote. A budget set to warn never refuses, and a project on its own decision model is not checked.
+
 ## Row Limits
 
 A run judges at most 10,000 rows by default. Pass `limit` to ask for fewer, or for up to 100,000 on a plan that lifts the cap. A `limit` above what your plan allows answers `instant_eval_row_cap_exceeded` with the cap and the plan in `meta`.

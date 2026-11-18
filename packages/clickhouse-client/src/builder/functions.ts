@@ -449,6 +449,17 @@ export const fn = {
       args: [keys.node, values.node],
       binding: undefined,
     }),
+  /** `sumMapIf(keys, values, when)`: `sumMap` over the rows `when` holds for. */
+  sumMapIf: <K, T extends string, U extends string, W extends string>(
+    keys: Arr<K, T>,
+    values: Arr<Num, U>,
+    when: Condition<W>,
+  ) =>
+    call<readonly [readonly K[], readonly number[]], T | U | W>({
+      name: "sumMapIf",
+      args: [keys.node, values.node, when.node],
+      binding: undefined,
+    }),
 
   // AggregateFunction states, read through their -Merge function
   sumMerge: merge("sum"),
@@ -641,6 +652,21 @@ export const fn = {
   replaceOne: replace("replaceOne"),
   replaceAll: replace("replaceAll"),
   replaceRegexpAll: replace("replaceRegexpAll"),
+  /** `substring(of, offset, length)`: bytes from the 1-based `offset`, both bound as Int64. */
+  substring: <V extends string | null, T extends string>(
+    of: E<V, T>,
+    offset: number,
+    length?: number,
+  ) =>
+    call<V, T>({
+      name: "substring",
+      args: [
+        of.node,
+        bound(offset, INT64),
+        ...(length === undefined ? [] : [bound(length, INT64)]),
+      ],
+      binding: STRING,
+    }),
   /** `trim(BOTH chars FROM of)`: `chars` stripped from both ends. */
   trimBoth: <T extends string, U extends string = never>(
     of: E<string | null, T>,
@@ -898,27 +924,31 @@ export const fn = {
       boolean,
       U | TablesOfExpression<A[number]>
     >,
-  /** `arraySort(x -> key, of)`: ordered by the key the lambda computes. */
-  arraySortBy: <V, T extends string, U extends string = never>(
-    key: (member: E<V, never>) => E<unknown, U>,
-    of: Arr<V, T>,
+  /** `arraySort((x, …) -> key, of, …)`: the first array, ordered by the key over every array. */
+  arraySortBy: <const A extends readonly [AnyArray, ...AnyArray[]], U extends string = never>(
+    key: (...params: LambdaParams<A>) => E<unknown, U>,
+    ...arrays: A
   ) =>
-    arrayLambda<readonly V[]>({
+    arrayLambda<ValueOfExpression<A[0]>>({
       name: "arraySort",
-      arrays: [of],
+      arrays,
       body: key,
-      binding: () => of.binding,
-    }) as E<readonly V[], T | U>,
-  arrayReverseSortBy: <V, T extends string, U extends string = never>(
-    key: (member: E<V, never>) => E<unknown, U>,
-    of: Arr<V, T>,
+      binding: () => arrays[0].binding,
+    }) as E<ValueOfExpression<A[0]>, U | TablesOfExpression<A[number]>>,
+  /** `arrayReverseSort((x, …) -> key, of, …)`: as `arraySortBy`, greatest key first. */
+  arrayReverseSortBy: <
+    const A extends readonly [AnyArray, ...AnyArray[]],
+    U extends string = never,
+  >(
+    key: (...params: LambdaParams<A>) => E<unknown, U>,
+    ...arrays: A
   ) =>
-    arrayLambda<readonly V[]>({
+    arrayLambda<ValueOfExpression<A[0]>>({
       name: "arrayReverseSort",
-      arrays: [of],
+      arrays,
       body: key,
-      binding: () => of.binding,
-    }) as E<readonly V[], T | U>,
+      binding: () => arrays[0].binding,
+    }) as E<ValueOfExpression<A[0]>, U | TablesOfExpression<A[number]>>,
   mapGet: <V, T extends string>(map: E<Dict<V>, T>, key: string) =>
     expression<V, T>(
       { kind: "mapGet", map: map.node, key: bound(key, STRING) },
@@ -965,6 +995,33 @@ export const fn = {
       name: "mapFilter",
       args: [lambda.node, of.node],
       binding: of.binding,
+    });
+  },
+  /** `mapApply((k, v) -> (key, value), of)`: each entry rewritten to the pair `apply` returns. */
+  mapApply: <V, R, T extends string, U extends string = never>(
+    apply: (key: E<string, never>, value: E<V, never>) => readonly [E<string, U>, E<R, U>],
+    of: E<Dict<V>, T>,
+  ): Expression<Dict<R>, T | U> => {
+    let element: Binding | undefined;
+    const lambda = lambdaOf({
+      bindings: [STRING, of.binding?.element],
+      body: (key, value) => {
+        const [newKey, newValue] = apply(key as E<string, never>, value as E<V, never>);
+        element = newValue.binding;
+        return call<unknown, U>({
+          name: "tuple",
+          args: [newKey.node, newValue.node],
+          binding: undefined,
+        });
+      },
+    });
+    return call<Dict<R>, T | U>({
+      name: "mapApply",
+      args: [lambda.node, of.node],
+      binding:
+        element === undefined
+          ? undefined
+          : { paramType: `Map(String, ${element.paramType})`, element },
     });
   },
   /** A tuple, for a keyset comparison such as `(EventTime, EventId) > (…)` or an argMax row. */

@@ -106,6 +106,7 @@ function service(clock = new TestClock()): ScenarioServiceContract {
     countRunsForExport: async () => 0,
     countUsage: async () => 0,
     getStoredBytes: async () => 0,
+    countStoredPastRetention: async () => 0,
     countOrganizationRuns: async () => 0,
     listRunsForExport: async () => ({ runs: [], hasMore: false }),
     queueRun: async () => {},
@@ -120,6 +121,7 @@ function service(clock = new TestClock()): ScenarioServiceContract {
     recordAgentInstance: async () => {},
     recordCutAtLimit: async () => {},
     recordHooks: async () => {},
+    recordRedTeamReport: async () => {},
   } satisfies SimulationService;
 
   return ScenarioServiceContract.create({

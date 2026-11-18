@@ -5,7 +5,7 @@ import type { DatasetColumns, InMemoryDataset } from "@langwatch/dataset-contrac
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import { act, cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, type MockInstance, vi } from "vitest";
 
 import { DatasetEditorTable } from "../dataset-editor-table.tsx";
 
@@ -122,6 +122,155 @@ describe("given an in-memory dataset", () => {
       expect(screen.getByText("ping")).toBeInTheDocument();
       expect(screen.getByText("pong")).toBeInTheDocument();
       expect(screen.getByTestId("dataset-row-count")).toHaveTextContent("2 records");
+    });
+  });
+
+  describe("when the dataset has thirty columns", () => {
+    const thirtyColumns: DatasetColumns = Array.from({ length: 30 }, (_, i) => ({
+      name: `column_${i}`,
+      type: "string",
+    }));
+    const renderWide = () =>
+      renderInMemory({
+        inMemoryDataset: {
+          name: "Wide",
+          columnTypes: thirtyColumns,
+          datasetRecords: [{ id: "r1", column_0: "hello" }],
+        },
+      });
+
+    /** @scenario A dataset with many columns scrolls sideways instead of squeezing them */
+    it("floors the grid at a minimum width per column so it scrolls sideways", () => {
+      renderWide();
+
+      const grid = screen.getByTestId("dataset-editor-grid");
+      const columns = grid.querySelectorAll("colgroup col");
+      expect(columns).toHaveLength(31);
+      const checkboxColumnPx = 36;
+      const floor = Number.parseInt(grid.style.minWidth, 10);
+      expect(floor).toBeGreaterThanOrEqual(checkboxColumnPx + 30 * 160);
+      expect(getComputedStyle(grid.parentElement!).overflowX).toBe("auto");
+    });
+
+    /** @scenario Moving with the keyboard to a column off screen scrolls it into view */
+    it("scrolls each cell the keyboard selects into view", async () => {
+      const scrollIntoView = vi
+        .spyOn(Element.prototype, "scrollIntoView")
+        .mockImplementation(() => {});
+      try {
+        const user = userEvent.setup();
+        renderWide();
+
+        await user.click(screen.getByText("hello"));
+        for (let i = 0; i < 29; i++) await user.keyboard("{Tab}");
+
+        const lastColumnIndex = 30;
+        const row = screen.getByText("hello").closest("tr")!;
+        const lastCell = row.querySelectorAll("td")[lastColumnIndex];
+        expect(scrollIntoView.mock.contexts.at(-1)).toBe(lastCell);
+      } finally {
+        scrollIntoView.mockRestore();
+      }
+    });
+  });
+
+  describe("when the dataset has more rows than the grid renders at once", () => {
+    const rowCount = 150;
+    const rowHeight = 160;
+    const viewport = 800;
+    let scrollTo: MockInstance<Element["scrollTo"]>;
+    let layout: { mockRestore: () => void }[] = [];
+    let user: ReturnType<typeof userEvent.setup>;
+
+    beforeEach(async () => {
+      scrollTo = vi.spyOn(Element.prototype, "scrollTo").mockImplementation(() => {});
+      // jsdom lays nothing out; give the grid a viewport and a scroll height.
+      layout = [
+        vi.spyOn(HTMLElement.prototype, "offsetHeight", "get").mockReturnValue(viewport),
+        vi.spyOn(HTMLElement.prototype, "offsetWidth", "get").mockReturnValue(1000),
+        vi.spyOn(Element.prototype, "clientHeight", "get").mockReturnValue(viewport),
+        vi.spyOn(Element.prototype, "scrollHeight", "get").mockReturnValue(rowCount * rowHeight),
+      ];
+      user = userEvent.setup();
+      renderInMemory({
+        inMemoryDataset: {
+          name: "Long",
+          columnTypes,
+          datasetRecords: Array.from({ length: rowCount }, (_, i) => ({
+            id: `r${i}`,
+            input: `value ${i}`,
+            expected_output: "",
+          })),
+        },
+      });
+      await user.click(await screen.findByText("value 0"));
+    });
+    afterEach(() => {
+      scrollTo.mockRestore();
+      for (const spy of layout) spy.mockRestore();
+    });
+
+    const gridScroller = () => screen.getByTestId("dataset-editor-grid").parentElement!;
+
+    /** @scenario Moving with the keyboard to a row that is not rendered brings it into view */
+    it("scrolls the grid to the selected row once it leaves the rendered rows", async () => {
+      scrollTo.mockClear();
+      const selectedRow = 40;
+      for (let i = 0; i < selectedRow; i++) await user.keyboard("{ArrowDown}");
+
+      expect(scrollTo.mock.contexts.at(-1)).toBe(gridScroller());
+      // Row 40's bottom edge lands on the viewport's bottom edge.
+      const rowBottom = (selectedRow + 1) * rowHeight;
+      expect(scrollTo.mock.calls.at(-1)?.[0]).toMatchObject({ top: rowBottom - viewport });
+    });
+
+    /** @scenario Moving to another column on a row scrolled out of view brings the row back */
+    it("brings the selected row back when only the column changes after scrolling it away", async () => {
+      const grid = gridScroller();
+      scrollTo.mockClear();
+      grid.scrollTop = 40 * rowHeight;
+      fireEvent.scroll(grid);
+      await waitFor(() => expect(screen.queryByText("value 0")).not.toBeInTheDocument());
+      // Scrolling by hand leaves the selection where it is; only a keyboard move recovers it.
+      expect(scrollTo).not.toHaveBeenCalled();
+
+      await user.keyboard("{ArrowRight}");
+
+      expect(scrollTo.mock.contexts.at(-1)).toBe(grid);
+      expect(scrollTo.mock.calls.at(-1)?.[0]).toMatchObject({ top: 0 });
+    });
+  });
+
+  describe("when the dataset has two columns", () => {
+    /** @scenario A dataset with few columns still fills the grid */
+    it("keeps the grid at the card's full width with a floor below it", () => {
+      renderInMemory();
+
+      const grid = screen.getByTestId("dataset-editor-grid");
+      expect(getComputedStyle(grid).width).toBe("100%");
+      expect(Number.parseInt(grid.style.minWidth, 10)).toBeLessThan(600);
+    });
+  });
+
+  describe("when a column name is too long for its header", () => {
+    /** @scenario A column name too long for its header is cut short, not overlapped */
+    it("truncates the name on one line and offers the full name on hover", () => {
+      const longName = "gold_skill_reason_for_the_thread_analysis";
+      renderInMemory({
+        inMemoryDataset: {
+          name: "Long",
+          columnTypes: [{ name: longName, type: "string" }],
+          datasetRecords: [{ id: "r1", [longName]: "x" }],
+        },
+      });
+
+      const label = screen.getByText(longName);
+      expect(label.closest("th")).toHaveAttribute("title", longName);
+      expect(getComputedStyle(label).textOverflow).toBe("ellipsis");
+      expect(getComputedStyle(label).whiteSpace).toBe("nowrap");
+      // A flex child only shrinks below its text with min-width 0, at every level.
+      expect(getComputedStyle(label).minWidth).toBe("0px");
+      expect(getComputedStyle(label.parentElement!).minWidth).toBe("0px");
     });
   });
 

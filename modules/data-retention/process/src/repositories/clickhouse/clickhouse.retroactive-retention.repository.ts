@@ -21,7 +21,7 @@ import {
   type RetroactiveMutationProgress,
 } from "@langwatch/data-retention-contract";
 import { RETENTION_TABLE_CATEGORY_MAP } from "@langwatch/data-retention-contract/retention-tables";
-import { EventLogRetention } from "@langwatch/eventing/server";
+import { EventLogRetention, RETENTION_RAISE_ONLY_ROW_FILTER } from "@langwatch/eventing/server";
 import { z } from "zod";
 
 import { EVENT_LOG_RETENTION_CLASSIFICATION } from "../../rules/event-log-retention.rules.ts";
@@ -157,10 +157,27 @@ export class ClickHouseRetroactiveRetentionRepository implements RetroactiveRete
     });
   }
 
-  async triggerUpdate(input: {
+  triggerUpdate(input: {
     projectId: string;
     category: RetentionCategory;
     newRetentionDays: number;
+  }): Promise<{ tables: string[] }> {
+    return this.#apply({ ...input, raiseOnly: false });
+  }
+
+  raiseRetention(input: {
+    projectId: string;
+    category: RetentionCategory;
+    newRetentionDays: number;
+  }): Promise<{ tables: string[] }> {
+    return this.#apply({ ...input, raiseOnly: true });
+  }
+
+  async #apply(input: {
+    projectId: string;
+    category: RetentionCategory;
+    newRetentionDays: number;
+    raiseOnly: boolean;
   }): Promise<{ tables: string[] }> {
     const activeMutations = await this.findActiveMutations(input);
     if (activeMutations.length > 0) {
@@ -169,7 +186,7 @@ export class ClickHouseRetroactiveRetentionRepository implements RetroactiveRete
     const plan = this.#plan(input.category);
     const rewritten: string[] = [];
     for (const target of plan.targets) {
-      rewritten.push(...(await this.rewriteTarget({ ...input, target })));
+      rewritten.push(...(await this.#rewriteTarget({ ...input, target })));
     }
     const eventingTables = rewritten.filter((table) => this.isEventingTable(table));
     const heldIndexes = rewritten.filter((table) => plan.categoryIndexes.includes(table));
@@ -184,19 +201,32 @@ export class ClickHouseRetroactiveRetentionRepository implements RetroactiveRete
     return this.#plan(input.category).targets;
   }
 
-  async rewriteTarget(input: {
+  rewriteTarget(input: {
     projectId: string;
     category: RetentionCategory;
     newRetentionDays: number;
     target: string;
   }): Promise<string[]> {
+    return this.#rewriteTarget({ ...input, raiseOnly: false });
+  }
+
+  async #rewriteTarget(input: {
+    projectId: string;
+    category: RetentionCategory;
+    newRetentionDays: number;
+    target: string;
+    raiseOnly: boolean;
+  }): Promise<string[]> {
     if (input.target === EVENTING_APPLY_TARGET) {
       // Once for both of eventing's tables: it raises its own index where the target holds it.
-      return this.eventLogRetention.retainCategory({
+      const eventLogRewrite = {
         tenantId: input.projectId,
         category: input.category,
         retentionDays: input.newRetentionDays,
-      });
+      };
+      return input.raiseOnly
+        ? this.eventLogRetention.raiseCategory(eventLogRewrite)
+        : this.eventLogRetention.retainCategory(eventLogRewrite);
     }
     if (this.#plan(input.category).categoryIndexes.includes(input.target)) {
       // A later migration creates each index, so a target without one yet skips it.
@@ -230,7 +260,9 @@ export class ClickHouseRetroactiveRetentionRepository implements RetroactiveRete
         `ALTER TABLE ${input.target} ` +
         "UPDATE _retention_days = {retentionDays:UInt16} " +
         "WHERE TenantId = {tenantId:String} " +
-        "AND _retention_days != {retentionDays:UInt16}",
+        (input.raiseOnly
+          ? `AND ${RETENTION_RAISE_ONLY_ROW_FILTER}`
+          : "AND _retention_days != {retentionDays:UInt16}"),
       params: {
         tenantId: input.projectId,
         retentionDays: input.newRetentionDays,

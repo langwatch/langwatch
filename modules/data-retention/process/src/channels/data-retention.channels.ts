@@ -1,3 +1,4 @@
+import type { RetentionCategory } from "@langwatch/data-retention-contract";
 import { EvaluationApi } from "@langwatch/evaluation-contract";
 import { ExperimentApi } from "@langwatch/experiment-contract";
 import { LangyApi } from "@langwatch/langy-contract";
@@ -19,7 +20,7 @@ const STORED_BYTES_OWNERS = {
 
 /** One owning module's answer to the storage meter: its stored bytes for one project. */
 export type StoredBytesOwner = Readonly<{
-  getStoredBytes(input: { projectId: string }): Promise<number>;
+  getStoredBytes(input: { projectId: string; beforeMs?: number }): Promise<number>;
 }>;
 
 /** Each module owning metered tables, by name, asked for its own bytes (ADR-202 Decided 20). */
@@ -27,9 +28,24 @@ export type StoredBytesOwners = Readonly<
   Record<keyof typeof STORED_BYTES_OWNERS, StoredBytesOwner>
 >;
 
+/** One owning module's count of a project's stored items a shorter period would remove. */
+export type StoredPastRetentionOwner = Readonly<{
+  countStoredPastRetention(input: {
+    projectId: string;
+    beforeMs: number;
+    retentionDays: number;
+  }): Promise<number>;
+}>;
+
+/** The module storing each category's items, asked for its own count (ADR-202 Decided 20). */
+export type StoredPastRetentionOwners = Readonly<
+  Record<RetentionCategory, StoredPastRetentionOwner>
+>;
+
 /** Every channel data-retention holds, as the container hands them to the module class. */
 export interface DataRetentionChannels {
   readonly storedBytesOwners: StoredBytesOwners;
+  readonly storedPastRetentionOwners: StoredPastRetentionOwners;
 }
 
 /**
@@ -45,6 +61,13 @@ export class BoundDataRetentionChannels {
   }: {
     bound: BoundApis<typeof BoundDataRetentionChannels.binds>;
   }): DataRetentionChannels {
-    return { storedBytesOwners: bound };
+    return {
+      storedBytesOwners: bound,
+      storedPastRetentionOwners: {
+        traces: bound.traces,
+        scenarios: bound.scenarios,
+        experiments: bound.experiments,
+      },
+    };
   }
 }

@@ -7,6 +7,7 @@ import type {
   TraceSummaryPage,
   TracesForProjectResult,
 } from "../../trace-read.contract.ts";
+import type { TracePageSizeBound } from "../../trace.errors.ts";
 import type { CompiledProjection } from "../ingest/trace-projection.types.ts";
 import type { TraceListFilter } from "../list/trace-list.queries.ts";
 
@@ -22,8 +23,8 @@ export type TraceListTracesInput = {
     dateField?: TraceDateField;
     /** A compiled `select` projection, applied by the read rather than reshaped after it. */
     projection?: CompiledProjection["plan"];
-    /** Refuse above this plan bound instead of clamping to the list bound. */
-    refuseAbove?: "tracesPageSizeMax" | "tracesDownloadPageSizeMax";
+    /** Refuse above this plan bound instead of clamping; a spans read takes the spans bound. */
+    refuseAbove?: TracePageSizeBound;
   };
 };
 

@@ -42,6 +42,7 @@
     "@langwatch/project-contract": "workspace:*",
     "@langwatch/scenario-contract": "workspace:*",
     "@langwatch/suite-contract": "workspace:*",
+    "@langwatch/task": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/trace-contract": "workspace:*",
     "@langwatch/upgrade": "workspace:*",

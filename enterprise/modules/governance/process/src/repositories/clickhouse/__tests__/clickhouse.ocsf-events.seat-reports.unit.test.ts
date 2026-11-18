@@ -101,7 +101,7 @@ describe("ClickHouseOcsfEventsRepository.findLatestSeatReports", () => {
       const [statement] = client.statements;
       expect(statement).toMatchObject({ identity: "reader", kind: "tenant", tenantId: "gov-1" });
       expect(statement?.settings).toMatchObject({ SQL_langwatch_tenant_ids: "gov-1" });
-      expect(statement?.params).toEqual({ tenantId: "gov-1", v0: "seat_report" });
+      expect(statement?.params).toEqual({ tenantId: "gov-1", v0: "seat_report", v1: "ocsf_push" });
       // TenantId leads the predicate — nothing else here is unique across
       // tenants — and neither value is spliced into the SQL text.
       expect(statement?.sql).toContain("WHERE TenantId = {tenantId:String}");

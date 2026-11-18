@@ -236,3 +236,24 @@ describe("ClickHouseSuiteRunRepository", () => {
     });
   });
 });
+
+describe("ClickHouseSuiteRunRepository.storedBytesRead before a cutoff", () => {
+  const beforeMs = Date.UTC(2026, 7, 1);
+
+  /** @scenario "Suite's stored bytes before a cutoff count only rows whose partition time is earlier" */
+  it("keeps only rows whose `StartedAt` is before the cutoff", () => {
+    const statement = ClickHouseSuiteRunRepository.storedBytesRead({
+      tenantId: "project_1",
+      beforeMs: beforeMs,
+    });
+
+    expect(statement.sql).toMatch(/StartedAt\)? < /);
+    expect(Object.values(statement.params)).toContain(beforeMs);
+  });
+
+  it("filters on no time without a cutoff", () => {
+    expect(ClickHouseSuiteRunRepository.storedBytesRead({ tenantId: "project_1" }).sql).not.toMatch(
+      /StartedAt\)? < /,
+    );
+  });
+});

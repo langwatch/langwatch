@@ -169,7 +169,7 @@ const MAIN = {
   aggregate: (bounded: boolean) => `${SELECT} WHERE ${KEY} ${bounded ? SINCE : ""} ${ORDER}`,
   many: `SELECT TenantId, AggregateId, ${EVENT_LOG_SELECT_COLUMNS} FROM event_log WHERE TenantId IN ({tenantIds:Array(String)}) AND AggregateType = {aggregateType:String} AND AggregateId IN ({aggregateIds:Array(String)}) ORDER BY TenantId ASC, AggregateId ASC, EventTimestamp ASC, EventId ASC`,
   upTo: `${SELECT} WHERE ${KEY} ${UP_TO} ${ORDER}`,
-  page: `${SELECT} WHERE ${KEY} ${UP_TO} AND (EventTimestamp > {afterTimestamp:UInt64} OR (EventTimestamp = {afterTimestamp:UInt64} AND EventId > {afterEventId:String})) ${ORDER} LIMIT {limit:UInt32}`,
+  page: `${SELECT} WHERE ${KEY} ${UP_TO} AND IdempotencyKey >= {afterKey:String} AND (IdempotencyKey > {afterKey:String} OR EventTimestamp > {afterTimestamp:UInt64} OR (EventTimestamp = {afterTimestamp:UInt64} AND EventId > {afterEventId:String})) ORDER BY IdempotencyKey ASC, EventTimestamp ASC, EventId ASC LIMIT {limit:UInt32}`,
   count: `SELECT COUNT(DISTINCT EventId) as count FROM event_log WHERE ${KEY} AND (EventTimestamp < {beforeTimestamp:UInt64} OR (EventTimestamp = {beforeTimestamp:UInt64} AND EventId < {beforeEventId:String})) AND EventId != {beforeEventId:String}`,
 };
 
@@ -371,11 +371,12 @@ describe("event_log's built reads on ClickHouse 26.8", () => {
     expect(built).toEqual(map(await mainRows<Row>({ sql: MAIN.upTo, params: upTo })));
     expect(built).toHaveLength(5);
 
-    const page = { after: { timestamp: 2_000, eventId: "e1" }, limit: 2 };
+    const afterKey = `${key.aggregateId}-e1`;
+    const page = { after: { idempotencyKey: afterKey, timestamp: 2_000, eventId: "e1" }, limit: 2 };
     const builtPage = await repository.getEventRecordsUpToPaged({ ...upTo, ...page });
     const mainPage = await mainRows<Row>({
       sql: MAIN.page,
-      params: { ...upTo, afterTimestamp: 2_000, afterEventId: "e1", limit: 2 },
+      params: { ...upTo, afterKey, afterTimestamp: 2_000, afterEventId: "e1", limit: 2 },
     });
     expect(builtPage).toEqual(map(mainPage));
     expect(builtPage.map((each) => each.EventId)).toEqual(["e2", "e3"]);

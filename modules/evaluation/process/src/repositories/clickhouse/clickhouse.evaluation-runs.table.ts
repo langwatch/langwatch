@@ -44,6 +44,8 @@ export const evaluationRuns = defineClickHouseTable({
     LastAttemptAt: column.nullable(moment()),
     LastAttemptError: column.nullable(column.string()),
     NextAttemptAt: column.nullable(moment()),
+    /** Goose 00131: the KSUID layout of ProjectionId; NULL on rows written before it. */
+    IdLayout: column.nullable(column.lowCardinalityString()),
     _retention_days: column.uint16(),
     _size_bytes: column.uint32(),
   },

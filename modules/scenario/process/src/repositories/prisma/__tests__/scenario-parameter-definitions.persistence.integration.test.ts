@@ -126,6 +126,7 @@ describe.skipIf(!databaseUrl)("Scenario parameter definition persistence", () =>
       countRunsForExport: async () => 0,
       countUsage: async () => 0,
       getStoredBytes: async () => 0,
+      countStoredPastRetention: async () => 0,
       countOrganizationRuns: async () => 0,
       listRunsForExport: async () => ({ runs: [], hasMore: false }),
       queueRun: async () => {},
@@ -140,6 +141,7 @@ describe.skipIf(!databaseUrl)("Scenario parameter definition persistence", () =>
       recordAgentInstance: async () => {},
       recordCutAtLimit: async () => {},
       recordHooks: async () => {},
+      recordRedTeamReport: async () => {},
     } satisfies SimulationService;
 
     scenarios = ScenarioService.create({

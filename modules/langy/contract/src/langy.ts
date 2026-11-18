@@ -238,7 +238,9 @@ export class LangyCredentialResolutionError extends HandledError {
   }
 }
 
-const langyStoredBytesInputSchemaDefinition = z.object({ projectId: z.string().min(1) }).strict();
+const langyStoredBytesInputSchemaDefinition = z
+  .object({ projectId: z.string().min(1), beforeMs: z.number().int().nonnegative().optional() })
+  .strict();
 export interface LangyStoredBytesInputSchema extends Named<
   typeof langyStoredBytesInputSchemaDefinition
 > {}

@@ -33,6 +33,8 @@ import {
   type ExperimentRunAggregate,
   type ExperimentRunListInput,
   type ExperimentStoredBytesInput,
+  type ExperimentStoredPastRetentionInput,
+  experimentStoredPastRetentionInputSchema,
   type ExperimentRunLookup,
   type ExperimentRunPageInput,
   type ExperimentRunSlugPageInput,
@@ -79,6 +81,7 @@ import {
   ArchivedExperimentWriteError,
   type ExperimentRepository,
 } from "../repositories/experiment.repository.ts";
+import { summariseDspyRuns } from "../rules/experiment-dspy-runs.rules.ts";
 import { isPostgresUniqueConflict } from "../rules/postgres-unique-conflict.rules.ts";
 import { ExperimentSlugService } from "./experiment-slug.service.ts";
 
@@ -376,37 +379,7 @@ export class ExperimentService {
       input.tenantId,
       versionIds,
     );
-    const stepsByRun = new Map<string, ExperimentDspyStepSummary[]>();
-    for (const step of steps) {
-      const runSteps = stepsByRun.get(step.runId) ?? [];
-      runSteps.push(step);
-      stepsByRun.set(step.runId, runSteps);
-    }
-
-    return Array.from(stepsByRun, ([runId, runSteps]) => {
-      const versionId = runSteps.find((step) => step.workflowVersionId)?.workflowVersionId;
-
-      return {
-        runId,
-        workflow_version: versionId ? versions[versionId] : void 0,
-        steps: runSteps
-          .map((step) => ({
-            run_id: step.runId,
-            index: step.stepIndex,
-            score: step.score,
-            label: step.label,
-            optimizer: { name: step.optimizerName },
-            llm_calls_summary: {
-              total: step.llmCallsTotal,
-              total_tokens: step.llmCallsTotalTokens,
-              total_cost: step.llmCallsTotalCost,
-            },
-            timestamps: { created_at: step.createdAt },
-          }))
-          .toSorted((a, b) => a.timestamps.created_at - b.timestamps.created_at),
-        created_at: Math.min(...runSteps.map((step) => step.createdAt)),
-      };
-    }).toSorted((a, b) => b.created_at - a.created_at);
+    return summariseDspyRuns({ steps, versions });
   }
 
   async getDspyStep(input: ExperimentDspyStepLookup): Promise<ExperimentDspyStep> {
@@ -464,6 +437,13 @@ export class ExperimentService {
   /** Experiment's stored bytes for one project (ADR-202 Decided 20). */
   getStoredBytes(input: ExperimentStoredBytesInput): Promise<number> {
     return this.options.runRepository.getStoredBytes(experimentStoredBytesInputSchema.parse(input));
+  }
+
+  /** The project's runs a period of `retentionDays` would remove now, for data retention. */
+  countStoredPastRetention(input: ExperimentStoredPastRetentionInput): Promise<number> {
+    return this.options.runRepository.countStoredPastRetention(
+      experimentStoredPastRetentionInputSchema.parse(input),
+    );
   }
 
   getRunsPage(

@@ -4,5 +4,6 @@
  * cannot answer throws.
  */
 export interface StorageMeterRepository {
-  getEventLogBytes(input: { tenantId: string }): Promise<number>;
+  /** `beforeMs` keeps events that occurred earlier, for billing's storage past 90 days. */
+  getEventLogBytes(input: { tenantId: string; beforeMs?: number | undefined }): Promise<number>;
 }

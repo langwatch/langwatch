@@ -104,7 +104,9 @@ export type LogPreparation = {
   errors: string[];
 };
 
-const logStoredBytesInputSchemaDefinition = z.object({ projectId: z.string().min(1) }).strict();
+const logStoredBytesInputSchemaDefinition = z
+  .object({ projectId: z.string().min(1), beforeMs: z.number().int().nonnegative().optional() })
+  .strict();
 export interface LogStoredBytesInputSchema extends Named<
   typeof logStoredBytesInputSchemaDefinition
 > {}

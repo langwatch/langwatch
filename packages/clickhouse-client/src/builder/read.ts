@@ -220,6 +220,17 @@ const initialState = ({
 
 /** Refuses a table the scope may not read: tenants read tenant tables, metadata the allow-list. */
 function checkSource({ scope, table }: { scope: TenantScope; table: ClickHouseTableFacts }) {
+  // Every replica is read only on the system identity, and only of its allow-listed tables.
+  if (
+    table.cluster !== undefined &&
+    !(scope.kind === "allTenants" && readsSystemIdentityTable(table))
+  ) {
+    throw new QueryBuilderError({
+      kind: "table-outside-scope",
+      table: table.stored,
+      scope: scope.kind,
+    });
+  }
   if (table.kind === "derived") {
     if (DERIVED.get(table)?.scope !== scope) throw new QueryBuilderError({ kind: "foreign-scope" });
     return;
@@ -982,6 +993,20 @@ function tailClausesOf({
   ];
 }
 
+/** A table's stored name, or `clusterAllReplicas` over it, the cluster bound as an identifier. */
+function storedSourceOf({
+  table,
+  context,
+}: {
+  table: ClickHouseTableFacts;
+  context: RenderContext;
+}) {
+  if (table.cluster === undefined) return table.stored;
+  const binding = { paramType: "Identifier" };
+  const node: ValueNode = { kind: "value", value: table.cluster, binding };
+  return `clusterAllReplicas({${paramNameOf({ node, context })}:${binding.paramType}}, ${table.stored})`;
+}
+
 /** The FROM clause, and the scope's predicate on a one-table read; join sides carry their own. */
 function sourceOf({ state, context }: { state: ReadState; context: RenderContext }): {
   from: string | undefined;
@@ -997,7 +1022,7 @@ function sourceOf({ state, context }: { state: ReadState; context: RenderContext
       context.systemTables.add(table.stored);
     }
     return {
-      from: `${table.stored}${alias}${state.final ? " FINAL" : ""}`,
+      from: `${storedSourceOf({ table, context })}${alias}${state.final ? " FINAL" : ""}`,
       predicate: tenantPredicate({ state, table, context, election: false }),
     };
   }

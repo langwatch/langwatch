@@ -141,8 +141,8 @@ export class EvaluationService {
 
   /** Evaluation's stored bytes for one project (ADR-202 Decided 20). */
   getStoredBytes(input: EvaluationStoredBytesInput): Promise<number> {
-    const { projectId } = evaluationStoredBytesInputSchema.parse(input);
-    return this.options.repository.getStoredBytes({ tenantId: projectId });
+    const { projectId, beforeMs } = evaluationStoredBytesInputSchema.parse(input);
+    return this.options.repository.getStoredBytes({ tenantId: projectId, beforeMs });
   }
 
   /** A page of finished runs on a trace; a full page names where the next resumes. */

@@ -76,6 +76,7 @@ const unusedRunRepository: ExperimentRunRepository = {
   findRun: notReached,
   findWorkflowVersions: notReached,
   getStoredBytes: notReached,
+  countStoredPastRetention: notReached,
 };
 
 const unusedDspyRepository: ExperimentDspyRepository = {

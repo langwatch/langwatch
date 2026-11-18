@@ -87,6 +87,7 @@ import type {
   ScenarioRunConfig,
   ScenarioLookup,
   ScenarioStoredBytesInput,
+  ScenarioStoredPastRetentionInput,
 } from "./scenario.ts";
 import type {
   ScenarioDuplicateInput,
@@ -292,6 +293,7 @@ export interface ScenarioApi {
     projectId: string;
   }): Promise<{ id: string; name: string }[]>;
   findTestSuite(input: ScenarioTestSuiteIdInput): Promise<ScenarioTestSuite | null>;
+  /** With a `templateId`, refused with `LimitExceededError` once the Free suite cap is reached. */
   createTestSuite(input: ScenarioTestSuiteCreateInput): Promise<ScenarioTestSuite>;
   updateTestSuite(input: ScenarioTestSuiteUpdateInput): Promise<ScenarioTestSuite>;
   getTestSuiteRunDefinition(
@@ -310,9 +312,14 @@ export interface ScenarioApi {
   getById(input: ScenarioIdInput): Promise<Scenario>;
   /** The same read, archived rows included; a miss is `found: false`, not a refusal. */
   readByIdIncludingArchived(input: ScenarioIdInput): Promise<ScenarioLookup>;
+  /**
+   * `sourceTemplateId` marks a scenario a suite template apply creates: the Free scenario cap
+   * skips the check and never counts it. Every other create, a copy included, counts.
+   */
   create(
     input: Omit<ScenarioCreateInput, "lastUpdatedById">,
     by: ScenarioCaller,
+    options?: { sourceTemplateId?: string },
   ): Promise<Scenario>;
   update(
     input: Omit<ScenarioUpdateInput, "lastUpdatedById">,
@@ -451,6 +458,8 @@ export interface ScenarioApi {
   countUsage(input: { projectIds: readonly string[]; since?: number }): Promise<ScenarioUsageCount>;
   /** The sum of `_size_bytes` over scenario's own table for one project; a store failure throws. */
   getStoredBytes(input: ScenarioStoredBytesInput): Promise<number>;
+  /** Distinct runs started before `beforeMs` and kept longer than `retentionDays`, or forever. */
+  countStoredPastRetention(input: ScenarioStoredPastRetentionInput): Promise<number>;
 }
 
 export const ScenarioApi = moduleApi<ScenarioApi>()("scenario");

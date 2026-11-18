@@ -138,21 +138,26 @@ describe("event_log reads", () => {
       expect(read.statement.params).toMatchObject({ v2: 9_000, v3: 9_000, v4: "evt-9" });
     });
 
-    it("pages strictly after a cursor, capped at the page size", () => {
+    it("pages strictly after a cursor in page order, capped at the page size", () => {
       const read = aggregateEventsUpToRead({
         ...KEY,
         upToTimestamp: 9_000,
         upToEventId: "evt-9",
         occurredAtFromMs: 5_000,
-        page: { after: { timestamp: 7_000, eventId: "evt-7" }, limit: 500 },
+        page: {
+          after: { idempotencyKey: "key-7", timestamp: 7_000, eventId: "evt-7" },
+          limit: 500,
+        },
       });
 
       expectSingleTenant(read.statement);
       expect(read.declaresFullScan).toBeUndefined();
       expect(read.statement.sql).toMatch(
-        /\(EventTimestamp > \{v7:UInt64\} OR \(EventTimestamp = \{v8:UInt64\} AND EventId > \{v9:String\}\)\) ORDER BY EventTimestamp ASC, EventId ASC LIMIT 500$/,
+        /IdempotencyKey >= \{v\d+:String\} AND \(IdempotencyKey > \{v\d+:String\} OR EventTimestamp > \{v\d+:UInt64\} OR \(EventTimestamp = \{v\d+:UInt64\} AND EventId > \{v\d+:String\}\)\) ORDER BY IdempotencyKey ASC, EventTimestamp ASC, EventId ASC LIMIT 500$/,
       );
-      expect(read.statement.params).toMatchObject({ v7: 7_000, v8: 7_000, v9: "evt-7" });
+      expect(Object.values(read.statement.params)).toEqual(
+        expect.arrayContaining(["key-7", 7_000, "evt-7"]),
+      );
     });
 
     it("reads the first page with no cursor", () => {

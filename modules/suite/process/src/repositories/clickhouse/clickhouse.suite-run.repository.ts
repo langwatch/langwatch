@@ -140,9 +140,15 @@ export class ClickHouseSuiteRunRepository implements ProjectionStore<
   }
 
   /** One tenant's `_size_bytes` in `suite_runs`, every stored row counted, as the meter counts. */
-  async getStoredBytes({ tenantId }: { tenantId: string }): Promise<number> {
+  async getStoredBytes({
+    tenantId,
+    beforeMs,
+  }: {
+    tenantId: string;
+    beforeMs?: number | undefined;
+  }): Promise<number> {
     const { rows } = await this.options.clickhouse.read({
-      statement: ClickHouseSuiteRunRepository.storedBytesRead({ tenantId }),
+      statement: ClickHouseSuiteRunRepository.storedBytesRead({ tenantId, beforeMs }),
       table: TABLE_NAME,
       declaresFullScan: true,
     });
@@ -316,15 +322,20 @@ export class ClickHouseSuiteRunRepository implements ProjectionStore<
       .build();
   }
 
-  /** The tenant's summed `_size_bytes`, under the meter's thread and time caps. */
+  /** The tenant's summed `_size_bytes` under the meter's caps; `beforeMs` keeps older rows only. */
   static storedBytesRead({
     tenantId,
+    beforeMs,
   }: {
     tenantId: string;
+    beforeMs?: number | undefined;
   }): ReaderReadStatement<{ bytes: number | string }> {
-    return clickhouseRead({ scope: tenantScope.single({ tenantId }) })
+    const read = clickhouseRead({ scope: tenantScope.single({ tenantId }) })
       .from(suiteRuns)
-      .select({ bytes: fn.sum(suiteRuns._size_bytes) })
+      .select({ bytes: fn.sum(suiteRuns._size_bytes) });
+    return (
+      beforeMs === undefined ? read : read.where(({ lt }) => lt(suiteRuns.StartedAt, beforeMs))
+    )
       .settings(STORAGE_METER_READ_SETTINGS)
       .build();
   }

@@ -30,6 +30,7 @@ import {
   type EvaluationRunData,
   type TraceEvaluationData,
 } from "@langwatch/evaluation-contract";
+import { KSUID_LAYOUTS } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 import { z } from "zod";
@@ -69,6 +70,10 @@ const logger = createLogger("langwatch:evaluation:clickhouse.evaluation-run-read
 /** The NO-HOLDS defaults the attempt columns (goose 00122) read as until the target has them. */
 const NO_ATTEMPT_MOMENT = fn.nullAs(column.nullable(column.dateTime64({ precision: 3 })));
 const NO_ATTEMPT_ERROR = fn.nullAs(column.nullable(column.string()));
+/** Goose 00131's IdLayout reads as NULL ("v1-legacy") until the target has it. */
+const NO_ID_LAYOUT = fn.nullAs(column.nullable(column.string()));
+/** A stored IdLayout, which the builder reads as a plain string; absent reads as NULL. */
+const storedIdLayoutSchema = z.enum(KSUID_LAYOUTS).nullish();
 /** The light trace-evaluation read answers no inputs. */
 const NO_INPUTS = fn.nullAs(column.nullable(column.string()));
 
@@ -120,6 +125,7 @@ function runRowColumns(holds: (name: string) => boolean) {
     NextAttemptAtMs: fn.toUnixTimestamp64Milli(
       fn.heldOr(r.NextAttemptAt, { holds, otherwise: NO_ATTEMPT_MOMENT }),
     ),
+    IdLayout: fn.heldOr(r.IdLayout, { holds, otherwise: NO_ID_LAYOUT }),
     LastProcessedEventId: r.LastProcessedEventId,
     LastEventOccurredAtMs: fn.toUnixTimestamp64Milli(r.LastEventOccurredAt),
   };
@@ -134,6 +140,7 @@ function withRecordKeys<
     AttemptCount: ClickHouseEvaluationRunRow["Attempts"];
     LastAttemptErrorText: ClickHouseEvaluationRunRow["LastAttemptError"];
     LastEventOccurredAtMs: ClickHouseEvaluationRunRow["LastEventOccurredAt"];
+    IdLayout: string | null;
   },
 >(row: R) {
   return {
@@ -144,6 +151,7 @@ function withRecordKeys<
     Attempts: row.AttemptCount,
     LastAttemptError: row.LastAttemptErrorText,
     LastEventOccurredAt: row.LastEventOccurredAtMs,
+    IdLayout: storedIdLayoutSchema.parse(row.IdLayout) ?? null,
   };
 }
 
@@ -236,25 +244,38 @@ export class EvaluationRunClickHouseReadRepository {
   }
 
   /** One tenant's `_size_bytes` in `evaluation_runs`, every stored row counted. */
-  async getStoredBytes({ tenantId }: { tenantId: string }): Promise<number> {
+  async getStoredBytes({
+    tenantId,
+    beforeMs,
+  }: {
+    tenantId: string;
+    beforeMs?: number | undefined;
+  }): Promise<number> {
     const client = await this.options.resolveQueryClient(tenantId);
     const { rows } = await client.read({
-      statement: EvaluationRunClickHouseReadRepository.storedBytesRead({ tenantId }),
+      statement: EvaluationRunClickHouseReadRepository.storedBytesRead({ tenantId, beforeMs }),
       table: TABLE_NAME,
       declaresFullScan: true,
     });
     return Number(rows[0]?.bytes ?? 0);
   }
 
-  /** The tenant's summed `_size_bytes`, under the meter's thread and time caps. */
+  /** The tenant's summed `_size_bytes` under the meter's caps; `beforeMs` keeps older rows only. */
   static storedBytesRead({
     tenantId,
+    beforeMs,
   }: {
     tenantId: string;
+    beforeMs?: number | undefined;
   }): ReaderReadStatement<{ bytes: number | string }> {
-    return clickhouseRead({ scope: builtScope.single({ tenantId }) })
+    const read = clickhouseRead({ scope: builtScope.single({ tenantId }) })
       .from(evaluationRuns)
-      .select({ bytes: fn.sum(evaluationRuns._size_bytes) })
+      .select({ bytes: fn.sum(evaluationRuns._size_bytes) });
+    return (
+      beforeMs === undefined
+        ? read
+        : read.where(({ lt }) => lt(evaluationRuns.ScheduledAt, beforeMs))
+    )
       .settings(STORAGE_METER_READ_SETTINGS)
       .build();
   }
@@ -652,6 +673,7 @@ export class EvaluationRunClickHouseReadRepository {
       lastAttemptAt: toNumberOrNull(row.LastAttemptAtMs ?? null),
       lastAttemptError: row.LastAttemptError ?? null,
       nextAttemptAt: toNumberOrNull(row.NextAttemptAtMs ?? null),
+      idLayout: row.IdLayout ?? "v1-legacy",
     });
   }
 }

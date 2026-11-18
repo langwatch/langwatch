@@ -17,5 +17,8 @@ export abstract class LangyAnalyticsEventRepository {
   abstract insertBatch(records: LangyAnalyticsEventRecord[], retentionDays: number): Promise<void>;
 
   /** One tenant's stored bytes over its analytics rows, every stored row version counted. */
-  abstract getStoredBytes(input: { tenantId: string }): Promise<number>;
+  abstract getStoredBytes(input: {
+    tenantId: string;
+    beforeMs?: number | undefined;
+  }): Promise<number>;
 }

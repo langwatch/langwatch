@@ -127,7 +127,7 @@ export class LogModule implements LogApiContract {
   /** The pipeline this module registers, built once by {@link create}. */
   /** Log's stored bytes for one project, for data-retention's storage meter. */
   getStoredBytes(input: LogStoredBytesInput): Promise<number> {
-    return this.#logRecords.getStoredBytes({ tenantId: input.projectId });
+    return this.#logRecords.getStoredBytes({ tenantId: input.projectId, beforeMs: input.beforeMs });
   }
 
   eventingPipeline(): LogProcessingPipeline {

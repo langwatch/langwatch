@@ -228,24 +228,38 @@ export class ClickHouseCanonicalLogRecordAppendRepository extends CanonicalLogRe
   }
 
   /** One tenant's `_size_bytes` in `log_records`, every stored row counted, as the meter counts. */
-  async getStoredBytes({ tenantId }: { tenantId: string }): Promise<number> {
+  async getStoredBytes({
+    tenantId,
+    beforeMs,
+  }: {
+    tenantId: string;
+    beforeMs?: number | undefined;
+  }): Promise<number> {
     const { rows } = await this.clickhouse.read({
-      statement: ClickHouseCanonicalLogRecordAppendRepository.storedBytesRead({ tenantId }),
+      statement: ClickHouseCanonicalLogRecordAppendRepository.storedBytesRead({
+        tenantId,
+        beforeMs,
+      }),
       table: logRecords.$table.name,
       declaresFullScan: true,
     });
     return Number(rows[0]?.bytes ?? 0);
   }
 
-  /** The tenant's summed `_size_bytes`, under the meter's thread and time caps. */
+  /** The tenant's summed `_size_bytes` under the meter's caps; `beforeMs` keeps older rows only. */
   static storedBytesRead({
     tenantId,
+    beforeMs,
   }: {
     tenantId: string;
+    beforeMs?: number | undefined;
   }): ReaderReadStatement<{ bytes: number | string }> {
-    return clickhouseRead({ scope: tenantScope.single({ tenantId }) })
+    const read = clickhouseRead({ scope: tenantScope.single({ tenantId }) })
       .from(logRecords)
-      .select({ bytes: fn.sum(logRecords._size_bytes) })
+      .select({ bytes: fn.sum(logRecords._size_bytes) });
+    return (
+      beforeMs === undefined ? read : read.where(({ lt }) => lt(logRecords.TimeUnixMs, beforeMs))
+    )
       .settings(STORAGE_METER_READ_SETTINGS)
       .build();
   }

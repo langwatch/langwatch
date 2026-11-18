@@ -7,6 +7,7 @@ import {
   type RetroactiveMutationRecord,
   type RetroactiveProgressRecordedData,
 } from "@langwatch/data-retention-contract";
+import { freshnessOf } from "@langwatch/eventing";
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
@@ -122,11 +123,18 @@ export class RetroactiveRetentionService {
     return progressOf(await this.options.status.getForProject(input));
   }
 
-  /** Worker: folds one of the pipeline's facts into the project's status row. */
+  /** Worker: folds a fact into the project's status row; a redelivery never rewinds it. */
   async fold(input: { projectId: string; fact: RetroactiveFact }): Promise<void> {
     const status = await this.options.status.getForProject(input);
-    const next = foldRetroactiveStatus({ status, fact: input.fact });
-    if (next !== null) await this.options.status.save(next);
+    const alreadyApplied =
+      status.lastAppliedEventId !== "" &&
+      freshnessOf({
+        answerId: status.lastAppliedEventId,
+        hintId: input.fact.id,
+        scope: "aggregate",
+      }) === "fresh";
+    if (alreadyApplied) return;
+    await this.options.status.save(foldRetroactiveStatus({ status, fact: input.fact }));
   }
 
   /**

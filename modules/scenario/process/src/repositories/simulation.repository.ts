@@ -77,7 +77,16 @@ export abstract class SimulationRepository {
   abstract countRunsForExport(input: SimulationExportFilterInput): Promise<number>;
   abstract countUsage(input: { projectIds: readonly string[]; since?: number }): Promise<number>;
   abstract countOrganizationRuns(input: { projectIds: readonly string[] }): Promise<number>;
-  abstract getStoredBytes(input: { projectId: string }): Promise<number>;
+  abstract getStoredBytes(input: {
+    projectId: string;
+    beforeMs?: number | undefined;
+  }): Promise<number>;
+  /** Distinct runs started before `beforeMs` whose rows are kept longer than `retentionDays`. */
+  abstract countStoredPastRetention(input: {
+    projectId: string;
+    beforeMs: number;
+    retentionDays: number;
+  }): Promise<number>;
   abstract listRunsForExport(
     input: SimulationExportRunsInput,
   ): Promise<{ runs: SimulationExportRun[]; nextCursor?: string; hasMore: boolean }>;
@@ -150,6 +159,9 @@ export class NullSimulationRepository extends SimulationRepository {
     return 0;
   }
   async getStoredBytes(): Promise<number> {
+    return 0;
+  }
+  async countStoredPastRetention(): Promise<number> {
     return 0;
   }
   async listRunsForExport(): Promise<{
