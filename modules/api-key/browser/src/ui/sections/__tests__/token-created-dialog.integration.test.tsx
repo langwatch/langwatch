@@ -7,7 +7,7 @@ import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import { act, cleanup, fireEvent, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, type MockInstance, vi } from "vitest";
 
 import { ApiKeyHostProvider } from "../../../model/api-key-host.ts";
 import { FakeApiKeyHost } from "../../../testing.tsx";
@@ -505,14 +505,15 @@ describe("given a key has just been minted with a name", () => {
         item: (index: number) => (index === 0 ? rect : null),
         [Symbol.iterator]: () => [rect][Symbol.iterator](),
       });
-      renderDialog({ keyName: "Deploy pipeline" });
-      const errors = vi.spyOn(console, "error").mockImplementation(() => undefined);
-      const copyButton = screen.getByRole("button", { name: "Copy API key" });
-      // The focus trap sets up on real animation frames; let them run before faking timers.
-      await vi.waitFor(() => expect(document.activeElement).toBe(copyButton));
-
-      vi.useFakeTimers();
+      let errors: MockInstance | undefined;
       try {
+        renderDialog({ keyName: "Deploy pipeline" });
+        errors = vi.spyOn(console, "error").mockImplementation(() => undefined);
+        const copyButton = screen.getByRole("button", { name: "Copy API key" });
+        // The focus trap sets up on real animation frames; let them run before faking timers.
+        await vi.waitFor(() => expect(document.activeElement).toBe(copyButton));
+
+        vi.useFakeTimers();
         fireEvent.click(copyButton);
         await act(async () => {
           await vi.advanceTimersByTimeAsync(0);
@@ -530,7 +531,7 @@ describe("given a key has just been minted with a name", () => {
         expect(errors).not.toHaveBeenCalled();
       } finally {
         vi.useRealTimers();
-        errors.mockRestore();
+        errors?.mockRestore();
         layout.mockRestore();
       }
     });
