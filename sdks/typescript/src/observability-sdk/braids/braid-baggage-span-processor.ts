@@ -5,7 +5,7 @@
  */
 
 import { propagation, type Context } from "@opentelemetry/api";
-import type { ReadableSpan, Span, SpanProcessor } from "@opentelemetry/sdk-trace-base";
+import type { ReadableSpan, Span, SpanProcessor } from "@opentelemetry/sdk-trace";
 
 import { assertBraidEntryKey, BRAID_SIGNATURE_KEY } from "./braid-wire-format";
 

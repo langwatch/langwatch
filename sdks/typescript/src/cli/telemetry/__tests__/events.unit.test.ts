@@ -1,10 +1,10 @@
-import type { LoggerProviderConfig } from "@opentelemetry/sdk-logs";
+import type { LoggerProviderOptions } from "@opentelemetry/sdk-logs";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 const loggerEmit = vi.fn();
 const forceFlush = vi.fn<() => Promise<void>>();
 const shutdown = vi.fn<() => Promise<void>>();
-const loggerProviderConstructed = vi.fn<(config: LoggerProviderConfig) => void>();
+const loggerProviderConstructed = vi.fn<(config: LoggerProviderOptions) => void>();
 const exporterConstructed = vi.fn<(config: Record<string, unknown>) => void>();
 
 // The OTLP pipeline is mocked so a unit test can assert the thing that matters
@@ -14,7 +14,7 @@ const exporterConstructed = vi.fn<(config: Record<string, unknown>) => void>();
 // would test nothing.
 vi.mock("@opentelemetry/sdk-logs", () => ({
   LoggerProvider: class {
-    constructor(config: LoggerProviderConfig) {
+    constructor(config: LoggerProviderOptions) {
       loggerProviderConstructed(config);
     }
     getLogger() {

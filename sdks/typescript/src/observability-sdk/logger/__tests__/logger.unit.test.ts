@@ -1,4 +1,5 @@
-import { logs, createNoopLogger } from "@opentelemetry/api-logs";
+import { logs, createNoopLogger } from "@opentelemetry/api";
+import type * as otelApi from "@opentelemetry/api";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 import {
@@ -10,12 +11,12 @@ import {
 import { resetObservabilitySdkConfig, initializeObservabilitySdkConfig } from "../../config";
 import { type LangWatchLogRecord } from "../types";
 
-vi.mock("@opentelemetry/api-logs", () => ({
+// The logs API lives in `@opentelemetry/api` itself; only its logs surface is replaced.
+vi.mock("@opentelemetry/api", async (importOriginal) => ({
+  ...(await importOriginal<typeof otelApi>()),
   logs: {
     getLoggerProvider: vi.fn(),
   },
-  // `NoopLoggerProvider` was dropped from the package's public exports;
-  // `createNoopLogger` is its replacement.
   createNoopLogger: vi.fn().mockReturnValue({
     emit: vi.fn(),
     enabled: vi.fn().mockReturnValue(false),

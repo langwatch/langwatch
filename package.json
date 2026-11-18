@@ -71,6 +71,7 @@
   "devDependencies": {
     "@nx/js": "23.2.1",
     "@opentelemetry/api": "catalog:",
+    "@opentelemetry/core": "catalog:",
     "@testing-library/jest-dom": "catalog:",
     "@types/node": "catalog:",
     "@types/react": "catalog:",

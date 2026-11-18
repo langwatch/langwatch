@@ -3,15 +3,14 @@ import {
   type LoggerOptions,
   type LoggerProvider,
   createNoopLogger,
-} from "@opentelemetry/api-logs";
+} from "@opentelemetry/api";
 
 import { LangWatchLoggerInternal } from "./implementation";
 import { type LangWatchLogger } from "./types";
 
 /**
- * `NoopLoggerProvider` was dropped from @opentelemetry/api-logs' public exports
- * (0.221) in favour of the still-exported `createNoopLogger`, so this is its
- * replacement: a provider whose loggers are always the shared no-op logger.
+ * `@opentelemetry/api` exports `createNoopLogger` but no `NoopLoggerProvider`,
+ * so this is one: a provider whose loggers are always the shared no-op logger.
  */
 const NOOP_LOGGER_PROVIDER: LoggerProvider = {
   getLogger: (_name: string, _version?: string, _options?: LoggerOptions) => createNoopLogger(),

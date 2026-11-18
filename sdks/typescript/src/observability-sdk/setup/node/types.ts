@@ -13,7 +13,7 @@ import {
   type Sampler,
   type SpanLimits,
   type IdGenerator,
-} from "@opentelemetry/sdk-trace-base";
+} from "@opentelemetry/sdk-trace";
 
 import { type Logger } from "../../../logger";
 import { type BraidOptions } from "../../braids";

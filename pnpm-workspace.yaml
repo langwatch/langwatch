@@ -212,6 +212,19 @@ catalogMode: strict
 catalogs:
   sdk-toolchain:
     typescript: ^6.0.3
+  # The published SDK runs OpenTelemetry JS 3.x (api 1.10); the apps stay on 2.x.
+  sdk-otel:
+    '@opentelemetry/api': ~1.10.0
+    '@opentelemetry/context-async-hooks': 3.1.1
+    '@opentelemetry/core': 3.1.1
+    '@opentelemetry/exporter-logs-otlp-proto': 0.301.1
+    '@opentelemetry/exporter-trace-otlp-proto': 0.301.1
+    '@opentelemetry/instrumentation': 0.301.1
+    '@opentelemetry/otlp-exporter-base': 0.301.1
+    '@opentelemetry/resources': 3.1.1
+    '@opentelemetry/sdk-logs': 3.1.1
+    '@opentelemetry/sdk-metrics': 3.1.1
+    '@opentelemetry/sdk-trace': 3.1.1
 
 linkWorkspacePackages: false
 workspaceConcurrency: 2
@@ -289,6 +302,7 @@ overrides:
   '@langwatch/scenario': file:./vendor/langwatch-scenario-1.7.0-dev.voice10.tgz
   '@langwatch/scenario@1.7.0-dev.voice10>langwatch': 2.2.0
   '@langwatch/scenario@1.7.0-dev.voice10>@opentelemetry/api': ~1.9.1
+  'langwatch@2.2.0>@opentelemetry/exporter-trace-otlp-grpc': 0.221.0
   '@modelcontextprotocol/client@>=2.0.0 <2.2.0': '>=2.2.0 <3'
   '@modelcontextprotocol/sdk>@hono/node-server': '>=2.0.10'
   '@modelcontextprotocol/sdk@>=1.10.0 <1.32.0': '>=1.32.0 <2'

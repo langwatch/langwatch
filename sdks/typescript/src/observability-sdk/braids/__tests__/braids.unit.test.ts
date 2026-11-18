@@ -13,10 +13,10 @@ import {
   W3CTraceContextPropagator,
 } from "@opentelemetry/core";
 import {
-  BasicTracerProvider,
+  TracerProvider,
   InMemorySpanExporter,
   SimpleSpanProcessor,
-} from "@opentelemetry/sdk-trace-base";
+} from "@opentelemetry/sdk-trace";
 import { describe, expect, it } from "vitest";
 
 import { BraidBaggageSpanProcessor, BraidSigningError, BRAID_SIGNATURE_KEY } from "..";
@@ -157,10 +157,10 @@ describe("braid signing", () => {
 describe("BraidBaggageSpanProcessor", () => {
   function startSpanUnder({ copyEntries, ctx }: { copyEntries: string[]; ctx: Context }) {
     const exporter = new InMemorySpanExporter();
-    const provider = new BasicTracerProvider({
+    const provider = new TracerProvider({
       spanProcessors: [
         new BraidBaggageSpanProcessor({ copyEntries }),
-        new SimpleSpanProcessor(exporter),
+        new SimpleSpanProcessor({ exporter }),
       ],
     });
     provider.getTracer("braids-test").startSpan("called", {}, ctx).end();
@@ -201,10 +201,10 @@ describe("BraidBaggageSpanProcessor", () => {
       wire.inject(calling, headers, defaultTextMapSetter);
 
       const exporter = new InMemorySpanExporter();
-      const called = new BasicTracerProvider({
+      const called = new TracerProvider({
         spanProcessors: [
           new BraidBaggageSpanProcessor({ copyEntries: ["orchestrator"] }),
-          new SimpleSpanProcessor(exporter),
+          new SimpleSpanProcessor({ exporter }),
         ],
       }).getTracer("called-service");
       const received = wire.extract(ROOT_CONTEXT, headers, defaultTextMapGetter);

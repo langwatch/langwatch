@@ -1,5 +1,5 @@
 import { SpanStatusCode, trace } from "@opentelemetry/api";
-import { InMemorySpanExporter, SimpleSpanProcessor } from "@opentelemetry/sdk-trace-base";
+import { InMemorySpanExporter, SimpleSpanProcessor } from "@opentelemetry/sdk-trace";
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 
 import { createLangWatchSpan } from "../..";
@@ -63,7 +63,7 @@ describe("Span Integration Tests", () => {
     vi.resetModules();
 
     spanExporter = new InMemorySpanExporter();
-    spanProcessor = new SimpleSpanProcessor(spanExporter);
+    spanProcessor = new SimpleSpanProcessor({ exporter: spanExporter });
 
     observabilityHandle = createIntegrationObservability({
       serviceName: "span-integration-test",
