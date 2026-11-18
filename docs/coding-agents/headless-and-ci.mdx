@@ -114,10 +114,10 @@ Put the same `env` block in it that [Manual OpenTelemetry setup](/coding-agents/
 
 The Sessions page names a session by the title the agent generated or by the first line of its first prompt. A background agent often starts every session with the same scripted text, so its sessions all get the same name, or none.
 
-To name them yourself, add `langwatch.session.name` to the resource attributes the agent exports with:
+To name them yourself, add `langwatch.session.name` to the resource attributes the agent exports with. Keep the ones already in `OTEL_RESOURCE_ATTRIBUTES`, such as `service.name=claude-code`, and append the name after a comma:
 
 ```bash
-export OTEL_RESOURCE_ATTRIBUTES="service.name=claude-code,langwatch.session.name=nightly-maintenance"
+export OTEL_RESOURCE_ATTRIBUTES="${OTEL_RESOURCE_ATTRIBUTES:+$OTEL_RESOURCE_ATTRIBUTES,}langwatch.session.name=nightly-maintenance"
 ```
 
 Every session the agent starts is then listed under that name. When the LangWatch hooks report a name the harness holds, such as one from Claude Code's `--name` or `/rename`, that name replaces it.
