@@ -42,7 +42,7 @@ describe("runNurturingMemberBackfill", () => {
 
       expect(await rows(members)).toEqual([]);
       expect(outcome).toEqual({
-        dryRun: { organizations: 2, memberships: 3, created: 3, alreadyPresent: 0 },
+        dryRun: { organizations: 2, memberships: 3, created: 3, alreadyPresent: 0, aborted: false },
         executed: null,
       });
     });
@@ -65,6 +65,7 @@ describe("runNurturingMemberBackfill", () => {
         memberships: 3,
         created: 3,
         alreadyPresent: 0,
+        aborted: false,
       });
     });
 
@@ -118,6 +119,7 @@ describe("runNurturingMemberBackfill", () => {
       });
 
       expect(outcome.executed).toBeNull();
+      expect(outcome.dryRun.aborted).toBe(true);
       expect(await rows(members)).toEqual([]);
     });
   });

@@ -1,13 +1,20 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import type { CioBatchCall, NurturingSignalOf } from "@langwatch/enterprise-nurturing-contract";
+import { createLogger } from "@langwatch/observability";
 
 import type { NurturingOrganizationMemberRepository } from "../repositories/nurturing-organization-member.repository.ts";
 import type { NurturingOrganizationPlanRepository } from "../repositories/nurturing-organization-plan.repository.ts";
-import { membersWhoseLatestOrganizationIsElsewhere } from "../rules/nurturing-organization-member.rules.ts";
+import {
+  isCurrentMembership,
+  type NurturingMembership,
+  membersWhoseLatestOrganizationIsElsewhere,
+} from "../rules/nurturing-organization-member.rules.ts";
 import { planFactChangesCopy } from "../rules/nurturing-organization-plan.rules.ts";
 import { fireSubscriptionSync } from "../rules/nurturing-subscription-sync-service.rules.ts";
 import type { NurturingMemberFactsService } from "./nurturing-member-facts.service.ts";
 import type { NurturingService } from "./nurturing.service.ts";
+
+const logger = createLogger("langwatch:nurturing:plan-sync");
 
 /** A catch-up fact reached a deployment with no Customer.io key; it fails so it can be replayed. */
 export class NoCustomerIoChannelError extends Error {
@@ -97,6 +104,40 @@ export class NurturingPlanSyncService {
       memberships,
       organizationId,
     });
-    return fireSubscriptionSync({ ...signal, admin, elsewhereMemberUserIds });
+    // A catch-up fact is only trusted for members the copy holds a current row for: without the
+    // member backfill a paid-team member with their own free org would be told free. Live facts
+    // keep identifying every member.
+    const noCopyRowMemberUserIds = signal.fromCatchUp
+      ? this.membersWithoutCopyRow({ memberships, memberUserIds, organizationId })
+      : [];
+    if (noCopyRowMemberUserIds.length > 0) {
+      logger.info(
+        { organizationId, skippedMembers: noCopyRowMemberUserIds.length },
+        "catch-up skipped members with no member-copy row; run nurturing-member-backfill first",
+      );
+    }
+    return fireSubscriptionSync({
+      ...signal,
+      admin,
+      elsewhereMemberUserIds: [...elsewhereMemberUserIds, ...noCopyRowMemberUserIds],
+    });
+  }
+
+  private membersWithoutCopyRow({
+    memberships,
+    memberUserIds,
+    organizationId,
+  }: Readonly<{
+    memberships: readonly NurturingMembership[];
+    memberUserIds: readonly string[];
+    organizationId: string;
+  }>): string[] {
+    const withRow = new Set(
+      memberships
+        .filter((membership) => membership.organizationId === organizationId)
+        .filter(isCurrentMembership)
+        .map(({ userId }) => userId),
+    );
+    return memberUserIds.filter((userId) => !withRow.has(userId));
   }
 }

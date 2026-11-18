@@ -119,7 +119,16 @@ describe("NurturingPlanSyncService", () => {
 
   describe("when the resync's newer catch-up fact meets an older real one", () => {
     it("sends the catch-up's plan and replaces the copy, so the resync corrects a wrong plan", async () => {
-      const { planSync, sent, plans } = planSyncOver();
+      const members = MemoryNurturingOrganizationMemberRepository.create();
+      for (const userId of change.memberUserIds) {
+        await members.recordMembershipChange({
+          organizationId: "org-1",
+          userId,
+          change: "joined",
+          at: 1_000,
+        });
+      }
+      const { planSync, sent, plans } = planSyncOver(members);
       await planSync.planChanged({ ...change, plan: "FREE" });
       sent.length = 0;
 
@@ -134,8 +143,38 @@ describe("NurturingPlanSyncService", () => {
     });
   });
 
+  describe("when a catch-up fact meets a member the copy holds no row for", () => {
+    /** @scenario "A catch-up fact identifies no member without a member-copy row, a live one still does" */
+    it("identifies only the member with a row, still groups the admin, and a live fact identifies both", async () => {
+      const members = MemoryNurturingOrganizationMemberRepository.create();
+      await members.recordMembershipChange({
+        organizationId: "org-1",
+        userId: "user-1",
+        change: "joined",
+        at: 1_000,
+      });
+      const catchUp = planSyncOver(members);
+
+      await catchUp.planSync.planCaughtUp({ ...change, fromCatchUp: true });
+
+      expect(catchUp.sent.flat().map(({ type, userId }) => [type, userId])).toEqual([
+        ["group", "admin-1"],
+        ["identify", "user-1"],
+      ]);
+      const live = planSyncOver(members);
+
+      await live.planSync.planChanged(change);
+
+      expect(live.sent.flat().map(({ type, userId }) => [type, userId])).toEqual([
+        ["group", "admin-1"],
+        ["identify", "user-1"],
+        ["identify", "user-2"],
+      ]);
+    });
+  });
+
   describe("when a person is in a paid team and their own free organization", () => {
-    /** @scenario "A person in a paid team and their own free org is never told free by the resync" */
+    /** @scenario "A person whose paid team is their latest join is never told free by the resync" */
     it.each([
       ["paid team's fact first", ["org-a", "org-b"]],
       ["free organization's fact first", ["org-b", "org-a"]],

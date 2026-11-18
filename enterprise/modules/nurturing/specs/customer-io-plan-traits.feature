@@ -4,6 +4,10 @@ Feature: Customer.io knows each team's real plan
   plan; nurturing never reads billing (ADR-001). A renewal or a seat change records no fact.
   Nurturing folds each fact into its own plan copy and tells Customer.io only a fact that changes it.
 
+  Run nurturing-member-backfill --execute first. If the resync runs first, it identifies no member
+  without a member-copy row (the org's group call still carries the plan), so the wrong order sends
+  nothing wrong.
+
   @unit
   Scenario: A started subscription tells Customer.io the plan on members and company
     Given an organization with two active members whose subscription became active on a paid plan
@@ -155,11 +159,20 @@ Feature: Customer.io knows each team's real plan
     And a re-run starts from the start
 
   @unit
-  Scenario: A person in a paid team and their own free org is never told free by the resync
+  Scenario: A person whose paid team is their latest join is never told free by the resync
     Given the member copy is empty and a person joined their own free organization, then a paid one
     When the member backfill runs and then both organizations' catch-up facts are delivered in either order
     Then the person is identified once, with the paid plan
     And the free organization's fact sends only its company call
+
+  @unit
+  Scenario: A catch-up fact identifies no member without a member-copy row, a live one still does
+    Given an organization with two members, one with a current member-copy row and one without
+    When the resync's catch-up fact for it is delivered
+    Then only the member with a row is identified
+    And the group call still carries the plan to the organization's admin
+    And the skipped member is counted and logged
+    And a live fact for the same organization identifies both members
 
   @unit
   Scenario: No request carries more than a hundred members

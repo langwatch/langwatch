@@ -488,4 +488,4 @@ Run by the tasks process, before serve.
 
 | Task                      | When and how                                                                                           |
 | ------------------------- | ------------------------------------------------------------------------------------------------------ |
-| `customer-io-plan-resync` | Run after the rollout; dry run unless `--execute`; running it against production needs the owner's go. |
+| `customer-io-plan-resync` | Run after the rollout and after `nurturing-member-backfill --execute`: if it runs first, it identifies no member without a member-copy row (the org's group call still carries the plan), so the wrong order sends nothing wrong; dry run unless `--execute`; running it against production needs the owner's go. |

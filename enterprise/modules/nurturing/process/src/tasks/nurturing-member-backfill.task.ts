@@ -10,10 +10,15 @@ import {
 
 const logger = createLogger("langwatch:task:nurturing-member-backfill");
 
+export type NurturingMemberBackfillReport = NurturingMemberBackfillTotals & {
+  /** True when the signal stopped the run, so the totals are partial. */
+  aborted: boolean;
+};
+
 export type NurturingMemberBackfillOutcome = {
-  dryRun: NurturingMemberBackfillTotals;
+  dryRun: NurturingMemberBackfillReport;
   /** Null without `--execute`. */
-  executed: NurturingMemberBackfillTotals | null;
+  executed: NurturingMemberBackfillReport | null;
 };
 
 /**
@@ -32,8 +37,14 @@ export async function runNurturingMemberBackfill({
 }): Promise<NurturingMemberBackfillOutcome> {
   const service = NurturingMemberBackfillService.create({ peers });
 
-  const dryRun = await service.backfill({ dryRun: true, signal });
-  logger.info({ report: dryRun }, "Nurturing member backfill dry run");
+  const dryRun = {
+    ...(await service.backfill({ dryRun: true, signal })),
+    aborted: signal.aborted,
+  };
+  logger.info(
+    { report: dryRun },
+    `Nurturing member backfill dry run: ${dryRun.created} members have no member-copy row; the plan resync will skip them until this runs with --execute`,
+  );
   if (!execute) {
     logger.info("This is a dry run. Re-run with --execute to write.");
     return { dryRun, executed: null };
@@ -43,7 +54,10 @@ export async function runNurturingMemberBackfill({
     return { dryRun, executed: null };
   }
 
-  const executed = await service.backfill({ dryRun: false, signal });
+  const executed = {
+    ...(await service.backfill({ dryRun: false, signal })),
+    aborted: signal.aborted,
+  };
   logger.info({ report: executed }, "Nurturing member backfill wrote");
   return { dryRun, executed };
 }

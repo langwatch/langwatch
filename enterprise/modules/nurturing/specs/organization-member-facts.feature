@@ -246,3 +246,9 @@ Feature: An organization's session facts reach every active member in Customer.i
     Given the member copy holds a leave for a person the owners still list
     When the member backfill runs with --execute
     Then the person's row still records the leave and is not current
+
+  @integration
+  Scenario: The member backfill skips disabled members and deactivated users
+    Given an organization with an active member, a member whose membership is disabled and a member whose user is deactivated
+    When the owners' active members of that organization are read
+    Then only the active member is listed

@@ -210,7 +210,7 @@ describe("NurturingDeliveryService, delivering billing's subscription_changed fa
       expect(sent).toEqual(requestsFor({ plan: "launch", hasSubscription: true }));
     });
 
-    it("does the same for a catch-up fact", async () => {
+    it("skips that member for a catch-up fact, which still groups the admin", async () => {
       const cio = recordingCustomerIo();
       const members = await memberCopyOf({ organizationId: "org-1", userIds: ["user-1"] });
       const delivery = await deliveryOver({ customerIo: cio.service, members });
@@ -220,7 +220,6 @@ describe("NurturingDeliveryService, delivering billing's subscription_changed fa
       expect(cio.sent.flat().map(({ type, userId }) => [type, userId])).toEqual([
         ["group", "admin-1"],
         ["identify", "user-1"],
-        ["identify", "user-2"],
       ]);
     });
   });
