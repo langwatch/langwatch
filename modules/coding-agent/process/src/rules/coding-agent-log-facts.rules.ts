@@ -9,6 +9,7 @@ import {
   LOGS_REQUIRE_SESSION_KEY_AGENT_IDS,
   normalizeEventName,
   pickDeclaredCodingAgent,
+  SESSION_NAME_FACT_KEY,
   SESSION_TITLE_FACT_KEY,
   SESSION_TITLE_FALLBACK_FACT_KEY,
 } from "@langwatch/coding-agent-contract";
@@ -166,6 +167,11 @@ function stampResourceIdentity({
   const entrypoint = resourceAttributes?.["app.entrypoint"];
   if (facts["app.entrypoint"] === undefined && typeof entrypoint === "string" && entrypoint) {
     facts["app.entrypoint"] = entrypoint;
+  }
+  // A launcher names its sessions through OTEL_RESOURCE_ATTRIBUTES; the record's own name wins.
+  const sessionName = resourceAttributes?.[SESSION_NAME_FACT_KEY];
+  if (facts[SESSION_NAME_FACT_KEY] === undefined && typeof sessionName === "string") {
+    if (sessionName.trim() !== "") facts[SESSION_NAME_FACT_KEY] = sessionName;
   }
 }
 
