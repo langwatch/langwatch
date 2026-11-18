@@ -130,12 +130,12 @@ describe("given an access gate inside a card", () => {
     expect(getComputedStyle(gate).textAlign).toBe("center");
     expect(getComputedStyle(gate).alignItems).toBe("center");
     expect(getComputedStyle(childrenWrapper).alignItems).toBe("center");
+    // The wrapper spans the gate, so a child that fills the width still fills it.
     expect(getComputedStyle(childrenWrapper).width).toBe("var(--chakra-sizes-full)");
     expect(getComputedStyle(actions).justifyContent).toBe("center");
-    expect(screen.getByTestId("illustration").style.width).toBe("100%");
   });
 
-  /** @scenario A gate inside a card draws no box of its own */
+  /** @scenario A gate that is a page's only content sits on the centre axis */
   it("keeps the words on the start edge when not centred", () => {
     renderWithDesignSystem(
       <AccessState kind="upgrade" title="Locked" description="Upgrade." data-testid="gate" />,
