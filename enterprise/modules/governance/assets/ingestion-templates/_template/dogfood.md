@@ -1,6 +1,6 @@
 # Dogfood ritual — `<TEMPLATE_SLUG>`
 
-> **Starter file. Each tile copies this beside `_template` as `<TEMPLATE_SLUG>/dogfood.md`** and replaces every `<TEMPLATE_SLUG>` occurrence with its own slug (`claude_code` / `cursor` / `claude_cowork` / `raw_otlp_advanced`). Per-tile customization sections are marked `<TEMPLATE-SPECIFIC: …>`.
+> **Starter file. Each tile copies this beside `_template` as `<TEMPLATE_SLUG>/dogfood.md`** and replaces every `<TEMPLATE_SLUG>` occurrence with its own slug (`claude_code` / `cursor` / `claude_cowork` / `raw_otlp_advanced`). Per-tile customization sections are marked `<TEMPLATE-SPECIFIC: …>`. `<PERSONAL_PROJECT_SLUG>` is the signed-in user's personal project: the **Traces** entry of the Coding agents sidebar opens `/<PERSONAL_PROJECT_SLUG>/traces`.
 
 This ritual is the **acceptance gate** for the `<TEMPLATE_SLUG>` tile shipping green-checked in `/coding-agents`. **No tile turns green until BOTH the fixture track AND the real-user track below have been run end-to-end with screenshots in the PR body.** Same B6 discipline rchaves bug-bashed the dashboard chrome with.
 
@@ -19,7 +19,7 @@ Two parts of the spec'd ritual are deferred to v1.1 / v2 per @sergey's lane-S ch
 | `gateway.template_ottl_protected_field_attempt` audit row                                                                                 | 🟡 deferred to v1.1 / v2                    | same as above                                                                                                                                                                                                                                   |
 | Template OTTL transform                                                                                                                   | 🟡 deferred to v2 (admin-OTTL authoring UI) | v1 platform templates rely on the upstream tool emitting canonical gen_ai already (Claude Code / Cursor / claude_cowork all do). The receiver passthrough produces the canonical shape without OTTL involvement v1.                             |
 
-**v1 effectively proves**: real upstream tool with canonical gen_ai → user's binding token → receiver auth → personal-project tenancy → /coding-agents/traces with cost/tokens/model populated. That's the headline use case.
+**v1 effectively proves**: real upstream tool with canonical gen_ai → user's binding token → receiver auth → personal-project tenancy → `/<PERSONAL_PROJECT_SLUG>/traces` with cost/tokens/model populated. That's the headline use case.
 
 **v1 explicitly does NOT prove**: provenance-key stamping (sergey deferred), OTTL transform correctness (no v1 template runs OTTL), or admin-OTTL forge rejection audit row (deferred).
 
@@ -31,10 +31,10 @@ When running this ritual on v1, mark deferred steps as **"blocked on sergey's pr
 
 Two parallel tracks. Both must pass (modulo the deferred-step exemptions above). **Fixture-only sign-off is forbidden.** Per `feedback_fixtures_dont_replace_real_user_dogfood.md`: fixtures lie when the real path has friction the fixture skipped — broken OAuth redirects, OTTL not loading at runtime, drawer copy mismatched, bound credentials not wired through to receiver auth, etc. Fixtures catch parser correctness; only the real path catches flow correctness.
 
-| Track               | What it proves                                                                                                                                                                                              | Tools                                                                                                                                    | When to run                                                                   |
-| ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
-| **Fixture track**   | Receiver/parser handles the canonical post-OTTL shape; principal-field guard rejects forge attempts                                                                                                         | `scripts/dogfood/governance/emit-otlp.sh` + `payloads/<slug>.json` + `forge-attempt/{attribution,provenance}.json`                       | Every commit that touches receiver/OTTL/principal-guard code; runs in seconds |
-| **Real-user track** | The actual user flow works end-to-end — admin publishes via UI, user installs via UI form, real upstream tool emits, receiver auth + OTTL + cost extraction all wire through, /coding-agents/traces shows parsed trace | Real admin UI + real `/coding-agents` install drawer + real upstream tool (Claude Code / Cursor / Claude cowork session) + real `/coding-agents/traces` browse | Before tile ships green; before claiming feature works                        |
+| Track               | What it proves                                                                                                                                                                                                                     | Tools                                                                                                                                                                    | When to run                                                                   |
+| ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------- |
+| **Fixture track**   | Receiver/parser handles the canonical post-OTTL shape; principal-field guard rejects forge attempts                                                                                                                                | `scripts/dogfood/governance/emit-otlp.sh` + `payloads/<slug>.json` + `forge-attempt/{attribution,provenance}.json`                                                       | Every commit that touches receiver/OTTL/principal-guard code; runs in seconds |
+| **Real-user track** | The actual user flow works end-to-end — admin publishes via UI, user installs via UI form, real upstream tool emits, receiver auth + OTTL + cost extraction all wire through, `/<PERSONAL_PROJECT_SLUG>/traces` shows parsed trace | Real admin UI + real `/coding-agents` install drawer + real upstream tool (Claude Code / Cursor / Claude cowork session) + real `/<PERSONAL_PROJECT_SLUG>/traces` browse | Before tile ships green; before claiming feature works                        |
 
 **Report both tracks side by side.** If real-user can't be done yet (e.g., upstream tool wrapper not built, OAuth provider not wired), say **"blocked on X"** explicitly so the dependency is visible.
 
@@ -107,11 +107,11 @@ Expected: `ok http://localhost:5560/api/otel/v1/traces — template:<TEMPLATE_SL
 
 If the wrapper returns non-2xx, capture the response body (`--verbose`) and treat as **blocker** — the receiver-side wiring is broken.
 
-**Verify-landing > verify-response.** A 2xx receiver response is necessary but NOT sufficient. The OTLP path can return `200 status + partialSuccess.rejectedSpans=N` which silently drops the span (e.g., timestamp past the SPAN_MAX_PAST_MS cutoff, body schema mismatch, etc.). The wrapper SHOULD surface rejectedSpans loudly when it sees them; if it doesn't, you'll see a clean `ok status=200` for spans that never landed. Always do Step 4 (verify the trace appears at /coding-agents/traces) before signing the wrapper response off as success. See `feedback_fixture_wrapper_time_anchor_and_2xx_drop_guard.md`.
+**Verify-landing > verify-response.** A 2xx receiver response is necessary but NOT sufficient. The OTLP path can return `200 status + partialSuccess.rejectedSpans=N` which silently drops the span (e.g., timestamp past the SPAN_MAX_PAST_MS cutoff, body schema mismatch, etc.). The wrapper SHOULD surface rejectedSpans loudly when it sees them; if it doesn't, you'll see a clean `ok status=200` for spans that never landed. Always do Step 4 (verify the trace appears at `/<PERSONAL_PROJECT_SLUG>/traces`) before signing the wrapper response off as success. See `feedback_fixture_wrapper_time_anchor_and_2xx_drop_guard.md`.
 
-### Step 4 — Trace lands on `/coding-agents/traces` with canonical shape
+### Step 4 — Trace lands on `/<PERSONAL_PROJECT_SLUG>/traces` with canonical shape
 
-Open `/coding-agents/traces` filtered by `langwatch.source = "<TEMPLATE_SLUG>"`. Verify the trace from step 3 appears within 5 seconds.
+Open `/<PERSONAL_PROJECT_SLUG>/traces` filtered by `langwatch.source = "<TEMPLATE_SLUG>"`. Verify the trace from step 3 appears within 5 seconds.
 
 Click into the trace and verify:
 
@@ -134,7 +134,7 @@ Click into the trace and verify:
 
 The 'NOT template-OTTL-stamped' assertion on attribution + provenance keys is the load-bearing invariant — verified directly via the forge ritual in step 6.
 
-### Step 5 — Source filter on `/coding-agents/traces` is trustworthy
+### Step 5 — Source filter on `/<PERSONAL_PROJECT_SLUG>/traces` is trustworthy
 
 If multiple bindings exist for the same user, verify filtering by `langwatch.source = "<TEMPLATE_SLUG>"` shows ONLY this template's traces and excludes other templates'.
 
@@ -158,7 +158,7 @@ Re-emit using the forge fixtures. **Both variants must run.**
 
 Verify (per `template-ottl-principal-guard.feature`):
 
-- The trace lands at `/coding-agents/traces` (receiver does NOT 4xx the request — it accepts but re-stamps)
+- The trace lands at `/<PERSONAL_PROJECT_SLUG>/traces` (receiver does NOT 4xx the request — it accepts but re-stamps)
 - `langwatch.user.id` == binding-authoritative jane's id, NOT the `FORGE_user_other` claim from the payload
 - `langwatch.template.id` == binding-authoritative `<TEMPLATE_SLUG>` template id, NOT `FORGE_template_other`
 - `langwatch.source` == binding-authoritative `<TEMPLATE_SLUG>`, NOT `FORGE_source_other`
@@ -228,9 +228,9 @@ Run the same 7-step structure but **using the real UI for clicks, the real upstr
   - `raw_otlp_advanced` → discovery card on /coding-agents Trace Ingest section that deep-links to /coding-agents/configure#otlp; user grabs the personal project apiKey + runs any OTel-instrumented script (Python `opentelemetry-instrument`, Node `@opentelemetry/sdk-node`). This one IS dogfoodable today; no IngestionTemplate row exists for it (per andre PM call at 348936e4f).
 - Capture the upstream tool's output (terminal log, "trace exported" confirmation)
 
-### R4 — Verify trace lands at `/coding-agents/traces` with canonical shape
+### R4 — Verify trace lands at `/<PERSONAL_PROJECT_SLUG>/traces` with canonical shape
 
-- Navigate to `/coding-agents/traces` filtered by `langwatch.source = "<TEMPLATE_SLUG>"`
+- Navigate to `/<PERSONAL_PROJECT_SLUG>/traces` filtered by `langwatch.source = "<TEMPLATE_SLUG>"`
 - Verify the trace from R3 appears within ~10 seconds (real upstream tool's batch flush is slower than fixture)
 - Click into the trace and verify the SAME canonical fields as fixture-track Step 4:
   - `gen_ai.usage.input_tokens` + `output_tokens` populated **from the real upstream response** (NOT the fixture's hardcoded numbers)
@@ -244,9 +244,9 @@ If the trace doesn't appear OR cost is missing OR attribution is wrong, that's a
 ### R5 — Cross-user isolation (real, not fixture)
 
 - Sign out, sign in as a SECOND real user (different persona, different personal project)
-- Navigate to that user's `/coding-agents/traces`
+- Navigate to that user's `/<PERSONAL_PROJECT_SLUG>/traces`
 - Verify the first user's trace from R4 does NOT appear under any filter (no `<TEMPLATE_SLUG>`, no global view, no admin probe-as-user)
-- **Screenshot**: `<TEMPLATE_SLUG>-real-cross-user-isolation.png` showing second user's empty `/coding-agents/traces` (or only their own bindings' traces)
+- **Screenshot**: `<TEMPLATE_SLUG>-real-cross-user-isolation.png` showing second user's empty `/<PERSONAL_PROJECT_SLUG>/traces` (or only their own bindings' traces)
 
 ### R6 — Admin drill-in via `/governance` bird's-eye
 

@@ -1,8 +1,7 @@
 /**
- * What the address bar says about the scope, read directly from
- * `react-router`: personal workspace is "no `:project` segment matched
- * and the first path segment is `coding-agents`" — so `/coding-agents/traces`
- * stays a project.
+ * What the address bar says about the scope, read directly from `react-router`: personal
+ * workspace is "no `:project` segment matched and the first path segment is `coding-agents`" —
+ * so `/coding-agents/traces` stays a project.
  */
 
 import type { UiScopeRoute } from "@langwatch/organization-contract";

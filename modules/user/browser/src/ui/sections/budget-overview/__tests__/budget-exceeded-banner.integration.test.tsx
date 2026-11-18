@@ -49,7 +49,8 @@ describe("BudgetExceededBanner", () => {
   describe("when a request-increase URL is provided", () => {
     it("renders the 'Request increase' link pointing to that URL", () => {
       renderBanner({
-        requestIncreaseUrl: "https://app.langwatch.example.com/coding-agents/configure#budget?req=abc",
+        requestIncreaseUrl:
+          "https://app.langwatch.example.com/coding-agents/configure#budget?req=abc",
       });
 
       const link = screen.getByRole("link", { name: /request increase/i });

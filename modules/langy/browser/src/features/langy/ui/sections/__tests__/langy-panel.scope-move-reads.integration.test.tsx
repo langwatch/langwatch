@@ -1,6 +1,6 @@
 /**
- * Moving from a project with a conversation open to the personal workspace (/coding-agents) never reads
- * that conversation under the personal project: each such read answers "not found".
+ * Moving from a project with a conversation open to the personal workspace (/coding-agents)
+ * never reads that conversation under the personal project: each such read answers "not found".
  * @vitest-environment jsdom
  * @see specs/langy/langy-context-awareness.feature
  */

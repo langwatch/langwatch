@@ -183,8 +183,14 @@ export const uiLegacyRedirectRoutes: readonly UiRedirectRouteDescriptor[] = [
     path: "/settings/routing-policies",
     redirect: { from: "/settings/routing-policies", to: "/gateway/routing-policies" },
   },
-  // The personal workspace moved from /me to /coding-agents; CLIs already
-  // installed still print /me links. Spec: specs/navigation/coding-agents-url-move.feature
+];
+
+/**
+ * The personal workspace moved from /me to /coding-agents; installed CLIs still print /me links.
+ * Mounted above the chrome: /me is no longer a personal address, so the chrome would hold the
+ * page waiting for a project and never run the redirect. Spec: coding-agents-url-move.feature
+ */
+export const uiCodingAgentsRedirectRoutes: readonly UiRedirectRouteDescriptor[] = [
   {
     // The devices inventory is a tab of configure; straight there, no chaining.
     path: "/me/devices",
@@ -260,6 +266,7 @@ export const uiRouteTable: readonly UiRouteDescriptor[] = [
     path: "/admin/*",
     redirect: { from: "/admin", to: "/ops", mapSegment: RETIRED_ADMIN_SEGMENTS },
   },
+  ...uiCodingAgentsRedirectRoutes,
   { path: "/share/:id", page: "pages/share/[id]" },
   // Public — no auth required; token in query-string is the authorisation
   { path: "/unsubscribe", page: "pages/unsubscribe" },

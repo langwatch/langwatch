@@ -32,11 +32,11 @@ docker exec wise-mixing-zebra-app-1 pnpm tsx scripts/dogfood/governance/<script>
 
 ## Personas
 
-| Persona            | Account              | What they see                                                                                      |
-| ------------------ | -------------------- | -------------------------------------------------------------------------------------------------- |
+| Persona            | Account              | What they see                                                                                                 |
+| ------------------ | -------------------- | ------------------------------------------------------------------------------------------------------------- |
 | Admin (rogerio)    | rogerio@langwatch.ai | Full /coding-agents + Governance + AI Gateway sidebar, admin drill-in, all tenant data scoped via RoleBinding |
 | Fresh user         | new sign-up          | Empty /coding-agents tile grid (no bindings yet), no governance sidebar until role granted                    |
-| Cross-tenant probe | second org           | Used to verify isolation — emit OTLP with forged tenant_id and confirm receiver clamps it back     |
+| Cross-tenant probe | second org           | Used to verify isolation — emit OTLP with forged tenant_id and confirm receiver clamps it back                |
 
 ## Flows
 
@@ -191,7 +191,7 @@ they're docs assets under `docs/images/ai-governance/`.
 | Install drawer returns 409 CONFLICT    | Tile already has binding                   | Drawer should auto-route to Rotate path; if not, check `hasExistingBinding` prop wiring |
 | TotalCost = NULL on trace              | Legacy model alias not in llmModels.json   | Bump payload to current-gen alias                                                       |
 | `pnpm tsx scripts/...` silently no-ops | Host `.env` DATABASE_URL points at AWS RDS | Run inside `docker exec wise-mixing-zebra-app-1`                                        |
-| /coding-agents/settings 404                       | tsx watch didn't pick up route             | Hard-kill API pid, restart `pnpm dev`                                                   |
+| /coding-agents/settings 404            | tsx watch didn't pick up route             | Hard-kill API pid, restart `pnpm dev`                                                   |
 
 ## TODO (out-of-scope for this runbook drop)
 

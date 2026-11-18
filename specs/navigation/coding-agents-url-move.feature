@@ -32,6 +32,14 @@ Feature: The personal workspace moves from /me to /coding-agents
     When I cold-load "/me/devices"
     Then I land on "/coding-agents/configure?tab=devices"
 
+  @integration
+  Scenario: An old address moves before the workspace has picked a project
+    Given I am signed in and no project has been picked for me yet
+    When I cold-load "/me/configure?tab=devices#inventory"
+    Then I land on "/coding-agents/configure?tab=devices#inventory"
+    # /me is no longer a personal address, so the chrome would hold the page
+    # waiting for a project: the redirects run above the chrome.
+
   @unit
   Scenario: The product switcher names the personal workspace Coding agents
     Then the personal product is labelled "Coding agents"

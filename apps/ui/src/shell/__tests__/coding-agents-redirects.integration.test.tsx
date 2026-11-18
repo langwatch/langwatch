@@ -4,18 +4,42 @@
  * Spec: specs/navigation/coding-agents-url-move.feature
  */
 
+import { uiRoutePageKeys, type UiPageLoaderRegistry } from "@langwatch/browser/feature-install";
 import { createUiRouteObjects } from "@langwatch/browser/route-objects";
 import { act, render, waitFor } from "@testing-library/react";
-import { createMemoryRouter, type RouteObject, RouterProvider } from "react-router";
+import { createMemoryRouter, Outlet, type RouteObject, RouterProvider } from "react-router";
 import { describe, expect, it } from "vitest";
 
-import { uiLegacyRedirectRoutes } from "../ui-route-table";
+import { uiCodingAgentsRedirectRoutes, uiRouteTable } from "../ui-route-table";
 
 /** The redirect descriptors the application mounts, materialised the same way. */
 const legacyRedirectRoutes = createUiRouteObjects({
-  table: uiLegacyRedirectRoutes,
+  table: uiCodingAgentsRedirectRoutes,
   loaders: {},
 });
+
+const passThrough = async () => ({ default: () => <Outlet /> });
+
+const stubbedPages: UiPageLoaderRegistry = Object.fromEntries(
+  uiRoutePageKeys(uiRouteTable).map((key) => [key, passThrough]),
+);
+
+/**
+ * The real table under a chrome still waiting for a project: the real chrome holds its
+ * page back then, so a redirect mounted beneath it never runs.
+ */
+const waitingChromeRoutes = createUiRouteObjects({
+  table: uiRouteTable,
+  loaders: stubbedPages,
+  shellLayouts: {
+    auth: passThrough,
+    chrome: async () => ({ default: () => null }),
+    "full-screen": passThrough,
+  },
+});
+
+/** The real table's routes are lazy; their first resolve can outlast waitFor's 1s default. */
+const LAZY_TABLE = { timeout: 5000 };
 
 function renderRouterAt(initialEntries: string[]) {
   const routes: RouteObject[] = [
@@ -102,6 +126,20 @@ describe("legacy /me redirects", () => {
       await waitFor(() => {
         expect(addressOf(router)).toBe("/coding-agents/configure?tab=devices");
       });
+    });
+  });
+
+  describe("when the chrome is still waiting for a project", () => {
+    /** @scenario An old address moves before the workspace has picked a project */
+    it("moves the old address anyway", async () => {
+      const router = createMemoryRouter(waitingChromeRoutes, {
+        initialEntries: ["/me/configure?tab=devices#inventory"],
+      });
+      render(<RouterProvider router={router} />);
+
+      await waitFor(() => {
+        expect(addressOf(router)).toBe("/coding-agents/configure?tab=devices#inventory");
+      }, LAZY_TABLE);
     });
   });
 });
