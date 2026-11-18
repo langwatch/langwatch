@@ -2060,7 +2060,7 @@ interface Input {
   occurredAtMs?: number;
   tenantId?: string;
 }
-type Output = z.infer<typeof agentCallGraphSchema>; // ../contract/src/trace-read.contract.ts:289
+type Output = z.infer<typeof agentCallGraphSchema>; // ../contract/src/trace-read.contract.ts:288
 
 // traces.spanDetail
 // Input: inline, ../contract/src/traces.trpc.ts:599
