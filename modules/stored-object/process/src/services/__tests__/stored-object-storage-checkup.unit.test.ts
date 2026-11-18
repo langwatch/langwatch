@@ -52,7 +52,8 @@ function throughLangWatch(): StoredObjectBytesRepository {
 
 /**
  * A member under a given upload setting that answers only what a checkup may ask: the probe's
- * write and remove, the upload route, and signing. Each signed key is recorded.
+ * write and remove, the upload route, and signing. Each signed key is recorded; the route is
+ * held for the checked project only, so a lookup for any other project fails the test.
  */
 function memberUnder(route: "direct" | "through-process", { refusal }: { refusal?: Error } = {}) {
   const signed: string[] = [];
@@ -61,7 +62,10 @@ function memberUnder(route: "direct" | "through-process", { refusal }: { refusal
     {
       write: (at, body, facts) => twin.write(at, body, facts),
       remove: (at) => twin.remove(at),
-      uploadRoute: async () => route,
+      uploadRoute: async (projectId) => {
+        if (projectId !== PROJECT_ID) throw new Error(`Asked the route of ${projectId}.`);
+        return route;
+      },
       signUpload: async (at) => {
         signed.push(at.key);
         if (refusal) throw refusal;
@@ -122,6 +126,19 @@ describe("StoredObjectService.probeStorage", () => {
         await expect(service.probeStorage({ projectId: PROJECT_ID })).rejects.toMatchObject({
           code: "direct_upload_unavailable",
         });
+        expect(signed).toEqual([]);
+      });
+    });
+
+    describe("when the account is set to upload through LangWatch and a public base URL is named", () => {
+      /** @scenario "The storage checkup reads where uploads go from the account's setting" */
+      it("passes without signing anything", async () => {
+        const { signed, storage } = memberUnder("through-process", {
+          refusal: new Error("This member's credentials cannot sign an upload."),
+        });
+        const service = serviceOver({ storage, publicBaseUrl: "https://app.example" });
+
+        await expect(service.probeStorage({ projectId: PROJECT_ID })).resolves.toBeUndefined();
         expect(signed).toEqual([]);
       });
     });

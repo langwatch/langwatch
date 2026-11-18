@@ -126,9 +126,12 @@ export class ClickHouseImportStoredObjectMigration {
     const address = legacyStorageAddressOf({ projectId, storageUri: row.storageUri });
     const fingerprint = this.fingerprint(row);
     const current = await this.options.records.findById({ tenantId: projectId, id });
-    if (current?.source === "canonical" || current?.legacyFingerprint === fingerprint) {
-      return "unchanged";
-    }
+    // A deleted row stays deleted, whatever its legacy version did since.
+    const isSettled =
+      current?.source === "canonical" ||
+      current?.status === "deleted" ||
+      current?.legacyFingerprint === fingerprint;
+    if (isSettled) return "unchanged";
     const now = this.now();
     const imported = this.importedRecord({
       row,

@@ -181,6 +181,37 @@ describe("ClickHouseImportStoredObjectMigration.step", () => {
     ).resolves.toMatchObject({ status: "deleted", byteLength: 3, generation: deletedGeneration });
   });
 
+  describe("when the import runs again after a delete, and the legacy row changed since", () => {
+    /** @scenario "A Stored Objects import never brings a deleted row back" */
+    it("leaves the row deleted and reports it unchanged", async () => {
+      const legacy = new OneLegacyObject();
+      const records = MemoryStoredObjectRecordRepository.create();
+      const step = ClickHouseImportStoredObjectMigration.create({ legacy, records }).step();
+      await step.migrateTenant({ tenantId: "project_1" });
+      const imported = await records.findById({ tenantId: "project_1", id: "so_legacy" });
+      if (!imported) throw new Error("the first pass imported nothing");
+      const deleted = {
+        ...imported,
+        status: "deleted" as const,
+        generation: imported.generation + 1,
+      };
+      await records.transition({ expected: imported, next: deleted });
+      legacy.sizeBytes = 4;
+
+      await expect(step.migrateTenant({ tenantId: "project_1" })).resolves.toMatchObject({
+        status: "finalized",
+        report: { imported: 0, unchanged: 1 },
+      });
+      await expect(
+        records.findById({ tenantId: "project_1", id: "so_legacy" }),
+      ).resolves.toMatchObject({
+        status: "deleted",
+        byteLength: 3,
+        generation: deleted.generation,
+      });
+    });
+  });
+
   /** @scenario "A legacy row stored outside its project fails the Stored Objects import" */
   it("refuses a row whose location is outside its project and writes nothing", async () => {
     const records = MemoryStoredObjectRecordRepository.create();

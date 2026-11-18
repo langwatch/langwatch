@@ -189,6 +189,14 @@ Feature: Stored Objects service and API
     Then it reports the row unchanged
     And the row stays as the delete left it
 
+  @unit @migration @regression
+  Scenario: A Stored Objects import never brings a deleted row back
+    Given the import copied a project's row and a delete then removed it
+    And that row's legacy version changed since
+    When the import runs for that project again
+    Then it reports the row unchanged
+    And the row stays deleted, so its object is not delivered again
+
   @unit @migration
   Scenario: A legacy row stored outside its project fails the Stored Objects import
     Given a legacy row's storage location does not sit under its project
