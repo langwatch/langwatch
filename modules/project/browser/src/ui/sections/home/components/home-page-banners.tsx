@@ -21,7 +21,7 @@ import {
   useState,
 } from "react";
 import type { IconType } from "react-icons";
-import { LuMic, LuZap } from "react-icons/lu";
+import { LuNetwork, LuShieldAlert, LuWorkflow, LuZap } from "react-icons/lu";
 
 import { useLangyStore } from "../../../../behavior/langy/langy.store.ts";
 import { useProjectHomeHost } from "../../../../model/project-home-host.ts";
@@ -151,7 +151,69 @@ interface Slide {
   navigate: (ctx: NavCtx) => void;
 }
 
+/** Where the call graph is explained: it lives inside a trace, so there is no page to open. */
+const AGENT_CALL_GRAPH_DOCS =
+  "https://langwatch.ai/docs/observability/multi-agent-a2a#the-call-graph";
+
+/** Newest first, in launch order (specs/home/home-announcements.feature). */
 const SLIDES: Slide[] = [
+  {
+    id: "red-team",
+    storagePrefix: "langwatch:red-team-home-banner-dismissed:v1:",
+    colors: ["red.solid", "orange.fg", "purple.solid", "orange.subtle"],
+    mesh: {
+      distortion: 0.88,
+      swirl: 0.58,
+      scale: 1.18,
+      offsetX: 0.14,
+      offsetY: 0.2,
+      rotation: 24,
+    },
+    Icon: LuShieldAlert,
+    heading: "Red-team your agent against the OWASP LLM Top 10",
+    badge: "New",
+    ctaLabel: "Create a red team suite",
+    posthogEvent: "red_team_banner_click",
+    navigate: ({ go, projectSlug }) => go(`/${projectSlug}/simulations`),
+  },
+  {
+    id: "braids",
+    storagePrefix: "langwatch:braids-home-banner-dismissed:v1:",
+    colors: ["accent.solid", "purple.solid", "cyan.solid", "bg.subtle"],
+    mesh: {
+      distortion: 0.8,
+      swirl: 0.66,
+      scale: 1.22,
+      offsetX: -0.16,
+      offsetY: -0.12,
+      rotation: 140,
+    },
+    Icon: LuWorkflow,
+    heading: "See every agent call across projects in one trace",
+    badge: "New",
+    ctaLabel: "Set up braids",
+    posthogEvent: "braids_banner_click",
+    navigate: ({ go }) => go("/settings/braids"),
+  },
+  {
+    id: "agent-call-graph",
+    storagePrefix: "langwatch:agent-call-graph-home-banner-dismissed:v1:",
+    colors: ["teal.solid", "cyan.solid", "accent.solid", "cyan.subtle"],
+    mesh: {
+      distortion: 0.85,
+      swirl: 0.62,
+      scale: 1.2,
+      offsetX: 0.2,
+      offsetY: -0.18,
+      rotation: 108,
+    },
+    Icon: LuNetwork,
+    heading: "Follow one call across every agent it reaches",
+    badge: "New",
+    ctaLabel: "See the agent call graph",
+    posthogEvent: "agent_call_graph_banner_click",
+    navigate: () => window.open(AGENT_CALL_GRAPH_DOCS, "_blank", "noopener,noreferrer"),
+  },
   {
     id: "automations",
     storagePrefix: "langwatch:automations-home-banner-dismissed:v1:",
@@ -170,30 +232,6 @@ const SLIDES: Slide[] = [
     ctaLabel: "Explore automations",
     posthogEvent: "automations_banner_click",
     navigate: ({ go, projectSlug }) => go(`/${projectSlug}/automations`),
-  },
-  {
-    id: "voice-agents",
-    storagePrefix: "langwatch:voice-agents-home-banner-dismissed:v1:",
-    colors: ["teal.solid", "cyan.solid", "purple.solid", "cyan.subtle"],
-    mesh: {
-      distortion: 0.85,
-      swirl: 0.62,
-      scale: 1.2,
-      offsetX: 0.2,
-      offsetY: -0.18,
-      rotation: 108,
-    },
-    Icon: LuMic,
-    heading: "Voice agent simulations are here",
-    badge: "New",
-    ctaLabel: "Try voice agent testing",
-    posthogEvent: "voice_agents_banner_click",
-    navigate: () =>
-      window.open(
-        "https://langwatch.ai/scenario/voice/getting-started",
-        "_blank",
-        "noopener,noreferrer",
-      ),
   },
 ];
 

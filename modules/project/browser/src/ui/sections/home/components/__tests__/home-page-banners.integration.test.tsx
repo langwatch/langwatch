@@ -18,6 +18,10 @@ vi.mock("../../../../../behavior/langy/langy.store.ts", () => ({
 
 vi.mock("@langwatch/design-system/langy-mark", () => ({ LangyMark: () => null }));
 
+// Each followed announcement records its own click, named per announcement.
+const track = vi.fn();
+vi.mock("@langwatch/browser-host/analytics", () => ({ useUiAnalytics: () => ({ track }) }));
+
 import {
   ProjectHomeHostProvider,
   ProjectHomeHost,
@@ -76,7 +80,7 @@ class StubProjectHomeHost extends ProjectHomeHost {
   }
 }
 
-const VOICE_KEY = "langwatch:voice-agents-home-banner-dismissed:v1:project-1";
+const RED_TEAM_KEY = "langwatch:red-team-home-banner-dismissed:v1:project-1";
 const AUTOMATIONS_KEY = "langwatch:automations-home-banner-dismissed:v1:project-1";
 
 function renderWithProviders(ui: React.ReactElement) {
@@ -120,11 +124,68 @@ describe("<HomePageBanners />", () => {
     localStorage.clear();
   });
 
-  it("leads with the automations announcement, with a segment per announcement", () => {
+  /** @scenario "The newest features are announced first, in launch order" */
+  it("announces the newest features first, in launch order, each marked new", () => {
+    const headings = [
+      "Red-team your agent against the OWASP LLM Top 10",
+      "See every agent call across projects in one trace",
+      "Follow one call across every agent it reaches",
+      "React the moment it matters",
+    ];
     renderWithProviders(<HomePageBanners />);
-    expect(screen.getByText("React the moment it matters")).toBeDefined();
-    expect(screen.getByRole("button", { name: "Show announcement 1 of 2" })).toBeDefined();
-    expect(screen.getByRole("button", { name: "Show announcement 2 of 2" })).toBeDefined();
+    expect(screen.getByText(headings[0]!)).toBeDefined();
+    expect(screen.getByText("New")).toBeDefined();
+    headings.slice(1).forEach((heading, i) => {
+      fireEvent.click(screen.getByRole("button", { name: `Show announcement ${i + 2} of 4` }));
+      expect(screen.getByText(heading)).toBeDefined();
+      expect(screen.getByText("New")).toBeDefined();
+    });
+  });
+
+  /** @scenario "Voice agent simulations are no longer announced" */
+  it("no longer announces voice agent simulations", () => {
+    renderWithProviders(<HomePageBanners />);
+    for (let i = 1; i <= 4; i++) {
+      fireEvent.click(screen.getByRole("button", { name: `Show announcement ${i} of 4` }));
+      expect(screen.queryByText(/voice agent/i)).toBeNull();
+    }
+  });
+
+  describe("when an announcement is followed", () => {
+    /** @scenario "Each announcement opens its feature" */
+    it.each([
+      [1, /Create a red team suite/, "/my-project/simulations", "red_team_banner_click"],
+      [2, /Set up braids/, "/settings/braids", "braids_banner_click"],
+      [4, /Explore automations/, "/my-project/automations", "automations_banner_click"],
+    ])("announcement %i routes in app", (index, cta, path, event) => {
+      renderWithProviders(<HomePageBanners />);
+      fireEvent.click(screen.getByRole("button", { name: `Show announcement ${index} of 4` }));
+      fireEvent.click(screen.getByRole("button", { name: cta }));
+      expect(routerPush).toHaveBeenCalledWith(path);
+      expect(track).toHaveBeenCalledWith({
+        name: event,
+        attributes: { surface: "home_banner", projectId: "project-1" },
+      });
+    });
+
+    /** @scenario "Each announcement opens its feature" */
+    it("opens the call graph docs in a new tab", () => {
+      const open = vi.spyOn(window, "open").mockReturnValue(null);
+      renderWithProviders(<HomePageBanners />);
+      fireEvent.click(screen.getByRole("button", { name: "Show announcement 3 of 4" }));
+      fireEvent.click(screen.getByRole("button", { name: /See the agent call graph/ }));
+      expect(open).toHaveBeenCalledWith(
+        "https://langwatch.ai/docs/observability/multi-agent-a2a#the-call-graph",
+        "_blank",
+        "noopener,noreferrer",
+      );
+      expect(routerPush).not.toHaveBeenCalled();
+      expect(track).toHaveBeenCalledWith({
+        name: "agent_call_graph_banner_click",
+        attributes: { surface: "home_banner", projectId: "project-1" },
+      });
+      open.mockRestore();
+    });
   });
 
   it("lays what it is given over the same ground", () => {
@@ -141,36 +202,27 @@ describe("<HomePageBanners />", () => {
     // would push /undefined/automations.
     hostState.project = undefined;
     renderWithProviders(<HomePageBanners />);
-    expect(screen.queryByText("React the moment it matters")).toBeNull();
-    expect(screen.queryByText("Voice agent simulations are here")).toBeNull();
+    expect(screen.queryByText("Red-team your agent against the OWASP LLM Top 10")).toBeNull();
   });
 
   it("shows an announcement a reader had previously hidden", () => {
     // There is no dismissal any more, so a stale key from when there was one
     // must not keep an announcement off the page forever.
     localStorage.setItem(AUTOMATIONS_KEY, String(Date.now() + 60_000));
-    localStorage.setItem(VOICE_KEY, String(Date.now() + 60_000));
+    localStorage.setItem(RED_TEAM_KEY, String(Date.now() + 60_000));
     renderWithProviders(<HomePageBanners />);
-    expect(screen.getByText("React the moment it matters")).toBeDefined();
+    expect(screen.getByText("Red-team your agent against the OWASP LLM Top 10")).toBeDefined();
   });
 
   describe("when a banner's link is followed", () => {
-    it("routes in-app announcements through SPA navigation", () => {
-      renderWithProviders(<HomePageBanners />);
-
-      fireEvent.click(screen.getByRole("button", { name: /Explore automations/ }));
-
-      expect(routerPush).toHaveBeenCalledWith("/my-project/automations");
-    });
-
     it("keeps the announcement on the page, so the way back is not lost", () => {
       renderWithProviders(<HomePageBanners />);
 
-      fireEvent.click(screen.getByRole("button", { name: /Explore automations/ }));
+      fireEvent.click(screen.getByRole("button", { name: /Create a red team suite/ }));
 
       // Still on screen: following a link is interest, not "seen it, thanks".
-      expect(screen.getByText("React the moment it matters")).toBeDefined();
-      expect(localStorage.getItem(AUTOMATIONS_KEY)).toBeNull();
+      expect(screen.getByText("Red-team your agent against the OWASP LLM Top 10")).toBeDefined();
+      expect(localStorage.getItem(RED_TEAM_KEY)).toBeNull();
     });
 
     it("offers no way to hide an announcement at all", () => {
@@ -205,7 +257,7 @@ describe("<HomePageBanners />", () => {
     it("carries no announcement about Langy", () => {
       renderWithProviders(<HomePageBanners />);
       expect(screen.queryByText("Langy can ship the fix, not just find it")).toBeNull();
-      expect(screen.getAllByRole("button", { name: /Show announcement/ })).toHaveLength(2);
+      expect(screen.getAllByRole("button", { name: /Show announcement/ })).toHaveLength(4);
     });
   });
 
