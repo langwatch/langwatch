@@ -56,6 +56,12 @@ export class ClickHouseColumns {
     });
   }
 
+  /** Which columns of `table` the target holds, for `fn.heldOr`; an unreadable list holds all. */
+  async holds({ table }: { table: string }): Promise<(name: string) => boolean> {
+    const present = (await this.tables().catch(() => undefined))?.get(table);
+    return (name) => present === undefined || present.has(name);
+  }
+
   /** A select list naming every column `has` keeps (all by default), the rest as defaults. */
   static named({
     alias,
