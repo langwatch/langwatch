@@ -1025,11 +1025,9 @@ function codingAgentsPages(table: readonly UiRouteDescriptor[]): string[] {
 const codingAgentsPageList = codingAgentsPages(uiRouteTable);
 
 /**
- * The old first segments that have a page of their own under /coding-agents, so the old
- * address keeps its sub-path there. Any other first segment finds no such page and lands on
- * the Coding agents home: `mapSegment` drops the sub-path of an unnamed segment, the query
- * and hash still travel. A page nested deeper (`budget/request`) is not a first segment, so
- * it gets an exact row below.
+ * Old first segments with their own /coding-agents page keep their sub-path there; any other
+ * segment lands on the Coding agents home, and the query and hash still travel. Deeper pages
+ * such as `budget/request` get exact rows below.
  */
 const KEPT_SEGMENTS: Readonly<Record<string, string>> = Object.fromEntries(
   codingAgentsPageList.filter((page) => !page.includes("/")).map((page) => [page, page]),
@@ -1038,17 +1036,9 @@ const KEPT_SEGMENTS: Readonly<Record<string, string>> = Object.fromEntries(
 const toCodingAgents = { from: "/me", to: "/coding-agents", mapSegment: KEPT_SEGMENTS } as const;
 
 /**
- * The personal workspace moved from /me to /coding-agents; installed CLIs still print /me links.
- * Mounted above the chrome: /me is no longer a personal address, so the chrome would hold the
- * page waiting for a project and never run the redirect. Spec: coding-agents-url-move.feature
- *
- * A /:project/<segment> page outranks the /me/* prefix row (a static segment beats a splat), so
- * "me" would read as a project slug there. Every such segment therefore gets its own /me twin
- * (/me/<seg> and /me/<seg>/*), derived from the project rows so a page added later is covered
- * without a hand edit. Twins cover the first segment of each project page only: a deeper project
- * row such as /:project/analytics/metrics still outranks /me/analytics/*, and no such address was
- * ever a real /me page. Every twin shares `toCodingAgents`: a segment with a /coding-agents page
- * keeps its sub-path, all others land on /coding-agents.
+ * Moved /me to /coding-agents; CLIs still print /me links. Mounted above the chrome, which would
+ * wait for a project and never redirect. /:project/<segment> outranks /me/*, so each project first
+ * segment gets /me twins derived from the rows. Spec: coding-agents-url-move.feature
  */
 export const uiCodingAgentsRedirectRoutes: readonly UiRedirectRouteDescriptor[] = [
   {
