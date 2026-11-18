@@ -4,10 +4,14 @@
  * Auto-instrumentation via the global API is NOT isolated by this.
  */
 
-import { trace } from "@opentelemetry/api";
+import { context, trace } from "@opentelemetry/api";
+import { AsyncLocalStorageContextManager } from "@opentelemetry/context-async-hooks";
 import { ConsoleSpanExporter, SimpleSpanProcessor, TracerProvider } from "@opentelemetry/sdk-trace";
 
 // ── Step 1: Simulate another OTel SDK initializing first ────────────
+// 3.x has no NodeTracerProvider.register(): the context manager that carries
+// the active span across `await` is registered on its own.
+context.setGlobalContextManager(new AsyncLocalStorageContextManager().enable());
 const externalProvider = new TracerProvider({
   spanProcessors: [new SimpleSpanProcessor({ exporter: new ConsoleSpanExporter() })],
 });

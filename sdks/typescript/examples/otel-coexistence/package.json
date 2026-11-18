@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@opentelemetry/api": "~1.10.0",
+    "@opentelemetry/context-async-hooks": "^3.1.1",
     "@opentelemetry/sdk-trace": "^3.1.1",
     "dotenv-cli": "^10.0.0",
     "langwatch": "file:../../"
