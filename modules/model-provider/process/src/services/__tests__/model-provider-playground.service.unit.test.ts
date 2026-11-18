@@ -1,7 +1,4 @@
-import type {
-  ModelProviderApi,
-  ModelProviderExecution,
-} from "@langwatch/model-provider-contract";
+import type { ModelProviderApi, ModelProviderExecution } from "@langwatch/model-provider-contract";
 import type { Project, ProjectApi } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -104,7 +101,7 @@ describe("ModelProviderPlaygroundService", () => {
     it("asks the proxy for chat completions with the model a latest alias names", async () => {
       const sent: { url: string; model: string }[] = [];
       vi.stubGlobal("fetch", async (url: string, init: RequestInit) => {
-        sent.push({ url, model: (JSON.parse(String(init.body)) as { model: string }).model });
+        sent.push({ url, model: (JSON.parse(init.body as string) as { model: string }).model });
         return new Response("data: [DONE]\n\n", {
           headers: { "content-type": "text/event-stream" },
         });
