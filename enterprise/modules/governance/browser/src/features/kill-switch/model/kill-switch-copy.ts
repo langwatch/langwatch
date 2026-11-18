@@ -103,10 +103,6 @@ export function summariesByRowId(
   return byRow;
 }
 
-/**
- * The other agents whose open stop holds one of `stop`'s virtual keys disabled: restoring `stop`
- * leaves that key disabled until they are restored too.
- */
 /** Another open stop holds a key while its target is applied or an approved stop is about to apply it. */
 function holdsSharedKey({
   holder,
@@ -123,6 +119,10 @@ function holdsSharedKey({
   return outcome.state === "pending" && holder.status === "stopping";
 }
 
+/**
+ * The other agents whose open stop holds one of `stop`'s virtual keys disabled: restoring `stop`
+ * leaves that key disabled until they are restored too.
+ */
 export function sharedKeyHoldersOf({
   stop,
   summaries,

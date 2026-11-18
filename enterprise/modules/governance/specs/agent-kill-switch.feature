@@ -586,6 +586,12 @@ Feature: Agent kill switch: stop a misbehaving agent where it runs, with approva
     Then the key is not called and the target is recorded failed
 
   @integration
+  Scenario: Key work never runs after a lock it waited for may have ended
+    Given a holder waited for the lock around a shared virtual key while another held it
+    When its locked work runs
+    Then its signal aborts before the transaction can lapse, counting the time it waited
+
+  @integration
   Scenario: A retried intent of an older round leaves the platform alone
     Given a stop of "support-bot" that was restored, and a newer stop of "support-bot" that is quarantined
     When the older stop's revert and apply intents run again

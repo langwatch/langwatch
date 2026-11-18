@@ -63,7 +63,6 @@ describe.skipIf(!connection)("the kill switch claim and prior state repositories
         sources: memory.ingestionSources,
         awsConnections: awsConnections(),
         ...presentPlatforms({ memory }),
-        ...presentPlatforms({ memory }),
         virtualKeys: createApiFixture<GatewayApi>(),
       }),
       registry: memory.agentRegistry,

@@ -68,7 +68,6 @@ export class AgentStopLifecycleService {
    * Decided by the fold's own rule on the row, under the agent's lock: the request is sent only when
    * the stop accepts it, and the row is advanced to what it accepted, so the next request reads it.
    */
-
   restore(input: {
     organizationId: string;
     stopId: string;

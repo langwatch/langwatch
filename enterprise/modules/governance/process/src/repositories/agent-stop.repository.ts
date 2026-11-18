@@ -11,13 +11,13 @@ import type {
 import type { AgentStopProjectionState } from "../features/kill-switch/eventing/agent-stop.projection.ts";
 import type { AgentStopRecord } from "../features/kill-switch/rules/agent-stop.rules.ts";
 
+/** Keyset position in the latest-first stop listing: request moment, then id. */
+export type AgentStopPosition = { requestedAt: string; id: string };
+
 /**
  * The AgentStop projection: written by the `agent_stop` pipeline's fold, read by the kill switch
  * services. Tenant is the organisation.
  */
-/** Keyset position in the latest-first stop listing: request moment, then id. */
-export type AgentStopPosition = { requestedAt: string; id: string };
-
 export abstract class AgentStopRepository implements StateProjectionStore<AgentStopProjectionState> {
   abstract get(
     key: string,

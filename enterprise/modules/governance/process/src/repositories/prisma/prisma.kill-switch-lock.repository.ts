@@ -9,11 +9,14 @@ import {
   KillSwitchLockRepository,
 } from "../kill-switch-lock.repository.ts";
 
-/** Holds the lock across a platform call; Prisma's 5s default is too short. */
-const KILL_SWITCH_LOCK_TIMEOUT_MS = 60_000;
 const KILL_SWITCH_LOCK_MAX_WAIT_MS = 10_000;
-/** The body's signal aborts this long before the transaction, and so the lock, can lapse. */
-const KILL_SWITCH_LOCK_FENCE_MS = 15_000;
+
+/**
+ * `timeoutMs` holds the lock across a platform call (Prisma's 5s default is too short); the
+ * body's signal aborts `fenceMs` before the transaction, and so the lock, can lapse.
+ */
+type KillSwitchLockTiming = { timeoutMs: number; fenceMs: number };
+const KILL_SWITCH_LOCK_TIMING: KillSwitchLockTiming = { timeoutMs: 60_000, fenceMs: 15_000 };
 
 /** Per process: the locked body writes on other pooled connections, so cap how many pin one. */
 const lockedRuns = new ConcurrencyLimiter({ maxConcurrent: 2 });
@@ -23,12 +26,18 @@ const lockedRuns = new ConcurrencyLimiter({ maxConcurrent: 2 });
  * A body still running near the timeout sees its signal aborted and checks it before each write.
  */
 export class PrismaKillSwitchLockRepository extends KillSwitchLockRepository {
-  private constructor(private readonly prisma: PrismaClient) {
+  private constructor(
+    private readonly prisma: PrismaClient,
+    private readonly timing: KillSwitchLockTiming,
+  ) {
     super();
   }
 
-  static create(prisma: PrismaClient): PrismaKillSwitchLockRepository {
-    return new PrismaKillSwitchLockRepository(prisma);
+  static create(
+    prisma: PrismaClient,
+    timing: KillSwitchLockTiming = KILL_SWITCH_LOCK_TIMING,
+  ): PrismaKillSwitchLockRepository {
+    return new PrismaKillSwitchLockRepository(prisma, timing);
   }
 
   async withLock<T>({
@@ -42,23 +51,26 @@ export class PrismaKillSwitchLockRepository extends KillSwitchLockRepository {
       task: () =>
         this.prisma.$transaction(
           async (transaction) => {
+            // Prisma's timeout runs from here, so the time spent waiting for the lock counts.
+            const startedAt = Date.now();
             await transaction.$executeRaw` ${skipTenantCheck({
               // Advisory-lock helper, the key names one kill switch resource.
               SKIP_TENANT_CHECK: true,
             })}
 SELECT pg_advisory_xact_lock(hashtextextended(${`kill-switch:${key}`}, 0))`;
             const fence = new AbortController();
-            const timer = setTimeout(
-              () => fence.abort(new Error(`kill switch lock ${key} is about to lapse`)),
-              KILL_SWITCH_LOCK_TIMEOUT_MS - KILL_SWITCH_LOCK_FENCE_MS,
-            );
+            const lapse = () => fence.abort(new Error(`kill switch lock ${key} is about to lapse`));
+            const { timeoutMs, fenceMs } = this.timing;
+            const left = timeoutMs - fenceMs - (Date.now() - startedAt);
+            if (left <= 0) lapse();
+            const timer = setTimeout(lapse, Math.max(left, 0));
             try {
               return await run({ signal: fence.signal });
             } finally {
               clearTimeout(timer);
             }
           },
-          { timeout: KILL_SWITCH_LOCK_TIMEOUT_MS, maxWait: KILL_SWITCH_LOCK_MAX_WAIT_MS },
+          { timeout: this.timing.timeoutMs, maxWait: KILL_SWITCH_LOCK_MAX_WAIT_MS },
         ),
     });
   }

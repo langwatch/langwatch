@@ -14,13 +14,6 @@ import { virtualKey } from "../../../features/kill-switch/services/__tests__/kil
 import { AgentStopPlanService } from "../../../features/kill-switch/services/agent-stop-plan.service.ts";
 import { MemoryGovernanceRepositories } from "../../memory/memory.governance.repositories.ts";
 import { PrismaAgentStopPlanRepository } from "../prisma.agent-stop-plan.repository.ts";
-
-/** The audit intent a connection write commits with. */
-const auditOf = (organizationId: string, action: string): AuditLogIntent => ({
-  idempotencyKey: generate("audit").toString(),
-  organizationId,
-  action,
-});
 import {
   AGENT_ID,
   connection,
@@ -28,6 +21,13 @@ import {
   presentPlatforms,
   seedRegistry,
 } from "./prisma.kill-switch.fixtures.ts";
+
+/** The audit intent a connection write commits with. */
+const auditOf = (organizationId: string, action: string): AuditLogIntent => ({
+  idempotencyKey: generate("audit").toString(),
+  organizationId,
+  action,
+});
 
 describe.skipIf(!connection)("the kill switch plan and AWS connection repositories", () => {
   const { ns, newOrganization, prisma, awsConnections, cleanup } = killSwitchDatabase();
@@ -74,7 +74,6 @@ describe.skipIf(!connection)("the kill switch plan and AWS connection repositori
         registry: memory.agentRegistry,
         sources: memory.ingestionSources,
         awsConnections: awsConnections(),
-        ...presentPlatforms({ memory }),
         ...presentPlatforms({ memory }),
         virtualKeys: createApiFixture<GatewayApi>({
           findVirtualKeyById: async (id, organization) =>

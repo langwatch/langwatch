@@ -50,13 +50,6 @@ const STOP_STATUSES_HOLDING_CONNECTIONS = [
   ...new Set([...AGENT_STOP_OPEN_STATUSES, ...AGENT_STOP_RESTORABLE_STATUSES]),
 ];
 
-/**
- * The AWS connections a Bedrock kill switch target signs with: a key pair, a role to assume, or
- * both. A role always gets an external id LangWatch generates, never one the caller picks. The
- * repository seals the secret access key and the external id before they are stored. A
- * connection a plan target or an unrestored stop still names cannot be deleted. Adding and removing
- * one writes an audit row.
- */
 type AuditEntryInput = {
   action: string;
   organizationId: string;
@@ -86,6 +79,13 @@ function auditEntryOf({
   };
 }
 
+/**
+ * The AWS connections a Bedrock kill switch target signs with: a key pair, a role to assume, or
+ * both. A role always gets an external id LangWatch generates, never one the caller picks. The
+ * repository seals the secret access key and the external id before they are stored. A
+ * connection a plan target or an unrestored stop still names cannot be deleted. Adding and removing
+ * one writes an audit row.
+ */
 export class GovernanceAwsConnectionService {
   private constructor(private readonly deps: GovernanceAwsConnectionDependencies) {}
 
