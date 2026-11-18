@@ -2,7 +2,7 @@ import { useDrawer } from "@langwatch/browser-host/drawer";
 import { UiRouteOutlet } from "@langwatch/browser/route-objects";
 import { setDrawerEndInset } from "@langwatch/design-system/drawer";
 import { Box } from "@langwatch/design-system/primitives";
-import { type ReactNode, useEffect, useLayoutEffect } from "react";
+import { memo, type ReactNode, useEffect, useLayoutEffect } from "react";
 
 import { useLangyStore } from "../../../../behavior/langy.store.ts";
 import { useLangyConversationDeepLink } from "../../../../behavior/use-langy-conversation-deep-link.ts";
@@ -44,8 +44,10 @@ export default function ProjectLangyLayout({ children }: { children?: ReactNode 
   );
 }
 
-/** The project's Langy provider around the routed app; the React Compiler memoises it. */
-function ProjectLangySubtree({
+/**
+ * A memo boundary between the layout's subscriptions and the whole routed app.
+ */
+const ProjectLangySubtree = memo(function ProjectLangySubtree({
   projectId,
   showLangy,
   children,
@@ -59,7 +61,7 @@ function ProjectLangySubtree({
       <LangyShiftedRoot showLangy={showLangy}>{children}</LangyShiftedRoot>
     </LangyProvider>
   );
-}
+});
 
 /** Who reserves the dock's room: the page wrapper, a claiming app shell, or nobody. */
 function dockReservation({ shifted, shellClaimed }: { shifted: boolean; shellClaimed: boolean }) {
