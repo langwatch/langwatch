@@ -877,6 +877,7 @@ function gatewayControlPlane(options: GatewayControlPlaneOptions): GatewayContro
     a2aTargets: GatewayA2aTargetService.create({
       repository: repositories.a2aTargets,
       changeEvents: changes,
+      auditLog: repositories.audit,
       transactions: repositories.transactions,
     }),
     budgetSpend,
@@ -2121,6 +2122,7 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
   async archiveA2aTarget(input: {
     id: string;
     organizationId: string;
+    actorUserId: string;
   }): Promise<GatewayA2aTargetDto> {
     await this.#dependencies.assertOrganizationExists(input.organizationId);
     return a2aTargetToDto(await this.#dependencies.a2aTargets.archive(input));
@@ -2156,6 +2158,7 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
   async archiveProjectA2aTarget(input: {
     id: string;
     projectId: string;
+    actorUserId: string;
   }): Promise<GatewayA2aTargetDto> {
     const organizationId = await this.#dependencies.organizationIdForProject(input.projectId);
     return a2aTargetToDto(

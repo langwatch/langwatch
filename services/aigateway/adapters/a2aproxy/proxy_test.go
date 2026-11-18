@@ -412,3 +412,42 @@ func TestUpstreamQueryStringStaysAfterThePath(t *testing.T) {
 	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
 	assert.Equal(t, "/message:send?tenant=7&x=1", gotURI)
 }
+
+// @scenario "an A2A reply is never marked cacheable by a shared cache"
+func TestRepliesAreNeverCacheable(t *testing.T) {
+	f := newFixture(t)
+	f.reply = func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("Cache-Control", "public, max-age=600")
+		_, _ = io.WriteString(w, `{"jsonrpc":"2.0","id":7,"result":{"task":{"id":"t1"}}}`)
+	}
+	rec := f.do(http.MethodPost, "/a2a/billing", sendMessage("GetTask", "hi"))
+	assert.Equal(t, "no-store", rec.Header().Get("Cache-Control"))
+
+	f.reply = sseReply(`{"result":{}}`)
+	rec = f.do(http.MethodPost, "/a2a/billing", sendMessage("SendStreamingMessage", "hi"))
+	assert.Equal(t, "no-store", rec.Header().Get("Cache-Control"))
+
+	f.reply = func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Cache-Control", "public, max-age=600")
+		_, _ = io.WriteString(w, `{"name":"Billing"}`)
+	}
+	rec = f.do(http.MethodGet, "/a2a/billing/.well-known/agent-card.json", "")
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	assert.Equal(t, "no-store", rec.Header().Get("Cache-Control"))
+
+	rec = f.do(http.MethodPost, "/a2a/unknown", sendMessage("SendMessage", "hi"))
+	assert.Equal(t, "no-store", rec.Header().Get("Cache-Control"), "a refusal is not cacheable either")
+}
+
+// @scenario "an allowed JSON-RPC call is forwarded"
+func TestRootJSONRPCKeepsTheRegisteredPath(t *testing.T) {
+	f := newFixture(t)
+	f.setTarget(func(tg *domain.A2ATarget) { tg.UpstreamURL = f.upstream.URL + "/rpc/" })
+	rec := f.do(http.MethodPost, "/a2a/billing", sendMessage("SendMessage", "hi"))
+
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	calls := f.upstreamCalls()
+	require.Len(t, calls, 1)
+	assert.Equal(t, "/rpc/", calls[0].path)
+}

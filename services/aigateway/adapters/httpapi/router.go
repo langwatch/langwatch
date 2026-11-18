@@ -155,8 +155,8 @@ func NewRouter(deps RouterDeps) http.Handler {
 	// /metrics is not served here: the scrape has its own listener (ADR-175).
 
 	// Unauthenticated and kept off the public ingress the same way as the
-	// probes above (charts/gateway/templates/ingress.yaml
-	// allowlists only /v1 and the exact /health path). Reveals nothing but
+	// probes above (the gateway Ingress in charts/langwatch/templates/ingress.yaml
+	// allowlists only /v1, /a2a and the exact /health path). Reveals nothing but
 	// a URL: dev tooling polls it to verify an already-running gateway
 	// before trusting it on a reused port.
 	r.Get("/debug/control-plane", debugControlPlaneHandler(deps.ControlPlaneBaseURL))

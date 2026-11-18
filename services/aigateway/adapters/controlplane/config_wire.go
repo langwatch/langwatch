@@ -627,7 +627,7 @@ func buildA2ATargets(wires []a2aTargetWire) []domain.A2ATarget {
 }
 
 // validA2ATargetWire re-checks what the control plane checked at save time:
-// http(s) URLs and header names and values without line breaks. A target
+// http(s) URLs without credentials, and header names and values without line breaks. A target
 // that fails is left out, so the gateway never calls it.
 func validA2ATargetWire(w a2aTargetWire) bool {
 	if !httpURL(w.UpstreamURL) || (w.CardURL != "" && !httpURL(w.CardURL)) {
@@ -643,5 +643,5 @@ func validA2ATargetWire(w a2aTargetWire) bool {
 
 func httpURL(raw string) bool {
 	u, err := url.Parse(raw)
-	return err == nil && (u.Scheme == "http" || u.Scheme == "https") && u.Host != ""
+	return err == nil && (u.Scheme == "http" || u.Scheme == "https") && u.Host != "" && u.User == nil
 }

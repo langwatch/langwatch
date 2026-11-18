@@ -140,7 +140,6 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	c.bundle = h.cfg.Bundle(c.ctx)
 	if c.bundle != nil {
 		if !h.inflight.acquire(c.bundle.VirtualKeyID) {
-			c.span = trace.SpanFromContext(r.Context())
 			c.refuse(refuseBusy)
 			return
 		}

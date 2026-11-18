@@ -10,7 +10,11 @@ export const gatewayA2aTargetNameSchema = z
 const httpUrlSchema = z
   .string()
   .url()
-  .refine((value) => /^https?:\/\//.test(value), "must be an http or https URL");
+  .refine((value) => /^https?:\/\//.test(value), "must be an http or https URL")
+  .refine(
+    (value) => URL.canParse(value) && !new URL(value).username && !new URL(value).password,
+    "cannot hold credentials: put them in the upstream headers, which are sealed",
+  );
 
 /** Headers the gateway sets itself, so a target cannot override them. */
 const RESERVED_HEADER = /^(content-type|content-length|a2a-version|host|traceparent|tracestate)$/i;
@@ -150,6 +154,20 @@ export class GatewayA2aTargetNotFoundError extends HandledError {
       fault: "customer",
     });
     this.name = "GatewayA2aTargetNotFoundError";
+  }
+}
+
+/** The upstream moved to another origin while keeping headers saved for the old one. */
+export class GatewayA2aTargetHeadersNeedReplacingError extends HandledError {
+  declare readonly code: "gateway_a2a_target_headers_need_replacing";
+
+  constructor() {
+    super(
+      "gateway_a2a_target_headers_need_replacing",
+      "The upstream URL moved to another origin: send new upstream headers with it, or an empty set",
+      { httpStatus: 422, fault: "customer" },
+    );
+    this.name = "GatewayA2aTargetHeadersNeedReplacingError";
   }
 }
 

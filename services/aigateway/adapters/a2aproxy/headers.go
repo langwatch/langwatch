@@ -7,11 +7,10 @@ import (
 )
 
 // keptResponseHeaders are the only upstream headers that reach the caller.
-// Anything else (CORS grants, WWW-Authenticate, cookies, hop-by-hop headers)
-// would speak for the gateway's own address, shared by every target.
+// Anything else (CORS grants, WWW-Authenticate, cookies, hop-by-hop headers,
+// cache rules) would speak for the gateway's own address, shared by every target.
 var keptResponseHeaders = map[string]bool{
 	"Content-Type":     true,
-	"Cache-Control":    true,
 	"Retry-After":      true,
 	"A2a-Version":      true,
 	"A2a-Extensions":   true,
@@ -31,6 +30,13 @@ func copyHeader(dst, src http.Header) {
 		dst.Set("Content-Type", "application/json")
 	}
 	dst.Set("X-Content-Type-Options", "nosniff")
+	setNoStore(dst)
+}
+
+// setNoStore keeps every A2A reply out of shared caches: each one answers a
+// key-scoped call, and a cached copy would skip the next caller's policy and scan.
+func setNoStore(h http.Header) {
+	h.Set("Cache-Control", "no-store")
 }
 
 // isEventStream reports whether a Content-Type names an SSE stream, in any case.

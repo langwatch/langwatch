@@ -12,7 +12,9 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.opentelemetry.io/otel/codes"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 
 	"github.com/langwatch/langwatch/services/aigateway/domain"
 )
@@ -208,4 +210,52 @@ func TestTokenOutsideTextPartsIsBlockedBeforeTheUpstream(t *testing.T) {
 			assert.Empty(t, f.upstreamCalls())
 		})
 	}
+}
+
+// @scenario "the outgoing scan covers every part of the payload, not only text parts"
+func TestDataPartStringsAreScannedAsWritten(t *testing.T) {
+	f := newFixture(t)
+	f.bundle.Config.Guardrails.Pre = []domain.GuardrailEntry{{ID: "g1"}}
+	// "dG9rZW4x" is itself valid base64 (of "token1"): inside a data part it is the sender's text.
+	f.scanner = GuardrailScanner{Evaluator: fakeEvaluator{deny: "dG9rZW4x"}}
+	body := `{"jsonrpc":"2.0","id":7,"method":"SendMessage","params":{"message":{"messageId":"m1","role":"ROLE_USER",` +
+		`"parts":[{"data":{"raw":"dG9rZW4x","bytes":"dG9rZW4x"}}]}}}`
+	rec := f.do(http.MethodPost, "/a2a/billing", body)
+
+	_, reason, _ := rpcError(t, rec)
+	assert.Equal(t, "a2a_content_blocked", reason)
+	assert.Empty(t, f.upstreamCalls())
+}
+
+func TestFilePartBytesAreScannedDecoded(t *testing.T) {
+	p := collectTexts([]byte(`{"message":{"parts":[{"raw":"dG9rZW4x","mediaType":"text/plain"}]}}`))
+	assert.Contains(t, p.texts, "token1")
+}
+
+// @scenario "a virtual key with too many calls in flight is refused"
+func TestBusyRefusalLeavesTheGatewaySpanAlone(t *testing.T) {
+	f := newFixture(t)
+	h := New(Config{
+		Registry: f.registry,
+		Bundle:   func(context.Context) *domain.Bundle { return f.bundle },
+		Client:   f.upstream.Client(),
+		Tracer:   sdktrace.NewTracerProvider().Tracer("test"),
+	})
+	for range maxInFlightPerKey {
+		require.True(t, h.inflight.acquire(f.bundle.VirtualKeyID))
+	}
+	recorder := tracetest.NewSpanRecorder()
+	ctx, gatewaySpan := sdktrace.NewTracerProvider(sdktrace.WithSpanProcessor(recorder)).Tracer("gw").Start(context.Background(), "gateway")
+	req := httptest.NewRequest(http.MethodPost, "http://gw.acme.test/a2a/billing/message:send", strings.NewReader(`{}`)).WithContext(ctx)
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	gatewaySpan.End()
+
+	assert.Equal(t, http.StatusTooManyRequests, rec.Code)
+	ended := recorder.Ended()
+	require.Len(t, ended, 1)
+	for _, kv := range ended[0].Attributes() {
+		assert.NotEqual(t, attrDecision, string(kv.Key), "the refusal belongs on the hop, not the gateway's own span")
+	}
+	assert.NotEqual(t, codes.Error, ended[0].Status().Code)
 }

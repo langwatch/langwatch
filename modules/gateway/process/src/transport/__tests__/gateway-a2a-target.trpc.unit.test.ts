@@ -129,7 +129,11 @@ describe("the gatewayA2aTargets tRPC declaration", () => {
         blockReason: null,
         actorUserId: "usr_1",
       });
-      expect(app.archiveProjectA2aTarget).toHaveBeenCalledWith({ projectId: "p1", id: "a2a_1" });
+      expect(app.archiveProjectA2aTarget).toHaveBeenCalledWith({
+        projectId: "p1",
+        id: "a2a_1",
+        actorUserId: "usr_1",
+      });
     });
   });
 
@@ -225,7 +229,11 @@ describe("the gatewayA2aTargets tRPC declaration", () => {
         actor,
       });
 
-      expect(app.archiveA2aTarget).toHaveBeenCalledWith({ id: "a2a_1", organizationId: ORG_ID });
+      expect(app.archiveA2aTarget).toHaveBeenCalledWith({
+        id: "a2a_1",
+        organizationId: ORG_ID,
+        actorUserId: "usr_1",
+      });
     });
   });
 

@@ -96,8 +96,12 @@ type payload struct {
 }
 
 // partText is the text-part text of one artifact, joined. An empty id holds
-// the text outside any artifact, such as a status message's.
-type partText struct{ id, text string }
+// the text outside any artifact, such as a status message's. appends is false
+// for an artifact update that replaces the artifact's earlier content.
+type partText struct {
+	id, text string
+	appends  bool
+}
 
 // maxJSONDepth bounds how deep the scan walks one body.
 const maxJSONDepth = 64
@@ -163,9 +167,11 @@ type jsonFrame struct {
 	content bool
 	key     string
 	// group indexes the artifact this frame sits in, -1 for none; artifact
-	// marks the frame of the artifact object itself.
-	group    int
-	artifact bool
+	// marks the frame of the artifact object itself. appendFlag is this
+	// object's "append" member, shared with the artifacts it holds.
+	group      int
+	artifact   bool
+	appendFlag *bool
 }
 
 // contentKeys open sender-authored objects: nothing under them is protocol.
@@ -185,6 +191,9 @@ type tokenWalker struct {
 type partGroup struct {
 	id     string
 	pieces []string
+	// appends points at the update's append member; nil means no update
+	// wrapped the artifact, as in a task snapshot, which replaces.
+	appends *bool
 }
 
 // walk reads one JSON value and appends its text.
@@ -219,8 +228,11 @@ func (w *tokenWalker) step(tok json.Token) (bool, error) {
 	case isDelim:
 		w.stack = w.stack[:top] // an array's closing bracket
 	default:
-		if s, ok := tok.(string); ok {
-			w.appendValue(s)
+		switch v := tok.(type) {
+		case string:
+			w.appendValue(v)
+		case bool:
+			w.noteAppend(v)
 		}
 	}
 	return w.valueDone(), nil
@@ -244,7 +256,7 @@ func (w *tokenWalker) open(d json.Delim) error {
 		f.group = w.stack[len(w.stack)-1].group
 	}
 	if w.withParts && d == '{' && !content && (f.key == "artifact" || f.key == "artifacts") {
-		w.groups = append(w.groups, partGroup{})
+		w.groups = append(w.groups, partGroup{appends: w.parentAppendFlag()})
 		f.group, f.artifact = len(w.groups)-1, true
 	}
 	w.stack = append(w.stack, f)
@@ -288,7 +300,7 @@ func (w *tokenWalker) appendValue(s string) {
 	if s == "" || (!w.inContent() && protocolValueKeys[key]) {
 		return
 	}
-	if key == "bytes" || key == "raw" {
+	if (key == "bytes" || key == "raw") && !w.inContent() {
 		if b, err := base64.StdEncoding.DecodeString(s); err == nil && utf8.Valid(b) {
 			s = string(b)
 		}
@@ -320,12 +332,41 @@ func (w *tokenWalker) notePart(key, s string) {
 	}
 }
 
-// partTexts joins each group's text, leaving out groups with none.
+// parentAppendFlag is the append member of the object about to hold an
+// artifact, created empty so a member read later still reaches the artifact.
+func (w *tokenWalker) parentAppendFlag() *bool {
+	parent := &w.stack[len(w.stack)-1]
+	if parent.key == "artifacts" {
+		return nil
+	}
+	if parent.appendFlag == nil {
+		parent.appendFlag = new(bool)
+	}
+	return parent.appendFlag
+}
+
+// noteAppend records an update's "append": true, wherever it sits among the members.
+func (w *tokenWalker) noteAppend(v bool) {
+	if !w.withParts || len(w.stack) == 0 || w.inContent() {
+		return
+	}
+	top := &w.stack[len(w.stack)-1]
+	if top.object && top.key == "append" {
+		if top.appendFlag == nil {
+			top.appendFlag = new(bool)
+		}
+		*top.appendFlag = v
+	}
+}
+
+// partTexts joins each group's text, leaving out groups with none. Text
+// outside an artifact always joins what came before it.
 func (w *tokenWalker) partTexts() []partText {
 	var out []partText
-	for _, g := range w.groups {
+	for i, g := range w.groups {
 		if len(g.pieces) > 0 {
-			out = append(out, partText{id: g.id, text: strings.Join(g.pieces, "")})
+			appends := i == w.outside || (g.appends != nil && *g.appends)
+			out = append(out, partText{id: g.id, text: strings.Join(g.pieces, ""), appends: appends})
 		}
 	}
 	return out

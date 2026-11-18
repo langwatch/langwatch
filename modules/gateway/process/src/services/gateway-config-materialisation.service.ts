@@ -206,18 +206,23 @@ export class GatewayConfigMaterialiserService {
     return this.projects.findTraceDestination(vk.traceProjectId);
   }
 
-  /** The A2A registry slice a key reads: its resolved trace project's targets and org-wide ones. */
+  /**
+   * The A2A registry slice a key reads: org-wide targets, plus its trace project's own targets
+   * when the key's scopes reach that project. The trace destination grants no access, and it
+   * stays put when scopes move.
+   */
   private a2aScopeOf(
     vk: VirtualKeyWithScopes,
-    traceProject: { id: string } | null,
+    traceProject: { id: string; teamId: string } | null,
   ): {
     organizationId: string;
     projectId: string | null;
     virtualKeyId: string;
   } {
+    const reached = traceProject && keyScopesReachProject({ vk, project: traceProject });
     return {
       organizationId: vk.organizationId,
-      projectId: traceProject?.id ?? null,
+      projectId: reached ? traceProject.id : null,
       virtualKeyId: vk.id,
     };
   }
@@ -312,7 +317,7 @@ export class GatewayConfigMaterialiserService {
   /** The slices other Gateway services own: cache rules, guardrails, export token, A2A targets. */
   private async persistedSlices(
     vk: VirtualKeyWithScopes,
-    traceProject: { id: string } | null,
+    traceProject: { id: string; teamId: string } | null,
     config: ReturnType<typeof parseVirtualKeyConfig>,
   ) {
     // The cache-rule bundle, the project's guardrail catalogue and the key's
@@ -476,4 +481,20 @@ async function settleBefore<T>({
   } finally {
     signal.removeEventListener("abort", onAbort);
   }
+}
+
+/** Whether a key's own scope entries reach a project: its organization, its team or itself. */
+function keyScopesReachProject({
+  vk,
+  project,
+}: {
+  vk: VirtualKeyWithScopes;
+  project: { id: string; teamId: string };
+}): boolean {
+  return vk.scopes.some(
+    (scope) =>
+      (scope.scopeType === "ORGANIZATION" && scope.scopeId === vk.organizationId) ||
+      (scope.scopeType === "TEAM" && scope.scopeId === project.teamId) ||
+      (scope.scopeType === "PROJECT" && scope.scopeId === project.id),
+  );
 }

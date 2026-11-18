@@ -47,6 +47,7 @@ describe("GatewayConfigMaterialiserService.versionToken", () => {
       const a2aTargets = GatewayA2aTargetService.create({
         repository: MemoryGatewayA2aTargetRepository.create(),
         changeEvents: MemoryGatewayChangeEventsRepository.create(),
+        auditLog: { append: async () => {} },
         transactions: { run: (work) => work({}) },
       });
       await a2aTargets.create({ ...target, projectId: null });
@@ -77,6 +78,68 @@ describe("GatewayConfigMaterialiserService.versionToken", () => {
       expect(await materialiser.versionToken(vk)).toBe(
         `cfg-1.${await a2aTargets.bundleFingerprint(bundleScope)}`,
       );
+    });
+  });
+
+  describe("given a key whose trace destination is a project its scopes do not reach", () => {
+    async function tokenFor(
+      scopes: { scopeType: "ORGANIZATION" | "TEAM" | "PROJECT"; scopeId: string }[],
+    ) {
+      const vk = { ...virtualKeyRow(), traceProjectId: "p_traces", scopes };
+      const a2aTargets = GatewayA2aTargetService.create({
+        repository: MemoryGatewayA2aTargetRepository.create(),
+        changeEvents: MemoryGatewayChangeEventsRepository.create(),
+        auditLog: { append: async () => {} },
+        transactions: { run: (work) => work({}) },
+      });
+      await a2aTargets.create({
+        organizationId: vk.organizationId,
+        projectId: "p_traces",
+        name: "billing",
+        agentName: "Billing agent",
+        cardUrl: "https://billing.acme.test/.well-known/agent-card.json",
+        upstreamUrl: "https://billing.acme.test/a2a",
+        actorUserId: "user_1",
+      });
+      const projects = createApiFixture<ProjectApi>({
+        findTraceDestination: async () => ({
+          id: "p_traces",
+          teamId: "team_traces",
+          archivedAt: null,
+          kind: "application",
+        }),
+      });
+      const store = MemoryGatewayStore.create();
+      const materialiser = GatewayConfigMaterialiserService.create({
+        scopeResolution: GatewayScopeResolutionService.create({
+          repository: MemoryGatewayScopeResolutionRepository.create(store),
+          platformProviders: createApiFixture<ModelProviderApi>(),
+          projects,
+        }),
+        projects,
+        chRepo: null,
+        budgetDecisions: memoryGatewayService({ store, projects }).service,
+        modelProviders: createApiFixture<ModelProviderApi>(),
+        assembly,
+        a2aTargets,
+      });
+      return materialiser.versionToken(vk);
+    }
+
+    /** @scenario "a key reaches a project's targets through its own scopes, never its trace destination" */
+    it("carries none of that project's targets", async () => {
+      expect(await tokenFor([{ scopeType: "PROJECT", scopeId: "p_elsewhere" }])).toBe("cfg-1");
+    });
+
+    /** @scenario "a key reaches a project's targets through its own scopes, never its trace destination" */
+    it("carries them once its project, team or organization scope reaches the project", async () => {
+      for (const scope of [
+        { scopeType: "PROJECT" as const, scopeId: "p_traces" },
+        { scopeType: "TEAM" as const, scopeId: "team_traces" },
+        { scopeType: "ORGANIZATION" as const, scopeId: virtualKeyRow().organizationId },
+      ]) {
+        expect(await tokenFor([scope])).not.toBe("cfg-1");
+      }
     });
   });
 });
