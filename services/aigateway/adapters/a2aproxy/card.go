@@ -28,6 +28,7 @@ func (h *Handler) serveCard(c *call, target domain.A2ATarget) {
 	rewriteCard(card, target.UpstreamURL, proxyBase(h.cfg.PublicBaseURL, c.r, target.Name))
 	out, _ := json.Marshal(card)
 	c.w.Header().Set("Content-Type", "application/json")
+	setNoStore(c.w.Header())
 	c.w.WriteHeader(http.StatusOK)
 	_, _ = c.w.Write(out)
 }

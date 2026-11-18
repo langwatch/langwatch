@@ -74,6 +74,16 @@ func (s *streamText) tail(id string) string {
 	return ""
 }
 
+// drop forgets an artifact's tail: its next text replaces what came before.
+func (s *streamText) drop(id string) {
+	for i, t := range s.tails {
+		if t.id == id {
+			s.tails = append(s.tails[:i], s.tails[i+1:]...)
+			return
+		}
+	}
+}
+
 func (s *streamText) add(id, text string) {
 	joined := text
 	for i, t := range s.tails {
@@ -105,6 +115,9 @@ func (h *Handler) checkEvent(c *call, event []byte, seen *streamText) *refusal {
 	}
 	p.texts = append(p.texts, fieldValues(event)...)
 	for _, part := range p.parts {
+		if !part.appends {
+			seen.drop(part.id)
+		}
 		if prev := seen.tail(part.id); prev != "" {
 			p.texts = append(p.texts, prev+part.text)
 		}

@@ -328,7 +328,7 @@ setA2aTargetBlocked(input: SetGatewayA2aTargetBlockedInput): Promise<GatewayA2aT
 #### `archiveA2aTarget`
 
 ```typescript
-archiveA2aTarget(input: { id: string; organizationId: string }): Promise<GatewayA2aTargetDto>;
+archiveA2aTarget(input: { id: string; organizationId: string; actorUserId: string; }): Promise<GatewayA2aTargetDto>;
 ```
 
 #### `listProjectA2aTargets`
@@ -354,7 +354,7 @@ setProjectA2aTargetBlocked(input: SetProjectGatewayA2aTargetBlockedInput): Promi
 #### `archiveProjectA2aTarget`
 
 ```typescript
-archiveProjectA2aTarget(input: { id: string; projectId: string }): Promise<GatewayA2aTargetDto>;
+archiveProjectA2aTarget(input: { id: string; projectId: string; actorUserId: string; }): Promise<GatewayA2aTargetDto>;
 ```
 
 #### `listGuardrails`
@@ -1503,7 +1503,7 @@ interface Input {
   blocked?: boolean;
   blockReason?: string | null;
 }
-type Output = z.infer<typeof gatewayA2aTargetDtoSchema>; // ../contract/src/gateway-a2a-target.ts:123
+type Output = z.infer<typeof gatewayA2aTargetDtoSchema>; // ../contract/src/gateway-a2a-target.ts:127
 
 // gatewayA2aTargets.update
 // Input: inline, ../contract/src/gateway-a2a-target.trpc.ts:30
@@ -1518,7 +1518,7 @@ interface Input {
   blocked?: boolean;
   blockReason?: string | null;
 }
-type Output = z.infer<typeof gatewayA2aTargetDtoSchema>; // ../contract/src/gateway-a2a-target.ts:123
+type Output = z.infer<typeof gatewayA2aTargetDtoSchema>; // ../contract/src/gateway-a2a-target.ts:127
 
 // gatewayA2aTargets.setBlocked
 // Input: inline, ../contract/src/gateway-a2a-target.trpc.ts:34
@@ -1528,7 +1528,7 @@ interface Input {
   blocked: boolean;
   blockReason: string | null;
 }
-type Output = z.infer<typeof gatewayA2aTargetDtoSchema>; // ../contract/src/gateway-a2a-target.ts:123
+type Output = z.infer<typeof gatewayA2aTargetDtoSchema>; // ../contract/src/gateway-a2a-target.ts:127
 
 // gatewayA2aTargets.archive
 // Input: targetIdSchema, ../contract/src/gateway-a2a-target.trpc.ts:17
@@ -1536,7 +1536,7 @@ interface Input {
   organizationId: string;
   id: string;
 }
-type Output = z.infer<typeof gatewayA2aTargetDtoSchema>; // ../contract/src/gateway-a2a-target.ts:123
+type Output = z.infer<typeof gatewayA2aTargetDtoSchema>; // ../contract/src/gateway-a2a-target.ts:127
 
 // gatewayA2aTargets.listForProject
 // Input: inline, ../contract/src/gateway-a2a-target.trpc.ts:42
@@ -1558,7 +1558,7 @@ interface Input {
   blockReason?: string | null;
   projectId: string;
 }
-type Output = z.infer<typeof gatewayA2aTargetDtoSchema>; // ../contract/src/gateway-a2a-target.ts:123
+type Output = z.infer<typeof gatewayA2aTargetDtoSchema>; // ../contract/src/gateway-a2a-target.ts:127
 
 // gatewayA2aTargets.setBlockedForProject
 // Input: inline, ../contract/src/gateway-a2a-target.trpc.ts:50
@@ -1568,7 +1568,7 @@ interface Input {
   blockReason: string | null;
   projectId: string;
 }
-type Output = z.infer<typeof gatewayA2aTargetDtoSchema>; // ../contract/src/gateway-a2a-target.ts:123
+type Output = z.infer<typeof gatewayA2aTargetDtoSchema>; // ../contract/src/gateway-a2a-target.ts:127
 
 // gatewayA2aTargets.archiveForProject
 // Input: projectTargetIdSchema, ../contract/src/gateway-a2a-target.trpc.ts:18
@@ -1576,7 +1576,7 @@ interface Input {
   projectId: string;
   id: string;
 }
-type Output = z.infer<typeof gatewayA2aTargetDtoSchema>; // ../contract/src/gateway-a2a-target.ts:123
+type Output = z.infer<typeof gatewayA2aTargetDtoSchema>; // ../contract/src/gateway-a2a-target.ts:127
 ```
 
 ### `gatewayBudgets`
@@ -1991,9 +1991,9 @@ Run by the tasks process, before serve.
 
 | Kind   | Leaf                          | Environment variable                    | Declared at                            |
 | ------ | ----------------------------- | --------------------------------------- | -------------------------------------- |
-| secret | `internalSecret`              | `LW_GATEWAY_INTERNAL_SECRET`            | `src/app/gateway.app.ts:1177`          |
-| secret | `jwtSecret`                   | `LW_GATEWAY_JWT_SECRET`                 | `src/app/gateway.app.ts:1178`          |
-| secret | `virtualKeyPepper`            | `LW_VIRTUAL_KEY_PEPPER`                 | `src/app/gateway.app.ts:1179`          |
+| secret | `internalSecret`              | `LW_GATEWAY_INTERNAL_SECRET`            | `src/app/gateway.app.ts:1178`          |
+| secret | `jwtSecret`                   | `LW_GATEWAY_JWT_SECRET`                 | `src/app/gateway.app.ts:1179`          |
+| secret | `virtualKeyPepper`            | `LW_VIRTUAL_KEY_PEPPER`                 | `src/app/gateway.app.ts:1180`          |
 | config | `spendSettlementGraceMs`      | `LW_SPEND_SETTLEMENT_GRACE_MS`          | `../contract/src/gateway.config.ts:27` |
 | config | `internalUrl`                 | `LW_GATEWAY_INTERNAL_URL`               | `../contract/src/gateway.config.ts:29` |
 | config | `controlPlaneUrl`             | `GATEWAY_CONTROL_PLANE_URL`             | `../contract/src/gateway.config.ts:31` |

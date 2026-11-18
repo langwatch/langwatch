@@ -201,12 +201,12 @@ func TestHopByHopAndCookieHeadersAreDropped(t *testing.T) {
 	dst := http.Header{}
 	copyHeader(dst, src)
 
-	assert.Equal(t, http.Header{"Content-Type": {"application/json"}, "X-Content-Type-Options": {"nosniff"}}, dst)
+	assert.Equal(t, http.Header{"Content-Type": {"application/json"}, "X-Content-Type-Options": {"nosniff"}, "Cache-Control": {"no-store"}}, dst)
 
 	src = http.Header{"Content-Type": {"text/event-stream"}, "Access-Control-Allow-Origin": {"*"}, "Www-Authenticate": {"Basic"}, "A2a-Version": {"1.0"}}
 	dst = http.Header{}
 	copyHeader(dst, src)
-	assert.Equal(t, http.Header{"Content-Type": {"text/event-stream"}, "A2a-Version": {"1.0"}, "X-Content-Type-Options": {"nosniff"}}, dst)
+	assert.Equal(t, http.Header{"Content-Type": {"text/event-stream"}, "A2a-Version": {"1.0"}, "X-Content-Type-Options": {"nosniff"}, "Cache-Control": {"no-store"}}, dst)
 }
 
 func TestCardURLWithDotSegmentsBecomesTheProxyBase(t *testing.T) {

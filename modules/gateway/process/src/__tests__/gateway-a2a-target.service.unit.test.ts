@@ -1,9 +1,14 @@
 import {
+  GatewayA2aTargetHeadersNeedReplacingError,
   GatewayA2aTargetNameTakenError,
   GatewayA2aTargetNotFoundError,
 } from "@langwatch/gateway-contract";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 
+import type {
+  AppendGatewayAuditInput,
+  GatewayAuditRepository,
+} from "../repositories/gateway-audit.repository.ts";
 import { MemoryGatewayA2aTargetRepository } from "../repositories/memory/memory.gateway-a2a-target.repository.ts";
 import { MemoryGatewayChangeEventsRepository } from "../repositories/memory/memory.gateway-change-event.repository.ts";
 import { a2aTargetToDto } from "../rules/gateway-a2a-target.rules.ts";
@@ -17,12 +22,30 @@ const base = {
   actorUserId: "user_1",
 };
 
-function service(changeEvents = MemoryGatewayChangeEventsRepository.create()) {
+const noAudit: GatewayAuditRepository = { append: async () => {} };
+
+function service(
+  changeEvents = MemoryGatewayChangeEventsRepository.create(),
+  auditLog: GatewayAuditRepository = noAudit,
+  repository = MemoryGatewayA2aTargetRepository.create(),
+) {
   return GatewayA2aTargetService.create({
-    repository: MemoryGatewayA2aTargetRepository.create(),
+    repository,
     changeEvents,
+    auditLog,
     transactions: { run: (work) => work({}) },
   });
+}
+
+/** A repository that fails the test the moment anything asks it to unseal every target's headers. */
+function sealedRepository() {
+  const repository = MemoryGatewayA2aTargetRepository.create();
+  const findAll = repository.findAll.bind(repository);
+  repository.findAll = async (organizationId, options) => {
+    if (options?.headers !== false) throw new Error("unsealed every target's headers");
+    return findAll(organizationId, options);
+  };
+  return repository;
 }
 
 describe("GatewayA2aTargetService", () => {
@@ -51,11 +74,11 @@ describe("GatewayA2aTargetService", () => {
       await expect(
         targets.updateForProject({ ...scope, id: foreign.id, agentName: "x", actorUserId: "u1" }),
       ).rejects.toThrow(GatewayA2aTargetNotFoundError);
-      await expect(targets.archiveForProject({ ...scope, id: foreign.id })).rejects.toThrow(
-        GatewayA2aTargetNotFoundError,
-      );
+      await expect(
+        targets.archiveForProject({ ...scope, id: foreign.id, actorUserId: "u1" }),
+      ).rejects.toThrow(GatewayA2aTargetNotFoundError);
     }
-    await targets.archiveForProject({ ...scope, id: own.id });
+    await targets.archiveForProject({ ...scope, id: own.id, actorUserId: "u1" });
     expect(await targets.listForProject(scope)).toEqual([]);
   });
 
@@ -71,17 +94,93 @@ describe("GatewayA2aTargetService", () => {
   });
 
   it("checks a new name without unsealing any target's headers", async () => {
-    const repository = MemoryGatewayA2aTargetRepository.create();
-    const findAll = vi.spyOn(repository, "findAll");
-    const targets = GatewayA2aTargetService.create({
-      repository,
-      changeEvents: MemoryGatewayChangeEventsRepository.create(),
-      transactions: { run: (work) => work({}) },
-    });
-    await targets.create({ ...base, projectId: null, name: "billing" });
+    const targets = service(undefined, undefined, sealedRepository());
 
-    expect(findAll).toHaveBeenCalledWith("org_1", { headers: false });
-    expect(findAll).not.toHaveBeenCalledWith("org_1");
+    await expect(
+      targets.create({ ...base, projectId: null, name: "billing" }),
+    ).resolves.toMatchObject({ name: "billing" });
+  });
+
+  /** @scenario "a target URL that holds credentials is refused at save time" */
+  it("refuses credentials inside a target URL without echoing them", async () => {
+    for (const field of ["upstreamUrl", "cardUrl"] as const) {
+      const error = await service()
+        .create({
+          ...base,
+          projectId: null,
+          name: "billing",
+          [field]: "https://agent:hunter2@billing.acme.test/a2a",
+        })
+        .catch((caught: unknown) => caught);
+      expect(String(error)).toContain("upstream headers");
+      expect(String(error)).not.toContain("hunter2");
+    }
+  });
+
+  /** @scenario "the target's saved upstream headers never follow its upstream to a new origin" */
+  it("refuses to carry saved upstream headers to a new upstream origin", async () => {
+    const targets = service();
+    const created = await targets.create({
+      ...base,
+      projectId: null,
+      name: "billing",
+      upstreamHeaders: { "X-Token": "s3cret" },
+    });
+    const edit = { id: created.id, organizationId: "org_1", actorUserId: "u1" };
+
+    for (const upstreamUrl of ["https://collector.evil.test/a2a", "http://billing.acme.test/a2a"]) {
+      await expect(targets.update({ ...edit, upstreamUrl })).rejects.toThrow(
+        GatewayA2aTargetHeadersNeedReplacingError,
+      );
+    }
+    await expect(
+      targets.update({ ...edit, upstreamUrl: "https://billing.acme.test/v2/a2a" }),
+    ).resolves.toMatchObject({ upstreamHeaders: { "X-Token": "s3cret" } });
+    await expect(
+      targets.update({
+        ...edit,
+        upstreamUrl: "https://agents.acme.test/a2a",
+        upstreamHeaders: { "X-Token": "replaced" },
+      }),
+    ).resolves.toMatchObject({ upstreamUrl: "https://agents.acme.test/a2a" });
+  });
+
+  /** @scenario "every A2A target write is audited without header values" */
+  it("writes a gateway audit row for every write, with header names but never values", async () => {
+    const rows: AppendGatewayAuditInput[] = [];
+    const targets = service(undefined, {
+      append: async (row) => {
+        rows.push(row);
+      },
+    });
+    const created = await targets.create({
+      ...base,
+      projectId: "p1",
+      name: "billing",
+      upstreamHeaders: { "X-Token": "s3cret" },
+    });
+    const ref = { id: created.id, organizationId: "org_1" };
+    await targets.update({ ...ref, agentName: "Renamed", actorUserId: "u2" });
+    await targets.setBlocked({ ...ref, blocked: true, blockReason: "incident", actorUserId: "u3" });
+    await targets.setBlocked({ ...ref, blocked: false, blockReason: null, actorUserId: "u3" });
+    await targets.archive({ ...ref, actorUserId: "u4" });
+
+    expect(rows.map((row) => [row.action, row.actorUserId, row.targetKind, row.projectId])).toEqual(
+      [
+        ["gateway.a2a_target.created", "user_1", "a2a_target", "p1"],
+        ["gateway.a2a_target.updated", "u2", "a2a_target", "p1"],
+        ["gateway.a2a_target.blocked", "u3", "a2a_target", "p1"],
+        ["gateway.a2a_target.unblocked", "u3", "a2a_target", "p1"],
+        ["gateway.a2a_target.archived", "u4", "a2a_target", "p1"],
+      ],
+    );
+    expect(rows.every((row) => row.targetId === created.id)).toBe(true);
+    expect(rows[1]?.before).toMatchObject({
+      agentName: "Billing agent",
+      upstreamHeaderNames: ["X-Token"],
+    });
+    expect(rows[1]?.after).toMatchObject({ agentName: "Renamed" });
+    expect(JSON.stringify(rows)).not.toContain("s3cret");
   });
 
   it("refuses names that cannot be a path segment", async () => {
@@ -154,14 +253,14 @@ describe("GatewayA2aTargetService", () => {
   it("drops an archived target from the bundle and refuses to touch it again", async () => {
     const targets = service();
     const created = await targets.create({ ...base, projectId: null, name: "billing" });
-    await targets.archive({ id: created.id, organizationId: "org_1" });
+    await targets.archive({ id: created.id, organizationId: "org_1", actorUserId: "u1" });
 
     expect(
       await targets.bundleFor({ organizationId: "org_1", projectId: null, virtualKeyId: "vk_1" }),
     ).toEqual([]);
-    await expect(targets.archive({ id: created.id, organizationId: "org_1" })).rejects.toThrow(
-      GatewayA2aTargetNotFoundError,
-    );
+    await expect(
+      targets.archive({ id: created.id, organizationId: "org_1", actorUserId: "u1" }),
+    ).rejects.toThrow(GatewayA2aTargetNotFoundError);
   });
 
   it("shows header names but never header values on the platform surface", async () => {
@@ -202,17 +301,10 @@ describe("GatewayA2aTargetService", () => {
   });
 
   it("fingerprints without unsealing headers and still moves on a header edit", async () => {
-    const repository = MemoryGatewayA2aTargetRepository.create();
-    const findAll = vi.spyOn(repository, "findAll");
-    const targets = GatewayA2aTargetService.create({
-      repository,
-      changeEvents: MemoryGatewayChangeEventsRepository.create(),
-      transactions: { run: (work) => work({}) },
-    });
+    const targets = service(undefined, undefined, sealedRepository());
     const created = await targets.create({ ...base, projectId: null, name: "billing" });
     const scope = { organizationId: "org_1", projectId: null, virtualKeyId: "vk_1" };
     const before = await targets.bundleFingerprint(scope);
-    expect(findAll).toHaveBeenLastCalledWith("org_1", { headers: false });
 
     await new Promise((resolve) => setTimeout(resolve, 2));
     await targets.update({
@@ -272,7 +364,11 @@ describe("GatewayA2aTargetService", () => {
       blockReason: "incident",
       actorUserId: base.actorUserId,
     });
-    await targets.archive({ id: created.id, organizationId: base.organizationId });
+    await targets.archive({
+      id: created.id,
+      organizationId: base.organizationId,
+      actorUserId: base.actorUserId,
+    });
 
     const { events } = await changeEvents.since(base.organizationId, 0n);
     expect(events.map((event) => [event.kind, event.projectId])).toEqual([

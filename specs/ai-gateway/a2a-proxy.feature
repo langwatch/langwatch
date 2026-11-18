@@ -27,9 +27,37 @@ Feature: A2A proxy on the gateway
     And a target of another project or an org-wide target is not found
 
   @unit
+  Scenario: a key reaches a project's targets through its own scopes, never its trace destination
+    Given a target registered for project "p1"
+    And a virtual key whose traces go to project "p1" but whose scopes reach only project "p2"
+    Then the key's configuration carries none of project "p1"'s targets
+    And a key whose project, team or organization scope reaches "p1" carries them
+
+  @unit
   Scenario: a target the gateway cannot call safely is left out of the configuration
     Given the configuration holds a target whose URL is not http or https, or whose header holds a line break
     Then the gateway leaves that target out
+
+  @unit
+  Scenario: a target URL that holds credentials is refused at save time
+    When an admin saves a target whose upstream or Agent Card URL carries a user name or password
+    Then the target is refused with a message that points at the sealed upstream headers
+    And the message does not repeat the credentials
+    And the gateway leaves such a target out of the configuration
+
+  @unit
+  Scenario: the target's saved upstream headers never follow its upstream to a new origin
+    Given the target "billing" has saved upstream headers
+    When an admin moves its upstream URL to another scheme, host or port without sending headers
+    Then the edit is refused
+    And a path change on the same origin keeps the saved headers
+    And a move that sends a new header set is saved
+
+  @unit
+  Scenario: every A2A target write is audited without header values
+    When an admin creates, edits, blocks, unblocks or archives a target
+    Then a gateway audit row records the action, the actor and the target before and after
+    And the rows carry header names but never header values
 
   @unit
   Scenario: the Agent Card is served with the gateway URL in place of the upstream
@@ -255,6 +283,11 @@ Feature: A2A proxy on the gateway
   Scenario: hop-by-hop and cookie headers from the upstream are dropped
     When the upstream replies with hop-by-hop headers, headers named in Connection and Set-Cookie
     Then the caller receives none of them
+
+  @unit
+  Scenario: an A2A reply is never marked cacheable by a shared cache
+    When the upstream replies with "Cache-Control: public"
+    Then the caller receives "Cache-Control: no-store" on replies, streams, Agent Cards and refusals
 
   @unit
   Scenario: an overlong streamed event ends the stream with an error event

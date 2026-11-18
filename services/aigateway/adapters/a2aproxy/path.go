@@ -126,11 +126,15 @@ var jsonRPCMethods = map[string]bool{
 }
 
 // upstreamEndpoint appends the escaped rest of the path to the upstream URL's
-// path, keeping the upstream's own query and adding the caller's after it.
+// path, keeping the upstream's own query and adding the caller's after it. With
+// no rest (a root JSON-RPC call) the registered path stays as it is, slash included.
 func upstreamEndpoint(base, rest, query string) string {
 	base, _, _ = strings.Cut(base, "#")
 	base, baseQuery, _ := strings.Cut(base, "?")
-	out := strings.TrimSuffix(base, "/") + rest
+	out := base
+	if rest != "" {
+		out = strings.TrimSuffix(base, "/") + rest
+	}
 	if out == "" || !strings.Contains(strings.TrimPrefix(strings.TrimPrefix(out, "https://"), "http://"), "/") {
 		out += "/"
 	}

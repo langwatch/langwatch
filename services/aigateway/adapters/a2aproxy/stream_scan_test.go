@@ -165,3 +165,24 @@ func TestStreamLineWithoutDataPrefixNeverReachesTheCaller(t *testing.T) {
 	assert.Contains(t, rec.Body.String(), `"reason":"a2a_content_blocked"`)
 	assert.NotContains(t, rec.Body.String(), ghToken)
 }
+
+// artifactUpdate is an artifact update event whose append flag is set as given.
+func artifactUpdate(artifactID, text string, appendText bool) string {
+	return fmt.Sprintf(`{"jsonrpc":"2.0","id":7,"result":{"artifactUpdate":{"taskId":"t1","append":%t,`+
+		`"artifact":{"artifactId":%q,"parts":[{"text":%q}]}}}}`, appendText, artifactID, text)
+}
+
+// @scenario "text of artifacts streamed side by side is scanned per artifact"
+func TestArtifactThatReplacesItsTextStartsAFreshTail(t *testing.T) {
+	f := cardNumberStreamFixture(t)
+	f.reply = sseReply(artifactUpdate("a1", "your card", false), artifactUpdate("a1", " number of items", false))
+	rec := f.do(http.MethodPost, "/a2a/billing", sendMessage("SendStreamingMessage", "hello"))
+
+	assert.NotContains(t, rec.Body.String(), "a2a_content_blocked")
+	assert.Contains(t, rec.Body.String(), "number of items")
+
+	f.reply = sseReply(artifactUpdate("a1", "your card", false), artifactUpdate("a1", " number 4111", true))
+	rec = f.do(http.MethodPost, "/a2a/billing", sendMessage("SendStreamingMessage", "hello"))
+	assert.Contains(t, rec.Body.String(), `"reason":"a2a_content_blocked"`)
+	assert.NotContains(t, rec.Body.String(), "4111")
+}

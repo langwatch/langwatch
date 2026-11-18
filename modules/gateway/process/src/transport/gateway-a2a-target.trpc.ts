@@ -34,8 +34,12 @@ export const gatewayA2aTargetTrpcTransport: TrpcRouterDeclaration<
 
   .procedure("archive")
   .withPermission("virtualKeys:manage")
-  .handle(({ app, input }) => {
-    return app.archiveA2aTarget({ id: input.id, organizationId: input.organizationId });
+  .handle(({ app, input, actor }) => {
+    return app.archiveA2aTarget({
+      id: input.id,
+      organizationId: input.organizationId,
+      actorUserId: actor.id,
+    });
   })
 
   .procedure("listForProject")
@@ -58,7 +62,11 @@ export const gatewayA2aTargetTrpcTransport: TrpcRouterDeclaration<
 
   .procedure("archiveForProject")
   .withPermission("virtualKeys:manage", { via: "projectId" })
-  .handle(({ app, input }) => {
-    return app.archiveProjectA2aTarget({ id: input.id, projectId: input.projectId });
+  .handle(({ app, input, actor }) => {
+    return app.archiveProjectA2aTarget({
+      id: input.id,
+      projectId: input.projectId,
+      actorUserId: actor.id,
+    });
   })
   .build();

@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 
 import {
+  GatewayA2aTargetHeadersNeedReplacingError,
   GatewayA2aTargetNameTakenError,
   GatewayA2aTargetNotFoundError,
   createGatewayA2aTargetInputSchema,
@@ -13,6 +14,10 @@ import {
 
 import type { GatewayA2aTargetRepository } from "../repositories/gateway-a2a-target.repository.ts";
 import type {
+  GatewayAuditAction,
+  GatewayAuditRepository,
+} from "../repositories/gateway-audit.repository.ts";
+import type {
   GatewayChangeEventKind,
   GatewayChangeEventsRepository,
 } from "../repositories/gateway-change-event.repository.ts";
@@ -20,37 +25,67 @@ import type {
   GatewayPersistenceTransaction,
   GatewayTransactionRepository,
 } from "../repositories/gateway-transaction.repository.ts";
-import { a2aTargetAdmitsKey, a2aTargetsForProject } from "../rules/gateway-a2a-target.rules.ts";
+import {
+  a2aTargetAdmitsKey,
+  a2aTargetToDto,
+  a2aTargetsForProject,
+} from "../rules/gateway-a2a-target.rules.ts";
 
 /** The A2A target registry: one name per scope (org-wide or one project). */
 export class GatewayA2aTargetService {
   static create(input: {
     repository: GatewayA2aTargetRepository;
     changeEvents: GatewayChangeEventsRepository;
+    auditLog: GatewayAuditRepository;
     transactions: GatewayTransactionRepository;
   }): GatewayA2aTargetService {
-    return new GatewayA2aTargetService(input.repository, input.changeEvents, input.transactions);
+    return new GatewayA2aTargetService(
+      input.repository,
+      input.changeEvents,
+      input.auditLog,
+      input.transactions,
+    );
   }
 
   private constructor(
     private readonly repository: GatewayA2aTargetRepository,
     private readonly changeEvents: GatewayChangeEventsRepository,
+    private readonly auditLog: GatewayAuditRepository,
     private readonly transactions: GatewayTransactionRepository,
   ) {}
 
-  /** Writes the target and bumps the change feed in one transaction, so gateways always refetch. */
-  private announce(
-    kind: GatewayChangeEventKind,
-    write: (transaction: GatewayPersistenceTransaction) => Promise<GatewayA2aTargetResource>,
-  ): Promise<GatewayA2aTargetResource> {
+  /**
+   * Writes the target, bumps the change feed so gateways refetch, and audits the write, all in
+   * one transaction. The audit rows carry the DTO: header names, never their values.
+   */
+  private announce(input: {
+    kind: GatewayChangeEventKind;
+    action: GatewayAuditAction;
+    actorUserId: string;
+    before: GatewayA2aTargetResource | null;
+    write: (transaction: GatewayPersistenceTransaction) => Promise<GatewayA2aTargetResource>;
+  }): Promise<GatewayA2aTargetResource> {
     return this.transactions.run(async (transaction) => {
-      const target = await write(transaction);
+      const target = await input.write(transaction);
       await this.changeEvents.append(
         {
           organizationId: target.organizationId,
           projectId: target.projectId,
-          kind,
+          kind: input.kind,
           payload: { a2aTargetId: target.id },
+        },
+        transaction,
+      );
+      await this.auditLog.append(
+        {
+          organizationId: target.organizationId,
+          projectId: target.projectId,
+          actorUserId: input.actorUserId,
+          action: input.action,
+          targetKind: "a2a_target",
+          targetId: target.id,
+          before: input.before ? a2aTargetToDto(input.before) : null,
+          after: a2aTargetToDto(target),
         },
         transaction,
       );
@@ -94,9 +129,14 @@ export class GatewayA2aTargetService {
     id: string;
     organizationId: string;
     projectId: string;
+    actorUserId: string;
   }): Promise<GatewayA2aTargetResource> {
     await this.requireProjectTarget(input);
-    return this.archive({ id: input.id, organizationId: input.organizationId });
+    return this.archive({
+      id: input.id,
+      organizationId: input.organizationId,
+      actorUserId: input.actorUserId,
+    });
   }
 
   /** Another project's target and an org-wide one read as not found to a project admin. */
@@ -115,18 +155,59 @@ export class GatewayA2aTargetService {
     if (existing.some((t) => t.name === parsed.name && t.projectId === parsed.projectId)) {
       throw new GatewayA2aTargetNameTakenError(parsed.name);
     }
-    return this.announce("A2A_TARGET_CREATED", (tx) => this.repository.create(parsed, tx));
+    return this.announce({
+      kind: "A2A_TARGET_CREATED",
+      action: "gateway.a2a_target.created",
+      actorUserId: parsed.actorUserId,
+      before: null,
+      write: (tx) => this.repository.create(parsed, tx),
+    });
   }
 
-  async update(input: UpdateGatewayA2aTargetInput): Promise<GatewayA2aTargetResource> {
+  update(input: UpdateGatewayA2aTargetInput): Promise<GatewayA2aTargetResource> {
+    return this.write(input, "gateway.a2a_target.updated");
+  }
+
+  private async write(
+    input: UpdateGatewayA2aTargetInput,
+    action: GatewayAuditAction,
+  ): Promise<GatewayA2aTargetResource> {
     const parsed = updateGatewayA2aTargetInputSchema.parse(input);
-    if (!(await this.repository.findById(parsed))) throw new GatewayA2aTargetNotFoundError();
-    return this.announce("A2A_TARGET_UPDATED", (tx) => this.repository.update(parsed, tx));
+    const before = await this.repository.findById(parsed);
+    if (!before) throw new GatewayA2aTargetNotFoundError();
+    if (
+      headersLeftBehind({
+        before,
+        upstreamUrl: parsed.upstreamUrl,
+        headers: parsed.upstreamHeaders,
+      })
+    ) {
+      throw new GatewayA2aTargetHeadersNeedReplacingError();
+    }
+    return this.announce({
+      kind: "A2A_TARGET_UPDATED",
+      action,
+      actorUserId: parsed.actorUserId,
+      before,
+      write: (tx) => this.repository.update(parsed, tx),
+    });
   }
 
-  async archive(input: { id: string; organizationId: string }): Promise<GatewayA2aTargetResource> {
-    if (!(await this.repository.findById(input))) throw new GatewayA2aTargetNotFoundError();
-    return this.announce("A2A_TARGET_DELETED", (tx) => this.repository.archive(input, tx));
+  async archive(input: {
+    id: string;
+    organizationId: string;
+    actorUserId: string;
+  }): Promise<GatewayA2aTargetResource> {
+    const before = await this.repository.findById(input);
+    if (!before) throw new GatewayA2aTargetNotFoundError();
+    const ref = { id: input.id, organizationId: input.organizationId };
+    return this.announce({
+      kind: "A2A_TARGET_DELETED",
+      action: "gateway.a2a_target.archived",
+      actorUserId: input.actorUserId,
+      before,
+      write: (tx) => this.repository.archive(ref, tx),
+    });
   }
 
   /** The bundle's `a2a_targets`: the key's project and org-wide targets the key may call. */
@@ -170,12 +251,34 @@ export class GatewayA2aTargetService {
     blockReason: string | null;
     actorUserId: string;
   }): Promise<GatewayA2aTargetResource> {
-    return this.update({
-      id: input.id,
-      organizationId: input.organizationId,
-      blocked: input.blocked,
-      blockReason: input.blocked ? input.blockReason : null,
-      actorUserId: input.actorUserId,
-    });
+    return this.write(
+      {
+        id: input.id,
+        organizationId: input.organizationId,
+        blocked: input.blocked,
+        blockReason: input.blocked ? input.blockReason : null,
+        actorUserId: input.actorUserId,
+      },
+      input.blocked ? "gateway.a2a_target.blocked" : "gateway.a2a_target.unblocked",
+    );
   }
+}
+
+/**
+ * Whether an edit would send headers saved for one upstream origin to another. Header values are
+ * never shown, so a URL edit alone must not be a way to read them back: a new origin needs a new
+ * header set, even an empty one. A path change on the same origin keeps them.
+ */
+function headersLeftBehind({
+  before,
+  upstreamUrl,
+  headers,
+}: {
+  before: GatewayA2aTargetResource;
+  upstreamUrl: string | undefined;
+  headers: Record<string, string> | undefined;
+}): boolean {
+  if (upstreamUrl === undefined || headers !== undefined) return false;
+  if (Object.keys(before.upstreamHeaders).length === 0) return false;
+  return new URL(upstreamUrl).origin !== new URL(before.upstreamUrl).origin;
 }

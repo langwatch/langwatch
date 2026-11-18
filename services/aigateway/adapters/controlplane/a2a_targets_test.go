@@ -29,12 +29,15 @@ func TestA2ATargetsLoadFromTheConfigWire(t *testing.T) {
 }
 
 // @scenario "a target the gateway cannot call safely is left out of the configuration"
+// @scenario "a target URL that holds credentials is refused at save time"
 func TestA2ATargetWithBadURLOrHeaderIsLeftOut(t *testing.T) {
 	targets := buildA2ATargets([]a2aTargetWire{
 		{Name: "ftp", UpstreamURL: "ftp://billing.acme.test"},
 		{Name: "nohost", UpstreamURL: "https:///a2a"},
 		{Name: "badcard", UpstreamURL: "https://a.acme.test", CardURL: "file:///etc/passwd"},
 		{Name: "crlf", UpstreamURL: "https://a.acme.test", UpstreamHeaders: map[string]string{"X-Token": "a\r\nHost: evil"}},
+		{Name: "userinfo", UpstreamURL: "https://agent:hunter2@a.acme.test"},
+		{Name: "carduserinfo", UpstreamURL: "https://a.acme.test", CardURL: "https://agent:hunter2@a.acme.test/card.json"},
 		{Name: "ok", UpstreamURL: "https://a.acme.test", CardURL: "https://a.acme.test/card.json"},
 	})
 
