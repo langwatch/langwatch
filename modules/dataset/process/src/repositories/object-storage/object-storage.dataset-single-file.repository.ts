@@ -51,6 +51,10 @@ export class ObjectStorageDatasetSingleFileRepository implements DatasetSingleFi
       contentType: JSON_MEDIA_TYPE,
     });
   }
+
+  removeSingleFile(input: { datasetId: string; projectId: string }): Promise<void> {
+    return this.objects.remove(addressOf(input));
+  }
 }
 
 function addressOf(input: { datasetId: string; projectId: string }): StoredObjectAddress {

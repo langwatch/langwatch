@@ -56,6 +56,10 @@ export class FilesystemDatasetSingleFileRepository implements DatasetSingleFileR
     }
   }
 
+  async removeSingleFile(input: { datasetId: string; projectId: string }): Promise<void> {
+    await fs.rm(this.pathOf(input), { force: true });
+  }
+
   private pathOf(input: { datasetId: string; projectId: string }): string {
     assertNoTraversal(input.projectId, input.datasetId);
     return path.join(this.root, input.projectId, input.datasetId);

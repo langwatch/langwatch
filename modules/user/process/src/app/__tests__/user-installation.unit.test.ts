@@ -1,4 +1,5 @@
 import type { AuthzApi } from "@langwatch/authz-contract";
+import type { DatasetApi } from "@langwatch/dataset-contract";
 import { EventSourcing } from "@langwatch/eventing";
 import { EventStoreMemory } from "@langwatch/eventing/testing";
 import type { NotificationService } from "@langwatch/notification-contract";
@@ -43,6 +44,7 @@ function process(
     .provide({
       auth: createUserTestAuth(),
       authz: peers.authz ?? createApiFixture<AuthzApi>(),
+      dataset: createApiFixture<DatasetApi>(),
       notification: createApiFixture<NotificationService>(),
       organization: peers.organization ?? createUserTestOrganizations(),
       "stored-object": createApiFixture<StoredObjectApi>(),
