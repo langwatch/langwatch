@@ -20185,6 +20185,15 @@
           "documentation": ""
         },
         {
+          "name": "braidsEnabled",
+          "columnName": "braidsEnabled",
+          "type": "Boolean",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
           "name": "updatedByUserId",
           "columnName": "updatedByUserId",
           "type": "String",

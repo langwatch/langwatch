@@ -1886,6 +1886,7 @@ export interface LwqlPrismaRows {
   readonly AuthzOrganizationPolicy: {
     readonly organizationId: "String";
     readonly braidsOrganizationAdminsOnly: "Boolean";
+    readonly braidsEnabled: "Boolean";
     readonly updatedByUserId: "String";
     readonly updatedAt: "DateTime";
   };
