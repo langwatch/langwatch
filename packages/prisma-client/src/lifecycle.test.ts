@@ -17,6 +17,7 @@ import {
   PrismaShutdownService,
   type PrismaQueryContext,
   type PrismaQueryExecutor,
+  readablePrismaMessage,
 } from "./connection.ts";
 import { type PrismaDriverAdapter, PrismaDriverAdapterFactory } from "./driver-adapter.ts";
 import { PrismaClient } from "./generated/client.ts";
@@ -369,6 +370,14 @@ describe("explicit Prisma lifecycle", () => {
 
       expect(logger.debug).toHaveBeenCalledOnce();
       expect(logger.error).not.toHaveBeenCalled();
+    });
+
+    it("puts the reason first and the call after, not Prisma's invocation header", () => {
+      const message = readablePrismaMessage(
+        "\nInvalid `prisma.grantUsage.update()` invocation:\n\n\nNo record was found for an update.",
+      );
+
+      expect(message).toBe("No record was found for an update. (prisma.grantUsage.update)");
     });
 
     it("lands a query event on the logger at debug, keyed by its SQL text", () => {

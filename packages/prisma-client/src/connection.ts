@@ -45,7 +45,20 @@ function isRecordNotFound(message: string): boolean {
 
 /** A query event carries `query` where a log event carries `message`. */
 function prismaEventMessage(event: Prisma.LogEvent | Prisma.QueryEvent): string {
-  return "query" in event ? event.query : event.message;
+  return "query" in event ? event.query : readablePrismaMessage(event.message);
+}
+
+const INVOCATION_HEADER = /^\s*Invalid `prisma\.([\w.]+)\(\)` invocation:\s*([\s\S]+)$/;
+
+/**
+ * Prisma opens with "Invalid `prisma.x.y()` invocation:" and gives the reason lines later, so
+ * the first line named the call, never the failure. The reason now comes first, the call after.
+ */
+export function readablePrismaMessage(message: string): string {
+  const match = INVOCATION_HEADER.exec(message);
+  const [, call, reason] = match ?? [];
+  if (call === undefined || reason === undefined) return message;
+  return `${reason.trim()} (prisma.${call})`;
 }
 
 /** An error event's level: a behind schema is a warning, a missing record is the caller's. */
