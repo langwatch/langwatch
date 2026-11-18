@@ -166,31 +166,30 @@ describe("main palette contrast", () => {
   });
 });
 
-describe("terminal colour parity", () => {
-  it.each([
-    ["terminal.fg", "fg"],
-    ["terminal.bg", "bg.card"],
-    ["terminal.black", "fg.subtle"],
-    ["terminal.red", "red.fg"],
-    ["terminal.green", "green.fg"],
-    ["terminal.yellow", "yellow.fg"],
-    ["terminal.blue", "blue.fg"],
-    ["terminal.magenta", "purple.fg"],
-    ["terminal.cyan", "cyan.fg"],
-    ["terminal.white", "fg"],
-    ["terminal.brightBlack", "fg.muted"],
-    ["terminal.brightRed", "red.fg"],
-    ["terminal.brightGreen", "green.fg"],
-    ["terminal.brightYellow", "yellow.fg"],
-    ["terminal.brightBlue", "blue.fg"],
-    ["terminal.brightMagenta", "pink.fg"],
-    ["terminal.brightCyan", "cyan.fg"],
-    ["terminal.brightWhite", "fg"],
-  ])("preserves %s as %s in both modes", (terminal, previous) => {
+describe("terminal screen", () => {
+  const terminal = entry(semantic, "terminal") as TokenTree;
+  const names = leaves(terminal, "terminal.").map(([name]) => name);
+
+  it.each(names)("keeps %s identical in light and dark mode", (name) => {
+    expect(resolve(name, "_light")).toBe(resolve(name, "_dark"));
+  });
+
+  it("stays a dark screen whatever the app's colour mode", () => {
     for (const mode of ["_light", "_dark"] satisfies Mode[]) {
-      expect(resolve(terminal, mode)).toBe(resolve(previous, mode));
+      expect(luminance(resolve("terminal.bg", mode))).toBeLessThan(0.01);
     }
   });
+
+  it.each(["fg", "faint", "red", "green", "yellow", "blue", "accent"])(
+    "keeps terminal.%s readable on the terminal screen",
+    (role) => {
+      const ratio = contrast(
+        resolve(`terminal.${role}`, "_light"),
+        resolve("terminal.bg", "_light"),
+      );
+      expect(ratio).toBeGreaterThanOrEqual(4.5);
+    },
+  );
 });
 
 describe("avatar fills under white initials", () => {
