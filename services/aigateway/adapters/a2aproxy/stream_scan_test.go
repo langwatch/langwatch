@@ -2,6 +2,7 @@ package a2aproxy
 
 import (
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 	"testing"
@@ -106,4 +107,61 @@ func TestStreamTailsAreBounded(t *testing.T) {
 	for _, tail := range s.tails {
 		assert.LessOrEqual(t, len(tail.text), streamTailBytes)
 	}
+}
+
+// @scenario "a streamed event that fails the scan ends the stream"
+func TestEventStreamMediaTypeIsReadInAnyCase(t *testing.T) {
+	f := cardNumberStreamFixture(t)
+	first := `{"jsonrpc":"2.0","id":7,"result":{"task":{"id":"t1","status":{"state":"TASK_STATE_WORKING"}}}}`
+	f.reply = func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "Text/Event-Stream; charset=utf-8")
+		_, _ = fmt.Fprintf(w, "data: %s\n\ndata: %s\n\n", first, `{"result":{"message":{"parts":[{"text":"card number"}]}}}`)
+	}
+	rec := f.do(http.MethodPost, "/a2a/billing", sendMessage("SendStreamingMessage", "hello"))
+
+	chunks := strings.Split(strings.TrimSpace(rec.Body.String()), "\n\n")
+	require.Len(t, chunks, 2, rec.Body.String())
+	assert.Equal(t, "data: "+first, chunks[0])
+	assert.Contains(t, chunks[1], `"reason":"a2a_content_blocked"`)
+}
+
+// @scenario "a phrase split across streamed events is scanned whole"
+func TestTokenSplitAcrossStreamEventsIsBlocked(t *testing.T) {
+	f := secretsFixture(t)
+	event := `{"jsonrpc":"2.0","id":7,"result":{"artifactUpdate":{"taskId":"t1","append":true,"artifact":{"parts":[{"text":%q}]}}}}`
+	f.reply = sseReply(fmt.Sprintf(event, "a"), fmt.Sprintf(event, ghToken[:12]), fmt.Sprintf(event, ghToken[12:]),
+		fmt.Sprintf(event, "b"), fmt.Sprintf(event, "c"))
+	rec := f.do(http.MethodPost, "/a2a/billing", sendMessage("SendStreamingMessage", "hello"))
+
+	chunks := strings.Split(strings.TrimSpace(rec.Body.String()), "\n\n")
+	require.Len(t, chunks, 3, rec.Body.String())
+	assert.Contains(t, chunks[2], `"reason":"a2a_content_blocked"`)
+	assert.NotContains(t, rec.Body.String(), ghToken[12:])
+}
+
+// @scenario "a stream line that is not an SSE data, event, id or retry field never reaches the caller"
+func TestStreamLineWithoutDataPrefixNeverReachesTheCaller(t *testing.T) {
+	f := secretsFixture(t)
+	f.reply = func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		_, _ = io.WriteString(w, ": "+ghToken+"\n"+ghToken+"\ndata: {\"result\":{}}\n\n")
+	}
+	rec := f.do(http.MethodPost, "/a2a/billing", sendMessage("SendStreamingMessage", "hello"))
+	assert.Equal(t, "data: {\"result\":{}}\n\n", rec.Body.String())
+
+	f.reply = func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		_, _ = io.WriteString(w, "id: "+ghToken+"\ndata: {\"result\":{}}\n\n")
+	}
+	rec = f.do(http.MethodPost, "/a2a/billing", sendMessage("SendStreamingMessage", "hello"))
+	assert.Contains(t, rec.Body.String(), `"reason":"a2a_content_blocked"`)
+	assert.NotContains(t, rec.Body.String(), ghToken)
+
+	f.reply = func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		_, _ = io.WriteString(w, "retry: "+ghToken+"\ndata: {\"result\":{}}\n\n")
+	}
+	rec = f.do(http.MethodPost, "/a2a/billing", sendMessage("SendStreamingMessage", "hello"))
+	assert.Contains(t, rec.Body.String(), `"reason":"a2a_content_blocked"`)
+	assert.NotContains(t, rec.Body.String(), ghToken)
 }

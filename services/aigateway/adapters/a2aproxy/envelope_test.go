@@ -53,3 +53,16 @@ func TestPlainJSONRPCEnvelopeStillPasses(t *testing.T) {
 		})
 	}
 }
+
+// @scenario "a JSON-RPC method that is not an A2A method is refused"
+func TestUnknownJSONRPCMethodIsRefusedBeforeTheUpstream(t *testing.T) {
+	f := newFixture(t)
+	rec := f.do(http.MethodPost, "/a2a/billing", `{"jsonrpc":"2.0","id":7,"method":"admin/drop_all"}`)
+	code, reason, _ := rpcError(t, rec)
+	assert.Equal(t, -32601, code)
+	assert.Equal(t, "a2a_operation_not_supported", reason)
+	assert.Empty(t, f.upstreamCalls())
+
+	rec = f.do(http.MethodPost, "/a2a/billing", `{"jsonrpc":"2.0","id":7,"method":"message/send","params":{}}`)
+	assert.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+}

@@ -1,6 +1,7 @@
 package a2aproxy
 
 import (
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -111,4 +112,16 @@ func TestSameOrigin(t *testing.T) {
 	} {
 		assert.Equal(t, tc.want, sameOrigin(tc.a, tc.b), "%s vs %s", tc.a, tc.b)
 	}
+}
+
+// @scenario "the Agent Card lists only the endpoint the gateway serves"
+func TestCardAdvertisesOnlyTheServedEndpointAndV02PathWorks(t *testing.T) {
+	f := newFixture(t)
+	f.reply = func(w http.ResponseWriter, _ *http.Request) {
+		base := f.upstream.URL + "/a2a"
+		_, _ = fmt.Fprintf(w, `{"url":%q,"supportedInterfaces":[{"url":%q},{"url":%q}]}`, base+"/v1", base, base+"/v1")
+	}
+	rec := f.do(http.MethodGet, "/a2a/billing/.well-known/agent.json", "")
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	assert.JSONEq(t, `{"url":"http://gw.acme.test/a2a/billing","supportedInterfaces":[{"url":"http://gw.acme.test/a2a/billing"}]}`, rec.Body.String())
 }

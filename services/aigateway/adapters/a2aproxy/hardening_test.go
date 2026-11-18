@@ -373,3 +373,10 @@ func TestReadEventsDropsAnUnfinishedEventAtEOF(t *testing.T) {
 		assert.Equal(t, []string{"one\n"}, got, body)
 	}
 }
+
+// @scenario "a path refusal says the path is not allowed"
+func TestUnsafePathSaysThePathIsRefused(t *testing.T) {
+	f := newFixture(t)
+	rec := f.do(http.MethodPost, "/a2a/billing/a%2Fb/message:send", `{}`)
+	assert.Contains(t, rec.Body.String(), `"message":"the A2A path is not allowed"`)
+}

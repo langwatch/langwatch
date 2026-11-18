@@ -398,3 +398,17 @@ func TestBundleRegistryFindsTargetInBundle(t *testing.T) {
 		t.Fatalf("missing target err = %v", err)
 	}
 }
+
+// @scenario "the query string of the upstream URL stays after the forwarded path"
+func TestUpstreamQueryStringStaysAfterThePath(t *testing.T) {
+	f := newFixture(t)
+	var gotURI string
+	f.reply = func(w http.ResponseWriter, r *http.Request) {
+		gotURI = r.URL.RequestURI()
+		_, _ = io.WriteString(w, `{}`)
+	}
+	f.setTarget(func(tg *domain.A2ATarget) { tg.UpstreamURL = f.upstream.URL + "/?tenant=7" })
+	rec := f.do(http.MethodPost, "/a2a/billing/message:send?x=1", `{"message":{"parts":[{"text":"hi"}]}}`)
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	assert.Equal(t, "/message:send?tenant=7&x=1", gotURI)
+}

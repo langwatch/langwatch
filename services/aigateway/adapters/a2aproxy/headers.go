@@ -33,6 +33,12 @@ func copyHeader(dst, src http.Header) {
 	dst.Set("X-Content-Type-Options", "nosniff")
 }
 
+// isEventStream reports whether a Content-Type names an SSE stream, in any case.
+func isEventStream(v string) bool {
+	media, _, err := mime.ParseMediaType(v)
+	return err == nil && media == "text/event-stream"
+}
+
 func servableContentType(v string) bool {
 	media, _, err := mime.ParseMediaType(v)
 	if err != nil {

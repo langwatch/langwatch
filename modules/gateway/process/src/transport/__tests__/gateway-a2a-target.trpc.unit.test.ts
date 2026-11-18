@@ -92,7 +92,7 @@ describe("the gatewayA2aTargets tRPC declaration", () => {
         listForProject: "virtualKeys:view",
         updateForProject: "virtualKeys:manage",
         setBlockedForProject: "virtualKeys:manage",
-        deleteForProject: "virtualKeys:manage",
+        archiveForProject: "virtualKeys:manage",
       };
 
       for (const [name, permission] of Object.entries(expected)) {
@@ -113,7 +113,7 @@ describe("the gatewayA2aTargets tRPC declaration", () => {
         input: { projectId: "p1", id: "a2a_1", blocked: true, blockReason: null },
         actor,
       });
-      await handlers.deleteForProject!({ input: { projectId: "p1", id: "a2a_1" }, actor });
+      await handlers.archiveForProject!({ input: { projectId: "p1", id: "a2a_1" }, actor });
 
       expect(app.listProjectA2aTargets).toHaveBeenCalledWith({ projectId: "p1" });
       expect(app.updateProjectA2aTarget).toHaveBeenCalledWith({
@@ -140,8 +140,8 @@ describe("the gatewayA2aTargets tRPC declaration", () => {
       expect(Object.keys(gatewayA2aTargetTrpc.members).toSorted()).toEqual(
         [
           "create",
-          "delete",
-          "deleteForProject",
+          "archive",
+          "archiveForProject",
           "list",
           "listForProject",
           "setBlocked",
@@ -155,7 +155,7 @@ describe("the gatewayA2aTargets tRPC declaration", () => {
         create: "virtualKeys:manage",
         update: "virtualKeys:manage",
         setBlocked: "virtualKeys:manage",
-        delete: "virtualKeys:manage",
+        archive: "virtualKeys:manage",
       });
     });
 
@@ -218,9 +218,9 @@ describe("the gatewayA2aTargets tRPC declaration", () => {
       expect(result).toEqual(expect.objectContaining({ blocked: true, blockReason: "incident" }));
     });
 
-    it("archives a target on delete", async () => {
+    it("archives a target", async () => {
       const app = fakeApp();
-      await mounted(app).handlers.delete!({
+      await mounted(app).handlers.archive!({
         input: { id: "a2a_1", organizationId: ORG_ID },
         actor,
       });

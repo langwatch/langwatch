@@ -625,3 +625,16 @@ condition = "AND"
 targetRules = ["generic-api-key"]
 paths = ['''^services/aigateway/adapters/authresolver/service_test\.go$''']
 regexes = ['''^vk-lw-a2a-(matching|other)-''']
+
+# `ghp_aB3dE5fG7hJ9kL1mN3pQ5rS7tU9vW1xY3zA5` is a made-up GitHub token shape in
+# the A2A proxy scan tests: the guardrail fake denies it, and the tests prove it
+# never reaches the upstream or the caller. A test of a secret scan needs a
+# secret-shaped value; this one is an alternating-case alphabet that names no
+# account. Scoped to that value in that file (`condition = "AND"`) and to
+# `github-pat` and `generic-api-key`, so any other token in the file is still caught.
+[[allowlists]]
+description = "Made-up GitHub token shape in the A2A proxy guardrail scan tests"
+condition = "AND"
+targetRules = ["github-pat", "generic-api-key"]
+paths = ['''^services/aigateway/adapters/a2aproxy/scan_test\.go$''']
+regexes = ['''^ghp_aB3dE5fG7hJ9kL1mN3pQ5rS7tU9vW1xY3zA5$''']

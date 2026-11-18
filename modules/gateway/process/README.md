@@ -1475,11 +1475,11 @@ Contract `../contract/src/gateway-a2a-target.trpc.ts:20`, router `src/transport/
 | `gatewayA2aTargets.create`               | mutation | Permission `virtualKeys:manage` | inline                  | `gatewayA2aTargetDtoSchema` |
 | `gatewayA2aTargets.update`               | mutation | Permission `virtualKeys:manage` | inline                  | `gatewayA2aTargetDtoSchema` |
 | `gatewayA2aTargets.setBlocked`           | mutation | Permission `virtualKeys:manage` | inline                  | `gatewayA2aTargetDtoSchema` |
-| `gatewayA2aTargets.delete`               | mutation | Permission `virtualKeys:manage` | `targetIdSchema`        | `gatewayA2aTargetDtoSchema` |
+| `gatewayA2aTargets.archive`              | mutation | Permission `virtualKeys:manage` | `targetIdSchema`        | `gatewayA2aTargetDtoSchema` |
 | `gatewayA2aTargets.listForProject`       | query    | Permission `virtualKeys:view`   | inline                  | inline                      |
 | `gatewayA2aTargets.updateForProject`     | mutation | Permission `virtualKeys:manage` | inline                  | `gatewayA2aTargetDtoSchema` |
 | `gatewayA2aTargets.setBlockedForProject` | mutation | Permission `virtualKeys:manage` | inline                  | `gatewayA2aTargetDtoSchema` |
-| `gatewayA2aTargets.deleteForProject`     | mutation | Permission `virtualKeys:manage` | `projectTargetIdSchema` | `gatewayA2aTargetDtoSchema` |
+| `gatewayA2aTargets.archiveForProject`    | mutation | Permission `virtualKeys:manage` | `projectTargetIdSchema` | `gatewayA2aTargetDtoSchema` |
 
 ```typescript
 // gatewayA2aTargets.list
@@ -1530,7 +1530,7 @@ interface Input {
 }
 type Output = z.infer<typeof gatewayA2aTargetDtoSchema>; // ../contract/src/gateway-a2a-target.ts:123
 
-// gatewayA2aTargets.delete
+// gatewayA2aTargets.archive
 // Input: targetIdSchema, ../contract/src/gateway-a2a-target.trpc.ts:17
 interface Input {
   organizationId: string;
@@ -1570,7 +1570,7 @@ interface Input {
 }
 type Output = z.infer<typeof gatewayA2aTargetDtoSchema>; // ../contract/src/gateway-a2a-target.ts:123
 
-// gatewayA2aTargets.deleteForProject
+// gatewayA2aTargets.archiveForProject
 // Input: projectTargetIdSchema, ../contract/src/gateway-a2a-target.trpc.ts:18
 interface Input {
   projectId: string;
