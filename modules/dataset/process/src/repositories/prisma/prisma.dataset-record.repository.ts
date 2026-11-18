@@ -153,7 +153,7 @@ SELECT pg_advisory_xact_lock(hashtextextended(${`dataset:${input.datasetId}`}, 0
     projectId: string;
     entries: (DatasetRecordInput & { id: string })[];
   }): Promise<DatasetRecord[]> {
-    await refuseObjectStorageDataset(this.database, input);
+    await refuseUnheldDataset({ client: this.database, key: input, write: "store" });
     await this.database.datasetRecord.createMany({
       data: input.entries.map(({ id, ...entry }) => ({
         id,
@@ -179,7 +179,7 @@ SELECT pg_advisory_xact_lock(hashtextextended(${`dataset:${input.datasetId}`}, 0
     projectId: string;
     entry: Record<string, unknown>;
   }): Promise<DatasetRecord> {
-    await refuseObjectStorageDataset(this.database, input);
+    await refuseUnheldDataset({ client: this.database, key: input, write: "store" });
     const changed = await this.database.datasetRecord.updateMany({
       where: {
         id: input.id,
@@ -204,7 +204,7 @@ SELECT pg_advisory_xact_lock(hashtextextended(${`dataset:${input.datasetId}`}, 0
     projectId: string;
     recordIds: string[];
   }): Promise<number> {
-    await refuseObjectStorageDataset(this.database, input);
+    await refuseUnheldDataset({ client: this.database, key: input, write: "remove" });
     const result = await this.database.datasetRecord.deleteMany({
       where: {
         id: { in: input.recordIds },
@@ -250,6 +250,8 @@ function lockedRecords({
         return datasetColumnsSchema.parse(row.columnTypes);
       },
       setColumnTypes: async (columnTypes: DatasetColumns): Promise<void> => {
+        // Columns stored here re-key no chunk: once the move flipped the dataset, refused too.
+        await refuseUnheldDataset({ client, key: { datasetId, projectId }, write: "store" });
         await client.dataset.updateMany({
           where: { id: datasetId, projectId },
           data: { columnTypes: columnTypes as Prisma.InputJsonValue },
@@ -263,15 +265,20 @@ function lockedRecords({
  * The records-table guard, read with the caller's client: under the dataset's lock it sees the
  * layout the content move commits under the same lock, so no flip lands between check and write.
  */
-async function refuseObjectStorageDataset(
-  client: DatasetRecordClient,
-  input: { datasetId: string; projectId: string },
-): Promise<void> {
+async function refuseUnheldDataset({
+  client,
+  key,
+  write,
+}: {
+  client: DatasetRecordClient;
+  key: { datasetId: string; projectId: string };
+  write: "store" | "remove";
+}): Promise<void> {
   const dataset = await client.dataset.findFirst({
-    where: { id: input.datasetId, projectId: input.projectId },
+    where: { id: key.datasetId, projectId: key.projectId },
     select: { id: true, contentLayout: true, useS3: true },
   });
-  assertRecordsTableHolds(dataset);
+  assertRecordsTableHolds({ dataset, write });
 }
 
 /** Deletes the dataset's entries and writes these in their place, in the client's transaction. */
@@ -286,7 +293,7 @@ async function replaceEntries({
   projectId: string;
   entries: (DatasetRecordInput & { id: string })[];
 }): Promise<void> {
-  await refuseObjectStorageDataset(client, { datasetId, projectId });
+  await refuseUnheldDataset({ client, key: { datasetId, projectId }, write: "store" });
   const writtenAt = Date.now();
   await client.datasetRecord.deleteMany({ where: { datasetId, projectId } });
   for (let start = 0; start < entries.length; start += REPLACE_BATCH_SIZE) {

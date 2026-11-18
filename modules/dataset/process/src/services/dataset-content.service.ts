@@ -312,20 +312,19 @@ export class DatasetContentService implements DatasetContent {
     dataset,
     input,
     columns,
-    newIds,
   }: {
     dataset: Dataset;
     input: CreateDatasetRecordsInput;
     /** The columns the entries were checked against; the append is refused when one is gone. */
     columns?: readonly string[] | undefined;
-    /** Ids the chunks must not hold yet: a create the content move beat to the records table. */
-    newIds?: readonly string[] | undefined;
   }): Promise<DatasetRecord[]> {
     // Minted here, not in the chunk write, so each answered row carries the id it was stored under.
     const forcedIds = input.entries.map(
       (entry) => entry.id ?? generate(RECORD_KSUID_RESOURCE).toString(),
     );
     const entries = input.entries.map(({ id: _id, ...entry }) => entry);
+    // A chosen id the chunks already hold is refused, as the records table's key refuses it.
+    const newIds = input.entries.flatMap((entry) => (entry.id ? [entry.id] : []));
     entries.forEach((entry) => assertStoredRowWithinLimit(entry));
     const storage = this.storage;
     await this.chunks.append({

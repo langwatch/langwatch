@@ -141,6 +141,8 @@ function harness({
 
   const updated: UpdateDatasetInput[] = [];
   const database = MemoryDatasetDatabase.create();
+  // The locked append reads the columns again from the store, so the dataset lives there too.
+  if (row) database.putDataset(row);
   const stored = MemoryDatasetContentRepository.create({ database });
   const datasets = Object.assign(MemoryDatasetContentRepository.create({ database }), {
     findOne: async ({ id }: { id: string; projectId: string }) =>

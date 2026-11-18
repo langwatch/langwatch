@@ -13,7 +13,7 @@ import { ObjectStorageDatasetChunkRepository } from "../../object-storage/object
 import { PrismaDatasetMigrationRepository } from "../prisma.dataset-migration.repository.ts";
 
 type DatasetLayout = { contentLayout: string; useS3: boolean };
-type Fingerprint = { count: number; maxUpdatedAt: Date | null };
+type Fingerprint = { count: number; maxUpdatedAt: Date | null; digest?: string };
 
 class FixtureStorage implements DatasetChunkRepository {
   readonly writeChunks = vi.fn(
@@ -46,10 +46,11 @@ class FixtureStorage implements DatasetChunkRepository {
 }
 
 function fingerprintRow(input: Fingerprint) {
-  return {
-    _count: { _all: input.count },
-    _max: { updatedAt: input.maxUpdatedAt },
-  };
+  return [{ count: input.count, maxUpdatedAt: input.maxUpdatedAt, digest: input.digest ?? "0" }];
+}
+
+function isFingerprintQuery(strings: TemplateStringsArray): boolean {
+  return strings.join("?").includes('AS "digest"');
 }
 
 function fixture(input: {
@@ -73,14 +74,18 @@ function fixture(input: {
     recordPageQuery.mockResolvedValueOnce(page);
   }
   const misfiledCount = vi.fn(async () => [{ count: 0n }]);
-  const recordAggregate = vi.fn(async () => fingerprintRow({ count: 0, maxUpdatedAt: null }));
-  const recordFindMany = vi.fn(async (): Promise<{ id: string; updatedAt: Date }[]> => []);
+  const fingerprintQuery = vi.fn(
+    async (_strings: TemplateStringsArray, ..._values: unknown[]) =>
+      fingerprintRow({ count: 0, maxUpdatedAt: null }),
+  );
   const update = vi.fn(async () => {});
   const executeRaw = vi.fn(async () => 1);
+  // No `datasetRecord` delegate: the fingerprint is one aggregate in SQL, never a row read.
   const transaction = {
     $executeRaw: executeRaw,
+    $queryRaw: (strings: TemplateStringsArray, ...values: unknown[]) =>
+      fingerprintQuery(strings, ...values),
     dataset: { findFirst: lockedDatasetFindFirst, update },
-    datasetRecord: { aggregate: recordAggregate, findMany: recordFindMany },
   };
   async function runTransaction<TResult>(
     operation: (database: typeof transaction) => Promise<TResult>,
@@ -94,15 +99,13 @@ function fixture(input: {
       findMany: datasetFindMany,
       update,
     },
-    datasetRecord: {
-      aggregate: recordAggregate,
-      findMany: recordFindMany,
-    },
-    // The move's two raw reads: its count of rows filed under another project, and record pages.
-    $queryRaw: (strings: TemplateStringsArray, ...values: unknown[]) =>
-      strings.join("?").includes('"projectId" <>')
+    // The move's raw reads: the fingerprint, rows filed under another project, and record pages.
+    $queryRaw: (strings: TemplateStringsArray, ...values: unknown[]) => {
+      if (isFingerprintQuery(strings)) return fingerprintQuery(strings, ...values);
+      return strings.join("?").includes('"projectId" <>')
         ? misfiledCount()
-        : recordPageQuery(strings, ...values),
+        : recordPageQuery(strings, ...values);
+    },
     $transaction: runTransaction,
   };
   const storage = new FixtureStorage();
@@ -120,10 +123,9 @@ function fixture(input: {
     datasetFindFirst,
     datasetFindMany,
     executeRaw,
+    fingerprintQuery,
     lockedDatasetFindFirst,
     migration,
-    recordAggregate,
-    recordFindMany,
     recordPageQuery,
     storage,
     update,
@@ -139,7 +141,7 @@ describe("given a deployment whose dataset destination is its object storage", (
         recordPages: [[{ id: "record_1", entry: { value: 1 } }], []],
         storage: ObjectStorageDatasetChunkRepository.create({ objectStorage }),
       });
-      subject.recordAggregate.mockResolvedValue(
+      subject.fingerprintQuery.mockResolvedValue(
         fingerprintRow({ count: 1, maxUpdatedAt: new Date("2026-01-01T00:00:00.000Z") }),
       );
 
@@ -173,7 +175,7 @@ describe("PrismaDatasetMigrationRepository", () => {
         [],
       ],
     });
-    subject.recordAggregate.mockResolvedValue(
+    subject.fingerprintQuery.mockResolvedValue(
       fingerprintRow({
         count: 3,
         maxUpdatedAt: new Date("2026-01-01T00:00:00.000Z"),
@@ -239,7 +241,7 @@ describe("PrismaDatasetMigrationRepository", () => {
     const subject = fixture({
       recordPages: [[{ id: "record_1", entry: { value: 1 } }], []],
     });
-    subject.recordAggregate
+    subject.fingerprintQuery
       .mockResolvedValueOnce(fingerprintRow(baseline))
       .mockResolvedValueOnce(fingerprintRow(recheck));
 
@@ -256,23 +258,34 @@ describe("PrismaDatasetMigrationRepository", () => {
     const subject = fixture({
       recordPages: [[{ id: "record_1", entry: { value: 1 } }], []],
     });
-    const unchanged = fingerprintRow({ count: 2, maxUpdatedAt: new Date(9) });
-    subject.recordAggregate.mockResolvedValueOnce(unchanged).mockResolvedValueOnce(unchanged);
     // record_1 is edited by a writer whose clock runs behind record_2's stored time.
-    subject.recordFindMany
-      .mockResolvedValueOnce([
-        { id: "record_1", updatedAt: new Date(1) },
-        { id: "record_2", updatedAt: new Date(9) },
-      ])
-      .mockResolvedValueOnce([
-        { id: "record_1", updatedAt: new Date(5) },
-        { id: "record_2", updatedAt: new Date(9) },
-      ]);
+    subject.fingerprintQuery
+      .mockResolvedValueOnce(fingerprintRow({ count: 2, maxUpdatedAt: new Date(9), digest: "11" }))
+      .mockResolvedValueOnce(fingerprintRow({ count: 2, maxUpdatedAt: new Date(9), digest: "12" }));
 
     await expect(
       subject.migration.migrateDataset({ datasetId: "dataset_1", projectId: "project_1" }),
     ).resolves.toBe("skipped-concurrent-write");
     expect(subject.update).not.toHaveBeenCalled();
+  });
+
+  it("fingerprints in one tenant-scoped aggregate, before the copy and again under the lock", async () => {
+    const subject = fixture({
+      recordPages: [[{ id: "record_1", entry: { value: 1 } }], []],
+    });
+    subject.fingerprintQuery.mockResolvedValue(
+      fingerprintRow({ count: 1, maxUpdatedAt: new Date(9), digest: "11" }),
+    );
+
+    await expect(
+      subject.migration.migrateDataset({ datasetId: "dataset_1", projectId: "project_1" }),
+    ).resolves.toBe("migrated");
+
+    expect(subject.fingerprintQuery).toHaveBeenCalledTimes(2);
+    for (const [sql, ...values] of subject.fingerprintQuery.mock.calls) {
+      expect(sql.join("?")).toMatch(/"datasetId"\s*=\s*\?\s+AND\s+"projectId"\s*=\s*\?/);
+      expect(values).toEqual(["dataset_1", "project_1"]);
+    }
   });
 
   /**
@@ -320,7 +333,7 @@ describe("PrismaDatasetMigrationRepository", () => {
       .mockResolvedValueOnce({ contentLayout: "s3_jsonl", useS3: false })
       .mockResolvedValueOnce({ contentLayout: "postgres", useS3: false })
       .mockResolvedValueOnce({ contentLayout: "postgres", useS3: false });
-    subject.recordAggregate
+    subject.fingerprintQuery
       .mockResolvedValueOnce(fingerprintRow({ count: 0, maxUpdatedAt: null }))
       .mockResolvedValueOnce(fingerprintRow({ count: 1, maxUpdatedAt: null }))
       .mockResolvedValueOnce(fingerprintRow({ count: 0, maxUpdatedAt: null }))

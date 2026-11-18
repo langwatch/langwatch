@@ -29,7 +29,7 @@ import type { DatasetContentRepository } from "../repositories/dataset-content.r
 import type { DatasetSingleFileRepository } from "../repositories/dataset-single-file.repository.ts";
 import type { DatasetRow } from "../repositories/dataset.repository.ts";
 import { mapPreviousColumnsToNewColumns } from "../rules/dataset-chunk-lines.rules.ts";
-import { assertColumnsCurrent } from "../rules/dataset-columns.rules.ts";
+import { assertColumnsCurrent, type CheckedColumn } from "../rules/dataset-columns.rules.ts";
 import {
   matchesDatasetSearch,
   refuseSearchScan,
@@ -258,7 +258,7 @@ export class DatasetSingleFileService implements Omit<
   async appendRecords(input: {
     dataset: DatasetRef;
     records: readonly { id: string; entry: Record<string, unknown> }[];
-    columns?: readonly string[] | undefined;
+    columns?: readonly CheckedColumn[] | undefined;
   }): Promise<"appended" | "converted"> {
     try {
       await this.appendToFile(input);
@@ -272,7 +272,7 @@ export class DatasetSingleFileService implements Omit<
   private async appendToFile(input: {
     dataset: DatasetRef;
     records: readonly { id: string; entry: Record<string, unknown> }[];
-    columns?: readonly string[] | undefined;
+    columns?: readonly CheckedColumn[] | undefined;
   }): Promise<void> {
     const { dataset } = input;
     const added = input.records.map((record) => ({

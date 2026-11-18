@@ -3,7 +3,7 @@
  * A record write that read the dataset in the records table, then waited on its lock while the
  * content move flipped it, lands in the chunks (write-paths.feature).
  */
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { createDatasetTestApp } from "../../app/__tests__/dataset.fixture.ts";
 import type { DatasetRepositories } from "../../repositories/dataset.repositories.ts";
@@ -126,5 +126,51 @@ describe("a record write that waited while the content move flipped the dataset"
       ["b", "row b"],
       ["c", "row c"],
     ]);
+  });
+});
+
+describe("a column edit that waited while the content move flipped the dataset", () => {
+  /** @scenario "A column edit that waited while the dataset moved is applied to object storage" */
+  it("renames the column in the chunks", async () => {
+    const { app, datasetId } = await movedWhileWaiting();
+
+    const edited = await app.upsertDataset({
+      projectId: PROJECT,
+      datasetId,
+      name: "moved-while-waiting",
+      columnTypes: [{ name: "question", type: "string" }],
+      columnRenames: [{ from: "input", to: "question" }],
+    });
+
+    expect(edited).toMatchObject({ contentLayout: "s3_jsonl" });
+    expect(edited.columnTypes).toEqual([{ name: "question", type: "string" }]);
+    const { records } = await app.getDatasetWithRecords({
+      projectId: PROJECT,
+      slugOrId: datasetId,
+      limitMb: null,
+    });
+    expect(records.map((record) => record.entry)).toEqual([
+      { question: "row a" },
+      { question: "row b" },
+      { question: "row c" },
+    ]);
+  });
+
+  /** @scenario "A column edit that waited while the dataset moved is applied to object storage" */
+  it("changes the column's type in the chunks", async () => {
+    const { app, datasetId, repositories } = await movedWhileWaiting();
+    const writeChunks = vi.spyOn(repositories.chunks, "writeChunks");
+
+    const edited = await app.upsertDataset({
+      projectId: PROJECT,
+      datasetId,
+      name: "moved-while-waiting",
+      columnTypes: [{ name: "input", type: "json" }],
+    });
+
+    expect(edited).toMatchObject({ contentLayout: "s3_jsonl" });
+    expect(edited.columnTypes).toEqual([{ name: "input", type: "json" }]);
+    // The move's copy, then the edit's rewrite of the chunks under the new type.
+    expect(writeChunks).toHaveBeenCalledTimes(2);
   });
 });

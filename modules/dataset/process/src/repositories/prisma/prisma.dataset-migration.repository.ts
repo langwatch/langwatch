@@ -4,7 +4,6 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { fromDate } from "@langwatch/time";
 import { z } from "zod";
 
-import { recordSetDigest } from "../../rules/dataset-record-set.rules.ts";
 import type {
   DatasetMigrationFingerprint,
   DatasetMigrationMetadata,
@@ -86,7 +85,7 @@ export class PrismaDatasetMigrationRepository implements DatasetMigrationReposit
     datasetId: string;
     projectId: string;
   }): Promise<DatasetMigrationFingerprint> {
-    return fingerprintOf(this.options.database.datasetRecord, input);
+    return fingerprintOf(this.options.database, input);
   }
 
   /**
@@ -140,7 +139,7 @@ SELECT pg_advisory_xact_lock(hashtextextended(${`dataset:${input.datasetId}`}, 0
           return "already-migrated";
         }
 
-        const recheck = await fingerprintOf(database.datasetRecord, {
+        const recheck = await fingerprintOf(database, {
           datasetId: input.datasetId,
           projectId: input.projectId,
         });
@@ -189,22 +188,30 @@ SELECT pg_advisory_xact_lock(hashtextextended(${`dataset:${input.datasetId}`}, 0
   }
 }
 
+/**
+ * One pass in Postgres, nothing per row in the process: the digest sums a 60-bit
+ * slice of each row's md5 over id and millisecond updatedAt, so it needs no sort
+ * and no row-sized string, and any edit to one row moves it (ADR-032).
+ */
 async function fingerprintOf(
-  records: PrismaClient["datasetRecord"],
+  database: Pick<PrismaClient, "$queryRaw">,
   input: { datasetId: string; projectId: string },
 ): Promise<DatasetMigrationFingerprint> {
-  const result = await records.aggregate({
-    where: input,
-    _count: { _all: true },
-    _max: { updatedAt: true },
-  });
-  const changes = await records.findMany({ where: input, select: { id: true, updatedAt: true } });
-  const maxUpdatedAt = result._max.updatedAt;
+  const [row] = await database.$queryRaw<
+    { count: number; maxUpdatedAt: Date | null; digest: string }[]
+  >`
+    SELECT count(*)::int AS "count",
+           max("updatedAt") AS "maxUpdatedAt",
+           coalesce(sum(('x' || substr(md5(
+             "id" || ':' || floor(extract(epoch FROM "updatedAt") * 1000)::bigint::text
+           ), 1, 15))::bit(60)::bigint), 0)::text AS "digest"
+      FROM "DatasetRecord"
+     WHERE "datasetId" = ${input.datasetId}
+       AND "projectId" = ${input.projectId}
+  `;
   return {
-    count: result._count._all,
-    maxUpdatedAt: maxUpdatedAt ? fromDate(maxUpdatedAt) : null,
-    digest: recordSetDigest(
-      changes.map((change) => ({ id: change.id, updatedAt: fromDate(change.updatedAt) })),
-    ),
+    count: row?.count ?? 0,
+    maxUpdatedAt: row?.maxUpdatedAt ? fromDate(row.maxUpdatedAt) : null,
+    digest: row?.digest ?? "0",
   };
 }

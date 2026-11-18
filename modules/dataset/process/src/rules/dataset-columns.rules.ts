@@ -35,16 +35,19 @@ export function assertKnownColumns({
   }
 }
 
+/** A column a write was prepared for: its name, or its name and the type its values took. */
+export type CheckedColumn = string | { name: string; type: string };
+
 /**
- * A write keyed by columns the dataset no longer has in that order is refused: a column edit
- * landed after the caller read them. Order catches a swap, where the names stay but their
- * values trade places. Callers that name no columns are not checked.
+ * A write keyed by columns the dataset no longer has in that order, or with another type, is
+ * refused: a column edit landed after the caller read them. Order catches a swap, where the names
+ * stay but their values trade places. Callers that name no columns are not checked.
  */
 export function assertColumnsCurrent({
   columns,
   columnTypes,
 }: {
-  columns: readonly string[] | undefined;
+  columns: readonly CheckedColumn[] | undefined;
   columnTypes: unknown;
 }): void {
   if (!columns) return;
@@ -53,8 +56,12 @@ export function assertColumnsCurrent({
   const position = new Map(parsed.data.map((column, index) => [column.name, index]));
   let previous = -1;
   for (const column of columns) {
-    const at = position.get(column);
+    const name = typeof column === "string" ? column : column.name;
+    const at = position.get(name);
     if (at === undefined || at <= previous) throw new DatasetStaleColumnsError();
+    if (typeof column !== "string" && parsed.data[at]?.type !== column.type) {
+      throw new DatasetStaleColumnsError();
+    }
     previous = at;
   }
 }

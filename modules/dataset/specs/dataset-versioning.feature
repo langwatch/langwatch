@@ -77,6 +77,12 @@ Feature: Dataset version history
     Then the rows it wrote are removed and the failure is raised
 
   @unit
+  Scenario: A save whose read after writing its rows fails removes the rows it wrote
+    Given a save that wrote its rows
+    When reading the dataset again, or the latest version after a taken number, fails
+    Then the rows it wrote are removed and the failure is raised
+
+  @unit
   Scenario: Saving unchanged content creates no version
     Given a dataset whose latest version holds its current content
     When a version is saved automatically or by an experiment run

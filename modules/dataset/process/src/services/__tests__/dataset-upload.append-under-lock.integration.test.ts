@@ -203,4 +203,46 @@ SELECT pg_advisory_xact_lock(hashtextextended(${`dataset:${datasetId}`}, 0))`;
     await expect(tableRows()).resolves.toBe(3);
     await expect(readRows()).resolves.toEqual(["four", "five"]);
   });
+
+  /** @scenario "A file appended to a records-table dataset whose columns changed while it waited is refused" */
+  it("refuses the rows when a column edit renames their column while the append waits", async () => {
+    const { appended } = await prisma.$transaction(async (tx) => {
+      await tx.$executeRaw` ${skipTenantCheck({
+        // Advisory-lock helper, key is dataset-bounded.
+        SKIP_TENANT_CHECK: true,
+      })}
+SELECT pg_advisory_xact_lock(hashtextextended(${`dataset:${datasetId}`}, 0))`;
+      const waiting = { appended: append(["four", "five"]).catch((error: unknown) => error) };
+      expect(await appendWaitsOnLock()).toBe(true);
+      await tx.dataset.update({
+        where: { id: datasetId, projectId },
+        data: { columnTypes: [{ name: "question", type: "string" }] },
+      });
+      return waiting;
+    });
+
+    await expect(appended).resolves.toMatchObject({ code: "dataset_stale_columns" });
+    await expect(tableRows()).resolves.toBe(3);
+  });
+
+  /** @scenario "A file appended to a records-table dataset whose columns changed while it waited is refused" */
+  it("refuses the rows when a column edit changes their column's type while the append waits", async () => {
+    const { appended } = await prisma.$transaction(async (tx) => {
+      await tx.$executeRaw` ${skipTenantCheck({
+        // Advisory-lock helper, key is dataset-bounded.
+        SKIP_TENANT_CHECK: true,
+      })}
+SELECT pg_advisory_xact_lock(hashtextextended(${`dataset:${datasetId}`}, 0))`;
+      const waiting = { appended: append(["4", "5"]).catch((error: unknown) => error) };
+      expect(await appendWaitsOnLock()).toBe(true);
+      await tx.dataset.update({
+        where: { id: datasetId, projectId },
+        data: { columnTypes: [{ name: "input", type: "number" }] },
+      });
+      return waiting;
+    });
+
+    await expect(appended).resolves.toMatchObject({ code: "dataset_stale_columns" });
+    await expect(tableRows()).resolves.toBe(3);
+  });
 });

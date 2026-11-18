@@ -27,7 +27,7 @@ import {
   chunkedMeta,
   chunkMetaOf,
 } from "../rules/dataset-chunking.rules.ts";
-import { assertColumnsCurrent } from "../rules/dataset-columns.rules.ts";
+import { assertColumnsCurrent, type CheckedColumn } from "../rules/dataset-columns.rules.ts";
 import { DatasetChunkDeleteService } from "./dataset-chunk-delete.service.ts";
 import { DatasetChunkMaintenanceService } from "./dataset-chunk-maintenance.service.ts";
 import { DatasetChunkRowEditService } from "./dataset-chunk-row-edit.service.ts";
@@ -147,7 +147,7 @@ export class DatasetChunkService {
     forcedIds?: (string | undefined)[];
     storage: DatasetChunkRepository;
     /** The columns the caller checked the entries against; refused when one is gone. */
-    columns?: readonly string[] | undefined;
+    columns?: readonly CheckedColumn[] | undefined;
     /** Ids the chunks must not hold yet, as the records table refuses a taken id. */
     newIds?: readonly string[] | undefined;
   }): Promise<{ appended: number }> {

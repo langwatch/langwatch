@@ -32,6 +32,16 @@ Feature: Every write puts dataset rows in object storage
       Then the write is refused, naming the dataset
       And no row is added to the records table
 
+    # The schema's relationMode is "prisma": the table has no foreign key to catch a row for a
+    # dataset that is gone, so the guard refuses it. Removing rows stays allowed, to clear leftovers.
+    @unit
+    Scenario: A records-table write for a dataset that does not exist is refused
+      Given no dataset with a given id in the project
+      When any part of the dataset module asks the records table to add, replace or change rows for it
+      Then the write is refused as "dataset_not_found"
+      And no row is added to the records table
+      And rows left behind for a deleted dataset can still be removed
+
     # REST POST /api/dataset (modules/dataset/process/src/transport/dataset.rest.ts:190), tRPC
     # dataset.upsert (dataset.trpc.ts:17), MCP and both SDKs all reach the same create service.
     # The record shape {id, datasetId, projectId, entry, createdAt, updatedAt} is the public
@@ -56,6 +66,16 @@ Feature: Every write puts dataset rows in object storage
       When a file of 2 rows is appended to the dataset
       Then the move leaves the dataset where it is for its next pass
       And after the next pass the dataset reads 5 rows from object storage
+
+    # The append checks the columns its rows were prepared for again under the lock, as the chunk
+    # and single-file appends do (rules/dataset-columns.rules.ts assertColumnsCurrent).
+    @integration
+    Scenario: A file appended to a records-table dataset whose columns changed while it waited is refused
+      Given a dataset with the column "input" whose 3 rows are still in the records table
+      And a column edit renames "input" to "question", or changes its type, while a file appended to it waits for the dataset's lock
+      When the column edit commits
+      Then the append is refused as "dataset_stale_columns"
+      And the records table still holds the 3 rows
 
     # The restore replaces the table rows under the lock (services/dataset-restore-content.service.ts),
     # so the move's change check sees it. Writing chunks for a dataset the move has not flipped
@@ -88,6 +108,17 @@ Feature: Every write puts dataset rows in object storage
       When a row is deleted, added or edited
       Then the change is in the dataset's chunks
       And no deleted row comes back
+
+    # The column edit stores the columns under the lock through the records table, which refuses
+    # once the move flipped the dataset; the edit is then applied to the chunks
+    # (services/dataset-upsert.service.ts).
+    @unit
+    Scenario: A column edit that waited while the dataset moved is applied to object storage
+      Given a dataset with the column "input" whose 3 rows are still in the records table
+      And the move flips it while a column edit waits for the dataset's lock
+      When the column edit renames "input" to "question", or only changes its type
+      Then the dataset has the new columns
+      And every row read from its chunks holds its value under the new columns
 
   Rule: Nothing creates a dataset in the records table by default
 

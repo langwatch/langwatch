@@ -35,6 +35,7 @@ import type { DatasetChunkRepository } from "../repositories/dataset-chunk.repos
 import type { DatasetContentRepository } from "../repositories/dataset-content.repository.ts";
 import type { DatasetRecordRepository } from "../repositories/dataset-record.repository.ts";
 import type { DatasetRow } from "../repositories/dataset.repository.ts";
+import { assertColumnsCurrent, type CheckedColumn } from "../rules/dataset-columns.rules.ts";
 import { onceMaxBytes } from "../rules/dataset-inline-file.rules.ts";
 import {
   assertStoredRowWithinLimit,
@@ -161,8 +162,8 @@ export class DatasetUploadService implements DatasetUpload {
       id: generate(RECORD_KSUID_RESOURCE).toString(),
       entry,
     }));
-    // The columns the rows were checked against: each locked write refuses them when one is gone.
-    const checked = columns.map((column) => column.name);
+    // The columns and types the rows were converted for: every locked write refuses stale ones.
+    const checked = columns.map(({ name, type }) => ({ name, type }));
     if (isSingleFileDataset(dataset) && this.singleFile) {
       // Converted to chunks while the append waited for the dataset's lock: append there.
       const outcome = await this.singleFile.appendRecords({
@@ -179,7 +180,7 @@ export class DatasetUploadService implements DatasetUpload {
       }
     } else if (dataset.contentLayout === "s3_jsonl") {
       await this.appendToChunks({ dataset, stamped, columns: checked });
-    } else if ((await this.appendToRecordsTable({ dataset, stamped })) === "moved") {
+    } else if ((await this.appendToRecordsTable({ dataset, stamped, columns: checked })) === "moved") {
       await this.appendToChunks({
         dataset: await this.findDataset(dataset.id, projectId),
         stamped,
@@ -197,7 +198,7 @@ export class DatasetUploadService implements DatasetUpload {
   }: {
     dataset: DatasetRow;
     stamped: { id: string; entry: Record<string, unknown> }[];
-    columns: readonly string[];
+    columns: readonly CheckedColumn[];
   }): Promise<void> {
     await this.chunks.append({
       dataset,
@@ -216,9 +217,11 @@ export class DatasetUploadService implements DatasetUpload {
   private async appendToRecordsTable({
     dataset,
     stamped,
+    columns,
   }: {
     dataset: DatasetRow;
     stamped: { id: string; entry: Record<string, unknown> }[];
+    columns: readonly CheckedColumn[];
   }): Promise<"appended" | "moved"> {
     const key = { datasetId: dataset.id, projectId: dataset.projectId };
     const entries = stamped.map(({ id, entry }) => ({
@@ -226,7 +229,10 @@ export class DatasetUploadService implements DatasetUpload {
       id,
     }));
     try {
-      await this.records.withDatasetLock(key, (locked) => locked.createMany({ ...key, entries }));
+      await this.records.withDatasetLock(key, async (locked) => {
+        assertColumnsCurrent({ columns, columnTypes: await locked.columnTypes() });
+        await locked.createMany({ ...key, entries });
+      });
       return "appended";
     } catch (error) {
       if (!(error instanceof DatasetRecordsTableWriteRefusedError)) throw error;

@@ -297,6 +297,47 @@ describe("given a save racing another save for its version number", () => {
 
     expect(deleteChunks).toHaveBeenCalledWith(expect.objectContaining({ chunkCount: 1 }));
   });
+
+  /** @scenario "A save whose read after writing its rows fails removes the rows it wrote" */
+  it("removes the rows it wrote when reading the dataset again fails", async () => {
+    const datasetId = await editedDataset();
+    let written = false;
+    const writeChunk = repositories.versionContent.writeChunk.bind(repositories.versionContent);
+    vi.spyOn(repositories.versionContent, "writeChunk").mockImplementation(async (input) => {
+      await writeChunk(input);
+      written = true;
+    });
+    const findById = repositories.datasets.findById.bind(repositories.datasets);
+    vi.spyOn(repositories.datasets, "findById").mockImplementation(async (input) => {
+      if (written) throw new Error("database down");
+      return findById(input);
+    });
+    const deleteChunks = vi.spyOn(repositories.versionContent, "deleteChunks");
+
+    await expect(save(datasetId)).rejects.toThrow("database down");
+
+    expect(deleteChunks).toHaveBeenCalledWith(expect.objectContaining({ chunkCount: 1 }));
+  });
+
+  /** @scenario "A save whose read after writing its rows fails removes the rows it wrote" */
+  it("removes the rows it wrote when reading the latest version after a taken number fails", async () => {
+    const datasetId = await editedDataset();
+    let numberTaken = false;
+    vi.spyOn(repositories.versions, "create").mockImplementation(async () => {
+      numberTaken = true;
+      throw new DatasetVersionNumberTakenError();
+    });
+    const findLatest = repositories.versions.findLatest.bind(repositories.versions);
+    vi.spyOn(repositories.versions, "findLatest").mockImplementation(async (input) => {
+      if (numberTaken) throw new Error("database down");
+      return findLatest(input);
+    });
+    const deleteChunks = vi.spyOn(repositories.versionContent, "deleteChunks");
+
+    await expect(save(datasetId)).rejects.toThrow("database down");
+
+    expect(deleteChunks).toHaveBeenCalledWith(expect.objectContaining({ chunkCount: 1 }));
+  });
 });
 
 describe("given a version whose rows are larger than one response", () => {

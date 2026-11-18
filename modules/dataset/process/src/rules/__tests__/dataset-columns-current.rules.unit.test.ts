@@ -39,4 +39,21 @@ describe("assertColumnsCurrent", () => {
       ).not.toThrow();
     });
   });
+
+  describe("given a write whose values were converted for each column's type", () => {
+    const current = [{ name: "q", type: "number" }];
+
+    /** @scenario "A file appended to a records-table dataset whose columns changed while it waited is refused" */
+    it("refuses it when a later edit changed a column's type", () => {
+      expect(() =>
+        assertColumnsCurrent({ columns: [{ name: "q", type: "string" }], columnTypes: current }),
+      ).toThrow(DatasetStaleColumnsError);
+    });
+
+    it("accepts it while every column keeps its type", () => {
+      expect(() =>
+        assertColumnsCurrent({ columns: [{ name: "q", type: "number" }], columnTypes: current }),
+      ).not.toThrow();
+    });
+  });
 });

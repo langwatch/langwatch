@@ -123,3 +123,35 @@ describe("given a dataset whose rows are still in the records table", () => {
     expect(rowsOf(datasetId).map((record) => record.id)).toEqual(["r1"]);
   });
 });
+
+describe("given no dataset row in the project", () => {
+  const datasetId = "missing-dataset";
+
+  /** @scenario "A records-table write for a dataset that does not exist is refused" */
+  it("refuses to add, replace or change rows, and adds none", async () => {
+    const entries = [{ id: "r1", input: "a" }];
+    const key = { datasetId, projectId: PROJECT };
+
+    await expect(records.createMany({ ...key, entries })).rejects.toMatchObject({
+      code: "dataset_not_found",
+    });
+    await expect(records.replaceAll({ ...key, entries })).rejects.toMatchObject({
+      code: "dataset_not_found",
+    });
+    await expect(records.update({ ...key, id: "r1", entry: { input: "b" } })).rejects.toMatchObject(
+      { code: "dataset_not_found" },
+    );
+    expect(rowsOf(datasetId)).toEqual([]);
+  });
+
+  /** @scenario "A records-table write for a dataset that does not exist is refused" */
+  it("still removes rows left behind for it", async () => {
+    const owner = await datasetIn({ contentLayout: "postgres" });
+    await records.createMany({ datasetId: owner, projectId: PROJECT, entries: [{ id: "r1" }] });
+    database.removeDataset(PROJECT, owner);
+
+    await records.deleteMany({ datasetId: owner, projectId: PROJECT, recordIds: ["r1"] });
+
+    expect(rowsOf(owner)).toEqual([]);
+  });
+});

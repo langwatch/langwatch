@@ -406,7 +406,6 @@ export class DatasetRecordService {
           dataset: current,
           input: parsed,
           columns,
-          newIds: parsed.entries.flatMap((entry) => (entry.id ? [entry.id] : [])),
         }),
     );
   }

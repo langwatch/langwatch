@@ -294,6 +294,32 @@ describe("adding rows to a dataset in object storage", () => {
   });
 });
 
+describe("adding a row whose id the dataset in object storage already holds", () => {
+  /** @scenario "A row added to a dataset in object storage with an id it already holds is refused" */
+  it("refuses it and keeps the one stored row", async () => {
+    const repositories = MemoryDatasetRepositories.create();
+    const app = createDatasetTestApp({ repositories });
+    const dataset = await app.upsertDataset({ projectId, name: "Taken Ids", columnTypes });
+    const add = () =>
+      app.batchCreateRecords({
+        projectId,
+        slugOrId: dataset.id,
+        entries: [{ id: "rec_1", question: "first" }],
+      });
+    await add();
+
+    const refusal = await add().catch((error: unknown) => error);
+
+    expect(refusal).toMatchObject({ code: "dataset_duplicate_record_id" });
+    const stored = await repositories.chunks.readChunk({
+      projectId,
+      datasetId: dataset.id,
+      index: 0,
+    });
+    expect(stored.map((line) => (line as { id: string }).id)).toEqual(["rec_1"]);
+  });
+});
+
 describe("copying a dataset kept in the Postgres records table", () => {
   /** @scenario "A copy of a dataset is created directly in object storage" */
   it("writes the copy's rows to object storage and none to the records table", async () => {

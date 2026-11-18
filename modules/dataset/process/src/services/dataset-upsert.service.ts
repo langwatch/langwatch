@@ -1,6 +1,7 @@
 import {
   upsertDatasetInputSchema,
   DatasetNameTakenError,
+  DatasetRecordsTableWriteRefusedError,
   DatasetStaleColumnsError,
   type Dataset,
   type UpsertDatasetInput,
@@ -104,7 +105,18 @@ export class DatasetUpsertService {
         columnRenames: parsed.columnRenames,
       });
     } else if (rewrites && existing.contentLayout === "postgres") {
-      await this.migrateRecordColumns({ dataset: existing, parsed, movesValues });
+      const stored = await this.migrateRecordColumns({ dataset: existing, parsed, movesValues });
+      if (stored.outcome === "moved") {
+        // The move flipped the dataset while the edit waited: apply it to the chunks.
+        return options.content.updateColumns({
+          dataset: stored.dataset,
+          projectId: parsed.projectId,
+          name,
+          slug: existing.slug,
+          columnTypes: parsed.columnTypes,
+          ...(parsed.columnRenames ? { columnRenames: parsed.columnRenames } : {}),
+        });
+      }
     }
     // Unchanged columns, or columns stored under the lock: writing them could undo a later edit.
     const { columnTypes: _kept, ...named } = update;
@@ -125,16 +137,27 @@ export class DatasetUpsertService {
     parsed: ParsedUpsert;
     /** False for a type change, reorder or addition: the columns change, no record does. */
     movesValues: boolean;
-  }): Promise<void> {
+  }): Promise<{ outcome: "stored" } | { outcome: "moved"; dataset: Dataset }> {
     const key = { datasetId: dataset.id, projectId: dataset.projectId };
-    await this.deps.options.records.withDatasetLock(key, async (records) => {
-      const current = await records.columnTypes();
-      if (JSON.stringify(current) !== JSON.stringify(dataset.columnTypes)) {
-        throw new DatasetStaleColumnsError();
-      }
-      if (movesValues) await this.rekeyRecords({ records, dataset, parsed });
-      await records.setColumnTypes(parsed.columnTypes);
-    });
+    try {
+      await this.deps.options.records.withDatasetLock(key, async (records) => {
+        const current = await records.columnTypes();
+        if (JSON.stringify(current) !== JSON.stringify(dataset.columnTypes)) {
+          throw new DatasetStaleColumnsError();
+        }
+        if (movesValues) await this.rekeyRecords({ records, dataset, parsed });
+        await records.setColumnTypes(parsed.columnTypes);
+      });
+      return { outcome: "stored" };
+    } catch (error) {
+      if (!(error instanceof DatasetRecordsTableWriteRefusedError)) throw error;
+      const current = await this.deps.getBySlugOrId({
+        projectId: dataset.projectId,
+        slugOrId: dataset.id,
+      });
+      if (current.contentLayout !== "s3_jsonl") throw error;
+      return { outcome: "moved", dataset: current };
+    }
   }
 
   private async rekeyRecords({

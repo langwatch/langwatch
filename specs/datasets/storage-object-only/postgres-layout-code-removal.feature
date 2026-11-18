@@ -30,7 +30,9 @@
 # move and the conversion before it serves: both declare needsOldWritersGone
 # (modules/dataset/process/src/dataset.module.ts), so they start only once the previous image is
 # gone, and waiting would stall the upgrade. So the new image serves at once, and a dataset still on
-# an old layout answers a coded, transient upgrade-in-progress refusal until its step moves it.
+# an old layout answers a coded, transient upgrade-in-progress refusal until its step moves it. A
+# dataset the step leaves for an operator (ADR-032 v20: a single file that is missing or unreadable)
+# answers a different refusal, not transient, naming the operator action; draining cannot fix it.
 # That per-dataset refusal is the prerequisite of the removal (ADR-032 v20). On an install with
 # nothing left on an old layout no dataset is refused.
 
@@ -75,6 +77,16 @@ Feature: Dataset code keeps one way of storing rows
       And once the previous release is gone the steps move the dataset and convert the single-file dataset
       And both datasets then open with every row
       And the upgrade never asks for an intermediate release and never waits on itself
+
+    # becomes @integration
+    @unimplemented
+    Scenario: A dataset the conversion leaves for an operator answers a refusal that names the action
+      Given an installation on the release that removes the old serving path
+      And a single-file dataset recorded with 3 rows whose file is missing
+      When the conversion step has run and left that dataset in place
+      Then opening it is refused with a coded content-unavailable answer that is not marked transient
+      And the answer says an operator must restore the file or mark the dataset's content as lost
+      And once the operator marks it lost the dataset opens with no rows, shown as content lost
 
     # becomes @integration
     @unimplemented

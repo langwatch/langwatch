@@ -346,36 +346,69 @@ export class DatasetVersionService {
     return hasher.digest();
   }
 
-  /** Writes the content again while hashing it, so the stored hash is of the stored rows. */
-  async #writeVersion({
-    dataset,
-    latest,
-    input,
-  }: {
+  /**
+   * Writes the content again while hashing it, so the stored hash is of the stored rows. Any
+   * failure before the rows are kept by a version row or removed removes them, then rethrows.
+   */
+  async #writeVersion(input: {
     dataset: Dataset;
     latest: DatasetVersion | null;
     input: Parameters<DatasetVersionService["snapshot"]>[0];
   }): Promise<DatasetSnapshot | "moved"> {
     const id = this.deps.generateId();
-    const address = { projectId: input.projectId, datasetId: dataset.id, versionId: id };
+    const address = {
+      projectId: input.input.projectId,
+      datasetId: input.dataset.id,
+      versionId: id,
+    };
+    const progress = { chunkCount: 0, settled: false };
+    try {
+      return await this.#writeAndRecord({ ...input, id, address, progress });
+    } catch (error) {
+      if (!progress.settled) {
+        await this.deps.versionContent.deleteChunks({
+          ...address,
+          chunkCount: progress.chunkCount,
+        });
+      }
+      throw error;
+    }
+  }
+
+  async #writeAndRecord({
+    dataset,
+    latest,
+    input,
+    id,
+    address,
+    progress,
+  }: {
+    dataset: Dataset;
+    latest: DatasetVersion | null;
+    input: Parameters<DatasetVersionService["snapshot"]>[0];
+    id: string;
+    address: { projectId: string; datasetId: string; versionId: string };
+    progress: { chunkCount: number; settled: boolean };
+  }): Promise<DatasetSnapshot | "moved"> {
     const hasher = DatasetContentHasherService.create({ columns: dataset.columnTypes });
     let buffer: DatasetVersionRow[] = [];
-    let chunkCount = 0;
+    const flush = async () => {
+      const chunk = { ...address, index: progress.chunkCount, rows: buffer };
+      await this.deps.versionContent.writeChunk(chunk);
+      progress.chunkCount++;
+      buffer = [];
+    };
     for await (const row of this.#currentRows(dataset)) {
       hasher.push(row);
       buffer.push(row);
-      if (buffer.length === DATASET_VERSION_ROWS_PER_CHUNK) {
-        const chunk = { ...address, index: chunkCount++, rows: buffer };
-        await this.deps.versionContent.writeChunk(chunk);
-        buffer = [];
-      }
+      if (buffer.length === DATASET_VERSION_ROWS_PER_CHUNK) await flush();
     }
-    if (buffer.length > 0) {
-      await this.deps.versionContent.writeChunk({ ...address, index: chunkCount++, rows: buffer });
-    }
+    if (buffer.length > 0) await flush();
+    const { chunkCount } = progress;
     const digest = hasher.digest();
     if (await this.#movedSince(dataset)) {
       await this.deps.versionContent.deleteChunks({ ...address, chunkCount });
+      progress.settled = true;
       return "moved";
     }
 
@@ -383,6 +416,7 @@ export class DatasetVersionService {
     for (let attempt = 1; attempt <= MAX_NUMBER_ATTEMPTS; attempt++) {
       if (previous && previous.contentHash === digest.contentHash) {
         await this.deps.versionContent.deleteChunks({ ...address, chunkCount });
+        progress.settled = true;
         return { version: await this.#keepUnchanged({ latest: previous, input }), created: false };
       }
       let version: DatasetVersion;
@@ -405,16 +439,14 @@ export class DatasetVersionService {
           pinned: input.pinned ?? false,
         });
       } catch (error) {
-        if (!(error instanceof DatasetVersionNumberTakenError)) {
-          await this.deps.versionContent.deleteChunks({ ...address, chunkCount });
-          throw error;
-        }
+        if (!(error instanceof DatasetVersionNumberTakenError)) throw error;
         previous = await this.deps.versions.findLatest({
           projectId: input.projectId,
           datasetId: dataset.id,
         });
         continue;
       }
+      progress.settled = true;
       await this.#announce({
         projectId: input.projectId,
         datasetId: dataset.id,
@@ -424,7 +456,6 @@ export class DatasetVersionService {
       });
       return { version, created: true };
     }
-    await this.deps.versionContent.deleteChunks({ ...address, chunkCount });
     throw new Error(
       `Dataset ${dataset.id} took no version number after ${MAX_NUMBER_ATTEMPTS} tries`,
     );
