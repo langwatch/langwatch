@@ -28,3 +28,39 @@ export function carryLangyConversation({
   params.set(LANGY_CONVERSATION_PARAM, conversationId);
   return `${path}?${params.toString()}`;
 }
+
+/** `?langy=open` opens the panel. Spec: specs/langy/langy-prompt-link.feature */
+export const LANGY_OPEN_PARAM = "langy";
+/** `?langyPrompt=<text>` types `<text>` into a fresh conversation's composer, never sent. */
+export const LANGY_PROMPT_PARAM = "langyPrompt";
+
+export type LangyPromptLink = Readonly<{ prompt: string }>;
+
+/** What a `?langy=open&langyPrompt=...` address asks for: an empty array when it asks nothing. */
+export function findLangyPromptLink({ search }: { search: string }): LangyPromptLink[] {
+  const params = new URLSearchParams(search);
+  const prompt = params.get(LANGY_PROMPT_PARAM);
+  if (params.get(LANGY_OPEN_PARAM) !== "open" && prompt === null) return [];
+  return [{ prompt: prompt ?? "" }];
+}
+
+/** The address with the link's parameters removed, everything else kept. */
+export function withoutLangyPromptLink({ search }: { search: string }): string {
+  const params = new URLSearchParams(search);
+  params.delete(LANGY_OPEN_PARAM);
+  params.delete(LANGY_PROMPT_PARAM);
+  const rest = params.toString();
+  return rest ? `?${rest}` : "";
+}
+
+/** A project page address that opens Langy with `prompt` typed in. */
+export function buildLangyPromptLink({ path, prompt }: { path: string; prompt: string }): string {
+  const hashAt = path.indexOf("#");
+  const beforeHash = hashAt === -1 ? path : path.slice(0, hashAt);
+  const hash = hashAt === -1 ? "" : path.slice(hashAt);
+  const [pathname, existing] = beforeHash.split("?", 2);
+  const params = new URLSearchParams(existing ?? "");
+  params.set(LANGY_OPEN_PARAM, "open");
+  params.set(LANGY_PROMPT_PARAM, prompt);
+  return `${pathname}?${params.toString()}${hash}`;
+}

@@ -99,6 +99,13 @@ interface LangyState extends TurnPhaseState, LangySliceSurface {
   // Spec: specs/langy/langy-peek-dock.feature
   closePanel: () => void;
   togglePanel: () => void;
+  /**
+   * The saved open state while the panel is open only because a link opened it, else null.
+   * Spec: specs/langy/langy-prompt-link.feature
+   */
+  savedOpenBeforeLink: boolean | null;
+  /** Open on a fresh conversation with `prompt` typed, not sent, keeping the saved open state. */
+  openFromLink: (prompt: string) => void;
 
   // Command-bar → panel handoff: a question queued from the Cmd+K "Ask Langy"
   // activation, auto-sent by the panel once it is mounted and idle. Ephemeral
@@ -432,6 +439,7 @@ const emptyConversationState = () => ({
  */
 const SCOPE_INDEPENDENT_KEYS: ReadonlySet<string> = new Set<keyof LangyState>([
   "isOpen",
+  "savedOpenBeforeLink",
   "panelMode",
   "panelEffect",
   "devMode",
@@ -727,14 +735,36 @@ function resetScope(state: LangyState, scope: Partial<LangyScope>): Partial<Lang
   };
 }
 
+function openFromLink({
+  state,
+  set,
+  prompt,
+}: {
+  state: LangyState;
+  set: (patch: Partial<LangyState>) => void;
+  prompt: string;
+}): void {
+  const savedOpenBeforeLink = state.savedOpenBeforeLink ?? state.isOpen;
+  const text = prompt.trim();
+  if (!text) {
+    set({ isOpen: true, savedOpenBeforeLink });
+    return;
+  }
+  state.startNewConversation();
+  set({ isOpen: true, savedOpenBeforeLink, draft: text });
+}
+
 export const useLangyStore = defineSlice<LangyState>({
   name: LANGY_STORE_SLICE,
   create: (set, get) => ({
     isOpen: false,
-    openPanel: () => set({ isOpen: true }),
-    closePanel: () => set({ isOpen: false }),
+    openPanel: () => set({ isOpen: true, savedOpenBeforeLink: null }),
+    closePanel: () => set({ isOpen: false, savedOpenBeforeLink: null }),
 
-    togglePanel: () => set((state) => ({ isOpen: !state.isOpen })),
+    togglePanel: () => set((state) => ({ isOpen: !state.isOpen, savedOpenBeforeLink: null })),
+
+    savedOpenBeforeLink: null,
+    openFromLink: (prompt) => openFromLink({ state: get(), set, prompt }),
 
     pendingPrompt: null,
     askLangy: (prompt) =>
@@ -1026,7 +1056,7 @@ export const useLangyStore = defineSlice<LangyState>({
   // open state, its layout, developer mode and WHICH CONVERSATION was open.
   persist: {
     partialize: (state) => ({
-      isOpen: state.isOpen,
+      isOpen: state.savedOpenBeforeLink ?? state.isOpen,
       devMode: state.devMode,
       panelMode: state.panelMode,
       panelEffect: state.panelEffect,
