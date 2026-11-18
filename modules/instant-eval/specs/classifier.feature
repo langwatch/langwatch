@@ -198,6 +198,13 @@ Feature: The Instant Evals classifier interface — one judged question, priced 
     Then its held-back turns spend none of its attempts
     And it is sent and its verdict comes back once the probe is answered
 
+  @unit @regression
+  Scenario: A text held behind a probe that never settles still gives up
+    Given a classifier that has stopped being sent to after sixteen failed sends
+    And a probe still unanswered after four minutes
+    When another text is held back
+    Then each held-back turn spends one of its attempts again
+
   @unit
   Scenario: Rate limits and permanent refusals never stop sends
     Given a classifier answering 429, 529 or 401 to every send

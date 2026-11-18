@@ -152,6 +152,20 @@ describe("the classifier breaker", () => {
     ).toBe(true);
   });
 
+  /** @scenario "A text held behind a probe that never settles still gives up" */
+  it("stops a held-back send awaiting a probe once the probe is overdue", () => {
+    const { probeAnsweredWithinMs } = INSTANT_EVAL_CLASSIFIER_BREAKER;
+    const open = after(downs(openAfterFailures));
+    const probe = classifierBreakerAllowsSend({ state: open, now: probeEveryMs });
+    const overdue = probeEveryMs + probeAnsweredWithinMs;
+
+    const held = classifierBreakerAllowsSend({ state: probe.state, now: overdue - 1 });
+    const late = classifierBreakerAllowsSend({ state: probe.state, now: overdue });
+
+    expect(held.isAwaitingProbe).toBe(true);
+    expect(late).toMatchObject({ isAllowed: false, isAwaitingProbe: false });
+  });
+
   /** @scenario "Rate limits and permanent refusals never stop sends" */
   it("neither opens nor resets on rate limits and permanent refusals", () => {
     expect(allows(after(Array.from({ length: 100 }, () => "neutral")), 0)).toBe(true);

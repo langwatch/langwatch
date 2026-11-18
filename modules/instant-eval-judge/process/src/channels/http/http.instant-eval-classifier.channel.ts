@@ -211,8 +211,8 @@ export class HttpInstantEvalClassifierChannel implements InstantEvalClassifierCh
   }
 
   /**
-   * One held-back turn, not sent. Behind an unanswered probe it is free: the probe settles
-   * within one request timeout, and an answer lets the text use every attempt it has left.
+   * One held-back turn, not sent. Behind an unanswered probe it is free until the probe is
+   * overdue, and an answer lets the text use every attempt it has left.
    * Otherwise it fails as a 500 would, with the same wait.
    */
   private async holdBack({

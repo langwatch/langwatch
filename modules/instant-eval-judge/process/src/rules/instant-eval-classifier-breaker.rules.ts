@@ -10,6 +10,11 @@ export const INSTANT_EVAL_CLASSIFIER_BREAKER = {
   openAfterFailures: 16,
   /** How often one probe goes through while it is stopped. */
   probeEveryMs: 10_000,
+  /**
+   * A probe settles within the rate limiter's longest wait plus one request timeout. One still
+   * unanswered after this is presumed stuck: held-back sends spend their attempts again.
+   */
+  probeAnsweredWithinMs: 240_000,
 } as const;
 
 /**
@@ -41,7 +46,7 @@ export const CLOSED_CLASSIFIER_BREAKER: ClassifierBreakerState = {
 
 /**
  * Whether this send may go out, the state once it does, and its probe number if it is one.
- * `isAwaitingProbe` says a held-back send waits on a probe still unanswered.
+ * `isAwaitingProbe` says a held-back send waits on a probe still unanswered and not overdue.
  */
 export function classifierBreakerAllowsSend({
   state,
@@ -58,9 +63,11 @@ export function classifierBreakerAllowsSend({
   if (state.openedAt === null) {
     return { isAllowed: true, state, probe: null, isAwaitingProbe: false };
   }
-  const { probeEveryMs } = INSTANT_EVAL_CLASSIFIER_BREAKER;
+  const { probeEveryMs, probeAnsweredWithinMs } = INSTANT_EVAL_CLASSIFIER_BREAKER;
   if (state.probeInFlight !== null || now - state.openedAt < probeEveryMs) {
-    return { isAllowed: false, state, probe: null, isAwaitingProbe: state.probeInFlight !== null };
+    const isAwaitingProbe =
+      state.probeInFlight !== null && now - state.openedAt < probeAnsweredWithinMs;
+    return { isAllowed: false, state, probe: null, isAwaitingProbe };
   }
   const probe = state.probesSent + 1;
   return {
