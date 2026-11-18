@@ -52,8 +52,10 @@ export class ObjectStorageDatasetSingleFileRepository implements DatasetSingleFi
     });
   }
 
-  removeSingleFile(input: { datasetId: string; projectId: string }): Promise<void> {
-    return this.objects.remove(addressOf(input));
+  /** A filesystem store keeps a dataset's chunks in a folder at this key: only a file goes. */
+  async removeSingleFile(input: { datasetId: string; projectId: string }): Promise<void> {
+    if (!(await this.objects.exists(addressOf(input)))) return;
+    await this.objects.remove(addressOf(input));
   }
 }
 

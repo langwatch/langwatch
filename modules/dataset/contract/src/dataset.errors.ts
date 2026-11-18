@@ -136,7 +136,7 @@ export class DuplicateRecordIdError extends HandledError {
   declare readonly code: "dataset_duplicate_record_id";
 
   constructor(id: string) {
-    super("dataset_duplicate_record_id", `Duplicate record id "${id}" in the same write`, {
+    super("dataset_duplicate_record_id", `Duplicate record id "${id}"`, {
       httpStatus: 409,
       fault: "customer",
       meta: { recordId: id },

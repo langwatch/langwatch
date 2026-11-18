@@ -4,7 +4,11 @@
  * advisory lock (Decision 9 / I-COUNT); this class keeps append, edit and locate.
  */
 
-import { type DatasetColumnRenames, type DatasetColumns } from "@langwatch/dataset-contract";
+import {
+  type DatasetColumnRenames,
+  type DatasetColumns,
+  DuplicateRecordIdError,
+} from "@langwatch/dataset-contract";
 import { createLogger } from "@langwatch/observability";
 
 import type { DatasetChunkRepository } from "../repositories/dataset-chunk.repository.ts";
@@ -147,6 +151,7 @@ export class DatasetChunkService {
     forcedIds,
     storage,
     columns,
+    newIds,
   }: {
     dataset: DatasetMutationRecord;
     projectId: string;
@@ -155,6 +160,8 @@ export class DatasetChunkService {
     storage: DatasetChunkRepository;
     /** The columns the caller checked the entries against; refused when one is gone. */
     columns?: readonly string[] | undefined;
+    /** Ids the chunks must not hold yet, as the records table refuses a taken id. */
+    newIds?: readonly string[] | undefined;
   }): Promise<{ appended: number }> {
     const datasetStorage = storage;
 
@@ -162,6 +169,14 @@ export class DatasetChunkService {
       const current = await tx.getOne({ id: dataset.id, projectId });
       assertReady(current);
       assertColumnsCurrent({ columns, columnTypes: current.columnTypes });
+      if (newIds && newIds.length > 0) {
+        const wanted = new Set(newIds);
+        for (let index = 0; index < (current.chunkCount ?? 0); index++) {
+          const rows = await datasetStorage.readChunk({ projectId, datasetId: dataset.id, index });
+          const taken = rows.find((line) => isChunkLine(line) && wanted.has(line.id));
+          if (isChunkLine(taken)) throw new DuplicateRecordIdError(taken.id);
+        }
+      }
 
       return this.appendLines({
         tx,

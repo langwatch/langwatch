@@ -56,8 +56,11 @@ export class FilesystemDatasetSingleFileRepository implements DatasetSingleFileR
     }
   }
 
+  /** The file and any temporary copy a write stopped before its rename left beside it. */
   async removeSingleFile(input: { datasetId: string; projectId: string }): Promise<void> {
-    await fs.rm(this.pathOf(input), { force: true });
+    const file = this.pathOf(input);
+    await fs.rm(`${file}.writing`, { force: true });
+    await fs.rm(file, { force: true });
   }
 
   private pathOf(input: { datasetId: string; projectId: string }): string {

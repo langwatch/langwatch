@@ -1082,6 +1082,8 @@ export abstract class DatasetContent {
     input: CreateDatasetRecordsInput;
     /** The columns the entries were checked against; the append is refused when one is gone. */
     columns?: readonly string[] | undefined;
+    /** Ids the chunks must not hold yet: a create the content move beat to the records table. */
+    newIds?: readonly string[] | undefined;
   }): Promise<DatasetRecord[]>;
   abstract deleteRecords(input: {
     dataset: Dataset;

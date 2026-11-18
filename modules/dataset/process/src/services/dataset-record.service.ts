@@ -401,7 +401,13 @@ export class DatasetRecordService {
             ...sanitizedEntry(Object.fromEntries(columns.map((c) => [c, entry[c] ?? null]))),
           })),
         }),
-      (moved, current) => moved.batchCreateRecords({ dataset: current, input: parsed, columns }),
+      (moved, current) =>
+        moved.batchCreateRecords({
+          dataset: current,
+          input: parsed,
+          columns,
+          newIds: parsed.entries.flatMap((entry) => (entry.id ? [entry.id] : [])),
+        }),
     );
   }
 

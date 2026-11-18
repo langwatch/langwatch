@@ -81,7 +81,6 @@ export class DatasetRestoreContentService {
       });
       for (const row of rows) await writer.push(row.entry, { id: row.id });
       const meta = await writer.finalize();
-      await this.deps.chunks.deleteChunksFrom({ projectId, datasetId, fromIndex: meta.chunkCount });
       await tx.updateContent({
         id: datasetId,
         projectId,
@@ -93,6 +92,9 @@ export class DatasetRestoreContentService {
           columnTypes: columns,
         },
       });
+      // Still under the lock, so no append lands past the new count first; a failed update
+      // above leaves these chunks, which the dataset still names.
+      await this.deps.chunks.deleteChunksFrom({ projectId, datasetId, fromIndex: meta.chunkCount });
     });
   }
 }

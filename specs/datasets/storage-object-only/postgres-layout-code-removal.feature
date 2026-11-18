@@ -26,11 +26,13 @@
 # A background step's finishBy is shown in Ops but not enforced by the runner
 # (packages/upgrade/src/step/migration-step.ts:37; only the reader keeps it,
 # packages/upgrade/src/reader/step-view.ts:98). A blocking step is frozen SQL and cannot read a
-# file or write a chunk (.claude/skills/migration-data-step). So the release that removes the
-# serving path first needs an upgrade-framework change: the new image serves only once named
-# background steps are recorded done, and until then the previous image, which still reads the old
-# layouts, keeps serving. That change is a prerequisite of the removal (ADR-032 v20). On an install
-# with nothing left on an old layout the steps find nothing and the new image serves at once.
+# file or write a chunk (.claude/skills/migration-data-step). And the new image cannot wait for the
+# move and the conversion before it serves: both declare needsOldWritersGone
+# (modules/dataset/process/src/dataset.module.ts), so they start only once the previous image is
+# gone, and waiting would stall the upgrade. So the new image serves at once, and a dataset still on
+# an old layout answers a coded, transient upgrade-in-progress refusal until its step moves it.
+# That per-dataset refusal is the prerequisite of the removal (ADR-032 v20). On an install with
+# nothing left on an old layout no dataset is refused.
 
 Feature: Dataset code keeps one way of storing rows
   As a LangWatch developer
@@ -66,12 +68,13 @@ Feature: Dataset code keeps one way of storing rows
 
     # becomes @integration
     @unimplemented
-    Scenario: A direct upgrade moves datasets left on an old layout before the new release serves
+    Scenario: A direct upgrade serves at once and opens each dataset left on an old layout once it is moved
       Given an installation with one dataset still in the records table and one single-file dataset
       When it upgrades straight to the release that removes the old serving path
-      Then the upgrade moves the dataset and converts the single-file dataset before the new release serves
-      And both datasets open with every row once it serves
-      And the upgrade never asks for an intermediate release
+      Then the new release serves, and until the move reaches them both datasets answer upgrade in progress
+      And once the previous release is gone the steps move the dataset and convert the single-file dataset
+      And both datasets then open with every row
+      And the upgrade never asks for an intermediate release and never waits on itself
 
     # becomes @integration
     @unimplemented

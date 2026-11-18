@@ -1126,3 +1126,84 @@ describe("given datasets created before versioning", () => {
     expect(saved.at(-1)).toMatchObject({ afterProjectId: PROJECT });
   });
 });
+
+describe("given a records-table dataset the move flips while a version is saved", () => {
+  /** @scenario "A version saved while the dataset moves holds every row" */
+  it("saves every row, read again from the chunks", async () => {
+    const datasetId = await createDataset();
+    await repositories.content.update({
+      id: datasetId,
+      projectId: PROJECT,
+      data: {
+        contentLayout: "postgres",
+        rowCount: null,
+        chunkCount: null,
+        sizeBytes: null,
+        chunkOffsets: null,
+      },
+    });
+    await repositories.records.createMany({
+      datasetId,
+      projectId: PROJECT,
+      entries: ["a", "b", "c"].map((id) => ({ id, input: `row ${id}` })),
+    });
+    let flipped = false;
+    // The first page read meets the move's flip; from then on the operator cleanup has emptied
+    // the table, so every read of it finds nothing.
+    vi.spyOn(repositories.records, "findPage").mockImplementation(async () => {
+      if (!flipped) {
+        flipped = true;
+        await DatasetMigrationService.create({
+          repository: repositories.migration,
+          storage: repositories.migrationChunks,
+          projects: { listAllIds: async () => ({ ids: [PROJECT], next: null }) },
+        }).run();
+      }
+      return [];
+    });
+
+    await save(datasetId);
+
+    expect((await versionsOf(datasetId))[0]).toMatchObject({ version: 1, rowCount: 3 });
+  });
+});
+
+describe("given a restore whose commit fails", () => {
+  /** @scenario "A restore whose commit fails leaves every chunk the dataset names" */
+  it("leaves the chunk past the restored count for the dataset to read", async () => {
+    const datasetId = await createDataset();
+    await save(datasetId);
+    await app.batchCreateRecords({
+      projectId: PROJECT,
+      slugOrId: datasetId,
+      entries: [{ id: "c", input: "third" }],
+    });
+    expect(
+      (await repositories.content.getOne({ id: datasetId, projectId: PROJECT })).chunkCount,
+    ).toBe(2);
+    const lock = repositories.content.withDatasetLock.bind(repositories.content);
+    vi.spyOn(repositories.content, "withDatasetLock").mockImplementation((id, mutate) =>
+      lock(id, (tx) =>
+        mutate(
+          Object.assign(Object.create(tx), {
+            updateContent: async () => {
+              throw new Error("the database went away");
+            },
+          }),
+        ),
+      ),
+    );
+
+    await expect(
+      app.restoreVersion({ projectId: PROJECT, datasetId, version: 1, editedBy: ALICE }),
+    ).rejects.toThrow("the database went away");
+    vi.restoreAllMocks();
+
+    const current = await app.getDatasetWithRecords({
+      projectId: PROJECT,
+      slugOrId: datasetId,
+      limitMb: null,
+    });
+    expect(current.records.map((record) => record.id)).toContain("c");
+  });
+});

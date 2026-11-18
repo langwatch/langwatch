@@ -312,11 +312,14 @@ export class DatasetContentService implements DatasetContent {
     dataset,
     input,
     columns,
+    newIds,
   }: {
     dataset: Dataset;
     input: CreateDatasetRecordsInput;
     /** The columns the entries were checked against; the append is refused when one is gone. */
     columns?: readonly string[] | undefined;
+    /** Ids the chunks must not hold yet: a create the content move beat to the records table. */
+    newIds?: readonly string[] | undefined;
   }): Promise<DatasetRecord[]> {
     // Minted here, not in the chunk write, so each answered row carries the id it was stored under.
     const forcedIds = input.entries.map(
@@ -332,6 +335,7 @@ export class DatasetContentService implements DatasetContent {
       forcedIds,
       storage,
       columns,
+      newIds,
     });
     return entries.map((entry, index) => toDatasetRecord({ id: forcedIds[index], entry }, dataset));
   }

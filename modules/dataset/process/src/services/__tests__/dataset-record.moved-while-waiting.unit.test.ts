@@ -87,6 +87,25 @@ describe("a record write that waited while the content move flipped the dataset"
   });
 
   /** @scenario "A record write that waited while the dataset moved goes to object storage" */
+  it("refuses a row whose id the move already copied, as the records table would", async () => {
+    const { app, datasetId, ids } = await movedWhileWaiting();
+
+    const refusal = await app
+      .batchCreateRecords({
+        projectId: PROJECT,
+        slugOrId: datasetId,
+        entries: [
+          { id: "d", input: "row d" },
+          { id: "b", input: "a second b" },
+        ],
+      })
+      .catch((error: unknown) => error);
+
+    expect(refusal).toMatchObject({ code: "dataset_duplicate_record_id", httpStatus: 409 });
+    await expect(ids()).resolves.toEqual(["a", "b", "c"]);
+  });
+
+  /** @scenario "A record write that waited while the dataset moved goes to object storage" */
   it("edits the row in the chunks", async () => {
     const { app, datasetId } = await movedWhileWaiting();
 

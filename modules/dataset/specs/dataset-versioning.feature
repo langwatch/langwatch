@@ -165,6 +165,15 @@ Feature: Dataset version history
     And the dataset has version 3, restored from version 1 and authored by that user
     And versions 1 and 2 are unchanged
 
+  # The restore rewrites the chunks in place, then commits the new count; the chunks past that
+  # count go only after the commit, so a failed commit never removes a chunk the dataset still names.
+  @unit
+  Scenario: A restore whose commit fails leaves every chunk the dataset names
+    Given a dataset in object storage whose rows fill 2 chunks
+    And a saved version 1 that fills 1 chunk
+    When version 1 is restored and recording the new content fails
+    Then the dataset still reads from both chunks it names
+
   @unit
   Scenario: Restoring a version first saves the edits made since the latest version
     Given a dataset with version 1 and an edit to row "a" that no version holds yet

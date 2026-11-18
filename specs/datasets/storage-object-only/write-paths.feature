@@ -68,6 +68,16 @@ Feature: Every write puts dataset rows in object storage
       Then the dataset reads the 4 rows of version 2 from the records table
       And when the move flips the dataset while a restore waits, the restore writes the chunks instead
 
+    # A snapshot reads the rows without the dataset lock. Once the cleanup an operator confirms has
+    # emptied the table, a read that began before the flip finds nothing there, so the snapshot
+    # checks the layout again after its read and reads again from where the rows now are.
+    @unit
+    Scenario: A version saved while the dataset moves holds every row
+      Given a dataset whose 3 rows are still in the records table
+      And the move flips it and the table is emptied while a version is being saved
+      When the version is saved
+      Then the version holds the 3 rows, read from the dataset's chunks
+
     # The record service decides where rows live before it takes the lock; the table refuses a
     # write the move beat to the lock, and the write goes to the chunks
     # (services/dataset-locked-records.service.ts).

@@ -45,6 +45,8 @@ import { DatasetRestoreContentService } from "./dataset-restore-content.service.
 const RECORD_PAGE_SIZE = 500;
 /** Concurrent saves that each take the next number; past this the save gives up. */
 const MAX_NUMBER_ATTEMPTS = 5;
+/** A dataset changes layout at most twice (single file or records table, then chunks), plus one. */
+const MAX_LAYOUT_ATTEMPTS = 3;
 
 export type DatasetVersionServiceDeps = {
   versions: DatasetVersionRepository;
@@ -95,16 +97,28 @@ export class DatasetVersionService {
     pinned?: boolean;
     restoredFromVersion?: number;
   }): Promise<DatasetSnapshot> {
-    const dataset = await this.#readyDataset(input);
-    const { contentHash } = await this.#hashCurrent(dataset);
-    const latest = await this.deps.versions.findLatest({
-      projectId: input.projectId,
-      datasetId: dataset.id,
-    });
-    if (latest && latest.contentHash === contentHash) {
-      return { version: await this.#keepUnchanged({ latest, input }), created: false };
+    // The read takes no lock: a pass that a move to new storage overlapped is read again.
+    for (let attempt = 1; attempt <= MAX_LAYOUT_ATTEMPTS; attempt++) {
+      const dataset = await this.#readyDataset(input);
+      const { contentHash } = await this.#hashCurrent(dataset);
+      if (await this.#movedSince(dataset)) continue;
+      const latest = await this.deps.versions.findLatest({
+        projectId: input.projectId,
+        datasetId: dataset.id,
+      });
+      if (latest && latest.contentHash === contentHash) {
+        return { version: await this.#keepUnchanged({ latest, input }), created: false };
+      }
+      const written = await this.#writeVersion({ dataset, latest, input });
+      if (written !== "moved") return written;
     }
-    return this.#writeVersion({ dataset, latest, input });
+    throw new Error(`Dataset ${input.datasetId} kept moving while a version was saved`);
+  }
+
+  /** Whether the dataset's rows moved to another layout since `dataset` was read. */
+  async #movedSince(dataset: Dataset): Promise<boolean> {
+    const now = await this.deps.lookup({ projectId: dataset.projectId, slugOrId: dataset.id });
+    return now.contentLayout !== dataset.contentLayout || now.useS3 !== dataset.useS3;
   }
 
   /**
@@ -341,7 +355,7 @@ export class DatasetVersionService {
     dataset: Dataset;
     latest: DatasetVersion | null;
     input: Parameters<DatasetVersionService["snapshot"]>[0];
-  }): Promise<DatasetSnapshot> {
+  }): Promise<DatasetSnapshot | "moved"> {
     const id = this.deps.generateId();
     const address = { projectId: input.projectId, datasetId: dataset.id, versionId: id };
     const hasher = DatasetContentHasherService.create({ columns: dataset.columnTypes });
@@ -360,6 +374,10 @@ export class DatasetVersionService {
       await this.deps.versionContent.writeChunk({ ...address, index: chunkCount++, rows: buffer });
     }
     const digest = hasher.digest();
+    if (await this.#movedSince(dataset)) {
+      await this.deps.versionContent.deleteChunks({ ...address, chunkCount });
+      return "moved";
+    }
 
     let previous = latest;
     for (let attempt = 1; attempt <= MAX_NUMBER_ATTEMPTS; attempt++) {
