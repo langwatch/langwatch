@@ -113,6 +113,26 @@ Feature: Braids
       And once the projection lands the repeat answers that braid
 
     @unit
+    Scenario: A braid write the ledger accepted stays saved when its confirmation fails
+      Given the ledger accepts ana's braid with a command id
+      When waiting for the grant projection or moving the organisation's epoch then fails
+      Then the request fails and the braid's write stays saved, since it may still land
+      And only a braid the ledger refused is forgotten
+
+    @unit
+    Scenario: A command id answers only the actor who sent it
+      Given ana's braid with a command id is in the ledger but not yet in the grant projection
+      When tom sends a braid with the same command id and terms
+      Then nothing is resent in tom's name and no braid answers as ana's
+      And tom's braid is refused with braid_already_exists
+
+    @unit
+    Scenario: A braid still being saved counts however long ago it was sent
+      Given ana's braid is in the ledger but the grant projection has not landed it for hours
+      When ana asks for a braid with the same projects, condition, data window and end date
+      Then the second braid is refused with braid_already_exists
+
+    @unit
     Scenario: A braid's grant does not pass on to a third project
       Given a live braid from "specialists" into "orchestrator"
       And a live braid from "orchestrator" into a third project "frontdesk"
@@ -378,6 +398,14 @@ Feature: Braids
       When ana repeats the same change
       Then the change answers the grant already attached
       And no third grant is attached
+
+    @unit
+    Scenario: A retried change whose braid was removed meanwhile is refused
+      Given ana's change of a braid is in the ledger but not yet in the grant projection
+      And the braid it replaces is removed
+      When ana repeats the change with the same command id
+      Then it is refused with braid_changed
+      And the replacement is not sent again
 
     @unit
     Scenario: A replaced braid reads nothing once its replacement is live, even before the worker revokes it

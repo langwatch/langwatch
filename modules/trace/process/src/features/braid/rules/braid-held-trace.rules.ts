@@ -1,5 +1,9 @@
 /** A span's place in its trace, as the held rule reads it. */
-export type LinkedSpan = Readonly<{ spanId: string; parentSpanId: string | null }>;
+export type LinkedSpan = Readonly<{
+  spanId: string;
+  parentSpanId: string | null;
+  startTimeMs: number;
+}>;
 
 /** One span id in one trace, the key a link between two projects' spans is matched on. */
 export type TraceSpanKey = Readonly<{ traceId: string; spanId: string }>;
@@ -7,16 +11,20 @@ export type TraceSpanKey = Readonly<{ traceId: string; spanId: string }>;
 /**
  * Whether a reader span and an owner span in one trace are parent and child, either way: the
  * only way a reader holds a trace for a braid; a shared trace id alone holds nothing (ADR-201 §3).
+ * As the live fence, only spans starting at or after `fromMs` link.
  */
 export function readerHoldsTrace({
   readerSpans,
   ownerSpans,
+  fromMs,
 }: {
   readerSpans: readonly LinkedSpan[];
   ownerSpans: readonly LinkedSpan[];
+  fromMs: number;
 }): boolean {
-  const readers = readerSpans.filter((span) => isSetSpanId(span.spanId));
-  const owners = ownerSpans.filter((span) => isSetSpanId(span.spanId));
+  const linkable = (span: LinkedSpan) => isSetSpanId(span.spanId) && span.startTimeMs >= fromMs;
+  const readers = readerSpans.filter(linkable);
+  const owners = ownerSpans.filter(linkable);
   const readerIds = new Set(readers.map((span) => span.spanId));
   const ownerIds = new Set(owners.map((span) => span.spanId));
   const linked = (spans: readonly LinkedSpan[], ids: ReadonlySet<string>) =>

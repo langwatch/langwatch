@@ -9,8 +9,9 @@ describe("readerHoldsTrace", () => {
     it("holds the trace", () => {
       expect(
         readerHoldsTrace({
-          readerSpans: [{ spanId: "r1", parentSpanId: null }],
-          ownerSpans: [{ spanId: "o1", parentSpanId: "r1" }],
+          readerSpans: [{ spanId: "r1", parentSpanId: null, startTimeMs: 1 }],
+          ownerSpans: [{ spanId: "o1", parentSpanId: "r1", startTimeMs: 1 }],
+          fromMs: 0,
         }),
       ).toBe(true);
     });
@@ -20,10 +21,24 @@ describe("readerHoldsTrace", () => {
     it("holds the trace", () => {
       expect(
         readerHoldsTrace({
-          readerSpans: [{ spanId: "r1", parentSpanId: "o1" }],
-          ownerSpans: [{ spanId: "o1", parentSpanId: null }],
+          readerSpans: [{ spanId: "r1", parentSpanId: "o1", startTimeMs: 1 }],
+          ownerSpans: [{ spanId: "o1", parentSpanId: null, startTimeMs: 1 }],
+          fromMs: 0,
         }),
       ).toBe(true);
+    });
+  });
+
+  describe("when the linked reader span starts before the braids' earliest window", () => {
+    /** @scenario "Testing a trace and the preview hold a trace only through links the reader's fence holds" */
+    it("holds nothing, as the live fence would not", () => {
+      const linked = {
+        readerSpans: [{ spanId: "r1", parentSpanId: null, startTimeMs: 50 }],
+        ownerSpans: [{ spanId: "o1", parentSpanId: "r1", startTimeMs: 150 }],
+      };
+
+      expect(readerHoldsTrace({ ...linked, fromMs: 100 })).toBe(false);
+      expect(readerHoldsTrace({ ...linked, fromMs: 50 })).toBe(true);
     });
   });
 
@@ -34,8 +49,9 @@ describe("readerHoldsTrace", () => {
     it("holds nothing through an owner root whose parent is unset the same way", () => {
       expect(
         readerHoldsTrace({
-          readerSpans: [{ spanId: unset, parentSpanId: null }],
-          ownerSpans: [{ spanId: "o1", parentSpanId: unset }],
+          readerSpans: [{ spanId: unset, parentSpanId: null, startTimeMs: 1 }],
+          ownerSpans: [{ spanId: "o1", parentSpanId: unset, startTimeMs: 1 }],
+          fromMs: 0,
         }),
       ).toBe(false);
     });
@@ -43,8 +59,9 @@ describe("readerHoldsTrace", () => {
     it("holds nothing through an owner span carrying the same unset id", () => {
       expect(
         readerHoldsTrace({
-          readerSpans: [{ spanId: "r1", parentSpanId: unset }],
-          ownerSpans: [{ spanId: unset, parentSpanId: null }],
+          readerSpans: [{ spanId: "r1", parentSpanId: unset, startTimeMs: 1 }],
+          ownerSpans: [{ spanId: unset, parentSpanId: null, startTimeMs: 1 }],
+          fromMs: 0,
         }),
       ).toBe(false);
     });

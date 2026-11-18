@@ -41,27 +41,18 @@ describe.skipIf(!DB_URL)("given the braid writes over a real database", () => {
     await prisma.$disconnect();
   });
 
-  it("reads a write back by its command id and among the reader's recent writes", async () => {
+  it("reads a write back by its command id and among the reader's writes", async () => {
     await writes.create({ write });
 
     expect(await writes.findByCommand({ organizationId, commandId: write.commandId })).toEqual([
       write,
     ]);
-    const since = createdAt.subtract({ minutes: 1 });
     expect(
-      await writes.findIntoReaderSince({
-        organizationId,
-        readerProjectId: write.readerProjectId,
-        since,
-      }),
+      await writes.findIntoReader({ organizationId, readerProjectId: write.readerProjectId }),
     ).toEqual([write]);
-    expect(
-      await writes.findIntoReaderSince({
-        organizationId,
-        readerProjectId: write.readerProjectId,
-        since: createdAt.add({ minutes: 1 }),
-      }),
-    ).toEqual([]);
+    expect(await writes.findIntoReader({ organizationId, readerProjectId: "proj_nobody" })).toEqual(
+      [],
+    );
   });
 
   it("refuses a second write under the same command id", async () => {

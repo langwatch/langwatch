@@ -156,15 +156,27 @@ export class PrismaSigningKeyRepository implements SigningKeyRepository {
       },
     });
     const at = toDate(input.at).getTime();
-    return rows.map(({ secretCiphertext, verifiesUntil, revokedAt, ...row }) => ({
-      ...row,
-      verifiesUntil: verifiesUntil ? fromDate(verifiesUntil) : null,
-      revokedAt: revokedAt ? fromDate(revokedAt) : null,
-      secret:
-        revokedAt === null && (verifiesUntil === null || verifiesUntil.getTime() > at)
-          ? this.cipher.decrypt(secretCiphertext)
-          : null,
-    }));
+    return rows.map(({ secretCiphertext, verifiesUntil, revokedAt, ...row }) => {
+      const verifies =
+        revokedAt === null && (verifiesUntil === null || verifiesUntil.getTime() > at);
+      const secret = verifies ? this.#opened(secretCiphertext) : null;
+      return {
+        ...row,
+        verifiesUntil: verifiesUntil ? fromDate(verifiesUntil) : null,
+        revokedAt: revokedAt ? fromDate(revokedAt) : null,
+        secret: secret ?? null,
+        unreadable: secret === undefined,
+      };
+    });
+  }
+
+  /** One key's secret opened; undefined when it will not open, so the others still verify. */
+  #opened(ciphertext: string): string | undefined {
+    try {
+      return this.cipher.decrypt(ciphertext);
+    } catch {
+      return undefined;
+    }
   }
 
   async markUsed(input: {

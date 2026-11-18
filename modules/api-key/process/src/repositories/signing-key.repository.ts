@@ -37,6 +37,8 @@ export type SigningKeyCredential = Readonly<{
   publicId: string;
   /** Null for a revoked key or one past `verifiesUntil` at the read: never opened. */
   secret: string | null;
+  /** The stored secret would not open: this key alone answers unavailable, the others verify. */
+  unreadable: boolean;
   verifiesUntil: Instant | null;
   revokedAt: Instant | null;
 }>;

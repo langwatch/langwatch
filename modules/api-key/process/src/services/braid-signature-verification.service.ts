@@ -30,11 +30,9 @@ export const SIGNING_KEY_UNKNOWN_REREAD_MS = 5_000;
 /** The most organisations held at once; past it the oldest goes, costing one early re-read. */
 const SIGNING_KEY_LOOKUP_MAX_HELD = 10_000;
 
-/** One organisation's keys by public id, so an unknown key id is answered from memory. */
-type HeldLookup = {
-  readonly at: number;
-  readonly credentials: Promise<ReadonlyMap<string, SigningKeyCredential>>;
-};
+type Credentials = ReadonlyMap<string, SigningKeyCredential>;
+/** One organisation's keys by public id as last read: an unknown key id is answered from memory. */
+type HeldLookup = { readonly at: number; readonly credentials: Credentials };
 type PendingUsage = {
   readonly organizationId: string;
   readonly keyId: string;
@@ -51,6 +49,8 @@ type PendingUsage = {
  */
 export class BraidSignatureVerificationService {
   readonly #lookups = new Map<string, HeldLookup>();
+  /** The read in flight per organisation; the held keys stay in use until it lands. */
+  readonly #reads = new Map<string, Promise<Credentials>>();
   readonly #pending = new Map<string, PendingUsage>();
   #flushTimer: ReturnType<typeof setTimeout> | undefined;
 
@@ -80,6 +80,10 @@ export class BraidSignatureVerificationService {
       return { outcome: "unavailable" };
     }
     if (!credential) return { outcome: "failed", reason: "unknown_key", publicId };
+    if (credential.unreadable) {
+      logger.warn({ publicId }, "signing key secret would not open; the span stays unverified");
+      return { outcome: "unavailable" };
+    }
 
     const at = this.now().epochMilliseconds;
     const reason = BraidSignatureVerificationService.failureOf({
@@ -101,6 +105,7 @@ export class BraidSignatureVerificationService {
   /** Drops the organisation's held keys, so a revoke on this server ends the key here at once. */
   forget({ organizationId }: { organizationId: string }): void {
     this.#lookups.delete(organizationId);
+    this.#reads.delete(organizationId);
   }
 
   /** Writes what this process has counted since the last write. */
@@ -149,32 +154,46 @@ export class BraidSignatureVerificationService {
     return reread.get(publicId);
   }
 
-  /** One read per organisation per window, whatever key ids the spans carry (#9682). */
+  /**
+   * One read per organisation per window, whatever key ids the spans carry (#9682). A held
+   * snapshot answers until its own window ends, even while an early re-read is in flight or fails.
+   */
   #credentialsOf({
     organizationId,
     maxAgeMs,
   }: {
     organizationId: string;
     maxAgeMs: number;
-  }): Promise<ReadonlyMap<string, SigningKeyCredential>> {
+  }): Promise<Credentials> {
     const at = this.now().epochMilliseconds;
     const held = this.#lookups.get(organizationId);
-    if (held && at - held.at < maxAgeMs) return held.credentials;
+    if (held && at - held.at < maxAgeMs) return Promise.resolve(held.credentials);
+    return this.#reads.get(organizationId) ?? this.#read({ organizationId, at });
+  }
 
-    const credentials = this.keys
+  #read({ organizationId, at }: { organizationId: string; at: number }): Promise<Credentials> {
+    const read: Promise<Credentials> = this.keys
       .findCredentials({ organizationId, at: this.now() })
-      .then((rows) => new Map(rows.map((row) => [row.publicId, row])));
+      .then((rows) => {
+        const credentials = new Map(rows.map((row) => [row.publicId, row]));
+        if (this.#reads.get(organizationId) === read)
+          this.#hold({ organizationId, at, credentials });
+        return credentials;
+      })
+      .finally(() => {
+        if (this.#reads.get(organizationId) === read) this.#reads.delete(organizationId);
+      });
+    this.#reads.set(organizationId, read);
+    return read;
+  }
+
+  #hold({ organizationId, at, credentials }: { organizationId: string } & HeldLookup): void {
     this.#lookups.delete(organizationId);
     if (this.#lookups.size >= SIGNING_KEY_LOOKUP_MAX_HELD) {
       const oldest = this.#lookups.keys().next();
       if (!oldest.done) this.#lookups.delete(oldest.value);
     }
     this.#lookups.set(organizationId, { at, credentials });
-    credentials.catch(() => {
-      if (this.#lookups.get(organizationId)?.credentials === credentials)
-        this.#lookups.delete(organizationId);
-    });
-    return credentials;
   }
 
   #count(input: { organizationId: string; keyId: string; passed: boolean; at: Instant }): void {

@@ -575,7 +575,10 @@ export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
     return { grantId, wasAttached: true };
   }
 
-  /** ADR-201 §1: one braid's grant under the id its write recorded; the caller holds the lock. */
+  /**
+   * ADR-201 §1: appends one braid's grant under the id its write recorded; the caller holds the
+   * lock and awaits the projection with `awaitSharedProjectGrants`, so it knows the append landed.
+   */
   async attachBraidGrant({
     organizationId,
     readerProjectId,
@@ -620,7 +623,6 @@ export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
         occurredAtMs,
       },
     });
-    await this.awaitSharedProjectGrants({ organizationId, grantIds: [grantId] });
     return { grantId };
   }
 

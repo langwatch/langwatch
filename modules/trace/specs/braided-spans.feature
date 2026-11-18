@@ -500,6 +500,14 @@ Feature: Braided spans in the reader's traces
       When an admin tests the condition against that trace
       Then the "specialists" spans are returned, none marked braided
 
+    @unit
+    Scenario: Testing a trace and the preview hold a trace only through links the reader's fence holds
+      Given an "orchestrator" trace whose root starts before the earliest window of every braid into "orchestrator"
+      And a "specialists" span that is a child of that root
+      When an admin tests the condition against that trace or previews it
+      Then the "specialists" spans are returned, none marked braided
+      And the preview reads links only from that earliest window, as the live fence does
+
     @integration
     Scenario: The preview counts calls that would stay hidden for want of a valid signature
       When an admin previews a condition requiring signed calls

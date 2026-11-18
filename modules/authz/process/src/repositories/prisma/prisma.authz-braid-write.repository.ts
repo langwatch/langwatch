@@ -1,7 +1,7 @@
 import { grantConditionSchema } from "@langwatch/authorization";
 import { prismaTables, skipTenantCheck } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { fromDate, toDate, type Instant } from "@langwatch/time";
+import { fromDate, toDate } from "@langwatch/time";
 
 import {
   AuthzBraidWriteRepository,
@@ -57,14 +57,12 @@ export class PrismaAuthzBraidWriteRepository extends AuthzBraidWriteRepository {
     return rows.map(writeOf);
   }
 
-  async findIntoReaderSince({
+  async findIntoReader({
     organizationId,
     readerProjectId,
-    since,
   }: {
     organizationId: string;
     readerProjectId: string;
-    since: Instant;
   }): Promise<AuthzBraidWrite[]> {
     const rows = await this.database.$queryRaw<WriteRow[]>`
       ${skipTenantCheck({
@@ -74,7 +72,6 @@ export class PrismaAuthzBraidWriteRepository extends AuthzBraidWriteRepository {
       SELECT * FROM "AuthzBraidWrite"
        WHERE "organizationId" = ${organizationId}
          AND "readerProjectId" = ${readerProjectId}
-         AND "createdAt" >= ${toDate(since)}
        ORDER BY "createdAt" ASC
     `;
     return rows.map(writeOf);

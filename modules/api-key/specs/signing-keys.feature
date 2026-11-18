@@ -66,6 +66,20 @@ Feature: Signing keys
       And the organisation's keys are read from the store once a minute, not once per span
       And the key in use still verifies
 
+    @unit
+    Scenario: A failed early re-read keeps the keys already held verifying
+      Given "orchestrator" holds a signing key whose spans verified in the last minute
+      When a span signed with an unknown key id asks for an early re-read and the store is down
+      Then that span is left unverified as unavailable
+      And spans signed with the held key still verify until the held keys' minute ends
+
+    @unit
+    Scenario: One signing key whose secret will not open leaves the others verifying
+      Given the organisation holds two live signing keys and one's stored secret will not open
+      When spans signed with each arrive
+      Then the span signed with the unreadable key is left unverified as unavailable
+      And the span signed with the other key still verifies
+
   Rule: Who may manage signing keys
 
     @unit

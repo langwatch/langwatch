@@ -130,5 +130,37 @@ describe("PrismaSigningKeyRepository", () => {
       ]);
       expect(decrypt).toHaveBeenCalledTimes(2);
     });
+
+    describe("when one live key's secret will not open", () => {
+      /** @scenario "One signing key whose secret will not open leaves the others verifying" */
+      it("marks that key unreadable and still opens the other live key", async () => {
+        const cipher = cipherDouble();
+        const live = (id: string, secretCiphertext: string) => ({
+          id,
+          projectId: "project-1",
+          publicId: `kid-${id}`,
+          secretCiphertext,
+          verifiesUntil: null,
+          revokedAt: null,
+        });
+        const findMany = vi.fn(async () => [
+          live("broken", "sealed-by-a-lost-key"),
+          live("healthy", cipher.encrypt(SECRET)),
+        ]);
+        const repository = PrismaSigningKeyRepository.create({
+          prisma: prismaDouble({ signingKey: { findMany } }),
+          cipher,
+        });
+
+        const credentials = await repository.findCredentials({ organizationId: "org-1", at: AT });
+
+        expect(
+          credentials.map(({ id, secret, unreadable }) => ({ id, secret, unreadable })),
+        ).toEqual([
+          { id: "broken", secret: null, unreadable: true },
+          { id: "healthy", secret: SECRET, unreadable: false },
+        ]);
+      });
+    });
   });
 });

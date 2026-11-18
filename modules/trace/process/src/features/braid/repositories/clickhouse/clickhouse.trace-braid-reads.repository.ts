@@ -220,6 +220,7 @@ export class ClickHouseTraceBraidReadsRepository extends TraceBraidReadsReposito
         WHERE ${tenantScope("StartTime")}
           AND TraceId IN {traceIds:Array(String)}
           AND StartTime >= ${millis("sinceMs")}
+          AND SpanId NOT IN ('', '0000000000000000')
           AND ParentSpanId NOT IN ('', '0000000000000000')
           AND (TraceId, ParentSpanId) NOT IN (
             SELECT TraceId, SpanId

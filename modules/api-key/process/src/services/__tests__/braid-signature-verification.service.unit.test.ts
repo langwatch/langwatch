@@ -3,6 +3,7 @@
  * (ADR-201 section 4, signed calls), and the ways it fails.
  * @see modules/api-key/specs/signing-keys.feature
  */
+import { SIGNING_KEY_LOOKUP_CACHE_MS } from "@langwatch/api-key-contract";
 import { fromDate, type Instant } from "@langwatch/time";
 import { beforeEach, describe, expect, it } from "vitest";
 
@@ -188,6 +189,83 @@ describe("verifying a braid signature", () => {
         reason: "bad_signature",
         publicId: "newkid",
       });
+    });
+  });
+
+  describe("when an early re-read for an unknown key id fails", () => {
+    /** @scenario "A failed early re-read keeps the keys already held verifying" */
+    it("keeps verifying the held keys until their own window ends", async () => {
+      let failing = false;
+      const flaky = BraidSignatureVerificationService.create({
+        keys: {
+          findCredentials: (input) =>
+            failing ? Promise.reject(new Error("database down")) : keys.findCredentials(input),
+          markUsed: (input) => keys.markUsed(input),
+        },
+        usage,
+        now: () => now,
+      });
+      const verifyWith = (signature: string) =>
+        flaky.verify({
+          organizationId: ORGANIZATION,
+          traceId: TRACE_ID,
+          entries: ENTRIES,
+          signature,
+        });
+      await expect(verifyWith(SIGNATURE)).resolves.toMatchObject({ outcome: "verified" });
+      failing = true;
+      now = now.add({ milliseconds: SIGNING_KEY_UNKNOWN_REREAD_MS });
+      const unknown = btoa(JSON.stringify({ ...JSON.parse(atob(SIGNATURE)), kid: "newkid" }));
+
+      const [early, held] = await Promise.all([
+        verifyWith(unknown.replace(/=+$/, "")),
+        verifyWith(SIGNATURE),
+      ]);
+      const after = await verifyWith(SIGNATURE);
+
+      expect(early).toEqual({ outcome: "unavailable" });
+      expect(held).toMatchObject({ outcome: "verified" });
+      expect(after).toMatchObject({ outcome: "verified" });
+      now = now.add({ milliseconds: SIGNING_KEY_LOOKUP_CACHE_MS });
+      await expect(verifyWith(SIGNATURE)).resolves.toEqual({ outcome: "unavailable" });
+    });
+  });
+
+  describe("when one key's stored secret will not open", () => {
+    /** @scenario "One signing key whose secret will not open leaves the others verifying" */
+    it("answers unavailable for that key alone and verifies the others", async () => {
+      const unreadable = BraidSignatureVerificationService.create({
+        keys: {
+          findCredentials: async (input) => [
+            ...(await keys.findCredentials(input)),
+            {
+              id: "key_broken",
+              projectId: "orchestrator",
+              publicId: "brokenkid",
+              secret: null,
+              unreadable: true,
+              verifiesUntil: null,
+              revokedAt: null,
+            },
+          ],
+          markUsed: (input) => keys.markUsed(input),
+        },
+        usage,
+        now: () => now,
+      });
+      const verifyWith = (signature: string) =>
+        unreadable.verify({
+          organizationId: ORGANIZATION,
+          traceId: TRACE_ID,
+          entries: ENTRIES,
+          signature,
+        });
+      const broken = btoa(JSON.stringify({ ...JSON.parse(atob(SIGNATURE)), kid: "brokenkid" }));
+
+      await expect(verifyWith(broken.replace(/=+$/, ""))).resolves.toEqual({
+        outcome: "unavailable",
+      });
+      await expect(verifyWith(SIGNATURE)).resolves.toMatchObject({ outcome: "verified" });
     });
   });
 

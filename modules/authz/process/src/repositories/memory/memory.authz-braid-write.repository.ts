@@ -22,21 +22,17 @@ export class MemoryAuthzBraidWriteRepository extends AuthzBraidWriteRepository {
     return write ? [write] : [];
   }
 
-  async findIntoReaderSince({
+  async findIntoReader({
     organizationId,
     readerProjectId,
-    since,
   }: {
     organizationId: string;
     readerProjectId: string;
-    since: AuthzBraidWrite["createdAt"];
   }): Promise<AuthzBraidWrite[]> {
     return [...this.#writes.values()]
       .filter(
         (write) =>
-          write.organizationId === organizationId &&
-          write.readerProjectId === readerProjectId &&
-          write.createdAt.epochMilliseconds >= since.epochMilliseconds,
+          write.organizationId === organizationId && write.readerProjectId === readerProjectId,
       )
       .toSorted((a, b) => a.createdAt.epochMilliseconds - b.createdAt.epochMilliseconds);
   }

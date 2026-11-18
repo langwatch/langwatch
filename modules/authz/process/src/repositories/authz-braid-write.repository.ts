@@ -28,11 +28,10 @@ export abstract class AuthzBraidWriteRepository {
     commandId: string;
   }): Promise<AuthzBraidWrite[]>;
 
-  /** Writes into a reader recorded at or after `since`, oldest first. */
-  abstract findIntoReaderSince(input: {
+  /** Every write into a reader, oldest first: one the projection never landed counts at any age. */
+  abstract findIntoReader(input: {
     organizationId: string;
     readerProjectId: string;
-    since: Instant;
   }): Promise<AuthzBraidWrite[]>;
 
   /** Records a write; a second record under the same command id is refused by the store. */

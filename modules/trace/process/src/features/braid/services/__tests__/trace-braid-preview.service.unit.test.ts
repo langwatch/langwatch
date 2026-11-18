@@ -69,6 +69,7 @@ function serviceOver({
   exampleTraceId = null as string | null,
   released = true,
   heldTraceIds = undefined as string[] | undefined,
+  readerStartMs = 1,
 } = {}) {
   const held = heldTraceIds ?? traceIds;
   const reads: TraceBraidReadsRepository = MemoryNullTraceBraidReadsRepository.create();
@@ -100,8 +101,8 @@ function serviceOver({
       parentSpanId: null,
       name: "handle_message",
       type: null,
-      startTimeMs: 1,
-      endTimeMs: 2,
+      startTimeMs: readerStartMs,
+      endTimeMs: readerStartMs + 1,
       durationMs: 1,
       status: "ok",
       model: null,
@@ -401,9 +402,9 @@ describe("TraceBraidPreviewService", () => {
 
     /** @scenario Testing a trace shows it exactly as the reader will see it */
     it("marks the owner's spans by the live braids and the draft, as the count reads them", async () => {
-      const { service, reads } = serviceOver();
+      const { service, reads } = serviceOver({ readerStartMs: 200 });
       reads.findOwnerSpansMarked.mockResolvedValue([
-        { ...ownerSpan("o-1", 3, "root-t1"), braided: true },
+        { ...ownerSpan("o-1", 300, "root-t1"), braided: true },
       ]);
 
       const tested = await service.testTrace({
@@ -446,6 +447,40 @@ describe("TraceBraidPreviewService", () => {
       expect(reads.findOwnerSpansMarked.mock.calls[0]?.[0].braids.map((b) => b.fromMs)).toEqual([
         300, 500,
       ]);
+    });
+  });
+
+  describe("when the linked reader root starts before every braid's window", () => {
+    const readerWithBraids = braidedProof({
+      projectId: READER,
+      braids: [{ owner: "proj_elsewhere", from: NOW - 3 * DAY_MS }],
+    });
+
+    /** @scenario "Testing a trace and the preview hold a trace only through links the reader's fence holds" */
+    it("marks nothing braided in a tested trace, as the live fence holds no such link", async () => {
+      const { service, reads } = serviceOver({ readerStartMs: 50 });
+      reads.findOwnerSpansMarked.mockResolvedValue([
+        { ...ownerSpan("o-1", 150, "root-t1"), braided: true },
+      ]);
+
+      const tested = await service.testTrace({ ...proofs, where: "", fromMs: 100, traceId: "t1" });
+
+      expect(tested.nodes).toContainEqual(
+        expect.objectContaining({ spanId: "o-1", braided: false }),
+      );
+    });
+
+    /** @scenario "Testing a trace and the preview hold a trace only through links the reader's fence holds" */
+    it("reads the preview's links from the earliest braid window into the reader, any owner's", async () => {
+      const { service, reads } = serviceOver({ traceIds: ["t1"] });
+      const reader = { ...proofs, readerAuthorization: readerWithBraids };
+
+      await service.preview({ ...reader, where: "", fromMs: NOW - DAY_MS });
+      await service.preview({ ...proofs, where: "", fromMs: NOW - DAY_MS });
+
+      const floors = reads.findOutsideParents.mock.calls.map(([call]) => call.sinceMs);
+      expect(floors).toEqual([NOW - 3 * DAY_MS, NOW - 3 * DAY_MS, NOW - DAY_MS, NOW - DAY_MS]);
+      expect(reads.countOwnerSpansInTraces.mock.calls[0]?.[0].sinceMs).toBe(NOW - 7 * DAY_MS);
     });
   });
 

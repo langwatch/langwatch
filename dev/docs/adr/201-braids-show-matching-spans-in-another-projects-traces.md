@@ -77,7 +77,9 @@ id, never a derived grant id, so a braid removed and made again within one secon
 Under the reader's lock the service records each write (`AuthzBraidWrite`: organisation, command id,
 grant id, terms) before sending its attach: a repeat of a recorded command id answers that braid,
 resending the same command while the projection lags, and the identical-braid and condition-limit
-checks read recorded writes the projection has not landed (an hour at most) as live.
+checks read recorded writes the projection has not landed, whatever their age, as live. A command
+id is scoped to the actor who sent it; a write is forgotten only when the ledger refused its attach,
+and a repeated change is refused once the braid it replaces is no longer live.
 
 **Several braids may join one pair** (decided by Alex, 2026-10-21), read as their union: an owner span
 shows when it matches any live braid's condition inside that braid's window. A braid identical to a live one

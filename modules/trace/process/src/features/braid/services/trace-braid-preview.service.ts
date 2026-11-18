@@ -95,8 +95,7 @@ async function overloadNamed<T>(read: () => Promise<T>): Promise<T> {
   try {
     return await read();
   } catch (error) {
-    if (isOverloaded(error))
-      throw new ClickHouseOverloadedError({ reasons: [error as Error] });
+    if (isOverloaded(error)) throw new ClickHouseOverloadedError({ reasons: [error as Error] });
     throw error;
   }
 }
@@ -128,6 +127,45 @@ function liveBraidsOf({
       fromMs: grant.condition?.from ?? 0,
       untilMs: grant.condition?.until ?? null,
     }));
+}
+
+/**
+ * The live fence's link floor (ADR-201 §3, `heldTraceOf`): spans on either side link only from
+ * the earliest window of every braid into the reader, any owner's, the draft replacing the edited.
+ */
+function heldFromOf({
+  reader,
+  replacedBraidId,
+  draftFromMs,
+}: {
+  reader: Own;
+  replacedBraidId: string | undefined;
+  draftFromMs: number;
+}): number {
+  const froms = reader.authorization.grants
+    .filter((grant) => isSpanBraidGrant(grant))
+    .filter((grant) => replacedBraidId === undefined || !grant.via.includes(replacedBraidId))
+    .map((grant) => grant.condition?.from ?? 0);
+  return Math.min(draftFromMs, ...froms);
+}
+
+/** A refused condition's preview: the refusal, and nothing counted. */
+function refusedPreviewOf({
+  refusal,
+  liveBraids,
+}: {
+  refusal: BraidConditionRefusal;
+  liveBraids: number;
+}): BraidPreview {
+  const traces = { every: 0, some: 0, none: 0, total: 0, capped: false };
+  return {
+    refusal: refusalViewOf(refusal),
+    traces,
+    spans: 0,
+    live: { braids: liveBraids, traces, spans: 0 },
+    unsignedHidden: null,
+    example: null,
+  };
 }
 
 const holdsVerified = (compiledWhere: CompiledWhere | undefined): boolean =>
@@ -214,17 +252,7 @@ export class TraceBraidPreviewService {
       replacedBraidId: input.braidId,
     });
     const compiled = compileBraidCondition({ text: input.where ?? "" });
-    if (!compiled.ok) {
-      const traces = { every: 0, some: 0, none: 0, total: 0, capped: false };
-      return {
-        refusal: refusalViewOf(compiled),
-        traces,
-        spans: 0,
-        live: { braids: live.length, traces, spans: 0 },
-        unsignedHidden: null,
-        example: null,
-      };
-    }
+    if (!compiled.ok) return refusedPreviewOf({ refusal: compiled, liveBraids: live.length });
     const sinceMs = this.#now() - BRAID_PREVIEW_WINDOW_MS;
     const found = await this.#reads.findReaderTraceIds({
       authorization: reader.authorization,
@@ -232,7 +260,17 @@ export class TraceBraidPreviewService {
       limit: BRAID_PREVIEW_TRACE_CAP + 1,
     });
     const traceIds = found.slice(0, BRAID_PREVIEW_TRACE_CAP);
-    const held = await this.#heldTraceIds({ reader, owner, traceIds, sinceMs });
+    const heldFromMs = heldFromOf({
+      reader,
+      replacedBraidId: input.braidId,
+      draftFromMs: input.fromMs,
+    });
+    const held = await this.#heldTraceIds({
+      reader,
+      owner,
+      traceIds,
+      sinceMs: Math.max(sinceMs, heldFromMs),
+    });
     const capped = found.length > BRAID_PREVIEW_TRACE_CAP || held.capped;
     const draft: BraidWindowRead = {
       compiledWhere: compiled.compiledWhere,
@@ -267,6 +305,7 @@ export class TraceBraidPreviewService {
             owner,
             traceId: exampleTraceId,
             braids: [...live, draft],
+            heldFromMs,
           });
     return {
       refusal: null,
@@ -363,13 +402,14 @@ export class TraceBraidPreviewService {
       owner,
       traceId: input.traceId,
       braids: [...live, draft],
+      heldFromMs: heldFromOf({ reader, replacedBraidId: input.braidId, draftFromMs: input.fromMs }),
     });
     return nodes === null ? { found: false, nodes: [] } : { found: true, nodes };
   }
 
   /**
    * The reader traces held for the owner (ADR-201 §3): each side's parents outside itself, matched
-   * against the other side's own spans under its own proof. Capped when either side hit its limit.
+   * against the other side's own spans under its own proof, both from the fence's link floor.
    */
   async #heldTraceIds(input: {
     reader: Own;
@@ -413,6 +453,7 @@ export class TraceBraidPreviewService {
     owner: Own;
     traceId: string;
     braids: readonly BraidWindowRead[];
+    heldFromMs: number;
   }): Promise<BraidTestTraceNode[] | null> {
     const readerNodes = await this.#readerSpans({
       authorization: withoutSpanBraids(input.reader.authorization),
@@ -424,7 +465,11 @@ export class TraceBraidPreviewService {
       traceId: input.traceId,
       braids: input.braids,
     });
-    const held = readerHoldsTrace({ readerSpans: readerNodes, ownerSpans });
+    const held = readerHoldsTrace({
+      readerSpans: readerNodes,
+      ownerSpans,
+      fromMs: input.heldFromMs,
+    });
     const nodes: BraidTestTraceNode[] = [
       ...readerNodes.map(nodeOf),
       ...ownerSpans.map((span) => ({

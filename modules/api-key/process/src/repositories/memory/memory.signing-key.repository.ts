@@ -111,6 +111,7 @@ export class MemorySigningKeyRepository implements SigningKeyRepository {
           revokedAt === null && (verifiesUntil === null || verifiesUntil.epochMilliseconds > at)
             ? secret
             : null,
+        unreadable: false,
         verifiesUntil,
         revokedAt,
       }));
