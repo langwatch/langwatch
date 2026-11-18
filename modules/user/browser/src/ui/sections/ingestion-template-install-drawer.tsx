@@ -276,9 +276,8 @@ export function IngestionTemplateInstallDrawer({
               environment, fire a request, and{" "}
               {personalProjectSlug ? (
                 <>
-                  traces will land at{" "}
-                  <InlineCode>{`/${personalProjectSlug}/traces`}</InlineCode> filtered by
-                  source={template.slug}.
+                  traces will land at <InlineCode>{`/${personalProjectSlug}/traces`}</InlineCode>{" "}
+                  filtered by source={template.slug}.
                 </>
               ) : (
                 "traces will land in your personal project; open Coding agents to find them."
