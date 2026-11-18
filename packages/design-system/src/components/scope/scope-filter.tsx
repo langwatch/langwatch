@@ -50,6 +50,12 @@ export function ScopeFilter({
 }) {
   const [moreOpen, setMoreOpen] = useState(false);
   const [moreQuery, setMoreQuery] = useState("");
+  const [highlighted, setHighlighted] = useState<string | null>(null);
+  // Like the project search: typing highlights the first match, so Enter picks it.
+  const changeMoreQuery = (next: string) => {
+    setMoreQuery(next);
+    setHighlighted(next.trim() ? firstScopeItemValue({ available, query: next }) : null);
+  };
 
   const label = filterLabel({ filter: value, available, currentTeamId, currentProjectId });
   const currentTeam = available.teams.find((team) => team.id === currentTeamId);
@@ -74,8 +80,10 @@ export function ScopeFilter({
 
   return (
     <Menu.Root
+      highlightedValue={highlighted}
+      onHighlightChange={({ highlightedValue }) => setHighlighted(highlightedValue)}
       onOpenChange={({ open }) => {
-        if (!open) setMoreQuery("");
+        if (!open) changeMoreQuery("");
       }}
     >
       <Menu.Trigger asChild>
@@ -143,7 +151,7 @@ export function ScopeFilter({
                 placeholder="Search scopes…"
                 aria-label="Search scopes"
                 value={moreQuery}
-                onChange={(event) => setMoreQuery(event.target.value)}
+                onChange={(event) => changeMoreQuery(event.target.value)}
                 onKeyDown={(event) => {
                   if (!MENU_KEYS.has(event.key)) event.stopPropagation();
                 }}
@@ -348,6 +356,27 @@ function ProjectSubmenu({
   );
 }
 
+function scopeItemValue({ hint, label }: { hint: string; label: string }): string {
+  return `${hint}:${label}`;
+}
+
+/** The More Scopes row a query lands on first: the organization, then teams, then projects. */
+function firstScopeItemValue({
+  available,
+  query,
+}: {
+  available: AvailableScopes;
+  query: string;
+}): string | null {
+  const matches = (name: string) => namesMatch({ name, query });
+  if (available.organization && matches(available.organization.name))
+    return scopeItemValue({ hint: "Organization", label: available.organization.name });
+  const team = available.teams.find((candidate) => matches(candidate.name));
+  if (team) return scopeItemValue({ hint: "Team", label: team.name });
+  const project = available.projects.find((candidate) => matches(candidate.name));
+  return project ? scopeItemValue({ hint: "Project", label: project.name }) : null;
+}
+
 function projectItemValue(projectId: string): string {
   return `project:${projectId}`;
 }
@@ -365,7 +394,7 @@ function ScopeOptionItem({
 }) {
   return (
     <Menu.Item
-      value={`${hint}:${label}`}
+      value={scopeItemValue({ hint, label })}
       onClick={onClick}
       data-testid={`filter-scope-${hint.toLowerCase()}-${label.toLowerCase()}`}
     >

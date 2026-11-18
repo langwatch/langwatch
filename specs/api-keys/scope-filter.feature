@@ -174,6 +174,12 @@ Feature: API Keys scope filter
     And the menu stays open with the search box still focused
 
   @integration
+  Scenario: A More Scopes search picks its first match on Enter
+    Given I have opened "More Scopes"
+    When I type part of a name and press Enter
+    Then the first scope that matches is picked, as in the project search
+
+  @integration
   Scenario: A More Scopes search with no matches says so
     Given I have opened "More Scopes"
     When I type text that matches no organization, team or project name

@@ -393,12 +393,14 @@ describe("given the scope filter", () => {
       ],
     };
 
-    async function openMore() {
+    async function openMore({
+      onChange = () => undefined,
+    }: { onChange?: (next: ScopeFilterValue) => void } = {}) {
       const user = userEvent.setup();
       renderWithDesignSystem(
         <ScopeFilter
           value={{ kind: "all" }}
-          onChange={() => undefined}
+          onChange={onChange}
           available={SCOPES}
           currentTeamId="team_1"
           currentProjectId="project_1"
@@ -425,6 +427,18 @@ describe("given the scope filter", () => {
       expect(screen.queryByTestId("filter-scope-organization-acme")).not.toBeInTheDocument();
       expect(screen.queryByTestId("filter-scope-team-platform")).not.toBeInTheDocument();
       expect(screen.queryByTestId("filter-scope-project-web app")).not.toBeInTheDocument();
+    });
+
+    /** @scenario A More Scopes search picks its first match on Enter */
+    it("highlights the first match as you type, so Enter picks it", async () => {
+      const picked: ScopeFilterValue[] = [];
+      const { user } = await openMore({ onChange: (next) => picked.push(next) });
+
+      await user.keyboard("research{Enter}");
+
+      expect(picked).toEqual([
+        { kind: "specific", scopeType: "TEAM", scopeId: "team_2", name: "Research" },
+      ]);
     });
 
     /** @scenario A More Scopes search with no matches says so */
