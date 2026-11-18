@@ -3,6 +3,7 @@
  * writeSpotlightFragment / useSpotlightURLSync
  * @vitest-environment jsdom
  */
+import { parseFragment } from "@langwatch/trace-contract";
 import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -150,6 +151,11 @@ describe("when the fragment already carries explorer state", () => {
 
       expect(window.location.hash).toBe(explorerHash);
       expect(readSpotlightFragment()).toBeNull();
+      // A reload restores the bar state through the same parser useURLSync applies.
+      expect(parseFragment(window.location.hash)).toEqual({
+        lensId: "all-traces",
+        overrides: { query: "trace.attribute.laze.agent.id:agt_123", preset: "7d" },
+      });
     });
   });
 
