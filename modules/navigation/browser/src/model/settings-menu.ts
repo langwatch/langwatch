@@ -155,6 +155,8 @@ export interface SettingsMenuGates {
   isPlatformAdmin: boolean;
   /** `release_braids` answered on; false while it is still loading, so no entry flickers. */
   braidsEnabled: boolean;
+  /** The organisation already has braids: shown with the flag off so an admin can end them. */
+  braidsPresent?: boolean;
 }
 
 export type EnterprisePlanGate = "included" | "locked" | "pending";
@@ -216,6 +218,8 @@ function organizationGroup({
         href: "/settings",
         isExactMatch: true,
         icon: Settings2,
+        // The organisation's Braids page is organisation-wide, so it lights no Project entry.
+        alsoActiveAt: ["/settings/organization-braids"],
       },
       // Keys sit here rather than in Access, where four enterprise entries
       // came first and left a page most readers use at the bottom of a group
@@ -355,6 +359,7 @@ function projectGroup({
   isLiteMember,
   enterprisePlan,
   braidsEnabled,
+  braidsPresent = false,
 }: SettingsMenuGates): SettingsMenuGroup {
   return {
     id: "settings-project",
@@ -376,13 +381,11 @@ function projectGroup({
           ]
         : []),
       { label: "Integrations", href: "/settings/integrations", icon: Blocks },
-      ...(!isLiteMember && braidsEnabled
+      ...(!isLiteMember && (braidsEnabled || braidsPresent)
         ? enterpriseEntry({
             item: {
               label: "Braids",
               href: "/settings/braids",
-              // The one Braids entry: the organization's braids page lights it too.
-              alsoActiveAt: ["/settings/organization-braids"],
               icon: Waypoints,
               feature: "braids",
             },

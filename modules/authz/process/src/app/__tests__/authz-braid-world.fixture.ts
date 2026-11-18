@@ -22,6 +22,7 @@ import { MemoryAuthzAdmissionRepository } from "../../repositories/memory/memory
 import { MemoryAuthzAuditTrailRepository } from "../../repositories/memory/memory.authz-audit-trail.repository.ts";
 import { MemoryAuthzBillingGrantRepository } from "../../repositories/memory/memory.authz-billing-grant.repository.ts";
 import { MemoryAuthzBraidLockRepository } from "../../repositories/memory/memory.authz-braid-lock.repository.ts";
+import { MemoryAuthzBraidWriteRepository } from "../../repositories/memory/memory.authz-braid-write.repository.ts";
 import { MemoryAuthzGrantProjectionRepository } from "../../repositories/memory/memory.authz-grant-projection.repository.ts";
 import { MemoryAuthzLedgerReadRepository } from "../../repositories/memory/memory.authz-ledger-read.repository.ts";
 import { MemoryAuthzLineageEpochRepository } from "../../repositories/memory/memory.authz-lineage-epoch.repository.ts";
@@ -79,6 +80,7 @@ function repositoriesOver(memory: AuthzMemoryStore): AuthzRepositories {
     ledgerReads: MemoryAuthzLedgerReadRepository.create({ memory }),
     billingGrants: MemoryAuthzBillingGrantRepository.create({ memory }),
     braidLocks: MemoryAuthzBraidLockRepository.create(),
+    braidWrites: MemoryAuthzBraidWriteRepository.create(),
     organizationPolicies: MemoryAuthzOrganizationPolicyRepository.create(),
   };
 }

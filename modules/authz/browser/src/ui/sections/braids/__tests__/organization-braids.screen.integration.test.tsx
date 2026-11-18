@@ -5,7 +5,7 @@
 
 import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@langwatch/trace-client", async () => ({
   traceClient: (await import("./braids-api-fake.ts")).braidTraces.traceClient,
@@ -20,14 +20,17 @@ const { braidsFake, liveBraid, STRUCTURE } = await import("./braids-api-fake.ts"
 const { FakeAuthzHost, renderWithAuthzHost } = await import("../../../../testing.tsx");
 const { default: OrganizationBraidsScreen } = await import("../organization-braids.screen.tsx");
 
-function renderAs({ isEnterprise = true }: { isEnterprise?: boolean } = {}) {
+function renderAs({
+  isEnterprise = true,
+  braidsReleased = true,
+}: { isEnterprise?: boolean; braidsReleased?: boolean } = {}) {
   const host = new FakeAuthzHost({
     scope: { organizationId: "org-1" },
     grants: new Set(["organization:manage"]),
     plan: { isEnterprise, isLoading: false },
     structure: STRUCTURE,
   });
-  return renderWithAuthzHost(<OrganizationBraidsScreen />, host);
+  return renderWithAuthzHost(<OrganizationBraidsScreen />, host, { braidsReleased });
 }
 
 beforeEach(() => {
@@ -78,6 +81,74 @@ describe("OrganizationBraidsScreen", () => {
       );
       expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
       expect(screen.getByText("Braids are paused")).toBeInTheDocument();
+    });
+  });
+
+  describe("given release_braids is off for the organisation", () => {
+    /** @scenario "With release_braids off both Braids pages open read-only" */
+    it("lists every braid under the not-enabled notice, with no setting of who may braid", () => {
+      renderAs({ braidsReleased: false });
+
+      expect(screen.getByTestId("braids-not-enabled")).toHaveTextContent(
+        /not enabled.*still apply.*remove them/,
+      );
+      expect(screen.getByTestId("organization-braids")).toBeInTheDocument();
+      expect(screen.queryByText("Who may braid")).not.toBeInTheDocument();
+      expect(screen.queryByText("Braids are paused")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("given a phone-width screen", () => {
+    function minWidthPx(query: string): number {
+      const found = /min-width:\s*([\d.]+)(px|rem|em)/.exec(query);
+      if (!found) return 0;
+      return Number(found[1]) * (found[2] === "px" ? 1 : 16);
+    }
+
+    /** Every `min-width` query answers as a 390 px screen would. */
+    function viewport({ wide }: { wide: boolean }) {
+      vi.stubGlobal("matchMedia", (query: string) => ({
+        matches: wide || minWidthPx(query) <= 390,
+        media: query,
+        onchange: null,
+        addListener: () => {},
+        removeListener: () => {},
+        addEventListener: () => {},
+        removeEventListener: () => {},
+        dispatchEvent: () => false,
+      }));
+    }
+
+    afterEach(() => vi.unstubAllGlobals());
+
+    /** @scenario The organisation's braids read on a phone-width screen */
+    it("stacks each braid's projects, condition and window in one row", async () => {
+      viewport({ wide: false });
+      renderAs();
+
+      const table = await screen.findByTestId("organization-braids-stacked");
+      expect(
+        within(table)
+          .getAllByRole("columnheader")
+          .map((h) => h.textContent),
+      ).toEqual(["Braid", "Actions"]);
+      const [first, second] = screen.getAllByTestId("organization-braid-row");
+      expect(within(first!).getByText("specialists")).toBeInTheDocument();
+      expect(within(first!).getByText("orchestrator")).toBeInTheDocument();
+      expect(within(first!).getByTestId("braid-window-from")).toBeInTheDocument();
+      expect(within(second!).getByText("Every span")).toBeInTheDocument();
+    });
+
+    /** @scenario Each braid row shows where it goes, its condition, its access and its activity */
+    it("names each row's menu apart from the others", () => {
+      viewport({ wide: true });
+      renderAs();
+
+      const names = screen
+        .getAllByRole("button", { name: /^Actions for the braid/ })
+        .map((button) => button.getAttribute("aria-label"));
+      expect(new Set(names).size).toBe(names.length);
+      expect(screen.queryByTestId("organization-braids-stacked")).toBeNull();
     });
   });
 });

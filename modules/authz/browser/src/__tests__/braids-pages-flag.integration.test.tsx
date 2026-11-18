@@ -1,7 +1,7 @@
 /**
  * @vitest-environment jsdom
- * Both Braids pages sit behind `release_braids`: opened the way the router opens them, through
- * the guard the installed declaration puts in front, before any braid is read.
+ * Both Braids pages open whatever `release_braids` says (Alex, 2026-11-18): opened the way the
+ * router opens them, through the guard the installed declaration puts in front.
  * @see modules/authz/specs/braids-release-flag.feature
  */
 
@@ -72,12 +72,12 @@ afterEach(cleanup);
 
 describe("the Braids pages", () => {
   describe("given release_braids is off for the organisation", () => {
-    /** @scenario "With release_braids off both Braids pages answer not-found" */
-    it.each(BRAIDS_PAGES)("answers %s with the not-found page", async (page) => {
+    /** @scenario "With release_braids off both Braids pages open read-only" */
+    it.each(BRAIDS_PAGES)("opens %s past the flag instead of not-found", async (page) => {
       await openPage({ page, braids: false });
 
-      expect(await screen.findByText(NOT_FOUND)).toBeInTheDocument();
-      expect(screen.queryByText(/Missing permission/)).not.toBeInTheDocument();
+      expect(await screen.findByText(/Missing permission/)).toBeInTheDocument();
+      expect(screen.queryByText(NOT_FOUND)).not.toBeInTheDocument();
     });
   });
 

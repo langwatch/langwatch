@@ -165,6 +165,7 @@ function braidedTrace({ withOwnerSpans = true } = {}) {
         {
           recordBraidedSpansView,
           hasPermission: async () => false,
+          assertBraidsReleased: async () => undefined,
           listBraids: async () => ({
             intoOtherProjects: [],
             fromOtherProjects: [
@@ -224,13 +225,7 @@ function braidedTrace({ withOwnerSpans = true } = {}) {
     resources: () => app.readSpanResourcesForViewer(viewer),
     agentCallGraph: () => app.readAgentCallGraphForViewer(viewer),
     traceEvents: () => app.readTraceEventsForViewer(viewer),
-    // What the `spanLangwatchSignals` procedure calls, on the proof the trace honoured.
-    spanLangwatchSignals: async () =>
-      app.readLangwatchSignals({
-        authorization: await app.authorizationForTrace({ authorization, traceId: "trace-1" }),
-        traceId: "trace-1",
-        reads: "spans",
-      }),
+    spanLangwatchSignals: () => app.readLangwatchSignalsForViewer(viewer),
   };
   return { reads, recordBraidedSpansView, authorization };
 }

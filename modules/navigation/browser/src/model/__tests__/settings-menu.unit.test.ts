@@ -271,18 +271,24 @@ describe("given the People & access group", () => {
 
 describe("given release_braids is off for the organisation", () => {
   describe("when the menu is built for an organisation admin on Enterprise", () => {
-    /** @scenario "With release_braids off the settings menu offers no Braids entry" */
-    it("offers no Braids entry, for the project page or the organisation page", () => {
-      const gates = {
-        enterprisePlan: "included",
-        hasPermission: () => true,
-        hasOrganizationPermission: () => true,
-      } as const;
+    const gates = {
+      enterprisePlan: "included",
+      hasPermission: () => true,
+      hasOrganizationPermission: () => true,
+      braidsEnabled: false,
+    } as const;
 
+    /** @scenario "With release_braids off the settings menu offers Braids only when braids exist" */
+    it("offers no Braids entry while the organisation has no braids", () => {
       expect(hrefsIn({ ...gates, braidsEnabled: true })).toContain("/settings/braids");
       for (const href of ["/settings/braids", "/settings/organization-braids"]) {
-        expect(hrefsIn({ ...gates, braidsEnabled: false })).not.toContain(href);
+        expect(hrefsIn({ ...gates, braidsPresent: false })).not.toContain(href);
       }
+    });
+
+    /** @scenario "With release_braids off the settings menu offers Braids only when braids exist" */
+    it("offers the Braids entry once the organisation has a braid", () => {
+      expect(hrefsIn({ ...gates, braidsPresent: true })).toContain("/settings/braids");
     });
   });
 });
@@ -324,8 +330,8 @@ describe("given a plan that lacks Enterprise", () => {
       ]);
     });
 
-    /** @scenario "The organization's braids page lights the one Braids entry" */
-    it("lights that one Braids entry on the organization's braids page", () => {
+    /** @scenario "The organization's braids page lights its Organization entry" */
+    it("lights the Organization group's General entry on the organization's braids page", () => {
       const items = settingsMenu({
         ...EVERYTHING_CLOSED,
         enterprisePlan: "locked",
@@ -336,7 +342,7 @@ describe("given a plan that lacks Enterprise", () => {
       const lit = items.filter((item) =>
         isSettingsMenuItemActive({ item, pathname: "/settings/organization-braids" }),
       );
-      expect(lit.map((item) => item.href)).toEqual(["/settings/braids"]);
+      expect(lit.map((item) => item.href)).toEqual(["/settings"]);
     });
 
     /** @scenario "A plan without Enterprise sees its entries locked" */

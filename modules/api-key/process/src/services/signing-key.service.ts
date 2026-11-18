@@ -74,8 +74,9 @@ export class SigningKeyService {
     return new SigningKeyService({ ...input, now: input.now ?? nowInstant });
   }
 
+  /** Asks no release flag, as revoke: a leaked key must be found to be revoked (Alex, 11-18). */
   async find({ projectId }: { projectId: string }): Promise<SigningKey[]> {
-    const organizationId = await this.releasedOrganizationOf({ projectId });
+    const organizationId = await this.projects.getOrganizationId(projectId);
     return this.listed({ rows: await this.keys.findByProject({ organizationId, projectId }) });
   }
 
@@ -124,7 +125,7 @@ export class SigningKeyService {
       verifiesUntil: at.add({ milliseconds: SIGNING_KEY_ROTATION_OVERLAP_MS }),
     });
     if (!marked) throw new SigningKeyNotFoundError(keyId);
-    this.braidSignatures.forget({ organizationId, publicId: current.publicId });
+    this.braidSignatures.forget({ organizationId });
     return this.issue({ organizationId, projectId, name: current.name, userId: input.userId });
   }
 
@@ -133,7 +134,7 @@ export class SigningKeyService {
     const organizationId = await this.projects.getOrganizationId(projectId);
     await this.keys.revoke({ organizationId, projectId, id: keyId, revokedAt: this.now() });
     const row = await this.keys.getById({ organizationId, projectId, id: keyId });
-    this.braidSignatures.forget({ organizationId, publicId: row.publicId });
+    this.braidSignatures.forget({ organizationId });
     const [revoked] = await this.listed({ rows: [row] });
     return revoked!;
   }
