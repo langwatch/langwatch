@@ -1,6 +1,9 @@
 /**
  * @vitest-environment jsdom
  */
+import { UiAnalytics, type UiAnalyticsEvent } from "@langwatch/browser-host/analytics";
+import { UiHostServicesContextProvider } from "@langwatch/browser-host/capabilities";
+import { createUiHostServicesFromHost } from "@langwatch/browser-host/testing";
 import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type React from "react";
@@ -17,10 +20,6 @@ vi.mock("../../../../../behavior/langy/langy.store.ts", () => ({
 }));
 
 vi.mock("@langwatch/design-system/langy-mark", () => ({ LangyMark: () => null }));
-
-// Each followed announcement records its own click, named per announcement.
-const track = vi.fn();
-vi.mock("@langwatch/browser-host/analytics", () => ({ useUiAnalytics: () => ({ track }) }));
 
 import {
   ProjectHomeHostProvider,
@@ -83,11 +82,37 @@ class StubProjectHomeHost extends ProjectHomeHost {
 const RED_TEAM_KEY = "langwatch:red-team-home-banner-dismissed:v1:project-1";
 const AUTOMATIONS_KEY = "langwatch:automations-home-banner-dismissed:v1:project-1";
 
+/** The shell's analytics destination, keeping each event instead of sending it. */
+class RecordingUiAnalytics extends UiAnalytics {
+  readonly events: UiAnalyticsEvent[] = [];
+
+  track(event: UiAnalyticsEvent): void {
+    this.events.push(event);
+  }
+
+  identify(): void {}
+
+  group(): void {}
+
+  reset(): void {}
+}
+
+let analytics = new RecordingUiAnalytics();
+
 function renderWithProviders(ui: React.ReactElement) {
+  const services = {
+    ...createUiHostServicesFromHost({
+      route: () => ({ params: {}, query: {} }),
+      navigate: () => void 0,
+    }),
+    analytics,
+  };
   return render(
-    <DesignSystemProvider forcedTheme="light">
-      <ProjectHomeHostProvider value={new StubProjectHomeHost()}>{ui}</ProjectHomeHostProvider>
-    </DesignSystemProvider>,
+    <UiHostServicesContextProvider value={services}>
+      <DesignSystemProvider forcedTheme="light">
+        <ProjectHomeHostProvider value={new StubProjectHomeHost()}>{ui}</ProjectHomeHostProvider>
+      </DesignSystemProvider>
+    </UiHostServicesContextProvider>,
   );
 }
 
@@ -110,6 +135,7 @@ describe("<HomePageBanners />", () => {
     }`;
     document.head.append(sheet);
     localStorage.clear();
+    analytics = new RecordingUiAnalytics();
     vi.clearAllMocks();
     routerPush.mockClear();
     askLangy.mockClear();
@@ -162,10 +188,9 @@ describe("<HomePageBanners />", () => {
       fireEvent.click(screen.getByRole("button", { name: `Show announcement ${index} of 4` }));
       fireEvent.click(screen.getByRole("button", { name: cta }));
       expect(routerPush).toHaveBeenCalledWith(path);
-      expect(track).toHaveBeenCalledWith({
-        name: event,
-        attributes: { surface: "home_banner", projectId: "project-1" },
-      });
+      expect(analytics.events).toEqual([
+        { name: event, attributes: { surface: "home_banner", projectId: "project-1" } },
+      ]);
     });
 
     /** @scenario "Each announcement opens its feature" */
@@ -180,10 +205,12 @@ describe("<HomePageBanners />", () => {
         "noopener,noreferrer",
       );
       expect(routerPush).not.toHaveBeenCalled();
-      expect(track).toHaveBeenCalledWith({
-        name: "agent_call_graph_banner_click",
-        attributes: { surface: "home_banner", projectId: "project-1" },
-      });
+      expect(analytics.events).toEqual([
+        {
+          name: "agent_call_graph_banner_click",
+          attributes: { surface: "home_banner", projectId: "project-1" },
+        },
+      ]);
       open.mockRestore();
     });
   });

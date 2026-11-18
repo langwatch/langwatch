@@ -64,7 +64,6 @@ function LangyHomebarMark() {
  */
 const LANGY_SLIDE: Slide = {
   id: "langy-ships-the-fix",
-  storagePrefix: "langwatch:langy-home-banner-dismissed:v1:",
   colors: ["accent.solid", "orange.muted", "purple.solid", "bg.subtle"],
   mesh: {
     distortion: 0.9,
@@ -123,8 +122,6 @@ interface NavCtx {
 
 interface Slide {
   id: string;
-  /** Per-project localStorage key prefix for the 7-day snooze. */
-  storagePrefix: string;
   /** Semantic colours resolved before they reach the WebGL shader. */
   colors: string[];
   /** Canvas shape + position, interpolated alongside the colours so the blob
@@ -159,7 +156,6 @@ const AGENT_CALL_GRAPH_DOCS =
 const SLIDES: Slide[] = [
   {
     id: "red-team",
-    storagePrefix: "langwatch:red-team-home-banner-dismissed:v1:",
     colors: ["red.solid", "orange.fg", "purple.solid", "orange.subtle"],
     mesh: {
       distortion: 0.88,
@@ -178,7 +174,6 @@ const SLIDES: Slide[] = [
   },
   {
     id: "braids",
-    storagePrefix: "langwatch:braids-home-banner-dismissed:v1:",
     colors: ["accent.solid", "purple.solid", "cyan.solid", "bg.subtle"],
     mesh: {
       distortion: 0.8,
@@ -197,7 +192,6 @@ const SLIDES: Slide[] = [
   },
   {
     id: "agent-call-graph",
-    storagePrefix: "langwatch:agent-call-graph-home-banner-dismissed:v1:",
     colors: ["teal.solid", "cyan.solid", "accent.solid", "cyan.subtle"],
     mesh: {
       distortion: 0.85,
@@ -216,7 +210,6 @@ const SLIDES: Slide[] = [
   },
   {
     id: "automations",
-    storagePrefix: "langwatch:automations-home-banner-dismissed:v1:",
     colors: ["orange.fg", "accent.solid", "red.solid", "orange.subtle"],
     mesh: {
       distortion: 0.92,
