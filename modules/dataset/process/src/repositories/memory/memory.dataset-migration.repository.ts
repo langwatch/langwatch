@@ -148,7 +148,11 @@ export class MemoryDatasetMigrationRepository implements DatasetMigrationReposit
       count: records.length,
       maxUpdatedAt: newest,
       digest: recordSetDigest(
-        records.map((record) => ({ id: record.id, updatedAt: fromDate(record.updatedAt) })),
+        records.map((record) => ({
+          id: record.id,
+          updatedAt: fromDate(record.updatedAt),
+          entry: record.entry,
+        })),
       ),
     };
   }

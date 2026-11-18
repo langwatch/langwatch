@@ -74,9 +74,8 @@ function fixture(input: {
     recordPageQuery.mockResolvedValueOnce(page);
   }
   const misfiledCount = vi.fn(async () => [{ count: 0n }]);
-  const fingerprintQuery = vi.fn(
-    async (_strings: TemplateStringsArray, ..._values: unknown[]) =>
-      fingerprintRow({ count: 0, maxUpdatedAt: null }),
+  const fingerprintQuery = vi.fn(async (_strings: TemplateStringsArray, ..._values: unknown[]) =>
+    fingerprintRow({ count: 0, maxUpdatedAt: null }),
   );
   const update = vi.fn(async () => {});
   const executeRaw = vi.fn(async () => 1);

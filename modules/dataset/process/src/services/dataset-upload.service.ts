@@ -180,7 +180,9 @@ export class DatasetUploadService implements DatasetUpload {
       }
     } else if (dataset.contentLayout === "s3_jsonl") {
       await this.appendToChunks({ dataset, stamped, columns: checked });
-    } else if ((await this.appendToRecordsTable({ dataset, stamped, columns: checked })) === "moved") {
+    } else if (
+      (await this.appendToRecordsTable({ dataset, stamped, columns: checked })) === "moved"
+    ) {
       await this.appendToChunks({
         dataset: await this.findDataset(dataset.id, projectId),
         stamped,
