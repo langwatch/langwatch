@@ -1,0 +1,9 @@
+{"url":"https://app.2ab28730.langwatch.localhost/platform-1-XnKoUj","value":"{\"key\":{\"id\":\"signingkey_000000DRbGQxgTZPB4JmKSS9ncg6a\",\"status\":\"active\"},\"revoke\":{\"s\":400,\"b\":\"{\\\"error\\\":{\\\"message\\\":\\\"validation_error\\\",\\\"code\\\":-32600,\\\"data\\\":{\\\"code\\\":\\\"BAD_REQUEST\\\",\\\"httpStatus\\\":400,\\\"path\\\":\\\"signingKeys.revoke\\\",\\\"cause\\\":null,\\\"error\\\":{\\\"code\\\":\\\"validation_error\\\",\\\"kind\\\":\\\"validation_error\\\",\\\"meta\\\":{\\\"fieldErrors\\\":{\\\"keyId\\\":[\\\"Invalid input: expected string, received undefined\\\"]},\\\"formErrors\\\"\"},\"firstTry\":400}"}
+{"url":"https://app.2ab28730.langwatch.localhost/platform-1-XnKoUj","value":"{\"s\":200,\"b\":\"{\\\"result\\\":{\\\"data\\\":{\\\"id\\\":\\\"signingkey_000000DRbGQxgTZPB4JmKSS9ncg6a\\\",\\\"name\\\":\\\"r2 orchestrator signer\\\",\\\"publicId\\\":\\\"v2PB4qKubP2RzBeG\\\",\\\"projectId\\\":\\\"local_project_000000DRbAKDN1J2egqSbioXnKoUl\\\",\\\"status\\\":\\\"revoked\\\",\\\"createdAt\\\":\\\"2026-11-18T10:48:05.911Z\\\",\\\"createdByUserId\\\":\\\"PH9Ed1uqlQj2hwA5cBMA-\\\",\\\"lastUsedAt\\\":\",\"at\":1794999065437}"}
+    at async <anonymous>:337:30
+haven: page.evaluate: Target page, context or browser has been closed
+{"url":"https://app.2ab28730.langwatch.localhost/settings/braids","value":"{\"created\":\"HLL3L4zcMnsDu3bX\",\"T6\":\"03b92a98d0614623029c29528988cf51\",\"T7\":\"112e19415090f22f51d40ddfe1c56fd4\",\"before\":200,\"revoke\":200,\"after\":200,\"afterS\":65,\"list\":[\"attributes[\\\"qa.persona\\\"] == \\\"u8-off2\\\"\",\"attributes[\\\"qa.persona\\\"] == \\\"u10-off2\\\"\",\"attributes[\\\"qa.persona\\\"] == \\\"u8-on\\\"\",\"attributes[\\\"qa.persona\\\"] == \\\"u10-on\\\"\",\"Verified(\\\"orchestrator\\\")\"]}"}
+s4.signed-before-revoke	local_project_000000DRbAKDN1J2egqSbioXnKoUl
+s4.signed-after-revoke	
+orch.before-revoke	
+orch.after-revoke	

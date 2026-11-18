@@ -1,0 +1,3 @@
+{"url":"https://app.2ab28730.langwatch.localhost/platform-1-XnKoUj","value":"{\"braids\":[200,\"rolebinding_000000DRbHG60BJ6AFySZsjoMxAHp\",200,\"rolebinding_000000DRbHG60BJ6AFySZsjoMxAHs\",null,null],\"T8\":\"3804d128b154665a685b1ea905fe9574\",\"send\":[200,200,200]}"}
+{"url":"https://app.2ab28730.langwatch.localhost/settings","value":"{\"T8\":{\"s\":200,\"spans\":[{\"n\":\"chain.C-reader\",\"id\":\"c3852d\"},{\"n\":\"chain.B-middle\",\"own\":\"nKoUj\",\"id\":\"419c93\"}]}}"}
+{"url":"https://app.2ab28730.langwatch.localhost/settings","value":"{\"T8\":{\"s\":200,\"spans\":[{\"n\":\"chain.B-middle\",\"id\":\"419c93\"},{\"n\":\"chain.A-origin\",\"own\":\"VX0mR\",\"id\":\"efd414\"}]}}"}

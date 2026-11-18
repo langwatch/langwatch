@@ -1,0 +1,5 @@
+Probe (b) 200 spans with random signature kids, trace 48563fa40de308371972f947738bbdc9, sent as P1 (specialist-agents)
+pg_stat_user_tables SigningKey before: seq_scan=5 idx_scan=18 (11:48:40)
+after (stable 105-120s later): seq_scan=5 idx_scan=218
+=> 200 index lookups for 200 spans, one per random kid. Spans stored / verified: 200,0
+All 4 OTLP requests answered 200, no throttling or refusal.

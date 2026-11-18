@@ -1,0 +1,1 @@
+{"url":"https://app.2ab28730.langwatch.localhost/platform-2-XnKoUl","value":"{\"T3\":{\"s\":200,\"spans\":[{\"n\":\"reader.injected\",\"id\":\"d93942\"}],\"full\":{\"s\":200,\"b\":676,\"names\":[\"reader.injected::674\"]},\"signals\":{\"s\":200,\"b\":\"[]\"}}}"}
