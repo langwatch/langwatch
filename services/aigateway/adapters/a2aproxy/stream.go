@@ -217,12 +217,14 @@ func sseFields(event []byte) []byte {
 	return out.Bytes()
 }
 
-// fieldValues returns the values of an event's event and id lines.
+// fieldValues returns the values of an event's event, id and retry lines.
 func fieldValues(event []byte) []string {
 	var out []string
 	for _, line := range bytes.Split(event, []byte("\n")) {
 		name, v, _ := bytes.Cut(line, []byte(":"))
-		if (string(name) == "event" || string(name) == "id") && len(bytes.TrimSpace(v)) > 0 {
+		field := string(name)
+		scanned := field == "event" || field == "id" || field == "retry"
+		if scanned && len(bytes.TrimSpace(v)) > 0 {
 			out = append(out, string(bytes.TrimSpace(v)))
 		}
 	}
