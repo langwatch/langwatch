@@ -309,8 +309,7 @@ function windowPredicate({
   if (keys.length === 0) return either;
   // Checked as the view DDL checks them: a catalogue name never reaches SQL unchecked.
   const keyList = keys.map((key) => `\`${identifier(key, "entity key")}\``).join(", ");
-  const table =
-    `${identifier(database, "database")}.${identifier(view.sourceTable, "sourceTable")}`;
+  const table = `${identifier(database, "database")}.${identifier(view.sourceTable, "table")}`;
   const members = memberWindows.map((window) => clickHouseLiteral(window.projectId)).join(", ");
   return (
     `(${keyList}) IN (SELECT ${keyList} FROM ${table} ` +
