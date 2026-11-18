@@ -169,11 +169,20 @@ describe("queryWithInstantEvalChipRetargeted", () => {
 
 describe("hasInstantEvalChipUnderOr", () => {
   /** @scenario "A chip typed by hand starts its run on Enter" */
-  it("finds a chip below an OR, at any depth, and only there", () => {
-    expect(hasInstantEvalChipUnderOr('status:error OR eval:"annoyed"')).toBe(true);
-    expect(hasInstantEvalChipUnderOr('a:1 OR (b:2 AND NOT eval.llm:"x")')).toBe(true);
-    expect(hasInstantEvalChipUnderOr('status:error AND NOT eval:"annoyed"')).toBe(false);
-    expect(hasInstantEvalChipUnderOr("status:error OR model:x")).toBe(false);
+  it("finds the named chip below an OR, at any depth, and only there", () => {
+    const under = (queryText: string, field = "eval", question = "annoyed") =>
+      hasInstantEvalChipUnderOr({ queryText, field, question });
+    expect(under('status:error OR eval:"annoyed"')).toBe(true);
+    expect(under('a:1 OR (b:2 AND NOT eval.llm:"annoyed")', "eval.llm")).toBe(true);
+    expect(under('status:error AND NOT eval:"annoyed"')).toBe(false);
+    expect(under("status:error OR model:x")).toBe(false);
+  });
+
+  /** @scenario "A chip typed by hand starts its run on Enter" */
+  it("ignores another eval chip under an OR", () => {
+    const queryText = 'NOT eval:"b" AND (status:error OR eval:"a")';
+    expect(hasInstantEvalChipUnderOr({ queryText, field: "eval", question: "b" })).toBe(false);
+    expect(hasInstantEvalChipUnderOr({ queryText, field: "eval", question: "a" })).toBe(true);
   });
 });
 

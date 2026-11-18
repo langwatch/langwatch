@@ -6,7 +6,7 @@
 import type { InstantEvalRunReference, InstantEvalTarget } from "@langwatch/instant-eval-contract";
 import type { LiqeQuery } from "liqe";
 
-import { filterAST, walkAST } from "../query/trace-query-ast.ts";
+import { filterAST, tagsUnderOr, walkAST } from "../query/trace-query-ast.ts";
 import { isEmptyAST, parse, serialize } from "../query/trace-query-parser.ts";
 
 /** The bare field, whose target comes from the lens. */
@@ -179,6 +179,7 @@ export function queryWithInstantEvalChipRetargeted({
   const trimmed = queryText.trim();
   let ast: LiqeQuery;
   try {
+    // `parse` hands back a cached tree; the walk below writes to its nodes.
     ast = structuredClone(parse(trimmed));
   } catch {
     return trimmed;
@@ -197,26 +198,32 @@ export function queryWithInstantEvalChipRetargeted({
 }
 
 /**
- * Whether an eval chip sits below an `OR`. Its run judges only the other terms,
- * so the text as typed would match rows it never judged.
+ * Whether the chip `field:question` sits below an `OR`. Its run judges only the
+ * other terms, so the text as typed would match rows it never judged.
  */
-export function hasInstantEvalChipUnderOr(queryText: string): boolean {
+export function hasInstantEvalChipUnderOr({
+  queryText,
+  field,
+  question,
+}: {
+  queryText: string;
+  field: string;
+  question: string;
+}): boolean {
+  let underOr: Set<LiqeQuery>;
   try {
-    return evalChipUnderOr(parse(queryText), false);
+    underOr = tagsUnderOr(parse(queryText.trim()));
   } catch {
     return false;
   }
-}
-
-function evalChipUnderOr(node: LiqeQuery, inOr: boolean): boolean {
-  if (node.type === "Tag") {
-    return inOr && node.field.type !== "ImplicitField" && isInstantEvalField(node.field.name);
-  }
-  if (node.type === "UnaryOperator") return evalChipUnderOr(node.operand, inOr);
-  if (node.type === "ParenthesizedExpression") return evalChipUnderOr(node.expression, inOr);
-  if (node.type !== "LogicalExpression") return false;
-  const nested = inOr || node.operator.operator === "OR";
-  return evalChipUnderOr(node.left, nested) || evalChipUnderOr(node.right, nested);
+  return [...underOr].some(
+    (node) =>
+      node.type === "Tag" &&
+      node.field.type === "Field" &&
+      node.field.name === field &&
+      node.expression.type === "LiteralExpression" &&
+      String(node.expression.value).trim() === question.trim(),
+  );
 }
 
 /**

@@ -187,7 +187,9 @@ function typedEvalRunOf({
       question: pending.question,
     }),
     fallbackQuery: queryText,
-    ...(hasInstantEvalChipUnderOr(queryText) ? {} : { typedQuery: queryText }),
+    ...(hasInstantEvalChipUnderOr({ queryText, field: pending.field, question: pending.question })
+      ? {}
+      : { typedQuery: queryText }),
     timeRange: { from: timeRange.from, to: timeRange.to },
   };
 }

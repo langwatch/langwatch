@@ -406,6 +406,16 @@ describe("given the text is an eval chip typed by hand", () => {
     });
 
     /** @scenario "A chip typed by hand starts its run on Enter" */
+    it("keeps the typed text when only another chip is under an OR", () => {
+      const { result } = renderSubmit();
+      const queryText = 'NOT eval:"b" AND (status:error OR eval:"a")';
+      act(() => result.current.submitSearch(queryText));
+      expect(handlers.onInstantEval).toHaveBeenCalledWith(
+        expect.objectContaining({ question: { instructions: "b" }, typedQuery: queryText }),
+      );
+    });
+
+    /** @scenario "A chip typed by hand starts its run on Enter" */
     it("judges the unit a target spelling asked for, whatever the lens shows", () => {
       const { result } = renderSubmit();
       act(() => result.current.submitSearch('eval.conversation:"the user is annoyed"'));
