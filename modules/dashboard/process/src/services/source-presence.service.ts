@@ -25,7 +25,10 @@ const SOURCE_EXISTENCE_SQL: Readonly<Record<DashboardSource, string>> = {
   codingAgents: "SELECT 1 AS present FROM coding_sessions LIMIT 1",
 };
 
-type SourcePresenceAnalytics = Pick<AnalyticsApi, "resolveRunCaller" | "executeLangWatchQL">;
+type SourcePresenceAnalytics = Pick<
+  AnalyticsApi,
+  "resolveRunCaller" | "executeLangWatchQL" | "reportBuiltInQueryFailure"
+>;
 
 /** The per-source answer the Flight Deck decides call-to-action versus data from. */
 export class SourcePresenceService {
@@ -70,6 +73,11 @@ export class SourcePresenceService {
       return result.rows.length > 0 ? "present" : "absent";
     } catch (error) {
       logger.warn({ error, source: input.source }, "dashboard source presence query failed");
+      this.#analytics.reportBuiltInQueryFailure({
+        projectId: input.caller.project.id,
+        source: input.source,
+        error,
+      });
       return "failed";
     }
   }

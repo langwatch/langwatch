@@ -52,6 +52,10 @@ const GENERATOR_OUTPUTS: readonly { generator: string; globs: readonly string[] 
     globs: ["modules/analytics/process/src/rules/lwql-*-manifest.generated.*"],
   },
   {
+    generator: "analytics generate:lwql-builtin-statements",
+    globs: ["modules/analytics/process/src/rules/lwql-builtin-statements.generated.*"],
+  },
+  {
     generator: "analytics generate:query-reference-fixture",
     globs: ["mcp/typescript/src/__tests__/fixtures/query-reference.json"],
   },

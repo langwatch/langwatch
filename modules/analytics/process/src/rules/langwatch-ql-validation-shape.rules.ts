@@ -117,6 +117,17 @@ export interface RejectedLangWatchQL {
   readonly ok: false;
   /** Never empty. Capped at {@link MAX_VIOLATIONS}; a longer list is truncated. */
   readonly violations: readonly LangWatchQLViolation[];
+  /**
+   * Server-side only, never on the wire: each `TABLE_NOT_ALLOWED` that named a view, with the
+   * qualified table it named, so the caller can tell a hidden view from one that does not exist.
+   */
+  readonly refusedViews?: readonly RefusedView[];
+}
+
+/** A refused view reference: the violation it produced and the qualified, lowercased table. */
+export interface RefusedView {
+  readonly violation: LangWatchQLViolation;
+  readonly table: string;
 }
 
 export type LangWatchQLValidation = AcceptedLangWatchQL | RejectedLangWatchQL;
@@ -215,6 +226,8 @@ export interface WalkContext {
   readonly appFunctions: LangWatchQLAppFunctionCall[];
   /** One entry per top-level `SELECT`; a subquery's limit bounds a read, not the response. */
   readonly topLevelLimits: TopLevelLimit[];
+  /** Every refused view reference, in walk order. */
+  readonly refusedViews: RefusedView[];
 }
 
 export interface NodeArgs {

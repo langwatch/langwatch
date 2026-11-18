@@ -15,7 +15,6 @@ import {
   formatLangWatchQLDateTimeParameter,
   isLangWatchQLDateTimeParameterType,
   isLangWatchQLGranularityParameterType,
-  isLangWatchQLSurfaceParameter,
   isLangWatchQLTimeWindowParameter,
   type LangWatchQLTimeWindow,
   type LangWatchQLTimeWindowParameter,
@@ -32,6 +31,7 @@ import {
   bindListParameters,
   mistypedListParameters,
 } from "../rules/langwatch-ql-reserved-lists.rules.ts";
+import { assertNoReservedNameSupplied } from "../rules/langwatch-ql-reserved-names.rules.ts";
 import type { LangWatchQLParameter } from "../rules/langwatch-ql-validation-shape.rules.ts";
 
 /** What a statement's reserved names mean for the request about to be made. */
@@ -283,12 +283,7 @@ export class LangWatchQLTimeWindowService {
     }
     const { followsSources, bound: listBound } = bindListParameters({ declared, lists });
 
-    const supplied = Object.keys(parameters ?? {})
-      .filter(isLangWatchQLSurfaceParameter)
-      .toSorted();
-    if (supplied.length > 0) {
-      throw new LangWatchQLReservedParameterSuppliedError(supplied);
-    }
+    assertNoReservedNameSupplied({ parameters });
 
     // A declared granularity is reserved too, but never window-injected: its
     // value is bound by the granularity resolver at run. Listing it as awaiting

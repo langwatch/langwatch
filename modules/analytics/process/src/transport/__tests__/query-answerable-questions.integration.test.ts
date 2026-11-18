@@ -12,6 +12,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import {
   ADMIT_EVERY_PLACEMENT,
+  TEST_ACCESS_REFUSALS,
   TEST_RUN_TELEMETRY,
 } from "../../app/__tests__/analytics.fixture.ts";
 import { LangWatchQLViewProvisioningService } from "../../features/provisioning/services/langwatch-ql-view-provisioning.service.ts";
@@ -673,6 +674,7 @@ describe("given the /api/v1/query REST door and a seed with known answers", () =
 
   const shippedService = () =>
     LangWatchQLService.create({
+      accessRefusals: TEST_ACCESS_REFUSALS,
       runTelemetry: TEST_RUN_TELEMETRY,
       placement: ADMIT_EVERY_PLACEMENT,
       executor: ClickHouseLangWatchQLExecutorRepository.create({
@@ -1322,6 +1324,7 @@ describe("given the /api/v1/query REST door and a seed with known answers", () =
       // for: the claim is about the relationship between the result and the
       // instant, and a wall clock would make it true only once.
       service = LangWatchQLService.create({
+        accessRefusals: TEST_ACCESS_REFUSALS,
         runTelemetry: TEST_RUN_TELEMETRY,
         placement: ADMIT_EVERY_PLACEMENT,
         executor: ClickHouseLangWatchQLExecutorRepository.create({

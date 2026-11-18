@@ -1,4 +1,5 @@
 import {
+  isLangWatchQLSurfaceParameter,
   LangWatchQLReservedParameterSuppliedError,
   LWQL_LIST_PARAMETERS,
 } from "@langwatch/analytics-contract";
@@ -51,4 +52,19 @@ export function assertNoReservedNameAssigned(sql: string): void {
   collectAssigned(parsed.statements, assigned);
   if (assigned.size > 0)
     throw new LangWatchQLReservedParameterSuppliedError([...assigned].toSorted());
+}
+
+/**
+ * Refuses a request that sends its own value for a name the surface fills.
+ * @throws {LangWatchQLReservedParameterSuppliedError} naming the reserved names supplied, sorted.
+ */
+export function assertNoReservedNameSupplied({
+  parameters,
+}: {
+  parameters: Readonly<Record<string, unknown>> | undefined;
+}): void {
+  const supplied = Object.keys(parameters ?? {})
+    .filter(isLangWatchQLSurfaceParameter)
+    .toSorted();
+  if (supplied.length > 0) throw new LangWatchQLReservedParameterSuppliedError(supplied);
 }

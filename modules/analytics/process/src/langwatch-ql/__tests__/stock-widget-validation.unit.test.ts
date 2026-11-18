@@ -5,9 +5,6 @@
  * @see modules/dashboard/specs/dashboards-v2.feature AC202
  * @vitest-environment node
  */
-import { readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
-
 import type { LangWatchQLProtections } from "@langwatch/analytics-contract";
 import { describe, expect, it } from "vitest";
 
@@ -15,17 +12,12 @@ import { LWQL_VIEW_CATALOG } from "../../rules/lwql-view-catalog.rules.ts";
 import { EVERY_CATALOGUE_PERMISSION } from "../../services/__tests__/lwql-catalogue-access.fixture.ts";
 import { LangWatchQLCatalogShapesService } from "../../services/langwatch-ql-catalog-shapes.service.ts";
 import { validateLangWatchQL } from "./lwql-validate.ts";
+import { loadStockStatements } from "./stock-statements.ts";
 
 const catalogShapes = LangWatchQLCatalogShapesService.create();
 const database = "analytics";
 
-// A committed copy of the stock SQL; the browser package's test keeps it equal to the catalogue.
-const queries: readonly { label: string; sql: string }[] = JSON.parse(
-  readFileSync(
-    fileURLToPath(new URL("./fixtures/stock-widget-queries.json", import.meta.url)),
-    "utf8",
-  ),
-);
+const queries = loadStockStatements();
 
 function violationsOf(sql: string, protections: LangWatchQLProtections) {
   const result = validateLangWatchQL({

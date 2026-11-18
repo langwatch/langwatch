@@ -13,12 +13,14 @@ import { describe, expect, it } from "vitest";
 
 import {
   ADMIT_EVERY_PLACEMENT,
+  TEST_ACCESS_REFUSALS,
   TEST_RUN_TELEMETRY,
 } from "../../app/__tests__/analytics.fixture.ts";
 import { LangWatchQLService } from "../langwatch-ql.service.ts";
 import { catalogueWithout, EVERY_CATALOGUE_PERMISSION } from "./lwql-catalogue-access.fixture.ts";
 
 const service = LangWatchQLService.create({
+  accessRefusals: TEST_ACCESS_REFUSALS,
   runTelemetry: TEST_RUN_TELEMETRY,
   placement: ADMIT_EVERY_PLACEMENT,
   executor: null,

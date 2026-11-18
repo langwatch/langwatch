@@ -26,6 +26,7 @@ import { z } from "zod";
 import { analyticsTestSecrets } from "../../app/__tests__/analytics-secrets.fixture.ts";
 import {
   ADMIT_EVERY_PLACEMENT,
+  TEST_ACCESS_REFUSALS,
   TEST_RUN_TELEMETRY,
 } from "../../app/__tests__/analytics.fixture.ts";
 import { AnalyticsModule } from "../../app/analytics.app.ts";
@@ -78,6 +79,7 @@ function mountDoor({
 } = {}) {
   const executor = new RecordingExecutor();
   const service = LangWatchQLService.create({
+    accessRefusals: TEST_ACCESS_REFUSALS,
     runTelemetry: TEST_RUN_TELEMETRY,
     placement: ADMIT_EVERY_PLACEMENT,
     executor,

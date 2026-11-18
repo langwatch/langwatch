@@ -11,6 +11,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   ADMIT_EVERY_PLACEMENT,
+  TEST_ACCESS_REFUSALS,
   TEST_RUN_TELEMETRY,
 } from "../../app/__tests__/analytics.fixture.ts";
 import {
@@ -22,6 +23,7 @@ import { LangWatchQLService } from "../../services/langwatch-ql.service.ts";
 import { analyticsLwqlTrpcTransport, type AnalyticsLwqlApi } from "../analytics-lwql.trpc.ts";
 
 const lwql = LangWatchQLService.create({
+  accessRefusals: TEST_ACCESS_REFUSALS,
   runTelemetry: TEST_RUN_TELEMETRY,
   placement: ADMIT_EVERY_PLACEMENT,
   executor: null,
@@ -43,7 +45,7 @@ function validateHandler({
 }: {
   protections: LangWatchQLProtections;
   enabled?: boolean;
-  execute?: AnalyticsLwqlApi["executeLangWatchQL"];
+  execute?: AnalyticsLwqlApi["executeWorkbenchQuery"];
 }): Handler {
   const app = createApiFixture<AnalyticsLwqlApi>({
     isWorkbenchEnabled: async () => enabled,
@@ -52,7 +54,7 @@ function validateHandler({
         langWatchQL: lwql,
         protections: { resolveMemberProtections: async () => protections },
       }).report(input),
-    executeLangWatchQL: execute,
+    executeWorkbenchQuery: execute,
   });
   const handlers: Record<string, Handler> = {};
   const runtime: TrpcProcedureFactory<object> = {

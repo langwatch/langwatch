@@ -8,6 +8,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   ADMIT_EVERY_PLACEMENT,
+  TEST_ACCESS_REFUSALS,
   TEST_RUN_TELEMETRY,
 } from "../../app/__tests__/analytics.fixture.ts";
 import { DEFAULT_LWQL_HYDRATION_LIMITS } from "../../features/hydration/rules/langwatch-ql-hydration-assembly.rules.ts";
@@ -102,6 +103,7 @@ function serviceOver({
   });
 
   return LangWatchQLService.create({
+    accessRefusals: TEST_ACCESS_REFUSALS,
     runTelemetry: TEST_RUN_TELEMETRY,
     placement: ADMIT_EVERY_PLACEMENT,
     executor: new KeyAnsweringExecutor(keys),
