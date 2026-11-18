@@ -232,6 +232,8 @@ interface AnalyticsAppDependencies {
   recency: AnalyticsRecencyRepository;
   /** The access model's owner probe and convergence; no-ops where LangWatchQL is unavailable. */
   lwqlProvisioning: LwqlProvisioningOperations;
+  /** The gate every LangWatchQL run passes; the worker stores the access model answer with it. */
+  lwqlPlacement: LangWatchQLPlacementGateService;
   /** A new project's key-map row, written on project's created event; no-op without LangWatchQL. */
   lwqlKeyMap: LwqlKeyMapService;
   /** How many members one group project's statement may name; the key set's ceiling unset. */
@@ -566,14 +568,15 @@ export class AnalyticsModule
     const runTelemetry = LangWatchQLRunTelemetryService.create({
       queryHashKey: await queryHashKey(setup.secrets),
     });
+    const lwqlPlacement = LangWatchQLPlacementGateService.create({
+      placement: setup.repositories.lwqlPlacement,
+      target: lwqlTargetOf({ connection }),
+      accessModel: lwqlAccessModelProbe({ admin, connection }),
+      answers: setup.repositories.lwqlAccessModelAnswer,
+    });
     const langWatchQL = LangWatchQLServiceClass.create({
       executor: connection ? ClickHouseLangWatchQLExecutorRepository.create({ connection }) : null,
-      placement: LangWatchQLPlacementGateService.create({
-        placement: setup.repositories.lwqlPlacement,
-        target: lwqlTargetOf({ connection }),
-        accessModel: lwqlAccessModelProbe({ admin, connection }),
-        answers: setup.repositories.lwqlAccessModelAnswer,
-      }),
+      placement: lwqlPlacement,
       database: connection?.database ?? DEFAULT_LWQL_DATABASE,
       hydration,
       judging: setup.channels.judge,
@@ -601,6 +604,7 @@ export class AnalyticsModule
         appFunctionStore: setup.repositories.appFunctionStore,
         recency: setup.repositories.recency,
         lwqlProvisioning,
+        lwqlPlacement,
         lwqlKeyMap: LwqlKeyMapService.create({
           projects: setup.dependencies.projects,
           ...(admin.configured && connection
@@ -665,6 +669,11 @@ export class AnalyticsModule
   /** Who owns the LangWatchQL access model now; the reconvergence watch probes this. */
   probeLwqlAccessModelOwner(): Promise<LwqlAccessModelOwner> {
     return this.#dependencies.lwqlProvisioning.probeOwner();
+  }
+
+  /** Stores the access model's answer for every gate in the fleet; the reconvergence check asks. */
+  refreshLwqlAccessModelAnswer(): Promise<void> {
+    return this.#dependencies.lwqlPlacement.refreshAccessModelAnswer();
   }
 
   /** Re-provisions the access model once a config store released it (SQL mode only). */
