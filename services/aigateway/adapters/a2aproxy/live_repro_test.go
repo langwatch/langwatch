@@ -121,4 +121,12 @@ func TestStreamLineWithoutDataPrefixNeverReachesTheCaller(t *testing.T) {
 	rec = f.do(http.MethodPost, "/a2a/billing", sendMessage("SendStreamingMessage", "hello"))
 	assert.Contains(t, rec.Body.String(), `"reason":"a2a_content_blocked"`)
 	assert.NotContains(t, rec.Body.String(), ghToken)
+
+	f.reply = func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		_, _ = io.WriteString(w, "retry: "+ghToken+"\ndata: {\"result\":{}}\n\n")
+	}
+	rec = f.do(http.MethodPost, "/a2a/billing", sendMessage("SendStreamingMessage", "hello"))
+	assert.Contains(t, rec.Body.String(), `"reason":"a2a_content_blocked"`)
+	assert.NotContains(t, rec.Body.String(), ghToken)
 }
