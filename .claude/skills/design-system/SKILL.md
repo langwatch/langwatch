@@ -120,9 +120,9 @@ Extend an existing pattern, do not invent one.
 ## Worked example
 
 ```tsx
+import { ListTable } from "@langwatch/design-system/list-table";
 // the shared list look: one component, tokens only
 import { Table } from "@langwatch/design-system/primitives";
-import { ListTable } from "@langwatch/design-system/list-table";
 ```
 
 A page needing a rail across modules takes

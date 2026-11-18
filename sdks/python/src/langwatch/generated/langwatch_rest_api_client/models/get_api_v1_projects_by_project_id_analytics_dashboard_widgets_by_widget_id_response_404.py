@@ -4,7 +4,6 @@ from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 from attrs import define as _attrs_define
-from attrs import field as _attrs_field
 
 from ..models.get_api_v1_projects_by_project_id_analytics_dashboard_widgets_by_widget_id_response_404_fault import (
     GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse404Fault,
@@ -53,7 +52,6 @@ class GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse404:
     docs_url: str | Unset = UNSET
     fault: GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse404Fault | Unset = UNSET
     reasons: list[Any] | Unset = UNSET
-    additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         type_ = self.type_
@@ -91,7 +89,7 @@ class GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse404:
             reasons = self.reasons
 
         field_dict: dict[str, Any] = {}
-        field_dict.update(self.additional_properties)
+
         field_dict.update(
             {
                 "type": type_,
@@ -183,21 +181,4 @@ class GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse404:
             reasons=reasons,
         )
 
-        get_api_v1_projects_by_project_id_analytics_dashboard_widgets_by_widget_id_response_404.additional_properties = d
         return get_api_v1_projects_by_project_id_analytics_dashboard_widgets_by_widget_id_response_404
-
-    @property
-    def additional_keys(self) -> list[str]:
-        return list(self.additional_properties.keys())
-
-    def __getitem__(self, key: str) -> Any:
-        return self.additional_properties[key]
-
-    def __setitem__(self, key: str, value: Any) -> None:
-        self.additional_properties[key] = value
-
-    def __delitem__(self, key: str) -> None:
-        del self.additional_properties[key]
-
-    def __contains__(self, key: str) -> bool:
-        return key in self.additional_properties

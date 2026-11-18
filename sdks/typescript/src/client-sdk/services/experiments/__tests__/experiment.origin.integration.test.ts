@@ -46,7 +46,7 @@ const mockFetch = () => {
       });
     }
     return new Response(JSON.stringify({}), { status: 200 });
-  }) as typeof fetch;
+  });
 };
 
 describe("Experiment origin and span parenting", () => {

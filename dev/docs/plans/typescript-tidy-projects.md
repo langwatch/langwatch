@@ -107,11 +107,11 @@ The manifest's suggested pilot (`@langwatch/ksuid` or `@langwatch/handled-error`
 ### What was proven
 
 - `pnpm --filter @langwatch/config typecheck` and `@langwatch/ui-kernel
-typecheck`: green before and after the flip, warm ~1-2s each (no measurable
+  typecheck`: green before and after the flip, warm ~1-2s each (no measurable
   regression; these are `tsc -b` incremental builds, dominated by the
   `tsbuildinfo` cache, not by the manifest).
 - `pnpm --filter @langwatch/authz-browser-kit typecheck` and `@langwatch/api-key-browser
-typecheck`: green before and after, in both the original state and the
+  typecheck`: green before and after, in both the original state and the
   flipped state (`types`→src, `langwatch-declaration-source` condition
   removed).
 - `pnpm --filter @langwatch/authz-browser-kit test` (41 tests) and

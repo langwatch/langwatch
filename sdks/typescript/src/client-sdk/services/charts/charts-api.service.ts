@@ -132,7 +132,7 @@ export class ChartsApiService {
       error,
       response,
       onError: this.handleApiError.bind(this),
-    }) as unknown as { data: SavedChart[] };
+    });
   }
 
   async get(id: string): Promise<SavedChart> {
@@ -147,7 +147,7 @@ export class ChartsApiService {
       error,
       response,
       onError: this.handleApiError.bind(this),
-    }) as unknown as SavedChart;
+    });
   }
 
   async create(params: {
@@ -165,7 +165,7 @@ export class ChartsApiService {
       error,
       response,
       onError: this.handleApiError.bind(this),
-    }) as unknown as SavedChart;
+    });
   }
 
   async update(
@@ -183,7 +183,7 @@ export class ChartsApiService {
       error,
       response,
       onError: this.handleApiError.bind(this),
-    }) as unknown as SavedChart;
+    });
   }
 
   /** Deletes a chart. The route answers `204` with no body, like `unplace`. */
@@ -224,7 +224,7 @@ export class ChartsApiService {
       error,
       response,
       onError: this.handleApiError.bind(this),
-    }) as unknown as SavedChart;
+    });
   }
 
   async unplace(id: string): Promise<void> {

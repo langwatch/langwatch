@@ -393,7 +393,7 @@ describe.each(backends)("given the membership reads on the $name backend", (back
 
       const claims = await Promise.all([complete(), complete()]);
 
-      expect(claims.toSorted()).toEqual([false, true]);
+      expect(claims.toSorted((a, b) => Number(a) - Number(b))).toEqual([false, true]);
       await expect(
         repositories.admissions.readAdmissionMarker({ organizationId, userId }),
       ).resolves.toEqual({ found: false });

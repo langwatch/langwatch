@@ -131,7 +131,7 @@ Rollouts blue-green) are introduced.
 - **Self-sufficient artifact / Web Workers.** The `renderBuiltUrl` runtime
   expression is self-defaulting — `(globalThis.__lwAssetUrl || (p => "/"+p))(…)`
   — so the built bundle works even when the resolver was never injected: `vite
-preview`, the CI boot-smoke, and any raw-`dist/` static server all fall back to
+  preview`, the CI boot-smoke, and any raw-`dist/` static server all fall back to
   same-origin. Reading via `globalThis` (defined in Web Worker scopes too, where
   `window` is not) means a worker chunk degrades to same-origin rather than
   throwing. The only consequence: a future CDN-hosted worker asset would be

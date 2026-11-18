@@ -59,9 +59,9 @@ describe("Feature: CLI families for webhooks and spend events", () => {
     expect(checkOrgApiKey()).toBe("sk-lw-key");
 
     vi.stubEnv("LANGWATCH_API_KEY", "");
-    const exit = vi.spyOn(process, "exit").mockImplementation((() => {
+    const exit = vi.spyOn(process, "exit").mockImplementation(() => {
       throw new Error("exit");
-    }) as never);
+    });
     const stderr = vi.spyOn(console, "error").mockImplementation(() => undefined);
     expect(() => checkOrgApiKey()).toThrow("exit");
     expect(

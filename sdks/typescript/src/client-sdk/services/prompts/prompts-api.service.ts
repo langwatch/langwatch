@@ -167,7 +167,7 @@ export class PromptsApiService {
       const originalError = error instanceof PromptsApiError ? error.originalError : null;
       const statusCode =
         originalError != null && typeof originalError === "object" && "statusCode" in originalError
-          ? (originalError as { statusCode: unknown }).statusCode
+          ? originalError.statusCode
           : null;
 
       if (statusCode === 404) {

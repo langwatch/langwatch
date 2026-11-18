@@ -184,6 +184,7 @@ Produce:
 ```tsx
 // Good import style
 import { Box, Button, Field, Stack, Text } from "@chakra-ui/react";
+
 // Then local
 import { SomeLocalComponent } from "./SomeLocalComponent";
 ```

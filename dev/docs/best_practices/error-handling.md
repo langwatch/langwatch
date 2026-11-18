@@ -152,7 +152,7 @@ in order of how often they are violated:
    was always the authority on what may ship, and it catches everything the
    plugin did except one shape — a copy object built outside the toast call's
    own argument list, `toaster.create(buildToast({ description: error.message
-}))`, which the scanner attributes to `buildToast`. Rewriting the plugin as
+   }))`, which the scanner attributes to `buildToast`. Rewriting the plugin as
    an oxlint JavaScript plugin is open follow-up work.
 
    The scanner works by derivation, so it will occasionally flag a value that
@@ -163,7 +163,7 @@ in order of how often they are violated:
 
    **The marker goes where the value is _used_, not where it is derived.** The
    scanner tracks taint through locals to a fixpoint — `const message = e
-instanceof Error ? e.message : "…"` taints `message`, and so does a second
+   instanceof Error ? e.message : "…"` taints `message`, and so does a second
    local assigned from it — but it only ever reports the copy slot the tainted
    value reaches. Suppression is matched against the line of that slot's key
    (`title`, `description` or `fallbackTitle`), so a marker parked on the
@@ -416,7 +416,7 @@ Not every transport carries the identical shape yet. Know which one you are on:
   contract, and don't assume a code is available when consuming them.
 - **Hono REST** — throw the `HandledError`; `createServiceApp`'s `onError`
   serialises it to `{ error: code, message, ...meta, tips?, docsUrl?, fault?,
-reasons? }`. Note that `message` is the error's own sentence here, not the
+  reasons? }`. Note that `message` is the error's own sentence here, not the
   code — which is why it has to be written customer-safe. Hand-rolling
   `c.json({ error: "..." }, { status })` is a code smell and bypasses the whole
   contract.

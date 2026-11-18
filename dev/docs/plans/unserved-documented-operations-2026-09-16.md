@@ -4,7 +4,7 @@ Supersedes `dev/docs/plans/unserved-documented-operations-2026-09-14.md`.
 
 > **Correction, 2026-09-16 (later the same day): the counts below are not
 > evidence.** Every Sep-16 run — r4, r5 and r6 — exited 2 with `CREDENTIAL
-LOST`, and r5 is the run this document was written from. r4 lost the project
+> LOST`, and r5 is the run this document was written from. r4 lost the project
 > key before the first probe; r5 and r6 lost the **organization key** partway
 > through, on the base. apidiff's own verdict says what that means: "this run's
 > counts are not comparable with any other run: probes made after the loss

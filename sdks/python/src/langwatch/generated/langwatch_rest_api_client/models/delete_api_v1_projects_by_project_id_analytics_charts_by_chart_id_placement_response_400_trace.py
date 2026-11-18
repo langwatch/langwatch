@@ -4,7 +4,6 @@ from collections.abc import Mapping
 from typing import Any, TypeVar
 
 from attrs import define as _attrs_define
-from attrs import field as _attrs_field
 
 from ..types import UNSET, Unset
 
@@ -25,7 +24,6 @@ class DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacementResponse400
     span_id: str | Unset = UNSET
     trace_url: str | Unset = UNSET
     logs_url: str | Unset = UNSET
-    additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         trace_id = self.trace_id
@@ -37,7 +35,7 @@ class DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacementResponse400
         logs_url = self.logs_url
 
         field_dict: dict[str, Any] = {}
-        field_dict.update(self.additional_properties)
+
         field_dict.update({})
         if trace_id is not UNSET:
             field_dict["traceId"] = trace_id
@@ -68,21 +66,4 @@ class DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacementResponse400
             logs_url=logs_url,
         )
 
-        delete_api_v1_projects_by_project_id_analytics_charts_by_chart_id_placement_response_400_trace.additional_properties = d
         return delete_api_v1_projects_by_project_id_analytics_charts_by_chart_id_placement_response_400_trace
-
-    @property
-    def additional_keys(self) -> list[str]:
-        return list(self.additional_properties.keys())
-
-    def __getitem__(self, key: str) -> Any:
-        return self.additional_properties[key]
-
-    def __setitem__(self, key: str, value: Any) -> None:
-        self.additional_properties[key] = value
-
-    def __delitem__(self, key: str) -> None:
-        del self.additional_properties[key]
-
-    def __contains__(self, key: str) -> bool:
-        return key in self.additional_properties

@@ -81,7 +81,7 @@ The cost is paid twice more:
 
 - Every method re-writes its input shape inline even though the contract already
   names it. `api-key.service.ts:162-167` spells out `{ id; organizationId;
-callerUserId; callerCanReadAnyKey }`, which is `ApiKeyCallerReadInput`
+  callerUserId; callerCanReadAnyKey }`, which is `ApiKeyCallerReadInput`
   (`contract/src/api-key.service.ts:43-48`). Nine of the named input types in
   the contract have zero users.
 - A test that exercises four methods must stub thirty-one:

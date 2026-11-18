@@ -722,7 +722,7 @@ describe("the agent client, given a fake platform", () => {
       });
       const handler = vi.fn(async () => "ok");
       const { connection } = await connectSupport(handler, {
-        parameters: gatedParameters(gate) as never,
+        parameters: gatedParameters(gate),
         concurrency: 1,
       });
 
@@ -1047,7 +1047,7 @@ describe("the agent client, given a fake platform", () => {
           loyaltyTier: { default: "none" },
           refundAmount: { type: "number", default: 49.95 },
         },
-      }) as Shop;
+      });
       declare(agent);
       const connection = await platform.nextConnection();
       const register = await connection.nextFrame<RegisterFrame>("register");
@@ -1072,7 +1072,7 @@ describe("the agent client, given a fake platform", () => {
     };
 
     it("lets a setup run past the turn timeout while its own deadline holds", async () => {
-      const agent = define(async () => "hi", { timeoutMs: 60 }) as Shop;
+      const agent = define(async () => "hi", { timeoutMs: 60 });
       agent.scenario.setup(async () => {
         await new Promise((resolve) => setTimeout(resolve, 150));
         return { orderId: "42" };

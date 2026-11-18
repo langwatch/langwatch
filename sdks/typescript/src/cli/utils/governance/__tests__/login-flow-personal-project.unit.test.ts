@@ -172,7 +172,7 @@ describe("runUnifiedLoginFlow (device session) personal-project persistence", ()
         api_key: "pkey_prior_user",
         validated_at: Math.floor(Date.now() / 1000),
       },
-    } as never);
+    });
     pollUntilDone.mockResolvedValue(exchangeResult());
 
     const cfg = await runUnifiedLoginFlow({ kind: "device_session" });

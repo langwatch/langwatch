@@ -41,12 +41,12 @@ export function applyFilterRule(rule: TraceFilter, spans: ReadableSpan[]): Reada
   }
 
   if ("include" in rule && rule.include) {
-    const criteria = (rule as { include: Criteria }).include;
+    const criteria = rule.include;
     return spans.filter((s) => matchesCriteria(s, criteria));
   }
 
   if ("exclude" in rule && rule.exclude) {
-    const criteria = (rule as { exclude: Criteria }).exclude;
+    const criteria = rule.exclude;
     return spans.filter((s) => !matchesCriteria(s, criteria));
   }
 

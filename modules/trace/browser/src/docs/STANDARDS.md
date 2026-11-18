@@ -688,6 +688,7 @@ stores/__tests__/
 ```tsx
 // factories/trace.factory.ts
 import { Factory } from "fishery";
+
 import type { TraceListItem } from "../types";
 
 export const traceFactory = Factory.define<TraceListItem>(({ sequence }) => ({
@@ -714,6 +715,7 @@ const errorTrace = traceFactory.build({ hasError: true, name: "failed.run" });
 // hooks/__tests__/useTraceList.test.ts
 import { renderHook } from "@testing-library/react";
 import { describe, it, expect, vi } from "vitest";
+
 import { useTraceList } from "../useTraceList";
 
 // Mock the store: one module, every slice the hook reads

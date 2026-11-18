@@ -64,9 +64,9 @@ export interface PostedRequest {
 }
 
 /** A collector that is not there at all. */
-export const unreachableCollector: typeof fetch = (async () => {
+export const unreachableCollector: typeof fetch = async () => {
   throw new Error("connect ECONNREFUSED");
-}) as unknown as typeof fetch;
+};
 
 export const attributesOf = (request: PostedRequest): Record<string, string> =>
   Object.fromEntries(

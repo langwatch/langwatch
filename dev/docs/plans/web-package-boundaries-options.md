@@ -46,10 +46,10 @@ means extraction and a handful of directional decisions, not a new export tier.
   web packages — a traversal-order-dependent sample, not a count of distinct
   cycles. Running the same DFS today reports **26**, of which **3 are
   contract-package cycles** (see §5, option C): `scenario-contract ↔
-suite-contract`, a five-contract ring through
+  suite-contract`, a five-contract ring through
   `evaluation → experiment → dataset → annotation → trace → evaluation`, and a
   five-contract ring through `scenario → automation → monitor → evaluation →
-experiment → scenario`.
+  experiment → scenario`.
 - **Hubs.** Out-degree: trace-web 12, scenario-web 8, experiment-web and
   workflow-web 7 each. In-degree: model-provider-web, trace-web and
   workflow-web 8 each, prompt-web 6.

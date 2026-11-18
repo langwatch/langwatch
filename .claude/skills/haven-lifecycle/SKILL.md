@@ -114,7 +114,7 @@ haven machine clean --yes                 # no pickers: only the pre-tick defaul
 ```
 
 - With no TTY `haven self install` runs `--yes`: on macOS also the native tier (`brew install grafana
-prometheus loki` and the pinned ClickHouse, Tempo and Alloy downloads). macOS needs no colima.
+  prometheus loki` and the pinned ClickHouse, Tempo and Alloy downloads). macOS needs no colima.
   Re-running is a no-op; a failed non-required row is logged and the run carries on.
 - `--build` builds the consoles the binary embeds in one cached, parallel `nx run-many` (the
   `haven-console` tag is the list); a console that fails serves a page naming `make haven-web`.

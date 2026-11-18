@@ -57,7 +57,7 @@ against that reference, the inventory of #7333 shows:
   (`composeVerificationCeremonies()` newing three repositories, plus a
   module-level mutable test seam), and `better-auth/identityDatabase.ts` (a
   lazily-constructed `IdentityCeremonies`). Four `new IdentityCeremonies({
-prisma })` sites, none sharing anything.
+  prisma })` sites, none sharing anything.
 - **A dependency cycle.** `app-layer/identity → better-auth/identityRouting`
   (for one pure function, `identifierProviderFor`) while
   `better-auth/identityDatabase → app-layer/identity`.

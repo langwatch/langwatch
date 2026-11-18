@@ -1,7 +1,7 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
 exports[`given the address-confirmation email rendered from the default fixture > when it is rendered > matches the stored snapshot > address-confirmation — default 1`] = `
-"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-wordmark.png"/><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-full-darktheme.svg"/><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
+"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
 :root { color-scheme: light dark; supported-color-schemes: light dark; }
 .lw-dark-only { display: none !important; mso-hide: all; width: 0 !important; max-height: 0 !important; overflow: hidden !important; font-size: 0 !important; line-height: 0 !important; }
 @media (prefers-color-scheme: dark) {
@@ -37,7 +37,7 @@ exports[`given the address-confirmation email rendered from the default fixture 
 `;
 
 exports[`given the automation-limit email rendered from the ceiling reached fixture > when it is rendered > matches the stored snapshot > automation-limit — ceiling reached 1`] = `
-"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-wordmark.png"/><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-full-darktheme.svg"/><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
+"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
 :root { color-scheme: light dark; supported-color-schemes: light dark; }
 .lw-dark-only { display: none !important; mso-hide: all; width: 0 !important; max-height: 0 !important; overflow: hidden !important; font-size: 0 !important; line-height: 0 !important; }
 @media (prefers-color-scheme: dark) {
@@ -73,7 +73,7 @@ exports[`given the automation-limit email rendered from the ceiling reached fixt
 `;
 
 exports[`given the automation-limit email rendered from the ceiling reached on negotiated terms fixture > when it is rendered > matches the stored snapshot > automation-limit — ceiling reached on negotiated terms 1`] = `
-"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-wordmark.png"/><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-full-darktheme.svg"/><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
+"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
 :root { color-scheme: light dark; supported-color-schemes: light dark; }
 .lw-dark-only { display: none !important; mso-hide: all; width: 0 !important; max-height: 0 !important; overflow: hidden !important; font-size: 0 !important; line-height: 0 !important; }
 @media (prefers-color-scheme: dark) {
@@ -109,7 +109,7 @@ exports[`given the automation-limit email rendered from the ceiling reached on n
 `;
 
 exports[`given the automation-limit email rendered from the ceiling reached, nothing higher to move… fixture > when it is rendered > matches the stored snapshot > automation-limit — ceiling reached, nothing higher to move to 1`] = `
-"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-wordmark.png"/><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-full-darktheme.svg"/><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
+"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
 :root { color-scheme: light dark; supported-color-schemes: light dark; }
 .lw-dark-only { display: none !important; mso-hide: all; width: 0 !important; max-height: 0 !important; overflow: hidden !important; font-size: 0 !important; line-height: 0 !important; }
 @media (prefers-color-scheme: dark) {
@@ -145,7 +145,7 @@ exports[`given the automation-limit email rendered from the ceiling reached, not
 `;
 
 exports[`given the automation-limit email rendered from the paused fixture > when it is rendered > matches the stored snapshot > automation-limit — paused 1`] = `
-"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-wordmark.png"/><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-full-darktheme.svg"/><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
+"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
 :root { color-scheme: light dark; supported-color-schemes: light dark; }
 .lw-dark-only { display: none !important; mso-hide: all; width: 0 !important; max-height: 0 !important; overflow: hidden !important; font-size: 0 !important; line-height: 0 !important; }
 @media (prefers-color-scheme: dark) {
@@ -181,7 +181,7 @@ exports[`given the automation-limit email rendered from the paused fixture > whe
 `;
 
 exports[`given the budget-increase-request email rendered from the default fixture > when it is rendered > matches the stored snapshot > budget-increase-request — default 1`] = `
-"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-wordmark.png"/><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-full-darktheme.svg"/><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
+"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
 :root { color-scheme: light dark; supported-color-schemes: light dark; }
 .lw-dark-only { display: none !important; mso-hide: all; width: 0 !important; max-height: 0 !important; overflow: hidden !important; font-size: 0 !important; line-height: 0 !important; }
 @media (prefers-color-scheme: dark) {
@@ -217,7 +217,7 @@ exports[`given the budget-increase-request email rendered from the default fixtu
 `;
 
 exports[`given the budget-increase-request email rendered from the no limit set yet fixture > when it is rendered > matches the stored snapshot > budget-increase-request — no limit set yet 1`] = `
-"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-wordmark.png"/><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-full-darktheme.svg"/><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
+"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
 :root { color-scheme: light dark; supported-color-schemes: light dark; }
 .lw-dark-only { display: none !important; mso-hide: all; width: 0 !important; max-height: 0 !important; overflow: hidden !important; font-size: 0 !important; line-height: 0 !important; }
 @media (prefers-color-scheme: dark) {
@@ -253,7 +253,7 @@ exports[`given the budget-increase-request email rendered from the no limit set 
 `;
 
 exports[`given the budget-increase-request email rendered from the no note, no period fixture > when it is rendered > matches the stored snapshot > budget-increase-request — no note, no period 1`] = `
-"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-wordmark.png"/><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-full-darktheme.svg"/><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
+"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
 :root { color-scheme: light dark; supported-color-schemes: light dark; }
 .lw-dark-only { display: none !important; mso-hide: all; width: 0 !important; max-height: 0 !important; overflow: hidden !important; font-size: 0 !important; line-height: 0 !important; }
 @media (prefers-color-scheme: dark) {
@@ -289,7 +289,7 @@ exports[`given the budget-increase-request email rendered from the no note, no p
 `;
 
 exports[`given the connected-statement email rendered from the default fixture > when it is rendered > matches the stored snapshot > connected-statement — default 1`] = `
-"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-wordmark.png"/><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-full-darktheme.svg"/><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
+"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
 :root { color-scheme: light dark; supported-color-schemes: light dark; }
 .lw-dark-only { display: none !important; mso-hide: all; width: 0 !important; max-height: 0 !important; overflow: hidden !important; font-size: 0 !important; line-height: 0 !important; }
 @media (prefers-color-scheme: dark) {
@@ -325,7 +325,7 @@ exports[`given the connected-statement email rendered from the default fixture >
 `;
 
 exports[`given the connected-statement email rendered from the the spend ledger could not be read fixture > when it is rendered > matches the stored snapshot > connected-statement — the spend ledger could not be read 1`] = `
-"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-wordmark.png"/><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-full-darktheme.svg"/><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
+"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
 :root { color-scheme: light dark; supported-color-schemes: light dark; }
 .lw-dark-only { display: none !important; mso-hide: all; width: 0 !important; max-height: 0 !important; overflow: hidden !important; font-size: 0 !important; line-height: 0 !important; }
 @media (prefers-color-scheme: dark) {
@@ -361,7 +361,7 @@ exports[`given the connected-statement email rendered from the the spend ledger 
 `;
 
 exports[`given the digest-coding-agent-week email rendered from the agent that reports only sessions and co… fixture > when it is rendered > matches the stored snapshot > digest-coding-agent-week — agent that reports only sessions and commits 1`] = `
-"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-wordmark.png"/><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-full-darktheme.svg"/><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
+"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
 :root { color-scheme: light dark; supported-color-schemes: light dark; }
 .lw-dark-only { display: none !important; mso-hide: all; width: 0 !important; max-height: 0 !important; overflow: hidden !important; font-size: 0 !important; line-height: 0 !important; }
 @media (prefers-color-scheme: dark) {
@@ -397,7 +397,7 @@ exports[`given the digest-coding-agent-week email rendered from the agent that r
 `;
 
 exports[`given the digest-coding-agent-week email rendered from the heavy user fixture > when it is rendered > matches the stored snapshot > digest-coding-agent-week — heavy user 1`] = `
-"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-wordmark.png"/><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-full-darktheme.svg"/><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
+"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
 :root { color-scheme: light dark; supported-color-schemes: light dark; }
 .lw-dark-only { display: none !important; mso-hide: all; width: 0 !important; max-height: 0 !important; overflow: hidden !important; font-size: 0 !important; line-height: 0 !important; }
 @media (prefers-color-scheme: dark) {
@@ -433,7 +433,7 @@ exports[`given the digest-coding-agent-week email rendered from the heavy user f
 `;
 
 exports[`given the digest-coding-agent-week email rendered from the light user fixture > when it is rendered > matches the stored snapshot > digest-coding-agent-week — light user 1`] = `
-"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-wordmark.png"/><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-full-darktheme.svg"/><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
+"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
 :root { color-scheme: light dark; supported-color-schemes: light dark; }
 .lw-dark-only { display: none !important; mso-hide: all; width: 0 !important; max-height: 0 !important; overflow: hidden !important; font-size: 0 !important; line-height: 0 !important; }
 @media (prefers-color-scheme: dark) {
@@ -469,7 +469,7 @@ exports[`given the digest-coding-agent-week email rendered from the light user f
 `;
 
 exports[`given the digest-plan-pressure email rendered from the at 82% and spread evenly fixture > when it is rendered > matches the stored snapshot > digest-plan-pressure — at 82% and spread evenly 1`] = `
-"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-wordmark.png"/><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-full-darktheme.svg"/><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
+"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
 :root { color-scheme: light dark; supported-color-schemes: light dark; }
 .lw-dark-only { display: none !important; mso-hide: all; width: 0 !important; max-height: 0 !important; overflow: hidden !important; font-size: 0 !important; line-height: 0 !important; }
 @media (prefers-color-scheme: dark) {
@@ -505,7 +505,7 @@ exports[`given the digest-plan-pressure email rendered from the at 82% and sprea
 `;
 
 exports[`given the digest-plan-pressure email rendered from the at 85% with a clear culprit fixture > when it is rendered > matches the stored snapshot > digest-plan-pressure — at 85% with a clear culprit 1`] = `
-"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-wordmark.png"/><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-full-darktheme.svg"/><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
+"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
 :root { color-scheme: light dark; supported-color-schemes: light dark; }
 .lw-dark-only { display: none !important; mso-hide: all; width: 0 !important; max-height: 0 !important; overflow: hidden !important; font-size: 0 !important; line-height: 0 !important; }
 @media (prefers-color-scheme: dark) {
@@ -541,7 +541,7 @@ exports[`given the digest-plan-pressure email rendered from the at 85% with a cl
 `;
 
 exports[`given the digest-plan-pressure email rendered from the maxed out, no card fixture > when it is rendered > matches the stored snapshot > digest-plan-pressure — maxed out, no card 1`] = `
-"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-wordmark.png"/><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-full-darktheme.svg"/><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
+"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
 :root { color-scheme: light dark; supported-color-schemes: light dark; }
 .lw-dark-only { display: none !important; mso-hide: all; width: 0 !important; max-height: 0 !important; overflow: hidden !important; font-size: 0 !important; line-height: 0 !important; }
 @media (prefers-color-scheme: dark) {
@@ -577,7 +577,7 @@ exports[`given the digest-plan-pressure email rendered from the maxed out, no ca
 `;
 
 exports[`given the digest-scenarios-trend email rendered from the down to a clean week fixture > when it is rendered > matches the stored snapshot > digest-scenarios-trend — down to a clean week 1`] = `
-"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-wordmark.png"/><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-full-darktheme.svg"/><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
+"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
 :root { color-scheme: light dark; supported-color-schemes: light dark; }
 .lw-dark-only { display: none !important; mso-hide: all; width: 0 !important; max-height: 0 !important; overflow: hidden !important; font-size: 0 !important; line-height: 0 !important; }
 @media (prefers-color-scheme: dark) {
@@ -613,7 +613,7 @@ exports[`given the digest-scenarios-trend email rendered from the down to a clea
 `;
 
 exports[`given the digest-scenarios-trend email rendered from the getting better fixture > when it is rendered > matches the stored snapshot > digest-scenarios-trend — getting better 1`] = `
-"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-wordmark.png"/><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-full-darktheme.svg"/><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
+"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
 :root { color-scheme: light dark; supported-color-schemes: light dark; }
 .lw-dark-only { display: none !important; mso-hide: all; width: 0 !important; max-height: 0 !important; overflow: hidden !important; font-size: 0 !important; line-height: 0 !important; }
 @media (prefers-color-scheme: dark) {
@@ -649,7 +649,7 @@ exports[`given the digest-scenarios-trend email rendered from the getting better
 `;
 
 exports[`given the digest-scenarios-trend email rendered from the more failing than usual fixture > when it is rendered > matches the stored snapshot > digest-scenarios-trend — more failing than usual 1`] = `
-"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-wordmark.png"/><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-full-darktheme.svg"/><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
+"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
 :root { color-scheme: light dark; supported-color-schemes: light dark; }
 .lw-dark-only { display: none !important; mso-hide: all; width: 0 !important; max-height: 0 !important; overflow: hidden !important; font-size: 0 !important; line-height: 0 !important; }
 @media (prefers-color-scheme: dark) {
@@ -685,7 +685,7 @@ exports[`given the digest-scenarios-trend email rendered from the more failing t
 `;
 
 exports[`given the digest-traces-week email rendered from the busy project fixture > when it is rendered > matches the stored snapshot > digest-traces-week — busy project 1`] = `
-"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-wordmark.png"/><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-full-darktheme.svg"/><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
+"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
 :root { color-scheme: light dark; supported-color-schemes: light dark; }
 .lw-dark-only { display: none !important; mso-hide: all; width: 0 !important; max-height: 0 !important; overflow: hidden !important; font-size: 0 !important; line-height: 0 !important; }
 @media (prefers-color-scheme: dark) {
@@ -721,7 +721,7 @@ exports[`given the digest-traces-week email rendered from the busy project fixtu
 `;
 
 exports[`given the digest-traces-week email rendered from the just over the threshold, no evaluations fixture > when it is rendered > matches the stored snapshot > digest-traces-week — just over the threshold, no evaluations 1`] = `
-"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-wordmark.png"/><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-full-darktheme.svg"/><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
+"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
 :root { color-scheme: light dark; supported-color-schemes: light dark; }
 .lw-dark-only { display: none !important; mso-hide: all; width: 0 !important; max-height: 0 !important; overflow: hidden !important; font-size: 0 !important; line-height: 0 !important; }
 @media (prefers-color-scheme: dark) {
@@ -757,7 +757,7 @@ exports[`given the digest-traces-week email rendered from the just over the thre
 `;
 
 exports[`given the digest-traces-week email rendered from the quiet week after a spike fixture > when it is rendered > matches the stored snapshot > digest-traces-week — quiet week after a spike 1`] = `
-"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-wordmark.png"/><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-full-darktheme.svg"/><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
+"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
 :root { color-scheme: light dark; supported-color-schemes: light dark; }
 .lw-dark-only { display: none !important; mso-hide: all; width: 0 !important; max-height: 0 !important; overflow: hidden !important; font-size: 0 !important; line-height: 0 !important; }
 @media (prefers-color-scheme: dark) {
@@ -793,7 +793,7 @@ exports[`given the digest-traces-week email rendered from the quiet week after a
 `;
 
 exports[`given the digest-whats-new email rendered from the update with a setup nudge fixture > when it is rendered > matches the stored snapshot > digest-whats-new — update with a setup nudge 1`] = `
-"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-wordmark.png"/><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-full-darktheme.svg"/><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
+"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
 :root { color-scheme: light dark; supported-color-schemes: light dark; }
 .lw-dark-only { display: none !important; mso-hide: all; width: 0 !important; max-height: 0 !important; overflow: hidden !important; font-size: 0 !important; line-height: 0 !important; }
 @media (prefers-color-scheme: dark) {
@@ -829,7 +829,7 @@ exports[`given the digest-whats-new email rendered from the update with a setup 
 `;
 
 exports[`given the digest-whats-new email rendered from the update with an evaluation nudge fixture > when it is rendered > matches the stored snapshot > digest-whats-new — update with an evaluation nudge 1`] = `
-"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-wordmark.png"/><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-full-darktheme.svg"/><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
+"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
 :root { color-scheme: light dark; supported-color-schemes: light dark; }
 .lw-dark-only { display: none !important; mso-hide: all; width: 0 !important; max-height: 0 !important; overflow: hidden !important; font-size: 0 !important; line-height: 0 !important; }
 @media (prefers-color-scheme: dark) {
@@ -865,7 +865,7 @@ exports[`given the digest-whats-new email rendered from the update with an evalu
 `;
 
 exports[`given the domain-auto-joined email rendered from the default fixture > when it is rendered > matches the stored snapshot > domain-auto-joined — default 1`] = `
-"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-wordmark.png"/><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-full-darktheme.svg"/><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
+"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
 :root { color-scheme: light dark; supported-color-schemes: light dark; }
 .lw-dark-only { display: none !important; mso-hide: all; width: 0 !important; max-height: 0 !important; overflow: hidden !important; font-size: 0 !important; line-height: 0 !important; }
 @media (prefers-color-scheme: dark) {
@@ -901,7 +901,7 @@ exports[`given the domain-auto-joined email rendered from the default fixture > 
 `;
 
 exports[`given the domain-auto-joined email rendered from the without the seat count fixture > when it is rendered > matches the stored snapshot > domain-auto-joined — without the seat count 1`] = `
-"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-wordmark.png"/><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-full-darktheme.svg"/><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
+"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
 :root { color-scheme: light dark; supported-color-schemes: light dark; }
 .lw-dark-only { display: none !important; mso-hide: all; width: 0 !important; max-height: 0 !important; overflow: hidden !important; font-size: 0 !important; line-height: 0 !important; }
 @media (prefers-color-scheme: dark) {
@@ -937,7 +937,7 @@ exports[`given the domain-auto-joined email rendered from the without the seat c
 `;
 
 exports[`given the idp-refused-sign-in email rendered from the an unnamed provider fixture > when it is rendered > matches the stored snapshot > idp-refused-sign-in — an unnamed provider 1`] = `
-"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-wordmark.png"/><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-full-darktheme.svg"/><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
+"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
 :root { color-scheme: light dark; supported-color-schemes: light dark; }
 .lw-dark-only { display: none !important; mso-hide: all; width: 0 !important; max-height: 0 !important; overflow: hidden !important; font-size: 0 !important; line-height: 0 !important; }
 @media (prefers-color-scheme: dark) {
@@ -973,7 +973,7 @@ exports[`given the idp-refused-sign-in email rendered from the an unnamed provid
 `;
 
 exports[`given the idp-refused-sign-in email rendered from the okta fixture > when it is rendered > matches the stored snapshot > idp-refused-sign-in — okta 1`] = `
-"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-wordmark.png"/><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-full-darktheme.svg"/><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
+"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
 :root { color-scheme: light dark; supported-color-schemes: light dark; }
 .lw-dark-only { display: none !important; mso-hide: all; width: 0 !important; max-height: 0 !important; overflow: hidden !important; font-size: 0 !important; line-height: 0 !important; }
 @media (prefers-color-scheme: dark) {
@@ -1009,7 +1009,7 @@ exports[`given the idp-refused-sign-in email rendered from the okta fixture > wh
 `;
 
 exports[`given the invite email rendered from the a workspace with nothing in it yet fixture > when it is rendered > matches the stored snapshot > invite — a workspace with nothing in it yet 1`] = `
-"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-wordmark.png"/><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-full-darktheme.svg"/><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
+"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
 :root { color-scheme: light dark; supported-color-schemes: light dark; }
 .lw-dark-only { display: none !important; mso-hide: all; width: 0 !important; max-height: 0 !important; overflow: hidden !important; font-size: 0 !important; line-height: 0 !important; }
 @media (prefers-color-scheme: dark) {
@@ -1045,7 +1045,7 @@ exports[`given the invite email rendered from the a workspace with nothing in it
 `;
 
 exports[`given the invite email rendered from the default fixture > when it is rendered > matches the stored snapshot > invite — default 1`] = `
-"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-wordmark.png"/><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-full-darktheme.svg"/><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
+"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
 :root { color-scheme: light dark; supported-color-schemes: light dark; }
 .lw-dark-only { display: none !important; mso-hide: all; width: 0 !important; max-height: 0 !important; overflow: hidden !important; font-size: 0 !important; line-height: 0 !important; }
 @media (prefers-color-scheme: dark) {
@@ -1083,7 +1083,7 @@ exports[`given the invite email rendered from the default fixture > when it is r
 `;
 
 exports[`given the invite email rendered from the long organization name fixture > when it is rendered > matches the stored snapshot > invite — long organization name 1`] = `
-"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-wordmark.png"/><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-full-darktheme.svg"/><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
+"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
 :root { color-scheme: light dark; supported-color-schemes: light dark; }
 .lw-dark-only { display: none !important; mso-hide: all; width: 0 !important; max-height: 0 !important; overflow: hidden !important; font-size: 0 !important; line-height: 0 !important; }
 @media (prefers-color-scheme: dark) {
@@ -1119,7 +1119,7 @@ exports[`given the invite email rendered from the long organization name fixture
 `;
 
 exports[`given the invite-re-request email rendered from the default fixture > when it is rendered > matches the stored snapshot > invite-re-request — default 1`] = `
-"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-wordmark.png"/><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-full-darktheme.svg"/><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
+"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
 :root { color-scheme: light dark; supported-color-schemes: light dark; }
 .lw-dark-only { display: none !important; mso-hide: all; width: 0 !important; max-height: 0 !important; overflow: hidden !important; font-size: 0 !important; line-height: 0 !important; }
 @media (prefers-color-scheme: dark) {
@@ -1155,7 +1155,7 @@ exports[`given the invite-re-request email rendered from the default fixture > w
 `;
 
 exports[`given the invite-re-request email rendered from the no seat free fixture > when it is rendered > matches the stored snapshot > invite-re-request — no seat free 1`] = `
-"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-wordmark.png"/><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-full-darktheme.svg"/><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
+"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
 :root { color-scheme: light dark; supported-color-schemes: light dark; }
 .lw-dark-only { display: none !important; mso-hide: all; width: 0 !important; max-height: 0 !important; overflow: hidden !important; font-size: 0 !important; line-height: 0 !important; }
 @media (prefers-color-scheme: dark) {
@@ -1191,7 +1191,7 @@ exports[`given the invite-re-request email rendered from the no seat free fixtur
 `;
 
 exports[`given the join-request-approved email rendered from the an organization watching its agents fixture > when it is rendered > matches the stored snapshot > join-request-approved — an organization watching its agents 1`] = `
-"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-wordmark.png"/><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-full-darktheme.svg"/><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
+"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
 :root { color-scheme: light dark; supported-color-schemes: light dark; }
 .lw-dark-only { display: none !important; mso-hide: all; width: 0 !important; max-height: 0 !important; overflow: hidden !important; font-size: 0 !important; line-height: 0 !important; }
 @media (prefers-color-scheme: dark) {
@@ -1229,7 +1229,7 @@ exports[`given the join-request-approved email rendered from the an organization
 `;
 
 exports[`given the join-request-approved email rendered from the default fixture > when it is rendered > matches the stored snapshot > join-request-approved — default 1`] = `
-"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-wordmark.png"/><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-full-darktheme.svg"/><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
+"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
 :root { color-scheme: light dark; supported-color-schemes: light dark; }
 .lw-dark-only { display: none !important; mso-hide: all; width: 0 !important; max-height: 0 !important; overflow: hidden !important; font-size: 0 !important; line-height: 0 !important; }
 @media (prefers-color-scheme: dark) {
@@ -1269,7 +1269,7 @@ exports[`given the join-request-approved email rendered from the default fixture
 `;
 
 exports[`given the join-request-approved email rendered from the without the checklist fixture > when it is rendered > matches the stored snapshot > join-request-approved — without the checklist 1`] = `
-"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-wordmark.png"/><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-full-darktheme.svg"/><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
+"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
 :root { color-scheme: light dark; supported-color-schemes: light dark; }
 .lw-dark-only { display: none !important; mso-hide: all; width: 0 !important; max-height: 0 !important; overflow: hidden !important; font-size: 0 !important; line-height: 0 !important; }
 @media (prefers-color-scheme: dark) {
@@ -1305,7 +1305,7 @@ exports[`given the join-request-approved email rendered from the without the che
 `;
 
 exports[`given the join-request-arrived email rendered from the default fixture > when it is rendered > matches the stored snapshot > join-request-arrived — default 1`] = `
-"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-wordmark.png"/><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-full-darktheme.svg"/><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
+"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
 :root { color-scheme: light dark; supported-color-schemes: light dark; }
 .lw-dark-only { display: none !important; mso-hide: all; width: 0 !important; max-height: 0 !important; overflow: hidden !important; font-size: 0 !important; line-height: 0 !important; }
 @media (prefers-color-scheme: dark) {
@@ -1341,7 +1341,7 @@ exports[`given the join-request-arrived email rendered from the default fixture 
 `;
 
 exports[`given the join-request-arrived email rendered from the the third colleague from one domain fixture > when it is rendered > matches the stored snapshot > join-request-arrived — the third colleague from one domain 1`] = `
-"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-wordmark.png"/><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-full-darktheme.svg"/><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
+"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
 :root { color-scheme: light dark; supported-color-schemes: light dark; }
 .lw-dark-only { display: none !important; mso-hide: all; width: 0 !important; max-height: 0 !important; overflow: hidden !important; font-size: 0 !important; line-height: 0 !important; }
 @media (prefers-color-scheme: dark) {
@@ -1377,7 +1377,7 @@ exports[`given the join-request-arrived email rendered from the the third collea
 `;
 
 exports[`given the join-request-expired email rendered from the default fixture > when it is rendered > matches the stored snapshot > join-request-expired — default 1`] = `
-"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-wordmark.png"/><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-full-darktheme.svg"/><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
+"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
 :root { color-scheme: light dark; supported-color-schemes: light dark; }
 .lw-dark-only { display: none !important; mso-hide: all; width: 0 !important; max-height: 0 !important; overflow: hidden !important; font-size: 0 !important; line-height: 0 !important; }
 @media (prefers-color-scheme: dark) {
@@ -1413,7 +1413,7 @@ exports[`given the join-request-expired email rendered from the default fixture 
 `;
 
 exports[`given the join-request-expired email rendered from the they already have somewhere to work fixture > when it is rendered > matches the stored snapshot > join-request-expired — they already have somewhere to work 1`] = `
-"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-wordmark.png"/><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-full-darktheme.svg"/><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
+"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
 :root { color-scheme: light dark; supported-color-schemes: light dark; }
 .lw-dark-only { display: none !important; mso-hide: all; width: 0 !important; max-height: 0 !important; overflow: hidden !important; font-size: 0 !important; line-height: 0 !important; }
 @media (prefers-color-scheme: dark) {
@@ -1449,7 +1449,7 @@ exports[`given the join-request-expired email rendered from the they already hav
 `;
 
 exports[`given the join-request-rejected email rendered from the default fixture > when it is rendered > matches the stored snapshot > join-request-rejected — default 1`] = `
-"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-wordmark.png"/><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-full-darktheme.svg"/><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
+"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
 :root { color-scheme: light dark; supported-color-schemes: light dark; }
 .lw-dark-only { display: none !important; mso-hide: all; width: 0 !important; max-height: 0 !important; overflow: hidden !important; font-size: 0 !important; line-height: 0 !important; }
 @media (prefers-color-scheme: dark) {
@@ -1485,7 +1485,7 @@ exports[`given the join-request-rejected email rendered from the default fixture
 `;
 
 exports[`given the join-request-reminder email rendered from the default fixture > when it is rendered > matches the stored snapshot > join-request-reminder — default 1`] = `
-"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-wordmark.png"/><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-full-darktheme.svg"/><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
+"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
 :root { color-scheme: light dark; supported-color-schemes: light dark; }
 .lw-dark-only { display: none !important; mso-hide: all; width: 0 !important; max-height: 0 !important; overflow: hidden !important; font-size: 0 !important; line-height: 0 !important; }
 @media (prefers-color-scheme: dark) {
@@ -1521,7 +1521,7 @@ exports[`given the join-request-reminder email rendered from the default fixture
 `;
 
 exports[`given the license email rendered from the a licence with nothing named for it fixture > when it is rendered > matches the stored snapshot > license — a licence with nothing named for it 1`] = `
-"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-wordmark.png"/><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-full-darktheme.svg"/><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
+"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
 :root { color-scheme: light dark; supported-color-schemes: light dark; }
 .lw-dark-only { display: none !important; mso-hide: all; width: 0 !important; max-height: 0 !important; overflow: hidden !important; font-size: 0 !important; line-height: 0 !important; }
 @media (prefers-color-scheme: dark) {
@@ -1557,7 +1557,7 @@ exports[`given the license email rendered from the a licence with nothing named 
 `;
 
 exports[`given the license email rendered from the a plan from the public ladder fixture > when it is rendered > matches the stored snapshot > license — a plan from the public ladder 1`] = `
-"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-wordmark.png"/><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-full-darktheme.svg"/><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
+"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
 :root { color-scheme: light dark; supported-color-schemes: light dark; }
 .lw-dark-only { display: none !important; mso-hide: all; width: 0 !important; max-height: 0 !important; overflow: hidden !important; font-size: 0 !important; line-height: 0 !important; }
 @media (prefers-color-scheme: dark) {
@@ -1593,7 +1593,7 @@ exports[`given the license email rendered from the a plan from the public ladder
 `;
 
 exports[`given the license email rendered from the default fixture > when it is rendered > matches the stored snapshot > license — default 1`] = `
-"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-wordmark.png"/><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-full-darktheme.svg"/><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
+"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
 :root { color-scheme: light dark; supported-color-schemes: light dark; }
 .lw-dark-only { display: none !important; mso-hide: all; width: 0 !important; max-height: 0 !important; overflow: hidden !important; font-size: 0 !important; line-height: 0 !important; }
 @media (prefers-color-scheme: dark) {
@@ -1629,7 +1629,7 @@ exports[`given the license email rendered from the default fixture > when it is 
 `;
 
 exports[`given the monitor-auto-paused email rendered from the evaluator timed out fixture > when it is rendered > matches the stored snapshot > monitor-auto-paused — evaluator timed out 1`] = `
-"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-wordmark.png"/><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-full-darktheme.svg"/><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
+"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
 :root { color-scheme: light dark; supported-color-schemes: light dark; }
 .lw-dark-only { display: none !important; mso-hide: all; width: 0 !important; max-height: 0 !important; overflow: hidden !important; font-size: 0 !important; line-height: 0 !important; }
 @media (prefers-color-scheme: dark) {
@@ -1665,7 +1665,7 @@ exports[`given the monitor-auto-paused email rendered from the evaluator timed o
 `;
 
 exports[`given the monitor-auto-paused email rendered from the no error message fixture > when it is rendered > matches the stored snapshot > monitor-auto-paused — no error message 1`] = `
-"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-wordmark.png"/><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-full-darktheme.svg"/><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
+"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
 :root { color-scheme: light dark; supported-color-schemes: light dark; }
 .lw-dark-only { display: none !important; mso-hide: all; width: 0 !important; max-height: 0 !important; overflow: hidden !important; font-size: 0 !important; line-height: 0 !important; }
 @media (prefers-color-scheme: dark) {
@@ -1701,7 +1701,7 @@ exports[`given the monitor-auto-paused email rendered from the no error message 
 `;
 
 exports[`given the organization-mfa-requirement email rendered from the default fixture > when it is rendered > matches the stored snapshot > organization-mfa-requirement — default 1`] = `
-"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-wordmark.png"/><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-full-darktheme.svg"/><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
+"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
 :root { color-scheme: light dark; supported-color-schemes: light dark; }
 .lw-dark-only { display: none !important; mso-hide: all; width: 0 !important; max-height: 0 !important; overflow: hidden !important; font-size: 0 !important; line-height: 0 !important; }
 @media (prefers-color-scheme: dark) {
@@ -1737,7 +1737,7 @@ exports[`given the organization-mfa-requirement email rendered from the default 
 `;
 
 exports[`given the organization-mfa-requirement email rendered from the requirement turned off fixture > when it is rendered > matches the stored snapshot > organization-mfa-requirement — requirement turned off 1`] = `
-"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-wordmark.png"/><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-full-darktheme.svg"/><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
+"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
 :root { color-scheme: light dark; supported-color-schemes: light dark; }
 .lw-dark-only { display: none !important; mso-hide: all; width: 0 !important; max-height: 0 !important; overflow: hidden !important; font-size: 0 !important; line-height: 0 !important; }
 @media (prefers-color-scheme: dark) {
@@ -1953,7 +1953,7 @@ exports[`given the payment-recovery email rendered from the restored fixture > w
 `;
 
 exports[`given the platform-operator-change email rendered from the default fixture > when it is rendered > matches the stored snapshot > platform-operator-change — default 1`] = `
-"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-wordmark.png"/><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-full-darktheme.svg"/><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
+"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
 :root { color-scheme: light dark; supported-color-schemes: light dark; }
 .lw-dark-only { display: none !important; mso-hide: all; width: 0 !important; max-height: 0 !important; overflow: hidden !important; font-size: 0 !important; line-height: 0 !important; }
 @media (prefers-color-scheme: dark) {
@@ -1989,7 +1989,7 @@ exports[`given the platform-operator-change email rendered from the default fixt
 `;
 
 exports[`given the platform-operator-change email rendered from the granted by the recovery task fixture > when it is rendered > matches the stored snapshot > platform-operator-change — granted by the recovery task 1`] = `
-"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-wordmark.png"/><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-full-darktheme.svg"/><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
+"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
 :root { color-scheme: light dark; supported-color-schemes: light dark; }
 .lw-dark-only { display: none !important; mso-hide: all; width: 0 !important; max-height: 0 !important; overflow: hidden !important; font-size: 0 !important; line-height: 0 !important; }
 @media (prefers-color-scheme: dark) {
@@ -2025,7 +2025,7 @@ exports[`given the platform-operator-change email rendered from the granted by t
 `;
 
 exports[`given the platform-operator-change email rendered from the role removed fixture > when it is rendered > matches the stored snapshot > platform-operator-change — role removed 1`] = `
-"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-wordmark.png"/><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-full-darktheme.svg"/><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
+"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
 :root { color-scheme: light dark; supported-color-schemes: light dark; }
 .lw-dark-only { display: none !important; mso-hide: all; width: 0 !important; max-height: 0 !important; overflow: hidden !important; font-size: 0 !important; line-height: 0 !important; }
 @media (prefers-color-scheme: dark) {
@@ -2061,7 +2061,7 @@ exports[`given the platform-operator-change email rendered from the role removed
 `;
 
 exports[`given the reset-password email rendered from the default fixture > when it is rendered > matches the stored snapshot > reset-password — default 1`] = `
-"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-wordmark.png"/><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-full-darktheme.svg"/><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
+"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
 :root { color-scheme: light dark; supported-color-schemes: light dark; }
 .lw-dark-only { display: none !important; mso-hide: all; width: 0 !important; max-height: 0 !important; overflow: hidden !important; font-size: 0 !important; line-height: 0 !important; }
 @media (prefers-color-scheme: dark) {
@@ -2097,7 +2097,7 @@ exports[`given the reset-password email rendered from the default fixture > when
 `;
 
 exports[`given the seat-request email rendered from the held, paying per seat fixture > when it is rendered > matches the stored snapshot > seat-request — held, paying per seat 1`] = `
-"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-wordmark.png"/><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-full-darktheme.svg"/><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
+"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
 :root { color-scheme: light dark; supported-color-schemes: light dark; }
 .lw-dark-only { display: none !important; mso-hide: all; width: 0 !important; max-height: 0 !important; overflow: hidden !important; font-size: 0 !important; line-height: 0 !important; }
 @media (prefers-color-scheme: dark) {
@@ -2133,7 +2133,7 @@ exports[`given the seat-request email rendered from the held, paying per seat fi
 `;
 
 exports[`given the seat-request email rendered from the no public origin to link from fixture > when it is rendered > matches the stored snapshot > seat-request — no public origin to link from 1`] = `
-"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-wordmark.png"/><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-full-darktheme.svg"/><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
+"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
 :root { color-scheme: light dark; supported-color-schemes: light dark; }
 .lw-dark-only { display: none !important; mso-hide: all; width: 0 !important; max-height: 0 !important; overflow: hidden !important; font-size: 0 !important; line-height: 0 !important; }
 @media (prefers-color-scheme: dark) {
@@ -2169,7 +2169,7 @@ exports[`given the seat-request email rendered from the no public origin to link
 `;
 
 exports[`given the seat-request email rendered from the view-only, on a negotiated plan, refuse… fixture > when it is rendered > matches the stored snapshot > seat-request — view-only, on a negotiated plan, refused by Okta 1`] = `
-"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-wordmark.png"/><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-full-darktheme.svg"/><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
+"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
 :root { color-scheme: light dark; supported-color-schemes: light dark; }
 .lw-dark-only { display: none !important; mso-hide: all; width: 0 !important; max-height: 0 !important; overflow: hidden !important; font-size: 0 !important; line-height: 0 !important; }
 @media (prefers-color-scheme: dark) {
@@ -2205,7 +2205,7 @@ exports[`given the seat-request email rendered from the view-only, on a negotiat
 `;
 
 exports[`given the sign-up-verification email rendered from the default fixture > when it is rendered > matches the stored snapshot > sign-up-verification — default 1`] = `
-"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-wordmark.png"/><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-full-darktheme.svg"/><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
+"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
 :root { color-scheme: light dark; supported-color-schemes: light dark; }
 .lw-dark-only { display: none !important; mso-hide: all; width: 0 !important; max-height: 0 !important; overflow: hidden !important; font-size: 0 !important; line-height: 0 !important; }
 @media (prefers-color-scheme: dark) {
@@ -2241,7 +2241,7 @@ exports[`given the sign-up-verification email rendered from the default fixture 
 `;
 
 exports[`given the sso-domain-proof-lapsed email rendered from the default fixture > when it is rendered > matches the stored snapshot > sso-domain-proof-lapsed — default 1`] = `
-"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-wordmark.png"/><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-full-darktheme.svg"/><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
+"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
 :root { color-scheme: light dark; supported-color-schemes: light dark; }
 .lw-dark-only { display: none !important; mso-hide: all; width: 0 !important; max-height: 0 !important; overflow: hidden !important; font-size: 0 !important; line-height: 0 !important; }
 @media (prefers-color-scheme: dark) {
@@ -2277,7 +2277,7 @@ exports[`given the sso-domain-proof-lapsed email rendered from the default fixtu
 `;
 
 exports[`given the sso-domain-proof-wavering email rendered from the default fixture > when it is rendered > matches the stored snapshot > sso-domain-proof-wavering — default 1`] = `
-"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-wordmark.png"/><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-full-darktheme.svg"/><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
+"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
 :root { color-scheme: light dark; supported-color-schemes: light dark; }
 .lw-dark-only { display: none !important; mso-hide: all; width: 0 !important; max-height: 0 !important; overflow: hidden !important; font-size: 0 !important; line-height: 0 !important; }
 @media (prefers-color-scheme: dark) {
@@ -2313,7 +2313,7 @@ exports[`given the sso-domain-proof-wavering email rendered from the default fix
 `;
 
 exports[`given the trigger-digest email rendered from the default fixture > when it is rendered > matches the stored snapshot > trigger-digest — default 1`] = `
-"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-wordmark.png"/><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-full-darktheme.svg"/><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
+"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
 :root { color-scheme: light dark; supported-color-schemes: light dark; }
 .lw-dark-only { display: none !important; mso-hide: all; width: 0 !important; max-height: 0 !important; overflow: hidden !important; font-size: 0 !important; line-height: 0 !important; }
 @media (prefers-color-scheme: dark) {
@@ -2349,7 +2349,7 @@ exports[`given the trigger-digest email rendered from the default fixture > when
 `;
 
 exports[`given the trigger-digest email rendered from the identifiers only fixture > when it is rendered > matches the stored snapshot > trigger-digest — identifiers only 1`] = `
-"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-wordmark.png"/><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-full-darktheme.svg"/><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
+"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
 :root { color-scheme: light dark; supported-color-schemes: light dark; }
 .lw-dark-only { display: none !important; mso-hide: all; width: 0 !important; max-height: 0 !important; overflow: hidden !important; font-size: 0 !important; line-height: 0 !important; }
 @media (prefers-color-scheme: dark) {
@@ -2385,7 +2385,7 @@ exports[`given the trigger-digest email rendered from the identifiers only fixtu
 `;
 
 exports[`given the trigger-digest email rendered from the truncated at ten fixture > when it is rendered > matches the stored snapshot > trigger-digest — truncated at ten 1`] = `
-"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-wordmark.png"/><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-full-darktheme.svg"/><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
+"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
 :root { color-scheme: light dark; supported-color-schemes: light dark; }
 .lw-dark-only { display: none !important; mso-hide: all; width: 0 !important; max-height: 0 !important; overflow: hidden !important; font-size: 0 !important; line-height: 0 !important; }
 @media (prefers-color-scheme: dark) {
@@ -2421,7 +2421,7 @@ exports[`given the trigger-digest email rendered from the truncated at ten fixtu
 `;
 
 exports[`given the upgrade-alert email rendered from the one step failed fixture > when it is rendered > matches the stored snapshot > upgrade-alert — one step failed 1`] = `
-"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-wordmark.png"/><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-full-darktheme.svg"/><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
+"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
 :root { color-scheme: light dark; supported-color-schemes: light dark; }
 .lw-dark-only { display: none !important; mso-hide: all; width: 0 !important; max-height: 0 !important; overflow: hidden !important; font-size: 0 !important; line-height: 0 !important; }
 @media (prefers-color-scheme: dark) {
@@ -2457,7 +2457,7 @@ exports[`given the upgrade-alert email rendered from the one step failed fixture
 `;
 
 exports[`given the upgrade-alert email rendered from the runner stopped fixture > when it is rendered > matches the stored snapshot > upgrade-alert — runner stopped 1`] = `
-"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-wordmark.png"/><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-full-darktheme.svg"/><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
+"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
 :root { color-scheme: light dark; supported-color-schemes: light dark; }
 .lw-dark-only { display: none !important; mso-hide: all; width: 0 !important; max-height: 0 !important; overflow: hidden !important; font-size: 0 !important; line-height: 0 !important; }
 @media (prefers-color-scheme: dark) {
@@ -2493,7 +2493,7 @@ exports[`given the upgrade-alert email rendered from the runner stopped fixture 
 `;
 
 exports[`given the upgrade-alert email rendered from the several steps failed fixture > when it is rendered > matches the stored snapshot > upgrade-alert — several steps failed 1`] = `
-"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-wordmark.png"/><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-full-darktheme.svg"/><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
+"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
 :root { color-scheme: light dark; supported-color-schemes: light dark; }
 .lw-dark-only { display: none !important; mso-hide: all; width: 0 !important; max-height: 0 !important; overflow: hidden !important; font-size: 0 !important; line-height: 0 !important; }
 @media (prefers-color-scheme: dark) {
@@ -2529,7 +2529,7 @@ exports[`given the upgrade-alert email rendered from the several steps failed fi
 `;
 
 exports[`given the upgrade-alert email rendered from the several steps failed on LangWatch Cloud fixture > when it is rendered > matches the stored snapshot > upgrade-alert — several steps failed on LangWatch Cloud 1`] = `
-"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-wordmark.png"/><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-full-darktheme.svg"/><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
+"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
 :root { color-scheme: light dark; supported-color-schemes: light dark; }
 .lw-dark-only { display: none !important; mso-hide: all; width: 0 !important; max-height: 0 !important; overflow: hidden !important; font-size: 0 !important; line-height: 0 !important; }
 @media (prefers-color-scheme: dark) {
@@ -2565,7 +2565,7 @@ exports[`given the upgrade-alert email rendered from the several steps failed on
 `;
 
 exports[`given the upgrade-alert email rendered from the several steps failed, details already s… fixture > when it is rendered > matches the stored snapshot > upgrade-alert — several steps failed, details already sent 1`] = `
-"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-wordmark.png"/><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-full-darktheme.svg"/><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
+"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
 :root { color-scheme: light dark; supported-color-schemes: light dark; }
 .lw-dark-only { display: none !important; mso-hide: all; width: 0 !important; max-height: 0 !important; overflow: hidden !important; font-size: 0 !important; line-height: 0 !important; }
 @media (prefers-color-scheme: dark) {
@@ -2601,7 +2601,7 @@ exports[`given the upgrade-alert email rendered from the several steps failed, d
 `;
 
 exports[`given the upgrade-alert email rendered from the several steps failed, details sendable … fixture > when it is rendered > matches the stored snapshot > upgrade-alert — several steps failed, details sendable from the step page 1`] = `
-"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-wordmark.png"/><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-full-darktheme.svg"/><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
+"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
 :root { color-scheme: light dark; supported-color-schemes: light dark; }
 .lw-dark-only { display: none !important; mso-hide: all; width: 0 !important; max-height: 0 !important; overflow: hidden !important; font-size: 0 !important; line-height: 0 !important; }
 @media (prefers-color-scheme: dark) {
@@ -2637,7 +2637,7 @@ exports[`given the upgrade-alert email rendered from the several steps failed, d
 `;
 
 exports[`given the usage-limit email rendered from the an organization on its own terms fixture > when it is rendered > matches the stored snapshot > usage-limit — an organization on its own terms 1`] = `
-"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-wordmark.png"/><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-full-darktheme.svg"/><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
+"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
 :root { color-scheme: light dark; supported-color-schemes: light dark; }
 .lw-dark-only { display: none !important; mso-hide: all; width: 0 !important; max-height: 0 !important; overflow: hidden !important; font-size: 0 !important; line-height: 0 !important; }
 @media (prefers-color-scheme: dark) {
@@ -2673,7 +2673,7 @@ exports[`given the usage-limit email rendered from the an organization on its ow
 `;
 
 exports[`given the usage-limit email rendered from the approaching the limit fixture > when it is rendered > matches the stored snapshot > usage-limit — approaching the limit 1`] = `
-"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-wordmark.png"/><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-full-darktheme.svg"/><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
+"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
 :root { color-scheme: light dark; supported-color-schemes: light dark; }
 .lw-dark-only { display: none !important; mso-hide: all; width: 0 !important; max-height: 0 !important; overflow: hidden !important; font-size: 0 !important; line-height: 0 !important; }
 @media (prefers-color-scheme: dark) {
@@ -2709,7 +2709,7 @@ exports[`given the usage-limit email rendered from the approaching the limit fix
 `;
 
 exports[`given the usage-limit email rendered from the limit reached fixture > when it is rendered > matches the stored snapshot > usage-limit — limit reached 1`] = `
-"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-wordmark.png"/><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-full-darktheme.svg"/><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
+"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
 :root { color-scheme: light dark; supported-color-schemes: light dark; }
 .lw-dark-only { display: none !important; mso-hide: all; width: 0 !important; max-height: 0 !important; overflow: hidden !important; font-size: 0 !important; line-height: 0 !important; }
 @media (prefers-color-scheme: dark) {
@@ -2745,7 +2745,7 @@ exports[`given the usage-limit email rendered from the limit reached fixture > w
 `;
 
 exports[`given the usage-limit email rendered from the nothing larger to move to fixture > when it is rendered > matches the stored snapshot > usage-limit — nothing larger to move to 1`] = `
-"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-wordmark.png"/><link rel="preload" as="image" href="https://app.langwatch.ai/images/logo-full-darktheme.svg"/><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
+"<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html dir="ltr" lang="en"><head><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/><meta name="x-apple-disable-message-reformatting"/><meta name="color-scheme" content="light dark"/><meta name="supported-color-schemes" content="light dark"/><style>
 :root { color-scheme: light dark; supported-color-schemes: light dark; }
 .lw-dark-only { display: none !important; mso-hide: all; width: 0 !important; max-height: 0 !important; overflow: hidden !important; font-size: 0 !important; line-height: 0 !important; }
 @media (prefers-color-scheme: dark) {

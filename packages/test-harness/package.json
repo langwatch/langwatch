@@ -82,7 +82,7 @@
     "@langwatch/vitest-config": "workspace:*",
     "ioredis": "catalog:",
     "nanoid": "catalog:",
-    "picomatch": "^4.0.4",
+    "picomatch": "^4.0.7",
     "pino": "catalog:",
     "stripe": "catalog:",
     "typescript": "catalog:"

@@ -167,9 +167,9 @@ describe.skipIf(SKIP_INTEGRATION)("Experiment Integration", () => {
       };
       const origExit = process.exit.bind(process);
       let exitedWith: number | string | null | undefined = null;
-      (process as unknown as { exit: (c?: number) => void }).exit = ((c?: number) => {
+      (process as unknown as { exit: (c?: number) => void }).exit = (c?: number) => {
         exitedWith = c;
-      }) as never;
+      };
       try {
         await fn();
       } finally {
@@ -592,7 +592,7 @@ describe("Evaluation Unit", () => {
           return new Response(JSON.stringify({}), { status: 200 });
         }
         return new Response(JSON.stringify({}), { status: 200 });
-      }) as typeof fetch;
+      });
 
       try {
         const langwatch = new LangWatch({

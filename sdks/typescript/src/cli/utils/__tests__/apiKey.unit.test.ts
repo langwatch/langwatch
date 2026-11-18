@@ -132,17 +132,17 @@ describe("resolveCredentials()", () => {
     delete process.env.LANGWATCH_ENDPOINT;
     mockedDotenvConfig.mockReset();
     mockedLoadConfig.mockReset();
-    mockedLoadConfig.mockReturnValue(loggedOutConfig() as never);
+    mockedLoadConfig.mockReturnValue(loggedOutConfig());
     mockedSaveConfig.mockReset();
     mockedFetchPersonalProject.mockReset();
-    mockedFetchPersonalProject.mockResolvedValue(null as never);
+    mockedFetchPersonalProject.mockResolvedValue(null);
     mockedNotice.mockClear();
     mockedResolveProjectSelector.mockReset();
     logSpy = vi.spyOn(console, "log").mockImplementation(() => undefined);
     errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
-    exitSpy = vi.spyOn(process, "exit").mockImplementation((() => {
+    exitSpy = vi.spyOn(process, "exit").mockImplementation(() => {
       throw new Error("process.exit called");
-    }) as never);
+    });
   });
 
   afterEach(() => {
@@ -178,7 +178,7 @@ describe("resolveCredentials()", () => {
     /** @scenario LANGWATCH_API_KEY beats the stored device session */
     it("prefers the environment over a stored device session", async () => {
       process.env.LANGWATCH_API_KEY = "sk-from-env";
-      mockedLoadConfig.mockReturnValue(loggedInConfig(freshPersonal()) as never);
+      mockedLoadConfig.mockReturnValue(loggedInConfig(freshPersonal()));
 
       const resolved = await resolveCredentials();
 
@@ -189,7 +189,7 @@ describe("resolveCredentials()", () => {
 
     /** @scenario a device session resolves the personal project API key when no env var is set */
     it("falls back to the device session's personal project key", async () => {
-      mockedLoadConfig.mockReturnValue(loggedInConfig(freshPersonal()) as never);
+      mockedLoadConfig.mockReturnValue(loggedInConfig(freshPersonal()));
 
       const resolved = await resolveCredentials();
 
@@ -199,13 +199,13 @@ describe("resolveCredentials()", () => {
     });
 
     it("lazily exchanges the personal key once and persists it for old sessions", async () => {
-      mockedLoadConfig.mockReturnValue(loggedInConfig() as never);
+      mockedLoadConfig.mockReturnValue(loggedInConfig());
       mockedFetchPersonalProject.mockResolvedValue({
         id: "proj_1",
         slug: "personal-x",
         name: "Personal Workspace",
         api_key: "pkey_lazy",
-      } as never);
+      });
 
       const resolved = await resolveCredentials();
 
@@ -227,7 +227,7 @@ describe("resolveCredentials()", () => {
         loggedInConfig({
           ...freshPersonal(),
           cli_api_key: "sk-lw-lookup01_secret01",
-        }) as never,
+        }),
       );
 
       const resolved = await resolveCredentials();
@@ -240,7 +240,7 @@ describe("resolveCredentials()", () => {
 
     it("tells which project a project command reads", async () => {
       mockedLoadConfig.mockReturnValue(
-        loggedInConfig({ ...freshPersonal(), cli_api_key: "sk-lw-lookup01_secret01" }) as never,
+        loggedInConfig({ ...freshPersonal(), cli_api_key: "sk-lw-lookup01_secret01" }),
       );
 
       await runWithCredentialHolder(async () => {
@@ -256,7 +256,7 @@ describe("resolveCredentials()", () => {
     describe("when the command answers for the organization, not a project", () => {
       it("says nothing about which project it reads", async () => {
         mockedLoadConfig.mockReturnValue(
-          loggedInConfig({ ...freshPersonal(), cli_api_key: "sk-lw-lookup01_secret01" }) as never,
+          loggedInConfig({ ...freshPersonal(), cli_api_key: "sk-lw-lookup01_secret01" }),
         );
 
         await runWithCredentialHolder(async () => {
@@ -274,7 +274,7 @@ describe("resolveCredentials()", () => {
         loggedInConfig({
           ...freshPersonal(),
           cli_api_key: "sk-lw-lookup01_secret01",
-        }) as never,
+        }),
       );
 
       const resolved = await resolveCredentials();
@@ -289,7 +289,7 @@ describe("resolveCredentials()", () => {
         cli_api_key: "sk-lw-lookup01_secret01",
         cli_api_key_scope: { kind: "organization", project_ids: [] },
       });
-      mockedLoadConfig.mockReturnValue(cfg as never);
+      mockedLoadConfig.mockReturnValue(cfg);
       mockedFetchPersonalProject.mockRejectedValue(
         new SessionApiError(401, "unauthorized", "Session expired or revoked"),
       );
@@ -312,7 +312,7 @@ describe("resolveCredentials()", () => {
         loggedInConfig({
           ...freshPersonal(),
           cli_api_key: "sk-lw-lookup01_secret01",
-        }) as never,
+        }),
       );
       mockedResolveProjectSelector.mockResolvedValue("proj_checkout");
 
@@ -330,7 +330,7 @@ describe("resolveCredentials()", () => {
         loggedInConfig({
           ...freshPersonal(),
           cli_api_key: "sk-lw-lookup01_secret01",
-        }) as never,
+        }),
       );
       mockedResolveProjectSelector.mockRejectedValue(
         new ProjectScopeError(
@@ -349,7 +349,7 @@ describe("resolveCredentials()", () => {
   describe("when the session-liveness gate blocks a cached key", () => {
     /** @scenario a device session uses the cached key without a network call while validation is fresh */
     it("uses the cached key without revalidating inside the window", async () => {
-      mockedLoadConfig.mockReturnValue(loggedInConfig(freshPersonal()) as never);
+      mockedLoadConfig.mockReturnValue(loggedInConfig(freshPersonal()));
 
       const resolved = await resolveCredentials();
 
@@ -359,13 +359,13 @@ describe("resolveCredentials()", () => {
 
     /** @scenario a stale cached key is revalidated before use */
     it("revalidates a stale cached key through the session endpoint", async () => {
-      mockedLoadConfig.mockReturnValue(loggedInConfig(stalePersonal()) as never);
+      mockedLoadConfig.mockReturnValue(loggedInConfig(stalePersonal()));
       mockedFetchPersonalProject.mockResolvedValue({
         id: "proj_1",
         slug: "personal-x",
         name: "Personal Workspace",
         api_key: "pkey_rotated",
-      } as never);
+      });
 
       const resolved = await resolveCredentials();
 
@@ -376,7 +376,7 @@ describe("resolveCredentials()", () => {
     /** @scenario device-session revocation severs CLI access and wipes the cached key */
     it("wipes the cached key and reports not-logged-in when the session is revoked", async () => {
       const cfg = loggedInConfig(stalePersonal());
-      mockedLoadConfig.mockReturnValue(cfg as never);
+      mockedLoadConfig.mockReturnValue(cfg);
       mockedFetchPersonalProject.mockRejectedValue(
         new SessionApiError(401, "unauthorized", "Session expired or revoked"),
       );
@@ -391,7 +391,7 @@ describe("resolveCredentials()", () => {
 
     /** @scenario a transient/offline revalidation keeps the last-known key without extending trust */
     it("keeps the last-known key on a transient/offline error without extending the clock", async () => {
-      mockedLoadConfig.mockReturnValue(loggedInConfig(stalePersonal()) as never);
+      mockedLoadConfig.mockReturnValue(loggedInConfig(stalePersonal()));
       mockedFetchPersonalProject.mockRejectedValue(new Error("network down"));
 
       const resolved = await resolveCredentials();
@@ -403,8 +403,8 @@ describe("resolveCredentials()", () => {
     });
 
     it("keeps a legacy-server key (404) and quiets the clock", async () => {
-      mockedLoadConfig.mockReturnValue(loggedInConfig(stalePersonal()) as never);
-      mockedFetchPersonalProject.mockResolvedValue(null as never); // 404: endpoint missing
+      mockedLoadConfig.mockReturnValue(loggedInConfig(stalePersonal()));
+      mockedFetchPersonalProject.mockResolvedValue(null); // 404: endpoint missing
 
       const resolved = await resolveCredentials();
 
@@ -422,7 +422,7 @@ describe("resolveCredentials()", () => {
   describe("when the daemon keeps the resolved key out of the shared env", () => {
     /** @scenario the resolved session key never touches the shared process env */
     it("does not materialize the session key into process.env", async () => {
-      mockedLoadConfig.mockReturnValue(loggedInConfig(freshPersonal()) as never);
+      mockedLoadConfig.mockReturnValue(loggedInConfig(freshPersonal()));
 
       await resolveCredentials();
 
@@ -441,7 +441,7 @@ describe("resolveCredentials()", () => {
       mockedLoadConfig.mockReturnValue({
         ...loggedInConfig(freshPersonal()),
         control_plane_url: "http://localhost:5560",
-      } as never);
+      });
 
       await resolveCredentials();
 
@@ -561,7 +561,7 @@ describe("resolveCredentials()", () => {
     /** @scenario the device session's key is never sent to another address than the one that issued it */
     it("resolves no key of the session and ends naming both addresses", async () => {
       process.env.LANGWATCH_ENDPOINT = OTHER;
-      mockedLoadConfig.mockReturnValue(loginWithBothKeys() as never);
+      mockedLoadConfig.mockReturnValue(loginWithBothKeys());
       setOutputFormat(undefined);
 
       await expect(resolveCredentials()).rejects.toThrow("process.exit called");
@@ -586,8 +586,8 @@ describe("resolveCredentials()", () => {
     it("reads the other address from the folder's .env just the same", async () => {
       mockedDotenvConfig.mockReturnValue({
         parsed: { LANGWATCH_ENDPOINT: OTHER },
-      } as never);
-      mockedLoadConfig.mockReturnValue(loginWithBothKeys() as never);
+      });
+      mockedLoadConfig.mockReturnValue(loginWithBothKeys());
 
       await expect(resolveCredentials()).rejects.toThrow("process.exit called");
 
@@ -598,7 +598,7 @@ describe("resolveCredentials()", () => {
     /** @scenario machine callers get a structured login_endpoint_mismatch document */
     it("prints one structured document on stdout for a machine caller", async () => {
       process.env.LANGWATCH_ENDPOINT = OTHER;
-      mockedLoadConfig.mockReturnValue(loginWithBothKeys() as never);
+      mockedLoadConfig.mockReturnValue(loginWithBothKeys());
       setOutputFormat("json");
 
       await expect(resolveCredentials()).rejects.toThrow("process.exit called");
@@ -618,7 +618,7 @@ describe("resolveCredentials()", () => {
     it("uses a key from LANGWATCH_API_KEY or the flag, paired with the other address", async () => {
       process.env.LANGWATCH_ENDPOINT = OTHER;
       process.env.LANGWATCH_API_KEY = "sk-of-the-other-address";
-      mockedLoadConfig.mockReturnValue(loginWithBothKeys() as never);
+      mockedLoadConfig.mockReturnValue(loginWithBothKeys());
 
       const fromEnv = await resolveCredentials();
       const fromFlag = await resolveCredentials({ apiKey: "sk-explicit" });
@@ -643,7 +643,7 @@ describe("resolveCredentials()", () => {
       "https://app.langwatch.ai///",
     ])("takes %s for the login's own address", async (spelling) => {
       process.env.LANGWATCH_ENDPOINT = spelling;
-      mockedLoadConfig.mockReturnValue(loginWithBothKeys() as never);
+      mockedLoadConfig.mockReturnValue(loginWithBothKeys());
 
       const resolved = await resolveCredentials();
 
@@ -657,7 +657,7 @@ describe("resolveCredentials()", () => {
       mockedLoadConfig.mockReturnValue({
         ...loginWithBothKeys(),
         control_plane_url: "http://localhost:5560",
-      } as never);
+      });
 
       await expect(resolveCredentials()).rejects.toThrow("process.exit called");
 

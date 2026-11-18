@@ -103,8 +103,11 @@ export function resolveTimeWindow({
 /** A cell as a table shows it: JSON for anything structured, blank for absent. */
 function tableCell(value: unknown): string {
   if (value === null || value === undefined) return "";
-  if (typeof value === "object") return JSON.stringify(value);
-  return String(value as string | number | boolean);
+  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "boolean" || typeof value === "bigint") {
+    return String(value);
+  }
+  return JSON.stringify(value) ?? "";
 }
 
 export function printTable(result: {

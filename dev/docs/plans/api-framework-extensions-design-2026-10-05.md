@@ -320,7 +320,11 @@ callback: puts refusal copy back in transports.
 
 ```ts
 type KeyKind =
-  "api_key" | "access_token" | "legacy_project_key" | "ingestion_key" | "langy_session_key";
+  | "api_key"
+  | "access_token"
+  | "legacy_project_key"
+  | "ingestion_key"
+  | "langy_session_key";
 withCredential("project", { keyKinds: ["api_key", "access_token", "legacy_project_key"] });
 ```
 

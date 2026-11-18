@@ -906,7 +906,7 @@ export class Experiment {
             if (callbackResult && typeof (callbackResult as Promise<R>).then === "function") {
               return callbackResult;
             }
-            return callbackResult as R;
+            return callbackResult;
           });
 
           span.setStatus({ code: SpanStatusCode.OK });
@@ -1213,7 +1213,7 @@ export class Experiment {
 
     if (typeof item === "object") {
       // Handle objects with toJSON method
-      if ("toJSON" in item && typeof (item as { toJSON: unknown }).toJSON === "function") {
+      if ("toJSON" in item && typeof item.toJSON === "function") {
         return (item as { toJSON: () => unknown }).toJSON();
       }
       // Return as-is, JSON.stringify will handle it

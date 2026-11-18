@@ -48,7 +48,7 @@ Two mechanisms were measured and rejected before the one below:
   `NOT_FOUND_COLUMN_IN_BLOCK`. Worse on both counts.
 - **Rewriting the caller's SQL at the gateway to add the predicate.** This
   works, and it is forbidden: `Scenario: Submitted SQL is never automatically
-rewritten` is a bound scope guard for this issue, and its test asserts that
+  rewritten` is a bound scope guard for this issue, and its test asserts that
   the statement in `system.query_log` is the submitted one with nothing but
   `FORMAT JSON` appended.
 

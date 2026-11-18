@@ -209,7 +209,7 @@ export class AgentsApiService {
       error,
       response,
       onError: this.handleApiError.bind(this),
-    }) as unknown as { id: string; name: string };
+    });
   }
 
   /**
@@ -221,13 +221,13 @@ export class AgentsApiService {
       params: { path: { id } },
       body,
     });
-    return unwrapApiResult({
+    return unwrapApiResult<AgentCallResponse>({
       operation: `call agent "${id}"`,
       data,
       error,
       response,
       onError: this.handleApiError.bind(this),
-    }) as AgentCallResponse;
+    });
   }
 
   /**
@@ -239,13 +239,13 @@ export class AgentsApiService {
     const { data, error, response } = await this.apiClient.POST("/api/v1/agents/{id}/test", {
       params: { path: { id } },
     });
-    return unwrapApiResult({
+    return unwrapApiResult<AgentTestRunResponse>({
       operation: `test agent "${id}"`,
       data,
       error,
       response,
       onError: this.handleApiError.bind(this),
-    }) as AgentTestRunResponse;
+    });
   }
 
   /** Every version of the agent, newest first, with the labels on each. */
@@ -254,13 +254,13 @@ export class AgentsApiService {
       "/api/v1/agents/{agentId}/versions",
       { params: { path: { agentId: id } } },
     );
-    return unwrapApiResult({
+    return unwrapApiResult<AgentVersionsResponse>({
       operation: `list versions of agent "${id}"`,
       data,
       error,
       response,
       onError: this.handleApiError.bind(this),
-    }) as AgentVersionsResponse;
+    });
   }
 
   /** Points a deploy label, such as `production`, at one of the agent's versions. */
@@ -269,13 +269,13 @@ export class AgentsApiService {
       "/api/v1/agents/{agentId}/labels/{label}",
       { params: { path: { agentId: id, label } }, body: { version } },
     );
-    return unwrapApiResult({
+    return unwrapApiResult<AgentLabelResponse>({
       operation: `deploy label "${label}" of agent "${id}"`,
       data,
       error,
       response,
       onError: this.handleApiError.bind(this),
-    }) as AgentLabelResponse;
+    });
   }
 
   /** Removes a deploy label from the agent. */
@@ -284,12 +284,12 @@ export class AgentsApiService {
       "/api/v1/agents/{agentId}/labels/{label}",
       { params: { path: { agentId: id, label } } },
     );
-    return unwrapApiResult({
+    return unwrapApiResult<{ label: string; removed: true }>({
       operation: `remove label "${label}" of agent "${id}"`,
       data,
       error,
       response,
       onError: this.handleApiError.bind(this),
-    }) as { label: string; removed: true };
+    });
   }
 }

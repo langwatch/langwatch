@@ -146,7 +146,7 @@ describe("followInstantEvalRun, given a run to follow", () => {
       const get = vi.fn();
 
       const live = await followInstantEvalRun({
-        service: { get } as never,
+        service: { get },
         run: run({ status: "finished" }),
         machine: true,
       });
@@ -164,7 +164,7 @@ describe("followInstantEvalRun, given a run to follow", () => {
         .mockResolvedValueOnce(run({ status: "finished", matched: 1_284 }));
 
       const live = await followInstantEvalRun({
-        service: { get } as never,
+        service: { get },
         run: run(),
         machine: true,
         sleep: async () => undefined,
@@ -182,7 +182,7 @@ describe("followInstantEvalRun, given a run to follow", () => {
       let clock = 0;
 
       const live = await followInstantEvalRun({
-        service: { get } as never,
+        service: { get },
         run: run(),
         machine: true,
         timeoutMs: 10_000,
@@ -203,7 +203,7 @@ describe("followInstantEvalRun, given a run to follow", () => {
       const get = vi.fn().mockRejectedValue(new Error("down"));
 
       const live = await followInstantEvalRun({
-        service: { get } as never,
+        service: { get },
         run: run(),
         machine: true,
         sleep: async () => undefined,
@@ -223,23 +223,22 @@ describe("printInstantEvalRows, given a model-call run", () => {
         status: "finished",
         sql: "SELECT TraceId, SpanId FROM analytics.spans WHERE SpanAttributes['langwatch.span.type'] = 'llm'",
       });
-      const judgment = (overrides: Partial<InstantEvalJudgment>): InstantEvalJudgment =>
-        ({
-          traceId: "trace_1",
-          questionId: "q1",
-          threadId: "",
-          spanId: "",
-          kind: "boolean",
-          status: "judged",
-          passed: true,
-          score: null,
-          label: null,
-          probability: 0.9,
-          probabilities: null,
-          error: null,
-          occurredAt: "2026-09-18T12:00:00.000Z",
-          ...overrides,
-        }) as InstantEvalJudgment;
+      const judgment = (overrides: Partial<InstantEvalJudgment>): InstantEvalJudgment => ({
+        traceId: "trace_1",
+        questionId: "q1",
+        threadId: "",
+        spanId: "",
+        kind: "boolean",
+        status: "judged",
+        passed: true,
+        score: null,
+        label: null,
+        probability: 0.9,
+        probabilities: null,
+        error: null,
+        occurredAt: "2026-09-18T12:00:00.000Z",
+        ...overrides,
+      });
       const printed: string[] = [];
       const logSpy = vi.spyOn(console, "log").mockImplementation((...parts: unknown[]) => {
         printed.push(parts.map(String).join(" "));

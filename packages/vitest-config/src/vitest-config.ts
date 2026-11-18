@@ -10,6 +10,7 @@ import { splitIsolationByMocking } from "./split-isolation-by-mocking.ts";
 // Absolute so it resolves the same regardless of the consuming package's cwd.
 const CONSOLE_GUARD_SETUP = fileURLToPath(new URL("./console-guard.ts", import.meta.url));
 const LOGGER_SETUP = fileURLToPath(new URL("./logger-setup.ts", import.meta.url));
+const BLOB_STREAM_SETUP = fileURLToPath(new URL("./blob-stream-setup.ts", import.meta.url));
 
 /**
  * The one vitest shape every package declares — vitest 5's speed options
@@ -92,6 +93,7 @@ export function moduleVitestTestOptions(
   const cacheExecArgv = fast ? moduleLoadingCacheExecArgv() : [];
   const resolvedSetupFiles = [
     LOGGER_SETUP,
+    BLOB_STREAM_SETUP,
     ...(kind === "unit" ? [CONSOLE_GUARD_SETUP] : []),
     ...(setupFiles ?? []),
   ];
@@ -123,10 +125,11 @@ export function moduleVitestTestOptions(
     // jsdom lane would collect the browser lane's files and fail them.
     exclude: [...(exclude ?? DEFAULT_EXCLUDE), BROWSER_TEST_GLOB],
     ...(include ? { include } : {}),
-    setupFiles: resolvedSetupFiles,
     ...(testTimeout === undefined ? {} : { testTimeout }),
     ...(dir === undefined ? {} : { dir }),
     ...test,
+    // A package's own `test.setupFiles` runs after the builder's, never instead of them.
+    setupFiles: [...resolvedSetupFiles, ...[test?.setupFiles ?? []].flat()],
   };
   // vitest runs a package script from the package directory, its default root.
   const suiteRoot = root ?? process.cwd();

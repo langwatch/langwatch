@@ -226,7 +226,7 @@ export class DatasetService {
             slugOrId,
           },
         },
-      }) as Promise<{ data?: unknown; error?: unknown; response: { status: number } }>,
+      }),
     );
 
     return this.unwrapResponse<GetDatasetApiResponse>(

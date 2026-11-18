@@ -32,7 +32,7 @@ Do not redo these. Each cost a verification pass to establish.
 4. **Gating is asymmetric.** On cloud the identifier backfill sets
    `enrolledAutomatically = false`, so this branch is inert until an operator
    enrolls an organization. On self-hosted `runsAutomaticallyOnSelfHosted =
-true`, so the next migration pass finalizes users with no operator action.
+   true`, so the next migration pass finalizes users with no operator action.
    "Ships gated off" is only half true, and self-hosted is the tier with the
    least soak.
 

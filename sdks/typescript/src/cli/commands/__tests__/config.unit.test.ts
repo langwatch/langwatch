@@ -26,9 +26,9 @@ describe("config commands", () => {
     process.env.LANGWATCH_CLI_CONFIG = configFile;
     logSpy = vi.spyOn(console, "log").mockImplementation(() => undefined);
     vi.spyOn(console, "error").mockImplementation(() => undefined);
-    exitSpy = vi.spyOn(process, "exit").mockImplementation((() => {
+    exitSpy = vi.spyOn(process, "exit").mockImplementation(() => {
       throw new Error("process.exit called");
-    }) as never);
+    });
   });
 
   afterEach(() => {

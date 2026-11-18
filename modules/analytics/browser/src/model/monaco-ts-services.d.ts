@@ -1,5 +1,5 @@
 /** The slice of Monaco's bundled TypeScript services the widget typing test drives. */
-declare module "monaco-editor/esm/vs/language/typescript/lib/typescriptServices.js" {
+declare module "monaco-editor/languages/features/typescript/lib/typescriptServices.js" {
   interface Diagnostic {
     readonly messageText: string | { readonly messageText: string };
     readonly start?: number;
@@ -61,6 +61,6 @@ declare module "monaco-editor/esm/vs/language/typescript/lib/typescriptServices.
   };
 }
 
-declare module "monaco-editor/esm/vs/language/typescript/lib/lib.js" {
+declare module "monaco-editor/languages/features/typescript/lib/lib.js" {
   export const libFileMap: Readonly<Record<string, string>>;
 }

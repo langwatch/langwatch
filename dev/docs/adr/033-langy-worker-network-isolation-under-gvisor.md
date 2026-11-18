@@ -97,7 +97,7 @@ that worker's authProxy present it.** This is "Fix A′".
 - The per-worker authProxy, which already terminates the external bearer token,
   swaps its current header-strip (`r.Header.Del("Authorization")`,
   `authproxy.go:81`) for a header-set: `Authorization: Basic
-base64("opencode:"+password)`. The legit control path keeps working; the
+  base64("opencode:"+password)`. The legit control path keeps working; the
   sibling path — which never has the password — gets `401` from opencode
   itself.
 

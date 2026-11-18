@@ -19,14 +19,13 @@ import {
   mintProjectIngestionKey,
 } from "../session-api";
 
-const liveSession = (): GovernanceConfig =>
-  ({
-    control_plane_url: "https://app.langwatch.ai",
-    gateway_url: "https://gateway.langwatch.ai",
-    access_token: "lw_at_test",
-    refresh_token: "lw_rt_test",
-    expires_at: Math.floor(Date.now() / 1000) + 3600,
-  }) as GovernanceConfig;
+const liveSession = (): GovernanceConfig => ({
+  control_plane_url: "https://app.langwatch.ai",
+  gateway_url: "https://gateway.langwatch.ai",
+  access_token: "lw_at_test",
+  refresh_token: "lw_rt_test",
+  expires_at: Math.floor(Date.now() / 1000) + 3600,
+});
 
 const jsonResponse = (status: number, body: unknown): Response =>
   new Response(JSON.stringify(body), {
@@ -65,7 +64,7 @@ describe("session-api request bounds", () => {
       vi.mocked(loadConfig).mockReturnValue({
         ...cfg,
         refresh_token: "lw_rt_from_sibling",
-      } as GovernanceConfig);
+      });
 
       const seen: string[] = [];
       const fetchImpl: typeof fetch = async (input, init) => {

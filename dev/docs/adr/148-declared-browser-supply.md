@@ -192,7 +192,7 @@ point.
    `release_langy_promo_enabled`.
 
 5. **A module's config slice travels with a projection.** `withConfig(schema,
-project)` where `project: (config: PublicAppConfig) => Input<schema>`, so the
+   project)` where `project: (config: PublicAppConfig) => Input<schema>`, so the
    projection lives in the module's own package and compiles there.
    `parseUiFeatureConfig`'s hand-written map is deleted.
 

@@ -117,10 +117,9 @@ export function CostStackedBars({
               keys.find((k) => k.key === String(name))?.label ?? String(name),
             ]}
             labelFormatter={(label) => {
-              const period = formatDayTick(String(label), interval);
-              return withheldDays.has(String(label))
-                ? `${period} · ${WITHHELD_TOOLTIP_NOTE}`
-                : period;
+              const day = typeof label === "string" ? label : "";
+              const period = formatDayTick(day, interval);
+              return withheldDays.has(day) ? `${period} · ${WITHHELD_TOOLTIP_NOTE}` : period;
             }}
             contentStyle={CHART_TOOLTIP_CONTENT}
             labelStyle={CHART_TOOLTIP_LABEL}

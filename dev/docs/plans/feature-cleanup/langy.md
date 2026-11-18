@@ -322,7 +322,7 @@ structurally.
   §2 authorisation) is worth keeping in some form; the incident narrative and
   the cross-service plumbing history are ADR material.
 - **`contract/src/cards/derived-safe.ts:1-66`** — 66 lines, `── WHY AN
-ALLOWLIST AT ALL ──` plus a wire-compatibility note on `blockId`. Already
+  ALLOWLIST AT ALL ──` plus a wire-compatibility note on `blockId`. Already
   cites ADR-060 §3; the prose largely restates it.
 
 Files where comment outweighs code:

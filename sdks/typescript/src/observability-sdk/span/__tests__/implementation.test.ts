@@ -24,7 +24,7 @@ describe("LangWatchSpan Implementation", () => {
 
   beforeEach(() => {
     mockSpan = createMockSpan();
-    langwatchSpan = createLangWatchSpan(mockSpan as any);
+    langwatchSpan = createLangWatchSpan(mockSpan);
   });
 
   afterEach(() => {

@@ -127,7 +127,7 @@ describe("waitForInstantEvalRun, given a run being followed", () => {
         .mockResolvedValueOnce(run({ status: "finished", progress: 10_000, matched: 1_284 }));
 
       const waited = await waitForInstantEvalRun({
-        service: { get } as never,
+        service: { get },
         runId: "instant_eval_abc",
         machine: true,
         timeoutMs: 60_000,
@@ -149,7 +149,7 @@ describe("waitForInstantEvalRun, given a run being followed", () => {
         .mockResolvedValue(run({ status: "failed", error: "instant_eval_stalled" }));
 
       const waited = await waitForInstantEvalRun({
-        service: { get } as never,
+        service: { get },
         runId: "instant_eval_abc",
         machine: true,
         timeoutMs: 60_000,
@@ -167,7 +167,7 @@ describe("waitForInstantEvalRun, given a run being followed", () => {
       const get = vi.fn().mockResolvedValue(run({ status: "cancelled" }));
 
       const waited = await waitForInstantEvalRun({
-        service: { get } as never,
+        service: { get },
         runId: "instant_eval_abc",
         machine: true,
         timeoutMs: 60_000,
@@ -188,7 +188,7 @@ describe("waitForInstantEvalRun, given a run being followed", () => {
       const nowSpy = vi.spyOn(Date, "now").mockImplementation(() => clock);
 
       const waited = await waitForInstantEvalRun({
-        service: { get } as never,
+        service: { get },
         runId: "instant_eval_abc",
         machine: true,
         timeoutMs: 10_000,
@@ -216,7 +216,7 @@ describe("waitForInstantEvalRun, given a run being followed", () => {
         .mockResolvedValue(run());
 
       const waited = await waitForInstantEvalRun({
-        service: { get } as never,
+        service: { get },
         runId: "instant_eval_abc",
         machine: true,
         timeoutMs: 600_000,
@@ -237,7 +237,7 @@ describe("waitForInstantEvalRun, given a run being followed", () => {
       const get = vi.fn().mockRejectedValue(new Error("down"));
 
       const waited = await waitForInstantEvalRun({
-        service: { get } as never,
+        service: { get },
         runId: "instant_eval_abc",
         machine: true,
         timeoutMs: 600_000,
@@ -255,7 +255,7 @@ describe("waitForInstantEvalRun, given a run being followed", () => {
       const get = vi.fn().mockRejectedValue(new Error("down"));
 
       const waited = await waitForInstantEvalRun({
-        service: { get } as never,
+        service: { get },
         runId: "instant_eval_abc",
         machine: true,
         timeoutMs: -1,

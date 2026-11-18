@@ -502,7 +502,7 @@ does **not** give away.
    (`contract/src/telemetry/coding-agent-definition.ts:228`), and pi's tree has a level they do not cover.
    `pi.harness.turn` resolves to no role, so it is admitted only because `sessionSpanNames` lists it.
    `sessionSpanNames` is therefore `["pi.harness.run", "pi.harness.turn", "pi.harness.compaction",
-"pi.harness.step", "pi.harness.navigation"]`, every harness span the shim emits, because a span not
+   "pi.harness.step", "pi.harness.navigation"]`, every harness span the shim emits, because a span not
    listed there is dropped at the dispatch filter
    (`process/src/eventing/coding-agent-processing.pipeline.ts:80`) with nothing recorded. Compaction
    matters most, since it is a canonical event kind we already fold for other agents

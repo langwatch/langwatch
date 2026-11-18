@@ -13,6 +13,7 @@ import {
   hoistStraySchemaDefs,
   normalizeExclusiveBounds,
   publishEnumRecordKeys,
+  SPEC_GENERATION_OPTIONS,
 } from "../rest/openapi.ts";
 
 const SECURITY_SCHEMES = {
@@ -113,6 +114,7 @@ export async function buildOpenApiDocument(restApp: Hono): Promise<Record<string
   const generated = await generateSpecs(restApp, {
     documentation: documentation(),
     excludeStaticFile: false,
+    ...SPEC_GENERATION_OPTIONS,
   });
   // The corrections rewrite in place, and hono-openapi hands every call the SAME
   // resolved schema objects, so they run over a copy.

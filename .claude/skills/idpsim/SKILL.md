@@ -98,7 +98,7 @@ README there is the full reference), console `apps/sims/src/idp` (ADR-160).
 - Negative tokens: `haven sim idp fault <t> bad-signature|wrong-audience|expired|replayed-nonce`
   breaks the next ID token once.
 - Auth0 directory webhook: `haven sim idp auth0-webhook <t> --event create|deactivate --user <u>
---target <stack-url> --secret-env <VAR>`. The secret comes from your environment only; never
+  --target <stack-url> --secret-env <VAR>`. The secret comes from your environment only; never
   put it in a flag, a file in the tree or a message.
 - Bare `haven sim idp` no longer runs the standalone simulator; use the hidden `haven simulator idp`.
 

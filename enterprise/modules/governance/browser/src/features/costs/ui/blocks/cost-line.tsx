@@ -59,7 +59,9 @@ export function CostLine({
           <YAxis tick={AXIS_TICK} tickFormatter={format} width={58} />
           <Tooltip
             formatter={(value) => format(Number(value))}
-            labelFormatter={(label) => formatDayTick(String(label), interval)}
+            labelFormatter={(label) =>
+              formatDayTick(typeof label === "string" ? label : "", interval)
+            }
             contentStyle={CHART_TOOLTIP_CONTENT}
             labelStyle={CHART_TOOLTIP_LABEL}
           />

@@ -54,7 +54,7 @@ Four processes compose the feature packages:
 ### The clauses added 2026-09-07 and 2026-09-08 (the shape drive)
 
 9. **Annotation is the shape.** Every feature is `defineFeature(...)
-.withRepositories(registry).withApp(App).withTransports(...)`, one
+   .withRepositories(registry).withApp(App).withTransports(...)`, one
    `<Feature>Api` token in the contract, procedures declared once with
    `defineTrpcContract` / `defineRestRouter`, mounted by the process with
    `runtime.mount`, Prisma and memory repository twins behind

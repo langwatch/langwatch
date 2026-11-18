@@ -36,7 +36,7 @@ describe("maybePrintIdentityNotice()", () => {
           status: 200,
           headers: { "content-type": "application/json" },
         }),
-    ) as unknown as typeof fetch;
+    );
 
   beforeEach(() => {
     dir = fs.mkdtempSync(path.join(os.tmpdir(), "lw-notice-"));

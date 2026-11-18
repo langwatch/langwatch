@@ -2033,14 +2033,7 @@ interface Input {
   occurredAtMs?: number;
   tenantId?: string;
 }
-// Output: tracesSpanLangwatchSignalsSchema, ../contract/src/trace.responses.ts:232
-type Output = {
-  spanId: string;
-  signals: (
-    "prompt" | "scenario" | "user" | "thread" | "evaluation" | "rag" | "metadata" | "genai"
-  )[];
-  ownerProjectId?: string | null;
-}[];
+type Output = z.infer<typeof tracesSpanLangwatchSignalsSchema>; // ../contract/src/trace.responses.ts:232
 
 // traces.spansFull
 // Input: inline, ../contract/src/traces.trpc.ts:578

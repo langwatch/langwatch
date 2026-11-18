@@ -8,9 +8,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
 import { describe, expect, it, vi } from "vitest";
-import { mock } from "vitest-mock-extended";
 
-import type { InternalConfig } from "@/client-sdk/types";
 import type { LangwatchApiClient } from "@/internal/api/client";
 import { LOGS_PATH, METRICS_PATH, TRACES_PATH } from "@/internal/constants";
 
@@ -137,8 +135,7 @@ describe("given the request paths the TypeScript SDK builds", () => {
       const get = vi.fn().mockResolvedValue({ data: { id: "p_1" }, error: undefined });
       const service = new PromptsApiService({
         langwatchApiClient: { GET: get } as unknown as LangwatchApiClient,
-        logger: mock(),
-      } as InternalConfig);
+      });
 
       await service.get("greeting-bot");
 

@@ -295,7 +295,7 @@ unmeasured.
 
 - `packages/architecture-enforcer/src/feature-catalogue.ts` reads
   `modules/catalogue.json` — 53 entries, each `{ id, root, classification:
-core|enterprise, subjects: string[] }`. This is the canonical feature list.
+  core|enterprise, subjects: string[] }`. This is the canonical feature list.
 - `packages/architecture-enforcer/src/check-feature-parity.ts` (1,890 lines) already solves
   "does this scenario have a test": discovers `.feature` files, parses scenarios + tags,
   finds `@scenario "<title>"` annotations above test declarations across TS/Go/Python/
@@ -521,7 +521,7 @@ Re-verified with a narrower, more precise grep than Part 1 used:
   is aspirational, not implemented, in every one of the 147 vitest configs.
 - **The integration lane's guardrails ARE real and correctly applied.** Read
   `apps/worker/vitest.integration.config.ts`, `packages/clickhouse-client/
-vitest.integration.config.ts`, `packages/prisma-client/vitest.integration.config.ts` in
+  vitest.integration.config.ts`, `packages/prisma-client/vitest.integration.config.ts` in
   full: each sets `pool: "forks"` + `fileParallelism: false` exactly as documented. The
   gap is specifically the **unit lane** (`vitest.config.ts`, not `.integration.config.ts`).
 - **Every unit-lane `test:unit` script is a bare `vitest run`** (checked `apps/ui`,
@@ -535,7 +535,7 @@ vitest.integration.config.ts`, `packages/prisma-client/vitest.integration.config
   `.github/workflows/langwatch-app-ci.yml` sets `VITEST_MAX_WORKERS: "4"` (commented
   "physical core count on GitHub-hosted ubuntu runners"). This is a genuine Vitest-recognized
   environment override — confirmed via `packages/test-harness/src/
-integration-file-concurrency.ts`'s own doc comment, which describes exactly this
+  integration-file-concurrency.ts`'s own doc comment, which describes exactly this
   mechanism (and why the integration lane has to actively _withdraw_ it to keep
   `fileParallelism: false` from being silently defeated). So **CI caps worker count; local
   does not** — the inverse of what you'd want if RAM is the constraint you're guarding

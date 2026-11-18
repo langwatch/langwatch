@@ -45,7 +45,7 @@ organisation's settings.
    it mints nothing.
 4. The popup posts the result to the exact docs origin with `postMessage` (never `*`):
    `{ type: "langwatch:docs-session", version: 1, state, outcome: "granted", token,
-expiresAt, expiresIn, project: { id, name } }`, or `outcome: "denied"`. It then closes.
+   expiresAt, expiresIn, project: { id, name } }`, or `outcome: "denied"`. It then closes.
    The docs time the key from `expiresIn` (seconds) on the page's monotonic clock, so a
    reader's wrong clock cannot stretch or cut it; `expiresAt` is for the app's own records.
 5. The docs accept a message only when `event.origin` is the configured app origin,

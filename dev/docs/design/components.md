@@ -9,15 +9,15 @@ Always import overlay components from `@langwatch/design-system`, not directly f
 ### Local UI Components (use these)
 
 ```tsx
-import { Drawer } from "@langwatch/design-system/drawer";
-import { Dialog } from "@langwatch/design-system/dialog";
-import { Popover } from "@langwatch/design-system/popover";
-import { Tooltip } from "@langwatch/design-system/tooltip";
-import { Menu } from "@langwatch/design-system/menu";
 import { Checkbox, CheckboxGroup } from "@langwatch/design-system/checkbox";
+import { Dialog } from "@langwatch/design-system/dialog";
+import { Drawer } from "@langwatch/design-system/drawer";
+import { InputGroup } from "@langwatch/design-system/input-group";
+import { Menu } from "@langwatch/design-system/menu";
+import { Popover } from "@langwatch/design-system/popover";
 import { Radio, RadioGroup } from "@langwatch/design-system/radio";
 import { Switch } from "@langwatch/design-system/switch";
-import { InputGroup } from "@langwatch/design-system/input-group";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 ```
 
 ### Primitives and raw parts (`@langwatch/design-system/primitives`)
@@ -112,8 +112,8 @@ A drawer another module opens is a typed token in its owner's contract (§10.1).
 ### Basic Usage
 
 ```tsx
-import { SelectDatasetDrawerToken } from "@langwatch/dataset-contract";
 import { useDrawer } from "@langwatch/browser-host/drawer";
+import { SelectDatasetDrawerToken } from "@langwatch/dataset-contract";
 
 function MyComponent() {
   const { openDrawer, closeDrawer, canGoBack, goBack } = useDrawer();

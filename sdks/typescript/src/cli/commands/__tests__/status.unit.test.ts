@@ -203,7 +203,7 @@ describe("statusCommand", () => {
         status: 401,
         statusText: "Unauthorized",
         json: async () => ({ error: "Unauthorized", message: "Invalid API key" }),
-      }) as unknown as typeof fetch;
+      });
     });
 
     it("prints an auth-specific diagnostic", async () => {
@@ -258,7 +258,7 @@ describe("statusCommand", () => {
         status: 503,
         statusText: "Service Unavailable",
         json: async () => ({ error: "ServiceUnavailable", message: "Backend down" }),
-      }) as unknown as typeof fetch;
+      });
     });
 
     it("hints at LANGWATCH_API_KEY and reminds the user which endpoint is in use", async () => {
@@ -283,7 +283,7 @@ describe("statusCommand", () => {
       const err = Object.assign(new TypeError("fetch failed"), { cause });
       mockGET.mockRejectedValue(err);
       mockPOST.mockRejectedValue(err);
-      global.fetch = vi.fn().mockRejectedValue(err) as unknown as typeof fetch;
+      global.fetch = vi.fn().mockRejectedValue(err);
     });
 
     it("surfaces ECONNREFUSED in the diagnostic", async () => {
@@ -418,7 +418,7 @@ describe("statusCommand", () => {
           };
         }
         return baseFetch(input as Parameters<typeof fetch>[0]);
-      }) as unknown as typeof fetch;
+      });
 
       await statusCommand();
 
@@ -496,7 +496,7 @@ describe("statusCommand", () => {
           };
         }
         return baseFetch(input as Parameters<typeof fetch>[0]);
-      }) as unknown as typeof fetch;
+      });
 
       await statusCommand({ output: "json" });
 

@@ -138,11 +138,11 @@ export const queryAnalyticsCommand = async (options: {
       endDate,
       series: [
         {
-          metric: metric as "metadata.trace_id",
+          metric: metric,
           aggregation: aggregation as "cardinality",
         },
       ],
-      groupBy: options.groupBy as "metadata.model" | undefined,
+      groupBy: options.groupBy,
       timeScale: parseTimeScale(options.timeScale),
       timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
       // Langy's own turns stay out unless asked for, as in the Trace Explorer.

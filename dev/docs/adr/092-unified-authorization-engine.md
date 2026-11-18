@@ -1274,4 +1274,4 @@ while the seat is off, and it is waiting for them when it comes back on.
   delivery-plan doc was retired into it).
 - Evidence: `dev/docs/security/hono-api-rbac-audit.md` (PR #4283); issues
   #1247, #3388, #3429, #3685, #4008; `git log --since=2026-01-01 --
-langwatch/src/server/api/rbac.ts` (28 commits).
+  langwatch/src/server/api/rbac.ts` (28 commits).

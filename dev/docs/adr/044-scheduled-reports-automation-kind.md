@@ -34,7 +34,7 @@ Two capabilities are missing entirely:
 1. **A per-trigger calendar schedule.** Nothing carries a cron expression +
    day-of-week + time-of-day + timezone at the trigger level. `Trigger` has
    `lastRunAt Float`, `notificationCadence` (`immediate | 5min_digest |
-15min_digest | hourly_digest`), and `traceDebounceMs` — all _relative_ windows
+   15min_digest | hourly_digest`), and `traceDebounceMs` — all _relative_ windows
    anchored to an event, never an absolute wall-clock instant
    (`src/automations/cadences.ts:9-31`; `computeScheduledFor` snaps to the next
    epoch-aligned UTC boundary, `triggerActionDispatch.ts:60-79`). The only
@@ -354,7 +354,7 @@ s poll. Redis only accelerates wake-up. The loop:
    minutes" job doesn't wait out the backstop.
 3. On wake: `SELECT ... WHERE active AND nextRunAt <= now` (indexed due-scan), then
    conditionally lease each due row, invoke its registered handler with `{
-targetType, targetId, slot }`, and advance `nextRunAt` after successful
+   targetType, targetId, slot }`, and advance `nextRunAt` after successful
    settlement. Failures keep the slot and retry with bounded backoff.
 
 **Cross-pod safety = Postgres conditional leases.** Every worker-capable pod may
@@ -597,7 +597,7 @@ for the other kinds.
 - [ADR-034](./034-event-sourced-analytics-materialization.md) — the slim/rollup
   analytics tables `getTimeseries` reads; report queries prefer the rollup.
 - PR #5015 (`feat(automations): graph alerts in automations drawer + Liquid template
-wiring`) — the kind-aware drawer, `graphAlert` sub-shape, and
+  wiring`) — the kind-aware drawer, `graphAlert` sub-shape, and
   `graph-trigger-evaluation.service.ts` this report generalizes.
 - `src/server/app-layer/automations/graph-trigger-evaluation.service.ts` — the
   server-side "stored graph → `getTimeseries`" evaluator the report render extends

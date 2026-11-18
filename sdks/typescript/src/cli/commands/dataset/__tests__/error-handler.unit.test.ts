@@ -20,11 +20,11 @@ describe("handleDatasetCommandError", () => {
     consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {
       /* suppress */
     });
-    processExitSpy = vi.spyOn(process, "exit").mockImplementation(((
-      _code?: number | string | null,
-    ) => {
-      throw new Error("process.exit called");
-    }) as (code?: number | string | null) => never);
+    processExitSpy = vi
+      .spyOn(process, "exit")
+      .mockImplementation((_code?: number | string | null) => {
+        throw new Error("process.exit called");
+      });
     spinnerFail = vi.fn();
     spinner = { fail: spinnerFail } as unknown as Ora;
   });

@@ -7,13 +7,13 @@ from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.update_organization_member_body import UpdateOrganizationMemberBody
 from ...models.update_organization_member_response_200 import UpdateOrganizationMemberResponse200
-from ...types import Response, safe_http_status
+from ...types import UNSET, Response, Unset, safe_http_status
 
 
 def _get_kwargs(
     user_id: str,
     *,
-    body: UpdateOrganizationMemberBody,
+    body: UpdateOrganizationMemberBody | Unset = UNSET,
 ) -> dict[str, Any]:
     headers: dict[str, Any] = {}
 
@@ -24,7 +24,8 @@ def _get_kwargs(
         ),
     }
 
-    _kwargs["json"] = body.to_dict()
+    if not isinstance(body, Unset):
+        _kwargs["json"] = body.to_dict()
 
     headers["Content-Type"] = "application/json"
 
@@ -64,14 +65,14 @@ def sync_detailed(
     user_id: str,
     *,
     client: AuthenticatedClient,
-    body: UpdateOrganizationMemberBody,
+    body: UpdateOrganizationMemberBody | Unset = UNSET,
 ) -> Response[UpdateOrganizationMemberResponse200]:
     """Change a member's organization role, or disable / re-enable their membership. Send exactly one of
     role or disabled. Re-enabling consumes a seat, so it is checked against the plan.
 
     Args:
         user_id (str):
-        body (UpdateOrganizationMemberBody):
+        body (UpdateOrganizationMemberBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -97,14 +98,14 @@ def sync(
     user_id: str,
     *,
     client: AuthenticatedClient,
-    body: UpdateOrganizationMemberBody,
+    body: UpdateOrganizationMemberBody | Unset = UNSET,
 ) -> UpdateOrganizationMemberResponse200 | None:
     """Change a member's organization role, or disable / re-enable their membership. Send exactly one of
     role or disabled. Re-enabling consumes a seat, so it is checked against the plan.
 
     Args:
         user_id (str):
-        body (UpdateOrganizationMemberBody):
+        body (UpdateOrganizationMemberBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -125,14 +126,14 @@ async def asyncio_detailed(
     user_id: str,
     *,
     client: AuthenticatedClient,
-    body: UpdateOrganizationMemberBody,
+    body: UpdateOrganizationMemberBody | Unset = UNSET,
 ) -> Response[UpdateOrganizationMemberResponse200]:
     """Change a member's organization role, or disable / re-enable their membership. Send exactly one of
     role or disabled. Re-enabling consumes a seat, so it is checked against the plan.
 
     Args:
         user_id (str):
-        body (UpdateOrganizationMemberBody):
+        body (UpdateOrganizationMemberBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -156,14 +157,14 @@ async def asyncio(
     user_id: str,
     *,
     client: AuthenticatedClient,
-    body: UpdateOrganizationMemberBody,
+    body: UpdateOrganizationMemberBody | Unset = UNSET,
 ) -> UpdateOrganizationMemberResponse200 | None:
     """Change a member's organization role, or disable / re-enable their membership. Send exactly one of
     role or disabled. Re-enabling consumes a seat, so it is checked against the plan.
 
     Args:
         user_id (str):
-        body (UpdateOrganizationMemberBody):
+        body (UpdateOrganizationMemberBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.

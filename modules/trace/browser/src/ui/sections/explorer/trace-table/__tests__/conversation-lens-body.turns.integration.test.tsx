@@ -91,6 +91,8 @@ beforeEach(() => {
   const scrollElement = document.createElement("div");
   Object.defineProperty(scrollElement, "offsetHeight", { value: 800 });
   Object.defineProperty(scrollElement, "offsetWidth", { value: 1200 });
+  Object.defineProperty(scrollElement, "clientHeight", { value: 800 });
+  Object.defineProperty(scrollElement, "clientWidth", { value: 1200 });
   document.body.appendChild(scrollElement);
   setTraceTableScrollElement(scrollElement);
 });

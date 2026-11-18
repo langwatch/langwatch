@@ -134,7 +134,7 @@ bundled v6 schema → LangWatchQL policy → field references.
 4. **Render** (`hooks/useLangWatchQLVegaView.ts`) — `vega-embed` is called with
    `ast: true`, which makes it parse expressions into a syntax tree and
    evaluate them with `vega-interpreter` instead of compiling with `new
-Function`. Do not add `expr` to `lwqlVegaEmbedOptions` — `vega@6`
+   Function`. Do not add `expr` to `lwqlVegaEmbedOptions` — `vega@6`
    exports no `expressionInterpreter`, so `ast: true` alone already reaches
    the interpreter; passing one explicitly only duplicates it in the bundle.
    The loader is `createNoNetworkVegaLoader()` — every method rejects, so a

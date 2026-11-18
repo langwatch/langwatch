@@ -217,7 +217,7 @@ the same rules as any other process code.
 copy that record §15 lists is deleted: write its replacement, not the copy.
 
 1. **Catalogue entry.** `modules/catalogue.json` gets `{ "id": "<name>",
-"root": "modules/<name>", "classification": "core", "subjects": ["<name>"] }`.
+   "root": "modules/<name>", "classification": "core", "subjects": ["<name>"] }`.
    If the subject already belongs to a module, this is an extension, not a
    new module.
 2. **Spec first**: `modules/<name>/specs/<name>.feature` — golden path plus

@@ -450,7 +450,7 @@ haven holds, sent as `X-Auth-Token`:
 
 - `--key project` (the default) is the seeded project key
   (`HAVEN_SEED_LANGWATCH_API_KEY`) for `local-dev-project`. With `--project
-<slug>` naming another project, haven mints a service key bound to that one
+  <slug>` naming another project, haven mints a service key bound to that one
   project through `POST /api/api-keys`.
 - `--key org` is a service key over the whole organization, minted once through
   `POST /api/api-keys` as the seeded admin.
@@ -811,7 +811,7 @@ The daemon's JSON, which the console reads:
   rather than letting a test model run as your own user. On macOS haven wants no
   colima: a development stack runs the worker on the host tier by default and
   `up` prints `Langy runs unsandboxed on this machine (macOS runs langyagent on
-the host); set LANGY_UNSAFE_HOST_ACCESS=0 to run it sandboxed in colima`. The
+  the host); set LANGY_UNSAFE_HOST_ACCESS=0 to run it sandboxed in colima`. The
   container tiers below stay as an explicit opt-in there. On the host tier haven
   also sets `LANGY_EGRESS_REQUIRE_TLS=false` in the langyagent environment (the
   worker reaches the manager's loopback relay over plain HTTP), and `up` builds the
@@ -834,8 +834,8 @@ the host); set LANGY_UNSAFE_HOST_ACCESS=0 to run it sandboxed in colima`. The
   machine**: on a development stack with no container runtime reachable (neither
   `colima` nor `docker` on PATH) haven resolves the host tier by itself rather than
   running no manager at all, and prints `no container runtime; running langyagent on
-the host because this is a development stack; set LANGY_UNSAFE_HOST_ACCESS=0 to
-refuse`. That one line is the whole point: a quieter isolation posture than the one
+  the host because this is a development stack; set LANGY_UNSAFE_HOST_ACCESS=0 to
+  refuse`. That one line is the whole point: a quieter isolation posture than the one
   you believe you have is never inferred in silence. `LANGY_UNSAFE_HOST_ACCESS=0`
   refuses it, and a stack that is not a development one (`NODE_ENV` / `ENVIRONMENT`
   naming anything outside `local`/`dev`/`development`/`test`) still fails closed:

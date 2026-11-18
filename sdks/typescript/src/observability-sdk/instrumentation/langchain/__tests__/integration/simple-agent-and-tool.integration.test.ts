@@ -85,7 +85,7 @@ describe.skipIf(!RUN_EXTERNAL)("LangChain Integration Tests", () => {
     expect(llmSpan?.name.startsWith("LLM:")).toBe(false);
 
     // Ensure no deprecated llm.* attributes are present
-    const llmAttrKeys = Object.keys(llmSpan!.attributes as any);
+    const llmAttrKeys = Object.keys(llmSpan!.attributes);
     expect(llmAttrKeys.some((k) => k.startsWith("llm."))).toBe(false);
   });
 
@@ -501,7 +501,7 @@ describe.skipIf(!RUN_EXTERNAL)("LangChain Integration Tests", () => {
       expect(llmSpan?.attributes["gen_ai.request.temperature"]).toBe(1);
 
       // Verify no deprecated llm.* attributes
-      const attrKeys = Object.keys(llmSpan!.attributes as any);
+      const attrKeys = Object.keys(llmSpan!.attributes);
       const deprecatedKeys = attrKeys.filter((k) => k.startsWith("llm."));
       expect(deprecatedKeys.length).toBe(0);
     });

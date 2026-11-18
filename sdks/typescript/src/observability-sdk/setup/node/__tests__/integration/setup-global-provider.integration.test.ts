@@ -105,7 +105,7 @@ describe("setupObservability Integration - attachToExistingProvider", () => {
 
     const handle = setupObservability({
       langwatch: { apiKey: "test-key" },
-      spanProcessors: [customProcessor as any],
+      spanProcessors: [customProcessor],
       debug: { logger },
       advanced: { attachToExistingProvider: true },
     });

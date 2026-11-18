@@ -120,13 +120,13 @@ export function formatApiErrorMessage({
     return formatErrorBody(body, options);
   }
 
-  // Primitive types (number, boolean, bigint, symbol) — coerce safely.
-  // We've already handled string, null/undefined, Error, and object above.
-  try {
-    return String(error as number | boolean | bigint);
-  } catch {
-    return "Unknown error occurred";
+  // What is left is a primitive: string, null/undefined, Error and object are handled above.
+  if (typeof error === "number" || typeof error === "boolean" || typeof error === "bigint") {
+    return String(error);
   }
+  if (typeof error === "symbol") return error.toString();
+
+  return "Unknown error occurred";
 }
 
 export interface FormatApiErrorForOperationParams {

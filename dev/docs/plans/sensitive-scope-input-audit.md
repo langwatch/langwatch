@@ -74,7 +74,7 @@ Method:
 2. Anchor on `.get|post|put|patch|delete("<path>", "<op>")` for REST and
    `.procedure("<name>")` for tRPC, then walk the fluent chain **upward through
    `node.parent`** collecting `.withParams/.withQuery/.withInput/.withPermission/
-.withAccess/.noPermission/.serviceAuthorized/.handle`, stopping at the next
+   .withAccess/.noPermission/.serviceAuthorized/.handle`, stopping at the next
    anchor.
 3. tRPC server transports declare no schema, so each `.procedure(n)` is joined
    to its contract's `.query|mutation|subscription(n).withInput(schema)` through

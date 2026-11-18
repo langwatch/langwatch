@@ -106,6 +106,7 @@ LangWatch uses a drawer navigation system that allows drawers to navigate to oth
 
 ```tsx
 import { useDrawer } from "@langwatch/browser-host/drawer";
+
 // The drawer's token, declared once by its owner (ARCHITECTURE.md §10.1)
 import { ChildDrawerToken } from "../../model/child-drawer.ts";
 

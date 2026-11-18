@@ -45,7 +45,7 @@ Measured 2026-10-06 (grep, re-measure per batch):
    re-publish a `UiScopeHostProvider` without `hasOrganizationPermission` or `isDemoProject`. The
    browser-host hook therefore answers organization permissions from the module host's
    `hasPermission` and reads the demo project as false. Main answered `hasOrgPermission =
-hasPermission` (origin/main line 537), and Q2 rules main's behaviour back in, so since Q2 the
+   hasPermission` (origin/main line 537), and Q2 rules main's behaviour back in, so since Q2 the
    shadowing changes no permission answer; the demo flag is the defect left. The first test of
    batch 3 must prove the shadowing before anything changes.
 

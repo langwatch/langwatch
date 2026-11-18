@@ -58,9 +58,8 @@ export function scanSpecifiers({ file, text }) {
 
 /** Strips JSONC comments and trailing commas, leaving strings alone. */
 function parseJsonc(text) {
-  const stripped = text.replace(
-    /("(?:\\.|[^"\\])*")|\/\/[^\n]*|\/\*[\s\S]*?\*\//g,
-    (all, string) => (string === undefined ? "" : string),
+  const stripped = text.replace(/("(?:\\.|[^"\\])*")|\/\/[^\n]*|\/\*[\s\S]*?\*\//g, (all, string) =>
+    string === undefined ? "" : string,
   );
 
   return JSON.parse(stripped.replace(/,(\s*[}\]])/g, "$1"));

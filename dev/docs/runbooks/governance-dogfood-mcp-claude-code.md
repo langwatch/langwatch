@@ -90,7 +90,7 @@ Claude Code should call:
    row with id `<custom-id>`
 2. `mcp__langwatch__governance_ingestion_templates_update_ottl_rules`
    with `id: <custom-id>` and `ottl_rules: 'delete_key(attributes,
-"claude.code.session_id")'`
+   "claude.code.session_id")'`
 3. `mcp__langwatch__governance_ingestion_templates_archive` with
    `id: <custom-id>`
 

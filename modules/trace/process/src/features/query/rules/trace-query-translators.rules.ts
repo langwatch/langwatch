@@ -197,8 +197,8 @@ function crossTableNumericHandler({
  */
 function matchNumericInMemory(value: number, tag: TagToken): boolean {
   if (tag.expression.type === "RangeExpression") {
-    const min = tag.expression.range.min;
-    const max = tag.expression.range.max;
+    const min = Number(tag.expression.range.min);
+    const max = Number(tag.expression.range.max);
     return value >= min && value <= max;
   }
   const num = extractNumericValue(tag);

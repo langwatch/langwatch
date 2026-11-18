@@ -158,12 +158,12 @@ export class EvaluatorsApiService {
       "/api/v1/evaluators/{evaluatorId}/labels/{label}",
       { params: { path: { evaluatorId: id, label } } },
     );
-    return unwrapApiResult({
+    return unwrapApiResult<{ label: string; removed: true }>({
       operation: `remove label "${label}" of evaluator "${id}"`,
       data,
       error,
       response,
       onError: this.handleApiError.bind(this),
-    }) as { label: string; removed: true };
+    });
   }
 }

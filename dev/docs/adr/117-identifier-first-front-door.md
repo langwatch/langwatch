@@ -173,7 +173,7 @@ configuration survives as method-set entries
 D04 as specced (`D04-sso-connection-aggregate.md`), decided here:
 
 - Aggregate `sso_connection` in the identity pipeline, `tenantId =
-organizationId`. Lifecycle DRAFT → CLAIMED → APPROVED →
+  organizationId`. Lifecycle DRAFT → CLAIMED → APPROVED →
   VERIFICATION_PENDING → VERIFIED → ACTIVE ⇄ SUSPENDED →
   TEARDOWN_PENDING → TORN_DOWN, guards evaluated against folded state
   (activation needs a verified domain + a live break-glass binding;
@@ -187,7 +187,7 @@ organizationId`. Lifecycle DRAFT → CLAIMED → APPROVED →
   (`identity-d04-connection-grandfather`, org-tenanted): existing
   `ssoDomain`/`ssoProvider` orgs get backfill events producing
   VERIFIED/ACTIVE connections (payloads note `source:
-"legacy-grandfathered"`), idempotency keys `grandfather:<orgId>`. The
+  "legacy-grandfathered"`), idempotency keys `grandfather:<orgId>`. The
   `finalized` proof is a routing comparison: the connection-based decision
   equals the string-based one for every domain the org carries — the same
   comparison `SSOCONN_ROUTING` shadow mode runs fleet-wide, evaluated per
@@ -199,7 +199,7 @@ organizationId`. Lifecycle DRAFT → CLAIMED → APPROVED →
   guards — grandfathering never weakens a guard.
 - **SAML protocol engine** (epic Open Q1/Q5): deliberately **not decided
   in this spike**. The aggregate is protocol-agnostic (`type: oidc |
-saml`; `idpMetadata` carries either). The engine choice
+  saml`; `idpMetadata` carries either). The engine choice
   (`@better-auth/sso` with its `ssoProvider` table as protocol state only,
   vs genericOAuth-with-SAML) is due at D04 implementation, recorded as a
   revision here — it does not block the aggregate, the grandfathering, or

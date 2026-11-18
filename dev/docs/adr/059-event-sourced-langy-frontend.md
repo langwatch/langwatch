@@ -46,7 +46,7 @@ Every load-bearing mechanism this ADR needs already exists in production form;
 none of it is speculative. Traced 2026-07-21:
 
 - **The cursor is already a system primitive.** `ProjectionCursor
-{ acceptedAt, eventId }` (KSUID tie-breaker) is defined in
+  { acceptedAt, eventId }` (KSUID tie-breaker) is defined in
   `event-sourcing/projections/stateProjection.types.ts`, persisted per document
   by `StateProjectionStore` (`StoredProjection.cursor`) — including by the
   Langy turn fold — with the portable comparator in
@@ -67,7 +67,7 @@ none of it is speculative. Traced 2026-07-21:
   `getEventRecordsUpToPaged` — the tail query is that clause minus the upper
   bound.
 - **No read-after-write gap.** Event inserts use `async_insert: 1,
-wait_for_async_insert: 1`: an acknowledged append is immediately visible to a
+  wait_for_async_insert: 1`: an acknowledged append is immediately visible to a
   catch-up read.
 - **ReplacingMergeTree duplicates are handled** — the abstract store dedups by
   idempotency key after every read (`deduplicateEvents`), and the folds are
@@ -194,7 +194,7 @@ Sharpen the seams the later phases build on; no behaviour change.
 - Move in, as the seed, `features/langy/stores/langyTurnPhase.ts` + its unit
   test; update the `langyStore` import.
 - Move the event schemas (`pipelines/langy-conversation-processing/schemas/
-events.ts` + `constants.ts` + the shared Zod helpers they need) into the
+  events.ts` + `constants.ts` + the shared Zod helpers they need) into the
   package with a portable event-envelope type; the server aliases it.
 - Move `ProjectionCursor` + a byte-wise `cursorHasReachedEvent` /
   `compareCursor` into the package; update the server's subscriber and
@@ -213,12 +213,12 @@ events.ts` + `constants.ts` + the shared Zod helpers they need) into the
 ### Phase 2 — cursor on the signal + authorized tail read (backend only)
 
 - Broadcast payload gains `cursor` (`langy-conversation-update-broadcast.
-subscriber.ts` already holds `record.cursor`); the client-facing signal
+  subscriber.ts` already holds `record.cursor`); the client-facing signal
   schema passes it through (owner/share fields stay server-side-stripped).
 - New event-store read `getEventsAfter({ tenantId, aggregateType, aggregateId,
-after: cursor, limit })`: the strict-after clause from
+  after: cursor, limit })`: the strict-after clause from
   `getEventRecordsUpToPaged` minus the upper bound, `ORDER BY (EventTimestamp,
-EventId)`, with the `EventOccurredAt` lower-bound predicate derived from
+  EventId)`, with the `EventOccurredAt` lower-bound predicate derived from
   `after.acceptedAt` (minus a safety window) for partition pruning. TenantId is
   the first predicate, per house CH rules.
 - New service method (`LangyConversationService` or the turn service):
@@ -258,7 +258,7 @@ EventId)`, with the `EventOccurredAt` lower-bound predicate derived from
 - The conversation spine (`langyConversationState`) gets the same treatment:
   shared `foldConversation`, snapshot+tail in the store.
 - Messages: extract the message _map_ logic (`langyMessageOperational.
-mapProjection`) into a shared `mapMessageEvent(event)`; the client applies it
+  mapProjection`) into a shared `mapMessageEvent(event)`; the client applies it
   over the same tail to maintain the open conversation's message list. The
   recents _list_ stays React Query + signal-then-refetch (slim, cross-
   conversation — the old model is right there).

@@ -75,7 +75,6 @@ import {
 import {
   removeVscodeTerminalOtelEnv,
   VSCODE_TELEMETRY_ENV_KEYS,
-  type VscodePlatform,
   vscodeTerminalEnvHasAnyClear,
   vscodeUserSettingsPath,
 } from "./vscode-settings";
@@ -285,11 +284,11 @@ export function scanTelemetryTargets({
   if (vscodePlatform === "darwin" || vscodePlatform === "linux" || vscodePlatform === "win32") {
     const home = os.homedir();
     const vscodeArgs = {
-      platform: vscodePlatform as VscodePlatform,
+      platform: vscodePlatform,
       home,
       keys: [...VSCODE_TELEMETRY_ENV_KEYS],
     };
-    const settingsPath = vscodeUserSettingsPath(vscodePlatform as VscodePlatform, home);
+    const settingsPath = vscodeUserSettingsPath(vscodePlatform, home);
     targets.push({
       label: `VS Code terminal telemetry clear (${tildify(settingsPath ?? "settings.json")})`,
       present: vscodeTerminalEnvHasAnyClear(vscodeArgs),

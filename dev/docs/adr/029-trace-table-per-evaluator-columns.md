@@ -89,7 +89,7 @@ rest`. The `eval:` prefix is the discriminator every consumer keys off.
   `{columns, registry, minWidth}` bundle. It parses `eval:` ids out of the
   logical column list, builds a `ColumnDef` per id (accessor returns the field
   value — wired for future sort — header = resolved label, `enableSorting:
-false`), and **merges** the matching `CellDef`s into the registry it hands
+  false`), and **merges** the matching `CellDef`s into the registry it hands
   down (`{...registry, cells: {...registry.cells, ...evalCells}}`). `columns.ts`
   and the static registry stay untouched and fully static.
 

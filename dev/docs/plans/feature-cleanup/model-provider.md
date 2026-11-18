@@ -369,7 +369,7 @@ whole service and repository layer. What is undocumented there is not obvious:
   then `fallbackPriorityGlobal`, then `createdAt`. Four tiebreakers, no note.
 - `services/model-provider-keys.service.ts:38-60` — `merge` decides which stored
   secrets survive an edit. The `isSecretCredentialField(key) && value !== "" &&
-value != null` branch at `:56` is the rule that stops a partial form submit
+  value != null` branch at `:56` is the rule that stops a partial form submit
   wiping a stored key. Unexplained.
 - `services/model-provider-keys.service.ts:120-141` — `mergeHeaders` falls back
   to matching a masked header **by array position** when the key changed. That

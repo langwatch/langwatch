@@ -42,7 +42,7 @@ and judging whether a bind proves its scenario (the `spec-binding-review` skill)
 8. **A regression test executes the bug.** If it crashed at runtime, the test runs the path and observes
    the crash. A string assertion about generated output is supplementary and passes on reintroduction.
 9. **Descriptions.** `it("checks local first")`, never "should". Nest `describe("when the user clicks
-submit")` for given/when instead of a flat test with comments.
+   submit")` for given/when instead of a flat test with comments.
 10. **A green package test is not proof of wire compatibility.** For a route, procedure name, input,
     output or status, mount the real router (see below) and diff the served surface against `origin/main`.
 11. **A live stack needs no real credential.** Stripe is paymentsim on every haven and CI stack unless

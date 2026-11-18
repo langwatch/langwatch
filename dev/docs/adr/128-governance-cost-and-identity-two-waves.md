@@ -2296,7 +2296,7 @@ money tables, only the identity tables and read paths.
 - **v3.10 (2026-09-03, captain: Sergio Esteban).** `IdentityMatch`'s
   overlap rule is narrowed to "at most one OPEN link per person", held by
   a plain partial unique index (`UNIQUE (discoveredPersonId) WHERE
-"validTo" IS NULL`, SQLSTATE 23505 / Prisma P2002) — the `btree_gist`
+  "validTo" IS NULL`, SQLSTATE 23505 / Prisma P2002) — the `btree_gist`
   exclusion constraint, and with it the repo's first `CREATE EXTENSION`,
   is dropped before shipping (§7 deployment note, Schema, Gates, open
   questions). The general rule guarded a case wave 2 cannot produce:

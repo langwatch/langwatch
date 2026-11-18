@@ -681,7 +681,7 @@ from the repository, the terminal and the conversation record. See
   and the ceiling is not on the list, so it never reaches the command that
   needs it.
 - **`writeCliLoginConfig`**: signs the command line in the way `langwatch
-login --device` does, as the test's own user, and writes the config file
+  login --device` does, as the test's own user, and writes the config file
   that login writes. The three steps are the product's own device flow:
   the command line's `device-code` request, the browser's `approve` (sent
   with the user's session cookie, no key selection, so the server stamps
@@ -765,7 +765,7 @@ login --device` does, as the test's own user, and writes the config file
   ladder reads, and these scenarios are about a project that has none.
   `forFolder`'s `requirements.txt` is installed into it so the only thing
   the terminal is short of is what the scenario took away. `interpreter:
-"supported"` is the newest version the published SDK ships for (what
+  "supported"` is the newest version the published SDK ships for (what
   most scenarios want); `"machine-default"` is whatever `python3` is on
   this machine, for the one scenario whose subject IS the interpreter.
 
@@ -836,7 +836,7 @@ login --device` does, as the test's own user, and writes the config file
   frame printed `langy_confirmation_required` was refused and is not a
   delete; only a successful one must come after the card's Yes.
   A delete is found by parsing the command into tokens (`langwatch <resource>
-delete|remove|archive`, also by path, in `(...)`/`$(...)`, or inside a quoted
+  delete|remove|archive`, also by path, in `(...)`/`$(...)`, or inside a quoted
   `bash -lc "..."`), never by matching the word, so an item named `delete-me`
   in a `get` is not one. Order is frame order: stream tool entries carry no
   server timestamp, so the answer and the delete cannot be compared by time.
@@ -1176,7 +1176,7 @@ cookie. Wire format is plain JSON (POST body `input`, response
   self-healed server-side by `COMMITTED_ABANDON_MS` (a 10-minute reclaim
   backstop in `langy-turn-admission.prisma.repository.ts`); (2) a worker
   crashing mid-reply (`langy_worker_stopped`) — `agent-turn-liveness
-.subscriber.ts`'s stall detection can take up to `MAX_STALL_MS` (90s) to
+  .subscriber.ts`'s stall detection can take up to `MAX_STALL_MS` (90s) to
   notice and fail the turn. The old 3×5s budget gave up on the server's
   own documented 90s recovery window before it elapsed, turning a
   self-healing hiccup into a hard test failure; the current budget retries

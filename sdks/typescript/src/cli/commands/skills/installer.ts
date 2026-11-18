@@ -131,9 +131,7 @@ export interface SkillFileResult {
 const fsErrorReason = (error: unknown): string => {
   const message = error instanceof Error ? error.message : String(error);
   const code =
-    typeof error === "object" && error !== null && "code" in error
-      ? String((error as { code: unknown }).code)
-      : undefined;
+    typeof error === "object" && error !== null && "code" in error ? String(error.code) : undefined;
   if (code === undefined || message.startsWith(code)) return message;
   return `${code}: ${message}`;
 };

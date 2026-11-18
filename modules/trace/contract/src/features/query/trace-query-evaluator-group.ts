@@ -110,7 +110,11 @@ function parseScoreBound(
   tag: Extract<LiqeQuery, { type: "Tag" }>,
 ): { from?: number; to?: number } | null {
   if (tag.expression.type === "RangeExpression") {
-    return { from: tag.expression.range.min, to: tag.expression.range.max };
+    const { min, max } = tag.expression.range;
+    return {
+      from: typeof min === "number" ? min : undefined,
+      to: typeof max === "number" ? max : undefined,
+    };
   }
   if (tag.expression.type !== "LiteralExpression") return null;
 

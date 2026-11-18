@@ -92,7 +92,7 @@ anything; the process mounts every installed module's declarations.
     Alex 2026-10-10). Declare it `defineMiddlewareContext("name", schema)`, name it on the route with
     `.withMiddlewareContext(name)` (the handler gets the parsed value after its arguments), and supply
     every one in the module installer: `.provideMiddlewareContext({ name: (request, { app, dependencies })
-   => value })`. A missing key, an extra key or a value of the wrong type does not compile, and a module
+       => value })`. A missing key, an extra key or a value of the wrong type does not compile, and a module
     whose routes need context it never provides does not publish. No process supplies it: a value several
     modules need is a shared helper (`projectRequestContext: projectRequestContextOf`). `.withHeaders(...)`
     values bind themselves. A tRPC procedure uses the same `.withMiddlewareContext(x)`; its mount binds it

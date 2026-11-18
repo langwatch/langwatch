@@ -1355,7 +1355,7 @@ export function DSPyRunsScoresChart({
           />
           <Tooltip
             content={<ChartTooltip />}
-            labelFormatter={(value) => `Step ${value}`}
+            labelFormatter={(value) => <>Step {value}</>}
             formatter={scoreTooltipFormatter}
           />
           {bestScore.index && (

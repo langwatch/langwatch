@@ -132,7 +132,7 @@ attempts and its ledger. Producers name the kind and a destination id; no destin
 holds producer code.
 
 1. **One operation shape, on every kind's API.** `requestDelivery({ organizationId, projectId?,
-destinationId, message: { type, idempotencyKey, body }, source: { module, ref } })` → `{ deliveryId }`.
+   destinationId, message: { type, idempotencyKey, body }, source: { module, ref } })` → `{ deliveryId }`.
    It writes a command and answers at once (the spelling of today's `requestGatewayEventDelivery`).
    `source` only groups ledger rows (automation reads its trigger's attempts by it). Mail keeps
    `NotificationApi.sendEmail` until it needs durability.

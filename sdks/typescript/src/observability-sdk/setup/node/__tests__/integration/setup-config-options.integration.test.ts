@@ -56,7 +56,7 @@ describe("setupObservability Integration - Configuration Options", () => {
     const options: SetupObservabilityOptions = {
       langwatch: { apiKey: "test-api-key", endpoint: "https://custom.langwatch.ai" },
       debug: { logger },
-      traceExporter: spyExporter as any,
+      traceExporter: spyExporter,
     };
     const handle = setupObservability(options);
     const tracer = trace.getTracer("test-exporter");
@@ -80,7 +80,7 @@ describe("setupObservability Integration - Configuration Options", () => {
     const options: SetupObservabilityOptions = {
       langwatch: { apiKey: "test-api-key" },
       serviceName: "test-service",
-      attributes: { "deployment.environment": "test", "service.version": "1.0.0" } as any,
+      attributes: { "deployment.environment": "test", "service.version": "1.0.0" },
       debug: { logger },
     };
     const handle = setupObservability(options);
@@ -140,7 +140,7 @@ describe("setupObservability Integration - Configuration Options", () => {
     const customSampler = { shouldSample: vi.fn(), toString: () => "customSampler" };
     const options: SetupObservabilityOptions = {
       langwatch: { apiKey: "test-api-key" },
-      sampler: customSampler as any,
+      sampler: customSampler,
       debug: { logger },
     };
     const handle = setupObservability(options);
@@ -157,7 +157,7 @@ describe("setupObservability Integration - Configuration Options", () => {
     };
     const options: SetupObservabilityOptions = {
       langwatch: { apiKey: "test-api-key" },
-      idGenerator: customIdGenerator as any,
+      idGenerator: customIdGenerator,
       debug: { logger },
     };
     const handle = setupObservability(options);
@@ -179,7 +179,7 @@ describe("setupObservability Integration - Configuration Options", () => {
     const spyProcessor = new SpyProcessor();
     const options: SetupObservabilityOptions = {
       langwatch: { apiKey: "test-api-key" },
-      spanProcessors: [spyProcessor as any],
+      spanProcessors: [spyProcessor],
       debug: { logger },
     };
     const handle = setupObservability(options);
@@ -273,7 +273,7 @@ describe("setupObservability Integration - Configuration Options", () => {
     };
     const options: SetupObservabilityOptions = {
       langwatch: { apiKey: "test-api-key" },
-      logRecordProcessors: [customLogRecordProcessor as any],
+      logRecordProcessors: [customLogRecordProcessor],
       debug: { logger },
     };
     const handle = setupObservability(options);
@@ -306,7 +306,7 @@ describe("setupObservability Integration - Configuration Options", () => {
     const customViews = [{ instrumentName: "custom.instrument" }];
     const options: SetupObservabilityOptions = {
       langwatch: { apiKey: "test-api-key" },
-      views: customViews as any,
+      views: customViews,
       debug: { logger },
     };
     const handle = setupObservability(options);
@@ -319,7 +319,7 @@ describe("setupObservability Integration - Configuration Options", () => {
     const customResourceDetectors = [{ detect: vi.fn() }];
     const options: SetupObservabilityOptions = {
       langwatch: { apiKey: "test-api-key" },
-      resourceDetectors: customResourceDetectors as any,
+      resourceDetectors: customResourceDetectors,
       debug: { logger },
     };
     const handle = setupObservability(options);
@@ -431,7 +431,7 @@ describe("setupObservability Integration - Configuration Options", () => {
     const options: SetupObservabilityOptions = {
       langwatch: { apiKey: "test-api-key" },
       debug: { logger },
-      traceExporter: spyExporter as any,
+      traceExporter: spyExporter,
       advanced: { skipOpenTelemetrySetup: true },
     };
     const handle = setupObservability(options);

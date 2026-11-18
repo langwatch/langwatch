@@ -46,7 +46,7 @@ function createSafeFallbackValue(value: unknown): string {
  */
 function createSafeSpanInputOutput(type: "text" | "raw", value: unknown): SpanInputOutput {
   const safeValue = createSafeFallbackValue(value);
-  return { type, value: safeValue } as SpanInputOutput;
+  return { type, value: safeValue };
 }
 
 /**
@@ -82,7 +82,7 @@ function processChatMessages(value: unknown): SpanInputOutput {
   // Strategy 1: Try strict schema first
   const strictResult = z.array(chatMessageSchema).safeParse(messages);
   if (strictResult.success) {
-    return { type: "chat_messages", value: strictResult.data } as SpanInputOutput;
+    return { type: "chat_messages", value: strictResult.data };
   }
 
   // Strategy 2: Try simple schema

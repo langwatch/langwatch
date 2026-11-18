@@ -25,8 +25,7 @@ describe("Prompt Tags", () => {
         } as unknown as LangwatchApiClient;
         service = new PromptsApiService({
           langwatchApiClient: apiClient,
-          logger: mock(),
-        } as InternalConfig);
+        });
       });
 
       /** @scenario Assign tag to existing version */
@@ -92,8 +91,7 @@ describe("Prompt Tags", () => {
         } as unknown as LangwatchApiClient;
         service = new PromptsApiService({
           langwatchApiClient: apiClient,
-          logger: mock(),
-        } as InternalConfig);
+        });
       });
 
       it("propagates the error", async () => {

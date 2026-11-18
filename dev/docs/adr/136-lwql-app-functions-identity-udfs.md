@@ -357,7 +357,7 @@ plan, and each one is pinned by a test built from the captured response:
   accepts only levels the question actually offered, which is what keeps the
   reading correct if the keys ever become the criteria themselves.
 - **A score holds at most ten levels.** Eleven is refused with `Too many score
-levels. Must have at most 10 levels.`, so `eval_score(text, 'x', 0, 10)` is
+  levels. Must have at most 10 levels.`, so `eval_score(text, 'x', 0, 10)` is
   refused by the validator where it was written rather than once per row at the
   provider. The ceiling is published through the classifier's limits, so there
   is one number rather than two that can disagree.

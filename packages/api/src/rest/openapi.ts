@@ -634,10 +634,13 @@ export function publishEnumRecordKeys(document: unknown): void {
   document.properties = Object.fromEntries(keys.map((key) => [key, value]));
 }
 
-// zod's OpenAPI adapter points a recursive schema's self-reference at
-// `#/components/schemas/<name>` but leaves the definition in that response's
-// local `$defs`. Anonymous `__schema0` names repeat across routes, so each one
-// is named by its content; a `.meta({ id })` name is kept
+/** Each route documents the refusals it answers (validation is a 422): hono-openapi adds no 400. */
+export const SPEC_GENERATION_OPTIONS = { defaultValidationErrorResponse: false } as const;
+
+// zod's OpenAPI adapter leaves a recursive schema's definition in a local
+// `$defs`, and newer hono-openapi puts it in components under the same
+// anonymous `__schema0`. Either way each anonymous name is replaced by one
+// chosen from its content; a `.meta({ id })` name is kept
 // (specs/api-reference/recursive-schema-defs.feature).
 
 /** zod's name for a definition the schema itself did not name. */
@@ -669,7 +672,7 @@ export function hoistStraySchemaDefs(document: unknown): void {
     return candidate;
   };
 
-  walkForDefs(document, schemas, (name, definition) => {
+  const nameFor = (name: string, definition: unknown): string => {
     if (!ANONYMOUS_DEFINITION.test(name)) return name;
 
     const shape = canonicalShape(definition, name);
@@ -678,7 +681,56 @@ export function hoistStraySchemaDefs(document: unknown): void {
     byShape.set(shape, named);
 
     return named;
-  });
+  };
+
+  walkForDefs(document, schemas, nameFor);
+  renameAnonymousComponents({ document, schemas, nameFor });
+}
+
+/** Renames the anonymous definitions the adapter already put in `components.schemas`. */
+function renameAnonymousComponents({
+  document,
+  schemas,
+  nameFor,
+}: {
+  document: unknown;
+  schemas: Record<string, unknown>;
+  nameFor: (name: string, definition: unknown) => string;
+}): void {
+  const anonymous = Object.keys(schemas).filter((name) => ANONYMOUS_DEFINITION.test(name));
+  const definitions = new Map(anonymous.map((name) => [name, schemas[name]]));
+  const renamed = new Map(anonymous.map((name) => [name, nameFor(name, schemas[name])]));
+
+  for (const name of anonymous) delete schemas[name];
+
+  rewriteRefs(document, renamed);
+
+  for (const [name, definition] of definitions) {
+    rewriteRefs(definition, renamed);
+    publishDefinition({ schemas, name: renamed.get(name) ?? name, definition });
+  }
+}
+
+/** Puts one definition in `components.schemas`, refusing a different one under the same name. */
+function publishDefinition({
+  schemas,
+  name,
+  definition,
+}: {
+  schemas: Record<string, unknown>;
+  name: string;
+  definition: unknown;
+}): void {
+  const held = schemas[name];
+
+  if (held !== void 0 && JSON.stringify(held) !== JSON.stringify(definition)) {
+    throw new Error(
+      `Two different schemas are published as components.schemas.${name}; ` +
+        "give one of them another .meta({ id })",
+    );
+  }
+
+  schemas[name] = definition;
 }
 
 /** Every `$defs` name a schema chose itself with `.meta({ id })`, anywhere in the document. */
@@ -775,18 +827,7 @@ function walkForDefs(
 
     for (const [name, definition] of Object.entries(defs)) {
       rewriteRefs(definition, renamed);
-
-      const published = renamed.get(name) ?? name;
-      const held = schemas[published];
-
-      if (held !== void 0 && JSON.stringify(held) !== JSON.stringify(definition)) {
-        throw new Error(
-          `Two different schemas are published as components.schemas.${published}; ` +
-            "give one of them another .meta({ id })",
-        );
-      }
-
-      schemas[published] = definition;
+      publishDefinition({ schemas, name: renamed.get(name) ?? name, definition });
     }
   }
 

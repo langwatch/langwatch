@@ -143,11 +143,11 @@ describe("cli-api — auth contract", () => {
       await getGovernanceStatus(cfg, {
         fetchImpl,
         refreshDeps: {
-          refreshImpl: (async () => ({
+          refreshImpl: async () => ({
             access_token: "at_new",
             refresh_token: "rt_new",
             expires_in: 3600,
-          })) as never,
+          }),
           saveImpl: vi.fn(),
           loadImpl: vi.fn() as never,
         },
@@ -169,11 +169,11 @@ describe("cli-api — auth contract", () => {
       await getGovernanceStatus(cfg, {
         fetchImpl,
         refreshDeps: {
-          refreshImpl: (async () => ({
+          refreshImpl: async () => ({
             access_token: "at_new",
             refresh_token: "rt_new",
             expires_in: 3600,
-          })) as never,
+          }),
           saveImpl: vi.fn(),
           loadImpl: vi.fn() as never,
         },
@@ -193,10 +193,10 @@ describe("cli-api — auth contract", () => {
         getGovernanceStatus(cfg, {
           fetchImpl,
           refreshDeps: {
-            refreshImpl: (async () => {
+            refreshImpl: async () => {
               throw new DeviceFlowError("unauthorized", "revoked");
-            }) as never,
-            loadImpl: (() => cfg) as never,
+            },
+            loadImpl: () => cfg,
             saveImpl: vi.fn(),
           },
         }),

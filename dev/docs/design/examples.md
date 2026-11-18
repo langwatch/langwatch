@@ -7,9 +7,9 @@ Practical examples implementing LangWatch design guidelines.
 Standard page with header, actions, and content.
 
 ```tsx
+import { PageLayout } from "@langwatch/design-system/page-layout";
 import { HStack, Spacer, VStack } from "@langwatch/design-system/primitives";
 import { Plus } from "lucide-react";
-import { PageLayout } from "@langwatch/design-system/page-layout";
 
 export function ExamplePage() {
   return (
@@ -36,8 +36,8 @@ export function ExamplePage() {
 Use for resource creation, editing, and selection flows.
 
 ```tsx
-import { Button, Field, Input, useDisclosure, VStack } from "@langwatch/design-system/primitives";
 import { Drawer } from "@langwatch/design-system/drawer";
+import { Button, Field, Input, useDisclosure, VStack } from "@langwatch/design-system/primitives";
 
 export function ResourceDrawer() {
   const { open, onOpen, onClose } = useDisclosure();
@@ -82,8 +82,8 @@ export function ResourceDrawer() {
 Use for destructive action confirmations only.
 
 ```tsx
-import { Button, useDisclosure, Text } from "@langwatch/design-system/primitives";
 import { Dialog } from "@langwatch/design-system/dialog";
+import { Button, useDisclosure, Text } from "@langwatch/design-system/primitives";
 
 export function DeleteConfirmDialog({ itemName, onConfirm }) {
   const { open, onOpen, onClose } = useDisclosure();
@@ -143,9 +143,9 @@ For custom translucent containers (overlay components have this built-in).
 ## Menu
 
 ```tsx
+import { Menu } from "@langwatch/design-system/menu";
 import { Button } from "@langwatch/design-system/primitives";
 import { MoreVertical, Pencil, Trash } from "lucide-react";
-import { Menu } from "@langwatch/design-system/menu";
 
 <Menu.Root>
   <Menu.Trigger asChild>
@@ -169,10 +169,11 @@ import { Menu } from "@langwatch/design-system/menu";
 Pattern for multi-step flows (e.g., type → list → editor). Drawers are opened by their owner's token (`dev/docs/ARCHITECTURE.md` §10.1); `components.md` ("Drawer Navigation") has the hook API.
 
 ```tsx
+import { useDrawer } from "@langwatch/browser-host/drawer";
+import { Drawer } from "@langwatch/design-system/drawer";
 import { Button, HStack } from "@langwatch/design-system/primitives";
 import { ArrowLeft } from "lucide-react";
-import { Drawer } from "@langwatch/design-system/drawer";
-import { useDrawer } from "@langwatch/browser-host/drawer";
+
 // Tokens declared once by the drawers' owner (ARCHITECTURE.md §10.1)
 import {
   CategorySelectorDrawerToken,
@@ -260,9 +261,9 @@ export function ItemDrawer() {
 ## Popover
 
 ```tsx
+import { Popover } from "@langwatch/design-system/popover";
 import { Button, Text } from "@langwatch/design-system/primitives";
 import { Info } from "lucide-react";
-import { Popover } from "@langwatch/design-system/popover";
 
 <Popover.Root positioning={{ placement: "bottom-start" }}>
   <Popover.Trigger asChild>

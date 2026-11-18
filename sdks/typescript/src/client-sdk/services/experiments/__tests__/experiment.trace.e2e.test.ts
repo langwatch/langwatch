@@ -69,7 +69,7 @@ describe("Target Trace Isolation", () => {
         return new Response(JSON.stringify({}), { status: 200 });
       }
       return new Response(JSON.stringify({}), { status: 200 });
-    }) as typeof fetch;
+    });
 
     const langwatch = new LangWatch({
       apiKey: "test-key",
@@ -150,7 +150,7 @@ describe("Target Trace Isolation", () => {
         return new Response(JSON.stringify({}), { status: 200 });
       }
       return new Response(JSON.stringify({}), { status: 200 });
-    }) as typeof fetch;
+    });
 
     const langwatch = new LangWatch({
       apiKey: "test-key",
@@ -211,7 +211,7 @@ describe("Target Trace Isolation", () => {
         return new Response(JSON.stringify({}), { status: 200 });
       }
       return new Response(JSON.stringify({}), { status: 200 });
-    }) as typeof fetch;
+    });
 
     const langwatch = new LangWatch({
       apiKey: "test-key",
@@ -247,7 +247,7 @@ describe("Target Trace Isolation", () => {
         });
       }
       return new Response(JSON.stringify({}), { status: 200 });
-    }) as typeof fetch;
+    });
 
     const langwatch = new LangWatch({
       apiKey: "test-key",
@@ -299,7 +299,7 @@ describe("Target Trace Isolation", () => {
         return new Response(JSON.stringify({}), { status: 200 });
       }
       return new Response(JSON.stringify({}), { status: 200 });
-    }) as typeof fetch;
+    });
 
     const langwatch = new LangWatch({
       apiKey: "test-key",

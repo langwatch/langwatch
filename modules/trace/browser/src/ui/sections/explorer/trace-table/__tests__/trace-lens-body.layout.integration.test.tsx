@@ -88,7 +88,7 @@ function renderTable({
   );
 }
 
-const BOX_PROPERTIES = ["offsetHeight", "offsetWidth"] as const;
+const BOX_PROPERTIES = ["offsetHeight", "offsetWidth", "clientHeight", "clientWidth"] as const;
 
 /** The trace's header row and the sub-row an addon renders beneath it. */
 function bodyRows(container: HTMLElement): { main: HTMLElement; sub: HTMLElement } {
@@ -103,7 +103,7 @@ beforeEach(() => {
   for (const property of BOX_PROPERTIES) {
     Object.defineProperty(HTMLElement.prototype, property, {
       configurable: true,
-      get: () => (property === "offsetHeight" ? 800 : 1200),
+      get: () => (property.endsWith("Height") ? 800 : 1200),
     });
   }
 });

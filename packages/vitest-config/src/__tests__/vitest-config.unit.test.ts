@@ -42,11 +42,14 @@ describe("moduleVitestTestOptions", () => {
       ]);
     });
 
-    it("omits include, testTimeout and dir when unasked, and sets up only the logger", () => {
+    it("omits include, testTimeout and dir when unasked, and sets up only the logger and Blob.stream", () => {
       const test = moduleVitestTestOptions({ kind: "node" }) ?? {};
 
       expect("include" in test).toBe(false);
-      expect(test.setupFiles).toEqual([expect.stringMatching(/logger-setup\.ts$/)]);
+      expect(test.setupFiles).toEqual([
+        expect.stringMatching(/logger-setup\.ts$/),
+        expect.stringMatching(/blob-stream-setup\.ts$/),
+      ]);
       expect("testTimeout" in test).toBe(false);
       expect("dir" in test).toBe(false);
     });
@@ -58,6 +61,16 @@ describe("moduleVitestTestOptions", () => {
 
       expect(test?.environment).toBe("jsdom");
       expect(test?.isolate).toBe(false);
+    });
+
+    it("gives Blob a stream() before the suite's own setup runs", () => {
+      const test = moduleVitestTestOptions({ kind: "jsdom", setupFiles: ["./vitest.setup.ts"] });
+
+      expect(test?.setupFiles).toEqual([
+        expect.stringMatching(/logger-setup\.ts$/),
+        expect.stringMatching(/blob-stream-setup\.ts$/),
+        "./vitest.setup.ts",
+      ]);
     });
   });
 
@@ -96,6 +109,7 @@ describe("moduleVitestTestOptions", () => {
       expect(test?.exclude).toEqual(["**/fixtures/**", BROWSER_TEST_GLOB]);
       expect(test?.setupFiles).toEqual([
         expect.stringMatching(/logger-setup\.ts$/),
+        expect.stringMatching(/blob-stream-setup\.ts$/),
         "./vitest.setup.ts",
       ]);
       expect(test?.testTimeout).toBe(30_000);
@@ -111,6 +125,19 @@ describe("moduleVitestTestOptions", () => {
       expect(test?.pool).toBe("threads");
       expect(test?.globals).toBe(true);
       expect(test?.fsModuleCache).toBe(true);
+    });
+
+    it("runs an escape-hatch block's setupFiles after the builder's own", () => {
+      const test = moduleVitestTestOptions({
+        kind: "jsdom",
+        test: { setupFiles: ["./vitest.setup.ts"] },
+      });
+
+      expect(test?.setupFiles).toEqual([
+        expect.stringMatching(/logger-setup\.ts$/),
+        expect.stringMatching(/blob-stream-setup\.ts$/),
+        "./vitest.setup.ts",
+      ]);
     });
   });
 });

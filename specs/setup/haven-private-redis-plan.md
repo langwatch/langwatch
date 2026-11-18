@@ -73,8 +73,8 @@ Owns `<home>/redis/`. `New(havenHome, sys)` takes the concrete `system.System`
   down→up-within-window path that preserves state); else `FreePorts(1)` (persist),
   `mkdir data`, `SpawnDetached(["redis-server", ...], dir, redis.log)`, poll-ping
   ready, write record. Flags: `--port <p> --bind 127.0.0.1 --dir <dir>/data
---save "" --appendonly no --daemonize no --maxmemory <cap> --maxmemory-policy
-noeviction` (no disk snapshots — the linger keeps state in the live process;
+  --save "" --appendonly no --daemonize no --maxmemory <cap> --maxmemory-policy
+  noeviction` (no disk snapshots — the linger keeps state in the live process;
   noeviction so queue keys are never dropped). Friendly `brew install redis` error
   if `redis-server` is not on PATH.
 - `Stop(slug)`: `Terminate(PID)` (SIGTERM, SIGKILL fallback) + remove data dir +

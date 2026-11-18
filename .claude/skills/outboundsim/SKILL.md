@@ -90,15 +90,15 @@ Tester recipes:
 
 - GOV-56: Governance > Sources > Add Databricks Genie, workspace URL = outbound origin, token
   `dapi-good`; Agents > Sync lists 3 spaces. Repeat with `dapi-revoked|noscope|ratelimited|down|
-malformed|cycle`: refusals unauthorized, forbidden, rate_limited, unavailable, malformed_response,
+  malformed|cycle`: refusals unauthorized, forbidden, rate_limited, unavailable, malformed_response,
   pagination_stalled. `dapi-empty`: no agents. One-off: `haven sim outbound fault add --channel
-databricks --target /api/2.0/genie/spaces --status 404 --times 1` -> not_found.
+  databricks --target /api/2.0/genie/spaces --status 404 --times 1` -> not_found.
 - GOV-06: the Genie source pulls 6 messages (2 per space); `haven sim outbound list --channel
-databricks` shows the reads. Custom HTTP pull: URL `<outbound>/feeds/usage`, bearer `feed-good`,
+  databricks` shows the reads. Custom HTTP pull: URL `<outbound>/feeds/usage`, bearer `feed-good`,
   eventsJsonPath `$.events`, cursorJsonPath `$.next_cursor`, cursorQueryParam `cursor`: 5 events,
   next run 0. Non-local custom URLs stay as before.
 - GOV-50: `curl -X PUT <outbound>/_sim/api/databricks/users -d '[{"id":"1001","userName":
-"<member email>","active":true},{"id":"1002","userName":"<same email>","active":true}]'`, pull;
+  "<member email>","active":true},{"id":"1002","userName":"<same email>","active":true}]'`, pull;
   People shows suggestions to confirm and a duplicate to refuse. OpenAI/Anthropic member lists
   (`sk-admin-good`) give three `@sim.vendor.test` people.
 - GOV-44: Copilot Studio Dataverse source with any tenant id and client secret (a tenant word in
@@ -178,7 +178,7 @@ Tester recipes:
   calls show one Converse. `bedrockRoleArn` holding `denied` refuses the call.
 - DS-46: `STORED_OBJECTS_BACKEND=azure AZURE_BLOB_ACCOUNT_NAME=simaccount AZURE_BLOB_CONTAINER=langwatch`
   plus either `AZURE_BLOB_ACCOUNT_KEY=<simaccount key>` (shared key) or `AZURE_BLOB_AUTH_MODE=managedIdentity
-IDENTITY_ENDPOINT=<direct>/azure-msi/token IDENTITY_HEADER=sim` (token mode, refresh). Upload a
+  IDENTITY_ENDPOINT=<direct>/azure-msi/token IDENTITY_HEADER=sim` (token mode, refresh). Upload a
   dataset, open it, delete it; `GET /_sim/api/azure` shows the blob come and go. Wrong account: the
   `otheraccount` key against `simaccount` (or a name outboundsim does not hold) is denied.
 - NOTIF-09: subscribe through the product API with endpoint `<WEB_PUSH_SERVICE_BASE>/<device>`

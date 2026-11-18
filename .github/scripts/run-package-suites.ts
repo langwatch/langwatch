@@ -785,8 +785,9 @@ if (isEntrypoint()) {
   const reportDir = process.env.PACKAGE_SUITES_REPORT_DIR;
   const extraArgsFor = (pkg: DiscoveredPackage, script: string): string[] | undefined => {
     if (hunt === undefined || hunt.trim() === "") return [];
-    const body = (JSON.parse(readFileSync(join(root, pkg.dir, "package.json"), "utf8")).scripts ??
-      {})[script] as string | undefined;
+    const body = (
+      JSON.parse(readFileSync(join(root, pkg.dir, "package.json"), "utf8")).scripts ?? {}
+    )[script] as string | undefined;
     return vitestArgsFor({
       body: body ?? "",
       extra: hunt.trim().split(/\s+/),

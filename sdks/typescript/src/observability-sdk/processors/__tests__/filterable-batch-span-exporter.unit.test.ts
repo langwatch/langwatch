@@ -25,7 +25,7 @@ describe("FilterableBatchSpanProcessor", () => {
 
   beforeEach(() => {
     onEndSpy = vi.fn();
-    exporter = { export: vi.fn(), shutdown: vi.fn() } as any;
+    exporter = { export: vi.fn(), shutdown: vi.fn() };
     // Patch BatchSpanProcessor's onEnd to spy on calls
     (FilterableBatchSpanProcessor.prototype as any).__proto__.onEnd = onEndSpy;
   });

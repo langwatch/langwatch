@@ -4,7 +4,6 @@ from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any, Literal, TypeVar, cast
 
 from attrs import define as _attrs_define
-from attrs import field as _attrs_field
 
 from ..types import UNSET, Unset
 
@@ -60,7 +59,6 @@ class Evaluation:
     retries: float | None | Unset = UNSET
     attempts: int | Unset = UNSET
     last_attempt_error: None | str | Unset = UNSET
-    additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         from ..models.evaluation_error_type_0 import EvaluationErrorType0
@@ -158,7 +156,7 @@ class Evaluation:
             last_attempt_error = self.last_attempt_error
 
         field_dict: dict[str, Any] = {}
-        field_dict.update(self.additional_properties)
+
         field_dict.update(
             {
                 "evaluation_id": evaluation_id,
@@ -387,21 +385,4 @@ class Evaluation:
             last_attempt_error=last_attempt_error,
         )
 
-        evaluation.additional_properties = d
         return evaluation
-
-    @property
-    def additional_keys(self) -> list[str]:
-        return list(self.additional_properties.keys())
-
-    def __getitem__(self, key: str) -> Any:
-        return self.additional_properties[key]
-
-    def __setitem__(self, key: str, value: Any) -> None:
-        self.additional_properties[key] = value
-
-    def __delitem__(self, key: str) -> None:
-        del self.additional_properties[key]
-
-    def __contains__(self, key: str) -> bool:
-        return key in self.additional_properties

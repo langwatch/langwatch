@@ -15,7 +15,16 @@ import type { QueryClient } from "@tanstack/react-query";
 import type { UiFeatureApiTransport } from "./transport";
 
 /** The three lanes this dispatcher uses, so a caller hands the narrowest thing. */
-export type UiRpcTransport = Pick<UiFeatureApiTransport, "query" | "mutation" | "subscription">;
+/** The callback form of a live procedure: the only one that hands back an unsubscribable. */
+type CallbackSubscription = (
+  path: string,
+  input: unknown,
+  handlers: UiRpcSubscriptionHandlers & { onData: (value: unknown) => void },
+) => UiRpcSubscription;
+
+export type UiRpcTransport = Pick<UiFeatureApiTransport, "query" | "mutation"> & {
+  subscription: CallbackSubscription;
+};
 
 export class BrowserUiRpc extends UiRpc {
   static create(input: { transport: UiRpcTransport; queryClient: QueryClient }): BrowserUiRpc {
@@ -41,7 +50,9 @@ export class BrowserUiRpc extends UiRpc {
   }
 
   subscribe(path: string, input: unknown, handlers: UiRpcSubscriptionHandlers): UiRpcSubscription {
-    return this.transport.subscription(path, input, handlers);
+    // tRPC hands back an unsubscribable only when at least one callback is given.
+    const onData = handlers.onData ?? (() => undefined);
+    return this.transport.subscription(path, input, { ...handlers, onData });
   }
 
   async mutate(path: string, input: unknown): Promise<unknown> {

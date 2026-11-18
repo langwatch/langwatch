@@ -387,7 +387,7 @@ Marked here as the **enforcement target**; not implemented in code in this PR.
   envelope + `buildWorkerEnv`), `services/langyagent/adapters/httpapi/handlers.go` (`/chat`
   dispatch), `platform/app/src/server/routes/langy.ts` (envelope construction +
   defense-in-depth allow-list check), `platform/app/src/server/services/langy/
-LangyCredentialService.ts` (`getModelsAllowed` precedent).
+  LangyCredentialService.ts` (`getModelsAllowed` precedent).
 - Chart: `charts/langyagent/templates/networkpolicy.yaml`,
   `charts/langyagent/values.yaml` (`networkPolicy.allowExternalHttps`).
 - Docs: `docs/langy-github-app.md §4` (NetworkPolicy / egress; existing FQDN /

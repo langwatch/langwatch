@@ -316,7 +316,7 @@ describe("trace-filters", () => {
               scopeName: "my-scope",
             }),
             attributes: { "http.request.method": "POST" },
-          } as ReadableSpan),
+          }),
         ).toBe(true);
         expect(
           isHttpRequestSpan({
@@ -325,7 +325,7 @@ describe("trace-filters", () => {
               scopeName: "my-scope",
             }),
             attributes: { "http.method": "GET" },
-          } as ReadableSpan),
+          }),
         ).toBe(true);
       });
     });
