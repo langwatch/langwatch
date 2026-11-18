@@ -28,7 +28,7 @@ async function copyOnce() {
   return { button, unmount };
 }
 
-describe("InlineCopyButton reset timer", () => {
+describe("given an inline copy button", () => {
   /** @scenario "An inline copy button that unmounts does not reset after it is gone" */
   it("does not touch state when it unmounts before the 2 second reset", async () => {
     vi.useFakeTimers();
@@ -64,13 +64,7 @@ describe("InlineCopyButton reset timer", () => {
   it("starts no reset timer when the copy resolves after unmount", async () => {
     vi.useFakeTimers();
     const errors = vi.spyOn(console, "error").mockImplementation(() => undefined);
-    const host = new FakeApiKeyHost();
-    let resolveCopy: (ok: boolean) => void = () => undefined;
-    vi.spyOn(host, "copyToClipboard").mockReturnValue(
-      new Promise<boolean>((resolve) => {
-        resolveCopy = resolve;
-      }),
-    );
+    const host = new FakeApiKeyHost({ copyPending: true });
     const onCopied = vi.fn();
     const { unmount } = renderWithApiKeyHost(
       <InlineCopyButton text="sk-1" label="API key" onCopied={onCopied} />,
@@ -80,7 +74,7 @@ describe("InlineCopyButton reset timer", () => {
 
     unmount();
     await act(async () => {
-      resolveCopy(true);
+      host.settleCopy(true);
       await vi.advanceTimersByTimeAsync(0);
     });
 

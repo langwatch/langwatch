@@ -48,7 +48,7 @@ Feature: Code, money and dates read the one way
     Then it lists the age, the zones, ISO 8601 and Unix milliseconds
     And each row is a button that copies its value
 
-  @integration
+  @integration @regression
   Scenario: A snippet copy button that unmounts does not reset after it is gone
     Given a copy button that has just copied successfully
     When it is closed and 2 seconds pass
@@ -60,7 +60,7 @@ Feature: Code, money and dates read the one way
     When 2 seconds pass while it stays mounted
     Then its check icon goes back to the copy icon
 
-  @integration
+  @integration @regression
   Scenario: A snippet copy button that unmounts mid-copy starts no reset timer when the copy lands
     Given a copy button whose copy has not resolved yet
     When it is closed and then the copy succeeds

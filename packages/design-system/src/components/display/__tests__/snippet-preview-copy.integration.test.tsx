@@ -61,7 +61,7 @@ describe("Feature: Code, money and dates read the one way", () => {
   });
 
   /** @scenario "A snippet copy button returns to its copy icon after 2 seconds" */
-  it("Scenario: A snippet copy button returns to the copy icon after 2 seconds", async () => {
+  it("Scenario: A snippet copy button returns to its copy icon after 2 seconds", async () => {
     vi.useFakeTimers();
     const { button } = await copyOnce();
     expect(button.querySelector("svg.lucide-check")).not.toBeNull();

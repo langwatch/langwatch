@@ -549,13 +549,7 @@ describe("given a key has just been minted with a name", () => {
       });
       let errors: MockInstance | undefined;
       try {
-        const host = new FakeApiKeyHost();
-        let resolveCopy: (ok: boolean) => void = () => undefined;
-        vi.spyOn(host, "copyToClipboard").mockReturnValue(
-          new Promise<boolean>((resolve) => {
-            resolveCopy = resolve;
-          }),
-        );
+        const host = new FakeApiKeyHost({ copyPending: true });
         renderDialog({ keyName: "Deploy pipeline", host });
         errors = vi.spyOn(console, "error").mockImplementation(() => undefined);
         const copyButton = screen.getByRole("button", { name: "Copy API key" });
@@ -572,7 +566,7 @@ describe("given a key has just been minted with a name", () => {
         });
         const pendingBefore = vi.getTimerCount();
         await act(async () => {
-          resolveCopy(true);
+          host.settleCopy(true);
           await vi.advanceTimersByTimeAsync(0);
         });
 
