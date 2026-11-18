@@ -936,6 +936,18 @@ jobs:
         if: ${{ matrix.shard == 1 }}
         run: pnpm exec nx run-many -t test:repo --outputStyle=static
 
+      # The LWQL columns manifest is a dump of the migrated schema. Replaying the
+      # migrations into a scratch database must reproduce the committed copy.
+      - name: Check the LWQL columns manifest matches the migrations
+        if: ${{ matrix.shard == 1 }}
+        run: |
+          env -u BUILD_TIME pnpm --filter @langwatch/analytics-process run generate:lwql-columns-manifest
+          manifest=modules/analytics/process/src/rules/lwql-columns-manifest.generated
+          if ! git diff --exit-code -- "$manifest.json" "$manifest.ts"; then
+            echo "::error::The LWQL columns manifest is stale. Run 'pnpm --filter @langwatch/analytics-process run generate:lwql-columns-manifest' and commit its output."
+            exit 1
+          fi
+
       # A read outside what the test cache key hashes replays a stale pass once that file
       # changes; this names the `reads` row that closes it. Runs after a red suite too.
       - name: Check suites declare what they read outside their package
