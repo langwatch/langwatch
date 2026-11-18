@@ -209,6 +209,7 @@ describe.skipIf(!connection)("the AgentStop Prisma repository", () => {
         retryRound: 1,
         retriedByUserId: "user-ops",
         retriedByApiKeyId: null,
+        advancedRequestIds: ["retry-1"],
       };
       await repository.store(
         {

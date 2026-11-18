@@ -573,6 +573,13 @@ Feature: Agent kill switch: stop a misbehaving agent where it runs, with approva
     And the other is refused at once as the stop itself would refuse it
 
   @integration
+  Scenario: A retry with nothing new to apply is counted once, however far the worker lags
+    Given a quarantined stop whose plan gained nothing since it was stopped
+    When it is retried, once or twice before the worker folds any retry
+    Then the stop counts each retry once, as its event log does
+    And a later retry still applies the target its plan gained and quarantines the agent
+
+  @integration
   Scenario: Key work never runs after its lock may have ended
     Given the lock around a shared virtual key is near the end of its transaction
     When the stop would disable the key

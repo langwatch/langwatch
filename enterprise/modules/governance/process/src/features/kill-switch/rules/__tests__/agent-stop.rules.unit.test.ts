@@ -2,11 +2,14 @@
  * The stop fold across two restores: each restore is a round, and an outcome answers only its own.
  * Spec: enterprise/modules/governance/specs/agent-kill-switch.feature
  */
+import { AGENT_STOP_EVENT_TYPES } from "@langwatch/enterprise-governance-contract";
 import { describe, expect, it } from "vitest";
 
+import { foldAgentStop } from "../../eventing/agent-stop.projection.ts";
 import { milestoneAuditKeyOf } from "../../services/agent-stop-target.service.ts";
 import { isGoneErrorCode } from "../agent-stop-target.rules.ts";
 import {
+  advancedStop,
   requestedStop,
   restoreRequestedStop,
   retriedStop,
@@ -287,6 +290,53 @@ describe("targetsDroppedStop", () => {
 
       expect(restoring).toMatchObject({ status: "restoring", restoreRound: 1 });
       expect(restoring.targets[0]?.state).toBe("reverting");
+    });
+  });
+});
+
+describe("foldAgentStop", () => {
+  describe("when the API already advanced the row by a request", () => {
+    const { failed } = restoreFailedStop();
+    const requests = [
+      {
+        type: AGENT_STOP_EVENT_TYPES.RETRY_REQUESTED,
+        requestId: "retry-1",
+        data: {
+          stopId: STOP_ID,
+          organizationId: ORG,
+          requestedByUserId: "user-ops",
+          requestedByApiKeyId: null,
+          requestId: "retry-1",
+          targets: [],
+        },
+      },
+      {
+        type: AGENT_STOP_EVENT_TYPES.TARGETS_DROPPED,
+        requestId: "drop-1",
+        data: { stopId: STOP_ID, organizationId: ORG, targetIds: [TARGET_ID], dropId: "drop-1" },
+      },
+    ];
+
+    /** @scenario "A retry with nothing new to apply is counted once, however far the worker lags" */
+    it.each(requests)("folds the $type event as a no-op that lets go of it", (request) => {
+      const decided = foldAgentStop({
+        stop: failed,
+        type: request.type,
+        data: request.data,
+        at: 5_000,
+      });
+      if (!decided) throw new Error("the fold dropped the stop");
+      const row = advancedStop({ stop: decided, requestId: request.requestId });
+
+      const folded = foldAgentStop({
+        stop: row,
+        type: request.type,
+        data: request.data,
+        at: 6_000,
+      });
+
+      expect(decided).not.toEqual(failed);
+      expect(folded).toEqual(decided);
     });
   });
 });

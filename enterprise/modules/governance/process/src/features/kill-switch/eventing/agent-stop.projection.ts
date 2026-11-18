@@ -15,6 +15,7 @@ import {
   type AgentStopRecord,
   approvedStop,
   deniedStop,
+  foldRequestOnce,
   requestedStop,
   restoreRequestedStop,
   retriedStop,
@@ -63,12 +64,14 @@ export function foldAgentStop({
         data: agentStopTargetSettledEventDataSchema.parse(data),
         at,
       });
-    case AGENT_STOP_EVENT_TYPES.RESTORE_REQUESTED:
-      return restoreRequestedStop({
+    case AGENT_STOP_EVENT_TYPES.RESTORE_REQUESTED: {
+      const restore = agentStopRestoreRequestedEventDataSchema.parse(data);
+      return foldRequestOnce({
         stop,
-        data: agentStopRestoreRequestedEventDataSchema.parse(data),
-        at,
+        requestId: restore.requestId,
+        fold: (held) => restoreRequestedStop({ stop: held, data: restore, at }),
       });
+    }
     case AGENT_STOP_EVENT_TYPES.TARGET_REVERTED:
       return targetRevertedStop({
         stop,
@@ -81,14 +84,22 @@ export function foldAgentStop({
         data: agentStopTargetSettledEventDataSchema.parse(data),
         at,
       });
-    case AGENT_STOP_EVENT_TYPES.RETRY_REQUESTED:
-      return retriedStop({ stop, data: agentStopRetryRequestedEventDataSchema.parse(data), at });
-    case AGENT_STOP_EVENT_TYPES.TARGETS_DROPPED:
-      return targetsDroppedStop({
+    case AGENT_STOP_EVENT_TYPES.RETRY_REQUESTED: {
+      const retry = agentStopRetryRequestedEventDataSchema.parse(data);
+      return foldRequestOnce({
         stop,
-        data: agentStopTargetsDroppedEventDataSchema.parse(data),
-        at,
+        requestId: retry.requestId,
+        fold: (held) => retriedStop({ stop: held, data: retry, at }),
       });
+    }
+    case AGENT_STOP_EVENT_TYPES.TARGETS_DROPPED: {
+      const drop = agentStopTargetsDroppedEventDataSchema.parse(data);
+      return foldRequestOnce({
+        stop,
+        requestId: drop.dropId,
+        fold: (held) => targetsDroppedStop({ stop: held, data: drop, at }),
+      });
+    }
     default:
       return stop;
   }
@@ -96,7 +107,8 @@ export function foldAgentStop({
 
 /**
  * The AgentStop row: the stop's status and every target's outcome. The executor skips an event
- * at or before the row's cursor (`lastAppliedEventId`), so a redelivery folds once.
+ * at or before the row's cursor (`lastAppliedEventId`), so a redelivery folds once; a request
+ * the API already advanced the row by folds once through `advancedRequestIds`.
  */
 export function agentStopProjection(
   store: StateProjectionStore<AgentStopProjectionState>,

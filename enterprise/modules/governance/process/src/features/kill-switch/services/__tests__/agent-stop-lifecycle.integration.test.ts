@@ -4,7 +4,10 @@
  * Spec: enterprise/modules/governance/specs/agent-kill-switch.feature
  */
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
-import type { AgentStopView } from "@langwatch/enterprise-governance-contract";
+import {
+  AGENT_STOP_EVENT_TYPES,
+  type AgentStopView,
+} from "@langwatch/enterprise-governance-contract";
 import type { GatewayApi } from "@langwatch/gateway-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -14,7 +17,12 @@ import {
   presentPlatforms,
   seedRegistry,
 } from "../../../../repositories/prisma/__tests__/prisma.kill-switch.fixtures.ts";
-import { requestedStop, targetAppliedStop } from "../../rules/agent-stop.rules.ts";
+import { foldAgentStop } from "../../eventing/agent-stop.projection.ts";
+import {
+  type AgentStopRecord,
+  requestedStop,
+  targetAppliedStop,
+} from "../../rules/agent-stop.rules.ts";
 import { AgentStopClaimService } from "../agent-stop-claim.service.ts";
 import { AgentStopPlanService } from "../agent-stop-plan.service.ts";
 import { AgentStopService } from "../agent-stop.service.ts";
@@ -36,12 +44,17 @@ const KEY_TARGET = {
   target: { kind: "gateway_virtual_key" as const, virtualKeyId: VIRTUAL_KEY_ID },
 };
 
+const EVENT_OF_COMMAND: Record<string, string> = {
+  requestRestore: AGENT_STOP_EVENT_TYPES.RESTORE_REQUESTED,
+  retry: AGENT_STOP_EVENT_TYPES.RETRY_REQUESTED,
+};
+
 /**
  * A stop service over memory whose sends reach no pipeline, so the projection never folds them:
- * the worst lag a request can meet. The stop is seeded quarantined, and its plan gained a key
- * since, so a retry has something to apply.
+ * the worst lag a request can meet. The stop is seeded quarantined; by default its plan gained a
+ * key since, so a retry has something to apply. `events` holds what each send would append.
  */
-async function laggingService() {
+async function laggingService({ planGainedTarget = true }: { planGainedTarget?: boolean } = {}) {
   const repositories = MemoryGovernanceRepositories.create();
   await seedRegistry({ memory: repositories, organizationId: ORG });
   await repositories.agentStopPlans.replaceTargets({
@@ -49,14 +62,19 @@ async function laggingService() {
     agentId: AGENT_ID,
     targets: [
       KEY_TARGET,
-      {
-        id: "target-vk-new",
-        label: "Virtual key vk-new",
-        target: { kind: "gateway_virtual_key", virtualKeyId: "vk-new" },
-      },
+      ...(planGainedTarget
+        ? [
+            {
+              id: "target-vk-new",
+              label: "Virtual key vk-new",
+              target: { kind: "gateway_virtual_key" as const, virtualKeyId: "vk-new" },
+            },
+          ]
+        : []),
     ],
   });
   const sent: string[] = [];
+  const events: { type: string; data: unknown; at: number }[] = [];
   let ids = 0;
   const service = AgentStopService.create({
     stops: repositories.agentStops,
@@ -80,8 +98,9 @@ async function laggingService() {
       }),
       outbox: () => undefined,
     }),
-    send: async (name) => {
+    send: async (name, payload) => {
       sent.push(name);
+      events.push({ type: EVENT_OF_COMMAND[name] ?? name, data: payload, at: payload.occurredAt });
     },
     newId: () => `id-${++ids}`,
   });
@@ -107,7 +126,21 @@ async function laggingService() {
     at: 2_000,
   });
   await repositories.agentStops.seed({ stop: quarantined, at: 2_000 });
-  return { service, sent, repositories };
+  return { service, sent, events, quarantined, repositories };
+}
+
+/** Folds events onto a stop one by one, as the projection and the process manager do. */
+function foldAll({
+  stop,
+  events,
+}: {
+  stop: AgentStopRecord;
+  events: readonly { type: string; data: unknown; at: number }[];
+}) {
+  return events.reduce<AgentStopRecord | null>(
+    (folded, event) => foldAgentStop({ stop: folded, ...event }),
+    stop,
+  );
 }
 
 describe("AgentStopService lifecycle requests", () => {
@@ -141,6 +174,80 @@ describe("AgentStopService lifecycle requests", () => {
 
       expect(answers.filter((answer) => answer.status === "fulfilled")).toHaveLength(1);
       expect(sent).toHaveLength(1);
+    });
+  });
+
+  describe("when a quarantined stop with nothing new is retried twice before the worker folds", () => {
+    /** @scenario "A retry with nothing new to apply is counted once, however far the worker lags" */
+    it("counts each retry once when the worker folds them onto the row", async () => {
+      const { service, events, quarantined, repositories } = await laggingService({
+        planGainedTarget: false,
+      });
+
+      await service.retryStop({ organizationId: ORG, stopId: "stop-1", caller: PERSON });
+      await service.retryStop({ organizationId: ORG, stopId: "stop-1", caller: PERSON });
+      const row = await repositories.agentStops.getStop({ organizationId: ORG, stopId: "stop-1" });
+      const fromLog = foldAll({ stop: quarantined, events });
+      const fromRow = foldAll({ stop: row, events });
+
+      expect(fromLog).toMatchObject({ status: "quarantined", retryRound: 2 });
+      expect(fromRow).toMatchObject({ status: "quarantined", retryRound: 2 });
+      expect(fromRow?.lastRequestId).toBe(fromLog?.lastRequestId);
+    });
+  });
+
+  describe("given a quarantined stop retried with nothing new to apply", () => {
+    /** @scenario "A retry with nothing new to apply is counted once, however far the worker lags" */
+    it("counts the retry once, so a later retry still applies the target the plan gained", async () => {
+      const harness = await killSwitchHarness();
+      await harness.plans.setPlan({
+        organizationId: ORG,
+        agentId: AGENT_ID,
+        targets: harness.fullPlan.slice(1),
+      });
+      const view = await request(harness);
+      await settled(harness, view.id, "quarantined");
+      const cursorOf = async () =>
+        (
+          await harness.repositories.agentStops.getStopWithCursor({
+            organizationId: ORG,
+            stopId: view.id,
+          })
+        ).eventId;
+      const before = await cursorOf();
+      // A queued worker: the retry's event is folded only after the API advanced the row.
+      const stops = harness.repositories.agentStops;
+      const advance = stops.advance.bind(stops);
+      let advanced = (): void => undefined;
+      const advancedOnce = new Promise<void>((resolve) => (advanced = resolve));
+      vi.spyOn(stops, "advance").mockImplementation(async (input) => {
+        await advance(input);
+        advanced();
+      });
+      const commands: Record<string, { send(payload: unknown): Promise<unknown> }> =
+        harness.pipeline.commands;
+      const retry = commands.retry;
+      if (!retry) throw new Error("the pipeline has no retry command");
+      const sendRetry = retry.send.bind(retry);
+      const queued: Promise<unknown>[] = [];
+      vi.spyOn(retry, "send").mockImplementation(async (payload) => {
+        queued.push(advancedOnce.then(() => sendRetry(payload)));
+      });
+
+      await harness.stops.retryStop({ organizationId: ORG, stopId: view.id, caller: PERSON });
+      await Promise.all(queued);
+      await vi.waitFor(async () => expect(await cursorOf()).not.toBe(before));
+      vi.restoreAllMocks();
+      const folded = await harness.stopOf(view.id);
+      await harness.setFullPlan();
+      await harness.stops.retryStop({ organizationId: ORG, stopId: view.id, caller: PERSON });
+
+      expect(folded).toMatchObject({ status: "quarantined", retryRound: 1 });
+      const stop = await settled(harness, view.id, "quarantined");
+      expect(stop.retryRound).toBe(2);
+      expect(stop.targets).toHaveLength(3);
+      expect(stop.targets.every((target) => target.state === "applied")).toBe(true);
+      await harness.eventing.close();
     });
   });
 

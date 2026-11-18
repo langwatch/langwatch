@@ -15,6 +15,7 @@ import type { AgentStopRepository } from "../../../repositories/agent-stop.repos
 import type { KillSwitchLockRepository } from "../../../repositories/kill-switch-lock.repository.ts";
 import { targetKeyOf } from "../rules/agent-stop-target.rules.ts";
 import {
+  advancedStop,
   type AgentStopRecord,
   isOpenStatus,
   isRestorableStatus,
@@ -101,7 +102,7 @@ export class AgentStopLifecycleService {
     const at = this.deps.now();
     await this.deps.send("requestRestore", { tenantId: organizationId, occurredAt: at, ...data });
     const stop = restoreRequestedStop({ stop: current, data, at });
-    await this.deps.stops.advance({ stop, eventId: read.eventId });
+    await this.advance({ stop, requestId: data.requestId, eventId: read.eventId });
     await this.deps.audit.record({ action: "governance.agent.restore_requested", stop, caller });
     return viewOfStop(stop);
   }
@@ -146,7 +147,7 @@ export class AgentStopLifecycleService {
     const at = this.deps.now();
     await this.deps.send("retry", { tenantId: organizationId, occurredAt: at, ...data });
     const stop = retriedStop({ stop: current, data, at });
-    await this.deps.stops.advance({ stop, eventId: read.eventId });
+    await this.advance({ stop, requestId: data.requestId, eventId: read.eventId });
     await this.deps.audit.record({ action: "governance.agent.stop_retried", stop, caller });
     return viewOfStop(stop);
   }
@@ -181,7 +182,25 @@ export class AgentStopLifecycleService {
     const at = this.deps.now();
     await this.deps.send("dropTargets", { tenantId: organizationId, occurredAt: at, ...data });
     const stop = targetsDroppedStop({ stop: read.stop, data, at });
-    if (stop !== read.stop) await this.deps.stops.advance({ stop, eventId: read.eventId });
+    if (stop !== read.stop) {
+      await this.advance({ stop, requestId: data.dropId, eventId: read.eventId });
+    }
+  }
+
+  /**
+   * Writes the request's outcome to the row read at `eventId`, ahead of the worker, marking the
+   * request so the projection folds its event as a no-op instead of applying it a second time.
+   */
+  private advance({
+    stop,
+    requestId,
+    eventId,
+  }: {
+    stop: AgentStopRecord;
+    requestId: string;
+    eventId: string;
+  }): Promise<void> {
+    return this.deps.stops.advance({ stop: advancedStop({ stop, requestId }), eventId });
   }
 
   /** Runs `run` on the stop's row as read under its agent's lock, with the cursor it was read at. */

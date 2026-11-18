@@ -69,6 +69,8 @@ export const agentStopRecordSchema = z.object({
   retriedByApiKeyId: z.string().nullable().default(null),
   /** The last restore or retry request the fold accepted. */
   lastRequestId: z.string().nullable().default(null),
+  /** Requests the API folded onto the row before the worker did; each one's event folds as a no-op. */
+  advancedRequestIds: z.string().array().default([]),
 });
 export type AgentStopRecord = z.infer<typeof agentStopRecordSchema>;
 
@@ -184,7 +186,34 @@ export function requestedStop({
     retriedByUserId: null,
     retriedByApiKeyId: null,
     lastRequestId: null,
+    advancedRequestIds: [],
   };
+}
+
+/** The stop as the API advances its row ahead of the worker: it remembers the request it folded. */
+export function advancedStop({
+  stop,
+  requestId,
+}: {
+  stop: AgentStopRecord;
+  requestId: string;
+}): AgentStopRecord {
+  return { ...stop, advancedRequestIds: [...stop.advancedRequestIds, requestId] };
+}
+
+/** Folds a request by `fold`, unless the API already advanced the stop by it: then it lets go of it. */
+export function foldRequestOnce({
+  stop,
+  requestId,
+  fold,
+}: {
+  stop: AgentStopRecord;
+  requestId: string;
+  fold: (stop: AgentStopRecord) => AgentStopRecord;
+}): AgentStopRecord {
+  if (!stop.advancedRequestIds.includes(requestId)) return fold(stop);
+  const advancedRequestIds = stop.advancedRequestIds.filter((held) => held !== requestId);
+  return { ...stop, advancedRequestIds };
 }
 
 function decided({

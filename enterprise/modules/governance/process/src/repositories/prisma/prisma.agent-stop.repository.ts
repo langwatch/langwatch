@@ -32,6 +32,7 @@ const targetsColumnSchema = z.object({
   retriedByUserId: agentStopRecordSchema.shape.retriedByUserId,
   retriedByApiKeyId: agentStopRecordSchema.shape.retriedByApiKeyId,
   lastRequestId: agentStopRecordSchema.shape.lastRequestId,
+  advancedRequestIds: agentStopRecordSchema.shape.advancedRequestIds,
 });
 type TargetsColumn = z.infer<typeof targetsColumnSchema>;
 
@@ -43,6 +44,7 @@ function targetsColumnOf(stop: AgentStopRecord): Prisma.InputJsonValue {
     retriedByUserId: stop.retriedByUserId,
     retriedByApiKeyId: stop.retriedByApiKeyId,
     lastRequestId: stop.lastRequestId,
+    advancedRequestIds: stop.advancedRequestIds,
   };
   return targetsColumnSchema.parse(column) as Prisma.InputJsonValue;
 }
@@ -76,6 +78,7 @@ function recordOf(row: Row): AgentStopRecord {
     retriedByUserId: column.retriedByUserId,
     retriedByApiKeyId: column.retriedByApiKeyId,
     lastRequestId: column.lastRequestId,
+    advancedRequestIds: column.advancedRequestIds,
   });
 }
 
