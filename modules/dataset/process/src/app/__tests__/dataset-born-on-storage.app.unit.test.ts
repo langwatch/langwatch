@@ -21,6 +21,7 @@ function failingChunkWrites(): { repositories: DatasetRepositories; reaped: stri
   const stored = repositories.chunks;
   const chunks: DatasetChunkRepository = {
     readChunk: (input) => stored.readChunk(input),
+    readMeasuredChunk: (input) => stored.readMeasuredChunk(input),
     readChunks: (input) => stored.readChunks(input),
     rewriteChunk: (input) => stored.rewriteChunk(input),
     readStagedUpload: (input) => stored.readStagedUpload(input),

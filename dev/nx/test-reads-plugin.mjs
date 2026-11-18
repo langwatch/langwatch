@@ -16,6 +16,7 @@ export const reads = {
     "docs/platform/**/*",
     "docs/pricing.mdx",
     "docs/self-hosting/connect.mdx",
+    "docs/self-hosting/configuration/environment-variables.mdx",
     "docs/features/instant-evals/limits-and-cost.mdx",
     "docs/self-hosting/data-and-telemetry.mdx",
     "docs/workflows/overview.mdx",

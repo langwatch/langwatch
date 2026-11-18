@@ -26,6 +26,7 @@ import type {
   InstantEvalEstimateService,
 } from "./instant-eval-estimate.service.ts";
 import type { InstantEvalFreeBudgetService } from "./instant-eval-free-budget.service.ts";
+import type { InstantEvalGatewayBudgetService } from "./instant-eval-gateway-budget.service.ts";
 import type { InstantEvalReadsService } from "./instant-eval-reads.service.ts";
 import {
   InstantEvalRequestStatementService,
@@ -83,6 +84,8 @@ interface InstantEvalRunUnits {
     InstantEvalFreeBudgetService,
     "standing" | "assertWithinBudget" | "reserve" | "release"
   >;
+  /** The gateway budgets set to block, which bind every plan. */
+  gatewayBudget: Pick<InstantEvalGatewayBudgetService, "assertWithinGatewayBudget">;
   /** The asker's traces:view proof a filter's selection is read under. */
   proofs: Pick<InstantEvalTraceProofService, "mint">;
 }
@@ -129,6 +132,7 @@ export class InstantEvalRunService {
     // Before the statement is accepted, so an organization past its budget is
     // told so without the probe reading anything on its behalf.
     await this.units.budget.assertWithinBudget({ projectId });
+    await this.units.gatewayBudget.assertWithinGatewayBudget({ projectId });
     const accepted = await this.#accept({ projectId, actor, caller, input, rowLimit });
     const runId = this.units.creates.nextRunId();
     await this.#reserve({ projectId, caller, accepted, rowLimit, runId });

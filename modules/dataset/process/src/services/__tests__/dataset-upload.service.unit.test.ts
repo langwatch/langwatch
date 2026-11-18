@@ -194,6 +194,7 @@ function harness({
     deleteChunksFrom: async () => undefined,
     readChunks: unwired("readChunks"),
     readChunk: unwired("readChunk"),
+    readMeasuredChunk: unwired("readMeasuredChunk"),
     rewriteChunk: unwired("rewriteChunk"),
     readStagedUpload: unwired("readStagedUpload"),
     removeStagedUpload: unwired("removeStagedUpload"),

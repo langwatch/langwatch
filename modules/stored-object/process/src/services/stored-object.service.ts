@@ -1,9 +1,8 @@
-import { Readable } from "node:stream";
-
 import { PermissionDeniedError } from "@langwatch/authorization";
 import { type AuthzApi } from "@langwatch/authz-contract";
 import { HandledError } from "@langwatch/handled-error";
 import { generate, KSUID_RESOURCES } from "@langwatch/ksuid";
+import { readableBody } from "@langwatch/process-stores/members";
 import {
   StorageUnavailableError,
   StoredObjectBytesMissingError,
@@ -213,8 +212,7 @@ export class StoredObjectService {
         projectId: input.projectId,
         address: value.storage,
       });
-      // The member's own stream frees its socket however a reader stops; a wrapper would not.
-      return { row, stream: bytes instanceof Readable ? bytes : Readable.from(bytes) };
+      return { row, stream: readableBody(bytes) };
     } catch (error) {
       if (error instanceof HandledError && error.code === "stored_object_not_found") {
         return { row, status: "missing" };
@@ -253,7 +251,7 @@ export class StoredObjectService {
     return this.readUrlOf(input);
   }
 
-  /** The row's purpose and owner kind; only the legacy index opens bytes, having no row read. */
+  /** The row's purpose and owner kind, from Postgres or the legacy index; no bytes are opened. */
   private async rowOf(input: {
     projectId: string;
     id: string;
@@ -263,9 +261,9 @@ export class StoredObjectService {
       if (value.status !== "available") throw new StoredObjectNotFoundError();
       return { purpose: value.purpose, ownerKind: value.ownerKind };
     }
-    const read = await this.options.legacy.getById(input);
-    if ("stream" in read) read.stream.destroy();
-    return { purpose: read.row.purpose, ownerKind: read.row.owner_kind };
+    const legacy = await this.options.legacy.findRowById(input);
+    if (!legacy) throw new StoredObjectNotFoundError();
+    return { purpose: legacy.purpose, ownerKind: legacy.owner_kind };
   }
 
   /** The bytes a signed read URL names, once its seal opens; the seal is the whole credential. */
