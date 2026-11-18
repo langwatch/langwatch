@@ -19,7 +19,11 @@ import { MemoryNullTraceBraidReadsRepository } from "../../features/braid/reposi
 import { openProtections } from "../../repositories/clickhouse/__tests__/open-protections.ts";
 import type { TraceViewerProtectionService } from "../../services/trace-viewer-protection.service.ts";
 import type { TraceAppDependencies, TracesSpanReader } from "../trace.app.ts";
-import { braidPlansOf, createTraceAppHarness } from "./support/trace-app.harness.ts";
+import {
+  braidPlansOf,
+  braidSettingsOf,
+  createTraceAppHarness,
+} from "./support/trace-app.harness.ts";
 
 const READER = "proj_orchestrator";
 const OWNER = "proj_specialists";
@@ -160,6 +164,7 @@ function braidedTrace({ withOwnerSpans = true } = {}) {
       "protections",
     ),
     braidPlans: braidPlansOf("ENTERPRISE"),
+    braidSettings: braidSettingsOf(true),
     braidDirectory: {
       authz: createApiFixture<AuthzApi>(
         {

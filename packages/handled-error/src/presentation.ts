@@ -886,7 +886,12 @@ const presentations = {
   braids_not_enabled: {
     title: "Braids aren't switched on here",
     describe: () =>
-      "This organisation can't manage braids yet. Braids it already has keep showing their spans.",
+      "This organisation can't manage braids yet. Removing a braid and revoking a signing key still work.",
+  },
+  braids_turned_off: {
+    title: "Braids is turned off",
+    describe: () =>
+      "An organisation admin can turn Braids on in organisation settings. Until then, existing braids are paused and kept.",
   },
   broadcaster_not_active: {
     title: "Live updates disconnected",
@@ -4389,6 +4394,11 @@ const presentations = {
   stored_object_files_rate_limited: {
     title: "Too many files opened at once",
     describe: () => "Wait a moment, then open the file again.",
+  },
+  stored_object_write_conflict: {
+    // Every row write lost to another writer; nothing failed, so a retry settles it.
+    title: "The file changed while we were updating it",
+    describe: () => "Try again in a moment.",
   },
   dataset_not_ready: {
     // A state, not a breakage — the rows are still being prepared. Waiting is

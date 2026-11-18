@@ -35,6 +35,7 @@ import {
   StoragePermissionDeniedError,
   StoredObjectNotFoundError,
   type ObjectBackend,
+  uploadRouteOf,
 } from "./object-storage-backend.ts";
 
 const API_VERSION = "2021-12-02";
@@ -425,6 +426,7 @@ export function azureBackend(options: {
 }): ObjectBackend {
   const place = azurePlace(options.credentials, options.clock);
   const { accountName, container } = options.credentials;
+  const uploadRoute = uploadRouteOf(options.uploads);
   return {
     destination: { kind: "azure", accountName, container },
     write: (at, body, facts) => writeBlob({ place, at, body, facts }),
@@ -433,9 +435,10 @@ export function azureBackend(options: {
     digest: async (at) => digestOf(await readBlob(place, at)),
     remove: (at) => removeBlob(place, at),
     signUpload: async (at, facts) =>
-      options.uploads === "through-langwatch"
+      uploadRoute === "through-process"
         ? { kind: "through-process" }
         : signBlobUpload(place, at, facts),
+    uploadRoute,
     signDownload: (at, facts) => signBlobDownload(place, at, facts),
     probe: () => probeContainer(place),
   };

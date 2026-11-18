@@ -1053,6 +1053,9 @@ importers:
       '@langwatch/slack-process':
         specifier: workspace:*
         version: link:../../modules/slack/process
+      '@langwatch/stored-object-contract':
+        specifier: workspace:*
+        version: link:../../modules/stored-object/contract
       '@langwatch/stored-object-process':
         specifier: workspace:*
         version: link:../../modules/stored-object/process

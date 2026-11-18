@@ -8,15 +8,22 @@ import { Readable } from "node:stream";
 import { HandledError, remediation } from "@langwatch/handled-error";
 import type { Instant } from "@langwatch/time";
 
+import type { ObjectStorageUploads } from "./config.ts";
 import type {
   DownloadFacts,
   ObjectBodyFacts,
   ObjectDigest,
   ObjectStorageDestination,
+  ObjectUploadRoute,
   SignedObjectUpload,
   StoredObjectAddress,
   UploadFacts,
 } from "./members.ts";
+
+/** An account's upload setting as the route its clients take; absent uploads direct. */
+export function uploadRouteOf(uploads: ObjectStorageUploads | undefined): ObjectUploadRoute {
+  return uploads === "through-langwatch" ? "through-process" : "direct";
+}
 
 /** One backend, already placed: the member routes a project to it, then calls it by key. */
 export interface ObjectBackend {
@@ -31,6 +38,7 @@ export interface ObjectBackend {
   digest(at: StoredObjectAddress): Promise<ObjectDigest>;
   remove(at: StoredObjectAddress): Promise<void>;
   signUpload(at: StoredObjectAddress, facts: UploadFacts): Promise<SignedObjectUpload>;
+  readonly uploadRoute: ObjectUploadRoute;
   signDownload(at: StoredObjectAddress, facts: DownloadFacts): Promise<string>;
   probe(): Promise<void>;
 }

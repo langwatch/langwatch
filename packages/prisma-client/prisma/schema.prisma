@@ -4893,6 +4893,7 @@ model AuthzEngineSwitch {
 model AuthzOrganizationPolicy {
   organizationId               String   @id
   braidsOrganizationAdminsOnly Boolean  @default(false)
+  braidsEnabled                Boolean  @default(false)
   updatedByUserId              String
   updatedAt                    DateTime @updatedAt
 }

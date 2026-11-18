@@ -2377,6 +2377,7 @@ export const prismaModelFieldCatalogue = {
   "AuthzOrganizationPolicy": [
     "organizationId",
     "braidsOrganizationAdminsOnly",
+    "braidsEnabled",
     "updatedByUserId",
     "updatedAt"
   ],

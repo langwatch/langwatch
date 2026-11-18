@@ -63,6 +63,11 @@ const registry = {
   },
 
   // ---- dataset storage ----
+  stored_object_write_conflict: {
+    tips: [
+      "Another change to the same file landed while this one was written; send the request again",
+    ],
+  },
   private_dataplane_unavailable: {
     tips: [
       "Set the variable this error names (CLICKHOUSE_URL__<label>__<orgId> or DATAPLANE_S3__<label>__<orgId>) and restart the api and worker",
@@ -520,8 +525,15 @@ const registry = {
   braids_not_enabled: {
     tips: [
       "Braid management is not switched on for this organisation yet; retrying will not help",
-      "Braids that already exist keep applying to trace reads; ask LangWatch to switch braids on to create or change them",
+      "Removing a braid and revoking a signing key still work; ask LangWatch to switch braids on to create or change them",
     ],
+  },
+  braids_turned_off: {
+    tips: [
+      "On the Enterprise plan, an organisation admin can turn Braids on in the organisation's Braids settings",
+      "While Braids is off, existing braids are paused and kept; removing a braid and revoking a signing key still work",
+    ],
+    docsPath: "/features/braids",
   },
 
   // ---- personal workspace reads ----
