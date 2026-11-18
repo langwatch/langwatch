@@ -49,3 +49,10 @@ Feature: Joining an OpenTelemetry JS 3.x tracer provider
     Then the provider found behind the proxy is an OpenTelemetry JS 3.x TracerProvider
     And no missing-provider error is logged
     And spans still reach the exporter
+
+  @unit
+  Scenario: A tracer taken before the provider is registered records through either api build
+    Given a LangWatch tracer taken before any provider is registered
+    And a provider registered later through the other module build of @opentelemetry/api
+    When the tracer starts spans
+    Then the registered provider records them
