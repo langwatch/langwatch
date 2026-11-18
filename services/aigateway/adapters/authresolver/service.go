@@ -1786,6 +1786,17 @@ func (s *Service) refreshConfigBackground(h [64]byte, e *entry) {
 		)
 		return
 	}
+	// A key disabled or revoked while this pod missed the event: drop every
+	// cached copy so the next request asks the control plane and gets its 403.
+	if res.KeyInactive {
+		s.l1.Remove(h)
+		s.lastKnown.Remove(h)
+		s.logger.Warn("auth_cache_hard_evict",
+			zap.String("vk_id", stale.VirtualKeyID),
+			zap.String("reason", "config_key_inactive"),
+		)
+		return
+	}
 	s.publishFetched(h, s.newEntry(&fresh, res.ETag, e.authStart()).carryBudgetChanges(e, budgetChangesAtStart), since)
 	s.logger.Debug("config_ttl_refresh_success", zap.String("vk_id", stale.VirtualKeyID))
 }

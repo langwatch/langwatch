@@ -162,7 +162,7 @@ describe("the internal door's resolve-key", () => {
       });
 
       expect(signJwt).toHaveBeenCalledWith(
-        expect.not.objectContaining({ notAfter: expect.anything() }),
+        expect.not.objectContaining({ secretNotAfter: expect.anything() }),
       );
     });
   });

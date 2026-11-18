@@ -807,9 +807,10 @@ func init() {
 // conditional half of the endpoint is exercised by etagConfigFetcher below.
 type fakeConfigFetcher struct {
 	fakeResolver
-	cfg     domain.BundleConfig
-	cfgErr  error
-	fetches atomic.Int64
+	cfg      domain.BundleConfig
+	cfgErr   error
+	inactive bool
+	fetches  atomic.Int64
 }
 
 func (f *fakeConfigFetcher) FetchConfig(_ context.Context, _, _ string) (domain.ConfigFetchResult, error) {
@@ -817,7 +818,7 @@ func (f *fakeConfigFetcher) FetchConfig(_ context.Context, _, _ string) (domain.
 	if f.cfgErr != nil {
 		return domain.ConfigFetchResult{}, f.cfgErr
 	}
-	return domain.ConfigFetchResult{Config: f.cfg}, nil
+	return domain.ConfigFetchResult{Config: f.cfg, KeyInactive: f.inactive}, nil
 }
 
 // backdateConfig makes the L1 entry's config look older than the TTL.

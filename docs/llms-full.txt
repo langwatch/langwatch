@@ -5995,7 +5995,7 @@ New requests stop as each gateway pod learns about the change:
 
 The third row is the case worth planning for. A pod that receives the revoke or disable event refuses the key within seconds and records it on a revocation list, so it keeps answering `403` through a later outage. The list is bounded: if the entry is pushed out before the outage, the pod still refuses the key, because the event removed its cached copies, but the caller gets `503 auth_upstream_unavailable` instead of `403`.
 
-A pod that missed the event keeps serving its cached copy until it next asks the control plane: near the token expiry, after a spend change, or when the cached config goes stale. Only then does the control plane's `403` evict the entry, with no grace.
+A pod that missed the event keeps serving its cached copy until it next asks the control plane: near the token expiry, after a spend change, or when the cached config goes stale. A token refresh gets the control plane's `403` and evicts the entry with no grace. A config refresh sees the key is no longer active and evicts the entry, so the next request gets that `403`.
 
 The grace window only covers a pod that missed the event and cannot reach the control plane. To bound it, set `LW_GATEWAY_AUTH_CACHE_FAIL_CLOSED_AFTER_SECONDS` (minimum 30): once neither the key nor the organization's change feed was confirmed within that limit, the pod answers `503 auth_upstream_unavailable` instead of serving the cached key. Read [Revocation latency](/ai-gateway/self-hosting/config#revocation-latency) for the trade-off.
 

@@ -363,3 +363,23 @@ func TestResolve_LastKnownAfterFreshKeyCheck_PassesFailClosed(t *testing.T) {
 	require.True(t, ok)
 	assert.False(t, restored.authStart().Before(before.Add(-time.Second)), "the restored entry carries the fresh key check time")
 }
+
+// @scenario "a config refresh that finds the key inactive evicts it"
+func TestRefreshConfigBackground_KeyInactive_EvictsEveryCopy(t *testing.T) {
+	fetcher := &fakeConfigFetcher{inactive: true}
+	svc, logs := newService(t, Options{Resolver: &fetcher.fakeResolver, ConfigFetcher: fetcher})
+	rawKey := "vk-lw-disabled"
+	h := seedServedKey(t, svc, rawKey, "vk_disabled")
+	e, ok := svc.l1.Peek(h)
+	require.True(t, ok)
+	require.True(t, e.tryBeginConfigRefresh())
+
+	svc.refreshConfigBackground(h, e)
+
+	_, inL1 := svc.l1.Peek(h)
+	assert.False(t, inL1, "a key the control plane reports inactive must not keep serving from the cache")
+	assert.Nil(t, svc.lastKnownFor(h), "nor fall back to its last known config")
+	evicts := logs.FilterMessage("auth_cache_hard_evict").All()
+	require.Len(t, evicts, 1)
+	assert.Equal(t, "config_key_inactive", evicts[0].ContextMap()["reason"])
+}

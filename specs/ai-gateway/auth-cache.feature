@@ -853,6 +853,13 @@ Feature: Gateway auth cache — hot path is zero RTT after first hit
       And it is refused as an invalid key, not as an expired one
 
     @unit
+    Scenario: a config refresh that finds the key inactive evicts it
+      Given a cached key that was disabled or revoked while the gateway missed the event
+      When the config refresh answers that the key is no longer active
+      Then the gateway drops every cached copy of the key
+      And the next request asks the control plane and is refused
+
+    @unit
     Scenario: a config response with no expiration field keeps the date the gateway holds
       Given a cached key that expires in five minutes
       When the config refresh comes from a control plane that sends no expiration field
