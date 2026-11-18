@@ -172,6 +172,24 @@ Feature: Migration order check
     And an edit inside either .withIdIndexes call still fails the check for that step
     And removing the gateway's .withIdIndexes call fails the check as a removed step
 
+  # Only code declares: a comment can neither hide a call nor stand in for one,
+  # and a call belongs to the module whose defineProcessModule chain it is on.
+  @unit
+  Scenario: A released id-index step is read from its owner's call in code
+    Given the same released id-index steps
+    When the gateway's call has a space before its bracket and the PR edits it
+    Or a comment naming another step sits above the ops call's step option and the PR edits that call
+    Then the check fails for that step
+    When the PR comments the gateway's call out
+    Or another module's file names the gateway module in a comment beside an identical call
+    Then removing the gateway's call still fails the check as a removed step
+
+  @unit
+  Scenario: An after list with a comment before its bracket is still a reference
+    Given a released step is named only in an `after: /* comment */ [...]` list
+    When the PR adds an unrelated line to that file
+    Then the check passes
+
   @unit
   Scenario: A code step no release manifest names yet may still change
     Given a module file declares the code step "topic:seed-clusters"

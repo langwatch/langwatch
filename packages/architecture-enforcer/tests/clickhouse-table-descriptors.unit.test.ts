@@ -5,6 +5,7 @@ import { dirname, join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
 import {
+  clickhouseScanAt,
   collectClickhouseOwnershipFindings,
   type DeclaredOwnership,
 } from "../src/policies/persistence/clickhouse-table-ownership.ts";
@@ -63,6 +64,10 @@ CREATE TABLE IF NOT EXISTS \${CLICKHOUSE_DATABASE}.trace_summaries (TenantId Str
       collectClickhouseOwnershipFindings(root, CATALOGUE, declared).map(
         (finding) => finding.message,
       ),
+    access: (module: string) =>
+      clickhouseScanAt(root, CATALOGUE)
+        .access.filter((entry) => entry.module === module)
+        .map(({ table, line, write }) => ({ table, line, write })),
   };
 }
 
@@ -95,7 +100,30 @@ export const sql = \`INSERT INTO \${TABLE_NAME} (TenantId) VALUES (1)\`;
 `,
       );
 
+      expect(workspace.access("trace")).toEqual([
+        { table: "trace_summaries", line: 4, write: true },
+        { table: "trace_summaries", line: 6, write: true },
+      ]);
       expect(workspace.messages()).toEqual([]);
+    });
+
+    /** @scenario "A database-qualified insert through a descriptor's table name is a write" */
+    it("resolves the descriptor after the database dot, and nothing for an unbound name", () => {
+      const workspace = fixture();
+      workspace.write(`${TRACE_CLICKHOUSE}/clickhouse.trace-summaries.table.ts`, DESCRIPTOR);
+      workspace.write(
+        `${TRACE_CLICKHOUSE}/clickhouse.trace-summary.repository.ts`,
+        `import { summaries } from "./clickhouse.trace-summaries.table.ts";
+export async function store(client: Client, database: string) {
+  await client.insert({ table: \`\${database}.\${summaries.$table.name}\`, values: [] });
+  await client.insert({ table: \`\${database}.\${unbound.$table.name}\`, values: [] });
+}
+`,
+      );
+
+      expect(workspace.access("trace")).toEqual([
+        { table: "trace_summaries", line: 3, write: true },
+      ]);
     });
 
     /** @scenario "A descriptor reached through a re-export is still the table" */
@@ -109,10 +137,15 @@ export const sql = \`INSERT INTO \${TABLE_NAME} (TenantId) VALUES (1)\`;
       workspace.write(
         `${TRACE_CLICKHOUSE}/clickhouse.trace-summary.repository.ts`,
         `import { traceSummaries } from "../../tables/index.ts";
-export const sql = \`INSERT INTO \${traceSummaries.$table.name} (TenantId) VALUES (1)\`;
+export async function store(client: Client) {
+  await client.insert({ table: traceSummaries.$table.name, values: [] });
+}
 `,
       );
 
+      expect(workspace.access("trace")).toEqual([
+        { table: "trace_summaries", line: 3, write: true },
+      ]);
       expect(workspace.messages()).toEqual([]);
     });
   });
@@ -128,6 +161,21 @@ export const sql = \`INSERT INTO \${traceSummaries.$table.name} (TenantId) VALUE
         `import { clickhouseRead } from "@langwatch/clickhouse-client/builder";
 import { summaries } from "./clickhouse.trace-summaries.table.ts";
 export const read = () => clickhouseRead({ scope }).from(summaries).build();
+`,
+      );
+
+      expect(workspace.messages()).toEqual(["analytics reads trace_summaries, owned by trace."]);
+    });
+
+    /** @scenario "A builder read from a foreign descriptor is a foreign read" */
+    it("reads a builder call with a space before its bracket", () => {
+      const workspace = fixture();
+      workspace.traceOwns();
+      workspace.write(`${ANALYTICS_CLICKHOUSE}/clickhouse.trace-summaries.table.ts`, DESCRIPTOR);
+      workspace.write(
+        `${ANALYTICS_CLICKHOUSE}/summary-read.repository.ts`,
+        `import { summaries } from "./clickhouse.trace-summaries.table.ts";
+export const read = () => clickhouseRead({ scope }).from (summaries).build();
 `,
       );
 
@@ -210,10 +258,14 @@ export function read() {
       expect(workspace.messages(SHARED)).toEqual([]);
     });
 
-    /** @scenario "A shadowing alias adds a read rather than hiding one" */
-    it("counts both tables a shadowed descriptor name may hold", () => {
+    /** @scenario "A shadowed descriptor name resolves to its nearest binding" */
+    it("resolves each read and write to the binding in scope where it is written", () => {
       const workspace = fixture();
       workspace.traceOwns();
+      workspace.write(
+        "packages/clickhouse-migrations/migrations/00002_create_analytics_own.sql",
+        "-- +goose Up\nCREATE TABLE IF NOT EXISTS analytics_own (TenantId String) ENGINE = MergeTree;\n",
+      );
       workspace.write(
         `${ANALYTICS_CLICKHOUSE}/clickhouse.own.table.ts`,
         `export const own = defineClickHouseTable({ name: "analytics_own", tenantColumn: "TenantId" });\n`,
@@ -223,14 +275,24 @@ export function read() {
         `${ANALYTICS_CLICKHOUSE}/summary-read.repository.ts`,
         `import { own } from "./clickhouse.own.table.ts";
 import { summaries } from "./clickhouse.trace-summaries.table.ts";
-export function read() {
-  { const own = summaries; void own; }
+export async function both(client: Client) {
+  {
+    const own = summaries;
+    clickhouseRead({ scope }).from(own).build();
+    await client.insert({ table: own.$table.name, values: [] });
+  }
+  await client.insert({ table: own.$table.name, values: [] });
   return clickhouseRead({ scope }).from(own).build();
 }
 `,
       );
 
-      expect(workspace.messages()).toEqual(["analytics reads trace_summaries, owned by trace."]);
+      expect(workspace.access("analytics")).toEqual([
+        { table: "trace_summaries", line: 6, write: false },
+        { table: "trace_summaries", line: 7, write: true },
+        { table: "analytics_own", line: 9, write: true },
+        { table: "analytics_own", line: 10, write: false },
+      ]);
     });
   });
 });

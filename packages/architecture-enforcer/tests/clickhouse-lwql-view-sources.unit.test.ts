@@ -53,8 +53,9 @@ CREATE TABLE IF NOT EXISTS \${CLICKHOUSE_DATABASE}.trace_summaries (TenantId Str
     view: (sourceTable: string) =>
       write(
         VIEW_CATALOGUE,
-        `export const TRACES = {\n  name: "traces",\n  sourceTable: "${sourceTable}",\n  columns: [],\n};\n`,
+        `export const TRACES: UngatedViewDefinition = {\n  name: "traces",\n  sourceTable: "${sourceTable}",\n  columns: [],\n};\n`,
       ),
+    write,
     reads: () =>
       clickhouseScanAt(root, CATALOGUE)
         .access.filter((entry) => entry.module === "analytics")
@@ -87,6 +88,24 @@ describe("LangWatchQL view sources", () => {
       workspace.view("trace_summaries");
 
       expect(workspace.messages(SHARED)).toEqual([]);
+    });
+  });
+
+  describe("given objects that only look like a view", () => {
+    /** @scenario "A sourceTable outside a LangWatchQL view declaration is not a read" */
+    it("reads a catalogue table's source and never untyped metadata's", () => {
+      const workspace = fixture();
+      workspace.write(
+        VIEW_CATALOGUE,
+        `const migrationNotes = { sourceTable: "trace_summaries" };
+export const TRACES_TABLE = defineTableCatalogue({
+  sourceTable: "trace_summaries",
+  columns: {},
+});
+`,
+      );
+
+      expect(workspace.reads()).toEqual([{ table: "trace_summaries", write: false }]);
     });
   });
 

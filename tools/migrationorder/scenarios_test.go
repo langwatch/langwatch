@@ -281,6 +281,32 @@ func TestStepsFreezesOnlyAReleasedReplayStepCall(t *testing.T) {
 	}
 }
 
+// idIndexFindings commits each file's base on main, under a manifest
+// releasing the gateway, ops and coding-agent id-index steps, then each
+// changed head on a branch, and returns the step findings.
+func idIndexFindings(t *testing.T, files map[string][2]string) []migrationorder.Finding {
+	t.Helper()
+	root := initRepo(t)
+	for file, versions := range files {
+		writeAndCommit(t, root, file, versions[0])
+	}
+	writeAndCommit(t, root, "packages/upgrade/releases/3.21.0.json", `{"release":"3.21.0","steps":[
+  {"id":"gateway:fill-id-indexes","kind":"data","mode":"background","owner":"gateway","description":"g"},
+  {"id":"ops:fill-event-log-id-index","kind":"data","mode":"background","owner":"ops","description":"o"},
+  {"id":"coding-agent:fill-id-indexes","kind":"data","mode":"background","owner":"coding-agent","description":"c"}]}`)
+	gitIn(t, root, "checkout", "-q", "-b", "feature")
+	for file, versions := range files {
+		if versions[1] != versions[0] {
+			writeAndCommit(t, root, file, versions[1])
+		}
+	}
+	in, err := migrationorder.Repo{Root: root}.Steps(t.Context(), "main")
+	if err != nil {
+		t.Fatal(err)
+	}
+	return migrationorder.CheckSteps(in)
+}
+
 // @scenario "A released id-index step is frozen in its declaring call, not where another step orders after it"
 func TestStepsFreezesAReleasedIdIndexStepInItsDeclaringCall(t *testing.T) {
 	const (
@@ -293,24 +319,7 @@ func TestStepsFreezesAReleasedIdIndexStepInItsDeclaringCall(t *testing.T) {
 	)
 	findingsAfter := func(t *testing.T, gatewayHead, opsHead string) []migrationorder.Finding {
 		t.Helper()
-		root := initRepo(t)
-		writeAndCommit(t, root, gatewayFile, gateway)
-		writeAndCommit(t, root, opsFile, ops)
-		writeAndCommit(t, root, "packages/upgrade/releases/3.21.0.json", `{"release":"3.21.0","steps":[
-  {"id":"gateway:fill-id-indexes","kind":"data","mode":"background","owner":"gateway","description":"g"},
-  {"id":"ops:fill-event-log-id-index","kind":"data","mode":"background","owner":"ops","description":"o"},
-  {"id":"coding-agent:fill-id-indexes","kind":"data","mode":"background","owner":"coding-agent","description":"c"}]}`)
-		gitIn(t, root, "checkout", "-q", "-b", "feature")
-		for file, heads := range map[string][2]string{gatewayFile: {gateway, gatewayHead}, opsFile: {ops, opsHead}} {
-			if heads[1] != heads[0] {
-				writeAndCommit(t, root, file, heads[1])
-			}
-		}
-		in, err := migrationorder.Repo{Root: root}.Steps(t.Context(), "main")
-		if err != nil {
-			t.Fatal(err)
-		}
-		return migrationorder.CheckSteps(in)
+		return idIndexFindings(t, map[string][2]string{gatewayFile: {gateway, gatewayHead}, opsFile: {ops, opsHead}})
 	}
 	unrelated := strings.Replace(ops, "  .withEventing(usageEventing)\n", "  .withEventing(usageEventing)\n  .withEventing(replayEventing)\n", 1)
 	if findings := findingsAfter(t, gateway, unrelated); len(findings) != 0 {
@@ -335,6 +344,56 @@ func TestStepsFreezesAReleasedIdIndexStepInItsDeclaringCall(t *testing.T) {
 				t.Errorf("want one finding on %s %q, got %+v", c.entry, c.problem, findings)
 			}
 		})
+	}
+}
+
+// @scenario "A released id-index step is read from its owner's call in code"
+func TestStepsReadsAReleasedIdIndexStepFromItsOwnersCallInCode(t *testing.T) {
+	const (
+		gatewayFile = "modules/gateway/process/src/gateway.module.ts"
+		opsFile     = "modules/ops/process/src/ops.module.ts"
+		otherFile   = "modules/other/process/src/other.module.ts"
+		gatewayCall = ".withIdIndexes (GATEWAY_ID_INDEXES, {\n  description: \"Fills gateway.\",\n})"
+		opsCall     = ".withIdIndexes([EVENT_LOG_ID_INDEX], {\n  // step: \"old-name\",\n  step: \"fill-event-log-id-index\",\n  after: [\"gateway:fill-id-indexes\"],\n})"
+		gateway     = "export const gateway = defineProcessModule(\"gateway\")\n  " + gatewayCall + ";\n"
+		ops         = "export const ops = defineProcessModule(\"ops\")\n  " + opsCall + ";\n"
+		removed     = "export const gateway = defineProcessModule(\"gateway\");\n"
+		other       = "// mirrors defineProcessModule(\"gateway\")\nexport const other = defineProcessModule(\"other\")\n  " + gatewayCall + ";\n"
+	)
+	cases := []struct {
+		name, problem, entry string
+		files                map[string][2]string
+	}{
+		{"a space before the bracket", "declares gateway:fill-id-indexes", gatewayFile, map[string][2]string{
+			gatewayFile: {gateway, strings.Replace(gateway, "Fills gateway.", "Fills more.", 1)}, opsFile: {ops, ops},
+		}},
+		{"a comment naming another step", "declares ops:fill-event-log-id-index", opsFile, map[string][2]string{
+			gatewayFile: {gateway, gateway}, opsFile: {ops, strings.Replace(ops, "[EVENT_LOG_ID_INDEX]", "[EVENT_LOG_ID_INDEX, MORE]", 1)},
+		}},
+		{"the call commented out", "released step gateway:fill-id-indexes was removed", gatewayFile, map[string][2]string{
+			gatewayFile: {gateway, strings.Replace(gateway, gatewayCall, "/* "+gatewayCall+" */", 1)}, opsFile: {ops, ops},
+		}},
+		{"another module's identical call", "released step gateway:fill-id-indexes was removed", gatewayFile, map[string][2]string{
+			gatewayFile: {gateway, removed}, opsFile: {ops, ops}, otherFile: {other, other},
+		}},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			findings := idIndexFindings(t, c.files)
+			if len(findings) != 1 || findings[0].Entry != c.entry || !strings.Contains(findings[0].Problem, c.problem) {
+				t.Errorf("want one finding on %s %q, got %+v", c.entry, c.problem, findings)
+			}
+		})
+	}
+}
+
+// @scenario "An after list with a comment before its bracket is still a reference"
+func TestStepsTreatsAnAfterListBehindACommentAsAReference(t *testing.T) {
+	const file = "modules/gateway/process/src/gateway.module.ts"
+	base := "export const gateway = defineProcessModule(\"gateway\")\n  .withIdIndexes(GATEWAY_ID_INDEXES, {\n    after: /* dependency */ [\"coding-agent:fill-id-indexes\"],\n  });\n"
+	head := "import { more } from \"./more\";\n" + base
+	if findings := idIndexFindings(t, map[string][2]string{file: {base, head}}); len(findings) != 0 {
+		t.Errorf("an unrelated line beside a commented after list, want no finding, got %+v", findings)
 	}
 }
 

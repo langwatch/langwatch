@@ -110,8 +110,8 @@ export const featureSourceLayoutRule = defineRule({
       what: `\`{{name}}\` is a process artifact: contract source holds none of ${PROCESS_ONLY_ARTIFACT_LIST}.`,
       why: "A contract is the module's public, runtime-neutral surface; a process artifact there leaks internals.",
       fix:
-        "Move it into `modules/{{feature}}/process/src/`: `.repository`, `.store` and" +
-        " `.mapper` under `repositories/`, `.channel` under `channels/`, `.projection`," +
+        "Move it into `modules/{{feature}}/process/src/`: `.repository`, `.store`, `.mapper`" +
+        " and `.table` under `repositories/`, `.channel` under `channels/`, `.projection`," +
         " `.subscriber`, `.process` and `.intent` under `eventing/`, `.rules` under" +
         " `rules/`, `.task` under `tasks/`, `.migration` under `migrations/`, and any" +
         " `.api` other than `{{feature}}.api.ts` as `transport/{{feature}}.<rest|trpc|ws>.ts`.",

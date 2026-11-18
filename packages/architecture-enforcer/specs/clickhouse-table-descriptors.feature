@@ -3,8 +3,9 @@ Feature: ClickHouse table descriptors in the table-ownership policy
   `defineClickHouseTable({ name: "..." })`, instead of a string literal. The
   clickhouse-table-ownership policy resolves a descriptor to its table, so a
   ported repository keeps its owner, its writes and its reads. A module that
-  declares a descriptor of another module's table is a reader of it, admitted
-  only by that table's share declaration.
+  reads a table through another module's descriptor, or its own copy of one,
+  is a reader of it, admitted only by that table's share declaration; declaring
+  a descriptor alone is not access.
 
   Background:
     Given the policy reads the table list from the goose migrations
@@ -23,11 +24,19 @@ Feature: ClickHouse table descriptors in the table-ownership policy
     Then trace owns trace_summaries
 
   @unit @architecture
+  Scenario: A database-qualified insert through a descriptor's table name is a write
+    Given trace declares a descriptor of trace_summaries
+    When trace's repository inserts into `${database}.${descriptor.$table.name}`
+    Then trace writes trace_summaries
+    And the same insert through a name nothing binds records no write
+
+  @unit @architecture
   Scenario: A builder read from a foreign descriptor is a foreign read
     Given trace writes trace_summaries
     And analytics declares its own descriptor of trace_summaries
     When analytics' repository reads from that descriptor with the builder
     Then the policy reports that analytics reads trace_summaries, owned by trace
+    And a space before the builder call's bracket changes nothing
 
   @unit @architecture
   Scenario: A builder join on a foreign descriptor is a foreign read
@@ -67,7 +76,8 @@ Feature: ClickHouse table descriptors in the table-ownership policy
     And the read passes once trace shares trace_summaries with analytics
 
   @unit @architecture
-  Scenario: A shadowing alias adds a read rather than hiding one
-    Given analytics binds a foreign descriptor to a local name that shadows its own descriptor
-    When analytics reads from that name
-    Then the policy counts a read of trace_summaries as well
+  Scenario: A shadowed descriptor name resolves to its nearest binding
+    Given analytics binds a foreign descriptor, inside a block, to a local name that shadows its own descriptor
+    When analytics reads and inserts through that name inside the block and outside it
+    Then the accesses inside the block are of trace_summaries
+    And the accesses outside it are of analytics' own table

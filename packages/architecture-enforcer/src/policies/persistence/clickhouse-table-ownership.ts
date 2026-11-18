@@ -38,7 +38,7 @@ const SUBSTITUTED_TABLE = new RegExp(
   "gi",
 );
 const NAMES_TABLE_BY_BINDING = new RegExp(
-  `\\b${VERB}\\s+${DATABASE_PREFIX}\\$\\{|\\btable\\s*:\\s*[A-Za-z_$]|\\$table\\.name|\\.(?:from|innerJoin|leftJoin)\\(`,
+  `\\b${VERB}\\s+${DATABASE_PREFIX}\\$\\{|\\btable\\s*:\\s*[A-Za-z_$]|\\$table\\.name|\\.(?:from|innerJoin|leftJoin)\\s*\\(`,
   "i",
 );
 const READING_VERBS = new Set(["from", "join"]);
@@ -47,6 +47,9 @@ const DESCRIPTOR_READS = new Set(["from", "innerJoin", "leftJoin"]);
 const DESCRIPTOR_NAME = ".$table.name";
 /** The key a LangWatchQL view (or its catalogue table) names the ClickHouse table it reads by. */
 const LWQL_VIEW_SOURCE = "sourceTable";
+/** A view is declared as a `*ViewDefinition`, its catalogue table through this call. */
+const LWQL_VIEW_TYPE_SUFFIX = "ViewDefinition";
+const LWQL_CATALOGUE_CALL = "defineTableCatalogue";
 
 export type Access = { module: string; table: string; file: string; line: number; write: boolean };
 type ScanRoot = { module: string; directory: string };
@@ -136,13 +139,13 @@ export const DECLARED_OWNERSHIP: DeclaredOwnership = {
     {
       reader: "trace",
       table: "instant_eval_judgments",
-      file: "modules/trace/process/src/features/query/repositories/clickhouse/clickhouse.trace-filter-condition.mapper.ts",
+      file: "modules/trace/process/src/features/query/rules/trace-query-subquery.rules.ts",
       reason: SUBQUERY,
     },
     {
       reader: "trace",
       table: "simulation_runs",
-      file: "modules/trace/process/src/features/query/repositories/clickhouse/clickhouse.trace-filter-condition.mapper.ts",
+      file: "modules/trace/process/src/features/query/rules/trace-query-subquery.rules.ts",
       reason: SUBQUERY,
     },
     {
@@ -565,7 +568,6 @@ type ConstantScope = {
   scopes: Map<string, ReadonlyMap<string, string>>;
   /** A depth-cut result per (remaining depth, file); a cycle-cut one is never kept. */
   bounded: Map<string, Bounded>;
-  resolved: Map<string, string | undefined>;
   cut: { cycles: number; depth: number };
   /** The files each walk in progress reached without a full cached result. */
   visiting: Set<string>[];
@@ -633,25 +635,6 @@ function addReExports(constants: Map<string, string>, statement: ts.Statement, t
       target.get(exported + DESCRIPTOR_NAME),
     );
   }
-}
-
-/** The resolver per (file, specifier) once: the walk below re-reaches the same imports. */
-function resolveOnce({
-  scope,
-  specifier,
-  file,
-}: {
-  scope: ConstantScope;
-  specifier: string;
-  file: string;
-}): string | undefined {
-  const key = `${file}\0${specifier}`;
-  if (scope.resolved.has(key)) return scope.resolved.get(key);
-
-  const target = scope.resolver.resolve({ specifier, file });
-  scope.resolved.set(key, target);
-
-  return target;
 }
 
 /** A file already on the trail, or past the depth limit, is cut and counted. */
@@ -731,7 +714,7 @@ function constantsOf({
   const source = sourceFile({ file });
   const constants = literalConstants(source);
   const through: Through = (specifier) => {
-    const target = resolveOnce({ scope, specifier, file });
+    const target = scope.resolver.resolve({ specifier, file });
 
     return target ? constantsOf({ file: target, scope, trail: [...trail, file] }) : new Map();
   };
@@ -748,7 +731,8 @@ function constantsOf({
   if (scope.cut.cycles !== cycles) return constants;
 
   if (scope.cut.depth === depth) scope.scopes.set(file, constants);
-  else scope.bounded.set(key, { constants, visited, checkedAt: scope.scopes.size });
+  // Unchecked: a file this walk cut may have resolved in full later in the same walk.
+  else scope.bounded.set(key, { constants, visited, checkedAt: -1 });
 
   return constants;
 }
@@ -758,7 +742,6 @@ type Reader = {
   module: string;
   tables: ReadonlyMap<string, string>;
   constant: (name: string) => string | undefined;
-  aliases: () => ReadonlyMap<string, ReadonlySet<string>>;
   found: Access[];
 };
 
@@ -790,7 +773,7 @@ function readSql(reader: Reader, node: ts.Node): void {
   }
 
   for (const match of text.matchAll(SUBSTITUTED_TABLE)) {
-    const table = reader.constant(match[2] ?? "");
+    const table = substitutedTable({ reader, node, text: match[2] ?? "" });
     if (table)
       record({ reader, node, table, write: !READING_VERBS.has((match[1] ?? "").toLowerCase()) });
   }
@@ -814,88 +797,146 @@ function insertedTable(reader: Reader, node: ts.CallExpression): string | undefi
   const value = property.initializer;
   if (ts.isStringLiteralLike(value)) return value.text;
 
-  if (ts.isTemplateExpression(value)) return qualifiedConstant(reader, value);
+  if (ts.isTemplateExpression(value)) return qualifiedTable(reader, value);
 
   return namedTable(reader, value);
 }
 
-/** A constant, or a descriptor's (or its alias's) `$table.name`, naming a table. */
+/** A constant, or a descriptor's `$table.name` resolved where it is written, naming a table. */
 function namedTable(reader: Reader, value: ts.Expression): string | undefined {
   if (ts.isIdentifier(value)) return reader.constant(value.text);
 
-  if (!ts.isPropertyAccessExpression(value)) return void 0;
+  const descriptor = descriptorNameOf(value);
+  if (descriptor !== undefined) return descriptorAt({ reader, node: value, name: descriptor });
 
-  const text = value.getText(reader.source);
-
-  return reader.constant(text) ?? [...(reader.aliases().get(text) ?? [])][0];
+  return ts.isPropertyAccessExpression(value)
+    ? reader.constant(value.getText(reader.source))
+    : void 0;
 }
 
-/** Every table a descriptor name may hold: its binding and each local alias of that name. */
-function descriptorTables(reader: Reader, name: string): string[] {
-  const key = name + DESCRIPTOR_NAME;
-  const bound = reader.constant(key);
+/** `name` in `name.$table.name`, when the expression is a descriptor's table name. */
+function descriptorNameOf(value: ts.Expression): string | undefined {
+  if (!ts.isPropertyAccessExpression(value) || value.name.text !== "name") return void 0;
 
-  return [...new Set([...(bound ? [bound] : []), ...(reader.aliases().get(key) ?? [])])];
+  const table = value.expression;
+  if (!ts.isPropertyAccessExpression(table) || table.name.text !== "$table") return void 0;
+
+  return ts.isIdentifier(table.expression) ? table.expression.text : void 0;
+}
+
+/** `${CONSTANT}` or `${descriptor.$table.name}` substituted into SQL at `node`. */
+function substitutedTable({
+  reader,
+  node,
+  text,
+}: {
+  reader: Reader;
+  node: ts.Node;
+  text: string;
+}): string | undefined {
+  const name = text.endsWith(DESCRIPTOR_NAME) ? text.slice(0, -DESCRIPTOR_NAME.length) : "";
+
+  return /^[A-Za-z_$][\w$]*$/.test(name)
+    ? descriptorAt({ reader, node, name })
+    : reader.constant(text);
 }
 
 /** `.from(descriptor)` and the builder's joins: the descriptor names the table read. */
-function descriptorReads(reader: Reader, node: ts.CallExpression): string[] {
-  if (!ts.isPropertyAccessExpression(node.expression)) return [];
+function descriptorRead(reader: Reader, node: ts.CallExpression): string | undefined {
+  if (!ts.isPropertyAccessExpression(node.expression)) return void 0;
 
-  if (!DESCRIPTOR_READS.has(node.expression.name.text)) return [];
+  if (!DESCRIPTOR_READS.has(node.expression.name.text)) return void 0;
 
   const [table] = node.arguments;
 
-  return table && ts.isIdentifier(table) ? descriptorTables(reader, table.text) : [];
+  return table && ts.isIdentifier(table)
+    ? descriptorAt({ reader, node, name: table.text })
+    : void 0;
+}
+
+type Binding = ts.VariableDeclaration | ts.ParameterDeclaration;
+
+const LOOP_HEADS = new Set([
+  ts.SyntaxKind.ForStatement,
+  ts.SyntaxKind.ForOfStatement,
+  ts.SyntaxKind.ForInStatement,
+]);
+
+function isLoopHead(
+  node: ts.Node,
+): node is ts.ForStatement | ts.ForOfStatement | ts.ForInStatement {
+  return LOOP_HEADS.has(node.kind);
+}
+
+/** The variable lists a scope declares itself: a block's statements or a loop's head. */
+function declaredLists(scope: ts.Node): ts.VariableDeclarationList[] {
+  if (isLoopHead(scope))
+    return scope.initializer && ts.isVariableDeclarationList(scope.initializer)
+      ? [scope.initializer]
+      : [];
+
+  const holdsStatements =
+    ts.isBlock(scope) ||
+    ts.isSourceFile(scope) ||
+    ts.isModuleBlock(scope) ||
+    ts.isCaseOrDefaultClause(scope);
+  if (!holdsStatements) return [];
+
+  return scope.statements.filter(ts.isVariableStatement).map((entry) => entry.declarationList);
+}
+
+/** The declaration `name` refers to at `node`: the nearest enclosing scope's own. */
+function nearestBinding(node: ts.Node, name: string): Binding | undefined {
+  const named = (binding: Binding) => ts.isIdentifier(binding.name) && binding.name.text === name;
+
+  for (let scope = node.parent; scope; scope = scope.parent) {
+    const parameter = ts.isFunctionLike(scope) ? scope.parameters.find(named) : void 0;
+    const declared = declaredLists(scope).flatMap((list) => [...list.declarations]);
+    const binding = parameter ?? declared.find(named);
+    if (binding) return binding;
+  }
+
+  return void 0;
 }
 
 /**
- * `const ledger = descriptor` at any depth: the alias names the same table. Every
- * binding of a name is kept, so a shadowing alias adds a read rather than hiding one.
+ * The table the descriptor `name` holds at `node`: its nearest binding, followed
+ * through `const alias = descriptor`; a file-level or imported one is a constant.
  */
-function descriptorAliases(
-  source: ts.SourceFile,
-  constant: (name: string) => string | undefined,
-): Map<string, Set<string>> {
-  const aliases = new Map<string, Set<string>>();
-  const visit = (node: ts.Node): void => {
-    if (ts.isVariableDeclaration(node)) addAlias({ aliases, constant, declaration: node });
+function descriptorAt({
+  reader,
+  node,
+  name,
+  hops = 0,
+}: {
+  reader: Reader;
+  node: ts.Node;
+  name: string;
+  hops?: number;
+}): string | undefined {
+  const binding = nearestBinding(node, name);
+  if (!binding) return reader.constant(name + DESCRIPTOR_NAME);
 
-    ts.forEachChild(node, visit);
-  };
+  if (ts.isParameter(binding) || hops > MAX_IMPORT_DEPTH) return void 0;
 
-  visit(source);
+  const aliased = aliasedKey(binding);
+  if (aliased) return descriptorAt({ reader, node: binding, name: aliased, hops: hops + 1 });
 
-  return aliases;
+  if (ts.isSourceFile(binding.parent.parent.parent)) return reader.constant(name + DESCRIPTOR_NAME);
+
+  const value = binding.initializer;
+
+  return value ? describedTable(ts.isAsExpression(value) ? value.expression : value) : void 0;
 }
 
-/** The descriptor key a declaration's identifier initialiser names, if it has one. */
+/** The descriptor name a declaration's identifier initialiser aliases, if it has one. */
 function aliasedKey(declaration: ts.VariableDeclaration): string | undefined {
   const initialiser = declaration.initializer;
   if (!initialiser) return void 0;
 
   const value = ts.isAsExpression(initialiser) ? initialiser.expression : initialiser;
 
-  return ts.isIdentifier(value) ? value.text + DESCRIPTOR_NAME : void 0;
-}
-
-function addAlias({
-  aliases,
-  constant,
-  declaration,
-}: {
-  aliases: Map<string, Set<string>>;
-  constant: (name: string) => string | undefined;
-  declaration: ts.VariableDeclaration;
-}): void {
-  const target = aliasedKey(declaration);
-  if (!target || !ts.isIdentifier(declaration.name)) return;
-
-  const bound = constant(target);
-  const tables = [...(bound ? [bound] : []), ...(aliases.get(target) ?? [])];
-  const key = declaration.name.text + DESCRIPTOR_NAME;
-
-  for (const table of tables) aliases.set(key, (aliases.get(key) ?? new Set()).add(table));
+  return ts.isIdentifier(value) ? value.text : void 0;
 }
 
 function isInsertOptions(node: ts.Node): boolean {
@@ -918,25 +959,42 @@ function readTable(reader: Reader, property: ts.Node): string | undefined {
   return namedTable(reader, initializer);
 }
 
-/** A LangWatchQL view's `sourceTable: "<table>"` reads that table (ADR-202, Decided 21). */
+/**
+ * A LangWatchQL view's `sourceTable: "<table>"` reads that table (ADR-202, Decided 21):
+ * a `*ViewDefinition` declaration's own key, or a `defineTableCatalogue({ ... })` one.
+ */
 function viewSource(property: ts.Node): string | undefined {
   if (!ts.isPropertyAssignment(property) || !ts.isIdentifier(property.name)) return void 0;
 
-  if (property.name.text !== LWQL_VIEW_SOURCE) return void 0;
+  if (property.name.text !== LWQL_VIEW_SOURCE || !isViewDeclaration(property.parent)) return void 0;
 
   return ts.isStringLiteralLike(property.initializer) ? property.initializer.text : void 0;
 }
 
-/** `${database}.${CONSTANT}`: the table is the declared constant after the database dot. */
-function qualifiedConstant(reader: Reader, template: ts.TemplateExpression): string | undefined {
+function isViewDeclaration(object: ts.Node): boolean {
+  const owner = object.parent;
+  if (ts.isCallExpression(owner))
+    return ts.isIdentifier(owner.expression) && owner.expression.text === LWQL_CATALOGUE_CALL;
+
+  const type =
+    ts.isVariableDeclaration(owner) || ts.isSatisfiesExpression(owner) ? owner.type : void 0;
+
+  return (
+    type !== undefined &&
+    ts.isTypeReferenceNode(type) &&
+    ts.isIdentifier(type.typeName) &&
+    type.typeName.text.endsWith(LWQL_VIEW_TYPE_SUFFIX)
+  );
+}
+
+/** `${database}.${table}`: the table is the constant or descriptor name after the database dot. */
+function qualifiedTable(reader: Reader, template: ts.TemplateExpression): string | undefined {
   const spans = template.templateSpans;
   const last = spans[spans.length - 1];
   if (!last || spans.length < 2 || last.literal.text !== "") return void 0;
 
-  if (!ts.isIdentifier(last.expression)) return void 0;
-
   const before = spans[spans.length - 2]?.literal.text;
-  return before === "." ? reader.constant(last.expression.text) : void 0;
+  return before === "." ? namedTable(reader, last.expression) : void 0;
 }
 
 /** An insert's table is a write; a builder read from a descriptor is a read. */
@@ -944,8 +1002,8 @@ function readCall(reader: Reader, node: ts.CallExpression): void {
   const table = insertedTable(reader, node);
   if (table) record({ reader, node, table, write: true });
 
-  for (const described of descriptorReads(reader, node))
-    record({ reader, node, table: described, write: false });
+  const described = descriptorRead(reader, node);
+  if (described) record({ reader, node, table: described, write: false });
 }
 
 function readFile({
@@ -974,9 +1032,7 @@ function readFile({
   let imported: ReadonlyMap<string, string> | undefined;
   const constant = (name: string): string | undefined =>
     local.get(name) ?? (imported ??= constantsOf({ file, scope })).get(name);
-  let collected: Map<string, Set<string>> | undefined;
-  const aliases = () => (collected ??= descriptorAliases(source, constant));
-  const reader: Reader = { source, module, tables, constant, aliases, found };
+  const reader: Reader = { source, module, tables, constant, found };
 
   const visit = (node: ts.Node): void => {
     if (ts.isStringLiteralLike(node)) readSql(reader, node);
@@ -1006,7 +1062,6 @@ export function collectAccess(
     resolver: workspaceModuleResolver({ root }),
     scopes: new Map(),
     bounded: new Map(),
-    resolved: new Map(),
     cut: { cycles: 0, depth: 0 },
     visiting: [],
   };

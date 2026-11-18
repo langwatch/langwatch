@@ -114,6 +114,13 @@ Feature: The clickhouse-table-ownership lint rule
     Then the later read resolves the deeper file's constant
 
   @unit
+  Scenario: A depth-cut constant set is refreshed when a file below it resolves in full during the same read
+    Given a file whose first import reaches a deeper file at the import depth limit
+    And whose later import resolves that deeper file in full within the same read
+    When a later read reaches the first file at the same depth
+    Then the later read resolves the deeper file's constant
+
+  @unit
   Scenario: A table only a materialised view fills belongs to the module writing the view's source
     Given a materialised view copies a table the trace module writes into a second table
     And no module inserts into the second table

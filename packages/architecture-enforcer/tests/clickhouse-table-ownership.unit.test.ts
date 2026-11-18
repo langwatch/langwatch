@@ -288,6 +288,21 @@ export const sql = \`INSERT INTO \${B} (TenantId) VALUES (1)\`;
 
       expect(workspace.readers()).toEqual([second, third]);
     });
+
+    /** @scenario "A depth-cut constant set is refreshed when a file below it resolves in full during the same read" */
+    it("re-reads a depth-cut file whose later import resolved the cut file in full", () => {
+      const workspace = fixture();
+      chain(workspace.write, ["e1", "e2", "e3", "e4", "e5", "b", "q", "y"]);
+      workspace.write(
+        "lib/e5.ts",
+        `export { T } from "./b.ts";\nimport { T as Direct } from "./y.ts";\n`,
+      );
+      workspace.write("lib/y.ts", `export const T = "trace_summaries";\n`);
+      workspace.write(first, importingReader("T", "e1"));
+      workspace.write(second, importingReader("T", "e1"));
+
+      expect(workspace.readers()).toEqual([second]);
+    });
   });
 
   describe("given two modules write one table", () => {
