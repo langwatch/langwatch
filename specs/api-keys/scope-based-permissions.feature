@@ -23,13 +23,13 @@ Feature: API Key Scope and Fine-Grained Permissions
 
   # ── Scope selector (ScopeChipPicker with quick-pick pills) ──
 
-  @integration @unimplemented
+  @integration
   Scenario: Scope defaults to current project via quick-pick pill
     When I open the create API key drawer
     Then the "This project · <current project name>" pill is selected by default
     And the key will be scoped to the current project context
 
-  @integration @unimplemented
+  @integration
   Scenario: Scope quick-picks show Organization, This team, This project, Multiple
     When I open the create API key drawer
     Then I see pill buttons: Organization, "This team · <current team name>", "This project · <current project name>", Multiple
@@ -271,7 +271,7 @@ Feature: API Key Scope and Fine-Grained Permissions
 
   # ── Edit flow ───────────────────────────────────────────────
 
-  @integration @unimplemented
+  @integration
   Scenario: Edit drawer pre-populates scope from existing binding
     Given I have an API key scoped to a team
     When I open the edit drawer
