@@ -10,7 +10,10 @@ import type {
  * reading gateway's tables.
  */
 export interface NurturingVirtualKeyRepository {
-  /** Folds one fact in by `foldVirtualKeyFact`: a redelivered or late fact changes nothing. */
+  /**
+   * Folds one fact in by `foldVirtualKeyFactWithoutErased`: a redelivered or late fact changes
+   * nothing, and a marked person it names is stored nowhere.
+   */
   recordKeyFact(input: Readonly<{ fact: NurturingVirtualKeyFact }>): Promise<void>;
   /** The organization's copy of the key; empty when nurturing saw no fact of it. */
   findKey(

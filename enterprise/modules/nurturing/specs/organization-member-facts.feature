@@ -93,6 +93,13 @@ Feature: An organization's session facts reach every active member in Customer.i
     Then Customer.io identifies the person with has_traces true
 
   @unit
+  Scenario: An organization's fact about an erased admin still reaches its other members
+    Given an organization whose admin was erased, with another active member
+    When a first trace or a coding agent's first session of the organization is delivered
+    Then the other member is told it
+    And the erased admin gets no call
+
+  @unit
   Scenario: A busy organization sends one batch per debounce window
     When traces of project-1 and project-2 are delivered inside 300 seconds
     Then each member is identified once

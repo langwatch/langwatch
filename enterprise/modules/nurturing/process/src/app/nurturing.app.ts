@@ -104,10 +104,12 @@ export class NurturingModule implements NurturingApi {
       users: dependencies.users,
       memberFacts,
       members: repositories.members,
+      erasedUsers: repositories.erasedUsers,
       plans: repositories.plans,
     });
     const gatewayFacts = NurturingGatewayFactsService.create({
       keys: repositories.virtualKeys,
+      erasedUsers: repositories.erasedUsers,
       members: repositories.members,
       admins: memberFacts,
       logger: createLogger("langwatch:nurturing:gateway-facts"),
@@ -142,6 +144,7 @@ export class NurturingModule implements NurturingApi {
           organizationsCreated: repositories.organizationsCreated,
           milestones: repositories.milestones,
           members: repositories.members,
+          erasedUsers: repositories.erasedUsers,
           sendBatch: (calls) => customerIo.batchOrThrow(calls),
           clock: { nowMs: () => nowInstant().epochMilliseconds },
           logger,
@@ -153,6 +156,7 @@ export class NurturingModule implements NurturingApi {
       : void 0;
     const organizationCreated = customerIo
       ? NurturingOrganizationCreatedService.create({
+          erasedUsers: repositories.erasedUsers,
           sendBatch: (calls) => customerIo.batchOrThrow(calls),
           logger,
         })

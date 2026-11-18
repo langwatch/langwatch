@@ -5,6 +5,7 @@ import type {
 } from "@langwatch/enterprise-nurturing-contract";
 import type { CounterHandle } from "@langwatch/observability/metrics";
 
+import type { NurturingErasedUserRepository } from "../repositories/nurturing-erased-user.repository.ts";
 import type { NurturingMilestonesRepository } from "../repositories/nurturing-milestones.repository.ts";
 import type { NurturingOrganizationCreatedRepository } from "../repositories/nurturing-organization-created.repository.ts";
 import type { NurturingOrganizationMemberRepository } from "../repositories/nurturing-organization-member.repository.ts";
@@ -40,6 +41,11 @@ type OrganizationUsageDependencies = Readonly<{
   milestones: Pick<NurturingMilestonesRepository, "findOrganization">;
   /** Nurturing's own copy of the organizations' members, from the owners' member facts. */
   members: Pick<NurturingOrganizationMemberRepository, "findMembershipsOfMembers">;
+  /**
+   * Nurturing's erasure marks: a member row can still name an erased person (a worker stopped
+   * between a write and its re-check, or a row from before the marks), and no identify goes to one.
+   */
+  erasedUsers: Pick<NurturingErasedUserRepository, "findErased">;
   /** Rejects when Customer.io did not take the call, so the subscriber's job retries. */
   sendBatch: (calls: CioBatchCall[]) => Promise<void>;
   clock: Readonly<{ nowMs: () => number }>;
@@ -269,8 +275,8 @@ export class NurturingOrganizationUsageService {
 
   /**
    * The onboarding emails are person-triggered and read person attributes, so each member gets the
-   * traits too, unless they joined another organization since: that one's traits are theirs. A
-   * refused call throws; each caller decides whether it is retried.
+   * traits too, unless they joined another organization since: that one's traits are theirs, or
+   * were erased. A refused call throws; each caller decides whether it is retried.
    */
   private async mirrorOntoMembers({
     organizationId,
@@ -281,11 +287,13 @@ export class NurturingOrganizationUsageService {
     traits: CioOrganizationUsageTraits;
     counts: MirroredCounts;
   }>): Promise<void> {
-    const { members, sendBatch } = this.dependencies;
-    const userIds = membersWhoseLatestOrganizationIs({
+    const { members, erasedUsers, sendBatch } = this.dependencies;
+    const latestHere = membersWhoseLatestOrganizationIs({
       memberships: await members.findMembershipsOfMembers({ organizationId }),
       organizationId,
     });
+    const erased = new Set(await erasedUsers.findErased({ userIds: latestHere }));
+    const userIds = latestHere.filter((userId) => !erased.has(userId));
     counts.members = userIds.length;
     for (let start = 0; start < userIds.length; start += MEMBER_BATCH_SIZE) {
       const batch = userIds.slice(start, start + MEMBER_BATCH_SIZE);

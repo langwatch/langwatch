@@ -12,6 +12,7 @@ import type { UserApi } from "@langwatch/user-contract";
 
 import type { PostHogChannel } from "../channels/posthog.channel.ts";
 import type { NurturingClaimRepository } from "../repositories/nurturing-claim.repository.ts";
+import type { NurturingErasedUserRepository } from "../repositories/nurturing-erased-user.repository.ts";
 import type { NurturingOrganizationMemberRepository } from "../repositories/nurturing-organization-member.repository.ts";
 import type { NurturingOrganizationPlanRepository } from "../repositories/nurturing-organization-plan.repository.ts";
 import { fire as fireActivity } from "../rules/nurturing-activity-tracking-service.rules.ts";
@@ -100,6 +101,8 @@ export class NurturingDeliveryService {
       memberFacts: NurturingMemberFactsService;
       /** Nurturing's member copy: a person is told the plan of their latest organization only. */
       members: Pick<NurturingOrganizationMemberRepository, "findMembershipsOfUsers">;
+      /** Nurturing's erasure marks: no signal reaches an erased person. */
+      erasedUsers: Pick<NurturingErasedUserRepository, "findErased">;
       /** Nurturing's plan copy: a subscription fact that does not change it sends nothing. */
       plans: NurturingOrganizationPlanRepository;
     }>,
@@ -136,13 +139,19 @@ export class NurturingDeliveryService {
     });
   }
 
-  /** `key` names the signal: its kind and source event. A first session also tells its members. */
-  async deliver({ key, signal }: { key: string; signal: NurturingSignal }): Promise<void> {
+  /**
+   * `key` names the signal: its kind and source event. A first session also tells its members. No
+   * erased person hears it, however late it lands.
+   */
+  async deliver({ key, signal: named }: { key: string; signal: NurturingSignal }): Promise<void> {
+    const catchUp = named.kind === "subscription_changed" && named.fromCatchUp === true;
+    if (!catchUp && !this.deps.customerIo && !this.deps.posthog) return;
+    const { signal, subjectErased } = await this.withoutErasedPeople(named);
     // Before any claim: a catch-up fact must fail, not vanish, when it is not delivered.
     if (signal.kind === "subscription_changed" && signal.fromCatchUp) {
       return this.parts.planSync.planCaughtUp(signal);
     }
-    if (!this.deps.customerIo && !this.deps.posthog) return;
+    if (subjectErased) return this.deliverToOthers({ key, signal });
     // Before the delivered claim: a replay it stops must still send a failed joined_organization.
     await this.parts.joinedOrganization?.deliver(signal);
     const deliveredClaim = `nurturing:${key}`;
@@ -154,6 +163,54 @@ export class NurturingDeliveryService {
     await this.identifyCodingAgentMembers(signal);
     await this.parts.ownCodingDelivery?.deliver(signal);
     if (memberBatch) this.identifyInBatches(memberBatch);
+  }
+
+  /**
+   * The signal without the people erasure marked: a marked member leaves its members, and a marked
+   * subject (its `userId`) is reported so nothing is sent to them. One read, before any claim, so a
+   * failed read fails the delivery and its retry acts.
+   */
+  private async withoutErasedPeople(
+    signal: NurturingSignal,
+  ): Promise<{ signal: NurturingSignal; subjectErased: boolean }> {
+    const subject = "userId" in signal ? [signal.userId] : [];
+    const members = "memberUserIds" in signal ? signal.memberUserIds : [];
+    const named = [...subject, ...members];
+    if (named.length === 0) return { signal, subjectErased: false };
+    const erased = new Set(await this.deps.erasedUsers.findErased({ userIds: named }));
+    if (erased.size === 0) return { signal, subjectErased: false };
+    return {
+      signal:
+        "memberUserIds" in signal
+          ? { ...signal, memberUserIds: signal.memberUserIds.filter((id) => !erased.has(id)) }
+          : signal,
+      subjectErased: subject.some((id) => erased.has(id)),
+    };
+  }
+
+  /**
+   * A signal about an erased person: nothing is sent to them. An organization's fact is still
+   * recorded and told to its other members, as a coding agent's first session still is.
+   */
+  private async deliverToOthers({
+    key,
+    signal,
+  }: {
+    key: string;
+    signal: NurturingSignal;
+  }): Promise<void> {
+    if (!isMemberFact(signal) && signal.kind !== "coding_agent_first_session") return;
+    const subject = "userId" in signal ? signal.userId : null;
+    const deliveredClaim = `nurturing:${key}`;
+    if (!(await this.deps.claims.claim(deliveredClaim, DELIVERED_WINDOW_SECONDS))) return;
+    if (await this.withinCustomerIoDebounce(signal)) return;
+    const memberBatch = await this.memberBatchOf({ signal, deliveredClaim });
+    await this.identifyCodingAgentMembers(signal);
+    if (!memberBatch) return;
+    this.identifyInBatches({
+      ...memberBatch,
+      userIds: memberBatch.userIds.filter((userId) => userId !== subject),
+    });
   }
 
   /**
@@ -217,10 +274,15 @@ export class NurturingDeliveryService {
     }
   }
 
-  /** Langy's failed guided turn: PostHog only, once per source event, never failing the fact. */
+  /**
+   * Langy's failed guided turn: PostHog only, once per source event, never to an erased person.
+   * Only a failed read of the erasure marks fails the fact, before its claim, so it retries.
+   */
   async deliverGuidedTurnFailed(data: GuidedOnboardingTurnFailedEventData): Promise<void> {
     const posthog = this.deps.posthog;
     if (!posthog) return;
+    const [erased] = await this.deps.erasedUsers.findErased({ userIds: [data.userId] });
+    if (erased) return;
     const key = `nurturing:guided_onboarding_turn_failed:${data.sourceEventId}`;
     if (!(await this.deps.claims.claim(key, DELIVERED_WINDOW_SECONDS))) return;
     try {

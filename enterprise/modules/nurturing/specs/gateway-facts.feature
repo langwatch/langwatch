@@ -162,11 +162,55 @@ Feature: Customer.io hears when a person's gateway key is created and when its b
     Then the key copy records the creation and stores no id for them
 
   @integration
-  Scenario: A late fact naming an erased person leaves the key's real holder in place
+  Scenario: A late fact naming an erased person ends the key with no holder, as if it landed first
     Given a key copy whose holder is another person, stamped T1
     And a person was erased
     When a holder fact naming the erased person, stamped T2 > T1, arrives
-    Then the key copy still names the other person as holder, stamped T1
+    Then the key copy names no holder, stamped T2, as when that fact landed before the erasure
+    And a fact naming the other person, stamped before T2, does not make them holder again
+
+  @integration
+  Scenario: A fact that lands while an erasure is committing still leaves the erased person off the key
+    Given key copies naming a person as holder on one and as creator on another
+    And that person's erasure mark has committed but its clearing of the key copies has not run
+    When a fact naming them as holder or creator is folded in
+    Then neither key copy names them
+    And the cleared holder keeps their stamp, as erasure's own clearing leaves it
+
+  @integration
+  Scenario: A key fact naming a marked person stores them nowhere even if its re-check never runs
+    Given a person's erasure mark is in Postgres
+    When a created fact naming them as holder and creator is written and its worker stops before the re-check
+    Then the write fails, and the key copy names no holder and no creator
+
+  @integration
+  Scenario: A holder change to another person, stamped before an erasure, still lands after it
+    Given a key copy whose holder is a person, stamped T1
+    And that person was erased
+    When a holder fact naming another person, stamped T2 > T1, arrives
+    Then the key copy names the other person as holder, stamped T2, as when it landed before the erasure
+
+  @unit @integration
+  Scenario: Two holder facts at one stamp, one naming an erased person, end the same in either order
+    Given a person was erased
+    When two holder facts stamped T, one naming them and one naming another person, arrive in either order
+    Then the key copy names the other person as holder, stamped T
+
+  @unit
+  Scenario: A key fact naming an erased person sends nothing to them
+    Given a person was erased
+    And organization's fact that they accepted an invitation, stamped before the erasure, lands after it
+    When gateway's created fact naming them as holder and creator is delivered
+    Then nurturing's member copy holds no row for them
+    And no identify or track goes to them, for the join or for the key
+    And virtual_key_created goes to the organization's admin
+    And no warning says a holder was passed over for a lagging member copy
+
+  @integration
+  Scenario: Which people are erased is read from the erasure marks in Postgres
+    Given two people's erasures were recorded in Postgres, one of them twice
+    When nurturing asks which of 2,500 people, those two among them, are erased
+    Then it names only the two erased people, each once, reading at most 1,000 ids at a time
 
   # --- AC Coverage Map (langwatch/tasks#1200) ---
   # AC 1: "null purpose counts as USER"          -> unit only: nurturing-virtual-key.rules.unit.test.ts
@@ -202,4 +246,10 @@ Feature: Customer.io hears when a person's gateway key is created and when its b
   # "key created after the erasure"              -> Scenario: A key is created for an erased person after their erasure
   # "late holder on a key with no holder"        -> Scenario: A holder change for an erased person arrives late on a key with no holder
   # "late created fact" (issue's Actual list)    -> Scenario: A late created fact never names an erased creator
-  # "real holder kept" (review)                  -> Scenario: A late fact naming an erased person leaves the key's real holder in place
+  # "erased holder null in any order"            -> Scenario: A late fact naming an erased person ends the key with no holder, as if it landed first
+  # "fact racing the erasure's commit"           -> Scenario: A fact that lands while an erasure is committing still leaves the erased person off the key
+  # "no send to an erased person"                -> Scenario: A key fact naming an erased person sends nothing to them
+  #                                               -> Scenario: Which people are erased is read from the erasure marks in Postgres
+  #                                               -> Scenario: A member fact landing after an erasure writes no member row in Postgres (project-usage.feature)
+  #                                               -> Scenario: A member fact landing while an erasure commits leaves no member row in Postgres (project-usage.feature)
+  # "hand-over after erasure kept"               -> Scenario: A holder change to another person, stamped before an erasure, still lands after it

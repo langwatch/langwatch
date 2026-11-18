@@ -23,7 +23,8 @@ export type NurturingVirtualKeyFact = Readonly<{
 /**
  * Nurturing's copy of one gateway key (`NurturingVirtualKey`). The name is the latest fact's; the
  * creator is the created fact's alone; the holder and purpose are each the latest non-null value,
- * stamped with its fact's time; each state time is its latest. Times are epoch ms, null unseen.
+ * stamped with its fact's time, and no holder when that names an erased person; each state time
+ * is its latest. Times are epoch ms, null unseen.
  */
 export type NurturingVirtualKey = Readonly<{
   virtualKeyId: string;
@@ -57,10 +58,15 @@ export function virtualKeyFactOf(data: RecordVkLifecycleCommandData): NurturingV
 
 type Stamped<Value> = Readonly<{ value: Value | null; at: number | null }>;
 
-/** The later of two stamped values; a null value never replaces one, and a tie keeps the held. */
+/**
+ * The later of two stamped values; a null value never replaces one, and a tie keeps the held
+ * unless it is null: a holder cleared for an erased person is filled by another fact at its stamp,
+ * so once a person is marked, their fact and another's at one stamp fold the same in either order.
+ */
 function laterNonNull<Value>(held: Stamped<Value>, incoming: Stamped<Value>): Stamped<Value> {
   if (incoming.value === null || incoming.at === null) return held;
-  return held.at === null || incoming.at > held.at ? incoming : held;
+  if (held.at === null || incoming.at > held.at) return incoming;
+  return held.value === null && incoming.at === held.at ? incoming : held;
 }
 
 type StateTime = Readonly<{
@@ -130,21 +136,18 @@ export function foldVirtualKeyFact({ held, fact }: KeyFold): NurturingVirtualKey
 
 /**
  * An erased account taken out of a key's copy: neither its creator nor its holder any more. A
- * cleared holder's stamp moves to the erasure, so no fact stamped before it can write them back.
+ * cleared holder keeps their stamp, so the key reads as `foldVirtualKeyFactWithoutErased` leaves
+ * it: no holder at the stamp of the fact that named them, which an older fact cannot fill and a
+ * later one naming someone else can.
  */
 export function forgetPersonOnKey({
   key,
   userId,
-  erasedAt,
-}: Readonly<{ key: NurturingVirtualKey; userId: string; erasedAt: number }>): NurturingVirtualKey {
-  const heldBy = key.principalUserId === userId;
+}: Readonly<{ key: NurturingVirtualKey; userId: string }>): NurturingVirtualKey {
   return {
     ...key,
     creatorUserId: key.creatorUserId === userId ? null : key.creatorUserId,
-    principalUserId: heldBy ? null : key.principalUserId,
-    principalUserIdAt: heldBy
-      ? Math.max(key.principalUserIdAt ?? 0, erasedAt)
-      : key.principalUserIdAt,
+    principalUserId: key.principalUserId === userId ? null : key.principalUserId,
   };
 }
 
@@ -157,22 +160,29 @@ export function erasedUserHashOf(userId: string): string {
 }
 
 /**
- * The fact with every erased person taken out, before it folds: an erased creator or holder reads
- * null, which the fold never stores. A fact stamped before an erasure can land after it, on a key
- * with no holder yet, on a key not copied yet, or as a late created fact; none names them again.
+ * One fact folded in with the erased people it names taken out of the roles it names them in, as
+ * the Postgres upsert and its re-check do: an erased holder it names leaves the key with no holder,
+ * stamped with the fact when it is the latest, so the key ends as when the fact landed before the
+ * erasure; an erased creator a created fact names is stored as none. A fact can land after the
+ * erasure on any key, copied or not.
  */
-export function withoutErasedPeople({
+export function foldVirtualKeyFactWithoutErased({
+  held,
   fact,
   isErased,
 }: Readonly<{
+  held: NurturingVirtualKey | null;
   fact: NurturingVirtualKeyFact;
   isErased: (userId: string) => boolean;
-}>): NurturingVirtualKeyFact {
-  const kept = (userId: string | null) => (userId !== null && isErased(userId) ? null : userId);
+}>): NurturingVirtualKey {
+  const key = foldVirtualKeyFact({ held, fact });
+  const clears = (named: string | null, stored: string | null) =>
+    named !== null && stored === named && isErased(named);
+  const creator = fact.action === "created" ? fact.actorUserId : null;
   return {
-    ...fact,
-    actorUserId: kept(fact.actorUserId),
-    principalUserId: kept(fact.principalUserId),
+    ...key,
+    creatorUserId: clears(creator, key.creatorUserId) ? null : key.creatorUserId,
+    principalUserId: clears(fact.principalUserId, key.principalUserId) ? null : key.principalUserId,
   };
 }
 

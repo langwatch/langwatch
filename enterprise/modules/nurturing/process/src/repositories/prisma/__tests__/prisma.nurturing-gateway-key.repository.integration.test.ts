@@ -21,7 +21,9 @@ import {
   type NurturingVirtualKeyFact,
 } from "../../../rules/nurturing-virtual-key.rules.ts";
 import { MemoryNurturingVirtualKeyRepository } from "../../memory/memory.nurturing-gateway-key.repository.ts";
+import { PrismaNurturingErasedUserRepository } from "../prisma.nurturing-erased-user.repository.ts";
 import { PrismaNurturingVirtualKeyRepository } from "../prisma.nurturing-gateway-key.repository.ts";
+import { stoppedBeforeRecheck } from "./nurturing-stopped-worker.test-helpers.ts";
 
 const databaseUrl = process.env.LANGWATCH_TEST_DATABASE_URL;
 const run = randomUUID();
@@ -185,7 +187,7 @@ describe.skipIf(!databaseUrl)("given nurturing's key copy in Postgres", () => {
       const stamped = (occurredAt: number) =>
         fact({ virtualKeyId, action: "rotated", principalUserId: lateErased, occurredAt });
       const twin = MemoryNurturingVirtualKeyRepository.create();
-      // T1 < T2 < now: both stamps are in 1970, the erasure's is the clock's.
+      // T1 < T2, both stamped in 1970.
       for (const repository of [keys, twin]) {
         await repository.recordKeyFact({ fact: stamped(1_000) });
         await repository.forgetUser({ userId: lateErased });
@@ -203,7 +205,6 @@ describe.skipIf(!databaseUrl)("given nurturing's key copy in Postgres", () => {
     it("copies the key naming no creator or holder, as the memory twin does", async () => {
       const person = erasedPerson("erased-before-copy");
       const virtualKeyId = keyId("copied-after-erasure");
-      // Stamped in 1970, so before the erasure's clock time.
       const created = fact({ virtualKeyId, actorUserId: person, principalUserId: person });
       const twin = MemoryNurturingVirtualKeyRepository.create();
       for (const repository of [keys, twin]) {
@@ -220,7 +221,7 @@ describe.skipIf(!databaseUrl)("given nurturing's key copy in Postgres", () => {
           keyCreatedAt: 1_000,
           creatorUserId: null,
           principalUserId: null,
-          principalUserIdAt: null,
+          principalUserIdAt: 1_000,
         },
       ]);
     });
@@ -249,7 +250,7 @@ describe.skipIf(!databaseUrl)("given nurturing's key copy in Postgres", () => {
 
       expect(held).toEqual(await twin.findKey(where));
       expect(held).toMatchObject([
-        { creatorUserId: "user-creator", principalUserId: null, principalUserIdAt: null },
+        { creatorUserId: "user-creator", principalUserId: null, principalUserIdAt: 2_000 },
       ]);
     });
   });
@@ -282,29 +283,140 @@ describe.skipIf(!databaseUrl)("given nurturing's key copy in Postgres", () => {
     });
   });
 
-  describe("when a later-stamped fact names an erased person as the holder of another's key", () => {
-    /** @scenario "A late fact naming an erased person leaves the key's real holder in place" */
-    it("keeps the real holder and their stamp, in Postgres as in the memory twin", async () => {
-      const person = erasedPerson("erased-not-holder");
-      const virtualKeyId = keyId("held-by-another");
+  describe("when a later fact naming an erased person lands before or after the erasure", () => {
+    /** @scenario "A late fact naming an erased person ends the key with no holder, as if it landed first" */
+    it("ends with no holder either way, in Postgres as in the memory twin", async () => {
+      const person = erasedPerson("erased-latest-holder");
+      const firstKey = keyId("erased-after-facts");
+      const thenKey = keyId("erased-between-facts");
+      const holderChange = (virtualKeyId: string) =>
+        fact({ virtualKeyId, action: "rotated", principalUserId: person, occurredAt: 2_000 });
       const twin = MemoryNurturingVirtualKeyRepository.create();
       for (const repository of [keys, twin]) {
-        await repository.recordKeyFact({ fact: fact({ virtualKeyId }) });
+        await repository.recordKeyFact({ fact: fact({ virtualKeyId: firstKey }) });
+        await repository.recordKeyFact({ fact: holderChange(firstKey) });
+        await repository.recordKeyFact({ fact: fact({ virtualKeyId: thenKey }) });
         await repository.forgetUser({ userId: person });
-        const holderChange = fact({
+        await repository.recordKeyFact({ fact: holderChange(thenKey) });
+        // Gateway's created fact, naming the earlier holder, redelivered after both.
+        await repository.recordKeyFact({ fact: fact({ virtualKeyId: thenKey }) });
+      }
+      const where = (virtualKeyId: string) => ({ organizationId: firstOrganization, virtualKeyId });
+
+      for (const virtualKeyId of [firstKey, thenKey]) {
+        const held = await keys.findKey(where(virtualKeyId));
+
+        expect(held).toEqual(await twin.findKey(where(virtualKeyId)));
+        expect(held).toMatchObject([{ principalUserId: null, principalUserIdAt: 2_000 }]);
+      }
+    });
+  });
+
+  describe("when a holder change to another person, stamped before an erasure, lands after it", () => {
+    /** @scenario "A holder change to another person, stamped before an erasure, still lands after it" */
+    it("makes that person the holder, in Postgres as in the memory twin", async () => {
+      const person = erasedPerson("erased-then-replaced");
+      const virtualKeyId = keyId("replaced-after-erasure");
+      const twin = MemoryNurturingVirtualKeyRepository.create();
+      for (const repository of [keys, twin]) {
+        await repository.recordKeyFact({ fact: fact({ virtualKeyId, principalUserId: person }) });
+        await repository.forgetUser({ userId: person });
+        const handedOver = fact({
           virtualKeyId,
           action: "rotated",
-          principalUserId: person,
+          principalUserId: "user-next",
           occurredAt: 2_000,
         });
-        await repository.recordKeyFact({ fact: holderChange });
+        await repository.recordKeyFact({ fact: handedOver });
       }
       const where = { organizationId: firstOrganization, virtualKeyId };
 
       const held = await keys.findKey(where);
 
       expect(held).toEqual(await twin.findKey(where));
-      expect(held).toMatchObject([{ principalUserId: "user-first", principalUserIdAt: 1_000 }]);
+      expect(held).toMatchObject([{ principalUserId: "user-next", principalUserIdAt: 2_000 }]);
+    });
+  });
+
+  describe("when two holder facts share a stamp and one names an erased person", () => {
+    /** @scenario "Two holder facts at one stamp, one naming an erased person, end the same in either order" */
+    it("makes the other person the holder in either order, in Postgres as in the memory twin", async () => {
+      const person = erasedPerson("erased-tied-holder");
+      const erasedFirst = keyId("tie-erased-first");
+      const otherFirst = keyId("tie-other-first");
+      const naming = (virtualKeyId: string, principalUserId: string) =>
+        fact({ virtualKeyId, action: "rotated", principalUserId, occurredAt: 2_000 });
+      const twin = MemoryNurturingVirtualKeyRepository.create();
+      for (const repository of [keys, twin]) {
+        await repository.forgetUser({ userId: person });
+        await repository.recordKeyFact({ fact: naming(erasedFirst, person) });
+        await repository.recordKeyFact({ fact: naming(erasedFirst, "user-next") });
+        await repository.recordKeyFact({ fact: naming(otherFirst, "user-next") });
+        await repository.recordKeyFact({ fact: naming(otherFirst, person) });
+      }
+      const where = (virtualKeyId: string) => ({ organizationId: firstOrganization, virtualKeyId });
+
+      for (const virtualKeyId of [erasedFirst, otherFirst]) {
+        const held = await keys.findKey(where(virtualKeyId));
+
+        expect(held).toEqual(await twin.findKey(where(virtualKeyId)));
+        expect(held).toMatchObject([{ principalUserId: "user-next", principalUserIdAt: 2_000 }]);
+      }
+    });
+  });
+
+  describe("when a fact naming a marked person is written and its worker stops before the re-check", () => {
+    /** @scenario "A key fact naming a marked person stores them nowhere even if its re-check never runs" */
+    it("rejects and leaves the key naming no creator or holder", async () => {
+      const person = erasedPerson("erased-stopped");
+      const virtualKeyId = keyId("stopped-before-recheck");
+      await PrismaNurturingErasedUserRepository.create({ prisma: connection.client }).markErased({
+        userId: person,
+      });
+      const stopping = PrismaNurturingVirtualKeyRepository.create({
+        prisma: stoppedBeforeRecheck(connection.client),
+      });
+      const created = fact({ virtualKeyId, actorUserId: person, principalUserId: person });
+
+      await expect(stopping.recordKeyFact({ fact: created })).rejects.toThrow("re-check");
+
+      await expect(
+        keys.findKey({ organizationId: firstOrganization, virtualKeyId }),
+      ).resolves.toMatchObject([{ creatorUserId: null, principalUserId: null }]);
+    });
+  });
+
+  describe("when a fact naming a person lands while their erasure is committing", () => {
+    /** @scenario "A fact that lands while an erasure is committing still leaves the erased person off the key" */
+    it("clears them after the upsert, the cleared holder keeping their stamp", async () => {
+      const person = erasedPerson("erased-mid-commit");
+      const heldKey = keyId("racing-holder");
+      const madeKey = keyId("racing-creator");
+      const held = fact({ virtualKeyId: heldKey, principalUserId: person });
+      const made = fact({ virtualKeyId: madeKey, actorUserId: person });
+      await keys.recordKeyFact({ fact: held });
+      await keys.recordKeyFact({ fact: made });
+      // The erasure's mark has committed but its clearing UPDATE has not run, as when the fact's
+      // upsert read no mark and wrote them back after that UPDATE had passed the row.
+      await connection.client.nurturingErasedUser.create({
+        data: { userIdHash: erasedUserHashOf(person) },
+      });
+
+      await keys.recordKeyFact({ fact: held });
+      await keys.recordKeyFact({ fact: made });
+
+      const [holderCleared] = await keys.findKey({
+        organizationId: firstOrganization,
+        virtualKeyId: heldKey,
+      });
+      expect(holderCleared).toMatchObject({
+        principalUserId: null,
+        principalUserIdAt: held.occurredAt,
+        creatorUserId: "user-creator",
+      });
+      await expect(
+        keys.findKey({ organizationId: firstOrganization, virtualKeyId: madeKey }),
+      ).resolves.toMatchObject([{ creatorUserId: null, principalUserId: "user-first" }]);
     });
   });
 });

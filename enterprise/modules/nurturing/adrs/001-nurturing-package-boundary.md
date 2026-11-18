@@ -81,16 +81,42 @@ It also owns `NurturingOrganization` (admin, milestone counts, coding signals,
 last trace), `NurturingProjectUsageView` (one peer fold row per project and
 owner), `NurturingProjectTraceDay` (trace counts per project and UTC day, kept
 30 days) and `NurturingErasedUser` (a SHA-256 of each erased account's id, never
-the id, so no gateway key fact folded after the erasure stores them again,
-whatever its stamp; https://github.com/langwatch/tasks/issues/1204). User ids
-are nanoids (~126 random bits), so a keyed hash (as governance uses for
+the id, so no member fact or gateway key fact folded after the erasure stores
+them again, whatever its stamp; https://github.com/langwatch/tasks/issues/1204).
+User ids are nanoids (~126 random bits), so a keyed hash (as governance uses for
 guessable emails) isn't needed; the hashed `nurturing-erased-user:` prefix stops
-joins with the bare SHA-256 a delivery claim key carries. Erasure still moves a
-cleared holder's stamp to now, which also closes the race for rows already
-naming the person; the kept cost is that a late holder change to another person,
-stamped between the erased holder's stamp and the erasure, is dropped, so budget
-emails then go to the admin. A redelivered batch can count a trace twice, and so
-can a root span stored more than once; accepted (owner decision, issue 9378).
+joins with the bare SHA-256 a delivery claim key carries. The marks have one
+repository, `NurturingErasedUserRepository`, whose memory twin every memory copy
+of one composition shares. The member copy, the organization copy and the key
+copy each write the mark through it before clearing their rows. A member or key
+write re-checks the mark after it, so a fact whose write read no mark of an
+erasure still committing leaves the person on no row; a worker stopping between
+a write and its re-check leaves them until the fact is redelivered. The
+re-checks give that guarantee; the mark checks inside the writes only shorten
+how long such a row is briefly visible. The usage mirror drops a marked member
+too, so such a row, or one from before the marks, gets no identify. An
+organization row a late fact names a marked admin on keeps the id, but every
+read of it names no admin, so no plan, usage or key send reaches them. Every
+delivered signal drops a marked person before any send: one about them sends
+nothing, and an organization's fact still reaches its other members; a guided
+turn's failure and an organization's creation read the marks too. A member list
+read from the owner (`getAllMembers`) does not read the marks: it relies on the
+owner deleting the person's `OrganizationUser` and `User` rows in the same
+transaction as the fact that records the erasure. The marks are
+read before the send, not with it: an erasure committing between that read and
+the send lets that one send out, and nothing short of holding the send in the
+erasure's transaction, which an HTTP call cannot join, closes it. A key fact
+naming a marked holder folds in as no holder at the fact's own stamp, clearing
+a holder keeps their stamp, and a holder fact at a cleared holder's own stamp
+fills it, so a key's holder is the person its latest-stamped holder fact names,
+or no one if they are erased, whatever order the facts and the erasure arrive
+in, but for one case: two holder facts at one stamp naming two people keep the
+one folded first while neither is marked; if that one is erased later, the key
+ends with no holder. Erasure no longer moves a cleared holder's stamp to now. A
+hand-over stamped between the holder's stamp and the erasure, which was
+dropped, now lands. The race the moved stamp closed is now closed by the
+re-check. A redelivered batch can count a trace twice, and so can a root span
+stored more than once; accepted (owner decision, issue 9378).
 Signals are events on the `nurturing` pipeline.
 A delivered signal is claimed in Redis for seven days under the process-wide idempotency key prefix,
 so a redelivered event sends nothing. A gateway key's creation and its budget's crossings

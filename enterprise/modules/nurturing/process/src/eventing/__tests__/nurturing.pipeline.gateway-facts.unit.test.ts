@@ -22,6 +22,7 @@ import {
   crossingFact,
   gatewayEvent,
   gatewayFactsOver,
+  inviteAcceptedEvent,
   lifecycleFact,
   ORGANIZATION_ID,
   userErasedEvent,
@@ -465,6 +466,46 @@ describe("gateway's key facts in nurturing", () => {
         facts.virtualKeys.findKey({ organizationId: ORGANIZATION_ID, virtualKeyId: "vk_1" }),
       ).resolves.toMatchObject([{ creatorUserId: null, principalUserId: null }]);
       expect(callsOf(facts.sent).at(-1)).toEqual(["track", ADMIN_USER_ID, "key_budget_threshold"]);
+    });
+  });
+
+  describe("when a person is erased, their late invite acceptance lands, then a key's created fact names them", () => {
+    /** @scenario "A key fact naming an erased person sends nothing to them" */
+    it("keeps them out of the member copy, tells them nothing and sends the creation to the admin", async () => {
+      const facts = await gatewayFactsOver();
+      await facts.joined("user-jane");
+      await facts.deliverFact(userErasedEvent("user-jane"));
+      await facts.deliverFact(inviteAcceptedEvent("user-jane", 3));
+
+      await facts.deliverFact(
+        created({ actor_user_id: "user-jane", principal_user_id: "user-jane" }),
+      );
+      // The join's identify and track are sent fire-and-forget: let any of them land first.
+      for (let tick = 0; tick < 3; tick++) await new Promise((resolve) => setTimeout(resolve, 0));
+
+      await expect(
+        facts.members.findMembershipsOfUsers({ userIds: ["user-jane"] }),
+      ).resolves.toEqual([]);
+      // Every request, single calls included (joined_organization, the join's identify and track).
+      expect(facts.requests.filter((body) => body.includes("user-jane"))).toEqual([]);
+      expect(callsOf(facts.sent)).toEqual([["track", ADMIN_USER_ID, "virtual_key_created"]]);
+      expect(facts.logLines.findLine("warn", "no row in nurturing's member copy")).toBeUndefined();
+    });
+  });
+
+  describe("when a key's created fact names an erased person, whose member row is gone", () => {
+    /** @scenario "A key fact naming an erased person sends nothing to them" */
+    it("sends the creation to the organization's admin and warns of no one passed over", async () => {
+      const facts = await gatewayFactsOver();
+      await facts.joined("user-jane");
+      await facts.deliverFact(userErasedEvent("user-jane"));
+
+      await facts.deliverFact(
+        created({ actor_user_id: "user-jane", principal_user_id: "user-jane" }),
+      );
+
+      expect(callsOf(facts.sent)).toEqual([["track", ADMIN_USER_ID, "virtual_key_created"]]);
+      expect(facts.logLines.findLine("warn", "no row in nurturing's member copy")).toBeUndefined();
     });
   });
 

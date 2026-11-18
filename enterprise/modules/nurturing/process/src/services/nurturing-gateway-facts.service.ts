@@ -5,6 +5,7 @@ import type {
   RecordVkLifecycleCommandData,
 } from "@langwatch/gateway-contract";
 
+import type { NurturingErasedUserRepository } from "../repositories/nurturing-erased-user.repository.ts";
 import type { NurturingVirtualKeyRepository } from "../repositories/nurturing-gateway-key.repository.ts";
 import type { NurturingOrganizationMemberRepository } from "../repositories/nurturing-organization-member.repository.ts";
 import {
@@ -20,9 +21,14 @@ import type { NurturingMemberFactsService } from "./nurturing-member-facts.servi
 type GatewayFactsDependencies = Readonly<{
   /** Nurturing's key copy: a crossing reads its key's name, holder and state here. */
   keys: Pick<NurturingVirtualKeyRepository, "findKey">;
+  /** Nurturing's erasure marks: no send picks a key's erased person. */
+  erasedUsers: Pick<NurturingErasedUserRepository, "findErased">;
   /** Nurturing's member copy, disabled rows included: who of the key's people is a member. */
   members: Pick<NurturingOrganizationMemberRepository, "findMembershipsOfUsers">;
-  /** The copied admin: the recipient when a current member and the key's people are not. */
+  /**
+   * The copied admin: the recipient when a current member and the key's people are not. It names
+   * no erased admin.
+   */
   admins: Pick<NurturingMemberFactsService, "adminOf">;
   /** Lines carry the key's id and a reason, never a person's id. */
   logger: Readonly<{
@@ -97,19 +103,30 @@ export class NurturingGatewayFactsService {
     await deliver(keyBudgetThresholdSignal({ data, key, userId, periodEnd }));
   }
 
-  /** The key's holder, its creator or the organization's admin, whoever is a current member. */
+  /**
+   * The key's holder, its creator or the organization's admin, whoever is a current member and
+   * not erased. An erased person is dropped before the choice, so is never warned of as passed
+   * over: a raw fact still names them, and a join racing their erasure can leave a member row
+   * until its re-check.
+   */
   private async recipientOf({
     organizationId,
     virtualKeyId,
-    holders,
+    holders: named,
   }: Readonly<{
     organizationId: string;
     virtualKeyId: string;
     holders: readonly (string | null)[];
   }>): Promise<string | null> {
+    const isSomeone = (userId: string | null): userId is string => userId !== null;
     const admin = await this.dependencies.admins.adminOf({ organizationId });
-    const people = [...holders, admin.kind === "admin" ? admin.userId : null];
-    const userIds = people.filter((userId): userId is string => userId !== null);
+    const erased = new Set(
+      await this.dependencies.erasedUsers.findErased({ userIds: named.filter(isSomeone) }),
+    );
+    const holders = named.map((userId) =>
+      isSomeone(userId) && erased.has(userId) ? null : userId,
+    );
+    const userIds = [...holders, admin.kind === "admin" ? admin.userId : null].filter(isSomeone);
     const memberships = await this.dependencies.members.findMembershipsOfUsers({ userIds });
     const { recipient, passedOverWithoutRow } = pickKeyRecipient({
       organizationId,

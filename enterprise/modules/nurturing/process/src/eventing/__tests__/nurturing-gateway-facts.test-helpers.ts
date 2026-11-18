@@ -8,7 +8,12 @@ import {
   type RecordVkLifecycleCommandData,
   recordVkLifecycleCommandDataSchema,
 } from "@langwatch/gateway-contract";
-import type { OrganizationApi } from "@langwatch/organization-contract";
+import {
+  INVITE_ACCEPTED_EVENT_TYPE,
+  inviteAcceptedEventDataSchema,
+  ORGANIZATION_AGGREGATE_TYPE,
+  type OrganizationApi,
+} from "@langwatch/organization-contract";
 import { createTestLogger } from "@langwatch/test-harness";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import {
@@ -20,6 +25,7 @@ import {
 import { vi } from "vitest";
 
 import { HttpCustomerIoChannel } from "../../channels/http/http.customer-io.channel.ts";
+import { MemoryNurturingErasedUserRepository } from "../../repositories/memory/memory.nurturing-erased-user.repository.ts";
 import { MemoryNurturingVirtualKeyRepository } from "../../repositories/memory/memory.nurturing-gateway-key.repository.ts";
 import { MemoryNurturingMilestonesRepository } from "../../repositories/memory/memory.nurturing-milestones.repository.ts";
 import { MemoryNurturingOrganizationMemberRepository } from "../../repositories/memory/memory.nurturing-organization-member.repository.ts";
@@ -33,7 +39,10 @@ import { NurturingGatewayFactsService } from "../../services/nurturing-gateway-f
 import { NurturingMemberFactsService } from "../../services/nurturing-member-facts.service.ts";
 import { NurturingUserErasureService } from "../../services/nurturing-user-erasure.service.ts";
 import { NurturingService } from "../../services/nurturing.service.ts";
-import { nurturingVirtualKeyCopySubscriber } from "../nurturing-project-usage.pipeline.ts";
+import {
+  nurturingMembershipSubscriber,
+  nurturingVirtualKeyCopySubscriber,
+} from "../nurturing-project-usage.pipeline.ts";
 import { buildNurturingPipeline } from "../nurturing.pipeline.ts";
 
 export const ORGANIZATION_ID = "org-1";
@@ -123,6 +132,29 @@ export function userErasedEvent(userId: string): Event {
   } as Event;
 }
 
+/** Organization's fact that `userId` accepted an invitation into the organization at `at`. */
+export function inviteAcceptedEvent(userId: string, at: number): Event {
+  return {
+    id: `evt-invite-accepted-${userId}-${at}`,
+    aggregateId: ORGANIZATION_ID,
+    aggregateType: ORGANIZATION_AGGREGATE_TYPE,
+    tenantId: createTenantId(ORGANIZATION_ID),
+    createdAt: at,
+    occurredAt: at,
+    type: INVITE_ACCEPTED_EVENT_TYPE,
+    version: "2026-10-09",
+    data: {
+      tenantId: ORGANIZATION_ID,
+      organizationId: ORGANIZATION_ID,
+      userId,
+      occurredAt: at,
+      inviteId: `invite-${userId}`,
+      organizationName: "Acme",
+      role: "MEMBER",
+    },
+  } as Event;
+}
+
 /** Customer.io over a recording fetch: every request body, and each call it took. */
 function recordingCustomerIo() {
   const requests: string[] = [];
@@ -149,7 +181,8 @@ function recordingCustomerIo() {
 
 /**
  * Nurturing as the app composes it for gateway's facts, over its own memory copies and a
- * recording Customer.io: the key copy's subscriber, then every nurturing peer lane on the type.
+ * recording Customer.io: the key copy's and member copy's subscribers, then every nurturing peer
+ * lane on the type.
  * `user-admin` is the organization's copied admin and a current member; `claims` may be
  * Redis-backed.
  */
@@ -157,9 +190,11 @@ export async function gatewayFactsOver({
   claims = MemoryNurturingClaimRepository.create(),
 }: Readonly<{ claims?: NurturingClaimRepository }> = {}) {
   const customerIo = recordingCustomerIo();
-  const virtualKeys = MemoryNurturingVirtualKeyRepository.create();
-  const members = MemoryNurturingOrganizationMemberRepository.create();
-  const milestones = MemoryNurturingMilestonesRepository.create();
+  // One mark set for every copy and send, as the app composes them.
+  const erasedUsers = MemoryNurturingErasedUserRepository.create();
+  const virtualKeys = MemoryNurturingVirtualKeyRepository.create({ erasedUsers });
+  const members = MemoryNurturingOrganizationMemberRepository.create({ erasedUsers });
+  const milestones = MemoryNurturingMilestonesRepository.create({ erasedUsers });
   await milestones.recordOrganization({
     organizationId: ORGANIZATION_ID,
     adminUserId: ADMIN_USER_ID,
@@ -179,6 +214,7 @@ export async function gatewayFactsOver({
     organizations: createApiFixture<OrganizationApi>({}),
   });
   const delivery = NurturingDeliveryService.create({
+    erasedUsers,
     claims,
     customerIo: customerIo.service,
     posthog: undefined,
@@ -190,6 +226,7 @@ export async function gatewayFactsOver({
   const { logger, lines } = createTestLogger();
   const gatewayFacts = NurturingGatewayFactsService.create({
     keys: virtualKeys,
+    erasedUsers,
     members,
     admins: memberFacts,
     logger,
@@ -220,9 +257,25 @@ export async function gatewayFactsOver({
   >({ registerEventSubscriber: (subscriber) => void subscribers.push(subscriber) });
   for (const projection of pipeline.globalProjections ?? []) projection.register(registry);
   const keyCopy = nurturingVirtualKeyCopySubscriber(virtualKeys);
+  const memberCopy = nurturingMembershipSubscriber({
+    eventType: INVITE_ACCEPTED_EVENT_TYPE,
+    data: inviteAcceptedEventDataSchema,
+    change: "joined",
+    members,
+  });
 
-  /** Copies a lifecycle fact, then hands the event to every nurturing peer lane on its type. */
+  /** Copies a lifecycle or join fact, then hands the event to every nurturing peer lane on it. */
   const deliverFact = async (event: Event) => {
+    if (event.type === INVITE_ACCEPTED_EVENT_TYPE) {
+      if (!memberCopy.handle) throw new Error("the member copy handles one fact at a time");
+      await memberCopy.handle(inviteAcceptedEventDataSchema.parse(event.data), {
+        tenantId: event.tenantId,
+        aggregateId: event.aggregateId,
+        createdAt: event.createdAt,
+        occurredAt: event.occurredAt,
+        eventId: event.id,
+      });
+    }
     if (event.type === GATEWAY_VK_LIFECYCLE_EVENT_TYPE) {
       if (!keyCopy.handle) throw new Error("the key copy handles one fact at a time");
       await keyCopy.handle(recordVkLifecycleCommandDataSchema.parse(event.data), {
@@ -262,6 +315,8 @@ export async function gatewayFactsOver({
     joined,
     disabled,
     virtualKeys,
+    members,
+    milestones,
     logLines: lines,
     requests: customerIo.requests,
     sent: customerIo.sent,

@@ -3,19 +3,29 @@ import type {
   NurturingMembership,
   NurturingMembershipChange,
 } from "../../rules/nurturing-organization-member.rules.ts";
+import type { NurturingErasedUserRepository } from "../nurturing-erased-user.repository.ts";
 import type { NurturingOrganizationMemberRepository } from "../nurturing-organization-member.repository.ts";
+import { MemoryNurturingErasedUserRepository } from "./memory.nurturing-erased-user.repository.ts";
 
 const COLUMN = { joined: "joinedAt", left: "leftAt", returned: "returnedAt" } as const;
 
-/** The Postgres twin's semantics: each change keeps its latest time. */
+/** The Postgres twin's semantics: each change keeps its latest time; an erased account, none. */
 export class MemoryNurturingOrganizationMemberRepository implements NurturingOrganizationMemberRepository {
-  static create(): MemoryNurturingOrganizationMemberRepository {
-    return new MemoryNurturingOrganizationMemberRepository();
+  /** `erasedUsers` is the marks every memory copy of one composition shares. */
+  static create({
+    erasedUsers = MemoryNurturingErasedUserRepository.create(),
+  }: Readonly<{
+    erasedUsers?: NurturingErasedUserRepository;
+  }> = {}): MemoryNurturingOrganizationMemberRepository {
+    return new MemoryNurturingOrganizationMemberRepository(erasedUsers);
   }
 
   readonly #memberships = new Map<string, NurturingMembership>();
+  readonly #erasedUsers: NurturingErasedUserRepository;
 
-  private constructor() {}
+  private constructor(erasedUsers: NurturingErasedUserRepository) {
+    this.#erasedUsers = erasedUsers;
+  }
 
   async recordMembershipChange({
     organizationId,
@@ -28,6 +38,8 @@ export class MemoryNurturingOrganizationMemberRepository implements NurturingOrg
     change: NurturingMembershipChange;
     at: number;
   }>): Promise<void> {
+    const [erased] = await this.#erasedUsers.findErased({ userIds: [userId] });
+    if (erased) return;
     const key = JSON.stringify([organizationId, userId]);
     const known = this.#memberships.get(key) ?? {
       organizationId,
@@ -41,6 +53,7 @@ export class MemoryNurturingOrganizationMemberRepository implements NurturingOrg
   }
 
   async forgetMember({ userId }: Readonly<{ userId: string }>): Promise<void> {
+    await this.#erasedUsers.markErased({ userId });
     for (const [key, membership] of this.#memberships) {
       if (membership.userId === userId) this.#memberships.delete(key);
     }

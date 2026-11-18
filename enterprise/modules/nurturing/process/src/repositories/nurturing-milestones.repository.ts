@@ -33,10 +33,11 @@ export type NurturingOrganizationRow = NurturingOrganizationCounts &
 
 /**
  * Nurturing's own read model, written by its peer subscribers (§9). A project's organization is
- * read by the service through `NurturingProjectDirectoryRepository`, never here (R40).
+ * read by the service through `NurturingProjectDirectoryRepository`, never here (R40). Every read
+ * of an organization's row names no erased admin, a count's included.
  */
 export interface NurturingMilestonesRepository {
-  /** The organization's row; empty when nurturing never learned it. */
+  /** The organization's row, naming no erased admin; empty when nurturing never learned it. */
   findOrganization(
     input: Readonly<{ organizationId: string }>,
   ): Promise<NurturingOrganizationRow[]>;
@@ -60,7 +61,10 @@ export interface NurturingMilestonesRepository {
 
 /** The admin an organization's row names, which an account's erasure takes back. */
 export interface NurturingOrganizationAdminRepository {
-  /** Clears the user as admin of every organization naming them; none named is a no-op. */
+  /**
+   * Marks the user erased and clears them as admin of every organization naming them; no read
+   * names them admin afterwards, even where a late fact stores them again.
+   */
   forgetAdmin(input: Readonly<{ adminUserId: string }>): Promise<void>;
 }
 

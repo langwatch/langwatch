@@ -11,6 +11,7 @@ import type { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { HttpCustomerIoChannel } from "../../channels/http/http.customer-io.channel.ts";
+import { MemoryNurturingErasedUserRepository } from "../../repositories/memory/memory.nurturing-erased-user.repository.ts";
 import { MemoryNurturingMilestonesRepository } from "../../repositories/memory/memory.nurturing-milestones.repository.ts";
 import { MemoryNurturingOrganizationMemberRepository } from "../../repositories/memory/memory.nurturing-organization-member.repository.ts";
 import { MemoryNurturingOrganizationPlanRepository } from "../../repositories/memory/memory.nurturing-organization-plan.repository.ts";
@@ -129,7 +130,9 @@ async function organizationWithMembers({
     projects,
     organizations: createApiFixture<OrganizationApi>({ getAllMembers, organizationIdsForMember }),
   });
+  const erasedUsers = MemoryNurturingErasedUserRepository.create();
   const delivery = NurturingDeliveryService.create({
+    erasedUsers,
     claims,
     memberFacts,
     members: MemoryNurturingOrganizationMemberRepository.create(),
@@ -142,7 +145,16 @@ async function organizationWithMembers({
   });
   const deliver = (signal: NurturingSignal) =>
     delivery.deliver({ key: `${signal.kind}:${signal.sourceEventId}`, signal });
-  return { claims, cio, deliver, milestones, projects, getAllMembers, organizationIdsForMember };
+  return {
+    claims,
+    cio,
+    deliver,
+    milestones,
+    projects,
+    getAllMembers,
+    organizationIdsForMember,
+    erasedUsers,
+  };
 }
 
 const down = new Error("the database is down");
@@ -262,6 +274,36 @@ describe("NurturingDeliveryService organization facts", () => {
         { has_traces: true, last_trace_at: seconds(T0) },
       ]);
       expect(cio.tracks().map(({ userId }) => userId)).toEqual(["admin-1"]);
+    });
+  });
+
+  describe("when a first trace names an erased admin, in an organization with another member", () => {
+    /** @scenario "An organization's fact about an erased admin still reaches its other members" */
+    it("identifies the other member and sends the erased admin nothing", async () => {
+      const { cio, deliver, erasedUsers } = await organizationWithMembers();
+      await erasedUsers.markErased({ userId: "admin-1" });
+
+      await deliver(firstTrace);
+      await settle();
+
+      expect(cio.calls.filter(({ userId }) => userId === "admin-1")).toEqual([]);
+      expect(traitsOf(cio.identifies(), "member-2")).toEqual([
+        { has_traces: true, last_trace_at: seconds(T0) },
+      ]);
+    });
+  });
+
+  describe("when a coding agent's first session names an erased admin", () => {
+    /** @scenario "An organization's fact about an erased admin still reaches its other members" */
+    it("tells the other member, and not the erased admin, that the organization uses one", async () => {
+      const { cio, deliver, erasedUsers } = await organizationWithMembers();
+      await erasedUsers.markErased({ userId: "admin-1" });
+
+      await deliver(firstSession);
+      await settle();
+
+      expect(cio.calls.filter(({ userId }) => userId === "admin-1")).toEqual([]);
+      expect(traitsOf(cio.identifies(), "member-2")).toContainEqual({ uses_coding_agent: true });
     });
   });
 
