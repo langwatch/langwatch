@@ -8,7 +8,12 @@ import {
   SigningKeyNotFoundError,
 } from "@langwatch/api-key-contract";
 import { SIGNING_KEY_PREFIX } from "@langwatch/api-key-contract/signing-key-wire-format";
-import { BRAIDS_FLAG, BraidsNotEnabledError } from "@langwatch/authz-contract";
+import {
+  type AuthzApi,
+  BRAIDS_FLAG,
+  BraidsNotEnabledError,
+  BraidsTurnedOffError,
+} from "@langwatch/authz-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { generate } from "@langwatch/ksuid";
 import type { ProjectApi } from "@langwatch/project-contract";
@@ -35,15 +40,16 @@ function randomBase62({ length }: { length: number }): string {
 }
 
 /**
- * A project's braid signing keys (ADR-201 §4): issued, rotated, revoked, listed with 24h counts.
- * The door asks permission and plan; the project's organisation names every read, so another
- * project's key reads as not found. All but revoke refuse while `release_braids` is off.
+ * A project's braid signing keys (ADR-201 §4); another project's key reads as not found. Listing
+ * and revoking ask no flag; `findProjectSigning`, issuing and rotating refuse while
+ * `release_braids` is off, and issuing and rotating also while Braids is turned off.
  */
 export class SigningKeyService {
   private readonly keys: SigningKeyRepository;
   private readonly usage: SigningKeyUsageRepository;
   private readonly projects: Pick<ProjectApi, "getOrganizationId">;
   private readonly flags: Pick<FeatureFlagApi, "isEnabled">;
+  private readonly settings: Pick<AuthzApi, "getOrganizationPolicy">;
   private readonly braidSignatures: Pick<BraidSignatureVerificationService, "forget">;
   private readonly now: () => Instant;
 
@@ -52,6 +58,7 @@ export class SigningKeyService {
     usage: SigningKeyUsageRepository;
     projects: Pick<ProjectApi, "getOrganizationId">;
     flags: Pick<FeatureFlagApi, "isEnabled">;
+    settings: Pick<AuthzApi, "getOrganizationPolicy">;
     braidSignatures: Pick<BraidSignatureVerificationService, "forget">;
     now: () => Instant;
   }) {
@@ -59,6 +66,7 @@ export class SigningKeyService {
     this.usage = deps.usage;
     this.projects = deps.projects;
     this.flags = deps.flags;
+    this.settings = deps.settings;
     this.braidSignatures = deps.braidSignatures;
     this.now = deps.now;
   }
@@ -68,6 +76,8 @@ export class SigningKeyService {
     usage: SigningKeyUsageRepository;
     projects: Pick<ProjectApi, "getOrganizationId">;
     flags: Pick<FeatureFlagApi, "isEnabled">;
+    /** The organisation's Braids setting: off refuses issuing and rotating keys. */
+    settings: Pick<AuthzApi, "getOrganizationPolicy">;
     braidSignatures: Pick<BraidSignatureVerificationService, "forget">;
     now?: () => Instant;
   }): SigningKeyService {
@@ -100,7 +110,7 @@ export class SigningKeyService {
     name: string;
     userId: string;
   }): Promise<IssuedSigningKey> {
-    const organizationId = await this.releasedOrganizationOf({ projectId: input.projectId });
+    const organizationId = await this.turnedOnOrganizationOf({ projectId: input.projectId });
     return this.issue({ ...input, organizationId });
   }
 
@@ -110,7 +120,7 @@ export class SigningKeyService {
     userId: string;
   }): Promise<IssuedSigningKey> {
     const { projectId, keyId } = input;
-    const organizationId = await this.releasedOrganizationOf({ projectId });
+    const organizationId = await this.turnedOnOrganizationOf({ projectId });
     const current = await this.keys.getById({ organizationId, projectId, id: keyId });
     if (current.rotatedAt !== null || current.revokedAt !== null) {
       throw new SigningKeyNotFoundError(keyId);
@@ -144,6 +154,14 @@ export class SigningKeyService {
     const organizationId = await this.projects.getOrganizationId(projectId);
     const target = { kind: "project", projectId, organizationId } as const;
     if (!(await this.flags.isEnabled(BRAIDS_FLAG, target))) throw new BraidsNotEnabledError();
+    return organizationId;
+  }
+
+  /** Released, and Braids turned on in the organisation's settings (Alex, 2026-11-18). */
+  private async turnedOnOrganizationOf({ projectId }: { projectId: string }): Promise<string> {
+    const organizationId = await this.releasedOrganizationOf({ projectId });
+    const policy = await this.settings.getOrganizationPolicy({ organizationId });
+    if (!policy.braidsEnabled) throw new BraidsTurnedOffError();
     return organizationId;
   }
 

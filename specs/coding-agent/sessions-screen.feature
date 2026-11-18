@@ -208,6 +208,43 @@ Rule: The session's own name outranks every derived title
     When a later context record carries a whitespace name
     Then the row keeps the name it already had
 
+  # A launcher that runs the agent itself (a hosted agent platform, a CI job)
+  # may not run a LangWatch capture hook at all. It names its sessions the
+  # OpenTelemetry way instead: OTEL_RESOURCE_ATTRIBUTES carries
+  # langwatch.session.name, and every record the agent exports carries it too.
+
+  @unit
+  Scenario: A launcher names its sessions through the resource attributes
+    Given an agent launched with langwatch.session.name "Scout" in OTEL_RESOURCE_ATTRIBUTES
+    When one of its prompt events arrives
+    Then the record contributes the name "Scout"
+
+  @unit
+  Scenario: A name on the record itself outranks the resource's name
+    Given an agent launched with langwatch.session.name "Scout" in OTEL_RESOURCE_ATTRIBUTES
+    When a record arrives that carries the name "pr-reviewer" itself
+    Then the record contributes the name "pr-reviewer"
+
+  @unit
+  Scenario: A blank resource name names nothing
+    Given an agent launched with a whitespace langwatch.session.name
+    When one of its prompt events arrives
+    Then the record contributes no name
+
+  @unit
+  Scenario: Any record that carries a name names the session
+    Given a session with no context record
+    When a prompt event arrives carrying the name "Scout" and the first line "## Your skills"
+    Then the row wears the name "Scout"
+    And a later generated title does not replace it
+
+  @unit
+  Scenario: A launcher's name does not undo a harness rename
+    Given a session named "Scout" by its launcher
+    When a context record renames it "pr-reviewer"
+    And a later prompt event still carries the launcher's name "Scout"
+    Then the row keeps the name "pr-reviewer"
+
   @unit
   Scenario: The session's own name is the title the list shows
     Given a stored session row named by its harness

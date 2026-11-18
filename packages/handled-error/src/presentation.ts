@@ -886,7 +886,12 @@ const presentations = {
   braids_not_enabled: {
     title: "Braids aren't switched on here",
     describe: () =>
-      "This organisation can't manage braids yet. Braids it already has keep showing their spans.",
+      "This organisation can't manage braids yet. Removing a braid and revoking a signing key still work.",
+  },
+  braids_turned_off: {
+    title: "Braids is turned off",
+    describe: () =>
+      "An organisation admin can turn Braids on in organisation settings. Until then, existing braids are paused and kept.",
   },
   broadcaster_not_active: {
     title: "Live updates disconnected",
@@ -3836,6 +3841,11 @@ const presentations = {
   instant_eval_classifier_unavailable: {
     title: "The judgements couldn't be made right now",
     describe: () => "The query ran, but nothing could be judged. Try again in a moment.",
+  },
+  instant_eval_decision_model_key_invalid: {
+    title: "The Instant Evals model's key couldn't be used",
+    describe: () =>
+      "Your model provider refused the key for this project's Instant Evals model, or it has none. Check it in Settings > Model Providers.",
   },
   instant_eval_estimate_unavailable: {
     title: "We couldn't work out the size of this run",

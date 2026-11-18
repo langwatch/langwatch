@@ -210,12 +210,16 @@ export interface AuthzApi {
   getOrganizationPolicy(
     args: Braids.AuthzOrganizationInput,
   ): Promise<Braids.AuthzOrganizationPolicy>;
-  /** The Braids screen's policy: refuses `braids_not_enabled` while `release_braids` is off. */
+  /** The Braids screen's policy; answers while `release_braids` is off, so it can be turned off. */
   getOrganizationPolicyForScreen(
     args: Braids.AuthzOrganizationInput,
   ): Promise<Braids.AuthzOrganizationPolicy>;
   /** Keeps braids to organisation admins or opens them again; audited, and bumps the epoch. */
   setBraidsPolicy(args: Braids.AuthzSetBraidsPolicyInput): Promise<Braids.AuthzOrganizationPolicy>;
+  /** Turns Braids on or off for the organisation; off pauses braids and keeps them. Audited. */
+  setBraidsEnabled(
+    args: Braids.AuthzSetBraidsEnabledInput,
+  ): Promise<Braids.AuthzOrganizationPolicy>;
   /** Every live braid in the organisation. */
   listOrganizationBraids(
     args: Braids.AuthzOrganizationInput,
@@ -228,7 +232,10 @@ export interface AuthzApi {
   countProjectMembersHoldingForScreen(
     args: Braids.AuthzCountProjectMembersHoldingInput,
   ): Promise<Braids.AuthzProjectMembersHolding>;
-  /** Refuses `braids_not_enabled` unless `release_braids` is on for the project's organisation. */
+  /**
+   * Refuses `braids_not_enabled` unless `release_braids` is on for the project's organisation,
+   * and `braids_turned_off` unless the organisation turned Braids on in settings.
+   */
   assertBraidsReleased(args: Braids.AuthzListBraidsInput): Promise<void>;
   /** The braid dialog's picker: which projects the caller may braid into, one batched decision. */
   listBraidTargets(args: Braids.AuthzListBraidTargetsInput): Promise<Braids.AuthzBraidTargets>;

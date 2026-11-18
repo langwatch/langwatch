@@ -197,3 +197,15 @@ Feature: Signing keys
       And release_braids is then switched off for the organisation
       When a span arrives signed with that key
       Then its signature is still verified as orchestrator's
+
+  Rule: Issuing and rotating signing keys waits until the organisation turns Braids on
+    # Decided by Alex, 2026-11-18: Braids is on by default but an organisation admin turns it on
+    # in settings. The setting: modules/authz/specs/braids.feature.
+
+    @unit
+    Scenario: With Braids turned off a signing key cannot be created or rotated
+      Given "orchestrator" holds a signing key
+      And the organisation has Braids turned off
+      When a key is created or rotated
+      Then each call is refused with braids_turned_off
+      And its keys are still listed and a key can still be revoked
