@@ -2069,6 +2069,9 @@ importers:
       '@langwatch/prompt-browser':
         specifier: workspace:*
         version: link:../../modules/prompt/browser
+      '@langwatch/react-rum':
+        specifier: workspace:*
+        version: link:../../packages/react-rum
       '@langwatch/scenario-browser':
         specifier: workspace:*
         version: link:../../modules/scenario/browser

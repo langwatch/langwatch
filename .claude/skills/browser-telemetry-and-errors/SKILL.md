@@ -26,6 +26,10 @@ helpers and the constants (`RUM_DEFAULT_SAMPLE_RATIO`, `RUM_TRACES_PATH`, `RUM_S
   the package (`sanitiseErrorMessage`, `BROWSER_ERROR_MAX_LENGTH`), so do not worry about leaking a URL query; do put nothing
   secret in a message anyway.
 - Change it only when the task is the telemetry itself (sampling, a new span). It is a framework package.
+- Tracing starts only once the app booted. Before that, the plain script in `apps/ui/vite/boot-report.ts`
+  (inline in `<head>`) reports each first load as a `boot` span on the same endpoint: `langwatch.boot.outcome` is `drawn`
+  (sampled sessions only), `stalled` (8 s still on the loading screen), `hidden`, `abandoned`, `reloaded` or `recovered`.
+  Spec `specs/ui/boot-report.feature`. A loading screen says what it waits on with `<LoadingScreen reason="...">`.
 
 ## The registry and `readHandledError`
 

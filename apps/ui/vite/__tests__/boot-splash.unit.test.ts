@@ -7,6 +7,7 @@ import { runInNewContext } from "node:vm";
 
 import { describe, expect, it } from "vitest";
 
+import { BOOT_REPORT_EVENTS, BOOT_REPORT_HEAD } from "../boot-report";
 import { BOOT_SPLASH_BODY, bootSplash, brandFallbackPage, bundleBootGround } from "../boot-splash";
 
 const VITE_FALLBACK = `<!DOCTYPE html>
@@ -54,6 +55,14 @@ describe("the boot splash", () => {
       expect(html.match(/<head>/g)).toHaveLength(1);
     });
 
+    it("puts the boot report in the head, where it runs before the app module", async () => {
+      const html = await transform(
+        '<html><head><script type="module" src="/assets/index-a1.js"></script></head><body><div id="root"></div></body></html>',
+      );
+      expect(html.indexOf(BOOT_REPORT_HEAD)).toBeGreaterThan(-1);
+      expect(html.indexOf(BOOT_REPORT_HEAD)).toBeLessThan(html.indexOf("</head>"));
+    });
+
     it("holds the screen while the app shows its own loading screen", async () => {
       const html = await transform('<html><head></head><body><div id="root"></div></body></html>');
       expect(html).toContain('[data-testid="loading-screen"]');
@@ -69,11 +78,26 @@ describe("the boot splash", () => {
       const splash = { isConnected: true };
       const timers: { run: () => void; repeat: boolean }[] = [];
       let healthy = false;
+      const told: unknown[] = [];
       runInNewContext(script, {
         document: {
           getElementById: (id: string) =>
             ({ "lw-boot": splash, root: {}, "lw-boot-note": note })[id],
+          dispatchEvent: (event: { type: string; detail: unknown }) => {
+            if (event.type === BOOT_REPORT_EVENTS.health) told.push(event.detail);
+            return true;
+          },
         },
+        CustomEvent: class {
+          constructor(
+            readonly type: string,
+            readonly init: { detail: unknown },
+          ) {}
+          get detail() {
+            return this.init.detail;
+          }
+        },
+        performance: { now: () => 0 },
         MutationObserver: class {
           observe() {}
         },
@@ -95,6 +119,12 @@ describe("the boot splash", () => {
       expect(note.textContent).toBe("Connecting to the server…");
       await flush();
       expect(note.textContent).toBe("Connected. Opening LangWatch…");
+      expect(told).toEqual([
+        { state: "pending", ms: undefined },
+        { state: "failed", ms: 0 },
+        { state: "pending", ms: undefined },
+        { state: "ok", ms: 0 },
+      ]);
     });
   });
 
