@@ -4333,6 +4333,11 @@ const presentations = {
     title: "Too many files opened at once",
     describe: () => "Wait a moment, then open the file again.",
   },
+  stored_object_write_conflict: {
+    // Every row write lost to another writer; nothing failed, so a retry settles it.
+    title: "The file changed while we were updating it",
+    describe: () => "Try again in a moment.",
+  },
   dataset_not_ready: {
     // A state, not a breakage — the rows are still being prepared. Waiting is
     // a real action, so this is not the "we've been notified" shape.

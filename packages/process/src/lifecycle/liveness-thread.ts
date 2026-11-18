@@ -8,6 +8,7 @@ import {
   REFUSED_BEFORE_ROUTING,
 } from "./client-error.ts";
 import { NOT_HANDLED_DRAINING, NOT_HANDLED_HEADER } from "./not-handled.ts";
+import { REQUEST_BODY_TIMEOUT_MS } from "./request-body-deadline.ts";
 
 /** The kubelet's path; answered in the thread from the heartbeat, never proxied. */
 export const LIVENESS_PATH = "/healthz";
@@ -32,9 +33,11 @@ export const PUBLIC_LISTENER_TIMEOUTS = {
   /** Above the 60s idle reuse of ALB and nginx, so Node never closes a socket a proxy reuses. */
   keepAliveTimeout: 65_000,
   headersTimeout: 66_000,
-  /** Two hours, not Node's 300s: a 5 GiB upload at about 6 Mbit/s, still bounding a slow body. */
-  requestTimeout: 2 * 60 * 60_000,
+  /** Node's 300s; a listener whose routes declare a longer body allowance raises it to theirs. */
+  requestTimeout: REQUEST_BODY_TIMEOUT_MS,
 } as const;
+/** A door proxying to another listener never cuts a body first: the listener behind it decides. */
+export const PROXY_DOOR_REQUEST_TIMEOUT_MS = 2 * 60 * 60_000;
 /** The listener's timeouts as read back; `timeout` (idle socket) stays Node's default, off. */
 export type ListenerTimeouts = Readonly<{
   keepAliveTimeout: number;
@@ -258,7 +261,19 @@ const unavailable = (res, body) => {
   if (res.headersSent) return res.destroy();
   res.writeHead(503, { "Content-Type": "text/plain" }).end(body);
 };
+// A declared body still arriving when an answer is written: Node would read the rest up to the
+// ceiling, so the answer closes the connection instead (a bodiless request is never pending).
+const bodyPending = (req) =>
+  !req.complete && (req.headers["transfer-encoding"] !== undefined || Number(req.headers["content-length"] || 0) > 0);
+const closeWhenBodyPending = (req, res) => {
+  const writeHead = res.writeHead;
+  res.writeHead = function (...args) {
+    if (bodyPending(req)) this.setHeader("connection", "close");
+    return writeHead.apply(this, args);
+  };
+};
 const server = http.createServer((req, res) => {
+  closeWhenBodyPending(req, res);
   if (req.url === workerData.livenessPath && !proxiesLiveness) {
     const stalled = stalledMs();
     if (stalled > workerData.stallBudgetMs) {
@@ -290,7 +305,7 @@ server.on("clientError", (error, socket) => {
   }
   if (!socket.writable) return socket.destroy();
   const status = workerData.clientErrorStatusLines[code] || "400 Bad Request";
-  socket.end("HTTP/1.1 " + status + "\\r\\nConnection: close\\r\\n\\r\\n");
+  socket.end("HTTP/1.1 " + status + "\\r\\nConnection: close\\r\\n\\r\\n", () => socket.destroy());
 });
 // The thread owns its client's connection, so the main thread's hop-by-hop headers stay behind.
 const endToEnd = (headers) =>
@@ -341,7 +356,7 @@ server.on("upgrade", (req, socket, head) => {
   upstream.on("error", () => socket.destroy());
   socket.on("error", () => upstream.destroy());
 });
-// PUBLIC_LISTENER_TIMEOUTS: a proxy's idle reuse outlived, two hours for a request body.
+// PUBLIC_LISTENER_TIMEOUTS: a proxy's idle reuse outlived; the request body bound is the caller's.
 Object.assign(server, workerData.listenerTimeouts);
 const deadline = Date.now() + workerData.handoverMs;
 const bind = () => server.listen(workerData.port);
@@ -457,6 +472,7 @@ export async function startLivenessThread({
   logger,
   stallBudgetMs = HEARTBEAT_STALL_BUDGET_MS,
   proxyTimeoutMs = MAIN_THREAD_PROXY_TIMEOUT_MS,
+  requestTimeoutMs,
 }: {
   port: number;
   heartbeat: SharedArrayBuffer;
@@ -467,6 +483,8 @@ export async function startLivenessThread({
   logger: LivenessLogger;
   stallBudgetMs?: number;
   proxyTimeoutMs?: number;
+  /** Node's `requestTimeout` on the public port: the listener's own, or a door's two hours. */
+  requestTimeoutMs: number;
 }): Promise<LivenessThread> {
   const thread = new Worker(LIVENESS_THREAD_SOURCE, {
     eval: true,
@@ -491,7 +509,7 @@ export async function startLivenessThread({
       hopByHopHeaders: HOP_BY_HOP_HEADERS,
       notHandledHeader: NOT_HANDLED_HEADER,
       notHandledDraining: NOT_HANDLED_DRAINING,
-      listenerTimeouts: PUBLIC_LISTENER_TIMEOUTS,
+      listenerTimeouts: { ...PUBLIC_LISTENER_TIMEOUTS, requestTimeout: requestTimeoutMs },
     },
   });
   // The main loop keeps its own loopback listener, which is what holds the process open.

@@ -63,6 +63,11 @@ const registry = {
   },
 
   // ---- dataset storage ----
+  stored_object_write_conflict: {
+    tips: [
+      "Another change to the same file landed while this one was written; send the request again",
+    ],
+  },
   private_dataplane_unavailable: {
     tips: [
       "Set the variable this error names (CLICKHOUSE_URL__<label>__<orgId> or DATAPLANE_S3__<label>__<orgId>) and restart the api and worker",
