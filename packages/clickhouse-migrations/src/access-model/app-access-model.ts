@@ -59,8 +59,9 @@ export interface AppReaderTenantTable {
 }
 
 /**
- * Tenant tables keyed on `TenantId`, as the ClickHouse migrations leave them. The LangWatchQL key
- * map and eventing's log are never granted to the reader; the guard test names them with why.
+ * Tenant tables keyed on `TenantId`, as the ClickHouse migrations leave them, eventing's log and
+ * its id index included (ADR-202 Decided 31). The LangWatchQL key map is never granted to the
+ * reader; the guard test names it with why.
  */
 const TENANT_ID_TABLES = [
   "automation_audit",
@@ -79,6 +80,8 @@ const TENANT_ID_TABLES = [
   "evaluation_runs",
   "evaluation_runs_by_trace_id_index",
   "evaluation_runs_id_index",
+  "event_log",
+  "event_log_id_index",
   "experiment_run_items",
   "experiment_runs",
   "experiment_runs_by_experiment_id_index",

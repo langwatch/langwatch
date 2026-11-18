@@ -88,6 +88,25 @@ Feature: Eventing's own surfaces over its tables
       When the storage meter asks for a tenant's event-log stored bytes before a cutoff
       Then the read keeps only events whose `EventOccurredAt` is before the cutoff
 
+  # ADR-202 Decided 31: the app reader reads event_log and event_log_id_index under a tenant policy.
+  Rule: The event log and its id index are read as the app reader, bounded to the request's tenant
+
+    @integration
+    Scenario: An aggregate's events read as the app reader are the request's tenant's alone
+      Given another tenant's events stored under the same aggregate id, on other days
+      And the app reader provisioned with its row policies enforcing
+      When an aggregate's events are read for this tenant, bounded by the event log's id index
+      Then the answer holds this tenant's events and none of the other tenant's
+      And the app reader's policy alone hides the other tenant's event log rows
+
+    @integration
+    Scenario: The event log's id-index bounds read as the app reader come from the request's tenant alone
+      Given another tenant's events stored under the same aggregate id, on other days
+      And the app reader provisioned with its row policies enforcing
+      When the aggregate's id-index bounds are read for each tenant
+      Then each tenant's bounds span its own events' occurred times alone
+      And the app reader's policy alone hides the other tenant's id-index rows
+
   Rule: Eventing declares its tables' LWQL entries as plain data
 
     @unit

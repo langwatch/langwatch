@@ -32,15 +32,10 @@ const TENANT_COLUMNS = ["TenantId", "project_id"] as const;
 /** Tables the migrations leave that hold no tenant rows, each with why. None today. */
 const TABLES_WITHOUT_TENANT: Readonly<Record<string, string>> = {};
 
-const EVENTING_OWNS =
-  "eventing reads its own log through its own surface (§7); slice 2 decides which identity it uses";
-
 /** Tenant tables the app reader is never granted, so it reads none of their rows; each with why. */
 const TABLES_NOT_GRANTED: Readonly<Record<string, string>> = {
   lwql_api_key_tenant_map:
     "KeyHash is the LangWatchQL capability's hash; ADR-200 keeps it to the LangWatchQL identity",
-  event_log: EVENTING_OWNS,
-  event_log_id_index: EVENTING_OWNS,
 };
 
 /** Engines that collapse rows sharing a sorting key, so `FINAL` must not span tenants. */
@@ -89,7 +84,7 @@ describe("given the ClickHouse migrations replayed into the tables they leave be
     expect(stale, "the migrations no longer leave these tables").toEqual([]);
   });
 
-  /** @scenario "The app reader is never granted the LangWatchQL key map or eventing's log" */
+  /** @scenario "The app reader is never granted the LangWatchQL key map" */
   it("grants the reader no table it is classified as never granted", () => {
     const withTenantColumn = tables.filter((t) => tenantColumnOf(t.columns)).map((t) => t.name);
     expect(

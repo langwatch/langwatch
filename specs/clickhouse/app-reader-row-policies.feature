@@ -84,10 +84,11 @@ Feature: ClickHouse row policies bound the application's reads to the request's 
     And no app reader policy or classification names a table the migrations do not leave
 
   @unit
-  Scenario: The app reader is never granted the LangWatchQL key map or eventing's log
+  Scenario: The app reader is never granted the LangWatchQL key map
     Given the ClickHouse migrations replayed into the tables they leave behind
-    Then "lwql_api_key_tenant_map", "event_log" and "event_log_id_index" are classified as never granted to the app reader
-    And the access-model definition gives the app reader no grant and no row policy on any of them
+    Then "lwql_api_key_tenant_map" is classified as never granted to the app reader
+    And the access-model definition gives the app reader no grant and no row policy on it
+    And "event_log" and "event_log_id_index" are policed on "TenantId" like every other tenant table
 
   @unit
   Scenario: Every deduplicating tenant table leads its sorting key with its tenant column
