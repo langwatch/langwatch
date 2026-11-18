@@ -45,7 +45,7 @@ Feature: Every settings page keeps the settings chrome
 
   Rule: a settings page reads in one centred column
 
-    @visual
+    @unit
     Scenario: On a wide window the column sits in the middle
       Given a settings page on a window wider than the settings column
       When the page opens
