@@ -14,7 +14,6 @@ export type CodeStepId =
   | "automation:unwrap-trigger-json-text"
   | "billing:record-usage-billing-catch-up"
   | "billing:fill-seat-change-organizations"
-  | "billing:resync-customer-io-plan"
   | "coding-agent:fill-id-indexes"
   | "data-retention:keep-control-plane-events-forever"
   | "dataset:move-content-to-object-storage"

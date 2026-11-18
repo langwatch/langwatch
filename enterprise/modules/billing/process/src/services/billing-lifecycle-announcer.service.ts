@@ -328,7 +328,7 @@ export class BillingLifecycleAnnouncerService {
   /**
    * The Customer.io plan resync's fact for one organization, from billing's own reads: plan and
    * active members. Stamped before the reads, so a re-run is a new fact. Throws, unlike the live
-   * fact, so the operator step stops where it failed. No active member, no fact; a dry run reads.
+   * fact, so the resync task stops where it failed. No active member, no fact; a dry run reads.
    */
   async customerIoPlanCaughtUp({
     organizationId,

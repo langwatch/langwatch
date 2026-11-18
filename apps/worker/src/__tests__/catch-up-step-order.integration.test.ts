@@ -16,7 +16,6 @@ const PROJECT_FACT_STEPS = [PROJECT_CREATED_STEP];
 const PROJECT_HISTORY_STEP = "project:list-personal-owner-and-first-message-facts";
 const ORGANIZATION_PRESENCE_STEP = "organization:record-presence-settings";
 const ANNOTATION_TRACE_STEP = "annotation:record-trace-annotations";
-const CUSTOMER_IO_PLAN_RESYNC_STEP = "billing:resync-customer-io-plan";
 const BACKGROUND_AFTER_OLD_WRITERS = {
   kind: "data",
   mode: "background",
@@ -97,15 +96,6 @@ describe("given the worker's installed modules", () => {
       expect(steps.find((step) => step.id === ANNOTATION_TRACE_STEP)).toMatchObject(
         BACKGROUND_AFTER_OLD_WRITERS,
       );
-    });
-
-    // tasks#1196: no deploy runs it; a person does, dry run first, with its own approval.
-    it("declares the Customer.io plan resync as an operator data step after old writers", () => {
-      expect(steps.find((step) => step.id === CUSTOMER_IO_PLAN_RESYNC_STEP)).toMatchObject({
-        kind: "data",
-        mode: "operator",
-        needsOldWritersGone: true,
-      });
     });
   });
 });

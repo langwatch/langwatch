@@ -109,14 +109,6 @@
     "needsOldWritersGone": true
   },
   {
-    "id": "billing:resync-customer-io-plan",
-    "kind": "data",
-    "mode": "operator",
-    "owner": "billing",
-    "description": "Records each organisation's plan and active members again, so nurturing sends them to Customer.io.",
-    "needsOldWritersGone": true
-  },
-  {
     "id": "coding-agent:fill-id-indexes",
     "kind": "data",
     "mode": "background",

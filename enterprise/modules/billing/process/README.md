@@ -458,6 +458,7 @@ Run by the tasks process, before serve.
 | Task                        | Class                              | Declared at                                      |
 | --------------------------- | ---------------------------------- | ------------------------------------------------ |
 | `tiered-free-to-seat-event` | `TieredFreeToSeatEventMigrateTask` | `src/tasks/tiered-free-to-seat-event.task.ts:79` |
+| `customer-io-plan-resync`   | `CustomerIoPlanResyncTask`         | `src/tasks/customer-io-plan-resync.task.ts:68`   |
 | `stripe-prices-sync`        | `StripePricesSyncTask`             | `src/tasks/stripe-prices-sync.task.ts:469`       |
 
 ## Configuration
@@ -482,3 +483,9 @@ Run by the tasks process, before serve.
 | config | `nodeEnvironment`                   | `NODE_ENV`                                     | `../contract/src/billing.config.ts:40` |
 
 <!-- readme:generated:end -->
+
+## Hand-run tasks
+
+| Task                      | When and how                                                                                           |
+| ------------------------- | ------------------------------------------------------------------------------------------------------ |
+| `customer-io-plan-resync` | Run after the rollout; dry run unless `--execute`; running it against production needs the owner's go. |

@@ -24,7 +24,7 @@ export const BILLING_LIFECYCLE_EVENT_VERSION = "2026-09-30" as const;
 
 /**
  * An organization gained or lost its subscription, with the members who carry the fact. A catch-up
- * fact restates it from billing's own reads, for billing:resync-customer-io-plan.
+ * fact restates it from billing's own reads, for the customer-io-plan-resync task.
  */
 const subscriptionChangedEventDataSchemaDefinition = z.object({
   tenantId: z.string().min(1),

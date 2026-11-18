@@ -77,7 +77,7 @@ days). A redelivered batch can count a trace twice, and so can a root span store
 more than once; accepted (owner decision, issue 9378). Signals are events on the
 `nurturing` pipeline. A delivered signal is claimed in Redis for seven days under the process-wide idempotency key prefix,
 so a redelivered event sends nothing. Billing's catch-up `subscription_changed` fact, recorded by
-`billing:resync-customer-io-plan`, is never claimed. Every `subscription_changed` fact folds into
+the `customer-io-plan-resync` task, is never claimed. Every `subscription_changed` fact folds into
 `NurturingOrganizationPlan` as ADR-174 decision 17 folds billing's facts: the newest billing fact
 wins, and a real fact wins a tie. Customer.io hears a fact only when it changes that row, and the row is
 written once the calls are sent, so a refused catch-up's retry sends again unless a fact that

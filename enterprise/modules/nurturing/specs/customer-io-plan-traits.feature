@@ -99,9 +99,24 @@ Feature: Customer.io knows each team's real plan
   @unit
   Scenario: A dry run of the resync sends nothing and saves no checkpoint
     Given organizations with plans and members
-    When billing:resync-customer-io-plan runs as a dry run
+    When the resync runs as a dry run
     Then no fact is recorded and no Customer.io call is sent
     And the report counts organizations, members, the most group calls and identifies it could send, and skips by reason
+
+  @unit
+  Scenario: Running the resync task without --execute sends nothing
+    Given organizations with plans and members
+    When a person runs pnpm task customer-io-plan-resync without --execute
+    Then only the dry run runs, so no fact is recorded and no Customer.io call is sent
+    And the dry run totals are printed
+
+  @unit
+  Scenario: Running the resync task with --execute prints the dry run totals, then sends
+    Given organizations with plans and members
+    When a person runs pnpm task customer-io-plan-resync --execute
+    Then a dry run over every organization runs first and its totals are printed
+    And then each organization with members has its plan and members recorded
+    And the recorded totals are printed
 
   @integration
   Scenario: A resync run records each organization's plan and members once and a second run sends the same values
@@ -169,6 +184,8 @@ Feature: Customer.io knows each team's real plan
   #        -> Scenario: Company traits nurturing does not know are left out
   #        -> Scenario: An organization nurturing never placed still sends nothing
   # AC 10: "dry run sends nothing, saves no checkpoint, reports counts" -> Scenario: A dry run of the resync sends nothing and saves no checkpoint
+  #        -> Scenario: Running the resync task without --execute sends nothing
+  #        -> Scenario: Running the resync task with --execute prints the dry run totals, then sends
   # AC 11: "real run records once; a second run sends the same values"  -> Scenario: A resync run records each organization's plan and members once and a second run sends the same values (evidence: two linked tests)
   # AC 12: "refused organization retries, others unaffected"            -> Scenario: A refused organization retries on its own
   #        -> Scenario: The plan copy keeps the newest fact, and a real fact wins a tie

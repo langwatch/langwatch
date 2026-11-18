@@ -976,7 +976,7 @@ export class BillingModule
     return this.#lifecycle.usageBillingCaughtUp({ organizationId, isDryRun });
   }
 
-  /** The Customer.io plan resync for one organization, for its operator step (tasks#1196). */
+  /** The Customer.io plan resync for one organization, for the customer-io-plan-resync task. */
   async catchUpCustomerIoPlan({
     organizationId,
     isDryRun = false,

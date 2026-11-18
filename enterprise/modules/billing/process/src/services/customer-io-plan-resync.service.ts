@@ -1,13 +1,14 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
- * billing:resync-customer-io-plan: each organization's plan and active members recorded again as
- * a catch-up fact, a page of organizations at a time; nurturing sends each to Customer.io.
+ * The customer-io-plan-resync task's walk: each organization's plan and active members recorded
+ * again as a catch-up fact, a page of organizations at a time; nurturing sends each to Customer.io.
  * Spec: enterprise/modules/nurturing/specs/customer-io-plan-traits.feature
  */
 import type { BillingAccountFactsRepository } from "../repositories/billing-account-facts.repository.ts";
 import { BillingOrganizationWalkService } from "./billing-organization-walk.service.ts";
 
-type CustomerIoPlanResyncPeers = Readonly<{
+/** What a resync reads and records through. */
+export type CustomerIoPlanResyncPeers = Readonly<{
   /** Organization ids through organization's shared table (C2 B). */
   organizations: Pick<BillingAccountFactsRepository, "listIds">;
   /** Records one organization's catch-up fact; a dry run only reads its members. */
