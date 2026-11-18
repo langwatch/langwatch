@@ -1,7 +1,7 @@
 /**
- * Product-native scope in top bar. Groups from useProjectPickItems (host's
- * workspace graph), with a per-team "New Project" entry. Spec:
- * modules/navigation/specs/product-switcher-navigation.feature
+ * Product-native scope in top bar: projects by team, per-team "New Project", current project
+ * ID and links on top. Specs: modules/navigation/specs/product-switcher-navigation.feature,
+ * specs/navigation/project-switcher-current-project.feature
  */
 
 import { Badge, Box, HStack, Text } from "@langwatch/design-system/primitives";
@@ -11,6 +11,7 @@ import { isAggregateProjectKind } from "@langwatch/project-contract";
 import { useProjectPickGroups } from "../../behavior/use-project-pick-groups.ts";
 import { useNavigationHost } from "../../model/navigation-host.ts";
 import { isProjectScopedProduct, type ProductId } from "../../model/products.ts";
+import { CurrentProjectHeader } from "../blocks/current-project-header.tsx";
 import { ProjectSwitcherCombobox } from "../blocks/project-switcher-combobox.tsx";
 
 function ScopeDivider() {
@@ -74,6 +75,14 @@ function ProjectScopeMenu() {
         currentProjectIsAggregate={currentProjectIsAggregate}
         showTeamHeaders={showTeamHeaders}
         onCreateProjectForTeam={onCreateProjectForTeam}
+        renderHeader={({ closeMenu }) => (
+          <CurrentProjectHeader
+            projectId={project.id}
+            projectName={project.name}
+            isAggregate={currentProjectIsAggregate}
+            onNavigate={closeMenu}
+          />
+        )}
       />
     </>
   );

@@ -1,7 +1,7 @@
 import { Button, Combobox, Text } from "@langwatch/design-system/primitives";
 import { AggregateProjectAvatar, ProjectAvatar } from "@langwatch/design-system/project-avatar";
 import { ChevronsUpDown } from "lucide-react";
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 
 import { useNavigationHost } from "../../model/navigation-host.ts";
 import {
@@ -22,6 +22,7 @@ export function ProjectSwitcherCombobox({
   currentProjectIsAggregate = false,
   showTeamHeaders,
   onCreateProjectForTeam,
+  renderHeader,
 }: {
   groups: ProjectPickGroup[];
   currentProjectId: string;
@@ -31,6 +32,8 @@ export function ProjectSwitcherCombobox({
   onCreateProjectForTeam:
     | (({ teamId, orgId }: { teamId: string; orgId: string }) => void)
     | undefined;
+  /** Drawn above the search field, outside the options; `closeMenu` closes the popup. */
+  renderHeader?: ({ closeMenu }: { closeMenu: () => void }) => ReactNode;
 }) {
   const host = useNavigationHost();
   const [query, setQuery] = useState("");
@@ -90,6 +93,7 @@ export function ProjectSwitcherCombobox({
         showTeamHeaders={showTeamHeaders}
         currentProjectId={currentProjectId}
         query={query}
+        header={renderHeader?.({ closeMenu: () => setOpen(false) })}
       />
     </Combobox.Root>
   );

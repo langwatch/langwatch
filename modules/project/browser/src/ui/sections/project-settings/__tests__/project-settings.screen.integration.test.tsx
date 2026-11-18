@@ -2,6 +2,7 @@
  * @vitest-environment jsdom
  *
  * Settings → General: role-based access control for workspace, project, and storage credentials.
+ * Spec: specs/navigation/project-switcher-current-project.feature (read-only project ID)
  */
 
 import { cleanup, fireEvent, screen } from "@testing-library/react";
@@ -234,5 +235,27 @@ describe("when the organization form is saved with the name cleared", () => {
 
     expect(await screen.findByText("Name is required")).toBeTruthy();
     expect(calls.updateOrganization).not.toHaveBeenCalled();
+  });
+});
+
+describe("when the reader may view the project but not update it", () => {
+  const projectViewer = () =>
+    new FakeProjectHost({ permissions: ["organization:view", "project:view"] });
+
+  /** @scenario A reader who may not change the project still sees its ID */
+  it("shows the Project ID read-only, with a copy button", () => {
+    renderWithProjectHost(<ProjectGeneralScreen />, projectViewer());
+
+    expect(screen.getByText("Project ID")).toBeTruthy();
+    expect(screen.getByTitle("project-1")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Copy project ID" })).toBeTruthy();
+  });
+
+  /** @scenario A reader who may not change the project still sees its ID */
+  it("offers no field or save that would change the project", () => {
+    renderWithProjectHost(<ProjectGeneralScreen />, projectViewer());
+
+    expect(screen.queryByRole("textbox")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Save changes" })).toBeNull();
   });
 });

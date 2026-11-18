@@ -1,18 +1,20 @@
 import { Box, Combobox, HStack, Portal } from "@langwatch/design-system/primitives";
 import { AggregateProjectAvatar, ProjectAvatar } from "@langwatch/design-system/project-avatar";
 import { Check, Plus, Search } from "lucide-react";
+import type { ReactNode } from "react";
 
 import type { ProjectPickGroup, ProjectPickItem } from "../../model/project-pick-items.ts";
 
 /**
- * The portaled popup of the project switcher combobox: the search field,
- * the empty state and the team groups.
+ * The portaled popup of the project switcher combobox: an optional header,
+ * the search field, the empty state and the team groups.
  */
 export function ProjectComboboxPopup({
   visibleGroups,
   showTeamHeaders,
   currentProjectId,
   query,
+  header,
 }: {
   visibleGroups: {
     team: ProjectPickGroup["team"];
@@ -21,11 +23,13 @@ export function ProjectComboboxPopup({
   showTeamHeaders: boolean;
   currentProjectId: string;
   query: string;
+  header?: ReactNode;
 }) {
   return (
     <Portal>
       <Combobox.Positioner>
         <Combobox.Content minWidth="260px" maxHeight="360px" overflowY="auto" padding={0}>
+          {header}
           <ProjectSearchHeader />
           <Combobox.Empty paddingX={3} paddingY={2} color="fg.muted" textStyle="bodySm">
             {`No projects match "${query.trim()}"`}

@@ -191,8 +191,26 @@ export function ProjectGeneralScreen() {
         {sharedProject && host.hasPermission("project:update") ? (
           <ProjectSettingsForm project={sharedProject} />
         ) : null}
+        {sharedProject && !host.hasPermission("project:update") ? (
+          <ProjectIdReadOnly projectId={sharedProject.id} />
+        ) : null}
       </VStack>
     </Box>
+  );
+}
+
+/** The ID every SDK and key setup asks for, shown to readers who may not edit the project. */
+function ProjectIdReadOnly({ projectId }: { projectId: string }) {
+  return (
+    <SettingsSection icon={<FolderCog size={18} />} title="Project configuration">
+      <SettingsFieldGroup>
+        <SettingsField label="Project ID" hint="Use this ID when authenticating with API keys.">
+          <SettingsFieldValue>
+            <IdText value={projectId} label="project ID" />
+          </SettingsFieldValue>
+        </SettingsField>
+      </SettingsFieldGroup>
+    </SettingsSection>
   );
 }
 
