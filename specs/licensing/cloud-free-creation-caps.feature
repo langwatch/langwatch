@@ -136,6 +136,11 @@ Feature: Cloud Free plan caps scenarios, simulations and custom evaluators
     Then the message says the plan includes 3 suites
 
   @unit
+  Scenario: The suite cap refusal names its own error type in logs
+    When a template apply is refused by the suite cap
+    Then the error is logged as "TestSuiteLimitExceededError" counted as test suites
+
+  @unit
   Scenario: A template scenario moved out of its suite counts against the scenario cap
     Given an organization on cloud Free at 3 of 3 counted scenarios
     And it applied a suite template
