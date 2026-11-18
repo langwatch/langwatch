@@ -37,9 +37,10 @@ function renderDialog(
     keyName?: string;
     copySucceeds?: boolean;
     onClose?: () => void;
+    host?: FakeApiKeyHost;
   } = {},
 ) {
-  const host = new FakeApiKeyHost({ copySucceeds: overrides.copySucceeds });
+  const host = overrides.host ?? new FakeApiKeyHost({ copySucceeds: overrides.copySucceeds });
   renderWithDesignSystem(
     <ApiKeyHostProvider value={host}>
       <TokenCreatedDialog
@@ -528,6 +529,55 @@ describe("given a key has just been minted with a name", () => {
         });
         expect(vi.getTimerCount()).toBe(0);
 
+        expect(errors).not.toHaveBeenCalled();
+      } finally {
+        vi.useRealTimers();
+        errors?.mockRestore();
+        layout.mockRestore();
+      }
+    });
+
+    /** @scenario The Copy API key button that closes mid-copy starts no reset timer when the copy lands */
+    it("starts no reset timer when a copy lands after the dialog closes", async () => {
+      // jsdom lays nothing out, so the focus trap would treat every element as hidden.
+      const rect = new DOMRect(0, 0, 10, 10);
+      const layout = vi.spyOn(Element.prototype, "getClientRects").mockReturnValue({
+        0: rect,
+        length: 1,
+        item: (index: number) => (index === 0 ? rect : null),
+        [Symbol.iterator]: () => [rect][Symbol.iterator](),
+      });
+      let errors: MockInstance | undefined;
+      try {
+        const host = new FakeApiKeyHost();
+        let resolveCopy: (ok: boolean) => void = () => undefined;
+        vi.spyOn(host, "copyToClipboard").mockReturnValue(
+          new Promise<boolean>((resolve) => {
+            resolveCopy = resolve;
+          }),
+        );
+        renderDialog({ keyName: "Deploy pipeline", host });
+        errors = vi.spyOn(console, "error").mockImplementation(() => undefined);
+        const copyButton = screen.getByRole("button", { name: "Copy API key" });
+        // The focus trap sets up on real animation frames; let them run before faking timers.
+        await vi.waitFor(() => expect(document.activeElement).toBe(copyButton));
+
+        vi.useFakeTimers();
+        fireEvent.click(copyButton);
+
+        cleanup();
+        // Library teardown timers are short; let them drain so only a reset timer could remain.
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(1999);
+        });
+        const pendingBefore = vi.getTimerCount();
+        await act(async () => {
+          resolveCopy(true);
+          await vi.advanceTimersByTimeAsync(0);
+        });
+
+        expect(pendingBefore).toBe(0);
+        expect(vi.getTimerCount()).toBe(0);
         expect(errors).not.toHaveBeenCalled();
       } finally {
         vi.useRealTimers();

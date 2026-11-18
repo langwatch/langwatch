@@ -358,3 +358,9 @@ Feature: Token Created modal command snippets
     Given the dialog's Copy API key button has just copied successfully
     When the dialog closes and 2 seconds pass
     Then nothing is left waiting to reset the tick and nothing breaks
+
+  @integration
+  Scenario: The Copy API key button that closes mid-copy starts no reset timer when the copy lands
+    Given the dialog's Copy API key button was clicked and its copy has not resolved yet
+    When the dialog is closed and then the copy succeeds
+    Then nothing is left waiting to reset the tick and nothing breaks
