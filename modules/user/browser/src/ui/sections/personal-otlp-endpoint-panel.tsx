@@ -116,7 +116,7 @@ export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer ${token ?? API_KEY_PLACE
         For ad-hoc / custom telemetry. Spans land as-emitted; cost / tokens / model are not
         auto-populated unless your spans already follow <InlineCode>gen_ai.*</InlineCode>{" "}
         conventions. If your admin has set up tools, tool-specific setup is on{" "}
-        <Link href="/me" fontWeight="medium">
+        <Link href="/coding-agents" fontWeight="medium">
           Your AI tools
         </Link>
         .

@@ -1,7 +1,8 @@
 /**
  * What the address bar says about the scope, read directly from
  * `react-router`: personal workspace is "no `:project` segment matched
- * and the first path segment is `me`" — so `/me/traces` stays a project.
+ * and the first path segment is `coding-agents`" — so `/coding-agents/traces`
+ * stays a project.
  */
 
 import type { UiScopeRoute } from "@langwatch/organization-contract";
@@ -25,7 +26,7 @@ export const UI_PUBLIC_ROUTES: readonly string[] = [
 ];
 
 /** The personal workspace's own top-level segment. */
-const PERSONAL_SCOPE_SEGMENT = "me";
+const PERSONAL_SCOPE_SEGMENT = "coding-agents";
 
 /** The query parameter that names an organization to switch to, once. */
 export const UI_ORG_QUERY_PARAM = "org";

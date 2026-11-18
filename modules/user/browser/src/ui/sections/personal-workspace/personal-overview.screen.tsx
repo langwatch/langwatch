@@ -45,7 +45,7 @@ import { PersonalWorkspaceLayout } from "../personal-workspace-layout.tsx";
 import { PersonalWorkspaceViewOnlyNotice } from "../personal-workspace-view-only-notice.tsx";
 import { TraceIngestSection } from "../trace-ingest-section.tsx";
 
-// /me/usage frequently surfaces sub-cent spend; defer to the shared
+// /coding-agents/usage frequently surfaces sub-cent spend; defer to the shared
 // gateway formatter so values like $0.000165 don't render as $0.00.
 const fmtUsd = (amount: number) => formatBudgetUsd(amount);
 
@@ -267,10 +267,10 @@ export function PersonalOverviewScreen() {
             title="Coding-agent usage (last 30 days)"
             action={
               <HStack gap={4}>
-                <Link href="/me/sessions" fontSize="sm" color="blue.fg">
+                <Link href="/coding-agents/sessions" fontSize="sm" color="blue.fg">
                   View sessions
                 </Link>
-                <Link href="/me/pull-requests" fontSize="sm" color="blue.fg">
+                <Link href="/coding-agents/pull-requests" fontSize="sm" color="blue.fg">
                   View pull requests
                 </Link>
               </HStack>

@@ -44,7 +44,7 @@ export function guidedPathLanding({
     case "llmops":
       return `/${projectSlug}/traces`;
     case "coding":
-      return "/me";
+      return "/coding-agents";
     case "gateway":
       return "/gateway";
     case "governance":

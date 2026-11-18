@@ -339,7 +339,7 @@ describe("given the retired personal and evaluation addresses", () => {
       const router = open("/me/devices");
 
       await waitFor(() => {
-        expect(addressOf(router)).toBe("/me/configure?tab=devices");
+        expect(addressOf(router)).toBe("/coding-agents/configure?tab=devices");
       }, LAZY_CHROME);
     });
   });

@@ -8,7 +8,7 @@ import { test, expect } from "./test.ts";
 
 test("app loads after authentication", async ({ page }) => {
   // Derive a real project deterministically, independent of persona-based root
-  // routing (a personal-persona user lands on /me, not a project route).
+  // routing (a personal-persona user lands on /coding-agents, not a project route).
   const slug = await getProjectSlug(page);
 
   await page.goto(`/${slug}/messages`);

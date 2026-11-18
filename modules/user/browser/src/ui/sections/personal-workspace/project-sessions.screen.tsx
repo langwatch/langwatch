@@ -45,7 +45,7 @@ export function ProjectSessionsScreen() {
               {
                 kind: "setting",
                 label: "Connect your AI tools",
-                href: "/me/configure",
+                href: "/coding-agents/configure",
                 onNavigate: ({ href }) => router.push(href),
               },
             ]}

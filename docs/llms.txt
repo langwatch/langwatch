@@ -558,21 +558,21 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 ## Get Started
 
 - [AI Governance](https://langwatch.ai/docs/ai-governance/overview.md): An inventory of every AI tool and source in the company, the people who use them, the agents they run, and a personal home page for each developer.
-- [Your first 5 minutes (developer)](https://langwatch.ai/docs/ai-governance/getting-started-developer.md): A new-developer walkthrough, install the LangWatch CLI, sign in via your company SSO, land on /me, run your first request through the gateway, and read your spend back. Each step links into the deeper docs.
+- [Your first 5 minutes (developer)](https://langwatch.ai/docs/ai-governance/getting-started-developer.md): A new-developer walkthrough, install the LangWatch CLI, sign in via your company SSO, land on /coding-agents, run your first request through the gateway, and read your spend back. Each step links into the deeper docs.
 - [From zero to your first governed request (admin)](https://langwatch.ai/docs/ai-governance/getting-started-admin.md): A 30-minute admin walkthrough to publish a routing policy, configure an ingestion source, import the AI Tools Portal starter pack, invite a developer, and watch their first request land. Each step links into the deeper admin docs.
 - [Open-core licensing](https://langwatch.ai/docs/ai-governance/open-core-licensing.md): LangWatch is open-core. The Apache 2.0 floor covers Personal Virtual Keys, the AI Tools Portal, Routing Policies, and CLI debugging. Multi-source ingestion, anomaly detection, OCSF, SIEM export, and extended retention require an Enterprise plan.
 
 ## Personal Portal
 
-- [AI Tools Portal overview](https://langwatch.ai/docs/ai-governance/personal-portal/overview.md): A customizable card-grid home at /me where every developer in your organization can see the AI tools available to them, coding assistants, model providers for virtual-key creation, and admin-curated external tools, published and scoped by your IT admins.
-- [AI Tools Portal tile interactions](https://langwatch.ai/docs/ai-governance/personal-portal/end-user.md): What each tile class expands into when an end user clicks it on /me. Covers coding-assistant setup walkthroughs, inline virtual-key creation, and external-tool guidance pages.
-- [AI Tools Portal admin catalog editor](https://langwatch.ai/docs/ai-governance/personal-portal/admin-catalog.md): How to publish, scope, and edit the AI tools that your developers see on /me. Covers starter-pack import, the three tile-type drawers, scope binding, reordering, and archive.
+- [AI Tools Portal overview](https://langwatch.ai/docs/ai-governance/personal-portal/overview.md): A customizable card-grid home at /coding-agents where every developer in your organization can see the AI tools available to them, coding assistants, model providers for virtual-key creation, and admin-curated external tools, published and scoped by your IT admins.
+- [AI Tools Portal tile interactions](https://langwatch.ai/docs/ai-governance/personal-portal/end-user.md): What each tile class expands into when an end user clicks it on /coding-agents. Covers coding-assistant setup walkthroughs, inline virtual-key creation, and external-tool guidance pages.
+- [AI Tools Portal admin catalog editor](https://langwatch.ai/docs/ai-governance/personal-portal/admin-catalog.md): How to publish, scope, and edit the AI tools that your developers see on /coding-agents. Covers starter-pack import, the three tile-type drawers, scope binding, reordering, and archive.
 - [AI Tools Portal devices](https://langwatch.ai/docs/ai-governance/personal-portal/sessions.md): See where your CLI is signed in across machines (laptop, workstation, dev container, CI runner), identify each session by device, see when it was last used, revoke any device in one click. Mirrors the macOS "Logged-in devices", GitHub "Active sessions", Apple ID "Trusted devices" pattern.
 
 ## Workspaces & Access
 
 - [Workspaces Personal, Team, Project](https://langwatch.ai/docs/ai-governance/workspaces.md): The three scopes every LangWatch artifact lives in. Personal for you, Team for groups of humans, Project for shared applications. How they nest, how budgets and routing policies attach, and how the workspace switcher in the chrome routes between them.
-- [Personas and default landing](https://langwatch.ai/docs/ai-governance/personas.md): LangWatch detects four personas based on org membership + activity signals, and routes each to the home that fits their work, admin to the bird-eye, personal-only user to /me, project-only LLMOps user to their project, mixed user to /me with a workspace switcher.
+- [Personas and default landing](https://langwatch.ai/docs/ai-governance/personas.md): LangWatch detects four personas based on org membership + activity signals, and routes each to the home that fits their work, admin to the bird-eye, personal-only user to /coding-agents, project-only LLMOps user to their project, mixed user to /coding-agents with a workspace switcher.
 
 ## Dashboards
 

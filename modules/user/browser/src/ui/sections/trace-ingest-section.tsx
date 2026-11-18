@@ -304,7 +304,12 @@ function RawOtlpAdvancedTile() {
           <Text fontSize="xs" color="fg.muted">
             Bring your own OTLP, raw shape. Use for custom telemetry pipelines.
           </Text>
-          <Link href="/me/configure#otlp" color="orange.fg" fontSize="xs" fontWeight="medium">
+          <Link
+            href="/coding-agents/configure#otlp"
+            color="orange.fg"
+            fontSize="xs"
+            fontWeight="medium"
+          >
             Get OTLP token →
           </Link>
         </VStack>

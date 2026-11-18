@@ -72,7 +72,7 @@ function readerMayOpenThePage({
   if (isResolverAddress(pathname)) return true;
   // Personal-scope addresses are the reader's by construction, even when
   // membership of the ambient team cannot be confirmed: without this a member
-  // on /me/* hits the refusal and the page never renders.
+  // on /coding-agents/* hits the refusal and the page never renders.
   if (isPersonalScopeRoute || isDemoProject) return true;
   // Administrators created through a role binding alone have no membership row
   // and still have full team access.
@@ -186,7 +186,7 @@ export const ShellPageBody = ({
       ? { label: team.name }
       : null;
   const isPersonalScopeRoute =
-    personalScope || pathname.startsWith("/me") || isOnOwnPersonalProject;
+    personalScope || isPathUnder({ pathname, base: "/coding-agents" }) || isOnOwnPersonalProject;
 
   // Audit emission for cross-scope reads. Fires once per project the
   // administrator drills into. Fail-quiet: a refused emission must not stop

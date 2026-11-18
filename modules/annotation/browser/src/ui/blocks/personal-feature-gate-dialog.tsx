@@ -30,8 +30,8 @@ export function PersonalFeatureGateDialog({ state }: { state: PersonalFeatureGat
           on enables Evaluations, Datasets, Annotations, and Automations together.
         </Text>
         <Text fontSize="xs" color="fg.muted">
-          You can disable them later in /me/configure, your data is preserved and reappears on
-          re-enable.
+          You can disable them later in /coding-agents/configure, your data is preserved and
+          reappears on re-enable.
         </Text>
       </VStack>
     </Dialog>

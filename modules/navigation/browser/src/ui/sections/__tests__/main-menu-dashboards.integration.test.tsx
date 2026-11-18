@@ -249,7 +249,7 @@ describe("the Dashboards section analytics lends", () => {
     it.each([
       { surface: "gateway", pathname: "/gateway/virtual-keys" },
       { surface: "governance", pathname: "/governance" },
-      { surface: "me", pathname: "/me" },
+      { surface: "me", pathname: "/coding-agents" },
     ] as const)("draws no section in $surface", async ({ surface, pathname }) => {
       renderSidebar({ surface, pathname });
 

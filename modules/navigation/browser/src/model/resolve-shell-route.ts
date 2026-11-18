@@ -69,7 +69,7 @@ function seatRefusalAt({
 
 /**
  * The product the chrome draws. Dashboards wins over the personal plane: its
- * sidebar is the saved-dashboards list, which the Me sidebar does not carry.
+ * sidebar is the saved-dashboards list, which the Coding agents sidebar does not carry.
  * A reader who clicked in from LLM Ops stays in that sidebar (the hint); no hint, no change.
  */
 function activeProductFor({
@@ -134,7 +134,9 @@ export function resolveShellRoute({
   const isPersonalScopeRoute =
     !isSettingsRoute &&
     !isOrgScopedProduct &&
-    (isPersonalScope || isPathUnder({ pathname, base: "/me" }) || isOnOwnPersonalProject);
+    (isPersonalScope ||
+      isPathUnder({ pathname, base: "/coding-agents" }) ||
+      isOnOwnPersonalProject);
   const activeProductId = activeProductFor({
     isSettingsRoute,
     isPersonalScopeRoute,

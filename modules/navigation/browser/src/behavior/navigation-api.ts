@@ -125,7 +125,7 @@ export type NavigationApiMap = ContractApiMap<typeof identityTrpc> & {
     /**
      * Which library entries the reader unlocked in their personal workspace. Default-empty
      * rather than default-on: an existing reader sees Traces alone until the bundle is turned
-     * on in `/me/configure`.
+     * on in `/coding-agents/configure`.
      */
     get: {
       query: {

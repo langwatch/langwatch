@@ -21,28 +21,28 @@ export const userWeb = defineBrowserModule("user")
     },
   })
   .withScreens({
-    "pages/me/index": {
-      path: "/me",
+    "pages/coding-agents/index": {
+      path: "/coding-agents",
       flags: [FrontendFlags.release_ui_ai_governance_enabled],
       load: () => import("./ui/sections/personal-workspace/personal-overview.screen.tsx"),
     },
-    "pages/me/configure": {
-      path: "/me/configure",
+    "pages/coding-agents/configure": {
+      path: "/coding-agents/configure",
       flags: [FrontendFlags.release_ui_ai_governance_enabled],
       load: () => import("./ui/sections/personal-workspace/personal-configure.screen.tsx"),
     },
-    "pages/me/pull-requests": {
-      path: "/me/pull-requests",
+    "pages/coding-agents/pull-requests": {
+      path: "/coding-agents/pull-requests",
       flags: [FrontendFlags.release_ui_ai_governance_enabled],
       load: () => import("./ui/sections/personal-workspace/personal-pull-requests.screen.tsx"),
     },
-    "pages/me/sessions": {
-      path: "/me/sessions",
+    "pages/coding-agents/sessions": {
+      path: "/coding-agents/sessions",
       flags: [FrontendFlags.release_ui_ai_governance_enabled],
       load: () => import("./ui/sections/personal-workspace/personal-sessions.screen.tsx"),
     },
-    "pages/me/budget/request": {
-      path: "/me/budget/request",
+    "pages/coding-agents/budget/request": {
+      path: "/coding-agents/budget/request",
       flags: [FrontendFlags.release_ui_ai_governance_enabled],
       load: () => import("./ui/sections/personal-workspace/personal-budget-request.screen.tsx"),
     },

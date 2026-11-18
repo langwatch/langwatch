@@ -5,7 +5,7 @@ import { isLoggedIn, loadConfig } from "@/cli/utils/governance/config";
 import { normalizeEndpoint } from "@/internal/endpoint";
 
 /**
- * Open LangWatch app: no path→project home/me, path→control_plane_url/path.
+ * Open LangWatch app: no path→project home/coding-agents, path→control_plane_url/path.
  */
 export const openCommand = async (
   options: { path?: string; browser?: string } = {},
@@ -24,7 +24,7 @@ export const openCommand = async (
   } else if (process.env.LANGWATCH_API_KEY) {
     target = base;
   } else {
-    target = `${base}/me`;
+    target = `${base}/coding-agents`;
   }
 
   console.log(`Opening ${target}`);

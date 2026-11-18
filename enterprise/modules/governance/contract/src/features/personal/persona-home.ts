@@ -68,7 +68,7 @@ export class PersonaHomeResolverService {
         persona,
         destination:
           input.organizationIntent === "AGENT_GOVERNANCE" && input.hasGovernanceUi
-            ? "/me"
+            ? "/coding-agents"
             : projectHome,
         isOverride: false,
         governanceUiEnabled: input.hasGovernanceUi,
@@ -120,7 +120,7 @@ export class PersonaHomeResolverService {
     } catch {
       return {
         persona: "project_only",
-        destination: input.firstProjectSlug ? `/${input.firstProjectSlug}` : "/me",
+        destination: input.firstProjectSlug ? `/${input.firstProjectSlug}` : "/coding-agents",
         isOverride: false,
         governanceUiEnabled: input.hasGovernanceUi ?? false,
         intentPinned: false,
@@ -145,7 +145,7 @@ export class PersonaHomeResolverService {
   }
 
   private mapPersonaToDestination(persona: Persona, input: PersonaResolverInput): string {
-    const noProjectHome = input.hasGovernanceUi ? "/me" : "/onboarding/welcome";
+    const noProjectHome = input.hasGovernanceUi ? "/coding-agents" : "/onboarding/welcome";
     const projectHome = input.firstProjectSlug ? `/${input.firstProjectSlug}` : noProjectHome;
 
     if (!input.hasGovernanceUi) return projectHome;
@@ -154,7 +154,7 @@ export class PersonaHomeResolverService {
         return "/governance";
       case "personal_only":
       case "mixed":
-        return "/me";
+        return "/coding-agents";
       case "project_only":
         return projectHome;
     }

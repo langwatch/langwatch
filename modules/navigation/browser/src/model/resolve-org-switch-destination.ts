@@ -3,7 +3,7 @@ import { type ProductId, productById } from "./products.ts";
 /**
  * Where an in-place organization switch lands: the settings detour stays put,
  * else the same product's home in the new organization when reachable, else
- * that org's project home, else Me, else the root (which re-resolves).
+ * that org's project home, else Coding agents, else the root (which re-resolves).
  */
 export function resolveOrgSwitchDestination({
   currentProduct,
@@ -27,6 +27,6 @@ export function resolveOrgSwitchDestination({
     if (home) return home;
   }
   if (projectSlug) return `/${projectSlug}`;
-  if (reachableProducts.includes("me")) return "/me";
+  if (reachableProducts.includes("me")) return "/coding-agents";
   return "/";
 }

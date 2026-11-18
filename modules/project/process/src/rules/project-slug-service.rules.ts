@@ -16,6 +16,7 @@ const RESERVED_TOP_LEVEL_ROUTES = new Set([
   "auth",
   "authorize",
   "cli",
+  "coding-agents",
   "gateway",
   "governance",
   "invite",

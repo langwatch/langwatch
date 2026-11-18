@@ -183,6 +183,36 @@ export const uiLegacyRedirectRoutes: readonly UiRedirectRouteDescriptor[] = [
     path: "/settings/routing-policies",
     redirect: { from: "/settings/routing-policies", to: "/gateway/routing-policies" },
   },
+  // The personal workspace moved from /me to /coding-agents; CLIs already
+  // installed still print /me links. Spec: specs/navigation/coding-agents-url-move.feature
+  {
+    // The devices inventory is a tab of configure; straight there, no chaining.
+    path: "/me/devices",
+    redirect: {
+      from: "/me/devices",
+      to: "/coding-agents/configure",
+      pinParams: { tab: "devices" },
+    },
+  },
+  {
+    // Spelled out: /:project/sessions outranks /me/*, so the prefix row alone
+    // would read "me" as a project slug here.
+    path: "/me/sessions",
+    redirect: { from: "/me", to: "/coding-agents" },
+  },
+  {
+    // Spelled out for the same reason: /:project/pull-requests outranks /me/*.
+    path: "/me/pull-requests",
+    redirect: { from: "/me", to: "/coding-agents" },
+  },
+  {
+    path: "/me/*",
+    redirect: { from: "/me", to: "/coding-agents" },
+  },
+  {
+    path: "/me",
+    redirect: { from: "/me", to: "/coding-agents" },
+  },
 ];
 
 export const uiRouteTable: readonly UiRouteDescriptor[] = [
@@ -539,41 +569,31 @@ export const uiRouteTable: readonly UiRouteDescriptor[] = [
             page: "pages/governance/users/[id]",
           },
 
-          // Personal-scope governance routes (must precede the /:project catch-all
-          // so "me" doesn't get treated as a project slug)
+          // Coding agents: the personal-scope routes (must precede the /:project
+          // catch-all so "coding-agents" doesn't get treated as a project slug)
           {
-            path: "/me",
-            page: "pages/me/index",
+            path: "/coding-agents",
+            page: "pages/coding-agents/index",
           },
           {
-            path: "/me/configure",
-            page: "pages/me/configure",
+            path: "/coding-agents/configure",
+            page: "pages/coding-agents/configure",
           },
           {
-            // The devices inventory moved into a tab of /me/configure, and this
-            // path keeps resolving so old links do not dead-end.
-            path: "/me/devices",
-            redirect: {
-              from: "/me/devices",
-              to: "/me/configure",
-              pinParams: { tab: "devices" },
-            },
+            path: "/coding-agents/pull-requests",
+            page: "pages/coding-agents/pull-requests",
           },
           {
-            path: "/me/pull-requests",
-            page: "pages/me/pull-requests",
-          },
-          {
-            path: "/me/sessions",
-            page: "pages/me/sessions",
+            path: "/coding-agents/sessions",
+            page: "pages/coding-agents/sessions",
           },
           {
             // Budget-increase request page that the CLI's `langwatch request-increase`
             // opens. The page file existed but routes.tsx is explicit (Vite migration)
             // - without this entry the URL 404'd, breaking the per-spec
             // budget-exceeded → request flow Ariana caught in dogfood.
-            path: "/me/budget/request",
-            page: "pages/me/budget/request",
+            path: "/coding-agents/budget/request",
+            page: "pages/coding-agents/budget/request",
           },
 
           // AI Gateway: org-scoped admin pages live under /gateway/** at the top level,

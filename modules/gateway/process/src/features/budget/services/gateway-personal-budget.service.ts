@@ -106,7 +106,7 @@ export class GatewayPersonalBudgetService {
     });
 
     return {
-      requestIncreaseUrl: `${baseUrl.replace(/\/$/, "")}/me/budget/request?${params.toString()}`,
+      requestIncreaseUrl: `${baseUrl.replace(/\/$/, "")}/coding-agents/budget/request?${params.toString()}`,
     };
   }
 }

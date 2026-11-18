@@ -184,7 +184,7 @@ export function AppHeaderUserMenu() {
 
 /**
  * A plain link for the org-less reader, else one item per governance org.
- * Picking one writes that org into scope, then opens `/me`.
+ * Picking one writes that org into scope, then opens `/coding-agents`.
  */
 function PersonalWorkspaceEntries({
   entries,
@@ -199,7 +199,7 @@ function PersonalWorkspaceEntries({
   if (orgLess) {
     return (
       <Menu.Item value="my-workspace" asChild>
-        <NavigationLink href="/me">My Workspace</NavigationLink>
+        <NavigationLink href="/coding-agents">My Workspace</NavigationLink>
       </Menu.Item>
     );
   }
@@ -216,7 +216,7 @@ function PersonalWorkspaceEntries({
                 teamId: "",
                 projectSlug: "",
               });
-              host.navigate("/me");
+              host.navigate("/coding-agents");
             }}
           >
             My Workspace

@@ -37,6 +37,6 @@ export function resolveLandingDestination({
   if (serverHomeDestination) return serverHomeDestination;
 
   if (projectSlug) return `/${projectSlug}`;
-  if (reachableProducts.includes("me")) return "/me";
+  if (reachableProducts.includes("me")) return "/coding-agents";
   return null;
 }

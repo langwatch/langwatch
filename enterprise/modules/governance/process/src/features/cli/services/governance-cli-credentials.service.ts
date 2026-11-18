@@ -185,7 +185,7 @@ export class GovernanceCliCredentialService implements GovernanceCliCredentialAp
       limitUsd: blocker.limitUsd,
       spentUsd: blocker.spentUsd,
       period: blocker.window.toLowerCase(),
-      requestIncreaseUrl: `${this.consoleBaseUrl()}/me/budget/request?${params.toString()}`,
+      requestIncreaseUrl: `${this.consoleBaseUrl()}/coding-agents/budget/request?${params.toString()}`,
       adminEmail,
     };
   }
