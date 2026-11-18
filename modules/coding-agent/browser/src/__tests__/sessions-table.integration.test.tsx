@@ -226,7 +226,7 @@ describe("the personal Sessions table", () => {
       expect(screen.getByRole("button", { name: "Open pull request #4218" })).toBeInTheDocument();
     });
 
-    /** @scenario "Paired figures in one cell share one text size" */
+    /** @scenario "Active and waiting time, and compactions and cache rebuilds, share one text size" */
     it("draws active and waiting time, and compactions and rebuilds, at one text size", () => {
       pinSessions([sessionRow()]);
 

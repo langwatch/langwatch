@@ -63,7 +63,7 @@ Rule: The page lists my sessions with their context economics
     And the row shows its peak context, compactions, cache rebuilds and waiting time
 
   @integration
-  Scenario: Paired figures in one cell share one text size
+  Scenario: Active and waiting time, and compactions and cache rebuilds, share one text size
     Given a session that both worked and waited, and both compacted and rebuilt its cache
     When the user opens their Sessions page
     Then its active and waiting time read at the same text size
