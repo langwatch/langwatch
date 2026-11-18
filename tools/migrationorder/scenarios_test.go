@@ -141,7 +141,7 @@ func TestStepsRefusesAChangeToAReleasedDeclaration(t *testing.T) {
 				if f.Entry != stepFile || !strings.Contains(f.Problem, "which release 3.21.0 shipped, and a released step cannot change") {
 					t.Errorf("finding = %+v", f)
 				}
-				if !strings.Contains(f.Fix, "restore the defineMigrationStep block declaring") || !strings.Contains(f.Fix, "git show main:"+stepFile) {
+				if !strings.Contains(f.Fix, "restore the declaration of") || !strings.Contains(f.Fix, "git show main:"+stepFile) {
 					t.Errorf("fix = %q, want the base declaration restored", f.Fix)
 				}
 				if id, _, ok := strings.Cut(strings.TrimPrefix(f.Problem, "declares "), ","); ok {
@@ -361,6 +361,9 @@ func TestStepsReadsAReleasedIdIndexStepFromItsOwnersCallInCode(t *testing.T) {
 		other       = "// mirrors defineProcessModule(\"gateway\")\nexport const other = defineProcessModule(\"other\")\n  " + gatewayCall + ";\n"
 	)
 	edited := strings.Replace(ops, "[EVENT_LOG_ID_INDEX]", "[EVENT_LOG_ID_INDEX, MORE]", 1)
+	wrapped := func(file string) string {
+		return strings.Replace(file, `defineProcessModule("gateway")`, "defineProcessModule(\n  \"gateway\",\n)", 1)
+	}
 	quotedKey := func(quote, file string) string {
 		return strings.Replace(file, "  step:", "  "+quote+"step"+quote+":", 1)
 	}
@@ -385,6 +388,9 @@ func TestStepsReadsAReleasedIdIndexStepFromItsOwnersCallInCode(t *testing.T) {
 		}},
 		{"a single-quoted step key", "declares ops:fill-event-log-id-index", opsFile, map[string][2]string{
 			gatewayFile: {gateway, gateway}, opsFile: {quotedKey(`'`, ops), quotedKey(`'`, edited)},
+		}},
+		{"the owner's call wrapped with a trailing comma", "declares gateway:fill-id-indexes", gatewayFile, map[string][2]string{
+			gatewayFile: {wrapped(gateway), wrapped(strings.Replace(gateway, "Fills gateway.", "Fills more.", 1))}, opsFile: {ops, ops},
 		}},
 	}
 	for _, c := range cases {

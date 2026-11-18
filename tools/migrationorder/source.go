@@ -12,7 +12,7 @@ var identifier = regexp.MustCompile(`^[\w$]*`)
 // starts at the owner's defineProcessModule in code, not in a comment.
 func ownerCalls(content, owner, method string) []string {
 	depths := codeDepths(content)
-	definition := regexp.MustCompile(`\bdefineProcessModule\s*\(\s*` + quotedLiteral(owner) + `\s*\)`)
+	definition := regexp.MustCompile(`\bdefineProcessModule\s*\(\s*` + quotedLiteral(owner) + `\s*,?\s*\)`)
 	var calls []string
 	for _, loc := range definition.FindAllStringIndex(content, -1) {
 		if depths[loc[0]] < 0 {
@@ -81,7 +81,12 @@ func codeDepths(content string) []int {
 			i = end
 			continue
 		}
-		depth += strings.Count("({[", content[i:i+1]) - strings.Count(")}]", content[i:i+1])
+		switch content[i] {
+		case '(', '{', '[':
+			depth++
+		case ')', '}', ']':
+			depth--
+		}
 		depths[i] = depth
 	}
 	return depths

@@ -59,7 +59,7 @@ type StepInput struct {
 func CheckSteps(in StepInput) []Finding {
 	var findings []Finding
 	for _, step := range in.Released {
-		restore := fmt.Sprintf("restore the defineMigrationStep block declaring %s as `git show %s:%s` has it, and declare the change as a new step with a new id",
+		restore := fmt.Sprintf("restore the declaration of %s as `git show %s:%s` has it, and declare the change as a new step with a new id",
 			step.ID, in.BaseRef, shellArg(step.Path))
 		switch {
 		case step.Head == "":
