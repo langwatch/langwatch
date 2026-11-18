@@ -19545,6 +19545,18 @@ For Claude Code, an administrator can apply the telemetry configuration to every
 
 Put the same `env` block in it that [Manual OpenTelemetry setup](/coding-agents/claude-code#manual-opentelemetry-setup) shows for `~/.claude/settings.json`. Variables in the managed settings file take precedence, and a user cannot override them.
 
+## Name the sessions of a background agent
+
+The Sessions page names a session by the title the agent generated or by the first line of its first prompt. A background agent often starts every session with the same scripted text, so its sessions all get the same name, or none.
+
+To name them yourself, add `langwatch.session.name` to the resource attributes the agent exports with. Keep the ones already in `OTEL_RESOURCE_ATTRIBUTES`, such as `service.name=claude-code`, and append the name after a comma:
+
+```bash
+export OTEL_RESOURCE_ATTRIBUTES="${OTEL_RESOURCE_ATTRIBUTES:+$OTEL_RESOURCE_ATTRIBUTES,}langwatch.session.name=nightly-maintenance"
+```
+
+Every session the agent starts is then listed under that name. When the LangWatch hooks report a name the harness holds, such as one from Claude Code's `--name` or `/rename`, that name replaces it.
+
 ## See your machines
 
 Every CLI sign-in, CI runners included, appears under **Devices** on [/me/configure](https://app.langwatch.ai/me/configure), where you revoke one machine or all of them. An organization can cap how long a device session lives before it must sign in again; see the session policy on the [governance dashboard](/ai-governance/governance-dashboard).
