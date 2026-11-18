@@ -223,9 +223,6 @@ describe("the remaining-content move", () => {
         needsOldWritersGone: true,
       });
       expect(declared?.after).toContain(FIRST_MOVE);
-      expect(steps.find((step) => step.id === "dataset:create-first-versions")?.after).toContain(
-        REMAINING_MOVE,
-      );
     });
   });
 

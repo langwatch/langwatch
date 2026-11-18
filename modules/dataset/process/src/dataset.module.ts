@@ -102,12 +102,13 @@ export const datasetProcessModule: PublishedProcessModule<
       // Before any dataset read: a row stored with an empty slug cannot be read at all.
       fillEmptySlugs,
       // Background and paced by its own work: it snapshots in its run and sends no queue work.
+      // Released in 3.24.0, so this block stays as it shipped.
       defineMigrationStep({
         id: "dataset:create-first-versions",
         kind: "data",
         mode: "background",
         description: "Saves version 1 of every dataset that has rows and no version history yet.",
-        after: [firstMove, remainingMove, fillEmptySlugs],
+        after: ["dataset:move-content-to-object-storage", fillEmptySlugs],
         run: app.firstVersionsRun(),
       }),
     ];
