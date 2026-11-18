@@ -17,18 +17,21 @@ export function CurrentProjectHeader({
   projectName,
   isAggregate,
   canOpenSettings,
+  canOpenApiKeys,
   onNavigate,
 }: {
   projectId: string;
   projectName: string;
   isAggregate: boolean;
   canOpenSettings: boolean;
+  canOpenApiKeys: boolean;
   onNavigate: () => void;
 }) {
   const { settingsHref, apiKeysHref } = currentProjectLinks({
     projectId,
     isAggregate,
     canOpenSettings,
+    canOpenApiKeys,
   });
   return (
     <VStack

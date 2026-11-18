@@ -50,3 +50,12 @@ Feature: The project switcher names the current project by its ID
     When I open the project switcher
     Then it shows the current project's ID with a copy button
     And it offers no "Project settings" link, because that page needs permission to update the project
+
+  @integration
+  Scenario: The header offers only the pages the reader can open there
+    Given I am in my personal workspace, which has no project settings page
+    When I open the project switcher
+    Then it offers no "Project settings" link
+    Given I am a lite member, for whom the settings menu hides API keys
+    When I open the project switcher
+    Then it offers no "API keys for this project" link

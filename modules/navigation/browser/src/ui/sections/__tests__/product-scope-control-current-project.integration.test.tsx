@@ -154,6 +154,27 @@ describe("the project switcher's current project header", () => {
     });
   });
 
+  describe("when the header would lead to a page the reader cannot open", () => {
+    /** @scenario The header offers only the pages the reader can open there */
+    it("leaves out settings for a personal workspace and keys for a lite member", async () => {
+      const personal = { id: "project_me_9", slug: "me", name: "Mine", isPersonal: true };
+      const { unmount } = renderSwitcher({ readings: { project: personal, pathname: "/me" } });
+      await openSwitcher();
+      expect(
+        within(currentProjectHeader()).queryByRole("link", { name: "Project settings" }),
+      ).not.toBeInTheDocument();
+      unmount();
+
+      renderSwitcher({ readings: { plan: { isLiteMember: true } } });
+      await openSwitcher();
+      const header = currentProjectHeader();
+      expect(within(header).getByRole("link", { name: "Project settings" })).toBeInTheDocument();
+      expect(
+        within(header).queryByRole("link", { name: "API keys for this project" }),
+      ).not.toBeInTheDocument();
+    });
+  });
+
   describe("when the current project is an aggregate", () => {
     /** @scenario An aggregate project shows its ID but offers no API keys */
     it("shows the ID and leaves out the API keys link", async () => {

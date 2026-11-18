@@ -80,7 +80,8 @@ function ProjectScopeMenu() {
             projectId={project.id}
             projectName={project.name}
             isAggregate={currentProjectIsAggregate}
-            canOpenSettings={host.hasPermission("project:update")}
+            canOpenSettings={!project.isPersonal && host.hasPermission("project:update")}
+            canOpenApiKeys={!host.plan().isLiteMember}
             onNavigate={closeMenu}
           />
         )}
