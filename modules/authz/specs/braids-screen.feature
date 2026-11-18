@@ -138,6 +138,60 @@ Feature: The Braids screen
       When ana completes a supported condition, a start date and an end choice
       Then the create button reads "Braid into orchestrator"
       And creating closes the dialog and lists the new braid
+      And the confirmation names "orchestrator"
+
+    @integration
+    Scenario: A braid still being saved is not offered for another save
+      When ana creates a braid and the server answers that the access change is still processing
+      Then the dialog closes saying the braid is being saved and there is no need to save it again
+      And the braids lists are read again, so the braid shows once it lands
+
+    @integration
+    Scenario: Saving the same braid again resends its command id
+      Given ana's first save of a braid failed before the server answered
+      When ana saves it again with the same terms
+      Then both saves carry the same command id, so the server keeps one braid
+      And a save after ana changes the condition carries a new command id
+
+    @integration
+    Scenario: The condition field says the reader's members can read it
+      When ana opens the dialog and picks "orchestrator"
+      Then the condition field says members of "orchestrator" can read the condition, so secrets stay out of it
+
+    @unit
+    Scenario: A new braid starts when it is made, not at midnight
+      When ana opens the dialog and leaves the window at "From now · no end"
+      Then the braid's start is the moment the dialog opened, never the start of that UTC day
+
+    @integration
+    Scenario: Editing a braid shows its real start
+      Given a live braid from "specialists" into "orchestrator" that started earlier today
+      When ana opens Edit on it
+      Then the window reads from its start date and time in UTC, never "From now"
+
+    @unit
+    Scenario: Accepting an attribute key closes its bracket once
+      When ana types attributes[ and the editor has closed the bracket for her
+      And she accepts "orchestrator" from the suggestions
+      Then the condition reads attributes["orchestrator"], with one closing bracket
+
+    @unit
+    Scenario: Autocomplete never offers reserved or signature keys
+      Given "specialists" spans carry langwatch.signature and other langwatch.* keys
+      When ana types attributes[" in the condition
+      Then those keys are not offered, since a condition cannot read them
+
+    @integration
+    Scenario: The dialog fits a phone-width screen
+      When ana opens the dialog on a 390 px wide screen
+      Then the form column shrinks to the dialog's width instead of running past its edge
+
+    @integration
+    Scenario: Escape asks before throwing away a changed draft
+      Given ana has picked a project or typed a condition
+      When she presses Escape with no suggestion list open
+      Then the dialog asks whether to discard the braid before closing
+      And an untouched dialog closes on Escape without asking
 
     @integration
     Scenario: Editing a braid saves only a change
@@ -154,7 +208,21 @@ Feature: The Braids screen
       When ana opens Braids
       Then the row shows the reader, the condition, the start date, the end date and the braided spans over the last 24 hours
       And its menu offers Edit, View in audit log and Remove braid
+      And each row's menu has a name of its own, naming the reader, the condition and the start
       And View in audit log names both projects, never the braid's grant id
+
+    @unit
+    Scenario: A preview or count refused by an overloaded trace store says it is busy
+      Given the trace store answers the braid preview or the braids' last 24 hours past its memory limit
+      When ana opens the dialog or the Braids page
+      Then the read is refused with clickhouse_overloaded, a retryable 503, never an unknown error
+
+    @integration
+    Scenario: A braid row says when its last 24 hours could not be counted
+      Given a live braid from "specialists" into "orchestrator"
+      And counting the braids' spans fails
+      When ana opens Braids
+      Then the row's Last 24 hours says the spans could not be counted, never "Counting spans" for ever
 
     @integration
     Scenario: A braid condition reads with syntax highlighting
@@ -202,6 +270,13 @@ Feature: The Braids screen
       When ana opens Braids in the project settings
       Then a quiet line under the page description links to all braids in the organisation
       And a member who cannot open the organisation's Braids is offered no such link
+
+    @integration
+    Scenario: The organisation's braids read on a phone-width screen
+      Given the organisation has live braids
+      When an organisation admin opens the organisation Braids page on a 390 px wide screen
+      Then each braid reads as one stacked row naming where it comes from, where it goes, its condition and its window
+      And nothing sits off-screen in a scroller that does not say it scrolls
 
     @integration
     Scenario: Removing a braid says what stops before it happens

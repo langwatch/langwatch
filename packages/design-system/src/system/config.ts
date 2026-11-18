@@ -510,11 +510,11 @@ export const designSystemConfig = defineConfig({
           braids: {
             lead: { value: { _light: "{colors.orange.solid}", _dark: "{colors.orange.solid}" } },
             weave: { value: { _light: "#3D3D4D", _dark: "#E7ECF2" } },
-            // Fictional example projects in the illustrations, in the app's avatar hues.
+            // Example projects in the illustrations: the brand kit's orange, blue and green.
             project: {
               1: { value: { _light: "{colors.orange.solid}", _dark: "{colors.orange.300}" } },
-              2: { value: { _light: "{colors.blue.400}", _dark: "{colors.blue.300}" } },
-              3: { value: { _light: "{colors.purple.400}", _dark: "{colors.purple.300}" } },
+              2: { value: { _light: "{colors.blue.600}", _dark: "{colors.blue.300}" } },
+              3: { value: { _light: "{colors.green.600}", _dark: "{colors.green.300}" } },
             },
             projectInk: {
               1: { value: { _light: "#141417", _dark: "#141417" } },

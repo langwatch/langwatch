@@ -256,6 +256,23 @@ describe("given the Braids page mounts the signing keys panel by its token", () 
     });
   });
 
+  describe("when the mounting page can't issue keys", () => {
+    /** @scenario "With release_braids off the keys panel offers Revoke but not Rotate or New key" */
+    it("offers Revoke but not Rotate, and ignores the New signing key link", async () => {
+      const user = userEvent.setup();
+      state.keys = [key({})];
+      renderWithApiKeyHost(
+        <Panel projectId="proj-1" canIssue={false} />,
+        new FakeApiKeyHost({ grants: MANAGER, query: ASKED }),
+      );
+
+      await user.click(screen.getByRole("button", { name: "Actions for Production" }));
+      expect(await screen.findByRole("menuitem", { name: "Revoke" })).toBeInTheDocument();
+      expect(screen.queryByRole("menuitem", { name: "Rotate" })).toBeNull();
+      expect(screen.queryByTestId("signing-key-create-confirm")).not.toBeInTheDocument();
+    });
+  });
+
   describe("when the viewer may not braid out of the project", () => {
     /** @scenario Someone who may not manage signing keys is told who does */
     it("says who manages the keys, reads none and offers no way to create one", () => {

@@ -2749,6 +2749,9 @@ const presentations = {
     // is a message they can forward as-is.
     title: "You don't have access to this",
     describe: (error) => {
+      if (str(error, "denialReason", "") === "braids-kept-to-organisation-admins") {
+        return "Your organisation keeps braids to its admins, so only they can create, change or remove them. Ask an organisation admin.";
+      }
       const permission = str(error, "permission", "");
       return permission
         ? `Ask an organization admin to grant you "${permission}" on this project.`

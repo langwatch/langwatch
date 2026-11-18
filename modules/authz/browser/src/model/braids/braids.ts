@@ -2,10 +2,13 @@
 // Spec: modules/authz/specs/braids-screen.feature. Decisions: ADR-201.
 
 import { type AuthzBraid, BRAID_AUDIT_TARGET_KIND } from "@langwatch/authz-contract";
-import { format } from "@langwatch/time";
+import { format, Temporal } from "@langwatch/time";
 
 /** Into other projects (this project owns the spans) or from other projects (it reads them). */
 export type BraidSide = "into" | "from";
+
+/** Spans per braid over the last 24 hours: undefined while counting, "failed" if it could not. */
+export type BraidActivityCounts = ReadonlyMap<string, number> | "failed" | undefined;
 
 export type BraidProject = {
   id: string;
@@ -167,12 +170,15 @@ export function braidAffordances({
   canManage,
   planState,
   keptToOrganizationAdmins,
+  released = true,
 }: {
   canManage: boolean;
   planState: BraidsPlanState;
   keptToOrganizationAdmins: boolean;
+  /** `release_braids` off: the list is read-only but Remove stays (Alex, 2026-11-18). */
+  released?: boolean;
 }): BraidAffordances {
-  const working = canManage && planState === "enterprise";
+  const working = canManage && planState === "enterprise" && released;
   return {
     canCreate: working,
     canEditInto: working,
@@ -221,4 +227,46 @@ export function braidsSectionOf(value: string | undefined): BraidsSection | unde
 export function braidsSigningKeysHref({ projectSlug }: { projectSlug: string }): string {
   const keys = `/settings/braids?${BRAIDS_SECTION_QUERY_KEY}=keys`;
   return `/${encodeURIComponent(projectSlug)}?return_to=${encodeURIComponent(keys)}`;
+}
+
+const LABEL_CONDITION_LENGTH = 80;
+
+/** A row menu's accessible name, its own on the page: other project, condition, start. */
+export function braidRowActionsLabel(row: BraidRow): string {
+  const direction = row.side === "into" ? "into" : "from";
+  return braidActionsLabel({
+    subject: `braid ${direction} ${row.otherProject.name}`,
+    where: row.where,
+    fromMs: row.fromMs,
+  });
+}
+
+/** The organisation list's row menu name: both projects, the condition and the start. */
+export function organizationBraidActionsLabel(row: OrganizationBraidRow): string {
+  return braidActionsLabel({
+    subject: `braid from ${row.owner.name} into ${row.reader.name}`,
+    where: row.where,
+    fromMs: row.fromMs,
+  });
+}
+
+function braidActionsLabel({
+  subject,
+  where: written,
+  fromMs,
+}: {
+  subject: string;
+  where: string | null;
+  fromMs: number;
+}): string {
+  const where = written?.trim();
+  let condition = where || "every span";
+  if (condition.length > LABEL_CONDITION_LENGTH) {
+    condition = `${condition.slice(0, LABEL_CONDITION_LENGTH)}…`;
+  }
+  const start = Temporal.Instant.fromEpochMilliseconds(fromMs)
+    .toString()
+    .slice(0, 16)
+    .replace("T", " ");
+  return `Actions for the ${subject}, ${condition}, from ${start} UTC`;
 }

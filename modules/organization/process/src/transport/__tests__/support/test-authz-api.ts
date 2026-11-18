@@ -291,7 +291,7 @@ export class TestAuthzApi implements AuthzApi {
   hasProjectPermission = unsupported<AuthzApi["hasProjectPermission"]>("hasProjectPermission");
   resolveGrantId = unsupported<AuthzApi["resolveGrantId"]>("resolveGrantId");
   listBraids = unsupported<AuthzApi["listBraids"]>("listBraids");
-  listBraidsForScreen = unsupported<AuthzApi["listBraidsForScreen"]>("listBraidsForScreen");
+  assertBraidsReleased = unsupported<AuthzApi["assertBraidsReleased"]>("assertBraidsReleased");
   getOrganizationPolicyForScreen = unsupported<AuthzApi["getOrganizationPolicyForScreen"]>(
     "getOrganizationPolicyForScreen",
   );

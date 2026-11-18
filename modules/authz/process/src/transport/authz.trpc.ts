@@ -199,10 +199,10 @@ export const authzTrpcTransport: TrpcRouterDeclaration<AuthzApi, typeof authzTrp
       app.applyMemberBindings({ ...input, caller: callerOf(actor), actor: toLedgerActor(actor) }),
     )
 
-    /** Members of either project list the braids touching it (ADR-201 §2). */
+    /** Members of either project list the braids touching it, flag or not (ADR-201 §2). */
     .procedure("listBraids")
     .withPermission("project:view", { via: "projectId" })
-    .handle(async ({ app, input }) => app.listBraidsForScreen(input))
+    .handle(async ({ app, input }) => app.listBraids(input))
 
     /** The owner is the first target: braids:manage there, traces:view at the reader. */
     .procedure("createBraid")
