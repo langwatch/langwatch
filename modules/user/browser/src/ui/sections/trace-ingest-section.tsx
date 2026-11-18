@@ -179,6 +179,7 @@ export function TraceIngestSection() {
             description: openTemplate.description,
             credentialSchema: openTemplate.credentialSchema,
           }}
+          personalProjectSlug={ctx.personalProjectSlug}
           installResult={installResults[openTemplate.slug] ?? null}
           isInstalling={installMutation.isPending || rotateMutation.isPending}
           // Both halves are gated on the template they belong to — a tRPC

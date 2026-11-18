@@ -33,8 +33,10 @@ Feature: The personal workspace moves from /me to /coding-agents
     When I cold-load "/me/<segment>"
     Then I land on "/coding-agents/<segment>" when that is a Coding agents page
     And otherwise I land on "/coding-agents"
-    # One twin per project page, derived from the project routes, so a page
-    # added later cannot make "me" read as a project slug again. A segment
+    # One twin per project page, derived from the project routes: "/me/<seg>"
+    # and "/me/<seg>/*" for the first segment of every project page. A deeper
+    # project row such as "/:project/analytics/metrics" still outranks
+    # "/me/analytics/*"; no such address was ever a real /me page. A segment
     # with no Coding agents page drops its sub-path: "/me/traces/abc" lands
     # on "/coding-agents".
 

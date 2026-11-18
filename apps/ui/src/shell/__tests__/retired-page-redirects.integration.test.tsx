@@ -9,7 +9,7 @@ import { act, render, waitFor } from "@testing-library/react";
 import { createMemoryRouter, Outlet, RouterProvider } from "react-router";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { uiRouteTable } from "../ui-route-table";
+import { uiRouterTable } from "../ui-route-table";
 
 /**
  * Every page the table names, stubbed by its key. A layout route has to render
@@ -17,7 +17,7 @@ import { uiRouteTable } from "../ui-route-table";
  * renders one is unaffected, so every stub renders both.
  */
 const stubbedPages: UiPageLoaderRegistry = Object.fromEntries(
-  uiRoutePageKeys(uiRouteTable).map((key) => [
+  uiRoutePageKeys(uiRouterTable).map((key) => [
     key,
     async () => ({
       default: () => (
@@ -38,7 +38,7 @@ const stubbedShellLayouts = {
 };
 
 const realRoutes = createUiRouteObjects({
-  table: uiRouteTable,
+  table: uiRouterTable,
   loaders: stubbedPages,
   shellLayouts: stubbedShellLayouts,
 });

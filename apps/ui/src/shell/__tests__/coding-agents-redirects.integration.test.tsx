@@ -11,7 +11,7 @@ import { createMemoryRouter, Outlet, type RouteObject, RouterProvider } from "re
 import { describe, expect, it } from "vitest";
 
 import { uiRoutePatterns } from "../route-patterns";
-import { uiCodingAgentsRedirectRoutes, uiRouteTable } from "../ui-route-table";
+import { uiCodingAgentsRedirectRoutes, uiRouterTable } from "../ui-route-table";
 
 /** The redirect descriptors the application mounts, materialised the same way. */
 const legacyRedirectRoutes = createUiRouteObjects({
@@ -22,7 +22,7 @@ const legacyRedirectRoutes = createUiRouteObjects({
 const passThrough = async () => ({ default: () => <Outlet /> });
 
 const stubbedPages: UiPageLoaderRegistry = Object.fromEntries(
-  uiRoutePageKeys(uiRouteTable).map((key) => [key, passThrough]),
+  uiRoutePageKeys(uiRouterTable).map((key) => [key, passThrough]),
 );
 
 /**
@@ -30,7 +30,7 @@ const stubbedPages: UiPageLoaderRegistry = Object.fromEntries(
  * page back then, so a redirect mounted beneath it never runs.
  */
 const waitingChromeRoutes = createUiRouteObjects({
-  table: uiRouteTable,
+  table: uiRouterTable,
   loaders: stubbedPages,
   shellLayouts: {
     auth: passThrough,
@@ -166,7 +166,7 @@ describe("legacy /me redirects", () => {
   });
 
   describe("when the old budget request address is cold-loaded", () => {
-    /** @scenario An old address that a project page also matches still moves */
+    /** @scenario An old deep link keeps its sub-path, query and hash */
     it("keeps its nested page", async () => {
       const router = renderRouterAt(["/me/budget/request"]);
 

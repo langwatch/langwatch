@@ -15,7 +15,6 @@ import { Check, Copy, Eye, EyeOff } from "lucide-react";
 import { useState } from "react";
 
 import { usePersonalToaster } from "../../behavior/personal-workspace-feedback.ts";
-import { usePersonalContext } from "../../behavior/use-personal-context.ts";
 
 const SECRET_MASK = "•".repeat(48);
 
@@ -108,6 +107,7 @@ export function IngestionTemplateInstallDrawer({
   open,
   onOpenChange,
   template,
+  personalProjectSlug,
   installResult,
   isInstalling,
   installError,
@@ -119,6 +119,8 @@ export function IngestionTemplateInstallDrawer({
   open: boolean;
   onOpenChange: (next: boolean) => void;
   template: IngestionTemplateMeta;
+  /** The caller's personal project slug; null until it resolves. */
+  personalProjectSlug: string | null;
   /** Set by parent when onInstall resolves. Cleared on close. */
   installResult: IngestionBindingResult | null;
   isInstalling: boolean;
@@ -151,10 +153,6 @@ export function IngestionTemplateInstallDrawer({
 }) {
   const [showSecret, setShowSecret] = useState(false);
   const toaster = usePersonalToaster();
-  const { personalProjectSlug } = usePersonalContext();
-  // The traces live in the caller's personal project; until its slug resolves, name the
-  // workspace home, which links onward to them.
-  const tracesPath = personalProjectSlug ? `/${personalProjectSlug}/traces` : "/coding-agents";
 
   const copy = async ({ text, what }: { text: string; what: string }): Promise<boolean> => {
     try {
@@ -275,8 +273,15 @@ export function IngestionTemplateInstallDrawer({
               <Badge variant="surface" size="sm">
                 {template.displayName}
               </Badge>{" "}
-              environment, fire a request, and traces will land at{" "}
-              <InlineCode>{tracesPath}</InlineCode> filtered by source={template.slug}.
+              environment, fire a request, and{" "}
+              {personalProjectSlug ? (
+                <>
+                  traces will land at <InlineCode>/{personalProjectSlug}/traces</InlineCode>{" "}
+                  filtered by source={template.slug}.
+                </>
+              ) : (
+                "traces will land in your personal project; open Coding agents to find them."
+              )}
             </Text>
 
             <Text fontSize="xs" color="fg.muted">

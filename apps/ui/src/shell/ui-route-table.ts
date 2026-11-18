@@ -185,7 +185,11 @@ export const uiLegacyRedirectRoutes: readonly UiRedirectRouteDescriptor[] = [
   },
 ];
 
-const uiRouteTableBeforeCodingAgents: readonly UiRouteDescriptor[] = [
+/**
+ * The table as data, one literal so the README extractor can read it. The router mounts
+ * `uiRouterTable`, which adds the /me redirect rows derived from this table.
+ */
+export const uiRouteTable: readonly UiRouteDescriptor[] = [
   // Auth (public), under the host every front-door screen reads its
   // deployment shape and its own address through.
   {
@@ -230,9 +234,6 @@ const uiRouteTableBeforeCodingAgents: readonly UiRouteDescriptor[] = [
     path: "/admin/*",
     redirect: { from: "/admin", to: "/ops", mapSegment: RETIRED_ADMIN_SEGMENTS },
   },
-];
-
-const uiRouteTableAfterCodingAgents: readonly UiRouteDescriptor[] = [
   { path: "/share/:id", page: "pages/share/[id]" },
   // Public — no auth required; token in query-string is the authorisation
   { path: "/unsubscribe", page: "pages/unsubscribe" },
@@ -1013,11 +1014,6 @@ function projectSegments(table: readonly UiRouteDescriptor[]): string[] {
   return [...new Set([...fromTable, ...MODULE_PROJECT_SEGMENTS])];
 }
 
-const uiRouteTableWithoutMeRedirects = [
-  ...uiRouteTableBeforeCodingAgents,
-  ...uiRouteTableAfterCodingAgents,
-];
-
 /** Every page under `/coding-agents/`, as the path after it: `sessions`, `budget/request`. */
 function codingAgentsPages(table: readonly UiRouteDescriptor[]): string[] {
   return uiRouteDescriptors(table).flatMap((descriptor) => {
@@ -1026,7 +1022,7 @@ function codingAgentsPages(table: readonly UiRouteDescriptor[]): string[] {
   });
 }
 
-const codingAgentsPageList = codingAgentsPages(uiRouteTableWithoutMeRedirects);
+const codingAgentsPageList = codingAgentsPages(uiRouteTable);
 
 /**
  * The old first segments that have a page of their own under /coding-agents, so the old
@@ -1047,10 +1043,12 @@ const toCodingAgents = { from: "/me", to: "/coding-agents", mapSegment: KEPT_SEG
  * page waiting for a project and never run the redirect. Spec: coding-agents-url-move.feature
  *
  * A /:project/<segment> page outranks the /me/* prefix row (a static segment beats a splat), so
- * "me" would read as a project slug there. Every such segment therefore gets its own /me twin,
- * derived from the project rows so a page added later is covered without a hand edit. Every
- * twin shares `toCodingAgents`: a segment with a /coding-agents page keeps its sub-path, all
- * others land on /coding-agents.
+ * "me" would read as a project slug there. Every such segment therefore gets its own /me twin
+ * (/me/<seg> and /me/<seg>/*), derived from the project rows so a page added later is covered
+ * without a hand edit. Twins cover the first segment of each project page only: a deeper project
+ * row such as /:project/analytics/metrics still outranks /me/analytics/*, and no such address was
+ * ever a real /me page. Every twin shares `toCodingAgents`: a segment with a /coding-agents page
+ * keeps its sub-path, all others land on /coding-agents.
  */
 export const uiCodingAgentsRedirectRoutes: readonly UiRedirectRouteDescriptor[] = [
   {
@@ -1068,7 +1066,7 @@ export const uiCodingAgentsRedirectRoutes: readonly UiRedirectRouteDescriptor[] 
       path: `/me/${page}`,
       redirect: { from: "/me", to: "/coding-agents" },
     })),
-  ...projectSegments(uiRouteTableWithoutMeRedirects).flatMap((segment) => [
+  ...projectSegments(uiRouteTable).flatMap((segment) => [
     { path: `/me/${segment}`, redirect: toCodingAgents },
     { path: `/me/${segment}/*`, redirect: toCodingAgents },
   ]),
@@ -1076,8 +1074,20 @@ export const uiCodingAgentsRedirectRoutes: readonly UiRedirectRouteDescriptor[] 
   { path: "/me", redirect: toCodingAgents },
 ];
 
-export const uiRouteTable: readonly UiRouteDescriptor[] = [
-  ...uiRouteTableBeforeCodingAgents,
-  ...uiCodingAgentsRedirectRoutes,
-  ...uiRouteTableAfterCodingAgents,
-];
+/** The top-level retired address the /me rows sit after, beside it and above the chrome. */
+const CODING_AGENTS_REDIRECTS_AFTER = "/admin/*";
+
+/**
+ * `table` with `uiCodingAgentsRedirectRoutes` at the top level, after the /admin retirement.
+ * Throws when that row is gone, so the rows cannot fall somewhere unplanned.
+ */
+function withCodingAgentsRedirects(table: readonly UiRouteDescriptor[]): UiRouteDescriptor[] {
+  const at = table.findIndex((descriptor) => descriptor.path === CODING_AGENTS_REDIRECTS_AFTER) + 1;
+  if (at === 0) {
+    throw new Error(`uiRouteTable has no top-level ${CODING_AGENTS_REDIRECTS_AFTER} row`);
+  }
+  return [...table.slice(0, at), ...uiCodingAgentsRedirectRoutes, ...table.slice(at)];
+}
+
+/** What the router mounts: `uiRouteTable` plus the /me redirect rows derived from it. */
+export const uiRouterTable: readonly UiRouteDescriptor[] = withCodingAgentsRedirects(uiRouteTable);
