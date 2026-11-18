@@ -111,7 +111,7 @@ export class GatewayA2aTargetService {
 
   async create(input: CreateGatewayA2aTargetInput): Promise<GatewayA2aTargetResource> {
     const parsed = createGatewayA2aTargetInputSchema.parse(input);
-    const existing = await this.repository.findAll(parsed.organizationId);
+    const existing = await this.repository.findAll(parsed.organizationId, { headers: false });
     if (existing.some((t) => t.name === parsed.name && t.projectId === parsed.projectId)) {
       throw new GatewayA2aTargetNameTakenError(parsed.name);
     }

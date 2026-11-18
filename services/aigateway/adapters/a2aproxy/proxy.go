@@ -137,18 +137,18 @@ type call struct {
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	c := &call{w: w, r: r, ctx: r.Context(), binding: bindingHTTPJSON, span: trace.SpanFromContext(context.Background())}
 	bad := parseRoute(c)
-	if b := h.cfg.Bundle(r.Context()); b != nil {
-		if !h.inflight.acquire(b.VirtualKeyID) {
+	c.bundle = h.cfg.Bundle(c.ctx)
+	if c.bundle != nil {
+		if !h.inflight.acquire(c.bundle.VirtualKeyID) {
 			c.span = trace.SpanFromContext(r.Context())
 			c.refuse(refuseBusy)
 			return
 		}
-		defer h.inflight.release(b.VirtualKeyID)
+		defer h.inflight.release(c.bundle.VirtualKeyID)
 	}
 	if bad == nil {
 		bad = parseBody(c)
 	}
-	c.bundle = h.cfg.Bundle(c.ctx)
 	if c.bundle == nil {
 		c.refuse(refuseUnauthenticated)
 		return
@@ -411,7 +411,7 @@ func (h *Handler) forward(c *call, target domain.A2ATarget) {
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	if strings.HasPrefix(resp.Header.Get("Content-Type"), "text/event-stream") {
+	if isEventStream(resp.Header.Get("Content-Type")) {
 		h.stream(c, resp)
 		return
 	}

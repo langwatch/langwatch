@@ -34,7 +34,7 @@ export const gatewayA2aTargetTrpc = defineTrpcContract("gatewayA2aTargets")
   .withInput(setGatewayA2aTargetBlockedInputSchema.omit({ actorUserId: true }))
   .withOutput(gatewayA2aTargetDtoSchema)
 
-  .mutation("delete")
+  .mutation("archive")
   .withInput(targetIdSchema)
   .withOutput(gatewayA2aTargetDtoSchema)
 
@@ -50,7 +50,7 @@ export const gatewayA2aTargetTrpc = defineTrpcContract("gatewayA2aTargets")
   .withInput(setProjectGatewayA2aTargetBlockedInputSchema.omit({ actorUserId: true }))
   .withOutput(gatewayA2aTargetDtoSchema)
 
-  .mutation("deleteForProject")
+  .mutation("archiveForProject")
   .withInput(projectTargetIdSchema)
   .withOutput(gatewayA2aTargetDtoSchema)
   .build();

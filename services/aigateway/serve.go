@@ -65,8 +65,9 @@ func Serve(ctx context.Context, application *app.App, deps *Deps, cfg Config) er
 		VoiceRelay:            deps.Voice,
 		A2A: a2aproxy.New(a2aproxy.Config{
 			Registry: a2aproxy.BundleRegistry{},
-			Scanner:  a2aproxy.GuardrailScanner{Evaluator: deps.ControlPlane},
-			Bundle:   httpapi.BundleFromContext,
+			// Wrapped as on the LLM routes, so /a2a verdicts and fail-opens are counted.
+			Scanner: a2aproxy.GuardrailScanner{Evaluator: gatewaymetrics.WithGuardrailMetrics(deps.ControlPlane, deps.Metrics)},
+			Bundle:  httpapi.BundleFromContext,
 			Client: a2aproxy.NewUpstreamClient(a2aproxy.UpstreamPolicy{
 				BlockLocal:   cfg.BlockLocalHTTPCalls,
 				AllowedHosts: splitAllowedHosts(cfg.AllowedProxyHosts),

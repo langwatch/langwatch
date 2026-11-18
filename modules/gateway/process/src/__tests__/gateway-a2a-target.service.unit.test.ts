@@ -70,6 +70,20 @@ describe("GatewayA2aTargetService", () => {
     ).resolves.toMatchObject({ projectId: null });
   });
 
+  it("checks a new name without unsealing any target's headers", async () => {
+    const repository = MemoryGatewayA2aTargetRepository.create();
+    const findAll = vi.spyOn(repository, "findAll");
+    const targets = GatewayA2aTargetService.create({
+      repository,
+      changeEvents: MemoryGatewayChangeEventsRepository.create(),
+      transactions: { run: (work) => work({}) },
+    });
+    await targets.create({ ...base, projectId: null, name: "billing" });
+
+    expect(findAll).toHaveBeenCalledWith("org_1", { headers: false });
+    expect(findAll).not.toHaveBeenCalledWith("org_1");
+  });
+
   it("refuses names that cannot be a path segment", async () => {
     await expect(service().create({ ...base, projectId: null, name: "Bad/Name" })).rejects.toThrow(
       "lowercase letters",

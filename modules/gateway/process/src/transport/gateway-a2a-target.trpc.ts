@@ -32,7 +32,7 @@ export const gatewayA2aTargetTrpcTransport: TrpcRouterDeclaration<
     return app.setA2aTargetBlocked({ ...input, actorUserId: actor.id });
   })
 
-  .procedure("delete")
+  .procedure("archive")
   .withPermission("virtualKeys:manage")
   .handle(({ app, input }) => {
     return app.archiveA2aTarget({ id: input.id, organizationId: input.organizationId });
@@ -56,7 +56,7 @@ export const gatewayA2aTargetTrpcTransport: TrpcRouterDeclaration<
     return app.setProjectA2aTargetBlocked({ ...input, actorUserId: actor.id });
   })
 
-  .procedure("deleteForProject")
+  .procedure("archiveForProject")
   .withPermission("virtualKeys:manage", { via: "projectId" })
   .handle(({ app, input }) => {
     return app.archiveProjectA2aTarget({ id: input.id, projectId: input.projectId });

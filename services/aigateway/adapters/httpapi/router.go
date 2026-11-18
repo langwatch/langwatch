@@ -235,13 +235,6 @@ func NewRouter(deps RouterDeps) http.Handler {
 		})
 	})
 
-	// Gemini-native surface. gemini-cli (GOOGLE_GEMINI_BASE_URL) and the
-	// @google/genai SDK POST to `/v1beta/models/{model}:generateContent`
-	// and `:streamGenerateContent`. We raw-forward to Bifrost's Gemini
-	// Passthrough endpoint, which prepends the provider's BaseURL and
-	// swaps our VK secret for the real x-goog-api-key on the way out.
-	// Any path under /v1beta (including :countTokens, :batchEmbedContents,
-	// cachedContents/*) is accepted by the same handler.
 	if deps.A2A != nil {
 		r.Route("/a2a", func(a2a chi.Router) {
 			a2a.Use(AuthMiddleware(deps.App.Auth()))
@@ -251,6 +244,13 @@ func NewRouter(deps RouterDeps) http.Handler {
 		})
 	}
 
+	// Gemini-native surface. gemini-cli (GOOGLE_GEMINI_BASE_URL) and the
+	// @google/genai SDK POST to `/v1beta/models/{model}:generateContent`
+	// and `:streamGenerateContent`. We raw-forward to Bifrost's Gemini
+	// Passthrough endpoint, which prepends the provider's BaseURL and
+	// swaps our VK secret for the real x-goog-api-key on the way out.
+	// Any path under /v1beta (including :countTokens, :batchEmbedContents,
+	// cachedContents/*) is accepted by the same handler.
 	r.Route("/v1beta", func(v1beta chi.Router) {
 		v1beta.Use(AuthMiddleware(deps.App.Auth()))
 		v1beta.Use(DispatchMetaMiddleware())

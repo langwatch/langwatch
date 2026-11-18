@@ -177,3 +177,35 @@ func TestContentUnderProtocolNamedKeysIsScanned(t *testing.T) {
 	p := collectTexts([]byte(rpcBody(`{"message":{"messageId":"m1","role":"user","parts":[{"kind":"data","data":{"id":"x1"}}]}}`)))
 	assert.Equal(t, []string{"id", "x1"}, p.texts)
 }
+
+// ghToken is a made-up GitHub token shape the guardrail fake denies; it is
+// allowlisted by value for this file in .gitleaks.toml.
+const ghToken = "ghp_aB3dE5fG7hJ9kL1mN3pQ5rS7tU9vW1xY3zA5"
+
+func secretsFixture(t *testing.T) *fixture {
+	t.Helper()
+	f := newFixture(t)
+	f.bundle.Config.Guardrails.Pre = []domain.GuardrailEntry{{ID: "g1"}}
+	f.bundle.Config.Guardrails.Post = []domain.GuardrailEntry{{ID: "g2"}}
+	f.scanner = GuardrailScanner{Evaluator: fakeEvaluator{deny: ghToken}}
+	return f
+}
+
+// @scenario "content outside text parts is scanned before the upstream"
+func TestTokenOutsideTextPartsIsBlockedBeforeTheUpstream(t *testing.T) {
+	file := base64.StdEncoding.EncodeToString([]byte("config: " + ghToken))
+	for name, part := range map[string]string{
+		"data part": `{"data":{"note":"` + ghToken + `"}}`,
+		"file part": `{"raw":"` + file + `","filename":"a.txt","mediaType":"text/plain"}`,
+		"metadata":  `{"text":"hi","metadata":{"k":"` + ghToken + `"}}`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			f := secretsFixture(t)
+			body := `{"jsonrpc":"2.0","id":7,"method":"SendMessage","params":{"message":{"messageId":"m1","role":"ROLE_USER","parts":[` + part + `]}}}`
+			rec := f.do(http.MethodPost, "/a2a/billing", body)
+			_, reason, _ := rpcError(t, rec)
+			assert.Equal(t, "a2a_content_blocked", reason)
+			assert.Empty(t, f.upstreamCalls())
+		})
+	}
+}
