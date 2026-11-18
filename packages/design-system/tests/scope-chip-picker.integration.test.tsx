@@ -402,34 +402,133 @@ describe("ScopeChipPicker search and team grouping", () => {
 describe("ScopeChipPicker summary line", () => {
   afterEach(cleanup);
 
-  const renderWithProject = (subjectNoun?: string) =>
+  const renderWith = ({
+    scope,
+    subjectNoun,
+    named = true,
+  }: {
+    scope: { scopeType: "TEAM" | "PROJECT"; scopeId: string };
+    subjectNoun?: string;
+    named?: boolean;
+  }) =>
+    renderWithDesignSystem(
+      <ScopeChipPicker
+        value={[scope]}
+        onChange={vi.fn()}
+        organizationId="org-1"
+        availableTeams={named ? [{ id: "team-1", name: "Platform" }] : undefined}
+        availableProjects={
+          named ? [{ id: "proj-1", name: "Checkout", teamId: "team-1" }] : undefined
+        }
+        singleSelect
+        subjectNoun={subjectNoun}
+        currentOrganizationId="org-1"
+        currentTeamId="team-1"
+        currentProjectId="proj-1"
+      />,
+    );
+
+  describe("given a picked project with a known name", () => {
+    /** @scenario The helper under the picker names the scope it binds to */
+    it("names the project, calling the scoped thing a configuration by default", () => {
+      renderWith({ scope: { scopeType: "PROJECT", scopeId: "proj-1" } });
+
+      expect(screen.getByText("Only Checkout can use this configuration.")).toBeInTheDocument();
+    });
+
+    /** @scenario The helper under the picker names the scope it binds to */
+    it("names the scoped thing with the subject noun", () => {
+      renderWith({ scope: { scopeType: "PROJECT", scopeId: "proj-1" }, subjectNoun: "connection" });
+
+      expect(screen.getByText("Only Checkout can use this connection.")).toBeInTheDocument();
+    });
+  });
+
+  describe("given a picked team with a known name", () => {
+    /** @scenario The helper under the picker names the scope it binds to */
+    it("names the team every project inherits from", () => {
+      renderWith({ scope: { scopeType: "TEAM", scopeId: "team-1" } });
+
+      expect(
+        screen.getByText("Every project in Platform inherits this configuration."),
+      ).toBeInTheDocument();
+    });
+  });
+
+  describe("given a picked project the picker has no name for", () => {
+    /** @scenario The helper keeps its plain wording when the scope's name is unknown */
+    it("keeps the plain wording", () => {
+      renderWith({ scope: { scopeType: "PROJECT", scopeId: "proj-1" }, named: false });
+
+      expect(screen.getByText("Only this project can use this configuration.")).toBeInTheDocument();
+    });
+  });
+});
+
+describe("ScopeChipPicker quick picks name the current scope", () => {
+  afterEach(cleanup);
+
+  const renderPicks = ({
+    teams,
+    projects,
+  }: {
+    teams?: { id: string; name: string }[];
+    projects?: { id: string; name: string; teamId?: string }[];
+  }) =>
     renderWithDesignSystem(
       <ScopeChipPicker
         value={[{ scopeType: "PROJECT", scopeId: "proj-1" }]}
         onChange={vi.fn()}
         organizationId="org-1"
-        projectId="proj-1"
-        projectName="Checkout"
-        singleSelect
-        subjectNoun={subjectNoun}
+        availableTeams={teams}
+        availableProjects={projects}
+        showQuickPicks
         currentOrganizationId="org-1"
+        currentTeamId="team-1"
         currentProjectId="proj-1"
       />,
     );
 
-  describe("given no subject noun", () => {
-    it("calls the scoped thing a configuration", () => {
-      renderWithProject();
+  describe("given the current team and project are among those it was given", () => {
+    /** @scenario The quick picks name the current team and project */
+    it("reads This team and This project followed by their names", () => {
+      renderPicks({
+        teams: [{ id: "team-1", name: "Platform" }],
+        projects: [{ id: "proj-1", name: "Checkout", teamId: "team-1" }],
+      });
 
-      expect(screen.getByText("Only this project can use this configuration.")).toBeInTheDocument();
+      expect(screen.getByTestId("quick-scope-team")).toHaveTextContent("This team · Platform");
+      expect(screen.getByTestId("quick-scope-project")).toHaveTextContent(
+        "This project · Checkout",
+      );
+      expect(screen.getByTestId("quick-scope-organization")).toHaveTextContent("Organization");
     });
   });
 
-  describe("given a subject noun", () => {
-    it("names the scoped thing with it", () => {
-      renderWithProject("connection");
+  describe("given a current project whose name is long", () => {
+    /** @scenario A long quick-pick name is truncated with the full label on hover */
+    it("truncates the label and carries the full label as its title", () => {
+      const name = "Customer support evaluation harness for the enterprise tier";
+      renderPicks({
+        teams: [{ id: "team-1", name: "Platform" }],
+        projects: [{ id: "proj-1", name, teamId: "team-1" }],
+      });
 
-      expect(screen.getByText("Only this project can use this connection.")).toBeInTheDocument();
+      const chip = screen.getByTestId("quick-scope-project");
+      expect(chip).toHaveAttribute("title", `This project · ${name}`);
+      expect(within(chip).getByText(`This project · ${name}`)).toHaveStyle({
+        textOverflow: "ellipsis",
+      });
+    });
+  });
+
+  describe("given the current team and project are not among those it was given", () => {
+    /** @scenario A quick pick whose name is unknown keeps its plain label */
+    it("keeps the plain This team and This project labels", () => {
+      renderPicks({ teams: [], projects: [] });
+
+      expect(screen.getByTestId("quick-scope-team")).toHaveTextContent(/^This team$/);
+      expect(screen.getByTestId("quick-scope-project")).toHaveTextContent(/^This project$/);
     });
   });
 });

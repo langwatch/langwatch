@@ -30,6 +30,11 @@ export type ScopeFilterValue =
       name: string;
     };
 
+/** Focuses More Scopes' search as it mounts; a stable ref, so later renders leave focus alone. */
+function focusWhenOpened(input: HTMLInputElement | null) {
+  input?.focus();
+}
+
 export function ScopeFilter({
   value,
   onChange,
@@ -44,12 +49,35 @@ export function ScopeFilter({
   currentProjectId?: string | null;
 }) {
   const [moreOpen, setMoreOpen] = useState(false);
+  const [moreQuery, setMoreQuery] = useState("");
 
   const label = filterLabel({ filter: value, available, currentTeamId, currentProjectId });
+  const currentTeam = available.teams.find((team) => team.id === currentTeamId);
+  const currentProject = available.projects.find((project) => project.id === currentProjectId);
+  const thisTeamLabel = currentTeam ? `This team · ${currentTeam.name}` : "This Team";
+  const thisProjectLabel = currentProject
+    ? `This project · ${currentProject.name}`
+    : "This Project";
   const otherProjects = available.projects.filter((project) => project.id !== currentProjectId);
+  const moreScopes = {
+    organization:
+      available.organization && namesMatch({ name: available.organization.name, query: moreQuery })
+        ? available.organization
+        : null,
+    teams: available.teams.filter((team) => namesMatch({ name: team.name, query: moreQuery })),
+    projects: available.projects.filter((project) =>
+      namesMatch({ name: project.name, query: moreQuery }),
+    ),
+  };
+  const noMoreScopes =
+    !moreScopes.organization && moreScopes.teams.length === 0 && moreScopes.projects.length === 0;
 
   return (
-    <Menu.Root>
+    <Menu.Root
+      onOpenChange={({ open }) => {
+        if (!open) setMoreQuery("");
+      }}
+    >
       <Menu.Trigger asChild>
         <Button size="sm" variant="outline" data-testid="scope-filter">
           <HStack gap={1}>
@@ -68,7 +96,7 @@ export function ScopeFilter({
             onClick={() => onChange({ kind: "team-current" })}
             data-testid="filter-this-team"
           >
-            This Team
+            <AmbientLabel label={thisTeamLabel} />
           </Menu.Item>
         )}
         {currentProjectId && otherProjects.length === 0 && (
@@ -77,13 +105,14 @@ export function ScopeFilter({
             onClick={() => onChange({ kind: "project-current" })}
             data-testid="filter-this-project"
           >
-            This Project
+            <AmbientLabel label={thisProjectLabel} />
           </Menu.Item>
         )}
         {otherProjects.length > 0 && (
           <ProjectSubmenu
-            hasCurrentProject={Boolean(currentProjectId)}
-            projects={otherProjects}
+            thisProjectLabel={currentProjectId ? thisProjectLabel : null}
+            currentProjectId={currentProject?.id ?? null}
+            projects={currentProject ? [currentProject, ...otherProjects] : otherProjects}
             onChange={onChange}
           />
         )}
@@ -106,22 +135,38 @@ export function ScopeFilter({
         </Menu.Item>
         {moreOpen && (
           <Box paddingLeft={2} paddingY={1}>
-            {available.organization && (
+            <Box paddingX={2} paddingBottom={1}>
+              <SearchInput
+                size="sm"
+                variant="flushed"
+                ref={focusWhenOpened}
+                placeholder="Search scopes…"
+                aria-label="Search scopes"
+                value={moreQuery}
+                onChange={(event) => setMoreQuery(event.target.value)}
+                onKeyDown={(event) => {
+                  if (!MENU_KEYS.has(event.key)) event.stopPropagation();
+                }}
+                data-testid="filter-more-search"
+                containerProps={{ width: "full" }}
+              />
+            </Box>
+            {moreScopes.organization && (
               <ScopeOptionItem
                 icon={<Building2 size={14} />}
-                label={available.organization.name}
+                label={moreScopes.organization.name}
                 hint="Organization"
                 onClick={() =>
                   onChange({
                     kind: "specific",
                     scopeType: "ORGANIZATION",
-                    scopeId: available.organization!.id,
-                    name: available.organization!.name,
+                    scopeId: moreScopes.organization!.id,
+                    name: moreScopes.organization!.name,
                   })
                 }
               />
             )}
-            {available.teams.map((team) => (
+            {moreScopes.teams.map((team) => (
               <ScopeOptionItem
                 key={`TEAM:${team.id}`}
                 icon={<Users size={14} />}
@@ -137,7 +182,7 @@ export function ScopeFilter({
                 }
               />
             ))}
-            {available.projects.map((project) => (
+            {moreScopes.projects.map((project) => (
               <ScopeOptionItem
                 key={`PROJECT:${project.id}`}
                 icon={<Folder size={14} />}
@@ -153,6 +198,17 @@ export function ScopeFilter({
                 }
               />
             ))}
+            {noMoreScopes && (
+              <Text
+                paddingX={2}
+                paddingY={1.5}
+                fontSize="sm"
+                color="fg.muted"
+                data-testid="filter-more-search-empty"
+              >
+                No scopes match
+              </Text>
+            )}
           </Box>
         )}
       </Menu.Content>
@@ -163,13 +219,29 @@ export function ScopeFilter({
 // Keys the menu itself handles; every other key edits the search text.
 const MENU_KEYS = new Set(["ArrowDown", "ArrowUp", "Enter", "Escape"]);
 
-/** Opens to the side: the current project first, then every other one, narrowed by name. */
+/** True when the name contains the query, ignoring case; an empty query matches all. */
+function namesMatch({ name, query }: { name: string; query: string }): boolean {
+  return name.toLowerCase().includes(query.trim().toLowerCase());
+}
+
+/** An ambient option's label, truncated in the menu with the whole label on hover. */
+function AmbientLabel({ label }: { label: string }) {
+  return (
+    <Text truncate maxWidth="280px" title={label}>
+      {label}
+    </Text>
+  );
+}
+
+/** Opens to the side: "This project", then every project (current first), narrowed by name. */
 function ProjectSubmenu({
-  hasCurrentProject,
+  thisProjectLabel,
+  currentProjectId,
   projects,
   onChange,
 }: {
-  hasCurrentProject: boolean;
+  thisProjectLabel: string | null;
+  currentProjectId: string | null;
   projects: AvailableScopes["projects"];
   onChange: (next: ScopeFilterValue) => void;
 }) {
@@ -177,11 +249,8 @@ function ProjectSubmenu({
   const [highlighted, setHighlighted] = useState<string | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
 
-  const matchesOf = (text: string) => {
-    const wanted = text.trim().toLowerCase();
-    if (!wanted) return projects;
-    return projects.filter((project) => project.name.toLowerCase().includes(wanted));
-  };
+  const matchesOf = (text: string) =>
+    projects.filter((project) => namesMatch({ name: project.name, query: text }));
   const matching = matchesOf(query);
 
   const changeQuery = (next: string) => {
@@ -201,7 +270,7 @@ function ProjectSubmenu({
       }}
     >
       <Menu.TriggerItem value="projects" data-testid="filter-project-submenu">
-        {hasCurrentProject ? "This Project" : "Projects"}
+        <AmbientLabel label={thisProjectLabel ?? "Projects"} />
       </Menu.TriggerItem>
       <Menu.Content
         minWidth="240px"
@@ -211,13 +280,13 @@ function ProjectSubmenu({
           if (typed && event.target !== searchRef.current) searchRef.current?.focus();
         }}
       >
-        {hasCurrentProject && (
+        {thisProjectLabel && (
           <Menu.Item
             value="this-project"
             onClick={() => onChange({ kind: "project-current" })}
             data-testid="filter-this-project"
           >
-            This Project
+            <AmbientLabel label={thisProjectLabel} />
           </Menu.Item>
         )}
         <Box paddingX={2} paddingY={1}>
@@ -254,6 +323,11 @@ function ProjectSubmenu({
               <HStack gap={2}>
                 <Folder size={14} />
                 <Text>{project.name}</Text>
+                {project.id === currentProjectId && (
+                  <Text fontSize="xs" color="fg.muted">
+                    Current
+                  </Text>
+                )}
               </HStack>
             </Menu.Item>
           ))}

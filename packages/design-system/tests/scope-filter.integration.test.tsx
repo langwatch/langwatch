@@ -46,6 +46,46 @@ describe("given the scope filter", () => {
       expect(screen.getByText("Web App")).toBeDefined();
     });
 
+    /** @scenario The This team and This project options name the team and project they follow */
+    it("names the team and project the ambient options follow", async () => {
+      const user = userEvent.setup();
+      renderWithDesignSystem(
+        <ScopeFilter
+          value={{ kind: "all" }}
+          onChange={() => undefined}
+          available={AVAILABLE}
+          currentTeamId="team_1"
+          currentProjectId="project_1"
+        />,
+      );
+
+      await user.click(screen.getByTestId("scope-filter"));
+
+      expect(await screen.findByTestId("filter-this-team")).toHaveTextContent(
+        "This team · Platform",
+      );
+      expect(screen.getByTestId("filter-this-project")).toHaveTextContent("This project · Web App");
+    });
+
+    /** @scenario An ambient option whose name is unknown keeps its plain label */
+    it("keeps the plain labels when the current team and project are not listed", async () => {
+      const user = userEvent.setup();
+      renderWithDesignSystem(
+        <ScopeFilter
+          value={{ kind: "all" }}
+          onChange={() => undefined}
+          available={{ organization: AVAILABLE.organization, teams: [], projects: [] }}
+          currentTeamId="team_9"
+          currentProjectId="project_9"
+        />,
+      );
+
+      await user.click(screen.getByTestId("scope-filter"));
+
+      expect(await screen.findByTestId("filter-this-team")).toHaveTextContent(/^This Team$/);
+      expect(screen.getByTestId("filter-this-project")).toHaveTextContent(/^This Project$/);
+    });
+
     /** @scenario Scope filter dropdown is keyboard navigable */
     it("is a menu, so arrow keys and Enter reach every option", async () => {
       const user = userEvent.setup();
@@ -117,11 +157,11 @@ describe("given the scope filter", () => {
     }
 
     /** @scenario This Project opens a submenu headed by the current project */
-    it("heads the submenu with This Project, then the search, then every other project", async () => {
+    it("heads the submenu with This project, then the search, then every project, current first", async () => {
       const { user, picked } = mount();
 
       const submenu = await openMenu({ user });
-      expect(submenu).toHaveTextContent("This Project");
+      expect(submenu).toHaveTextContent("This project · Web App");
       expect(screen.queryByTestId("filter-this-project")).not.toBeInTheDocument();
       await user.click(submenu);
       await screen.findByTestId("filter-project-search");
@@ -135,12 +175,33 @@ describe("given the scope filter", () => {
         );
       expect(items).toEqual([
         "filter-this-project",
+        "filter-project-option-project_1",
         "filter-project-option-project_2",
         "filter-project-option-project_3",
       ]);
+      expect(screen.getByTestId("filter-this-project")).toHaveTextContent("This project · Web App");
+      expect(screen.getByTestId("filter-project-option-project_1")).toHaveTextContent(
+        "Web AppCurrent",
+      );
+      expect(screen.getByTestId("filter-project-option-project_2")).not.toHaveTextContent(
+        "Current",
+      );
 
       await user.click(screen.getByTestId("filter-this-project"));
       expect(picked).toEqual([{ kind: "project-current" }]);
+    });
+
+    /** @scenario The project search finds the current project */
+    it("finds the current project by name and marks it Current", async () => {
+      const { user } = mount();
+      const search = await openProjectSubmenu({ user });
+
+      await user.click(search);
+      await user.keyboard("web");
+
+      expect(screen.getByTestId("filter-project-option-project_1")).toHaveTextContent("Current");
+      expect(screen.queryByTestId("filter-project-option-project_2")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("filter-project-search-empty")).not.toBeInTheDocument();
     });
 
     /** @scenario The project search box is the shared search field */
@@ -205,7 +266,7 @@ describe("given the scope filter", () => {
 
       await user.click(search);
       await user.keyboard("o");
-      // "o" matches Support Bot only among the other projects.
+      // "o" matches Support Bot only: Web App and Billing API have no "o".
       await waitFor(() =>
         expect(screen.getByTestId("filter-project-option-project_3")).toHaveAttribute(
           "data-highlighted",
@@ -277,8 +338,9 @@ describe("given the scope filter", () => {
 
       const reopened = await screen.findByTestId("filter-project-search");
       expect(reopened).toHaveValue("");
-      expect(screen.getByTestId("filter-project-option-project_2")).toBeInTheDocument();
-      expect(screen.getByTestId("filter-project-option-project_3")).toBeInTheDocument();
+      for (const id of ["project_1", "project_2", "project_3"]) {
+        expect(screen.getByTestId(`filter-project-option-${id}`)).toBeInTheDocument();
+      }
     });
 
     /** @scenario Picking another project from the submenu filters to that project */
@@ -315,6 +377,80 @@ describe("given the scope filter", () => {
       for (const id of ["project_1", "project_2", "project_3"]) {
         expect(screen.getByTestId(`filter-project-option-${id}`)).toBeInTheDocument();
       }
+    });
+  });
+
+  describe("when More Scopes is opened", () => {
+    const SCOPES = {
+      organization: { id: "org_1", name: "ACME" },
+      teams: [
+        { id: "team_1", name: "Platform" },
+        { id: "team_2", name: "Research" },
+      ],
+      projects: [
+        { id: "project_1", name: "Web App", teamId: "team_1" },
+        { id: "project_2", name: "Research Notebook", teamId: "team_2" },
+      ],
+    };
+
+    async function openMore() {
+      const user = userEvent.setup();
+      renderWithDesignSystem(
+        <ScopeFilter
+          value={{ kind: "all" }}
+          onChange={() => undefined}
+          available={SCOPES}
+          currentTeamId="team_1"
+          currentProjectId="project_1"
+        />,
+      );
+      await user.click(screen.getByTestId("scope-filter"));
+      await user.click(await screen.findByTestId("filter-more-scopes"));
+      return { user, search: await screen.findByTestId("filter-more-search") };
+    }
+
+    /** @scenario More Scopes has the shared search field, narrowing every scope by name */
+    it("narrows the organization, teams and projects by name, ignoring case", async () => {
+      const { user, search } = await openMore();
+      expect(search).toHaveAttribute("type", "search");
+      expect(search.closest("div")?.querySelector("svg[aria-hidden='true']")).toBeTruthy();
+      expect(search).toHaveFocus();
+
+      await user.keyboard("rESEARCH");
+
+      expect(search).toHaveFocus();
+      expect(search).toHaveValue("rESEARCH");
+      expect(screen.getByTestId("filter-scope-team-research")).toBeInTheDocument();
+      expect(screen.getByTestId("filter-scope-project-research notebook")).toBeInTheDocument();
+      expect(screen.queryByTestId("filter-scope-organization-acme")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("filter-scope-team-platform")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("filter-scope-project-web app")).not.toBeInTheDocument();
+    });
+
+    /** @scenario A More Scopes search with no matches says so */
+    it("says no scope matches", async () => {
+      const { user, search } = await openMore();
+
+      await user.click(search);
+      await user.keyboard("zzz");
+
+      expect(screen.getByTestId("filter-more-search-empty")).toHaveTextContent("No scopes match");
+      expect(screen.queryByTestId(/^filter-scope-/)).not.toBeInTheDocument();
+    });
+
+    /** @scenario Reopening the scope filter starts More Scopes from an empty search */
+    it("empties the search when the scope filter is closed and reopened", async () => {
+      const { user, search } = await openMore();
+      await user.click(search);
+      await user.keyboard("acme{Escape}");
+      await waitFor(() =>
+        expect(screen.queryByTestId("filter-more-scopes")).not.toBeInTheDocument(),
+      );
+
+      await user.click(screen.getByTestId("scope-filter"));
+      const reopened = await screen.findByTestId("filter-more-search");
+      expect(reopened).toHaveValue("");
+      expect(screen.getByTestId("filter-scope-team-platform")).toBeInTheDocument();
     });
   });
 

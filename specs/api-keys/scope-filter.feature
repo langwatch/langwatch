@@ -47,27 +47,58 @@ Feature: API Keys scope filter
   Scenario: Scope filter dropdown offers the same options as the model-providers page
     When I open the API Keys scope filter dropdown
     Then I see an "All you can see" option
-    And I see a "This Team" option (when a current team is in context)
-    And I see a "This Project" option (when a current project is in context), which opens a project submenu when I can see other projects
+    And I see a "This team · <current team name>" option (when a current team is in context)
+    And I see a "This project · <current project name>" option (when a current project is in context), which opens a project submenu when I can see other projects
     And I see a "More Scopes" submenu
     And the "More Scopes" submenu lists the organization, every team I can manage, and every project I can manage
 
   # ============================================================================
-  # Projects submenu: the current project first, every other one searchable
+  # The ambient options name what they follow
   # ============================================================================
-  # "This Project" opens to the side. Its first entry keeps following the
+  # "This team" and "This project" mean wherever the reader is now. In an
+  # organization with many teams and projects a bare "This project" does not
+  # say which one, so the option carries the name (issue #9707).
+
+  @integration
+  Scenario: The This team and This project options name the team and project they follow
+    Given the current team is "Platform" and the current project is "Web App"
+    When I open the scope filter dropdown
+    Then the team option reads "This team · Platform"
+    And the project option reads "This project · Web App"
+
+  @integration
+  Scenario: An ambient option whose name is unknown keeps its plain label
+    Given a current team and project are in context
+    But neither is among the scopes I can see
+    When I open the scope filter dropdown
+    Then the team option reads "This Team"
+    And the project option reads "This Project"
+
+  # ============================================================================
+  # Projects submenu: the current project first, every project searchable
+  # ============================================================================
+  # "This project" opens to the side. Its first entry keeps following the
   # reader's current project after a project switch; below it a search box
-  # narrows every other project the reader can see. "More Scopes" keeps its
-  # flat list of the organization, teams and projects.
+  # narrows every project the reader can see, the current one included, so
+  # typing the name of the project the reader is in finds it (issue #9708).
 
   @integration
   Scenario: This Project opens a submenu headed by the current project
     Given a current project is in context
     And I can see other projects
     When I open the scope filter dropdown and open the "This Project" submenu
-    Then the submenu's first option is "This Project"
-    And below it are a search box and every other project I can see, without the current project
-    And picking "This Project" sets the filter to follow my current project
+    Then the submenu's first option is "This project · <current project name>"
+    And below it are a search box and every project I can see
+    And the current project is listed first and marked "Current"
+    And picking "This project · <current project name>" sets the filter to follow my current project
+
+  @integration
+  Scenario: The project search finds the current project
+    Given a current project is in context
+    And I have opened the "This Project" submenu
+    When I type part of the current project's name into the search box
+    Then the current project stays listed, marked "Current"
+    And the submenu does not say "No projects match"
 
   # The search box is the design system's shared search field, not a hand-rolled
   # icon beside an input: see specs/components/search-input.feature.
@@ -95,7 +126,7 @@ Feature: API Keys scope filter
     Given I have opened the "This Project" submenu
     When I type text that matches no project name
     Then the submenu shows "No projects match" in place of the list
-    And "This Project" is still offered
+    And the "This project" option is still offered
 
   @integration
   Scenario: Reopening the project submenu starts from an empty search
@@ -110,7 +141,7 @@ Feature: API Keys scope filter
     Then the filter is set to that specific project
     And the filter control reads "Project: " followed by its name
 
-  # With no current project there is nothing for "This Project" to follow, so
+  # With no current project there is nothing for "This project" to follow, so
   # the submenu is named for what it holds and lists every visible project.
   @integration
   Scenario: Without a current project the submenu is named Projects
@@ -127,7 +158,32 @@ Feature: API Keys scope filter
     Given a current project is in context
     And it is the only project I can see
     When I open the scope filter dropdown
-    Then "This Project" is a plain option that applies straight away, with no submenu
+    Then "This project · <current project name>" is a plain option that applies straight away, with no submenu
+
+  # ============================================================================
+  # More Scopes: the same search over the organization, teams and projects
+  # ============================================================================
+
+  @integration
+  Scenario: More Scopes has the shared search field, narrowing every scope by name
+    Given I have opened "More Scopes"
+    Then a search box sits above the organization, teams and projects, drawn with the design system's search field
+    And the search box has focus, so typing narrows the list straight away
+    When I type part of a name, in any letter case, into the search box
+    Then only the organization, teams and projects whose names contain that text stay listed
+    And the menu stays open with the search box still focused
+
+  @integration
+  Scenario: A More Scopes search with no matches says so
+    Given I have opened "More Scopes"
+    When I type text that matches no organization, team or project name
+    Then More Scopes shows "No scopes match" in place of the list
+
+  @integration
+  Scenario: Reopening the scope filter starts More Scopes from an empty search
+    Given I have typed into the More Scopes search box
+    When I close the scope filter and open it again
+    Then the More Scopes search box is empty and every scope is listed again
 
   # ============================================================================
   # Inclusive cascade — picking a scope keeps the matching branch of the tree
