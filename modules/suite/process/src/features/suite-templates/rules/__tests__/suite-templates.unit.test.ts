@@ -6,8 +6,10 @@ import { owaspAgenticTop10Template } from "../owasp-agentic-top-10.rules.ts";
 import { owaspLlmTop10Template } from "../owasp-llm-top-10-2025.rules.ts";
 import { piiSensitiveDataTemplate } from "../pii-sensitive-data.rules.ts";
 import { promptInjectionTemplate } from "../prompt-injection.rules.ts";
+import { retailSupportAgentTemplate } from "../retail-support-agent.rules.ts";
 import { fillTemplateScenario, SUITE_TEMPLATES } from "../suite-template-fill.rules.ts";
 import { supportAgentTemplate } from "../support-agent.rules.ts";
+import { voiceSupportAgentTemplate } from "../voice-support-agent.rules.ts";
 
 const OFFICIAL_NAMES = [
   "LLM01 Prompt Injection",
@@ -74,16 +76,50 @@ describe("shipped suite templates", () => {
         OFFICIAL_AGENTIC_NAMES.map((name) => [name.slice(0, 5)]),
       );
     });
+  });
 
-    /** @scenario "Every shipped template parses with the template schema" */
-    it("ships archetypes with three to five scenarios and no attacks", () => {
-      const archetypes = SUITE_TEMPLATES.filter((template) => template.kind === "archetype");
-      expect(archetypes.length).toBeGreaterThanOrEqual(2);
+  describe("when the archetypes are read", () => {
+    const archetypes = SUITE_TEMPLATES.filter((template) => template.kind === "archetype");
+
+    /** @scenario "The archetypes cover the everyday agent kinds" */
+    it("ships one archetype per everyday agent kind", () => {
+      expect(archetypes.map((template) => template.id).toSorted()).toEqual([
+        "analytics-copilot",
+        "banking-assistant",
+        "claims-intake-agent",
+        "it-helpdesk-agent",
+        "knowledge-assistant",
+        "kyc-onboarding-agent",
+        "legal-ops-assistant",
+        "payments-agent",
+        "retail-support-agent",
+        "support-agent",
+        "voice-support-agent",
+      ]);
+    });
+
+    /** @scenario "The archetypes cover the everyday agent kinds" */
+    it("holds four to six scenarios of a situation and two criteria, and no attack", () => {
       for (const template of archetypes) {
-        expect(template.scenarios.length).toBeGreaterThanOrEqual(3);
-        expect(template.scenarios.length).toBeLessThanOrEqual(5);
-        expect(template.scenarios.every((scenario) => scenario.attack === undefined)).toBe(true);
+        expect(template.scenarios.length).toBeGreaterThanOrEqual(4);
+        expect(template.scenarios.length).toBeLessThanOrEqual(6);
+        for (const scenario of template.scenarios) {
+          expect(scenario.situation.length).toBeGreaterThan(0);
+          expect(scenario.criteria).toHaveLength(2);
+          expect(scenario.attack).toBeUndefined();
+        }
       }
+    });
+
+    /** @scenario "The archetypes cover the everyday agent kinds" */
+    it("tests the voice support agent on calls a chat agent never meets", () => {
+      expect(voiceSupportAgentTemplate.scenarios.map((scenario) => scenario.key)).toEqual([
+        "language-switch",
+        "caller-interrupts",
+        "read-back",
+        "book-and-callback",
+        "noisy-line",
+      ]);
     });
   });
 
@@ -139,10 +175,10 @@ describe("fillTemplateScenario", () => {
 
     /** @scenario "Applying with only an agent name drops the criteria that name an empty list" */
     it("drops criteria that name the empty tools or must never list", () => {
-      const [orderStatus] = supportAgentTemplate.scenarios;
-      if (!orderStatus) throw new Error("support agent template has no scenarios");
+      const [orderStatus] = retailSupportAgentTemplate.scenarios;
+      if (!orderStatus) throw new Error("retail support agent template has no scenarios");
       const filled = fillTemplateScenario({
-        template: supportAgentTemplate,
+        template: retailSupportAgentTemplate,
         scenario: orderStatus,
         fit,
       });

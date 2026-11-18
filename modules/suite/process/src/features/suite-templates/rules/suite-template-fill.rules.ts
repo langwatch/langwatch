@@ -5,12 +5,21 @@ import type {
   SuiteTemplateScenario,
 } from "@langwatch/suite-contract";
 
+import { analyticsCopilotTemplate } from "./analytics-copilot.rules.ts";
+import { bankingAssistantTemplate } from "./banking-assistant.rules.ts";
+import { claimsIntakeAgentTemplate } from "./claims-intake-agent.rules.ts";
+import { itHelpdeskAgentTemplate } from "./it-helpdesk-agent.rules.ts";
+import { knowledgeAssistantTemplate } from "./knowledge-assistant.rules.ts";
+import { kycOnboardingAgentTemplate } from "./kyc-onboarding-agent.rules.ts";
+import { legalOpsAssistantTemplate } from "./legal-ops-assistant.rules.ts";
 import { owaspAgenticTop10Template } from "./owasp-agentic-top-10.rules.ts";
 import { owaspLlmTop10Template } from "./owasp-llm-top-10-2025.rules.ts";
 import { paymentsAgentTemplate } from "./payments-agent.rules.ts";
 import { piiSensitiveDataTemplate } from "./pii-sensitive-data.rules.ts";
 import { promptInjectionTemplate } from "./prompt-injection.rules.ts";
+import { retailSupportAgentTemplate } from "./retail-support-agent.rules.ts";
 import { supportAgentTemplate } from "./support-agent.rules.ts";
+import { voiceSupportAgentTemplate } from "./voice-support-agent.rules.ts";
 
 /** Every shipped suite template, sorted by kind then title. */
 export const SUITE_TEMPLATES: readonly SuiteTemplate[] = [
@@ -20,6 +29,15 @@ export const SUITE_TEMPLATES: readonly SuiteTemplate[] = [
   promptInjectionTemplate,
   supportAgentTemplate,
   paymentsAgentTemplate,
+  analyticsCopilotTemplate,
+  bankingAssistantTemplate,
+  claimsIntakeAgentTemplate,
+  itHelpdeskAgentTemplate,
+  knowledgeAssistantTemplate,
+  kycOnboardingAgentTemplate,
+  legalOpsAssistantTemplate,
+  retailSupportAgentTemplate,
+  voiceSupportAgentTemplate,
 ].toSorted(
   (left, right) => left.kind.localeCompare(right.kind) || left.title.localeCompare(right.title),
 );

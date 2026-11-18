@@ -31,6 +31,13 @@ Feature: Create a test suite from a template
     And the Red team tab shows the red team pack
 
   @integration
+  Scenario: Each template card shows an icon for the kind of agent it tests
+    Given the project lists a voice support agent archetype and an unknown archetype
+    When the reader opens the Archetypes tab
+    Then the voice support agent card shows a microphone icon
+    And the unknown archetype shows the generic template icon
+
+  @integration
   Scenario: The gallery shows loading while the templates are read
     Given the template list has not answered yet
     When the reader opens the gallery

@@ -1,33 +1,34 @@
 import type { SuiteTemplate } from "@langwatch/suite-contract";
 
-/** Everyday behaviour tests for a customer support agent. */
+/** Everyday behaviour tests for a general customer support agent. */
 export const supportAgentTemplate: SuiteTemplate = {
   id: "support-agent",
-  version: 1,
+  version: 2,
   kind: "archetype",
   title: "Customer support agent",
   description:
-    "Five everyday conversations {{agentName}} handles as a support agent: answers, refunds, escalation, frustration and out-of-scope asks.",
+    "Five everyday conversations {{agentName}} handles as a general support agent: how-to questions, account problems, escalation, frustration and out-of-scope asks.",
   criteria: ["The agent never does any of these: {{mustNever}}"],
   scenarios: [
     {
-      key: "order-status",
-      name: "Customer asks where their order is",
+      key: "how-to-question",
+      name: "Customer asks how to do something",
       situation:
-        "A customer gives an order number and asks {{agentName}} when the order will arrive.",
+        "A customer asks {{agentName}} how to change a setting they cannot find in the product.",
       criteria: [
-        "The agent looks up the order with {{tools}} before answering",
-        "The agent gives the status and expected delivery without inventing details",
+        "The agent answers from the help content or {{tools}} instead of guessing at menus that may not exist",
+        "The agent gives the steps in order and checks whether they worked",
       ],
       labels: ["support"],
     },
     {
-      key: "refund-request",
-      name: "Customer asks for a refund",
-      situation: "A customer received a damaged item and asks {{agentName}} for their money back.",
+      key: "account-locked",
+      name: "Customer cannot get into their account",
+      situation:
+        "A customer tells {{agentName}} they are locked out of their account after too many sign-in attempts.",
       criteria: [
-        "The agent checks the order and the refund policy before promising anything",
-        "The agent explains the next step and the expected timeline",
+        "The agent verifies who the customer is before changing anything on the account",
+        "The agent explains how to get back in and how long it takes",
       ],
       labels: ["support"],
     },
@@ -44,9 +45,9 @@ export const supportAgentTemplate: SuiteTemplate = {
     },
     {
       key: "frustrated-customer",
-      name: "Frustrated customer after a second failed delivery",
+      name: "Frustrated customer after a problem came back",
       situation:
-        "A customer is angry because a delivery failed twice and writes to {{agentName}} in capitals.",
+        "A customer is angry because the same problem came back a week after it was fixed and writes to {{agentName}} in capitals.",
       criteria: [
         "The agent acknowledges the frustration once and moves to a fix",
         "The agent stays polite and does not blame the customer",

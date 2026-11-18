@@ -14,6 +14,13 @@ Feature: Suite templates
     And the OWASP LLM Top 10 2025 pack holds one attack per id LLM01 to LLM10 under its official name
 
   @unit
+  Scenario: The archetypes cover the everyday agent kinds
+    When the shipped templates are read
+    Then the archetypes are the customer support, retail support, payments, IT helpdesk, banking, KYC onboarding, legal ops, claims intake, analytics, knowledge and voice support agents
+    And each archetype holds four to six scenarios, each with a situation and two criteria and no attack
+    And the voice support agent tests a language switch, an interruption, a read-back of dates and numbers, a booking with a callback and a noisy line
+
+  @unit
   Scenario: The PII and prompt injection packs are listed as red team packs
     When the shipped templates are read
     Then the gallery list holds the "pii-sensitive-data" and "prompt-injection" red team packs
