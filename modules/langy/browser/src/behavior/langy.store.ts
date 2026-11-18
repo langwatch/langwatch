@@ -1,4 +1,5 @@
 import { defineSlice } from "@langwatch/browser-host/global-store";
+import { onUiStorageReaderChange } from "@langwatch/browser-host/storage";
 import {
   applyLangyTurnEvents,
   initialLangyTurnProjection,
@@ -1111,3 +1112,7 @@ export function attachedContextToChip(item: LangyAttachedContext): LangyContextC
     ref: item.id,
   };
 }
+
+// A link's kept preference belongs to the reader who followed it; registered after the slice's
+// own restore, so the next reader's restored `isOpen` is what gets saved.
+onUiStorageReaderChange(() => useLangyStore.setState({ savedOpenBeforeLink: null }));

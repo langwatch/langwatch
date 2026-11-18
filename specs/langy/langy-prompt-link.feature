@@ -40,7 +40,7 @@ Feature: A link opens Langy with a question ready to send
     Then the saved preference is still closed
     And after I open or close the panel myself, my choice is saved
 
-  @unit
+  @integration
   Scenario: A link with only the question still opens Langy
     When I open a link with "langyPrompt=hello" and no "langy" parameter
     Then the Langy panel is open
@@ -51,3 +51,10 @@ Feature: A link opens Langy with a question ready to send
     When I open a link with "langy=open&langyPrompt=%20%20"
     Then the Langy panel is open
     And the composer keeps what it had
+
+  @integration
+  Scenario: A question link beside a conversation link opens a new conversation
+    When I open a link with "langyConversation=<id>&langyPrompt=hello"
+    Then the Langy panel is open on a new conversation
+    And the composer holds "hello"
+    And the address no longer has "langyConversation"

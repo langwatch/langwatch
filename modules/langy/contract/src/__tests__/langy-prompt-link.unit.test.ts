@@ -19,7 +19,6 @@ describe("findLangyPromptLink", () => {
     expect(findLangyPromptLink({ search: "?langy=open" })).toEqual([{ prompt: "" }]);
   });
 
-  /** @scenario "A link with only the question still opens Langy" */
   it("treats langyPrompt without langy=open as a request to open", () => {
     expect(findLangyPromptLink({ search: "?langyPrompt=hello" })).toEqual([{ prompt: "hello" }]);
   });
@@ -36,6 +35,12 @@ describe("withoutLangyPromptLink", () => {
     );
     expect(withoutLangyPromptLink({ search: "?langy=open&langyPrompt=hi" })).toBe("");
   });
+
+  it("drops a langyConversation link the question supersedes", () => {
+    expect(
+      withoutLangyPromptLink({ search: "?langyConversation=c1&langyPrompt=hi&tab=traces" }),
+    ).toBe("?tab=traces");
+  });
 });
 
 describe("buildLangyPromptLink", () => {
@@ -50,5 +55,14 @@ describe("buildLangyPromptLink", () => {
     expect(findLangyPromptLink({ search })).toEqual([
       { prompt: "What spent the most tokens & why?" },
     ]);
+  });
+
+  it("keeps every existing parameter, including values that hold a question mark", () => {
+    const href = buildLangyPromptLink({ path: "/p?next=/a?x=1&tab=traces#frag", prompt: "hi" });
+    const params = new URLSearchParams(href.slice(href.indexOf("?"), href.indexOf("#")));
+
+    expect(params.get("next")).toBe("/a?x=1");
+    expect(params.get("tab")).toBe("traces");
+    expect(href.endsWith("#frag")).toBe(true);
   });
 });

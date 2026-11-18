@@ -80,6 +80,34 @@ describe("useLangyPromptLink", () => {
     });
   });
 
+  describe("given only the question in the link", () => {
+    /** @scenario "A link with only the question still opens Langy" */
+    it("opens the panel with the question typed", async () => {
+      useLangyStore.getState().resetForScope(SCOPE);
+
+      renderAt("/my-project/traces?langyPrompt=hello");
+
+      await waitFor(() => expect(useLangyStore.getState().isOpen).toBe(true));
+      expect(useLangyStore.getState().draft).toBe("hello");
+    });
+  });
+
+  describe("given a conversation link beside the question", () => {
+    /** @scenario "A question link beside a conversation link opens a new conversation" */
+    it("opens a new conversation with the question and drops the conversation link", async () => {
+      useLangyStore.getState().resetForScope(SCOPE);
+      useLangyStore.setState({ activeConversationId: "langyconv_1" });
+
+      const { result } = renderAt(
+        "/my-project/traces?langyConversation=langyconv_1&langyPrompt=hello",
+      );
+
+      await waitFor(() => expect(result.current.search).toBe(""));
+      expect(useLangyStore.getState().activeConversationId).toBeNull();
+      expect(useLangyStore.getState().draft).toBe("hello");
+    });
+  });
+
   describe("given the project has not loaded yet", () => {
     /** @scenario "The question waits until the project is known" */
     it("types nothing until the scope is announced, then types the question", async () => {

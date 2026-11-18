@@ -1,4 +1,4 @@
-import { LANGY_CONVERSATION_PARAM } from "@langwatch/langy-contract";
+import { findLangyPromptLink, LANGY_CONVERSATION_PARAM } from "@langwatch/langy-contract";
 import { useEffect } from "react";
 import { useSearchParams } from "react-router";
 
@@ -17,7 +17,9 @@ export function useLangyConversationDeepLink(): void {
     redirectToOnboarding: false,
     redirectToProjectOnboarding: false,
   });
-  const conversationId = searchParams.get(LANGY_CONVERSATION_PARAM);
+  // A question link beside it supersedes it: useLangyPromptLink opens a new conversation.
+  const hasPromptLink = findLangyPromptLink({ search: searchParams.toString() }).length > 0;
+  const conversationId = hasPromptLink ? null : searchParams.get(LANGY_CONVERSATION_PARAM);
 
   const detail = api.langy.detail.useQuery(
     {

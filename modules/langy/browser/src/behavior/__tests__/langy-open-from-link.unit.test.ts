@@ -36,6 +36,17 @@ describe("openFromLink", () => {
     });
   });
 
+  describe("given another reader signs in after a link opened Langy", () => {
+    it("saves the new reader's own open state, not the link's kept one", () => {
+      langy().openFromLink("hello");
+      setUiStorageReader("user-2");
+
+      expect(langy().savedOpenBeforeLink).toBeNull();
+      langy().setDraft("x");
+      expect(savedIsOpen()).toBe(langy().isOpen);
+    });
+  });
+
   describe("given a question in the link", () => {
     it("starts a fresh conversation with the question typed", () => {
       useLangyStore.setState({ activeConversationId: "langyconv_old" });
