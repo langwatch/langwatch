@@ -15,31 +15,55 @@ import { TRACE_EXPLORER_SPOTLIGHTS } from "../../../../../model/explorer/onboard
 import { useTraceExplorerTourPreference } from "../hooks/use-trace-explorer-tour-preference.ts";
 
 // ---------------------------------------------------------------------------
-// URL fragment helpers (scoped to sp= prefix so we don't clobber the
-// existing lens/query fragment that useURLSync manages).
+// URL fragment helpers. The tour step rides as an `sp=` parameter beside the
+// lens/query fragment useURLSync owns (`#all-traces?q=…&sp=<id>`), or alone
+// as `#sp=<id>`; writing or clearing it never touches the rest.
 // ---------------------------------------------------------------------------
 
 const SP_PREFIX = "sp=";
 
+/** The fragment body split into what useURLSync owns and the tour step. */
+function splitFragment(hash: string): { rest: string; step: string | null } {
+  const body = hash.replace(/^#/, "");
+  if (body.startsWith(SP_PREFIX)) {
+    return { rest: "", step: body.slice(SP_PREFIX.length) };
+  }
+  const separator = body.indexOf("?");
+  if (separator === -1) return { rest: body, step: null };
+  const params = body.slice(separator + 1).split("&");
+  const stepParam = params.find((param) => param.startsWith(SP_PREFIX));
+  const kept = params.filter((param) => param && !param.startsWith(SP_PREFIX));
+  const base = body.slice(0, separator);
+  return {
+    rest: kept.length > 0 ? `${base}?${kept.join("&")}` : base,
+    step: stepParam === undefined ? null : stepParam.slice(SP_PREFIX.length),
+  };
+}
+
 export function readSpotlightFragment(): string | null {
   if (typeof window === "undefined") return null;
-  const hash = window.location.hash.slice(1); // strip leading #
-  if (!hash.startsWith(SP_PREFIX)) return null;
-  return decodeURIComponent(hash.slice(SP_PREFIX.length)) || null;
+  const { step } = splitFragment(window.location.hash);
+  if (!step) return null;
+  try {
+    return decodeURIComponent(step) || null;
+  } catch {
+    return null;
+  }
 }
 
 export function writeSpotlightFragment(id: string | null): void {
   if (typeof window === "undefined") return;
-  if (id === null) {
-    // If there's no other fragment content, remove the hash entirely.
-    const bare = window.location.pathname + window.location.search;
-    window.history.replaceState(null, "", bare);
-  } else {
-    const newHash = `#${SP_PREFIX}${encodeURIComponent(id)}`;
-    const newURL = window.location.pathname + window.location.search + newHash;
-    if (newURL !== window.location.href) {
-      window.history.replaceState(null, "", newURL);
-    }
+  const { rest } = splitFragment(window.location.hash);
+  let body = rest;
+  if (id !== null) {
+    const step = `${SP_PREFIX}${encodeURIComponent(id)}`;
+    if (!rest) body = step;
+    else body = rest.includes("?") ? `${rest}&${step}` : `${rest}?${step}`;
+  }
+  const newURL = window.location.pathname + window.location.search + (body ? `#${body}` : "");
+  const currentURL = window.location.pathname + window.location.search + window.location.hash;
+  if (newURL !== currentURL) {
+    window.history.replaceState(null, "", newURL);
   }
 }
 
