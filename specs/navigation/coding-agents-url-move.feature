@@ -28,6 +28,17 @@ Feature: The personal workspace moves from /me to /coding-agents
     # sessions and pull requests addresses each have their own row.
 
   @integration
+  Scenario: Every old address a project page also matches lands on Coding agents
+    Given the application serves a project page at "/:project/<segment>"
+    When I cold-load "/me/<segment>"
+    Then I land on "/coding-agents/<segment>" when that is a Coding agents page
+    And otherwise I land on "/coding-agents"
+    # One twin per project page, derived from the project routes, so a page
+    # added later cannot make "me" read as a project slug again. A segment
+    # with no Coding agents page drops its sub-path: "/me/traces/abc" lands
+    # on "/coding-agents".
+
+  @integration
   Scenario: The old devices address lands on the devices tab
     When I cold-load "/me/devices"
     Then I land on "/coding-agents/configure?tab=devices"

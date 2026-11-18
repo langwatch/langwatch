@@ -35,7 +35,7 @@ export type UiPageRouteDescriptor = {
   readonly page: string;
   /** The explicit native route mount point for a pre-router web installation. */
   readonly webRouteParent?: "project";
-  /** An account page (`/me`, Settings > Profile and Security): the shell draws its title large. */
+  /** An account page (Settings > Profile and Security): the shell draws its title large. */
   readonly heading?: "account";
   readonly children?: readonly UiRouteDescriptor[];
 };
@@ -185,43 +185,7 @@ export const uiLegacyRedirectRoutes: readonly UiRedirectRouteDescriptor[] = [
   },
 ];
 
-/**
- * The personal workspace moved from /me to /coding-agents; installed CLIs still print /me links.
- * Mounted above the chrome: /me is no longer a personal address, so the chrome would hold the
- * page waiting for a project and never run the redirect. Spec: coding-agents-url-move.feature
- */
-export const uiCodingAgentsRedirectRoutes: readonly UiRedirectRouteDescriptor[] = [
-  {
-    // The devices inventory is a tab of configure; straight there, no chaining.
-    path: "/me/devices",
-    redirect: {
-      from: "/me/devices",
-      to: "/coding-agents/configure",
-      pinParams: { tab: "devices" },
-    },
-  },
-  {
-    // Spelled out: /:project/sessions outranks /me/*, so the prefix row alone
-    // would read "me" as a project slug here.
-    path: "/me/sessions",
-    redirect: { from: "/me", to: "/coding-agents" },
-  },
-  {
-    // Spelled out for the same reason: /:project/pull-requests outranks /me/*.
-    path: "/me/pull-requests",
-    redirect: { from: "/me", to: "/coding-agents" },
-  },
-  {
-    path: "/me/*",
-    redirect: { from: "/me", to: "/coding-agents" },
-  },
-  {
-    path: "/me",
-    redirect: { from: "/me", to: "/coding-agents" },
-  },
-];
-
-export const uiRouteTable: readonly UiRouteDescriptor[] = [
+const uiRouteTableBeforeCodingAgents: readonly UiRouteDescriptor[] = [
   // Auth (public), under the host every front-door screen reads its
   // deployment shape and its own address through.
   {
@@ -266,7 +230,9 @@ export const uiRouteTable: readonly UiRouteDescriptor[] = [
     path: "/admin/*",
     redirect: { from: "/admin", to: "/ops", mapSegment: RETIRED_ADMIN_SEGMENTS },
   },
-  ...uiCodingAgentsRedirectRoutes,
+];
+
+const uiRouteTableAfterCodingAgents: readonly UiRouteDescriptor[] = [
   { path: "/share/:id", page: "pages/share/[id]" },
   // Public — no auth required; token in query-string is the authorisation
   { path: "/unsubscribe", page: "pages/unsubscribe" },
@@ -1024,4 +990,94 @@ export const uiRouteTable: readonly UiRouteDescriptor[] = [
       },
     ],
   },
+];
+
+/**
+ * Project pages a module declares, so the table never sees them. The /me twin test reads the
+ * modules' own routes and fails when this list falls behind.
+ */
+const MODULE_PROJECT_SEGMENTS = [
+  "annotations",
+  "datasets",
+  "insights",
+  "online-evaluations",
+  "prompts",
+] as const;
+
+/** The first segment of every `/:project/<segment>` page: table order, then module-owned. */
+function projectSegments(table: readonly UiRouteDescriptor[]): string[] {
+  const fromTable = uiRouteDescriptors(table).flatMap((descriptor) => {
+    const segment = descriptor.path?.match(/^\/:project\/([^/:*]+)/)?.[1];
+    return segment === void 0 ? [] : [segment];
+  });
+  return [...new Set([...fromTable, ...MODULE_PROJECT_SEGMENTS])];
+}
+
+const uiRouteTableWithoutMeRedirects = [
+  ...uiRouteTableBeforeCodingAgents,
+  ...uiRouteTableAfterCodingAgents,
+];
+
+/** Every page under `/coding-agents/`, as the path after it: `sessions`, `budget/request`. */
+function codingAgentsPages(table: readonly UiRouteDescriptor[]): string[] {
+  return uiRouteDescriptors(table).flatMap((descriptor) => {
+    const page = descriptor.path?.match(/^\/coding-agents\/([^:*]+)$/)?.[1];
+    return page === void 0 ? [] : [page];
+  });
+}
+
+const codingAgentsPageList = codingAgentsPages(uiRouteTableWithoutMeRedirects);
+
+/**
+ * The old first segments that have a page of their own under /coding-agents, so the old
+ * address keeps its sub-path there. Any other first segment finds no such page and lands on
+ * the Coding agents home: `mapSegment` drops the sub-path of an unnamed segment, the query
+ * and hash still travel. A page nested deeper (`budget/request`) is not a first segment, so
+ * it gets an exact row below.
+ */
+const KEPT_SEGMENTS: Readonly<Record<string, string>> = Object.fromEntries(
+  codingAgentsPageList.filter((page) => !page.includes("/")).map((page) => [page, page]),
+);
+
+const toCodingAgents = { from: "/me", to: "/coding-agents", mapSegment: KEPT_SEGMENTS } as const;
+
+/**
+ * The personal workspace moved from /me to /coding-agents; installed CLIs still print /me links.
+ * Mounted above the chrome: /me is no longer a personal address, so the chrome would hold the
+ * page waiting for a project and never run the redirect. Spec: coding-agents-url-move.feature
+ *
+ * A /:project/<segment> page outranks the /me/* prefix row (a static segment beats a splat), so
+ * "me" would read as a project slug there. Every such segment therefore gets its own /me twin,
+ * derived from the project rows so a page added later is covered without a hand edit. Every
+ * twin shares `toCodingAgents`: a segment with a /coding-agents page keeps its sub-path, all
+ * others land on /coding-agents.
+ */
+export const uiCodingAgentsRedirectRoutes: readonly UiRedirectRouteDescriptor[] = [
+  {
+    // The devices inventory is a tab of configure; straight there, no chaining.
+    path: "/me/devices",
+    redirect: {
+      from: "/me/devices",
+      to: "/coding-agents/configure",
+      pinParams: { tab: "devices" },
+    },
+  },
+  ...codingAgentsPageList
+    .filter((page) => page.includes("/"))
+    .map((page) => ({
+      path: `/me/${page}`,
+      redirect: { from: "/me", to: "/coding-agents" },
+    })),
+  ...projectSegments(uiRouteTableWithoutMeRedirects).flatMap((segment) => [
+    { path: `/me/${segment}`, redirect: toCodingAgents },
+    { path: `/me/${segment}/*`, redirect: toCodingAgents },
+  ]),
+  { path: "/me/*", redirect: toCodingAgents },
+  { path: "/me", redirect: toCodingAgents },
+];
+
+export const uiRouteTable: readonly UiRouteDescriptor[] = [
+  ...uiRouteTableBeforeCodingAgents,
+  ...uiCodingAgentsRedirectRoutes,
+  ...uiRouteTableAfterCodingAgents,
 ];

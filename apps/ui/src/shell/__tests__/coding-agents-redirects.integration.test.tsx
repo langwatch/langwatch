@@ -10,6 +10,7 @@ import { act, render, waitFor } from "@testing-library/react";
 import { createMemoryRouter, Outlet, type RouteObject, RouterProvider } from "react-router";
 import { describe, expect, it } from "vitest";
 
+import { uiRoutePatterns } from "../route-patterns";
 import { uiCodingAgentsRedirectRoutes, uiRouteTable } from "../ui-route-table";
 
 /** The redirect descriptors the application mounts, materialised the same way. */
@@ -49,6 +50,7 @@ function renderRouterAt(initialEntries: string[]) {
     { path: "/coding-agents/configure", element: <div>configure</div> },
     { path: "/coding-agents/sessions", element: <div>sessions</div> },
     { path: "/coding-agents/pull-requests", element: <div>pull requests</div> },
+    { path: "/coding-agents/budget/request", element: <div>budget request</div> },
     // The project pages that outrank a /me/* prefix row, so the old
     // addresses are ranked against what the application also serves.
     { path: "/:project/sessions", element: <div>project sessions</div> },
@@ -61,6 +63,18 @@ function renderRouterAt(initialEntries: string[]) {
   render(<RouterProvider router={router} />);
   return router;
 }
+
+/** Every `/:project/<segment>` the application serves: the table's own and the modules'. */
+const projectSegments = [
+  ...new Set(
+    uiRoutePatterns().flatMap((pattern) => pattern.match(/^\/:project\/([^/:*]+)/)?.[1] ?? []),
+  ),
+];
+
+/** The segments with a page of their own under /coding-agents: read off the same patterns. */
+const codingAgentsSegments = new Set(
+  uiRoutePatterns().flatMap((pattern) => pattern.match(/^\/coding-agents\/([^/:*]+)$/)?.[1] ?? []),
+);
 
 function addressOf(router: ReturnType<typeof renderRouterAt>): string {
   const { pathname, search, hash } = router.state.location;
@@ -114,6 +128,50 @@ describe("legacy /me redirects", () => {
 
       await waitFor(() => {
         expect(addressOf(router)).toBe(to);
+      });
+    });
+  });
+
+  describe("when an old address names any page the project routes serve", () => {
+    /** @scenario Every old address a project page also matches lands on Coding agents */
+    it.each(projectSegments)("moves /me/%s instead of opening a project", async (segment) => {
+      const projectPages: RouteObject[] = uiRoutePatterns()
+        .filter((pattern) => pattern.startsWith("/:project/"))
+        .map((path) => ({ path, element: <div>project page</div> }));
+      const router = createMemoryRouter(
+        [
+          ...legacyRedirectRoutes,
+          ...projectPages,
+          { path: "/coding-agents/*", element: <div>coding agents</div> },
+        ],
+        { initialEntries: [`/me/${segment}`] },
+      );
+      render(<RouterProvider router={router} />);
+
+      await waitFor(() => {
+        expect(addressOf(router)).toBe(
+          codingAgentsSegments.has(segment) ? `/coding-agents/${segment}` : "/coding-agents",
+        );
+      });
+    });
+
+    /** @scenario Every old address a project page also matches lands on Coding agents */
+    it("drops the sub-path of a segment with no Coding agents page", async () => {
+      const router = renderRouterAt(["/me/traces/abc?range=7d"]);
+
+      await waitFor(() => {
+        expect(addressOf(router)).toBe("/coding-agents?range=7d");
+      });
+    });
+  });
+
+  describe("when the old budget request address is cold-loaded", () => {
+    /** @scenario An old address that a project page also matches still moves */
+    it("keeps its nested page", async () => {
+      const router = renderRouterAt(["/me/budget/request"]);
+
+      await waitFor(() => {
+        expect(addressOf(router)).toBe("/coding-agents/budget/request");
       });
     });
   });

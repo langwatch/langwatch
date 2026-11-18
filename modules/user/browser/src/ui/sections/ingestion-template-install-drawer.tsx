@@ -15,6 +15,7 @@ import { Check, Copy, Eye, EyeOff } from "lucide-react";
 import { useState } from "react";
 
 import { usePersonalToaster } from "../../behavior/personal-workspace-feedback.ts";
+import { usePersonalContext } from "../../behavior/use-personal-context.ts";
 
 const SECRET_MASK = "•".repeat(48);
 
@@ -150,6 +151,10 @@ export function IngestionTemplateInstallDrawer({
 }) {
   const [showSecret, setShowSecret] = useState(false);
   const toaster = usePersonalToaster();
+  const { personalProjectSlug } = usePersonalContext();
+  // The traces live in the caller's personal project; until its slug resolves, name the
+  // workspace home, which links onward to them.
+  const tracesPath = personalProjectSlug ? `/${personalProjectSlug}/traces` : "/coding-agents";
 
   const copy = async ({ text, what }: { text: string; what: string }): Promise<boolean> => {
     try {
@@ -271,7 +276,7 @@ export function IngestionTemplateInstallDrawer({
                 {template.displayName}
               </Badge>{" "}
               environment, fire a request, and traces will land at{" "}
-              <InlineCode>/me/traces</InlineCode> filtered by source={template.slug}.
+              <InlineCode>{tracesPath}</InlineCode> filtered by source={template.slug}.
             </Text>
 
             <Text fontSize="xs" color="fg.muted">
