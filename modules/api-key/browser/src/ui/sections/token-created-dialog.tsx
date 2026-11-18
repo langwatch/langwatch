@@ -22,7 +22,7 @@ import {
 } from "@langwatch/design-system/primitives";
 import { Select } from "@langwatch/design-system/select";
 import { Check, Clipboard, Eye, EyeOff, Key } from "lucide-react";
-import { type Ref, useMemo, useRef, useState } from "react";
+import { type Ref, useEffect, useMemo, useRef, useState } from "react";
 
 import { useApiKeyHost } from "../../model/api-key-host.ts";
 import {
@@ -167,10 +167,25 @@ function KeyHandOff({
 }) {
   const [revealed, setRevealed] = useState(false);
   const [copied, setCopied] = useState(false);
+  const resetTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const mounted = useRef(true);
+
+  // The reset timer must not outlive the dialog.
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+      clearTimeout(resetTimer.current);
+    };
+  }, []);
+
   const copyKey = async () => {
     if (!(await copy({ text: token, what: "API key" }))) return;
+    // The copy is awaited, so the dialog may have closed meanwhile.
+    if (!mounted.current) return;
     setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    clearTimeout(resetTimer.current);
+    resetTimer.current = setTimeout(() => setCopied(false), 2000);
   };
   return (
     <Card

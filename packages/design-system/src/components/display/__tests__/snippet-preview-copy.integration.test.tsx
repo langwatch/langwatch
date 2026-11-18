@@ -74,8 +74,8 @@ describe("Feature: Code, money and dates read the one way", () => {
     expect(button.querySelector("svg.lucide-clipboard")).not.toBeNull();
   });
 
-  /** @scenario "A snippet copy button that unmounts mid-copy sets no state when the copy lands" */
-  it("Scenario: A snippet copy button that unmounts mid-copy sets no state when the copy lands", async () => {
+  /** @scenario "A snippet copy button that unmounts mid-copy starts no reset timer when the copy lands" */
+  it("Scenario: A snippet copy button that unmounts mid-copy starts no reset timer when the copy lands", async () => {
     vi.useFakeTimers();
     const errors = vi.spyOn(console, "error").mockImplementation(() => undefined);
     let resolveCopy: (ok: boolean) => void = () => undefined;

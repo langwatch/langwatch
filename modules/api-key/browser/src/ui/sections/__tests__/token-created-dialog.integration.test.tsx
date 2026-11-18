@@ -495,6 +495,34 @@ describe("given a key has just been minted with a name", () => {
       );
     });
 
+    /** @scenario The Copy API key button that closes with the dialog does not reset after it is gone */
+    it("leaves no reset timer behind when the dialog closes within 2 seconds of a copy", async () => {
+      renderDialog({ keyName: "Deploy pipeline" });
+      const errors = vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+      vi.useFakeTimers();
+      try {
+        fireEvent.click(screen.getByRole("button", { name: "Copy API key" }));
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(0);
+        });
+        expect(screen.getByRole("button", { name: "Copy API key" })).toHaveTextContent("Copied");
+
+        cleanup();
+        // Checked before advancing: an uncleared timer would have fired by 2000 ms.
+        expect(vi.getTimerCount()).toBe(0);
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(2000);
+        });
+
+        expect(errors).not.toHaveBeenCalled();
+        expect(vi.getTimerCount()).toBe(0);
+      } finally {
+        vi.useRealTimers();
+        errors.mockRestore();
+      }
+    });
+
     /** @scenario The named key can be copied on its own */
     it("reveals and hides the value on its own toggle", () => {
       renderDialog();

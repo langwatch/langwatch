@@ -50,10 +50,9 @@ Feature: Code, money and dates read the one way
 
   @integration
   Scenario: A snippet copy button that unmounts does not reset after it is gone
-    # Fake timers, not sleeps: the 2 second reset must be cleared on unmount.
     Given a copy button that has just copied successfully
-    When it unmounts and 2 seconds pass
-    Then nothing throws and React logs no state-update warning
+    When it is closed and 2 seconds pass
+    Then the tick is cleared and nothing breaks
 
   @integration
   Scenario: A snippet copy button returns to its copy icon after 2 seconds
@@ -62,7 +61,7 @@ Feature: Code, money and dates read the one way
     Then its check icon goes back to the copy icon
 
   @integration
-  Scenario: A snippet copy button that unmounts mid-copy sets no state when the copy lands
+  Scenario: A snippet copy button that unmounts mid-copy starts no reset timer when the copy lands
     Given a copy button whose copy has not resolved yet
-    When it unmounts and then the copy succeeds
-    Then it sets no state and starts no reset timer
+    When it is closed and then the copy succeeds
+    Then nothing is left waiting to reset the tick and nothing breaks
