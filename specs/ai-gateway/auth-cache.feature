@@ -850,6 +850,7 @@ Feature: Gateway auth cache — hot path is zero RTT after first hit
       When the config refresh answers with the key's own later expiration date
       And the control plane is unreachable when the grace ends
       Then the old secret stops being served at the grace end
+      And it is refused as an invalid key, not as an expired one
 
     @unit
     Scenario: a config response with no expiration field keeps the date the gateway holds

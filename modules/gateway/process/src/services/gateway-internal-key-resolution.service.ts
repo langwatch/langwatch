@@ -171,8 +171,9 @@ export class GatewayInternalKeyResolutionService {
       return refuse(statusRejection.status, { ...statusRejection });
     }
 
-    // A token minted for the old secret inside a rotation grace ends with it, and
-    // carries the grace end as its own claim so a gateway caps the old secret there.
+    // A token minted for the old secret inside a rotation grace carries the grace
+    // end as its own claim; `vk_expires_at` stays the key's date, so an ended old
+    // secret reads as an invalid key, never as an expired one.
     const now = nowInstant().epochMilliseconds;
     const graceEnd =
       vk.presentedPreviousSecret &&
@@ -180,11 +181,8 @@ export class GatewayInternalKeyResolutionService {
       vk.previousSecretValidUntil.epochMilliseconds > now
         ? vk.previousSecretValidUntil
         : null;
-    const [notAfter] = [vk.expiresAt, graceEnd]
-      .filter((at): at is Instant => at !== null)
-      .toSorted((a, b) => a.epochMilliseconds - b.epochMilliseconds);
     return answer(
-      await this.keyResolution({ vk, notAfter: notAfter ?? null, secretNotAfter: graceEnd }),
+      await this.keyResolution({ vk, notAfter: vk.expiresAt, secretNotAfter: graceEnd }),
     );
   }
 

@@ -70,6 +70,13 @@ func (b *Bundle) KeyExpired(now time.Time) bool {
 	return !b.VirtualKeyExpiresAt.IsZero() && !now.Before(b.VirtualKeyExpiresAt)
 }
 
+// SecretEnded reports whether the presented secret's rotation grace has ended
+// at instant now. The key itself may still serve its current secret, so an
+// ended secret is an unknown credential, not an expired key.
+func (b *Bundle) SecretEnded(now time.Time) bool {
+	return !b.SecretValidUntil.IsZero() && !now.Before(b.SecretValidUntil)
+}
+
 // ConnectServiceManagedModels is the entitlement a license needs before its
 // traffic may reach the platform's own models. Spelled the way the license
 // registry, the install's opt-in and the hosted routes all spell it.

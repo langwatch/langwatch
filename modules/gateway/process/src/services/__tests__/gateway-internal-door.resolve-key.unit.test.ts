@@ -84,13 +84,15 @@ describe("the internal door's resolve-key", () => {
 
   describe("when the key is inside a rotation grace", () => {
     /** @scenario A token minted inside a rotation grace ends with the grace */
-    it("ends the token at the grace end", async () => {
+    it("ends the old secret at the grace end and keeps the key's own expiry", async () => {
       const graceEnd = Temporal.Now.instant().add({ seconds: 40 });
+      const keyExpiresAt = Temporal.Now.instant().add({ hours: 1 });
       const signJwt = vi.fn(() => ({ jwt: "signed.jwt", expiresAt: 1 }));
       const door = GatewayInternalDoorService.create({
         protocol: createApiFixture<GatewayInternalProtocol>({
           findVirtualKeyBySecret: vi.fn(async () => ({
             ...customerKey,
+            expiresAt: keyExpiresAt,
             previousHashedSecret: "old-hash",
             previousSecretValidUntil: graceEnd,
             presentedPreviousSecret: true,
@@ -107,7 +109,7 @@ describe("the internal door's resolve-key", () => {
       });
 
       expect(signJwt).toHaveBeenCalledWith(
-        expect.objectContaining({ notAfter: graceEnd, secretNotAfter: graceEnd }),
+        expect.objectContaining({ notAfter: keyExpiresAt, secretNotAfter: graceEnd }),
       );
     });
 

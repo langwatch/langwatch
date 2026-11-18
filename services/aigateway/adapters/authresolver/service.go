@@ -427,9 +427,13 @@ const (
 	// has stopped, so no grace window applies and the request is refused with
 	// the key's own error rather than an upstream one.
 	entryKeyExpired
+	// entrySecretEnded holds a rotated key's previous secret past its grace
+	// end. The key still serves its current secret, so the old one is refused
+	// as an unknown key, again with no grace and no control-plane call.
+	entrySecretEnded
 )
 
-// classifyEntry is the one place that decides which of the four an entry is,
+// classifyEntry is the one place that decides which of the five an entry is,
 // so every path through the cache reaches the same verdict about the same
 // bundle. The order matters twice.
 //
@@ -448,6 +452,8 @@ func classifyEntry(e *entry) entryState {
 	switch {
 	case e.keyExpired():
 		return entryKeyExpired
+	case e.bundle != nil && e.bundle.SecretEnded(time.Now()):
+		return entrySecretEnded
 	case !e.softExpired():
 		return entryFresh
 	case !e.hardExpired():
@@ -809,6 +815,11 @@ func (s *Service) resolveCached(ctx context.Context, lk lookup, e *entry) (serve
 			"message": domain.KeyExpiredMessage,
 		})
 
+	case entrySecretEnded:
+		s.recordMiss()
+		s.evictOnLookup(lk.hash, e, "previous_secret_ended")
+		return served{}, herr.New(ctx, domain.ErrInvalidAPIKey, nil)
+
 	default:
 		// Past hard cap: evict, then resolve fresh.
 		s.recordMiss()
@@ -945,7 +956,7 @@ func (s *Service) lastKnownUsable(e *entry, now time.Time) bool {
 	e.mu.Lock()
 	confirmedAt, hard := e.configConfirmedAt, e.hardExpiresAt
 	e.mu.Unlock()
-	return e.bundle != nil && !e.bundle.KeyExpired(now) &&
+	return e.bundle != nil && !e.bundle.KeyExpired(now) && !e.bundle.SecretEnded(now) &&
 		!now.After(hard) && now.Sub(confirmedAt) <= s.lastKnownMaxAge
 }
 

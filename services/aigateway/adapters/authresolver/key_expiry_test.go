@@ -274,5 +274,6 @@ func TestResolve_ConfigRefreshDuringRotationGrace_OldSecretStopsAtGraceEnd(t *te
 	served, err := svc.Resolve(context.Background(), domain.PresentedKey{Token: rawKey})
 
 	assert.Nil(t, served, "the old secret must not serve past its grace end")
-	require.Error(t, err)
+	require.ErrorIs(t, err, domain.ErrInvalidAPIKey, "an ended old secret is an unknown key")
+	assert.NotErrorIs(t, err, domain.ErrKeyExpired, "the key itself has not expired")
 }
