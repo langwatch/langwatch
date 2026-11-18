@@ -45,6 +45,7 @@ function renderSwitcher({ readings }: { readings?: Partial<StubNavigationReading
         currentUser: { id: "user_1", name: "Ada", email: "ada@acme.test", image: null },
         isLoading: false,
         pathname: "/demo",
+        permissions: ["project:update"],
         ...readings,
       }}
       actions={{ navigate: navigateMock }}
@@ -132,6 +133,24 @@ describe("the project switcher's current project header", () => {
       await waitFor(() => {
         expect(screen.queryByPlaceholderText("Search projects")).not.toBeVisible();
       });
+    });
+  });
+
+  describe("when the reader may view the project but not update it", () => {
+    /** @scenario A reader who may not change the project sees its ID, with no dead-end settings link */
+    it("shows the ID and copy button but no Project settings link", async () => {
+      renderSwitcher({ readings: { permissions: [] } });
+      await openSwitcher();
+
+      const header = currentProjectHeader();
+      expect(within(header).getByTitle("project_demo_1")).toBeInTheDocument();
+      expect(within(header).getByRole("button", { name: "Copy project ID" })).toBeInTheDocument();
+      expect(
+        within(header).queryByRole("link", { name: "Project settings" }),
+      ).not.toBeInTheDocument();
+      expect(
+        within(header).getByRole("link", { name: "API keys for this project" }),
+      ).toBeInTheDocument();
     });
   });
 

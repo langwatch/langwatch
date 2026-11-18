@@ -16,14 +16,20 @@ export function CurrentProjectHeader({
   projectId,
   projectName,
   isAggregate,
+  canOpenSettings,
   onNavigate,
 }: {
   projectId: string;
   projectName: string;
   isAggregate: boolean;
+  canOpenSettings: boolean;
   onNavigate: () => void;
 }) {
-  const { settingsHref, apiKeysHref } = currentProjectLinks({ projectId, isAggregate });
+  const { settingsHref, apiKeysHref } = currentProjectLinks({
+    projectId,
+    isAggregate,
+    canOpenSettings,
+  });
   return (
     <VStack
       as="section"
@@ -52,13 +58,15 @@ export function CurrentProjectHeader({
         <IdText value={projectId} label="project ID" />
       </HStack>
       <HStack gap={3} flexWrap="wrap">
-        <HeaderLink
-          href={settingsHref}
-          icon={<Settings size={12} aria-hidden />}
-          onNavigate={onNavigate}
-        >
-          Project settings
-        </HeaderLink>
+        {settingsHref && (
+          <HeaderLink
+            href={settingsHref}
+            icon={<Settings size={12} aria-hidden />}
+            onNavigate={onNavigate}
+          >
+            Project settings
+          </HeaderLink>
+        )}
         {apiKeysHref && (
           <HeaderLink
             href={apiKeysHref}
