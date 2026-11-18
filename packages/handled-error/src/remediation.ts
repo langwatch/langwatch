@@ -1090,6 +1090,12 @@ const registry = {
       "Retry shortly; if it persists, the judgements can be made later by running the same statement as a job",
     ],
   },
+  instant_eval_decision_model_key_invalid: {
+    tips: [
+      "Every row of the run was refused for the key of the project's own Instant Evals model",
+      "Check the key, and that the provider row is switched on, in Settings > Model Providers",
+    ],
+  },
   instant_eval_estimate_unavailable: {
     tips: [
       "The statement was accepted; working out how many rows it matches is what failed",
