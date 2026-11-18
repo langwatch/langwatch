@@ -162,7 +162,8 @@ Feature: The organization picks its PII redaction level on the Data Privacy page
     When an admin opens the Data Privacy page for project "web-app"
     Then the page shows no organization PII level picker and no price
     When the admin sets a rule's PII redaction to Strict in the drawer
-    Then the drawer says Strict here uses the rule-based detector and the LangWatch PII Redaction Model comes with an Enterprise license
+    Then the drawer says Strict here uses the rule-based detector
+    And it shows the Enterprise lock line: the LangWatch PII Redaction Model is part of LangWatch Enterprise
     And it links to activating a license, or tells a reader who cannot manage it to ask an admin
     And it does not mention LangWatch Cloud
 

@@ -141,8 +141,9 @@ describe("given the Data Privacy page", () => {
       noPickerOrPrice();
       expect(effectivePii()).toBe("PII redactionEssential");
       const advert = await screen.findByTestId("pii-redaction-model-licence-advert");
+      expect(advert.textContent).toContain("Strict here uses the rule-based detector.");
       expect(advert.textContent).toContain(
-        "Strict here uses the rule-based detector. The LangWatch PII Redaction Model comes with an Enterprise license.",
+        "The LangWatch PII Redaction Model is part of LangWatch Enterprise.",
       );
       expect(within(advert).getByRole("link", { name: "Activate a license" })).toHaveAttribute(
         "href",
@@ -162,9 +163,7 @@ describe("given the Data Privacy page", () => {
       });
 
       const advert = await screen.findByTestId("pii-redaction-model-licence-advert");
-      expect(advert.textContent).toContain(
-        "Ask your organization admin about an Enterprise license.",
-      );
+      expect(advert.textContent).toContain("Ask an organization admin to activate a license.");
       expect(within(advert).queryByRole("link")).toBeNull();
     });
   });

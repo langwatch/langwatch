@@ -45,7 +45,7 @@ export const PII_REDACTION_MODEL_PRICE_UNIT = "per 1M characters excl. VAT, pay 
 
 export const STRICT_BILLING_NOTE =
   "Pay as you go, no quota or plan. Every span the model answers is billed by the characters sent, even when it finds nothing. Spans that fall back to the rule-based detector are free. Essential stays included.";
-export const STRICT_FREE_NOTE = "Strict has no charge for your organization.";
+const STRICT_FREE_NOTE = "Strict has no charge for your organization.";
 const STRICT_LICENSED_NOTE =
   "Strict is included with your Enterprise license, with no usage price.";
 
@@ -63,12 +63,10 @@ const STRICT_RULE_BASED = "Strict here uses the rule-based detector.";
 /** Self-hosted Strict without the model: why, and what to do. Never names LangWatch Cloud. */
 export const STRICT_RULE_BASED_NOTES = {
   "turn-on": `${STRICT_RULE_BASED} Your Enterprise license includes the ${PII_REDACTION_MODEL_NAME}: ask whoever runs your deployment to turn it on.`,
-  licence: `${STRICT_RULE_BASED} The ${PII_REDACTION_MODEL_NAME} comes with an Enterprise license.`,
+  licence: STRICT_RULE_BASED,
 } as const;
 export type StrictRuleBasedNote = keyof typeof STRICT_RULE_BASED_NOTES;
 
-export const ACTIVATE_LICENCE_LINK = { href: "/settings/license", label: "Activate a license" };
-export const ASK_ADMIN_FOR_LICENCE = "Ask your organization admin about an Enterprise license.";
 export const STRICT_BILLED_NOTE =
   "Strict is billed from the next trace. Projects or teams with their own Strict rule keep it when the organization moves to Essential.";
 
