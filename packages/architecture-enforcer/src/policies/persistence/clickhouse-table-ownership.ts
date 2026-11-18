@@ -199,23 +199,20 @@ export const DECLARED_OWNERSHIP: DeclaredOwnership = {
     {
       table: "gateway_spend",
       owner: "gateway",
-      readers: ["billing"],
-      reason:
-        "billing sums a connected customer's confirmed spend per request type for its statement and term cap (round 37 D5, EF-5)",
+      readers: ["analytics", "billing"],
+      reason: `billing sums a connected customer's confirmed spend per request type for its statement and term cap (round 37 D5, EF-5); ${lwqlView("gateway_request_spend")}`,
     },
     {
       table: "gateway_budget_ledger_events",
       owner: "gateway",
-      readers: ["billing"],
-      reason:
-        "billing sums the contract budget's bucket since its window opened, the spend the gateway enforces (C3a D5, Alex 2026-10-10)",
+      readers: ["analytics", "billing"],
+      reason: `billing sums the contract budget's bucket since its window opened, the spend the gateway enforces (C3a D5, Alex 2026-10-10); ${lwqlView("gateway_budget_ledger")}`,
     },
     {
       table: "log_records",
       owner: "log",
-      readers: ["trace"],
-      reason:
-        "trace's log read and session groups select over log's records, never a copy (R40, 2026-10-07)",
+      readers: ["analytics", "trace"],
+      reason: `trace's log read and session groups select over log's records, never a copy (R40, 2026-10-07); ${lwqlView("logs")}`,
     },
     {
       table: "instant_eval_runs",
@@ -303,18 +300,6 @@ export const DECLARED_OWNERSHIP: DeclaredOwnership = {
       reason: lwqlView("session_metrics"),
     },
     {
-      table: "gateway_spend",
-      owner: "gateway",
-      readers: ["analytics"],
-      reason: lwqlView("gateway_request_spend"),
-    },
-    {
-      table: "gateway_budget_ledger_events",
-      owner: "gateway",
-      readers: ["analytics"],
-      reason: lwqlView("gateway_budget_ledger"),
-    },
-    {
       table: "gateway_budget_scope_totals",
       owner: "gateway",
       readers: ["analytics"],
@@ -355,12 +340,6 @@ export const DECLARED_OWNERSHIP: DeclaredOwnership = {
       owner: "langy",
       readers: ["analytics"],
       reason: lwqlView("langy_usage_events"),
-    },
-    {
-      table: "log_records",
-      owner: "log",
-      readers: ["analytics"],
-      reason: lwqlView("logs"),
     },
     {
       table: "log_usage_estimates",
