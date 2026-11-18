@@ -9,6 +9,7 @@ export type AuthzOrganizationPolicyDatabase = Pick<PrismaClient, "$queryRaw" | "
 
 type PolicyRow = {
   braidsOrganizationAdminsOnly: boolean;
+  braidsEnabled: boolean;
   updatedByUserId: string;
   updatedAt: Date;
 };
@@ -37,7 +38,7 @@ export class PrismaAuthzOrganizationPolicyRepository extends AuthzOrganizationPo
         // The row is keyed by the organization itself.
         SKIP_TENANT_CHECK: true,
       })}
-      SELECT "braidsOrganizationAdminsOnly", "updatedByUserId", "updatedAt"
+      SELECT "braidsOrganizationAdminsOnly", "braidsEnabled", "updatedByUserId", "updatedAt"
         FROM "AuthzOrganizationPolicy"
        WHERE "organizationId" = ${organizationId}
     `;
@@ -45,6 +46,7 @@ export class PrismaAuthzOrganizationPolicyRepository extends AuthzOrganizationPo
     return {
       organizationId,
       braidsOrganizationAdminsOnly: row.braidsOrganizationAdminsOnly,
+      braidsEnabled: row.braidsEnabled,
       updatedByUserId: row.updatedByUserId,
       updatedAtMs: row.updatedAt.getTime(),
     };
@@ -69,6 +71,30 @@ export class PrismaAuthzOrganizationPolicyRepository extends AuthzOrganizationPo
       VALUES (${organizationId}, ${braidsOrganizationAdminsOnly}, ${updatedByUserId}, now())
       ON CONFLICT ("organizationId") DO UPDATE
         SET "braidsOrganizationAdminsOnly" = EXCLUDED."braidsOrganizationAdminsOnly",
+            "updatedByUserId" = EXCLUDED."updatedByUserId",
+            "updatedAt" = now()
+    `;
+  }
+
+  async setBraidsEnabled({
+    organizationId,
+    braidsEnabled,
+    updatedByUserId,
+  }: {
+    organizationId: string;
+    braidsEnabled: boolean;
+    updatedByUserId: string;
+  }): Promise<void> {
+    await this.database.$executeRaw`
+      ${skipTenantCheck({
+        // The row is keyed by the organization itself.
+        SKIP_TENANT_CHECK: true,
+      })}
+      INSERT INTO "AuthzOrganizationPolicy"
+        ("organizationId", "braidsEnabled", "updatedByUserId", "updatedAt")
+      VALUES (${organizationId}, ${braidsEnabled}, ${updatedByUserId}, now())
+      ON CONFLICT ("organizationId") DO UPDATE
+        SET "braidsEnabled" = EXCLUDED."braidsEnabled",
             "updatedByUserId" = EXCLUDED."updatedByUserId",
             "updatedAt" = now()
     `;

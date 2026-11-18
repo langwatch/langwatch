@@ -1,7 +1,7 @@
 /**
- * The organisation's Braids screen, for its admins: who may braid (the setting) and every live
- * braid in the organisation. Below Enterprise the setting shows the upsell, never a dead switch.
- * Spec: modules/authz/specs/braids-screen.feature, "An organisation admin chooses who may braid".
+ * The organisation's Braids screen, for its admins: whether Braids is on, who may braid and every
+ * live braid. Below Enterprise each setting shows the upsell, never a dead switch. Spec:
+ * modules/authz/specs/braids-screen.feature, "An organisation turns Braids on in settings".
  */
 
 import { Link } from "@langwatch/browser-host/link";
@@ -18,6 +18,7 @@ import {
   useBraidsPolicy,
   useBraidsReleased,
   useOrganizationBraids,
+  useSetBraidsEnabled,
   useSetBraidsPolicy,
 } from "../../../behavior/use-braids.ts";
 import { useAuthzHost } from "../../../model/authz-host.ts";
@@ -30,6 +31,53 @@ import { NO_RULE_UNDER_HEADER } from "../../elements/no-rule-under-header.ts";
 import { SectionErrorNotice } from "../../elements/section-error-notice.tsx";
 
 const KEEP_TO_ADMINS = "Keep braids to organisation admins";
+const ENABLE_BRAIDS = "Enable Braids";
+
+/** The organisation's own switch for Braids (Alex, 2026-11-18): off by default, off pauses. */
+function EnableBraids({
+  organizationId,
+  isEnterprise,
+  enabled,
+  isReading,
+}: {
+  organizationId: string;
+  isEnterprise: boolean;
+  enabled: boolean;
+  isReading: boolean;
+}) {
+  const setting = useSetBraidsEnabled({ organizationId });
+  return (
+    <SettingsSection
+      title={ENABLE_BRAIDS}
+      hint="Whether this organisation's projects can show each other's matching spans."
+    >
+      <ToggleRow
+        label={ENABLE_BRAIDS}
+        on={isEnterprise && enabled}
+        hint={
+          isEnterprise
+            ? "Turn it on and projects can braid. Turning it off pauses every braid and keeps it: the spans stop showing within 30 seconds and come back when you turn Braids on again."
+            : "Braids is included in Enterprise."
+        }
+        data-testid="braids-enabled-row"
+      >
+        {isEnterprise ? (
+          <Switch
+            checked={enabled}
+            disabled={isReading || setting.isSaving}
+            onCheckedChange={({ checked }) => setting.set(checked)}
+            inputProps={{ "aria-label": ENABLE_BRAIDS }}
+            data-testid="braids-enabled-switch"
+          />
+        ) : (
+          <Button asChild colorPalette="orange" size="xs">
+            <Link href="/settings/plans">See plans</Link>
+          </Button>
+        )}
+      </ToggleRow>
+    </SettingsSection>
+  );
+}
 
 function OrganizationBraidsHeader({ locked = false }: { locked?: boolean }) {
   return (
@@ -140,6 +188,8 @@ export default function OrganizationBraidsScreen() {
     projects: host.organizationStructure().projects,
   });
   const paused = released && !isEnterprise && rows.length > 0;
+  // Known off, never assumed: the setting pauses braids on Enterprise too.
+  const turnedOff = released && isEnterprise && policy.data?.braidsEnabled === false;
 
   return (
     <>
@@ -159,6 +209,14 @@ export default function OrganizationBraidsScreen() {
           </Box>
         ) : null}
         {released ? (
+          <EnableBraids
+            organizationId={organizationId}
+            isEnterprise={isEnterprise}
+            enabled={policy.data?.braidsEnabled ?? false}
+            isReading={policy.isLoading}
+          />
+        ) : null}
+        {released ? (
           <WhoMayBraid
             organizationId={organizationId}
             isEnterprise={isEnterprise}
@@ -171,7 +229,11 @@ export default function OrganizationBraidsScreen() {
           hint="Each braid shows a project's matching spans inside another project's traces."
           data-testid="organization-braids"
         >
-          <OrganizationBraidsList failed={braids.isError} rows={rows} paused={paused} />
+          <OrganizationBraidsList
+            failed={braids.isError}
+            rows={rows}
+            paused={paused || turnedOff}
+          />
         </SettingsSection>
       </Stack>
     </>

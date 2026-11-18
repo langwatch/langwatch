@@ -415,6 +415,18 @@ log" and a notice sending admins to the project page to remove one. Creating, ch
 signing-key management refuse `braids_not_enabled`; listing and removing do not, so an admin can find
 and end a braid. The settings menu shows Braids with the flag off only once braids exist.
 
+**The organisation turns Braids on** (decided by Alex, 2026-11-18: "Braids is on by default, but has
+to be enabled in settings"). `release_braids` defaults on and stays LangWatch's kill switch, its off
+behaviour as above. Each organisation also holds "Braids enabled", `braidsEnabled` on
+`AuthzOrganizationPolicy` beside `braidsOrganizationAdminsOnly`, default false, so every existing
+organisation starts off. Changing it is `setBraidsEnabled`: `organization:manage`, Enterprise, audited
+as `authz.organization_policy.braids_enabled_changed`, and it bumps the epoch. While it is off,
+creating and changing braids, the dialog's reads and issuing or rotating signing keys refuse
+`braids_turned_off`; listing, removing, revoking and reading the settings do not. Off also **pauses**
+braids the way leaving Enterprise does: the trace module's pause service asks the plan and then
+`AuthzApi.getOrganizationPolicy`, cached per organisation for no longer than the asking proof, so the
+spans stop showing within the proof bound and come back when it is turned on.
+
 ### 10. Order of work
 
 | #   | Release 1 package                                                                         | Owner                |
@@ -527,6 +539,7 @@ model SigningKey {
 model AuthzOrganizationPolicy {
   organizationId               String   @id
   braidsOrganizationAdminsOnly Boolean  @default(false)
+  braidsEnabled                Boolean  @default(false) // v1.24: off pauses braids (§9)
   updatedByUserId              String
   updatedAt                    DateTime @updatedAt
 }
@@ -748,3 +761,9 @@ not operations.
 - v1.23 (2026-11-18, from review, under the "never fail open" ruling). An empty or all-zero span id or
   parent id never links a reader span to an owner span, in the fence and in the preview; the reader's
   24-hour count runs under a 10 s and 4 GiB cap and answers `clickhouse_overloaded` past it (§3).
+- v1.24 (2026-11-18, decided by Alex: "Braids is on by default, but has to be enabled in settings").
+  `release_braids` defaults on as a kill switch; a new organisation setting, "Braids enabled"
+  (`AuthzOrganizationPolicy.braidsEnabled`, default false, expand-only migration
+  `20261118140000_braids_authz_organization_enabled`), is changed by an organisation admin on
+  Enterprise and audited. Off refuses management with `braids_turned_off` and pauses braids in the
+  trace read, as leaving Enterprise does; on resumes them (§9, "The organisation turns Braids on").

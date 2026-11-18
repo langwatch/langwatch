@@ -12,8 +12,11 @@ export type BraidsApiState = {
   project: { intoOtherProjects: Braid[]; fromOtherProjects: Braid[] } | undefined;
   organization: Braid[] | undefined;
   keptToAdmins: boolean;
+  /** The organisation's "Braids enabled" setting; a fixture organisation has it on. */
+  braidsEnabled: boolean;
   remove: Mock<(input: unknown) => void>;
   setPolicy: Mock<(input: unknown) => void>;
+  setEnabled: Mock<(input: unknown) => void>;
   targets: { projectId: string; selectable: boolean; reason?: "this_project" | "aggregate" }[];
   /** When set, the target list query fails. */
   targetsFail: boolean;
@@ -52,8 +55,10 @@ export function braidsApiFake() {
     project: { intoOtherProjects: [], fromOtherProjects: [] },
     organization: [],
     keptToAdmins: false,
+    braidsEnabled: true,
     remove: vi.fn(),
     setPolicy: vi.fn(),
+    setEnabled: vi.fn(),
     targets: [],
     targetsFail: false,
     targetsRefetch: vi.fn(),
@@ -106,6 +111,7 @@ export function braidsApiFake() {
       getBraidsPolicy: query(() => ({
         organizationId: "org-1",
         braidsOrganizationAdminsOnly: state.keptToAdmins,
+        braidsEnabled: state.braidsEnabled,
         updatedByUserId: null,
         updatedAtMs: null,
       })),
@@ -133,6 +139,17 @@ export function braidsApiFake() {
         (input: { braidsOrganizationAdminsOnly: boolean }) => ({
           organizationId: "org-1",
           braidsOrganizationAdminsOnly: input.braidsOrganizationAdminsOnly,
+          braidsEnabled: state.braidsEnabled,
+          updatedByUserId: "u-ana",
+          updatedAtMs: 1,
+        }),
+      ),
+      setBraidsEnabled: mutation(
+        () => state.setEnabled,
+        (input: { braidsEnabled: boolean }) => ({
+          organizationId: "org-1",
+          braidsOrganizationAdminsOnly: state.keptToAdmins,
+          braidsEnabled: input.braidsEnabled,
           updatedByUserId: "u-ana",
           updatedAtMs: 1,
         }),

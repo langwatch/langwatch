@@ -94,6 +94,17 @@ describe("what the viewer may do", () => {
       braidAffordances({ canManage: true, planState: "paused", keptToOrganizationAdmins: false }),
     ).toMatchObject({ canCreate: false, canEditInto: false, canRemove: true });
   });
+
+  it("offers only removal while the organisation has Braids turned off", () => {
+    expect(
+      braidAffordances({
+        canManage: true,
+        planState: "enterprise",
+        keptToOrganizationAdmins: false,
+        turnedOn: false,
+      }),
+    ).toMatchObject({ canCreate: false, canEditInto: false, canRemove: true });
+  });
 });
 
 describe("braidAuditHref", () => {

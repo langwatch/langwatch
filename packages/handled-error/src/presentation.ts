@@ -888,6 +888,11 @@ const presentations = {
     describe: () =>
       "This organisation can't manage braids yet. Braids it already has keep showing their spans.",
   },
+  braids_turned_off: {
+    title: "Braids is turned off",
+    describe: () =>
+      "An organisation admin can turn Braids on in organisation settings. Until then, existing braids are paused and kept.",
+  },
   broadcaster_not_active: {
     title: "Live updates disconnected",
     describe: () => "Refresh the page to reconnect.",

@@ -337,9 +337,9 @@ export const FEATURE_FLAGS = [
   {
     key: "release_braids",
     scope: "PRODUCT",
-    defaultValue: false,
+    defaultValue: true,
     description:
-      "Opens braid management (spec: modules/authz/specs/braids-release-flag.feature): the project and organisation Braids settings pages and their settings entry, and every procedure behind them, which creates, changes and lists braids, sets who may braid, and issues, rotates and lists braid signing keys. Default off. Enable it per organisation, never by a project rule: organisation-wide procedures ask it for the organisation and project ones for the project, and the two must agree. While off both pages answer not-found, the entry is hidden and those procedures refuse with braids_not_enabled; removing a braid and revoking a signing key still work, since both only narrow access. Braids that already exist keep applying either way: trace reads still show braided spans, signed calls are still verified and braided reads are still audited. Force-enable in dev via FEATURE_FLAG_FORCE_ENABLE=release_braids.",
+      "Kill switch for braid management (spec: modules/authz/specs/braids-release-flag.feature). Default on (Alex, 2026-11-18): each organisation still turns Braids on in its own Braids settings, which an organisation admin on Enterprise changes. Switch it off per organisation, never by a project rule: organisation-wide procedures ask it for the organisation and project ones for the project, and the two must agree. While off both Braids pages open read-only, the settings entry shows only while braids exist, and the procedures that create, change and list braid targets, set who may braid or turn Braids on, and issue, rotate and list braid signing keys refuse with braids_not_enabled; removing a braid and revoking a signing key still work, since both only narrow access. Braids that already exist keep applying either way: trace reads still show braided spans, signed calls are still verified and braided reads are still audited. Switch it off for an organisation through the operator store.",
   },
   {
     key: "release_ui_comparison_leaderboard_enabled",

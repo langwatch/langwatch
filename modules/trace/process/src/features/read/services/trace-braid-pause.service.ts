@@ -1,4 +1,5 @@
 import { type Authorization, honourSpanBraids, withoutSpanBraids } from "@langwatch/authorization";
+import type { AuthzApi } from "@langwatch/authz-contract";
 import { type EntitlementApi, isEnterpriseTier } from "@langwatch/entitlement-contract";
 import { nowInstant } from "@langwatch/time";
 
@@ -6,36 +7,47 @@ import { TraceTtlCacheService } from "../../../services/trace-ttl-cache.service.
 import { readsBraidedSpans } from "../../braid/rules/braided-span-owner.rules.ts";
 
 type BraidPlans = Pick<EntitlementApi, "getActivePlan">;
+type BraidSettings = Pick<AuthzApi, "getOrganizationPolicy">;
 
 /**
- * Braids pause below Enterprise and are kept (ADR-201 §9): the trace module, which owns the
- * merged read, asks the plan, and only it may honour them; a proof it never saw reads none. Cached
- * per organisation for no longer than the proof that asked lives.
+ * Braids pause below Enterprise and while the organisation has Braids turned off, and are kept
+ * (ADR-201 §9): only this read honours them. Cached per organisation for no longer than the
+ * asking proof lives, so a change shows within the proof bound.
  */
 export class TraceBraidPauseService {
-  static create(deps: { plans: BraidPlans }): TraceBraidPauseService {
-    return new TraceBraidPauseService(deps.plans);
+  static create(deps: { plans: BraidPlans; settings: BraidSettings }): TraceBraidPauseService {
+    return new TraceBraidPauseService(deps.plans, deps.settings);
   }
 
-  readonly #enterprise = TraceTtlCacheService.create<boolean>(0);
+  readonly #honours = TraceTtlCacheService.create<boolean>(0);
 
-  private constructor(private readonly plans: BraidPlans) {}
+  private constructor(
+    private readonly plans: BraidPlans,
+    private readonly settings: BraidSettings,
+  ) {}
 
-  /** The proof as the read may honour it: braids honoured on Enterprise, stripped below it. */
+  /** The proof as the read may honour it: braids honoured when on, stripped while paused. */
   async honoured({ authorization }: { authorization: Authorization }): Promise<Authorization> {
     if (!readsBraidedSpans(authorization)) return authorization;
-    const enterprise = await this.isEnterprise(authorization);
-    return enterprise ? honourSpanBraids({ authorization }) : withoutSpanBraids(authorization);
+    const honours = await this.honoursBraids(authorization);
+    return honours ? honourSpanBraids({ authorization }) : withoutSpanBraids(authorization);
   }
 
-  private async isEnterprise(authorization: Authorization): Promise<boolean> {
+  private async honoursBraids(authorization: Authorization): Promise<boolean> {
     const { organizationId } = authorization.scope;
-    const cached = await this.#enterprise.get(organizationId);
+    const cached = await this.#honours.get(organizationId);
     if (cached.kind === "hit") return cached.value;
-    const plan = await this.plans.getActivePlan({ organizationId });
-    const enterprise = isEnterpriseTier(plan.type);
+    const honours = await this.askHonours({ organizationId });
     const lifeMs = authorization.expiresAt - nowInstant().epochMilliseconds;
-    if (lifeMs > 0) await this.#enterprise.set(organizationId, enterprise, lifeMs);
-    return enterprise;
+    if (lifeMs > 0) await this.#honours.set(organizationId, honours, lifeMs);
+    return honours;
+  }
+
+  /** The plan first: below Enterprise the setting is never asked. */
+  private async askHonours({ organizationId }: { organizationId: string }): Promise<boolean> {
+    const plan = await this.plans.getActivePlan({ organizationId });
+    if (!isEnterpriseTier(plan.type)) return false;
+    const policy = await this.settings.getOrganizationPolicy({ organizationId });
+    return policy.braidsEnabled;
   }
 }

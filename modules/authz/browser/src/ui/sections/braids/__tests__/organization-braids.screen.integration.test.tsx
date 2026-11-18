@@ -39,7 +39,9 @@ beforeEach(() => {
     liveBraid({ braidId: "b-2", ownerProjectId: "p-orch", readerProjectId: "p-spec", where: null }),
   ];
   braidsFake.state.keptToAdmins = false;
+  braidsFake.state.braidsEnabled = true;
   braidsFake.state.setPolicy.mockClear();
+  braidsFake.state.setEnabled.mockClear();
 });
 
 describe("OrganizationBraidsScreen", () => {
@@ -81,6 +83,52 @@ describe("OrganizationBraidsScreen", () => {
       );
       expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
       expect(screen.getByText("Braids are paused")).toBeInTheDocument();
+    });
+  });
+
+  describe("given the organisation has Braids turned off", () => {
+    /** @scenario An organisation admin turns Braids on at the top of the organisation Braids page */
+    it("puts the Enable Braids switch above who may braid, saying what on and off do", async () => {
+      braidsFake.state.braidsEnabled = false;
+      const { host } = renderAs();
+
+      const sections = screen.getAllByRole("heading").map((heading) => heading.textContent);
+      expect(sections.indexOf("Enable Braids")).toBeGreaterThanOrEqual(0);
+      expect(sections.indexOf("Enable Braids")).toBeLessThan(sections.indexOf("Who may braid"));
+      const row = screen.getByTestId("braids-enabled-row");
+      expect(row).toHaveTextContent(/projects can braid/i);
+      expect(row).toHaveTextContent(/pauses every braid and keeps it/);
+      const toggle = screen.getByRole("checkbox", { name: "Enable Braids" });
+      expect(toggle).not.toBeChecked();
+      await userEvent.setup().click(toggle);
+      expect(braidsFake.state.setEnabled).toHaveBeenCalledWith({
+        organizationId: "org-1",
+        braidsEnabled: true,
+      });
+      expect(host.successes[0]?.title).toBe("Braids is on");
+    });
+
+    /** @scenario While Braids is off the organisation page lists its braids as paused */
+    it("lists every braid marked paused", () => {
+      braidsFake.state.braidsEnabled = false;
+      renderAs();
+
+      for (const row of screen.getAllByTestId("organization-braid-row")) {
+        expect(row).toHaveTextContent(/Paused · /);
+      }
+    });
+  });
+
+  describe("given an organisation below Enterprise", () => {
+    /** @scenario Below Enterprise the organisation Braids page offers the upsell instead of the switch */
+    it("offers See plans in the Enable Braids row and no switch", () => {
+      braidsFake.state.braidsEnabled = false;
+      renderAs({ isEnterprise: false });
+
+      const row = screen.getByTestId("braids-enabled-row");
+      expect(row).toHaveTextContent(/Braids is included in Enterprise/);
+      expect(within(row).getByRole("link", { name: "See plans" })).toBeInTheDocument();
+      expect(screen.queryByRole("checkbox", { name: "Enable Braids" })).toBeNull();
     });
   });
 

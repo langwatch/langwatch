@@ -334,3 +334,44 @@ Feature: The Braids screen
       Then a banner above the sections says braids are paused and start again on upgrade
       And each braid row is marked paused once, where its activity would be
       And the Signing keys section says signing keys need the Enterprise plan, with no New signing key
+
+  Rule: An organisation turns Braids on in settings
+    # Decided by Alex, 2026-11-18. The setting's rules: braids.feature, same rule name.
+
+    @integration
+    Scenario: An organisation admin turns Braids on at the top of the organisation Braids page
+      Given the organisation has Braids turned off
+      When ana opens Braids in the organisation settings
+      Then an "Enable Braids" switch is the first section, above "Who may braid"
+      And it says turning it on lets projects braid, and turning it off pauses braids and keeps them
+      And turning it on saves the setting and says Braids is on
+
+    @integration
+    Scenario: Below Enterprise the organisation Braids page offers the upsell instead of the switch
+      Given an organisation below Enterprise
+      When ana opens Braids in the organisation settings
+      Then the "Enable Braids" row says Braids is included in Enterprise and offers See plans
+      And there is no switch to turn it on
+
+    @integration
+    Scenario: While Braids is off the organisation page lists its braids as paused
+      Given a live braid from "specialists" into "orchestrator"
+      And the organisation has Braids turned off
+      When ana opens Braids in the organisation settings
+      Then the braid is listed, marked paused
+
+    @integration
+    Scenario: While Braids is off the project page sends an organisation admin to turn it on
+      Given a live braid from "specialists" into "orchestrator"
+      And the organisation has Braids turned off
+      When ana opens the project Braids page of "specialists"
+      Then a banner says Braids is off for the organisation and links to the organisation Braids page
+      And the braid is listed, marked paused, with Remove and without New braid or Edit
+
+    @integration
+    Scenario: While Braids is off the project page tells a project admin to ask an organisation admin
+      Given the organisation has Braids turned off
+      And tom, an admin of the team holding "specialists" who is not an organisation admin
+      When tom opens the project Braids page of "specialists"
+      Then a banner says Braids is off for the organisation and to ask an organisation admin to turn it on
+      And it offers no link to the organisation Braids page

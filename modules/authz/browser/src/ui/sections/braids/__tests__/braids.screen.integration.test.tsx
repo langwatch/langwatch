@@ -64,6 +64,7 @@ beforeEach(() => {
   const { state } = braidsFake;
   state.project = { intoOtherProjects: [], fromOtherProjects: [] };
   state.keptToAdmins = false;
+  state.braidsEnabled = true;
   state.remove.mockClear();
 });
 
@@ -385,6 +386,48 @@ describe("BraidsScreen", () => {
       await openRowMenu();
       expect(await screen.findByRole("menuitem", { name: "Remove braid" })).toBeInTheDocument();
       expect(screen.queryByRole("menuitem", { name: "Edit" })).not.toBeInTheDocument();
+    });
+  });
+
+  describe("given the organisation has Braids turned off", () => {
+    /** @scenario While Braids is off the project page sends an organisation admin to turn it on */
+    it("links an organisation admin to the organisation page and lists the braid paused with only Remove", async () => {
+      braidsFake.state.braidsEnabled = false;
+      braidsFake.state.project = { intoOtherProjects: [liveBraid()], fromOtherProjects: [] };
+      renderAs({ grants: new Set([...ADMIN, "organization:manage"]) });
+
+      const banner = screen.getByTestId("braids-turned-off");
+      expect(banner).toHaveTextContent(/Braids is off for your organisation/);
+      expect(banner).toHaveTextContent(/paused and kept/);
+      expect(within(banner).getByRole("link", { name: "Turn on Braids" })).toHaveAttribute(
+        "href",
+        "/settings/organization-braids",
+      );
+      const row = within(screen.getByTestId("braids-section-into")).getByTestId("braid-row");
+      expect(within(row).getByTestId("braid-paused")).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /New braid/ })).not.toBeInTheDocument();
+      expect(screen.queryByTestId("new-signing-key")).not.toBeInTheDocument();
+      await openRowMenu();
+      expect(await screen.findByRole("menuitem", { name: "Remove braid" })).toBeInTheDocument();
+      expect(screen.queryByRole("menuitem", { name: "Edit" })).not.toBeInTheDocument();
+    });
+
+    /** @scenario While Braids is off the project page tells a project admin to ask an organisation admin */
+    it("tells a project admin to ask an organisation admin, with no link to the organisation page", () => {
+      braidsFake.state.braidsEnabled = false;
+      renderAs();
+
+      const banner = screen.getByTestId("braids-turned-off");
+      expect(banner).toHaveTextContent(/Ask an organisation admin to turn it on/);
+      expect(within(banner).queryByRole("link", { name: "Turn on Braids" })).toBeNull();
+      expect(screen.queryByRole("button", { name: /New braid/ })).not.toBeInTheDocument();
+    });
+
+    it("keeps the upsell below Enterprise when the organisation has no braids", () => {
+      braidsFake.state.braidsEnabled = false;
+      renderAs({ isEnterprise: false });
+
+      expect(screen.queryByTestId("braids-turned-off")).toBeNull();
     });
   });
 });

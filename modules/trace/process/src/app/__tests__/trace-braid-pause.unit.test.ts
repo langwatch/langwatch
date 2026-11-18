@@ -5,7 +5,11 @@ import type { PlanType } from "@langwatch/plans";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
-import { braidedProof, ownProof } from "../../__tests__/support/authorization-proofs.fixture.ts";
+import {
+  braidedProof,
+  ownProof,
+  TEST_PROOF_LIFETIME_MS,
+} from "../../__tests__/support/authorization-proofs.fixture.ts";
 import { MemoryNullTraceBraidReadsRepository } from "../../features/braid/repositories/memory/memory.null-trace-braid-reads.repository.ts";
 import { readsBraidedSpans } from "../../features/braid/rules/braided-span-owner.rules.ts";
 import type { TraceAppDependencies } from "../trace.app.ts";
@@ -16,11 +20,36 @@ const OWNER = "proj_specialists";
 
 const BRAID_ID = "braid_web";
 
-/** The trace detail's proof as the route mints it, with the organisation on the plan named. */
-function detailApp({ planType }: { planType?: PlanType }) {
+/**
+ * The trace detail's proof as the route mints it, with the organisation on the plan named and
+ * its "Braids enabled" setting as `settings.braidsEnabled` holds it when asked.
+ */
+function detailApp({
+  planType,
+  braidsEnabled = true,
+}: {
+  planType?: PlanType;
+  braidsEnabled?: boolean;
+}) {
   const asked: string[] = [];
   const counted: Authorization[] = [];
+  const settings = { braidsEnabled, asked: 0 };
   const app = createTraceAppHarness({
+    braidSettings: createApiFixture<TraceAppDependencies["braidSettings"]>(
+      {
+        getOrganizationPolicy: async ({ organizationId }) => {
+          settings.asked++;
+          return {
+            organizationId,
+            braidsOrganizationAdminsOnly: false,
+            braidsEnabled: settings.braidsEnabled,
+            updatedByUserId: null,
+            updatedAtMs: null,
+          };
+        },
+      },
+      "braidSettings",
+    ),
     ...(planType === undefined
       ? {}
       : {
@@ -89,7 +118,7 @@ function detailApp({ planType }: { planType?: PlanType }) {
     app.authorizationForTrace({ authorization, traceId: "trace-1" });
   const countActivity = () =>
     app.readBraidActivity({ projectId: READER, authorization: braided(), braidIds: [BRAID_ID] });
-  return { open, countActivity, counted, asked };
+  return { open, countActivity, counted, asked, settings };
 }
 
 /** The route's proof: braids carried, not yet honoured by the plan check. */
@@ -146,6 +175,57 @@ describe("braided spans and the organisation's plan", () => {
       await open(braided());
 
       expect(asked).toEqual(["test-organization"]);
+    });
+  });
+
+  describe("given an Enterprise organisation with Braids turned off in settings", () => {
+    /** @scenario Turning Braids off pauses braids within thirty seconds and keeps them */
+    it("asks the setting again once the proof that cached the answer has expired", async () => {
+      const { open, settings } = detailApp({ planType: "ENTERPRISE" });
+      // The answer lives no longer than the asking proof, itself within the 30 s proof bound.
+      const shortLived = braidedProof({
+        projectId: READER,
+        braids: [{ owner: OWNER }],
+        honoured: false,
+        now: Date.now() - TEST_PROOF_LIFETIME_MS + 5,
+      });
+      expect(readsBraidedSpans(await open(shortLived))).toBe(true);
+
+      settings.braidsEnabled = false;
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      const proof = await open(braided());
+
+      expect(readsBraidedSpans(proof)).toBe(false);
+      expect(spanFenceOf(proof).braids).toBeUndefined();
+      expect(settings.asked).toBe(2);
+    });
+
+    it("strips the braids for a proof minted after the setting was turned off", async () => {
+      const { open } = detailApp({ planType: "ENTERPRISE", braidsEnabled: false });
+
+      const proof = await open(braided());
+
+      expect(readsBraidedSpans(proof)).toBe(false);
+      expect(proof.grants.map((grant) => grant.projectId)).toEqual([READER]);
+      expect(spanFenceOf(proof).braids).toBeUndefined();
+    });
+
+    /** @scenario Turning Braids on again resumes the braids it paused */
+    it("honours the same braid again for a proof minted after Braids is turned back on", async () => {
+      const paused = detailApp({ planType: "ENTERPRISE", braidsEnabled: false });
+      const resumed = detailApp({ planType: "ENTERPRISE", braidsEnabled: true });
+
+      expect(readsBraidedSpans(await paused.open(braided()))).toBe(false);
+      expect(spanFenceOf(await resumed.open(braided())).braids?.clauses).toHaveLength(1);
+    });
+  });
+
+  describe("given an organisation below Enterprise with Braids turned on", () => {
+    it("never asks the setting and honours no braid", async () => {
+      const { open, settings } = detailApp({ planType: "LAUNCH" });
+
+      expect(readsBraidedSpans(await open(braided()))).toBe(false);
+      expect(settings.asked).toBe(0);
     });
   });
 

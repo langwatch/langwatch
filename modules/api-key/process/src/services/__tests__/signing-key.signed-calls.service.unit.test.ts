@@ -65,6 +65,15 @@ describe("the API key module's answer to a span's signature", () => {
       usage,
       projects: { getOrganizationId: async () => ORGANIZATION },
       flags,
+      settings: {
+        getOrganizationPolicy: async ({ organizationId }) => ({
+          organizationId,
+          braidsOrganizationAdminsOnly: false,
+          braidsEnabled: true,
+          updatedByUserId: null,
+          updatedAtMs: null,
+        }),
+      },
       braidSignatures: signatures,
       now: () => now,
     });

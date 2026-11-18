@@ -28,6 +28,24 @@ export function useBraidsPolicy({
   );
 }
 
+/**
+ * The organisation's braid settings as the project page reads them. Off is known, never assumed:
+ * an unread setting leaves the server to refuse by name.
+ */
+export function useBraidsSettings({
+  organizationId,
+  released,
+}: {
+  organizationId: string | undefined;
+  released: boolean;
+}) {
+  const policy = useBraidsPolicy({ organizationId, released });
+  return {
+    keptToAdmins: policy.data?.braidsOrganizationAdminsOnly ?? false,
+    turnedOff: released && policy.data?.braidsEnabled === false,
+  };
+}
+
 export function useProjectBraids({ projectId }: { projectId: string | undefined }) {
   return authzApi.authz.listBraids.useQuery(
     { projectId: projectId ?? "" },
@@ -82,6 +100,28 @@ export function useSetBraidsPolicy({ organizationId }: { organizationId: string 
   };
 }
 
+/** Turns Braids on or off for the organisation; off pauses its braids and keeps them. */
+export function useSetBraidsEnabled({ organizationId }: { organizationId: string }) {
+  const host = useAuthzHost();
+  const utils = authzApi.useUtils();
+  const setting = authzApi.authz.setBraidsEnabled.useMutation({
+    onSuccess: (policy) => {
+      void utils.authz.getBraidsPolicy.invalidate();
+      host.succeeded({
+        title: policy.braidsEnabled ? "Braids is on" : "Braids is off",
+        description: policy.braidsEnabled
+          ? "Projects can braid again, and paused braids show their spans again."
+          : "Existing braids are paused and kept. The change is in the audit log.",
+      });
+    },
+    onError: (error) => host.failed({ error, fallbackTitle: "Couldn't turn Braids on or off" }),
+  });
+  return {
+    isSaving: setting.isPending,
+    set: (braidsEnabled: boolean) => setting.mutate({ organizationId, braidsEnabled }),
+  };
+}
+
 /** Each braid's spans over the last 24 hours, by braid id; undefined until it answers. */
 export function useBraidActivity({
   projectId,
@@ -90,7 +130,7 @@ export function useBraidActivity({
 }: {
   projectId: string | undefined;
   braids: AuthzProjectBraids | undefined;
-  /** Off below Enterprise or while braids are not released: a paused braid counts nothing. */
+  /** Off below Enterprise, unreleased or turned off: a paused braid counts nothing. */
   enabled: boolean;
 }): BraidActivityCounts {
   const braidIds = [...(braids?.intoOtherProjects ?? []), ...(braids?.fromOtherProjects ?? [])].map(

@@ -3,17 +3,29 @@
 # this file is the release flag braid management sits behind. Signing keys: the api-key
 # module's signing-keys.feature.
 #
-# Bound by unit and integration tests in authz, navigation and api-key.
+# Since 2026-11-18 (decided by Alex) the flag defaults on and stays as LangWatch's kill switch;
+# an organisation admin turns Braids on in settings (braids.feature, "An organisation turns
+# Braids on in settings"). The scenarios below with the flag off are the kill switch.
+#
+# Bound by unit and integration tests in authz, navigation, api-key and feature-flag.
 
 @authz @braids
-Feature: Braid management behind the release_braids flag
+Feature: Braid management behind the release_braids kill switch
   As LangWatch
-  I want braid management switched on per organisation
-  So that braids roll out gradually without breaking the braids an organisation already has
+  I want to be able to switch braid management off for an organisation
+  So that a problem can be contained without breaking the braids an organisation already has
 
   Background:
     Given an Enterprise organisation with plain projects "orchestrator" and "specialists"
     And ana, an organisation admin
+
+  Rule: The flag is a kill switch, on unless LangWatch switches it off
+
+    @unit
+    Scenario: release_braids is on by default
+      Given an organisation LangWatch has not switched off
+      When release_braids is read for it
+      Then it is on, and the organisation's own Braids setting decides whether Braids is used
 
   Rule: Off, the Braids screens list existing braids read-only so an admin can end them
     # Decided by Alex, 2026-11-18 (option 2a): braids keep applying while the flag is off, so

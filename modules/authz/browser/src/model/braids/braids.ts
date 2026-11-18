@@ -156,6 +156,22 @@ export function braidsPlanState({
   return braidCount > 0 ? "paused" : "upsell";
 }
 
+/** Why the page's braids are paused: the plan, or the organisation's Braids setting turned off. */
+export function braidsPauses({
+  released,
+  planState,
+  turnedOff,
+}: {
+  released: boolean;
+  planState: BraidsPlanState;
+  turnedOff: boolean;
+}): { byPlan: boolean; byOrganization: boolean } {
+  return {
+    byPlan: released && planState === "paused",
+    byOrganization: released && turnedOff && planState === "enterprise",
+  };
+}
+
 export type BraidAffordances = {
   canCreate: boolean;
   /** Edit is the owner side's alone; a reader's admins may only remove. */
@@ -171,14 +187,17 @@ export function braidAffordances({
   planState,
   keptToOrganizationAdmins,
   released = true,
+  turnedOn = true,
 }: {
   canManage: boolean;
   planState: BraidsPlanState;
   keptToOrganizationAdmins: boolean;
   /** `release_braids` off: the list is read-only but Remove stays (Alex, 2026-11-18). */
   released?: boolean;
+  /** The organisation's "Braids enabled" setting off: the same, braids paused. */
+  turnedOn?: boolean;
 }): BraidAffordances {
-  const working = canManage && planState === "enterprise" && released;
+  const working = canManage && planState === "enterprise" && released && turnedOn;
   return {
     canCreate: working,
     canEditInto: working,
@@ -213,6 +232,8 @@ export function braidAuditHref({
 }
 
 export const BRAIDS_GUIDE_HREF = "https://langwatch.ai/docs/features/braids";
+/** The organisation's Braids page, where its admins turn Braids on. */
+export const ORGANIZATION_BRAIDS_HREF = "/settings/organization-braids";
 
 /** The Braids page's sections; `section` in the query scrolls to one, as Signing keys links do. */
 export const BRAIDS_SECTIONS = ["into", "from", "keys"] as const;
