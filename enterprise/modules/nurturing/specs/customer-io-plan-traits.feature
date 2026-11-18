@@ -155,6 +155,13 @@ Feature: Customer.io knows each team's real plan
     And a re-run starts from the start
 
   @unit
+  Scenario: A person in a paid team and their own free org is never told free by the resync
+    Given the member copy is empty and a person joined their own free organization, then a paid one
+    When the member backfill runs and then both organizations' catch-up facts are delivered in either order
+    Then the person is identified once, with the paid plan
+    And the free organization's fact sends only its company call
+
+  @unit
   Scenario: No request carries more than a hundred members
     Given an organization with 250 active members
     When its plan is delivered

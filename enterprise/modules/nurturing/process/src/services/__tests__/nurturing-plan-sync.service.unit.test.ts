@@ -8,8 +8,10 @@
 import type { CioBatchCall, NurturingSignalOf } from "@langwatch/enterprise-nurturing-contract";
 import { describe, expect, it } from "vitest";
 
+import { MemoryNurturingMemberSourceRepository } from "../../repositories/memory/memory.nurturing-member-source.repository.ts";
 import { MemoryNurturingOrganizationMemberRepository } from "../../repositories/memory/memory.nurturing-organization-member.repository.ts";
 import { MemoryNurturingOrganizationPlanRepository } from "../../repositories/memory/memory.nurturing-organization-plan.repository.ts";
+import { NurturingMemberBackfillService } from "../nurturing-member-backfill.service.ts";
 import { NurturingPlanSyncService } from "../nurturing-plan-sync.service.ts";
 
 const change: NurturingSignalOf<"subscription_changed"> = {
@@ -129,6 +131,54 @@ describe("NurturingPlanSyncService", () => {
       await expect(plans.findPlan({ organizationId: "org-1" })).resolves.toMatchObject({
         fact: { plan: "LAUNCH", fromCatchUp: true },
       });
+    });
+  });
+
+  describe("when a person is in a paid team and their own free organization", () => {
+    /** @scenario "A person in a paid team and their own free org is never told free by the resync" */
+    it.each([
+      ["paid team's fact first", ["org-a", "org-b"]],
+      ["free organization's fact first", ["org-b", "org-a"]],
+    ])("never tells them free after the member backfill (%s)", async (_order, order) => {
+      // Without the backfill the copy holds no row for alice, so org-b's fact finds her in no
+      // other organization (membersWhoseLatestOrganizationIsElsewhere) and identifies her as
+      // free. The backfill is what makes her latest organization, org-a, known.
+      const members = MemoryNurturingOrganizationMemberRepository.create();
+      const source = MemoryNurturingMemberSourceRepository.create({
+        membersByOrganization: {
+          "org-b": [{ userId: "alice", joinedAt: 1_000 }],
+          "org-a": [{ userId: "alice", joinedAt: 2_000 }],
+        },
+      });
+      await NurturingMemberBackfillService.create({ peers: { source, members } }).backfill({
+        dryRun: false,
+        signal: new AbortController().signal,
+      });
+      const { planSync, sent } = planSyncOver(members);
+      const facts = {
+        "org-a": { ...change, organizationId: "org-a", memberUserIds: ["alice"], plan: "LAUNCH" },
+        "org-b": {
+          ...change,
+          organizationId: "org-b",
+          memberUserIds: ["alice"],
+          plan: "FREE",
+          hasSubscription: false,
+        },
+      } as const;
+
+      for (const organizationId of order) {
+        await planSync.planCaughtUp({
+          ...facts[organizationId as keyof typeof facts],
+          fromCatchUp: true,
+        });
+      }
+
+      const identifies = sent.flat().filter((call) => call.type === "identify");
+      expect(identifies.map(({ userId }) => userId)).toEqual(["alice"]);
+      expect(identifies.map((call) => ("traits" in call ? call.traits?.plan : undefined))).toEqual([
+        "launch",
+      ]);
+      expect(sent.flat().filter((call) => call.type === "group")).toHaveLength(2);
     });
   });
 });
