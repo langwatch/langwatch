@@ -25,12 +25,15 @@ import { signingKeyUsageHourOf, signingKeyVerifiesAt } from "../rules/signing-ke
 const logger = createLogger("langwatch:api-key:braid-signature");
 /** Counts and last use are written at most this often from one process. */
 export const SIGNING_KEY_USAGE_FLUSH_MS = 10_000;
-/** The most lookups held at once; past it the oldest goes, costing one early re-read. */
+/** How often an unknown key id may re-read the organisation's keys, so a new key verifies soon. */
+export const SIGNING_KEY_UNKNOWN_REREAD_MS = 5_000;
+/** The most organisations held at once; past it the oldest goes, costing one early re-read. */
 const SIGNING_KEY_LOOKUP_MAX_HELD = 10_000;
 
+/** One organisation's keys by public id, so an unknown key id is answered from memory. */
 type HeldLookup = {
   readonly at: number;
-  readonly credential: Promise<SigningKeyCredential | undefined>;
+  readonly credentials: Promise<ReadonlyMap<string, SigningKeyCredential>>;
 };
 type PendingUsage = {
   readonly organizationId: string;
@@ -43,7 +46,7 @@ type PendingUsage = {
 
 /**
  * Verifies a span's `langwatch.signature` (ADR-201 §4) without the secret leaving this module.
- * A key, or its absence, is held for `SIGNING_KEY_LOOKUP_CACHE_MS`; each verdict on a known key
+ * An organisation's keys are held for `SIGNING_KEY_LOOKUP_CACHE_MS`; each verdict on a known key
  * is counted in memory and written every `SIGNING_KEY_USAGE_FLUSH_MS`, never once per span.
  */
 export class BraidSignatureVerificationService {
@@ -95,9 +98,9 @@ export class BraidSignatureVerificationService {
     return { outcome: "verified", signingProjectId: credential.projectId, keys: signature.keys };
   }
 
-  /** Drops a held lookup, so a revoke on this server ends the key here at once. */
-  forget({ organizationId, publicId }: { organizationId: string; publicId: string }): void {
-    this.#lookups.delete(`${organizationId}:${publicId}`);
+  /** Drops the organisation's held keys, so a revoke on this server ends the key here at once. */
+  forget({ organizationId }: { organizationId: string }): void {
+    this.#lookups.delete(organizationId);
   }
 
   /** Writes what this process has counted since the last write. */
@@ -127,31 +130,51 @@ export class BraidSignatureVerificationService {
     }
   }
 
-  #lookup({
+  async #lookup({
     organizationId,
     publicId,
   }: {
     organizationId: string;
     publicId: string;
   }): Promise<SigningKeyCredential | undefined> {
-    const cacheKey = `${organizationId}:${publicId}`;
-    const at = this.now().epochMilliseconds;
-    const held = this.#lookups.get(cacheKey);
-    if (held && at - held.at < SIGNING_KEY_LOOKUP_CACHE_MS) return held.credential;
+    const held = await this.#credentialsOf({
+      organizationId,
+      maxAgeMs: SIGNING_KEY_LOOKUP_CACHE_MS,
+    });
+    if (held.has(publicId)) return held.get(publicId);
+    const reread = await this.#credentialsOf({
+      organizationId,
+      maxAgeMs: SIGNING_KEY_UNKNOWN_REREAD_MS,
+    });
+    return reread.get(publicId);
+  }
 
-    const credential = this.keys
-      .findCredentials({ organizationId, publicId })
-      .then(([found]) => found);
-    this.#lookups.delete(cacheKey);
+  /** One read per organisation per window, whatever key ids the spans carry (#9682). */
+  #credentialsOf({
+    organizationId,
+    maxAgeMs,
+  }: {
+    organizationId: string;
+    maxAgeMs: number;
+  }): Promise<ReadonlyMap<string, SigningKeyCredential>> {
+    const at = this.now().epochMilliseconds;
+    const held = this.#lookups.get(organizationId);
+    if (held && at - held.at < maxAgeMs) return held.credentials;
+
+    const credentials = this.keys
+      .findCredentials({ organizationId, at: this.now() })
+      .then((rows) => new Map(rows.map((row) => [row.publicId, row])));
+    this.#lookups.delete(organizationId);
     if (this.#lookups.size >= SIGNING_KEY_LOOKUP_MAX_HELD) {
       const oldest = this.#lookups.keys().next();
       if (!oldest.done) this.#lookups.delete(oldest.value);
     }
-    this.#lookups.set(cacheKey, { at, credential });
-    credential.catch(() => {
-      if (this.#lookups.get(cacheKey)?.credential === credential) this.#lookups.delete(cacheKey);
+    this.#lookups.set(organizationId, { at, credentials });
+    credentials.catch(() => {
+      if (this.#lookups.get(organizationId)?.credentials === credentials)
+        this.#lookups.delete(organizationId);
     });
-    return credential;
+    return credentials;
   }
 
   #count(input: { organizationId: string; keyId: string; passed: boolean; at: Instant }): void {
@@ -195,7 +218,9 @@ export class BraidSignatureVerificationService {
     const message = braidSignatureMessage({ traceId: input.traceId, entries: signed });
     if (message.kind === "malformed") return "malformed";
     if (credential.revokedAt !== null) return "revoked";
-    if (!signingKeyVerifiesAt({ key: credential, at })) return "expired";
+    if (!signingKeyVerifiesAt({ key: credential, at }) || credential.secret === null) {
+      return "expired";
+    }
 
     const hmacKey = `${SIGNING_KEY_PREFIX}${credential.publicId}_${credential.secret}`;
     const expected = createHmac("sha256", hmacKey).update(message.text, "utf8").digest();

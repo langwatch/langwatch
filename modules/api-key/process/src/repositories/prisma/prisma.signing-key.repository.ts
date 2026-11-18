@@ -142,10 +142,10 @@ export class PrismaSigningKeyRepository implements SigningKeyRepository {
 
   async findCredentials(input: {
     organizationId: string;
-    publicId: string;
+    at: Instant;
   }): Promise<SigningKeyCredential[]> {
     const rows = await this.database.signingKey.findMany({
-      where: { publicId: input.publicId, organizationId: input.organizationId },
+      where: { organizationId: input.organizationId },
       select: {
         id: true,
         projectId: true,
@@ -155,11 +155,15 @@ export class PrismaSigningKeyRepository implements SigningKeyRepository {
         revokedAt: true,
       },
     });
+    const at = toDate(input.at).getTime();
     return rows.map(({ secretCiphertext, verifiesUntil, revokedAt, ...row }) => ({
       ...row,
       verifiesUntil: verifiesUntil ? fromDate(verifiesUntil) : null,
       revokedAt: revokedAt ? fromDate(revokedAt) : null,
-      secret: this.cipher.decrypt(secretCiphertext),
+      secret:
+        revokedAt === null && (verifiesUntil === null || verifiesUntil.getTime() > at)
+          ? this.cipher.decrypt(secretCiphertext)
+          : null,
     }));
   }
 

@@ -58,6 +58,14 @@ Feature: Signing keys
       Then the key is listed as revoked
       And spans signed with it stop being marked verified within a minute
 
+    @unit
+    Scenario: Spans signed with unknown key ids cost no database read each
+      Given "orchestrator" holds a signing key in use
+      When spans arrive signed with many key ids no organisation holds
+      Then each is left unverified as an unknown key
+      And the organisation's keys are read from the store once a minute, not once per span
+      And the key in use still verifies
+
   Rule: Who may manage signing keys
 
     @unit

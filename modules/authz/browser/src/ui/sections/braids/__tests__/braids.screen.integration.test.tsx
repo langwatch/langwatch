@@ -36,8 +36,10 @@ function renderAs({
   query = {},
   projectSwitcher,
   structure = STRUCTURE,
+  braidsReleased = true,
 }: {
   structure?: typeof STRUCTURE;
+  braidsReleased?: boolean;
   grants?: Set<string>;
   isEnterprise?: boolean;
   projectId?: string;
@@ -52,7 +54,7 @@ function renderAs({
     query,
     projectSwitcher,
   });
-  return renderWithAuthzHost(<BraidsScreen />, host);
+  return renderWithAuthzHost(<BraidsScreen />, host, { braidsReleased });
 }
 
 const scrollIntoView = vi.fn();
@@ -142,6 +144,17 @@ describe("BraidsScreen", () => {
         Node.DOCUMENT_POSITION_FOLLOWING,
       );
     });
+    /** @scenario A braid row says when its last 24 hours could not be counted */
+    it("says the spans could not be counted when the count fails", () => {
+      braidsFake.state.project = { intoOtherProjects: [liveBraid()], fromOtherProjects: [] };
+      braidTraces.state.activity = "failed";
+      renderAs();
+
+      expect(
+        within(screen.getByTestId("braid-row")).getByTestId("braid-activity"),
+      ).toHaveTextContent("Couldn't count spans");
+    });
+
     /** @scenario Each braid row shows where it goes, its condition, its access and its activity */
     it("Each braid row shows where it goes, its condition, its access and its activity", async () => {
       braidsFake.state.project = { intoOtherProjects: [liveBraid()], fromOtherProjects: [] };
@@ -344,6 +357,33 @@ describe("BraidsScreen", () => {
       expect(screen.getByTestId("braids-none-from")).toBeInTheDocument();
       expect(screen.getByTestId("braids-signing-keys-paused")).toBeInTheDocument();
       expect(screen.queryByTestId("new-signing-key")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("given release_braids is off for the organisation", () => {
+    /** @scenario "With release_braids off both Braids pages open read-only" */
+    it("says Braids is not enabled and that existing braids still apply and can be removed here", () => {
+      renderAs({ braidsReleased: false });
+
+      expect(screen.getByTestId("braids-not-enabled")).toHaveTextContent(
+        /not enabled.*still apply.*remove them here/,
+      );
+    });
+
+    /** @scenario "With release_braids off the project Braids page lists braids with only Remove" */
+    it("lists the braid with Remove and offers no New braid, Edit, signing keys or setting", async () => {
+      braidsFake.state.project = { intoOtherProjects: [liveBraid()], fromOtherProjects: [] };
+      renderAs({ braidsReleased: false });
+
+      expect(
+        within(screen.getByTestId("braids-section-into")).getByTestId("braid-row"),
+      ).toBeVisible();
+      expect(screen.queryByRole("button", { name: /New braid/ })).not.toBeInTheDocument();
+      expect(screen.queryByTestId("braids-section-keys")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("braids-who-may-braid")).not.toBeInTheDocument();
+      await openRowMenu();
+      expect(await screen.findByRole("menuitem", { name: "Remove braid" })).toBeInTheDocument();
+      expect(screen.queryByRole("menuitem", { name: "Edit" })).not.toBeInTheDocument();
     });
   });
 });

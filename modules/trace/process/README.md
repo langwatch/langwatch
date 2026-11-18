@@ -341,6 +341,14 @@ The drawer timeline, each braided span's events protected by its owner.
 readTraceEventsForViewer(input: TraceDrawerReadInput): Promise<DerivedTraceEvent[]>;
 ```
 
+#### `readLangwatchSignalsForViewer`
+
+Signal buckets per span, the trace opened and owners grouped as the span tree is.
+
+```typescript
+readLangwatchSignalsForViewer(input: TraceDrawerReadInput): Promise<SpanLangwatchSignals[]>;
+```
+
 #### `readTraceFacetsForApiKey`
 
 `GET /api/traces/facets` for an API key: the discovery payload or one field's paged values.
@@ -1625,8 +1633,8 @@ Contract `../contract/src/traces.trpc.ts:190`, router `src/transport/traces.trpc
 | `traces.resourceInfo`                  | query        | Permission `traces:view`                                              | inline                          | `traceResourceInfoSchema`          |
 | `traces.traceEvents`                   | query        | Permission `traces:view`                                              | inline                          | `tracesTraceEventsSchema`          |
 | `traces.braidPreview`                  | query        | Permission `traces:view`; Entitlement `enterprise` (feature `BRAIDS`) | `braidPreviewInputSchema`       | `braidPreviewSchema`               |
-| `traces.braidAttributeKeys`            | query        | Permission `traces:view`                                              | `braidAttributeKeysInputSchema` | `braidAttributeKeysSchema`         |
-| `traces.braidActivity`                 | query        | Permission `traces:view`                                              | `braidActivityInputSchema`      | `braidActivitySchema`              |
+| `traces.braidAttributeKeys`            | query        | Permission `traces:view`; Entitlement `enterprise` (feature `BRAIDS`) | `braidAttributeKeysInputSchema` | `braidAttributeKeysSchema`         |
+| `traces.braidActivity`                 | query        | Permission `traces:view`; Entitlement `enterprise` (feature `BRAIDS`) | `braidActivityInputSchema`      | `braidActivitySchema`              |
 | `traces.braidTestTrace`                | query        | Permission `traces:view`; Entitlement `enterprise` (feature `BRAIDS`) | `braidTestTraceInputSchema`     | `braidTestTraceSchema`             |
 
 ```typescript

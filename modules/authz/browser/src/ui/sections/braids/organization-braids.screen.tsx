@@ -16,12 +16,14 @@ import { ToggleRow } from "@langwatch/design-system/toggle-row";
 
 import {
   useBraidsPolicy,
+  useBraidsReleased,
   useOrganizationBraids,
   useSetBraidsPolicy,
 } from "../../../behavior/use-braids.ts";
 import { useAuthzHost } from "../../../model/authz-host.ts";
 import { BRAIDS_GUIDE_HREF, organizationBraidRows } from "../../../model/braids/braids.ts";
 import { OrganizationBraidsTable } from "../../blocks/braids/organization-braids-table.tsx";
+import { BraidsNotEnabledBanner } from "../../elements/braids-not-enabled-banner.tsx";
 import { BraidsPageLinks } from "../../elements/braids-page-links.tsx";
 import { BraidsTitle } from "../../elements/braids-title.tsx";
 import { NO_RULE_UNDER_HEADER } from "../../elements/no-rule-under-header.ts";
@@ -115,10 +117,13 @@ export default function OrganizationBraidsScreen() {
   const host = useAuthzHost();
   const { organizationId } = host.scope();
   const { isEnterprise, isLoading: isPlanLoading } = host.plan();
+  // Off, the page lists existing braids and no setting (Alex, 2026-11-18).
+  const releasedFlag = useBraidsReleased();
+  const released = releasedFlag === true;
   const braids = useOrganizationBraids({ organizationId });
-  const policy = useBraidsPolicy({ organizationId });
+  const policy = useBraidsPolicy({ organizationId, released });
 
-  if (!organizationId || isPlanLoading || braids.isLoading) {
+  if (!organizationId || isPlanLoading || releasedFlag === undefined || braids.isLoading) {
     return (
       <>
         <OrganizationBraidsHeader />
@@ -134,12 +139,17 @@ export default function OrganizationBraidsScreen() {
     braids: braids.data ?? [],
     projects: host.organizationStructure().projects,
   });
-  const paused = !isEnterprise && rows.length > 0;
+  const paused = released && !isEnterprise && rows.length > 0;
 
   return (
     <>
-      <OrganizationBraidsHeader locked={!isEnterprise} />
+      <OrganizationBraidsHeader locked={released && !isEnterprise} />
       <Stack gap={0} css={NO_RULE_UNDER_HEADER}>
+        {released ? null : (
+          <Box paddingBottom={4}>
+            <BraidsNotEnabledBanner removeHere={false} />
+          </Box>
+        )}
         {paused ? (
           <Box paddingBottom={4}>
             <Banner status="warning" title="Braids are paused">
@@ -148,12 +158,14 @@ export default function OrganizationBraidsScreen() {
             </Banner>
           </Box>
         ) : null}
-        <WhoMayBraid
-          organizationId={organizationId}
-          isEnterprise={isEnterprise}
-          keptToAdmins={policy.data?.braidsOrganizationAdminsOnly ?? false}
-          isReading={policy.isLoading}
-        />
+        {released ? (
+          <WhoMayBraid
+            organizationId={organizationId}
+            isEnterprise={isEnterprise}
+            keptToAdmins={policy.data?.braidsOrganizationAdminsOnly ?? false}
+            isReading={policy.isLoading}
+          />
+        ) : null}
         <SettingsSection
           title="Braids in this organisation"
           hint="Each braid shows a project's matching spans inside another project's traces."

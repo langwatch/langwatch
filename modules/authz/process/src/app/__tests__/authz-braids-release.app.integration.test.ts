@@ -38,14 +38,12 @@ afterEach(async () => {
 
 const braidInput = { projectId: SPECIALISTS, readerProjectId: ORCHESTRATOR, fromMs: FROM_MS };
 
-/** Every refused management procedure the screens call; removing a braid is not one of them. */
+/** Every refused management procedure the screens call; listing and removing are not among them. */
 function everyManagementCall({ as }: World, userId: string, braidId: string) {
   const caller = as(userId);
   return {
-    listBraids: caller.listBraids({ projectId: SPECIALISTS }),
     createBraid: caller.createBraid(braidInput),
     changeBraid: caller.changeBraid({ ...braidInput, braidId }),
-    listOrganizationBraids: caller.listOrganizationBraids({ organizationId: ORG }),
     listBraidTargets: caller.listBraidTargets({
       projectId: SPECIALISTS,
       projectIds: [ORCHESTRATOR],
@@ -109,6 +107,21 @@ describe("braid management behind release_braids", () => {
       expect(proof.grants[1]).toMatchObject({ projectId: SPECIALISTS, via: [braid.braidId] });
     });
 
+    /** @scenario "Listing braids still answers while release_braids is off" */
+    it("lists the project's and the organisation's braids through the screens' routes", async () => {
+      const made = await world();
+      const braid = await made.as(ANA).createBraid(braidInput);
+
+      made.flags.withhold({ flag: BRAIDS_FLAG, organizationId: ORG });
+
+      await expect(made.as(ANA).listBraids({ projectId: SPECIALISTS })).resolves.toMatchObject({
+        intoOtherProjects: [expect.objectContaining({ braidId: braid.braidId })],
+      });
+      await expect(made.as(ANA).listOrganizationBraids({ organizationId: ORG })).resolves.toEqual([
+        expect.objectContaining({ braidId: braid.braidId }),
+      ]);
+    });
+
     /** @scenario "Removing a braid still works while release_braids is off" */
     it("removes it through the screen's route, and the reader's next read no longer carries it", async () => {
       const made = await world();
@@ -149,7 +162,7 @@ describe("braid management behind release_braids", () => {
     });
 
     /** @scenario "A trace read still shows an existing braid's matched conditions while braids are off" */
-    it("answers the trace read's listBraids with the braid and its condition, while the screen's route refuses", async () => {
+    it("answers the trace read's listBraids with the braid and its condition, as the screen's route does", async () => {
       const made = await world();
       const braid = await made.as(ANA).createBraid({ ...braidInput, where: WEB });
 
@@ -164,9 +177,9 @@ describe("braid management behind release_braids", () => {
           }),
         ],
       });
-      await expect(refusalOf(made.as(ANA).listBraids({ projectId: ORCHESTRATOR }))).resolves.toBe(
-        "braids_not_enabled",
-      );
+      await expect(made.as(ANA).listBraids({ projectId: ORCHESTRATOR })).resolves.toMatchObject({
+        fromOtherProjects: [expect.objectContaining({ braidId: braid.braidId, where: WEB })],
+      });
     });
   });
 });

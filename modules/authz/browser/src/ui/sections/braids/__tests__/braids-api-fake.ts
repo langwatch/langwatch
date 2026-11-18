@@ -42,7 +42,7 @@ export type BraidTraceState = {
   };
   previewAsked: Mock<(input: unknown) => void>;
   attributeKeys: { key: string; spanCount: number }[];
-  activity: { braidId: string; spanCount: number }[] | undefined;
+  activity: { braidId: string; spanCount: number }[] | undefined | "failed";
   testTrace: { found: boolean; nodes: unknown[] };
   testTraceAsked: Mock<(input: unknown) => void>;
 };
@@ -154,18 +154,27 @@ export function braidTraceFake() {
     testTrace: { found: false, nodes: [] },
     testTraceAsked: vi.fn(),
   };
-  const asked = (read: () => unknown, record?: Mock<(input: unknown) => void>) => ({
+  const asked = (
+    read: () => unknown,
+    record?: Mock<(input: unknown) => void>,
+    fails: () => boolean = () => false,
+  ) => ({
     useQuery: (input: unknown, options?: { enabled?: boolean }) => {
       const enabled = options?.enabled !== false;
       if (enabled) record?.(input);
-      return { data: enabled ? read() : undefined, isLoading: false, isError: false };
+      const isError = enabled && fails();
+      return { data: enabled && !isError ? read() : undefined, isLoading: false, isError };
     },
   });
   const traceClient = {
     traces: {
       braidPreview: asked(() => state.preview, state.previewAsked),
       braidAttributeKeys: asked(() => ({ keys: state.attributeKeys })),
-      braidActivity: asked(() => (state.activity ? { activity: state.activity } : undefined)),
+      braidActivity: asked(
+        () => (Array.isArray(state.activity) ? { activity: state.activity } : undefined),
+        undefined,
+        () => state.activity === "failed",
+      ),
       braidTestTrace: asked(() => state.testTrace, state.testTraceAsked),
     },
   };

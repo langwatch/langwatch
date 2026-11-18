@@ -14,9 +14,11 @@ import {
   BraidGovernanceProjectError,
   BraidIntoItselfError,
   BraidNotOnProjectError,
+  AuthzGrantNotConfirmedError,
   GrantExceedsCallerPermissionsError,
   GrantExpiryInPastError,
   GrantValidationError,
+  newAuthzGrantId,
   type AuthzBraid,
   type AuthzBraidRemoved,
   type AuthzChangeBraidInput,
@@ -33,6 +35,10 @@ import { nowInstant, Temporal } from "@langwatch/time";
 
 import type { EventingAuthzLedgerAdapter } from "../eventing/authz-grant.store.ts";
 import type { AuthzBraidLockRepository } from "../repositories/authz-braid-lock.repository.ts";
+import type {
+  AuthzBraidWrite,
+  AuthzBraidWriteRepository,
+} from "../repositories/authz-braid-write.repository.ts";
 import type { AuthzEpochRepository } from "../repositories/authz-epoch.repository.ts";
 import type {
   AuthzLedgerReadRepository,
@@ -46,8 +52,18 @@ const BRAID_CONFERRED_PERMISSIONS = ["traces:view"] as const;
 export const BRAID_REMOVED_REASON = "braid_removed";
 export const BRAID_CHANGED_REASON = "braid_changed";
 const NO_CONDITION_DIGEST = "none";
+/** How long a recorded write the grant projection has not landed still counts as being saved. */
+const IN_FLIGHT_WINDOW_MS = 60 * 60_000;
 
 type BraidTerms = { condition: GrantCondition; expiresAtMs: number | undefined; key: string };
+type BraidRequest = {
+  organizationId: string;
+  readerProjectId: string;
+  ownerProjectId: string;
+  terms: BraidTerms;
+  actor: LedgerActor;
+  commandId: string | undefined;
+};
 
 /**
  * ADR-201 §1-§2: a braid is a shared span grant from the owner project to the reader project.
@@ -57,12 +73,14 @@ type BraidTerms = { condition: GrantCondition; expiresAtMs: number | undefined; 
 export class AuthzBraidService {
   static create(deps: {
     ledger: Pick<EventingAuthzLedgerAdapter, "attachBraidGrant" | "revokeBindings">;
-    reads: Pick<AuthzLedgerReadRepository, "findBraids">;
+    reads: Pick<AuthzLedgerReadRepository, "findBraids" | "findStoredGrantIds">;
     lineage: Pick<ScopeLineageRepository, "findProjectLineage">;
     locks: AuthzBraidLockRepository;
+    writes: AuthzBraidWriteRepository;
     epoch: Pick<AuthzEpochRepository, "bump">;
     permissions: Pick<AuthzGrantWriterPermissions, "findPermissionsBeyondCaller">;
     now?: () => number;
+    newGrantId?: () => string;
   }): AuthzBraidService {
     return new AuthzBraidService(deps);
   }
@@ -92,21 +110,24 @@ export class AuthzBraidService {
   }
 
   async createBraid(input: AuthzCreateBraidInput): Promise<AuthzBraid> {
-    const { projectId: ownerProjectId, readerProjectId, actor, caller } = input;
+    const { projectId: ownerProjectId, readerProjectId, actor, caller, commandId } = input;
     const terms = this.termsOf({ ownerProjectId, input });
     const organizationId = await this.organizationOfPair({ ownerProjectId, readerProjectId });
     await this.assertWithinCaller({ organizationId, caller, ownerProjectId });
+    const request = { organizationId, readerProjectId, ownerProjectId, terms, actor, commandId };
 
     return this.deps.locks.withReaderLock({
       readerProjectId,
       write: async () => {
+        const [recorded] = await this.recordedWriteOf({ organizationId, commandId });
+        if (recorded) return this.answerRepeat({ recorded, request });
         const live = withoutReplaced(
           await this.liveIntoReader({ organizationId, readerProjectId }),
         );
         const identical = live.find((row) => keyOf(row) === terms.key);
         if (identical) throw new BraidAlreadyExistsError({ braidId: identical.grantId });
         assertWithinConditionLimit({ live, readerProjectId, terms });
-        return this.attach({ organizationId, readerProjectId, ownerProjectId, terms, actor });
+        return this.attach(request);
       },
     });
   }
@@ -116,40 +137,47 @@ export class AuthzBraidService {
    * The worker revokes the old once the attach lands (ADR-201 §2), so the lock is not held for it.
    */
   async changeBraid(input: AuthzChangeBraidInput): Promise<AuthzBraid> {
-    const { projectId: ownerProjectId, readerProjectId, braidId, actor, caller } = input;
+    const { projectId: ownerProjectId, readerProjectId, braidId, actor, caller, commandId } = input;
     const terms = this.termsOf({ ownerProjectId, input });
     const organizationId = await this.organizationOfPair({ ownerProjectId, readerProjectId });
     await this.assertWithinCaller({ organizationId, caller, ownerProjectId });
+    const request = { organizationId, readerProjectId, ownerProjectId, terms, actor, commandId };
 
     return this.deps.locks.withReaderLock({
       readerProjectId,
       write: async () => {
-        const live = await this.liveIntoReader({ organizationId, readerProjectId });
-        const old = live.find((row) => row.grantId === braidId);
-        if (!old) return this.refuseGone({ organizationId, braidId });
-        if (old.ownerProjectId !== ownerProjectId) {
-          throw new BraidNotOnProjectError({ braidId, projectId: ownerProjectId });
-        }
-        // Changed already, its revoke still the worker's: a repeat answers that change.
-        const replacement = live.find((row) => row.replacesGrantId === braidId);
-        if (replacement && keyOf(replacement) === terms.key) return braidOf(replacement);
-        if (replacement) throw new BraidChangedError({ braidId });
-        if (old.isReplaced) return this.refuseGone({ organizationId, braidId });
-        if (keyOf(old) === terms.key) return braidOf(old);
-        const others = withoutReplaced(live).filter((row) => row.grantId !== braidId);
-        const identical = others.find((row) => keyOf(row) === terms.key);
-        if (identical) throw new BraidAlreadyExistsError({ braidId: identical.grantId });
-        assertWithinConditionLimit({ live: others, readerProjectId, terms });
-        return this.attach({
-          organizationId,
-          readerProjectId,
-          ownerProjectId,
-          terms,
-          actor,
-          replacesGrantId: braidId,
-        });
+        const [recorded] = await this.recordedWriteOf({ organizationId, commandId });
+        if (recorded) return this.answerRepeat({ recorded, request, replacesGrantId: braidId });
+        return this.changeUnderLock({ request, braidId });
       },
     });
+  }
+
+  private async changeUnderLock({
+    request,
+    braidId,
+  }: {
+    request: BraidRequest;
+    braidId: string;
+  }): Promise<AuthzBraid> {
+    const { organizationId, readerProjectId, ownerProjectId, terms } = request;
+    const live = await this.liveIntoReader({ organizationId, readerProjectId });
+    const old = live.find((row) => row.grantId === braidId);
+    if (!old) return this.refuseGone({ organizationId, braidId });
+    if (old.ownerProjectId !== ownerProjectId) {
+      throw new BraidNotOnProjectError({ braidId, projectId: ownerProjectId });
+    }
+    // Changed already, its revoke still the worker's: a repeat answers that change.
+    const replacement = live.find((row) => row.replacesGrantId === braidId);
+    if (replacement && keyOf(replacement) === terms.key) return braidOf(replacement);
+    if (replacement) throw new BraidChangedError({ braidId });
+    if (old.isReplaced) return this.refuseGone({ organizationId, braidId });
+    if (keyOf(old) === terms.key) return braidOf(old);
+    const others = withoutReplaced(live).filter((row) => row.grantId !== braidId);
+    const identical = others.find((row) => keyOf(row) === terms.key);
+    if (identical) throw new BraidAlreadyExistsError({ braidId: identical.grantId });
+    assertWithinConditionLimit({ live: others, readerProjectId, terms });
+    return this.attach({ ...request, replacesGrantId: braidId });
   }
 
   /**
@@ -271,7 +299,7 @@ export class AuthzBraidService {
     const text = (input.where ?? "").trim();
     const compiled = compileBraidCondition({ text });
     if (!compiled.ok) throw new BraidConditionRefusedError({ refusal: compiled });
-    const now = this.deps.now?.() ?? nowInstant().epochMilliseconds;
+    const now = this.nowMs();
     if (input.expiresAtMs !== undefined && input.expiresAtMs <= now) {
       throw new GrantExpiryInPastError({ expiresAtMs: input.expiresAtMs });
     }
@@ -341,6 +369,7 @@ export class AuthzBraidService {
     if (missing.length > 0) throw new GrantExceedsCallerPermissionsError(missing);
   }
 
+  /** The reader's live braids, with the writes recorded but not yet projected (ADR-201 §1). */
   private async liveIntoReader({
     organizationId,
     readerProjectId,
@@ -348,46 +377,161 @@ export class AuthzBraidService {
     organizationId: string;
     readerProjectId: string;
   }): Promise<LedgerBraidRow[]> {
+    // Writes and stored ids first, projection last: a write landing in between is in the rows.
+    const recent = await this.deps.writes.findIntoReaderSince({
+      organizationId,
+      readerProjectId,
+      since: Temporal.Instant.fromEpochMilliseconds(this.nowMs() - IN_FLIGHT_WINDOW_MS),
+    });
+    const stored = new Set(
+      recent.length === 0
+        ? []
+        : await this.deps.reads.findStoredGrantIds({
+            organizationId,
+            grantIds: recent.map((write) => write.grantId),
+          }),
+    );
     const rows = await this.deps.reads.findBraids({ organizationId, projectId: readerProjectId });
-    return rows.filter((row) => row.readerProjectId === readerProjectId);
+    const projected = rows.filter((row) => row.readerProjectId === readerProjectId);
+    return [...projected, ...recent.filter((write) => !stored.has(write.grantId)).map(rowOfWrite)];
   }
 
+  private async recordedWriteOf({
+    organizationId,
+    commandId,
+  }: {
+    organizationId: string;
+    commandId: string | undefined;
+  }): Promise<AuthzBraidWrite[]> {
+    if (commandId === undefined) return [];
+    return this.deps.writes.findByCommand({
+      organizationId,
+      commandId: ledgerCommandIdOf(commandId),
+    });
+  }
+
+  /**
+   * A command id already sent answers its braid: the projected row once landed, else the same
+   * command resent (the ledger keeps one fact) and awaited. Other terms under it are refused.
+   */
+  private async answerRepeat({
+    recorded,
+    request,
+    replacesGrantId,
+  }: {
+    recorded: AuthzBraidWrite;
+    request: BraidRequest;
+    replacesGrantId?: string;
+  }): Promise<AuthzBraid> {
+    const { organizationId } = request;
+    const recordedRequest = [
+      recorded.readerProjectId,
+      recorded.ownerProjectId,
+      recorded.termsKey,
+      recorded.replacesGrantId,
+    ];
+    const thisRequest = [
+      request.readerProjectId,
+      request.ownerProjectId,
+      request.terms.key,
+      replacesGrantId ?? null,
+    ];
+    if (JSON.stringify(recordedRequest) !== JSON.stringify(thisRequest)) {
+      throw new GrantValidationError("This command id was already used for another braid", {
+        commandId: request.commandId,
+      });
+    }
+    const [row] = await this.deps.reads.findBraids({
+      organizationId,
+      grantId: recorded.grantId,
+      includeRevoked: true,
+    });
+    if (row && !row.isLive) return this.refuseGone({ organizationId, braidId: row.grantId });
+    if (row) return braidOf(row);
+    await this.send({ write: recorded, actor: request.actor });
+    return braidOf(rowOfWrite(recorded));
+  }
+
+  /** Records the write before its command, so a retry or a twin sees it while it is in flight. */
   private async attach({
     organizationId,
     readerProjectId,
     ownerProjectId,
     terms,
     actor,
+    commandId,
     replacesGrantId,
-  }: {
-    organizationId: string;
-    readerProjectId: string;
-    ownerProjectId: string;
-    terms: BraidTerms;
-    actor: LedgerActor;
-    replacesGrantId?: string;
-  }): Promise<AuthzBraid> {
-    const { grantId } = await this.deps.ledger.attachBraidGrant({
+  }: BraidRequest & { replacesGrantId?: string }): Promise<AuthzBraid> {
+    const grantId = this.deps.newGrantId?.() ?? newAuthzGrantId();
+    const write: AuthzBraidWrite = {
       organizationId,
+      commandId: commandId === undefined ? `braid:${grantId}` : ledgerCommandIdOf(commandId),
+      grantId,
       readerProjectId,
       ownerProjectId,
+      termsKey: terms.key,
       condition: terms.condition,
-      ...(terms.expiresAtMs === undefined ? {} : { expiresAtMs: terms.expiresAtMs }),
-      ...(replacesGrantId === undefined ? {} : { replacesGrantId }),
-      actor,
-    });
-    const now = this.deps.now?.() ?? nowInstant().epochMilliseconds;
-    return {
-      braidId: grantId,
-      ownerProjectId,
-      readerProjectId,
-      where: terms.condition.where ?? null,
-      fromMs: msOf(terms.condition.from),
-      expiresAtMs: terms.expiresAtMs ?? null,
+      expiresAt:
+        terms.expiresAtMs === undefined
+          ? null
+          : Temporal.Instant.fromEpochMilliseconds(terms.expiresAtMs),
+      replacesGrantId: replacesGrantId ?? null,
       createdByUserId: actor.type === "user" ? actor.id : null,
-      createdAtMs: now,
+      createdAt: Temporal.Instant.fromEpochMilliseconds(this.nowMs()),
     };
+    await this.deps.writes.create({ write });
+    try {
+      await this.send({ write, actor });
+    } catch (error) {
+      // Unconfirmed may still land, so it stays in flight; any other refusal never will.
+      if (!(error instanceof AuthzGrantNotConfirmedError)) {
+        await this.deps.writes.delete({ organizationId, commandId: write.commandId });
+      }
+      throw error;
+    }
+    return braidOf(rowOfWrite(write));
   }
+
+  private async send({ write, actor }: { write: AuthzBraidWrite; actor: LedgerActor }) {
+    await this.deps.ledger.attachBraidGrant({
+      organizationId: write.organizationId,
+      readerProjectId: write.readerProjectId,
+      ownerProjectId: write.ownerProjectId,
+      condition: write.condition,
+      ...(write.expiresAt === null ? {} : { expiresAtMs: write.expiresAt.epochMilliseconds }),
+      ...(write.replacesGrantId === null ? {} : { replacesGrantId: write.replacesGrantId }),
+      actor,
+      grantId: write.grantId,
+      commandId: write.commandId,
+      occurredAtMs: write.createdAt.epochMilliseconds,
+    });
+  }
+
+  private nowMs(): number {
+    return this.deps.now?.() ?? nowInstant().epochMilliseconds;
+  }
+}
+
+/** A client's command id in the ledger's namespace of braid commands, apart from every other. */
+function ledgerCommandIdOf(commandId: string): string {
+  return `braid:cmd:${commandId}`;
+}
+
+/** A recorded write the grant projection has not landed, read as the live braid it will be. */
+function rowOfWrite(write: AuthzBraidWrite): LedgerBraidRow {
+  return {
+    grantId: write.grantId,
+    ownerProjectId: write.ownerProjectId,
+    readerProjectId: write.readerProjectId,
+    condition: write.condition,
+    expiresAt: write.expiresAt,
+    createdByUserId: write.createdByUserId,
+    occurredAt: write.createdAt,
+    revokedReason: null,
+    isLive: true,
+    replacesGrantId: write.replacesGrantId,
+    isReplaced: false,
+  };
 }
 
 /** A live grant a change replaced is on its way out, even once its replacement is removed: it

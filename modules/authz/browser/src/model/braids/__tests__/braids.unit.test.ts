@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 import {
   braidAffordances,
   braidAuditHref,
+  braidRowActionsLabel,
   braidProject,
   braidsPlanState,
   braidsSigningKeysHref,
@@ -184,5 +185,34 @@ describe("when two braids on one pair start the same day", () => {
         projects: [],
       }).map((row) => row.fromShowsTime),
     ).toEqual([true, true]);
+  });
+});
+
+describe("braidRowActionsLabel", () => {
+  const row = {
+    braidId: "b-1",
+    side: "into" as const,
+    otherProject: { id: "p-orch", name: "orchestrator" },
+    where: 'attributes["orchestrator"] == "web"',
+    fromMs: Date.UTC(2026, 10, 18, 9, 5),
+    fromShowsTime: false,
+    expiresAtMs: null,
+    createdAtMs: 0,
+  };
+
+  /** @scenario Each braid row shows where it goes, its condition, its access and its activity */
+  it("names each row's menu by its reader, condition and start, so no two read alike", () => {
+    const labels = [
+      row,
+      { ...row, braidId: "b-2", where: 'attributes["orchestrator"] == "cli"' },
+      { ...row, braidId: "b-3", fromMs: Date.UTC(2026, 10, 18, 10, 0) },
+      { ...row, braidId: "b-4", where: null },
+    ].map(braidRowActionsLabel);
+
+    expect(labels[0]).toBe(
+      'Actions for the braid into orchestrator, attributes["orchestrator"] == "web", from 2026-11-18 09:05 UTC',
+    );
+    expect(labels[3]).toContain("every span");
+    expect(new Set(labels).size).toBe(labels.length);
   });
 });

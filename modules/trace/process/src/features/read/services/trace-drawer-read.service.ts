@@ -11,6 +11,7 @@ import {
   type OwnedSpan,
   type Span,
   type SpanDetail,
+  type SpanLangwatchSignals,
   type SpanTreeDeltaInput,
   type SpanTreeInput,
   type SpanTreeNode,
@@ -38,6 +39,7 @@ import {
   resourceInfoOf,
 } from "../../../rules/trace-view-gates.rules.ts";
 import {
+  ownerAudienceNamed,
   protectByOwner,
   readsBraidedSpans,
   verifiedMarksOf,
@@ -63,6 +65,7 @@ type TraceDrawerReads = Pick<
   | "readSpanResources"
   | "readSpansWithResources"
   | "readTraceEvents"
+  | "readLangwatchSignals"
 >;
 
 type StoredSpans = Awaited<ReturnType<TraceDrawerReads["readSpans"]>>;
@@ -356,6 +359,25 @@ export class TraceDrawerReadService {
     });
   }
 
+  /**
+   * Each span's LangWatch signal buckets, opened as the span tree is: the trace's member, its
+   * withholding asked first. Buckets name attribute prefixes, never content, so no owner redacts.
+   */
+  async langwatchSignals(input: TraceDrawerReadInput): Promise<SpanLangwatchSignals[]> {
+    const { authorization } = await this.#open(input);
+    const rows = await this.deps.reads.readLangwatchSignals({
+      authorization,
+      traceId: input.traceId,
+      occurredAtMs: input.occurredAtMs,
+      reads: "spans",
+    });
+    return rows.map((row) => ({
+      spanId: row.spanId,
+      signals: row.signals,
+      ...(row.ownerProjectId === undefined ? {} : { ownerProjectId: row.ownerProjectId }),
+    }));
+  }
+
   /** Each braid owner's protections for this viewer: its policy, the viewer's standing there. */
   async ownerProtections({
     viewerUserId,
@@ -368,13 +390,24 @@ export class TraceDrawerReadService {
     const resolved = await Promise.all(
       owners.map(
         async (projectId) =>
-          [
-            projectId,
-            await this.deps.reads.resolveViewerProtections({ projectId, userId: viewerUserId }),
-          ] as const,
+          [projectId, await this.#ownerProtectionsOf({ projectId, viewerUserId })] as const,
       ),
     );
     return new Map(resolved);
+  }
+
+  async #ownerProtectionsOf({
+    projectId,
+    viewerUserId,
+  }: {
+    projectId: string;
+    viewerUserId: string;
+  }): Promise<Protections> {
+    const [protections, ownerName] = await Promise.all([
+      this.deps.reads.resolveViewerProtections({ projectId, userId: viewerUserId }),
+      this.deps.braids.ownerName({ ownerProjectId: projectId }),
+    ]);
+    return ownerAudienceNamed({ protections, ownerName });
   }
 
   async #open(input: TraceDrawerReadInput): Promise<OpenedTrace> {
