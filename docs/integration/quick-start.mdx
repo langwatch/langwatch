@@ -111,12 +111,15 @@ const nextConfig = {
 
 module.exports = nextConfig;
 
-// ./src/instrumentation.ts - Configure LangWatch export
-// Reads LANGWATCH_API_KEY from the environment.
+// ./src/instrumentation.node.ts - Configure LangWatch export (reads LANGWATCH_API_KEY)
+import { setupObservability } from "langwatch/observability/node";
+
+setupObservability({ serviceName: "your-app-name" }); // Give your service a clear name
+
+// ./src/instrumentation.ts - Load it on the Node.js runtime only
 export async function register() {
   if (process.env.NEXT_RUNTIME === "nodejs") {
-    const { setupObservability } = await import("langwatch/observability/node");
-    setupObservability({ serviceName: "your-app-name" }); // Give your service a clear name
+    await import("./instrumentation.node");
   }
 }
 
