@@ -209,6 +209,29 @@ describe("BillingLifecycleAnnouncerService", () => {
       expect(changed).toEqual([]);
     });
 
+    it("says no subscription and free when only a failed or pending row exists", async () => {
+      // findLastNonCancelled would return such a row; findActive does not.
+      const { service, changed } = announcerOver({ remaining: false });
+
+      await service.customerIoPlanCaughtUp({ organizationId: "org-1" });
+
+      expect(changed).toEqual([expect.objectContaining({ hasSubscription: false, plan: "FREE" })]);
+    });
+
+    it("throws on a dry run too when its senders are not connected", async () => {
+      const service = BillingLifecycleAnnouncerService.create({
+        subscriptions: { findLastNonCancelled: async () => null, findActive: async () => null },
+        organizations: { findActiveMemberIds: async () => ["user-1"] },
+        resourceLimitAlerts: { notifyResourceLimitReached: async () => {} },
+        planLimitAlerts: { notifyPlanLimitReached: async () => {} },
+        billingOrganizations: { getOrganizationForBilling: async () => billedLookup },
+      });
+
+      await expect(
+        service.customerIoPlanCaughtUp({ organizationId: "org-1", isDryRun: true }),
+      ).rejects.toThrow("not connected");
+    });
+
     it("throws when its senders are not connected, so the step stops where it failed", async () => {
       const service = BillingLifecycleAnnouncerService.create({
         subscriptions: { findLastNonCancelled: async () => null, findActive: async () => null },

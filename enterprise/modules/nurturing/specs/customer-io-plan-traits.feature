@@ -152,7 +152,7 @@ Feature: Customer.io knows each team's real plan
     When the resync runs
     Then the empty organization is counted as skipped
     And the run stops between organizations
-    And a resumed run starts after the last completed page
+    And a re-run starts from the start
 
   @unit
   Scenario: No request carries more than a hundred members

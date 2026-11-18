@@ -13,6 +13,8 @@ const logger = createLogger("langwatch:task:customer-io-plan-resync");
 export type CustomerIoPlanResyncReport = CustomerIoPlanResyncTotals & {
   afterOrganizationId: string | null;
   dryRun: boolean;
+  /** True when the signal stopped the run, so the totals are partial. */
+  aborted: boolean;
 };
 
 export type CustomerIoPlanResyncOutcome = {
@@ -39,14 +41,14 @@ export async function runCustomerIoPlanResync({
   const resync = CustomerIoPlanResyncService.create({ peers });
   const run = async (dryRun: boolean): Promise<CustomerIoPlanResyncReport> => {
     const totals = await resync.resync({
-      // No resume: a re-run records every organization again; nurturing sends only what changed.
+      // No resume: a re-run records every organization again; each catch-up is stamped fresh, so a re-run re-sends every organization (same values: safe, not free).
       after: undefined,
       dryRun,
       signal,
       onPage: async ({ afterOrganizationId }) =>
         logger.info({ afterOrganizationId }, "Recorded a page of organizations"),
     });
-    return { ...totals, dryRun };
+    return { ...totals, dryRun, aborted: signal.aborted };
   };
 
   const dryRunReport = await run(true);

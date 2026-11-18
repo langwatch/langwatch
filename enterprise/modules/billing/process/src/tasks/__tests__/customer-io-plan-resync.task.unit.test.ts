@@ -60,7 +60,7 @@ describe("runCustomerIoPlanResync", () => {
       expect(caughtUp).toHaveLength(ORGANIZATIONS.length);
       expect(caughtUp.every(({ isDryRun }) => isDryRun)).toBe(true);
       expect(outcome).toEqual({
-        dryRun: { ...TOTALS, factsRecorded: 0, dryRun: true },
+        dryRun: { ...TOTALS, factsRecorded: 0, dryRun: true, aborted: false },
         executed: null,
       });
     });
@@ -78,8 +78,8 @@ describe("runCustomerIoPlanResync", () => {
         ...ORGANIZATIONS.map((organizationId) => ({ organizationId, isDryRun: false })),
       ]);
       expect(outcome).toEqual({
-        dryRun: { ...TOTALS, factsRecorded: 0, dryRun: true },
-        executed: { ...TOTALS, factsRecorded: 2, dryRun: false },
+        dryRun: { ...TOTALS, factsRecorded: 0, dryRun: true, aborted: false },
+        executed: { ...TOTALS, factsRecorded: 2, dryRun: false, aborted: false },
       });
     });
 

@@ -337,22 +337,21 @@ export class BillingLifecycleAnnouncerService {
     organizationId: string;
     isDryRun?: boolean;
   }): Promise<{ members: number }> {
-    const commands = isDryRun ? undefined : this.#connected();
+    // Connected up front so a dry run fails exactly where --execute would.
+    const commands = this.#connected();
     const occurredAt = (this.deps.now ?? nowInstant)().epochMilliseconds;
     const memberUserIds = await this.deps.organizations.findActiveMemberIds(organizationId);
     const members = memberUserIds.length;
-    if (members === 0 || !commands) return { members };
-    const [plan, lastNonCancelled] = await Promise.all([
-      this.#activePlanOf(organizationId),
-      this.deps.subscriptions.findLastNonCancelled(organizationId),
-    ]);
+    if (members === 0 || isDryRun) return { members };
+    // One findActive read feeds both fields, so plan and hasSubscription cannot disagree.
+    const active = await this.deps.subscriptions.findActive(organizationId);
     await commands.recordSubscriptionChanged.send({
       tenantId: organizationId,
       occurredAt,
       organizationId,
       memberUserIds,
-      hasSubscription: lastNonCancelled != null,
-      plan,
+      hasSubscription: active != null,
+      plan: activePlanOf({ active }),
       fromCatchUp: true,
     });
     return { members };
