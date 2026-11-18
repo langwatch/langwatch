@@ -688,7 +688,7 @@ Feature: Agent kill switch: stop a misbehaving agent where it runs, with approva
     Given a stop of "support-bot" that is quarantined and a stop of "pricing-bot" pending approval
     When a person with governance:view opens the Agents page
     Then "support-bot" shows the status "Quarantined" with a Restore action
-    And an approval card for "pricing-bot" offers Approve and Deny
+    And an approval card lists "pricing-bot" without Approve or Deny, which need governance:manage
 
   @integration
   Scenario: A failing stop read shows its error and offers no action on the stop state it lacks
