@@ -59,7 +59,9 @@ An AWS connection that a stop plan target, or a stop that is not restored yet, s
 
 Each target is retried with backoff before it is recorded as failed. A failed target carries an error code such as `http_403` or `AccessDeniedException`. Restore reverts only the targets that were applied, so a key that failed to disable is not enabled by a restore.
 
-A deleted resource counts as done once the stop has reached it. When Databricks answers `404` or Bedrock answers `ResourceNotFoundException` for a target the stop already changed, the target is recorded as applied on a stop and as reverted on a restore, with `gone: true` in the stop, the audit row and the webhook body. A not-found on the stop's first call to a target usually means a wrong region, account or id, so the target is recorded failed with code `target_not_found` and the stop ends `stop_failed`.
+A deleted resource counts as done once the stop has reached it. When Databricks answers `404` or Bedrock answers `ResourceNotFoundException` for a target the stop already changed, the target is recorded as applied on a stop and as reverted on a restore, with `gone: true` in the stop, the audit row and the webhook body.
+
+A not-found on the stop's first call to a target usually means a wrong region, account or id, so the target is recorded failed with code `target_not_found` and the stop ends `stop_failed`.
 
 ## Retry a stop
 
