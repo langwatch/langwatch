@@ -184,6 +184,15 @@ describe("hasInstantEvalChipUnderOr", () => {
     expect(hasInstantEvalChipUnderOr({ queryText, field: "eval", question: "b" })).toBe(false);
     expect(hasInstantEvalChipUnderOr({ queryText, field: "eval", question: "a" })).toBe(true);
   });
+
+  /** @scenario "A chip typed by hand starts its run on Enter" */
+  it("counts a NOT over a group with other terms as an OR, but not a NOT on the chip alone", () => {
+    const under = (queryText: string) =>
+      hasInstantEvalChipUnderOr({ queryText, field: "eval", question: "the user" });
+    expect(under('NOT (eval:"the user" AND status:error)')).toBe(true);
+    expect(under('NOT (status:error AND (eval:"the  user"))')).toBe(true);
+    expect(under('status:error AND NOT (eval:"the user")')).toBe(false);
+  });
 });
 
 describe("resolveInstantEvalChips", () => {
