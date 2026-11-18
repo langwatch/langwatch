@@ -356,6 +356,13 @@ Feature: The Braids screen
       And Retry reads the setting again
 
     @integration
+    Scenario: The Enable Braids row shows no switch until the setting is read
+      Given reading the organisation's Braids settings has not answered yet
+      When ana opens Braids in the organisation settings
+      Then the Enable Braids row shows a placeholder where the switch goes
+      And there is no switch, on or off, until the setting answers
+
+    @integration
     Scenario: Below Enterprise the organisation Braids page offers the upsell instead of the switch
       Given an organisation below Enterprise
       When ana opens Braids in the organisation settings

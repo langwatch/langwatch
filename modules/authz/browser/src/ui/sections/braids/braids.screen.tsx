@@ -28,6 +28,7 @@ import {
   type BraidsPlanState,
   type BraidsSection,
   braidAffordances,
+  braidsPausedBy,
   braidsPauses,
   braidsPlanState,
   braidsSectionOf,
@@ -233,7 +234,12 @@ function BraidsNotices({
   if (released && !turnedOff && !paused && !keptToAdmins) return null;
   return (
     <Stack gap={4} paddingBottom={4}>
-      {released ? null : <BraidsNotEnabledBanner removeHere paused={turnedOff} />}
+      {released ? null : (
+        <BraidsNotEnabledBanner
+          removeHere
+          pausedBy={braidsPausedBy({ byOrganization: turnedOff, byPlan: paused })}
+        />
+      )}
       {released && turnedOff ? (
         <TurnedOffBanner total={total} isOrganizationAdmin={isOrganizationAdmin} />
       ) : null}
@@ -365,7 +371,7 @@ export default function BraidsScreen() {
     released,
     turnedOn: !turnedOff,
   });
-  const pauses = braidsPauses({ released, planState, turnedOff });
+  const pauses = braidsPauses({ planState, turnedOff });
   const paused = pauses.byPlan;
   const pausedByOrganization = pauses.byOrganization;
   const seesOrganization = host.hasPermission(AUTHZ_MANAGE_PERMISSION);

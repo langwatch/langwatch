@@ -16,6 +16,8 @@ export type BraidsApiState = {
   braidsEnabled: boolean;
   /** When set, reading the organisation's settings fails. */
   policyFails: boolean;
+  /** When set, reading the organisation's settings has not answered yet. */
+  policyLoading: boolean;
   policyRefetch: Mock<() => void>;
   remove: Mock<(input: unknown) => void>;
   setPolicy: Mock<(input: unknown) => void>;
@@ -60,6 +62,7 @@ export function braidsApiFake() {
     keptToAdmins: false,
     braidsEnabled: true,
     policyFails: false,
+    policyLoading: false,
     policyRefetch: vi.fn(),
     remove: vi.fn(),
     setPolicy: vi.fn(),
@@ -122,9 +125,12 @@ export function braidsApiFake() {
       listBraids: query(() => state.project),
       listOrganizationBraids: query(() => state.organization),
       getBraidsPolicy: {
-        useQuery: () =>
-          state.policyFails
-            ? { data: undefined, isLoading: false, isError: true, refetch: state.policyRefetch }
+        useQuery: () => {
+          const refetch = state.policyRefetch;
+          if (state.policyLoading)
+            return { data: undefined, isLoading: true, isError: false, refetch };
+          return state.policyFails
+            ? { data: undefined, isLoading: false, isError: true, refetch }
             : {
                 data: {
                   organizationId: "org-1",
@@ -135,8 +141,9 @@ export function braidsApiFake() {
                 },
                 isLoading: false,
                 isError: false,
-                refetch: state.policyRefetch,
-              },
+                refetch,
+              };
+        },
       },
       removeBraid: mutation(
         () => state.remove,

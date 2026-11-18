@@ -189,7 +189,7 @@ describe("braided spans and the organisation's plan", () => {
         expect(readsBraidedSpans(await open(braided()))).toBe(true);
 
         settings.braidsEnabled = false;
-        // The answer lives no longer than the asking proof, itself within the 30 s proof bound.
+        // The answer lives no longer than the proof that asked; this fixture's proof lasts 5 min.
         expect(readsBraidedSpans(await open(braided()))).toBe(true);
         expect(settings.asked).toBe(1);
 

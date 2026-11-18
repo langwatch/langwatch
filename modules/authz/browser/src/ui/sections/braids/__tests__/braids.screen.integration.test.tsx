@@ -66,6 +66,7 @@ beforeEach(() => {
   state.keptToAdmins = false;
   state.braidsEnabled = true;
   state.policyFails = false;
+  state.policyLoading = false;
   state.remove.mockClear();
 });
 
@@ -421,6 +422,28 @@ describe("BraidsScreen", () => {
       const row = within(screen.getByTestId("braids-section-into")).getByTestId("braid-row");
       expect(within(row).getByTestId("braid-paused")).toBeInTheDocument();
     });
+
+    describe.each([
+      { setting: "on", braidsEnabled: true, resumes: /when you upgrade\./ },
+      { setting: "off", braidsEnabled: false, resumes: /an organisation admin turns Braids on/ },
+    ])(
+      "and the organisation is below Enterprise with Braids $setting",
+      ({ braidsEnabled, resumes }) => {
+        /** @scenario With release_braids off below Enterprise the pages say the braids are paused by the plan */
+        it("says the braids are paused by the plan, not applying, and marks each paused", () => {
+          braidsFake.state.braidsEnabled = braidsEnabled;
+          braidsFake.state.project = { intoOtherProjects: [liveBraid()], fromOtherProjects: [] };
+          renderAs({ isEnterprise: false, braidsReleased: false });
+
+          const notice = screen.getByTestId("braids-not-enabled");
+          expect(notice).toHaveTextContent(/paused and kept, since they need the Enterprise plan/);
+          expect(notice).not.toHaveTextContent(/still apply/);
+          expect(screen.getByTestId("braids-plan-paused")).toHaveTextContent(resumes);
+          const row = within(screen.getByTestId("braids-section-into")).getByTestId("braid-row");
+          expect(within(row).getByTestId("braid-paused")).toBeInTheDocument();
+        });
+      },
+    );
   });
 
   describe("given the organisation has Braids turned off", () => {

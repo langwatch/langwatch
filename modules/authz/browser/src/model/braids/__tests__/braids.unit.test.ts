@@ -7,6 +7,8 @@ import {
   braidAuditHref,
   braidRowActionsLabel,
   braidProject,
+  braidsPausedBy,
+  braidsPauses,
   braidsPlanState,
   braidsSigningKeysHref,
   braidsSectionOf,
@@ -60,6 +62,26 @@ describe("plan state", () => {
     expect(braidsPlanState({ isEnterprise: true, braidCount: 0 })).toBe("enterprise");
     expect(braidsPlanState({ isEnterprise: false, braidCount: 0 })).toBe("upsell");
     expect(braidsPlanState({ isEnterprise: false, braidCount: 2 })).toBe("paused");
+  });
+
+  /** @scenario With release_braids off below Enterprise the pages say the braids are paused by the plan */
+  it("pauses kept braids by the plan whatever the organisation's setting", () => {
+    for (const turnedOff of [false, true]) {
+      expect(braidsPauses({ planState: "paused", turnedOff })).toEqual({
+        byPlan: true,
+        byOrganization: false,
+      });
+    }
+    expect(braidsPausedBy({ byPlan: true, byOrganization: false })).toBe("plan");
+  });
+
+  it("pauses an Enterprise organisation's braids only when its setting is off", () => {
+    expect(braidsPauses({ planState: "enterprise", turnedOff: true })).toEqual({
+      byPlan: false,
+      byOrganization: true,
+    });
+    expect(braidsPausedBy({ byPlan: false, byOrganization: true })).toBe("organization");
+    expect(braidsPausedBy({ byPlan: false, byOrganization: false })).toBeUndefined();
   });
 });
 

@@ -156,20 +156,34 @@ export function braidsPlanState({
   return braidCount > 0 ? "paused" : "upsell";
 }
 
-/** Why the page's braids are paused: the plan, or the organisation's Braids setting turned off. */
+/**
+ * Why the page's braids are paused: the plan, or the organisation's Braids setting turned off.
+ * The plan pauses them with `release_braids` on or off: trace reads never honour a braid below
+ * Enterprise (trace-braid-pause.service.ts).
+ */
 export function braidsPauses({
-  released,
   planState,
   turnedOff,
 }: {
-  released: boolean;
   planState: BraidsPlanState;
   turnedOff: boolean;
 }): { byPlan: boolean; byOrganization: boolean } {
   return {
-    byPlan: released && planState === "paused",
+    byPlan: planState === "paused",
     byOrganization: turnedOff && planState === "enterprise",
   };
+}
+
+/** What the not-enabled notice names as pausing the braids; the setting before the plan. */
+export function braidsPausedBy({
+  byPlan,
+  byOrganization,
+}: {
+  byPlan: boolean;
+  byOrganization: boolean;
+}): "organization" | "plan" | undefined {
+  if (byOrganization) return "organization";
+  return byPlan ? "plan" : undefined;
 }
 
 export type BraidAffordances = {

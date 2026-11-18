@@ -21,7 +21,13 @@ import {
   useSetBraidsPolicy,
 } from "../../../behavior/use-braids.ts";
 import { useAuthzHost } from "../../../model/authz-host.ts";
-import { BRAIDS_GUIDE_HREF, organizationBraidRows } from "../../../model/braids/braids.ts";
+import {
+  BRAIDS_GUIDE_HREF,
+  braidsPausedBy,
+  braidsPauses,
+  braidsPlanState,
+  organizationBraidRows,
+} from "../../../model/braids/braids.ts";
 import { OrganizationBraidsTable } from "../../blocks/braids/organization-braids-table.tsx";
 import { BraidsNotEnabledBanner } from "../../elements/braids-not-enabled-banner.tsx";
 import { BraidsPageLinks } from "../../elements/braids-page-links.tsx";
@@ -68,10 +74,18 @@ function EnableBraids({
   } else if (isEnterprise) {
     hint =
       "Turn it on and projects can braid. Turning it off pauses every braid and keeps it: the spans stop showing within 30 seconds and come back when you turn Braids on again.";
-    control = (
+    // Until the setting answers there is no state to show, so a placeholder, not a guess.
+    control = isReading ? (
+      <Skeleton
+        height="20px"
+        width="36px"
+        borderRadius="full"
+        data-testid="braids-enabled-loading"
+      />
+    ) : (
       <Switch
         checked={enabled}
-        disabled={isReading || setting.isSaving}
+        disabled={setting.isSaving}
         onCheckedChange={({ checked }) => setting.set(checked)}
         inputProps={{ "aria-label": ENABLE_BRAIDS }}
         data-testid="braids-enabled-switch"
@@ -203,17 +217,25 @@ export default function OrganizationBraidsScreen() {
     braids: braids.data ?? [],
     projects: host.organizationStructure().projects,
   });
-  const paused = released && !isEnterprise && rows.length > 0;
   // Known off, never assumed: the setting pauses braids on Enterprise, released or not.
-  const turnedOff = isEnterprise && policy.data?.braidsEnabled === false;
+  const { byPlan: paused, byOrganization: turnedOff } = braidsPauses({
+    planState: braidsPlanState({ isEnterprise, braidCount: rows.length }),
+    turnedOff: policy.data?.braidsEnabled === false,
+  });
+  // Unreleased, the row shows only to turn Braids off, or to say the setting couldn't be read.
+  const unread = policy.isError && !policy.data;
+  const showsSwitchRow = released || policy.data?.braidsEnabled === true || unread;
 
   return (
     <>
-      <OrganizationBraidsHeader locked={released && !isEnterprise} />
+      <OrganizationBraidsHeader locked={!isEnterprise && (released || paused)} />
       <Stack gap={0} css={NO_RULE_UNDER_HEADER}>
         {released ? null : (
           <Box paddingBottom={4}>
-            <BraidsNotEnabledBanner removeHere={false} paused={turnedOff} />
+            <BraidsNotEnabledBanner
+              removeHere={false}
+              pausedBy={braidsPausedBy({ byOrganization: turnedOff, byPlan: paused })}
+            />
           </Box>
         )}
         {paused ? (
@@ -225,7 +247,7 @@ export default function OrganizationBraidsScreen() {
             />
           </Box>
         ) : null}
-        {released || policy.data?.braidsEnabled === true ? (
+        {showsSwitchRow ? (
           <EnableBraids
             organizationId={organizationId}
             isEnterprise={isEnterprise}

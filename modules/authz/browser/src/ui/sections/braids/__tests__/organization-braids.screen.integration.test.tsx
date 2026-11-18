@@ -41,6 +41,7 @@ beforeEach(() => {
   braidsFake.state.keptToAdmins = false;
   braidsFake.state.braidsEnabled = true;
   braidsFake.state.policyFails = false;
+  braidsFake.state.policyLoading = false;
   braidsFake.state.saveError = undefined;
   braidsFake.state.policyRefetch.mockClear();
   braidsFake.state.setPolicy.mockClear();
@@ -134,6 +135,17 @@ describe("OrganizationBraidsScreen", () => {
       expect(braidsFake.state.policyRefetch).toHaveBeenCalledOnce();
     });
 
+    /** @scenario The Enable Braids row shows no switch until the setting is read */
+    it("shows a placeholder and no switch while the setting is still loading", () => {
+      braidsFake.state.policyLoading = true;
+      renderAs();
+
+      const row = screen.getByTestId("braids-enabled-row");
+      expect(within(row).getByTestId("braids-enabled-loading")).toBeInTheDocument();
+      expect(screen.queryByRole("checkbox", { name: "Enable Braids" })).toBeNull();
+      expect(within(row).queryByRole("button", { name: "Retry" })).toBeNull();
+    });
+
     /** @scenario While Braids is off the organisation page lists its braids as paused */
     it("lists every braid marked paused", () => {
       braidsFake.state.braidsEnabled = false;
@@ -214,6 +226,41 @@ describe("OrganizationBraidsScreen", () => {
 
       expect(screen.queryByRole("checkbox", { name: "Enable Braids" })).toBeNull();
     });
+
+    /** @scenario With release_braids off the Enable Braids row offers Retry when the setting can't be read */
+    it("says the setting couldn't be read and offers Retry, with no switch", async () => {
+      braidsFake.state.policyFails = true;
+      renderAs({ braidsReleased: false });
+
+      const row = screen.getByTestId("braids-enabled-row");
+      expect(row).toHaveTextContent(/Couldn't read whether Braids is on/);
+      expect(screen.queryByRole("checkbox", { name: "Enable Braids" })).toBeNull();
+      await userEvent.setup().click(within(row).getByRole("button", { name: "Retry" }));
+      expect(braidsFake.state.policyRefetch).toHaveBeenCalledOnce();
+    });
+
+    describe.each([
+      { setting: "on", braidsEnabled: true, resumes: /when you upgrade\./ },
+      { setting: "off", braidsEnabled: false, resumes: /an organisation admin turns Braids on/ },
+    ])(
+      "and the organisation is below Enterprise with Braids $setting",
+      ({ braidsEnabled, resumes }) => {
+        /** @scenario With release_braids off below Enterprise the pages say the braids are paused by the plan */
+        it("says the braids are paused by the plan, not applying, and lists each paused", () => {
+          braidsFake.state.braidsEnabled = braidsEnabled;
+          renderAs({ isEnterprise: false, braidsReleased: false });
+
+          const notice = screen.getByTestId("braids-not-enabled");
+          expect(notice).toHaveTextContent(/paused and kept, since they need the Enterprise plan/);
+          expect(notice).not.toHaveTextContent(/still apply/);
+          expect(screen.getByTestId("braids-plan-paused")).toHaveTextContent(resumes);
+          expect(screen.getByTestId("braids-enterprise-badge")).toBeInTheDocument();
+          for (const row of screen.getAllByTestId("organization-braid-row")) {
+            expect(row).toHaveTextContent(/Paused · /);
+          }
+        });
+      },
+    );
   });
 
   describe("given a phone-width screen", () => {
