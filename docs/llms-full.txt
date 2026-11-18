@@ -45492,7 +45492,7 @@ Without the deployment, every row is skipped as `classifier_not_configured`.
 
 ## When your model cannot answer
 
-A run on your own model never falls back to LangWatch Evals Preview. Rows it cannot judge are marked `skipped` with the reason in `error`, and the run carries on. When the key is refused for every row of a page, the run fails with `instant_eval_decision_model_key_invalid` instead, so it does not read as nothing matched. List skipped rows with `langwatch instant-eval results <run-id> --status skipped`.
+A run on your own model never falls back to LangWatch Evals Preview. Rows it cannot judge are marked `skipped` with the reason in `error`, and the run carries on. When the key is refused for every row of a page, the run fails with `instant_eval_decision_model_key_invalid` instead, so it does not read as a run where no row matched. List skipped rows with `langwatch instant-eval results <run-id> --status skipped`.
 
 | `error`                           | Why                                                                                                         | Fix                                                                         |
 | --------------------------------- | ----------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
