@@ -171,6 +171,7 @@ export const APP_ERROR_CODES = [
   "cli_key_selection_invalid",
   "cli_session_record_not_found",
   "clickhouse_overloaded",
+  "clickhouse_system_identity_absent",
   "clickhouse_unavailable",
   "client_outdated",
   "cloud_ops_key_mismatch",

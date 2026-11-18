@@ -32,6 +32,8 @@ export const LWQL_UNCONFIRMED_ALERT_AFTER_MS = 15 * 60_000;
 interface LwqlReconvergenceRunDeps {
   /** Throws when ClickHouse is unreachable; the next check probes again. */
   readonly probe: () => Promise<LwqlAccessModelOwner>;
+  /** Probes on the worker's identity and stores the answer every gate reads; throws on failure. */
+  readonly refreshAnswer: () => Promise<void>;
   /** The SQL-mode re-provision of the whole access model; logs and swallows its own failure. */
   readonly converge: () => Promise<void>;
   /** Catalog reads only; throws when ClickHouse is unreadable, `unknown` when PostgreSQL is. */
@@ -270,6 +272,18 @@ async function probeAccessModel({
   if (owner === "none") await converge();
 }
 
+/** Last in the check, so it answers what this check provisioned; a failure waits for the next. */
+async function refreshAccessModelAnswer(
+  refreshAnswer: LwqlReconvergenceRunDeps["refreshAnswer"],
+): Promise<void> {
+  await refreshAnswer().catch((error: unknown) => {
+    logger.warn(
+      { error: clickHouseErrorSummary(error) },
+      "lwql could not store whether the access model is provisioned; the next check tries again in 5 minutes",
+    );
+  });
+}
+
 /** A check called outside the outbox is its first delivery. */
 const FIRST_DELIVERY = { attempt: 1 };
 
@@ -318,6 +332,7 @@ export function runLwqlReconvergence(
     } finally {
       // A failed fill still probes, then fails the check so the outbox delivers it again.
       await probeAccessModel(deps);
+      await refreshAccessModelAnswer(deps.refreshAnswer);
     }
   };
 }

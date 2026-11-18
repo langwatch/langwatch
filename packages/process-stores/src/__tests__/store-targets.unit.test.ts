@@ -37,7 +37,9 @@ describe("given the stores' ClickHouse admin member", () => {
       await new Promise<void>((listening) => server.listen(0, "127.0.0.1", listening));
       const { port } = server.address() as AddressInfo;
       const built = buildClickHouseAdmin({ url: `http://admin:admin@127.0.0.1:${port}/langwatch` });
-      if (!built.value.configured) throw new Error("the admin member was not configured");
+      if (!built.value.configured || built.value.statements === null) {
+        throw new Error("the admin member holds no statements");
+      }
 
       await built.value.statements.rows("SELECT {password:String}", { password: "param-secret" });
 
@@ -59,6 +61,55 @@ describe("given the stores' ClickHouse admin member", () => {
         expect(built.close).toBeUndefined();
       },
     );
+  });
+
+  describe("when there is no CLICKHOUSE_URL and the reader's URL names a server and database", () => {
+    /** @scenario "A process without CLICKHOUSE_URL takes the LangWatchQL server from the reader's URL and sends nothing" */
+    it("answers the reader's target with no statements and opens no client", () => {
+      const built = buildClickHouseAdmin({
+        readerUrl: "http://langwatch_app_reader:reader-secret@clickhouse:8123/langwatch?x=1",
+      });
+
+      expect(built.value).toEqual({
+        configured: true,
+        target: { url: "http://clickhouse:8123/", database: "langwatch" },
+        statements: null,
+      });
+      expect(JSON.stringify(built.value)).not.toContain("reader-secret");
+      expect(built.close).toBeUndefined();
+    });
+
+    it("keeps CLICKHOUSE_URL's target and statements when both are given", async () => {
+      const built = buildClickHouseAdmin({
+        url: "http://admin:admin-secret@system-host:8123/langwatch",
+        readerUrl: "http://langwatch_app_reader:reader-secret@reader-host:8123/langwatch",
+      });
+
+      expect(built.value).toMatchObject({
+        configured: true,
+        target: { url: "http://system-host:8123/", database: "langwatch" },
+        statements: expect.any(Object),
+      });
+      await built.close?.();
+    });
+
+    it("never falls back to the reader where CLICKHOUSE_URL is set but names no database", () => {
+      const built = buildClickHouseAdmin({
+        url: "http://clickhouse:8123/",
+        readerUrl: "http://langwatch_app_reader:reader-secret@clickhouse:8123/langwatch",
+      });
+
+      expect(built.value).toEqual({ configured: false });
+    });
+  });
+
+  describe("when there is no CLICKHOUSE_URL and the reader's URL names no database", () => {
+    /** @scenario "A process given neither CLICKHOUSE_URL nor a reader URL with a database names no LangWatchQL server" */
+    it("answers not configured", () => {
+      const built = buildClickHouseAdmin({ readerUrl: "http://reader:secret@clickhouse:8123/" });
+
+      expect(built.value).toEqual({ configured: false });
+    });
   });
 });
 

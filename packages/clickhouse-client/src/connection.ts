@@ -151,11 +151,17 @@ export class ClickHouseConnection<Client extends ClickHouseCloseableClient> {
     return route.kind === "shared" ? this.shared() : this.resolveOrganization(organizationId);
   }
 
-  /** Resolves a known organisation without a directory lookup. */
+  /**
+   * Resolves a known organisation without a directory lookup. One whose route this identity lacks
+   * or cannot parse is refused by the variable to set, never answered on the shared server.
+   */
   resolveOrganization(organizationId: string): Client {
     this.assertOpen();
     const route = this.configuration.privateRoutes.get(organizationId);
-    if (route === undefined) return this.shared();
+    if (route === undefined) {
+      this.router.assertRoutable(organizationId);
+      return this.shared();
+    }
     return this.clientFor(route.url);
   }
 
@@ -314,6 +320,9 @@ export class ClickHouseConnectionService<Client extends ClickHouseCloseableClien
         ...(configuration.malformedPrivateRoutes === undefined
           ? {}
           : { malformed: configuration.malformedPrivateRoutes }),
+        ...(configuration.missingPrivateRoutes === undefined
+          ? {}
+          : { missing: configuration.missingPrivateRoutes }),
       },
       directory: this.directory,
       ...(this.refusal === undefined ? {} : { refusal: this.refusal }),

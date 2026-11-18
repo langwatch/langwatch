@@ -19,7 +19,11 @@ export {
   readyIdIndexedClientDouble,
   type ScriptedStatements,
 } from "./idIndexedClientDouble.ts";
-export { type VendorStatements, vendorQueryClient } from "./vendorQueryClient.ts";
+export {
+  type VendorStatements,
+  vendorQueryClient,
+  vendorQueryDriver,
+} from "./vendorQueryClient.ts";
 
 /**
  * The ClickHouse image every container-backed test starts, here and in
@@ -35,6 +39,7 @@ export const TEST_CLICKHOUSE_IMAGE = "clickhouse/clickhouse-server:26.8.36.3";
 export const TEST_CLICKHOUSE_TUNING = {
   target: "/etc/clickhouse-server/config.d/zz-langwatch-test-tuning.xml",
   content: `<clickhouse>
+    <custom_settings_prefixes>custom_,SQL_</custom_settings_prefixes>
     <max_server_memory_usage>1073741824</max_server_memory_usage>
     <mark_cache_size>67108864</mark_cache_size>
     <uncompressed_cache_size>0</uncompressed_cache_size>
@@ -96,7 +101,7 @@ export function testClickHouseProfilePins(): {
  * the hash — so bumping this value is what forces new containers when tuning changes.
  */
 export const TEST_CLICKHOUSE_TUNING_LABEL = {
-  "langwatch.test.clickhouse-tuning": "v1",
+  "langwatch.test.clickhouse-tuning": "v2",
 };
 
 export interface TestClickHouseEndpoint {
@@ -228,6 +233,8 @@ async function startContainerEndpoints({
           ...TEST_CLICKHOUSE_TUNING_LABEL,
           ...pins.label,
         })
+        // The suite's user provisions the app's identities (ADR-202), as the upgrade does.
+        .withEnvironment({ CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: "1" })
         .withReuse()
         .withCopyContentToContainer([TEST_CLICKHOUSE_TUNING, pins.file])
         .withStartupTimeout(120_000)

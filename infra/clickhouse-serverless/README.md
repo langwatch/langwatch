@@ -115,8 +115,8 @@ that model reaches this ClickHouse depends on the posture (see
   server's config files, the app self-provisions the same model via SQL DDL.
 
 What `ch-config` renders in both cases is the server-level settings the model
-needs: `custom-settings-prefixes.yaml` declares the `custom_` settings prefix the
-per-query tenant capability rides on, and `access-control.yaml` sets
+needs: `custom-settings-prefixes.yaml` declares the `custom_` and `SQL_` settings prefixes
+(LangWatchQL's capability and the app reader's tenant set, ADR-202) the per-query tenant settings ride on, and `access-control.yaml` sets
 `access_control_improvements.settings_constraints_replace_previous` to `true`
 (without it, ClickHouse rejects the `<database>_profile` settings profile's
 `CHANGEABLE_IN_READONLY` constraint on `custom_api_key_hash`). In `sql` mode the image

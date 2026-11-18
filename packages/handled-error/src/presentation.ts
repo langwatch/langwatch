@@ -823,6 +823,12 @@ const presentations = {
     title: "Too much running at once",
     describe: () => "We paused this one to keep the rest responsive. Try again.",
   },
+  clickhouse_system_identity_absent: {
+    // fault: platform. A read-only process was asked to write or to read across tenants:
+    // a deployment wiring defect, never the customer's.
+    title: "This could not be completed right now",
+    describe: () => "We're on it. Try again in a moment.",
+  },
   client_outdated: {
     // fault: customer. A tab left open across an upgrade still speaks the
     // earlier release's wire format; reloading fetches this one.

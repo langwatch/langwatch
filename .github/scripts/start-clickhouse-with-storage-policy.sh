@@ -13,6 +13,7 @@ CLICKHOUSE_PASSWORD="${CLICKHOUSE_PASSWORD:?CLICKHOUSE_PASSWORD is required; the
 # Each disk must have a unique name AND path - we define 'hot' and 'cold' disks with different paths
 cat > /tmp/storage_policy.xml << 'EOF'
 <clickhouse>
+    <custom_settings_prefixes>custom_,SQL_</custom_settings_prefixes>
     <storage_configuration>
         <disks>
             <hot>
@@ -61,6 +62,7 @@ docker run -d \
   -e CLICKHOUSE_DB=default \
   -e CLICKHOUSE_USER=default \
   -e CLICKHOUSE_PASSWORD="${CLICKHOUSE_PASSWORD}" \
+  -e CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT=1 \
   -v /tmp/storage_policy.xml:/etc/clickhouse-server/config.d/storage_policy.xml:ro \
   -v "$PROFILE_PINS":/etc/clickhouse-server/users.d/zz-langwatch-profile-pins.yaml:ro \
   clickhouse/clickhouse-server:26.8.36.3

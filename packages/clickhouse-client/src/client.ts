@@ -4,7 +4,40 @@
  * sits outside retry — a slot must survive a retry, or a small overload turns persistent.
  */
 
-import { hasIdBound, type IdBound, idBoundOf, IdIndexRegistry, readIdBound } from "./idBound.ts";
+import { AuthorizationExpiredError } from "@langwatch/authorization";
+import { nowInstant } from "@langwatch/time";
+
+import { fn } from "./builder/functions.ts";
+import {
+  clickhouseRead,
+  type ClickHouseReadStatement,
+  type MetadataReadStatement,
+} from "./builder/read.ts";
+import { tenantScope } from "./builder/scope.ts";
+import { systemColumns } from "./builder/system-tables.ts";
+import { SERVER_METADATA_TABLES } from "./builder/table.ts";
+import {
+  hasIdBound,
+  type IdBound,
+  idBoundOf,
+  type IdBoundOptions,
+  IdIndexRegistry,
+  readIdBound,
+} from "./idBound.ts";
+import type { ShadowSampler } from "./identity/shadowSampler.ts";
+import {
+  identityOf,
+  type IdentityOperation,
+  insertIdentityOf,
+  SystemIdentityAbsentError,
+  type SystemIdentityAbsentErrorFactory,
+} from "./identity/statementIdentity.ts";
+import {
+  refuseBuiltTenantSettingMismatch,
+  refuseTenantSettingInText,
+  TENANT_IDS_SETTING,
+  tenantSettingOf,
+} from "./identity/tenantSetting.ts";
 import {
   type IdIndexBounds,
   type IdIndexDeclaration,
@@ -23,7 +56,7 @@ import type {
   ClickHouseOverloadErrorFactory,
   ClickHouseStatementAdmission,
 } from "./managed-client.ts";
-import { CLICKHOUSE_COLUMNS_QUERY, ClickHouseColumns } from "./present-columns.ts";
+import { ClickHouseColumns } from "./present-columns.ts";
 import type { InsertRequest, QueryDriver, QueryRequest, QueryResult } from "./query.ts";
 import { TRANSIENT_NETWORK_CODES } from "./resilience.ts";
 import type { RetryPolicy } from "./retry.ts";
@@ -35,8 +68,18 @@ import type { TenantGuard } from "./tenantGuard.ts";
 import type { QueryTracer } from "./tracing.ts";
 
 export interface ClickHouseQueryClientOptions {
-  /** The only collaborator that talks to a server. */
-  driver: QueryDriver;
+  /**
+   * The system identity (ADR-202): inserts, commands and `SKIP_TENANT_CHECK` statements, and
+   * every read while no reader is given. A reader-only process omits it and refuses those by name.
+   */
+  driver?: QueryDriver | undefined;
+  /** The app reader: every other read, carrying its tenant set as `SQL_langwatch_tenant_ids`. */
+  readerDriver?: QueryDriver | undefined;
+  /**
+   * The insert-only writer (ADR-202 Decided 12): inserts in a process given no system driver.
+   * Never sent a read, a command or a skip-check statement; ignored beside a system driver.
+   */
+  writerDriver?: QueryDriver | undefined;
   /** Refuses statements with no tenant predicate unless they set `SKIP_TENANT_CHECK`. */
   tenantGuard: TenantGuard;
   /** Records a span per statement. Omit to record none. */
@@ -59,6 +102,10 @@ export interface ClickHouseQueryClientOptions {
   unavailableErrorFactory?: ClickHouseUnavailableErrorFactory | undefined;
   /** Builds the handled refusal for a read the server refused as overloaded; raw by default. */
   overloadErrorFactory?: ClickHouseOverloadErrorFactory | undefined;
+  /** Builds the handled refusal for a system statement in a reader-only process; raw by default. */
+  systemIdentityAbsentErrorFactory?: SystemIdentityAbsentErrorFactory | undefined;
+  /** Re-runs a share of reader reads under the enforcing identity (ADR-202); none by default. */
+  shadowSampler?: ShadowSampler | undefined;
   /**
    * Rows one coalesced async insert carries at most (ADR-187); 0 sends every insert alone.
    * Coalescing needs a limiter: with none, nothing ever waits for a slot.
@@ -103,8 +150,48 @@ class InsertNotRetriedInPlace extends Error {
   }
 }
 
+/** Raw SQL, a statement the typed builder built, or its server-metadata read (ADR-202). */
+type StatementOrigin = "raw" | "built" | "metadata";
+
+/** A request on its way to the driver; a built one carries its tables' tenant columns. */
+type SentRequest = QueryRequest & { readonly builtTenantColumns?: readonly string[] | undefined };
+
+/** Only a built statement's own tenant columns widen the guard; a raw one is held to TenantId. */
+const guardedColumnsOf = ({
+  request,
+  origin,
+}: {
+  request: SentRequest;
+  origin: StatementOrigin;
+}) => (origin === "built" ? request.builtTenantColumns : undefined);
+
+/** One statement as it leaves: the identity's driver, and the request that driver receives. */
+/** A statement the typed builder built, and how `read` sends it. */
+type BuiltRead<Row> = {
+  statement: ClickHouseReadStatement<Row> | MetadataReadStatement<Row>;
+  table?: string | undefined;
+  /** Sends an all-tenants or server-metadata statement to this organisation's server. */
+  organizationId?: string | undefined;
+  /** Sends an all-tenants or server-metadata statement to this tenant's server. */
+  tenantId?: string | undefined;
+  /** How the statement's `{{idBound}}` marker reads its window, as `query()` takes it. */
+  idBound?: IdBoundOptions | undefined;
+  /** The read scans every partition on purpose; sent as `SKIP_COLD_SCAN_CHECK`. */
+  declaresFullScan?: true | undefined;
+  /** A capped read that must not run again when it times out. */
+  retryOnTimeout?: false | undefined;
+  signal?: QueryRequest["signal"];
+};
+
+interface Sending {
+  driver: QueryDriver;
+  request: QueryRequest;
+}
+
 export class ClickHouseQueryClient {
-  private readonly driver: QueryDriver;
+  private readonly systemDriver: QueryDriver | undefined;
+  private readonly readerDriver: QueryDriver | undefined;
+  private readonly writerDriver: QueryDriver | undefined;
   private readonly tenantGuard: TenantGuard;
   private readonly tracer: QueryTracer | undefined;
   private readonly limiter: ClickHouseStatementAdmission | undefined;
@@ -119,11 +206,15 @@ export class ClickHouseQueryClient {
   private readonly columnLists = new Map<string, ClickHouseColumns>();
   private readonly unavailable: ClickHouseUnavailableErrorFactory | undefined;
   private readonly overloaded: ClickHouseOverloadErrorFactory | undefined;
+  private readonly systemAbsent: SystemIdentityAbsentErrorFactory | undefined;
+  private readonly shadow: ShadowSampler | undefined;
   private readonly idIndexRegistry: IdIndexRegistry;
   private readonly coalescer: InsertCoalescer<InsertRequest> | undefined;
 
   constructor({
     driver,
+    readerDriver,
+    writerDriver,
     tenantGuard,
     tracer,
     limiter,
@@ -133,11 +224,18 @@ export class ClickHouseQueryClient {
     privateRouteVariables,
     unavailableErrorFactory,
     overloadErrorFactory,
+    systemIdentityAbsentErrorFactory,
+    shadowSampler,
     organizationOf,
     placementOf,
     insertCoalesceMaxRows,
   }: ClickHouseQueryClientOptions) {
-    this.driver = driver;
+    if (driver === undefined && readerDriver === undefined) {
+      throw new Error("A ClickHouse client needs a driver for the system or the reader identity.");
+    }
+    this.systemDriver = driver;
+    this.readerDriver = readerDriver;
+    this.writerDriver = writerDriver;
     this.tenantGuard = tenantGuard;
     this.tracer = tracer;
     this.limiter = limiter;
@@ -147,6 +245,8 @@ export class ClickHouseQueryClient {
     this.routeVariables = privateRouteVariables ?? [];
     this.unavailable = unavailableErrorFactory;
     this.overloaded = overloadErrorFactory;
+    this.systemAbsent = systemIdentityAbsentErrorFactory;
+    this.shadow = shadowSampler;
     this.organizationOf = organizationOf;
     this.placement = placementOf;
     this.idIndexRegistry = new IdIndexRegistry(this);
@@ -254,17 +354,17 @@ export class ClickHouseQueryClient {
   columns({ tenantId }: { tenantId: string }): ClickHouseColumns {
     const known = this.columnLists.get(tenantId);
     if (known !== undefined) return known;
+    const statement = clickhouseRead({
+      scope: tenantScope.serverMetadata({
+        reason: "the schema's column list, which no tenant owns",
+      }),
+    })
+      .from(systemColumns)
+      .select({ table: systemColumns.table, name: systemColumns.name })
+      .where(({ eq }) => eq(systemColumns.database, fn.currentDatabase()))
+      .build();
     const columns = ClickHouseColumns.over({
-      read: async () =>
-        (
-          await this.query<{ table: string; name: string }>({
-            tenantId,
-            sql: CLICKHOUSE_COLUMNS_QUERY,
-            table: "system.columns",
-            // The schema's column list describes the server, which no tenant owns.
-            SKIP_TENANT_CHECK: true,
-          })
-        ).rows,
+      read: async () => (await this.read({ statement, table: "system.columns", tenantId })).rows,
     });
     this.columnLists.set(tenantId, columns);
     return columns;
@@ -275,6 +375,17 @@ export class ClickHouseQueryClient {
    * `{{idBound}}` marker runs once per window its id index read takes, each under every policy.
    */
   async query<Row>(request: QueryRequest): Promise<QueryResult<Row>> {
+    return this.boundedOrPlain<Row>({ request, origin: "raw" });
+  }
+
+  /** A statement carrying an `{{idBound}}` marker runs per window; any other runs once. */
+  private async boundedOrPlain<Row>({
+    request,
+    origin,
+  }: {
+    request: SentRequest;
+    origin: StatementOrigin;
+  }): Promise<QueryResult<Row>> {
     const bound = hasIdBound(request)
       ? idBoundOf({
           sql: request.sql,
@@ -283,17 +394,119 @@ export class ClickHouseQueryClient {
           openEnded: request.idBound?.openEnded,
         })
       : null;
-    if (bound !== null) return this.boundedQuery<Row>({ request, bound });
-    return this.statement<Row>(request);
+    if (bound !== null) return this.boundedQuery<Row>({ request, bound, origin });
+    return this.statement<Row>(request, origin);
+  }
+
+  /**
+   * Runs one statement the typed builder built, on the identity it names and with its own
+   * settings. A reader statement routes by its route tenant, its tenant setting must be exactly
+   * its tenant set, and a braided proof's expiry refuses it and caps its time limit, as the fence.
+   */
+  async read<Row>(built: BuiltRead<Row>): Promise<QueryResult<Row>> {
+    const { request, origin, expiresAt } = this.builtRequestOf(built);
+    if (origin === "metadata") return this.statement<Row>(request, origin);
+    const result = await this.boundedOrPlain<Row>({ request, origin });
+    // A slow statement or a retry may outlast the proof: its rows are refused, never released.
+    refuseExpired({ expiresAt });
+    return result;
+  }
+
+  /**
+   * Streams one read batch by batch (replay's event reads), on the identity, tenant setting and
+   * guard `query` gives it. The slot and retries do not apply: the reader sets how long it runs
+   * and a retried stream would repeat rows. A driver that cannot stream answers it as one batch.
+   */
+  async *stream<Row>(request: QueryRequest): AsyncGenerator<Row[]> {
+    // A bounded read expands its marker per window, so it is answered whole, as one batch.
+    const sending = hasIdBound(request)
+      ? null
+      : this.checkedSending({ operation: "stream", request, origin: "raw" });
+    if (sending?.driver.stream === undefined) {
+      yield (await this.query<Row>(request)).rows;
+      return;
+    }
+    yield* sending.driver.stream<Row>(sending.request);
+  }
+
+  /** The request a built statement leaves as, refused first when its proof has expired. */
+  private builtRequestOf<Row>({
+    statement,
+    table,
+    organizationId,
+    tenantId,
+    idBound,
+    declaresFullScan,
+    retryOnTimeout,
+    signal,
+  }: BuiltRead<Row>): {
+    request: SentRequest;
+    origin: StatementOrigin;
+    expiresAt: number | undefined;
+  } {
+    const sent = {
+      sql: statement.sql,
+      params: { ...statement.params },
+      table,
+      signal,
+      ...(idBound === undefined ? {} : { idBound }),
+      ...(declaresFullScan === true ? { SKIP_COLD_SCAN_CHECK: true as const } : {}),
+      ...(retryOnTimeout === false ? { retryOnTimeout: false as const } : {}),
+    };
+    if (statement.kind === "metadata") {
+      refuseMetadataOutsideAllowList({ sql: statement.sql });
+      return {
+        request: {
+          ...sent,
+          tenantId: tenantId ?? "",
+          ...(organizationId === undefined ? {} : { organizationId }),
+          settings: { ...statement.settings },
+        },
+        origin: "metadata",
+        expiresAt: undefined,
+      };
+    }
+    if (statement.identity === "system") {
+      return {
+        request: {
+          ...sent,
+          // Only the route: an all-tenants statement is never checked against a tenant.
+          tenantId: tenantId ?? "",
+          ...(organizationId === undefined ? {} : { organizationId }),
+          settings: { ...statement.settings },
+          // An all-tenants scope, built only with its reason (`tenantScope.allTenants`).
+          SKIP_TENANT_CHECK: true,
+        },
+        origin: "built",
+        expiresAt: undefined,
+      };
+    }
+    refuseExpired({ expiresAt: statement.expiresAt });
+    return {
+      request: {
+        ...sent,
+        tenantId: statement.tenantId,
+        tenantIds: statement.tenantIds,
+        builtTenantColumns: statement.tenantColumns,
+        settings: settingsWithinExpiry({
+          settings: { ...statement.settings },
+          expiresAt: statement.expiresAt,
+        }),
+      },
+      origin: "built",
+      expiresAt: statement.expiresAt,
+    };
   }
 
   /** A statement bounded by its id index, each attempt run as its own statement. */
   private async boundedQuery<Row>({
     request,
     bound,
+    origin,
   }: {
-    request: QueryRequest;
+    request: SentRequest;
     bound: IdBound;
+    origin: StatementOrigin;
   }): Promise<QueryResult<Row>> {
     const { tenantId } = request;
     const rows = await readIdBound<Row>({
@@ -304,7 +517,8 @@ export class ClickHouseQueryClient {
       indexBounds: (lookup) =>
         this.indexBounds({ tenantId, tenantIds: request.tenantIds, ...lookup }),
       options: request.idBound,
-      run: async ({ sql, params }) => (await this.statement<Row>({ ...request, sql, params })).rows,
+      run: async ({ sql, params }) =>
+        (await this.statement<Row>({ ...request, sql, params }, origin)).rows,
     });
     return { rows };
   }
@@ -314,11 +528,13 @@ export class ClickHouseQueryClient {
    * bottom per the class order. Each step is a plain call rather than a
    * wrap, so an absent policy is a skipped line, not a hole in a chain.
    */
-  private async statement<Row>(request: QueryRequest): Promise<QueryResult<Row>> {
-    this.tenantGuard.assert(request);
-    refuseUnexpandedIdBound({ request });
+  private async statement<Row>(
+    request: SentRequest,
+    origin: StatementOrigin = "raw",
+  ): Promise<QueryResult<Row>> {
+    const sending = this.checkedSending({ operation: "read", request, origin });
 
-    const runOnce = () => this.driver.execute<Row>(request);
+    const runOnce = () => sending.driver.execute<Row>(sending.request);
     const withRetries = () =>
       this.retries === undefined
         ? runOnce()
@@ -347,9 +563,13 @@ export class ClickHouseQueryClient {
           });
 
     try {
-      return await (this.tracer === undefined
+      const result = await (this.tracer === undefined
         ? withSlot()
-        : this.tracer.trace({ request, task: withSlot }));
+        : this.tracer.trace({ request: sending.request, task: withSlot }));
+      if (sending.driver === this.readerDriver && origin !== "metadata") {
+        void this.shadow?.observe({ request: sending.request, returned: result.rows.length });
+      }
+      return result;
     } catch (error) {
       if (this.overloaded !== undefined && isServerOverload(error)) {
         throw this.overloaded.create({ cause: error });
@@ -359,19 +579,22 @@ export class ClickHouseQueryClient {
     }
   }
 
-  /**
-   * Streams one read batch by batch (replay's event reads). The tenant guard applies; the slot and
-   * retries do not, since the reader sets how long it runs and a retried stream would repeat rows.
-   * A driver that cannot stream answers the whole result, under every policy, as one batch.
-   */
-  async *stream<Row>(request: QueryRequest): AsyncGenerator<Row[]> {
-    this.tenantGuard.assert(request);
-    // A bounded read expands its marker per window, so it is answered whole, as one batch.
-    if (this.driver.stream === undefined || hasIdBound(request)) {
-      yield (await this.query<Row>(request)).rows;
-      return;
+  /** The checks every read and stream passes before it leaves, then the identity it leaves on. */
+  private checkedSending({
+    operation,
+    request,
+    origin,
+  }: {
+    operation: "read" | "stream";
+    request: SentRequest;
+    origin: StatementOrigin;
+  }): Sending {
+    // A metadata read names only allow-listed system tables (checked in `read`), no tenant rows.
+    if (origin !== "metadata") {
+      this.tenantGuard.assert(request, { tenantColumns: guardedColumnsOf({ request, origin }) });
     }
-    yield* this.driver.stream<Row>(request);
+    refuseUnexpandedIdBound({ request });
+    return this.sendingOf({ operation, request, origin });
   }
 
   /**
@@ -381,8 +604,9 @@ export class ClickHouseQueryClient {
   async command(request: QueryRequest): Promise<void> {
     this.tenantGuard.assert(request);
     refuseUnexpandedIdBound({ request });
+    const sending = this.sendingOf({ operation: "command", request });
 
-    const runOnce = () => this.driver.command(request);
+    const runOnce = () => sending.driver.command(sending.request);
     const withRetries = () =>
       this.retries === undefined
         ? runOnce()
@@ -403,6 +627,7 @@ export class ClickHouseQueryClient {
    */
   async insert(request: InsertRequest): Promise<void> {
     this.tenantGuard.assertInsert(request);
+    this.inserterFor({ table: request.table });
     if (request.rows.length === 0) return;
 
     // An async insert that would wait for a slot joins others of its route and table (ADR-187).
@@ -423,7 +648,8 @@ export class ClickHouseQueryClient {
 
   /** One insert statement under the slot already held: retried only when refused, and reported. */
   private sendInsert(request: InsertRequest): Promise<void> {
-    const runOnce = () => this.driver.insert(request);
+    const driver = this.inserterFor({ table: request.table });
+    const runOnce = () => driver.insert(request);
     const refusedOnly = async (): Promise<void> => {
       try {
         await runOnce();
@@ -461,6 +687,74 @@ export class ClickHouseQueryClient {
       params: { table: request.table },
       task: marked,
     });
+  }
+
+  /**
+   * The identity a statement leaves on (ADR-202). A raw tenant read goes as the reader with the
+   * tenant set computed here; a built one keeps its own. With no reader, a raw read keeps the one
+   * credential and sends no setting, as before the reader.
+   */
+  private sendingOf({
+    operation,
+    request,
+    origin = "raw",
+  }: {
+    operation: Exclude<IdentityOperation, "insert">;
+    request: QueryRequest;
+    origin?: StatementOrigin;
+  }): Sending {
+    refuseTenantSettingInText({ request });
+    if (origin === "metadata") {
+      // The reader, with no tenant setting: the system tables it names carry no tenant rows.
+      return {
+        driver: this.readerDriver ?? this.systemFor({ operation, table: request.table }),
+        request,
+      };
+    }
+    const skipsTenantCheck = request.SKIP_TENANT_CHECK === true;
+    if (identityOf({ operation, skipsTenantCheck }) === "system") {
+      return { driver: this.systemFor({ operation, table: request.table }), request };
+    }
+    if (origin === "built") {
+      refuseBuiltTenantSettingMismatch({ request });
+      return {
+        driver: this.readerDriver ?? this.systemFor({ operation, table: request.table }),
+        request,
+      };
+    }
+    const tenants = tenantSettingOf({ request });
+    if (this.readerDriver === undefined) {
+      return { driver: this.systemFor({ operation, table: request.table }), request };
+    }
+    return {
+      driver: this.readerDriver,
+      request: { ...request, settings: { ...request.settings, [TENANT_IDS_SETTING]: tenants } },
+    };
+  }
+
+  /** The driver an insert leaves on: the system's, else the writer's, else the refusal. */
+  private inserterFor({ table }: { table: string }): QueryDriver {
+    const identity = insertIdentityOf({
+      holdsSystem: this.systemDriver !== undefined,
+      holdsWriter: this.writerDriver !== undefined,
+    });
+    if (identity === "writer" && this.writerDriver !== undefined) return this.writerDriver;
+    return this.systemFor({ operation: "insert", table });
+  }
+
+  /** The system identity's driver, or the refusal of a process that holds none. */
+  private systemFor({
+    operation,
+    table,
+  }: {
+    operation: IdentityOperation;
+    table: string | undefined;
+  }): QueryDriver {
+    if (this.systemDriver !== undefined) return this.systemDriver;
+    throw (
+      this.systemAbsent?.create({ operation, table }) ??
+      new SystemIdentityAbsentError(operation, table)
+    );
   }
 
   /** One statement's outcome, reported the way the vendor client policy reports it. */
@@ -505,7 +799,54 @@ function coalescedRequest(requests: readonly InsertRequest[]): InsertRequest {
   return { ...first, rows: requests.flatMap((request) => request.rows) };
 }
 
+/** A braided proof that has expired authorises nothing, before its read or after it. */
+function refuseExpired({ expiresAt }: { expiresAt: number | undefined }): void {
+  if (expiresAt !== undefined && expiresAt <= nowInstant().epochMilliseconds) {
+    throw new AuthorizationExpiredError(expiresAt);
+  }
+}
+
+/** `max_execution_time` cut to the proof's remaining whole seconds; at least one, as 0 is none. */
+function settingsWithinExpiry({
+  settings,
+  expiresAt,
+}: {
+  settings: Record<string, string | number>;
+  expiresAt: number | undefined;
+}): Record<string, string | number> {
+  if (expiresAt === undefined) return settings;
+  const remaining = Math.max(1, Math.ceil((expiresAt - nowInstant().epochMilliseconds) / 1000));
+  const asked = Number(settings.max_execution_time ?? 0);
+  const limit = Number.isFinite(asked) && asked > 0 ? Math.min(asked, remaining) : remaining;
+  return { ...settings, max_execution_time: limit };
+}
+
 /** The last check before a statement leaves: an unexpanded marker never reaches the server. */
+/** Every table a metadata statement's text names is on the allow-list, whoever built it. */
+function refuseMetadataOutsideAllowList({ sql }: { sql: string }): void {
+  const allowed: ReadonlySet<string> = new Set(SERVER_METADATA_TABLES);
+  for (const [, table] of sql.matchAll(METADATA_TABLE_REFERENCE)) {
+    if (table === undefined || !allowed.has(table.toLowerCase())) {
+      throw new MetadataTableRefusedError(table ?? "unknown");
+    }
+  }
+}
+
+/** A server-metadata statement naming a table off the allow-list; never sent. */
+export class MetadataTableRefusedError extends Error {
+  readonly code = "clickhouse_metadata_table_refused";
+
+  constructor(readonly table: string) {
+    super(
+      `A server-metadata read names "${table}", which is not an allow-listed system table; only ` +
+        `${SERVER_METADATA_TABLES.join(", ")} may be read without a tenant.`,
+    );
+    this.name = "MetadataTableRefusedError";
+  }
+}
+
+const METADATA_TABLE_REFERENCE = /\b(?:FROM|JOIN)\s+`?([\w.]+)`?/gi;
+
 function refuseUnexpandedIdBound({ request }: { request: QueryRequest }): void {
   if (hasIdBound(request)) throw new StatementScopeError({ kind: "unexpanded-id-bound" });
 }

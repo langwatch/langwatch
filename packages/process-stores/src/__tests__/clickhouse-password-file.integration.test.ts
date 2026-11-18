@@ -154,7 +154,9 @@ describe("given the ClickHouse member in front of a server that records logins",
         passwordFile: passwordPath,
       });
       try {
-        if (!admin.value.configured) throw new Error("the admin seam was not configured");
+        if (!admin.value.configured || admin.value.statements === null) {
+          throw new Error("the admin seam holds no statements");
+        }
         await admin.value.statements.command("SELECT 1");
       } finally {
         await admin.close?.();

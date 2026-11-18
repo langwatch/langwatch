@@ -34,6 +34,15 @@ export class LangWatchQLServerConfigService {
 
   private constructor() {}
 
+  /** The settings-prefix config declaring `prefixes`; the default file declares only `custom_`. */
+  customSettingsPrefixConfigXml({ prefixes }: { prefixes: readonly string[] }): string {
+    for (const prefix of prefixes) sqlText.assertIdentifier(prefix, "settingsPrefix");
+    return `<clickhouse>
+    <custom_settings_prefixes>${prefixes.join(",")}</custom_settings_prefixes>
+</clickhouse>
+`;
+  }
+
   /**
    * Server-level config letting the *administrative* user create users, profiles, row policies
    * and named collections. Never `show_named_collections_secrets`: `lwql_postgres` holds a

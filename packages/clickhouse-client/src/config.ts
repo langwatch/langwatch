@@ -19,6 +19,8 @@ export interface ClickHouseConfigurationInput {
   privateRoutes?: readonly ClickHousePrivateRouteConfiguration[] | undefined;
   /** Organizations whose route variable is present but unusable: refused, never shared. */
   malformedPrivateRoutes?: readonly ClickHouseMalformedRouteConfiguration[] | undefined;
+  /** Organizations routed privately for the other identity only: refused, never shared. */
+  missingPrivateRoutes?: readonly ClickHouseMalformedRouteConfiguration[] | undefined;
   poolSizing?: PoolSizingInput | undefined;
 }
 
@@ -33,6 +35,8 @@ export interface ClickHouseConfiguration {
   privateRoutes: ReadonlyMap<string, ClickHousePrivateRouteConfiguration>;
   /** organizationId -> the variable naming its unusable route. */
   malformedPrivateRoutes?: ReadonlyMap<string, string>;
+  /** organizationId -> the variable naming the route this identity lacks. */
+  missingPrivateRoutes?: ReadonlyMap<string, string>;
   poolSizing: PoolSizingDecision;
 }
 
@@ -80,11 +84,17 @@ export class ClickHouseConfigService {
     for (const { organizationId, variable } of input.malformedPrivateRoutes ?? []) {
       if (!privateRoutes.has(organizationId)) malformedPrivateRoutes.set(organizationId, variable);
     }
+    const missingPrivateRoutes = new Map<string, string>();
+    for (const { organizationId, variable } of input.missingPrivateRoutes ?? []) {
+      const known = privateRoutes.has(organizationId) || malformedPrivateRoutes.has(organizationId);
+      if (!known) missingPrivateRoutes.set(organizationId, variable);
+    }
 
     return {
       shared: shared === undefined ? undefined : { ...shared },
       privateRoutes,
       malformedPrivateRoutes,
+      missingPrivateRoutes,
       poolSizing: resolvePoolSize(input.poolSizing),
     };
   }

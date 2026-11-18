@@ -23,21 +23,36 @@ function parsedUrl(url: string | undefined): URL[] {
   }
 }
 
-/**
- * Not configured where the URL is absent, unparsable or names no database. Throws only when
- * `CLICKHOUSE_PASSWORD_FILE` is set and gives no password, as the routed client does.
- */
-export function buildClickHouseAdmin(
-  config: ClickHouseConfig | undefined,
-): BuiltMember<ClickHouseAdmin> {
-  const [parsed] = parsedUrl(config?.url);
+/** The server origin and the database a URL's path names, or nothing where either is absent. */
+function targetOf(url: string | undefined): Readonly<{ url: string; database: string }>[] {
+  const [parsed] = parsedUrl(url);
   const database = parsed?.pathname.replace(/^\//, "") ?? "";
-  if (!parsed || !database || !config?.url) return { value: { configured: false } };
+  if (!parsed || !database) return [];
   const server = new URL(parsed.toString());
   server.username = "";
   server.password = "";
   server.pathname = "/";
   server.search = "";
+  return [{ url: server.toString(), database }];
+}
+
+/**
+ * Not configured where neither `CLICKHOUSE_URL` nor the reader's URL names a server and a
+ * database. Without `CLICKHOUSE_URL` the target is the reader's and no client opens. Throws
+ * only when `CLICKHOUSE_PASSWORD_FILE` is set and gives no password, as the routed client does.
+ */
+export function buildClickHouseAdmin(
+  config: ClickHouseConfig | undefined,
+): BuiltMember<ClickHouseAdmin> {
+  const [target] = targetOf(config?.url);
+  if (!target || !config?.url) {
+    const [readerTarget] = config?.url?.trim() ? [] : targetOf(config?.readerUrl);
+    return {
+      value: readerTarget
+        ? { configured: true, target: readerTarget, statements: null }
+        : { configured: false },
+    };
+  }
   const url = config.url.trim();
   const passwordFile = config.passwordFile
     ? ClickHousePasswordFile.open({ path: config.passwordFile })
@@ -52,7 +67,7 @@ export function buildClickHouseAdmin(
   return {
     value: {
       configured: true,
-      target: { url: server.toString(), database },
+      target,
       statements: {
         async command(statement) {
           await client.command({ query: statement });

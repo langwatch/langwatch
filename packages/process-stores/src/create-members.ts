@@ -153,7 +153,12 @@ function prismaMember({
 
 function clickhouseConfigured(config: ProcessConfig): boolean {
   const clickhouse = config.clickhouse;
-  return Boolean(clickhouse?.url?.trim()) || (clickhouse?.privateRoutes?.length ?? 0) > 0;
+  return (
+    Boolean(clickhouse?.url?.trim()) ||
+    (clickhouse?.privateRoutes?.length ?? 0) > 0 ||
+    Boolean(clickhouse?.readerUrl?.trim()) ||
+    (clickhouse?.readerPrivateRoutes?.length ?? 0) > 0
+  );
 }
 
 function clickhouseMember({
@@ -167,10 +172,10 @@ function clickhouseMember({
   if (!clickhouse || !clickhouseConfigured(config)) {
     throw new MemberNotConfiguredError(
       "clickhouse",
-      "set CLICKHOUSE_URL or a CLICKHOUSE_URL__<label>__<orgId> route",
+      "set CLICKHOUSE_URL, CLICKHOUSE_READER_URL or a CLICKHOUSE_URL__<label>__<orgId> route",
     );
   }
-  return buildClickHouse({ config: clickhouse, directory: tenantDirectory() });
+  return buildClickHouse({ config: clickhouse, directory: tenantDirectory(), role: config.role });
 }
 
 function objectStorageMember({
@@ -248,21 +253,28 @@ function eventingMember({
       : eventLogMembers({
           clickhouse: read("clickhouse"),
           organizationOf: (tenantId: string) => tenantDirectory().organizationForTenant(tenantId),
+          indexed: eventing.store.kind !== "producer-only",
         })),
   });
 }
 
-/** The event log a role reads, and its aggregate index's readiness from the index's marker row. */
+/**
+ * The event log a role reads, and for a draining role its aggregate index's readiness from the
+ * marker row. The producer (the api) checks none: the check skips the tenant check, which the api
+ * never sends (ADR-202 Decided 3), so its few event reads stay unbounded.
+ */
 function eventLogMembers({
   clickhouse,
   organizationOf,
+  indexed,
 }: {
   clickhouse: ClickHouseQueryClient;
   organizationOf: (tenantId: string) => Promise<string | null>;
+  indexed: boolean;
 }) {
   return {
     eventLog: { clickhouse, organizationOf },
-    eventLogIndexReadiness: eventLogIdIndexReadiness({ clickhouse }),
+    ...(indexed ? { eventLogIndexReadiness: eventLogIdIndexReadiness({ clickhouse }) } : {}),
   };
 }
 

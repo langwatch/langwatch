@@ -320,10 +320,11 @@ spec:{{ $jobSpec }}
                 LWQL_ENABLED=false
               fi
 
-              if [ "${LWQL_ENABLED}" = "true" ]; then
+              if [ "${LWQL_ENABLED}" = "true" ] || [ -n "${CLICKHOUSE_READER_URL:-}" ]; then
                 # Render the two files from the same env the app reads for LWQL.
                 # The renderer is offline (no ClickHouse connection), so it is
-                # safe to run before the ClickHouse StatefulSet exists.
+                # safe to run before the ClickHouse StatefulSet exists. With
+                # LangWatchQL off it writes the app reader alone (ADR-202 Decided 6).
                 cd /app/apps/tasks
                 LWQL_RENDER_OUT_DIR=/render pnpm run task lwql-render-access-config
               else

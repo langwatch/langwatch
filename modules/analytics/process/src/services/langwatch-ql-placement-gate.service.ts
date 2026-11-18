@@ -13,10 +13,11 @@ import type { LwqlAccessModelOwner } from "../rules/langwatch-ql-config-store.ru
 
 const logger = createLogger("langwatch:analytics:lwql:placement-gate");
 
-/** Whether config names a server to hold the access model, and the probe asking that server. */
+/** Whether config names a server to hold the access model, and the probe the worker asks it. */
 type LangWatchQLAccessModelProbe = Readonly<{
   configured: boolean;
-  probeOwner(): Promise<LwqlAccessModelOwner>;
+  /** Null where the process holds no system credential to read `system.*` with. */
+  probeOwner: (() => Promise<LwqlAccessModelOwner>) | null;
 }>;
 
 /** The server LangWatchQL queries, by origin; unconfigured where it has none. */
@@ -79,38 +80,44 @@ export class LangWatchQLPlacementGateService {
       );
       throw new LangWatchQLNotProvisionedError();
     }
-    if (
-      (await this.#accessModelAnswer({ projectIds, origin: target.origin })) === "not_provisioned"
-    ) {
+    const answer = await this.#accessModelAnswer({ projectIds, origin: target.origin });
+    if (answer === null) {
+      logger.warn(
+        { projectIds },
+        "LangWatchQL refused: not provisioned yet, as no worker has stored whether an access model is provisioned",
+      );
+      throw new LangWatchQLNotProvisionedError();
+    }
+    if (answer === "not_provisioned") {
       logger.warn({ projectIds }, "LangWatchQL refused: no access model is provisioned");
       throw new LangWatchQLNotProvisionedError();
     }
   }
 
-  /** Config decides where it can; otherwise the fleet's answer, probing once it has expired. */
+  /**
+   * The worker's probe, stored for every gate in the fleet; nothing where config names no
+   * server or the process cannot probe. A failed probe or store throws to the caller.
+   */
+  async refreshAccessModelAnswer(): Promise<void> {
+    const { target, accessModel, answers } = this.deps;
+    if (!target.configured || !accessModel.configured || accessModel.probeOwner === null) return;
+    const owner = await accessModel.probeOwner();
+    await answers.recordAnswer({
+      origin: target.origin,
+      answer: owner === "none" ? "not_provisioned" : "provisioned",
+    });
+  }
+
+  /** Config decides where it can; otherwise the worker's stored answer: the gate never probes. */
   async #accessModelAnswer({
     projectIds,
     origin,
   }: {
     projectIds: readonly string[];
     origin: string;
-  }): Promise<LangWatchQLAccessModelAnswer> {
+  }): Promise<LangWatchQLAccessModelAnswer | null> {
     if (!this.deps.accessModel.configured) return "not_provisioned";
-    const held = await this.#decide({
-      projectIds,
-      read: () => this.deps.answers.findAnswer({ origin }),
-    });
-    if (held !== null) return held;
-    const owner = await this.#decide({
-      projectIds,
-      read: () => this.deps.accessModel.probeOwner(),
-    });
-    const answer = owner === "none" ? "not_provisioned" : "provisioned";
-    await this.#decide({
-      projectIds,
-      read: () => this.deps.answers.recordAnswer({ origin, answer }),
-    });
-    return answer;
+    return this.#decide({ projectIds, read: () => this.deps.answers.findAnswer({ origin }) });
   }
 
   /** A read the gate cannot complete refuses: never a fallback to the shared server. */

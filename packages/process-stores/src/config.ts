@@ -50,6 +50,28 @@ export interface ClickHouseConfig {
   readonly privateRoutes?: readonly ClickHousePrivateRoute[];
   /** Route variables that did not parse: those organizations are refused, never shared. */
   readonly malformedRoutes?: readonly MalformedPrivateVariable[];
+  /**
+   * `CLICKHOUSE_READER_URL` — the shared server as the app reader (ADR-202). With any reader
+   * credential set, tenant reads go as the reader and a target lacking one refuses them by name.
+   */
+  readonly readerUrl?: string;
+  /** `CLICKHOUSE_READER_URL__<label>__<orgId>`: each private server as the app reader. */
+  readonly readerPrivateRoutes?: readonly ClickHousePrivateRoute[];
+  /** Reader route variables that did not parse: refused, never shared. */
+  readonly malformedReaderRoutes?: readonly MalformedPrivateVariable[];
+  /**
+   * `CLICKHOUSE_WRITER_URL` — the shared server as the insert-only writer (ADR-202 Decided 12).
+   * Connected only where the system identity is absent: the api's inserts go as the writer.
+   */
+  readonly writerUrl?: string;
+  /** `CLICKHOUSE_WRITER_URL__<label>__<orgId>`: each private server as the writer. */
+  readonly writerPrivateRoutes?: readonly ClickHousePrivateRoute[];
+  /** Writer route variables that did not parse: refused, never shared. */
+  readonly malformedWriterRoutes?: readonly MalformedPrivateVariable[];
+  /** `CLICKHOUSE_ENFORCING_READER_URL`: the shared server as the shadow sampler's reader. */
+  readonly enforcingReaderUrl?: string;
+  /** `CLICKHOUSE_SHADOW_SAMPLE_RATE`: share of reader reads re-run enforced; 0 samples none. */
+  readonly shadowSampleRate?: number;
   /** What sizes the per-endpoint pool, as main's `CLICKHOUSE_*` pool variables state it. */
   readonly poolSizing?: PoolSizingInput;
   /** How long one statement may take before the driver abandons it. */
@@ -201,6 +223,11 @@ export type ObjectStorageConfig = (
 export interface ProcessConfig {
   /** Names the process in every log line and every metric these members write. */
   readonly processName: string;
+  /**
+   * Which role this process boots as, as `ProcessServer.boot` states it. Only the api warns
+   * about the system ClickHouse credential beside the reader and the writer (ADR-202 Decided 14).
+   */
+  readonly role?: "api" | "worker" | "tasks";
   /** The 32-byte key stored values are encrypted under, hex-encoded. */
   readonly encryptionKey: string;
   /** The key before a rotation, hex-encoded: stored values open under it, none is sealed. */

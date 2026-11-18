@@ -2,6 +2,7 @@ package render
 
 import (
 	"path/filepath"
+	"strings"
 
 	"github.com/langwatch/langwatch/infra/clickhouse-serverless/internal/config"
 )
@@ -11,16 +12,15 @@ type customSettingsPrefixesConfig struct {
 	CustomSettingsPrefixes string `yaml:"custom_settings_prefixes"`
 }
 
-// renderCustomSettingsPrefixes writes custom-settings-prefixes.yaml declaring
-// the `custom_` settings prefix. A LangWatchQL deployment prerequisite: the
-// per-query tenant capability travels as a `custom_`-prefixed setting, and
-// without the declared prefix the server rejects the settings profile with
-// UNKNOWN_SETTING (115) before any of the access model can be created.
-// Unconditional — the prefix declaration alone changes nothing for a server
-// that never uses such a setting.
+// customSettingsPrefixes: `custom_` carries LangWatchQL's tenant capability,
+// `SQL_` the app reader's tenant set and enforce switch (ADR-202).
+var customSettingsPrefixes = []string{"SQL_", "custom_"}
+
+// renderCustomSettingsPrefixes declares them; undeclared, the server refuses
+// either settings profile with UNKNOWN_SETTING (115). Unconditional.
 func renderCustomSettingsPrefixes(configD string) error {
 	return writeYAML(filepath.Join(configD, "custom-settings-prefixes.yaml"), customSettingsPrefixesConfig{
-		CustomSettingsPrefixes: "custom_",
+		CustomSettingsPrefixes: strings.Join(customSettingsPrefixes, ","),
 	})
 }
 

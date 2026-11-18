@@ -117,6 +117,7 @@ describe("given a rendered install whose config store has not mounted the named 
     convergeAppOwned,
     check: runLwqlReconvergence({
       probe: () => Promise.resolve("config_store"),
+      refreshAnswer: () => Promise.resolve(),
       converge: () => Promise.resolve(),
       findDrift: () => findLwqlAppOwnedDrift({ database: database(), plan: plan() }),
       convergeAppOwned,
