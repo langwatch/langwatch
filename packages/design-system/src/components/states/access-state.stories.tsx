@@ -38,6 +38,8 @@ export const Inset: Story = {
     ),
   ],
 };
+/** A page's only content, with an illustration under the words: on the centre axis. */
+export const Centered: Story = { args: { centered: true } };
 export const Permission: Story = {
   args: {
     kind: "permission",

@@ -12,6 +12,8 @@ export type AccessStateProps = {
   /** Inside a card, popover or dialog that already draws the surface: no box of its own, the
    * icon beside the words, so the lock starts on the host's content edge. Implies `compact`. */
   inset?: boolean;
+  /** A whole page's only content, often with an illustration: everything on the centre axis. */
+  centered?: boolean;
   "data-testid"?: string;
 };
 
@@ -23,6 +25,7 @@ export function AccessState({
   children,
   compact = false,
   inset = false,
+  centered = false,
   "data-testid": testId,
 }: AccessStateProps) {
   if (inset) {
@@ -57,9 +60,12 @@ export function AccessState({
       borderColor="border.muted"
       borderRadius="xl"
       bg="bg.panel"
+      align={centered ? "center" : undefined}
+      textAlign={centered ? "center" : undefined}
       data-testid={testId}
+      data-centered={centered ? "" : undefined}
     >
-      <Stack gap={4} align="start">
+      <Stack gap={4} align={centered ? "center" : "start"}>
         <AccessStateIcon kind={kind} compact={compact} />
         <Stack gap={2} maxWidth="64ch">
           <Heading as="h2" size={compact ? "sm" : "xl"}>
@@ -70,9 +76,9 @@ export function AccessState({
           </Text>
         </Stack>
       </Stack>
-      {children && <Box>{children}</Box>}
+      {children && <Box width={centered ? "full" : undefined}>{children}</Box>}
       {actions && (
-        <HStack gap={3} flexWrap="wrap">
+        <HStack gap={3} flexWrap="wrap" justify={centered ? "center" : undefined}>
           {actions}
         </HStack>
       )}
