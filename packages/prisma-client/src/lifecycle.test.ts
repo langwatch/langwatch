@@ -350,6 +350,27 @@ describe("explicit Prisma lifecycle", () => {
       expect(logger.error).not.toHaveBeenCalled();
     });
 
+    it("lands a record-not-found error event at debug, since its caller gets the throw", () => {
+      const logger = fakeLogger();
+      const timestamp = new Date("2026-09-09T00:00:00.000Z");
+
+      forwardPrismaEvent({
+        logger,
+        level: "error",
+        event: {
+          target: "x",
+          message:
+            "Invalid `prisma.grantUsage.update()` invocation: An operation failed because it " +
+            "depends on one or more records that were required but not found. " +
+            "No record was found for an update.",
+          timestamp,
+        },
+      });
+
+      expect(logger.debug).toHaveBeenCalledOnce();
+      expect(logger.error).not.toHaveBeenCalled();
+    });
+
     it("lands a query event on the logger at debug, keyed by its SQL text", () => {
       const logger = fakeLogger();
       const timestamp = new Date("2026-09-09T00:00:00.000Z");

@@ -33,9 +33,32 @@ function isSchemaBehind(message: string): boolean {
   return message.toLowerCase().includes("does not exist") && SCHEMA_BEHIND_SUBJECT.test(message);
 }
 
+const RECORD_NOT_FOUND = /\bP2025\b|required but not found|No record was found for/;
+
+/**
+ * P2025 also reaches its caller as a thrown error, and some callers catch it on purpose (a
+ * fenced update that matched no row). Prisma's own event for it is a duplicate, so it is debug.
+ */
+function isRecordNotFound(message: string): boolean {
+  return RECORD_NOT_FOUND.test(message);
+}
+
 /** A query event carries `query` where a log event carries `message`. */
 function prismaEventMessage(event: Prisma.LogEvent | Prisma.QueryEvent): string {
   return "query" in event ? event.query : event.message;
+}
+
+/** An error event's level: a behind schema is a warning, a missing record is the caller's. */
+function errorEventLevel({
+  level,
+  message,
+}: {
+  level: Prisma.LogLevel;
+  message: string;
+}): "error" | "warn" | "info" | "debug" {
+  if (level !== "error") return prismaLoggerLevel(level);
+  if (isSchemaBehind(message)) return "warn";
+  return isRecordNotFound(message) ? "debug" : "error";
 }
 
 /** Forwards one Prisma client event to the process logger as one structured line. */
@@ -49,8 +72,7 @@ export function forwardPrismaEvent({
   event: Prisma.LogEvent | Prisma.QueryEvent;
 }): void {
   const message = prismaEventMessage(event);
-  const loggerLevel =
-    level === "error" && isSchemaBehind(message) ? "warn" : prismaLoggerLevel(level);
+  const loggerLevel = errorEventLevel({ level, message });
   logger[loggerLevel](
     { target: event.target, message, timestamp: event.timestamp },
     PRISMA_EVENT_MESSAGE[level],
