@@ -372,6 +372,26 @@ describe("explicit Prisma lifecycle", () => {
       expect(logger.error).not.toHaveBeenCalled();
     });
 
+    it("lands a unique-conflict error event at debug, since its caller gets the throw", () => {
+      const logger = fakeLogger();
+      const timestamp = new Date("2026-09-09T00:00:00.000Z");
+
+      forwardPrismaEvent({
+        logger,
+        level: "error",
+        event: {
+          target: "x",
+          message:
+            "Invalid `prisma.identifier.upsert()` invocation: Unique constraint failed on the " +
+            "constraint: `Identifier_providerId_providerAccountId_live_key`",
+          timestamp,
+        },
+      });
+
+      expect(logger.debug).toHaveBeenCalledOnce();
+      expect(logger.error).not.toHaveBeenCalled();
+    });
+
     it("puts the reason first and the call after, not Prisma's invocation header", () => {
       const message = readablePrismaMessage(
         "\nInvalid `prisma.grantUsage.update()` invocation:\n\n\n" +

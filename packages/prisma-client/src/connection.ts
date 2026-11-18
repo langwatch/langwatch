@@ -33,14 +33,16 @@ function isSchemaBehind(message: string): boolean {
   return message.toLowerCase().includes("does not exist") && SCHEMA_BEHIND_SUBJECT.test(message);
 }
 
-const RECORD_NOT_FOUND = /\bP2025\b|required but not found|No record was found for/;
+const CALLER_HANDLES =
+  /\bP20(?:02|25)\b|required but not found|No record was found for|Unique constraint failed/;
 
 /**
- * P2025 also reaches its caller as a thrown error, and some callers catch it on purpose (a
- * fenced update that matched no row). Prisma's own event for it is a duplicate, so it is debug.
+ * P2025 (no record) and P2002 (unique conflict) also reach their caller as a thrown error, and
+ * some callers catch them on purpose: a fenced update that matched no row, a conflict that is
+ * parked. Prisma's own event for them is a duplicate, so it is debug.
  */
-function isRecordNotFound(message: string): boolean {
-  return RECORD_NOT_FOUND.test(message);
+function isCallerHandled(message: string): boolean {
+  return CALLER_HANDLES.test(message);
 }
 
 /** A query event carries `query` where a log event carries `message`. */
@@ -61,7 +63,7 @@ export function readablePrismaMessage(message: string): string {
   return `${reason.trim()} (prisma.${call})`;
 }
 
-/** An error event's level: a behind schema is a warning, a missing record is the caller's. */
+/** An error event's level: a behind schema warns; a missing row or a conflict is the caller's. */
 function errorEventLevel({
   level,
   message,
@@ -71,7 +73,7 @@ function errorEventLevel({
 }): "error" | "warn" | "info" | "debug" {
   if (level !== "error") return prismaLoggerLevel(level);
   if (isSchemaBehind(message)) return "warn";
-  return isRecordNotFound(message) ? "debug" : "error";
+  return isCallerHandled(message) ? "debug" : "error";
 }
 
 /** Forwards one Prisma client event to the process logger as one structured line. */
