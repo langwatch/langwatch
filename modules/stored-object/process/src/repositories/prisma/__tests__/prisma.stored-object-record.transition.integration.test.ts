@@ -122,6 +122,20 @@ describe.skipIf(!databaseUrl)("Prisma stored-object record: conditional transiti
     });
   });
 
+  /** @scenario "A Stored Objects import never writes over a row another run created" */
+  it("inserts a row once and leaves a row that already holds the id as it is", async () => {
+    const first = record({ id: `${namespace}-insert` as StoredObjectId, status: "deleted" });
+
+    await expect(repository.insert(first)).resolves.toBe(true);
+    await expect(
+      repository.insert({ ...first, status: "available", generation: 0, byteLength: 4 }),
+    ).resolves.toBe(false);
+    await expect(repository.findById({ tenantId, id: first.id })).resolves.toMatchObject({
+      status: "deleted",
+      byteLength: 3,
+    });
+  });
+
   it("never moves another tenant's row under the same id", async () => {
     const theirs = record({
       tenantId: otherTenantId,

@@ -26,7 +26,7 @@ import { gateTraceLogVisibility, redactV2Content } from "../rules/trace-read-map
 
 const evaluationsSchema = evaluationSchema.array();
 
-/** ADR-201 §9: the braid dialog's reads are Enterprise, named at the owner. */
+/** ADR-201 §9: the braid dialog's and Braids page's reads are Enterprise, named at the owner. */
 const braids = { feature: "BRAIDS" } as const;
 
 export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesTrpc> =
@@ -601,25 +601,9 @@ export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesT
 
     .procedure("spanLangwatchSignals")
     .withPermission("traces:view")
-    .handle(async ({ app, input, authorization: routeProof }) => {
-      const authorization = await app.authorizationForTrace({
-        authorization: routeProof,
-        traceId: input.traceId,
-        tenantId: input.tenantId,
-      });
-      const rows = await app.readLangwatchSignals({
-        authorization,
-        traceId: input.traceId,
-        occurredAtMs: input.occurredAtMs,
-        reads: "spans",
-      });
-
-      return rows.map((r) => ({
-        spanId: r.spanId,
-        signals: r.signals,
-        ...(r.ownerProjectId === undefined ? {} : { ownerProjectId: r.ownerProjectId }),
-      }));
-    })
+    .handle(({ app, input, authorization, actor }) =>
+      app.readLangwatchSignalsForViewer({ ...input, authorization, viewerUserId: actor.id }),
+    )
 
     /**
      * Full span data for every span in a trace — used by the LLM Optimized
@@ -678,10 +662,12 @@ export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesT
     )
 
     .procedure("braidAttributeKeys")
+    .withEntitlement("enterprise", braids)
     .withPermission("traces:view")
     .handle(({ app, authorization }) => app.readBraidAttributeKeys({ authorization }))
 
     .procedure("braidActivity")
+    .withEntitlement("enterprise", braids)
     .withPermission("traces:view")
     .handle(({ app, input, authorization }) =>
       app.readBraidActivity({

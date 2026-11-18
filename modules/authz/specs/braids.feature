@@ -89,11 +89,56 @@ Feature: Braids
       And the other request is refused with braid_already_exists
 
     @unit
-    Scenario: Braids do not chain
+    Scenario: Repeating a create with the same command id answers the same braid
+      Given ana braided "specialists" into "orchestrator" with a command id
+      When the same request arrives again with that command id, saved or still being saved
+      Then it answers the same braid with the same id
+      And the ledger is written once
+      And the same command id on a request with other terms is refused with grant_validation_failed
+
+    @unit
+    Scenario: A braid identical to one still being saved is refused
+      Given ana's braid from "specialists" into "orchestrator" is in the ledger but not yet in the grant projection
+      When ana asks for a braid with the same projects, condition, data window and end date and no command id
+      Then the second braid is refused with braid_already_exists
+      And a change of another braid to those terms is refused the same way
+      And the braid still being saved counts toward the reader's distinct conditions
+
+    @unit
+    Scenario: A braid not confirmed in time is saved once, and its retry answers it
+      Given the grant projection does not land ana's braid within the read-your-writes window
+      When ana braids "specialists" into "orchestrator" with a command id
+      Then the request is refused with authz_grant_not_confirmed and the braid is still saved
+      And repeating the request with the same command id resends the same command and writes no second braid
+      And once the projection lands the repeat answers that braid
+
+    @unit
+    Scenario: A braid write the ledger accepted stays saved when its confirmation fails
+      Given the ledger accepts ana's braid with a command id
+      When waiting for the grant projection or moving the organisation's epoch then fails
+      Then the request fails and the braid's write stays saved, since it may still land
+      And only a braid the ledger refused is forgotten
+
+    @unit
+    Scenario: A command id answers only the actor who sent it
+      Given ana's braid with a command id is in the ledger but not yet in the grant projection
+      When tom sends a braid with the same command id and terms
+      Then nothing is resent in tom's name and no braid answers as ana's
+      And tom's braid is refused with braid_already_exists
+
+    @unit
+    Scenario: A braid still being saved counts however long ago it was sent
+      Given ana's braid is in the ledger but the grant projection has not landed it for hours
+      When ana asks for a braid with the same projects, condition, data window and end date
+      Then the second braid is refused with braid_already_exists
+
+    @unit
+    Scenario: A braid's grant does not pass on to a third project
       Given a live braid from "specialists" into "orchestrator"
       And a live braid from "orchestrator" into a third project "frontdesk"
       When a proof is minted for "frontdesk"
       Then it carries the braid from "orchestrator" and nothing braided into "orchestrator"
+      And this is about grants, not calls: a call chain through several owners is held only where each owner braids into the reader itself (braided-spans.feature)
 
   Rule: A braid's grant in a proof carries a permission of its own and its compiled condition
 
@@ -198,6 +243,14 @@ Feature: Braids
       When tom's permissions are read
       Then tom holds braids:manage on "specialists"
 
+    @unit
+    Scenario: A refusal under braids kept to organisation admins names the policy
+      Given the organisation keeps braids to its admins
+      And tom is an admin of the team holding "specialists"
+      When tom asks to braid out of "specialists"
+      Then the refusal's reason says the organisation keeps braids to its admins, as the Braids page's banner does
+      And it is not a bare missing grant
+
     @integration
     Scenario: With braids kept to organisation admins, a team admin may not braid
       Given the organisation keeps braids to its admins
@@ -270,7 +323,7 @@ Feature: Braids
     Scenario: A braid with no condition braids every owner span in the reader's traces
       When ana saves a braid from "specialists" into "orchestrator" with no condition
       Then the braid is accepted
-      And every "specialists" span sharing a trace id with an "orchestrator" trace is braided
+      And every "specialists" span is braided in each trace where an "orchestrator" span and a "specialists" span are parent and child
 
     @unit
     Scenario: A compiled condition carries the compiler's version
@@ -345,6 +398,14 @@ Feature: Braids
       When ana repeats the same change
       Then the change answers the grant already attached
       And no third grant is attached
+
+    @unit
+    Scenario: A retried change whose braid was removed meanwhile is refused
+      Given ana's change of a braid is in the ledger but not yet in the grant projection
+      And the braid it replaces is removed
+      When ana repeats the change with the same command id
+      Then it is refused with braid_changed
+      And the replacement is not sent again
 
     @unit
     Scenario: A replaced braid reads nothing once its replacement is live, even before the worker revokes it

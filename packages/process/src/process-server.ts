@@ -8,6 +8,7 @@ import type { SecretsResolver } from "@langwatch/secrets";
 import { z } from "zod";
 
 import { bootInstalledProcess } from "./boot-installed-process.ts";
+import type { LongRequestBody } from "./lifecycle/request-body-deadline.ts";
 import { processShutdownDeadlineMs } from "./lifecycle/shutdown-deadline.ts";
 import type { IdIndexRetention } from "./migration/id-index-fill-step.ts";
 import { warnIgnoredMigrationSkips } from "./migration/ignored-migration-skips.ts";
@@ -51,6 +52,7 @@ export class ProcessServer implements ProcessBoot {
     resolver: SecretsResolver;
     healthPort?: number;
     ownsProcess?: boolean;
+    longRequestBodies?: readonly LongRequestBody[];
     modules: readonly ProcessModule[];
     idIndexRetention?: IdIndexRetention;
   }): ProcessServer {
@@ -60,6 +62,7 @@ export class ProcessServer implements ProcessBoot {
       logger: options.logger,
       ownsProcess: options.ownsProcess,
       healthPort: options.healthPort ?? settings.port,
+      ...(options.longRequestBodies ? { longRequestBodies: options.longRequestBodies } : {}),
       shutdownDeadlineMs: processShutdownDeadlineMs({
         deadlineMs: settings.shutdownDeadlineMs,
         queueDrainMs: (options.config.stores as StoresConfig | undefined)?.shutdownDrainTimeoutMs,
