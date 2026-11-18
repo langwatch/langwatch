@@ -298,12 +298,11 @@ func TestStepsFreezesEachIdIndexCallOfOneChainOnItsOwn(t *testing.T) {
 	cases := []struct {
 		name, gateway, ops, want string
 	}{
-		{"the gateway's unreleased second call edited", gateway, ops, ""},
+		{"the gateway's unreleased second call edited", strings.Replace(gateway, "Fills second.", "Fills more.", 1), ops, ""},
 		{"the gateway's released call edited", strings.Replace(gateway, "Fills gateway.", "Fills more.", 1), ops, "declares gateway:fill-id-indexes"},
 		{"the ops module's unreleased call edited", gateway, strings.Replace(ops, "Fills ops.", "Fills more.", 1), ""},
 		{"the ops module's released call edited", gateway, strings.Replace(ops, "Fills the event log.", "Fills more.", 1), "declares ops:fill-event-log-id-index"},
 	}
-	cases[0].gateway = strings.Replace(gateway, "Fills second.", "Fills more.", 1)
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			findings := idIndexFindings(t, map[string][2]string{gatewayFile: {gateway, c.gateway}, opsFile: {ops, c.ops}})

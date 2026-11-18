@@ -36,7 +36,8 @@ type ReleasedStep struct {
 	// Path is repository-relative, on the base branch.
 	Path string
 	// Base is the declaration on the base branch: the step call (stepCalls)
-	// holding the id, or the whole file when no such call encloses it.
+	// holding the id or the owner's id-index fill call (idIndexBlock), else
+	// the whole file when neither encloses it.
 	Base string
 	// Head is the same declaration on the branch head, at HeadPath; empty
 	// when the branch no longer declares the id anywhere.
@@ -96,8 +97,9 @@ func isCodeStep(id string) bool {
 }
 
 // Steps reads the released code steps from the manifests on baseRef and on
-// every release line, finds the base branch declaration of each by its quoted
-// id, and the same declaration on HEAD: at the same path first, else anywhere.
+// every release line, finds the base branch declaration of each (a step call
+// quoting its id, or its owner's id-index fill call), and the same declaration
+// on HEAD: at the same path first, else anywhere.
 func (r Repo) Steps(ctx context.Context, baseRef string, releasedRefs ...string) (StepInput, error) {
 	in := StepInput{BaseRef: baseRef}
 	releaseOf := map[string]string{}
@@ -173,7 +175,7 @@ func (reader *fileReader) baseDeclarations(ref, id string, declared []declaratio
 }
 
 // findBlock returns the first file on ref, by path, that declares id in a
-// step call (stepCalls), and that call.
+// step call (stepCalls) or its owner's id-index fill call, and that call.
 func (reader *fileReader) findBlock(ref, id string, declared []declaration) (string, string, error) {
 	for _, d := range declared {
 		if d.id != id {
