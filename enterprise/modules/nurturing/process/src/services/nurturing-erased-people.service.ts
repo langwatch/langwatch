@@ -17,7 +17,6 @@ export class NurturingErasedPeopleService {
   private constructor(private readonly erasedUsers: ErasureMarks) {}
 
   /** Whether erasure marked this one person. */
-
   async isErased(userId: string): Promise<boolean> {
     const [erased] = await this.erasedUsers.findErased({ userIds: [userId] });
     return erased !== undefined;

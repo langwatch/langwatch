@@ -102,18 +102,22 @@ nothing, and an organization's fact still reaches its other members; a guided
 turn's failure and an organization's creation read the marks too. A member list
 read from the owner (`getAllMembers`) does not read the marks: it relies on the
 owner deleting the person's `OrganizationUser` and `User` rows in the same
-transaction as the fact that records the erasure. The marks are
-read before the send, not with it: an erasure committing between that read and
-the send lets that one send out, and nothing short of holding the send in the
-erasure's transaction, which an HTTP call cannot join, closes it. A key fact
-naming a marked holder folds in as no holder at the fact's own stamp, clearing
-a holder keeps their stamp, and a holder fact at a cleared holder's own stamp
-fills it, so a key's holder is the person its latest-stamped holder fact names,
-or no one if they are erased, whatever order the facts and the erasure arrive
-in, but for one case: two holder facts at one stamp naming two people keep the
-one folded first while neither is marked; if that one is erased later, the key
-ends with no holder. Erasure no longer moves a cleared holder's stamp to now. A
-hand-over stamped between the holder's stamp and the erasure, which was
+transaction as the fact that records the erasure. The mark is written by
+nurturing's `userErased` subscriber, after the owner has committed the erasure:
+until it runs, however long it lags or retries, a signal about the person still
+sends, and an identify can recreate their Customer.io person, which nurturing
+never deletes. After it, the marks are read before the send, not with it: a mark
+written between that read and the send lets that one send out. Nothing short of
+holding the send in the erasure's transaction, which an HTTP call cannot join,
+closes either gap. A key fact naming a marked holder folds in as no holder at
+the fact's own stamp, clearing a holder keeps their stamp, and a holder fact at
+a cleared holder's own stamp fills it, so a key's holder is the person its
+latest-stamped holder fact names, or no one if they are erased, whatever order
+the facts and the erasure arrive in, but for one case: two holder facts at one
+stamp naming two people keep the one folded first while neither is marked; if
+that one is erased later, the key has no holder until the other person's fact at
+that stamp is redelivered. Erasure no longer moves a cleared holder's stamp to
+now. A hand-over stamped between the holder's stamp and the erasure, which was
 dropped, now lands. The race the moved stamp closed is now closed by the
 re-check. A redelivered batch can count a trace twice, and so can a root span
 stored more than once; accepted (owner decision, issue 9378).

@@ -317,6 +317,7 @@ export async function gatewayFactsOver({
     virtualKeys,
     members,
     milestones,
+    erasedUsers,
     logLines: lines,
     requests: customerIo.requests,
     sent: customerIo.sent,

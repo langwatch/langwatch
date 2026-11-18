@@ -509,6 +509,26 @@ describe("gateway's key facts in nurturing", () => {
     });
   });
 
+  describe("when a key's holder is marked erased but their member row survived", () => {
+    /** @scenario "A key fact naming a marked holder whose member row survived goes to the admin" */
+    it("sends the creation to the organization's admin and nothing to the holder", async () => {
+      const facts = await gatewayFactsOver();
+      await facts.joined("user-jane");
+      // Marked with no DELETE, as a join whose worker stopped before its re-check leaves it.
+      await facts.erasedUsers.markErased({ userId: "user-jane" });
+
+      await facts.deliverFact(
+        created({ actor_user_id: "user-jane", principal_user_id: "user-jane" }),
+      );
+
+      await expect(
+        facts.members.findMembershipsOfUsers({ userIds: ["user-jane"] }),
+      ).resolves.toHaveLength(1);
+      expect(facts.requests.filter((body) => body.includes("user-jane"))).toEqual([]);
+      expect(callsOf(facts.sent)).toEqual([["track", ADMIN_USER_ID, "virtual_key_created"]]);
+    });
+  });
+
   describe("when every fact above has been delivered", () => {
     it("never sends the secret, prefix, reason, end user, bucket, budget, project or a person's id", async () => {
       const facts = await gatewayFactsOver();

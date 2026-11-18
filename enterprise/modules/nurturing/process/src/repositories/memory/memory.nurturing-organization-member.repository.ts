@@ -38,9 +38,13 @@ export class MemoryNurturingOrganizationMemberRepository implements NurturingOrg
     change: NurturingMembershipChange;
     at: number;
   }>): Promise<void> {
-    const [erased] = await this.#erasedUsers.findErased({ userIds: [userId] });
-    if (erased) return;
     const key = JSON.stringify([organizationId, userId]);
+    const [erased] = await this.#erasedUsers.findErased({ userIds: [userId] });
+    // As Postgres's re-check does: a marked account's row in this organization goes.
+    if (erased) {
+      this.#memberships.delete(key);
+      return;
+    }
     const known = this.#memberships.get(key) ?? {
       organizationId,
       userId,

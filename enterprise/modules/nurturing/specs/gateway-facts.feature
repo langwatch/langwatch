@@ -206,6 +206,13 @@ Feature: Customer.io hears when a person's gateway key is created and when its b
     And virtual_key_created goes to the organization's admin
     And no warning says a holder was passed over for a lagging member copy
 
+  @unit
+  Scenario: A key fact naming a marked holder whose member row survived goes to the admin
+    Given a person is marked erased but still holds a current member row
+    When gateway's created fact naming them as holder and creator is delivered
+    Then virtual_key_created goes to the organization's admin
+    And no identify or track goes to them
+
   @integration
   Scenario: Which people are erased is read from the erasure marks in Postgres
     Given two people's erasures were recorded in Postgres, one of them twice
@@ -249,6 +256,7 @@ Feature: Customer.io hears when a person's gateway key is created and when its b
   # "erased holder null in any order"            -> Scenario: A late fact naming an erased person ends the key with no holder, as if it landed first
   # "fact racing the erasure's commit"           -> Scenario: A fact that lands while an erasure is committing still leaves the erased person off the key
   # "no send to an erased person"                -> Scenario: A key fact naming an erased person sends nothing to them
+  #                                               -> Scenario: A key fact naming a marked holder whose member row survived goes to the admin
   #                                               -> Scenario: Which people are erased is read from the erasure marks in Postgres
   #                                               -> Scenario: A member fact landing after an erasure writes no member row in Postgres (project-usage.feature)
   #                                               -> Scenario: A member fact landing while an erasure commits leaves no member row in Postgres (project-usage.feature)

@@ -30,7 +30,10 @@ export class PrismaNurturingVirtualKeyRepository
   extends PrismaRepository.for("NurturingVirtualKey")
   implements NurturingVirtualKeyRepository
 {
-  /** `erasedUsers` defaults to the marks over the same client. */
+  /**
+   * `erasedUsers` defaults to the marks over the same client. It only writes marks: the writes'
+   * own checks always read them on this client, through `markExists`.
+   */
   static create({
     prisma,
     erasedUsers = PrismaNurturingErasedUserRepository.create({ prisma }),

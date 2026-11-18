@@ -76,7 +76,7 @@ Feature: Customer.io knows each team's real plan
     Then Customer.io receives no call
     And one line with a count and no ids is logged
 
-  @unit
+  @integration
   Scenario: A subscription fact naming an erased member tells them nothing
     Given billing's subscription fact names two members, one of them erased
     When it is delivered

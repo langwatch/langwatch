@@ -10,8 +10,12 @@ Feature: Nurturing keeps its own copy of personal owners and traced projects, fr
   When user records an account erased, nurturing marks it erased (NurturingErasedUser, a hash of
   its id), deletes every owner row naming it, in every organization, and clears it wherever its
   own organization rows name it admin. It reads no other module's table and calls no sink. No
-  signal delivered afterwards reaches the account, and no read names it admin again: a late
-  project-created fact naming it admin stores it, but the mark reads it as no admin. Accepted
+  signal delivered after the mark reaches the account, and no read names it admin again: a late
+  project-created fact naming it admin stores it, but the mark reads it as no admin. The mark
+  is written when nurturing handles lw.user.erased, after user has committed the erasure: a
+  signal about the account delivered in between, however long that handling lags or retries,
+  still sends, and an identify then can recreate its Customer.io person, which nurturing never
+  deletes. Accepted
   residue: a personal-owner fact delivered after the erasure (a delayed listing or a redelivered
   workspace fact) writes the owner row again, as the owner copy does not read the marks.
 
