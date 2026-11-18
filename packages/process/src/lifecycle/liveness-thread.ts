@@ -256,12 +256,24 @@ const answerFailed = (req, res) => {
   if (!String(req.headers.accept || "").includes("text/html")) return answerUpgrading(req, res);
   answerConsole(res, 503, hasSession(req) ? consoleHold.consolePage : consoleHold.loginPage);
 };
-const unavailable = (res, body, headers) => {
+const unavailable = (res, body) => {
   if (res.destroyed || res.writableEnded) return;
   if (res.headersSent) return res.destroy();
-  res.writeHead(503, { "Content-Type": "text/plain", ...headers }).end(body);
+  res.writeHead(503, { "Content-Type": "text/plain" }).end(body);
+};
+// A declared body still arriving when an answer is written: Node would read the rest up to the
+// ceiling, so the answer closes the connection instead (a bodiless request is never pending).
+const bodyPending = (req) =>
+  !req.complete && (req.headers["transfer-encoding"] !== undefined || Number(req.headers["content-length"] || 0) > 0);
+const closeWhenBodyPending = (req, res) => {
+  const writeHead = res.writeHead;
+  res.writeHead = function (...args) {
+    if (bodyPending(req)) this.setHeader("connection", "close");
+    return writeHead.apply(this, args);
+  };
 };
 const server = http.createServer((req, res) => {
+  closeWhenBodyPending(req, res);
   if (req.url === workerData.livenessPath && !proxiesLiveness) {
     const stalled = stalledMs();
     if (stalled > workerData.stallBudgetMs) {
@@ -317,14 +329,12 @@ const proxy = (req, res) => {
     if (reply.headers[workerData.notHandledHeader] === workerData.notHandledDraining) {
       headers.connection = "close";
     }
-    // Answered before the client's body arrived (a cut, a refusal): the rest is not read here either.
-    if (!req.complete) headers.connection = "close";
     res.writeHead(reply.statusCode ?? 502, headers);
     reply.pipe(res);
   });
   upstream.on("error", () => {
     clearInterval(timer);
-    unavailable(res, "main thread did not answer", req.complete ? {} : { connection: "close" });
+    unavailable(res, "main thread did not answer");
   });
   req.pipe(upstream);
 };

@@ -90,6 +90,8 @@ Feature: Uploads through LangWatch when browsers cannot reach the bucket
       Given a door in front of the api's listener: the liveness thread every booted process has, or the npx server's boot door
       When the api answers before the client's request body has fully arrived
       Then the door relays the answer and closes the client's connection
+      And an answer the door writes itself, such as liveness or readiness, closes a connection whose body is still arriving
+      And a request that declared no body keeps its connection for reuse
 
   Rule: Uploads nobody confirmed are cleaned up
 

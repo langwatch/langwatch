@@ -386,3 +386,52 @@ describe("given a proxy door in front of the api", () => {
     });
   });
 });
+
+describe("given the liveness thread holding the api's two-hour ceiling", () => {
+  /** A thread in front of a listener that answers everything at once, readiness latched. */
+  async function threadWithItsOwnAnswers(): Promise<LivenessThread> {
+    const api = http.createServer((_request, response) => response.end("ok"));
+    listeners.push(api);
+    await new Promise<void>((resolve) => api.listen(0, "127.0.0.1", resolve));
+    const readiness = new SharedArrayBuffer(4);
+    Atomics.store(new Int32Array(readiness), 0, 1);
+    const thread = await startLivenessThread({
+      port: 0,
+      heartbeat: new BigInt64Array(new SharedArrayBuffer(8)).buffer as SharedArrayBuffer,
+      readiness,
+      proxyPort: (api.address() as AddressInfo).port,
+      logger,
+      requestTimeoutMs: TWO_HOURS_MS,
+    });
+    threads.push(thread);
+    return thread;
+  }
+
+  describe.each(["/healthz", "/readyz"])(
+    "when a client sends a slow body to %s, which the thread answers itself",
+    (path) => {
+      /** @scenario "A door in front of the api closes a client whose body the api cut" */
+      it("answers and closes the connection instead of holding it for the ceiling", async () => {
+        const thread = await threadWithItsOwnAnswers();
+
+        const answer = await sendSlowly({ port: thread.address.port, path, bytes: 8, gapMs: 100 });
+
+        expect(answer.statusLine).toBe("HTTP/1.1 200 OK");
+        expect(answer.closedEarly).toBe(true);
+      });
+    },
+  );
+
+  describe("when a probe sends no body", () => {
+    /** @scenario "A door in front of the api closes a client whose body the api cut" */
+    it("keeps the connection open for reuse", async () => {
+      const thread = await threadWithItsOwnAnswers();
+
+      const response = await fetch(`http://127.0.0.1:${thread.address.port}/healthz`);
+
+      expect(response.status).toBe(200);
+      expect(response.headers.get("connection")).not.toBe("close");
+      await response.text();
+    });
+  });
+});
