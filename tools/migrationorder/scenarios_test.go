@@ -281,6 +281,63 @@ func TestStepsFreezesOnlyAReleasedReplayStepCall(t *testing.T) {
 	}
 }
 
+// @scenario "A released id-index step is frozen in its declaring call, not where another step orders after it"
+func TestStepsFreezesAReleasedIdIndexStepInItsDeclaringCall(t *testing.T) {
+	const (
+		gatewayFile = "modules/gateway/process/src/gateway.module.ts"
+		opsFile     = "modules/ops/process/src/ops.module.ts"
+		gatewayCall = ".withIdIndexes(GATEWAY_ID_INDEXES, {\n  after: [\"coding-agent:fill-id-indexes\"],\n  description: \"Fills gateway.\",\n})"
+		opsCall     = ".withIdIndexes([EVENT_LOG_ID_INDEX], {\n  step: \"fill-event-log-id-index\",\n  after: [\"gateway:fill-id-indexes\"],\n})"
+		gateway     = "export const gateway = defineProcessModule(\"gateway\")\n  " + gatewayCall + ";\n"
+		ops         = "export const ops = defineProcessModule(\"ops\")\n  .withEventing(usageEventing)\n  " + opsCall + ";\n"
+	)
+	findingsAfter := func(t *testing.T, gatewayHead, opsHead string) []migrationorder.Finding {
+		t.Helper()
+		root := initRepo(t)
+		writeAndCommit(t, root, gatewayFile, gateway)
+		writeAndCommit(t, root, opsFile, ops)
+		writeAndCommit(t, root, "packages/upgrade/releases/3.21.0.json", `{"release":"3.21.0","steps":[
+  {"id":"gateway:fill-id-indexes","kind":"data","mode":"background","owner":"gateway","description":"g"},
+  {"id":"ops:fill-event-log-id-index","kind":"data","mode":"background","owner":"ops","description":"o"},
+  {"id":"coding-agent:fill-id-indexes","kind":"data","mode":"background","owner":"coding-agent","description":"c"}]}`)
+		gitIn(t, root, "checkout", "-q", "-b", "feature")
+		for file, heads := range map[string][2]string{gatewayFile: {gateway, gatewayHead}, opsFile: {ops, opsHead}} {
+			if heads[1] != heads[0] {
+				writeAndCommit(t, root, file, heads[1])
+			}
+		}
+		in, err := migrationorder.Repo{Root: root}.Steps(t.Context(), "main")
+		if err != nil {
+			t.Fatal(err)
+		}
+		return migrationorder.CheckSteps(in)
+	}
+	unrelated := strings.Replace(ops, "  .withEventing(usageEventing)\n", "  .withEventing(usageEventing)\n  .withEventing(replayEventing)\n", 1)
+	if findings := findingsAfter(t, gateway, unrelated); len(findings) != 0 {
+		t.Errorf("an unrelated line in the referencing file, want no finding, got %+v", findings)
+	}
+	// coding-agent:fill-id-indexes is only referenced here, never declared.
+	gatewayUnrelated := "import { more } from \"./more\";\n" + gateway
+	if findings := findingsAfter(t, gatewayUnrelated, ops); len(findings) != 0 {
+		t.Errorf("an unrelated line beside a reference to an undeclared step, want no finding, got %+v", findings)
+	}
+	cases := []struct {
+		name, gateway, ops, entry, problem string
+	}{
+		{"the gateway call edited", strings.Replace(gateway, "Fills gateway.", "Fills more.", 1), ops, gatewayFile, "declares gateway:fill-id-indexes"},
+		{"the ops call edited", gateway, strings.Replace(ops, "[EVENT_LOG_ID_INDEX]", "[EVENT_LOG_ID_INDEX, MORE]", 1), opsFile, "declares ops:fill-event-log-id-index"},
+		{"the gateway call removed", "export const gateway = defineProcessModule(\"gateway\");\n", ops, gatewayFile, "released step gateway:fill-id-indexes was removed"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			findings := findingsAfter(t, c.gateway, c.ops)
+			if len(findings) != 1 || findings[0].Entry != c.entry || !strings.Contains(findings[0].Problem, c.problem) {
+				t.Errorf("want one finding on %s %q, got %+v", c.entry, c.problem, findings)
+			}
+		})
+	}
+}
+
 // @scenario "A code step no release manifest names yet may still change"
 func TestStepsLeavesAnUnreleasedStepFileAlone(t *testing.T) {
 	root := repoWithStep(t, "")
