@@ -162,6 +162,7 @@ const storesConfig: StoresConfig = {
   redis: { dbIndex: undefined },
   objectStorage: {
     backend: "file",
+    uploads: undefined,
     localRoot: "/tmp/langwatch-api-credentials-test",
     s3: { bucket: undefined, endpoint: undefined, region: undefined },
     azure: {

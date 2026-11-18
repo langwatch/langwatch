@@ -32,6 +32,7 @@ const storesConfig: StoresConfig = {
   redis: { dbIndex: undefined },
   objectStorage: {
     backend: "file",
+    uploads: undefined,
     localRoot: "/tmp/langwatch-clickhouse-reader-identity-test",
     s3: { bucket: undefined, endpoint: undefined, region: undefined },
     azure: {
