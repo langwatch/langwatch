@@ -126,13 +126,18 @@ export interface RoutingTable {
   readonly variables?: ReadonlyMap<string, string>;
   /** organizationId -> the variable naming its unusable route: refused, never shared. */
   readonly malformed?: ReadonlyMap<string, string>;
+  /** organizationId -> the variable naming the route this identity lacks: refused, never shared. */
+  readonly missing?: ReadonlyMap<string, string>;
 }
 
 /**
  * Pure and total: never throws for a malformed entry (collected in
  * `skipped`), except a duplicate organisation — there's no safe way to pick.
  */
-export function parseRoutingTable(env: Record<string, string | undefined>): RoutingTable {
+export function parseRoutingTable(
+  env: Record<string, string | undefined>,
+  { prefix = PRIVATE_ROUTE_ENV_PREFIX }: { prefix?: string } = {},
+): RoutingTable {
   const routes = new Map<string, string>();
   const source = new Map<string, string>();
   const variables = new Map<string, string>();
@@ -141,12 +146,9 @@ export function parseRoutingTable(env: Record<string, string | undefined>): Rout
   const ambiguous: { envVar: string; organizationId: string }[] = [];
 
   for (const [envVar, value] of Object.entries(env)) {
-    if (!envVar.startsWith(PRIVATE_ROUTE_ENV_PREFIX)) continue;
+    if (!envVar.startsWith(prefix)) continue;
 
-    const { label, organizationId } = privateRouteNameOf({
-      prefix: PRIVATE_ROUTE_ENV_PREFIX,
-      variable: envVar,
-    });
+    const { label, organizationId } = privateRouteNameOf({ prefix, variable: envVar });
 
     if (organizationId === "") {
       skipped.push({ envVar, reason: "no organization id in the name" });
@@ -242,6 +244,8 @@ export interface TenantRouter {
   placementOf(tenantId: string): Promise<TenantPlacement>;
   /** Where a known organization's statements go; refuses a recorded private one with no route. */
   routeOrganization(organizationId: string): Promise<TenantRoute>;
+  /** Throws the refusal for an organisation whose configured route is malformed or missing. */
+  assertRoutable(organizationId: string): void;
   /** The organisation a tenant belongs to, from the same cached directory `route` reads. */
   organizationOf(tenantId: string): Promise<string>;
   /**
@@ -281,6 +285,27 @@ class PlainRefusal extends PrivateRouteRefusalFactory {
   }
 }
 
+/** Throws for an unrouted organisation the table names as malformed or missing; never shared. */
+function assertConfiguredRoutable({
+  table,
+  refusal,
+  organizationId,
+}: {
+  table: TenantRouterOptions["table"];
+  refusal: PrivateRouteRefusalFactory;
+  organizationId: string;
+}): void {
+  if (table.routes.has(organizationId)) return;
+  const broken = table.malformed?.get(organizationId);
+  if (broken !== undefined) {
+    throw refusal.create({ organizationId, variable: broken, problem: "malformed" });
+  }
+  const lacking = table.missing?.get(organizationId);
+  if (lacking !== undefined) {
+    throw refusal.create({ organizationId, variable: lacking, problem: "missing" });
+  }
+}
+
 /**
  * The platform tenant and any organization never recorded as private share the cluster. A
  * malformed route, or a recorded one now missing, is refused: never the shared server.
@@ -300,10 +325,7 @@ async function routeForOrganization({
   const url = table.routes.get(organizationId);
   if (url !== undefined) return { kind: "private", organizationId, url };
 
-  const broken = table.malformed?.get(organizationId);
-  if (broken !== undefined) {
-    throw refusal.create({ organizationId, variable: broken, problem: "malformed" });
-  }
+  assertConfiguredRoutable({ table, refusal, organizationId });
   const recorded = await directory.recordedPrivateDataplaneOf?.(organizationId);
   if (recorded?.clickhouseLabel != null) {
     const variable = privateRouteVariableOf({
@@ -334,7 +356,9 @@ async function placementForOrganization({
   return {
     organizationId,
     recordedPrivate:
-      recorded?.clickhouseLabel != null || table.malformed?.has(organizationId) === true,
+      recorded?.clickhouseLabel != null ||
+      table.malformed?.has(organizationId) === true ||
+      table.missing?.has(organizationId) === true,
     route: url === undefined ? { kind: "shared" } : { kind: "private", organizationId, url },
   };
 }
@@ -384,6 +408,10 @@ export function createTenantRouter({
     },
     routeOrganization(organizationId) {
       return routeForOrganization({ table, directory, refusal, organizationId });
+    },
+    assertRoutable(organizationId) {
+      if (organizationId === PLATFORM_TENANT) return;
+      assertConfiguredRoutable({ table, refusal, organizationId });
     },
     async organizationOf(tenantId) {
       if (tenantId === "") throw new UnknownTenantError(tenantId);

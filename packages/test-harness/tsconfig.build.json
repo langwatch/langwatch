@@ -24,22 +24,25 @@
   ],
   "references": [
     {
-      "path": "../api/tsconfig.build.json"
-    },
-    {
-      "path": "../authorization/tsconfig.build.json"
-    },
-    {
-      "path": "../clickhouse-client/tsconfig.build.json"
-    },
-    {
-      "path": "../prisma-client/tsconfig.build.json"
+      "path": "../vitest-config/tsconfig.build.json"
     },
     {
       "path": "../time/tsconfig.build.json"
     },
     {
-      "path": "../vitest-config/tsconfig.build.json"
+      "path": "../prisma-client/tsconfig.build.json"
+    },
+    {
+      "path": "../clickhouse-migrations/tsconfig.build.json"
+    },
+    {
+      "path": "../clickhouse-client/tsconfig.build.json"
+    },
+    {
+      "path": "../authorization/tsconfig.build.json"
+    },
+    {
+      "path": "../api/tsconfig.build.json"
     }
   ]
 }

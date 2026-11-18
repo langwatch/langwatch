@@ -271,11 +271,43 @@ Feature: A typed ClickHouse read builder renders the tenant predicate and the te
     Then the statement goes out on the system identity as an all-tenants statement, with no tenant setting
     And a derived read or CTE over bound rows alone, which names neither a tenant nor a system table, is still refused as naming no tenant table
 
+  @integration
+  Scenario: The parts lacking a table's columns, counted over a derived system read, run on 26.8 as main's raw query does
+    Given ClickHouse 26.8 and a table with one part holding every listed column and one part written before a column was added
+    When the count of parts lacking a listed column is built over a derived system.parts_columns read and sent as the system
+    Then it returns the count main's raw text returns
+
   @unit
   Scenario: A constant false condition matches no row and binds nothing
     Given a read's where or a branch of an OR
     When it is cond.never()
     Then it renders as 0 = 1 with no parameter
+
+  @integration
+  Scenario: A read whose where is the constant false returns no row on 26.8
+    Given ClickHouse 26.8 and two tenants' spans
+    When a read of every span is built with cond.never() as its where and sent as the system
+    Then it returns no row, where the same read without it returns both spans
+
+  @unit
+  Scenario: An id index's tenant listing is an all-tenants read beside its raise
+    Given an id index's table name
+    When its tenant listing is built
+    Then it selects the index's distinct TenantId as a system statement, sent routed by target
+    And a name that is not an id index's table is refused, and the api's client refuses the listing by name
+
+  @integration
+  Scenario: On 26.8 the reader cannot list what the system-table reads need
+    Given ClickHouse 26.8 and a reader granted one tenant table and the three server-metadata tables, beside a table it is not granted
+    When the reader reads system.parts, system.disks, system.backup_log and system.mutations
+    Then each is refused as access denied
+    And system.tables, which every user may read, lists the granted table and not the other
+
+  @integration
+  Scenario: The system-table reads run on 26.8 as main's raw queries do
+    Given ClickHouse 26.8, two tenants' tables, a table the reader is not granted, and retention rewrites of each tenant
+    When the footprint, disk, backup, held-table, mutation and id-index tenant reads are built and sent as the system
+    Then each returns the rows main's raw query returns
 
   @unit
   Scenario: A read sets its own query-level settings but never the scope's
@@ -388,6 +420,19 @@ Feature: A typed ClickHouse read builder renders the tenant predicate and the te
     When the third census's shapes are built, their id markers expanded as the client expands them, and sent
     Then each returns exactly its tenant's rows, also when the setting lists every tenant
     And a day start in a bound time zone runs as a constant
+
+  @unit
+  Scenario: A built read on a table keyed on its own tenant column passes the client's guard
+    Given a descriptor whose tenant column is project_id
+    When a read of it is built and sent through the client
+    Then the statement names project_id as the tenant column its predicates bind, and the client's guard checks that column as it checks TenantId
+    And a predicate on it bound to another tenant, beside an OR, under a NOT or written as a literal is refused
+
+  @unit
+  Scenario: A raw statement cannot borrow a built statement's tenant column
+    Given the text of a built read keyed on project_id
+    When it is sent as a raw statement, with or without the built statement's tenant columns
+    Then the guard refuses it for a missing TenantId predicate
 
   @unit
   Scenario: The latest-version election repeats the read's id bounds on any column of its table

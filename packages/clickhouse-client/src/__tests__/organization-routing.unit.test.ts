@@ -2,7 +2,11 @@ import { describe, expect, it, vi } from "vitest";
 
 import { ClickHouseQueryClient } from "../client.ts";
 import { ClickHouseConfigService } from "../config.ts";
-import { ClickHouseConnection, ClickHouseNotConfiguredError } from "../connection.ts";
+import {
+  ClickHouseConnection,
+  ClickHouseConnectionService,
+  ClickHouseNotConfiguredError,
+} from "../connection.ts";
 import { CANCELLED_ON_CLIENT_CLOSE, routingDriver } from "../routingDriver.ts";
 import { createTenantRouter, parseRoutingTable } from "../tenancy.ts";
 import { TenantGuard } from "../tenantGuard.ts";
@@ -159,6 +163,62 @@ describe("organization routing", () => {
         }),
       ).rejects.toBeInstanceOf(ClickHouseNotConfiguredError);
       expect(isolated.query).not.toHaveBeenCalled();
+    } finally {
+      await connection.closeOnce();
+    }
+  });
+
+  /** @scenario "A statement naming an organisation whose route is unusable is refused, never shared" */
+  it("refuses a statement naming an organisation whose route is malformed or missing", async () => {
+    const shared = {
+      query: vi.fn(async (_params: unknown) => ({ json: async () => [] })),
+      insert: vi.fn(async (_params: unknown) => void 0),
+      command: vi.fn(async (_params: unknown) => void 0),
+      close: vi.fn(async () => void 0),
+    };
+    const connection = ClickHouseConnectionService.create({
+      directory: { organizationForTenant: async () => "org-shared" },
+      clientFactory: { create: () => shared },
+    }).connect(
+      ClickHouseConfigService.create().resolve({
+        shared: { url: "http://shared.invalid:8123", cluster: "test" },
+        malformedPrivateRoutes: [
+          { organizationId: "org-broken", variable: "CLICKHOUSE_URL__org-broken" },
+        ],
+        missingPrivateRoutes: [
+          { organizationId: "org-lacking", variable: "CLICKHOUSE_URL__org-lacking" },
+        ],
+      }),
+    );
+    const client = new ClickHouseQueryClient({
+      driver: routingDriver(connection),
+      tenantGuard: new TenantGuard(),
+    });
+
+    try {
+      await expect(
+        client.query({
+          tenantId: "",
+          organizationId: "org-broken",
+          sql: "SELECT count() FROM billable_events",
+          // An organisation aggregate across its projects, as billing's meter reads send it.
+          SKIP_TENANT_CHECK: true,
+        }),
+      ).rejects.toMatchObject({
+        refusal: { organizationId: "org-broken", problem: "malformed" },
+      });
+      await expect(
+        client.insert({
+          tenantId: "project-a",
+          organizationId: "org-lacking",
+          table: "billable_events",
+          rows: [{ TenantId: "project-a" }],
+        }),
+      ).rejects.toMatchObject({
+        refusal: { variable: "CLICKHOUSE_URL__org-lacking", problem: "missing" },
+      });
+      expect(shared.query).not.toHaveBeenCalled();
+      expect(shared.insert).not.toHaveBeenCalled();
     } finally {
       await connection.closeOnce();
     }

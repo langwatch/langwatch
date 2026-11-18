@@ -130,6 +130,7 @@ describe("analytics' key-map reaction to a created project", () => {
           unconfirmedSince: MemoryLwqlUnconfirmedSinceRepository.create(),
           app: {
             probeLwqlAccessModelOwner: async () => "none",
+            refreshLwqlAccessModelAnswer: () => Promise.resolve(),
             convergeLwqlAccessModel: async () => void 0,
             findLwqlAppOwnedDrift: async () => ({
               clickHouse: [],

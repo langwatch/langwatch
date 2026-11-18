@@ -18,6 +18,10 @@
     "./testing": {
       "types": "./dist/clickhouse-test-endpoints.d.ts",
       "default": "./src/clickhouse-test-endpoints.ts"
+    },
+    "./builder": {
+      "types": "./dist/builder/index.d.ts",
+      "default": "./src/builder/index.ts"
     }
   },
   "scripts": {

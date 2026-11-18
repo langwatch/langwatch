@@ -2185,6 +2185,24 @@ clickhouse:
   ## @param clickhouse.lwqlAccess.secretName [string] Secret carrying the rendered LWQL access files; mounted unconditionally into every ClickHouse pod. Rendered from the parent helper — leave as-is.
   lwqlAccess:
     secretName: '{{ include "langwatch.lwql.accessSecretName" $ }}'
+  # App reader (ADR-202): tenant reads run as langwatch_app_reader, bounded by a
+  # row policy per tenant table. Off this release: the server must declare the
+  # SQL_ settings prefix, which the clickhouse-serverless image does from its
+  # next release. Turn it on once clickhouse-serverless.image.tag is at that
+  # release. A values-only change does not roll ClickHouse (see podAnnotations).
+  appReader:
+    ## @param clickhouse.appReader.enabled [default: false] Provision the app reader on chart-managed ClickHouse and point the app and workers at it (CLICKHOUSE_READER_URL). The access-render Job delivers it whether or not lwql.enabled is on. Needs a clickhouse-serverless image that declares the SQL_ settings prefix. The password is generated into a hook Secret; with secrets.existingSecret, or autogen off, that Secret carries CLICKHOUSE_READER_URL (and CLICKHOUSE_ENFORCING_READER_URL) itself.
+    enabled: false
+    ## @param clickhouse.appReader.enforce [default: false] Enforce each read's tenant set (CLICKHOUSE_TENANCY_ENFORCE). false keeps shadow: the policies exist and admit every row. Read wherever the reader is provisioned, chart-managed or not.
+    enforce: false
+    ## @param clickhouse.appReader.shadowSampleRate [string, default: "0"] Share of reader reads re-run as langwatch_app_reader_enforcing to count the rows enforcement would hide (CLICKHOUSE_SHADOW_SAMPLE_RATE). Above 0, the chart also wires CLICKHOUSE_ENFORCING_READER_URL.
+    shadowSampleRate: "0"
+  # App writer (ADR-202 Decided 12): the insert-only user the api sends its three
+  # inserts as once its system credential is removed. Off this release; it is
+  # provisioned beside the reader, so it needs clickhouse.appReader.enabled.
+  appWriter:
+    ## @param clickhouse.appWriter.enabled [default: false] Provision the app writer (langwatch_app_writer, INSERT on three tables, no SELECT) on chart-managed ClickHouse and point the app, the workers and the render Job at it (CLICKHOUSE_WRITER_URL). Needs clickhouse.appReader.enabled. The password is generated into a hook Secret; with secrets.existingSecret, or autogen off, that Secret carries CLICKHOUSE_WRITER_URL itself.
+    enabled: false
   ## @param clickhouse.extraVolumes [array] Extra volumes for the ClickHouse pod.
   extraVolumes: []
   ## @param clickhouse.extraVolumeMounts [array] Extra mounts for the ClickHouse container.

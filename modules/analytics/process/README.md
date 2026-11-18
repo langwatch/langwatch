@@ -484,12 +484,12 @@ None: this module declares no websocket, rawsocket or rawhttp door.
 
 ### Pipeline `lwql_reconvergence` (aggregate `global`)
 
-Declared at `src/eventing/analytics-lwql-reconvergence.pipeline.ts:57`.
+Declared at `src/eventing/analytics-lwql-reconvergence.pipeline.ts:58`.
 
 | Kind            | Name                | Handles                                                                                    | Declared at                                                |
 | --------------- | ------------------- | ------------------------------------------------------------------------------------------ | ---------------------------------------------------------- |
-| process manager | `lwqlReconvergence` | every 5 min (`LWQL_RECONVERGENCE_INTERVAL_MS = 5 * 60_000`); intents `reconverge` (outbox) | `src/eventing/analytics-lwql-reconvergence.pipeline.ts:67` |
-| peer subscriber | `syncLwqlKeyMapRow` | `lw.project.created` from [project](../../project/README.md)                               | `src/eventing/analytics-lwql-reconvergence.pipeline.ts:62` |
+| process manager | `lwqlReconvergence` | every 5 min (`LWQL_RECONVERGENCE_INTERVAL_MS = 5 * 60_000`); intents `reconverge` (outbox) | `src/eventing/analytics-lwql-reconvergence.pipeline.ts:68` |
+| peer subscriber | `syncLwqlKeyMapRow` | `lw.project.created` from [project](../../project/README.md)                               | `src/eventing/analytics-lwql-reconvergence.pipeline.ts:63` |
 
 ## Configuration
 

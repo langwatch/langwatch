@@ -65,6 +65,14 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./src/index.ts"
+    },
+    "./clickhouse-app-reader": {
+      "types": "./dist/clickhouse-app-reader.d.ts",
+      "default": "./src/clickhouse-app-reader.ts"
+    },
+    "./clickhouse-server-lock": {
+      "types": "./dist/clickhouse-server-lock.d.ts",
+      "default": "./src/clickhouse-server-lock.ts"
     }
   },
   "scripts": {
@@ -77,6 +85,7 @@
     "@langwatch/api": "workspace:*",
     "@langwatch/authorization": "workspace:*",
     "@langwatch/clickhouse-client": "workspace:*",
+    "@langwatch/clickhouse-migrations": "workspace:*",
     "@langwatch/prisma-client": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/vitest-config": "workspace:*",

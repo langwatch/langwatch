@@ -150,6 +150,15 @@ export class LangWatchQLAccessModelService {
     return policyName(table);
   }
 
+  /**
+   * The LangWatchQL user's policy hiding one system table. Named per user, since the table is
+   * server-wide: two installs sharing a server never replace each other's.
+   */
+  hiddenPolicyName({ names, table }: { names: LangWatchQLNames; table: string }): string {
+    const user = sqlText.assertIdentifier(names.restrictedUser, "restrictedUser");
+    return `${sqlText.assertIdentifier(table, "table")}_hidden_${user}`;
+  }
+
   keyMapPolicyName(keyMapTable: string): string {
     return keyMapPolicyName(keyMapTable);
   }

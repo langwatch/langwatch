@@ -38,15 +38,9 @@ export interface VendorStatements {
 const asRows = <Row>(rows: unknown): Row[] =>
   Array.isArray(rows) ? rows.filter((_row): _row is Row => true) : [];
 
-/** A client over `vendor` with `indexes` declared, each read as not filled. */
-export function vendorQueryClient({
-  vendor,
-  indexes,
-}: {
-  vendor: VendorStatements;
-  indexes: readonly IdIndexDeclaration[];
-}): ClickHouseQueryClient {
-  const driver: QueryDriver = {
+/** One identity's driver over `vendor`: a system, reader or writer connection alike. */
+export function vendorQueryDriver({ vendor }: { vendor: VendorStatements }): QueryDriver {
+  return {
     async execute<Row>(request: Parameters<QueryDriver["execute"]>[0]): Promise<QueryResult<Row>> {
       if (isIdIndexReadinessStatement(request)) {
         throw new Error("A suite's connection never reads an id index as filled.");
@@ -76,7 +70,20 @@ export function vendorQueryClient({
       });
     },
   };
-  const client = new ClickHouseQueryClient({ driver, tenantGuard: new TenantGuard() });
+}
+
+/** A client over `vendor` with `indexes` declared, each read as not filled. */
+export function vendorQueryClient({
+  vendor,
+  indexes,
+}: {
+  vendor: VendorStatements;
+  indexes: readonly IdIndexDeclaration[];
+}): ClickHouseQueryClient {
+  const client = new ClickHouseQueryClient({
+    driver: vendorQueryDriver({ vendor }),
+    tenantGuard: new TenantGuard(),
+  });
   client.declareIdIndexes({ indexes });
   return client;
 }

@@ -1,17 +1,26 @@
 import type { JsonValue } from "@langwatch/eventing";
 import { intentAccessorOf } from "@langwatch/eventing/testing";
 import type * as Observability from "@langwatch/observability";
-/** Spec: specs/lwql/api.feature, modules/analytics/specs/analytics-lwql-project-keys.feature */
+/**
+ * Spec: specs/lwql/api.feature, modules/analytics/specs/analytics-lwql-project-keys.feature,
+ * modules/analytics/specs/analytics-lwql-access-model-answer.feature
+ */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { LwqlAppOwnedDrift } from "../../features/provisioning/services/langwatch-ql-self-provisioning.service.ts";
 import type { LwqlUnconfirmedSinceRepository } from "../../repositories/langwatch-ql-unconfirmed-since.repository.ts";
+import { MemoryLangWatchQLAccessModelAnswerRepository } from "../../repositories/memory/memory.langwatch-ql-access-model-answer.repository.ts";
+import {
+  MEMORY_SHARED_ORIGIN,
+  MemoryLangWatchQLPlacementRepository,
+} from "../../repositories/memory/memory.langwatch-ql-placement.repository.ts";
 import { MemoryLwqlUnconfirmedSinceRepository } from "../../repositories/memory/memory.langwatch-ql-unconfirmed-since.repository.ts";
 import {
   collectionUnconfirmedError,
   LWQL_COLLECTION_UNCONFIRMED,
 } from "../../rules/langwatch-ql-collection-probe.rules.ts";
 import type { LwqlAccessModelOwner } from "../../rules/langwatch-ql-config-store.rules.ts";
+import { LangWatchQLPlacementGateService } from "../../services/langwatch-ql-placement-gate.service.ts";
 import {
   LWQL_RECONVERGENCE_PROCESS_NAME,
   LWQL_UNCONFIRMED_ALERT_AFTER_MS,
@@ -110,6 +119,7 @@ function workerOver(
   const fillKeyMap = vi.fn(() => Promise.resolve());
   const check = runLwqlReconvergence({
     probe: () => Promise.resolve("config_store"),
+    refreshAnswer: () => Promise.resolve(),
     converge,
     findDrift: () => world.findDrift(),
     convergeAppOwned: () => world.convergeAppOwned(),
@@ -154,6 +164,7 @@ function fleet({
   const checks = Array.from({ length: workers }, () =>
     runLwqlReconvergence({
       probe: () => Promise.resolve("config_store"),
+      refreshAnswer: () => Promise.resolve(),
       converge: () => Promise.resolve(),
       findDrift: async () => (world.converged ? healthy : { ...staleEngineTable, postgres }),
       convergeAppOwned: (half) =>
@@ -188,6 +199,7 @@ async function checkWithSilentRedis(drift: LwqlAppOwnedDrift, convergeFails: boo
   try {
     const done = runLwqlReconvergence({
       probe: () => Promise.resolve("config_store"),
+      refreshAnswer: () => Promise.resolve(),
       converge: () => Promise.resolve(),
       findDrift: () => Promise.resolve(drift),
       convergeAppOwned: () => (convergeFails ? Promise.reject(unconfirmed()) : Promise.resolve()),
@@ -289,6 +301,7 @@ describe("given a check over the app-owned objects", () => {
       const converge = vi.fn(() => Promise.resolve());
       await runLwqlReconvergence({
         probe: () => Promise.resolve("config_store"),
+        refreshAnswer: () => Promise.resolve(),
         converge,
         findDrift: () => Promise.resolve(drift),
         convergeAppOwned,
@@ -305,6 +318,7 @@ describe("given a check over the app-owned objects", () => {
       const convergeAppOwned = vi.fn(() => Promise.resolve());
       await runLwqlReconvergence({
         probe: () => Promise.resolve("config_store"),
+        refreshAnswer: () => Promise.resolve(),
         converge: () => Promise.resolve(),
         findDrift: () => Promise.reject(new Error("ECONNREFUSED")),
         convergeAppOwned,
@@ -498,6 +512,7 @@ describe("given a check over the app-owned objects", () => {
       const converged: LwqlAppOwnedDrift[] = [];
       await runLwqlReconvergence({
         probe: () => Promise.resolve("config_store"),
+        refreshAnswer: () => Promise.resolve(),
         converge: () => Promise.resolve(),
         findDrift: () => Promise.resolve(drift),
         convergeAppOwned: async (half) => {
@@ -529,6 +544,7 @@ describe("given a check over the app-owned objects", () => {
       const convergeAppOwned = vi.fn((_half: LwqlAppOwnedDrift) => Promise.reject(refusal()));
       const check = runLwqlReconvergence({
         probe: () => Promise.resolve("config_store"),
+        refreshAnswer: () => Promise.resolve(),
         converge: () => Promise.resolve(),
         findDrift: () =>
           Promise.resolve({
@@ -593,6 +609,7 @@ describe("given a check over the app-owned objects", () => {
       const refused = new Error("ECONNREFUSED");
       const check = runLwqlReconvergence({
         probe,
+        refreshAnswer: () => Promise.resolve(),
         converge: () => Promise.resolve(),
         findDrift: () => Promise.resolve(healthy),
         convergeAppOwned: () => Promise.resolve(),
@@ -609,6 +626,7 @@ describe("given a check over the app-owned objects", () => {
     function redelivered(fillKeyMap: () => Promise<unknown>) {
       const deps = {
         probe: vi.fn(() => Promise.resolve<LwqlAccessModelOwner>("none")),
+        refreshAnswer: vi.fn(() => Promise.resolve()),
         converge: vi.fn(() => Promise.resolve()),
         findDrift: vi.fn(() =>
           Promise.resolve<LwqlAppOwnedDrift>({
@@ -634,6 +652,7 @@ describe("given a check over the app-owned objects", () => {
       expect(deps.convergeAppOwned).not.toHaveBeenCalled();
       expect(deps.probe).not.toHaveBeenCalled();
       expect(deps.converge).not.toHaveBeenCalled();
+      expect(deps.refreshAnswer).not.toHaveBeenCalled();
     });
 
     /** @scenario "The reconvergence check fills the key-map rows a project lacks" */
@@ -661,6 +680,7 @@ describe("given the pipeline's check, delivered by its outbox", () => {
       unconfirmedSince: MemoryLwqlUnconfirmedSinceRepository.create(),
       app: {
         probeLwqlAccessModelOwner: () => Promise.resolve("config_store"),
+        refreshLwqlAccessModelAnswer: () => Promise.resolve(),
         convergeLwqlAccessModel: () => Promise.resolve(),
         findLwqlAppOwnedDrift: () => Promise.resolve(drifts.shift() ?? healthy),
         convergeLwqlAppOwnedObjects: () => Promise.resolve(),
@@ -769,6 +789,7 @@ describe("given the SQL-mode owner probe", () => {
       converge,
       done: runLwqlReconvergence({
         probe,
+        refreshAnswer: () => Promise.resolve(),
         converge,
         findDrift: () => Promise.resolve(healthy),
         convergeAppOwned: () => Promise.resolve(),
@@ -802,6 +823,7 @@ describe("given the SQL-mode owner probe", () => {
       });
     await runLwqlReconvergence({
       probe: () => Promise.resolve("none"),
+      refreshAnswer: () => Promise.resolve(),
       converge,
       findDrift: () => Promise.resolve(healthy),
       convergeAppOwned: () => Promise.resolve(),
@@ -810,5 +832,100 @@ describe("given the SQL-mode owner probe", () => {
     })(wakeOnce);
     order.push("intent resolved");
     expect(order).toEqual(["converged", "intent resolved"]);
+  });
+});
+
+describe("given the check stores the access model's answer", () => {
+  const STORE_FAILED = "lwql could not store whether the access model is provisioned";
+
+  /** The gate's own refresh over memory answers and the given probe, as the worker composes it. */
+  function gateOver(probeOwner: () => Promise<LwqlAccessModelOwner>) {
+    const answers = MemoryLangWatchQLAccessModelAnswerRepository.create();
+    const gate = LangWatchQLPlacementGateService.create({
+      placement: MemoryLangWatchQLPlacementRepository.create(),
+      target: { configured: true, origin: MEMORY_SHARED_ORIGIN },
+      accessModel: { configured: true, probeOwner },
+      answers,
+    });
+    return { answers, refreshAnswer: () => gate.refreshAccessModelAnswer() };
+  }
+
+  function checkOver({
+    refreshAnswer,
+    probe = () => Promise.resolve("config_store"),
+    converge = () => Promise.resolve(),
+  }: {
+    refreshAnswer: () => Promise<void>;
+    probe?: () => Promise<LwqlAccessModelOwner>;
+    converge?: () => Promise<void>;
+  }) {
+    return runLwqlReconvergence({
+      probe,
+      refreshAnswer,
+      converge,
+      findDrift: () => Promise.resolve(healthy),
+      convergeAppOwned: () => Promise.resolve(),
+      fillKeyMap: () => Promise.resolve(),
+      unconfirmedSince: MemoryLwqlUnconfirmedSinceRepository.create(),
+    })(wakeOnce);
+  }
+
+  describe("when the server holds a provisioned access model", () => {
+    /** @scenario "Each reconvergence check stores the access model's answer for its server" */
+    it("stores provisioned for the server's origin", async () => {
+      const { answers, refreshAnswer } = gateOver(() => Promise.resolve("sql_store"));
+
+      await checkOver({ refreshAnswer });
+
+      expect(await answers.findAnswer({ origin: MEMORY_SHARED_ORIGIN })).toBe("provisioned");
+    });
+  });
+
+  describe("when the check provisions the access model in SQL mode", () => {
+    /** @scenario "A check that provisions the access model stores the new answer before it ends" */
+    it("stores the answer after it provisioned, within the same check", async () => {
+      let owner: LwqlAccessModelOwner = "none";
+      const { answers, refreshAnswer } = gateOver(() => Promise.resolve(owner));
+
+      await checkOver({
+        refreshAnswer,
+        probe: () => Promise.resolve(owner),
+        converge: () => {
+          owner = "sql_store";
+          return Promise.resolve();
+        },
+      });
+
+      expect(await answers.findAnswer({ origin: MEMORY_SHARED_ORIGIN })).toBe("provisioned");
+    });
+  });
+
+  describe("when the probe fails", () => {
+    /** @scenario "A probe that fails stores nothing and the check still completes" */
+    it("stores nothing, completes and warns", async () => {
+      const { answers, refreshAnswer } = gateOver(() =>
+        Promise.reject(new Error("connect ECONNREFUSED 8123")),
+      );
+
+      await expect(checkOver({ refreshAnswer })).resolves.toBeUndefined();
+
+      expect(await answers.findAnswer({ origin: MEMORY_SHARED_ORIGIN })).toBeNull();
+      expect(logCalls).toContainEqual(
+        expect.objectContaining({ level: "warn", message: expect.stringContaining(STORE_FAILED) }),
+      );
+    });
+  });
+
+  describe("when the answer store refuses the write", () => {
+    /** @scenario "A store that refuses the answer does not fail the check" */
+    it("completes and warns", async () => {
+      await expect(
+        checkOver({ refreshAnswer: () => Promise.reject(new Error("connect ECONNREFUSED 6379")) }),
+      ).resolves.toBeUndefined();
+
+      expect(logCalls).toContainEqual(
+        expect.objectContaining({ level: "warn", message: expect.stringContaining(STORE_FAILED) }),
+      );
+    });
   });
 });

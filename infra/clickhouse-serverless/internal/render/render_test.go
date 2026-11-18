@@ -522,8 +522,8 @@ func TestRenderAll_LangWatchQLAccessPrerequisites(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read custom-settings-prefixes.yaml: %v", err)
 	}
-	if !strings.Contains(string(prefixData), "custom_settings_prefixes: custom_") {
-		t.Error("custom-settings-prefixes.yaml should declare the custom_ prefix")
+	if !strings.Contains(string(prefixData), "custom_settings_prefixes: SQL_,custom_") {
+		t.Error("custom-settings-prefixes.yaml should declare the SQL_ and custom_ prefixes")
 	}
 
 	// The zz- name is load-bearing: users.d merges lexicographically and the
@@ -574,8 +574,8 @@ func TestRenderAll_AccessPrerequisitesPresentInBothModes(t *testing.T) {
 			if err != nil {
 				t.Fatalf("read custom-settings-prefixes.yaml: %v", err)
 			}
-			if !strings.Contains(string(prefixData), "custom_settings_prefixes: custom_") {
-				t.Error("custom-settings-prefixes.yaml should declare the custom_ prefix")
+			if !strings.Contains(string(prefixData), "custom_settings_prefixes: SQL_,custom_") {
+				t.Error("custom-settings-prefixes.yaml should declare the SQL_ and custom_ prefixes")
 			}
 
 			accessData, err := os.ReadFile(filepath.Join(dir, "users.d/zz-access-management.yaml"))

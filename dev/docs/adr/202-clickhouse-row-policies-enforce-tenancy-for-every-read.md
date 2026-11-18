@@ -1,0 +1,194 @@
+# ADR-202: ClickHouse row policies enforce tenancy for every read, then a typed builder replaces raw SQL
+
+**Date:** 2026-11-13
+
+**Status:** Accepted (Alex, 2026-11-13 and 2026-11-14); one open question remains
+
+**Builds on:** ADR-084 (tenant isolation lives in ClickHouse), ADR-159 (the app owns the LangWatchQL access model), ADR-177 (aggregate project reads through grants), ADR-198 (access tiers), ADR-200 (LangWatchQL isolation), ADR-201 (braids)
+
+**Scope note:** `dev/docs/plans/clickhouse-row-policies-scope.md`
+
+## Context
+
+Tenancy on application reads is enforced today by two text checks over SQL, both in `packages/clickhouse-client`:
+
+- **The fence** (`authorized-reads.ts`, 1,682 lines). A repository writes a marker (`{{tenantScope:Col}}`, `{{tenantSet}}`, `{{tenantScopeWithConditions:...}}`, `{{tenantScopeForLatestVersion:...}}`) and the client expands it from the authorization proof: own projects, shared windows (ADR-177) and braid clauses under a held-trace semi-join (ADR-201 §3). Around it sit an election allow-list, per-arm marker coverage, refusal of aliases named after columns it reads, pinned settings (`prefer_column_name_to_alias`, `enable_global_with_statement`), refusal of IN-over-table, `joinGet` and `dict*`, and a proof expiry cap. Five review rounds on braids each found a new bypass shape in that parser.
+- **The tenant guard** (`tenantGuard.ts`). Every other statement must carry `TenantId = {p:String}` or a declared `TenantId IN` set bound to the request's `tenantId` / `tenantIds`, or opt out with `SKIP_TENANT_CHECK: true` under a reason comment.
+
+Both read the SQL as text. Neither can prove a statement reads only the rows it names: a subquery, a join side, a CTE or an alias the parser does not model can reach another tenant. The scope note counts about 23 ClickHouse files that read through the fence, about 48 that write the predicate by hand, and about 47 call sites that skip the check.
+
+LangWatchQL already solved the same problem for untrusted SQL by moving the check into ClickHouse: one restricted user, a row policy per source table whose predicate reads a per-query custom setting (`getSetting('custom_api_key_hash')`), and a profile that pins the dangerous settings (ADR-159, ADR-200). ClickHouse applies a row policy inside every query shape (CTE, `UNION ALL`, both join sides, subqueries, `merge()`), so the policy, not the submitted text, bounds the read.
+
+## Decision
+
+Three steps, each shippable alone, in this order.
+
+### 1. Row policies on every tenant table, keyed by a per-query setting
+
+- The application's reading identity becomes a dedicated ClickHouse user, `langwatch_app_reader` (name open), with a settings profile `langwatch_app_reader_profile`.
+- Every table that holds tenant rows gets one row policy for that user: `CREATE ROW POLICY OR REPLACE <table>_app_tenant ON <db>.<table> USING <TenantColumn> IN tenantSetOf(getSetting('SQL_langwatch_tenant_ids')) TO langwatch_app_reader`. The tenant column is per table (`TenantId` on most, `project_id` on `stored_objects`); the definition lists it, as `LangWatchQLTable.tenantColumn` does.
+- The exact predicate form is chosen by measurement, not here: `has(splitByChar(',', getSetting(...)), TenantId)` or an `IN` over the split array. The one that `EXPLAIN indexes = 1` shows pruning on the primary key of `stored_spans`, `trace_summaries` and `event_log` wins (see Performance).
+- The client sets `SQL_langwatch_tenant_ids` on every read from what it already knows: the proof's tenant set for a fenced read (own, shared and braided owners), the request's `tenantIds` for a declared set, `[tenantId]` otherwise. A read with no tenant set is refused before it is sent. The value travels as a request setting, never in the statement text.
+- The client refuses any statement text that names the setting's prefix (`SQL_langwatch_`) or carries its own `SETTINGS` clause naming it, because a query-level `SETTINGS` overrides the request setting, including in a subquery. This is a one-token check, not a parser. It lands with the client change in slice 2; until then nothing sends reads as the reader.
+- The profile pins, `CONST`: `use_query_condition_cache = 0` and `use_query_cache = 0` unless measured safe on the server version (ADR-200 found the condition cache crossing tenants on 25.10 with a setting-keyed policy), `allow_introspection_functions = 0`. The fence's own pins (`prefer_column_name_to_alias`, `enable_global_with_statement`) stay request settings the fence sets, not profile pins. The tenant setting itself stays changeable, with `log_query_settings` left on: tenant ids are not secrets, unlike the LangWatchQL capability.
+- The access model is one more entry in ADR-159's single typed definition, delivered by its two emitters: rendered `users.d` (chart-managed and `clickhouse-serverless`) and SQL DDL (ClickHouse Cloud, BYO). It is never a goose migration: goose DDL for access entities reaches one replica only, the reason ADR-159 rejected `ON CLUSTER`.
+- A table without a policy is readable in full by every user (ADR-200 item 4, confirmed on 26.8; haven sets `users_without_row_policies_can_read_rows` to true explicitly). A guard test therefore replays the migrations and fails when a table carrying a tenant column has no policy in the definition and no recorded exclusion. That test is the only check; no migration-safety scan refuses such a table.
+- **Tenant tables the reader is never granted.** `lwql_api_key_tenant_map` holds `KeyHash`, which ADR-200 keeps to the LangWatchQL identity. The reader has no grant and no policy on it, so a read fails closed for want of a grant. The guard test classifies it with its reason and still fails on any table it does not classify. Eventing's `event_log` and `event_log_id_index` are policed tenant tables like the rest (Decided 31).
+- **The reader's own query log.** On 26.8 every user holds an implicit `SELECT` on `system.user_query_log`, which lists the statements and settings logged under that user's name; `REVOKE` does not remove it. Every tenant shares the reader, so a read for tenant A could list tenant B's statements and tenant set. The reader therefore carries one more row policy, `USING 0` on `system.user_query_log`, which both emitters render (`CREATE ROW POLICY`, and `databases.system.user_query_log.filter` in users.d). `query_log`, `processes`, `query_views_log` and `text_log` need a grant the reader does not hold. The LangWatchQL user carries the same policy (Decided 5). Rejected: `log_queries = 0 CONST`, which drops every application read from the operator's `query_log`; a server-side switch, which provisioning cannot check on a target.
+
+### 2. A typed query builder
+
+Described below. It replaces hand-written SQL in repositories so the tenant predicate, named parameters and the setting are produced by construction.
+
+### 3. An oxlint rule banning raw SQL into the client
+
+Once a module has moved, `langwatch/no-raw-clickhouse-sql` refuses a string or template literal passed as `sql` to the client in that module's repositories. It ships at error with a shrink-only baseline, the same ratchet as `eventing-table-access`.
+
+## How braids fit
+
+The policy admits the proof's tenant set: own projects, shared projects and every braided owner. The braid conditions, the shared and braid time windows and the held-trace semi-join **stay in the fence** (later, in the builder).
+
+Why not in the policy:
+
+- A row policy is static DDL delivered by rendered config or DDL on every replica (ADR-159). A braid's compiled predicate is per-reader data saved at run time. Putting it in a policy would mean a policy per braid and a config roll per save.
+- A policy predicate can only read settings, constants and subqueries over tables. Expressing per-owner windows and per-clause predicates through settings would rebuild the fence's renderer inside a setting string, with the same attack surface.
+- The held-trace semi-join reads the reader's own spans. Inside a policy it would run as a subquery on every read of `stored_spans`, including reads that do not need it.
+
+What this buys: after step 1, a fence bug can at worst show rows of a tenant the proof already names (a window too wide, a braid condition not applied), never a tenant outside the proof. The cross-organisation leak class closes; the within-proof class stays the fence's job and the builder's.
+
+Windows stay in the builder (Decided 7): moving them into the policy as parallel array settings was considered and rejected.
+
+## What needs a policy-exempt identity
+
+Row policies filter `SELECT` only. A second user, `langwatch_app_system` (name open), has no row policy and is used only where a read must span tenants or where the policy must not apply.
+
+| Path                                                                | Identity                           | Why                                                                                                                                                                     |
+| ------------------------------------------------------------------- | ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Inserts (projections, event appends, coalesced inserts)             | system, or reader if verified safe | Row policies do not filter `INSERT`. The risk is materialised views (next row)                                                                                          |
+| Materialised views triggered by an insert (id-index fills, rollups) | system until proven                | Must be tested: if the MV's `SELECT` over the inserted block applies the reader's policy and no setting is present, the MV writes nothing. Silent data loss, not a leak |
+| Goose migrations, `pnpm task upgrade` (tasks app)                   | system (today's admin URL)         | DDL, `INSERT ... SELECT` backfills, all tenants                                                                                                                         |
+| Background steps that walk every tenant (`SKIP_TENANT_CHECK` today) | system                             | Retention, id-index fill, replay, storage footprint, usage meters                                                                                                       |
+| Mutations (`ALTER ... DELETE`, lightweight delete)                  | system                             | Not filtered by policies; already tenant-predicated in text                                                                                                             |
+| Worker reads for one tenant (projections reading back, subscribers) | reader                             | Same as api                                                                                                                                                             |
+| api reads                                                           | reader                             | The point of this ADR                                                                                                                                                   |
+
+Keeping the exempt identity narrow:
+
+- The client exposes it only through `SKIP_TENANT_CHECK: true`, which is already counted, logged and reason-checked by `langwatch/skip-tenant-check-reason`. A skipped statement is sent on the system identity; nothing else is.
+- The api process is not given the system credential at all (decided: the api serves a few Ops reads today; those move to the worker or to an `*Api` call on ops). Only worker and tasks hold it.
+- The system user's grants exclude `access_management`; only the provisioning path (the existing LangWatchQL admin target) creates policies.
+
+## FINAL, dedup, GLOBAL IN, Distributed, routed orgs
+
+- **`FINAL` and IN-tuple dedup.** ClickHouse applies the policy before `FINAL` collapses versions. That is correct only when the tenant column is in the sorting key of every Replacing, Collapsing or Aggregating table, so all versions of a row share it. A guard test asserts this per policy-bearing table; a table that fails gets its policy on a column that is in the key, or stays on the fence until migrated.
+- **`GLOBAL IN` and subqueries.** The policy applies to every table a subquery reads, so the fence's IN-over-table refusal becomes defence in depth rather than the only line.
+- **Distributed tables.** None in the schema today (no `ENGINE = Distributed` in `packages/clickhouse-migrations`). If one appears, the policy must sit on the local tables of every shard, the custom setting must be forwarded (it is, by default), and the cluster's inter-server user must be the reader. Out of scope until then.
+- **`clusterAllReplicas`, `remote()`, `dictGet`, `joinGet`.** Not granted to the reader. Dictionaries bypass row policies; the fence's refusal of `dict*` and `joinGet` stays.
+- **Routed organisations and BYOC dataplanes.** Every target the router knows (shared, `CLICKHOUSE_URL__<label>__<orgId>`) needs the same users and policies. The upgrade already walks every target for goose; the access model needs the same walk in `sql` mode, and a rendered-config target needs the chart Job. A target without the access model must refuse reader traffic by name, as ADR-200's placement gate does for LangWatchQL, never fall back to an unpoliced user.
+
+## Rollout
+
+1. **Allow the setting prefix.** `custom_settings_prefixes` must include `SQL_` on every target. ClickHouse Cloud accepts `SQL_` (to confirm per service); the rendered config adds it beside `custom_`; the BYO prerequisites in `charts/langwatch/README.md` gain a row.
+2. **Provision users and policies in shadow.** The policy predicate is `getSetting('SQL_langwatch_tenancy_enforce') = 0 OR <tenant predicate>`, with `SQL_langwatch_tenancy_enforce` pinned `CONST` in the reader profile (0 in shadow, 1 when enforcing). The client cannot flip it per query; the switch is a profile change per target.
+3. **Measure in shadow.** Three signals (the sampler reports by table, `clickhouse_shadow_divergence_total{table}`, because the client carries no statement name):
+   - every read the client sends without a tenant set (a counter by statement name; should already be zero because the client refuses it);
+   - a sampled re-run of a fraction of reads as `SELECT count()` over the same statement on a second identity whose profile pins enforce to 1, logged with the statement name when the counts differ ("rows the policy would hide");
+   - CI and integration suites run with enforce on from the first slice, so a missing tenant in a test fails at once.
+4. **Enforce per target**, shared first, routed targets after. Self-hosted installs run one release in shadow (the chart pins enforce off and reports what the policy would have hidden), and the release after turns enforce on by default.
+5. Remove the shadow branch of the predicate in a later release.
+
+## Performance
+
+A row policy is one more filter on every read. It must prune on the primary key: every tenant table orders by the tenant column first. Before enforcement, each candidate predicate form is checked with `EXPLAIN indexes = 1` on the three largest tables, and a benchmark compares p50 and p99 of the trace list, trace detail and analytics timeseries with and without the policy. The query condition cache pin may cost more than the policy; measure it separately on 26.8.
+
+## Alternatives considered
+
+- **An AST parser in place of the text fence.** ClickHouse's grammar moves every release and has no stable JS parser; a parser that disagrees with the server is the same bypass class with more code. It also leaves raw reads unchecked unless every read goes through it. Rejected as the enforcement layer; a builder that never produces text it cannot reason about is the better use of that effort.
+- **Per-tenant ClickHouse users.** Thousands of users and policies, provisioning on project creation, credential storage per tenant, and no answer for a proof spanning several tenants (ADR-177 aggregates, braids). Rejected.
+- **Views per tenant.** Same churn as users, DDL per project on every replica, and views do not stop a read of the base table. Rejected.
+- **Keep the fence and harden it.** Five rounds of new shapes show the cost curve. The fence stays for windows and braids, inside a boundary the server enforces.
+
+## The typed builder
+
+Shape (names illustrative):
+
+```ts
+const read = clickhouseRead({ scope: tenantScope.fromProof({ authorization, reads: "spans" }) })
+  .from(storedSpans)
+  .select({ traceId: storedSpans.TraceId, name: storedSpans.SpanName })
+  .where(({ eq }) => eq(storedSpans.TraceId, traceId))
+  .limit(100);
+```
+
+What it guarantees:
+
+- **The scope is a required constructor argument**: `tenantScope.fromProof`, `tenantScope.single({ tenantId })`, `tenantScope.set({ tenantIds })` or `tenantScope.allTenants({ reason })`, the last only on the system identity. The builder renders the tenant predicate and sets the request setting from the same value, so text and policy cannot disagree.
+- **Tables are typed descriptors** declared once by their owner (column names, types, tenant column, time column, sort key), so a repository cannot name a column that does not exist or read another module's table without the owner's shared descriptor.
+- **Values are named parameters only**; there is no string escape hatch except `sql.fragment` with a reviewed allow-list, refused by lint outside `packages/clickhouse-client`.
+- **The fence's features are builder operations**: `.withinWindows()`, `.braided({ heldTrace })`, `.latestVersion()`, rendering what the markers render today. The markers die when the last caller moves.
+- **Escape for analytics.** The analytics aggregation mappers build large dynamic SQL; they move last and may keep a narrower builder of their own.
+
+Migration path: about 139 non-test TypeScript files under ClickHouse repository folders (mappers included), about 50 of which issue reads. Fenced files move first because the builder replaces the fence's renderer; raw single-tenant reads next, module by module; skip-check sweeps last onto `allTenants`. Each module's move turns its baseline entries off in the lint rule.
+
+## Consequences
+
+- A missing or wrong tenant predicate in any application read returns no foreign rows, whether the read is fenced, raw or new.
+- Two ClickHouse identities and their credentials on every target and every distribution; the chart, the SaaS terraform and the BYO docs all change.
+- The access-model definition grows from LangWatchQL's tables to every tenant table. A new tenant table must be added to it, which the guard test enforces.
+- Materialised views and inserts need proof before the reader identity touches them.
+- The fence shrinks to windows, braids and elections, and later disappears into the builder.
+
+## Decided (Alex, 2026-11-13)
+
+1. The setting is `SQL_langwatch_tenant_ids`; rendered config adds `SQL_` to `custom_settings_prefixes`.
+2. Two users: a restricted reader the policies bind, and a system user for the reads listed above. Skipping the policy is visible in configuration, not in a predicate branch.
+3. The api never holds the system credential. Api-side reads that skip the tenant check today move behind the worker or tasks.
+4. Self-hosted installs run one release in shadow before enforcing.
+5. The LangWatchQL user gets the same `USING 0` policy on `system.user_query_log` through the same code path, so both emitters render it. Its name carries the user (`user_query_log_hidden_<user>`), so it never replaces the app reader's `user_query_log_app_hidden` or another install's on a shared server. Alex, 2026-11-13: fixed in #9549.
+6. Routed and BYOC targets get the access model the way migrations reach them: provisioning walks every target the router knows. A target without the model refuses reader traffic for its organisations by name; it never keeps the text checks alone.
+
+## Decided (Alex, 2026-11-14)
+
+7. Shared and braid windows, braid conditions and the held-trace semi-join stay in the builder for good; the policy bounds only the tenant set.
+8. Inserts and the materialised views they trigger stay on the system identity. The reader holds `SELECT` only.
+9. The builder is hand-written in `packages/clickhouse-client`; no query-builder library.
+10. The reader requires ClickHouse 26.8 and leaves `use_query_condition_cache` on, once an isolation test on 26.8 proves the cache does not cross tenants under the setting-keyed policy. Proven on 26.8.34.13 (`app-reader-identity.integration.test.ts`): the app reader's pin is removed; the LangWatchQL pin stays under ADR-200. The cache recorded no reader hits in that run, so its benefit is still unmeasured.
+11. Every slice lands in one PR (#9549).
+12. The api keeps its three ClickHouse inserts (the governance OTLP spend debit, `POST /api/dspy/log_steps`, instant-eval run create) and sends them as `langwatch_app_writer`, an insert-only user granted INSERT on those tables alone. Moving them to the worker cost more than a worker-only insert protects (Alex, 2026-11-14, reversing his earlier ruling the same day). The api still holds no credential that reads across tenants (Decided 14).
+13. Data retention's api writes move to the worker too: applying a retention change to existing rows (`ALTER TABLE ... UPDATE`), cancelling it (`KILL MUTATION`) and reading its progress (`system.mutations`). Apply and cancel return once accepted; the worker keeps a progress status per project that the api reads. The governance workspace-view audit insert follows the same principle through its existing worker path (Alex, 2026-11-14).
+
+14. Staff-only Ops reads across tenants run in the worker: the Ops event explorer's search and Ops EXPLAIN are sent as commands, the worker runs them on its own credential, and the screen receives the result through a read hint. The api holds no credential that reads every tenant, `CLICKHOUSE_OPS_URL` included (Alex, 2026-11-14). The EXPLAIN route answers `202 { requestId }` and a new `GET /api/ops/clickhouse/explain/:requestId` returns `pending` or the rows; the operator agent polls it (Alex, 2026-11-14).
+15. The builder gains a scalar-subquery comparison (`col = (SELECT max(..) ...)`), its inner read under the same tenant predicate, because the CTE form of scenario run-state's latest-version read measured 23% more memory and up to twice the rows on 26.8 (Alex, 2026-11-14).
+16. The three materialised views fed by the writer's tables (`gateway_budget_scope_totals_mv`, `gateway_budget_ledger_events_id_index_mv`, `dspy_steps_id_index_mv`) run as `SQL SECURITY DEFINER`, set by a migration, so an insert-only writer fills them; without it 26.8 refuses the push with 497 after storing the source row. An insert depends on the definer user existing (Alex, 2026-11-14). Proven on 26.8: migrations 00132 and 00133 set `DEFINER = CURRENT_USER`, the user the upgrade runs as on each target; ClickHouse refuses to drop that user (630); a renamed definer, or one without grants, fails the insert (192 or 497) and stores nothing. A guard test fails any later view over a writer table without `SQL SECURITY DEFINER`.
+17. An organisation's usage totals are summed over its current projects, archived included; usage under a project that moved out or was deleted unpurged no longer counts for the old organisation (Alex, 2026-11-14).
+
+## Decided (Alex, 2026-11-15)
+
+18. The trace filter compiler returns builder conditions, not SQL text, so trace-list, facet, session-groups and legacy's filtered reads are built; no compiled-filter node admits its text.
+19. Analytics' dashboard reads move onto the shared builder in this PR; there is no second, analytics-only renderer.
+20. The storage meter asks each owning module for its own stored bytes through that module's `*Api`; data-retention reads no other module's table.
+21. LangWatchQL views are reads: the table-ownership policy counts each view's source table as read by analytics.
+22. The eventing framework reports `event_log`'s stored bytes to the storage meter; `stored_log_records` no longer counts in the figure.
+23. The legacy stored-object owner lookup is deleted with its four scenarios; id-only links stay unresolvable.
+24. Gateway keeps every version of a spend row in one month and turns id-index pruning back on under `FINAL`, in this PR. Rows split across months before the fix stay as they are; no repair step.
+25. Other modules hand `TraceApi` a filter as written, never compiled text; trace compiles it inside each read, and `translateTraceFilter` only validates.
+26. Analytics narrows filter options with its own filter translator on the builder; `TraceApi.translateLegacyFilters` goes.
+27. Under a share, a filter's side-table check (evaluations, spans, scenario runs, Instant Eval judgments) reads only rows inside the share's windows, on each table's own time column; out-of-window rows never decide whether a trace matches. This is stricter than main for shared projects only.
+28. Under a share, the session-groups log search reads only `log_records` rows inside the share's windows, on `TimeUnixMs`; a log line outside the window no longer admits a session.
+29. Analytics answers differ from main where main's answer was wrong: under an aggregate proof each member's trace counts separately; pipeline series main dropped are computed; a pipeline or evaluation series beside span or run metrics is read on its own; span-grouped counts honour the metric's condition; evaluation metrics compute per run; span-grouped event, thumbs and token values count only the spans or events behind each group key. Under a model grouping every series keys by the span's own model, else the trace's models; under an event grouping, event metrics count only that key's events; chart shapes main answered only in text are ported, not refused.
+30. Instant Eval's LangWatchQL statement keeps trace's text filter dialect (`compileLangWatchQLTraceFilter`): the user reads and reruns it, it queries the LangWatchQL view, and it runs as the reader under row policies.
+
+## Decided (2026-11-18)
+
+31. Eventing's `event_log` and `event_log_id_index` are read by the app reader under a tenant row policy on `TenantId`, which leads both sorting keys. Eventing is not routed to the system identity: the api reads the event log, and it holds no credential that reads every tenant (Decided 3, 14). Proven on 26.8 (`event-log-reads.app-reader.integration.test.ts`).
+
+## Open questions for Alex
+
+1. Whether the reader's names (`langwatch_app_reader`, its profile and policies) become configurable per install. They are fixed today, so two installs sharing one server would replace each other's reader and grants. That fails closed, not open, but it rules out sharing a server until decided.
+
+## References
+
+- `packages/clickhouse-client/src/authorized-reads.ts`, `tenantGuard.ts`, `query.ts`
+- `modules/analytics/process/src/services/langwatch-ql-access-model.service.ts`, `langwatch-ql-access-model-definition.service.ts`
+- `charts/langwatch/README.md` (LangWatchQL prerequisites)
+- `dev/docs/plans/clickhouse-row-policies-scope.md`

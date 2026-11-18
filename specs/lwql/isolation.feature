@@ -43,7 +43,7 @@ Feature: LangWatchQL never answers across a tenant or an instance
     Given a self-hosted install whose ClickHouse has no LangWatchQL access model
     When a LangWatchQL query runs
     Then it is refused with error code lwql_not_provisioned
-    And once the access model is provisioned and the last answer has expired, the same query is answered
+    And once the access model is provisioned and a worker's check has stored that answer, the same query is answered
 
   @unit
   Scenario: Every LangWatchQL entry point passes the gate
@@ -74,6 +74,20 @@ Feature: LangWatchQL never answers across a tenant or an instance
     Given two tenants with rows on a real ClickHouse
     When the restricted user queries system.processes, user_processes, text_log, query_thread_log, query_views_log, part_log, session_log, opentelemetry_span_log and asynchronous_insert_log
     Then each is refused
+
+  # ClickHouse 26.8 grants every user its own system.user_query_log, and REVOKE cannot take it
+  # back; every tenant shares the restricted user, so a policy admitting no row hides it (ADR-202).
+  @unit
+  Scenario: Both emitters hide the restricted user's query log under a policy of its own
+    Given the access model rendered as DDL and as users.d, with and without the app reader
+    Then the restricted user carries a row policy admitting no row on system.user_query_log, and no grant on it
+    And its policy name is distinct from the app reader's, so neither replaces the other
+
+  @integration
+  Scenario: The restricted user cannot read another tenant's logged statements, even past the validator
+    Given tenant B's statement, sent straight to ClickHouse as the restricted user, is in the server's query log
+    When the restricted user reads system.user_query_log for tenant A
+    Then it reads no row, so neither tenant B's statement text nor its log_comment is visible
 
   @integration
   Scenario: The query condition cache never carries one tenant's result into another's

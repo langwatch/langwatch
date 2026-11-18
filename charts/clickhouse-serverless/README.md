@@ -77,8 +77,8 @@ Either way this image renders the server-level prerequisites the model needs:
 in `sql` mode the `default` user is granted `access_management` and
 `named_collection_control` (the right to create users, profiles, row policies and
 named collections through SQL); with `lwqlAccess.secretName` set it gets neither,
-only use of the `lwql_postgres*` collections the rendered model delivers; the `custom_` settings prefix is declared
-so the per-query tenant capability the app's queries rely on is accepted rather
+only use of the `lwql_postgres*` collections the rendered model delivers; the `custom_` and `SQL_` settings prefixes are declared
+(LangWatchQL's capability and the app reader's tenant set, ADR-202), so the per-query settings the app's queries rely on are accepted rather
 than rejected with `UNKNOWN_SETTING`; and
 `access_control_improvements.settings_constraints_replace_previous` is set, so
 the settings profile's `CHANGEABLE_IN_READONLY` constraint on
