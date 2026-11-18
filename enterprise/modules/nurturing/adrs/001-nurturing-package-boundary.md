@@ -107,20 +107,21 @@ nurturing's `userErased` subscriber, after the owner has committed the erasure:
 until it runs, however long it lags or retries, a signal about the person still
 sends, and an identify can recreate their Customer.io person, which nurturing
 never deletes. After it, the marks are read before the send, not with it: a mark
-written between that read and the send lets that one send out. Nothing short of
-holding the send in the erasure's transaction, which an HTTP call cannot join,
-closes either gap. A key fact naming a marked holder folds in as no holder at
-the fact's own stamp, clearing a holder keeps their stamp, and a holder fact at
-a cleared holder's own stamp fills it, so a key's holder is the person its
-latest-stamped holder fact names, or no one if they are erased, whatever order
-the facts and the erasure arrive in, but for one case: two holder facts at one
-stamp naming two people keep the one folded first while neither is marked; if
-that one is erased later, the key has no holder until the other person's fact at
-that stamp is redelivered. Erasure no longer moves a cleared holder's stamp to
-now. A hand-over stamped between the holder's stamp and the erasure, which was
-dropped, now lands. The race the moved stamp closed is now closed by the
-re-check. A redelivered batch can count a trace twice, and so can a root span
-stored more than once; accepted (owner decision, issue 9378).
+written between that read and the send lets that one send out. Neither gap
+closes outright, because an HTTP call cannot join the erasure's transaction. The
+first can be shortened; this change does not shorten it. A key fact naming a
+marked holder folds in as no holder at the fact's own stamp, clearing a holder
+keeps their stamp, and a holder fact at a cleared holder's own stamp fills it,
+so a key's holder is the person its latest-stamped holder fact names, or no one
+if they are erased, whatever order the facts and the erasure arrive in, but for
+one case: two holder facts at one stamp naming two people keep the one folded
+first while neither is marked; if that one is erased later, the key has no
+holder until the other person's fact at that stamp is redelivered. Erasure no
+longer moves a cleared holder's stamp to now. A hand-over stamped between the
+holder's stamp and the erasure, which was dropped, now lands. The race the moved
+stamp closed is now closed by the re-check. A redelivered batch can count a
+trace twice, and so can a root span stored more than once; accepted (owner
+decision, issue 9378).
 Signals are events on the `nurturing` pipeline.
 A delivered signal is claimed in Redis for seven days under the process-wide idempotency key prefix,
 so a redelivered event sends nothing. A gateway key's creation and its budget's crossings
