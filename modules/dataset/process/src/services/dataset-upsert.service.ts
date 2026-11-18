@@ -84,44 +84,54 @@ export class DatasetUpsertService {
     }
     const movesValues = columnEditMovesValues(columnEdit);
     const rewrites = columnsChanged || movesValues;
-    if (existing.contentLayout === "s3_jsonl" && rewrites) {
-      return options.content.updateColumns({
-        dataset: existing,
+    // Refused under the lock if another column edit committed since this one read the columns.
+    const editChunks = (dataset: Dataset) =>
+      options.content.updateColumns({
+        dataset,
         projectId: parsed.projectId,
         name,
         slug: existing.slug,
         columnTypes: parsed.columnTypes,
         ...(parsed.columnRenames ? { columnRenames: parsed.columnRenames } : {}),
+        previousColumns: existing.columnTypes,
       });
-    }
+    if (existing.contentLayout === "s3_jsonl" && rewrites) return editChunks(existing);
 
     const lockedLayout =
       (isSingleFileDataset(existing) && options.singleFile !== undefined) ||
       existing.contentLayout === "postgres";
-    if (rewrites && isSingleFileDataset(existing) && options.singleFile) {
-      await options.singleFile.updateColumns({
-        dataset: existing,
-        columnTypes: parsed.columnTypes,
-        columnRenames: parsed.columnRenames,
-      });
-    } else if (rewrites && existing.contentLayout === "postgres") {
-      const stored = await this.migrateRecordColumns({ dataset: existing, parsed, movesValues });
-      if (stored.outcome === "moved") {
-        // The move flipped the dataset while the edit waited: apply it to the chunks.
-        return options.content.updateColumns({
-          dataset: stored.dataset,
-          projectId: parsed.projectId,
-          name,
-          slug: existing.slug,
-          columnTypes: parsed.columnTypes,
-          ...(parsed.columnRenames ? { columnRenames: parsed.columnRenames } : {}),
-        });
-      }
+    if (rewrites) {
+      const stored = await this.storeColumnEdit({ existing, parsed, movesValues });
+      // The move flipped the dataset while the edit waited: apply it to the chunks.
+      if (stored.outcome === "moved") return editChunks(stored.dataset);
     }
     // Unchanged columns, or columns stored under the lock: writing them could undo a later edit.
     const { columnTypes: _kept, ...named } = update;
     const writesColumns = columnsChanged && !lockedLayout;
     return options.repository.update(writesColumns ? update : named);
+  }
+
+  /** A column edit stored where the dataset's rows live outside the chunks, under its lock. */
+  private async storeColumnEdit({
+    existing,
+    parsed,
+    movesValues,
+  }: {
+    existing: Dataset;
+    parsed: ParsedUpsert;
+    movesValues: boolean;
+  }): Promise<{ outcome: "stored" } | { outcome: "moved"; dataset: Dataset }> {
+    const { singleFile } = this.deps.options;
+    if (isSingleFileDataset(existing) && singleFile) {
+      await singleFile.updateColumns({
+        dataset: existing,
+        columnTypes: parsed.columnTypes,
+        columnRenames: parsed.columnRenames,
+      });
+      return { outcome: "stored" };
+    }
+    if (existing.contentLayout !== "postgres") return { outcome: "stored" };
+    return this.migrateRecordColumns({ dataset: existing, parsed, movesValues });
   }
 
   /**

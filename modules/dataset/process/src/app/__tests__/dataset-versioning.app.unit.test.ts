@@ -307,16 +307,39 @@ describe("given a save racing another save for its version number", () => {
       await writeChunk(input);
       written = true;
     });
+    const failure = new Error("database down");
     const findById = repositories.datasets.findById.bind(repositories.datasets);
     vi.spyOn(repositories.datasets, "findById").mockImplementation(async (input) => {
-      if (written) throw new Error("database down");
+      if (written) throw failure;
       return findById(input);
     });
     const deleteChunks = vi.spyOn(repositories.versionContent, "deleteChunks");
 
-    await expect(save(datasetId)).rejects.toThrow("database down");
+    await expect(save(datasetId)).rejects.toBe(failure);
 
     expect(deleteChunks).toHaveBeenCalledWith(expect.objectContaining({ chunkCount: 1 }));
+  });
+
+  /** @scenario "A save whose read after writing its rows fails removes the rows it wrote" */
+  it("raises the read's failure, not the removal's, when removing the rows fails too", async () => {
+    const datasetId = await editedDataset();
+    let written = false;
+    const writeChunk = repositories.versionContent.writeChunk.bind(repositories.versionContent);
+    vi.spyOn(repositories.versionContent, "writeChunk").mockImplementation(async (input) => {
+      await writeChunk(input);
+      written = true;
+    });
+    const failure = new Error("database down");
+    const findById = repositories.datasets.findById.bind(repositories.datasets);
+    vi.spyOn(repositories.datasets, "findById").mockImplementation(async (input) => {
+      if (written) throw failure;
+      return findById(input);
+    });
+    vi.spyOn(repositories.versionContent, "deleteChunks").mockRejectedValue(
+      new Error("storage down"),
+    );
+
+    await expect(save(datasetId)).rejects.toBe(failure);
   });
 
   /** @scenario "A save whose read after writing its rows fails removes the rows it wrote" */
@@ -327,14 +350,15 @@ describe("given a save racing another save for its version number", () => {
       numberTaken = true;
       throw new DatasetVersionNumberTakenError();
     });
+    const failure = new Error("database down");
     const findLatest = repositories.versions.findLatest.bind(repositories.versions);
     vi.spyOn(repositories.versions, "findLatest").mockImplementation(async (input) => {
-      if (numberTaken) throw new Error("database down");
+      if (numberTaken) throw failure;
       return findLatest(input);
     });
     const deleteChunks = vi.spyOn(repositories.versionContent, "deleteChunks");
 
-    await expect(save(datasetId)).rejects.toThrow("database down");
+    await expect(save(datasetId)).rejects.toBe(failure);
 
     expect(deleteChunks).toHaveBeenCalledWith(expect.objectContaining({ chunkCount: 1 }));
   });

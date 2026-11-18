@@ -47,7 +47,7 @@ describe("assertColumnsCurrent", () => {
     it("refuses it when a later edit changed a column's type", () => {
       expect(() =>
         assertColumnsCurrent({ columns: [{ name: "q", type: "string" }], columnTypes: current }),
-      ).toThrow(DatasetStaleColumnsError);
+      ).toThrow(expect.objectContaining({ code: "dataset_stale_columns" }));
     });
 
     it("accepts it while every column keeps its type", () => {

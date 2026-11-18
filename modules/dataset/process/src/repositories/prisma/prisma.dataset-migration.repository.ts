@@ -189,9 +189,9 @@ SELECT pg_advisory_xact_lock(hashtextextended(${`dataset:${input.datasetId}`}, 0
 }
 
 /**
- * One pass in Postgres, nothing per row in the process: the digest sums a 60-bit
- * slice of each row's md5 over id and millisecond updatedAt, so it needs no sort
- * and no row-sized string, and any edit to one row moves it (ADR-032).
+ * One pass in Postgres, nothing per row in the process: the digest sums a 60-bit slice of
+ * each row's md5 over id, millisecond updatedAt and entry, so it needs no sort and no
+ * row-sized string, and any edit to one row moves it, same millisecond too (ADR-032).
  */
 async function fingerprintOf(
   database: Pick<PrismaClient, "$queryRaw">,
@@ -204,6 +204,7 @@ async function fingerprintOf(
            max("updatedAt") AS "maxUpdatedAt",
            coalesce(sum(('x' || substr(md5(
              "id" || ':' || floor(extract(epoch FROM "updatedAt") * 1000)::bigint::text
+               || ':' || "entry"::text
            ), 1, 15))::bit(60)::bigint), 0)::text AS "digest"
       FROM "DatasetRecord"
      WHERE "datasetId" = ${input.datasetId}

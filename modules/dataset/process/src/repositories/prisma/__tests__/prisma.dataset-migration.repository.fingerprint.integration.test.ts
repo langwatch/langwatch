@@ -108,6 +108,24 @@ describe.skipIf(!DB_URL)("PrismaDatasetMigrationRepository fingerprint", () => {
     });
   });
 
+  describe("when a record's content changes and its updated time stays the same", () => {
+    it("changes the digest", async () => {
+      const before = await repository.getFingerprint(key);
+      const row = await prisma.datasetRecord.findFirstOrThrow({
+        where: { id: `${namespace}-b`, projectId },
+      });
+      await prisma.datasetRecord.update({
+        where: { id: row.id, projectId },
+        data: { entry: { changed: true }, updatedAt: row.updatedAt },
+      });
+
+      const after = await repository.getFingerprint(key);
+
+      expect(after.maxUpdatedAt?.epochMilliseconds).toBe(before.maxUpdatedAt?.epochMilliseconds);
+      expect(after.digest).not.toBe(before.digest);
+    });
+  });
+
   describe("when a row of the dataset is filed under another project", () => {
     it("leaves it out of the fingerprint", async () => {
       const before = await repository.getFingerprint(key);

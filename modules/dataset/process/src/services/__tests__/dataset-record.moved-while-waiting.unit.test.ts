@@ -173,4 +173,34 @@ describe("a column edit that waited while the content move flipped the dataset",
     // The move's copy, then the edit's rewrite of the chunks under the new type.
     expect(writeChunks).toHaveBeenCalledTimes(2);
   });
+
+  /** @scenario "A column edit that waited while the dataset moved is applied to object storage" */
+  it("refuses the edit when another column edit commits before it reaches the chunks", async () => {
+    const { app, datasetId, repositories } = await movedWhileWaiting();
+    const lock = repositories.records.withDatasetLock.bind(repositories.records);
+    repositories.records.withDatasetLock = async (key, work) => {
+      try {
+        return await lock(key, work);
+      } finally {
+        // Another edit commits after the table refused this one, before it is applied to chunks.
+        await repositories.content.update({
+          id: datasetId,
+          projectId: PROJECT,
+          data: { columnTypes: [{ name: "input", type: "number" }] },
+        });
+      }
+    };
+
+    const refusal = await app
+      .upsertDataset({
+        projectId: PROJECT,
+        datasetId,
+        name: "moved-while-waiting",
+        columnTypes: [{ name: "question", type: "string" }],
+        columnRenames: [{ from: "input", to: "question" }],
+      })
+      .catch((error: unknown) => error);
+
+    expect(refusal).toMatchObject({ code: "dataset_stale_columns" });
+  });
 });

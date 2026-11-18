@@ -1,8 +1,3 @@
-/**
- * Dataset versions: snapshots saved by autosave, by hand, by experiment runs and
- * by restores; reads, comparisons and restores of them.
- * Spec: modules/dataset/specs/dataset-versioning.feature.
- */
 import {
   DatasetNotReadyError,
   DatasetVersionNotFoundError,
@@ -20,6 +15,12 @@ import {
   type DatasetVersionSavedEventData,
   type DatasetVersionTrigger,
 } from "@langwatch/dataset-contract";
+/**
+ * Dataset versions: snapshots saved by autosave, by hand, by experiment runs and
+ * by restores; reads, comparisons and restores of them.
+ * Spec: modules/dataset/specs/dataset-versioning.feature.
+ */
+import { createLogger } from "@langwatch/observability";
 
 import type { DatasetChunkRepository } from "../repositories/dataset-chunk.repository.ts";
 import type { DatasetContentRepository } from "../repositories/dataset-content.repository.ts";
@@ -69,6 +70,8 @@ export type DatasetVersionServiceDeps = {
 type VersionSavedSink = (data: DatasetVersionSavedEventData) => Promise<void>;
 
 export type DatasetSnapshot = { version: DatasetVersion; created: boolean };
+
+const logger = createLogger("langwatch:dataset:versions");
 
 export class DatasetVersionService {
   #announce: VersionSavedSink = async () => undefined;
@@ -346,35 +349,31 @@ export class DatasetVersionService {
     return hasher.digest();
   }
 
-  /**
-   * Writes the content again while hashing it, so the stored hash is of the stored rows. Any
-   * failure before the rows are kept by a version row or removed removes them, then rethrows.
-   */
+  /** Writes and records a version; a failure before its rows are kept or removed removes them. */
   async #writeVersion(input: {
     dataset: Dataset;
     latest: DatasetVersion | null;
     input: Parameters<DatasetVersionService["snapshot"]>[0];
   }): Promise<DatasetSnapshot | "moved"> {
     const id = this.deps.generateId();
-    const address = {
-      projectId: input.input.projectId,
-      datasetId: input.dataset.id,
-      versionId: id,
-    };
+    const { projectId } = input.input;
+    const address = { projectId, datasetId: input.dataset.id, versionId: id };
     const progress = { chunkCount: 0, settled: false };
     try {
       return await this.#writeAndRecord({ ...input, id, address, progress });
     } catch (error) {
       if (!progress.settled) {
-        await this.deps.versionContent.deleteChunks({
-          ...address,
-          chunkCount: progress.chunkCount,
-        });
+        await this.deps.versionContent
+          .deleteChunks({ ...address, chunkCount: progress.chunkCount })
+          .catch((cause: unknown) =>
+            logger.warn({ ...address, cause }, "Version chunks left behind"),
+          );
       }
       throw error;
     }
   }
 
+  /** Writes the content again while hashing it, so the stored hash is of the stored rows. */
   async #writeAndRecord({
     dataset,
     latest,

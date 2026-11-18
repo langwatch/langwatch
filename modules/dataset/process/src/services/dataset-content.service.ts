@@ -411,6 +411,7 @@ export class DatasetContentService implements DatasetContent {
     slug,
     columnTypes,
     columnRenames,
+    previousColumns,
   }: {
     dataset: Dataset;
     projectId: string;
@@ -418,11 +419,13 @@ export class DatasetContentService implements DatasetContent {
     slug: string;
     columnTypes: Dataset["columnTypes"];
     columnRenames?: DatasetColumnRenames;
+    /** The columns the edit was prepared against, when not the given dataset's own. */
+    previousColumns?: Dataset["columnTypes"];
   }): Promise<Dataset> {
     const updated = await this.chunks.migrateColumns({
       dataset,
       projectId,
-      oldColumnTypes: dataset.columnTypes,
+      oldColumnTypes: previousColumns ?? dataset.columnTypes,
       newColumnTypes: columnTypes,
       ...(columnRenames ? { columnRenames } : {}),
       name,

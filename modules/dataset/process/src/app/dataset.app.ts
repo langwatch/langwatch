@@ -1108,6 +1108,8 @@ export abstract class DatasetContent {
     slug: string;
     columnTypes: Dataset["columnTypes"];
     columnRenames?: DatasetColumnRenames;
+    /** The columns the edit was prepared against, when not the given dataset's own. */
+    previousColumns?: Dataset["columnTypes"];
   }): Promise<Dataset>;
 }
 
