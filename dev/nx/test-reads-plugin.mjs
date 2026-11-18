@@ -23,6 +23,7 @@ export const reads = {
     "docs/governance/agent-registry.mdx",
     "docs/governance/kill-switch.mdx",
     "docs/ai-governance/ingestion-sources/index.mdx",
+    "docs/features/braids.mdx",
   ],
   "@langwatch/agent-process": [
     "modules/agent/**/*",

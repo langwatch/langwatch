@@ -38,8 +38,16 @@ describe.skipIf(!connection)("the kill switch Prisma lock", () => {
     it("aborts the body's signal on the transaction's clock, counting the wait", async () => {
       const locks = lockOf();
       const key = `test-${nanoid(8)}`;
-      const first = locks.withLock({ key, run: () => sleep(2_000) });
-      await sleep(100);
+      let held = (): void => undefined;
+      const holding = new Promise<void>((resolve) => (held = resolve));
+      const first = locks.withLock({
+        key,
+        run: async () => {
+          held();
+          await sleep(2_000);
+        },
+      });
+      await holding;
       const askedAt = Date.now();
 
       const abortedAt = await locks.withLock({

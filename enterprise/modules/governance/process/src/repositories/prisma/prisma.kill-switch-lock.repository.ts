@@ -48,11 +48,11 @@ export class PrismaKillSwitchLockRepository extends KillSwitchLockRepository {
     run: (hold: KillSwitchLockHold) => Promise<T>;
   }): Promise<T> {
     return lockedRuns.run({
-      task: () =>
-        this.prisma.$transaction(
+      task: () => {
+        // Counted from the call: Prisma's timeout can include waiting for a connection, and the lock.
+        const startedAt = Date.now();
+        return this.prisma.$transaction(
           async (transaction) => {
-            // Prisma's timeout runs from here, so the time spent waiting for the lock counts.
-            const startedAt = Date.now();
             await transaction.$executeRaw` ${skipTenantCheck({
               // Advisory-lock helper, the key names one kill switch resource.
               SKIP_TENANT_CHECK: true,
@@ -71,7 +71,8 @@ SELECT pg_advisory_xact_lock(hashtextextended(${`kill-switch:${key}`}, 0))`;
             }
           },
           { timeout: this.timing.timeoutMs, maxWait: KILL_SWITCH_LOCK_MAX_WAIT_MS },
-        ),
+        );
+      },
     });
   }
 }
