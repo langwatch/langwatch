@@ -174,9 +174,7 @@ describe.skipIf(!databaseUrl)("given nurturing's member and organization creatio
       }),
     ).rejects.toThrow("re-check");
 
-    await expect(
-      members.findMembershipsOfUsers({ userIds: [erasedStopped] }),
-    ).resolves.toEqual([]);
+    await expect(members.findMembershipsOfUsers({ userIds: [erasedStopped] })).resolves.toEqual([]);
   });
 
   /** @scenario "The trace traits are removed once when an organization's window ends" */
