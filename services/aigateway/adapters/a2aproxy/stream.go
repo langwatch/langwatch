@@ -6,7 +6,6 @@ import (
 	"errors"
 	"io"
 	"net/http"
-	"strings"
 )
 
 // errEventTooLarge is an SSE event, or one of its lines, over maxEventBytes.
@@ -51,37 +50,67 @@ func (h *Handler) stream(c *call, resp *http.Response) {
 	write(c.errorEvent(r))
 }
 
-// streamTailBytes is how much earlier streamed text each event is scanned
-// with, so a phrase split across events is seen whole.
+// streamTailBytes is how much earlier text of the same artifact each event
+// is scanned with, so a phrase split across events is seen whole.
 const streamTailBytes = 4 << 10
 
-// streamText keeps the end of the text streamed so far.
-type streamText struct{ tail string }
+// maxStreamTails bounds how many artifacts a stream keeps a tail for; past
+// it, the artifact written longest ago is dropped.
+const maxStreamTails = 64
 
-func (s *streamText) add(texts []string) {
-	s.tail += strings.Join(texts, "")
-	if len(s.tail) > streamTailBytes {
-		s.tail = s.tail[len(s.tail)-streamTailBytes:]
+type streamTail struct{ id, text string }
+
+// streamText keeps the end of each artifact's streamed text-part text, the
+// most recently written last. Names, other strings and SSE field values never
+// join it, so nothing lands between the halves of a split phrase.
+type streamText struct{ tails []streamTail }
+
+func (s *streamText) tail(id string) string {
+	for _, t := range s.tails {
+		if t.id == id {
+			return t.text
+		}
+	}
+	return ""
+}
+
+func (s *streamText) add(id, text string) {
+	joined := text
+	for i, t := range s.tails {
+		if t.id == id {
+			joined = t.text + text
+			s.tails = append(s.tails[:i], s.tails[i+1:]...)
+			break
+		}
+	}
+	if len(joined) > streamTailBytes {
+		joined = joined[len(joined)-streamTailBytes:]
+	}
+	s.tails = append(s.tails, streamTail{id: id, text: joined})
+	if len(s.tails) > maxStreamTails {
+		s.tails = s.tails[1:]
 	}
 }
 
-// checkEvent scans one event's texts plus the event's text joined to the
+// checkEvent scans every string of one event and its SSE field values each
+// on its own, plus each artifact's text-part text joined to that artifact's
 // text streamed before it.
 func (h *Handler) checkEvent(c *call, event []byte, seen *streamText) *refusal {
 	if !h.cfg.Scanner.Applies(c.bundle, DirectionResponse) {
 		return nil
 	}
-	p := collectTexts(eventData(event))
+	p := collectStreamTexts(eventData(event))
 	if !p.parsed {
 		return &refuseReplyUnscannable
 	}
 	p.texts = append(p.texts, fieldValues(event)...)
-	texts := p.texts
-	if seen.tail != "" && len(p.texts) > 0 {
-		texts = append(append([]string(nil), p.texts...), seen.tail+strings.Join(p.texts, ""))
+	for _, part := range p.parts {
+		if prev := seen.tail(part.id); prev != "" {
+			p.texts = append(p.texts, prev+part.text)
+		}
+		seen.add(part.id, part.text)
 	}
-	seen.add(p.texts)
-	return h.checkTexts(c, DirectionResponse, texts)
+	return h.checkTexts(c, DirectionResponse, p.texts)
 }
 
 func (c *call) errorEvent(r refusal) []byte {

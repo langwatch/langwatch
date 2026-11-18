@@ -175,6 +175,12 @@ Feature: A2A proxy on the gateway
     And the caller receives a JSON-RPC error with code -32601 and reason "a2a_operation_not_supported"
 
   @unit
+  Scenario: a JSON-RPC envelope that names a member twice or in another case is refused
+    When the caller sends POST /a2a/billing with "method" twice, with both "method" and "Method", or with "id", "jsonrpc" or "params" repeated or in another case
+    Then the upstream is not called
+    And the caller receives a JSON-RPC error with code -32600 and reason "a2a_invalid_request"
+
+  @unit
   Scenario: the query string of the upstream URL stays after the forwarded path
     Given the target's upstream URL is "https://billing.acme.test/?tenant=7"
     When the caller sends POST /a2a/billing/message:send?x=1
@@ -305,6 +311,21 @@ Feature: A2A proxy on the gateway
     And the caller receives a JSON-RPC error with code -32023 and reason "a2a_target_not_https"
 
   @unit
+  Scenario: an Agent Card URL on plain http is refused where https is required
+    Given the gateway requires https for customer endpoints
+    And the target "billing" has an https upstream and an http Agent Card URL
+    When the caller fetches GET /a2a/billing/.well-known/agent-card.json
+    Then the Agent Card URL is not fetched
+    And the caller receives HTTP 502 with reason "a2a_target_not_https"
+
+  @unit
+  Scenario: the target's upstream headers go only to an Agent Card on the upstream's own origin
+    When the target's Agent Card URL differs from its upstream in scheme, host or port
+    Then the gateway fetches the card without the target's upstream headers
+    When the Agent Card URL is on the upstream's own scheme, host and port
+    Then the card fetch carries the target's upstream headers
+
+  @unit
   Scenario: Agent Card URLs use the configured public base URL
     Given the gateway's public base URL is "https://gateway.acme.test"
     When the caller fetches the Agent Card with another Host and X-Forwarded-Proto
@@ -317,6 +338,21 @@ Feature: A2A proxy on the gateway
     Then the first event is forwarded
     And the stream ends with an error event with reason "a2a_content_blocked"
     And "4111" never reaches the caller
+
+  @unit
+  Scenario: a phrase split across streamed events is scanned whole with names and ids between them
+    Given the key scans replies for "card number"
+    When the upstream streams "your card num" and then "ber 4111" as text of artifact "a1" named "answer", or as status message text
+    And each event carries SSE event and id lines
+    Then the stream ends with an error event with reason "a2a_content_blocked"
+    And "4111" never reaches the caller
+
+  @unit
+  Scenario: text of artifacts streamed side by side is scanned per artifact
+    Given the key scans replies for "card number"
+    When the upstream streams "your card num" for artifact "a1", then text for artifact "a2", then "ber 4111" for artifact "a1"
+    Then the stream ends with an error event with reason "a2a_content_blocked"
+    And "your card" in artifact "a1" followed by " number of items" in artifact "a2" is forwarded, not joined into one phrase
 
   @unit
   Scenario: an allowed host may resolve to a local address and no environment proxy is used

@@ -84,7 +84,8 @@ type Config struct {
 	// BudgetPrecheck checks the key's budgets. Nil checks none; an error
 	// admits the call, as on the LLM routes.
 	BudgetPrecheck func(ctx context.Context, bundle *domain.Bundle) (domain.BudgetDecision, error)
-	// RequireHTTPS refuses targets whose upstream is not https.
+	// RequireHTTPS refuses targets whose upstream, or Agent Card URL for a
+	// card fetch, is not https.
 	RequireHTTPS bool
 	// PublicBaseURL is the gateway's public origin for Agent Card URLs.
 	// Empty uses the request's own scheme and Host.
@@ -210,20 +211,86 @@ func parseRoute(c *call) *refusal {
 	return nil
 }
 
-// parseJSONRPC reads the JSON-RPC id and method from the body.
+// parseJSONRPC reads the JSON-RPC id and method from the body, by the exact
+// member names the upstream reads, so the method checked is the one it runs.
 func parseJSONRPC(c *call) *refusal {
-	var msg struct {
-		ID     json.RawMessage `json:"id"`
-		Method string          `json:"method"`
-	}
-	if json.Unmarshal(c.body, &msg) != nil {
+	members, ok := readEnvelope(c.body)
+	if !ok {
 		return &refuseInvalidRequest
 	}
-	c.id, c.method = msg.ID, msg.Method
-	if !jsonRPCMethods[msg.Method] {
+	var method string
+	if raw, has := members["method"]; has && json.Unmarshal(raw, &method) != nil {
+		return &refuseInvalidRequest
+	}
+	c.id, c.method = members["id"], method
+	if !jsonRPCMethods[method] {
 		return &refuseUnsupported
 	}
 	return nil
+}
+
+// envelopeMembers are the members of a JSON-RPC 2.0 request.
+var envelopeMembers = []string{"jsonrpc", "method", "params", "id"}
+
+// readEnvelope reads the top-level members of one JSON object by their exact
+// names. A repeated name, or one equal to an envelope member only when case
+// is ignored, fails: parsers disagree on which copy wins (encoding/json folds
+// case and keeps the last), so the gateway and the upstream could differ.
+func readEnvelope(body []byte) (map[string]json.RawMessage, bool) {
+	dec := json.NewDecoder(bytes.NewReader(body))
+	if tok, err := dec.Token(); err != nil || tok != json.Delim('{') {
+		return nil, false
+	}
+	members := map[string]json.RawMessage{}
+	for dec.More() {
+		if !readMember(dec, members) {
+			return nil, false
+		}
+	}
+	if _, err := dec.Token(); err != nil { // the closing brace
+		return nil, false
+	}
+	if _, err := dec.Token(); !errors.Is(err, io.EOF) {
+		return nil, false
+	}
+	return members, true
+}
+
+// readMember reads one member into members, keeping the value of method and
+// id only. It fails on a name readEnvelope refuses.
+func readMember(dec *json.Decoder, members map[string]json.RawMessage) bool {
+	tok, err := dec.Token()
+	name, isName := tok.(string)
+	_, repeated := members[name]
+	if err != nil || !isName || repeated || foldsToEnvelopeMember(name) {
+		return false
+	}
+	var value json.RawMessage
+	target := any(&value)
+	if name != "method" && name != "id" {
+		target = &skippedValue{}
+	}
+	if dec.Decode(target) != nil {
+		return false
+	}
+	members[name] = value
+	return true
+}
+
+// skippedValue reads past a member value without keeping a copy of it.
+type skippedValue struct{}
+
+func (*skippedValue) UnmarshalJSON([]byte) error { return nil }
+
+// foldsToEnvelopeMember reports whether name is an envelope member in another
+// case, by the Unicode folding encoding/json applies (so "jſonrpc" counts).
+func foldsToEnvelopeMember(name string) bool {
+	for _, m := range envelopeMembers {
+		if name != m && strings.EqualFold(name, m) {
+			return true
+		}
+	}
+	return false
 }
 
 // readLimited reads at most maxBodyBytes. A body over the limit is reported,
@@ -301,7 +368,8 @@ func (h *Handler) admit(c *call) (domain.A2ATarget, bool) {
 		return target, false
 	case domain.A2AAllowed:
 	}
-	if h.cfg.RequireHTTPS && !strings.HasPrefix(strings.ToLower(target.UpstreamURL), "https://") {
+	plainCard := c.isCard && target.CardURL != "" && !isHTTPS(target.CardURL)
+	if h.cfg.RequireHTTPS && (!isHTTPS(target.UpstreamURL) || plainCard) {
 		c.refuse(refuseNotHTTPS)
 		return target, false
 	}

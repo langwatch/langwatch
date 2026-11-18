@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"go.opentelemetry.io/otel/attribute"
@@ -32,7 +33,8 @@ func (h *Handler) serveCard(c *call, target domain.A2ATarget) {
 }
 
 // fetchCard reads the upstream Agent Card, parsed and raw, refusing the call
-// when it cannot.
+// when it cannot. The target's upstream headers go only to a card on the
+// upstream's own origin: a card elsewhere is fetched without them.
 func (h *Handler) fetchCard(c *call, target domain.A2ATarget) (map[string]any, []byte, bool) {
 	cardURL := target.CardURL
 	if cardURL == "" {
@@ -43,8 +45,10 @@ func (h *Handler) fetchCard(c *call, target domain.A2ATarget) (map[string]any, [
 		c.refuse(refuseUpstream.withMessage("the Agent Card URL is invalid"))
 		return nil, nil, false
 	}
-	for k, v := range target.UpstreamHeaders {
-		req.Header.Set(k, v)
+	if sameOrigin(target.UpstreamURL, cardURL) {
+		for k, v := range target.UpstreamHeaders {
+			req.Header.Set(k, v)
+		}
 	}
 	propagation.TraceContext{}.Inject(c.ctx, propagation.HeaderCarrier(req.Header))
 	resp, err := h.cfg.Client.Do(req)
@@ -87,6 +91,33 @@ func rewriteCard(card map[string]any, upstream, proxy string) {
 		}
 		card[key] = kept
 	}
+}
+
+// sameOrigin reports whether two absolute URLs share scheme, host and port,
+// the port defaulting by scheme.
+func sameOrigin(a, b string) bool {
+	ua, errA := url.Parse(a)
+	ub, errB := url.Parse(b)
+	if errA != nil || errB != nil || ua.Host == "" || ub.Host == "" {
+		return false
+	}
+	return strings.EqualFold(ua.Scheme, ub.Scheme) &&
+		strings.EqualFold(ua.Hostname(), ub.Hostname()) && originPort(ua) == originPort(ub)
+}
+
+func originPort(u *url.URL) string {
+	if p := u.Port(); p != "" {
+		return p
+	}
+	if strings.EqualFold(u.Scheme, "https") {
+		return "443"
+	}
+	return "80"
+}
+
+// isHTTPS reports whether a target URL is https.
+func isHTTPS(raw string) bool {
+	return strings.HasPrefix(strings.ToLower(raw), "https://")
 }
 
 // sameEndpoint reports whether u names the upstream endpoint itself.
