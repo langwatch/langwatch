@@ -69955,6 +69955,7 @@ The Helm chart also deploys:
 - `langwatch/clickhouse-serverless`, Performance-tweaked ClickHouse image optimized for LangWatch's event ingestion and analytical query patterns
 - `langwatch/ai-gateway`, the AI Gateway (`gateway.image.repository`, on by default)
 - `langwatch/langyagent`, the Langy assistant (`langyagent.image.repository`, on by default)
+- `langwatch/pii-redaction-model`, the PII redaction model (`images.pii_redaction_model.repository`, off by default); mirror it only when `piiRedactionModel.enabled` is on
 - `postgres`, `redis` and the Prometheus server image, when the chart runs those services
 
 ## Service Communication

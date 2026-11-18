@@ -1546,9 +1546,10 @@ piiRedactionModel:
   ## @param piiRedactionModel.enabled [default: false] Deploy the PII redaction model (Deployment, Service and PDB) and point the app and workers at it.
   enabled: false
 
-  # Like enabled, it forces release_pii_redaction_model_enabled: every Strict
-  # organization goes to the model. Self-hosted calls are never priced.
-  ## @param piiRedactionModel.externalEndpoint [string] PII_REDACTION_MODEL_ENDPOINT for a model this release does not deploy: an http(s) address, or a Lambda alias ARN when global.serviceAccount carries an IAM role allowed lambda:InvokeFunction. Ignored when enabled. Like enabled, it routes every Strict organization to the model.
+  # Like enabled, it forces release_pii_redaction_model_enabled: Strict
+  # organizations with an Enterprise license go to the model, the rest stay on
+  # Presidio. Self-hosted calls are never priced.
+  ## @param piiRedactionModel.externalEndpoint [string] PII_REDACTION_MODEL_ENDPOINT for a model this release does not deploy: an http(s) address, or a Lambda alias ARN when global.serviceAccount carries an IAM role allowed lambda:InvokeFunction. Ignored when enabled. Like enabled, it routes Strict organizations with an Enterprise license to the model; the rest stay on Presidio.
   externalEndpoint: ""
 
   ## @param piiRedactionModel.imagePullSecrets [array] Optional, only for a private mirror of images.pii_redaction_model (the default image is public), e.g. [{ name: my-registry }].
