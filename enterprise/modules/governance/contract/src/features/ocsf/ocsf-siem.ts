@@ -72,12 +72,18 @@ function cursorField(decode: (cursor: string) => unknown) {
     .optional();
 }
 
+function isStorableInstant(iso: string): boolean {
+  try {
+    return Temporal.Instant.from(iso).epochMilliseconds >= 0;
+  } catch {
+    return false;
+  }
+}
+
 /** An instant the stores can hold: ClickHouse reads window bounds as unsigned epoch milliseconds. */
 const windowInstant = z.iso
   .datetime({ offset: true })
-  .refine((iso) => Temporal.Instant.from(iso).epochMilliseconds >= 0, {
-    message: "Must be 1970-01-01T00:00:00Z or later",
-  })
+  .refine(isStorableInstant, { message: "Must be 1970-01-01T00:00:00Z or later" })
   .optional();
 
 const windowFields = {

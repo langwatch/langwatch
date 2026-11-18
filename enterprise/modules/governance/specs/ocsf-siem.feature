@@ -112,6 +112,11 @@ Feature: OCSF 1.9 SIEM export, push and ingest
       Then the answer is 422 with code "validation_error"
 
     @integration
+    Scenario: A since or until that is not a full instant is a validation error on every stream
+      When a SIEM reads the governance events, project traces or audit stream with a since or until of "2026-01-01"
+      Then the answer is 422 with code "validation_error"
+
+    @integration
     Scenario: The governance events stream pages in write order and reads an event written again once, at its newest version
       Given three governance events stored one after another
       When a SIEM reads them two per page with the cursor
