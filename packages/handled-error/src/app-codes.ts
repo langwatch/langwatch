@@ -248,6 +248,7 @@ export const APP_ERROR_CODES = [
   "dataset_not_ready",
   "dataset_not_retryable",
   "dataset_page_too_large",
+  "dataset_records_table_write_refused",
   "dataset_row_too_large",
   "dataset_stale_columns",
   "dataset_too_large_to_edit_columns",
