@@ -298,6 +298,14 @@ The usage report's figures for these projects.
 countUsage(input: { projectIds: readonly string[]; since?: number }): Promise<DatasetUsageCount>;
 ```
 
+#### `eraseStoredContent`
+
+Removes every object the projects' datasets keep (chunks, version chunks, single files and staged uploads), archived ones included, for an erasure that then deletes their rows.
+
+```typescript
+eraseStoredContent(input: { projectIds: readonly string[] }): Promise<{ datasets: number }>;
+```
+
 #### `listVersions`
 
 Newest first, with author names, and whether the layout allows a restore.

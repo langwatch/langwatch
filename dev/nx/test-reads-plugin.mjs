@@ -221,6 +221,7 @@ export const reads = {
   ],
   "@langwatch/user-browser": ["docs/coding-agents/explore-your-usage-with-your-own-agent.mdx"],
   "@langwatch/gateway-contract": [".env.example"],
+  "@langwatch/dataset-process": [".env.example", "pnpm-workspace.yaml"],
   "@langwatch/analytics-contract": [
     "dev/scripts/build-charts-lib.mjs",
     "docs/features/querying-your-data.mdx",
