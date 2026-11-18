@@ -49,11 +49,11 @@ function everyManagementCall({ as }: World, userId: string, braidId: string) {
       projectIds: [ORCHESTRATOR],
     }),
     countProjectTraceViewers: caller.countProjectTraceViewers({ projectId: ORCHESTRATOR }),
-    getBraidsPolicy: caller.getBraidsPolicy({ organizationId: ORG }),
     setBraidsPolicy: caller.setBraidsPolicy({
       organizationId: ORG,
       braidsOrganizationAdminsOnly: true,
     }),
+    turnBraidsOn: caller.setBraidsEnabled({ organizationId: ORG, braidsEnabled: true }),
   };
 }
 
@@ -143,7 +143,7 @@ describe("braid management behind release_braids", () => {
     });
 
     /** @scenario "General authz reads peers ask still answer while release_braids is off" */
-    it("answers the policy and the member count to peers, while the screen's routes refuse", async () => {
+    it("answers the policy and the member count to peers, while the screen's count refuses", async () => {
       const made = await world();
       made.flags.withhold({ flag: BRAIDS_FLAG, organizationId: ORG });
 
@@ -153,12 +153,29 @@ describe("braid management behind release_braids", () => {
       await expect(
         made.app.countProjectMembersHolding({ projectId: ORCHESTRATOR, permission: "traces:view" }),
       ).resolves.toMatchObject({ exact: true });
-      await expect(refusalOf(made.as(ANA).getBraidsPolicy({ organizationId: ORG }))).resolves.toBe(
-        "braids_not_enabled",
-      );
       await expect(
         refusalOf(made.as(ANA).countProjectTraceViewers({ projectId: ORCHESTRATOR })),
       ).resolves.toBe("braids_not_enabled");
+    });
+
+    /** @scenario "With release_braids off an organisation admin can still turn Braids off" */
+    it("answers the settings and accepts turning Braids off", async () => {
+      const made = await world();
+      await made.as(ANA).createBraid(braidInput);
+
+      made.flags.withhold({ flag: BRAIDS_FLAG, organizationId: ORG });
+      const settings = await made.as(ANA).getBraidsPolicy({ organizationId: ORG });
+      const turnedOff = await made.as(ANA).setBraidsEnabled({
+        organizationId: ORG,
+        braidsEnabled: false,
+      });
+
+      expect(settings).toMatchObject({ braidsEnabled: true });
+      expect(turnedOff).toMatchObject({ braidsEnabled: false, updatedByUserId: ANA });
+      await expect(made.as(ANA).getBraidsPolicy({ organizationId: ORG })).resolves.toMatchObject({
+        braidsEnabled: false,
+        updatedByUserId: ANA,
+      });
     });
 
     /** @scenario "A trace read still shows an existing braid's matched conditions while braids are off" */

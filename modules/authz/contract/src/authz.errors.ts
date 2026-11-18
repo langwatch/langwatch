@@ -622,6 +622,20 @@ export class BraidsNotEnabledError extends HandledError {
   }
 }
 
+/** Braid management while the organisation has Braids turned off; its braids are paused. */
+export class BraidsTurnedOffError extends HandledError {
+  declare readonly code: "braids_turned_off";
+
+  constructor() {
+    super("braids_turned_off", "Braids is turned off for this organisation", {
+      httpStatus: 403,
+      fault: "customer",
+      ...remediation("braids_turned_off"),
+    });
+    this.name = "BraidsTurnedOffError";
+  }
+}
+
 /** The change is durable but the epoch did not move; repeating it finishes (ADR-201 §8). */
 export class AuthzEpochBumpFailedError extends HandledError {
   declare readonly code: "authz_epoch_bump_failed";

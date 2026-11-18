@@ -525,8 +525,15 @@ const registry = {
   braids_not_enabled: {
     tips: [
       "Braid management is not switched on for this organisation yet; retrying will not help",
-      "Braids that already exist keep applying to trace reads; ask LangWatch to switch braids on to create or change them",
+      "Removing a braid and revoking a signing key still work; ask LangWatch to switch braids on to create or change them",
     ],
+  },
+  braids_turned_off: {
+    tips: [
+      "On the Enterprise plan, an organisation admin can turn Braids on in the organisation's Braids settings",
+      "While Braids is off, existing braids are paused and kept; removing a braid and revoking a signing key still work",
+    ],
+    docsPath: "/features/braids",
   },
 
   // ---- personal workspace reads ----
