@@ -145,6 +145,80 @@ export function queryWithoutInstantEvalChip({
   });
 }
 
+/** The field a chip for `target` is spelled with on this lens. */
+function instantEvalFieldFor({
+  target,
+  lensId,
+}: {
+  target: InstantEvalTarget;
+  lensId: string | undefined;
+}): string {
+  if (target === instantEvalTargetForLens(lensId)) return INSTANT_EVAL_FIELD;
+  return (
+    Object.entries(INSTANT_EVAL_TARGET_FIELDS).find(([, candidate]) => candidate === target)?.[0] ??
+    INSTANT_EVAL_FIELD
+  );
+}
+
+/**
+ * The query with each bare chip on `question` that this lens reads as another
+ * target spelled with the field forcing `target`; `NOT` and grouping are kept.
+ * A query that does not parse is returned as it came.
+ */
+export function queryWithInstantEvalChipRetargeted({
+  queryText,
+  question,
+  target,
+  lensId,
+}: {
+  queryText: string;
+  question: string;
+  target: InstantEvalTarget;
+  lensId: string | undefined;
+}): string {
+  const trimmed = queryText.trim();
+  let ast: LiqeQuery;
+  try {
+    ast = structuredClone(parse(trimmed));
+  } catch {
+    return trimmed;
+  }
+  const wanted = question.replace(/\s+/g, " ").trim();
+  walkAST(ast, (node) => {
+    if (node.type !== "Tag" || node.field.type !== "Field") return;
+    if (node.field.name !== INSTANT_EVAL_FIELD) return;
+    if (node.expression.type !== "LiteralExpression") return;
+    const value = String(node.expression.value).replace(/\s+/g, " ");
+    if (value.trim() !== wanted) return;
+    if (instantEvalTargetForLens(lensId) === target) return;
+    node.field = { ...node.field, name: instantEvalFieldFor({ target, lensId }) };
+  });
+  return serialize(ast);
+}
+
+/**
+ * Whether an eval chip sits below an `OR`. Its run judges only the other terms,
+ * so the text as typed would match rows it never judged.
+ */
+export function hasInstantEvalChipUnderOr(queryText: string): boolean {
+  try {
+    return evalChipUnderOr(parse(queryText), false);
+  } catch {
+    return false;
+  }
+}
+
+function evalChipUnderOr(node: LiqeQuery, inOr: boolean): boolean {
+  if (node.type === "Tag") {
+    return inOr && node.field.type !== "ImplicitField" && isInstantEvalField(node.field.name);
+  }
+  if (node.type === "UnaryOperator") return evalChipUnderOr(node.operand, inOr);
+  if (node.type === "ParenthesizedExpression") return evalChipUnderOr(node.expression, inOr);
+  if (node.type !== "LogicalExpression") return false;
+  const nested = inOr || node.operator.operator === "OR";
+  return evalChipUnderOr(node.left, nested) || evalChipUnderOr(node.right, nested);
+}
+
 /**
  * The chip text for a question: the bare field when the target is what the lens
  * judges anyway, the forcing spelling when it is not. Always quoted — a chip
@@ -159,12 +233,7 @@ export function instantEvalChipText({
   target: InstantEvalTarget;
   lensId: string | undefined;
 }): string {
-  const field =
-    target === instantEvalTargetForLens(lensId)
-      ? INSTANT_EVAL_FIELD
-      : (Object.entries(INSTANT_EVAL_TARGET_FIELDS).find(
-          ([, candidate]) => candidate === target,
-        )?.[0] ?? INSTANT_EVAL_FIELD);
+  const field = instantEvalFieldFor({ target, lensId });
   const collapsed = question.replace(/\s+/g, " ").trim();
   return `${field}:"${collapsed.replace(/[\\"]/g, "\\$&")}"`;
 }

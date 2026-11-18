@@ -2,10 +2,9 @@ import { toaster } from "@langwatch/design-system/toaster";
 import type { ExplorerSearchClassification } from "@langwatch/instant-eval-contract";
 import {
   combineQueries,
-  isInstantEvalField,
+  hasInstantEvalChipUnderOr,
   isRouteKind,
   type ModelTrouble,
-  parse,
   queryWithoutInstantEvalChip,
   requoteBareTerms,
   resolveInstantEvalChips,
@@ -13,7 +12,6 @@ import {
   type RouteSearchResult,
   splitBareWords,
 } from "@langwatch/trace-contract";
-import type { LiqeQuery } from "liqe";
 import { type RefObject, useCallback, useRef } from "react";
 
 import { useFilterStore } from "../../../../behavior/explorer.store.ts";
@@ -152,29 +150,6 @@ function useApplyRoute({
 }
 
 /**
- * Whether an eval chip sits below an `OR`. Its run judges only the other terms,
- * so the text as typed would match rows it never judged; such a chip is rebuilt.
- */
-function hasEvalChipUnderOr(queryText: string): boolean {
-  try {
-    return evalChipUnderOr(parse(queryText), false);
-  } catch {
-    return false;
-  }
-}
-
-function evalChipUnderOr(node: LiqeQuery, inOr: boolean): boolean {
-  if (node.type === "Tag") {
-    return inOr && node.field.type !== "ImplicitField" && isInstantEvalField(node.field.name);
-  }
-  if (node.type === "UnaryOperator") return evalChipUnderOr(node.operand, inOr);
-  if (node.type === "ParenthesizedExpression") return evalChipUnderOr(node.expression, inOr);
-  if (node.type !== "LogicalExpression") return false;
-  const nested = inOr || node.operator.operator === "OR";
-  return evalChipUnderOr(node.left, nested) || evalChipUnderOr(node.right, nested);
-}
-
-/**
  * The run a typed eval chip asks for, or null when every chip already has one.
  * The question is judged as written, with no model between Enter and the
  * estimate, and the fallback is the query as typed so a refusal leaves it be.
@@ -212,7 +187,7 @@ function typedEvalRunOf({
       question: pending.question,
     }),
     fallbackQuery: queryText,
-    ...(hasEvalChipUnderOr(queryText) ? {} : { typedQuery: queryText }),
+    ...(hasInstantEvalChipUnderOr(queryText) ? {} : { typedQuery: queryText }),
     timeRange: { from: timeRange.from, to: timeRange.to },
   };
 }

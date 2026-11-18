@@ -293,7 +293,7 @@ describe("given a chip typed by hand under NOT", () => {
   });
 
   /** @scenario "A chip typed by hand starts its run on Enter" */
-  it("re-spells the chip for its target when the lens changed before the run started", () => {
+  it("re-spells the chip in place, NOT kept, when the lens changed before the run started", () => {
     const lensId = useViewStore.getState().activeLensId;
     const { result } = renderHook(() => useInstantEvalRoute({ isInstantEvalAvailable: true }));
     act(() => result.current.onInstantEvalRoute(typed));
@@ -302,7 +302,7 @@ describe("given a chip typed by hand under NOT", () => {
       act(() => useViewStore.setState({ activeLensId: "conversations" }));
       act(() => startCallbacks().onSuccess?.({ id: "run-1" }));
 
-      expect(useFilterStore.getState().queryText).toBe('eval.trace:"the user is annoyed"');
+      expect(useFilterStore.getState().queryText).toBe('NOT eval.trace:"the user is annoyed"');
     } finally {
       useViewStore.setState({ activeLensId: lensId });
     }

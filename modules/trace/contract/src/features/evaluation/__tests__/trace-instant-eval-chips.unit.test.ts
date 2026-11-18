@@ -5,9 +5,11 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  hasInstantEvalChipUnderOr,
   instantEvalChipsOf,
   instantEvalChipText,
   instantEvalRunKey,
+  queryWithInstantEvalChipRetargeted,
   queryWithoutInstantEvalChip,
   queryWithoutInstantEvalChips,
   resolveInstantEvalChips,
@@ -135,6 +137,43 @@ describe("queryWithoutInstantEvalChip", () => {
     expect(queryWithoutInstantEvalChip({ queryText, field: "eval", question: "annoyed" })).toBe(
       'eval.llm:"annoyed"',
     );
+  });
+});
+
+describe("queryWithInstantEvalChipRetargeted", () => {
+  /** @scenario "A chip typed by hand starts its run on Enter" */
+  it("re-spells a bare chip for its target in place, NOT and other terms kept", () => {
+    expect(
+      queryWithInstantEvalChipRetargeted({
+        queryText: 'status:error AND NOT eval:"annoyed" AND eval:"other"',
+        question: "annoyed",
+        target: "traces",
+        lensId: "conversations",
+      }),
+    ).toBe('status:error AND NOT eval.trace:"annoyed" AND eval:"other"');
+  });
+
+  /** @scenario "A chip typed by hand starts its run on Enter" */
+  it("leaves a chip the lens already reads as its target as typed", () => {
+    const queryText = 'NOT eval:"annoyed"';
+    expect(
+      queryWithInstantEvalChipRetargeted({
+        queryText,
+        question: "annoyed",
+        target: "threads",
+        lensId: "conversations",
+      }),
+    ).toBe(queryText);
+  });
+});
+
+describe("hasInstantEvalChipUnderOr", () => {
+  /** @scenario "A chip typed by hand starts its run on Enter" */
+  it("finds a chip below an OR, at any depth, and only there", () => {
+    expect(hasInstantEvalChipUnderOr('status:error OR eval:"annoyed"')).toBe(true);
+    expect(hasInstantEvalChipUnderOr('a:1 OR (b:2 AND NOT eval.llm:"x")')).toBe(true);
+    expect(hasInstantEvalChipUnderOr('status:error AND NOT eval:"annoyed"')).toBe(false);
+    expect(hasInstantEvalChipUnderOr("status:error OR model:x")).toBe(false);
   });
 });
 

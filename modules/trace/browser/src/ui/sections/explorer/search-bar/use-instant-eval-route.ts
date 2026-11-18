@@ -14,6 +14,7 @@ import {
   instantEvalChipText,
   instantEvalChipsOf,
   instantEvalRunKey,
+  queryWithInstantEvalChipRetargeted,
   queryWithoutInstantEvalChips,
 } from "@langwatch/trace-contract";
 import { type RefObject, useCallback, useRef, useState } from "react";
@@ -123,7 +124,10 @@ function routeRunKey({
   });
 }
 
-/** The typed text, when its chip still reads as the run's target under `lensId`. */
+/**
+ * The typed text, its chip re-spelled for the run's target when a lens switch
+ * since Enter would read it as another one; undefined when no chip reads so.
+ */
 function typedQueryForLens({
   payload,
   lensId,
@@ -131,14 +135,22 @@ function typedQueryForLens({
   payload: InstantEvalRoutePayload;
   lensId: string | undefined;
 }): string | undefined {
-  const { typedQuery } = payload;
+  const { typedQuery, target } = payload;
   if (typedQuery === undefined) return undefined;
-  const wanted = payload.question.instructions.replace(/\s+/g, " ").trim();
-  const matches = instantEvalChipsOf({ queryText: typedQuery, lensId }).some(
-    (chip) =>
-      chip.target === payload.target && chip.question.replace(/\s+/g, " ").trim() === wanted,
-  );
-  return matches ? typedQuery : undefined;
+  const question = payload.question.instructions;
+  const wanted = question.replace(/\s+/g, " ").trim();
+  const readsAsTarget = (queryText: string) =>
+    instantEvalChipsOf({ queryText, lensId }).some(
+      (chip) => chip.target === target && chip.question.replace(/\s+/g, " ").trim() === wanted,
+    );
+  if (readsAsTarget(typedQuery)) return typedQuery;
+  const respelled = queryWithInstantEvalChipRetargeted({
+    queryText: typedQuery,
+    question,
+    target,
+    lensId,
+  });
+  return readsAsTarget(respelled) ? respelled : undefined;
 }
 
 /** The bar's query with the route's eval chip in it: what a refusal leaves for the reader. */
@@ -274,8 +286,7 @@ function useInstantEvalStarter({
     ({ payload, key, runId }: PendingRoute & { runId: string }) => {
       const lensId = useViewStore.getState().activeLensId;
       registerEvalRun({ key, runId });
-      // A chip typed by hand goes back as typed, so a `NOT` in front of it stays,
-      // unless a lens switch since Enter would now read it as another target.
+      // A chip typed by hand goes back as typed, so a `NOT` in front of it stays.
       applyQueryText(
         typedQueryForLens({ payload, lensId }) ??
           combineQueries({
