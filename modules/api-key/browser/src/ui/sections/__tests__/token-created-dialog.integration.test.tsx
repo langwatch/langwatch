@@ -520,7 +520,8 @@ describe("given a key has just been minted with a name", () => {
         expect(screen.getByRole("button", { name: "Copy API key" })).toHaveTextContent("Copied");
 
         cleanup();
-        // Library teardown timers are short; an uncleared 2000 ms reset would still be pending at 1999 ms.
+        // Library teardown timers are short;
+        // an uncleared 2000 ms reset would still be pending at 1999 ms.
         await act(async () => {
           await vi.advanceTimersByTimeAsync(1999);
         });
