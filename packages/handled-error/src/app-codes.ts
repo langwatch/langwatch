@@ -323,6 +323,7 @@ export const APP_ERROR_CODES = [
   "filter_too_complex",
   "filter_value_refused",
   "forbidden",
+  "gateway_a2a_target_headers_need_replacing",
   "gateway_a2a_target_name_taken",
   "gateway_a2a_target_not_found",
   "gateway_budget_cycle_anchor_invalid",
