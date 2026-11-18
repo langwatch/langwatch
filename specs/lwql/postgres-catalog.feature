@@ -65,6 +65,20 @@ Feature: Every catalogued Postgres model is queryable through LangWatchQL
       Then the sum equals the budget's own limit
       And the count is one
 
+    @integration
+    Scenario: A single project still reads its organization's row once
+      Given an organization with two projects and one gateway budget with a known limit
+      When a caller queries each project on its own, summing the budget limit and counting budgets
+      Then each read's sum equals the budget's own limit
+      And each read's count is one
+
+    @unit
+    Scenario: A fanned-out view keeps one row per entity across the projects read
+      Given a model whose tenant column is organizationId or teamId
+      When its LangWatchQL view is rendered
+      Then the view keeps one row per primary key, the lowest in-scope project's, after the tenant predicate
+      And a project-scoped view is rendered without that step
+
     @unit
     Scenario: A team-scoped model fans out to one row per project in the team
       Given a model whose tenant column is teamId

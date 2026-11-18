@@ -69,49 +69,49 @@ const ACCESS_MODEL_DOCS = fileURLToPath(
   new URL("../../../../../../charts/langwatch/README.md", import.meta.url),
 );
 
-describe("given the PostgreSQL-resident catalog mapped into ClickHouse through the server-side named collection", () => {
-  let harness: LangWatchQLClickHouseHarness;
-  let postgres: LangWatchQLPostgresHarness;
-  /** The restricted identity carrying tenant-a's valid key-hash context. */
-  let tenantA: ClickHouseClient;
-  let database: string;
+let harness: LangWatchQLClickHouseHarness;
+let postgres: LangWatchQLPostgresHarness;
+/** The restricted identity carrying tenant-a's valid key-hash context. */
+let tenantA: ClickHouseClient;
+let database: string;
 
-  beforeAll(async () => {
-    postgres = await startLangWatchQLPostgres();
-    harness = await startLangWatchQLClickHouse({
-      suite: "pgengine",
-      image: LWQL_CLICKHOUSE_TEST_IMAGE,
-    });
-    database = harness.names.database;
-    await mapPostgresIntoClickHouse({ harness, postgres });
-    // The LangWatchQL views over the engine tables — the objects a caller names.
-    // Only the PostgreSQL-resident half: the ClickHouse-resident entries read
-    // migrated fact tables this suite does not stand up.
-    await harness.applyAsAdmin(
-      viewProvisioning.setupStatements({
-        names: harness.names,
-        sourceDatabase: harness.factDatabase,
-        views: POSTGRES_VIEWS,
-        dedup: SHIPPED_LWQL_DEDUP,
-      }),
-    );
-    // Grants and row policies come from the single access-model emitter (ADR-159).
-    // `extraViews`, not `views`: every apply re-mints the whole model, so it must
-    // keep the base fixture's grants or the native `traces` reads lose theirs.
-    await harness.applyAccessModel({
-      extraViews: POSTGRES_VIEWS,
-      sourceDatabase: harness.factDatabase,
-    });
-    tenantA = await harness.restrictedClient({
-      keyHash: harness.tenantA.keyHash,
-    });
-  }, 240_000);
-
-  afterAll(async () => {
-    await harness?.stop();
-    await postgres?.stop();
+beforeAll(async () => {
+  postgres = await startLangWatchQLPostgres();
+  harness = await startLangWatchQLClickHouse({
+    suite: "pgengine",
+    image: LWQL_CLICKHOUSE_TEST_IMAGE,
   });
+  database = harness.names.database;
+  await mapPostgresIntoClickHouse({ harness, postgres });
+  // The LangWatchQL views over the engine tables — the objects a caller names.
+  // Only the PostgreSQL-resident half: the ClickHouse-resident entries read
+  // migrated fact tables this suite does not stand up.
+  await harness.applyAsAdmin(
+    viewProvisioning.setupStatements({
+      names: harness.names,
+      sourceDatabase: harness.factDatabase,
+      views: POSTGRES_VIEWS,
+      dedup: SHIPPED_LWQL_DEDUP,
+    }),
+  );
+  // Grants and row policies come from the single access-model emitter (ADR-159).
+  // `extraViews`, not `views`: every apply re-mints the whole model, so it must
+  // keep the base fixture's grants or the native `traces` reads lose theirs.
+  await harness.applyAccessModel({
+    extraViews: POSTGRES_VIEWS,
+    sourceDatabase: harness.factDatabase,
+  });
+  tenantA = await harness.restrictedClient({
+    keyHash: harness.tenantA.keyHash,
+  });
+}, 240_000);
 
+afterAll(async () => {
+  await harness?.stop();
+  await postgres?.stop();
+});
+
+describe("given the PostgreSQL-resident catalog mapped into ClickHouse through the server-side named collection", () => {
   describe("when the restricted identity carries a valid key-hash context", () => {
     /** @scenario "A PG-resident table is readable through ClickHouse only within the caller's tenant rows" */
     it("reads its own tenant's mapped rows and none of the other tenant's", async () => {
@@ -218,105 +218,6 @@ describe("given the PostgreSQL-resident catalog mapped into ClickHouse through t
         [harness.tenantB.tenantId, `VK ${harness.tenantB.tenantId}`],
       ]);
     });
-  });
-
-  describe("when a caller reads two sibling projects of one organization in one query", () => {
-    /**
-     * The organization fan-out emits one row per project, so the budget appears once per sibling
-     * the caller reads. tasks#1212: a multi-project SUM must still count it once.
-     */
-    const ORGANIZATION_ID = "lwql-fanout-org";
-    const TEAM_ID = "lwql-fanout-team";
-    const BUDGET_ID = "lwql-fanout-budget";
-    const LIMIT_USD = 250;
-    const SIBLINGS = [1, 2].map((index) => ({
-      id: `lwql-fanout-project-${index}`,
-      lwqlKey: `raw-lwql-key-FANOUT-DO-NOT-LOG-${index}`,
-    }));
-    const keyHashes = () =>
-      SIBLINGS.map(({ lwqlKey }) => lwqlCapability.tenantCapability({ secret: lwqlKey }));
-    const keyMapTable = () => `${harness.factDatabase}.${harness.names.keyMapTable}`;
-
-    const seedStatements = (): string[] => [
-      `INSERT INTO "Organization" ("id", "name", "slug") ` +
-        `VALUES ('${ORGANIZATION_ID}', 'Fan-out org', '${ORGANIZATION_ID}-slug')`,
-      `INSERT INTO "Team" ("id", "name", "slug", "organizationId") ` +
-        `VALUES ('${TEAM_ID}', 'Fan-out team', '${TEAM_ID}-slug', '${ORGANIZATION_ID}')`,
-      `INSERT INTO "Project" ` +
-        `("id", "name", "slug", "apiKey", "lwqlKey", "teamId", "language", "framework") VALUES ` +
-        SIBLINGS.map(
-          ({ id }) =>
-            `('${id}', 'Project ${id}', '${id}-slug', 'excluded-apikey-of-${id}', ` +
-            `'excluded-lwqlkey-of-${id}', '${TEAM_ID}', 'python', 'openai')`,
-        ).join(", "),
-      `INSERT INTO "GatewayBudget" ` +
-        `("id", "organizationId", "scopeType", "scopeId", "name", "window", "limitUsd", ` +
-        `"resetsAt", "createdById") VALUES ('${BUDGET_ID}', '${ORGANIZATION_ID}', ` +
-        `'ORGANIZATION', '${ORGANIZATION_ID}', 'Fan-out budget', 'MONTH', ${LIMIT_USD}, ` +
-        `'2027-01-01T00:00:00Z', 'lwql-fanout-user')`,
-    ];
-
-    const deleteSeed = async (): Promise<void> => {
-      await postgres.asAdmin(`DELETE FROM "GatewayBudget" WHERE "id" = '${BUDGET_ID}'`);
-      await postgres.asAdmin(`DELETE FROM "Project" WHERE "teamId" = '${TEAM_ID}'`);
-      await postgres.asAdmin(`DELETE FROM "Team" WHERE "id" = '${TEAM_ID}'`);
-      await postgres.asAdmin(`DELETE FROM "Organization" WHERE "id" = '${ORGANIZATION_ID}'`);
-      await harness.applyAsAdmin([
-        `ALTER TABLE ${keyMapTable()} DELETE WHERE KeyHash IN ` +
-          `(${keyHashes()
-            .map((hash) => `'${hash}'`)
-            .join(", ")}) SETTINGS mutations_sync = 2`,
-      ]);
-    };
-
-    /** @scenario "An organization-level row is counted once in a multi-project query" */
-    it("sums the organization's budget limit once and counts one budget", async () => {
-      const service = LangWatchQLService.create({
-        runTelemetry: TEST_RUN_TELEMETRY,
-        placement: ADMIT_EVERY_PLACEMENT,
-        executor: ClickHouseLangWatchQLExecutorRepository.create({
-          connection: {
-            ...harness.restrictedConnection(),
-            database,
-            tenantSetting: harness.names.tenantSetting,
-          },
-        }),
-        database,
-        views: POSTGRES_VIEWS,
-      });
-
-      try {
-        for (const sql of seedStatements()) {
-          const seeded = await postgres.asAdmin(sql);
-          expect(seeded.exitCode, `seeding failed: ${sql}\n${seeded.stderr}`).toBe(0);
-        }
-        await harness.admin.insert({
-          table: keyMapTable(),
-          format: "JSONEachRow",
-          values: SIBLINGS.map(({ id }, index) => ({ KeyHash: keyHashes()[index], TenantId: id })),
-        });
-
-        const result = await service.executeForProjects({
-          projects: SIBLINGS,
-          protections: {
-            catalogue: EVERY_CATALOGUE_PERMISSION,
-            canSeeCosts: true,
-            canSeeCapturedInput: true,
-            canSeeCapturedOutput: true,
-          },
-          sql:
-            "SELECT sum(LimitUsd) AS total, count() AS n FROM gateway_budgets " +
-            `WHERE GatewayBudgetId = '${BUDGET_ID}'`,
-        });
-
-        expect(
-          result.rows.map((row) => ({ total: Number(row.total), n: Number(row.n) })),
-        ).toEqual([{ total: LIMIT_USD, n: 1 }]);
-      } finally {
-        await service.close();
-        await deleteSeed();
-      }
-    }, 60_000);
   });
 
   describe("when a caller asks for traffic by topic name", () => {
@@ -1126,4 +1027,132 @@ describe("given the PostgreSQL-resident catalog mapped into ClickHouse through t
       );
     });
   });
+});
+
+describe("when a caller reads two sibling projects of one organization in one query", () => {
+  /**
+   * The organization fan-out emits one row per project, so the budget appears once per sibling
+   * the caller reads. tasks#1212: a multi-project SUM must still count it once.
+   */
+  const ORGANIZATION_ID = "lwql-fanout-org";
+  const TEAM_ID = "lwql-fanout-team";
+  const BUDGET_ID = "lwql-fanout-budget";
+  const LIMIT_USD = 250;
+  const SIBLINGS = [1, 2].map((index) => ({
+    id: `lwql-fanout-project-${index}`,
+    lwqlKey: `raw-lwql-key-FANOUT-DO-NOT-LOG-${index}`,
+  }));
+  const keyHashes = () =>
+    SIBLINGS.map(({ lwqlKey }) => lwqlCapability.tenantCapability({ secret: lwqlKey }));
+  const keyMapTable = () => `${harness.factDatabase}.${harness.names.keyMapTable}`;
+
+  const seedStatements = (): string[] => [
+    `INSERT INTO "Organization" ("id", "name", "slug") ` +
+      `VALUES ('${ORGANIZATION_ID}', 'Fan-out org', '${ORGANIZATION_ID}-slug')`,
+    `INSERT INTO "Team" ("id", "name", "slug", "organizationId") ` +
+      `VALUES ('${TEAM_ID}', 'Fan-out team', '${TEAM_ID}-slug', '${ORGANIZATION_ID}')`,
+    `INSERT INTO "Project" ` +
+      `("id", "name", "slug", "apiKey", "lwqlKey", "teamId", "language", "framework") VALUES ` +
+      SIBLINGS.map(
+        ({ id }) =>
+          `('${id}', 'Project ${id}', '${id}-slug', 'excluded-apikey-of-${id}', ` +
+          `'excluded-lwqlkey-of-${id}', '${TEAM_ID}', 'python', 'openai')`,
+      ).join(", "),
+    `INSERT INTO "GatewayBudget" ` +
+      `("id", "organizationId", "scopeType", "scopeId", "name", "window", "limitUsd", ` +
+      `"resetsAt", "createdById") VALUES ('${BUDGET_ID}', '${ORGANIZATION_ID}', ` +
+      `'ORGANIZATION', '${ORGANIZATION_ID}', 'Fan-out budget', 'MONTH', ${LIMIT_USD}, ` +
+      `'2027-01-01T00:00:00Z', 'lwql-fanout-user')`,
+  ];
+
+  const cleanupStatements = (): string[] => [
+    `DELETE FROM "GatewayBudget" WHERE "id" = '${BUDGET_ID}'`,
+    `DELETE FROM "Project" WHERE "teamId" = '${TEAM_ID}'`,
+    `DELETE FROM "Team" WHERE "id" = '${TEAM_ID}'`,
+    `DELETE FROM "Organization" WHERE "id" = '${ORGANIZATION_ID}'`,
+  ];
+
+  /** Runs every delete before asserting, so one failed delete still lets the rest clean up. */
+  const deleteSeed = async (): Promise<void> => {
+    const failures: string[] = [];
+    for (const sql of cleanupStatements()) {
+      const result = await postgres.asAdmin(sql);
+      if (result.exitCode !== 0) failures.push(`cleanup failed: ${sql}\n${result.stderr}`);
+    }
+    const quotedHashes = keyHashes().map((hash) => `'${hash}'`);
+    await harness.applyAsAdmin([
+      `ALTER TABLE ${keyMapTable()} DELETE WHERE KeyHash IN (${quotedHashes.join(", ")}) ` +
+        "SETTINGS mutations_sync = 2",
+    ]);
+    expect(failures, "seed cleanup left rows behind").toEqual([]);
+  };
+
+  let service: LangWatchQLService;
+
+  const sumBudget = async (projects: typeof SIBLINGS) => {
+    const result = await service.executeForProjects({
+      projects,
+      protections: {
+        catalogue: EVERY_CATALOGUE_PERMISSION,
+        canSeeCosts: true,
+        canSeeCapturedInput: true,
+        canSeeCapturedOutput: true,
+      },
+      sql:
+        "SELECT sum(LimitUsd) AS total, count() AS n FROM gateway_budgets " +
+        `WHERE GatewayBudgetId = '${BUDGET_ID}'`,
+    });
+    return result.rows.map((row) => ({ total: Number(row.total), n: Number(row.n) }));
+  };
+
+  beforeAll(async () => {
+    service = LangWatchQLService.create({
+      runTelemetry: TEST_RUN_TELEMETRY,
+      placement: ADMIT_EVERY_PLACEMENT,
+      executor: ClickHouseLangWatchQLExecutorRepository.create({
+        connection: {
+          ...harness.restrictedConnection(),
+          database,
+          tenantSetting: harness.names.tenantSetting,
+        },
+      }),
+      database,
+      views: POSTGRES_VIEWS,
+    });
+    for (const sql of seedStatements()) {
+      const seeded = await postgres.asAdmin(sql);
+      expect(seeded.exitCode, `seeding failed: ${sql}\n${seeded.stderr}`).toBe(0);
+    }
+    await harness.admin.insert({
+      table: keyMapTable(),
+      format: "JSONEachRow",
+      values: SIBLINGS.map(({ id }, index) => ({ KeyHash: keyHashes()[index], TenantId: id })),
+    });
+  }, 60_000);
+
+  // A failed cleanup reports as an afterAll error, never in place of a test's own failure.
+  afterAll(async () => {
+    try {
+      // Undefined at runtime when beforeAll failed before creating it.
+      await service?.close();
+    } finally {
+      await deleteSeed();
+    }
+  }, 60_000);
+
+  /** @scenario "An organization-level row is counted once in a multi-project query" */
+  it("sums the organization's budget limit once and counts one budget", async () => {
+    const rows = await sumBudget(SIBLINGS);
+    expect(rows, `got ${JSON.stringify(rows)}`).toEqual([{ total: LIMIT_USD, n: 1 }]);
+  }, 60_000);
+
+  /** @scenario "A single project still reads its organization's row once" */
+  it.each(SIBLINGS.map((sibling) => [sibling.id, sibling] as const))(
+    "reads the budget once when %s is the only project in the query",
+    async (_id, sibling) => {
+      const rows = await sumBudget([sibling]);
+      expect(rows, `got ${JSON.stringify(rows)}`).toEqual([{ total: LIMIT_USD, n: 1 }]);
+    },
+    60_000,
+  );
 });

@@ -657,6 +657,12 @@ function deriveModel({
     ...(isFannedOut ? [TENANT_COLUMN] : []),
     ...model.primaryKey.map((keyField) => exposedKeyName({ name, table, scope, keyField })),
   ].filter((key, index, all) => all.indexOf(key) === index);
+  // A key holding the consumed scope field names a row only together with its team or
+  // organization, which TenantId no longer carries: collapsing on the rest would merge
+  // rows of different scopes, so such a view keeps its fan-out.
+  const collapsesFanOut =
+    isFannedOut && !model.primaryKey.some((keyField) => keyField === scope.consumedField);
+  const entityKeyColumns = keyColumns.filter((key) => key !== TENANT_COLUMN);
 
   const grain = override.grain ?? defaultGrain({ isFannedOut, scope, keyColumns });
   const exposedNames = new Set(columns.map((column) => column.name));
@@ -675,6 +681,7 @@ function deriveModel({
       tenantSourceColumn: scope.column,
       ...(scope.tenantPath.length > 0 ? { tenantPath: scope.tenantPath } : {}),
       ...(override.rowFilter !== undefined ? { rowFilter: override.rowFilter } : {}),
+      ...(collapsesFanOut ? { entityKeyColumns } : {}),
     },
     description: viewDescription(model, override, grain),
     gates: [],

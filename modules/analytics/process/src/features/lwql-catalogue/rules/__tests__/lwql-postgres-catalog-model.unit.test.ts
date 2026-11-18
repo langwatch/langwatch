@@ -66,6 +66,16 @@ describe("given the derived Postgres catalog", () => {
     });
   });
 
+  describe("when a view's rows fan out to one per project", () => {
+    /** @scenario "A fanned-out view keeps one row per entity across the projects read" */
+    it("names the exposed primary key as the entity a multi-project read keeps once", () => {
+      const entityKeys = (name: string) => byName.get(name)!.postgres!.entityKeyColumns;
+      expect(entityKeys("gateway_budgets")).toEqual(["GatewayBudgetId"]);
+      expect(entityKeys("ingestion_sources")).toEqual(["IngestionSourceId"]);
+      expect(entityKeys("topics")).toBeUndefined();
+    });
+  });
+
   describe("when a model has no tenant column but a declared parent", () => {
     /** @scenario "A model without a tenant column is reached through a declared parent" */
     it("takes its TenantId from the parent and needs no skip entry", () => {

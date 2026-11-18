@@ -110,6 +110,20 @@ function postgresTenantPredicate({
 }
 
 /**
+ * Keeps one copy of a row the approved view repeats once per project of its team or
+ * organization. The row policy on the engine table has already dropped every copy outside the
+ * caller's key set, so a single-project read keeps its own copy and a multi-project read keeps
+ * one, not one per project (tasks#1212). The lowest project wins, so `TenantId` is stable
+ * across reads. "" for a view with no fan-out.
+ */
+function postgresFanOutCollapse(view: LangWatchQLViewDefinition): string {
+  const keys = view.postgres?.entityKeyColumns ?? [];
+  if (keys.length === 0) return "";
+  const byEntity = keys.map(sourceColumn).join(", ");
+  return `\nORDER BY ${byEntity}, ${sourceColumn(TENANT_COLUMN)}\nLIMIT 1 BY ${byEntity}`;
+}
+
+/**
  * One grain column as a `GROUP BY` key: a derived column groups by its expression, so the view
  * holds one row per published value rather than one per source value it maps from.
  */
@@ -372,6 +386,7 @@ export class LangWatchQLViewStatementsService {
       : enginePredicate;
     const preFilter = preFilterClause(view, where);
     const grouping = groupingClause({ view, grouped, settled });
+    const collapse = postgres ? postgresFanOutCollapse(view) : "";
 
     const viewName = floor === undefined ? view.name : flooredViewName(view.name);
     return (
@@ -379,7 +394,7 @@ export class LangWatchQLViewStatementsService {
       `${sqlText.assertIdentifier(names.database, "database")}.${sqlText.assertIdentifier(viewName, "view")}\n` +
       `SQL SECURITY INVOKER\n` +
       `AS SELECT\n${projection}\n` +
-      `FROM ${from}${joinClause}${where}${preFilter}${grouping}`
+      `FROM ${from}${joinClause}${where}${preFilter}${grouping}${collapse}`
     );
   }
 
