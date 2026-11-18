@@ -18,6 +18,29 @@ import {
 
 const endpoints: TestClickHouseEndpoint[] = [];
 
+type SentRequest = TestClickHouseEndpoint["requests"][number];
+
+/** The values `request` binds to the placeholders `pattern` captures in `within` (its SQL). */
+function bound({
+  request,
+  pattern,
+  within = request?.body ?? "",
+}: {
+  request: SentRequest | undefined;
+  pattern: RegExp;
+  within?: string;
+}): (string | null)[] {
+  const names = pattern.exec(within)?.slice(1) ?? [];
+  const params = new URL(request?.url ?? "", "http://endpoint").searchParams;
+  return names.map((name) => params.get(`param_${name}`));
+}
+
+/** A list read's `latest` election (the dedup group) and the page read over it. */
+function electionAndPage(sql: string): { election: string; page: string } {
+  const [, election = "", page = ""] = /^WITH latest AS \((.*?)\) SELECT (.*)$/s.exec(sql) ?? [];
+  return { election, page };
+}
+
 afterEach(async () => {
   await Promise.all(endpoints.splice(0).map((endpoint) => endpoint.close()));
 });
@@ -62,20 +85,26 @@ describe("Coding Agent ClickHouse query contract", () => {
     });
 
     expect(endpoint.requests).toHaveLength(1);
-    expect(endpoint.requests[0]?.body).toContain(
+    const request = endpoint.requests[0];
+    expect(request?.body).toContain(
       "AND TimeUnixMs >= fromUnixTimestamp64Milli({idBound_fromMs:Int64}) " +
         "AND TimeUnixMs <= fromUnixTimestamp64Milli({idBound_toMs:Int64})",
     );
-    expect(endpoint.requests[0]?.body).toContain("EventKind IN");
-    expect(endpoint.requests[0]?.body).toContain("(TimeUnixMs, RecordId) >");
-    expect(endpoint.requests[0]?.body).toContain(
-      "ORDER BY TimeUnixMs ASC, RecordId ASC, UpdatedAt DESC",
+    expect(request?.url).toContain("param_idBound_fromMs=100");
+    expect(request?.url).toContain("param_idBound_toMs=200");
+    expect(bound({ request, pattern: /EventKind IN \(\{(\w+):Array\(String\)\}\)/ })).toEqual([
+      "['model_call']",
+    ]);
+    expect(
+      bound({
+        request,
+        pattern:
+          /tuple\(TimeUnixMs, RecordId\) > tuple\(fromUnixTimestamp64Milli\(\{(\w+):Int64\}\), \{(\w+):String\}\)/,
+      }),
+    ).toEqual(["150", "record-1"]);
+    expect(request?.body).toMatch(
+      /ORDER BY TimeUnixMs ASC, RecordId ASC, UpdatedAt DESC LIMIT 1 BY TimeUnixMs, RecordId LIMIT 25\s/,
     );
-    expect(endpoint.requests[0]?.body).toContain("LIMIT 1 BY TimeUnixMs, RecordId");
-    expect(endpoint.requests[0]?.body).toContain("LIMIT {limit:UInt32}");
-    expect(endpoint.requests[0]?.url).toContain("param_idBound_fromMs=100");
-    expect(endpoint.requests[0]?.url).toContain("param_idBound_toMs=200");
-    expect(endpoint.requests[0]?.url).toContain("param_cursorTimeMs=150");
   });
 
   it("keeps the session list range and user filter outside its unwindowed latest-version dedup", async () => {
@@ -90,13 +119,22 @@ describe("Coding Agent ClickHouse query contract", () => {
     });
 
     const request = endpoint.requests[0];
-    expect(request?.body).toContain("AND UserId = {userId:String}");
-    expect(request?.body).toContain("StartedAt BETWEEN fromUnixTimestamp64Milli({from:Int64})");
-    expect(request?.body).toContain("SELECT TenantId, SessionId, max(UpdatedAt)");
-    const dedup = request?.body.split("SELECT TenantId, SessionId, max(UpdatedAt)")[1] ?? "";
-    expect(dedup).not.toContain("StartedAt BETWEEN");
-    expect(dedup).not.toContain("UserId =");
-    expect(request?.url).toContain("param_limit=50");
+    const { election, page } = electionAndPage(request?.body ?? "");
+    expect(election).toContain("SELECT tuple(TenantId, SessionId, max(UpdatedAt))");
+    expect(election).not.toContain("StartedAt");
+    expect(election).not.toContain("UserId");
+    expect(bound({ request, within: page, pattern: /UserId = \{(\w+):String\}/ })).toEqual([
+      "user-1",
+    ]);
+    expect(
+      bound({
+        request,
+        within: page,
+        pattern:
+          /StartedAt >= fromUnixTimestamp64Milli\(\{(\w+):Int64\}\) AND StartedAt <= fromUnixTimestamp64Milli\(\{(\w+):Int64\}\)/,
+      }),
+    ).toEqual([String(TEST_NOW_MS - 1_000), String(TEST_NOW_MS)]);
+    expect(page).toMatch(/ORDER BY StartedAt DESC LIMIT 50\s/);
   });
 
   it("round-trips a session through concrete package persistence and returns the durable row unchanged", async () => {
@@ -182,8 +220,7 @@ describe("Coding Agent session list and helper threads", () => {
     const before = harness.endpoint.requests.length;
     harness.endpoint.queryRows.push(records);
     const rows = await harness.service.listRecent({ projectId: "project-1", ...window, limit });
-    const request = harness.endpoint.requests[before];
-    return { rows, sql: request?.body ?? "" };
+    return { rows, request: harness.endpoint.requests[before] };
   }
 
   /** @scenario "An auxiliary session is not listed" */
@@ -228,13 +265,17 @@ describe("Coding Agent session list and helper threads", () => {
     it("drops a marked session inside the dedup group, so it costs no page slot", async () => {
       const harness = await runtime();
 
-      const { sql } = await list(harness, []);
+      const { request } = await list(harness, []);
 
-      const dedup = sql.split("SELECT TenantId, SessionId, max(UpdatedAt)")[1] ?? "";
-      expect(dedup).toContain("HAVING max(toUInt8(Auxiliary)) = 0");
-      expect(dedup.indexOf("GROUP BY TenantId, SessionId")).toBeLessThan(
-        dedup.indexOf("HAVING max(toUInt8(Auxiliary)) = 0"),
-      );
+      const { election } = electionAndPage(request?.body ?? "");
+      expect(
+        bound({
+          request,
+          within: election,
+          pattern:
+            /GROUP BY TenantId, SessionId HAVING max\(toUInt8\(Auxiliary\)\) = \{(\w+):UInt8\}/,
+        }),
+      ).toEqual(["0"]);
     });
   });
 });

@@ -69,6 +69,10 @@
     "./clickhouse-app-reader": {
       "types": "./dist/clickhouse-app-reader.d.ts",
       "default": "./src/clickhouse-app-reader.ts"
+    },
+    "./clickhouse-server-lock": {
+      "types": "./dist/clickhouse-server-lock.d.ts",
+      "default": "./src/clickhouse-server-lock.ts"
     }
   },
   "scripts": {

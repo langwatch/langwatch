@@ -12,6 +12,7 @@ import {
   APP_READER_SETTINGS_PREFIX,
   APP_READER_TENANT_TABLES,
 } from "@langwatch/clickhouse-migrations";
+import { holdTestClickHouseServer } from "@langwatch/test-harness/clickhouse-server-lock";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import type { PostgresNamedCollection } from "../../features/provisioning/services/langwatch-ql-postgres-mapping.service.ts";
@@ -300,6 +301,7 @@ describe("given ClickHouse 26.8 with the shipped migrations", () => {
   let admin: ClickHouseClient;
   let factDatabase: string;
   const opened: ClickHouseClient[] = [];
+  let release: (() => Promise<void>) | undefined;
 
   function clientAs(user: string, password: string): ClickHouseClient {
     const url = new URL(harness?.container.getHttpUrl() ?? "");
@@ -316,16 +318,22 @@ describe("given ClickHouse 26.8 with the shipped migrations", () => {
       facts: "migrated",
       settingsPrefixes: ["custom_", APP_READER_SETTINGS_PREFIX],
     });
+    // The reused container's reader is server-wide: no other file replaces or drops it mid-run.
+    release = await holdTestClickHouseServer({ url: harness.container.getHttpUrl() });
     admin = harness.admin;
     factDatabase = harness.factDatabase;
   }, 300_000);
 
   afterAll(async () => {
-    await Promise.all(opened.map((client) => client.close()));
-    if (!admin) return;
-    await dropReaders(admin, [factDatabase, CACHE_DATABASE]);
-    await admin.command({ query: `DROP DATABASE IF EXISTS ${CACHE_DATABASE}` });
-    await harness?.stop();
+    try {
+      await Promise.all(opened.map((client) => client.close()));
+      if (!admin) return;
+      await dropReaders(admin, [factDatabase, CACHE_DATABASE]);
+      await admin.command({ query: `DROP DATABASE IF EXISTS ${CACHE_DATABASE}` });
+      await harness?.stop();
+    } finally {
+      await release?.();
+    }
   });
 
   describe("when the system identity inserts before and after the readers' policies exist", () => {

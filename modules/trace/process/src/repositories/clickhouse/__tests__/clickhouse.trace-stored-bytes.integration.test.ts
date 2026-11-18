@@ -32,14 +32,16 @@ async function store({
   payload,
   occurredAt = at,
   retentionDays,
+  traceId = `trace-${nanoid()}`,
 }: {
   tenantId: string;
   payload: string;
   occurredAt?: string;
   retentionDays?: number;
+  /** A trace stored again, as a later version of it is. */
+  traceId?: string;
 }) {
   const kept = retentionDays === undefined ? {} : { _retention_days: retentionDays };
-  const traceId = `trace-${nanoid()}`;
   const insert = (table: string, row: Record<string, unknown>) =>
     ch.insert({
       table,
@@ -92,8 +94,11 @@ describe.skipIf(!testClickHouseConfigured())("trace's stored bytes (real ClickHo
     });
     const daysAgo = (days: number) =>
       new Date(now - days * DAY_MS).toISOString().replace("T", " ").replace("Z", "");
-    await store({ tenantId: aged, payload: "old", occurredAt: daysAgo(120), retentionDays: 371 });
+    const old = { tenantId: aged, occurredAt: daysAgo(120), traceId: `trace-old-${run}` };
+    await store({ ...old, payload: "old", retentionDays: 371 });
+    await store({ ...old, payload: "old, again", retentionDays: 371 });
     await store({ tenantId: aged, payload: "kept", occurredAt: daysAgo(120), retentionDays: 0 });
+    await store({ tenantId: aged, payload: "short", occurredAt: daysAgo(120), retentionDays: 35 });
     await store({ tenantId: aged, payload: "new", occurredAt: daysAgo(0), retentionDays: 371 });
   }, 120_000);
 
@@ -156,7 +161,8 @@ describe.skipIf(!testClickHouseConfigured())("trace's stored bytes (real ClickHo
         retentionDays,
       });
 
-    // Both 120-day-old traces are past 91 days (one kept forever); none is past 130.
+    // The old trace (stored twice) and the one kept forever are past 91 days; the one already on
+    // 35 days and the new one are not. None is past 130.
     expect(await count(91)).toBe(2);
     expect(await count(130)).toBe(0);
   });

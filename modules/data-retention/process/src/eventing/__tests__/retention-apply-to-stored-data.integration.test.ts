@@ -1,8 +1,8 @@
 /**
  * @vitest-environment node
- * An organization's shorter period applied to stored data over a live ClickHouse: the stored items
- * past it are counted, then the apply request fans out one rewrite per project and category, each
- * recorded as applied. Runs on a scratch database.
+ * An organization's shorter period applied to stored data over a live ClickHouse: the apply request
+ * fans out one rewrite per project and category, each recorded as applied. Runs on a scratch
+ * database. The count past the period is each owner's read, proven in its own module.
  * @see modules/data-retention/specs/retention-apply-to-stored-data.feature
  */
 import { retentionCategories } from "@langwatch/data-retention-contract";
@@ -35,20 +35,9 @@ const organizationId = retentionTestGraph.organizationId ?? "";
 const projectId = retentionTestGraph.projectId;
 const siblingProjectId = `project-${generate("test").toString()}`;
 const NEW_PERIOD = 91;
-const DAY_MS = 86_400_000;
 
-/** Each table's columns beyond the tenant and the stamp, as the count and rewrite read them. */
-const EXTRA_COLUMNS: Record<string, string> = {
-  stored_spans: "SpanId String, ",
-  trace_summaries: "TraceId String, OccurredAt DateTime64(3), ",
-  simulation_runs: "ScenarioRunId String, StartedAt DateTime64(3), ",
-  experiment_runs: "RunId String, StartedAt DateTime64(3), ",
-};
-
-/** A ClickHouse DateTime64 literal `days` ago; the server's zone shifts it by hours at most. */
-function ago(days: number): string {
-  return new Date(Date.now() - days * DAY_MS).toISOString().replace("T", " ").replace("Z", "");
-}
+/** Columns beyond the tenant and the stamp: the span id this suite's own check reads back. */
+const EXTRA_COLUMNS: Record<string, string> = { stored_spans: "SpanId String, " };
 
 describe.skipIf(!scratchClickHouseUrl)("a shorter period applied to stored data", () => {
   let clickhouse: ScratchClickHouse;
@@ -81,22 +70,6 @@ describe.skipIf(!scratchClickHouseUrl)("a shorter period applied to stored data"
       values: [
         { TenantId: projectId, SpanId: "kept-a-year", _retention_days: 371 },
         { TenantId: siblingProjectId, SpanId: "sibling-kept-a-year", _retention_days: 371 },
-      ],
-    });
-    await scoped.insert({
-      table: "trace_summaries",
-      format: "JSONEachRow",
-      values: [
-        { TenantId: projectId, TraceId: "old", OccurredAt: ago(120), _retention_days: 371 },
-        { TenantId: projectId, TraceId: "old", OccurredAt: ago(120), _retention_days: 371 },
-        { TenantId: projectId, TraceId: "recent", OccurredAt: ago(10), _retention_days: 371 },
-        { TenantId: projectId, TraceId: "kept-forever", OccurredAt: ago(400), _retention_days: 0 },
-        {
-          TenantId: projectId,
-          TraceId: "already-short",
-          OccurredAt: ago(120),
-          _retention_days: 35,
-        },
       ],
     });
 
@@ -132,22 +105,6 @@ describe.skipIf(!scratchClickHouseUrl)("a shorter period applied to stored data"
   afterAll(async () => {
     await eventing?.close();
     await clickhouse?.drop();
-  });
-
-  // A trace kept forever is past every period, so applying one deletes it too.
-  it("counts each stored trace past the period once, leaving recent and already-short ones out", async () => {
-    const counted = await app.getStoredPastRetention({
-      projectId,
-      scope: { scopeType: "ORGANIZATION", scopeId: organizationId },
-      userId: "user-1",
-    });
-
-    expect(counted).toEqual({
-      projectCount: 2,
-      traces: { rows: 2, retentionDays: NEW_PERIOD },
-      scenarios: { rows: 0, retentionDays: NEW_PERIOD },
-      experiments: { rows: 0, retentionDays: NEW_PERIOD },
-    });
   });
 
   /** @scenario "Applying a shorter period now rewrites every project under the scope" */

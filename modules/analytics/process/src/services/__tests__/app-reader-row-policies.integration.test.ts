@@ -7,6 +7,7 @@ import { createHash, randomBytes } from "node:crypto";
 
 import { type ClickHouseClient, createClient } from "@clickhouse/client";
 import { APP_READER_NAMES, APP_READER_SETTINGS_PREFIX } from "@langwatch/clickhouse-migrations";
+import { holdTestClickHouseServer } from "@langwatch/test-harness/clickhouse-server-lock";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import type { PostgresNamedCollection } from "../../features/provisioning/services/langwatch-ql-postgres-mapping.service.ts";
@@ -177,6 +178,7 @@ describe("given the app reader provisioned from the rendered DDL", () => {
   let harness: LangWatchQLClickHouseHarness | undefined;
   let admin: ClickHouseClient;
   let reader: ClickHouseClient;
+  let release: (() => Promise<void>) | undefined;
 
   async function provision({ enforce }: { enforce: boolean }): Promise<void> {
     for (const statement of readerDdl({ enforce })) await admin.command({ query: statement });
@@ -214,6 +216,8 @@ describe("given the app reader provisioned from the rendered DDL", () => {
       suite: "app_reader_row_policies",
       settingsPrefixes: ["custom_", APP_READER_SETTINGS_PREFIX],
     });
+    // The reused container's reader is server-wide: no other file replaces or drops it mid-run.
+    release = await holdTestClickHouseServer({ url: harness.container.getHttpUrl() });
     admin = harness.admin;
     await admin
       .command({
@@ -236,24 +240,29 @@ describe("given the app reader provisioned from the rendered DDL", () => {
     readerUrl.username = APP_READER_NAMES.user;
     readerUrl.password = READER_LOGIN;
     reader = createClient({ url: readerUrl.toString() });
-  });
+  }, 300_000);
 
   afterAll(async () => {
-    await reader?.close();
-    if (!admin) return;
-    await admin.command({ query: `DROP USER IF EXISTS ${APP_READER_NAMES.user}` });
-    await admin.command({
-      query: `DROP SETTINGS PROFILE IF EXISTS ${APP_READER_NAMES.settingsProfile}`,
-    });
-    for (const statement of readerDdl({ enforce: false }).filter((s) =>
-      s.startsWith("CREATE ROW POLICY"),
-    )) {
-      const [, name, table] = /^CREATE ROW POLICY OR REPLACE (\S+) ON (\S+)/.exec(statement) ?? [];
-      if (name && table)
-        await admin.command({ query: `DROP ROW POLICY IF EXISTS ${name} ON ${table}` });
+    try {
+      await reader?.close();
+      if (!admin) return;
+      await admin.command({ query: `DROP USER IF EXISTS ${APP_READER_NAMES.user}` });
+      await admin.command({
+        query: `DROP SETTINGS PROFILE IF EXISTS ${APP_READER_NAMES.settingsProfile}`,
+      });
+      for (const statement of readerDdl({ enforce: false }).filter((s) =>
+        s.startsWith("CREATE ROW POLICY"),
+      )) {
+        const [, name, table] =
+          /^CREATE ROW POLICY OR REPLACE (\S+) ON (\S+)/.exec(statement) ?? [];
+        if (name && table)
+          await admin.command({ query: `DROP ROW POLICY IF EXISTS ${name} ON ${table}` });
+      }
+      await admin.command({ query: `DROP DATABASE IF EXISTS ${DATABASE}` });
+      await harness?.stop();
+    } finally {
+      await release?.();
     }
-    await admin.command({ query: `DROP DATABASE IF EXISTS ${DATABASE}` });
-    await harness?.stop();
   });
 
   describe("when the profile pins enforce to 1", () => {

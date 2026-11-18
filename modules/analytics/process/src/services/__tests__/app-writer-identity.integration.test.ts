@@ -15,6 +15,7 @@ import {
   APP_WRITER_TABLES,
   renderAppReaderDdl,
 } from "@langwatch/clickhouse-migrations";
+import { holdTestClickHouseServer } from "@langwatch/test-harness/clickhouse-server-lock";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import {
@@ -135,6 +136,7 @@ describe("given ClickHouse 26.8 with the shipped migrations and the writer provi
   let factDatabase: string;
   let writer: ClickHouseClient;
   const opened: ClickHouseClient[] = [];
+  let release: (() => Promise<void>) | undefined;
 
   function clientAs(user: string, password: string): ClickHouseClient {
     const url = new URL(harness?.container.getHttpUrl() ?? "");
@@ -151,6 +153,8 @@ describe("given ClickHouse 26.8 with the shipped migrations and the writer provi
       facts: "migrated",
       settingsPrefixes: ["custom_", APP_READER_SETTINGS_PREFIX],
     });
+    // The reused container's reader is server-wide: no other file replaces or drops it mid-run.
+    release = await holdTestClickHouseServer({ url: harness.container.getHttpUrl() });
     admin = harness.admin;
     factDatabase = harness.factDatabase;
     for (const statement of identitiesDdl({ sourceDatabase: factDatabase })) {
@@ -160,21 +164,25 @@ describe("given ClickHouse 26.8 with the shipped migrations and the writer provi
   }, 300_000);
 
   afterAll(async () => {
-    await Promise.all(opened.map((client) => client.close()));
-    if (!admin) return;
-    for (const user of [APP_READER_NAMES.user, APP_WRITER_NAMES.user]) {
-      await admin.command({ query: `DROP USER IF EXISTS ${user}` });
-      await admin.command({ query: `DROP SETTINGS PROFILE IF EXISTS ${user}_profile` });
+    try {
+      await Promise.all(opened.map((client) => client.close()));
+      if (!admin) return;
+      for (const user of [APP_READER_NAMES.user, APP_WRITER_NAMES.user]) {
+        await admin.command({ query: `DROP USER IF EXISTS ${user}` });
+        await admin.command({ query: `DROP SETTINGS PROFILE IF EXISTS ${user}_profile` });
+      }
+      const policies = identitiesDdl({ sourceDatabase: factDatabase })
+        .map((statement) => /^CREATE ROW POLICY OR REPLACE (\S+) ON (\S+)/.exec(statement))
+        .filter((match) => match !== null);
+      for (const [, name, table] of policies) {
+        await admin.command({ query: `DROP ROW POLICY IF EXISTS ${name} ON ${table}` });
+      }
+      // A reused container keeps the facts database; the next run migrates its views afresh.
+      await admin.command({ query: `DROP DATABASE IF EXISTS ${factDatabase}` });
+      await harness?.stop();
+    } finally {
+      await release?.();
     }
-    const policies = identitiesDdl({ sourceDatabase: factDatabase })
-      .map((statement) => /^CREATE ROW POLICY OR REPLACE (\S+) ON (\S+)/.exec(statement))
-      .filter((match) => match !== null);
-    for (const [, name, table] of policies) {
-      await admin.command({ query: `DROP ROW POLICY IF EXISTS ${name} ON ${table}` });
-    }
-    // A reused container keeps the facts database; the next run migrates its views afresh.
-    await admin.command({ query: `DROP DATABASE IF EXISTS ${factDatabase}` });
-    await harness?.stop();
   });
 
   describe("when the writer inserts into instant_eval_runs, which feeds no view", () => {
