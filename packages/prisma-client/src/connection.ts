@@ -50,7 +50,7 @@ function prismaEventMessage(event: Prisma.LogEvent | Prisma.QueryEvent): string 
   return "query" in event ? event.query : readablePrismaMessage(event.message);
 }
 
-const INVOCATION_HEADER = /^\s*Invalid `prisma\.([\w.]+)\(\)` invocation:\s*([\s\S]+)$/;
+const INVOCATION_HEADER = /^\s*Invalid `prisma\.([\w.]+)\(\)` invocation:/;
 
 /**
  * Prisma opens with "Invalid `prisma.x.y()` invocation:" and gives the reason lines later, so
@@ -58,9 +58,10 @@ const INVOCATION_HEADER = /^\s*Invalid `prisma\.([\w.]+)\(\)` invocation:\s*([\s
  */
 export function readablePrismaMessage(message: string): string {
   const match = INVOCATION_HEADER.exec(message);
-  const [, call, reason] = match ?? [];
-  if (call === undefined || reason === undefined) return message;
-  return `${reason.trim()} (prisma.${call})`;
+  const call = match?.[1];
+  const reason = match ? message.slice(match[0].length).trim() : "";
+  if (call === undefined || reason === "") return message;
+  return `${reason} (prisma.${call})`;
 }
 
 /** An error event's level: a behind schema warns; a missing row or a conflict is the caller's. */
