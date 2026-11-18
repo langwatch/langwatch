@@ -5311,6 +5311,13 @@ model NurturingVirtualKey {
   @@index([principalUserId])
 }
 
+/// Each account nurturing erased, as a SHA-256 of its id and never the id: a gateway key fact
+/// naming it, however late it lands, stores no creator or holder. Platform-wide, like the erasure.
+model NurturingErasedUser {
+  userIdHash String   @id
+  erasedAt   DateTime @default(now())
+}
+
 /// Nurturing's read model per organization: its admin and its milestone counts.
 /// `seeded` marks an organization learned from the project backfill: its first_* already happened.
 model NurturingOrganization {

@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+import { createHash } from "node:crypto";
+
 import type {
   RecordVkLifecycleCommandData,
   VirtualKeyPurpose,
@@ -143,6 +145,34 @@ export function forgetPersonOnKey({
     principalUserIdAt: heldBy
       ? Math.max(key.principalUserIdAt ?? 0, erasedAt)
       : key.principalUserIdAt,
+  };
+}
+
+/**
+ * How nurturing marks an account erased: a SHA-256 of its id, so the mark holds no id. The domain
+ * prefix keeps it from matching the bare SHA-256 a delivery claim key carries for the same id.
+ */
+export function erasedUserHashOf(userId: string): string {
+  return createHash("sha256").update(`nurturing-erased-user:${userId}`).digest("hex");
+}
+
+/**
+ * The fact with every erased person taken out, before it folds: an erased creator or holder reads
+ * null, which the fold never stores. A fact stamped before an erasure can land after it, on a key
+ * with no holder yet, on a key not copied yet, or as a late created fact; none names them again.
+ */
+export function withoutErasedPeople({
+  fact,
+  isErased,
+}: Readonly<{
+  fact: NurturingVirtualKeyFact;
+  isErased: (userId: string) => boolean;
+}>): NurturingVirtualKeyFact {
+  const kept = (userId: string | null) => (userId !== null && isErased(userId) ? null : userId);
+  return {
+    ...fact,
+    actorUserId: kept(fact.actorUserId),
+    principalUserId: kept(fact.principalUserId),
   };
 }
 

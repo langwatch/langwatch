@@ -21639,6 +21639,34 @@
       ]
     },
     {
+      "name": "NurturingErasedUser",
+      "tableName": "NurturingErasedUser",
+      "documentation": "Each account nurturing erased, as a SHA-256 of its id and never the id: a gateway key fact\nnaming it, however late it lands, stores no creator or holder. Platform-wide, like the erasure.",
+      "primaryKey": [
+        "userIdHash"
+      ],
+      "fields": [
+        {
+          "name": "userIdHash",
+          "columnName": "userIdHash",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "erasedAt",
+          "columnName": "erasedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        }
+      ]
+    },
+    {
       "name": "NurturingOrganization",
       "tableName": "NurturingOrganization",
       "documentation": "Nurturing's read model per organization: its admin and its milestone counts.\n`seeded` marks an organization learned from the project backfill: its first_* already happened.",

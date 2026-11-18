@@ -2,10 +2,12 @@
 import { nowEpochMs } from "@langwatch/time";
 
 import {
+  erasedUserHashOf,
   foldVirtualKeyFact,
   forgetPersonOnKey,
   type NurturingVirtualKey,
   type NurturingVirtualKeyFact,
+  withoutErasedPeople,
 } from "../../rules/nurturing-virtual-key.rules.ts";
 import type { NurturingVirtualKeyRepository } from "../nurturing-gateway-key.repository.ts";
 
@@ -16,6 +18,7 @@ export class MemoryNurturingVirtualKeyRepository implements NurturingVirtualKeyR
   }
 
   readonly #keys = new Map<string, NurturingVirtualKey>();
+  readonly #erasedUserHashes = new Set<string>();
 
   private constructor() {}
 
@@ -23,7 +26,9 @@ export class MemoryNurturingVirtualKeyRepository implements NurturingVirtualKeyR
     const held = this.#keys.get(fact.virtualKeyId) ?? null;
     // As the Postgres upsert: a key never moves organization, so another's fact changes nothing.
     if (held && held.organizationId !== fact.organizationId) return;
-    this.#keys.set(fact.virtualKeyId, foldVirtualKeyFact({ held, fact }));
+    const isErased = (userId: string) => this.#erasedUserHashes.has(erasedUserHashOf(userId));
+    const kept = withoutErasedPeople({ fact, isErased });
+    this.#keys.set(fact.virtualKeyId, foldVirtualKeyFact({ held, fact: kept }));
   }
 
   async findKey({
@@ -39,6 +44,7 @@ export class MemoryNurturingVirtualKeyRepository implements NurturingVirtualKeyR
 
   async forgetUser({ userId }: Readonly<{ userId: string }>): Promise<void> {
     const erasedAt = nowEpochMs();
+    this.#erasedUserHashes.add(erasedUserHashOf(userId));
     for (const [virtualKeyId, key] of this.#keys) {
       this.#keys.set(virtualKeyId, forgetPersonOnKey({ key, userId, erasedAt }));
     }

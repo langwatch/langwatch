@@ -2045,6 +2045,10 @@ export interface LwqlPrismaRows {
     readonly enabledAt: "DateTime?";
     readonly revokedAt: "DateTime?";
   };
+  readonly NurturingErasedUser: {
+    readonly userIdHash: "String";
+    readonly erasedAt: "DateTime";
+  };
   readonly NurturingOrganization: {
     readonly organizationId: "String";
     readonly adminUserId: "String?";

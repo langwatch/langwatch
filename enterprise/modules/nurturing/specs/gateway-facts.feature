@@ -141,6 +141,33 @@ Feature: Customer.io hears when a person's gateway key is created and when its b
     When that person is erased, then a fact naming them stamped T2 lands, T1 < T2 < the erasure
     Then the key copy still names no holder
 
+  @integration
+  Scenario: A key is created for an erased person after their erasure
+    Given a person was erased
+    When a gateway "key created" fact naming them, stamped before the erasure, arrives
+    Then the key copy stores no id for them
+
+  @integration
+  Scenario: A holder change for an erased person arrives late on a key with no holder
+    Given a person was erased
+    And a key copy has no holder yet
+    When a holder fact naming them, stamped before the erasure, arrives
+    Then the key copy stores no id for them
+
+  @integration
+  Scenario: A late created fact never names an erased creator
+    Given a key copy folded from a later fact, so with no creator yet
+    And a person was erased
+    When the key's "key created" fact naming them as creator, stamped before the erasure, arrives
+    Then the key copy records the creation and stores no id for them
+
+  @integration
+  Scenario: A late fact naming an erased person leaves the key's real holder in place
+    Given a key copy whose holder is another person, stamped T1
+    And a person was erased
+    When a holder fact naming the erased person, stamped T2 > T1, arrives
+    Then the key copy still names the other person as holder, stamped T1
+
   # --- AC Coverage Map (langwatch/tasks#1200) ---
   # AC 1: "null purpose counts as USER"          -> unit only: nurturing-virtual-key.rules.unit.test.ts
   # AC 2: "CONNECT and LANGY send nothing"       -> Scenario: CONNECT and LANGY keys send nothing
@@ -170,3 +197,9 @@ Feature: Customer.io hears when a person's gateway key is created and when its b
   # AC 18: "forbidden fields in payloads"        -> unit only: nurturing.pipeline.gateway-facts.unit.test.ts greps every captured request
   # AC 19: "webhook envelope test unchanged"     -> unit only: the file is not in the diff
   # AC 20: "ADR-001 and READMEs"                 -> adrs/001-nurturing-package-boundary.md; READMEs from CI's printed diff
+  #
+  # --- AC Coverage Map (langwatch/tasks#1204) ---
+  # "key created after the erasure"              -> Scenario: A key is created for an erased person after their erasure
+  # "late holder on a key with no holder"        -> Scenario: A holder change for an erased person arrives late on a key with no holder
+  # "late created fact" (issue's Actual list)    -> Scenario: A late created fact never names an erased creator
+  # "real holder kept" (review)                  -> Scenario: A late fact naming an erased person leaves the key's real holder in place

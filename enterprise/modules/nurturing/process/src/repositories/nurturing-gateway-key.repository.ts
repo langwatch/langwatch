@@ -16,6 +16,9 @@ export interface NurturingVirtualKeyRepository {
   findKey(
     input: Readonly<{ organizationId: string; virtualKeyId: string }>,
   ): Promise<NurturingVirtualKey[]>;
-  /** Clears an erased account from every key copy; no fact stamped before it restores them. */
+  /**
+   * Marks an erased account and clears it from every key copy: no fact folded in afterwards names
+   * it again, whatever key it is for and whenever it was stamped.
+   */
   forgetUser(input: Readonly<{ userId: string }>): Promise<void>;
 }

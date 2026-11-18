@@ -3,15 +3,19 @@
  * @vitest-environment node
  * @see enterprise/modules/nurturing/specs/gateway-facts.feature
  */
+import { createHash } from "node:crypto";
+
 import { describe, expect, it } from "vitest";
 
 import {
+  erasedUserHashOf,
   foldVirtualKeyFact,
   forgetPersonOnKey,
   isLiveKey,
   isPersonKey,
   type NurturingVirtualKey,
   type NurturingVirtualKeyFact,
+  withoutErasedPeople,
 } from "../nurturing-virtual-key.rules.ts";
 
 const fact = (overrides: Partial<NurturingVirtualKeyFact>): NurturingVirtualKeyFact => ({
@@ -169,6 +173,58 @@ describe("forgetPersonOnKey", () => {
       const key = foldAll([fact({})]);
 
       expect(forgetPersonOnKey({ key, userId: "user-jane", erasedAt: 3_000 })).toEqual(key);
+    });
+  });
+});
+
+describe("withoutErasedPeople", () => {
+  describe("given a fact naming an erased creator and a holder who is not erased", () => {
+    it("reads the creator as null and keeps the holder and everything else", () => {
+      const named = fact({ actorUserId: "user-jane", principalUserId: "user-holder" });
+
+      const kept = withoutErasedPeople({ fact: named, isErased: (id) => id === "user-jane" });
+
+      expect(kept).toEqual({ ...named, actorUserId: null });
+    });
+  });
+
+  describe("given a fact naming an erased holder and no creator", () => {
+    it("reads the holder as null and asks nothing about the missing creator", () => {
+      const asked: string[] = [];
+      const named = fact({ action: "rotated", actorUserId: null, principalUserId: "user-jane" });
+
+      const kept = withoutErasedPeople({
+        fact: named,
+        isErased: (id) => {
+          asked.push(id);
+          return true;
+        },
+      });
+
+      expect(kept).toEqual({ ...named, principalUserId: null });
+      expect(asked).toEqual(["user-jane"]);
+    });
+  });
+});
+
+describe("erasedUserHashOf", () => {
+  describe("given an account id", () => {
+    it("is a stable SHA-256 hex that differs per id and holds no trace of the id", () => {
+      const hash = erasedUserHashOf("user-jane");
+
+      expect(hash).toMatch(/^[0-9a-f]{64}$/);
+      expect(erasedUserHashOf("user-jane")).toBe(hash);
+      expect(erasedUserHashOf("user-john")).not.toBe(hash);
+      expect(hash).not.toContain("user-jane");
+    });
+  });
+
+  describe("given the bare SHA-256 a delivery claim key carries for the same id", () => {
+    it("matches neither it nor its prefix, so the two cannot be joined", () => {
+      const bare = createHash("sha256").update("user-jane").digest("hex");
+
+      expect(erasedUserHashOf("user-jane")).not.toBe(bare);
+      expect(erasedUserHashOf("user-jane").startsWith(bare.slice(0, 16))).toBe(false);
     });
   });
 });

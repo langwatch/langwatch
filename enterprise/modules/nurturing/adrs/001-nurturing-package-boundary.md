@@ -79,10 +79,20 @@ purpose and state, folded order-free from gateway's `vk_lifecycle` facts),
 (a project that traced).
 It also owns `NurturingOrganization` (admin, milestone counts, coding signals,
 last trace), `NurturingProjectUsageView` (one peer fold row per project and
-owner), `NurturingProjectTraceDay` (trace counts per project and UTC day, kept 30
-days). A redelivered batch can count a trace twice, and so can a root span stored
-more than once; accepted (owner decision, issue 9378). Signals are events on the
-`nurturing` pipeline. A delivered signal is claimed in Redis for seven days under the process-wide idempotency key prefix,
+owner), `NurturingProjectTraceDay` (trace counts per project and UTC day, kept
+30 days) and `NurturingErasedUser` (a SHA-256 of each erased account's id, never
+the id, so no gateway key fact folded after the erasure stores them again,
+whatever its stamp; https://github.com/langwatch/tasks/issues/1204). User ids
+are nanoids (~126 random bits), so a keyed hash (as governance uses for
+guessable emails) isn't needed; the hashed `nurturing-erased-user:` prefix stops
+joins with the bare SHA-256 a delivery claim key carries. Erasure still moves a
+cleared holder's stamp to now, which also closes the race for rows already
+naming the person; the kept cost is that a late holder change to another person,
+stamped between the erased holder's stamp and the erasure, is dropped, so budget
+emails then go to the admin. A redelivered batch can count a trace twice, and so
+can a root span stored more than once; accepted (owner decision, issue 9378).
+Signals are events on the `nurturing` pipeline.
+A delivered signal is claimed in Redis for seven days under the process-wide idempotency key prefix,
 so a redelivered event sends nothing. A gateway key's creation and its budget's crossings
 are claimed per call, the identify apart from the track, so a retry after a refused call
 sends only that call. Billing's catch-up `subscription_changed` fact, recorded by
