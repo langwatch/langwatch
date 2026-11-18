@@ -65,6 +65,12 @@ Feature: The REST runtime renders what a transport may not hand-roll
       When the body names an aggregate project
       Then it is refused 403 aggregate_project_is_read_only and the handler is not reached
 
+    @unit
+    Scenario: A header or body that names no project is the caller's 400, not a wiring 500
+      Given a route that asks its permission at the project an optional x-project-id header names
+      When a signed-in caller sends no such header
+      Then it is refused 400 validation_error, nothing is asked and the handler is not reached
+
   Rule: A protocol route renders every refusal in its protocol's own document
 
     @integration
