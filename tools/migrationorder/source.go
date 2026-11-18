@@ -38,7 +38,7 @@ func nextLink(content string, pos int) (link chainLink, end int, ok bool) {
 		return chainLink{}, 0, false
 	}
 	start := skipSpace(content, dot+1)
-	nameEnd := start + len(identifier.FindString(content[min(start, len(content)):]))
+	nameEnd := start + len(identifier.FindString(content[start:]))
 	open := skipSpace(content, nameEnd)
 	if nameEnd == start || !byteAt(content, open, '(') {
 		return chainLink{}, 0, false
@@ -57,7 +57,7 @@ func byteAt(content string, i int, b byte) bool {
 func skipSpace(content string, pos int) int {
 	for pos < len(content) {
 		if next := skipComment(content, pos); next > pos {
-			pos = next + 1
+			pos = min(next+1, len(content))
 			continue
 		}
 		if !strings.ContainsRune(" \t\r\n", rune(content[pos])) {
