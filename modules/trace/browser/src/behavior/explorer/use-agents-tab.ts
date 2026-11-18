@@ -1,5 +1,4 @@
 import type { AgentCallGraph, SpanTreeNode } from "@langwatch/trace-contract";
-import { useMemo } from "react";
 
 import { mayHaveSeveralAgents } from "../../model/agent-call-graph-layout.ts";
 import { useAgentCallGraph } from "./use-agent-call-graph.ts";
@@ -27,7 +26,7 @@ export function useAgentsTab({
   isSpanTreeLoading: boolean;
   isAgentsTabOpen: boolean;
 }): AgentsTab {
-  const maySeveral = useMemo(() => mayHaveSeveralAgents({ spans: spanTree }), [spanTree]);
+  const maySeveral = mayHaveSeveralAgents({ spans: spanTree });
   const { isReady, query } = useAgentCallGraph({ enabled: isAgentsTabOpen && maySeveral });
   const graph = query.data;
   const isGraphError = query.isError;
