@@ -937,6 +937,62 @@ describe("CodingAgentSessionFoldProjection", () => {
       expect(state.titleSource).toBe("name");
     });
 
+    /** @scenario "Any record that carries a name names the session" */
+    it("takes the name from a prompt record with no context record", () => {
+      const projection = makeProjection();
+      let state = projection.init();
+
+      state = projection.handleCodingAgentSessionLogFactsContributed(
+        logFactsEvent({
+          facts: { ...promptFacts("## Your skills"), "langwatch.session.name": "Scout" },
+        }),
+        state,
+      );
+      expect(state.title).toBe("Scout");
+      expect(state.titleSource).toBe("name");
+
+      state = projection.handleCodingAgentSessionLogFactsContributed(
+        logFactsEvent({
+          facts: {
+            "event.name": "claude_code.api_response_body",
+            "langwatch.session.title": "Review the open pull requests",
+          },
+          timeMs: 3_000,
+        }),
+        state,
+      );
+      expect(state.title).toBe("Scout");
+    });
+
+    /** @scenario "A launcher's name does not undo a harness rename" */
+    it("keeps a harness rename over the launcher's name on later records", () => {
+      const projection = makeProjection();
+      let state = projection.init();
+      const prompt = { ...promptFacts("## Your skills"), "langwatch.session.name": "Scout" };
+
+      state = projection.handleCodingAgentSessionLogFactsContributed(
+        logFactsEvent({ facts: prompt }),
+        state,
+      );
+      state = projection.handleCodingAgentSessionLogFactsContributed(
+        logFactsEvent({
+          facts: {
+            "event.name": "langwatch.session_context",
+            "coding_agent.name": "claude_code",
+            "langwatch.session.name": "pr-reviewer",
+          },
+          timeMs: 2_000,
+        }),
+        state,
+      );
+      state = projection.handleCodingAgentSessionLogFactsContributed(
+        logFactsEvent({ facts: prompt, timeMs: 3_000 }),
+        state,
+      );
+
+      expect(state.title).toBe("pr-reviewer");
+    });
+
     /** @scenario "A renamed session renames its row" */
     it("folds the newest name in place", () => {
       const projection = makeProjection();
