@@ -66,7 +66,7 @@ resubscribe(input: DigestTokenQuery): Promise<void>;
 
 |             |                                               |
 | ----------- | --------------------------------------------- |
-| Declared at | `src/transport/digest-unsubscribe.rest.ts:39` |
+| Declared at | `src/transport/digest-unsubscribe.rest.ts:43` |
 | Base URL    | none: each route's path is its address        |
 | Addressing  | literal                                       |
 | Credential  | project                                       |
@@ -75,7 +75,7 @@ resubscribe(input: DigestTokenQuery): Promise<void>;
 
 The weekly digest's unsubscribe page
 
-Public: RFC 8058 one-click unsubscribe from the weekly digest: the email arrives where no session exists, and the HMAC token naming one person is the whole authorization. Hidden from the OpenAPI document. Declared at `src/transport/digest-unsubscribe.rest.ts:45`.
+Public: RFC 8058 one-click unsubscribe from the weekly digest: the email arrives where no session exists, and the HMAC token naming one person is the whole authorization. Hidden from the OpenAPI document. Declared at `src/transport/digest-unsubscribe.rest.ts:49`.
 
 Answers at `/api/digest/unsubscribe`.
 
@@ -84,7 +84,7 @@ Answers at `/api/digest/unsubscribe`.
 interface Query {
   token: string;
 }
-// Response: inline, src/transport/digest-unsubscribe.rest.ts:48
+// Response: inline, src/transport/digest-unsubscribe.rest.ts:52
 type Response = unknown;
 ```
 
@@ -92,13 +92,13 @@ type Response = unknown;
 
 RFC 8058 one-click unsubscribe from the weekly digest
 
-Public: RFC 8058 one-click unsubscribe from the weekly digest: the email arrives where no session exists, and the HMAC token naming one person is the whole authorization. Hidden from the OpenAPI document. Declared at `src/transport/digest-unsubscribe.rest.ts:61`.
+Public: RFC 8058 one-click unsubscribe from the weekly digest: the email arrives where no session exists, and the HMAC token naming one person is the whole authorization. Hidden from the OpenAPI document. Declared at `src/transport/digest-unsubscribe.rest.ts:65`.
 
 Answers at `/api/digest/unsubscribe`.
 
 ```typescript
 type Query = z.infer<typeof digestTokenQuerySchema>; // ../contract/src/digest.ts:67
-// Response: inline, src/transport/digest-unsubscribe.rest.ts:67
+// Response: inline, src/transport/digest-unsubscribe.rest.ts:71
 type Response = unknown;
 ```
 
@@ -106,13 +106,13 @@ type Response = unknown;
 
 Resubscribe to the weekly digest from its unsubscribe page
 
-Public: RFC 8058 one-click unsubscribe from the weekly digest: the email arrives where no session exists, and the HMAC token naming one person is the whole authorization. Hidden from the OpenAPI document. Declared at `src/transport/digest-unsubscribe.rest.ts:78`.
+Public: RFC 8058 one-click unsubscribe from the weekly digest: the email arrives where no session exists, and the HMAC token naming one person is the whole authorization. Hidden from the OpenAPI document. Declared at `src/transport/digest-unsubscribe.rest.ts:82`.
 
 Answers at `/api/digest/resubscribe`.
 
 ```typescript
 type Query = z.infer<typeof digestTokenQuerySchema>; // ../contract/src/digest.ts:67
-// Response: inline, src/transport/digest-unsubscribe.rest.ts:84
+// Response: inline, src/transport/digest-unsubscribe.rest.ts:88
 type Response = unknown;
 ```
 
@@ -178,25 +178,26 @@ Declared at `src/eventing/digest-send.pipeline.ts:56`. Events: `DigestSendReques
 
 ### Pipeline `digest` (aggregate `digest_week`)
 
-Declared at `src/eventing/digest.pipeline.ts:79`. Events: `projectActivityRecordedEventSchema`, `userActivityRecordedEventSchema`.
+Declared at `src/eventing/digest.pipeline.ts:82`. Events: `projectActivityRecordedEventSchema`, `userActivityRecordedEventSchema`.
 
 | Kind                | Name                                                    | Handles                                                                                                                | Declared at                           |
 | ------------------- | ------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- | ------------------------------------- |
-| command             | `recordProjectActivity`                                 | –                                                                                                                      | `src/eventing/digest.pipeline.ts:117` |
-| command             | `recordUserActivity`                                    | –                                                                                                                      | `src/eventing/digest.pipeline.ts:118` |
-| peer subscriber     | `spanRecorded`                                          | `lw.trace.span_recorded` from [trace](../../../../modules/trace/README.md)                                             | `src/eventing/digest.pipeline.ts:87`  |
-| peer subscriber     | `evaluationCompleted`                                   | `lw.evaluation.lifecycle_completed` from [evaluation](../../../../modules/evaluation/README.md)                        | `src/eventing/digest.pipeline.ts:93`  |
-| peer subscriber     | `scenarioRunFinished`                                   | `lw.simulation_run.finished` from [scenario](../../../../modules/scenario/README.md)                                   | `src/eventing/digest.pipeline.ts:99`  |
-| peer subscriber     | `codingAgentSpanFacts`                                  | `lw.obs.coding_agent_session.span_facts_contributed` from [coding-agent](../../../../modules/coding-agent/README.md)   | `src/eventing/digest.pipeline.ts:105` |
-| peer subscriber     | `codingAgentMetricFacts`                                | `lw.obs.coding_agent_session.metric_facts_contributed` from [coding-agent](../../../../modules/coding-agent/README.md) | `src/eventing/digest.pipeline.ts:111` |
-| Postgres projection | `≈ projectWeekProjection({ store: deps.projectWeeks })` | –                                                                                                                      | `src/eventing/digest.pipeline.ts:84`  |
-| Postgres projection | `≈ userWeekProjection({ store: deps.userWeeks })`       | –                                                                                                                      | `src/eventing/digest.pipeline.ts:85`  |
+| command             | `recordProjectActivity`                                 | –                                                                                                                      | `src/eventing/digest.pipeline.ts:126` |
+| command             | `recordUserActivity`                                    | –                                                                                                                      | `src/eventing/digest.pipeline.ts:127` |
+| peer subscriber     | `spanRecorded`                                          | `lw.trace.span_recorded` from [trace](../../../../modules/trace/README.md)                                             | `src/eventing/digest.pipeline.ts:90`  |
+| peer subscriber     | `evaluationCompleted`                                   | `lw.evaluation.lifecycle_completed` from [evaluation](../../../../modules/evaluation/README.md)                        | `src/eventing/digest.pipeline.ts:96`  |
+| peer subscriber     | `scenarioRunFinished`                                   | `lw.simulation_run.finished` from [scenario](../../../../modules/scenario/README.md)                                   | `src/eventing/digest.pipeline.ts:102` |
+| peer subscriber     | `codingAgentSpanFacts`                                  | `lw.obs.coding_agent_session.span_facts_contributed` from [coding-agent](../../../../modules/coding-agent/README.md)   | `src/eventing/digest.pipeline.ts:108` |
+| peer subscriber     | `codingAgentMetricFacts`                                | `lw.obs.coding_agent_session.metric_facts_contributed` from [coding-agent](../../../../modules/coding-agent/README.md) | `src/eventing/digest.pipeline.ts:114` |
+| peer subscriber     | `userErased`                                            | `lw.user.erased` from [user](../../../../modules/user/README.md)                                                       | `src/eventing/digest.pipeline.ts:121` |
+| Postgres projection | `≈ projectWeekProjection({ store: deps.projectWeeks })` | –                                                                                                                      | `src/eventing/digest.pipeline.ts:87`  |
+| Postgres projection | `≈ userWeekProjection({ store: deps.userWeeks })`       | –                                                                                                                      | `src/eventing/digest.pipeline.ts:88`  |
 
 ## Configuration
 
 | Kind   | Leaf            | Environment variable | Declared at                          |
 | ------ | --------------- | -------------------- | ------------------------------------ |
-| secret | `unsubscribe`   | `NEXTAUTH_SECRET`    | `src/app/digest.app.ts:64`           |
+| secret | `unsubscribe`   | `NEXTAUTH_SECRET`    | `src/app/digest.app.ts:68`           |
 | config | `publicBaseUrl` | `BASE_HOST`          | `../contract/src/digest.config.ts:5` |
 
 <!-- readme:generated:end -->
