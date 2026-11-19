@@ -36,7 +36,7 @@ export function CurrentProjectHeader({
   return (
     <VStack
       as="section"
-      aria-label="Current project"
+      aria-label="Current project details"
       align="stretch"
       gap={1.5}
       paddingX={3}

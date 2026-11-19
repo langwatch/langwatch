@@ -30,6 +30,7 @@ export function ProjectComboboxPopup({
       <Combobox.Positioner>
         <Combobox.Content
           minWidth="260px"
+          // The pinned header takes about 170px; at 360px only five rows would show.
           maxHeight="min(480px, 70vh)"
           overflowY="auto"
           padding={0}

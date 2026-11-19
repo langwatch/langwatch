@@ -52,10 +52,20 @@ Feature: The project switcher names the current project by its ID
     And it offers no "Project settings" link, because that page needs permission to update the project
 
   @integration
-  Scenario: The header offers only the pages the reader can open there
+  Scenario: A personal workspace offers no project settings link
     Given I am in my personal workspace, which has no project settings page
     When I open the project switcher
     Then it offers no "Project settings" link
+
+  @integration
+  Scenario: A lite member is offered no API keys link
     Given I am a lite member, for whom the settings menu hides API keys
     When I open the project switcher
-    Then it offers no "API keys for this project" link
+    Then it still links "Project settings"
+    And it offers no "API keys for this project" link
+
+  @integration
+  Scenario: The list keeps a highlighted row clear of the pinned header
+    Given the project switcher is open on a list longer than the popup
+    When I arrow down to the last project and back up the list
+    Then each highlighted row shows in full below the pinned header and search field

@@ -65,7 +65,7 @@ async function openSwitcher() {
 }
 
 function currentProjectHeader() {
-  return screen.getByRole("region", { name: "Current project" });
+  return screen.getByRole("region", { name: "Current project details" });
 }
 
 beforeEach(() => vi.clearAllMocks());
@@ -154,19 +154,25 @@ describe("the project switcher's current project header", () => {
     });
   });
 
-  describe("when the header would lead to a page the reader cannot open", () => {
-    /** @scenario The header offers only the pages the reader can open there */
-    it("leaves out settings for a personal workspace and keys for a lite member", async () => {
+  describe("when the current project is the reader's personal workspace", () => {
+    /** @scenario A personal workspace offers no project settings link */
+    it("leaves out the Project settings link", async () => {
       const personal = { id: "project_me_9", slug: "me", name: "Mine", isPersonal: true };
-      const { unmount } = renderSwitcher({ readings: { project: personal, pathname: "/me" } });
+      renderSwitcher({ readings: { project: personal, pathname: "/me" } });
       await openSwitcher();
+
       expect(
         within(currentProjectHeader()).queryByRole("link", { name: "Project settings" }),
       ).not.toBeInTheDocument();
-      unmount();
+    });
+  });
 
+  describe("when the reader is a lite member", () => {
+    /** @scenario A lite member is offered no API keys link */
+    it("keeps Project settings and leaves out the API keys link", async () => {
       renderSwitcher({ readings: { plan: { isLiteMember: true } } });
       await openSwitcher();
+
       const header = currentProjectHeader();
       expect(within(header).getByRole("link", { name: "Project settings" })).toBeInTheDocument();
       expect(
