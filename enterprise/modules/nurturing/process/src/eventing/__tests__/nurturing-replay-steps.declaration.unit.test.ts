@@ -25,7 +25,7 @@ function recordingReplayer() {
   const replayer: LaneReplayer = {
     async replayLane({ lane }) {
       lanes.push(lane);
-      return { lane, kind: "recorded", aggregatesReplayed: 0, totalEvents: 0, replayedThrough: "1" };
+      return { lane, kind: "map", aggregatesReplayed: 0, totalEvents: 0, replayedThrough: "1" };
     },
   };
   return { lanes, replayer };
