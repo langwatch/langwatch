@@ -165,7 +165,7 @@ Feature: API Keys scope filter
     When I change the scope filter to a team in the same organization
     Then the key remains visible because its organization-scoped binding matches the cascade
 
-  @integration
+  @integration @regression
   Scenario: A legacy project key follows the scope filter like a key bound to its project
     Given project "alpha" under team "Platform" and project "beta" under team "Growth" both still have a live legacy key
     When I change the scope filter to project "alpha"
@@ -175,7 +175,7 @@ Feature: API Keys scope filter
     Then only the "Project key" row of project "beta" is listed
     And the legacy keys banner still names both projects
 
-  @integration
+  @integration @regression
   Scenario: A filter that leaves only other projects' legacy keys shows the empty state
     Given only project "beta" still has a live legacy key and no other key exists
     When I change the scope filter to project "alpha"

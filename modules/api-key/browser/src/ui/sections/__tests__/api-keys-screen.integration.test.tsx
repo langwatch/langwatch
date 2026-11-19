@@ -1118,9 +1118,12 @@ describe("given legacy keys on projects under different teams", () => {
       new FakeApiKeyHost({ availableScopes: scopes, query: { [API_KEY_SCOPE_QUERY_KEY]: scope } }),
     );
   const legacyRowProjects = () =>
-    screen
-      .queryAllByTestId("legacy-key-row")
-      .map((row) => (within(row).queryByText("Web App") ? "Web App" : "Checkout"));
+    screen.queryAllByTestId("legacy-key-row").map((row) => {
+      const label = within(row)
+        .getByRole("button", { name: /^Actions for the legacy project key of / })
+        .getAttribute("aria-label");
+      return /of (.+) \(/.exec(label ?? "")?.[1] ?? "";
+    });
 
   beforeEach(() => {
     state.members = ADMIN;
