@@ -131,6 +131,31 @@ The expiry is 15 minutes for a workflow run, which nlpgo checks once, when the
 request arrives. A scenario run gets one hour, because its child process reuses
 one envelope for every turn.
 
+**langevals never dials a bound host; nlpgo does.** langevals (LLM-as-judge and
+ragas evaluators, and topic clustering) calls models through litellm, which
+resolves the name through DNS. For a call whose base URL host is bound in the
+project's organization, `ModelProviderApi.prepareLangevalsExecution` rewrites
+the litellm parameters to an OpenAI-shape call to nlpgo's `/go/proxy/v1`: the
+original parameters ride as `x-litellm-*` headers in `extra_headers`, next to
+the signed envelope (valid for 30 minutes, which covers a clustering page). An
+unbound call keeps its parameters exactly. nlpgo then verifies the envelope and
+pins the call as it does for the playground, so there is no third
+implementation of the address gate or the pinned dial.
+
+The proxy wants the internal secret. The app sends it to langevals as a request
+header, with the proxy's URL in `X-LangWatch-Engine-Proxy`, and only on a
+request that has a proxied call. It never goes in the body: a large body is
+staged in the project's object storage, which can be a customer's bucket.
+langevals adds the secret to a call's extra headers only when that call goes to
+exactly the named proxy (scheme, host, port and path). langevals runs no tenant
+code, reads no bindings and chooses no address. A deployment where langevals
+cannot reach the app's NLP service URL fails closed: the call errors, and
+nothing is resolved through DNS.
+
+An agent test turn signs the bindings in the parent and carries them on the
+child's job, as a scenario run does. A workflow agent's turn sends them when it
+posts straight to nlpgo; the relay route signs its own.
+
 **The gateway's bundle stays unsigned.** The AI gateway fetches its bundle from
 the control plane itself: it signs the request with its own internal secret
 and verifies the answer's JWT. No tenant code runs in the gateway, and no
@@ -144,6 +169,9 @@ custom model endpoint:
 - model discovery;
 - nlpgo's playground proxy (playground and prompts);
 - nlpgo workflow LLM and evaluator blocks;
+- langevals evaluators and topic clustering, through nlpgo's proxy;
+- the scenario child (simulator, judge, prompt and workflow targets, and agent
+  test turns);
 - AI gateway virtual-key traffic.
 
 Each path builds its endpoint policy from the global flags plus the call's
@@ -212,15 +240,28 @@ calls, not arbitrary HTTP.
 
 ## Known gaps
 
-These paths do not honour bindings yet; the spec tags them `@unimplemented`:
+These paths do not honour bindings yet; the spec tags them `@unimplemented`.
+A call on one of them to a bound host is refused and never reaches the private
+endpoint:
 
-- langevals evaluators (`llm_*`, ragas);
-- topic clustering and agent test turns;
-- Azure OpenAI, Bedrock and the LangWatch provider;
-- realtime (voice) sessions, Codex coding-agent runs and Voyage embeddings.
+- Azure OpenAI and Bedrock: Bifrost cannot derive a provider per endpoint for
+  them, so a bound call cannot be pinned;
+- the LangWatch provider, realtime (voice) sessions and Azure audio: they share
+  one connection pool across tenants;
+- Codex coding-agent runs and Voyage embeddings.
+
+Vertex AI cannot use a private endpoint: its provider settings have no base
+URL, so a Vertex AI call always goes to Google's own endpoint and no binding
+applies to it.
 
 nlpgo credentials carry no provenance, so nlpgo refuses `langwatch.ai`
 bindings instead of skipping platform credentials as the gateway does.
+
+langevals reaches a bound host only through nlpgo, so it needs a route to the
+app's NLP service URL. The Helm chart runs langevals in the same namespace as
+nlpgo with no network policy between them, so it has one. A deployment that
+runs langevals where it cannot reach nlpgo (a Lambda outside the cluster, for
+example) fails closed for bound calls.
 
 ## Infra follow-ups
 

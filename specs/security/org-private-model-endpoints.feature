@@ -13,10 +13,12 @@ Feature: Private model endpoints for one organization
 
   Paths covered: the credential check on save, model discovery, the nlpgo
   playground proxy, nlpgo workflow LLM blocks and the evaluators nlpgo runs
-  itself, and AI gateway virtual keys. In the scenarios, "a model call" means
-  each of these paths. The AI gateway picks up a binding change on the next
-  bundle revalidation, not on the next call; the other paths pick it up on the
-  next call. The gaps are listed under "Paths that do not honour bindings yet".
+  itself, AI gateway virtual keys, and the model calls langevals makes for
+  evaluators and topic clustering, which go through nlpgo's proxy. In the
+  scenarios, "a model call" means each of these paths. The AI gateway picks up
+  a binding change on the next bundle revalidation, not on the next call; the
+  other paths pick it up on the next call. The gaps are listed under "Paths
+  that do not honour bindings yet".
 
   The app sends nlpgo the organization's bindings only in the
   X-LangWatch-Private-Endpoints header: an Ed25519-signed envelope naming the
@@ -206,6 +208,53 @@ Feature: Private model endpoints for one organization
       And the engine receives only the organization's envelope, on the HTTP and the Lambda route
 
   # ============================================================================
+  # Model calls other services make for the app
+  # ============================================================================
+
+  Rule: langevals never dials a bound hostname itself
+
+    langevals runs litellm, which resolves names through DNS. A call to a bound
+    host goes through nlpgo's proxy instead, with the signed envelope, and
+    nlpgo verifies it and dials the registered addresses.
+
+    @unit
+    Scenario: A langevals model call to a bound hostname goes through nlpgo
+      Given "acme-prod" has a custom provider with base URL "https://llm.internal.acme.test/v1"
+      When an LLM-as-judge evaluator runs for "acme-prod" in langevals
+      Then langevals calls nlpgo's proxy, not "llm.internal.acme.test"
+      And the call carries the provider's own parameters and Acme's envelope signed for "acme-prod"
+
+    @unit
+    Scenario: Topic clustering's model calls to a bound hostname go through nlpgo
+      Given "acme-prod" clusters topics with a model on "https://llm.internal.acme.test/v1"
+      When a clustering page runs for "acme-prod"
+      Then the naming call goes to nlpgo's proxy with Acme's envelope
+      And an embeddings call to an unbound host goes straight to its provider
+
+    @unit
+    Scenario: A langevals model call to an unbound host keeps its route
+      When an evaluator for "acme-prod" calls a model on "https://api.example.com/v1"
+      Then langevals calls "https://api.example.com/v1" with exactly the parameters it had before
+
+    @unit
+    Scenario: The engine credential reaches langevals in a header, never in the body
+      When the app posts an evaluation whose model call goes through nlpgo
+      Then the internal secret and the proxy URL are request headers
+      And the body, which may be staged in a customer's bucket, holds neither
+
+    @unit
+    Scenario: langevals sends the engine credential only to the engine proxy
+      Given the app named nlpgo's proxy and the internal secret in the request headers
+      When a model call in that request goes anywhere else
+      Then the call carries no internal secret
+
+    @unit
+    Scenario: An agent test turn carries the organization's signed bindings
+      When an agent test turn for a workflow agent in "acme-prod" posts straight to nlpgo
+      Then it carries Acme's envelope signed for "acme-prod"
+      And a turn sent through the relay carries none, because the relay signs its own
+
+  # ============================================================================
   # Customers manage bindings
   # ============================================================================
 
@@ -338,22 +387,18 @@ Feature: Private model endpoints for one organization
 
     @unimplemented
     Scenario Outline: <path> does not honour bindings yet
-      Given "acme-prod" has a custom provider with base URL "https://llm.internal.acme.test/v1"
+      Given "acme-prod" has a provider whose endpoint host "llm.internal.acme.test" is bound
       When <path> runs for "acme-prod"
-      Then the hostname is resolved as usual
-      And a private answer is refused as a private address
+      Then the call never reaches the private endpoint
 
       Examples:
-        | path                                                  |
-        | a langevals evaluator (llm_* and ragas)              |
-        | topic clustering                                     |
-        | an agent test turn                                   |
-        | an Azure OpenAI provider                             |
-        | a Bedrock provider                                   |
-        | the LangWatch provider                               |
-        | a realtime (voice) session                           |
-        | a Codex coding-agent run                             |
-        | Voyage embeddings                                    |
+        | path                         |
+        | an Azure OpenAI provider     |
+        | a Bedrock provider           |
+        | the LangWatch provider       |
+        | a realtime (voice) session   |
+        | a Codex coding-agent run     |
+        | Voyage embeddings            |
 
   Rule: Installs that allow private calls see no change
 

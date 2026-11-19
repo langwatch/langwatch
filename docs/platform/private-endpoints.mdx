@@ -239,25 +239,25 @@ today:
 - listing the models a provider serves;
 - the prompt playground and prompts;
 - LLM and evaluator blocks in Workflows;
-- the simulator, the judge and prompt or workflow targets in Agent Testing;
-- the LangWatch AI Gateway, through virtual keys.
-
-These do not use it yet, so a provider on a private endpoint does not work
-for them:
-
-- evaluators that run in the LangWatch evaluators service (the built-in
-  evaluator library);
+- evaluators from the built-in evaluator library, such as LLM-as-a-judge and
+  RAGAS evaluators;
 - topic clustering;
-- some background Agent Testing jobs.
-
-For those features, set a public model provider as the default model, or ask
-your LangWatch contact about timing.
+- Agent Testing: the simulator, the judge, prompt and workflow targets, and
+  agent test runs;
+- the LangWatch AI Gateway, through virtual keys.
 
 Only the **Custom (OpenAI-compatible)** provider, and providers that take a
 custom base URL such as OpenAI or Anthropic, can use a private endpoint.
 Azure OpenAI, Bedrock, Voyage AI and Codex cannot. A call from one of those to
 a bound hostname is refused with a message that the credentials cannot use a
-private endpoint yet.
+private endpoint yet. Realtime (voice) sessions cannot use a private endpoint
+either.
+
+Vertex AI cannot use a private endpoint. It has no base URL setting, so its
+calls always go to Google's own endpoint.
+
+If you run LangWatch yourself, the evaluators service must be able to reach
+the NLP service. The Helm chart sets this up for you.
 
 ## Troubleshooting
 
