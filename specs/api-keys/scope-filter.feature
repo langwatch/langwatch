@@ -47,8 +47,8 @@ Feature: API Keys scope filter
   Scenario: Scope filter dropdown offers the same options as the model-providers page
     When I open the API Keys scope filter dropdown
     Then I see an "All you can see" option
-    And I see a "This team · <current team name>" option (when a current team is in context)
-    And I see a "This project · <current project name>" option (when a current project is in context), which opens a project submenu when I can see other projects
+    And I see a "Team" option with the current team's name in a badge (when a current team is in context)
+    And I see a "Project" option with the current project's name in a badge (when a current project is in context), which opens a project submenu when I can see other projects
     And I see a "More Scopes" submenu
     And the "More Scopes" submenu lists the organization, every team I can manage, and every project I can manage
 
@@ -57,16 +57,21 @@ Feature: API Keys scope filter
   # ============================================================================
   # "This team" and "This project" mean wherever the reader is now. In an
   # organization with many teams and projects a bare "This project" does not
-  # say which one, so the option carries the name (issue #9707).
+  # say which one, so the option reads "Team" or "Project" with the name in the
+  # platform's green badge (issue #9707). Without a known name it keeps its
+  # plain "This Team" / "This Project" label.
 
-  @integration
-  Scenario: The This team and This project options name the team and project they follow
+  @integration @regression
+  Scenario: The ambient team and project options name the team and project they follow
     Given the current team is "Platform" and the current project is "Web App"
     When I open the scope filter dropdown
-    Then the team option reads "This team · Platform"
-    And the project option reads "This project · Web App"
+    Then the team option reads "Team" followed by "Platform" in a badge
+    And the project option reads "Project" followed by "Web App" in a badge
+    And a screen reader names the team option "Team Platform"
+    When I pick the team option
+    Then the filter control reads "Team" followed by "Platform" in a badge
 
-  @integration
+  @integration @regression
   Scenario: An ambient option whose name is unknown keeps its plain label
     Given a current team and project are in context
     But neither is among the scopes I can see
@@ -87,10 +92,10 @@ Feature: API Keys scope filter
     Given a current project is in context
     And I can see other projects
     When I open the scope filter dropdown and open the "This Project" submenu
-    Then the submenu's first option is "This project · <current project name>"
+    Then the submenu's first option is "Project" with the current project's name in a badge
     And below it are a search box and every project I can see
     And the current project is listed first and marked "Current"
-    And picking "This project · <current project name>" sets the filter to follow my current project
+    And picking that option sets the filter to follow my current project
 
   @integration
   Scenario: The project search finds the current project
@@ -139,7 +144,7 @@ Feature: API Keys scope filter
     Given I have opened the "This Project" submenu
     When I pick another project from the list
     Then the filter is set to that specific project
-    And the filter control reads "Project: " followed by its name
+    And the filter control reads "Project" followed by its name in a badge
 
   # With no current project there is nothing for "This project" to follow, so
   # the submenu is named for what it holds and lists every visible project.
@@ -158,7 +163,7 @@ Feature: API Keys scope filter
     Given a current project is in context
     And it is the only project I can see
     When I open the scope filter dropdown
-    Then "This project · <current project name>" is a plain option that applies straight away, with no submenu
+    Then "Project" with the current project's name in a badge is a plain option that applies straight away, with no submenu
 
   # ============================================================================
   # More Scopes: the same search over the organization, teams and projects

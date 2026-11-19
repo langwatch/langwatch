@@ -433,14 +433,18 @@ describe("ScopeChipPicker summary line", () => {
     it("names the project, calling the scoped thing a configuration by default", () => {
       renderWith({ scope: { scopeType: "PROJECT", scopeId: "proj-1" } });
 
-      expect(screen.getByText("Only Checkout can use this configuration.")).toBeInTheDocument();
+      const helper = screen.getByTestId("scope-summary");
+      expect(helper).toHaveTextContent(/^Only Checkout can use this configuration\.$/);
+      expect(within(helper).getByTestId("scope-name-badge")).toHaveTextContent(/^Checkout$/);
     });
 
     /** @scenario The helper under the picker names the scope it binds to */
     it("names the scoped thing with the subject noun", () => {
       renderWith({ scope: { scopeType: "PROJECT", scopeId: "proj-1" }, subjectNoun: "connection" });
 
-      expect(screen.getByText("Only Checkout can use this connection.")).toBeInTheDocument();
+      expect(screen.getByTestId("scope-summary")).toHaveTextContent(
+        /^Only Checkout can use this connection\.$/,
+      );
     });
   });
 
@@ -449,9 +453,9 @@ describe("ScopeChipPicker summary line", () => {
     it("names the team every project inherits from", () => {
       renderWith({ scope: { scopeType: "TEAM", scopeId: "team-1" } });
 
-      expect(
-        screen.getByText("Every project in Platform inherits this configuration."),
-      ).toBeInTheDocument();
+      const helper = screen.getByTestId("scope-summary");
+      expect(helper).toHaveTextContent(/^Every project in Platform inherits this configuration\.$/);
+      expect(within(helper).getByTestId("scope-name-badge")).toHaveTextContent(/^Platform$/);
     });
   });
 
@@ -460,7 +464,10 @@ describe("ScopeChipPicker summary line", () => {
     it("keeps the plain wording", () => {
       renderWith({ scope: { scopeType: "PROJECT", scopeId: "proj-1" }, named: false });
 
-      expect(screen.getByText("Only this project can use this configuration.")).toBeInTheDocument();
+      expect(screen.getByTestId("scope-summary")).toHaveTextContent(
+        /^Only this project can use this configuration\.$/,
+      );
+      expect(screen.queryByTestId("scope-name-badge")).toBeNull();
     });
   });
 });
@@ -489,46 +496,62 @@ describe("ScopeChipPicker quick picks name the current scope", () => {
       />,
     );
 
+  /** The green name badge inside an element: the platform's own `Badge`, carrying the name. */
+  const badgeIn = (element: HTMLElement) => within(element).getByTestId("scope-name-badge");
+
   describe("given the current team and project are among those it was given", () => {
     /** @scenario The quick picks name the current team and project */
-    it("reads This team and This project followed by their names", () => {
+    it("reads Team and Project, each followed by its name in a green badge", () => {
       renderPicks({
         teams: [{ id: "team-1", name: "Platform" }],
         projects: [{ id: "proj-1", name: "Checkout", teamId: "team-1" }],
       });
 
-      expect(screen.getByTestId("quick-scope-team")).toHaveTextContent("This team · Platform");
-      expect(screen.getByTestId("quick-scope-project")).toHaveTextContent(
-        "This project · Checkout",
-      );
-      expect(screen.getByTestId("quick-scope-organization")).toHaveTextContent("Organization");
+      const team = screen.getByTestId("quick-scope-team");
+      const project = screen.getByTestId("quick-scope-project");
+      expect(team).toHaveTextContent(/^Team Platform$/);
+      expect(project).toHaveTextContent(/^Project Checkout$/);
+      expect(badgeIn(team)).toHaveTextContent(/^Platform$/);
+      expect(badgeIn(project)).toHaveTextContent(/^Checkout$/);
+      expect(badgeIn(project)).toHaveClass("chakra-badge");
+      expect(screen.getByTestId("quick-scope-organization")).toHaveTextContent(/^Organization$/);
+    });
+
+    /** @scenario The quick picks name the current team and project */
+    it("gives each pick an accessible name that reads the kind, then the name", () => {
+      renderPicks({
+        teams: [{ id: "team-1", name: "Platform" }],
+        projects: [{ id: "proj-1", name: "Checkout", teamId: "team-1" }],
+      });
+
+      expect(screen.getByRole("button", { name: "Team Platform" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Project Checkout" })).toBeInTheDocument();
     });
   });
 
   describe("given a current project whose name is long", () => {
     /** @scenario A long quick-pick name is truncated with the full label on hover */
-    it("truncates the label and carries the full label as its title", () => {
+    it("truncates the name inside the badge and carries the full name as its title", () => {
       const name = "Customer support evaluation harness for the enterprise tier";
       renderPicks({
         teams: [{ id: "team-1", name: "Platform" }],
         projects: [{ id: "proj-1", name, teamId: "team-1" }],
       });
 
-      const chip = screen.getByTestId("quick-scope-project");
-      expect(chip).toHaveAttribute("title", `This project · ${name}`);
-      expect(within(chip).getByText(`This project · ${name}`)).toHaveStyle({
-        textOverflow: "ellipsis",
-      });
+      const badge = badgeIn(screen.getByTestId("quick-scope-project"));
+      expect(badge).toHaveAttribute("title", name);
+      expect(within(badge).getByText(name)).toHaveStyle({ textOverflow: "ellipsis" });
     });
   });
 
   describe("given the current team and project are not among those it was given", () => {
     /** @scenario A quick pick whose name is unknown keeps its plain label */
-    it("keeps the plain This team and This project labels", () => {
+    it("keeps the plain This team and This project labels, with no badge", () => {
       renderPicks({ teams: [], projects: [] });
 
       expect(screen.getByTestId("quick-scope-team")).toHaveTextContent(/^This team$/);
       expect(screen.getByTestId("quick-scope-project")).toHaveTextContent(/^This project$/);
+      expect(screen.queryByTestId("scope-name-badge")).toBeNull();
     });
   });
 });

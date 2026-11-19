@@ -26,47 +26,55 @@ Feature: API Key Scope and Fine-Grained Permissions
   @integration
   Scenario: Scope defaults to current project via quick-pick pill
     When I open the create API key drawer
-    Then the "This project · <current project name>" pill is selected by default
+    Then the "Project" pill, with the current project's name in a badge, is selected by default
     And the key will be scoped to the current project context
 
   @integration
-  Scenario: Scope quick-picks show Organization, This team, This project, Multiple
+  Scenario: Scope quick-picks show Organization, Team, Project, Multiple
     When I open the create API key drawer
-    Then I see pill buttons: Organization, "This team · <current team name>", "This project · <current project name>", Multiple
+    Then I see pill buttons: Organization, "Team" with the current team's name in a badge, "Project" with the current project's name in a badge, Multiple
     And each pill has an icon: building for organization, users for team, folder for project
 
   # The shared scope picker names the current team and project, so a reader in
   # an organization with many of each can tell what a key will be bound to
-  # without opening Advanced (issue #9707).
-  @integration
+  # without opening Advanced (issue #9707). The name is the platform's green
+  # badge, the one the key list uses for "Active".
+  @integration @regression
   Scenario: The quick picks name the current team and project
     Given the current team is "Platform" and the current project is "Checkout"
     When the scope picker shows its quick picks
-    Then the team pill reads "This team · Platform"
-    And the project pill reads "This project · Checkout"
+    Then the team pill reads "Team" followed by "Platform" in a green badge
+    And the project pill reads "Project" followed by "Checkout" in a green badge
+    And a screen reader names the pills "Team Platform" and "Project Checkout"
 
-  @integration
+  @integration @regression
   Scenario: A long quick-pick name is truncated with the full label on hover
     Given the current project has a name too long for its pill
     When the scope picker shows its quick picks
-    Then the project pill truncates the name
-    And hovering the pill shows its full label
+    Then the name truncates inside its badge
+    And hovering the badge shows the full name
 
-  @integration
+  @integration @regression
   Scenario: A quick pick whose name is unknown keeps its plain label
     Given a current team and project are in context
     But neither is among the teams and projects the picker was given
     When the scope picker shows its quick picks
-    Then the pills read "This team" and "This project"
+    Then the pills read "This team" and "This project", with no badge
 
-  @integration
+  @integration @regression
   Scenario: The helper under the picker names the scope it binds to
     When the picked scope is the project "Checkout"
-    Then the helper reads "Only Checkout can use this configuration."
+    Then the helper reads "Only Checkout can use this configuration." with "Checkout" in a badge
     When the picked scope is the team "Platform"
-    Then the helper reads "Every project in Platform inherits this configuration."
+    Then the helper reads "Every project in Platform inherits this configuration." with "Platform" in a badge
 
-  @integration
+  @integration @regression
+  Scenario: The Advanced summary names the key's scope in a badge
+    When I open the create API key drawer in the project "Web App"
+    Then the closed Advanced section reads "Personal key with all permissions on Web App."
+    And "Web App" is in a badge
+
+  @integration @regression
   Scenario: The helper keeps its plain wording when the scope's name is unknown
     When the picked scope is a project the picker has no name for
     Then the helper reads "Only this project can use this configuration."
@@ -275,7 +283,7 @@ Feature: API Key Scope and Fine-Grained Permissions
   Scenario: Edit drawer pre-populates scope from existing binding
     Given I have an API key scoped to a team
     When I open the edit drawer
-    Then the "This team · <current team name>" pill is selected in the scope picker
+    Then the "Team" pill, with the team's name in a badge, is selected in the scope picker
 
   @integration @unimplemented
   Scenario: Edit drawer pre-populates fine-grained permissions from CustomRole

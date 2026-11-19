@@ -1,7 +1,7 @@
 /** @vitest-environment jsdom */
 // Read-side scope filter: one option list for every page, reachable by keyboard.
 import "@testing-library/jest-dom/vitest";
-import { cleanup, screen, waitFor } from "@testing-library/react";
+import { cleanup, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -41,12 +41,12 @@ describe("given the scope filter", () => {
 
       // One surface, one option list: the API Keys page and the model-providers
       // page pass the same three-field shape and therefore see the same menu.
-      expect(await screen.findByText("ACME")).toBeDefined();
-      expect(screen.getByText("Platform")).toBeDefined();
-      expect(screen.getByText("Web App")).toBeDefined();
+      expect(await screen.findByTestId("filter-scope-organization-acme")).toBeDefined();
+      expect(screen.getByTestId("filter-scope-team-platform")).toBeDefined();
+      expect(screen.getByTestId("filter-scope-project-web app")).toBeDefined();
     });
 
-    /** @scenario The This team and This project options name the team and project they follow */
+    /** @scenario The ambient team and project options name the team and project they follow */
     it("names the team and project the ambient options follow", async () => {
       const user = userEvent.setup();
       renderWithDesignSystem(
@@ -61,10 +61,30 @@ describe("given the scope filter", () => {
 
       await user.click(screen.getByTestId("scope-filter"));
 
-      expect(await screen.findByTestId("filter-this-team")).toHaveTextContent(
-        "This team · Platform",
+      const team = await screen.findByTestId("filter-this-team");
+      const project = screen.getByTestId("filter-this-project");
+      expect(team).toHaveTextContent(/^Team Platform$/);
+      expect(project).toHaveTextContent(/^Project Web App$/);
+      expect(within(team).getByTestId("scope-name-badge")).toHaveTextContent(/^Platform$/);
+      expect(within(project).getByTestId("scope-name-badge")).toHaveTextContent(/^Web App$/);
+      expect(screen.getByRole("menuitem", { name: "Team Platform" })).toBe(team);
+    });
+
+    /** @scenario The ambient team and project options name the team and project they follow */
+    it("names the followed team in the trigger once it is the filter", () => {
+      renderWithDesignSystem(
+        <ScopeFilter
+          value={{ kind: "team-current" }}
+          onChange={() => undefined}
+          available={AVAILABLE}
+          currentTeamId="team_1"
+          currentProjectId="project_1"
+        />,
       );
-      expect(screen.getByTestId("filter-this-project")).toHaveTextContent("This project · Web App");
+
+      const trigger = screen.getByTestId("scope-filter");
+      expect(trigger).toHaveTextContent(/^Team Platform$/);
+      expect(within(trigger).getByTestId("scope-name-badge")).toHaveTextContent(/^Platform$/);
     });
 
     /** @scenario An ambient option whose name is unknown keeps its plain label */
@@ -84,6 +104,7 @@ describe("given the scope filter", () => {
 
       expect(await screen.findByTestId("filter-this-team")).toHaveTextContent(/^This Team$/);
       expect(screen.getByTestId("filter-this-project")).toHaveTextContent(/^This Project$/);
+      expect(screen.queryByTestId("scope-name-badge")).toBeNull();
     });
 
     /** @scenario Scope filter dropdown is keyboard navigable */
@@ -161,7 +182,7 @@ describe("given the scope filter", () => {
       const { user, picked } = mount();
 
       const submenu = await openMenu({ user });
-      expect(submenu).toHaveTextContent("This project · Web App");
+      expect(submenu).toHaveTextContent(/^Project Web App$/);
       expect(screen.queryByTestId("filter-this-project")).not.toBeInTheDocument();
       await user.click(submenu);
       await screen.findByTestId("filter-project-search");
@@ -179,7 +200,7 @@ describe("given the scope filter", () => {
         "filter-project-option-project_2",
         "filter-project-option-project_3",
       ]);
-      expect(screen.getByTestId("filter-this-project")).toHaveTextContent("This project · Web App");
+      expect(screen.getByTestId("filter-this-project")).toHaveTextContent(/^Project Web App$/);
       expect(screen.getByTestId("filter-project-option-project_1")).toHaveTextContent(
         "Web AppCurrent",
       );
@@ -362,7 +383,9 @@ describe("given the scope filter", () => {
           currentProjectId="project_1"
         />,
       );
-      expect(screen.getByTestId("scope-filter")).toHaveTextContent("Project: Billing API");
+      const trigger = screen.getByTestId("scope-filter");
+      expect(trigger).toHaveTextContent(/^Project Billing API$/);
+      expect(within(trigger).getByTestId("scope-name-badge")).toHaveTextContent(/^Billing API$/);
     });
 
     /** @scenario Without a current project the submenu is named Projects */

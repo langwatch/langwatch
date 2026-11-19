@@ -5,7 +5,7 @@
  * Spec: specs/api-keys/scope-based-permissions.feature
  */
 
-import { cleanup, screen } from "@testing-library/react";
+import { cleanup, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { type ComponentProps, useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -127,13 +127,15 @@ function teamScopedKey(): EditKey {
 afterEach(() => cleanup());
 
 describe("given the create API key drawer opens in a project", () => {
-  /** @scenario Scope quick-picks show Organization, This team, This project, Multiple */
+  /** @scenario Scope quick-picks show Organization, Team, Project, Multiple */
   it("offers the four quick picks, naming the current team and project, each with an icon", async () => {
     await openCreate();
 
     expect(pick("organization")).toHaveTextContent("Organization");
-    expect(pick("team")).toHaveTextContent("This team · Platform");
-    expect(pick("project")).toHaveTextContent("This project · Web App");
+    expect(pick("team")).toHaveTextContent(/^Team Platform$/);
+    expect(pick("project")).toHaveTextContent(/^Project Web App$/);
+    expect(within(pick("team")).getByTestId("scope-name-badge")).toHaveTextContent(/^Platform$/);
+    expect(within(pick("project")).getByTestId("scope-name-badge")).toHaveTextContent(/^Web App$/);
     expect(pick("multiple")).toHaveTextContent("Multiple");
     for (const scope of ["organization", "team", "project"] as const) {
       expect(pick(scope).querySelector("svg")).not.toBeNull();
@@ -146,6 +148,18 @@ describe("given the create API key drawer opens in a project", () => {
 
     expect(pick("project")).toHaveAttribute("aria-pressed", "true");
     expect(pick("team")).toHaveAttribute("aria-pressed", "false");
+  });
+
+  /** @scenario The Advanced summary names the key's scope in a badge */
+  it("names the current project in a badge under the picker and in the Advanced summary", async () => {
+    await openCreate();
+
+    const helper = screen.getByTestId("scope-summary");
+    expect(helper).toHaveTextContent(/^Only Web App can use this configuration\.$/);
+    expect(within(helper).getByTestId("scope-name-badge")).toHaveTextContent(/^Web App$/);
+    const summary = screen.getByTestId("api-key-advanced-summary");
+    expect(summary).toHaveTextContent(/^Personal key with all permissions on Web App\.$/);
+    expect(within(summary).getByTestId("scope-name-badge")).toHaveTextContent(/^Web App$/);
   });
 });
 
@@ -173,7 +187,7 @@ describe("given the edit drawer opens on a team-scoped key", () => {
     await userEvent.setup().click(screen.getByRole("button", { name: "Edit" }));
     await screen.findByTestId("quick-scope-team");
 
-    expect(pick("team")).toHaveTextContent("This team · Platform");
+    expect(pick("team")).toHaveTextContent(/^Team Platform$/);
     expect(pick("team")).toHaveAttribute("aria-pressed", "true");
   });
 });

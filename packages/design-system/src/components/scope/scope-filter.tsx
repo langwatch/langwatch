@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { Box, Button, HStack, Text } from "../../primitives.ts";
 import { SearchInput } from "../forms/search-input.tsx";
 import { Menu } from "../overlays/menu.tsx";
+import { NamedScope } from "./scope-name-badge.tsx";
 
 // Read-side scope filter; read-only twin of picker; presentational only.
 
@@ -29,6 +30,9 @@ export type ScopeFilterValue =
       scopeId: string;
       name: string;
     };
+
+/** How an option or the trigger reads: "Team" then the name as a badge, or plain words alone. */
+type ScopeLabel = { kind: string; name?: string };
 
 /** Focuses More Scopes' search as it mounts; a stable ref, so later renders leave focus alone. */
 function focusWhenOpened(input: HTMLInputElement | null) {
@@ -60,10 +64,12 @@ export function ScopeFilter({
   const label = filterLabel({ filter: value, available, currentTeamId, currentProjectId });
   const currentTeam = available.teams.find((team) => team.id === currentTeamId);
   const currentProject = available.projects.find((project) => project.id === currentProjectId);
-  const thisTeamLabel = currentTeam ? `This team · ${currentTeam.name}` : "This Team";
-  const thisProjectLabel = currentProject
-    ? `This project · ${currentProject.name}`
-    : "This Project";
+  const thisTeamLabel = namedOr({ kind: "Team", name: currentTeam?.name, fallback: "This Team" });
+  const thisProjectLabel = namedOr({
+    kind: "Project",
+    name: currentProject?.name,
+    fallback: "This Project",
+  });
   const otherProjects = available.projects.filter((project) => project.id !== currentProjectId);
   const moreScopes = {
     organization:
@@ -88,8 +94,8 @@ export function ScopeFilter({
     >
       <Menu.Trigger asChild>
         <Button size="sm" variant="outline" data-testid="scope-filter">
-          <HStack gap={1}>
-            <Text>{label}</Text>
+          <HStack gap={1} minWidth={0}>
+            <ScopeLabelText label={label} badgeMaxWidth="10rem" />
             <ChevronDown size={14} />
           </HStack>
         </Button>
@@ -104,7 +110,7 @@ export function ScopeFilter({
             onClick={() => onChange({ kind: "team-current" })}
             data-testid="filter-this-team"
           >
-            <AmbientLabel label={thisTeamLabel} />
+            <ScopeLabelText label={thisTeamLabel} />
           </Menu.Item>
         )}
         {currentProjectId && otherProjects.length === 0 && (
@@ -113,7 +119,7 @@ export function ScopeFilter({
             onClick={() => onChange({ kind: "project-current" })}
             data-testid="filter-this-project"
           >
-            <AmbientLabel label={thisProjectLabel} />
+            <ScopeLabelText label={thisProjectLabel} />
           </Menu.Item>
         )}
         {otherProjects.length > 0 && (
@@ -232,13 +238,29 @@ function namesMatch({ name, query }: { name: string; query: string }): boolean {
   return name.toLowerCase().includes(query.trim().toLowerCase());
 }
 
-/** An ambient option's label, truncated in the menu with the whole label on hover. */
-function AmbientLabel({ label }: { label: string }) {
-  return (
-    <Text truncate maxWidth="280px" title={label}>
-      {label}
-    </Text>
-  );
+/** The kind and, when known, the name as a badge; or a plain label when no name is known. */
+function namedOr({
+  kind,
+  name,
+  fallback,
+}: {
+  kind: string;
+  name: string | undefined;
+  fallback: string;
+}): ScopeLabel {
+  return name ? { kind, name } : { kind: fallback };
+}
+
+/** A label as it reads: "Team [Platform]"; a long name truncates, whole on hover. */
+function ScopeLabelText({
+  label,
+  badgeMaxWidth = "14rem",
+}: {
+  label: ScopeLabel;
+  badgeMaxWidth?: string;
+}) {
+  if (!label.name) return <Text>{label.kind}</Text>;
+  return <NamedScope kind={label.kind} name={label.name} maxWidth={badgeMaxWidth} />;
 }
 
 /** Opens to the side: "This project", then every project (current first), narrowed by name. */
@@ -248,7 +270,7 @@ function ProjectSubmenu({
   projects,
   onChange,
 }: {
-  thisProjectLabel: string | null;
+  thisProjectLabel: ScopeLabel | null;
   currentProjectId: string | null;
   projects: AvailableScopes["projects"];
   onChange: (next: ScopeFilterValue) => void;
@@ -278,7 +300,7 @@ function ProjectSubmenu({
       }}
     >
       <Menu.TriggerItem value="projects" data-testid="filter-project-submenu">
-        <AmbientLabel label={thisProjectLabel ?? "Projects"} />
+        <ScopeLabelText label={thisProjectLabel ?? { kind: "Projects" }} />
       </Menu.TriggerItem>
       <Menu.Content
         minWidth="240px"
@@ -294,7 +316,7 @@ function ProjectSubmenu({
             onClick={() => onChange({ kind: "project-current" })}
             data-testid="filter-this-project"
           >
-            <AmbientLabel label={thisProjectLabel} />
+            <ScopeLabelText label={thisProjectLabel} />
           </Menu.Item>
         )}
         <Box paddingX={2} paddingY={1}>
@@ -419,17 +441,17 @@ function filterLabel({
   available: AvailableScopes;
   currentTeamId?: string | null;
   currentProjectId?: string | null;
-}): string {
-  if (filter.kind === "all") return "All you can see";
+}): ScopeLabel {
+  if (filter.kind === "all") return { kind: "All you can see" };
   if (filter.kind === "team-current") {
     const team = available.teams.find((candidate) => candidate.id === currentTeamId);
-    return team ? `Team: ${team.name}` : "This Team";
+    return namedOr({ kind: "Team", name: team?.name, fallback: "This Team" });
   }
   if (filter.kind === "project-current") {
     const project = available.projects.find((candidate) => candidate.id === currentProjectId);
-    return project ? `Project: ${project.name}` : "This Project";
+    return namedOr({ kind: "Project", name: project?.name, fallback: "This Project" });
   }
-  return `${scopeTypePrefix(filter.scopeType)}: ${filter.name}`;
+  return { kind: scopeTypePrefix(filter.scopeType), name: filter.name };
 }
 
 function scopeTypePrefix(scopeType: "ORGANIZATION" | "TEAM" | "PROJECT"): string {
