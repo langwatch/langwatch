@@ -8,8 +8,11 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  emptyPlanFold,
+  foldPlanFact,
   type NurturingPlanFact,
   planFactChangesCopy,
+  planFactOf,
 } from "../nurturing-organization-plan.rules.ts";
 
 const real = (occurredAt: number, plan = "LAUNCH"): NurturingPlanFact => ({
@@ -65,6 +68,60 @@ describe("planFactChangesCopy", () => {
     it("keeps the held fact on a tie between two of the same kind", () => {
       expect(changes(real(10), real(10, "GROWTH"))).toBe(false);
       expect(changes(catchUp(10), catchUp(10, "GROWTH"))).toBe(false);
+    });
+  });
+});
+
+describe("foldPlanFact", () => {
+  const fold = (facts: readonly [string, NurturingPlanFact][]) =>
+    facts.reduce(
+      (state, [eventId, fact]) => foldPlanFact(state, { eventId, fact }),
+      emptyPlanFold(),
+    );
+
+  describe("when the plan fold takes billing's facts", () => {
+    /** @scenario "The plan fold sends only the fact that won it" */
+    it("holds the winning fact and names its event as the winner", () => {
+      expect(fold([["event-1", real(10)]])).toEqual({
+        held: { outcome: "held", fact: real(10) },
+        winnerEventId: "event-1",
+        LastEventOccurredAt: 10,
+      });
+    });
+
+    /** @scenario "The plan fold sends only the fact that won it" */
+    it("leaves the state, its winner included, as it was for a losing fact", () => {
+      const won = fold([["event-1", real(20)]]);
+
+      expect(foldPlanFact(won, { eventId: "event-older", fact: real(10) })).toBe(won);
+      expect(foldPlanFact(won, { eventId: "event-tied", fact: catchUp(20) })).toBe(won);
+    });
+
+    /** @scenario "The plan copy keeps the newest fact, and a real fact wins a tie" */
+    it("ends on the same state whatever order the facts land in", () => {
+      const facts: [string, NurturingPlanFact][] = [
+        ["event-a", catchUp(10, "FREE")],
+        ["event-b", real(30, "GROWTH")],
+        ["event-c", catchUp(30, "FREE")],
+        ["event-d", real(20)],
+      ];
+
+      expect(fold(facts.toReversed())).toEqual(fold(facts));
+      expect(fold(facts)).toMatchObject({ winnerEventId: "event-b" });
+    });
+  });
+
+  describe("when billing's fact is read as a plan fact", () => {
+    /** @scenario "A subscription_changed fact stored before it carried a plan sends no plan" */
+    it("names no plan for a fact stored before billing carried one, and a real fact by default", () => {
+      expect(planFactOf({ occurredAt: 10 })).toEqual({
+        plan: null,
+        occurredAt: 10,
+        fromCatchUp: false,
+      });
+      expect(planFactOf({ plan: "LAUNCH", occurredAt: 10, fromCatchUp: true })).toEqual(
+        catchUp(10),
+      );
     });
   });
 });

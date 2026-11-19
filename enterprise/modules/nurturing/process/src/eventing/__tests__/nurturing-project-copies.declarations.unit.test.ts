@@ -64,6 +64,7 @@ describe("the five subscriber lanes the personal-project and traced-project maps
         tracedProjects: repositories.tracedProjects,
         lastTraces: repositories.milestones,
       },
+      plans: { store: repositories.plans, deliver: async () => undefined },
       sync: undefined,
     });
   };

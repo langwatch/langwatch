@@ -37,6 +37,7 @@ import {
   IDENTITY_MARKS_STEP,
   KEYS_STEP,
   nurturingReplayStepsOver,
+  PLANS_STEP,
   USER_MARKS_STEP,
 } from "./nurturing-replay-steps.test-helpers.ts";
 
@@ -91,6 +92,7 @@ describe("given the nurturing module installed on a worker", () => {
       IDENTITY_MARKS_STEP,
       KEYS_STEP,
       EVALUATION_DAYS_STEP,
+      PLANS_STEP,
       PLACEMENTS_STEP,
       ORGANIZATIONS_CREATED_STEP,
       ADMINS_STEP,
@@ -116,6 +118,7 @@ describe("given the nurturing module installed on a worker", () => {
       undefined,
       undefined,
       [USER_MARKS_STEP, IDENTITY_MARKS_STEP],
+      undefined,
       undefined,
       [PROJECT_CREATED_FACTS_STEP],
       undefined,

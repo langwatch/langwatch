@@ -1,11 +1,9 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import type { FoldStateRead, ProjectionStoreContext } from "@langwatch/eventing";
 
-import {
-  type NurturingPlanFact,
-  type NurturingPlanFoldState,
-  type NurturingPlanHeld,
-  planFactChangesCopy,
+import type {
+  NurturingPlanFact,
+  NurturingPlanFoldState,
 } from "../../rules/nurturing-organization-plan.rules.ts";
 import type { NurturingOrganizationPlanRepository } from "../nurturing-organization-plan.repository.ts";
 
@@ -16,10 +14,7 @@ type PlanRow = Readonly<{
   winnerEventId: string | null;
 }>;
 
-/**
- * The Postgres twin's semantics: a fact recorded lands only where it changes the copy; the fold's
- * store replaces the row.
- */
+/** The Postgres twin's semantics: the fold's store replaces the organization's row. */
 export class MemoryNurturingOrganizationPlanRepository implements NurturingOrganizationPlanRepository {
   static create(): MemoryNurturingOrganizationPlanRepository {
     return new MemoryNurturingOrganizationPlanRepository();
@@ -57,27 +52,6 @@ export class MemoryNurturingOrganizationPlanRepository implements NurturingOrgan
       fact: state.held.fact,
       appliedEventIds: [...(context.appliedEventIds ?? [])],
       winnerEventId: state.winnerEventId,
-    });
-  }
-
-  async findPlan({
-    organizationId,
-  }: Readonly<{ organizationId: string }>): Promise<NurturingPlanHeld> {
-    const row = this.#rows.get(organizationId);
-    return row ? { outcome: "held", fact: row.fact } : { outcome: "none" };
-  }
-
-  async recordPlan({
-    organizationId,
-    fact,
-  }: Readonly<{ organizationId: string; fact: NurturingPlanFact }>): Promise<void> {
-    const held = await this.findPlan({ organizationId });
-    if (!planFactChangesCopy({ held, incoming: fact })) return;
-    const known = this.#rows.get(organizationId);
-    this.#rows.set(organizationId, {
-      fact,
-      appliedEventIds: known?.appliedEventIds ?? [],
-      winnerEventId: known?.winnerEventId ?? null,
     });
   }
 }

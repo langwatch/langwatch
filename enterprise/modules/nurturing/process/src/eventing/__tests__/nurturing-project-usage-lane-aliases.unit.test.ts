@@ -6,6 +6,14 @@
  * Spec: enterprise/modules/nurturing/specs/project-usage.feature
  */
 import {
+  BILLING_LIFECYCLE_AGGREGATE_TYPE,
+  BILLING_LIFECYCLE_EVENT_VERSION,
+  BILLING_LIFECYCLE_PIPELINE_NAME,
+  SUBSCRIPTION_CHANGED_EVENT_TYPE,
+  subscriptionChangedEventDataSchema,
+} from "@langwatch/enterprise-billing-contract";
+import type { NurturingSignal } from "@langwatch/enterprise-nurturing-contract";
+import {
   EVALUATION_LIFECYCLE_AGGREGATE_TYPE,
   EVALUATION_LIFECYCLE_COMPLETED_EVENT_TYPE,
   EVALUATION_LIFECYCLE_EVENT_VERSION,
@@ -23,12 +31,16 @@ import { EventStoreMemory, testEventSchema } from "@langwatch/eventing/testing";
 import { describe, expect, it, vi } from "vitest";
 
 import { MemoryNurturingEvaluationDayRepository } from "../../repositories/memory/memory.nurturing-evaluation-day.repository.ts";
+import { MemoryNurturingOrganizationPlanRepository } from "../../repositories/memory/memory.nurturing-organization-plan.repository.ts";
 import { MemoryNurturingRepositories } from "../../repositories/memory/memory.nurturing.repositories.ts";
 import {
   buildNurturingProjectUsagePipeline,
   NURTURING_EVALUATION_ACTIVE_DAY_LANE_ALIAS,
   NURTURING_PROJECT_USAGE_PIPELINE_NAME,
+  NURTURING_SUBSCRIPTION_CHANGED_LANE_ALIAS,
   nurturingEvaluationDaysMap,
+  nurturingOrganizationPlanFold,
+  nurturingPlanSyncSubscriber,
 } from "../nurturing-project-usage.pipeline.ts";
 
 const NOON = Date.UTC(2026, 10, 20, 12);
@@ -53,10 +65,43 @@ function evaluated(projectId: string): Event {
   };
 }
 
-/** A worker of this release with evaluation's pipeline as a stand-in; the test registers the host. */
+/** Billing's subscription fact for org-1, as its log and a queued job carry it. */
+function subscriptionChanged(): Event {
+  return {
+    id: "billing-1",
+    aggregateId: "org-1",
+    aggregateType: BILLING_LIFECYCLE_AGGREGATE_TYPE,
+    tenantId: createTenantId("org-1"),
+    createdAt: NOON,
+    occurredAt: NOON,
+    type: SUBSCRIPTION_CHANGED_EVENT_TYPE,
+    version: BILLING_LIFECYCLE_EVENT_VERSION,
+    idempotencyKey: "billing-1",
+    data: {
+      tenantId: "org-1",
+      occurredAt: NOON,
+      organizationId: "org-1",
+      memberUserIds: ["user-1"],
+      hasSubscription: true,
+      plan: "GROWTH",
+    },
+  };
+}
+
+/** A worker of this release with evaluation's and billing's pipelines as stand-ins. */
 function worker() {
   const eventStore = EventStoreMemory.createForTesting();
   const eventSourcing = new EventSourcing({ eventStore });
+  eventSourcing.register(
+    definePipeline({
+      name: BILLING_LIFECYCLE_PIPELINE_NAME,
+      aggregate: defineAggregate({ type: BILLING_LIFECYCLE_AGGREGATE_TYPE }),
+    })
+      .withEvents([
+        testEventSchema(SUBSCRIPTION_CHANGED_EVENT_TYPE, subscriptionChangedEventDataSchema),
+      ])
+      .build(),
+  );
   eventSourcing.register(
     definePipeline({
       name: EVALUATION_LIFECYCLE_PIPELINE_NAME,
@@ -116,10 +161,12 @@ describe("the usage host's lane aliases", () => {
         tracedProjects: repositories.tracedProjects,
         lastTraces: repositories.milestones,
       },
+      plans: { store: repositories.plans, deliver: async () => undefined },
       sync: undefined,
     });
 
     expect(pipeline.laneAliases).toContainEqual(NURTURING_EVALUATION_ACTIVE_DAY_LANE_ALIAS);
+    expect(pipeline.laneAliases).toContainEqual(NURTURING_SUBSCRIPTION_CHANGED_LANE_ALIAS);
     expect(pipeline.laneAliases?.some((alias) => "tombstone" in alias)).toBe(false);
   });
 
@@ -150,6 +197,57 @@ describe("the usage host's lane aliases", () => {
         ]),
       );
       await eventSourcing.close();
+    });
+  });
+
+  describe("given a job the previous release queued under the subscriptionChanged lane", () => {
+    /** @scenario "A subscription_changed job the previous release queued still sends its plan" */
+    it("folds it into the plan copy and sends it once, as the fact that won", async () => {
+      const plans = MemoryNurturingOrganizationPlanRepository.create();
+      const delivered: NurturingSignal[] = [];
+      const { eventStore, eventSourcing } = worker();
+      eventSourcing.register(
+        usageHost()
+          .withPeerFoldProjection(nurturingOrganizationPlanFold(plans), [
+            nurturingPlanSyncSubscriber({
+              store: plans,
+              deliver: async ({ signal }) => void delivered.push(signal),
+            }),
+          ])
+          .withLaneAliases([NURTURING_SUBSCRIPTION_CHANGED_LANE_ALIAS])
+          .build(),
+      );
+      eventSourcing.startConsumers();
+      const fact = subscriptionChanged();
+      await eventStore.seed({ events: [fact] });
+
+      await queuedByPreviousRelease({
+        eventSourcing,
+        key: NURTURING_SUBSCRIPTION_CHANGED_LANE_ALIAS.from,
+        event: fact,
+      });
+
+      await vi.waitFor(() =>
+        expect(delivered).toEqual([
+          expect.objectContaining({
+            kind: "subscription_changed",
+            organizationId: "org-1",
+            plan: "GROWTH",
+          }),
+        ]),
+      );
+      await expect(
+        plans.get("org-1", { aggregateId: "org-1", tenantId: createTenantId("org-1") }),
+      ).resolves.toMatchObject({ kind: "folded", state: { winnerEventId: fact.id } });
+      await eventSourcing.close();
+    });
+
+    /** @scenario "A subscription_changed job the previous release queued still sends its plan" */
+    it("routes the former key to the plan fold, never to a tombstone", () => {
+      expect(NURTURING_SUBSCRIPTION_CHANGED_LANE_ALIAS).toEqual({
+        from: "global:subscriber:nurturing.subscriptionChanged",
+        to: { jobType: "projection", lane: "organizationPlans" },
+      });
     });
   });
 });

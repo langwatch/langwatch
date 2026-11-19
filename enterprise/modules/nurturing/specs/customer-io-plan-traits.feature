@@ -2,7 +2,9 @@ Feature: Customer.io knows each team's real plan
   Lifecycle emails branch on plan, so Customer.io holds the plan billing resolved for each
   team, on its members and on its company. Billing's subscription_changed fact carries the
   plan; nurturing never reads billing (ADR-001). A renewal or a seat change records no fact.
-  Nurturing folds each fact into its own plan copy and tells Customer.io only a fact that changes it.
+  Nurturing folds each fact into its own plan copy, a peer fold over billing's facts keyed by the
+  organization, and tells Customer.io, on a fact's live delivery, only the fact that won the copy.
+  A deploy step fills the copy from billing's log and sends nothing: a replay runs no subscriber.
 
   Run the resync once the deploy's nurturing:replay-organization-members step is done, which fills
   the member copy from organization's member facts. If the resync runs first, it identifies no
@@ -157,6 +159,28 @@ Feature: Customer.io knows each team's real plan
     When an older catch-up fact, a catch-up with the same stamp and a newer catch-up are folded in turn
     Then the older fact and the tied catch-up leave the copy unchanged, so they send nothing
     And the newer catch-up replaces it
+
+  @unit
+  Scenario: The plan fold sends only the fact that won it
+    Given billing's facts for an organization delivered live, a newer one after an older one
+    When each is folded into nurturing's plan copy
+    Then each fact that wins the copy sends once, and a fact that loses it mints no send
+    And the winning fact delivered again sends nothing more, as its send is claimed
+
+  @unit
+  Scenario: A refused plan send retries its own job
+    Given the plan fold committed a winning fact, and Customer.io refuses its send
+    When the send's job is retried
+    Then the retry sends the plan
+    But a retry after a newer fact won the copy sends nothing
+
+  @unit
+  Scenario: The deploy replay fills the plan copy as live delivery would, and sends nothing
+    Given billing's log holds subscription facts from before the plan fold existed
+    When the nurturing:replay-organization-plans step runs, and runs again
+    Then the plan copy equals the copy live delivery of the same facts builds, its winner included
+    And no Customer.io or PostHog call is made, though the winning fact would send live
+    And a newer live fact afterwards sends exactly once
 
   @integration
   Scenario: The plan fold's row keeps the ids it folded and the fact that won

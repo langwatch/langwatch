@@ -145,6 +145,13 @@ Feature: Per-email usage reaches Customer.io from nurturing's own project rows
     Then the evaluation row is not among them, and it is left unchanged
 
   @unit
+  Scenario: A subscription_changed job the previous release queued still sends its plan
+    Given the previous release queued a job under the retired subscriptionChanged lane
+    When a worker of this release takes it
+    Then the plan fold folds it and its send tells Customer.io the plan once
+    And the former lane is routed to the plan fold, never tombstoned
+
+  @unit
   Scenario: A job queued under a retired copy lane reaches its successor
     Given the previous release queued a job under the evaluation-day subscriber's lane
     When a worker of this release takes it

@@ -18,7 +18,6 @@ import {
   ownerFact,
 } from "../../eventing/__tests__/nurturing-organization-copies.test-helpers.ts";
 import { MemoryNurturingOrganizationMemberRepository } from "../../repositories/memory/memory.nurturing-organization-member.repository.ts";
-import { MemoryNurturingOrganizationPlanRepository } from "../../repositories/memory/memory.nurturing-organization-plan.repository.ts";
 import { MemoryNurturingRepositories } from "../../repositories/memory/memory.nurturing.repositories.ts";
 import { NurturingPlanSyncService } from "../nurturing-plan-sync.service.ts";
 
@@ -33,19 +32,15 @@ const change: NurturingSignalOf<"subscription_changed"> = {
   plan: "LAUNCH",
 };
 
-function planSyncOver(
-  members = MemoryNurturingOrganizationMemberRepository.create(),
-  plans = MemoryNurturingOrganizationPlanRepository.create(),
-) {
+function planSyncOver(members = MemoryNurturingOrganizationMemberRepository.create()) {
   const sent: CioBatchCall[][] = [];
   const record = async (calls: CioBatchCall[]) => void sent.push(calls);
   const planSync = NurturingPlanSyncService.create({
     customerIo: { batchOrThrow: record },
     admins: { adminOf: async () => ({ kind: "admin", userId: "admin-1" }) },
     members,
-    plans,
   });
-  return { planSync, sent, plans };
+  return { planSync, sent };
 }
 
 describe("NurturingPlanSyncService", () => {
@@ -70,8 +65,7 @@ describe("NurturingPlanSyncService", () => {
   });
 
   describe("when Customer.io refuses a live change", () => {
-    it("rejects without recording the plan copy, and sends the change on a retry", async () => {
-      const plans = MemoryNurturingOrganizationPlanRepository.create();
+    it("rejects, and sends the change on a retry", async () => {
       const sent: CioBatchCall[][] = [];
       let refusing = true;
       const send = async (calls: CioBatchCall[]) => {
@@ -82,72 +76,24 @@ describe("NurturingPlanSyncService", () => {
         customerIo: { batchOrThrow: send },
         admins: { adminOf: async () => ({ kind: "admin", userId: "admin-1" }) },
         members: MemoryNurturingOrganizationMemberRepository.create(),
-        plans,
       });
 
       await expect(planSync.planChanged(change)).rejects.toThrow("refused");
 
-      await expect(plans.findPlan({ organizationId: "org-1" })).resolves.toEqual({
-        outcome: "none",
-      });
       refusing = false;
       await planSync.planChanged(change);
       expect(sent).toHaveLength(2);
-      await expect(plans.findPlan({ organizationId: "org-1" })).resolves.toMatchObject({
-        fact: { plan: "LAUNCH" },
-      });
     });
   });
 
-  describe("when the plan copy already holds a newer real fact", () => {
-    it("sends nothing for an older live fact and keeps the newer one", async () => {
-      const { planSync, sent, plans } = planSyncOver();
-      const newer = { ...change, occurredAt: change.occurredAt + 1, plan: "GROWTH" };
-      await planSync.planChanged(newer);
-      sent.length = 0;
-
-      await planSync.planChanged(change);
-
-      expect(sent).toEqual([]);
-      await expect(plans.findPlan({ organizationId: "org-1" })).resolves.toMatchObject({
-        fact: { plan: "GROWTH" },
-      });
-    });
-
-    it("sends nothing for a catch-up fact with the same stamp", async () => {
+  describe("when the plan fold hands over an organization with no active member", () => {
+    it("sends nothing, as nobody is there to tell", async () => {
       const { planSync, sent } = planSyncOver();
-      await planSync.planChanged(change);
-      sent.length = 0;
 
-      await planSync.planCaughtUp({ ...change, fromCatchUp: true });
+      await planSync.planChanged({ ...change, memberUserIds: [] });
+      await planSync.planCaughtUp({ ...change, memberUserIds: [], fromCatchUp: true });
 
       expect(sent).toEqual([]);
-    });
-  });
-
-  describe("when the resync's newer catch-up fact meets an older real one", () => {
-    it("sends the catch-up's plan and replaces the copy, so the resync corrects a wrong plan", async () => {
-      const members = MemoryNurturingOrganizationMemberRepository.create();
-      for (const userId of change.memberUserIds) {
-        await members.recordMembershipChange({
-          organizationId: "org-1",
-          userId,
-          change: "joined",
-          at: 1_000,
-        });
-      }
-      const { planSync, sent, plans } = planSyncOver(members);
-      await planSync.planChanged({ ...change, plan: "FREE" });
-      sent.length = 0;
-
-      const later = { ...change, occurredAt: change.occurredAt + 1, fromCatchUp: true };
-      await planSync.planCaughtUp(later);
-
-      const planOf = (call: CioBatchCall) => ("traits" in call ? call.traits?.plan : undefined);
-      expect(sent.flat().map(planOf)).toEqual(["launch", "launch", "launch"]);
-      await expect(plans.findPlan({ organizationId: "org-1" })).resolves.toMatchObject({
-        fact: { plan: "LAUNCH", fromCatchUp: true },
-      });
     });
   });
 

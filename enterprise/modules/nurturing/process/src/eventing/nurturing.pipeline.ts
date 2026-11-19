@@ -17,8 +17,6 @@ import {
 import {
   CHECKOUT_COMPLETED_EVENT_TYPE,
   checkoutCompletedEventDataSchema,
-  SUBSCRIPTION_CHANGED_EVENT_TYPE,
-  subscriptionChangedEventDataSchema,
   SUBSCRIPTION_STARTED_EVENT_TYPE,
   subscriptionStartedEventDataSchema,
 } from "@langwatch/enterprise-billing-contract";
@@ -43,7 +41,6 @@ import {
   defineAggregate,
   defineEventingModule,
   definePipeline,
-  type Event,
   type EventingSetup,
   type LaneAlias,
   type StaticPipelineDefinition,
@@ -147,7 +144,6 @@ import {
   sessionStartedSignal,
   signedUpSignal,
   ssoAutoAddedSignal,
-  subscriptionChangedSignal,
   subscriptionStartedSignal,
   traceReceivedSignal,
   userCreatedSignal,
@@ -226,12 +222,6 @@ export const MAIN_NURTURING_LANE_ALIASES: readonly LaneAlias[] = [
       "trace's projectMetadata job, queued beside it, records the first-trace and trace-received facts nurturing sends",
   },
 ];
-
-/** The queue group of a subscription change: its organization, whose one plan copy its jobs fold. */
-export function subscriptionOrganizationGroupOf(event: Event): string {
-  const { data } = event as Event<{ organizationId: string }>;
-  return `subscriptionChanged:${data.organizationId}`;
-}
 
 export type NurturingPipeline = StaticPipelineDefinition<
   NurturingSignalRecordedEvent,
@@ -367,16 +357,6 @@ export function buildNurturingPipeline(deps: {
             }),
         }),
       )
-      .withPeerSubscriber("subscriptionChanged", {
-        eventType: SUBSCRIPTION_CHANGED_EVENT_TYPE,
-        data: subscriptionChangedEventDataSchema,
-        // One job per organization at a time: its plan copy is a read-then-write fold.
-        options: { groupKeyFn: subscriptionOrganizationGroupOf },
-        handle: (data, { aggregateId }) => {
-          const signal = subscriptionChangedSignal({ data, aggregateId });
-          return deliverSignal(signal);
-        },
-      })
       .withPeerSubscriber("subscriptionStarted", {
         eventType: SUBSCRIPTION_STARTED_EVENT_TYPE,
         data: subscriptionStartedEventDataSchema,

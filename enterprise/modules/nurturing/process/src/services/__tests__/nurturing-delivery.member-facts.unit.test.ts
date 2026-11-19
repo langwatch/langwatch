@@ -14,7 +14,6 @@ import { HttpCustomerIoChannel } from "../../channels/http/http.customer-io.chan
 import { MemoryNurturingErasedUserRepository } from "../../repositories/memory/memory.nurturing-erased-user.repository.ts";
 import { MemoryNurturingMilestonesRepository } from "../../repositories/memory/memory.nurturing-milestones.repository.ts";
 import { MemoryNurturingOrganizationMemberRepository } from "../../repositories/memory/memory.nurturing-organization-member.repository.ts";
-import { MemoryNurturingOrganizationPlanRepository } from "../../repositories/memory/memory.nurturing-organization-plan.repository.ts";
 import { MemoryNurturingProjectDirectoryRepository } from "../../repositories/memory/memory.nurturing-project-directory.repository.ts";
 import type { NurturingClaimRepository } from "../../repositories/nurturing-claim.repository.ts";
 import { NurturingDeliveryService } from "../nurturing-delivery.service.ts";
@@ -136,7 +135,6 @@ async function organizationWithMembers({
     claims,
     memberFacts,
     members: MemoryNurturingOrganizationMemberRepository.create(),
-    plans: MemoryNurturingOrganizationPlanRepository.create(),
     customerIo: cio.service,
     posthog: undefined,
     users: createApiFixture<UserApi>({

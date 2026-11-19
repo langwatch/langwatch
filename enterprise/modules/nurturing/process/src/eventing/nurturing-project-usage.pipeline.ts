@@ -15,6 +15,11 @@
  */
 import { SSO_AUTO_ADDED_EVENT_TYPE, ssoAutoAddedEventDataSchema } from "@langwatch/auth-contract";
 import {
+  SUBSCRIPTION_CHANGED_EVENT_TYPE,
+  subscriptionChangedEventDataSchema,
+} from "@langwatch/enterprise-billing-contract";
+import type { NurturingSignal } from "@langwatch/enterprise-nurturing-contract";
+import {
   EVALUATION_LIFECYCLE_COMPLETED_EVENT_TYPE,
   evaluationLifecycleCompletedEventDataSchema,
 } from "@langwatch/evaluation-contract";
@@ -125,6 +130,7 @@ import type {
 } from "../repositories/nurturing-milestones.repository.ts";
 import type { NurturingOrganizationCreatedRepository } from "../repositories/nurturing-organization-created.repository.ts";
 import type { NurturingOrganizationMemberRepository } from "../repositories/nurturing-organization-member.repository.ts";
+import type { NurturingOrganizationPlanRepository } from "../repositories/nurturing-organization-plan.repository.ts";
 import type {
   NurturingPersonalProjectRepository,
   NurturingPersonalProjectRow,
@@ -142,6 +148,13 @@ import type {
 import type { NurturingRepositories } from "../repositories/nurturing.repositories.ts";
 import type { NurturingMembershipChange } from "../rules/nurturing-organization-member.rules.ts";
 import {
+  emptyPlanFold,
+  foldPlanFact,
+  type NurturingPlanFoldState,
+  planFactOf,
+} from "../rules/nurturing-organization-plan.rules.ts";
+import { subscriptionChangedSignal } from "../rules/nurturing-owner-signals.rules.ts";
+import {
   emptyProjectUsage,
   foldProjectUsage,
   type NurturingProjectUsageFact,
@@ -153,6 +166,7 @@ import {
   type NurturingVirtualKeyFact,
   virtualKeyFactOf,
 } from "../rules/nurturing-virtual-key.rules.ts";
+import { nurturingSignalKey } from "./nurturing-signal.commands.ts";
 import { NURTURING_PIPELINE_NAME } from "./nurturing-signal.events.ts";
 
 /** Hosts nurturing's peer folds and subscribers over the owners' facts; no event of its own. */
@@ -519,6 +533,7 @@ function nurturingProjectUsageHost({
   store,
   evaluationDays,
   copies,
+  plans,
   sync,
   logger = createLogger("langwatch:nurturing:project-facts"),
 }: Readonly<{
@@ -526,6 +541,7 @@ function nurturingProjectUsageHost({
   /** Read only by the usage sync, which prunes it too. */
   evaluationDays: NurturingEvaluationDayRepository;
   copies: NurturingUsageCopies;
+  plans: NurturingPlanCopy;
   sync: NurturingUsageSync | undefined;
   /** Where a traced fact naming no organization is logged. */
   logger?: ProjectFactsLogger;
@@ -564,6 +580,10 @@ function nurturingProjectUsageHost({
     .withPeerMapProjection(
       nurturingEvaluationDaysMap(sync ? evaluationDays : KEEP_NO_EVALUATION_DAYS),
     )
+    // With or without a channel: a catch-up fact with no channel must fail its job, not vanish.
+    .withPeerFoldProjection(nurturingOrganizationPlanFold(plans.store), [
+      nurturingPlanSyncSubscriber(plans),
+    ])
     .withLaneAliases([
       ...ORGANIZATION_COPY_LANE_ALIASES,
       ...PERSONAL_AND_TRACED_PROJECT_LANE_ALIASES,
@@ -1236,9 +1256,90 @@ export const NURTURING_EVALUATION_ACTIVE_DAY_LANE_ALIAS: RoutedLaneAlias = {
   to: { jobType: "handler", lane: NURTURING_EVALUATION_DAYS_PROJECTION_NAME },
 };
 
+/** Lane name under `<host pipeline>.`, which a withMigrations step in nurturing.module.ts names. */
+export const NURTURING_ORGANIZATION_PLANS_PROJECTION_NAME = "organizationPlans" as const;
+
+const PLAN_EVENTS = [
+  { type: SUBSCRIPTION_CHANGED_EVENT_TYPE, data: subscriptionChangedEventDataSchema },
+] as const;
+
+/** Nurturing's plan copy, and the send of a fact that won it. */
+export type NurturingPlanCopy = Readonly<{
+  store: NurturingOrganizationPlanRepository;
+  /**
+   * Tells Customer.io the plan: a live fact is claimed, a catch-up with no channel rejects, and a
+   * refused request rejects, so the job retries.
+   */
+  deliver: (input: Readonly<{ key: string; signal: NurturingSignal }>) => Promise<void>;
+}>;
+
+/**
+ * Nurturing's plan copy, folded from billing's subscription_changed facts (§9), one row per
+ * organization: billing keys the facts by organization, so the fold's aggregate is one and a
+ * replay rebuilds each row from its own log. The newest fact wins and a real fact wins a tie
+ * (`planFactChangesCopy`); the winner's event id is kept beside it. Folding commutes, so a late
+ * fact is folded as it comes rather than re-folding the organization's log.
+ */
+export function nurturingOrganizationPlanFold(
+  store: NurturingOrganizationPlanRepository,
+): PeerFoldProjectionDeclaration<NurturingPlanFoldState, typeof PLAN_EVENTS> {
+  return {
+    events: PLAN_EVENTS,
+    fold: {
+      name: NURTURING_ORGANIZATION_PLANS_PROJECTION_NAME,
+      version: "2026-11-19",
+      eventTypes: [SUBSCRIPTION_CHANGED_EVENT_TYPE],
+      init: emptyPlanFold,
+      apply: (state, event) =>
+        foldPlanFact(state, { eventId: event.id, fact: planFactOf(event.data) }),
+      store,
+      LastEventOccurredAtKey: "LastEventOccurredAt",
+      options: { refoldOnOutOfOrder: false },
+    },
+  };
+}
+
+/**
+ * The plan fold's send: only the fact that won the fold tells Customer.io, so an older, tied or
+ * redelivered losing fact mints no job, and a replay, which runs no subscriber, sends nothing. The
+ * fold commits first; a refused send fails this job alone, and its retry sends again unless a
+ * newer fact has won the copy since.
+ */
+export function nurturingPlanSyncSubscriber({
+  store,
+  deliver,
+}: NurturingPlanCopy): PeerFoldSubscriberSpec<NurturingPlanFoldState> {
+  return {
+    name: "planSync",
+    when: (event, { state }) => state.winnerEventId === event.id,
+    handler: async (event) => {
+      const organizationId = String(event.aggregateId);
+      // The job carries the state its fold committed; a retry reads the copy as it is now.
+      const current = await store.get(organizationId, {
+        aggregateId: organizationId,
+        tenantId: event.tenantId,
+      });
+      if (current.kind !== "folded" || current.state.winnerEventId !== event.id) return;
+      const data = subscriptionChangedEventDataSchema.parse(event.data);
+      const signal = subscriptionChangedSignal({ data, aggregateId: organizationId });
+      await deliver({ key: nurturingSignalKey(signal), signal });
+    },
+  };
+}
+
+/**
+ * The retired subscriptionChanged subscriber's lane: jobs the previous release queued under it
+ * reach the plan fold, whose subscriber still sends the fact that wins.
+ */
+export const NURTURING_SUBSCRIPTION_CHANGED_LANE_ALIAS: RoutedLaneAlias = {
+  from: `global:subscriber:${NURTURING_PIPELINE_NAME}.subscriptionChanged`,
+  to: { jobType: "projection", lane: NURTURING_ORGANIZATION_PLANS_PROJECTION_NAME },
+};
+
 /** The host's retired lanes, each taken by its successor while an older release may hold jobs. */
 export const NURTURING_PROJECT_USAGE_LANE_ALIASES: readonly LaneAlias[] = [
   NURTURING_EVALUATION_ACTIVE_DAY_LANE_ALIAS,
+  NURTURING_SUBSCRIPTION_CHANGED_LANE_ALIAS,
 ];
 
 /** The host pipeline as a TYPE, derived from the builder above. */
@@ -1269,6 +1370,7 @@ export const nurturingProjectUsageEventing = defineEventingModule({
         tracedProjects: repositories.tracedProjects,
         lastTraces: repositories.milestones,
       },
+      plans: { store: repositories.plans, deliver: (input) => app.deliverPlan(input) },
       sync: app.syncsOrganizationUsage()
         ? {
             countTraces: (input) => app.countTraces(input),

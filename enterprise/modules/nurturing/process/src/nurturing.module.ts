@@ -14,6 +14,7 @@ import {
   NURTURING_ORGANIZATION_ADMINS_PROJECTION_NAME,
   NURTURING_ORGANIZATION_CREATIONS_PROJECTION_NAME,
   NURTURING_ORGANIZATION_MEMBERS_PROJECTION_NAME,
+  NURTURING_ORGANIZATION_PLANS_PROJECTION_NAME,
   NURTURING_PERSONAL_OWNERS_OF_ORGANIZATION_PROJECTION_NAME,
   NURTURING_PERSONAL_OWNERS_OF_PROJECT_PROJECTION_NAME,
   NURTURING_PROJECT_PLACEMENTS_PROJECTION_NAME,
@@ -81,6 +82,15 @@ export const nurturingProcessModule: PublishedProcessModule<
       description: "Fills nurturing's evaluation days from evaluation's log since 2026-10-19.",
       lane: `${NURTURING_PROJECT_USAGE_PIPELINE_NAME}.${NURTURING_EVALUATION_DAYS_PROJECTION_NAME}`,
       since: NURTURING_EVALUATION_DAYS_REPLAY_SINCE,
+      needsOldWritersGone: true,
+      trailingPass: true,
+      replayer,
+    }),
+    // A replay runs no subscriber, so filling the plan copy tells Customer.io nothing.
+    defineProjectionReplayStep({
+      id: "nurturing:replay-organization-plans",
+      description: "Fills nurturing's plan copy from billing's subscription log; sends nothing.",
+      lane: `${NURTURING_PROJECT_USAGE_PIPELINE_NAME}.${NURTURING_ORGANIZATION_PLANS_PROJECTION_NAME}`,
       needsOldWritersGone: true,
       trailingPass: true,
       replayer,

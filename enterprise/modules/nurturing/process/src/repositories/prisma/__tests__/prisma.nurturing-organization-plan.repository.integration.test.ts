@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * @vitest-environment node
- * Nurturing's plan copy through the tenancy guards: the conditional write is the fold rule in SQL,
- * and the plan fold's store keeps the ids it folded and the fact that won, as the memory twin does.
+ * Nurturing's plan copy through the tenancy guards: the plan fold's store keeps the ids it folded
+ * and the fact that won, as the memory twin does.
  * Spec: enterprise/modules/nurturing/specs/customer-io-plan-traits.feature
  */
 import { randomUUID } from "node:crypto";
@@ -24,8 +24,6 @@ import { PrismaNurturingOrganizationPlanRepository } from "../prisma.nurturing-o
 
 const databaseUrl = process.env.LANGWATCH_TEST_DATABASE_URL;
 const namespace = `test-nurturing-plan-${randomUUID()}`;
-const realFirst = `${namespace}-real`;
-const catchUpFirst = `${namespace}-catch-up`;
 const folded = `${namespace}-folded`;
 const neverFolded = `${namespace}-never-folded`;
 
@@ -62,48 +60,10 @@ describe.skipIf(!databaseUrl)("given nurturing's plan copy", () => {
 
   afterAll(async () => {
     if (!connection) return;
-    for (const organizationId of [realFirst, catchUpFirst, folded]) {
-      await connection.client.nurturingOrganizationPlan.deleteMany({ where: { organizationId } });
-    }
+    await connection.client.nurturingOrganizationPlan.deleteMany({
+      where: { organizationId: folded },
+    });
     await connection.closeOnce();
-  });
-
-  it("keeps the newest fact: an older or tied catch-up loses, a newer catch-up wins", async () => {
-    const record = (plan: string, occurredAt: number, fromCatchUp: boolean) =>
-      plans.recordPlan({ organizationId: realFirst, fact: { plan, occurredAt, fromCatchUp } });
-    const held = () => plans.findPlan({ organizationId: realFirst });
-
-    await record("LAUNCH", 2_000, false);
-    await record("FREE", 1_000, false);
-    await record("FREE", 2_000, true);
-
-    await expect(held()).resolves.toEqual({
-      outcome: "held",
-      fact: { plan: "LAUNCH", occurredAt: 2_000, fromCatchUp: false },
-    });
-
-    await record("GROWTH", 3_000, true);
-
-    await expect(held()).resolves.toEqual({
-      outcome: "held",
-      fact: { plan: "GROWTH", occurredAt: 3_000, fromCatchUp: true },
-    });
-  });
-
-  it("gives a tie to a real fact over a held catch-up", async () => {
-    await plans.recordPlan({
-      organizationId: catchUpFirst,
-      fact: { plan: "FREE", occurredAt: 1_000, fromCatchUp: true },
-    });
-    await plans.recordPlan({
-      organizationId: catchUpFirst,
-      fact: { plan: "LAUNCH", occurredAt: 1_000, fromCatchUp: false },
-    });
-
-    await expect(plans.findPlan({ organizationId: catchUpFirst })).resolves.toEqual({
-      outcome: "held",
-      fact: { plan: "LAUNCH", occurredAt: 1_000, fromCatchUp: false },
-    });
   });
 
   describe("when the plan fold stores an organization's state, then a losing fact's delivery", () => {
@@ -124,10 +84,6 @@ describe.skipIf(!databaseUrl)("given nurturing's plan copy", () => {
       expect(read).toEqual({
         state: foldState("LAUNCH", 2_000, "event-won"),
         appliedEventIds: ["event-old"],
-      });
-      await expect(plans.findPlan({ organizationId: folded })).resolves.toEqual({
-        outcome: "held",
-        fact: { plan: "LAUNCH", occurredAt: 2_000, fromCatchUp: false },
       });
     });
   });

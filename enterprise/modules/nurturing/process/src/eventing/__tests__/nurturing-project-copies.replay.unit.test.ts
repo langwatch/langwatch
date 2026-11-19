@@ -7,49 +7,31 @@
  * Spec: enterprise/modules/nurturing/specs/project-facts-copies.feature
  */
 import {
-  defineAggregate,
-  definePipeline,
   type ReplayEvent,
   ReplayService,
   projectionLaneReplayer,
   replayProjectionsOf,
   sealPipelineDefinition,
 } from "@langwatch/eventing";
-import { testEventSchema } from "@langwatch/eventing/testing";
-import {
-  IDENTITY_PIPELINE_NAME,
-  USER_ERASED_EVENT_TYPE as IDENTITY_USER_ERASED_EVENT_TYPE,
-  USER_IDENTITY_AGGREGATE_TYPE,
-  userErasedPayloadSchema,
-} from "@langwatch/identity-contract";
 import {
   PERSONAL_TEAM_CREATED_EVENT_TYPE,
   PERSONAL_WORKSPACE_PROVISIONED_EVENT_TYPE,
-  personalTeamCreatedEventDataSchema,
-  personalWorkspaceProvisionedEventDataSchema,
 } from "@langwatch/organization-contract";
 import {
   PROJECT_FIRST_MESSAGE_LISTED_EVENT_TYPE,
   PROJECT_PERSONAL_OWNER_LISTED_EVENT_TYPE,
-  projectFirstMessageListedEventDataSchema,
-  projectPersonalOwnerListedEventDataSchema,
 } from "@langwatch/project-contract";
 import { memoryRedisDouble } from "@langwatch/test-harness/client-doubles/redis";
 import {
   FIRST_TRACE_RECORDED_EVENT_TYPE,
-  firstTraceRecordedEventDataSchema,
   PROJECT_TRACED_EVENT_TYPE,
-  projectTracedEventDataSchema,
   TRACE_RECEIVED_EVENT_TYPE,
-  traceReceivedEventDataSchema,
 } from "@langwatch/trace-contract";
 import { isMigrationStep, type MigrationStep } from "@langwatch/upgrade/step";
 import {
   USER_AGGREGATE_TYPE,
   USER_ERASED_EVENT_TYPE,
   USER_LIFECYCLE_EVENT_VERSION,
-  USER_LIFECYCLE_PIPELINE_NAME,
-  userErasedEventDataSchema,
 } from "@langwatch/user-contract";
 import { describe, expect, it, vi } from "vitest";
 
@@ -60,10 +42,7 @@ import type { MemoryNurturingPersonalProjectRepository } from "../../repositorie
 import type { MemoryNurturingTracedProjectRepository } from "../../repositories/memory/memory.nurturing-traced-project.repository.ts";
 import { MemoryNurturingRepositories } from "../../repositories/memory/memory.nurturing.repositories.ts";
 import type { NurturingPersonalProjectRepository } from "../../repositories/nurturing-personal-project.repository.ts";
-import {
-  buildNurturingProjectUsagePipeline,
-  NURTURING_PROJECT_USAGE_PIPELINE_NAME,
-} from "../nurturing-project-usage.pipeline.ts";
+import { buildNurturingProjectUsagePipeline } from "../nurturing-project-usage.pipeline.ts";
 import {
   LAST_TRACES_STEP,
   PERSONAL_OWNERS_OF_ORGANIZATION_STEP,
@@ -72,6 +51,7 @@ import {
   TRACED_PROJECTS_OF_PROJECT_STEP,
   TRACED_PROJECTS_OF_TRACE_STEP,
 } from "./nurturing-project-copies.test-helpers.ts";
+import { allNurturingOwnerStandIns } from "./nurturing-owner-stand-ins.test-helpers.ts";
 import {
   IDENTITY_MARKS_STEP,
   nurturingReplayStepsOver,
@@ -215,48 +195,6 @@ function inReverse(events: ReplayEvent[]): ReplayEvent[] {
   }));
 }
 
-const ownerPipeline = (name: string, aggregateType: string) =>
-  definePipeline({ name, aggregate: defineAggregate({ type: aggregateType }) });
-
-/** The owners' pipelines as stand-ins, each declaring the facts nurturing's maps consume. */
-function owners() {
-  const organization = ownerPipeline("organization_lifecycle", "organization")
-    .withEvents([
-      testEventSchema(PERSONAL_TEAM_CREATED_EVENT_TYPE, personalTeamCreatedEventDataSchema),
-      testEventSchema(
-        PERSONAL_WORKSPACE_PROVISIONED_EVENT_TYPE,
-        personalWorkspaceProvisionedEventDataSchema,
-      ),
-    ])
-    .build();
-  const project = ownerPipeline("project_lifecycle", "project")
-    .withEvents([
-      testEventSchema(
-        PROJECT_PERSONAL_OWNER_LISTED_EVENT_TYPE,
-        projectPersonalOwnerListedEventDataSchema,
-      ),
-      testEventSchema(
-        PROJECT_FIRST_MESSAGE_LISTED_EVENT_TYPE,
-        projectFirstMessageListedEventDataSchema,
-      ),
-    ])
-    .build();
-  const trace = ownerPipeline("trace_project_milestones", "trace_project_milestone")
-    .withEvents([
-      testEventSchema(PROJECT_TRACED_EVENT_TYPE, projectTracedEventDataSchema),
-      testEventSchema(FIRST_TRACE_RECORDED_EVENT_TYPE, firstTraceRecordedEventDataSchema),
-      testEventSchema(TRACE_RECEIVED_EVENT_TYPE, traceReceivedEventDataSchema),
-    ])
-    .build();
-  const user = ownerPipeline(USER_LIFECYCLE_PIPELINE_NAME, USER_AGGREGATE_TYPE)
-    .withEvents([testEventSchema(USER_ERASED_EVENT_TYPE, userErasedEventDataSchema)])
-    .build();
-  const identity = ownerPipeline(IDENTITY_PIPELINE_NAME, USER_IDENTITY_AGGREGATE_TYPE)
-    .withEvents([testEventSchema(IDENTITY_USER_ERASED_EVENT_TYPE, userErasedPayloadSchema)])
-    .build();
-  return [organization, project, trace, user, identity].map(sealPipelineDefinition);
-}
-
 /** What a channel would have been asked, were any reachable from the copies. */
 function channels() {
   const customerIo = MemoryCustomerIoChannel.create();
@@ -304,6 +242,7 @@ function deploy({
       tracedProjects: repositories.tracedProjects,
       lastTraces: repositories.milestones,
     },
+    plans: { store: repositories.plans, deliver: async () => undefined },
     sync: undefined,
     logger: { warn: (payload) => void warnings.push(payload) },
   });
@@ -314,7 +253,10 @@ function deploy({
         script: { hdel: async () => 0, hlen: async () => 0, lpush: async () => 0 },
       }),
     }),
-    projections: replayProjectionsOf([...owners(), sealPipelineDefinition(pipeline)]),
+    projections: replayProjectionsOf([
+      ...allNurturingOwnerStandIns(),
+      sealPipelineDefinition(pipeline),
+    ]),
   });
   const steps = [...nurturingReplayStepsOver(replayer), ...projectCopiesReplayStepsOver(replayer)];
   const run = async (id: string) => {

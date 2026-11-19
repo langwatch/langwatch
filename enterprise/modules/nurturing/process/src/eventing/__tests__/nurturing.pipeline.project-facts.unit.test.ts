@@ -72,7 +72,6 @@ function nurturingOverCopies() {
     erasedUsers,
     memberFacts: unplacedMemberFacts(),
     members,
-    plans: MemoryNurturingOrganizationPlanRepository.create(),
     claims: {
       claim: async (key: string) => !seen.has(key) && Boolean(seen.add(key)),
       release: async (key: string) => void seen.delete(key),
@@ -121,6 +120,10 @@ function nurturingOverCopies() {
       personalProjects,
       tracedProjects,
       lastTraces: organizations,
+    },
+    plans: {
+      store: MemoryNurturingOrganizationPlanRepository.create(),
+      deliver: async () => undefined,
     },
     sync: undefined,
     logger,

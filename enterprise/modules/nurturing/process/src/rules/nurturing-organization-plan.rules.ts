@@ -44,3 +44,34 @@ export function planFactChangesCopy({
   }
   return held.fact.fromCatchUp && !incoming.fromCatchUp;
 }
+
+/** The plan fold before any fact: no plan held, no winner. */
+export function emptyPlanFold(): NurturingPlanFoldState {
+  return { held: { outcome: "none" }, winnerEventId: null, LastEventOccurredAt: 0 };
+}
+
+/** A subscription fact as the plan copy folds it; a fact stored before plans names none. */
+export function planFactOf({
+  plan,
+  occurredAt,
+  fromCatchUp,
+}: Readonly<{ plan?: string; occurredAt: number; fromCatchUp?: boolean }>): NurturingPlanFact {
+  return { plan: plan ?? null, occurredAt, fromCatchUp: fromCatchUp ?? false };
+}
+
+/**
+ * Folds one subscription fact into the plan copy: a fact that changes it, by
+ * `planFactChangesCopy`, is held and its event becomes the winner; any other leaves the state as it
+ * was, its winner included. Pure, so a replay rebuilds the row live delivery wrote.
+ */
+export function foldPlanFact(
+  state: NurturingPlanFoldState,
+  { eventId, fact }: Readonly<{ eventId: string; fact: NurturingPlanFact }>,
+): NurturingPlanFoldState {
+  if (!planFactChangesCopy({ held: state.held, incoming: fact })) return state;
+  return {
+    held: { outcome: "held", fact },
+    winnerEventId: eventId,
+    LastEventOccurredAt: fact.occurredAt,
+  };
+}

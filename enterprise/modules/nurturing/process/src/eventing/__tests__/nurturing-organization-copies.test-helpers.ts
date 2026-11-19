@@ -10,7 +10,6 @@ import {
   type ReplayEvent,
   ReplayService,
   replayProjectionsOf,
-  type SealedPipelineDefinition,
   sealPipelineDefinition,
 } from "@langwatch/eventing";
 import { testEventSchema } from "@langwatch/eventing/testing";
@@ -73,10 +72,10 @@ import {
   NURTURING_ORGANIZATION_MEMBERS_PROJECTION_NAME,
   NURTURING_PROJECT_PLACEMENTS_PROJECTION_NAME,
   NURTURING_PROJECT_USAGE_PIPELINE_NAME,
-  nurturingProjectUsagePeerEvents,
   type NurturingUsageCopies,
   type NurturingUsageSync,
 } from "../nurturing-project-usage.pipeline.ts";
+import { allNurturingOwnerStandIns } from "./nurturing-owner-stand-ins.test-helpers.ts";
 import {
   IDENTITY_MARKS_STEP,
   nurturingReplayStepsOver,
@@ -162,13 +161,8 @@ function ownerStandIn({
 
 /**
  * The owners whose facts the usage pipeline's copies take, one stand-in each declaring every type
- * a copy consumes from it: a peer lane's replay and routing find its one owner among them.
+ * a copy consumes from it, as a runtime registers them.
  */
-export function nurturingCopyOwners(): SealedPipelineDefinition[] {
-  return nurturingCopyOwnerPipelines().map((owner) => sealPipelineDefinition(owner));
-}
-
-/** The same owners unsealed, as a runtime registers them. */
 export function nurturingCopyOwnerPipelines(): ReturnType<typeof ownerStandIn>[] {
   return [
     ownerStandIn({
@@ -284,11 +278,12 @@ export function liveMapsOver(
   copies: NurturingUsageCopies,
   sync?: NurturingUsageSync,
 ): (event: ReplayEvent) => Promise<void> {
-  const { projectUsage, evaluationDays } = MemoryNurturingRepositories.create();
+  const { projectUsage, evaluationDays, plans } = MemoryNurturingRepositories.create();
   const pipeline = buildNurturingProjectUsagePipeline({
     store: projectUsage,
     evaluationDays,
     copies,
+    plans: { store: plans, deliver: async () => undefined },
     sync,
   });
   const lanes: ((event: Event) => Promise<void>)[] = [];
@@ -342,11 +337,11 @@ export function copiesDeploy({
     store: repositories.projectUsage,
     evaluationDays: repositories.evaluationDays,
     copies,
+    plans: { store: repositories.plans, deliver: async () => undefined },
     sync,
   });
   const projections = replayProjectionsOf([
-    ...nurturingCopyOwners(),
-    ...(sync ? nurturingUsageOwners() : []),
+    ...allNurturingOwnerStandIns(),
     sealPipelineDefinition(pipeline),
   ]);
   const replayer = projectionLaneReplayer({
@@ -377,21 +372,4 @@ export function copiesDeploy({
     for (const { id } of steps) await run(id);
   };
   return { repositories, log, steps, run, runAll };
-}
-
-/** The usage folds' owners, which a deployment with a channel registers folds over. */
-function nurturingUsageOwners(): SealedPipelineDefinition[] {
-  type Declared = readonly Readonly<{
-    type: string;
-    data: Parameters<typeof testEventSchema>[1];
-  }>[];
-  return Object.entries(nurturingProjectUsagePeerEvents).map(([owner, events]) => {
-    const declared: Declared = events;
-    const standIn = ownerStandIn({
-      name: `${owner}_stand_in`,
-      aggregateType: owner,
-      events: declared.map(({ type, data }): Parameters<typeof testEventSchema> => [type, data]),
-    });
-    return sealPipelineDefinition(standIn);
-  });
 }

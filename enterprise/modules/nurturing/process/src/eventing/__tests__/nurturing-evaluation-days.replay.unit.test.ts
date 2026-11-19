@@ -9,20 +9,16 @@ import {
   EVALUATION_LIFECYCLE_AGGREGATE_TYPE,
   EVALUATION_LIFECYCLE_COMPLETED_EVENT_TYPE,
   EVALUATION_LIFECYCLE_EVENT_VERSION,
-  EVALUATION_LIFECYCLE_PIPELINE_NAME,
   evaluationLifecycleCompletedEventDataSchema,
 } from "@langwatch/evaluation-contract";
 import {
   createTenantId,
-  defineAggregate,
-  definePipeline,
   type ReplayEvent,
   ReplayService,
   projectionLaneReplayer,
   replayProjectionsOf,
   sealPipelineDefinition,
 } from "@langwatch/eventing";
-import { testEventSchema } from "@langwatch/eventing/testing";
 import { memoryRedisDouble } from "@langwatch/test-harness/client-doubles/redis";
 import { isMigrationStep } from "@langwatch/upgrade/step";
 import { describe, expect, it, vi } from "vitest";
@@ -41,6 +37,7 @@ import {
   EVALUATION_DAYS_STEP,
   nurturingReplayStepsOver,
 } from "./nurturing-replay-steps.test-helpers.ts";
+import { allNurturingOwnerStandIns } from "./nurturing-owner-stand-ins.test-helpers.ts";
 import { NurturingSeededLog } from "./nurturing-seeded-log.test-helpers.ts";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -65,22 +62,6 @@ function evaluated(projectId: string, at: number): ReplayEvent {
     idempotencyKey: `evaluation-${n}`,
     data: { tenantId: projectId, projectId, evaluationId: `evaluation-${n}`, occurredAt: at },
   };
-}
-
-function evaluationOwner() {
-  return sealPipelineDefinition(
-    definePipeline({
-      name: EVALUATION_LIFECYCLE_PIPELINE_NAME,
-      aggregate: defineAggregate({ type: EVALUATION_LIFECYCLE_AGGREGATE_TYPE }),
-    })
-      .withEvents([
-        testEventSchema(
-          EVALUATION_LIFECYCLE_COMPLETED_EVENT_TYPE,
-          evaluationLifecycleCompletedEventDataSchema,
-        ),
-      ])
-      .build(),
-  );
 }
 
 /** The usage sync's hooks, each counting its calls: a replay must make none. */
@@ -112,6 +93,7 @@ function deploy({ events, syncs = true }: { events: ReplayEvent[]; syncs?: boole
       tracedProjects: repositories.tracedProjects,
       lastTraces: repositories.milestones,
     },
+    plans: { store: repositories.plans, deliver: async () => undefined },
     sync: syncs ? sync : undefined,
   });
   const replayer = projectionLaneReplayer({
@@ -121,7 +103,10 @@ function deploy({ events, syncs = true }: { events: ReplayEvent[]; syncs?: boole
         script: { hdel: async () => 0, hlen: async () => 0, lpush: async () => 0 },
       }),
     }),
-    projections: replayProjectionsOf([evaluationOwner(), sealPipelineDefinition(pipeline)]),
+    projections: replayProjectionsOf([
+      ...allNurturingOwnerStandIns(),
+      sealPipelineDefinition(pipeline),
+    ]),
   });
   const step = nurturingReplayStepsOver(replayer).find(({ id }) => id === EVALUATION_DAYS_STEP);
   if (!step || !isMigrationStep(step)) throw new Error(`no step ${EVALUATION_DAYS_STEP}`);

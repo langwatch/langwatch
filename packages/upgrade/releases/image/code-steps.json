@@ -419,6 +419,14 @@
     "needsOldWritersGone": true
   },
   {
+    "id": "nurturing:replay-organization-plans",
+    "kind": "data",
+    "mode": "background",
+    "owner": "nurturing",
+    "description": "Fills nurturing's plan copy from billing's subscription log; sends nothing.",
+    "needsOldWritersGone": true
+  },
+  {
     "id": "ops:copy-automation-migration-state",
     "kind": "data",
     "mode": "blocking",

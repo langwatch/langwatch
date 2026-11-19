@@ -32,7 +32,6 @@ import { MemoryNurturingErasedUserRepository } from "../../repositories/memory/m
 import { MemoryNurturingVirtualKeyRepository } from "../../repositories/memory/memory.nurturing-gateway-key.repository.ts";
 import { MemoryNurturingMilestonesRepository } from "../../repositories/memory/memory.nurturing-milestones.repository.ts";
 import { MemoryNurturingOrganizationMemberRepository } from "../../repositories/memory/memory.nurturing-organization-member.repository.ts";
-import { MemoryNurturingOrganizationPlanRepository } from "../../repositories/memory/memory.nurturing-organization-plan.repository.ts";
 import { MemoryNurturingPersonalProjectRepository } from "../../repositories/memory/memory.nurturing-personal-project.repository.ts";
 import { MemoryNurturingProjectDirectoryRepository } from "../../repositories/memory/memory.nurturing-project-directory.repository.ts";
 import {
@@ -152,6 +151,7 @@ function registeredCopyLanes({
       tracedProjects: others.tracedProjects,
       lastTraces: others.milestones,
     },
+    plans: { store: others.plans, deliver: async () => undefined },
     sync: undefined,
   });
   const copyLanes = new Set(
@@ -164,6 +164,9 @@ function registeredCopyLanes({
     Parameters<NonNullable<typeof pipeline.globalProjections>[number]["register"]>[0]
   >({
     registerEventSubscriber: () => undefined,
+    // The plan fold and its send register too; this lane reads only the key map.
+    registerPeerFoldProjection: () => undefined,
+    registerSubscriber: () => undefined,
     registerPeerMapProjection: <MapRecord, Own extends Event>(
       map: MapProjectionDefinition<MapRecord, Own>,
     ) => {
@@ -292,7 +295,6 @@ export async function gatewayFactsOver({
     users: createApiFixture<UserApi>({}),
     memberFacts,
     members,
-    plans: MemoryNurturingOrganizationPlanRepository.create(),
   });
   const { logger, lines } = createTestLogger();
   const gatewayFacts = NurturingGatewayFactsService.create({

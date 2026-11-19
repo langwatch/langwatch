@@ -52,6 +52,7 @@ export class NurturingModule implements NurturingApi {
   static readonly secrets = nurturingSecrets;
 
   readonly #pipeline: NurturingPipeline;
+  readonly #delivery: NurturingDeliveryService;
   readonly #organizationUsage: NurturingOrganizationUsageService | undefined;
   readonly #organizationCreated: NurturingOrganizationCreatedService | undefined;
   readonly #uncopiedProjects: NurturingUncopiedProjectsService;
@@ -60,18 +61,21 @@ export class NurturingModule implements NurturingApi {
 
   private constructor({
     pipeline,
+    delivery,
     organizationUsage,
     organizationCreated,
     uncopiedProjects,
     traceCounting,
   }: Readonly<{
     pipeline: NurturingPipeline;
+    delivery: NurturingDeliveryService;
     organizationUsage: NurturingOrganizationUsageService | undefined;
     organizationCreated: NurturingOrganizationCreatedService | undefined;
     uncopiedProjects: NurturingUncopiedProjectsService;
     traceCounting: NurturingTraceCountingService;
   }>) {
     this.#pipeline = pipeline;
+    this.#delivery = delivery;
     this.#organizationUsage = organizationUsage;
     this.#organizationCreated = organizationCreated;
     this.#uncopiedProjects = uncopiedProjects;
@@ -104,7 +108,6 @@ export class NurturingModule implements NurturingApi {
       memberFacts,
       members: repositories.members,
       erasedUsers: repositories.erasedUsers,
-      plans: repositories.plans,
     });
     const gatewayFacts = NurturingGatewayFactsService.create({
       keys: repositories.virtualKeys,
@@ -188,6 +191,7 @@ export class NurturingModule implements NurturingApi {
         virtualKeyCreated: (input) => gatewayFacts.virtualKeyCreated(input),
         keyBudgetCrossed: (input) => gatewayFacts.keyBudgetCrossed(input),
       }),
+      delivery,
       organizationUsage,
       organizationCreated,
       uncopiedProjects,
@@ -220,6 +224,14 @@ export class NurturingModule implements NurturingApi {
    */
   async organizationCreated(data: OrganizationCreatedEventData): Promise<void> {
     await this.#organizationCreated?.organizationCreated(data);
+  }
+
+  /**
+   * A plan fact that won nurturing's plan copy, on its live delivery: Customer.io is told the plan.
+   * Rejects when refused, or for a catch-up with no channel, so the plan fold's job retries.
+   */
+  async deliverPlan(input: Readonly<{ key: string; signal: NurturingSignal }>): Promise<void> {
+    await this.#delivery.deliver(input);
   }
 
   /** Counts the traces whose organization is inside its window; rejects while a copy is awaited. */

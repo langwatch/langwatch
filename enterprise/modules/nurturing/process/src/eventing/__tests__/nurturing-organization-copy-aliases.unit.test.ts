@@ -41,6 +41,7 @@ function worker() {
       store: repositories.projectUsage,
       evaluationDays: repositories.evaluationDays,
       copies: copiesOver(repositories),
+      plans: { store: repositories.plans, deliver: async () => undefined },
       sync: undefined,
     }),
   );
