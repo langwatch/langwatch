@@ -5,7 +5,7 @@ import { isLoggedIn, loadConfig } from "@/cli/utils/governance/config";
 import { normalizeEndpoint } from "@/internal/endpoint";
 
 /**
- * Open LangWatch app: no path→project home /me, path→control_plane_url/path.
+ * Open the app: /me, or the project home with LANGWATCH_API_KEY; with a path, BASE/path.
  */
 export const openCommand = async (
   options: { path?: string; browser?: string } = {},
