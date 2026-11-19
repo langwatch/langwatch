@@ -236,9 +236,10 @@ describe("the usage host's lane aliases", () => {
           }),
         ]),
       );
-      await expect(
-        plans.get("org-1", { aggregateId: "org-1", tenantId: createTenantId("org-1") }),
-      ).resolves.toMatchObject({ kind: "folded", state: { winnerEventId: fact.id } });
+      await expect(plans.get("org-1")).resolves.toMatchObject({
+        kind: "folded",
+        state: { winnerEventId: fact.id },
+      });
       await eventSourcing.close();
     });
 

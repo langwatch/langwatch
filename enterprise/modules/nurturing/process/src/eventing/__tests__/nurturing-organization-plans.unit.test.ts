@@ -212,7 +212,7 @@ function liveWorker({
 }
 
 const held = async (store: MemoryNurturingOrganizationPlanRepository) => {
-  const read = await store.get(ORGANIZATION_ID, storeContext);
+  const read = await store.get(ORGANIZATION_ID);
   return read.kind === "folded" ? read.state : null;
 };
 
