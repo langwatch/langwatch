@@ -242,3 +242,25 @@ describe("given a newer run took the run over before its answer was filed", () =
     expect(settled).toEqual([]);
   });
 });
+
+describe("given a run that replaces a lost one", () => {
+  const SUPERSEDING = { ...RUN, supersedes: { runId: "run-0", slot: RUN.slot - 86_400_000 } };
+
+  it("records the lost run as failed with timeout while the process still waits on this run", async () => {
+    const { service, settled } = harness();
+    service.connect(processWaitingOn(["run-1"]));
+
+    await service.run(SUPERSEDING);
+
+    expect(settled[0]).toMatchObject({ runId: "run-0", outcome: "failed", reason: "timeout" });
+  });
+
+  it("records nothing for the lost run once the process waits on another run", async () => {
+    const { service, settled } = harness();
+    service.connect(processWaitingOn(["run-2"]));
+
+    await service.run(SUPERSEDING);
+
+    expect(settled).toEqual([]);
+  });
+});

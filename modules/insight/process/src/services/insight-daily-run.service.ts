@@ -424,9 +424,9 @@ export class InsightDailyRunService implements InsightDailyRunExecutor {
   }
 
   /**
-   * The run this one replaces is recorded as lost before this run's own. A repeat delivery
-   * records nothing: the log reads the repeat once but the projections fold it, after this
-   * run's outcome, and the lost run would read as the newest.
+   * The run this one replaces is recorded as lost first. A repeat is skipped only once the
+   * process has folded this run's outcome. Rare trade: a takeover after the 60-minute expiry
+   * leaves the replaced run unrecorded.
    */
   private async settleSuperseded(input: RunInput): Promise<void> {
     const { projectId, scheduleId, userId, board, supersedes } = input;
