@@ -20,6 +20,7 @@ import {
   type SharedCredentialStore,
 } from "@langwatch/secrets/shared-credential";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { Temporal } from "@langwatch/time";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ZodError } from "zod";
 
@@ -64,6 +65,7 @@ function createService(
     ({
       id,
       token,
+      createdAt: Temporal.Instant.fromEpochMilliseconds(0),
       organizationId: input.organizationId,
       bindings: input.bindings,
       permissions: input.permissions,

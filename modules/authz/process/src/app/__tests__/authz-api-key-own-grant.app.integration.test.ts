@@ -2,11 +2,17 @@
  * @vitest-environment node
  * An API key's own role and grant, sent as the held-key mint sends them each try, over the authz
  * app's grants pipeline in memory. The key service is not composed: api-key-process cannot depend
- * on authz-process, so each try sends what `ApiKeyGrantPolicyService.writeBindings` sends.
+ * on authz-process, so each try sends what `ApiKeyGrantPolicyService.writeBindings` sends: the
+ * key's stable command id and binding id on its create, none of its own on an edit.
  * @see specs/rbac/authz-grants.feature
  */
 import type { LedgerActor } from "@langwatch/authorization";
-import { GRANT_ATTACHED_EVENT_TYPE, ROLE_DEFINED_EVENT_TYPE } from "@langwatch/authz-contract";
+import {
+  API_KEY_OWN_GRANT_COMMAND_PREFIX,
+  GRANT_ATTACHED_EVENT_TYPE,
+  newAuthzGrantId,
+  ROLE_DEFINED_EVENT_TYPE,
+} from "@langwatch/authz-contract";
 import { createTenantId, EventSourcing } from "@langwatch/eventing";
 import { EventStoreMemory } from "@langwatch/eventing/testing";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
@@ -25,11 +31,16 @@ import { repositoriesOver } from "./authz-braid-world.fixture.ts";
 import { memoryAuthzChannels } from "./authz-channels.fixture.ts";
 
 // Mirrors the held key in modules/api-key/process/src/services/__tests__/
-// held-key-mint.slow-fold.unit.test.ts, whose key id the repository mints.
+// held-key-mint.slow-fold.unit.test.ts, whose key id, content hash and creation time are minted
+// there, so only their shapes are mirrored: `apikeygrant:<keyId>:<hash>` and a rolebinding id.
 const ORG = "org_1";
 const KEY = "key_held";
 const ROLE = `apikey:${KEY}`;
 const ACTOR: LedgerActor = { type: "system", id: null };
+const CREATE = {
+  commandId: `${API_KEY_OWN_GRANT_COMMAND_PREFIX}${KEY}:6f1c2a9d0b7e4c3a8d5f9e2b1a0c7d64`,
+  bindingId: newAuthzGrantId(),
+};
 const REFUSED = { code: "authz_grant_not_confirmed" };
 
 /**
@@ -107,12 +118,15 @@ function world({ lagging = false }: { lagging?: boolean } = {}) {
     poll: { intervalMs: 1, timeoutMs: 25 },
   });
 
-  let bindings = 0;
   /**
    * One try of the held-key mint's grant write, as the api-key slow-fold test pins it on every try
-   * ("sends one role and binding on every try"). `caller` stops at the grants service.
+   * ("sends the key's stable ids on every try"); an edit sends a fresh binding id and no command
+   * id. `caller` stops at the grants service.
    */
-  async function grantKey(): Promise<{ attached: string[]; duplicates: string[] }> {
+  async function grantKey(
+    ids: { commandId?: string; bindingId: string } = CREATE,
+  ): Promise<{ attached: string[]; duplicates: string[] }> {
+    const commandId = ids.commandId ? { commandId: ids.commandId } : {};
     await ledger.defineRole({
       organizationId: ORG,
       roleId: ROLE,
@@ -120,13 +134,14 @@ function world({ lagging = false }: { lagging?: boolean } = {}) {
       permissions: ["traces:view"],
       kind: "system_api_key",
       actor: ACTOR,
+      ...commandId,
       requireProjection: true,
     });
     return ledger.attachBindings({
       organizationId: ORG,
       bindings: [
         {
-          bindingId: `rb_${++bindings}`,
+          bindingId: ids.bindingId,
           principal: { apiKeyId: KEY },
           role: "CUSTOM",
           customRoleId: ROLE,
@@ -137,6 +152,7 @@ function world({ lagging = false }: { lagging?: boolean } = {}) {
       actor: ACTOR,
       source: "grants-service",
       onDuplicate: "skip",
+      ...commandId,
       requireProjection: true,
     });
   }
@@ -171,7 +187,7 @@ describe("given an API key's own role and grant written on each try of a held-ke
       await expect(grantKey()).rejects.toMatchObject(REFUSED);
       await expect(grantKey()).rejects.toMatchObject(REFUSED);
       projection.landRoles();
-      // Tries 3 and 4: the role is read back, so it is skipped; the grant is not seen yet.
+      // Tries 3 and 4: the role is read back; the grant is not seen yet.
       await expect(grantKey()).rejects.toMatchObject(REFUSED);
       await expect(grantKey()).rejects.toMatchObject(REFUSED);
       projection.landGrants();
@@ -179,9 +195,10 @@ describe("given an API key's own role and grant written on each try of a held-ke
 
       const [grant] = keyGrants();
       if (!grant) throw new Error("no grant was folded for the key");
-      expect(settled).toEqual({ attached: [], duplicates: [grant.id] });
-      // Two appends of each fact, and the log keeps one of each.
-      expect(appended.filter((name) => name === "defineRole")).toHaveLength(2);
+      expect(settled).toEqual({ attached: [], duplicates: [CREATE.bindingId] });
+      // The role is appended on every try and the grant on each try before it is read back, all
+      // under the key's ids, so the log keeps one of each.
+      expect(appended.filter((name) => name === "defineRole")).toHaveLength(5);
       expect(appended.filter((name) => name === "attachGrant")).toHaveLength(2);
       expect(await eventsOf(ROLE, ROLE_DEFINED_EVENT_TYPE)).toHaveLength(1);
       expect(await eventsOf(grant.id, GRANT_ATTACHED_EVENT_TYPE)).toHaveLength(1);
@@ -192,7 +209,7 @@ describe("given an API key's own role and grant written on each try of a held-ke
     });
   });
 
-  describe("when the key's grant is revoked and the key is granted again", () => {
+  describe("when the key's grant is revoked and an edit grants it again", () => {
     /** @scenario "A revoked API key grant attached again is recorded as a new grant" */
     it("attaches a new live grant under a new id and records it", async () => {
       const { ledger, grantKey, eventsOf, auditRows, keyGrants } = world();
@@ -201,7 +218,7 @@ describe("given an API key's own role and grant written on each try of a held-ke
       const [firstId] = first.attached;
       if (!firstId) throw new Error("the first grant was not attached");
       await ledger.revokeBindings({ organizationId: ORG, bindingIds: [firstId], actor: ACTOR });
-      const second = await grantKey();
+      const second = await grantKey({ bindingId: newAuthzGrantId() });
       const [secondId] = second.attached;
       if (!secondId) throw new Error("the second grant was not attached");
 

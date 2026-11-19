@@ -1,7 +1,8 @@
 /**
- * A role delete that was not waited for is still seen by the next define of that role: the
- * adapter marks it at once, so a retried API key role definition neither skips nor confirms on a
- * role about to go. The real adapter runs over the memory repositories; no command ever folds.
+ * An API key's own role deleted without waiting is still seen by the next define of that role:
+ * the adapter marks it at once, so the define's hold never confirms on a role about to go. Any
+ * other role's delete is left to the fold. The real adapter runs over the memory repositories;
+ * no command ever folds.
  * @see specs/rbac/authz-grants.feature
  */
 import type { LedgerActor } from "@langwatch/authorization";
@@ -47,39 +48,48 @@ class UnfoldedDispatcher extends AuthzGrantsCommandDispatcher {
   }
 }
 
+/** One live role, a ledger whose commands never fold, and its sent command names. */
+function ledgerOver(kind: "custom" | "system_api_key") {
+  const memory = AuthzMemoryStore.create();
+  memory.roleHeads.push({
+    id: ROLE_ID,
+    organizationId: ORG_ID,
+    name: ROLE_ID,
+    description: null,
+    permissions: ["traces:view"],
+    kind,
+    occurredAt: at(1_000),
+    deletedAt: null,
+    updatedAt: at(1_000),
+  });
+  const dispatcher = new UnfoldedDispatcher();
+  const ledger = EventingAuthzLedgerAdapter.create({
+    reads: MemoryAuthzLedgerReadRepository.create({ memory }),
+    lineage: { findProjectLineage: async () => null },
+    dispatcher,
+    epoch: MemoryAuthzEpochRepository.create({ memory }),
+    revocation: MemoryAuthzRevocationRepository.create({ memory }),
+    membershipStamps: MemoryAuthzMembershipStampRepository.create({ memory }),
+    poll: { intervalMs: 1, timeoutMs: 5 },
+  });
+  return { memory, dispatcher, ledger };
+}
+
+const deleteWithoutWaiting = (ledger: EventingAuthzLedgerAdapter) =>
+  ledger.deleteRole({
+    organizationId: ORG_ID,
+    roleId: ROLE_ID,
+    actor: ACTOR,
+    awaitProjection: false,
+  });
+
 describe("given an API key's own role, live with the definition a retry restates", () => {
   describe("when the role is deleted without waiting and then defined again", () => {
-    /** @scenario "A define after a delete not waited for is sent and not confirmed" */
+    /** @scenario "A define after a key role's delete not waited for is sent and not confirmed" */
     it("sends the definition and refuses it, the role staying deleted", async () => {
-      const memory = AuthzMemoryStore.create();
-      memory.roleHeads.push({
-        id: ROLE_ID,
-        organizationId: ORG_ID,
-        name: ROLE_ID,
-        description: null,
-        permissions: ["traces:view"],
-        kind: "system_api_key",
-        occurredAt: at(1_000),
-        deletedAt: null,
-        updatedAt: at(1_000),
-      });
-      const dispatcher = new UnfoldedDispatcher();
-      const ledger = EventingAuthzLedgerAdapter.create({
-        reads: MemoryAuthzLedgerReadRepository.create({ memory }),
-        lineage: { findProjectLineage: async () => null },
-        dispatcher,
-        epoch: MemoryAuthzEpochRepository.create({ memory }),
-        revocation: MemoryAuthzRevocationRepository.create({ memory }),
-        membershipStamps: MemoryAuthzMembershipStampRepository.create({ memory }),
-        poll: { intervalMs: 1, timeoutMs: 5 },
-      });
+      const { memory, dispatcher, ledger } = ledgerOver("system_api_key");
 
-      await ledger.deleteRole({
-        organizationId: ORG_ID,
-        roleId: ROLE_ID,
-        actor: ACTOR,
-        awaitProjection: false,
-      });
+      await deleteWithoutWaiting(ledger);
       const defined = ledger.defineRole({
         organizationId: ORG_ID,
         roleId: ROLE_ID,
@@ -93,6 +103,20 @@ describe("given an API key's own role, live with the definition a retry restates
       await expect(defined).rejects.toMatchObject({ code: "authz_grant_not_confirmed" });
       expect(dispatcher.sent).toEqual(["deleteRole", "defineRole"]);
       expect(memory.roleHeads[0]?.deletedAt).not.toBeNull();
+    });
+  });
+});
+
+describe("given a custom role", () => {
+  describe("when it is deleted without waiting", () => {
+    /** @scenario "A custom role's delete not waited for is left to the fold" */
+    it("leaves the Role row live until the delete folds", async () => {
+      const { memory, dispatcher, ledger } = ledgerOver("custom");
+
+      await deleteWithoutWaiting(ledger);
+
+      expect(dispatcher.sent).toEqual(["deleteRole"]);
+      expect(memory.roleHeads[0]?.deletedAt).toBeNull();
     });
   });
 });

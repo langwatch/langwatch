@@ -45,6 +45,7 @@ function createFixture({
   ): DisabledApiKey => ({
     id,
     token,
+    createdAt: Temporal.Instant.fromEpochMilliseconds(0),
     organizationId: "org-1",
     bindings: input.bindings,
     permissions: input.permissions,

@@ -1,5 +1,6 @@
 import { SYSTEM_ACTORS } from "@langwatch/authorization";
 import {
+  API_KEY_OWN_GRANT_COMMAND_PREFIX,
   BRAID_AUDIT_TARGET_KIND,
   GRANT_ATTACHED_EVENT_TYPE,
   GRANT_REVOKED_EVENT_TYPE,
@@ -19,7 +20,7 @@ import {
 } from "../repositories/authz-audit-trail.repository.ts";
 import type { AuthzLedgerReadRepository } from "../repositories/authz-ledger-read.repository.ts";
 import { SYSTEM_API_KEY_ROLE_KIND } from "../repositories/eventing/eventing.authz-read.mapper.ts";
-import { type AuthzGrantsEvent, isApiKeyGrantFact } from "./authz-grant.events.ts";
+import type { AuthzGrantsEvent } from "./authz-grant.events.ts";
 
 const AUTHZ_AUDIT_ACTION_PREFIX = "authz.grants." as const;
 const AUTHZ_AUDIT_VERBS = [
@@ -98,9 +99,9 @@ function isAuditable(event: AuthzGrantsEvent): boolean {
 }
 
 /**
- * An API key's own role definition, and its own-role grant, is audited on its fact, as the event
- * log keeps one: a retry before the fold appends again under the same idempotency key but a new
- * event id, and writes no second row. Every other event keeps its event-id row.
+ * An API key's own role definition, and its own-role grant sent under the key's stable id, is
+ * audited on its fact (the caller's idempotency key), as the event log keeps one: a retry appends
+ * again under that key but a new event id, and writes no second row. Others keep the event id.
  */
 function rowId(event: AuthzGrantsEvent): string {
   if (!event.idempotencyKey || !isKeyedOnFact(event)) return `authz-evt-${event.id}`;
@@ -109,7 +110,11 @@ function rowId(event: AuthzGrantsEvent): string {
 
 function isKeyedOnFact(event: AuthzGrantsEvent): boolean {
   if (event.type === ROLE_DEFINED_EVENT_TYPE) return event.data.kind === SYSTEM_API_KEY_ROLE_KIND;
-  return event.type === GRANT_ATTACHED_EVENT_TYPE && isApiKeyGrantFact(event.idempotencyKey);
+  return (
+    event.type === GRANT_ATTACHED_EVENT_TYPE &&
+    event.data.principal.type === "apiKey" &&
+    (event.idempotencyKey?.startsWith(API_KEY_OWN_GRANT_COMMAND_PREFIX) ?? false)
+  );
 }
 
 function toRow(event: AuthzGrantsEvent): AuthzAuditRow {

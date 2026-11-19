@@ -1,4 +1,5 @@
 import {
+  API_KEY_OWN_GRANT_COMMAND_PREFIX,
   AUTHZ_GRANTS_EVENT_VERSION_LATEST,
   GRANT_ATTACHED_EVENT_TYPE,
   ROLE_DEFINED_EVENT_TYPE,
@@ -12,7 +13,6 @@ import {
   type AuthzAuditRow,
 } from "../../repositories/authz-audit-trail.repository.ts";
 import {
-  apiKeyGrantCommandId,
   AUTHZ_GRANT_AGGREGATE_TYPE,
   type GrantAttachedEvent,
   type RoleDefinedEvent,
@@ -59,7 +59,8 @@ const keyGrantAttached: GrantAttachedEvent = {
   id: "evt_key_grant",
   aggregateId: "grant_1",
   type: GRANT_ATTACHED_EVENT_TYPE,
-  idempotencyKey: `${apiKeyGrantCommandId("grant_1")}:0`,
+  // The key's stable command id, then the binding id the adapter appends, then the event index.
+  idempotencyKey: `${API_KEY_OWN_GRANT_COMMAND_PREFIX}key_1:content:grant_1:0`,
   data: {
     grantId: "grant_1",
     principal: { type: "apiKey", id: "key_1" },
@@ -138,7 +139,7 @@ describe("EventingAuthzAuditAdapter redelivery", () => {
     await adapter.handler({ ...keyGrantAttached, id: "evt_second_append" });
 
     expect([...store.rows.keys()]).toEqual([
-      "authz-evt-org_acme:grant_1:apikeygrant:grant_1:0",
+      "authz-evt-org_acme:grant_1:apikeygrant:key_1:content:grant_1:0",
     ]);
   });
 
@@ -146,9 +147,15 @@ describe("EventingAuthzAuditAdapter redelivery", () => {
   it("keeps the event id as the row id for any other attach, even one carrying a key", async () => {
     const store = new KeyedAuditTrailStore();
     const adapter = EventingAuthzAuditAdapter.create({ store });
+    const userGrant = {
+      ...keyGrantAttached,
+      id: "evt_user_grant",
+      data: { ...keyGrantAttached.data, principal: { type: "user" as const, id: "user_1" } },
+    };
 
     await adapter.handler({ ...keyGrantAttached, idempotencyKey: "authzcmd_1:grant_1:0" });
+    await adapter.handler(userGrant);
 
-    expect([...store.rows.keys()]).toEqual(["authz-evt-evt_key_grant"]);
+    expect([...store.rows.keys()]).toEqual(["authz-evt-evt_key_grant", "authz-evt-evt_user_grant"]);
   });
 });

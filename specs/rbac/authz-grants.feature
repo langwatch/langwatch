@@ -408,51 +408,44 @@ Feature: Authorization grants
     Then the write is not confirmed
 
   @unit
-  Scenario: A retried API key role definition records no second definition
-    Given an API key's own role whose live row already carries the requested definition
-    When the same role definition is written again
-    Then no second role definition is recorded
-    And the organization's access cache is still refreshed
+  Scenario: A retry under the caller's command id records one role definition
+    Given an API key's own role definition sent under its key's stable command id
+    When the same definition is sent again under that id before it lands
+    Then both are sent under that id
+    And the event log keeps one role definition and the audit trail one row
 
   @unit
-  Scenario: A redefinition after a delete is recorded as a new fact
-    Given an API key's own role that was defined and then deleted
-    When it is defined again with the same permissions
-    Then the definition is sent under a new command id, not the first definition's
+  Scenario: A role defined with no command id is a new fact every time
+    Given an API key's own role defined with no command id of the caller's
+    When it is defined again, then changed, then changed back
+    Then every define is sent, each under an id the ledger mints for it
 
   @unit
-  Scenario: A define after a delete not waited for is sent and not confirmed
+  Scenario: A define after a key role's delete not waited for is sent and not confirmed
     Given an API key's own role, live with the definition a retry restates
     When the role is deleted without waiting for the fold and then defined again
     Then the delete is marked on the Role row at once
     And the definition is sent and refused, the role staying deleted
 
   @unit
-  Scenario: A retry before the fold records one role definition and one audit row
-    Given an API key's own role definition whose projection has not landed
-    When the same role definition is written again before it lands
-    Then the retry is sent under the first try's command id, its permissions in any order
-    And the event log keeps one role definition and the audit trail one row
-
-  @unit
-  Scenario: A changed API key role definition is recorded, a change back included
-    Given an API key's own role defined once
-    When it is redefined with other permissions and then with the first ones again
-    Then each of the three definitions is recorded
+  Scenario: A custom role's delete not waited for is left to the fold
+    Given a live custom role
+    When it is deleted without waiting for the fold
+    Then the Role row stays live until the delete folds
 
   @integration
   Scenario: A held key whose role and grant land after a slow fold has one of each
-    Given an API key's own role and its grant, written as the held-key mint writes them each try
+    Given an API key's own role and its grant, sent under the key's stable ids each try
     And a fold that lands the role only after two tries and the grant only after two more
     When the tries run until the grant is read back
-    Then each fact was appended twice and the event log keeps one role definition and one grant
+    Then the event log keeps one role definition and one grant
     And the audit trail has one row for the role definition and one for the grant
     And the key holds exactly one live grant
 
   @integration
   Scenario: A revoked API key grant attached again is recorded as a new grant
     Given an API key's own grant that was attached and then revoked
-    When the key is granted again
+    When an edit grants the key again, under a fresh binding id and no command id
     Then a new grant is attached under a new id, live, with its own audit row
 
   @integration
@@ -850,10 +843,10 @@ Feature: Authorization grants
 
   @unit
   Scenario: An API key's own-role grant attached twice under one key writes one audit row
-    Given an API key's own-role grant appended twice under its derived command id
+    Given an API key's own-role grant appended twice under the key's stable command id
     When both are handled
     Then exactly one audit row exists
-    And any other attach keeps its event id as its audit row id
+    And any other attach, a user's under that prefix included, keeps its event id as its row id
 
   @unit @regression
   Scenario: Migrated custom bindings retain their permission restrictions

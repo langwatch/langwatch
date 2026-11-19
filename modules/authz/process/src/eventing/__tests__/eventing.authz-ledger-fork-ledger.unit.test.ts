@@ -176,11 +176,12 @@ describe("given a caller that only needs the role retired", () => {
       });
 
       expect(sent.map((command) => command.verb)).toEqual(["deleteRole"]);
-      // Marked at once with the fold's guards, so the delete is never in flight unseen.
+      // An API key's own role is marked at once with the fold's guards; no other role matches.
       expect(db.role.updateMany).toHaveBeenCalledWith({
         where: {
           id: "role_1",
           organizationId: ORG_ID,
+          kind: "system_api_key",
           deletedAt: null,
           occurredAt: { lte: new Date(1_700_000_000_000) },
         },

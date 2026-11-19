@@ -5,6 +5,7 @@ import {
   AuthzRevocationRepository,
   type AuthzRoleDeletionMark,
 } from "../authz-revocation.repository.ts";
+import { SYSTEM_API_KEY_ROLE_KIND } from "../eventing/eventing.authz-read.mapper.ts";
 import type { AuthzMemoryStore } from "./authz-memory.store.ts";
 
 /** The synchronous deny over the memory Grant head, with the Prisma mark's guards. */
@@ -38,18 +39,20 @@ export class MemoryAuthzRevocationRepository extends AuthzRevocationRepository {
     organizationId,
     roleId,
     deletedAt,
-  }: AuthzRoleDeletionMark): Promise<void> {
+  }: AuthzRoleDeletionMark): Promise<number> {
     const at = Temporal.Instant.fromEpochMilliseconds(deletedAt.epochMilliseconds);
     const row = this.memory.roleHeads.find(
       (stored) =>
         stored.id === roleId &&
         stored.organizationId === organizationId &&
+        stored.kind === SYSTEM_API_KEY_ROLE_KIND &&
         stored.deletedAt === null &&
         stored.occurredAt.epochMilliseconds <= at.epochMilliseconds,
     );
-    if (!row) return;
+    if (!row) return 0;
     row.deletedAt = at;
     row.occurredAt = at;
     row.updatedAt = Temporal.Instant.fromEpochMilliseconds(nowInstant().epochMilliseconds);
+    return 1;
   }
 }

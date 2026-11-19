@@ -279,8 +279,7 @@ describe("given a role definition whose projection does not land inside the wind
     /** @scenario "A role definition is confirmed by the canonical Role projection" */
     it("confirms the defined role's name and permissions", async () => {
       const { writer, db } = harness({});
-      // No head before the write; the projected row afterwards.
-      db.role.findFirst.mockResolvedValueOnce(null).mockResolvedValue({
+      db.role.findFirst.mockResolvedValue({
         name: "apikey:key_1",
         description: null,
         permissions: ["langy:view"],
@@ -419,48 +418,26 @@ describe("given an api key's own role defined again", () => {
     kind: "system_api_key" as const,
     actor: ACTOR,
   };
-  /** The live head as Postgres returns it; `occurredAt` is the fact that set it. */
-  const liveRow = (permissions: string[], occurredAtMs: number) => ({
-    name: "apikey:key_1",
-    description: null,
-    permissions,
-    occurredAt: new Date(occurredAtMs),
-  });
   const definitions = (sent: { verb: string; data: unknown }[]) =>
     sent
       .filter((entry) => entry.verb === "defineRole")
       .map((entry) => entry.data as DefineRoleCommandData);
 
-  describe("when a retry restates the definition the live role already carries", () => {
-    /** @scenario "A retried API key role definition records no second definition" */
-    it("records one role definition, not a second for the retry", async () => {
-      const { writer, db, sent, epoch } = harness({});
-      db.role.findFirst
-        .mockResolvedValueOnce(null)
-        .mockResolvedValue(liveRow(["langy:view"], 1_000));
-
-      await writer.defineRole(apiKeyRole);
-      await writer.defineRole(apiKeyRole);
-
-      expect(definitions(sent).map((data) => data.role.permissions)).toEqual([["langy:view"]]);
-      expect(epoch.bump).toHaveBeenCalledTimes(2);
-    });
-  });
-
-  describe("when a retry arrives before the first try's definition has folded", () => {
-    /** @scenario "A retry before the fold records one role definition and one audit row" */
-    it("reuses the first try's command id: one role_defined, one audit row", async () => {
+  describe("when a retry sends the caller's command id again before the fold", () => {
+    /** @scenario "A retry under the caller's command id records one role definition" */
+    it("sends it under that id: one role_defined, one audit row", async () => {
       const { writer, sent } = harness({});
+      const commandId = "apikeygrant:key_1:content";
 
       for (let attempt = 0; attempt < 2; attempt++) {
-        await expect(writer.defineRole(apiKeyRole)).rejects.toMatchObject({
+        await expect(writer.defineRole({ ...apiKeyRole, commandId })).rejects.toMatchObject({
           code: "authz_grant_not_confirmed",
         });
       }
 
       const [first, retry] = definitions(sent);
       if (!first || !retry) throw new Error("expected a first try and a retry");
-      expect(retry.commandId).toBe(first.commandId);
+      expect([first.commandId, retry.commandId]).toEqual([commandId, commandId]);
       // The retry's clock has moved on: one key, two business times, and nothing refuses it.
       const retriedLater = { ...retry, role: { ...retry.role, occurredAtMs: 1_700_000_040_000 } };
       const events = [first, retriedLater].flatMap((data) =>
@@ -469,9 +446,6 @@ describe("given an api key's own role defined again", () => {
           data,
         } as never),
       );
-      expect(events.map((event) => event.occurredAt)).toEqual([
-        1_700_000_000_000, 1_700_000_040_000,
-      ]);
       expect(new Set(events.map((event) => event.id)).size).toBe(2);
       expect(deduplicateEvents(events)).toHaveLength(1);
       const audit = new KeyedAuditTrailStore();
@@ -481,82 +455,30 @@ describe("given an api key's own role defined again", () => {
     });
   });
 
-  describe("when the role changes and then changes back", () => {
-    /** @scenario "A changed API key role definition is recorded, a change back included" */
-    it("records every change, the change back included, under its own id", async () => {
+  describe("when it is defined with no command id of the caller's", () => {
+    /** @scenario "A role defined with no command id is a new fact every time" */
+    it("sends every define, a repeat and a change back included, under a minted id", async () => {
       const { writer, db, sent } = harness({});
+      db.role.findFirst.mockImplementation(async () => {
+        const last = definitions(sent).at(-1);
+        return { name: "apikey:key_1", description: null, permissions: last?.role.permissions };
+      });
       const first = ["langy:view"];
       const second = ["langy:view", "traces:view"];
-      db.role.findFirst
-        .mockResolvedValueOnce(null)
-        .mockResolvedValueOnce(liveRow(first, 1_000))
-        .mockResolvedValueOnce(liveRow(first, 1_000))
-        .mockResolvedValueOnce(liveRow(second, 2_000))
-        .mockResolvedValueOnce(liveRow(second, 2_000))
-        .mockResolvedValueOnce(liveRow(first, 3_000));
 
-      await writer.defineRole({ ...apiKeyRole, permissions: first });
-      await writer.defineRole({ ...apiKeyRole, permissions: second });
-      await writer.defineRole({ ...apiKeyRole, permissions: first });
-
-      const sentDefinitions = definitions(sent);
-      expect(sentDefinitions.map((data) => data.role.permissions)).toEqual([first, second, first]);
-      expect(new Set(sentDefinitions.map((data) => data.commandId)).size).toBe(3);
-    });
-  });
-
-  describe("when only the name or the description changes", () => {
-    /** @scenario "A changed API key role definition is recorded, a change back included" */
-    it.each([
-      ["name", { name: "apikey:key_1 renamed" }],
-      ["description", { description: "Reads the board" }],
-    ])("records the %s change under a new id", async (_field, change) => {
-      const { writer, db, sent } = harness({});
-      db.role.findFirst
-        .mockResolvedValueOnce(liveRow(["langy:view"], 1_000))
-        .mockResolvedValue({ ...liveRow(["langy:view"], 2_000), description: null, ...change });
-
-      await writer.defineRole({ ...apiKeyRole, ...change });
-
-      expect(definitions(sent)).toHaveLength(1);
-      expect(definitions(sent)[0]?.role).toMatchObject(change);
-    });
-  });
-
-  describe("when the role was deleted and is defined again with the same permissions", () => {
-    /** @scenario "A redefinition after a delete is recorded as a new fact" */
-    it("sends it under a new id, not the first definition's", async () => {
-      const { writer, db, sent } = harness({});
-      db.role.findFirst
-        .mockResolvedValueOnce(null)
-        .mockResolvedValueOnce(liveRow(["langy:view"], 1_000))
-        .mockResolvedValueOnce({ ...liveRow(["langy:view"], 2_000), deletedAt: new Date(2_000) })
-        .mockResolvedValueOnce(liveRow(["langy:view"], 3_000));
-
-      await writer.defineRole(apiKeyRole);
-      await writer.defineRole(apiKeyRole);
-
-      const [original, redefined] = definitions(sent);
-      expect(redefined).toBeDefined();
-      expect(redefined?.commandId).not.toBe(original?.commandId);
-    });
-  });
-
-  describe("when a retry before the fold lists the same permissions in another order", () => {
-    /** @scenario "A retry before the fold records one role definition and one audit row" */
-    it("sends it under the first try's command id", async () => {
-      const { writer, sent } = harness({});
-      const permissions = ["langy:view", "traces:view"];
-
-      for (const listed of [permissions, permissions.toReversed()]) {
-        await expect(
-          writer.defineRole({ ...apiKeyRole, permissions: listed }),
-        ).rejects.toMatchObject({ code: "authz_grant_not_confirmed" });
+      for (const permissions of [first, first, second, first]) {
+        await writer.defineRole({ ...apiKeyRole, permissions });
       }
 
-      const [first, retry] = definitions(sent);
-      expect(retry?.role.permissions).toEqual(["traces:view", "langy:view"]);
-      expect(retry?.commandId).toBe(first?.commandId);
+      const sentDefinitions = definitions(sent);
+      expect(sentDefinitions.map((data) => data.role.permissions)).toEqual([
+        first,
+        first,
+        second,
+        first,
+      ]);
+      // The harness mints one fixed id; in production each define mints its own.
+      expect(sentDefinitions.map((data) => data.commandId)).toEqual(Array(4).fill("authzcmd_test"));
     });
   });
 });

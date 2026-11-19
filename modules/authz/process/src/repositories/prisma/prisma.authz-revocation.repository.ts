@@ -5,6 +5,7 @@ import {
   AuthzRevocationRepository,
   type AuthzRoleDeletionMark,
 } from "../authz-revocation.repository.ts";
+import { SYSTEM_API_KEY_ROLE_KIND } from "../eventing/eventing.authz-read.mapper.ts";
 
 /** The two writes this repository performs, and no other. */
 type RevocationDatabase = {
@@ -12,7 +13,7 @@ type RevocationDatabase = {
     updateMany(args: unknown): Promise<unknown>;
   };
   role: {
-    updateMany(args: unknown): Promise<unknown>;
+    updateMany(args: unknown): Promise<{ count: number }>;
   };
 };
 
@@ -46,11 +47,18 @@ export class PrismaAuthzRevocationRepository extends AuthzRevocationRepository {
     organizationId,
     roleId,
     deletedAt,
-  }: AuthzRoleDeletionMark): Promise<void> {
+  }: AuthzRoleDeletionMark): Promise<number> {
     const at = toDate(deletedAt);
-    await this.database.role.updateMany({
-      where: { id: roleId, organizationId, deletedAt: null, occurredAt: { lte: at } },
+    const { count } = await this.database.role.updateMany({
+      where: {
+        id: roleId,
+        organizationId,
+        kind: SYSTEM_API_KEY_ROLE_KIND,
+        deletedAt: null,
+        occurredAt: { lte: at },
+      },
       data: { deletedAt: at, occurredAt: at },
     });
+    return count;
   }
 }

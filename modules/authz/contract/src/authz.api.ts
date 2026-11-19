@@ -342,5 +342,11 @@ export const AuthzApi = moduleApi<AuthzApi>()("authz");
 // A binding's id is caller-minted, in the persisted format shared across processes.
 export const GRANT_KSUID_RESOURCE = "rolebinding";
 
+/**
+ * Begins the stable command id an API key's own role and grant are written under on its create,
+ * so the audit trail keys that attach on its fact: a retry under the same id writes no second row.
+ */
+export const API_KEY_OWN_GRANT_COMMAND_PREFIX = "apikeygrant:";
+
 /** The id a new role binding gets: one scheme, minted by whoever calls `attachBindings`. */
 export const newAuthzGrantId = (): string => generate(GRANT_KSUID_RESOURCE).toString();

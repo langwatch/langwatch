@@ -10,6 +10,7 @@ import {
 } from "@langwatch/api-key-contract";
 import type { ApiKeyScope } from "@langwatch/api-key-contract";
 import { MemberNotFoundError } from "@langwatch/organization-contract";
+import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
 import { ApiKeyGrantPolicyService } from "../api-key-grant-policy.service.ts";
@@ -863,6 +864,52 @@ describe("ApiKeyGrantPolicyService", () => {
         expect(methodOrder.indexOf("defineRole")).toBeLessThan(
           methodOrder.indexOf("attachBindings"),
         );
+      });
+    });
+
+    describe("given a key's own role and grant written on its create, then on an edit", () => {
+      const created = {
+        ...input,
+        replace: false,
+        bindings: [scope({ role: "CUSTOM" })],
+        permissions: ["traces:view", "project:view"],
+        createdAt: Temporal.Instant.from("2026-10-01T10:00:00Z"),
+      };
+      const sent = (calls: Record<string, unknown>[]) =>
+        calls.flatMap((call) =>
+          call.method === "defineRole" || call.method === "attachBindings"
+            ? [{ commandId: call.commandId, bindings: call.bindings }]
+            : [],
+        );
+
+      /** @scenario "A held key's retries send its own role and grant under the same ids" */
+      it("sends one id per content on create and none on an edit", async () => {
+        const first = policyWith({});
+        const retry = policyWith({});
+        const changed = policyWith({});
+        const edit = policyWith({});
+
+        await first.service.writeBindings(created);
+        await retry.service.writeBindings({
+          ...created,
+          permissions: created.permissions.toReversed(),
+        });
+        await changed.service.writeBindings({ ...created, permissions: ["traces:view"] });
+        const { createdAt: _createdAt, ...edited } = created;
+        await edit.service.writeBindings(edited);
+
+        const [define, attach] = sent(first.calls);
+        expect(define?.commandId).toMatch(/^apikeygrant:key-1:[0-9a-f]{32}$/);
+        expect(attach?.commandId).toBe(define?.commandId);
+        expect(attach?.bindings).toEqual([
+          expect.objectContaining({ bindingId: expect.stringMatching(/^rolebinding_/) }),
+        ]);
+        expect(sent(retry.calls)).toEqual(sent(first.calls));
+        expect(sent(changed.calls)[0]?.commandId).not.toBe(define?.commandId);
+        expect(sent(edit.calls).map((call) => call.commandId)).toEqual([undefined, undefined]);
+        expect(sent(edit.calls)[1]?.bindings).toEqual([
+          expect.objectContaining({ bindingId: "generated-binding" }),
+        ]);
       });
     });
 

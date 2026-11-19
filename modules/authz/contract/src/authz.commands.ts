@@ -696,6 +696,11 @@ const authzDefineRoleInputSchemaDefinition = z
     permissions: z.array(z.string().min(1)),
     kind: authzRoleKindSchema,
     actor: ledgerActorSchema,
+    /**
+     * The caller's stable id for this definition: a retry under it is the same fact, one event
+     * and one audit row. Absent, every define is a new fact.
+     */
+    commandId: z.string().min(1).optional(),
     /** Same contract as `authzAttachBindingsInputSchema.requireProjection`. */
     requireProjection: z.boolean().optional(),
   })

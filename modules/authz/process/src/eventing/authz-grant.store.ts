@@ -3,8 +3,6 @@
  * behind every grant mutation, waiting (bounded) for the projection to land
  * attach- and role-shaped writes before returning (ADR-007's breaker doctrine).
  */
-import { createHash } from "node:crypto";
-
 import {
   type GrantCondition,
   isGrantablePermission,
@@ -28,12 +26,10 @@ import {
   type AuthzSharedProjectGrant,
   type DefineRoleCommandData,
   type GrantEventSource,
-  GRANT_KSUID_RESOURCE,
   GrantPrincipalNotFoundError,
   newAuthzGrantId,
   type RevokeGrantCommandData,
 } from "@langwatch/authz-contract";
-import { getEnvironment, Instance, Ksuid } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import { Temporal, nowInstant } from "@langwatch/time";
 import { z } from "zod";
@@ -41,21 +37,12 @@ import { z } from "zod";
 import type { AuthzCompatibilityLedger } from "../app/authz.app.ts";
 import type { AuthzEpochRepository } from "../repositories/authz-epoch.repository.ts";
 import { BindingMissingError, type GrantWrite } from "../repositories/authz-grant.repository.ts";
-import type {
-  AuthzLedgerReadRepository,
-  LedgerGrantHistoryRow,
-  LedgerGrantIdentity,
-  LedgerRoleDefinition,
-  LedgerRoleHead,
-} from "../repositories/authz-ledger-read.repository.ts";
+import type { AuthzLedgerReadRepository } from "../repositories/authz-ledger-read.repository.ts";
 import type { AuthzMembershipStampRepository } from "../repositories/authz-membership-stamp.repository.ts";
 import type { ScopeLineageRepository } from "../repositories/authz-read.repository.ts";
 import type { AuthzRevocationRepository } from "../repositories/authz-revocation.repository.ts";
 import { bindingIdentityKey } from "../repositories/eventing/eventing.authz-grant.mapper.ts";
-import {
-  sharedProjectReadsOf,
-  SYSTEM_API_KEY_ROLE_KIND,
-} from "../repositories/eventing/eventing.authz-read.mapper.ts";
+import { sharedProjectReadsOf } from "../repositories/eventing/eventing.authz-read.mapper.ts";
 import {
   compatBindingFromGrantFact,
   grantRowToFact,
@@ -74,7 +61,6 @@ import {
   validateMembershipBootstrap,
 } from "../rules/membership-stamp-fence.rules.ts";
 import type { AuthzGrantsCommandDispatcher } from "../services/authz-grants-command-dispatcher.service.ts";
-import { apiKeyGrantCommandId } from "./authz-grant.events.ts";
 
 const logger = createLogger("langwatch:authz:ledger");
 
@@ -188,103 +174,6 @@ function refuseMintedOnlyPermissions(permissions: readonly string[]): void {
   });
 }
 
-/** One role definition as `defineRole` is asked for it. */
-type RoleDefinition = {
-  organizationId: string;
-  roleId: string;
-  name: string;
-  description: string | undefined;
-  permissions: string[];
-};
-
-/** Whether a stored role row says exactly what the definition asks for. */
-function isSameDefinition({
-  row,
-  definition,
-}: {
-  row: LedgerRoleDefinition;
-  definition: RoleDefinition;
-}): boolean {
-  return (
-    row.name === definition.name &&
-    (row.description ?? null) === (definition.description || null) &&
-    samePermissions({ stored: row.permissions, wanted: definition.permissions })
-  );
-}
-
-/**
- * Content plus the head it was read over, deleted heads included: a retry before the fold reads
- * the same head, so it shares the first try's key and audit row. A, B, A and delete-then-define
- * read a moved head, so each is a new fact. Limit: if neither A nor B folded, the second A shares
- * the first A's key and a projection rebuild may keep B.
- */
-function apiKeyRoleCommandId({
-  definition,
-  base,
-}: {
-  definition: RoleDefinition;
-  base: LedgerRoleHead | null;
-}): string {
-  const digest = createHash("sha256")
-    .update(
-      JSON.stringify({
-        name: definition.name,
-        description: definition.description || null,
-        // Sorted, as the skip compares them: the same set in another order is the same fact.
-        permissions: [...definition.permissions].toSorted(),
-        base: base ? base.occurredAt.epochMilliseconds : "none",
-      }),
-    )
-    .digest("hex")
-    .slice(0, 32);
-  return `apikeyrole:${definition.roleId}:${digest}`;
-}
-
-/**
- * An API key's own-role grant id: its identity plus that identity's rows, revoked ones included.
- * A retry before the fold reads the same rows, so it names the first try's grant; a revoke moves
- * them, so a re-attach is a new grant rather than the revoked one, whose upsert keeps `revokedAt`.
- */
-function apiKeyGrantId({
-  organizationId,
-  identity,
-  history,
-  role,
-}: {
-  organizationId: string;
-  identity: LedgerGrantIdentity;
-  history: readonly LedgerGrantHistoryRow[];
-  role: LedgerRoleHead;
-}): string {
-  const changedAtMs = history.map((row) =>
-    Math.max(row.occurredAt.epochMilliseconds, row.revokedAt?.epochMilliseconds ?? 0),
-  );
-  const lastChangedAtMs = Math.max(0, ...changedAtMs);
-  const digest = createHash("sha256")
-    .update(
-      JSON.stringify({
-        organizationId,
-        identity,
-        rows: history.length,
-        revoked: history.filter((row) => row.revokedAt !== null).length,
-        lastChangedAtMs,
-      }),
-    )
-    .digest();
-  return new Ksuid({
-    environment: getEnvironment(),
-    resource: GRANT_KSUID_RESOURCE,
-    // Both instants stand still across retries before the fold, so the id does too.
-    timestamp: Math.floor(Math.max(role.occurredAt.epochMilliseconds, lastChangedAtMs) / 1000),
-    instance: new Instance(
-      Instance.schemes.RANDOM,
-      new Uint8Array(digest.buffer, digest.byteOffset, 8),
-    ),
-    sequenceId: digest.readUInt32BE(8),
-    layout: "v2",
-  }).toString();
-}
-
 /**
  * The injected ledger adapter. Every verb bumps the organization's authz
  * epoch after its write lands (decision 19: the epoch stays until contract;
@@ -361,18 +250,12 @@ export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
       validateMembershipBootstrap({ organizationId, binding });
     }
 
-    const partitioned = await this.partitionByIdentity({
+    const { fresh, duplicates } = await this.partitionByIdentity({
       organizationId,
       bindings,
       onDuplicate,
     });
-    const { duplicates } = partitioned;
-    if (partitioned.fresh.length === 0) return { attached: [], duplicates };
-    // A caller's own command id is stable already, and an attaching write may repeat an identity.
-    const { fresh, derived } =
-      commandId === undefined && onDuplicate === "skip"
-        ? await this.withApiKeyGrantIds({ organizationId, bindings: partitioned.fresh })
-        : { fresh: partitioned.fresh, derived: new Set<string>() };
+    if (fresh.length === 0) return { attached: [], duplicates };
 
     const occurredAtMs = occurredAtOverrideMs ?? this.now();
     // An import states the lifetime its own inventory read, so it neither
@@ -390,9 +273,7 @@ export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
         senders.attachGrant.send({
           tenantId: organizationId,
           organizationId,
-          commandId: derived.has(binding.bindingId)
-            ? apiKeyGrantCommandId(binding.bindingId)
-            : `${batchId}:${binding.bindingId}`,
+          commandId: `${batchId}:${binding.bindingId}`,
           grant: {
             grantId: binding.bindingId,
             principal: principalForWhere(binding.principal),
@@ -426,44 +307,6 @@ export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
     if (held.size === 0) return { attached: wanted, duplicates };
     return splitByHeld({ fresh, held, duplicates });
   };
-
-  /**
-   * Names each binding of an API key to its own role (kind `system_api_key`) by its derived grant
-   * id, answering which ids were derived. Every other binding keeps the id it was asked under.
-   */
-  private async withApiKeyGrantIds({
-    organizationId,
-    bindings,
-  }: {
-    organizationId: string;
-    bindings: LedgerBindingAttach[];
-  }): Promise<{ fresh: LedgerBindingAttach[]; derived: Set<string> }> {
-    const roles = new Map<string, LedgerRoleHead | null>();
-    const derived = new Set<string>();
-    const fresh: LedgerBindingAttach[] = [];
-    for (const binding of bindings) {
-      const roleId = binding.customRoleId;
-      const isKeyBinding = principalForWhere(binding.principal).type === "apiKey";
-      if (!isKeyBinding || roleId === null) {
-        fresh.push(binding);
-        continue;
-      }
-      if (!roles.has(roleId)) {
-        roles.set(roleId, await this.options.reads.findRoleHead({ roleId, organizationId }));
-      }
-      const role = roles.get(roleId);
-      if (!role || role.kind !== SYSTEM_API_KEY_ROLE_KIND) {
-        fresh.push(binding);
-        continue;
-      }
-      const identity = grantIdentityWhere(binding);
-      const history = await this.options.reads.findGrantHistory({ organizationId, identity });
-      const grantId = apiKeyGrantId({ organizationId, identity, history, role });
-      derived.add(grantId);
-      fresh.push({ ...binding, bindingId: grantId });
-    }
-    return { fresh, derived };
-  }
 
   /**
    * Hold until the attach landed. A skipping attach the fold dropped because an
@@ -1101,6 +944,7 @@ export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
     permissions,
     kind,
     actor,
+    commandId: callerCommandId,
     requireProjection = true,
   }: {
     organizationId: string;
@@ -1110,6 +954,8 @@ export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
     permissions: string[];
     kind: "custom" | "system_api_key";
     actor: LedgerActor;
+    /** The caller's stable id for this definition, same contract as `attachBindings`. */
+    commandId?: string;
     /**
      * Whether an unlanded projection is an error, same contract as
      * {@link EventingAuthzLedgerAdapter.attachBindings}: turned on before
@@ -1121,19 +967,6 @@ export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
     refuseMintedOnlyPermissions(permissions);
     if (kind === "custom") {
       await this.refuseAddedPlatformPermissions({ organizationId, roleId, permissions });
-    }
-    const definition = { organizationId, roleId, name, description, permissions };
-    let commandId = this.options.newCommandId?.() ?? newCommandId();
-    if (kind === "system_api_key") {
-      // A retried key mint restates its own role: nothing is sent once the live head says the
-      // same (the bump stays, the earlier try may have timed out before its own), and a retry
-      // before the fold shares the first try's id. See apiKeyRoleCommandId for A, B, then A.
-      const head = await this.options.reads.findRoleHead({ roleId, organizationId });
-      if (head && head.deletedAt === null && isSameDefinition({ row: head, definition })) {
-        await this.options.epoch.bump({ organizationId });
-        return;
-      }
-      commandId = apiKeyRoleCommandId({ definition, base: head });
     }
     const occurredAtMs = this.now();
     const role: DefineRoleCommandData["role"] = {
@@ -1149,7 +982,8 @@ export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
     ).commands.defineRole.send({
       tenantId: organizationId,
       organizationId,
-      commandId,
+      // A caller's own id makes its retry the same fact; without one, every define is a new one.
+      commandId: callerCommandId ?? this.options.newCommandId?.() ?? newCommandId(),
       role,
       actor,
     });
@@ -1164,19 +998,21 @@ export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
       // The CANONICAL Role head, like every other read-your-writes check
       // here: a deleted row confirms nothing, and the compat CustomRole rows
       // can carry a definition the fold never authored.
-      check: () => this.isLiveRole(definition),
+      check: async () => {
+        const row = await this.options.reads.findLiveRole({ roleId, organizationId });
+        return (
+          row !== null &&
+          row.name === name &&
+          (row.description ?? null) === (description || null) &&
+          samePermissions({
+            stored: row.permissions,
+            wanted: permissions,
+          })
+        );
+      },
       required: requireProjection,
     });
     await this.options.epoch.bump({ organizationId });
-  }
-
-  /** Whether the canonical live Role row already carries exactly this definition. */
-  private async isLiveRole(definition: RoleDefinition): Promise<boolean> {
-    const row = await this.options.reads.findLiveRole({
-      roleId: definition.roleId,
-      organizationId: definition.organizationId,
-    });
-    return row !== null && isSameDefinition({ row, definition });
   }
 
   /**
@@ -1211,8 +1047,9 @@ export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
       actor,
       occurredAtMs,
     });
-    // Marked now, as a grant revoke is: a delete not waited for is never in flight unseen.
-    await this.options.revocation.enforceRoleDeletion({
+    // An API key's own role is marked now, as a grant revoke is, so its delete is never in
+    // flight unseen; any other role's delete is left to the fold.
+    await this.options.revocation.enforceApiKeyRoleDeletion({
       organizationId,
       roleId,
       deletedAt: Temporal.Instant.fromEpochMilliseconds(occurredAtMs),

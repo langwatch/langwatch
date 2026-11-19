@@ -13,11 +13,9 @@ import { z } from "zod";
 import {
   AuthzLedgerReadRepository,
   type LedgerDirectoryGrantRow,
-  type LedgerGrantHistoryRow,
   type LedgerGrantIdentity,
   type LedgerBraidRow,
   type LedgerRoleDefinition,
-  type LedgerRoleHead,
 } from "../authz-ledger-read.repository.ts";
 import type { AuthzReadRepository } from "../authz-read.repository.ts";
 import {
@@ -279,24 +277,6 @@ export class PrismaAuthzLedgerReadRepository extends AuthzLedgerReadRepository {
     return rows.map((row) => row.id);
   }
 
-  async findGrantHistory({
-    organizationId,
-    identity,
-  }: {
-    organizationId: string;
-    identity: LedgerGrantIdentity;
-  }): Promise<LedgerGrantHistoryRow[]> {
-    // Not `liveGrants`: a revoked row is the history a re-attach is told apart by.
-    const rows = (await this.prisma.grant.findMany({
-      where: { organizationId, ...identity },
-      select: { occurredAt: true, revokedAt: true },
-    } as never)) as { occurredAt: Date; revokedAt: Date | null }[];
-    return rows.map((row) => ({
-      occurredAt: fromDate(row.occurredAt),
-      revokedAt: row.revokedAt ? fromDate(row.revokedAt) : null,
-    }));
-  }
-
   async findLiveRole({
     roleId,
     organizationId,
@@ -309,37 +289,6 @@ export class PrismaAuthzLedgerReadRepository extends AuthzLedgerReadRepository {
       select: { name: true, description: true, permissions: true },
     })) as LedgerRoleDefinition | null | undefined;
     return row ?? null;
-  }
-
-  async findRoleHead({
-    roleId,
-    organizationId,
-  }: {
-    roleId: string;
-    organizationId: string;
-  }): Promise<LedgerRoleHead | null> {
-    const row = (await this.prisma.role.findFirst({
-      where: { id: roleId, organizationId },
-      select: {
-        name: true,
-        description: true,
-        permissions: true,
-        kind: true,
-        occurredAt: true,
-        deletedAt: true,
-      },
-    })) as
-      | (LedgerRoleDefinition & { kind: string; occurredAt: Date; deletedAt?: Date | null })
-      | null;
-    if (!row) return null;
-    return {
-      name: row.name,
-      description: row.description,
-      permissions: row.permissions,
-      kind: row.kind,
-      occurredAt: fromDate(row.occurredAt),
-      deletedAt: row.deletedAt ? fromDate(row.deletedAt) : null,
-    };
   }
 
   async hasLiveRole({

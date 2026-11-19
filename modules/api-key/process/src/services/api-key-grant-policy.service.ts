@@ -15,8 +15,9 @@ import {
 } from "@langwatch/authz-contract";
 import { MemberNotFoundError } from "@langwatch/organization-contract";
 import { isAggregateProjectKind } from "@langwatch/project-contract";
-import { Temporal, fromDate, nowInstant } from "@langwatch/time";
+import { type Instant, Temporal, fromDate, nowInstant } from "@langwatch/time";
 
+import { ownGrantBindingId, ownGrantCommandId } from "./api-key-own-grant-ids.ts";
 import type { ApiKeyDependencies } from "./api-key.service.ts";
 
 type ResolvedScope =
@@ -330,11 +331,28 @@ export class ApiKeyGrantPolicyService {
     caller: AuthzGrantCaller;
     replace?: boolean;
     roleId?: string;
+    /**
+     * The key's creation instant, set on its create only: every try then sends the same command
+     * and binding ids for the key's own role and grant, so a retry is the same fact. An edit
+     * leaves it unset, so each edit is a new one.
+     */
+    createdAt?: Instant;
   }): Promise<ApiKeyScope[]> {
     let bindings = input.bindings;
     const ownRoleId = input.permissions?.length
       ? (input.roleId ?? `apikey:${input.apiKeyId}`)
       : null;
+    const stableIds =
+      ownRoleId && input.createdAt
+        ? {
+            commandId: ownGrantCommandId({
+              apiKeyId: input.apiKeyId,
+              permissions: input.permissions ?? [],
+              bindings: input.bindings,
+            }),
+            createdAt: input.createdAt,
+          }
+        : undefined;
     if (ownRoleId) {
       await this.options.grants.defineRole({
         organizationId: input.organizationId,
@@ -343,6 +361,7 @@ export class ApiKeyGrantPolicyService {
         permissions: [...(input.permissions ?? [])].toSorted(),
         kind: "system_api_key",
         actor: input.actor,
+        ...(stableIds ? { commandId: stableIds.commandId } : {}),
         requireProjection: true,
       });
       bindings = bindings.map((binding) =>
@@ -362,6 +381,7 @@ export class ApiKeyGrantPolicyService {
       ...input,
       bindings: bindings.filter(isOwnRole),
       caller: { type: "system" },
+      stableIds,
     });
     if (input.replace) {
       // A duplicate is an existing binding the caller asked for again, so it is
@@ -390,13 +410,18 @@ export class ApiKeyGrantPolicyService {
     bindings: ApiKeyScope[];
     actor: { type: "user" | "system"; id: string | null };
     caller: AuthzGrantCaller;
+    /** The key's own grant on its create: named the same on every try. */
+    stableIds?: { commandId: string; createdAt: Instant };
   }): Promise<AuthzAttachOutcome> {
     if (input.bindings.length === 0) return { attached: [], duplicates: [] };
+    const { stableIds } = input;
 
     return this.options.grants.attachBindings({
       organizationId: input.organizationId,
       bindings: input.bindings.map((binding) => ({
-        bindingId: this.options.bindingIds.generateBindingId(),
+        bindingId: stableIds
+          ? ownGrantBindingId({ ...stableIds, binding })
+          : this.options.bindingIds.generateBindingId(),
         principal: { apiKeyId: input.apiKeyId },
         role: binding.role,
         customRoleId: binding.role === "CUSTOM" ? (binding.customRoleId ?? null) : null,
@@ -407,6 +432,7 @@ export class ApiKeyGrantPolicyService {
       actor: input.actor,
       source: "grants-service",
       onDuplicate: "skip",
+      ...(stableIds ? { commandId: stableIds.commandId } : {}),
       // Both callers act on these rows next: a create activates the credential,
       // and a replace revokes whatever the attach did not keep. A durable
       // append that is not yet readable would hand out a token the resolver

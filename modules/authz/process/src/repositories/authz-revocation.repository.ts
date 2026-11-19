@@ -19,7 +19,7 @@ export type AuthzRevocationMark = {
   revokedReason: string | null;
 };
 
-/** A role marked deleted ahead of its fold, at the instant its delete fact carries. */
+/** An API key's own role marked deleted ahead of its fold, at its delete fact's instant. */
 export type AuthzRoleDeletionMark = {
   organizationId: string;
   roleId: string;
@@ -56,15 +56,17 @@ export abstract class AuthzRevocationRepository {
   }
 
   /**
-   * The role's delete, written ahead of its fold with the fold's own guards: a define that reads
-   * the Role head next sees it, so it neither skips nor confirms on a role about to go.
+   * An API key's own role (kind `system_api_key`) deleted ahead of its fold, with the fold's own
+   * guards: a define's hold then never confirms on a role about to go. Other roles are untouched.
    */
-  async enforceRoleDeletion(mark: AuthzRoleDeletionMark): Promise<void> {
-    authzDirectProjectionWriteTotal.inc({ reason: "revocation" });
-    await this.markRoleDeleted(mark);
+  async enforceApiKeyRoleDeletion(mark: AuthzRoleDeletionMark): Promise<void> {
+    if ((await this.markRoleDeleted(mark)) > 0) {
+      authzDirectProjectionWriteTotal.inc({ reason: "revocation" });
+    }
   }
 
   protected abstract markRevoked(mark: AuthzRevocationMark): Promise<void>;
 
-  protected abstract markRoleDeleted(mark: AuthzRoleDeletionMark): Promise<void>;
+  /** Marks the role when it is an API key's own; answers how many rows it marked. */
+  protected abstract markRoleDeleted(mark: AuthzRoleDeletionMark): Promise<number>;
 }

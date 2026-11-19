@@ -220,8 +220,9 @@ describe("HeldKeyMintService over a ledger that folds slower than one try", () =
             { own: 3, landedBy: 2 },
           ]);
           // The binding is appended once; the last try finds it landed and appends nothing.
-          expect(ledger.grantAppends).toEqual(["rb_1"]);
-          expect(ledger.attachAnswers).toEqual([{ attached: [], duplicates: ["rb_1"] }]);
+          const [bindingId] = ledger.grantAppends;
+          expect(ledger.grantAppends).toEqual([expect.stringMatching(/^rolebinding_/)]);
+          expect(ledger.attachAnswers).toEqual([{ attached: [], duplicates: [bindingId] }]);
         });
       });
     },
@@ -229,8 +230,8 @@ describe("HeldKeyMintService over a ledger that folds slower than one try", () =
 
   describe("given the role and the attach each land 25000 ms after their append", () => {
     describe("when the outbox retries until the grant is read back", () => {
-      /** @scenario "A held key's retries send one role and one grant write, a binding id apart" */
-      it("sends one role and binding on every try, the binding id its only change", async () => {
+      /** @scenario "A held key's retries send its own role and grant under the same ids" */
+      it("sends the key's stable ids on every try, and the same role and binding", async () => {
         const { service, ledger } = createFixture(25_000);
 
         const { result } = await outbox(() => service.createHeld({ holdKey: "run-1", key }));
@@ -239,6 +240,10 @@ describe("HeldKeyMintService over a ledger that folds slower than one try", () =
         // authz-api-key-own-grant.app.integration.test.ts (`grantKey`): keep the two in step.
         const roleId = `apikey:${result.apiKeyId}`;
         const actor = { type: "system", id: null };
+        const commandId = ledger.defineRoleCalls[0]?.commandId;
+        const bindingId = ledger.attachCalls[0]?.bindings[0]?.bindingId;
+        expect(commandId).toMatch(new RegExp(`^apikeygrant:${result.apiKeyId}:[0-9a-f]{32}$`));
+        expect(bindingId).toMatch(/^rolebinding_/);
         const role = {
           organizationId: ORG_ID,
           roleId,
@@ -246,9 +251,10 @@ describe("HeldKeyMintService over a ledger that folds slower than one try", () =
           permissions: ["traces:view"],
           kind: "system_api_key",
           actor,
+          commandId,
           requireProjection: true,
         };
-        const attach = (bindingId: string) => ({
+        const attach = {
           organizationId: ORG_ID,
           bindings: [
             {
@@ -264,20 +270,12 @@ describe("HeldKeyMintService over a ledger that folds slower than one try", () =
           actor,
           source: "grants-service",
           onDuplicate: "skip",
+          commandId,
           requireProjection: true,
-        });
-        // Try 1 stops at the role; tries 2 and 3 reach the attach.
+        };
+        // Try 1 stops at the role; tries 2 and 3 reach the attach. Nothing differs between tries.
         expect(ledger.defineRoleCalls).toStrictEqual([role, role, role]);
-        expect(ledger.attachCalls).toStrictEqual([attach("rb_1"), attach("rb_2")]);
-        const [second, third] = ledger.attachCalls.map(({ bindings, ...call }) => ({
-          ...call,
-          bindings: bindings.map(({ bindingId: _bindingId, ...binding }) => binding),
-        }));
-        expect(third).toStrictEqual(second);
-        for (const call of [...ledger.defineRoleCalls, ...ledger.attachCalls]) {
-          expect(call).not.toHaveProperty("commandId");
-          expect(call).not.toHaveProperty("occurredAtMs");
-        }
+        expect(ledger.attachCalls).toStrictEqual([attach, attach]);
       });
     });
   });

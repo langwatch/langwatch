@@ -18,6 +18,7 @@ import {
 } from "@langwatch/api-key-contract";
 import type { AuthzGrantCaller } from "@langwatch/authz-contract";
 import { createLogger } from "@langwatch/observability";
+import { fromDate, type Instant } from "@langwatch/time";
 import type { z } from "zod";
 
 import type { ApiKeyRepository, StoredApiKey } from "../repositories/api-key.repository.ts";
@@ -58,6 +59,8 @@ function actor(userId: string | null | undefined): {
 export type DisabledApiKey = Readonly<{
   id: string;
   token: string;
+  /** When the row was written: dates the key's own grant id, the same on every try. */
+  createdAt: Instant;
   organizationId: string;
   bindings: ApiKeyScope[];
   permissions: string[] | undefined;
@@ -74,10 +77,12 @@ type PreparedKey = {
 function disabledKey({
   id,
   token,
+  createdAt,
   prepared,
 }: {
   id: string;
   token: string;
+  createdAt: Instant;
   prepared: PreparedKey;
 }): DisabledApiKey {
   const { parsed } = prepared;
@@ -85,6 +90,7 @@ function disabledKey({
   return {
     id,
     token,
+    createdAt,
     organizationId: parsed.organizationId,
     bindings: prepared.bindings,
     permissions: prepared.permissions,
@@ -159,7 +165,10 @@ export class ApiKeyLifecycleService {
     token: string;
     input: CreateApiKeyInput;
   }): Promise<DisabledApiKey> {
-    return disabledKey({ id, token, prepared: await this.prepare(input) });
+    const row = await this.repository.findById({ id });
+    if (!row) throw new ApiKeyNotFoundError(id);
+    const createdAt = fromDate(row.createdAt);
+    return disabledKey({ id, token, createdAt, prepared: await this.prepare(input) });
   }
 
   /**
@@ -175,6 +184,7 @@ export class ApiKeyLifecycleService {
       actor: key.actor,
       caller: key.caller,
       roleId: `apikey:${key.id}`,
+      createdAt: key.createdAt,
     });
 
     return {
@@ -240,7 +250,8 @@ export class ApiKeyLifecycleService {
       }),
     );
 
-    return disabledKey({ id: row.id, token: generated.token, prepared });
+    const createdAt = fromDate(row.createdAt);
+    return disabledKey({ id: row.id, token: generated.token, createdAt, prepared });
   }
 
   /** Every pod reads the changed key afresh: its shared answer is deleted right after the write. */

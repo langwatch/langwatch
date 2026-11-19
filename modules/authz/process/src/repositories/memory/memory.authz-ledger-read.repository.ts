@@ -12,11 +12,9 @@ import { z } from "zod";
 import {
   AuthzLedgerReadRepository,
   type LedgerDirectoryGrantRow,
-  type LedgerGrantHistoryRow,
   type LedgerGrantIdentity,
   type LedgerBraidRow,
   type LedgerRoleDefinition,
-  type LedgerRoleHead,
 } from "../authz-ledger-read.repository.ts";
 import type { AuthzReadRepository } from "../authz-read.repository.ts";
 import { NOT_A_BRAID, sharedProjectReadsOf } from "../eventing/eventing.authz-read.mapper.ts";
@@ -250,18 +248,6 @@ export class MemoryAuthzLedgerReadRepository extends AuthzLedgerReadRepository {
       .map((row) => row.id);
   }
 
-  async findGrantHistory({
-    organizationId,
-    identity,
-  }: {
-    organizationId: string;
-    identity: LedgerGrantIdentity;
-  }): Promise<LedgerGrantHistoryRow[]> {
-    return this.memory.grants
-      .filter((row) => row.organizationId === organizationId && sameIdentity({ row, identity }))
-      .map((row) => ({ occurredAt: row.occurredAt, revokedAt: row.revokedAt }));
-  }
-
   async findLiveRole({
     roleId,
     organizationId,
@@ -272,28 +258,6 @@ export class MemoryAuthzLedgerReadRepository extends AuthzLedgerReadRepository {
     const row = this.liveRole({ roleId, organizationId });
     return row
       ? { name: row.name, description: row.description, permissions: [...row.permissions] }
-      : null;
-  }
-
-  async findRoleHead({
-    roleId,
-    organizationId,
-  }: {
-    roleId: string;
-    organizationId: string;
-  }): Promise<LedgerRoleHead | null> {
-    const row = this.memory.roleHeads.find(
-      (stored) => stored.id === roleId && stored.organizationId === organizationId,
-    );
-    return row
-      ? {
-          name: row.name,
-          description: row.description,
-          permissions: [...row.permissions],
-          kind: row.kind,
-          occurredAt: row.occurredAt,
-          deletedAt: row.deletedAt,
-        }
       : null;
   }
 
