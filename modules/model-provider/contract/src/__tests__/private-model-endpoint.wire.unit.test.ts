@@ -17,11 +17,11 @@ const WIRE_JSON =
   '[{"hostname":"llm.internal.acme.test","addresses":["10.20.1.21","10.20.2.34"],"port":443}]';
 
 /**
- * The vector nlpgo's verifier is held to as well
- * (services/aigateway/domain/private_endpoint_envelope_test.go): seed 0x01..0x20, acme-prod,
- * signed at 1800000000 for 900 seconds. Ed25519 is deterministic, so the value is exact. The seed
- * is built here rather than written out, so the source carries no key material.
+ * The vector nlpgo's verifier is held to too (aigateway/domain/private_endpoint_envelope_test.go):
+ * seed 0x01..0x20, acme-prod, signed at 1800000000 for 900 seconds. Ed25519 is deterministic, so
+ * the value is exact. The seed is built, not written out, so the source carries no key material.
  */
+const { btoa } = globalThis as unknown as { btoa: (data: string) => string };
 const SHARED_SEED = btoa(String.fromCharCode(...Array.from({ length: 32 }, (_, i) => i + 1)));
 const SHARED_HEADER =
   "eyJ2IjoxLCJvcmdhbml6YXRpb25JZCI6Im9yZ19hY21lIiwicHJvamVjdElkIjoiYWNtZS1wcm9kIiwiYmluZGluZ3MiOlt7Imhvc3RuYW1lIjoibGxtLmludGVybmFsLmFjbWUudGVzdCIsImFkZHJlc3NlcyI6WyIxMC4yMC4xLjIxIiwiMTAuMjAuMi4zNCJdLCJwb3J0Ijo0NDN9XSwiZXhwaXJlc0F0IjoxODAwMDAwOTAwfQ.oyQyB4gk0jXh3oyefY_wDJ4rK1h1zu6ZKDwOTXbtNi3KFSIRCAJpo5WqzvoY79_eppAlLxm4e1dD7iaGwKB4CQ";
