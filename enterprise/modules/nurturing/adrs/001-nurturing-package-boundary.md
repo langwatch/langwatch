@@ -1,6 +1,6 @@
 # ADR-001: Nurturing learns from events and keeps its own copies
 
-**Status:** Accepted (2026-09-29; amended 2026-11-11 and 2026-11-17, twice)
+**Status:** Accepted (2026-09-29; amended 2026-11-11, 2026-11-17 (twice) and 2026-11-19)
 
 **Behavioural contract:** [Nurturing](../specs/nurturing.feature)
 
@@ -31,6 +31,30 @@ An owner that pushes a fact may call `NurturingApi.recordSignal` with a signal
 from one Zod discriminated union by kind; the command lands as an event on
 nurturing's own pipeline, keyed by kind and source event, and nurturing's
 subscriber sends it once.
+
+**Amended (2026-11-19): copies are projections, filled at deploy.** Nurturing's
+copies of the owners' facts are peer map projections on its
+`nurturing_project_usage` pipeline, one per owner pipeline, and its plan copy is
+a peer fold over billing's `subscription_changed` facts keyed by organization.
+Each write is order-free and idempotent (a time keeps its earliest or latest, a
+set only grows, a personal project's first owner stays), so a redelivered, late
+or replayed fact leaves a row as live delivery would. A deploy step replays each
+lane from its owner's log after the erasure-mark steps; the member, admin and
+personal-project writes read the marks as the key copy does, so no replayed row
+names a person erased before the copy existed. A replay never sends: it writes
+the projection's store and runs no subscriber, and a map has none. The plan
+fold's subscriber tells Customer.io a plan only on a fact's live delivery and
+only when that fact won the fold, so a deploy replay fills the plan copy and
+sends nothing, and a newer live or catch-up fact still sends. The fold commits
+before the send; a refused send retries its own job, so a refused catch-up's
+retry still sends again unless a fact that beats it landed first. The member
+copy's history before organization recorded member facts comes from
+organization's `member_listed` facts, recorded once by organization's own step;
+the `nurturing-member-backfill` task is removed. The trace-day counts stay a
+batch subscriber and keep the owner's decision of issue 9378: a replay over
+counted rows would count every trace again. An organization's evaluation and run
+counts and coding columns stay subscriber-written, because each write decides a
+send from the row before it. `NurturingUncopiedProject` holds no owner fact.
 
 ## Known exceptions on main, tracked
 
@@ -142,7 +166,7 @@ beats it landed first.
 
 The Customer.io service and the PostHog client are built in `NurturingModule.create`
 only when their key is set; the PostHog client is closed with the process. The
-copies' subscribers and the key copy's map always register. The per-project
+copies' maps and the plan fold always register. The per-project
 usage folds, the trace counting, the usage sync and the founder's group call on an organization's
 creation register only with a Customer.io channel. Owners
 send the command in any role; the subscribers run in the worker. The founder's
@@ -176,6 +200,7 @@ parsed by their own contracts' schemas.
 
 A signal lags its fact by the owner's event and nurturing's subscriber. Each new
 fact costs a peer subscriber or fold and, when it must be kept, a column or
-table of nurturing's own. Nurturing's copies are only as complete as the events
-it has seen: a project, organization or member that existed before its copy
-began is absent until an owner event names it.
+table of nurturing's own. A copy is complete for everything its owner's log names; an
+organization created before organization recorded `created` stays absent from
+`NurturingOrganizationCreated`, and every window that reads it had already
+ended.
