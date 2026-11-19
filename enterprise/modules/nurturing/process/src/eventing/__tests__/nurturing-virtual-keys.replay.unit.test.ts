@@ -113,6 +113,9 @@ function identityErased(userId: string): ReplayEvent {
   };
 }
 
+/** How a step runs: for real or dry, from the start or from the report a failed run saved. */
+type StepRunOptions = { dryRun?: boolean; resumeFrom?: MigrationStepReport | null };
+
 /** A worker's deploy over the seeded owner logs: nurturing's own steps and its memory copies. */
 function deploy({
   events,
@@ -158,10 +161,7 @@ function deploy({
     if (!found || !isMigrationStep(found)) throw new Error(`no step ${id}`);
     return found;
   };
-  const run = (
-    id: string,
-    { dryRun = false, resumeFrom = null }: { dryRun?: boolean; resumeFrom?: MigrationStepReport | null } = {},
-  ) =>
+  const run = (id: string, { dryRun = false, resumeFrom = null }: StepRunOptions = {}) =>
     step(id).run({
       log: { info: () => undefined, warn: () => undefined },
       checkpoint: { resumeFrom, save: async () => undefined },
@@ -175,7 +175,10 @@ function deploy({
   const rows = (...ids: number[]) =>
     Promise.all(
       ids.map((id) =>
-        repositories.virtualKeys.findKey({ organizationId: ORGANIZATION_ID, virtualKeyId: keyId(id) }),
+        repositories.virtualKeys.findKey({
+          organizationId: ORGANIZATION_ID,
+          virtualKeyId: keyId(id),
+        }),
       ),
     );
   return { repositories, log, steps, step, run, runAll, rows, projections };
@@ -203,7 +206,9 @@ async function perFactRows({
 }
 
 function keysLaneOf(projections: ReturnType<typeof replayProjectionsOf>) {
-  const lane = projections.mapProjections.find(({ projectionName }) => projectionName === KEYS_LANE);
+  const lane = projections.mapProjections.find(
+    ({ projectionName }) => projectionName === KEYS_LANE,
+  );
   if (!lane) throw new Error(`no lane ${KEYS_LANE}`);
   return lane;
 }

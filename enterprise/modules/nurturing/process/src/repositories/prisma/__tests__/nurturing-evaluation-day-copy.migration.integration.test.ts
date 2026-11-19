@@ -47,7 +47,9 @@ const MIGRATION_SQL = readFileSync(
 
 /** The migration's copy statement, limited to the projects this test seeded. */
 function copyScopedTo({ projectIds }: { projectIds: string[] }): string {
-  const statement = MIGRATION_SQL.match(/INSERT INTO "NurturingProjectEvaluationDay"[\s\S]*?;/)?.[0];
+  const statement = MIGRATION_SQL.match(
+    /INSERT INTO "NurturingProjectEvaluationDay"[\s\S]*?;/,
+  )?.[0];
   if (!statement) throw new Error("the migration no longer carries its copy statement");
   const owner = `WHERE usage."owner" = 'evaluation'`;
   if (!statement.includes(owner)) throw new Error("the copy no longer selects evaluation rows");
@@ -86,7 +88,9 @@ describe.skipIf(!databaseUrl)("the nurturing evaluation-day copy migration", () 
 
   afterAll(async () => {
     if (!prisma) return;
-    await prisma.nurturingProjectEvaluationDay.deleteMany({ where: { projectId: { in: projectIds } } });
+    await prisma.nurturingProjectEvaluationDay.deleteMany({
+      where: { projectId: { in: projectIds } },
+    });
     await prisma.nurturingProjectUsageView.deleteMany({ where: { projectId: { in: projectIds } } });
   });
 

@@ -14,7 +14,7 @@ import type { PostHogChannel } from "../channels/posthog.channel.ts";
 import type { NurturingClaimRepository } from "../repositories/nurturing-claim.repository.ts";
 import type { NurturingErasedUserRepository } from "../repositories/nurturing-erased-user.repository.ts";
 import type { NurturingOrganizationMemberRepository } from "../repositories/nurturing-organization-member.repository.ts";
-import type { NurturingOrganizationPlanRepository } from "../repositories/nurturing-organization-plan.repository.ts";
+import type { NurturingOrganizationPlanCopyRepository } from "../repositories/nurturing-organization-plan.repository.ts";
 import { fire as fireActivity } from "../rules/nurturing-activity-tracking-service.rules.ts";
 import { fireCodingOrApp, isCodingOrAppSignal } from "../rules/nurturing-coding-delivery.rules.ts";
 import { selfHostedTraits, unixSecondsOf } from "../rules/nurturing-customer-io-timestamp.rules.ts";
@@ -105,7 +105,7 @@ export class NurturingDeliveryService {
       /** Nurturing's erasure marks: no signal reaches an erased person. */
       erasedUsers: Pick<NurturingErasedUserRepository, "findErased">;
       /** Nurturing's plan copy: a subscription fact that does not change it sends nothing. */
-      plans: NurturingOrganizationPlanRepository;
+      plans: NurturingOrganizationPlanCopyRepository;
     }>,
     private readonly parts: Readonly<{
       postHogDelivery: NurturingPostHogDeliveryService | undefined;

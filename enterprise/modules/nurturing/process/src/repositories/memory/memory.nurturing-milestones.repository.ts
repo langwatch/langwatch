@@ -38,7 +38,7 @@ function newOrganization(organizationId: string): MemoryOrganization {
 }
 
 /** The greater id, as GREATEST under `COLLATE "C"` compares ids (ASCII); null when both are. */
-function greaterIdOf(known: string | null, incoming: string | null): string | null {
+function pickGreaterId(known: string | null, incoming: string | null): string | null {
   if (known === null) return incoming;
   if (incoming === null) return known;
   return incoming > known ? incoming : known;
@@ -122,7 +122,7 @@ export class MemoryNurturingMilestonesRepository
     const knownAt = this.#adminAt.get(organizationId);
     let admin = known.adminUserId;
     if (adminUserId !== null && (knownAt === undefined || at >= knownAt)) {
-      admin = knownAt === at ? greaterIdOf(known.adminUserId, named) : named;
+      admin = knownAt === at ? pickGreaterId(known.adminUserId, named) : named;
       this.#adminAt.set(organizationId, at);
     }
     // As the re-check does: a marked admin the row already named at this stamp goes.

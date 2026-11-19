@@ -43,10 +43,10 @@ describe("organization's member listed fact", () => {
 
     it("refuses one with no join time, or one not marked backfilled", () => {
       expect(
-        organizationMemberListedEventDataSchema.safeParse({ ...LISTED, joinedAt: undefined }).success,
+        organizationMemberListedEventDataSchema.validate({ ...LISTED, joinedAt: undefined }),
       ).toBe(false);
       expect(
-        organizationMemberListedEventDataSchema.safeParse({ ...LISTED, backfilled: false }).success,
+        organizationMemberListedEventDataSchema.validate({ ...LISTED, backfilled: false }),
       ).toBe(false);
     });
   });

@@ -142,9 +142,7 @@ describe.skipIf(!databaseUrl)("given nurturing's organization admin in Postgres"
       await organizations.recordAdminFact(fact(organizationId, { adminUserId: "admin-a" }));
       await organizations.forgetAdmin({ adminUserId: person });
 
-      await organizations.recordAdminFact(
-        fact(organizationId, { adminUserId: person, at: 2_000 }),
-      );
+      await organizations.recordAdminFact(fact(organizationId, { adminUserId: person, at: 2_000 }));
       await organizations.recordAdminFact(fact(organizationId, { adminUserId: "admin-b" }));
 
       await expect(stored(organizationId)).resolves.toMatchObject({

@@ -3,7 +3,7 @@ import type { CioBatchCall, NurturingSignalOf } from "@langwatch/enterprise-nurt
 import { createLogger } from "@langwatch/observability";
 
 import type { NurturingOrganizationMemberRepository } from "../repositories/nurturing-organization-member.repository.ts";
-import type { NurturingOrganizationPlanRepository } from "../repositories/nurturing-organization-plan.repository.ts";
+import type { NurturingOrganizationPlanCopyRepository } from "../repositories/nurturing-organization-plan.repository.ts";
 import {
   type NurturingMembership,
   membersWhoseLatestOrganizationIsElsewhere,
@@ -33,7 +33,7 @@ type PlanSyncDependencies = Readonly<{
   /** The same member copy the usage sync reads, read here by person: whose latest org is whose. */
   members: Pick<NurturingOrganizationMemberRepository, "findMembershipsOfUsers">;
   /** Nurturing's plan copy: a fact that does not change it tells Customer.io nothing. */
-  plans: NurturingOrganizationPlanRepository;
+  plans: NurturingOrganizationPlanCopyRepository;
 }>;
 
 type SubscriptionChanged = NurturingSignalOf<"subscription_changed">;
