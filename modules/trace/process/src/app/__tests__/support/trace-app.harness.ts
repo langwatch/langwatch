@@ -27,13 +27,27 @@ export function braidPlansOf(type: PlanType = "FREE"): TraceAppDependencies["bra
   };
 }
 
+/** The organisation's "Braids enabled" setting, answered the same for every organisation. */
+export function braidSettingsOf(braidsEnabled: boolean): TraceAppDependencies["braidSettings"] {
+  return {
+    getOrganizationPolicy: async ({ organizationId }) => ({
+      organizationId,
+      braidsOrganizationAdminsOnly: false,
+      braidsEnabled,
+      updatedByUserId: null,
+      updatedAtMs: null,
+    }),
+  };
+}
+
 /** The braid peers by name: a test that reaches one it did not configure fails by its name. */
 export function braidTwins(): Pick<
   TraceAppDependencies,
-  "braidPlans" | "braidDirectory" | "braidPrices"
+  "braidPlans" | "braidSettings" | "braidDirectory" | "braidPrices"
 > {
   return {
     braidPlans: braidPlansOf(),
+    braidSettings: createApiFixture<AuthzApi>({}, "braidSettings"),
     braidDirectory: {
       authz: createApiFixture<AuthzApi>({}, "braidAuthz"),
       projects: createApiFixture<ProjectApi>({}, "braidProjects"),

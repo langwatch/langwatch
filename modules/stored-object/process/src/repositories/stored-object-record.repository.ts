@@ -57,6 +57,9 @@ export interface StoredObjectRecordRepository {
 
   upsert(value: StoredObjectRecord): Promise<void>;
 
+  /** Writes `value` only where no row holds its id yet; false when one already does. */
+  insert(value: StoredObjectRecord): Promise<boolean>;
+
   /** Writes `next` only while the row still holds `expected`'s status and generation. */
   transition(input: {
     expected: Pick<StoredObjectRecord, "status" | "generation">;

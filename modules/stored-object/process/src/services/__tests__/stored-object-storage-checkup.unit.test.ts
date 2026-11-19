@@ -4,7 +4,8 @@
  * but gives clients no address to send them to.
  * @see modules/stored-object/specs/uploads-through-langwatch.feature
  */
-import { memoryObjectStorage } from "@langwatch/process-stores";
+import { memoryObjectStorage, type ObjectStorage } from "@langwatch/process-stores";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -49,6 +50,35 @@ function throughLangWatch(): StoredObjectBytesRepository {
   return ObjectStorageStoredObjectBytesRepository.create({ objectStorage: memoryObjectStorage() });
 }
 
+/**
+ * A member under a given upload setting that answers only what a checkup may ask: the probe's
+ * write and remove, the upload route, and signing. Each signed key is recorded; route and
+ * signing answer for the checked project only, so a call for any other project fails the test.
+ */
+function memberUnder(route: "direct" | "through-process", { refusal }: { refusal?: Error } = {}) {
+  const signed: string[] = [];
+  const twin = memoryObjectStorage();
+  const objectStorage = createApiFixture<ObjectStorage>(
+    {
+      write: (at, body, facts) => twin.write(at, body, facts),
+      remove: (at) => twin.remove(at),
+      uploadRoute: async (projectId) => {
+        if (projectId !== PROJECT_ID) throw new Error(`Asked the route of ${projectId}.`);
+        return route;
+      },
+      signUpload: async (at) => {
+        if (at.projectId !== PROJECT_ID) throw new Error(`Signed for ${at.projectId}.`);
+        signed.push(at.key);
+        if (refusal) throw refusal;
+        return { kind: "direct", url: `https://bucket.example/${at.key}`, headers: {} };
+      },
+    },
+    "objectStorage",
+  );
+
+  return { signed, storage: ObjectStorageStoredObjectBytesRepository.create({ objectStorage }) };
+}
+
 describe("StoredObjectService.probeStorage", () => {
   describe("given an account set to upload through LangWatch", () => {
     describe("when the deployment names no public base URL", () => {
@@ -82,6 +112,60 @@ describe("StoredObjectService.probeStorage", () => {
 
         await expect(service.probeStorage({ projectId: PROJECT_ID })).resolves.toBeUndefined();
         expect(storage.probes).toBe(1);
+      });
+    });
+  });
+  describe("given a member that refuses to sign any upload", () => {
+    describe("when the account is set to upload through LangWatch and no public base URL is named", () => {
+      /** @scenario "The storage checkup reads where uploads go from the account's setting" */
+      it("still names the missing address, from the setting alone", async () => {
+        const { signed, storage } = memberUnder("through-process", {
+          refusal: new Error("This member's credentials cannot sign an upload."),
+        });
+        const service = serviceOver({ storage, publicBaseUrl: undefined });
+
+        await expect(service.probeStorage({ projectId: PROJECT_ID })).rejects.toMatchObject({
+          code: "direct_upload_unavailable",
+        });
+        expect(signed).toEqual([]);
+      });
+    });
+
+    describe("when the account is set to upload through LangWatch and a public base URL is named", () => {
+      /** @scenario "The storage checkup reads where uploads go from the account's setting" */
+      it("passes without signing anything", async () => {
+        const { signed, storage } = memberUnder("through-process", {
+          refusal: new Error("This member's credentials cannot sign an upload."),
+        });
+        const service = serviceOver({ storage, publicBaseUrl: "https://app.example" });
+
+        await expect(service.probeStorage({ projectId: PROJECT_ID })).resolves.toBeUndefined();
+        expect(signed).toEqual([]);
+      });
+    });
+
+    describe("when the account is set to upload directly", () => {
+      /** @scenario "The storage checkup reads where uploads go from the account's setting" */
+      it("fails, since clients could not be handed an upload address", async () => {
+        const refusal = new Error("This member's credentials cannot sign an upload.");
+        const { signed, storage } = memberUnder("direct", { refusal });
+        const service = serviceOver({ storage, publicBaseUrl: undefined });
+
+        await expect(service.probeStorage({ projectId: PROJECT_ID })).rejects.toBe(refusal);
+        expect(signed).toHaveLength(1);
+      });
+    });
+  });
+
+  describe("given a member whose account uploads directly and can sign", () => {
+    describe("when the storage checkup runs", () => {
+      /** @scenario "The storage checkup reads where uploads go from the account's setting" */
+      it("signs one throwaway upload under the checkup prefix and passes", async () => {
+        const { signed, storage } = memberUnder("direct");
+        const service = serviceOver({ storage, publicBaseUrl: undefined });
+
+        await expect(service.probeStorage({ projectId: PROJECT_ID })).resolves.toBeUndefined();
+        expect(signed).toEqual([expect.stringMatching(new RegExp(`^${PROJECT_ID}/checkup/`))]);
       });
     });
   });

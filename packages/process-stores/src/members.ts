@@ -65,6 +65,9 @@ export type SignedObjectUpload =
   | Readonly<{ kind: "direct"; url: string; headers: Readonly<Record<string, string>> }>
   | Readonly<{ kind: "through-process" }>;
 
+/** Where an account sends clients' upload bytes: straight to the bucket, or through the process. */
+export type ObjectUploadRoute = SignedObjectUpload["kind"];
+
 /** Where one project's objects live. */
 export type ObjectStorageDestination =
   | Readonly<{ kind: "s3"; bucket: string }>
@@ -92,6 +95,8 @@ export interface ObjectStorage {
   /** Removes the object; an absent one is already removed. */
   remove(at: StoredObjectAddress): Promise<void>;
   signUpload(at: StoredObjectAddress, facts: UploadFacts): Promise<SignedObjectUpload>;
+  /** Where the project's account sends clients' upload bytes, from its setting: signs nothing. */
+  uploadRoute(projectId: string): Promise<ObjectUploadRoute>;
   /** A GET URL a remote reader fetches the object from; a backend with no URL to sign refuses. */
   signDownload(at: StoredObjectAddress, facts: DownloadFacts): Promise<string>;
   destination(projectId: string): Promise<ObjectStorageDestination>;

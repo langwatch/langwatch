@@ -124,6 +124,28 @@ export class InstantEvalClassifierNotConfiguredError extends HandledError {
   }
 }
 
+/**
+ * Every row of a run's page was refused for the project's own decision model's key: refused by
+ * the provider, no key, or the provider row off. Failed rather than recorded as skips, which a
+ * caller would read as nothing matching. Names no provider and no key.
+ */
+export class InstantEvalDecisionModelKeyInvalidError extends HandledError {
+  declare readonly code: "instant_eval_decision_model_key_invalid";
+
+  constructor() {
+    super(
+      "instant_eval_decision_model_key_invalid",
+      "The key for this project's Instant Evals model could not be used. Check it in Settings > Model Providers.",
+      {
+        httpStatus: 403,
+        fault: "customer",
+        ...remediation("instant_eval_decision_model_key_invalid"),
+      },
+    );
+    this.name = "InstantEvalDecisionModelKeyInvalidError";
+  }
+}
+
 /** The memory judge answers from a hash, not the text, so a production process refuses it. */
 export class InstantEvalMemoryJudgeInProductionError extends HandledError {
   declare readonly code: "instant_eval_memory_judge_in_production";

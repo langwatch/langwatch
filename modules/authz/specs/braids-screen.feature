@@ -11,7 +11,7 @@ Feature: The Braids screen
   So that I can decide what leaves a project and see what arrives in it
 
   Background:
-    Given an Enterprise organisation with plain projects "orchestrator" and "specialists"
+    Given an Enterprise organisation with Braids turned on and plain projects "orchestrator" and "specialists"
     And an organisation admin named ana viewing the settings of "specialists"
 
   Rule: The page explains braids before there are any
@@ -332,5 +332,62 @@ Feature: The Braids screen
       And the organisation has left Enterprise
       When ana opens Braids
       Then a banner above the sections says braids are paused and start again on upgrade
+      And while the organisation has Braids turned off it says an organisation admin must also turn it on
+      And while that setting can't be read it says upgrading resumes braids only if Braids is on
       And each braid row is marked paused once, where its activity would be
       And the Signing keys section says signing keys need the Enterprise plan, with no New signing key
+
+  Rule: An organisation turns Braids on in settings
+    # Decided by Alex, 2026-11-18. The setting's rules: braids.feature, same rule name.
+
+    @integration
+    Scenario: An organisation admin turns Braids on at the top of the organisation Braids page
+      Given the organisation has Braids turned off
+      When ana opens Braids in the organisation settings
+      Then an "Enable Braids" switch is the first section, above "Who may braid"
+      And it says turning it on lets projects braid, and turning it off pauses braids and keeps them
+      And turning it on saves the setting and says Braids is on
+
+    @integration
+    Scenario: The Enable Braids row offers Retry while the setting can't be read
+      Given reading the organisation's Braids settings fails
+      When ana opens Braids in the organisation settings
+      Then the Enable Braids row says the setting couldn't be read and shows no switch
+      And Retry reads the setting again
+
+    @integration
+    Scenario: The Enable Braids row shows no switch until the setting is read
+      Given reading the organisation's Braids settings has not answered yet
+      When ana opens Braids in the organisation settings
+      Then the Enable Braids row shows a placeholder where the switch goes
+      And there is no switch, on or off, until the setting answers
+
+    @integration
+    Scenario: Below Enterprise the organisation Braids page offers the upsell instead of the switch
+      Given an organisation below Enterprise
+      When ana opens Braids in the organisation settings
+      Then the "Enable Braids" row says Braids is included in Enterprise and offers See plans
+      And there is no switch to turn it on
+
+    @integration
+    Scenario: While Braids is off the organisation page lists its braids as paused
+      Given a live braid from "specialists" into "orchestrator"
+      And the organisation has Braids turned off
+      When ana opens Braids in the organisation settings
+      Then the braid is listed, marked paused
+
+    @integration
+    Scenario: While Braids is off the project page sends an organisation admin to turn it on
+      Given a live braid from "specialists" into "orchestrator"
+      And the organisation has Braids turned off
+      When ana opens the project Braids page of "specialists"
+      Then a banner says Braids is off for the organisation and links to the organisation Braids page
+      And the braid is listed, marked paused, with Remove and without New braid or Edit
+
+    @integration
+    Scenario: While Braids is off the project page tells a project admin to ask an organisation admin
+      Given the organisation has Braids turned off
+      And tom, an admin of the team holding "specialists" who is not an organisation admin
+      When tom opens the project Braids page of "specialists"
+      Then a banner says Braids is off for the organisation and to ask an organisation admin to turn it on
+      And it offers no link to the organisation Braids page

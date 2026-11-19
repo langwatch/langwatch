@@ -4,11 +4,11 @@ import { HandledError } from "@langwatch/handled-error";
 import { generate, KSUID_RESOURCES } from "@langwatch/ksuid";
 import { readableBody } from "@langwatch/process-stores/members";
 import {
-  StorageUnavailableError,
   StoredObjectBytesMissingError,
   StoredObjectDeletedError,
   StoredObjectNotFoundError,
   StoredObjectUnavailableError,
+  StoredObjectWriteConflictError,
   type ConfirmStoredObjectUploadInput,
   type CreateStoredObjectUploadInput,
   type DeleteProjectStoredObjectsResult,
@@ -383,7 +383,7 @@ export class StoredObjectService {
       }
     }
 
-    throw new StorageUnavailableError();
+    throw new StoredObjectWriteConflictError(input.projectId, input.id);
   }
 
   async getStorageUsageByProject(input: {
@@ -413,13 +413,15 @@ export class StoredObjectService {
     return this.options.storage.resolveDestination(input);
   }
 
-  /** Writes and removes a probe, then refuses an account clients cannot be sent through. */
+  /** Writes and removes a probe, then proves clients can be handed an upload address. */
   async probeStorage(input: { projectId: string }): Promise<void> {
     await this.options.storage.probe(input);
-    const expiresAt = this.now().add({ minutes: 1 });
-    if (await this.options.storage.uploadsThroughProcess({ ...input, expiresAt })) {
+    if (await this.options.storage.uploadsThroughProcess(input)) {
       this.options.signer.publicOrigin();
+      return;
     }
+    const expiresAt = this.now().add({ minutes: 1 });
+    await this.options.storage.signCheckupUpload({ ...input, expiresAt });
   }
 
   async deleteOwnedBy(input: { projectId: string }): Promise<DeleteProjectStoredObjectsResult> {
