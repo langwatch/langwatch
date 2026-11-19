@@ -119,7 +119,8 @@ const CODE_PATTERNS = [
  */
 const NON_CODE_LITERALS = new Set([
   "unknown",
-  // A kill switch target outcome code (KillSwitchPlatformError), recorded on the stop, never raised.
+  // A kill switch target outcome code (KillSwitchPlatformError): recorded on the stop,
+  // never raised.
   "source_not_configured",
 ]);
 
