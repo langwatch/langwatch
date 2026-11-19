@@ -4093,10 +4093,6 @@ model InstantEvalJudgeUsageBilling {
   usageBilled    Boolean
   occurredAt     DateTime
   fromCatchUp    Boolean
-  /// The event ids folded in, so a redelivery folds once.
-  appliedEventIds String[] @default([])
-  /// The fact that last changed the row; only it may tell Customer.io.
-  winnerEventId   String?
 }
 
 // The judge's own spend, one row per request, never rewritten. The organization's total is
@@ -5287,10 +5283,14 @@ model NurturingOrganizationCreated {
 /// copy. The newest fact wins, and a real fact wins a tie over a catch-up; Customer.io hears a
 /// fact only when it changes this row.
 model NurturingOrganizationPlan {
-  organizationId String   @id
-  plan           String?
-  occurredAt     DateTime
-  fromCatchUp    Boolean
+  organizationId  String   @id
+  plan            String?
+  occurredAt      DateTime
+  fromCatchUp     Boolean
+  /// The event ids folded in, so a redelivery folds once.
+  appliedEventIds String[] @default([])
+  /// The fact that last changed the row; only it may tell Customer.io.
+  winnerEventId   String?
 }
 
 /// Each gateway virtual key, folded from gateway's vk_lifecycle facts: nurturing's own copy. The

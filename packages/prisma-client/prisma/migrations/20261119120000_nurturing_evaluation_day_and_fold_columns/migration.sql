@@ -25,7 +25,7 @@
 
 ALTER TABLE "NurturingOrganization" ADD COLUMN IF NOT EXISTS "adminAt" TIMESTAMP(3);
 
-ALTER TABLE "NurturingOrganizationPlan" ADD COLUMN IF NOT EXISTS "appliedEventIds" TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[], ADD COLUMN IF NOT EXISTS "winnerEventId" TEXT;
+ALTER TABLE "NurturingOrganizationPlan" ADD COLUMN IF NOT EXISTS "appliedEventIds" TEXT[] DEFAULT ARRAY[]::TEXT[], ADD COLUMN IF NOT EXISTS "winnerEventId" TEXT;
 
 CREATE TABLE IF NOT EXISTS "NurturingProjectEvaluationDay" (
     "projectId" TEXT NOT NULL,
