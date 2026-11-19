@@ -2142,7 +2142,7 @@ type Output = z.infer<typeof governanceSpenderBreakdownSchema>; // ../contract/s
 
 ### `governanceKillSwitch`
 
-Contract `../contract/src/features/kill-switch/agent-kill-switch.ts:580`, router `src/transport/governance-kill-switch.trpc.ts:33`.
+Contract `../contract/src/features/kill-switch/agent-kill-switch.ts:582`, router `src/transport/governance-kill-switch.trpc.ts:33`.
 
 | Procedure                                  | Kind     | Gate                                                                                | Input  | Output                    |
 | ------------------------------------------ | -------- | ----------------------------------------------------------------------------------- | ------ | ------------------------- |
@@ -2161,21 +2161,21 @@ Contract `../contract/src/features/kill-switch/agent-kill-switch.ts:580`, router
 
 ```typescript
 // governanceKillSwitch.summaries
-// Input: inline, ../contract/src/features/kill-switch/agent-kill-switch.ts:582
+// Input: inline, ../contract/src/features/kill-switch/agent-kill-switch.ts:584
 interface Input {
   organizationId: string;
 }
-// Output: agentKillSwitchSummarySchema.array() (inline, ../contract/src/features/kill-switch/agent-kill-switch.ts:583)
+// Output: agentKillSwitchSummarySchema.array() (inline, ../contract/src/features/kill-switch/agent-kill-switch.ts:585)
 
 // governanceKillSwitch.pendingApprovals
-// Input: inline, ../contract/src/features/kill-switch/agent-kill-switch.ts:586
+// Input: inline, ../contract/src/features/kill-switch/agent-kill-switch.ts:588
 interface Input {
   organizationId: string;
 }
-// Output: agentStopViewSchema.array() (inline, ../contract/src/features/kill-switch/agent-kill-switch.ts:587)
+// Output: agentStopViewSchema.array() (inline, ../contract/src/features/kill-switch/agent-kill-switch.ts:589)
 
 // governanceKillSwitch.plan
-// Input: inline, ../contract/src/features/kill-switch/agent-kill-switch.ts:590
+// Input: inline, ../contract/src/features/kill-switch/agent-kill-switch.ts:592
 interface Input {
   organizationId: string;
   agentId: string;
@@ -2183,15 +2183,15 @@ interface Input {
 type Output = z.infer<typeof agentStopPlanSchema>; // ../contract/src/features/kill-switch/agent-kill-switch.ts:75
 
 // governanceKillSwitch.setPlan
-// Input: z.object({ ...agentScope, targets: setAgentStopPlanInputSchema.shape.targets, expectedVer… (inline, ../contract/src/features/kill-switch/agent-kill-switch.ts:595)
+// Input: z.object({ ...agentScope, targets: setAgentStopPlanInputSchema.shape.targets, expectedVer… (inline, ../contract/src/features/kill-switch/agent-kill-switch.ts:597)
 type Output = z.infer<typeof agentStopPlanSchema>; // ../contract/src/features/kill-switch/agent-kill-switch.ts:75
 
 // governanceKillSwitch.awsConnections
-// Input: inline, ../contract/src/features/kill-switch/agent-kill-switch.ts:604
+// Input: inline, ../contract/src/features/kill-switch/agent-kill-switch.ts:606
 interface Input {
   organizationId: string;
 }
-// Output: inline, ../contract/src/features/kill-switch/agent-kill-switch.ts:605
+// Output: inline, ../contract/src/features/kill-switch/agent-kill-switch.ts:607
 type Output = {
   id: string;
   name: string;
@@ -2202,7 +2202,7 @@ type Output = {
 }[];
 
 // governanceKillSwitch.createAwsConnection
-// Input: inline, ../contract/src/features/kill-switch/agent-kill-switch.ts:608
+// Input: inline, ../contract/src/features/kill-switch/agent-kill-switch.ts:610
 interface Input {
   organizationId: string;
   connection: {
@@ -2223,18 +2223,18 @@ interface Output {
 }
 
 // governanceKillSwitch.deleteAwsConnection
-// Input: inline, ../contract/src/features/kill-switch/agent-kill-switch.ts:612
+// Input: inline, ../contract/src/features/kill-switch/agent-kill-switch.ts:614
 interface Input {
   organizationId: string;
   connectionId: string;
 }
-// Output: inline, ../contract/src/features/kill-switch/agent-kill-switch.ts:613
+// Output: inline, ../contract/src/features/kill-switch/agent-kill-switch.ts:615
 interface Output {
   deleted: boolean;
 }
 
 // governanceKillSwitch.requestStop
-// Input: inline, ../contract/src/features/kill-switch/agent-kill-switch.ts:617
+// Input: inline, ../contract/src/features/kill-switch/agent-kill-switch.ts:619
 interface Input {
   organizationId: string;
   agentId: string;
@@ -2244,7 +2244,7 @@ interface Input {
 type Output = z.infer<typeof agentStopViewSchema>; // ../contract/src/features/kill-switch/agent-kill-switch.ts:248
 
 // governanceKillSwitch.approveStop
-// Input: inline, ../contract/src/features/kill-switch/agent-kill-switch.ts:627
+// Input: inline, ../contract/src/features/kill-switch/agent-kill-switch.ts:629
 interface Input {
   organizationId: string;
   stopId: string;
@@ -2254,7 +2254,7 @@ interface Input {
 type Output = z.infer<typeof agentStopViewSchema>; // ../contract/src/features/kill-switch/agent-kill-switch.ts:248
 
 // governanceKillSwitch.denyStop
-// Input: inline, ../contract/src/features/kill-switch/agent-kill-switch.ts:636
+// Input: inline, ../contract/src/features/kill-switch/agent-kill-switch.ts:638
 interface Input {
   organizationId: string;
   stopId: string;
@@ -2263,7 +2263,7 @@ interface Input {
 type Output = z.infer<typeof agentStopViewSchema>; // ../contract/src/features/kill-switch/agent-kill-switch.ts:248
 
 // governanceKillSwitch.restore
-// Input: inline, ../contract/src/features/kill-switch/agent-kill-switch.ts:640
+// Input: inline, ../contract/src/features/kill-switch/agent-kill-switch.ts:642
 interface Input {
   organizationId: string;
   stopId: string;
@@ -2271,7 +2271,7 @@ interface Input {
 type Output = z.infer<typeof agentStopViewSchema>; // ../contract/src/features/kill-switch/agent-kill-switch.ts:248
 
 // governanceKillSwitch.retryStop
-// Input: inline, ../contract/src/features/kill-switch/agent-kill-switch.ts:644
+// Input: inline, ../contract/src/features/kill-switch/agent-kill-switch.ts:646
 interface Input {
   organizationId: string;
   stopId: string;
