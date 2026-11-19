@@ -64,4 +64,9 @@ export class NurturingService {
   async batch(calls: CioBatchCall[]): Promise<void> {
     await this.channel.batch(calls);
   }
+
+  /** As batch, but rejects when Customer.io did not take the batch. */
+  async batchOrThrow(calls: CioBatchCall[]): Promise<void> {
+    await this.channel.batchOrThrow(calls);
+  }
 }

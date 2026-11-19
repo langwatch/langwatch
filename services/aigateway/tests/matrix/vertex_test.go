@@ -58,16 +58,9 @@ func TestVertex_StructuredOutputs(t *testing.T) {
 // the setup call which uses Vertex's project-scoped cachedContents endpoint
 // authenticated with an OAuth2 access token (not API key).
 //
-// Requires:
-//   - VERTEX_PROJECT     GCP project id (e.g. "langwatch")
-//   - VERTEX_LOCATION    region (e.g. "us-central1")
-//   - VERTEX_ACCESS_TOKEN  OAuth2 token, OR
-//   - GOOGLE_APPLICATION_CREDENTIALS  path to a service-account JSON; the
-//     test will exec `gcloud auth print-access-token --account=…` to mint
-//     a fresh token (matches the local-dev auth flow).
-//
-// Skip if neither auth path is available — the rest of the matrix still
-// runs without GCP creds.
+// Requires VERTEX_PROJECT, VERTEX_LOCATION and an OAuth2 token: either
+// VERTEX_ACCESS_TOKEN (CI mints it from the service-account secret) or a
+// gcloud session. It skips when none is available.
 func TestVertex_Cache(t *testing.T) {
 	project := requireEnv(t, "VERTEX_PROJECT")
 	location := os.Getenv("VERTEX_LOCATION")

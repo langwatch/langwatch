@@ -43,6 +43,7 @@ const subscriptionRecord = (
   endDate: null,
   maxMembers: null,
   maxMembersLite: null,
+  maxMembersDeveloper: null,
   maxMessagesPerMonth: null,
   lastPaymentFailedDate: null,
   seatsKept: null,
@@ -116,6 +117,7 @@ const createMockOrganizationRepository = (): {
   claimStripeCustomerId: vi.fn(),
   findWithAdministrators: vi.fn(),
   findActiveMemberIds: vi.fn(),
+  findMemberEmails: vi.fn(),
   findSelfHostedCustomers: vi.fn(),
   listIds: vi.fn(),
 });

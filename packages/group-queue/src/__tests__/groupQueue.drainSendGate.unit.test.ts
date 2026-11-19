@@ -172,6 +172,31 @@ describe("GroupQueueProcessor staging gate during shutdown", () => {
     });
   });
 
+  describe("given a caller that wraps the refusal in its own error", () => {
+    describe("when the wrapped error is checked", () => {
+      /** @scenario "A refusal wrapped by the caller is still recognised" */
+      it("recognises the refusal through its cause chain", () => {
+        const refusal = new QueueStagingClosedError({ queueName: "q", operation: "sendEach" });
+        const wrapped = new Error("dispatch failed", {
+          cause: new Error("batch failed", { cause: refusal }),
+        });
+
+        expect(isQueueStagingClosed(wrapped)).toBe(true);
+        expect(
+          isQueueStagingClosed(new Error("dispatch failed", { cause: new Error("Redis down") })),
+        ).toBe(false);
+      });
+
+      /** @scenario "A refusal wrapped by the caller is still recognised" */
+      it("stops on a cause chain that loops back on itself", () => {
+        const looped = new Error("first");
+        looped.cause = new Error("second", { cause: looped });
+
+        expect(isQueueStagingClosed(looped)).toBe(false);
+      });
+    });
+  });
+
   describe("given a queue whose drain overran its budget", () => {
     /** @scenario A drain that overran its budget still closes the gate */
     /** @scenario "Closing a GroupQueueConsumer drains claimed work within its budget" */

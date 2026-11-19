@@ -352,13 +352,14 @@ type Response = z.infer<typeof queryReferenceSchema>; // ../contract/src/feature
 
 ### `analytics.lwql`
 
-Contract `../contract/src/features/lwql/analytics-lwql.trpc.ts:122`, router `src/transport/analytics-lwql.trpc.ts:82`.
+Contract `../contract/src/features/lwql/analytics-lwql.trpc.ts:134`, router `src/transport/analytics-lwql.trpc.ts:85`.
 
 | Procedure                         | Kind     | Gate                        | Input                    | Output                          |
 | --------------------------------- | -------- | --------------------------- | ------------------------ | ------------------------------- |
 | `analytics.lwql.availability`     | query    | Permission `analytics:view` | `lwqlProjectScopeSchema` | `langWatchQLAvailabilitySchema` |
 | `analytics.lwql.schema`           | query    | Permission `analytics:view` | `lwqlProjectScopeSchema` | `langWatchQLSchema`             |
 | `analytics.lwql.validate`         | query    | Permission `analytics:view` | `lwqlRunRequestSchema`   | `lwqlValidationResultSchema`    |
+| `analytics.lwql.spanDataFloor`    | query    | Permission `analytics:view` | `lwqlProjectScopeSchema` | `lwqlSpanDataFloorSchema`       |
 | `analytics.lwql.readableProjects` | query    | Permission `analytics:view` | `lwqlProjectScopeSchema` | `lwqlReadableProjectsSchema`    |
 | `analytics.lwql.query`            | mutation | Permission `analytics:view` | `lwqlQueryRequestSchema` | `langWatchQLQueryResultSchema`  |
 
@@ -391,6 +392,14 @@ interface Input {
   granularitySeconds?: 1 | 60 | 3600 | 86400 | 604800;
 }
 type Output = z.infer<typeof lwqlValidationResultSchema>; // ../contract/src/features/lwql/analytics-lwql.trpc.ts:100
+
+// analytics.lwql.spanDataFloor
+type Input = z.infer<typeof lwqlProjectScopeSchema>; // ../contract/src/features/lwql/analytics-lwql.trpc.ts:25
+// Output: lwqlSpanDataFloorSchema, ../contract/src/features/lwql/analytics-lwql.trpc.ts:131
+interface Output {
+  from: string | null;
+  rebuilding: boolean;
+}
 
 // analytics.lwql.readableProjects
 type Input = z.infer<typeof lwqlProjectScopeSchema>; // ../contract/src/features/lwql/analytics-lwql.trpc.ts:25
@@ -486,11 +495,11 @@ Declared at `src/eventing/analytics-lwql-reconvergence.pipeline.ts:57`.
 
 | Kind   | Leaf                              | Environment variable                      | Declared at                              |
 | ------ | --------------------------------- | ----------------------------------------- | ---------------------------------------- |
-| secret | `lwqlClickHousePassword`          | `LWQL_CLICKHOUSE_PASSWORD`                | `src/app/analytics.app.ts:485`           |
-| secret | `lwqlPostgresReaderPassword`      | `LWQL_POSTGRES_READER_PASSWORD`           | `src/app/analytics.app.ts:486`           |
-| secret | `queryHashKey`                    | `API_KEY_PEPPER`                          | `src/app/analytics.app.ts:487`           |
-| secret | `queryHashKeyFallback`            | `CREDENTIALS_SECRET`                      | `src/app/analytics.app.ts:488`           |
-| secret | `queryHashKeyLastFallback`        | `NEXTAUTH_SECRET`                         | `src/app/analytics.app.ts:489`           |
+| secret | `lwqlClickHousePassword`          | `LWQL_CLICKHOUSE_PASSWORD`                | `src/app/analytics.app.ts:486`           |
+| secret | `lwqlPostgresReaderPassword`      | `LWQL_POSTGRES_READER_PASSWORD`           | `src/app/analytics.app.ts:487`           |
+| secret | `queryHashKey`                    | `API_KEY_PEPPER`                          | `src/app/analytics.app.ts:488`           |
+| secret | `queryHashKeyFallback`            | `CREDENTIALS_SECRET`                      | `src/app/analytics.app.ts:489`           |
+| secret | `queryHashKeyLastFallback`        | `NEXTAUTH_SECRET`                         | `src/app/analytics.app.ts:490`           |
 | config | `langwatchQl.url`                 | `LWQL_CLICKHOUSE_URL`                     | `../contract/src/analytics.config.ts:11` |
 | config | `langwatchQl.username`            | `LWQL_CLICKHOUSE_USER`                    | `../contract/src/analytics.config.ts:12` |
 | config | `langwatchQl.database`            | `LWQL_DATABASE`                           | `../contract/src/analytics.config.ts:13` |

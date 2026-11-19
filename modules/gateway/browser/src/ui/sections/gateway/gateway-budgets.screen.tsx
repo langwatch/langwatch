@@ -211,9 +211,6 @@ function BudgetsPage() {
         </PageLayout.Header>
 
         <PageLayout.Container>
-          <Text color="fg.muted" marginBottom={6}>
-            Spend ceilings that stop or warn before a team, project, key or member overspends.
-          </Text>
           {isLoading && <ListSkeleton />}
           {showError && (
             <GatewayErrorPanel

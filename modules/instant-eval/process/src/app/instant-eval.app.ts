@@ -89,6 +89,7 @@ import {
 } from "../services/instant-eval-estimate.service.ts";
 import { InstantEvalFinishService } from "../services/instant-eval-finish.service.ts";
 import { InstantEvalFreeBudgetService } from "../services/instant-eval-free-budget.service.ts";
+import { InstantEvalGatewayBudgetService } from "../services/instant-eval-gateway-budget.service.ts";
 import { InstantEvalHostedSwitchJudgeService } from "../services/instant-eval-hosted-switch-judge.service.ts";
 import { InstantEvalJudgeChoiceService } from "../services/instant-eval-judge-choice.service.ts";
 import { InstantEvalJudgePageService } from "../services/instant-eval-judge-page.service.ts";
@@ -286,6 +287,13 @@ export class InstantEvalModule implements InstantEvalApiContract, InstantEvalBro
       reservations: repositories.budgetReservations,
       isBounded,
     });
+    const gatewayBudget = InstantEvalGatewayBudgetService.create({
+      peers: {
+        findSpendAttribution: spendAttributionOf(projects),
+        checkBudget: (input) => gateway.checkBudget(input),
+        isOwnDecisionModel: (input) => judge.isOwnDecisionModel(input),
+      },
+    });
     const context = InstantEvalRunContextService.create({
       runs: repositories.runs,
       peers: {
@@ -320,6 +328,7 @@ export class InstantEvalModule implements InstantEvalApiContract, InstantEvalBro
     const queries = InstantEvalQueryJudgingService.create({
       rows: InstantEvalJudgeRowsService.create({ judge }),
       budget,
+      gatewayBudget,
       spend: judgedSpend,
       holdPricing: () => setup.channels.judges.queryHoldPricing(),
       queryTokenBudget: setup.config.queryTokenBudget,
@@ -372,6 +381,7 @@ export class InstantEvalModule implements InstantEvalApiContract, InstantEvalBro
             textSource,
           }),
           budget,
+          gatewayBudget,
           proofs: InstantEvalTraceProofService.create({ authz: setup.dependencies.authz }),
         },
         peers: {
@@ -403,8 +413,10 @@ export class InstantEvalModule implements InstantEvalApiContract, InstantEvalBro
             judgments: repositories.judgments,
             cancellations,
             budget,
+            gatewayBudget,
             analytics,
             judgedSpend,
+            ownModels: judge,
           }),
           commands: () => dispatcher.outcomeCommands(),
         },
@@ -511,8 +523,10 @@ export class InstantEvalModule implements InstantEvalApiContract, InstantEvalBro
     judgments,
     cancellations,
     budget,
+    gatewayBudget,
     analytics,
     judgedSpend,
+    ownModels,
   }: {
     context: InstantEvalRunContextService;
     rowSource: InstantEvalRowSourceService;
@@ -521,8 +535,10 @@ export class InstantEvalModule implements InstantEvalApiContract, InstantEvalBro
     judgments: InstantEvalRepositories["judgments"];
     cancellations: InstantEvalCancellationRepository;
     budget: InstantEvalFreeBudgetService;
+    gatewayBudget: InstantEvalGatewayBudgetService;
     analytics: AnalyticsApi;
     judgedSpend: InstantEvalJudgedSpendService;
+    ownModels: Pick<InstantEvalDecisionModelJudgeService, "isOwnDecisionModel">;
   }): InstantEvalRunExecutor {
     const plans = InstantEvalPlanService.create({
       context,
@@ -538,6 +554,8 @@ export class InstantEvalModule implements InstantEvalApiContract, InstantEvalBro
       judgments,
       cancellation: cancellations,
       budget,
+      gatewayBudget,
+      ownModels,
     });
     const finishes = InstantEvalFinishService.create({
       spend: judgedSpend,

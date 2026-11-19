@@ -24,6 +24,7 @@
     "@langwatch/browser-host": "workspace:*",
     "@langwatch/data-privacy-contract": "workspace:*",
     "@langwatch/design-system": "workspace:*",
+    "@langwatch/feature-flag-contract": "workspace:*",
     "@langwatch/redaction": "workspace:*",
     "lucide-react": "catalog:",
     "safe-regex2": "catalog:"
@@ -31,6 +32,7 @@
   "devDependencies": {
     "@chakra-ui/react": "catalog:",
     "@emotion/react": "catalog:",
+    "@langwatch/test-harness": "workspace:*",
     "@langwatch/vitest-config": "workspace:*",
     "@testing-library/jest-dom": "catalog:",
     "@testing-library/react": "catalog:",

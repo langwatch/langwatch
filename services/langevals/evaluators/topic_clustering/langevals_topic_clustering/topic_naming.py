@@ -26,6 +26,15 @@ logger = get_logger("topic_clustering.naming")
 os.environ["AZURE_API_VERSION"] = "2024-02-01"
 
 
+def cost_of(response) -> float:
+    """A model litellm cannot price costs nothing here, so its names are kept."""
+    try:
+        return completion_cost(response) or 0.0
+    except Exception as e:
+        logger.warning("Could not price the naming call, counting it as zero", error=str(e))
+        return 0.0
+
+
 @retry(wait=wait_exponential(min=12, max=60), stop=stop_after_attempt(4), reraise=True)
 def generate_topic_names(
     litellm_params: dict[str, str],
@@ -100,7 +109,7 @@ def generate_topic_names(
             f"Failed to generate topic names for {len(topic_examples)} topics: {e}\n\nExisting: {existing_str}\n\nTopic examples: {topic_examples_str}\n\n. Error: {e}"
         )
 
-    total_cost = completion_cost(response)
+    total_cost = cost_of(response)
     topic_names_dict = json.loads(
         response.choices[0].message.tool_calls[0].function.arguments  # type: ignore
     )
@@ -339,7 +348,7 @@ def improve_name_between_two_topics(
             f"Failed to improve names between {topic_a_name} and {topic_b_name}: {e}\n\nTopic examples: {topic_examples_str}\n\n. Error: {e}"
         )
 
-    total_cost = completion_cost(response)
+    total_cost = cost_of(response)
 
     arguments = json.loads(response.choices[0].message.tool_calls[0].function.arguments)  # type: ignore
     new_topic_a_name = arguments["topic_a"]

@@ -4,18 +4,8 @@
  * the dominant driver of the S3 bill. Detection only.
  */
 
+import { withoutLiteralsOrComments } from "./statementShape.ts";
 import { TIME_PARTITIONED_TABLES } from "./timePartitionedTables.ts";
-
-/**
- * Strip comments, which can hide or fake a predicate, and blank out string literals, which name no
- * table (`table = 'trace_summaries'` in a `system.mutations` read is not a read of it).
- */
-function stripCommentsAndLiterals(sql: string): string {
-  return sql
-    .replace(/--[^\n]*/g, " ")
-    .replace(/\/\*[\s\S]*?\*\//g, " ")
-    .replace(/'(?:[^'\\]|\\.|'')*'/g, "''");
-}
 
 /**
  * Does the SQL use `column` in a filter comparison rather than merely a projection or ORDER BY?
@@ -42,7 +32,8 @@ export function detectColdScan(query: string): string | null {
     return null;
   }
 
-  const sql = stripCommentsAndLiterals(query);
+  // Comments can hide or fake a predicate; literals name no table (`table = 'trace_summaries'`).
+  const sql = withoutLiteralsOrComments(query);
   const trimmed = sql.trimStart().toUpperCase();
   const isReadStatement = trimmed.startsWith("SELECT") || trimmed.startsWith("WITH");
   if (!isReadStatement) {

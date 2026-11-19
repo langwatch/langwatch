@@ -1,4 +1,4 @@
-import { nowInstant } from "@langwatch/time";
+import { nowEpochMs } from "@langwatch/time";
 import type { z } from "zod";
 
 import type { Event } from "../domain/types.ts";
@@ -166,7 +166,7 @@ export abstract class AbstractFoldProjection<
    * Do NOT override — implement `initState()` instead.
    */
   init(): State {
-    const now = nowInstant().epochMilliseconds;
+    const now = nowEpochMs();
     return {
       ...this.initState(),
       [this.createdAtKey]: now,
@@ -187,7 +187,7 @@ export abstract class AbstractFoldProjection<
     const handler = this[handlerName as keyof this] as (e: { type: string }, s: State) => State;
     const newState = handler.call(this, event, state);
     const prevUpdatedAt: number = state[this.updatedAtKey];
-    const nextUpdatedAt = Math.max(nowInstant().epochMilliseconds, prevUpdatedAt + 1);
+    const nextUpdatedAt = Math.max(nowEpochMs(), prevUpdatedAt + 1);
     const eventOccurredAt = (event as Record<string, unknown>).occurredAt;
     const prevLastOccurred: number = state[this.LastEventOccurredAtKey];
     const nextLastOccurred =

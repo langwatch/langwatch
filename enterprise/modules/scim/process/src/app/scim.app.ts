@@ -68,7 +68,11 @@ import {
   EntitlementApi,
   isEnterpriseTier,
 } from "@langwatch/entitlement-contract";
-import type { EventingCommandSender, EventingParticipation } from "@langwatch/eventing";
+import type {
+  EventingCommandSender,
+  EventingParticipation,
+  ProcessStore,
+} from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import { AdminSurfaceHiddenError } from "@langwatch/ops-contract";
 import type { FeatureSetup } from "@langwatch/process";
@@ -83,6 +87,11 @@ import {
   buildScimDirectoryPipeline,
   type ScimDirectoryDefinition,
 } from "../eventing/scim-directory.pipeline.ts";
+import type { RecordMemberCreatedCommandData } from "../eventing/scim-member-created.events.ts";
+import {
+  buildScimMembershipPipeline,
+  type ScimMembershipDefinition,
+} from "../eventing/scim-membership.pipeline.ts";
 import type { ScimSyncSummary } from "../eventing/scim-sync-summary.process.ts";
 import { scimOperatorReads } from "../repositories/prisma/prisma.scim-sync-projection.repository.ts";
 import type { ScimRepositories } from "../repositories/scim.repositories.ts";
@@ -261,6 +270,7 @@ export class ScimModule implements ScimApiContract {
   #scimSyncLedger: ScimSyncLedgerWriterService | undefined;
   #costCenterFacts: ScimCostCenterFactsService | undefined;
   #syncSummaries: ScimSyncSummaryService | undefined;
+  #recordMemberCreated: EventingCommandSender<RecordMemberCreatedCommandData> | undefined;
 
   private constructor(options: ScimAppOptions) {
     this.#scim = options.scim;
@@ -390,6 +400,26 @@ export class ScimModule implements ScimApiContract {
   /** scim_cost_center's senders: each member's cost center is recorded through them. */
   connectCostCenter(commands: ScimCostCenterSenders): void {
     this.#costCenterFacts?.connect(commands);
+  }
+
+  /** scim_membership: the outbox the directory create's membership write commits its fact to. */
+  membershipPipeline({ processStore }: { processStore: ProcessStore }): ScimMembershipDefinition {
+    return buildScimMembershipPipeline({
+      sender: () => {
+        const sender = this.#recordMemberCreated;
+        if (!sender) throw new Error("scim_membership is not registered in this process");
+        return sender;
+      },
+      retention: processStore,
+    });
+  }
+
+  connectMembership(
+    commands: Readonly<{
+      recordMemberCreated: EventingCommandSender<RecordMemberCreatedCommandData>;
+    }>,
+  ): void {
+    this.#recordMemberCreated = commands.recordMemberCreated;
   }
 
   /** One directory push's summary card, posted by the worker once the push has gone quiet. */

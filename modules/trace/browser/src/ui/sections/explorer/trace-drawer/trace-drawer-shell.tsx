@@ -48,6 +48,8 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
     headerQuery,
     spanTreeQuery,
     canGoBack,
+    showsAgents,
+    agentsTab,
     goBackInTraceHistory,
     handleClose,
     drawerContentRef,
@@ -168,6 +170,7 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
             isLoading={isLoading}
             isPlaceholder={isPlaceholder}
             isSpansLoading={spanTreeQuery.isLoading}
+            agentsTab={agentsTab}
             onClose={handleClose}
           />
         </Drawer.Body>
@@ -175,6 +178,7 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
       <KeyboardShortcutsHelp
         open={shortcutsOpen}
         onClose={() => setShortcutsOpen(false)}
+        context={trace ? { trace, spanTree, canGoBack, showsAgents } : undefined}
         fallbackFocusSelector='[data-testid="trace-overflow-menu"]'
       />
       {/* Show-once feature spotlights — only meaningful once a trace has

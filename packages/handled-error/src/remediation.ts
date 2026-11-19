@@ -63,6 +63,11 @@ const registry = {
   },
 
   // ---- dataset storage ----
+  stored_object_write_conflict: {
+    tips: [
+      "Another change to the same file landed while this one was written; send the request again",
+    ],
+  },
   private_dataplane_unavailable: {
     tips: [
       "Set the variable this error names (CLICKHOUSE_URL__<label>__<orgId> or DATAPLANE_S3__<label>__<orgId>) and restart the api and worker",
@@ -78,11 +83,36 @@ const registry = {
     ],
   },
 
+  storage_credentials_refused: {
+    tips: [
+      "On Azure Blob with a shared key, check AZURE_BLOB_ACCOUNT_NAME and AZURE_BLOB_ACCOUNT_KEY name the same account, then restart the api and worker",
+      "Under a token mode, check the identity's client id, tenant and secret or federated token; a role grant does not fix a credential Azure rejects",
+    ],
+    docsPath: "/self-hosting/configuration/environment-variables",
+  },
+
+  storage_permission_denied: {
+    tips: [
+      'Grant the identity "Storage Blob Data Contributor" on the storage account or the container',
+      'The control-plane "Contributor" role does not grant data access',
+    ],
+    docsPath: "/self-hosting/configuration/environment-variables",
+  },
+
   dataset_invalid_column: {
     tips: [
       "Add the column to the dataset, or remove it from the row, and send it again; retrying unchanged will fail identically",
       "The message names the dataset's valid columns",
     ],
+  },
+
+  // ---- data retention ----
+  data_retention_billed_through_billing: {
+    tips: [
+      "Ask someone with subscription:manage in the organization to set this length; it adds a storage line to the subscription",
+      "Or pick 90 days or less, which the plan includes",
+    ],
+    docsPath: "/platform/data-retention",
   },
 
   // ---- automations ----
@@ -100,6 +130,12 @@ const registry = {
       "If you just sent this trace, retry in a few seconds; ingestion is asynchronous",
     ],
     docsPath: "/platform/data-retention",
+  },
+  trace_withheld_over_plan: {
+    tips: [
+      "Upgrade the plan on Settings > Subscription to show every held trace again",
+      "Or remove members on Settings > Members until they fit the plan",
+    ],
   },
   span_not_found: {
     tips: ["Check the span id; spans are deleted with their trace after the retention window"],
@@ -336,6 +372,11 @@ const registry = {
     tips: ["Re-create the API key with the required scope, or ask an admin to raise your role"],
     docsPath: "/api-reference/api-keys/create-api-key",
   },
+  impersonation_cannot_mint_credential: {
+    tips: [
+      "No role or grant changes this; leave impersonation, and ask the member to create or rotate the key themselves",
+    ],
+  },
   legacy_project_key_ingestion_only: {
     tips: [
       "A legacy project key is limited to ingestion and the scopes enabled for its project; create an API key with the permissions this call needs and send it instead",
@@ -364,6 +405,12 @@ const registry = {
       "A self-hosted installation registers more documentation sites in its configuration",
     ],
   },
+  docs_playground_sessions_disabled: {
+    tips: [
+      "Paste an API key into the playground instead",
+      "An organisation admin can turn docs playground sessions back on under Settings, Authentication",
+    ],
+  },
   api_key_reserved_name: {
     tips: [
       "This name is reserved for keys LangWatch manages on your behalf; pick a different name",
@@ -371,6 +418,14 @@ const registry = {
     docsPath: "/api-reference/api-keys/create-api-key",
   },
 
+  // ---- ingestion sources ----
+  ingestion_source_disabled: {
+    tips: [
+      "Stop the exporter, or ask an organization admin to set the source back to active",
+      "Events refused while the source was disabled are not kept; resend them after re-enabling if you need them",
+    ],
+    docsPath: "/ai-governance/ingestion-sources/index",
+  },
   // ---- ingestion keys ----
   ingestion_key_not_found: {
     tips: [
@@ -447,6 +502,13 @@ const registry = {
       "Organization slugs are unique across the instance; pick a different slug, or omit it to derive one from the name",
     ],
   },
+  workflow_result_too_large: {
+    tips: [
+      "The workflow ran, but its result is over the 6 MB one synchronous answer can carry",
+      "Return less from the end node: fewer rows, shorter text, or a reference to stored data instead of the data itself",
+    ],
+    docsPath: "/workflows/overview",
+  },
   duplicate_invite: {
     tips: [
       "A pending invite for this email already exists; resend it, revoke it first, or treat this as already done",
@@ -458,6 +520,20 @@ const registry = {
       "List the organization's SCIM tokens to find the right id",
     ],
     docsPath: "/platform/scim",
+  },
+
+  braids_not_enabled: {
+    tips: [
+      "Braid management is not switched on for this organisation yet; retrying will not help",
+      "Removing a braid and revoking a signing key still work; ask LangWatch to switch braids on to create or change them",
+    ],
+  },
+  braids_turned_off: {
+    tips: [
+      "On the Enterprise plan, an organisation admin can turn Braids on in the organisation's Braids settings",
+      "While Braids is off, existing braids are paused and kept; removing a braid and revoking a signing key still work",
+    ],
+    docsPath: "/features/braids",
   },
 
   // ---- personal workspace reads ----
@@ -529,6 +605,13 @@ const registry = {
       "An archived agent is not found; a connected agent that registers again restores its row",
     ],
     docsPath: "/agent-testing/connect-your-agent",
+  },
+  agent_registry_entry_not_found: {
+    tips: [
+      "List the registry with GET /api/governance/registry/agents and use an `id` from that list",
+      "Registry ids start with agentreg_; a LangWatch agent id is a different id",
+    ],
+    docsPath: "/governance/agent-registry",
   },
   agent_offline: {
     tips: [
@@ -670,6 +753,12 @@ const registry = {
   },
 
   // ---- scenario runs ----
+  scenario_red_team_config_mismatch: {
+    tips: [
+      "Send kind red_team together with a redTeam config holding attackGoal and owaspIds",
+      "For a standard scenario, leave redTeam out",
+    ],
+  },
   scenario_reserved_set_id: {
     tips: [
       "Send the run without a setId; it is then recorded in the project's own one-off bucket",
@@ -776,6 +865,15 @@ const registry = {
       "Open Settings, then Default Models, and set a model for the role in meta.role",
       "Set it at the organization scope so every team and project inherits it; a project scope covers that project only",
       "Enabling a provider is not enough on its own: the role still needs a model chosen for it",
+    ],
+    docsPath: "/platform/model-providers",
+  },
+
+  model_provider_unavailable: {
+    tips: [
+      "meta.reason is not_configured when the project has no row for the provider, disabled when the row is switched off",
+      "Add or enable the provider in Settings, then Model Providers, or name a model from a provider that is enabled",
+      "Retrying without changing the settings fails the same way",
     ],
     docsPath: "/platform/model-providers",
   },
@@ -992,6 +1090,12 @@ const registry = {
       "Retry shortly; if it persists, the judgements can be made later by running the same statement as a job",
     ],
   },
+  instant_eval_decision_model_key_invalid: {
+    tips: [
+      "Every row of the run was refused for the key of the project's own Instant Evals model",
+      "Check the key, and that the provider row is switched on, in Settings > Model Providers",
+    ],
+  },
   instant_eval_estimate_unavailable: {
     tips: [
       "The statement was accepted; working out how many rows it matches is what failed",
@@ -1003,6 +1107,13 @@ const registry = {
       "Read `meta.spentUsd` against `meta.budgetUsd`; the organization has spent its free Instant Evals allowance across every project",
       "Upgrade the organization to a paid plan under Settings, Plan & billing; judged queries and runs are then billed per input token",
     ],
+  },
+  instant_eval_gateway_budget_exceeded: {
+    tips: [
+      "Read `meta.scope` and `meta.budgetId`; that gateway budget is set to block, and Instant Evals count against it like gateway traffic",
+      "Compare `meta.spentUsd` with `meta.limitUsd`, then raise or remove the budget under AI Gateway, Budgets, or wait for its `meta.window` to reset",
+    ],
+    docsPath: "/features/instant-evals/limits-and-cost",
   },
   instant_eval_not_enabled: {
     tips: [

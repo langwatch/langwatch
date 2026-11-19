@@ -87,6 +87,27 @@ describe("explainHandledError", () => {
       expect(description).toBe("Slack no longer accepts this webhook.");
     });
 
+    /** @scenario "The refusal names the Developer seats and the minimum" */
+    it("names Developer seats when a Developer seat change is refused", () => {
+      const { title, description } = explainHandledError(
+        shape({
+          code: "seat_quantity_below_in_use",
+          meta: { seat: "developer", requested: 1, minimum: 2 },
+        }),
+      );
+
+      expect(title).toBe("That's too few seats");
+      expect(description).toBe("Nothing changed. Choose at least 2 developer seats.");
+    });
+
+    it("keeps the full-seat wording when the refusal names no seat kind", () => {
+      const { description } = explainHandledError(
+        shape({ code: "seat_quantity_below_in_use", meta: { requested: 0, minimum: 1 } }),
+      );
+
+      expect(description).toBe("Nothing changed. Choose at least 1 seat.");
+    });
+
     /** @scenario "meta is read only where the client knows its shape" */
     it("falls back cleanly when the declared meta is absent", () => {
       const { title, description } = explainHandledError(
@@ -255,6 +276,21 @@ describe("explainHandledError", () => {
       );
 
       expect(description).toContain("3 simulations");
+    });
+
+    /** @scenario The suite cap refusal names suites */
+    it("names suites when the suite cap refused a template apply", () => {
+      const { description } = explainHandledError(
+        shape({
+          code: "resource_limit_exceeded",
+          httpStatus: 403,
+          meta: { limitType: "scenarioSets", current: 3, max: 3, countedAs: "testSuites" },
+        }),
+      );
+
+      expect(description).toBe(
+        "Your plan includes 3 suites. Upgrade to create more. Everything you already have keeps working.",
+      );
     });
 
     it("keeps the generic plan-limit line for every other allowance", () => {

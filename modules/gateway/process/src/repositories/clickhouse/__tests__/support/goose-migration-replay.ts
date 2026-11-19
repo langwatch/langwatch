@@ -115,6 +115,9 @@ async function resolveMigrationVariables({
     CLICKHOUSE_ENGINE_AGGREGATING: cluster
       ? "ReplicatedAggregatingMergeTree()"
       : "AggregatingMergeTree()",
+    CLICKHOUSE_ENGINE_VERSIONED_COLLAPSING_PREFIX: cluster
+      ? "ReplicatedVersionedCollapsingMergeTree("
+      : "VersionedCollapsingMergeTree(",
   };
 }
 

@@ -1569,6 +1569,56 @@ describe("guardOrganizationId — OrganizationUser", () => {
   });
 });
 
+describe("guardOrganizationId: nurturing's trace window sweep and member copy", () => {
+  const runOrganizationGuard = (params: GuardParams) =>
+    guardOrganizationId(
+      params,
+      vi.fn(async () => "ok"),
+    );
+  const span = { gt: new Date(1_000), lte: new Date(2_000) };
+
+  describe("when the sweep reads the organizations created in one span", () => {
+    it("permits exactly that read", async () => {
+      await expect(
+        runOrganizationGuard({
+          model: "NurturingOrganizationCreated",
+          action: "findMany",
+          args: { where: { createdAt: span } },
+        }),
+      ).resolves.toBe("ok");
+    });
+
+    it.each([
+      ["an open-ended span", "findMany", { createdAt: { gt: new Date(1_000) } }],
+      ["a write", "deleteMany", { createdAt: span }],
+    ])("refuses %s", async (_name, action, where) => {
+      await expect(
+        runOrganizationGuard({ model: "NurturingOrganizationCreated", action, args: { where } }),
+      ).rejects.toThrow(/organizationId/);
+    });
+  });
+
+  describe("when the member copy is read for named members", () => {
+    it("permits the read and refuses a write keyed on the users alone", async () => {
+      const where = { userId: { in: ["user-1", "user-2"] } };
+      await expect(
+        runOrganizationGuard({
+          model: "NurturingOrganizationMember",
+          action: "findMany",
+          args: { where },
+        }),
+      ).resolves.toBe("ok");
+      await expect(
+        runOrganizationGuard({
+          model: "NurturingOrganizationMember",
+          action: "deleteMany",
+          args: { where },
+        }),
+      ).rejects.toThrow(/organizationId/);
+    });
+  });
+});
+
 describe("guardOrganizationId — organizationId as an operator or a composite key", () => {
   const runOrganizationGuard = (params: GuardParams) =>
     guardOrganizationId(
