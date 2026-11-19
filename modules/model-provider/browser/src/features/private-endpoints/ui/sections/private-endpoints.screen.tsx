@@ -28,10 +28,10 @@ type Editing =
   | { kind: "add"; initial: BindingDraft }
   | { kind: "change"; bindingId: string; initial: BindingDraft };
 
-const MODEL_PROVIDERS_NEXT = {
-  kind: "setting",
-  label: "Model providers",
-  href: "/settings/model-providers",
+const PRIVATE_ENDPOINTS_DOCS_NEXT = {
+  kind: "docs",
+  label: "How private endpoints work",
+  href: "https://langwatch.ai/docs/platform/private-endpoints",
 } as const;
 
 export default function PrivateEndpointsScreen() {
@@ -144,7 +144,7 @@ export default function PrivateEndpointsScreen() {
             description:
               "LangWatch staff set up private endpoints on request, for a model gateway inside your own network. Contact us to set one up.",
             icon: <Network size={24} />,
-            next: [MODEL_PROVIDERS_NEXT],
+            next: [PRIVATE_ENDPOINTS_DOCS_NEXT],
           }}
         >
           {table}

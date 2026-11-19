@@ -83,6 +83,9 @@ describe("Feature: Private model endpoints in organization settings", () => {
       renderScreen();
 
       expect(screen.getByText(/LangWatch staff set up private endpoints on request/)).toBeVisible();
+      expect(
+        screen.getByRole("link", { name: /How private endpoints work/ }).getAttribute("href"),
+      ).toBe("https://langwatch.ai/docs/platform/private-endpoints");
     });
   });
 
