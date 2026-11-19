@@ -454,19 +454,23 @@ describe("given every replay step run over seeded owner logs on a worker with re
     it("holds the personal owners both logs named", () => {
       const personal = rows().personalProjects as MemoryNurturingPersonalProjectRepository;
 
-      expect(personal.storedRows().map(({ projectId }) => projectId).toSorted()).toEqual([
-        "project-po",
-        "project-pp",
-      ]);
+      expect(
+        personal
+          .storedRows()
+          .map(({ projectId }) => projectId)
+          .toSorted(),
+      ).toEqual(["project-po", "project-pp"]);
     });
 
     it("holds the traced projects both logs named", () => {
       const traced = rows().tracedProjects as MemoryNurturingTracedProjectRepository;
 
-      expect(traced.storedRows().map(({ projectId }) => projectId).toSorted()).toEqual([
-        "project-tf",
-        "project-tt",
-      ]);
+      expect(
+        traced
+          .storedRows()
+          .map(({ projectId }) => projectId)
+          .toSorted(),
+      ).toEqual(["project-tf", "project-tt"]);
     });
 
     it("holds the organization's latest trace time", async () => {
@@ -493,9 +497,11 @@ describe("given only the traced-projects replay run over trace's and project's l
     await worker.run([TRACED_PROJECTS_OF_TRACE_STEP, TRACED_PROJECTS_OF_PROJECT_STEP]);
 
     const traced = worker.repositories.tracedProjects as MemoryNurturingTracedProjectRepository;
-    expect(traced.storedRows().map(({ projectId }) => projectId).toSorted()).toEqual([
-      "project-tf",
-      "project-tt",
-    ]);
+    expect(
+      traced
+        .storedRows()
+        .map(({ projectId }) => projectId)
+        .toSorted(),
+    ).toEqual(["project-tf", "project-tt"]);
   });
 });
