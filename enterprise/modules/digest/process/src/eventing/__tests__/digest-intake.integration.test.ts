@@ -168,7 +168,11 @@ async function threeCodingAgentSessions() {
       value: (index + 1) * 100,
     });
     await codingAgentMetric({ sessionId, metricName: "claude_code.cost.usage", value: 0.5 });
-    await codingAgentMetric({ sessionId, metricName: "claude_code.lines_of_code.count", value: 10 });
+    await codingAgentMetric({
+      sessionId,
+      metricName: "claude_code.lines_of_code.count",
+      value: 10,
+    });
   }
 }
 

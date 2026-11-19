@@ -6,13 +6,13 @@ import {
   DigestNothingToSendError,
   DigestOrganizationNotEnrolledError,
 } from "@langwatch/enterprise-digest-contract";
+import { createLogger } from "@langwatch/observability";
 import {
   MemberNotFoundError,
   type OrganizationApi,
   type OrganizationRestMemberSummary,
 } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
-import { createLogger } from "@langwatch/observability";
 import type { UserApi } from "@langwatch/user-contract";
 
 import type { DigestMailChannel } from "../channels/digest-mail.channel.ts";
@@ -28,15 +28,18 @@ import {
   digestMessageId,
   digestTemplateInput,
   type DigestTemplateProps,
-  homeOrganization,
   type OrganizationWeek,
   pickFocusProject,
+  pickHomeOrganization,
   weekActivity,
   weekVisibleTo,
 } from "../rules/digest-email.rules.ts";
-import { type DigestTemplatePick, eligibleDigestTemplates } from "../rules/digest-template.rules.ts";
+import { renderDigestMail } from "../rules/digest-mail.rules.ts";
+import {
+  type DigestTemplatePick,
+  eligibleDigestTemplates,
+} from "../rules/digest-template.rules.ts";
 import { oldestKeptWeek, plannableWeek, sendableWeek } from "../rules/digest-week.rules.ts";
-import { renderDigestMail } from "./digest-mail.render.ts";
 import type { DigestUnsubscribeService } from "./digest-unsubscribe.service.ts";
 import type { DigestWeekService } from "./digest-week.service.ts";
 
@@ -130,7 +133,10 @@ export class DigestSendService {
         }
       } catch (error) {
         failed += 1;
-        logger.error({ error, organizationId, isoWeek }, "the digest could not plan an organization");
+        logger.error(
+          { error, organizationId, isoWeek },
+          "the digest could not plan an organization",
+        );
       }
     }
     // Left unplanned so the next wake tries the failed ones again; a request is keyed by
@@ -300,7 +306,7 @@ export class DigestSendService {
         }),
       })),
     );
-    return homeOrganization(ranked) === organizationId;
+    return pickHomeOrganization(ranked) === organizationId;
   }
 
   /** The member's standing now; a member removed since the plan answers not-found. */

@@ -249,7 +249,7 @@ describe("the weekly digest send", () => {
       // No scheme: neither the template's links nor notification's unsubscribe URL accept it.
       digest.world.publicBaseUrl = "app.example.test";
 
-      await expect(sendFor({ userId: MEMBER, isoWeek: SENT_WEEK })).rejects.toThrow();
+      await expect(sendFor({ userId: MEMBER, isoWeek: SENT_WEEK })).rejects.toThrow(/Invalid URL/);
 
       expect(digest.mail).toEqual([]);
       expect(await digest.repositories.sends.isSent({ userId: MEMBER, isoWeek: SENT_WEEK })).toBe(

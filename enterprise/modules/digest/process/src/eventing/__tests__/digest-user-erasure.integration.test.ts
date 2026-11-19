@@ -53,8 +53,7 @@ const weekOwners = async () =>
     .map(({ userId }) => userId)
     .toSorted();
 
-const isSent = (userId: string) =>
-  digest.repositories.sends.isSent({ userId, isoWeek: SENT_WEEK });
+const isSent = (userId: string) => digest.repositories.sends.isSent({ userId, isoWeek: SENT_WEEK });
 
 /** Rows naming both people: an opt-out, a claimed send and a folded week each. */
 async function rowsForBoth() {

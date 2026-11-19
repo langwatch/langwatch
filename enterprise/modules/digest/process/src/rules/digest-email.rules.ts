@@ -83,9 +83,10 @@ export function weekActivity({ week, userId }: { week: OrganizationWeek; userId:
 
 /**
  * Which organization's week a person in several enrolled ones is sent: the one with the most
- * activity, the lowest organization id on a tie, so every attempt at the week agrees.
+ * activity, the lowest organization id on a tie, so every attempt at the week agrees. None when
+ * there are no candidates.
  */
-export function homeOrganization(
+export function pickHomeOrganization(
   candidates: readonly Readonly<{ organizationId: string; activity: number }>[],
 ): string | undefined {
   return candidates.toSorted(

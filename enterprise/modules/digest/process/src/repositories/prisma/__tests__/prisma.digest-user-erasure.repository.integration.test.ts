@@ -106,9 +106,7 @@ describe.skipIf(!databaseUrl)("given digest rows naming two people in two organi
         await erasure.forgetUser({ userId: erased });
       }
 
-      await expect(audience.findUnsubscribed({ userIds: [erased, kept] })).resolves.toEqual([
-        kept,
-      ]);
+      await expect(audience.findUnsubscribed({ userIds: [erased, kept] })).resolves.toEqual([kept]);
       for (const organizationId of organizationIds) {
         await expect(sendersIn(organizationId)).resolves.toEqual([kept]);
         await expect(weekOwnersIn(organizationId)).resolves.toEqual([kept]);

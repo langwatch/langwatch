@@ -9,7 +9,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   ADMIN,
-  digestWorld,
   emailOf,
   installDigest,
   type InstalledDigest,
@@ -129,7 +128,11 @@ describe("when the picked template cannot be built", () => {
     // The admin is eligible for plan-pressure first, which needs a name the module lacks.
     digest.world.usage = { currentMonthMessagesCount: 900, maxMonthlyUsageLimit: 1_000 };
     digest.world.unnamedOrganizations.add(ORGANIZATION);
-    await digest.seedProjectWeek({ organizationId: ORGANIZATION, projectId: PROJECT, traces: 1_200 });
+    await digest.seedProjectWeek({
+      organizationId: ORGANIZATION,
+      projectId: PROJECT,
+      traces: 1_200,
+    });
 
     await digest.carryOut({
       userId: ADMIN,

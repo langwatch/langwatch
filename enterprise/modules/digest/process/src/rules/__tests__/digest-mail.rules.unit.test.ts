@@ -9,7 +9,7 @@ import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
 import type { DigestMail } from "../../channels/digest-mail.channel.ts";
-import { renderDigestMail } from "../digest-mail.render.ts";
+import { renderDigestMail } from "../digest-mail.rules.ts";
 
 const ONE_CLICK = "https://app.example.test/api/digest/unsubscribe?token=signed";
 
@@ -60,9 +60,10 @@ describe("renderDigestMail", () => {
 
   describe("when the template's schema refuses the props", () => {
     it("rejects before anything is sent", async () => {
+      // The template's schema names the field it refused.
       await expect(
         renderDigestMail(mail({ props: { ...planPressureProps(), unsubscribeUrl: "not a url" } })),
-      ).rejects.toThrow();
+      ).rejects.toThrow(/"unsubscribeUrl"/);
     });
   });
 
@@ -70,7 +71,10 @@ describe("renderDigestMail", () => {
     it("rejects an unsubscribe address that is not a URL", async () => {
       const oneClickUnsubscribeUrl = "app.example.test/api/digest/unsubscribe";
 
-      await expect(renderDigestMail(mail({ oneClickUnsubscribeUrl }))).rejects.toThrow();
+      // Notification's command names the envelope field it refused, `unsubscribe.url`.
+      await expect(renderDigestMail(mail({ oneClickUnsubscribeUrl }))).rejects.toThrow(
+        /"unsubscribe"/,
+      );
     });
   });
 });

@@ -13,8 +13,8 @@ import {
   type DigestNames,
   type DigestTemplateProps,
   digestTemplateInput,
-  homeOrganization,
   type OrganizationWeek,
+  pickHomeOrganization,
 } from "../digest-email.rules.ts";
 import { pickDigestTemplate } from "../digest-template.rules.ts";
 import { emptyProjectWeek, type ProjectWeekState } from "../digest-week.rules.ts";
@@ -205,11 +205,11 @@ describe("buildDigestTemplateProps()", () => {
   });
 });
 
-describe("homeOrganization()", () => {
+describe("pickHomeOrganization()", () => {
   /** @scenario "A member of two enrolled organizations is sent the busier one's week" */
   it("is the organization with the most activity", () => {
     expect(
-      homeOrganization([
+      pickHomeOrganization([
         { organizationId: "org-a", activity: 10 },
         { organizationId: "org-b", activity: 30 },
       ]),
@@ -222,11 +222,11 @@ describe("homeOrganization()", () => {
       { organizationId: "org-b", activity: 5 },
       { organizationId: "org-a", activity: 5 },
     ];
-    expect(homeOrganization(tied)).toBe("org-a");
-    expect(homeOrganization(tied.toReversed())).toBe("org-a");
+    expect(pickHomeOrganization(tied)).toBe("org-a");
+    expect(pickHomeOrganization(tied.toReversed())).toBe("org-a");
   });
 
   it("is none without candidates", () => {
-    expect(homeOrganization([])).toBeUndefined();
+    expect(pickHomeOrganization([])).toBeUndefined();
   });
 });

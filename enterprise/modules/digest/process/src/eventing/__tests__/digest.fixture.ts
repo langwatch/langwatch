@@ -5,12 +5,6 @@
  * plan and send intents are carried out the way the outbox carries them out.
  */
 import {
-  EVALUATION_LIFECYCLE_COMPLETED_EVENT_TYPE,
-  EVALUATION_LIFECYCLE_EVENT_VERSION,
-  type EvaluationLifecycleCompletedEventData,
-  evaluationLifecycleCompletedEventDataSchema,
-} from "@langwatch/evaluation-contract";
-import {
   METRIC_FACTS_CONTRIBUTED_EVENT_TYPE,
   METRIC_FACTS_CONTRIBUTED_EVENT_VERSION_LATEST,
   metricFactsContributionSchema,
@@ -18,6 +12,12 @@ import {
   SPAN_FACTS_CONTRIBUTED_EVENT_VERSION_LATEST,
   spanFactsContributionSchema,
 } from "@langwatch/coding-agent-contract";
+import {
+  EVALUATION_LIFECYCLE_COMPLETED_EVENT_TYPE,
+  EVALUATION_LIFECYCLE_EVENT_VERSION,
+  type EvaluationLifecycleCompletedEventData,
+  evaluationLifecycleCompletedEventDataSchema,
+} from "@langwatch/evaluation-contract";
 import {
   buildIntentAccessor,
   createTenantId,
@@ -35,12 +35,12 @@ import {
   SIMULATION_RUN_EVENT_TYPES,
   simulationRunFinishedEventDataSchema,
 } from "@langwatch/scenario-contract";
+import { type Instant, Temporal } from "@langwatch/time";
 import {
   recordTraceSpanEventDataSchema,
   SPAN_RECORDED_EVENT_TYPE,
   SPAN_RECORDED_EVENT_VERSION_LATEST,
 } from "@langwatch/trace-contract";
-import { type Instant, Temporal } from "@langwatch/time";
 import {
   USER_ERASED_EVENT_TYPE,
   USER_LIFECYCLE_EVENT_VERSION,
@@ -48,10 +48,10 @@ import {
 } from "@langwatch/user-contract";
 import { z } from "zod";
 
-import { emptyProjectWeek } from "../../rules/digest-week.rules.ts";
 import { MemoryDigestMailChannel } from "../../channels/memory/memory.digest.channels.ts";
 import { MemoryDigestAudienceRepository } from "../../repositories/memory/memory.digest-audience.repository.ts";
 import { MemoryDigestRepositories } from "../../repositories/memory/memory.digest.repositories.ts";
+import { emptyProjectWeek } from "../../rules/digest-week.rules.ts";
 import { DigestCommandsService } from "../../services/digest-commands.service.ts";
 import { DigestSendService } from "../../services/digest-send.service.ts";
 import { DigestSourceService } from "../../services/digest-source.service.ts";
@@ -207,12 +207,11 @@ export function installDigest(
     recordUser: (activity) => commands.recordUser(activity),
     now,
   });
-  const membersIn = (organizationId: string) =>
-    organizationId === ORGANIZATION
-      ? world.members
-      : organizationId === OTHER_ORGANIZATION
-        ? world.otherMembers
-        : [];
+  const membersIn = (organizationId: string): readonly WorldMember[] => {
+    if (organizationId === ORGANIZATION) return world.members;
+    if (organizationId === OTHER_ORGANIZATION) return world.otherMembers;
+    return [];
+  };
   const knownProject = (id: string) => world.projects.includes(id) || id === OTHER_PROJECT;
   const sends = DigestSendService.create({
     audience: repositories.audience,
