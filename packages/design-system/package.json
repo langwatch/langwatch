@@ -399,6 +399,10 @@
       "types": "./dist/components/forms/segmented-control.d.ts",
       "default": "./src/components/forms/segmented-control.tsx"
     },
+    "./project-picker": {
+      "types": "./dist/components/scope/project-picker.d.ts",
+      "default": "./src/components/scope/project-picker.tsx"
+    },
     "./provider-scope-chips": {
       "types": "./dist/components/scope/provider-scope-chips.d.ts",
       "default": "./src/components/scope/provider-scope-chips.tsx"
