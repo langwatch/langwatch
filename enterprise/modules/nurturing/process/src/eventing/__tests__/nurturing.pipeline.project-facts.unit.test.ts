@@ -118,6 +118,7 @@ function nurturingOverCopies() {
       virtualKeys: MemoryNurturingVirtualKeyRepository.create({ erasedUsers }),
       personalProjects,
       tracedProjects,
+      lastTraces: organizations,
     },
     sync: undefined,
     logger,

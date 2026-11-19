@@ -403,6 +403,14 @@
     "needsOldWritersGone": true
   },
   {
+    "id": "nurturing:replay-last-traces",
+    "kind": "data",
+    "mode": "background",
+    "owner": "nurturing",
+    "description": "Fills each organization's latest trace time from trace's facts since the day before the release.",
+    "needsOldWritersGone": true
+  },
+  {
     "id": "ops:copy-automation-migration-state",
     "kind": "data",
     "mode": "blocking",

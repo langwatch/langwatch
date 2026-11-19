@@ -256,6 +256,11 @@
       "seed": "unplanned",
       "note": "needs first_message_listed facts, which project's listing step records; the seed writes no events"
     },
+    "nurturing:replay-last-traces": {
+      "status": "pending",
+      "seed": "unplanned",
+      "note": "needs first_trace_recorded or trace_received facts in trace's log; the seed writes no events"
+    },
     "ops:checkup-canary-project": {
       "status": "pending",
       "seed": "unplanned",

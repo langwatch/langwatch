@@ -223,6 +223,7 @@ export function copiesOver(repositories: NurturingRepositories): NurturingUsageC
     virtualKeys: repositories.virtualKeys,
     personalProjects: repositories.personalProjects,
     tracedProjects: repositories.tracedProjects,
+    lastTraces: repositories.milestones,
   };
 }
 

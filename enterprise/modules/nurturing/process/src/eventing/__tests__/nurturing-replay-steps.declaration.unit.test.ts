@@ -24,6 +24,7 @@ import {
   PROJECT_CREATED_FACTS_STEP,
 } from "./nurturing-organization-copies.test-helpers.ts";
 import {
+  LAST_TRACES_STEP,
   PERSONAL_OWNERS_OF_ORGANIZATION_STEP,
   PERSONAL_OWNERS_OF_PROJECT_STEP,
   PROJECT_LISTING_STEP,
@@ -97,6 +98,7 @@ describe("given the nurturing module installed on a worker", () => {
       PERSONAL_OWNERS_OF_PROJECT_STEP,
       TRACED_PROJECTS_OF_TRACE_STEP,
       TRACED_PROJECTS_OF_PROJECT_STEP,
+      LAST_TRACES_STEP,
     ]);
     for (const [index, step] of steps.entries()) {
       expect(step).toMatchObject({
@@ -121,6 +123,7 @@ describe("given the nurturing module installed on a worker", () => {
       [USER_MARKS_STEP, IDENTITY_MARKS_STEP, PROJECT_LISTING_STEP],
       undefined,
       [PROJECT_LISTING_STEP],
+      undefined,
     ]);
 
     // The lane and the trailing pass are only observable by running: each step asks for its lane twice.

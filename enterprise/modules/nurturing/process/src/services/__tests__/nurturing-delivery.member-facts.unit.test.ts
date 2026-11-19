@@ -143,8 +143,17 @@ async function organizationWithMembers({
       findById: async () => ({ email: "jane@example.com", name: "Jane" }) as never,
     }),
   });
-  const deliver = (signal: NurturingSignal) =>
-    delivery.deliver({ key: `${signal.kind}:${signal.sourceEventId}`, signal });
+  // The last-trace lane records every trace fact on its own, beside the signal's delivery: the
+  // time is stored before the delivery here, as when the lane's job runs first.
+  const deliver = async (signal: NurturingSignal) => {
+    if (signal.kind === "first_trace_integrated" || signal.kind === "trace_received") {
+      const organizationId = placed.get(signal.projectId);
+      if (organizationId !== undefined) {
+        await milestones.recordLastTrace({ organizationId, occurredAt: signal.occurredAt });
+      }
+    }
+    return delivery.deliver({ key: `${signal.kind}:${signal.sourceEventId}`, signal });
+  };
   return {
     claims,
     cio,
@@ -688,10 +697,6 @@ describe("NurturingDeliveryService organization facts", () => {
       [
         "getPlacement",
         ({ projects }) => vi.spyOn(projects, "getPlacement").mockRejectedValueOnce(down),
-      ],
-      [
-        "recordLastTrace",
-        ({ milestones }) => vi.spyOn(milestones, "recordLastTrace").mockRejectedValueOnce(down),
       ],
       ["getAllMembers", ({ getAllMembers }) => getAllMembers.mockRejectedValueOnce(down)],
     ];

@@ -113,7 +113,10 @@ import { z } from "zod";
 
 import type { NurturingModule } from "../app/nurturing.app.ts";
 import type { NurturingVirtualKeyRepository } from "../repositories/nurturing-gateway-key.repository.ts";
-import type { NurturingOrganizationAdminRepository } from "../repositories/nurturing-milestones.repository.ts";
+import type {
+  NurturingOrganizationAdminRepository,
+  NurturingTraceMilestonesRepository,
+} from "../repositories/nurturing-milestones.repository.ts";
 import type { NurturingOrganizationCreatedRepository } from "../repositories/nurturing-organization-created.repository.ts";
 import type { NurturingOrganizationMemberRepository } from "../repositories/nurturing-organization-member.repository.ts";
 import type {
@@ -527,6 +530,8 @@ export type NurturingUsageCopies = Readonly<{
   virtualKeys: NurturingVirtualKeyRepository;
   personalProjects: NurturingPersonalProjectRepository;
   tracedProjects: NurturingTracedProjectRepository;
+  /** The organization's latest trace time, the trace half of the milestones table. */
+  lastTraces: Pick<NurturingTraceMilestonesRepository, "recordLastTrace">;
 }>;
 
 /** What the usage sync needs; absent without a Customer.io channel, when nothing syncs. */
@@ -551,8 +556,15 @@ function nurturingProjectUsageHost({
   /** Where a traced fact naming no organization is logged. */
   logger?: ProjectFactsLogger;
 }>) {
-  const { organizationsCreated, admins, members, virtualKeys, personalProjects, tracedProjects } =
-    copies;
+  const {
+    organizationsCreated,
+    admins,
+    members,
+    virtualKeys,
+    personalProjects,
+    tracedProjects,
+    lastTraces,
+  } = copies;
   // The copies always register, as nurturing's other copies do: a channel configured later
   // then finds the projects, organizations, members and gateway keys created before it.
   const copied = definePipeline({
@@ -574,6 +586,7 @@ function nurturingProjectUsageHost({
     .withPeerMapProjection(nurturingPersonalOwnersOfProjectMap(personalProjects))
     .withPeerMapProjection(nurturingTracedProjectsOfTraceMap({ tracedProjects, logger }))
     .withPeerMapProjection(nurturingTracedProjectsOfProjectMap({ tracedProjects, logger }))
+    .withPeerMapProjection(nurturingLastTracesMap(lastTraces))
     .withLaneAliases([
       ...ORGANIZATION_COPY_LANE_ALIASES,
       ...PERSONAL_AND_TRACED_PROJECT_LANE_ALIASES,
@@ -965,6 +978,7 @@ export const NURTURING_TRACED_PROJECTS_OF_TRACE_PROJECTION_NAME =
   "tracedProjectsOfTrace" as const;
 export const NURTURING_TRACED_PROJECTS_OF_PROJECT_PROJECTION_NAME =
   "tracedProjectsOfProject" as const;
+export const NURTURING_LAST_TRACES_PROJECTION_NAME = "lastTraces" as const;
 
 /**
  * The five peer subscriber lanes these maps replace, on the `nurturing` pipeline. A job the
@@ -1135,6 +1149,54 @@ export function nurturingTracedProjectsOfProjectMap({
   };
 }
 
+const LAST_TRACE_EVENTS = [
+  { type: FIRST_TRACE_RECORDED_EVENT_TYPE, data: firstTraceRecordedEventDataSchema },
+  { type: TRACE_RECEIVED_EVENT_TYPE, data: traceReceivedEventDataSchema },
+] as const;
+
+/** Most trace facts of one organization the queue drains into one write. */
+const LAST_TRACE_COALESCE_MAX_BATCH = 500;
+
+/** An organization's trace time as one fact names it. */
+type LastTrace = Readonly<{ organizationId: string; occurredAt: number }>;
+
+/**
+ * Nurturing's copy of an organization's latest trace time, from trace's first and later trace
+ * facts, told to a person who joins later. A fact naming no organization (an older one) maps to
+ * nothing and mints no job. The time only moves forward in the store, so any order and any
+ * repeat leave the same row; a coalesced batch is one organization's, written as its latest.
+ */
+export function nurturingLastTracesMap(
+  lastTraces: Pick<NurturingTraceMilestonesRepository, "recordLastTrace">,
+): PeerMapProjectionDeclaration<LastTrace, typeof LAST_TRACE_EVENTS> {
+  return {
+    events: LAST_TRACE_EVENTS,
+    map: {
+      name: NURTURING_LAST_TRACES_PROJECTION_NAME,
+      eventTypes: LAST_TRACE_EVENTS.map(({ type }) => type),
+      map: ({ data: { organizationId, occurredAt } }) =>
+        organizationId === undefined ? null : { organizationId, occurredAt },
+      options: {
+        enqueue: { filter: ({ data }) => data.organizationId !== undefined },
+        groupKeyFn: ({ data }) => `lastTrace:${data.organizationId}`,
+        coalesceMaxBatch: LAST_TRACE_COALESCE_MAX_BATCH,
+      },
+      store: {
+        append: (trace) => lastTraces.recordLastTrace(trace),
+        bulkAppend: async (traces) => {
+          const latest = new Map<string, number>();
+          for (const { organizationId, occurredAt } of traces) {
+            latest.set(organizationId, Math.max(latest.get(organizationId) ?? 0, occurredAt));
+          }
+          for (const [organizationId, occurredAt] of latest) {
+            await lastTraces.recordLastTrace({ organizationId, occurredAt });
+          }
+        },
+      },
+    },
+  };
+}
+
 /** The host pipeline as a TYPE, derived from the builder above. */
 export type NurturingProjectUsagePipeline = ReturnType<
   ReturnType<typeof nurturingProjectUsageHost>["build"]
@@ -1160,6 +1222,7 @@ export const nurturingProjectUsageEventing = defineEventingModule({
         virtualKeys: repositories.virtualKeys,
         personalProjects: repositories.personalProjects,
         tracedProjects: repositories.tracedProjects,
+        lastTraces: repositories.milestones,
       },
       sync: app.syncsOrganizationUsage()
         ? {

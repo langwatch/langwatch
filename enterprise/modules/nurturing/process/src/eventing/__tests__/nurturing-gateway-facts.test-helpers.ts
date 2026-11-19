@@ -149,6 +149,7 @@ function registeredCopyLanes({
       virtualKeys,
       personalProjects: others.personalProjects,
       tracedProjects: others.tracedProjects,
+      lastTraces: others.milestones,
     },
     sync: undefined,
   });

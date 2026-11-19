@@ -88,7 +88,10 @@ export interface NurturingOrganizationAdminRepository {
 
 /** The organization's latest trace, the one fact of it a person joining later must be told. */
 export interface NurturingTraceMilestonesRepository {
-  /** Moves the time forward only; a late trace or an organization never learned changes nothing. */
+  /**
+   * Moves the time forward only, creating the organization's row when nurturing holds none; a
+   * late or repeated trace changes nothing.
+   */
   recordLastTrace(input: Readonly<{ organizationId: string; occurredAt: number }>): Promise<void>;
   /** Epoch ms of the latest recorded trace; null when none was recorded. */
   findLastTraceAt(input: Readonly<{ organizationId: string }>): Promise<number | null>;

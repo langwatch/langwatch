@@ -105,8 +105,8 @@ Feature: An organization's session facts reach every active member in Customer.i
     Then each member is identified once
     And after 301 seconds each member is identified again with the later time
 
-  # Known limit: a trace the per-project window drops first is never recorded, so the stored time
-  # can lag by up to that window.
+  # The last-trace lane (project-facts-copies.feature) records every trace fact, whatever window
+  # the delivery's claims drop.
   @unit
   Scenario: A trace the organization's window drops still moves the stored time
     Given a trace of project-1 was just told to the members
@@ -125,7 +125,6 @@ Feature: An organization's session facts reach every active member in Customer.i
     Examples:
       | read            |
       | getPlacement    |
-      | recordLastTrace |
       | getAllMembers   |
 
   @unit

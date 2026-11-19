@@ -10,9 +10,11 @@ Feature: Nurturing keeps its own copy of personal owners and traced projects, fr
   Each copy is a peer map on nurturing's usage host, so a deploy step replays it from its owner's
   log, after the erasure-mark steps for the owners and after project's listing step for the lanes
   that read project's listed facts. A replay writes the store alone and runs no subscriber: it sends
-  nothing. Every write is order-free (the first owner stays, a traced row is insert-ignore), so a
-  redelivered, late or replayed fact leaves a row as live delivery
-  would. The five subscriber lanes the maps replace are aliased to them for one release.
+  nothing. Every write is order-free (the first owner stays, a traced row is insert-ignore, a trace
+  time only moves forward), so a redelivered, late or replayed fact leaves a row as live delivery
+  would. An organization's last trace time is a third map on trace's first and later trace facts: a
+  fact naming no organization writes nothing, and a burst is written as one organization's latest
+  time. The five subscriber lanes the maps replace are aliased to them for one release.
 
   When user records an account erased, nurturing marks it erased (NurturingErasedUser, a hash of
   its id), deletes every owner row naming it, in every organization, and clears it wherever its
@@ -201,10 +203,46 @@ Feature: Nurturing keeps its own copy of personal owners and traced projects, fr
   @unit
   Scenario: A copy lane is registered whether or not a channel syncs
     When nurturing's usage pipeline is built with or without a Customer.io channel
-    Then the personal-owner and traced-project maps are registered either way
+    Then the personal-owner, traced-project and last-trace maps are registered either way
 
   @unit
   Scenario: The copy steps run after the erasure marks and project's listing step
     Given nurturing's replay steps are declared
     Then the owner steps run after both erasure-marks steps, and the project lanes after project's listing step
     And the steps' ids are in the image's code steps
+
+  @unit
+  Scenario: The last-trace replay starts the day before the release
+    Given the last-trace replay step is declared
+    When it runs
+    Then it replays from the day before the release, and the other copy steps from the start of the log
+
+  @unit
+  Scenario: Replaying the last-trace lane fills each organization's latest trace time
+    Given trace's log holds trace facts of two organizations after the window opens, one before it, and one naming none
+    When the last-trace replay step runs
+    Then each organization has its latest trace time, the older one has none, and nothing is sent
+
+  @unit
+  Scenario: Replaying the last-trace lane twice, or in reverse order, leaves each time as it was
+    Given the last-trace replay has run
+    When it runs again, or runs over the same log in reverse order
+    Then each organization's time is the same
+
+  @unit
+  Scenario: Five hundred trace facts of one organization are one write of the latest time
+    Given 500 trace_received facts of one organization in one coalesced batch
+    When the map's store writes the batch
+    Then the store is written once, with the batch's latest time
+    And a burst of the organization's facts is grouped together, in batches of 500
+
+  @unit
+  Scenario: A trace fact naming no organization writes nothing
+    Given a trace fact that names no organization
+    Then it maps to no record, mints no job and writes no row
+
+  @integration
+  Scenario: A trace time creates the organization's row, and only moves forward
+    Given nurturing holds no row for an organization
+    When a trace time is recorded, then an older one
+    Then the organization's row holds the later time

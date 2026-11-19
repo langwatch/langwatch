@@ -135,6 +135,7 @@ function deploy({
       virtualKeys: keys ? keys(repositories.virtualKeys) : repositories.virtualKeys,
       personalProjects: repositories.personalProjects,
       tracedProjects: repositories.tracedProjects,
+      lastTraces: repositories.milestones,
     },
     sync: undefined,
   });

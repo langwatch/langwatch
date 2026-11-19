@@ -8,6 +8,7 @@ import { nurturingChannels } from "./channels/nurturing-channels.registry.ts";
 import {
   NURTURING_AUTH_MEMBERS_PROJECTION_NAME,
   NURTURING_IDENTITY_ERASURE_MARKS_PROJECTION_NAME,
+  NURTURING_LAST_TRACES_PROJECTION_NAME,
   NURTURING_ORGANIZATION_ADMINS_PROJECTION_NAME,
   NURTURING_ORGANIZATION_CREATIONS_PROJECTION_NAME,
   NURTURING_ORGANIZATION_MEMBERS_PROJECTION_NAME,
@@ -24,6 +25,12 @@ import {
 import { nurturingTraceWindowEndEventing } from "./eventing/nurturing-trace-window-end.pipeline.ts";
 import { nurturingEventing } from "./eventing/nurturing.pipeline.ts";
 import { nurturingRepositories } from "./repositories/nurturing-repositories.registry.ts";
+
+/**
+ * The release's date less a day: an organization's trace time older than this is already in its
+ * column, and the time only moves forward, so a replay from here loses nothing.
+ */
+const LAST_TRACES_REPLAY_SINCE = "2026-11-18T00:00:00Z";
 
 export const nurturingProcessModule: PublishedProcessModule<
   "nurturing",
@@ -165,6 +172,16 @@ export const nurturingProcessModule: PublishedProcessModule<
       needsOldWritersGone: true,
       trailingPass: true,
       after: ["project:list-personal-owner-and-first-message-facts"],
+      replayer,
+    }),
+    defineProjectionReplayStep({
+      id: "nurturing:replay-last-traces",
+      description:
+        "Fills each organization's latest trace time from trace's facts since the day before the release.",
+      lane: `${NURTURING_PROJECT_USAGE_PIPELINE_NAME}.${NURTURING_LAST_TRACES_PROJECTION_NAME}`,
+      since: LAST_TRACES_REPLAY_SINCE,
+      needsOldWritersGone: true,
+      trailingPass: true,
       replayer,
     }),
   ]);

@@ -76,7 +76,9 @@ export class MemoryNurturingMilestonesRepository
     organizationId,
     occurredAt,
   }: Readonly<{ organizationId: string; occurredAt: number }>): Promise<void> {
-    if (!this.#organizations.has(organizationId)) return;
+    if (!this.#organizations.has(organizationId)) {
+      this.#organizations.set(organizationId, newOrganization(organizationId));
+    }
     const known = this.#lastTraceAt.get(organizationId);
     if (known === undefined || known < occurredAt) {
       this.#lastTraceAt.set(organizationId, occurredAt);

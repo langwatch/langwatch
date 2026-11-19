@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * @vitest-environment node
- * Nurturing's personal-project and traced-project copies as peer maps filled at
+ * Nurturing's personal-project, traced-project and last-trace copies as peer maps filled at
  * deploy: the real replay engine over seeded owner logs, the module's own steps, memory
  * repositories. The per-fact memory twin is the oracle, and no channel is ever reachable.
  * Spec: enterprise/modules/nurturing/specs/project-facts-copies.feature
@@ -55,6 +55,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { MemoryCustomerIoChannel } from "../../channels/memory/memory.customer-io.channel.ts";
 import { MemoryPostHogChannel } from "../../channels/memory/memory.posthog.channel.ts";
+import type { MemoryNurturingMilestonesRepository } from "../../repositories/memory/memory.nurturing-milestones.repository.ts";
 import type { MemoryNurturingPersonalProjectRepository } from "../../repositories/memory/memory.nurturing-personal-project.repository.ts";
 import type { MemoryNurturingTracedProjectRepository } from "../../repositories/memory/memory.nurturing-traced-project.repository.ts";
 import { MemoryNurturingRepositories } from "../../repositories/memory/memory.nurturing.repositories.ts";
@@ -64,6 +65,7 @@ import {
   NURTURING_PROJECT_USAGE_PIPELINE_NAME,
 } from "../nurturing-project-usage.pipeline.ts";
 import {
+  LAST_TRACES_STEP,
   PERSONAL_OWNERS_OF_ORGANIZATION_STEP,
   PERSONAL_OWNERS_OF_PROJECT_STEP,
   projectCopiesReplayStepsOver,
@@ -77,8 +79,10 @@ import {
 } from "./nurturing-replay-steps.test-helpers.ts";
 import { NurturingSeededLog } from "./nurturing-seeded-log.test-helpers.ts";
 
-/** After the release's replay window opens. */
+/** After the release's replay window opens (the day before 2026-11-19). */
 const AFTER_RELEASE_MS = Date.UTC(2026, 10, 19, 12);
+/** Before it: such a trace time is already in the column, so the last-trace replay skips it. */
+const BEFORE_RELEASE_MS = Date.UTC(2026, 9, 1);
 
 let sequence = 0;
 /** An owner's fact as its log holds it, in the order the test appends it. */
@@ -156,6 +160,31 @@ const firstMessageListed = (projectId: string, organizationId: string) =>
     aggregateId: projectId,
     tenantId: projectId,
     data: { projectId, organizationId },
+  });
+
+const traceFact = ({
+  type = TRACE_RECEIVED_EVENT_TYPE,
+  projectId = "project-t1",
+  organizationId,
+  at,
+}: {
+  type?: string;
+  projectId?: string;
+  organizationId?: string;
+  at: number;
+}) =>
+  ownerFact({
+    type,
+    aggregateType: "trace_project_milestone",
+    aggregateId: projectId,
+    tenantId: projectId,
+    at,
+    data: {
+      projectId,
+      userId: "admin-1",
+      ...(type === FIRST_TRACE_RECORDED_EVENT_TYPE && { sdkLanguage: "python", sdkFramework: "x" }),
+      ...(organizationId !== undefined && { organizationId }),
+    },
   });
 
 function userErased(userId: string): ReplayEvent {
@@ -272,6 +301,7 @@ function deploy({
         ? personalProjects(repositories.personalProjects)
         : repositories.personalProjects,
       tracedProjects: repositories.tracedProjects,
+      lastTraces: repositories.milestones,
     },
     sync: undefined,
     logger: { warn: (payload) => void warnings.push(payload) },
@@ -301,11 +331,18 @@ function deploy({
     for (const { id } of steps) await run(id);
   };
   /** The copies' rows, in the order each store keeps them; the memory twins list what they hold. */
-  const state = async () => ({
+  const state = async (organizationIds: string[] = []) => ({
     personal: (
       repositories.personalProjects as MemoryNurturingPersonalProjectRepository
     ).storedRows(),
     traced: (repositories.tracedProjects as MemoryNurturingTracedProjectRepository).storedRows(),
+    lastTraceAt: await Promise.all(
+      organizationIds.map((organizationId) =>
+        (repositories.milestones as MemoryNurturingMilestonesRepository).findLastTraceAt({
+          organizationId,
+        }),
+      ),
+    ),
   });
   return { repositories, run, runAll, state, warnings, requests: sinks.requests };
 }
@@ -317,16 +354,19 @@ const byProject = <Row extends { projectId: string }>(rows: Row[]) =>
 async function perFact({
   personal = [],
   traced = [],
+  traces = [],
   erased = [],
 }: {
   personal?: { projectId: string; organizationId: string; ownerUserId: string }[];
   traced?: { projectId: string; organizationId: string }[];
+  traces?: { organizationId: string; occurredAt: number }[];
   erased?: string[];
 }) {
   const repositories = MemoryNurturingRepositories.create();
   for (const userId of erased) await repositories.personalProjects.forgetOwner({ ownerUserId: userId });
   for (const row of personal) await repositories.personalProjects.recordOwner(row);
   for (const row of traced) await repositories.tracedProjects.recordTraced(row);
+  for (const trace of traces) await repositories.milestones.recordLastTrace(trace);
   return repositories;
 }
 
@@ -488,5 +528,45 @@ describe("given trace's and project's logs hold traced projects from before the 
     expect(byProject((await reversed.state()).traced)).toEqual(
       byProject((await forward.state()).traced),
     );
+  });
+});
+
+describe("given trace's log holds trace times from before and after the release", () => {
+  const facts = () => [
+    traceFact({ type: FIRST_TRACE_RECORDED_EVENT_TYPE, organizationId: "org-1", at: AFTER_RELEASE_MS }),
+    traceFact({ organizationId: "org-1", at: AFTER_RELEASE_MS + 5_000 }),
+    traceFact({ organizationId: "org-1", projectId: "project-t2", at: AFTER_RELEASE_MS + 2_000 }),
+    traceFact({ organizationId: "org-2", projectId: "project-t3", at: AFTER_RELEASE_MS + 1_000 }),
+    // Already in the column, so the replay window skips it; a fact naming no organization writes nothing.
+    traceFact({ organizationId: "org-old", projectId: "project-t4", at: BEFORE_RELEASE_MS }),
+    traceFact({ projectId: "project-t5", at: AFTER_RELEASE_MS + 9_000 }),
+  ];
+
+  /** @scenario "Replaying the last-trace lane fills each organization's latest trace time" */
+  it("fills each organization's latest time since the day before the release, and sends nothing", async () => {
+    const worker = deploy({ events: facts() });
+
+    await worker.runAll();
+
+    expect((await worker.state(["org-1", "org-2", "org-old"])).lastTraceAt).toEqual([
+      AFTER_RELEASE_MS + 5_000,
+      AFTER_RELEASE_MS + 1_000,
+      null,
+    ]);
+    expect(worker.requests()).toEqual({ customerIo: 0, posthog: 0 });
+  });
+
+  /** @scenario "Replaying the last-trace lane twice, or in reverse order, leaves each time as it was" */
+  it("leaves the same times in reverse order and after a second run", async () => {
+    const forward = deploy({ events: facts() });
+    const reversed = deploy({ events: inReverse(facts()) });
+    await forward.runAll();
+    await reversed.runAll();
+    const first = JSON.stringify(await forward.state(["org-1", "org-2"]));
+
+    await forward.run(LAST_TRACES_STEP);
+
+    expect(JSON.stringify(await forward.state(["org-1", "org-2"]))).toBe(first);
+    expect(JSON.stringify(await reversed.state(["org-1", "org-2"]))).toBe(first);
   });
 });

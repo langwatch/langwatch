@@ -75,12 +75,19 @@ export class PrismaNurturingMilestonesRepository
     occurredAt,
   }: Readonly<{ organizationId: string; occurredAt: number }>): Promise<void> {
     const at = new Date(occurredAt);
-    // SQL for the reason given above `recordCodingFirstSession`: the time only moves forward.
+    // One upsert in SQL, for the reason given above `recordCodingFirstSession`: GREATEST moves the
+    // time forward only, so any order or repeat of a fact leaves the same row. The fact's own
+    // organization is compared with its bound id: the tenancy guard reads no tenant from an
+    // INSERT ... SELECT's column list, only from a comparison.
     await this.#database.$executeRaw`
-      UPDATE "NurturingOrganization"
-         SET "lastTraceAt" = ${at}, "updatedAt" = now()
-       WHERE "organizationId" = ${organizationId}
-         AND ("lastTraceAt" IS NULL OR "lastTraceAt" < ${at})
+      INSERT INTO "NurturingOrganization" ("organizationId", "lastTraceAt", "updatedAt")
+      SELECT fact."organizationId", fact."lastTraceAt", now()
+        FROM (VALUES (${organizationId}, (${at}::timestamptz AT TIME ZONE 'UTC')::timestamp(3)))
+             AS fact ("organizationId", "lastTraceAt")
+       WHERE fact."organizationId" = ${organizationId}
+      ON CONFLICT ("organizationId") DO UPDATE
+         SET "lastTraceAt" = GREATEST("NurturingOrganization"."lastTraceAt", EXCLUDED."lastTraceAt"),
+             "updatedAt" = now()
     `;
   }
 
