@@ -91,7 +91,8 @@ jobs:
           WHEEL_VERSION: ${{ steps.wheel_version.outputs.version }}
           RELEASE_VERSION: ${{ steps.get_version.outputs.version }}
         run: |
-          if [ "$WHEEL_VERSION" != "$RELEASE_VERSION" ]; then
+          # PEP 440 equality: the wheel says 2.1.0rc1 where the tag says 2.1.0-rc.1
+          if ! uv run --no-project --with packaging python -c 'import os,sys; from packaging.version import Version as V; sys.exit(0 if V(os.environ["WHEEL_VERSION"])==V(os.environ["RELEASE_VERSION"]) else 1)'; then
             echo "::error::Wheel version $WHEEL_VERSION does not match release version $RELEASE_VERSION"
             exit 1
           fi
