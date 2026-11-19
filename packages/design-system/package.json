@@ -411,6 +411,10 @@
       "types": "./dist/components/scope/scope-filter.d.ts",
       "default": "./src/components/scope/scope-filter.tsx"
     },
+    "./scope-name-badge": {
+      "types": "./dist/components/scope/scope-name-badge.d.ts",
+      "default": "./src/components/scope/scope-name-badge.tsx"
+    },
     "./option-list": {
       "types": "./dist/components/forms/option-list.d.ts",
       "default": "./src/components/forms/option-list.tsx"
