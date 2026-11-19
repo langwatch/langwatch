@@ -3,10 +3,6 @@
  * The `/api/graphs` wire: the size a graph posted without one lands at, and that
  * it reads back, lists and renames at that size. Spec: dashboard-service.feature.
  */
-import {
-  CHART_GRID_DEFAULT_COL_SPAN,
-  CHART_GRID_DEFAULT_ROW_SPAN,
-} from "@langwatch/analytics-contract/chart-grid";
 import { canonicalErrorResponse, createRestRuntime } from "@langwatch/api/rest";
 import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { describe, expect, it } from "vitest";
@@ -64,7 +60,8 @@ function mountedGraphs() {
 }
 
 const GRAPH = { name: "Latency", graph: { graphType: "line" } };
-const SIZE = { colSpan: CHART_GRID_DEFAULT_COL_SPAN, rowSpan: CHART_GRID_DEFAULT_ROW_SPAN };
+// Literal on purpose: a constant-derived expectation would follow a regression.
+const SIZE = { colSpan: 4, rowSpan: 5 };
 const sizeOf = (graph: { colSpan: number; rowSpan: number }) => ({
   colSpan: graph.colSpan,
   rowSpan: graph.rowSpan,
