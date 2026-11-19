@@ -145,13 +145,9 @@ export function buildAgentStopPipeline({
 
 export const agentStopEventing = defineEventingModule({
   pipeline: AGENT_STOP_PIPELINE_NAME,
-  build: ({
-    app,
-    participation,
-    processStore,
-  }: EventingSetup<GovernanceRepositories, GovernanceModule>) => {
+  build: ({ app, processStore }: EventingSetup<GovernanceRepositories, GovernanceModule>) => {
     app.connectKillSwitchAuditOutbox({ processStore });
-    return app.agentStopPipeline({ participation, processStore });
+    return app.agentStopPipeline({ processStore });
   },
   connect: ({ app, commands }) => app.connectAgentStop(commands),
 });

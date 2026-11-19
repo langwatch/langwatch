@@ -145,3 +145,10 @@ export function sharedKeyHoldersOf({
     return holds ? [openStop.agentName] : [];
   });
 }
+
+/** The Restore dialog's note on a shared virtual key, worded for one holder or several. */
+export function sharedKeyNoteOf({ holders }: { holders: readonly string[] }): string {
+  const names = new Intl.ListFormat("en-GB", { type: "conjunction" }).format(holders);
+  const verb = holders.length > 1 ? "are" : "is";
+  return `The virtual key stays disabled while ${names} ${verb} still stopped.`;
+}

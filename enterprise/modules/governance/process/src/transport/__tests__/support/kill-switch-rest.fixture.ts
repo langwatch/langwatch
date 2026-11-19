@@ -249,7 +249,7 @@ export async function buildKillSwitchRest({
     processStore,
   });
   const pipeline = eventing.register(
-    app.agentStopPipeline({ participation: "consume", processStore }),
+    app.agentStopPipeline({ processStore }),
   );
   app.connectAgentStop(pipeline.commands);
   const call = mountKillSwitchRest({ app, grants, planType });

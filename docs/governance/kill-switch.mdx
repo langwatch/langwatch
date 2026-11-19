@@ -71,7 +71,9 @@ You can retry a `quarantined`, `stop_failed` or `restore_failed` stop. Any other
 
 ## Change the plan of a stopped agent
 
-Removing a target from the stop plan also removes it from the agent's open stop. A stop or restore that only waited on that target finishes: a stop that failed on it becomes `quarantined`, and a restore that failed on it becomes `restored`. A restore does not touch a removed target, so it stays as the stop left it.
+Removing a target from the stop plan also removes it from the agent's open stop, and turns it back on at once if the stop had turned it off: the virtual key is enabled, the serving endpoint started and the alias accepts calls again. A target that was already off before the stop, or that no longer exists, is left as it is.
+
+A stop or restore that only waited on that target finishes: a stop that failed on it becomes `quarantined`, and a restore that failed on it becomes `restored`. A later restore does not call a removed target again.
 
 ## Shared virtual keys
 

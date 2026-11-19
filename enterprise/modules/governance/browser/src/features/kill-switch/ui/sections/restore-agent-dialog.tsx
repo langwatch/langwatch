@@ -8,6 +8,7 @@ import {
   useShowErrorToast,
 } from "../../../../behavior/governance-feedback.ts";
 import { useKillSwitchRefresh } from "../../behavior/use-kill-switch.ts";
+import { sharedKeyNoteOf } from "../../model/kill-switch-copy.ts";
 
 /** Restoring a stopped agent: only the targets the stop applied are turned back on. */
 export function RestoreAgentDialog({
@@ -72,7 +73,7 @@ export function RestoreAgentDialog({
       </Text>
       {sharedKeyHolders.length > 0 ? (
         <Text textStyle="sm" color="fg.muted" data-testid="restore-shared-key-note">
-          {`The virtual key stays disabled while ${sharedKeyHolders.join(", ")} is still stopped.`}
+          {sharedKeyNoteOf({ holders: sharedKeyHolders })}
         </Text>
       ) : null}
     </Dialog>

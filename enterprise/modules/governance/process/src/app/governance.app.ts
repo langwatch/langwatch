@@ -1253,7 +1253,6 @@ export class GovernanceModule implements GovernanceRestApi {
   agentStopPipeline({
     processStore,
   }: {
-    participation: EventingParticipation;
     processStore: Pick<ProcessStore, "deleteDispatchedBefore">;
   }): AgentStopPipelineDefinition {
     return buildAgentStopPipeline({

@@ -8,7 +8,7 @@ import type {
 } from "@langwatch/enterprise-governance-contract";
 import { describe, expect, it } from "vitest";
 
-import { sharedKeyHoldersOf } from "../kill-switch-copy.ts";
+import { sharedKeyHoldersOf, sharedKeyNoteOf } from "../kill-switch-copy.ts";
 
 function stopOf({
   id,
@@ -90,6 +90,24 @@ describe("sharedKeyHoldersOf", () => {
         }),
       ).toEqual(["Sales pipeline"]);
       expect(sharedKeyHoldersOf({ stop: null, summaries: [] })).toEqual([]);
+    });
+  });
+});
+
+describe("sharedKeyNoteOf", () => {
+  describe("when one other agent still holds the key", () => {
+    it("names it with a singular verb", () => {
+      expect(sharedKeyNoteOf({ holders: ["billing-bot"] })).toBe(
+        "The virtual key stays disabled while billing-bot is still stopped.",
+      );
+    });
+  });
+
+  describe("when several other agents still hold the key", () => {
+    it("lists them with a plural verb", () => {
+      expect(sharedKeyNoteOf({ holders: ["billing-bot", "refund-bot", "triage-bot"] })).toBe(
+        "The virtual key stays disabled while billing-bot, refund-bot and triage-bot are still stopped.",
+      );
     });
   });
 });
