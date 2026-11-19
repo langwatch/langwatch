@@ -277,7 +277,7 @@ describe("given a custom role definition", () => {
     /** @scenario A custom role cannot gain ops permissions */
     it("is written, since the fence leaves it inert", async () => {
       const { writer, db, sent } = harness({});
-      db.role.findFirst.mockResolvedValueOnce(null).mockResolvedValue({
+      db.role.findFirst.mockResolvedValue({
         name: "apikey:key_1",
         description: null,
         permissions: ["ops:view"],
