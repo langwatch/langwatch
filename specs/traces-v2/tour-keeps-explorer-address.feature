@@ -25,3 +25,9 @@ Feature: Trace tour keeps the explorer state in the address
     Given the address fragment carries a lens and a query
     When the page tour moves to a step
     Then the fragment keeps the lens and the query and adds the step
+
+  @integration
+  Scenario: The bar-state writer keeps the tour step
+    Given the address fragment carries a query and a tour step
+    When the explorer rewrites the fragment for its own state
+    Then the tour step is still in the fragment
