@@ -1,3 +1,4 @@
+import { isUniqueConstraintError, uniqueConstraintTargets } from "@langwatch/prisma-client/errors";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
 import type {
@@ -135,6 +136,13 @@ export class PrismaPrivateModelEndpointRepository implements PrivateModelEndpoin
       update: fields,
       select: BINDING_COLUMNS,
     });
+  }
+
+  isHostnameTaken(error: unknown): boolean {
+    if (!isUniqueConstraintError(error)) return false;
+    const targets = uniqueConstraintTargets(error);
+    // An unnamed P2002 on this table can only be the (organizationId, hostname) index.
+    return targets.length === 0 || targets.some((target) => target.includes("hostname"));
   }
 
   async removeBinding({

@@ -41,5 +41,10 @@ export interface PrivateModelEndpointRepository {
     hostname: string;
   }): Promise<PrivateModelEndpointBindingRecord | null>;
   saveBinding(input: PrivateModelEndpointBindingRecord): Promise<PrivateModelEndpointBindingRecord>;
+  /**
+   * Whether a `saveBinding` failure is the organization's hostname already being bound: the
+   * unique index catching a concurrent bind the service's own check let through.
+   */
+  isHostnameTaken(error: unknown): boolean;
   removeBinding(input: { organizationId: string; id: string }): Promise<void>;
 }

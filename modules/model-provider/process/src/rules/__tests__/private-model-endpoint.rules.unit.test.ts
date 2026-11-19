@@ -40,6 +40,9 @@ describe("normalizeBindingHostname", () => {
       ["", "Enter a hostname"],
       ["llm_acme.test", "valid hostname"],
       ["metadata.google.internal", "metadata"],
+      ["langwatch.ai", "LangWatch hostname"],
+      ["app.langwatch.ai", "LangWatch hostname"],
+      ["Gateway.LangWatch.AI.", "LangWatch hostname"],
     ])("refuses %j on the hostname field and says why", (hostname, reason) => {
       const errors = fieldErrorsOf(() => normalizeBindingHostname(hostname));
 

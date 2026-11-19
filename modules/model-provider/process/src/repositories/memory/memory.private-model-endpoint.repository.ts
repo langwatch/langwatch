@@ -4,6 +4,14 @@ import type {
   PrivateModelEndpointRepository,
 } from "../private-model-endpoint.repository.ts";
 
+/** The twin of the (organizationId, hostname) unique index refusing a second binding. */
+export class MemoryBindingHostnameTakenError extends Error {
+  constructor(hostname: string) {
+    super(`hostname "${hostname}" is already bound in this organization`);
+    this.name = "MemoryBindingHostnameTakenError";
+  }
+}
+
 /** The in-memory twin: the same organization fence and the same cascade as Postgres. */
 export class MemoryPrivateModelEndpointRepository implements PrivateModelEndpointRepository {
   readonly #endpoints = new Map<string, PrivateModelEndpointRecord>();
@@ -98,8 +106,19 @@ export class MemoryPrivateModelEndpointRepository implements PrivateModelEndpoin
   saveBinding(
     input: PrivateModelEndpointBindingRecord,
   ): Promise<PrivateModelEndpointBindingRecord> {
+    const taken = [...this.#bindings.values()].some(
+      (row) =>
+        row.id !== input.id &&
+        row.organizationId === input.organizationId &&
+        row.hostname === input.hostname,
+    );
+    if (taken) return Promise.reject(new MemoryBindingHostnameTakenError(input.hostname));
     this.#bindings.set(input.id, { ...input });
     return Promise.resolve({ ...input });
+  }
+
+  isHostnameTaken(error: unknown): boolean {
+    return error instanceof MemoryBindingHostnameTakenError;
   }
 
   removeBinding({ organizationId, id }: { organizationId: string; id: string }): Promise<void> {

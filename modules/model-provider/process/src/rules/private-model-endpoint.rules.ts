@@ -39,6 +39,17 @@ function isPrivateAddress(address: string): boolean {
   return isPrivateIpv6(address);
 }
 
+/**
+ * LangWatch's own domains. No organization may bind a name under them: nlpgo's credentials carry
+ * no provenance, so such a binding could pull a call meant for LangWatch to the organization's
+ * endpoint. Mirrors langWatchDomains in services/aigateway/domain.
+ */
+const LANGWATCH_DOMAINS = ["langwatch.ai"] as const;
+
+function isLangWatchHostname(hostname: string): boolean {
+  return LANGWATCH_DOMAINS.some((domain) => hostname === domain || hostname.endsWith(`.${domain}`));
+}
+
 function isHostnameLabel(label: string): boolean {
   return HOSTNAME_LABEL.test(label);
 }
@@ -63,6 +74,9 @@ function assertBindableHostname(hostname: string): void {
   }
   if (isCloudMetadataHost(hostname)) {
     refuse("hostname", "A cloud metadata hostname cannot be bound.");
+  }
+  if (isLangWatchHostname(hostname)) {
+    refuse("hostname", "A LangWatch hostname cannot be bound.");
   }
 }
 
