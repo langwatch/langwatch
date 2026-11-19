@@ -291,7 +291,6 @@ export class InstantEvalModule implements InstantEvalApiContract, InstantEvalBro
       peers: {
         findSpendAttribution: spendAttributionOf(projects),
         checkBudget: (input) => gateway.checkBudget(input),
-        isOwnDecisionModel: (input) => judge.isOwnDecisionModel(input),
       },
     });
     const context = InstantEvalRunContextService.create({
