@@ -806,11 +806,12 @@ Feature: Authorization grants
     Then exactly one audit row exists
 
   @unit
-  Scenario: A fact appended twice under one idempotency key writes one audit row
-    Given one fact appended twice, each append with its own event id and the same idempotency key
+  Scenario: A role definition appended twice under one idempotency key writes one audit row
+    Given one role definition appended twice, each append with its own event id and the same idempotency key
     When both are handled
     Then exactly one audit row exists
-    And a fact on another aggregate that shares the key still gets its own row
+    And a role definition on another role that shares the key still gets its own row
+    And any other event's audit row is still keyed on its event id
 
   @unit @regression
   Scenario: Migrated custom bindings retain their permission restrictions

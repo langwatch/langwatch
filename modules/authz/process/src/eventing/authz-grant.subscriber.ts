@@ -97,11 +97,14 @@ function isAuditable(event: AuthzGrantsEvent): boolean {
 }
 
 /**
- * One row per fact, as the event log keeps one: two appends of a fact share its idempotency key
- * within the aggregate but not the event id, so a deterministic retry writes no second row.
+ * A role definition's row is keyed on its fact, as the event log keeps one: a retried API key role
+ * definition appends again under the same idempotency key but a new event id, and writes no second
+ * row. Every other event keeps its event-id row; widening that is its own change.
  */
 function rowId(event: AuthzGrantsEvent): string {
-  if (!event.idempotencyKey) return `authz-evt-${event.id}`;
+  if (event.type !== ROLE_DEFINED_EVENT_TYPE || !event.idempotencyKey) {
+    return `authz-evt-${event.id}`;
+  }
   return `authz-evt-${event.tenantId}:${event.aggregateId}:${event.idempotencyKey}`;
 }
 
