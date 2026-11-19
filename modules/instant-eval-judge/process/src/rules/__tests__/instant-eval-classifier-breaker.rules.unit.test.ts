@@ -121,6 +121,51 @@ describe("the classifier breaker", () => {
     expect(allows(older, probeEveryMs * 5)).toBe(false);
   });
 
+  /** @scenario "A cancelled probe does not stop the next one" */
+  it("keeps the newer probe reserved when a stale probe comes back", () => {
+    const first = classifierBreakerAllowsSend({
+      state: after(downs(openAfterFailures)),
+      now: probeEveryMs,
+    });
+    const reopened = after(["up", ...downs(openAfterFailures)], first.state, probeEveryMs);
+    const second = classifierBreakerAllowsSend({ state: reopened, now: probeEveryMs * 2 });
+    const stale = recordClassifierSend({
+      state: second.state,
+      health: "neutral",
+      now: probeEveryMs * 2,
+      probe: first.probe,
+    });
+
+    expect(second.probe).toBe(2);
+    expect(stale.probeInFlight).toBe(2);
+    expect(allows(stale, probeEveryMs * 5)).toBe(false);
+  });
+
+  /** @scenario "A text held behind a slow probe is sent once the probe is answered" */
+  it("says a held-back send awaits a probe only while one is unanswered", () => {
+    const open = after(downs(openAfterFailures));
+    const probe = classifierBreakerAllowsSend({ state: open, now: probeEveryMs });
+
+    expect(classifierBreakerAllowsSend({ state: open, now: 0 }).isAwaitingProbe).toBe(false);
+    expect(
+      classifierBreakerAllowsSend({ state: probe.state, now: probeEveryMs }).isAwaitingProbe,
+    ).toBe(true);
+  });
+
+  /** @scenario "A text held behind a probe that never settles still gives up" */
+  it("stops a held-back send awaiting a probe once the probe is overdue", () => {
+    const { probeAnsweredWithinMs } = INSTANT_EVAL_CLASSIFIER_BREAKER;
+    const open = after(downs(openAfterFailures));
+    const probe = classifierBreakerAllowsSend({ state: open, now: probeEveryMs });
+    const overdue = probeEveryMs + probeAnsweredWithinMs;
+
+    const held = classifierBreakerAllowsSend({ state: probe.state, now: overdue - 1 });
+    const late = classifierBreakerAllowsSend({ state: probe.state, now: overdue });
+
+    expect(held.isAwaitingProbe).toBe(true);
+    expect(late).toMatchObject({ isAllowed: false, isAwaitingProbe: false });
+  });
+
   /** @scenario "Rate limits and permanent refusals never stop sends" */
   it("neither opens nor resets on rate limits and permanent refusals", () => {
     expect(allows(after(Array.from({ length: 100 }, () => "neutral")), 0)).toBe(true);

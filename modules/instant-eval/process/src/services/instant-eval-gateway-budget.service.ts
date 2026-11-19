@@ -1,6 +1,7 @@
 /**
  * The gateway budgets a customer set to block, asked before Instant Evals judge. The free
  * budget binds only an unpaid organization; these bind every plan, as they do gateway traffic.
+ * An own decision model is checked too: its provider usage is debited to them (ADR-193).
  * @see modules/instant-eval/specs/instant-eval-billing.feature
  */
 
@@ -18,8 +19,6 @@ interface InstantEvalGatewayBudgetPeers {
   }): Promise<{ organizationId: string; teamId: string } | undefined>;
   /** The gateway's own preflight, the one its requests are refused by. */
   checkBudget(input: GatewayBudgetCheckInput): Promise<GatewayBudgetCheckResult>;
-  /** Whether the project runs on its own decision model, whose cost is not ours (ADR-182). */
-  isOwnDecisionModel(input: { projectId: string }): Promise<boolean>;
 }
 
 /** The scopes an Instant Eval answers to; it has no key, person or end user of its own. */
@@ -57,7 +56,6 @@ export class InstantEvalGatewayBudgetService {
     projectId: string;
     inFlightUsd?: number;
   }): Promise<void> {
-    if (await this.peers.isOwnDecisionModel({ projectId })) return;
     const attribution = await this.peers.findSpendAttribution({ projectId });
     if (!attribution) return;
 

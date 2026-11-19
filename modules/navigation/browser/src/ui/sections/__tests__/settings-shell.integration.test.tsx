@@ -448,12 +448,14 @@ describe("the settings shell in a new navigation mode", () => {
     it("puts API keys under General, above the access group", () => {
       renderSettingsSidebar();
 
-      const entries = within(screen.getByTestId("sidebar-scroll-region"))
-        .getAllByRole("link")
-        .map((link) => link.textContent?.trim());
+      const links = within(screen.getByTestId("sidebar-scroll-region")).getAllByRole("link");
+      const entries = links.map((link) => link.textContent?.trim());
+      const organizationGeneral = links.findIndex(
+        (link) => link.getAttribute("href") === "/settings",
+      );
 
       expect(entries.filter((entry) => entry === "API keys")).toHaveLength(1);
-      expect(entries.indexOf("API keys")).toBe(entries.indexOf("General") + 1);
+      expect(entries.indexOf("API keys")).toBe(organizationGeneral + 1);
       expect(entries.indexOf("API keys")).toBeLessThan(entries.indexOf("Users"));
     });
 
@@ -560,6 +562,98 @@ describe("the settings shell in a new navigation mode", () => {
         "aria-current",
         "page",
       );
+    });
+  });
+});
+
+describe("the settings menu's group order", () => {
+  describe("when the settings sidebar renders", () => {
+    /** @scenario The Project group sits between You and Organization */
+    it("reads You, Project, Organization, then the remaining groups", () => {
+      renderSettingsSidebar();
+
+      const groupButtons = screen
+        .getAllByRole("button", { name: /^Collapse / })
+        .map((button) => button.textContent?.trim());
+
+      expect(groupButtons.slice(0, 4)).toEqual([
+        "You",
+        "Project",
+        "Organization",
+        "People & access",
+      ]);
+    });
+  });
+});
+
+const SHARED_TEAM = {
+  id: "team_1",
+  name: "Core",
+  isPersonal: false,
+  ownerUserId: null,
+  members: [{ userId: "user_1" }],
+  projects: [{ id: "project_1", slug: "checkout-bot", name: "Checkout bot", isPersonal: false }],
+};
+
+/** The LLM Ops sidebar on a page of `checkout-bot`, holding the Settings entry at its foot. */
+function renderProjectPageSidebar({ permissions }: { permissions: string[] }) {
+  const organization = { ...ORGANIZATION, teams: [SHARED_TEAM] };
+  return renderWithDesignSystem(
+    <WithStubNavigationHost
+      readings={{
+        organization,
+        organizations: [organization],
+        project: SHARED_TEAM.projects[0],
+        team: SHARED_TEAM,
+        openableTeams: [SHARED_TEAM],
+        projectParam: "checkout-bot",
+        pathname: "/checkout-bot/traces",
+        permissions,
+        plan: { isEnterprise: true, isLoading: false, isLiteMember: false },
+      }}
+    >
+      <SidebarContent surface="llm-ops" showExpanded />
+    </WithStubNavigationHost>,
+  );
+}
+
+describe("the Settings entry on a project's page", () => {
+  describe("when the reader may update the project", () => {
+    /** @scenario "Settings opened from a project lands on that project's settings" */
+    it("opens the project's General page", () => {
+      renderProjectPageSidebar({ permissions: ["organization:view", "project:update"] });
+
+      expect(screen.getByRole("link", { name: "Settings" })).toHaveAttribute(
+        "href",
+        "/settings/project",
+      );
+    });
+  });
+
+  describe("when the project's General page opened from a project page", () => {
+    /** @scenario "Settings opened from a project lands on that project's settings" */
+    it("keeps the back entry on the page the reader left", () => {
+      captureSettingsReturnPath({
+        organizationId: ORGANIZATION.id,
+        pathname: "/checkout-bot/traces",
+      });
+      renderSettingsSidebar({ pathname: "/settings/project" });
+
+      expect(screen.getByRole("link", { name: /^Back to / })).toHaveAttribute(
+        "href",
+        "/checkout-bot/traces",
+      );
+      expect(markedEntries()).toEqual(["General"]);
+      expect(generalLink("/settings/project")).toHaveAttribute("aria-current", "page");
+    });
+  });
+
+  describe("when the reader may only view the project", () => {
+    /** @scenario "A reader who may not update the project lands on the organization's settings" */
+    it("opens the organization's General page", () => {
+      renderProjectPageSidebar({ permissions: ["organization:view", "project:view"] });
+
+      expect(screen.getByRole("link", { name: "Settings" })).toHaveAttribute("href", "/settings");
     });
   });
 });

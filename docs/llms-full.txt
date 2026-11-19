@@ -45618,7 +45618,7 @@ langwatch instant-eval run \
   --target threads --last 7d
 ```
 
-You can ask up to ten questions per run, all of the same text. Put each `--criteria`, `--threshold`, `--score`, `--category` and `--id` after the `--ask` it belongs to. You pay for the text plus the questions, in one judge request per row, so ten questions cost about the same as one.
+You can ask up to ten questions per run, all of the same text. Put each `--criteria`, `--threshold`, `--score`, `--category` and `--id` after the `--ask` it belongs to. You pay for the text, the questions and a small fixed part of every request, in one judge request per row, so ten questions cost about the same as one.
 
 ## Questions from a file
 
@@ -78302,7 +78302,9 @@ GROUP BY TraceId, ConversationId
 
 An organization without a paid plan also gets `freeBudgetRemainingUsd`, what is left of its $1 free budget. Once that is spent, a new run and a judged query answer `402` with `instant_eval_free_budget_exhausted`, carrying `spentUsd` and `budgetUsd` in `meta`, until the organization upgrades. The rate is on [Pricing](/pricing#instant-evals).
 
-On any plan, a [gateway budget](/ai-gateway/budgets) set to block on the project, its team or the organization also applies. Once it is reached, a new run and a judged query answer `402` with `instant_eval_gateway_budget_exceeded`, carrying `budgetId`, `scope`, `window`, `limitUsd` and `spentUsd` in `meta`. A run under way stops before its next page and keeps the verdicts it wrote. A budget set to warn never refuses, and a project on its own decision model is not checked.
+On any plan, a [gateway budget](/ai-gateway/budgets) set to block on the project, its team or the organization also applies. Once it is reached, a new run and a judged query answer `402` with `instant_eval_gateway_budget_exceeded`, carrying `budgetId`, `scope`, `window`, `limitUsd` and `spentUsd` in `meta`. A run under way stops before its next page and keeps the verdicts it wrote.
+
+A budget set to warn never refuses. A run on your own decision model is checked too, as its provider usage counts against these budgets.
 
 ## Row Limits
 
@@ -82125,7 +82127,7 @@ Each plan includes a base volume of events stored for a default window. For exam
 
 Instant Evals are priced separately from events. A judged query or run is charged per input token sent to the judge, at **$0.0546 per million input tokens**. Output is free. Judging ten thousand conversations of average size costs about a quarter of a dollar.
 
-Input tokens are the text the judge reads plus the questions asked about it. One request carries every question about one text, so a statement with three eval columns costs about the same as one with a single column.
+Input tokens are the text the judge reads, the questions asked about it and a small fixed part of every request. One request carries every question about one text, so a statement with three eval columns costs about the same as one with a single column.
 
 `POST /api/v1/instant-evals/estimate` returns the price of a run before it starts, from the rows the statement matches and a sample of their size. See [Running an Instant Eval](/api-reference/instant-evals/running-an-instant-eval).
 
