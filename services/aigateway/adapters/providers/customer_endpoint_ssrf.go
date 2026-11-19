@@ -26,6 +26,10 @@ type customerEndpointPolicy struct {
 	// loopback address. Test-only: it lets a local TLS server stand in for a
 	// PrivateLink endpoint. Production never sets it.
 	allowLoopbackPrivateEndpoints bool
+	// bindings are the calling organization's private endpoint bindings
+	// (ADR-203). A host bound here is checked against its binding and never
+	// resolved. validateCredentialEndpoints sets them per credential.
+	bindings []domain.PrivateEndpoint
 }
 
 type endpointResolutionError struct{ cause error }
@@ -103,49 +107,59 @@ func isAlwaysBlockedEndpointHost(host string) bool {
 		host == "metadata.goog" || strings.HasSuffix(host, ".compute.internal")
 }
 
+// validateCustomerEndpoint checks a customer-configured URL. A host bound in
+// policy.bindings is checked against its binding and never resolved
+// (ADR-203); every other host gets the SSRF rules.
 func validateCustomerEndpoint(ctx context.Context, rawURL string, policy customerEndpointPolicy) error {
-	return validateCustomerEndpointFor(ctx, rawURL, policy, nil)
-}
-
-// validateCustomerEndpointFor is validateCustomerEndpoint for a caller whose
-// organization has private endpoint bindings. A host bound in bindings is
-// checked against its binding and never resolved (ADR-203); every other host
-// gets exactly today's rules.
-func validateCustomerEndpointFor(ctx context.Context, rawURL string, policy customerEndpointPolicy, bindings []domain.PrivateEndpoint) error {
-	u, err := url.Parse(rawURL)
+	u, scheme, host, err := parseCustomerEndpoint(rawURL)
 	if err != nil {
-		return fmt.Errorf("customer endpoint is not a valid URL")
+		return err
 	}
-	scheme := strings.ToLower(u.Scheme)
-	if scheme != "http" && scheme != "https" {
-		return fmt.Errorf("customer endpoint must use http or https")
-	}
-	if u.Opaque != "" {
-		return fmt.Errorf("customer endpoint must use an absolute hierarchical URL")
-	}
-	if u.User != nil {
-		return fmt.Errorf("customer endpoint must not contain URL credentials")
-	}
-	host := normalizeEndpointHost(u.Hostname())
-	if host == "" {
-		return fmt.Errorf("customer endpoint has no host")
-	}
-	if isAlwaysBlockedEndpointHost(host) {
-		return fmt.Errorf("customer endpoint host is reserved for cloud metadata")
+	if ep, bound := domain.PrivateEndpointFor(policy.bindings, host); bound {
+		return checkBoundEndpoint(u, ep, policy.allowLoopbackPrivateEndpoints)
 	}
 
-	if ep, bound := domain.PrivateEndpointFor(bindings, host); bound {
-		return checkBoundEndpoint(scheme, u.Port(), ep, policy.allowLoopbackPrivateEndpoints)
-	}
-
-	_, allowlisted := policy.allowedHosts[host]
 	if policy.requireHTTPS && scheme != "https" {
 		return fmt.Errorf("customer endpoint must use https")
 	}
 	if parsed := net.ParseIP(host); parsed != nil {
+		_, allowlisted := policy.allowedHosts[host]
 		return endpointAddressError(parsed, policy.blockLocal, allowlisted)
 	}
+	return checkResolvedEndpoint(ctx, host, policy)
+}
 
+// parseCustomerEndpoint checks the parts of a customer endpoint URL that
+// hold whatever the host resolves to, and returns its lowercased scheme and
+// normalized host.
+func parseCustomerEndpoint(rawURL string) (*url.URL, string, string, error) {
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		return nil, "", "", fmt.Errorf("customer endpoint is not a valid URL")
+	}
+	scheme := strings.ToLower(u.Scheme)
+	if scheme != "http" && scheme != "https" {
+		return nil, "", "", fmt.Errorf("customer endpoint must use http or https")
+	}
+	if u.Opaque != "" {
+		return nil, "", "", fmt.Errorf("customer endpoint must use an absolute hierarchical URL")
+	}
+	if u.User != nil {
+		return nil, "", "", fmt.Errorf("customer endpoint must not contain URL credentials")
+	}
+	host := normalizeEndpointHost(u.Hostname())
+	if host == "" {
+		return nil, "", "", fmt.Errorf("customer endpoint has no host")
+	}
+	if isAlwaysBlockedEndpointHost(host) {
+		return nil, "", "", fmt.Errorf("customer endpoint host is reserved for cloud metadata")
+	}
+	return u, scheme, host, nil
+}
+
+// checkResolvedEndpoint resolves an unbound host and checks every address.
+func checkResolvedEndpoint(ctx context.Context, host string, policy customerEndpointPolicy) error {
+	_, allowlisted := policy.allowedHosts[host]
 	addresses, err := policy.resolve(ctx, host)
 	if err != nil {
 		return &endpointResolutionError{cause: err}
@@ -162,14 +176,15 @@ func validateCustomerEndpointFor(ctx context.Context, rawURL string, policy cust
 }
 
 func validateCredentialEndpoints(ctx context.Context, cred domain.Credential, policy customerEndpointPolicy) error {
+	policy.bindings = cred.PrivateEndpoints.List()
 	if baseURL := credBaseURL(cred); baseURL != "" {
-		if err := validateCustomerEndpointFor(ctx, baseURL, policy, cred.PrivateEndpoints); err != nil {
+		if err := validateCustomerEndpoint(ctx, baseURL, policy); err != nil {
 			return fmt.Errorf("base_url rejected: %w", err)
 		}
 	}
 	if cred.ProviderID == domain.ProviderAzure {
 		if endpoint := credExtra(cred, "endpoint", "api_base"); endpoint != "" {
-			if err := validateCustomerEndpointFor(ctx, endpoint, policy, cred.PrivateEndpoints); err != nil {
+			if err := validateCustomerEndpoint(ctx, endpoint, policy); err != nil {
 				return fmt.Errorf("azure endpoint rejected: %w", err)
 			}
 		}
@@ -219,9 +234,10 @@ func privateEndpointProviderSupported(cred domain.Credential) bool {
 	case domain.ProviderAzure, domain.ProviderBedrock, domain.ProviderLangWatch,
 		domain.ProviderOpenAICodex, domain.ProviderVoyage:
 		return false
+	default:
+		provider := mapProvider(cred)
+		return provider == bfschemas.VLLM || isURLDerivedProvider(provider)
 	}
-	provider := mapProvider(cred)
-	return provider == bfschemas.VLLM || isURLDerivedProvider(provider)
 }
 
 func isRetryableEndpointResolutionError(err error) bool {

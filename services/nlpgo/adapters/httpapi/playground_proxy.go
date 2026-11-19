@@ -103,7 +103,7 @@ func buildPlaygroundProxyRequest(r *http.Request, catalog litellm.OutputTokensLo
 	if refused != nil {
 		return playgroundProxyRequest{}, false, refused
 	}
-	cred.PrivateEndpoints = privateEndpoints
+	cred.PrivateEndpoints = domain.NewPrivateEndpointSet(privateEndpoints)
 
 	raw, err := io.ReadAll(r.Body)
 	if err != nil {

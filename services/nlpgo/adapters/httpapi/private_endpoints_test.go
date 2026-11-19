@@ -22,7 +22,7 @@ import (
 
 // Scenarios: specs/security/org-private-model-endpoints.feature. The app
 // sends the organization's bindings in a signed envelope (ADR-203); nlpgo
-// honours one only when its signature verifies under the configured public
+// accepts one only when its signature verifies under the configured public
 // key, it has not expired, and it was signed for the request's project.
 // Holding the internal secret authorizes nothing about bindings.
 
@@ -112,24 +112,24 @@ func TestPlaygroundProxy_PrivateEndpointsHeader(t *testing.T) {
 	const path = "/go/proxy/v1/chat/completions"
 	secret := map[string]string{InternalSecretHeader: testSecret}
 
-	// @scenario "nlpgo honours bindings only in an envelope signed for the request's project"
+	// @scenario "nlpgo accepts bindings only in an envelope signed for the request's project"
 	t.Run("a valid envelope puts the bindings on the credential", func(t *testing.T) {
 		fake := okBindingProxy()
 		rec := httptest.NewRecorder()
 		newGuardedProxyRouter(fake, testSecret, verifyKey).ServeHTTP(rec, proxyChatRequest(path, with(secret, acmeHeaders())))
 		require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
-		assert.Equal(t, acmeBindings, fake.gotRequest.Credential.PrivateEndpoints)
+		assert.Equal(t, acmeBindings, fake.gotRequest.Credential.PrivateEndpoints.List())
 	})
 
-	// @scenario "A project's studio Lambda honours signed bindings without the internal secret"
-	t.Run("an engine with no internal secret honours a valid envelope", func(t *testing.T) {
+	// @scenario "A project's studio Lambda accepts signed bindings without the internal secret"
+	t.Run("an engine with no internal secret accepts a valid envelope", func(t *testing.T) {
 		// A per-project NLP Lambda carries no internal secret: the signature
 		// alone authorizes the bindings.
 		fake := okBindingProxy()
 		rec := httptest.NewRecorder()
 		newGuardedProxyRouter(fake, "", verifyKey).ServeHTTP(rec, proxyChatRequest(path, acmeHeaders()))
 		require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
-		assert.Equal(t, acmeBindings, fake.gotRequest.Credential.PrivateEndpoints)
+		assert.Equal(t, acmeBindings, fake.gotRequest.Credential.PrivateEndpoints.List())
 	})
 
 	t.Run("no header keeps today's rules", func(t *testing.T) {
@@ -137,16 +137,16 @@ func TestPlaygroundProxy_PrivateEndpointsHeader(t *testing.T) {
 		rec := httptest.NewRecorder()
 		newGuardedProxyRouter(fake, testSecret, verifyKey).ServeHTTP(rec, proxyChatRequest(path, secret))
 		require.Equal(t, http.StatusOK, rec.Code)
-		assert.Empty(t, fake.gotRequest.Credential.PrivateEndpoints)
+		assert.Empty(t, fake.gotRequest.Credential.PrivateEndpoints.List())
 	})
 
-	// @scenario "Without a verify key nlpgo honours no bindings"
+	// @scenario "Without a verify key nlpgo accepts no bindings"
 	t.Run("no verify key configured ignores the header, even with the internal secret", func(t *testing.T) {
 		fake := okBindingProxy()
 		rec := httptest.NewRecorder()
 		newGuardedProxyRouter(fake, testSecret, nil).ServeHTTP(rec, proxyChatRequest(path, with(secret, acmeHeaders())))
 		require.Equal(t, http.StatusOK, rec.Code)
-		assert.Empty(t, fake.gotRequest.Credential.PrivateEndpoints)
+		assert.Empty(t, fake.gotRequest.Credential.PrivateEndpoints.List())
 	})
 
 	_, forger := newTestKey()
@@ -261,14 +261,14 @@ func TestWorkflowRoutes_PrivateEndpoints(t *testing.T) {
 	}
 
 	for _, path := range []string{"/go/studio/execute_sync", "/go/studio/execute"} {
-		t.Run(path+" honours a valid envelope", func(t *testing.T) {
+		t.Run(path+" accepts a valid envelope", func(t *testing.T) {
 			rec, exec := postWorkflow(t, path, workflowPost{secret: testSecret, key: verifyKey, body: inProject("acme-prod"), headers: acmeHeaders()})
 			require.Less(t, rec.Code, 400, rec.Body.String())
 			require.Equal(t, 1, exec.calls)
 			assert.Equal(t, acmeBindings, exec.seen)
 		})
 
-		t.Run(path+" honours a valid envelope on an engine with no internal secret", func(t *testing.T) {
+		t.Run(path+" accepts a valid envelope on an engine with no internal secret", func(t *testing.T) {
 			rec, exec := postWorkflow(t, path, workflowPost{key: verifyKey, body: plain, headers: acmeHeaders()})
 			require.Less(t, rec.Code, 400, rec.Body.String())
 			assert.Equal(t, acmeBindings, exec.seen)

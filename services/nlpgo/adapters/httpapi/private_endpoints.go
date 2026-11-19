@@ -48,7 +48,7 @@ var privateEndpointsNow = time.Now
 // The header holds an envelope the app signed with a key no engine holds, so
 // what authorizes bindings is a signature nlpgo can check, not a secret it
 // shares: tenant code on a per-project NLP Lambda can read that Lambda's
-// environment. The envelope is honoured only when its signature verifies, it
+// environment. The envelope is accepted only when its signature verifies, it
 // has not expired, and it was signed for the project this request runs for:
 // the app's X-LangWatch-Project-Id header and, on a workflow route, the
 // project_id the body names (bodyProjectID; empty on the proxy).

@@ -44,7 +44,7 @@ var ErrPrivateEndpointsMalformed = errors.New("private endpoint bindings are mal
 
 // ParsePrivateEndpoints decodes the JSON array of bindings. Absent (empty
 // input or JSON null) and an empty array both mean "no bindings", which is
-// today's behaviour. Every entry must be well formed; the errors name the
+// the behavior before bindings. Every entry must be well formed; the errors name the
 // field and the entry index, never an address value.
 func ParsePrivateEndpoints(raw []byte) ([]PrivateEndpoint, error) {
 	trimmed := strings.TrimSpace(string(raw))
@@ -115,16 +115,25 @@ func validateBindingHostname(host string) error {
 		return errors.New("hostname must not be a LangWatch domain")
 	}
 	for _, label := range strings.Split(host, ".") {
-		if label == "" || len(label) > 63 {
+		if !isDNSLabel(label) {
 			return errors.New("hostname must be a DNS name")
-		}
-		for _, c := range label {
-			if !(c >= 'a' && c <= 'z' || c >= '0' && c <= '9' || c == '-') {
-				return errors.New("hostname must be a DNS name")
-			}
 		}
 	}
 	return nil
+}
+
+// isDNSLabel reports whether label is 1 to 63 lowercase letters, digits or
+// hyphens.
+func isDNSLabel(label string) bool {
+	if label == "" || len(label) > 63 {
+		return false
+	}
+	for _, c := range label {
+		if (c < 'a' || c > 'z') && (c < '0' || c > '9') && c != '-' {
+			return false
+		}
+	}
+	return true
 }
 
 // NormalizeEndpointHost lowercases a host and drops a trailing dot, the form
@@ -163,6 +172,28 @@ func (ep PrivateEndpoint) Identity() string {
 		b.WriteByte(',')
 	}
 	return b.String()
+}
+
+// PrivateEndpointSet holds one organization's bindings behind a pointer, so a
+// Credential carries them in one word. A nil set has no bindings.
+type PrivateEndpointSet struct {
+	Bindings []PrivateEndpoint
+}
+
+// NewPrivateEndpointSet wraps eps, or returns nil when there are none.
+func NewPrivateEndpointSet(eps []PrivateEndpoint) *PrivateEndpointSet {
+	if len(eps) == 0 {
+		return nil
+	}
+	return &PrivateEndpointSet{Bindings: eps}
+}
+
+// List returns the bindings, or nil for a nil set.
+func (s *PrivateEndpointSet) List() []PrivateEndpoint {
+	if s == nil {
+		return nil
+	}
+	return s.Bindings
 }
 
 type privateEndpointsCtxKey struct{}

@@ -31,7 +31,7 @@ func TestFetchConfig_PrivateEndpoints(t *testing.T) {
 		assert.Equal(t, want, res.Config.PrivateEndpoints)
 		require.Len(t, res.Config.Credentials, 2)
 		for _, cred := range res.Config.Credentials {
-			assert.Equal(t, want, cred.PrivateEndpoints, cred.ID)
+			assert.Equal(t, want, cred.PrivateEndpoints.List(), cred.ID)
 		}
 	})
 
@@ -49,9 +49,9 @@ func TestFetchConfig_PrivateEndpoints(t *testing.T) {
 		for _, cred := range res.Config.Credentials {
 			byID[cred.ID] = cred
 		}
-		assert.Len(t, byID["mp_1"].PrivateEndpoints, 1, "the organization's own credential is bound")
-		assert.Empty(t, byID["platform-openai"].PrivateEndpoints, "a platform key is never bound")
-		assert.Empty(t, byID["mp_lw"].PrivateEndpoints, "a call to LangWatch is never bound")
+		assert.Len(t, byID["mp_1"].PrivateEndpoints.List(), 1, "the organization's own credential is bound")
+		assert.Empty(t, byID["platform-openai"].PrivateEndpoints.List(), "a platform key is never bound")
+		assert.Empty(t, byID["mp_lw"].PrivateEndpoints.List(), "a call to LangWatch is never bound")
 		assert.Len(t, res.Config.PrivateEndpoints, 1)
 	})
 
@@ -66,7 +66,7 @@ func TestFetchConfig_PrivateEndpoints(t *testing.T) {
 			require.NoError(t, err)
 			assert.Empty(t, res.Config.PrivateEndpoints)
 			for _, cred := range res.Config.Credentials {
-				assert.Empty(t, cred.PrivateEndpoints)
+				assert.Empty(t, cred.PrivateEndpoints.List())
 			}
 		})
 	}

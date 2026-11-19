@@ -252,10 +252,11 @@ func withPrivateEndpoints(cfg domain.BundleConfig, eps []domain.PrivateEndpoint)
 		return cfg
 	}
 	cfg.PrivateEndpoints = eps
+	set := domain.NewPrivateEndpointSet(eps)
 	creds := make([]domain.Credential, len(cfg.Credentials))
 	for i, cred := range cfg.Credentials {
 		if customerCredential(cred) {
-			cred.PrivateEndpoints = eps
+			cred.PrivateEndpoints = set
 		}
 		creds[i] = cred
 	}

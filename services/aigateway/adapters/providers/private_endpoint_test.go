@@ -37,6 +37,7 @@ func acmeBinding(addresses ...string) domain.PrivateEndpoint {
 // refusingResolver fails the test if a lookup happens: a bound hostname must
 // never be resolved.
 func refusingResolver(t *testing.T) endpointResolver {
+	t.Helper()
 	return func(_ context.Context, host string) ([]net.IP, error) {
 		t.Errorf("unexpected DNS lookup for %q", host)
 		return nil, errors.New("lookup refused by test")
@@ -57,7 +58,7 @@ func customCred(baseURL string, eps ...domain.PrivateEndpoint) domain.Credential
 		ProviderID:       domain.ProviderCustom,
 		APIKey:           "sk-acme",
 		Extra:            map[string]string{"base_url": baseURL},
-		PrivateEndpoints: eps,
+		PrivateEndpoints: domain.NewPrivateEndpointSet(eps),
 	}
 }
 
@@ -169,7 +170,7 @@ func TestValidateCredentialEndpointsWithPrivateEndpoints(t *testing.T) {
 		azure := domain.Credential{
 			ID: "mp_azure", ProviderID: domain.ProviderAzure, APIKey: "k",
 			Extra:            map[string]string{"endpoint": "https://llm.internal.acme.test"},
-			PrivateEndpoints: []domain.PrivateEndpoint{acmeBinding()},
+			PrivateEndpoints: domain.NewPrivateEndpointSet([]domain.PrivateEndpoint{acmeBinding()}),
 		}
 		err := validateCredentialEndpoints(t.Context(), azure, policy)
 		assertNoRegisteredAddress(t, err)
@@ -255,7 +256,7 @@ func TestPrivateEndpointDialer(t *testing.T) {
 		_, err := d.DialEndpoint(t.Context(), acmeBinding(), "llm.internal.acme.test:443")
 		assertNoRegisteredAddress(t, err)
 		assert.Contains(t, err.Error(), "llm.internal.acme.test:443")
-		assert.True(t, errors.Is(err, syscall.ECONNREFUSED), "the cause stays inspectable for logs")
+		assert.ErrorIs(t, err, syscall.ECONNREFUSED, "the cause stays inspectable for logs")
 	})
 
 	// @scenario "A silent address does not hold up the next one"
@@ -301,7 +302,7 @@ func TestPrivateEndpointDialer(t *testing.T) {
 		_, err := d.DialEndpoint(t.Context(), acmeBinding(), "llm.internal.acme.test:443")
 		assertNoRegisteredAddress(t, err)
 		assert.Less(t, time.Since(start), 900*time.Millisecond)
-		assert.True(t, errors.Is(err, context.DeadlineExceeded))
+		assert.ErrorIs(t, err, context.DeadlineExceeded)
 	})
 
 	t.Run("the production dialer allows 3s per address within the caller's budget", func(t *testing.T) {

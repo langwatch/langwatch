@@ -154,7 +154,7 @@ Feature: Private model endpoints for one organization
       Then the header is the one nlpgo's verifier is tested against
 
     @unit
-    Scenario: nlpgo honours bindings only in an envelope signed for the request's project
+    Scenario: nlpgo accepts bindings only in an envelope signed for the request's project
       Given nlpgo holds LANGWATCH_PRIVATE_ENDPOINTS_VERIFY_KEY
       When a request for "acme-prod" carries Acme's envelope signed for "acme-prod"
       Then the call runs under Acme's bindings
@@ -182,14 +182,14 @@ Feature: Private model endpoints for one organization
       And this holds with the internal secret too
 
     @unit
-    Scenario: Without a verify key nlpgo honours no bindings
+    Scenario: Without a verify key nlpgo accepts no bindings
       Given nlpgo holds no LANGWATCH_PRIVATE_ENDPOINTS_VERIFY_KEY
       When a request carries a valid envelope
       Then the call runs with no bindings
       And nlpgo logs a warning
 
     @unit
-    Scenario: A project's studio Lambda honours signed bindings without the internal secret
+    Scenario: A project's studio Lambda accepts signed bindings without the internal secret
       Given a project's studio Lambda holds the verify key and no internal secret
       When a request carries Acme's envelope signed for that project
       Then the call runs under Acme's bindings

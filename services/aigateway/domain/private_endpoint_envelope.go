@@ -22,7 +22,7 @@ import (
 // no JSON canonicalization is needed on either side.
 
 // PrivateEndpointsProjectHeader names the project a call runs for. The app
-// sets it next to PrivateEndpointsHeader; nlpgo honours an envelope only when
+// sets it next to PrivateEndpointsHeader; nlpgo accepts an envelope only when
 // it was signed for this project (and, on a workflow route, for the project
 // the body names, if it names one).
 const PrivateEndpointsProjectHeader = "X-LangWatch-Project-Id"
@@ -49,12 +49,13 @@ type privateEndpointsEnvelopeWire struct {
 }
 
 var (
-	// ErrPrivateEndpointsSignature: the value was not signed by the key
-	// this process trusts.
+	// ErrPrivateEndpointsSignature is returned when the value was not signed
+	// by the key this process trusts.
 	ErrPrivateEndpointsSignature = errors.New("private endpoint bindings are not signed by LangWatch")
-	// ErrPrivateEndpointsExpired: the envelope's expiry has passed.
+	// ErrPrivateEndpointsExpired is returned when the envelope's expiry has passed.
 	ErrPrivateEndpointsExpired = errors.New("private endpoint bindings have expired")
-	// ErrPrivateEndpointsProject: the envelope was signed for another project.
+	// ErrPrivateEndpointsProject is returned when the envelope was signed for
+	// another project.
 	ErrPrivateEndpointsProject = errors.New("private endpoint bindings were signed for another project")
 )
 
@@ -86,20 +87,9 @@ func decodeBase64Any(raw string) ([]byte, error) {
 // verify under key, or that has expired at now. The caller checks the
 // project. Errors never name an address.
 func VerifyPrivateEndpointsHeader(value string, key ed25519.PublicKey, now time.Time) (PrivateEndpointsEnvelope, error) {
-	payload, sig, found := strings.Cut(strings.TrimSpace(value), ".")
-	if !found || payload == "" || sig == "" {
-		return PrivateEndpointsEnvelope{}, fmt.Errorf("%w: not a signed envelope", ErrPrivateEndpointsMalformed)
-	}
-	signature, err := base64.RawURLEncoding.DecodeString(sig)
+	raw, err := verifiedEnvelopePayload(value, key)
 	if err != nil {
-		return PrivateEndpointsEnvelope{}, fmt.Errorf("%w: signature is not base64url without padding", ErrPrivateEndpointsMalformed)
-	}
-	if len(key) != ed25519.PublicKeySize || !ed25519.Verify(key, []byte(payload), signature) {
-		return PrivateEndpointsEnvelope{}, ErrPrivateEndpointsSignature
-	}
-	raw, err := base64.RawURLEncoding.DecodeString(payload)
-	if err != nil {
-		return PrivateEndpointsEnvelope{}, fmt.Errorf("%w: envelope is not base64url without padding", ErrPrivateEndpointsMalformed)
+		return PrivateEndpointsEnvelope{}, err
 	}
 	var wire privateEndpointsEnvelopeWire
 	if err := json.Unmarshal(raw, &wire); err != nil {
@@ -125,6 +115,27 @@ func VerifyPrivateEndpointsHeader(value string, key ed25519.PublicKey, now time.
 		Bindings:       bindings,
 		ExpiresAt:      expiresAt,
 	}, nil
+}
+
+// verifiedEnvelopePayload splits a signed header value, checks its signature
+// under key and returns the decoded payload.
+func verifiedEnvelopePayload(value string, key ed25519.PublicKey) ([]byte, error) {
+	payload, sig, found := strings.Cut(strings.TrimSpace(value), ".")
+	if !found || payload == "" || sig == "" {
+		return nil, fmt.Errorf("%w: not a signed envelope", ErrPrivateEndpointsMalformed)
+	}
+	signature, err := base64.RawURLEncoding.DecodeString(sig)
+	if err != nil {
+		return nil, fmt.Errorf("%w: signature is not base64url without padding", ErrPrivateEndpointsMalformed)
+	}
+	if len(key) != ed25519.PublicKeySize || !ed25519.Verify(key, []byte(payload), signature) {
+		return nil, ErrPrivateEndpointsSignature
+	}
+	raw, err := base64.RawURLEncoding.DecodeString(payload)
+	if err != nil {
+		return nil, fmt.Errorf("%w: envelope is not base64url without padding", ErrPrivateEndpointsMalformed)
+	}
+	return raw, nil
 }
 
 // SignPrivateEndpointsHeader is the inverse of VerifyPrivateEndpointsHeader.

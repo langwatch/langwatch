@@ -152,7 +152,7 @@ func (p *privateEndpointProxy) password(key string) string {
 // start binds the loopback listener on first use.
 func (p *privateEndpointProxy) start() (string, error) {
 	p.once.Do(func() {
-		ln, err := net.Listen("tcp4", "127.0.0.1:0")
+		ln, err := (&net.ListenConfig{}).Listen(context.Background(), "tcp4", "127.0.0.1:0")
 		if err != nil {
 			p.err = fmt.Errorf("private endpoint proxy: %w", err)
 			return
@@ -278,7 +278,7 @@ func closeWrite(c net.Conn) {
 }
 
 // privateEndpointClients holds one net/http client per binding for the
-// direct HTTP lanes that honour bindings (model discovery). One client per
+// direct HTTP lanes that apply bindings (model discovery). One client per
 // binding keeps a pinned connection out of every other caller's pool.
 type privateEndpointClients struct {
 	mu      sync.Mutex

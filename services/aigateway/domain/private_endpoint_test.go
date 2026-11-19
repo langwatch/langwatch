@@ -2,7 +2,6 @@ package domain
 
 import (
 	"context"
-	"errors"
 	"net/netip"
 	"testing"
 
@@ -62,7 +61,7 @@ func TestParsePrivateEndpoints(t *testing.T) {
 		t.Run("refuses "+tc.name, func(t *testing.T) {
 			_, err := ParsePrivateEndpoints([]byte(tc.raw))
 			require.Error(t, err)
-			assert.True(t, errors.Is(err, ErrPrivateEndpointsMalformed))
+			assert.ErrorIs(t, err, ErrPrivateEndpointsMalformed)
 		})
 	}
 

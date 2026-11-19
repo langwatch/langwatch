@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"net"
 	"net/netip"
+	"net/url"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/langwatch/langwatch/pkg/ssrf"
@@ -26,10 +28,10 @@ var sharedAddressSpace = netip.MustParsePrefix("100.64.0.0/10")
 
 // errPrivateEndpointAddress is the refusal for a binding that carries an
 // address no private endpoint may have. Staff validation should make it
-// unreachable; this is the defence in depth behind it.
-var errPrivateEndpointAddress = errors.New("has an address that may not be dialled")
+// unreachable; this check is a second layer behind it.
+var errPrivateEndpointAddress = errors.New("has an address that may not be dialed")
 
-// privateEndpointAddressAllowed reports whether addr may be dialled as a
+// privateEndpointAddressAllowed reports whether addr may be dialed as a
 // private endpoint address: a private-use (RFC 1918), unique-local (RFC 4193)
 // or shared (RFC 6598) address, and never cloud metadata. Loopback, link-local,
 // unspecified, multicast, public and every other special range are refused.
@@ -64,10 +66,11 @@ func checkPrivateEndpointAddresses(ep domain.PrivateEndpoint, allowLoopback bool
 // checkBoundEndpoint applies a binding to a parsed customer endpoint URL. The
 // URL must be https on the binding's port. No DNS lookup happens: the
 // binding's addresses are where the call goes.
-func checkBoundEndpoint(scheme, port string, ep domain.PrivateEndpoint, allowLoopback bool) error {
-	if scheme != "https" {
+func checkBoundEndpoint(u *url.URL, ep domain.PrivateEndpoint, allowLoopback bool) error {
+	if !strings.EqualFold(u.Scheme, "https") {
 		return fmt.Errorf("customer endpoint %s is bound to a private endpoint and must use https", ep.Hostname)
 	}
+	port := u.Port()
 	if port == "" {
 		port = "443"
 	}
@@ -156,6 +159,16 @@ func (d privateEndpointDialer) DialEndpoint(ctx context.Context, ep domain.Priva
 		ctx, cancel = context.WithTimeout(ctx, d.timeout)
 		defer cancel()
 	}
+	conn, err := d.dialFirst(ctx, ep, port)
+	if err != nil {
+		return nil, &privateEndpointDialError{host: ep.Hostname, port: ep.Port, cause: err}
+	}
+	return conn, nil
+}
+
+// dialFirst tries ep's addresses in order and returns the first connection,
+// or the last dial error (the context's when no dial was attempted).
+func (d privateEndpointDialer) dialFirst(ctx context.Context, ep domain.PrivateEndpoint, port string) (net.Conn, error) {
 	var lastErr error
 	for _, addr := range ep.Addresses {
 		if ctx.Err() != nil {
@@ -170,17 +183,18 @@ func (d privateEndpointDialer) DialEndpoint(ctx context.Context, ep domain.Priva
 	if lastErr == nil {
 		lastErr = ctx.Err()
 	}
-	return nil, &privateEndpointDialError{host: ep.Hostname, port: ep.Port, cause: lastErr}
+	return nil, lastErr
 }
 
 // boundEndpointForURL returns the binding a credential URL's host is bound
 // to, if any. An unparseable URL is not bound; validation refuses it.
 func boundEndpointForCredential(cred domain.Credential) (domain.PrivateEndpoint, bool) {
-	if len(cred.PrivateEndpoints) == 0 {
+	eps := cred.PrivateEndpoints.List()
+	if len(eps) == 0 {
 		return domain.PrivateEndpoint{}, false
 	}
 	for _, raw := range credentialEndpointURLs(cred) {
-		if ep, ok := domain.PrivateEndpointFor(cred.PrivateEndpoints, urlHost(raw)); ok {
+		if ep, ok := domain.PrivateEndpointFor(eps, urlHost(raw)); ok {
 			return ep, true
 		}
 	}
