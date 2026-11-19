@@ -1,12 +1,14 @@
 Feature: Weekly digest emails
   LangWatch Cloud sends each person one weekly email about their week's usage, picked from five
-  templates by what their data shows. Operators choose the cohort and preview every email in Cloud
-  admin before anything is sent. Anyone can unsubscribe in one click; clicks and unsubscribes are counted.
+  templates by what their data shows, and sent through our own mailer. Operators choose the cohort
+  and arm the send in Cloud admin; nothing is sent until they do. Anyone can unsubscribe in one
+  click; clicks and unsubscribes are counted.
   Design: dev/docs/plans/weekly-digest.md
 
-  # Gap (Alex, 2026-10-06): planned, never built, here or on main. Only the
-  # template pick exists; the folds, the send, unsubscribe and Cloud admin are
-  # @unimplemented until the module is built.
+  # Built: the pick, the folds' redelivery rule, the weekly send through our own mailer, the
+  # one-click unsubscribe and the operators' switches. The other folds' peer intake, click
+  # tracking, the rate limit, the "what's new" card and the Cloud admin gallery and its metrics
+  # are @unimplemented.
 
   # Picking a template
 
@@ -82,48 +84,80 @@ Feature: Weekly digest emails
     When the digest subscriber has handled their events
     Then the project's week holds the passed and failed counts
 
-  @integration @unimplemented
+  @integration
   Scenario: A redelivered event is not counted twice
     When the same evaluation completed event is delivered twice
     Then the project's week counts it once
+
+  @integration
+  Scenario: A project of an organization not enrolled folds nothing
+    Given a project whose organization is not enrolled
+    When its evaluation completes
+    Then no week is folded for it
 
   @integration @unimplemented
   Scenario: A fold holds numbers and ids, never personal data
     When any week is folded
     Then no fold row carries an email address or a name
 
-  @integration @unimplemented
-  Scenario: Weeks older than five are swept
-    Given folds for the last seven ISO weeks
-    When the weekly wake runs
-    Then only the last five weeks remain
+  @integration
+  Scenario: Weeks older than the sent week's baseline are swept
+    Given folds for the last seven ISO weeks, this one included
+    When the hourly wake runs after Monday 08:00 UTC
+    Then the sent week, the four weeks its scenario baseline reads and this week remain
 
   # Sending
 
-  @integration @unimplemented
+  @integration
   Scenario: Nothing is sent while the send is disarmed
     Given the week is built and the send is not armed
     When the scheduled wake runs
     Then no email is sent
 
-  @integration @unimplemented
+  @integration
+  Scenario: Nothing is sent while no organization is enrolled
+    Given the send is armed and no organization is enrolled
+    When the scheduled wake runs
+    Then no email is sent
+
+  @integration
   Scenario: Each enrolled member gets one email a week
     Given the send is armed and an enrolled organization with three members
     When the scheduled wake runs twice
     Then each member receives exactly one email for this ISO week
     And every email carries an RFC 8058 one-click unsubscribe
 
-  @integration @unimplemented
+  @integration
+  Scenario: An organization admin near the plan limit is sent the plan's numbers
+    Given the send is armed and an enrolled organization at 90% of its monthly limit
+    When the week's emails are sent
+    Then its admin's email is digest-plan-pressure with the usage, the count and the limit
+    And its other members' emails are not
+
+  @integration
   Scenario: An unsubscribed member is skipped
     Given the send is armed and a member who unsubscribed
     When the week's emails are sent
     Then that member receives none
 
-  @integration @unimplemented
+  @integration
   Scenario: A member of an organization unenrolled after planning is skipped
     Given the week's sends are planned for an enrolled organization
     When the organization is unenrolled before its sends are handled
     Then its members receive none
+
+  @integration
+  Scenario: Disarming after the week is planned sends nothing more
+    Given the week's sends are planned for an enrolled organization
+    When the send is disarmed before its sends are handled
+    Then no member receives one
+
+  @integration
+  Scenario: A member whose pick has nothing to show this week is sent nothing
+    Given the send is armed and a member whose pick is digest-whats-new
+    And no "what's new" card is published for the week
+    When the week's emails are sent
+    Then that member receives none and no send is recorded for them
 
   @integration @unimplemented
   Scenario: Every link in a sent email is a tracked redirect
@@ -133,18 +167,18 @@ Feature: Weekly digest emails
 
   # Unsubscribe and clicks
 
-  @integration @unimplemented
+  @integration
   Scenario: One-click unsubscribe from the mail client
     When a POST with a valid unsubscribe token arrives
     Then the member is unsubscribed and the send it came from is recorded
 
-  @integration @unimplemented
+  @integration
   Scenario: A forged or tampered unsubscribe token is refused
     When the unsubscribe page is asked with a token whose signature does not match
     Then the answer is refused as an invalid link
     And no subscription changes
 
-  @integration @unimplemented
+  @integration
   Scenario: Resubscribing from the unsubscribe page
     Given a member who unsubscribed
     When they resubscribe from the same page
@@ -192,7 +226,7 @@ Feature: Weekly digest emails
     When the cohort is read sorted by coding-agent cost descending
     Then the organizations come back highest cost first
 
-  @integration @unimplemented
+  @integration
   Scenario: Sending a test goes only to the operator
     When an operator sends themself a test of a member's email
     Then only the operator receives it
