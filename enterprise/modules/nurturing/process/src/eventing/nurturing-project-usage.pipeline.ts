@@ -1003,8 +1003,7 @@ export const NURTURING_PERSONAL_OWNERS_OF_ORGANIZATION_PROJECTION_NAME =
   "personalOwnersOfOrganization" as const;
 export const NURTURING_PERSONAL_OWNERS_OF_PROJECT_PROJECTION_NAME =
   "personalOwnersOfProject" as const;
-export const NURTURING_TRACED_PROJECTS_OF_TRACE_PROJECTION_NAME =
-  "tracedProjectsOfTrace" as const;
+export const NURTURING_TRACED_PROJECTS_OF_TRACE_PROJECTION_NAME = "tracedProjectsOfTrace" as const;
 export const NURTURING_TRACED_PROJECTS_OF_PROJECT_PROJECTION_NAME =
   "tracedProjectsOfProject" as const;
 export const NURTURING_LAST_TRACES_PROJECTION_NAME = "lastTraces" as const;

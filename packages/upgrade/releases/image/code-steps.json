@@ -331,6 +331,22 @@
     "needsOldWritersGone": true
   },
   {
+    "id": "nurturing:replay-evaluation-days",
+    "kind": "data",
+    "mode": "background",
+    "owner": "nurturing",
+    "description": "Fills nurturing's evaluation days from evaluation's log since 2026-10-19.",
+    "needsOldWritersGone": true
+  },
+  {
+    "id": "nurturing:replay-organization-plans",
+    "kind": "data",
+    "mode": "background",
+    "owner": "nurturing",
+    "description": "Fills nurturing's plan copy from billing's subscription log; sends nothing.",
+    "needsOldWritersGone": true
+  },
+  {
     "id": "nurturing:replay-project-placements",
     "kind": "data",
     "mode": "background",
@@ -408,22 +424,6 @@
     "mode": "background",
     "owner": "nurturing",
     "description": "Fills each organization's latest trace time from trace's facts since the day before the release.",
-    "needsOldWritersGone": true
-  },
-  {
-    "id": "nurturing:replay-evaluation-days",
-    "kind": "data",
-    "mode": "background",
-    "owner": "nurturing",
-    "description": "Fills nurturing's evaluation days from evaluation's log since 2026-10-19.",
-    "needsOldWritersGone": true
-  },
-  {
-    "id": "nurturing:replay-organization-plans",
-    "kind": "data",
-    "mode": "background",
-    "owner": "nurturing",
-    "description": "Fills nurturing's plan copy from billing's subscription log; sends nothing.",
     "needsOldWritersGone": true
   },
   {

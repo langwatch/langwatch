@@ -92,7 +92,7 @@ describe("the five subscriber lanes the personal-project and traced-project maps
     const lanes = (host().globalProjections ?? []).map(({ name }) => name);
     for (const alias of aliases) expect(alias).toMatchObject({ to: { jobType: "handler" } });
     for (const lane of Object.values(routed)) {
-      expect(lanes).toContain(`${NURTURING_PROJECT_USAGE_PIPELINE_NAME}.${lane}`);
+      expect(lanes).toContain(`${NURTURING_PROJECT_USAGE_PIPELINE_NAME}.${String(lane)}`);
     }
   });
 

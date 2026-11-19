@@ -9,8 +9,7 @@ import type { NurturingPlanFoldState } from "../rules/nurturing-organization-pla
  * fold's aggregate), with the ids of the events folded in, so a redelivery folds once, and the
  * event of the fact that won, the only one whose delivery tells Customer.io.
  */
-export interface NurturingOrganizationPlanRepository
-  extends FoldProjectionStore<NurturingPlanFoldState> {
+export interface NurturingOrganizationPlanRepository extends FoldProjectionStore<NurturingPlanFoldState> {
   /** Required here: the fold dedupes a redelivered fact by the ids it stored. */
   getWithApplied: NonNullable<FoldProjectionStore<NurturingPlanFoldState>["getWithApplied"]>;
 }

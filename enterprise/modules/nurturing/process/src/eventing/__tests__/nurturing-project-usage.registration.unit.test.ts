@@ -172,9 +172,9 @@ describe("the placement copies", () => {
     await deliver(fact);
     await deliver(fact);
 
-    await expect(
-      repositories.placements.getPlacement({ projectId: "project-1" }),
-    ).resolves.toEqual({ outcome: "known", organizationId: "org-1" });
+    await expect(repositories.placements.getPlacement({ projectId: "project-1" })).resolves.toEqual(
+      { outcome: "known", organizationId: "org-1" },
+    );
     await expect(
       repositories.placements.findProjectIds({ organizationId: "org-1" }),
     ).resolves.toEqual(["project-1"]);
@@ -210,9 +210,9 @@ describe("the placement copies", () => {
 
     expect(uncopiedProjects.storedProjectIds()).toEqual([]);
     expect(uncopied.isDropped({ projectId: "project-1" })).toBe(false);
-    await expect(
-      repositories.placements.getPlacement({ projectId: "project-1" }),
-    ).resolves.toEqual({ outcome: "known", organizationId: "org-1" });
+    await expect(repositories.placements.getPlacement({ projectId: "project-1" })).resolves.toEqual(
+      { outcome: "known", organizationId: "org-1" },
+    );
   });
 
   /** @scenario "A project nurturing never saw created sends nothing" */
