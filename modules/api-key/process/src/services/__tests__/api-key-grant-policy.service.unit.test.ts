@@ -867,7 +867,7 @@ describe("ApiKeyGrantPolicyService", () => {
       });
     });
 
-    describe("given a key's own role and grant written on its create, then on an edit", () => {
+    describe("given a key's role and grants written on its create, then on an edit", () => {
       const created = {
         ...input,
         replace: false,
@@ -909,6 +909,40 @@ describe("ApiKeyGrantPolicyService", () => {
         expect(sent(edit.calls).map((call) => call.commandId)).toEqual([undefined, undefined]);
         expect(sent(edit.calls)[1]?.bindings).toEqual([
           expect.objectContaining({ bindingId: "generated-binding" }),
+        ]);
+      });
+
+      /** @scenario "A held key's retries send its own role and grant under the same ids" */
+      it("names an extra binding the same on a retry, and fresh on an edit", async () => {
+        const withExtra = {
+          ...created,
+          bindings: [...created.bindings, scope({ role: "VIEWER", scopeId: "project-2" })],
+        };
+        const first = policyWith({});
+        const retry = policyWith({});
+        const edit = policyWith({});
+
+        await first.service.writeBindings(withExtra);
+        await retry.service.writeBindings(withExtra);
+        const { createdAt: _createdAt, ...edited } = withExtra;
+        await edit.service.writeBindings(edited);
+
+        // The define, then the extra binding's attach, then the own role's.
+        const [define, extra, own] = sent(first.calls);
+        expect(extra?.commandId).toBe(define?.commandId);
+        expect(own?.commandId).toBe(define?.commandId);
+        const [extraId] = (extra?.bindings ?? []) as { bindingId: string }[];
+        const [ownId] = (own?.bindings ?? []) as { bindingId: string }[];
+        expect(extraId?.bindingId).toMatch(/^rolebinding_/);
+        expect(extraId?.bindingId).not.toBe(ownId?.bindingId);
+        expect(sent(retry.calls)).toEqual(sent(first.calls));
+        expect(sent(edit.calls).map((call) => call.commandId)).toEqual([
+          undefined,
+          undefined,
+          undefined,
+        ]);
+        expect(sent(edit.calls)[1]?.bindings).toEqual([
+          expect.objectContaining({ role: "VIEWER", bindingId: "generated-binding" }),
         ]);
       });
     });

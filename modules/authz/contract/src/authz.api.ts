@@ -343,8 +343,8 @@ export const AuthzApi = moduleApi<AuthzApi>()("authz");
 export const GRANT_KSUID_RESOURCE = "rolebinding";
 
 /**
- * Begins the stable command id an API key's own role and grant are written under on its create,
- * so the audit trail keys that attach on its fact: a retry under the same id writes no second row.
+ * Begins the stable command id an API key's create writes its own role and grants under, so the
+ * audit trail keys those attaches on their fact: a retry under the same id writes no second row.
  */
 export const API_KEY_OWN_GRANT_COMMAND_PREFIX = "apikeygrant:";
 

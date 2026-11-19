@@ -333,8 +333,8 @@ export class ApiKeyGrantPolicyService {
     roleId?: string;
     /**
      * The key's creation instant, set on its create only: every try then sends the same command
-     * and binding ids for the key's own role and grant, so a retry is the same fact. An edit
-     * leaves it unset, so each edit is a new one.
+     * and binding ids for the key's own role and every grant, so a retry is the same fact. An
+     * edit leaves it unset, so each edit is a new one.
      */
     createdAt?: Instant;
   }): Promise<ApiKeyScope[]> {
@@ -342,17 +342,16 @@ export class ApiKeyGrantPolicyService {
     const ownRoleId = input.permissions?.length
       ? (input.roleId ?? `apikey:${input.apiKeyId}`)
       : null;
-    const stableIds =
-      ownRoleId && input.createdAt
-        ? {
-            commandId: ownGrantCommandId({
-              apiKeyId: input.apiKeyId,
-              permissions: input.permissions ?? [],
-              bindings: input.bindings,
-            }),
-            createdAt: input.createdAt,
-          }
-        : undefined;
+    const stableIds = input.createdAt
+      ? {
+          commandId: ownGrantCommandId({
+            apiKeyId: input.apiKeyId,
+            permissions: input.permissions ?? [],
+            bindings: input.bindings,
+          }),
+          createdAt: input.createdAt,
+        }
+      : undefined;
     if (ownRoleId) {
       await this.options.grants.defineRole({
         organizationId: input.organizationId,
@@ -376,6 +375,7 @@ export class ApiKeyGrantPolicyService {
     const answered = await this.attach({
       ...input,
       bindings: bindings.filter((binding) => !isOwnRole(binding)),
+      stableIds,
     });
     const ownRole = await this.attach({
       ...input,
@@ -410,7 +410,7 @@ export class ApiKeyGrantPolicyService {
     bindings: ApiKeyScope[];
     actor: { type: "user" | "system"; id: string | null };
     caller: AuthzGrantCaller;
-    /** The key's own grant on its create: named the same on every try. */
+    /** The key's grants on its create: each named the same on every try. */
     stableIds?: { commandId: string; createdAt: Instant };
   }): Promise<AuthzAttachOutcome> {
     if (input.bindings.length === 0) return { attached: [], duplicates: [] };

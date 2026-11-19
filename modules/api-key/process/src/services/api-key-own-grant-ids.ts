@@ -1,7 +1,7 @@
 /**
- * The ids a key's create writes its own role and grant under, the same on every try: authz keeps
- * one fact per command id, so a retried create records one role definition and one grant, with
- * one audit row each (tasks#1139). An edit sends none of these, so every edit is a new fact.
+ * The ids a key's create writes its own role and its grants under, the same on every try: authz
+ * keeps one fact per command id, so a retried create records one role definition and one of each
+ * grant, with one audit row each (tasks#1139). An edit sends none, so every edit is a new fact.
  */
 import { createHash } from "node:crypto";
 

@@ -374,7 +374,8 @@ Feature: API key lifecycle
     Given the grants fold 25 seconds after they are appended
     When the caller retries until the grant is read back
     Then every try defines the key's own role under one command id, from the key and its content
-    And every try that reaches the attach sends that command id and one binding id
+    And every try that reaches the attach sends that command id and one binding id per binding
+    And a binding beside the key's own role is named the same way on every try
     And an edit of the key sends neither, so each edit is a new fact
 
   @unit

@@ -41,6 +41,8 @@ const CREATE = {
   commandId: `${API_KEY_OWN_GRANT_COMMAND_PREFIX}${KEY}:6f1c2a9d0b7e4c3a8d5f9e2b1a0c7d64`,
   bindingId: newAuthzGrantId(),
 };
+/** A built-in role the same create grants beside the key's own, under the same command id. */
+const EXTRA_BINDING_ID = newAuthzGrantId();
 const REFUSED = { code: "authz_grant_not_confirmed" };
 
 /**
@@ -121,10 +123,10 @@ function world({ lagging = false }: { lagging?: boolean } = {}) {
   /**
    * One try of the held-key mint's grant write, as the api-key slow-fold test pins it on every try
    * ("sends the key's stable ids on every try"); an edit sends a fresh binding id and no command
-   * id. `caller` stops at the grants service.
+   * id. `caller` stops at the grants service. An extra binding is attached first, as there.
    */
   async function grantKey(
-    ids: { commandId?: string; bindingId: string } = CREATE,
+    ids: { commandId?: string; bindingId: string; extraBindingId?: string } = CREATE,
   ): Promise<{ attached: string[]; duplicates: string[] }> {
     const commandId = ids.commandId ? { commandId: ids.commandId } : {};
     await ledger.defineRole({
@@ -137,7 +139,27 @@ function world({ lagging = false }: { lagging?: boolean } = {}) {
       ...commandId,
       requireProjection: true,
     });
-    return ledger.attachBindings({
+    const extra = ids.extraBindingId
+      ? await ledger.attachBindings({
+          organizationId: ORG,
+          bindings: [
+            {
+              bindingId: ids.extraBindingId,
+              principal: { apiKeyId: KEY },
+              role: "VIEWER",
+              customRoleId: null,
+              scopeType: "ORGANIZATION",
+              scopeId: ORG,
+            },
+          ],
+          actor: ACTOR,
+          source: "grants-service",
+          onDuplicate: "skip",
+          ...commandId,
+          requireProjection: true,
+        })
+      : { attached: [], duplicates: [] };
+    const own = await ledger.attachBindings({
       organizationId: ORG,
       bindings: [
         {
@@ -155,6 +177,10 @@ function world({ lagging = false }: { lagging?: boolean } = {}) {
       ...commandId,
       requireProjection: true,
     });
+    return {
+      attached: [...extra.attached, ...own.attached],
+      duplicates: [...extra.duplicates, ...own.duplicates],
+    };
   }
 
   const eventsOf = async (aggregateId: string, type: string) =>
@@ -206,6 +232,39 @@ describe("given an API key's own role and grant written on each try of a held-ke
       expect(auditRows("role_defined", "roleId", ROLE)).toHaveLength(1);
       expect(auditRows("attach", "grantId", grant.id)).toHaveLength(1);
       expect(auditRows("attach", "roleKey", `custom:${ROLE}`)).toHaveLength(1);
+    });
+  });
+
+  describe("when the key also holds a built-in role, retried before its grant lands", () => {
+    /** @scenario "A held key's other grant retried before the fold has one audit row" */
+    it("stores one grant.attached and one audit row for each of the key's grants", async () => {
+      const { projection, appended, grantKey, eventsOf, auditRows, keyGrants } = world({
+        lagging: true,
+      });
+      if (!projection) throw new Error("the world has no lagging reader");
+      const ids = { ...CREATE, extraBindingId: EXTRA_BINDING_ID };
+      const grantIds = [EXTRA_BINDING_ID, CREATE.bindingId];
+
+      // Try 1: the role is not read back yet.
+      await expect(grantKey(ids)).rejects.toMatchObject(REFUSED);
+      projection.landRoles();
+      // Tries 2 and 3: the extra grant is appended and not read back; try 3 retries it.
+      await expect(grantKey(ids)).rejects.toMatchObject(REFUSED);
+      await expect(grantKey(ids)).rejects.toMatchObject(REFUSED);
+      projection.landGrants();
+      // Try 4: the extra grant is read back; the key's own grant is appended, not read back.
+      await expect(grantKey(ids)).rejects.toMatchObject(REFUSED);
+      projection.landGrants();
+      const settled = await grantKey(ids);
+
+      expect(settled).toEqual({ attached: [], duplicates: grantIds });
+      expect(appended.filter((name) => name === "attachGrant")).toHaveLength(3);
+      for (const grantId of grantIds) {
+        expect(await eventsOf(grantId, GRANT_ATTACHED_EVENT_TYPE)).toHaveLength(1);
+        expect(auditRows("attach", "grantId", grantId)).toHaveLength(1);
+      }
+      const live = keyGrants().filter((row) => row.revokedAt === null);
+      expect(live.map((row) => row.id).toSorted()).toEqual(grantIds.toSorted());
     });
   });
 

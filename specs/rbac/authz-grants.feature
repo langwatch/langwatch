@@ -443,6 +443,14 @@ Feature: Authorization grants
     And the key holds exactly one live grant
 
   @integration
+  Scenario: A held key's other grant retried before the fold has one audit row
+    Given an API key's create that also binds the key to a built-in role, under the create's ids
+    And a fold that lands each grant only after a retry
+    When the tries run until both grants are read back
+    Then the event log keeps one grant attach for each grant
+    And the audit trail has one row for each, and the key holds both grants live
+
+  @integration
   Scenario: A revoked API key grant attached again is recorded as a new grant
     Given an API key's own grant that was attached and then revoked
     When an edit grants the key again, under a fresh binding id and no command id
@@ -843,7 +851,7 @@ Feature: Authorization grants
 
   @unit
   Scenario: An API key's own-role grant attached twice under one key writes one audit row
-    Given an API key's own-role grant appended twice under the key's stable command id
+    Given an API key's grant appended twice under its create's stable command id
     When both are handled
     Then exactly one audit row exists
     And any other attach, a user's under that prefix included, keeps its event id as its row id
