@@ -127,6 +127,11 @@ envelope. With no verify key, nlpgo ignores the header and logs a warning.
 nlpgo never reads bindings from a request body: the app relays some bodies
 unread (`/api/scenario/execute-sync`), so a body field could name any address.
 
+The envelope is signed, not encrypted, so its registered addresses are readable
+wherever it travels: a Lambda event, langevals' environment and request body.
+They are our own VPC-internal endpoint addresses, not secrets; the organization
+UI hides them for clarity, not confidentiality.
+
 The expiry is 15 minutes for a workflow run, which nlpgo checks once, when the
 request arrives. A scenario run gets one hour, because its child process reuses
 one envelope for every turn.
