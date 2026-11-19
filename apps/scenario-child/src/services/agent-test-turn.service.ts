@@ -88,6 +88,7 @@ async function runAgentTestTurnValue({
     parameters: job.parameters,
     httpPort: runtime.httpPort,
     logger: runtime.logger,
+    privateEndpointsHeaders: job.privateEndpointsHeaders,
   });
   const startedAt = nowInstant().epochMilliseconds;
   const answer = await withinCallDeadline(

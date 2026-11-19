@@ -596,6 +596,12 @@ const AgentTestTurnJobSchemaDefinition = z.object({
     engineCodeBlockTimeoutSeconds: z.number().optional(),
     maxTimeoutMs: z.number().optional(),
   }),
+  /**
+   * The organization's private endpoint bindings (ADR-203), signed by the parent for this
+   * project. Only a workflow target's direct call to nlpgo sends them. Absent when the
+   * organization bound none.
+   */
+  privateEndpointsHeaders: z.record(z.string(), z.string()).optional(),
 });
 export interface AgentTestTurnJobSchema extends Named<typeof AgentTestTurnJobSchemaDefinition> {}
 export const AgentTestTurnJobSchema: AgentTestTurnJobSchema = AgentTestTurnJobSchemaDefinition;

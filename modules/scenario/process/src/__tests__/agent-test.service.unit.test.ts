@@ -94,6 +94,7 @@ function serviceFor(options: {
   queueRun?: ReturnType<typeof vi.fn>;
   namesById?: Record<string, string>;
   connected?: AgentOverview;
+  privateEndpointsHeaders?: Record<string, string>;
 }) {
   const queueRun = options.queueRun ?? vi.fn().mockResolvedValue(undefined);
   const { agents, callConnected } = fakeAgents(options.namesById, options.connected);
@@ -104,7 +105,11 @@ function serviceFor(options: {
     workflows: {} as never,
     prompts: {} as never,
     secrets: {} as never,
-    modelProviders: {} as never,
+    modelProviders: {
+      privateEndpointsHeadersForProject: vi
+        .fn()
+        .mockResolvedValue(options.privateEndpointsHeaders ?? {}),
+    } as never,
     turns: { run: runTurn },
     nlpTimeouts: { engineCodeBlockTimeoutSeconds: Number.NaN, maxTimeoutMs: 90_000 },
     simulations: { queueRun } as never,
@@ -291,6 +296,26 @@ describe("AgentTestService.sendTurn", () => {
         },
         logContext: { projectId: "proj_1", scenarioId: AGENT_TEST_SCENARIO_ID },
       });
+    });
+  });
+
+  describe("given the project's organization bound private endpoints", () => {
+    /** @scenario "An agent test turn carries the organization's signed bindings" */
+    it("puts the signed bindings on the child's job", async () => {
+      runTurn.mockResolvedValue({ success: true, output: "pong", durationMs: 12 });
+      const signed = {
+        "X-LangWatch-Private-Endpoints": "payload.signature",
+        "X-LangWatch-Project-Id": "proj_1",
+      };
+      const { service } = serviceFor({ privateEndpointsHeaders: signed });
+
+      await service.sendTurn({ projectId: "proj_1", agent: httpAgent(), message: "ping", actor });
+
+      expect(runTurn).toHaveBeenCalledWith(
+        expect.objectContaining({
+          job: expect.objectContaining({ privateEndpointsHeaders: signed }),
+        }),
+      );
     });
   });
 
