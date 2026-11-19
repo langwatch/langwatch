@@ -1,5 +1,6 @@
 import {
   AUTHZ_GRANTS_EVENT_VERSION_LATEST,
+  GRANT_ATTACHED_EVENT_TYPE,
   ROLE_DEFINED_EVENT_TYPE,
   ROLE_DELETED_EVENT_TYPE,
 } from "@langwatch/authz-contract";
@@ -11,7 +12,9 @@ import {
   type AuthzAuditRow,
 } from "../../repositories/authz-audit-trail.repository.ts";
 import {
+  apiKeyGrantCommandId,
   AUTHZ_GRANT_AGGREGATE_TYPE,
+  type GrantAttachedEvent,
   type RoleDefinedEvent,
   type RoleDeletedEvent,
 } from "../authz-grant.events.ts";
@@ -47,6 +50,23 @@ const roleDefined: RoleDefinedEvent = {
     name: "apikey:key_1",
     permissions: ["traces:view"],
     kind: "system_api_key",
+    actor: { type: "user", id: "user_admin" },
+  },
+};
+
+const keyGrantAttached: GrantAttachedEvent = {
+  ...roleDeleted,
+  id: "evt_key_grant",
+  aggregateId: "grant_1",
+  type: GRANT_ATTACHED_EVENT_TYPE,
+  idempotencyKey: `${apiKeyGrantCommandId("grant_1")}:0`,
+  data: {
+    grantId: "grant_1",
+    principal: { type: "apiKey", id: "key_1" },
+    roleKey: "custom:apikey:key_1",
+    scope: { type: "PROJECT", id: "project_1" },
+    source: "grants-service",
+    onDuplicate: "skip",
     actor: { type: "user", id: "user_admin" },
   },
 };
@@ -92,5 +112,28 @@ describe("EventingAuthzAuditAdapter redelivery", () => {
     await adapter.handler({ ...roleDeleted, idempotencyKey: "cmd_1:0" });
 
     expect([...store.rows.keys()]).toEqual(["authz-evt-evt_role_deleted"]);
+  });
+
+  /** @scenario "An API key's own-role grant attached twice under one key writes one audit row" */
+  it("leaves one audit row when an API key's own-role grant is appended twice", async () => {
+    const store = new KeyedAuditTrailStore();
+    const adapter = EventingAuthzAuditAdapter.create({ store });
+
+    await adapter.handler({ ...keyGrantAttached, id: "evt_first_append" });
+    await adapter.handler({ ...keyGrantAttached, id: "evt_second_append" });
+
+    expect([...store.rows.keys()]).toEqual([
+      "authz-evt-org_acme:grant_1:apikeygrant:grant_1:0",
+    ]);
+  });
+
+  /** @scenario "An API key's own-role grant attached twice under one key writes one audit row" */
+  it("keeps the event id as the row id for any other attach, even one carrying a key", async () => {
+    const store = new KeyedAuditTrailStore();
+    const adapter = EventingAuthzAuditAdapter.create({ store });
+
+    await adapter.handler({ ...keyGrantAttached, idempotencyKey: "authzcmd_1:grant_1:0" });
+
+    expect([...store.rows.keys()]).toEqual(["authz-evt-evt_key_grant"]);
   });
 });

@@ -13,6 +13,7 @@ import { z } from "zod";
 import {
   AuthzLedgerReadRepository,
   type LedgerDirectoryGrantRow,
+  type LedgerGrantHistoryRow,
   type LedgerGrantIdentity,
   type LedgerBraidRow,
   type LedgerRoleDefinition,
@@ -278,6 +279,24 @@ export class PrismaAuthzLedgerReadRepository extends AuthzLedgerReadRepository {
     return rows.map((row) => row.id);
   }
 
+  async findGrantHistory({
+    organizationId,
+    identity,
+  }: {
+    organizationId: string;
+    identity: LedgerGrantIdentity;
+  }): Promise<LedgerGrantHistoryRow[]> {
+    // Not `liveGrants`: a revoked row is the history a re-attach is told apart by.
+    const rows = (await this.prisma.grant.findMany({
+      where: { organizationId, ...identity },
+      select: { occurredAt: true, revokedAt: true },
+    } as never)) as { occurredAt: Date; revokedAt: Date | null }[];
+    return rows.map((row) => ({
+      occurredAt: fromDate(row.occurredAt),
+      revokedAt: row.revokedAt ? fromDate(row.revokedAt) : null,
+    }));
+  }
+
   async findLiveRole({
     roleId,
     organizationId,
@@ -305,15 +324,19 @@ export class PrismaAuthzLedgerReadRepository extends AuthzLedgerReadRepository {
         name: true,
         description: true,
         permissions: true,
+        kind: true,
         occurredAt: true,
         deletedAt: true,
       },
-    })) as (LedgerRoleDefinition & { occurredAt: Date; deletedAt?: Date | null }) | null;
+    })) as
+      | (LedgerRoleDefinition & { kind: string; occurredAt: Date; deletedAt?: Date | null })
+      | null;
     if (!row) return null;
     return {
       name: row.name,
       description: row.description,
       permissions: row.permissions,
+      kind: row.kind,
       occurredAt: fromDate(row.occurredAt),
       deletedAt: row.deletedAt ? fromDate(row.deletedAt) : null,
     };

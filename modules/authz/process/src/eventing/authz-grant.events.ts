@@ -27,6 +27,18 @@ import { z } from "zod";
  */
 export const AUTHZ_GRANT_AGGREGATE_TYPE = "authz_grant" as const;
 
+const API_KEY_GRANT_COMMAND_PREFIX = "apikeygrant:";
+
+/** The command id an API key's own-role grant is attached under: a function of its grant id. */
+export function apiKeyGrantCommandId(grantId: string): string {
+  return `${API_KEY_GRANT_COMMAND_PREFIX}${grantId}`;
+}
+
+/** Whether a fact was appended under {@link apiKeyGrantCommandId}, its key naming the fact. */
+export function isApiKeyGrantFact(idempotencyKey: string | undefined): boolean {
+  return idempotencyKey?.startsWith(API_KEY_GRANT_COMMAND_PREFIX) ?? false;
+}
+
 type AuthzEvent<Type extends string, Payload> = Event<Payload> & {
   type: Type;
 };

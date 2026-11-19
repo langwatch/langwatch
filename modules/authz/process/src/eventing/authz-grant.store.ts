@@ -32,6 +32,7 @@ import {
   newAuthzGrantId,
   type RevokeGrantCommandData,
 } from "@langwatch/authz-contract";
+import { Instance, Ksuid } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import { Temporal, nowInstant } from "@langwatch/time";
 import { z } from "zod";
@@ -41,6 +42,8 @@ import type { AuthzEpochRepository } from "../repositories/authz-epoch.repositor
 import { BindingMissingError, type GrantWrite } from "../repositories/authz-grant.repository.ts";
 import type {
   AuthzLedgerReadRepository,
+  LedgerGrantHistoryRow,
+  LedgerGrantIdentity,
   LedgerRoleDefinition,
   LedgerRoleHead,
 } from "../repositories/authz-ledger-read.repository.ts";
@@ -48,7 +51,10 @@ import type { AuthzMembershipStampRepository } from "../repositories/authz-membe
 import type { ScopeLineageRepository } from "../repositories/authz-read.repository.ts";
 import type { AuthzRevocationRepository } from "../repositories/authz-revocation.repository.ts";
 import { bindingIdentityKey } from "../repositories/eventing/eventing.authz-grant.mapper.ts";
-import { sharedProjectReadsOf } from "../repositories/eventing/eventing.authz-read.mapper.ts";
+import {
+  sharedProjectReadsOf,
+  SYSTEM_API_KEY_ROLE_KIND,
+} from "../repositories/eventing/eventing.authz-read.mapper.ts";
 import {
   compatBindingFromGrantFact,
   grantRowToFact,
@@ -67,6 +73,7 @@ import {
   validateMembershipBootstrap,
 } from "../rules/membership-stamp-fence.rules.ts";
 import type { AuthzGrantsCommandDispatcher } from "../services/authz-grants-command-dispatcher.service.ts";
+import { apiKeyGrantCommandId } from "./authz-grant.events.ts";
 
 const logger = createLogger("langwatch:authz:ledger");
 
@@ -232,6 +239,51 @@ function apiKeyRoleCommandId({
 }
 
 /**
+ * An API key's own-role grant id: its identity plus that identity's rows, revoked ones included.
+ * A retry before the fold reads the same rows, so it names the first try's grant; a revoke moves
+ * them, so a re-attach is a new grant rather than the revoked one, whose upsert keeps `revokedAt`.
+ */
+function apiKeyGrantId({
+  organizationId,
+  identity,
+  history,
+  role,
+}: {
+  organizationId: string;
+  identity: LedgerGrantIdentity;
+  history: readonly LedgerGrantHistoryRow[];
+  role: LedgerRoleHead;
+}): string {
+  const changedAtMs = history.map((row) =>
+    Math.max(row.occurredAt.epochMilliseconds, row.revokedAt?.epochMilliseconds ?? 0),
+  );
+  const lastChangedAtMs = Math.max(0, ...changedAtMs);
+  const digest = createHash("sha256")
+    .update(
+      JSON.stringify({
+        organizationId,
+        identity,
+        rows: history.length,
+        revoked: history.filter((row) => row.revokedAt !== null).length,
+        lastChangedAtMs,
+      }),
+    )
+    .digest();
+  return new Ksuid({
+    environment: "prod",
+    resource: "grant",
+    // Both instants stand still across retries before the fold, so the id does too.
+    timestamp: Math.floor(Math.max(role.occurredAt.epochMilliseconds, lastChangedAtMs) / 1000),
+    instance: new Instance(
+      Instance.schemes.RANDOM,
+      new Uint8Array(digest.buffer, digest.byteOffset, 8),
+    ),
+    sequenceId: digest.readUInt32BE(8),
+    layout: "v2",
+  }).toString();
+}
+
+/**
  * The injected ledger adapter. Every verb bumps the organization's authz
  * epoch after its write lands (decision 19: the epoch stays until contract;
  * the projection cursor is alongside, not instead).
@@ -307,12 +359,18 @@ export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
       validateMembershipBootstrap({ organizationId, binding });
     }
 
-    const { fresh, duplicates } = await this.partitionByIdentity({
+    const partitioned = await this.partitionByIdentity({
       organizationId,
       bindings,
       onDuplicate,
     });
-    if (fresh.length === 0) return { attached: [], duplicates };
+    const { duplicates } = partitioned;
+    if (partitioned.fresh.length === 0) return { attached: [], duplicates };
+    // A caller's own command id is stable already, and an attaching write may repeat an identity.
+    const { fresh, derived } =
+      commandId === undefined && onDuplicate === "skip"
+        ? await this.withApiKeyGrantIds({ organizationId, bindings: partitioned.fresh })
+        : { fresh: partitioned.fresh, derived: new Set<string>() };
 
     const occurredAtMs = occurredAtOverrideMs ?? this.now();
     // An import states the lifetime its own inventory read, so it neither
@@ -330,7 +388,9 @@ export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
         senders.attachGrant.send({
           tenantId: organizationId,
           organizationId,
-          commandId: `${batchId}:${binding.bindingId}`,
+          commandId: derived.has(binding.bindingId)
+            ? apiKeyGrantCommandId(binding.bindingId)
+            : `${batchId}:${binding.bindingId}`,
           grant: {
             grantId: binding.bindingId,
             principal: principalForWhere(binding.principal),
@@ -364,6 +424,44 @@ export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
     if (held.size === 0) return { attached: wanted, duplicates };
     return splitByHeld({ fresh, held, duplicates });
   };
+
+  /**
+   * Names each binding of an API key to its own role (kind `system_api_key`) by its derived grant
+   * id, answering which ids were derived. Every other binding keeps the id it was asked under.
+   */
+  private async withApiKeyGrantIds({
+    organizationId,
+    bindings,
+  }: {
+    organizationId: string;
+    bindings: LedgerBindingAttach[];
+  }): Promise<{ fresh: LedgerBindingAttach[]; derived: Set<string> }> {
+    const roles = new Map<string, LedgerRoleHead | null>();
+    const derived = new Set<string>();
+    const fresh: LedgerBindingAttach[] = [];
+    for (const binding of bindings) {
+      const roleId = binding.customRoleId;
+      const isKeyBinding = principalForWhere(binding.principal).type === "apiKey";
+      if (!isKeyBinding || roleId === null) {
+        fresh.push(binding);
+        continue;
+      }
+      if (!roles.has(roleId)) {
+        roles.set(roleId, await this.options.reads.findRoleHead({ roleId, organizationId }));
+      }
+      const role = roles.get(roleId);
+      if (!role || role.kind !== SYSTEM_API_KEY_ROLE_KIND) {
+        fresh.push(binding);
+        continue;
+      }
+      const identity = grantIdentityWhere(binding);
+      const history = await this.options.reads.findGrantHistory({ organizationId, identity });
+      const grantId = apiKeyGrantId({ organizationId, identity, history, role });
+      derived.add(grantId);
+      fresh.push({ ...binding, bindingId: grantId });
+    }
+    return { fresh, derived };
+  }
 
   /**
    * Hold until the attach landed. A skipping attach the fold dropped because an

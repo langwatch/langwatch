@@ -39,9 +39,12 @@ export type LedgerRoleDefinition = Readonly<{
   permissions: unknown;
 }>;
 
-/** A role head, live or deleted, with the business time of the fact that last set it. */
+/** A role head, live or deleted, its kind, and the business time of the fact last setting it. */
 export type LedgerRoleHead = LedgerRoleDefinition &
-  Readonly<{ occurredAt: Instant; deletedAt: Instant | null }>;
+  Readonly<{ kind: string; occurredAt: Instant; deletedAt: Instant | null }>;
+
+/** One Grant row of an identity, live or revoked: the instants a change to it moves. */
+export type LedgerGrantHistoryRow = Readonly<{ occurredAt: Instant; revokedAt: Instant | null }>;
 
 /** One grant the directory wrote, with the two instants a change view orders on. */
 export type LedgerDirectoryGrantRow = Readonly<{
@@ -113,6 +116,12 @@ export abstract class AuthzLedgerReadRepository {
     organizationId: string;
     grantIds: readonly string[];
   }): Promise<string[]>;
+
+  /** Every Grant row carrying this identity, revoked ones included. */
+  abstract findGrantHistory(input: {
+    organizationId: string;
+    identity: LedgerGrantIdentity;
+  }): Promise<LedgerGrantHistoryRow[]>;
 
   /** A live role head's definition. */
   abstract findLiveRole(input: {

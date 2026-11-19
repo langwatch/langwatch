@@ -433,6 +433,28 @@ Feature: Authorization grants
     When it is redefined with other permissions and then with the first ones again
     Then each of the three definitions is recorded
 
+  @integration
+  Scenario: A held key whose role and grant land after a slow fold has one of each
+    Given an API key's own role and its grant, written as the held-key mint writes them each try
+    And a fold that lands the role only after two tries and the grant only after two more
+    When the tries run until the grant is read back
+    Then each fact was appended twice and the event log keeps one role definition and one grant
+    And the audit trail has one row for the role definition and one for the grant
+    And the key holds exactly one live grant
+
+  @integration
+  Scenario: A revoked API key grant attached again is recorded as a new grant
+    Given an API key's own grant that was attached and then revoked
+    When the key is granted again
+    Then a new grant is attached under a new id, live, with its own audit row
+
+  @integration
+  Scenario: Grants other than an API key's own keep the ids they are attached under
+    Given an API key bound to a custom role and to a built-in role
+    When both bindings are attached
+    Then each grant keeps the id it was asked under
+    And each audit row is keyed on its event id
+
   @unit
   Scenario: A custom role definition is recorded even when it restates the live row
     Given a custom role whose live row already carries the requested definition
@@ -818,6 +840,13 @@ Feature: Authorization grants
     Then exactly one audit row exists
     And a role definition on another role that shares the key still gets its own row
     And any other event's audit row is still keyed on its event id
+
+  @unit
+  Scenario: An API key's own-role grant attached twice under one key writes one audit row
+    Given an API key's own-role grant appended twice under its derived command id
+    When both are handled
+    Then exactly one audit row exists
+    And any other attach keeps its event id as its audit row id
 
   @unit @regression
   Scenario: Migrated custom bindings retain their permission restrictions

@@ -455,6 +455,39 @@ describe.each(backends)("given the ledger reads on the $name backend", (backend)
       ).toBeNull();
     });
 
+    it("reads an identity's grant history, revoked rows in, other identities out", async () => {
+      const fixture = await open();
+      const { organizationId, repositories } = fixture;
+      const userId = await fixture.user();
+      const gone = grantRow({ organizationId, principalId: userId });
+      const live = grantRow({ organizationId, principalId: userId, occurredAt: at(T0 + 60_000) });
+      const other = grantRow({ organizationId, principalId: userId, roleKey: "admin" });
+      await attach(fixture, gone);
+      await revoke(fixture, [gone.id]);
+      await attach(fixture, live);
+      await attach(fixture, other);
+
+      const history = await repositories.ledgerReads.findGrantHistory({
+        organizationId,
+        identity: identityOf(gone),
+      });
+
+      const instants = history.map((row) => [
+        row.occurredAt.epochMilliseconds,
+        row.revokedAt?.epochMilliseconds ?? null,
+      ]);
+      expect(instants.toSorted(([first], [second]) => Number(first) - Number(second))).toEqual([
+        [T0, T0 + 50_000],
+        [T0 + 60_000, null],
+      ]);
+      expect(
+        await repositories.ledgerReads.findGrantHistory({
+          organizationId: id("org"),
+          identity: identityOf(gone),
+        }),
+      ).toEqual([]);
+    });
+
     it("lists a reader's shared reads with their window, and a window that no longer parses as null", async () => {
       const fixture = await open();
       const { organizationId, repositories } = fixture;
@@ -655,6 +688,7 @@ describe.each(backends)("given the ledger reads on the $name backend", (backend)
       expect(head?.permissions).toEqual(["traces:view", "traces:share"]);
       expect(head?.occurredAt.epochMilliseconds).toBe(at(T0).epochMilliseconds);
       expect(head?.deletedAt).toBe(null);
+      expect(head?.kind).toBe("custom");
       // A deleted head is still read, its occurredAt moved to the delete.
       const deleted = await ledgerReads.findRoleHead({ roleId: dropped.id, organizationId });
       expect(deleted?.deletedAt?.epochMilliseconds).toBe(at(T0 + 1_000).epochMilliseconds);

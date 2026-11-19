@@ -12,6 +12,7 @@ import { z } from "zod";
 import {
   AuthzLedgerReadRepository,
   type LedgerDirectoryGrantRow,
+  type LedgerGrantHistoryRow,
   type LedgerGrantIdentity,
   type LedgerBraidRow,
   type LedgerRoleDefinition,
@@ -249,6 +250,18 @@ export class MemoryAuthzLedgerReadRepository extends AuthzLedgerReadRepository {
       .map((row) => row.id);
   }
 
+  async findGrantHistory({
+    organizationId,
+    identity,
+  }: {
+    organizationId: string;
+    identity: LedgerGrantIdentity;
+  }): Promise<LedgerGrantHistoryRow[]> {
+    return this.memory.grants
+      .filter((row) => row.organizationId === organizationId && sameIdentity({ row, identity }))
+      .map((row) => ({ occurredAt: row.occurredAt, revokedAt: row.revokedAt }));
+  }
+
   async findLiveRole({
     roleId,
     organizationId,
@@ -277,6 +290,7 @@ export class MemoryAuthzLedgerReadRepository extends AuthzLedgerReadRepository {
           name: row.name,
           description: row.description,
           permissions: [...row.permissions],
+          kind: row.kind,
           occurredAt: row.occurredAt,
           deletedAt: row.deletedAt,
         }
