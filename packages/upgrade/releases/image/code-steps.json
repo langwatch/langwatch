@@ -355,6 +355,22 @@
     "needsOldWritersGone": true
   },
   {
+    "id": "nurturing:replay-organization-members",
+    "kind": "data",
+    "mode": "background",
+    "owner": "nurturing",
+    "description": "Fills nurturing's member copy from organization's member facts at deploy.",
+    "needsOldWritersGone": true
+  },
+  {
+    "id": "nurturing:replay-auth-members",
+    "kind": "data",
+    "mode": "background",
+    "owner": "nurturing",
+    "description": "Fills nurturing's member copy from auth's single sign-on joins at deploy.",
+    "needsOldWritersGone": true
+  },
+  {
     "id": "ops:copy-automation-migration-state",
     "kind": "data",
     "mode": "blocking",

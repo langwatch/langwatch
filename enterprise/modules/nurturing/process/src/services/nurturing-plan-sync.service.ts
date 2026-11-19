@@ -103,17 +103,16 @@ export class NurturingPlanSyncService {
       memberships,
       organizationId,
     });
-    // A catch-up fact is only trusted for members the copy holds a row for (any row, even a stale leave
-    // the backfill never rewrites): without the
-    // member backfill a paid-team member with their own free org would be told free. Live facts
-    // keep identifying every member.
+    // A catch-up fact is only trusted for members the copy holds a row for (any row, even a stale
+    // leave): until the member replay step fills the copy, a paid-team member with their own free
+    // org would be told free. Live facts keep identifying every member.
     const noCopyRowMemberUserIds = signal.fromCatchUp
       ? this.membersWithoutCopyRow({ memberships, memberUserIds, organizationId })
       : [];
     if (noCopyRowMemberUserIds.length > 0) {
       logger.info(
         { organizationId, skippedMembers: noCopyRowMemberUserIds.length },
-        "catch-up skipped members with no member-copy row; run nurturing-member-backfill first",
+        "catch-up skipped members with no member-copy row; nurturing:replay-organization-members fills it",
       );
     }
     return fireSubscriptionSync({

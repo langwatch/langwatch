@@ -6,7 +6,6 @@ import type { NurturingRepositories } from "../nurturing.repositories.ts";
 import { PrismaNurturingErasedUserRepository } from "./prisma.nurturing-erased-user.repository.ts";
 import { PrismaNurturingEvaluationDayRepository } from "./prisma.nurturing-evaluation-day.repository.ts";
 import { PrismaNurturingVirtualKeyRepository } from "./prisma.nurturing-gateway-key.repository.ts";
-import { PrismaNurturingMemberSourceRepository } from "./prisma.nurturing-member-source.repository.ts";
 import { PrismaNurturingMilestonesRepository } from "./prisma.nurturing-milestones.repository.ts";
 import { PrismaNurturingOrganizationCreatedRepository } from "./prisma.nurturing-organization-created.repository.ts";
 import { PrismaNurturingOrganizationMemberRepository } from "./prisma.nurturing-organization-member.repository.ts";
@@ -52,7 +51,6 @@ export class PostgresNurturingRepositories {
     return {
       ...ownedRepositories.create({ prisma }),
       projects: PrismaNurturingProjectDirectoryRepository.create({ prisma }),
-      memberSource: PrismaNurturingMemberSourceRepository.create({ prisma }),
     };
   }
 }

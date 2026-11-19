@@ -6,12 +6,20 @@
  * @see enterprise/modules/nurturing/specs/customer-io-plan-traits.feature
  */
 import type { CioBatchCall, NurturingSignalOf } from "@langwatch/enterprise-nurturing-contract";
+import {
+  ORGANIZATION_AGGREGATE_TYPE,
+  ORGANIZATION_MEMBER_LISTED_EVENT_TYPE,
+} from "@langwatch/organization-contract";
 import { describe, expect, it } from "vitest";
 
-import { MemoryNurturingMemberSourceRepository } from "../../repositories/memory/memory.nurturing-member-source.repository.ts";
+import {
+  copiesOver,
+  liveMapsOver,
+  ownerFact,
+} from "../../eventing/__tests__/nurturing-organization-copies.test-helpers.ts";
 import { MemoryNurturingOrganizationMemberRepository } from "../../repositories/memory/memory.nurturing-organization-member.repository.ts";
 import { MemoryNurturingOrganizationPlanRepository } from "../../repositories/memory/memory.nurturing-organization-plan.repository.ts";
-import { NurturingMemberBackfillService } from "../nurturing-member-backfill.service.ts";
+import { MemoryNurturingRepositories } from "../../repositories/memory/memory.nurturing.repositories.ts";
 import { NurturingPlanSyncService } from "../nurturing-plan-sync.service.ts";
 
 const change: NurturingSignalOf<"subscription_changed"> = {
@@ -205,21 +213,36 @@ describe("NurturingPlanSyncService", () => {
     it.each<[string, ("org-a" | "org-b")[]]>([
       ["paid team's fact first", ["org-a", "org-b"]],
       ["free organization's fact first", ["org-b", "org-a"]],
-    ])("never tells them free after the member backfill (%s)", async (_order, order) => {
-      // Without the backfill the copy holds no row for alice, so org-b's fact finds her in no
-      // other organization (membersWhoseLatestOrganizationIsElsewhere) and identifies her as
-      // free. The backfill is what makes her latest organization, org-a, known.
+    ])("never tells them free once their memberships are listed (%s)", async (_order, order) => {
+      // Without the listed members the copy holds no row for alice, so org-b's fact finds her in
+      // no other organization (membersWhoseLatestOrganizationIsElsewhere) and identifies her as
+      // free. Copying organization's member_listed facts makes her latest organization known.
       const members = MemoryNurturingOrganizationMemberRepository.create();
-      const source = MemoryNurturingMemberSourceRepository.create({
-        membersByOrganization: {
-          "org-b": [{ userId: "alice", joinedAt: 1_000 }],
-          "org-a": [{ userId: "alice", joinedAt: 2_000 }],
-        },
+      const copyMember = liveMapsOver({
+        ...copiesOver(MemoryNurturingRepositories.create()),
+        members,
       });
-      await NurturingMemberBackfillService.create({ peers: { source, members } }).backfill({
-        dryRun: false,
-        signal: new AbortController().signal,
-      });
+      for (const [organizationId, joinedAt] of [
+        ["org-b", 1_000],
+        ["org-a", 2_000],
+      ] as const) {
+        await copyMember(
+          ownerFact({
+            type: ORGANIZATION_MEMBER_LISTED_EVENT_TYPE,
+            aggregateType: ORGANIZATION_AGGREGATE_TYPE,
+            aggregateId: organizationId,
+            tenantId: organizationId,
+            data: {
+              tenantId: organizationId,
+              organizationId,
+              userId: "alice",
+              joinedAt,
+              backfilled: true,
+              occurredAt: 5_000,
+            },
+          }),
+        );
+      }
       const { planSync, sent } = planSyncOver(members);
       const facts: Record<"org-a" | "org-b", NurturingSignalOf<"subscription_changed">> = {
         "org-a": { ...change, organizationId: "org-a", memberUserIds: ["alice"], plan: "LAUNCH" },

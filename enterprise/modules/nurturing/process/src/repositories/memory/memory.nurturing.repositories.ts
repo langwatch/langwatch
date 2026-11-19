@@ -7,7 +7,6 @@ import type { NurturingRepositories } from "../nurturing.repositories.ts";
 import { MemoryNurturingErasedUserRepository } from "./memory.nurturing-erased-user.repository.ts";
 import { MemoryNurturingEvaluationDayRepository } from "./memory.nurturing-evaluation-day.repository.ts";
 import { MemoryNurturingVirtualKeyRepository } from "./memory.nurturing-gateway-key.repository.ts";
-import { MemoryNurturingMemberSourceRepository } from "./memory.nurturing-member-source.repository.ts";
 import { MemoryNurturingMilestonesRepository } from "./memory.nurturing-milestones.repository.ts";
 import { MemoryNurturingOrganizationCreatedRepository } from "./memory.nurturing-organization-created.repository.ts";
 import { MemoryNurturingOrganizationMemberRepository } from "./memory.nurturing-organization-member.repository.ts";
@@ -51,7 +50,6 @@ export class MemoryNurturingRepositories {
       erasedUsers,
       milestones: MemoryNurturingMilestonesRepository.create({ erasedUsers }),
       projects: MemoryNurturingProjectDirectoryRepository.create(),
-      memberSource: MemoryNurturingMemberSourceRepository.create(),
       placements: MemoryNurturingProjectPlacementRepository.create(),
       organizationsCreated: MemoryNurturingOrganizationCreatedRepository.create(),
       members: MemoryNurturingOrganizationMemberRepository.create({ erasedUsers }),

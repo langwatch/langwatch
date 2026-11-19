@@ -67,8 +67,10 @@ import { MemoryNurturingRepositories } from "../../repositories/memory/memory.nu
 import type { NurturingRepositories } from "../../repositories/nurturing.repositories.ts";
 import {
   buildNurturingProjectUsagePipeline,
+  NURTURING_AUTH_MEMBERS_PROJECTION_NAME,
   NURTURING_ORGANIZATION_ADMINS_PROJECTION_NAME,
   NURTURING_ORGANIZATION_CREATIONS_PROJECTION_NAME,
+  NURTURING_ORGANIZATION_MEMBERS_PROJECTION_NAME,
   NURTURING_PROJECT_PLACEMENTS_PROJECTION_NAME,
   NURTURING_PROJECT_USAGE_PIPELINE_NAME,
   nurturingProjectUsagePeerEvents,
@@ -85,15 +87,19 @@ import { NurturingSeededLog } from "./nurturing-seeded-log.test-helpers.ts";
 export const PLACEMENTS_STEP = "nurturing:replay-project-placements";
 export const ORGANIZATIONS_CREATED_STEP = "nurturing:replay-organizations-created";
 export const ADMINS_STEP = "nurturing:replay-organization-admins";
+export const MEMBERS_STEP = "nurturing:replay-organization-members";
+export const AUTH_MEMBERS_STEP = "nurturing:replay-auth-members";
 /** Project's own step, which records every project it held before it recorded creations. */
 export const PROJECT_CREATED_FACTS_STEP = "project:record-created-facts";
+/** Organization's own step, which lists the members it held before it recorded member facts. */
+export const MEMBER_LISTING_STEP = "organization:list-member-facts";
 
 const laneOf = (projection: string) => `${NURTURING_PROJECT_USAGE_PIPELINE_NAME}.${projection}`;
 
 /**
- * The placement, organization-creation and admin steps as nurturing.module.ts declares them,
- * rebuilt over a test's own replayer from the same pinned ids and lane constants. The module's
- * declaration test compares the module against this.
+ * The placement, organization-creation, admin and member steps as nurturing.module.ts declares
+ * them, rebuilt over a test's own replayer from the same pinned ids and lane constants. The
+ * module's declaration test compares the module against this.
  * Spec: enterprise/modules/nurturing/specs/project-usage.feature
  */
 export function organizationCopiesReplayStepsOver(replayer: LaneReplayer): MigrationStep[] {
@@ -121,6 +127,20 @@ export function organizationCopiesReplayStepsOver(replayer: LaneReplayer): Migra
         "Fills each organization's admin and seeded flag from project's created facts at deploy.",
       lane: laneOf(NURTURING_ORGANIZATION_ADMINS_PROJECTION_NAME),
       after: [USER_MARKS_STEP, IDENTITY_MARKS_STEP, PROJECT_CREATED_FACTS_STEP],
+    }),
+    defineProjectionReplayStep({
+      ...common,
+      id: MEMBERS_STEP,
+      description: "Fills nurturing's member copy from organization's member facts at deploy.",
+      lane: laneOf(NURTURING_ORGANIZATION_MEMBERS_PROJECTION_NAME),
+      after: [USER_MARKS_STEP, IDENTITY_MARKS_STEP, MEMBER_LISTING_STEP],
+    }),
+    defineProjectionReplayStep({
+      ...common,
+      id: AUTH_MEMBERS_STEP,
+      description: "Fills nurturing's member copy from auth's single sign-on joins at deploy.",
+      lane: laneOf(NURTURING_AUTH_MEMBERS_PROJECTION_NAME),
+      after: [USER_MARKS_STEP, IDENTITY_MARKS_STEP],
     }),
   ];
 }
@@ -276,7 +296,7 @@ export function liveMapsOver(
     registerPeerMapProjection: <MapRecord, Own extends Event>(
       map: MapProjectionDefinition<MapRecord, Own>,
     ) => {
-      // The router hands a lane only the event types it declares; narrowing by them is that contract.
+      // The router hands a lane only the types it declares; narrowing by them is the contract.
       const isOwn = (event: Event): event is Own => map.eventTypes.includes(event.type);
       lanes.push(async (event) => {
         if (!isOwn(event)) return;

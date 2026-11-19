@@ -6,9 +6,11 @@ import { defineProjectionReplayStep } from "@langwatch/upgrade/step";
 import { NurturingModule } from "./app/nurturing.app.ts";
 import { nurturingChannels } from "./channels/nurturing-channels.registry.ts";
 import {
+  NURTURING_AUTH_MEMBERS_PROJECTION_NAME,
   NURTURING_IDENTITY_ERASURE_MARKS_PROJECTION_NAME,
   NURTURING_ORGANIZATION_ADMINS_PROJECTION_NAME,
   NURTURING_ORGANIZATION_CREATIONS_PROJECTION_NAME,
+  NURTURING_ORGANIZATION_MEMBERS_PROJECTION_NAME,
   NURTURING_PROJECT_PLACEMENTS_PROJECTION_NAME,
   NURTURING_PROJECT_USAGE_PIPELINE_NAME,
   NURTURING_USER_ERASURE_MARKS_PROJECTION_NAME,
@@ -18,7 +20,6 @@ import {
 import { nurturingTraceWindowEndEventing } from "./eventing/nurturing-trace-window-end.pipeline.ts";
 import { nurturingEventing } from "./eventing/nurturing.pipeline.ts";
 import { nurturingRepositories } from "./repositories/nurturing-repositories.registry.ts";
-import { NurturingMemberBackfillTask } from "./tasks/nurturing-member-backfill.task.ts";
 
 export const nurturingProcessModule: PublishedProcessModule<
   "nurturing",
@@ -31,12 +32,6 @@ export const nurturingProcessModule: PublishedProcessModule<
   .withEventing(nurturingEventing)
   .withEventing(nurturingProjectUsageEventing)
   .withEventing(nurturingTraceWindowEndEventing)
-  // Hand-run after the rollout, dry run unless --execute: the member copy was never backfilled.
-  .withTasks(({ repositories }) => [
-    NurturingMemberBackfillTask.create({
-      peers: { source: repositories.memberSource, members: repositories.members },
-    }),
-  ])
   // Deploy-time fills from its owners' logs: the erasure marks of both erasure sources, then the
   // key copy, which runs `after` them so a key copied from old facts finds every erased person
   // marked. Spec: enterprise/modules/nurturing/specs/gateway-facts.feature
@@ -99,6 +94,29 @@ export const nurturingProcessModule: PublishedProcessModule<
         "nurturing:replay-identity-erasure-marks",
         "project:record-created-facts",
       ],
+      replayer,
+    }),
+    // Organization's listing step records the members it held before it recorded member facts.
+    defineProjectionReplayStep({
+      id: "nurturing:replay-organization-members",
+      description: "Fills nurturing's member copy from organization's member facts at deploy.",
+      lane: `${NURTURING_PROJECT_USAGE_PIPELINE_NAME}.${NURTURING_ORGANIZATION_MEMBERS_PROJECTION_NAME}`,
+      needsOldWritersGone: true,
+      trailingPass: true,
+      after: [
+        "nurturing:replay-user-erasure-marks",
+        "nurturing:replay-identity-erasure-marks",
+        "organization:list-member-facts",
+      ],
+      replayer,
+    }),
+    defineProjectionReplayStep({
+      id: "nurturing:replay-auth-members",
+      description: "Fills nurturing's member copy from auth's single sign-on joins at deploy.",
+      lane: `${NURTURING_PROJECT_USAGE_PIPELINE_NAME}.${NURTURING_AUTH_MEMBERS_PROJECTION_NAME}`,
+      needsOldWritersGone: true,
+      trailingPass: true,
+      after: ["nurturing:replay-user-erasure-marks", "nurturing:replay-identity-erasure-marks"],
       replayer,
     }),
   ]);

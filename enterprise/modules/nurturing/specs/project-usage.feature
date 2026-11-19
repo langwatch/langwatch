@@ -40,9 +40,11 @@ Feature: Per-email usage reaches Customer.io from nurturing's own project rows
   written from the owners' member facts: a join by organization's lw.organization.signed_up,
   lw.organization.invite_accepted or lw.organization.created naming its founder, or auth's
   lw.auth.sso_auto_added, a leave by
-  lw.organization.member_removed or member_disabled, a return by member_enabled. Each keeps its
-  latest time, so a redelivery or a late fact changes nothing; "joined last" is the latest join
-  time in the copy. A member who joined before the copy existed is not in it. User's
+  lw.organization.member_removed or member_disabled, a return by member_enabled, and a membership
+  from before organization recorded member facts by its lw.organization.member_listed, joined when
+  its row was created. Each keeps its latest time, so a redelivery, a late fact or a replay changes
+  nothing; "joined last" is the latest join time in the copy. Two peer maps write it, one per owner
+  pipeline (organization's and auth's), filled at deploy by their replay steps. User's
   lw.user.erased marks the account erased (NurturingErasedUser, a hash of its id), then deletes
   every membership of it (with the other rows naming it, project-facts-copies.feature); a member
   fact delivered after the erasure, or while it commits, leaves no row for it, unless its worker
@@ -347,7 +349,7 @@ Feature: Per-email usage reaches Customer.io from nurturing's own project rows
 
   @unit
   Scenario: Nurturing keeps its own copy of an organization's members
-    Given the owners' facts of a person joining by signup, invite, single sign-on or founding an organization, leaving by removal or disabling, and returning by enabling
+    Given the owners' facts of a person joining by signup, invite, single sign-on, founding an organization or being listed by organization, leaving by removal or disabling, and returning by enabling
     When nurturing takes them, in any order and any number of times
     Then the person is a current member when their latest join or return is after their latest leave
     And their latest organization is their current membership with the latest join
@@ -502,6 +504,38 @@ Feature: Per-email usage reaches Customer.io from nurturing's own project rows
 
   @unit
   Scenario: Copy jobs the previous release queued reach the peer map that replaced their lane
-    Given the previous release queued jobs under the placement, organization-created and project-created subscriber keys
+    Given the previous release queued jobs under the placement, organization-created, project-created and seven member subscriber keys
     When a worker of the new release dequeues them
-    Then the placement, organization-creation and admin maps each write their copy
+    Then the placement, organization-creation, admin and member maps each write their copy
+
+  # Projections build plan row 4: the member copy is two peer maps, organization's member facts
+  # (member_listed included) and auth's single sign-on joins, filled at deploy after the marks.
+  @unit
+  Scenario: Members from before the copy existed are copied at deploy from organization's and auth's logs
+    Given organization's log holds member facts and member_listed facts, and auth's holds single sign-on joins
+    When the deploy runs nurturing's organization and auth member replay steps
+    Then the member copy holds what live delivery of the same facts would have written
+
+  @unit
+  Scenario: Replaying the member copy twice leaves every row as it was
+    Given both member steps ran
+    When each runs again
+    Then every member row is byte-identical
+
+  @unit
+  Scenario: Every active member organization lists gets a member row, once
+    Given organization's listing step recorded a member_listed fact for each active membership
+    When the deploy runs the organization member step, and runs it again
+    Then each listed member is a current member of their organization, and the second run adds no row
+
+  @unit
+  Scenario: The deploy replay copies no member erased before the copy existed
+    Given organization's and auth's logs name a member that user's log records erased
+    When the deploy runs the marks steps and then the member steps, or the member is erased while they run, or a fact naming them lands live afterwards
+    Then no membership names that person
+
+  @unit
+  Scenario: Replaying the member copy sends nothing
+    Given a deployment with a Customer.io channel and logs holding member facts
+    When the deploy runs nurturing's replay steps
+    Then no usage, trace or organization-created sync runs

@@ -45,6 +45,8 @@ export type CodeStepId =
   | "nurturing:replay-project-placements"
   | "nurturing:replay-organizations-created"
   | "nurturing:replay-organization-admins"
+  | "nurturing:replay-organization-members"
+  | "nurturing:replay-auth-members"
   | "ops:copy-automation-migration-state"
   | "ops:copy-identity-authz-migration-state"
   | "ops:recopy-identity-authz-migration-state-after-rollout"

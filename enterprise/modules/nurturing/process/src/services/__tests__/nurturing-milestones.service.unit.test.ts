@@ -8,6 +8,7 @@ import type { EvaluationLifecycleCompletedEventData } from "@langwatch/evaluatio
 import type { ProjectCreatedEventData } from "@langwatch/project-contract";
 import { describe, expect, it } from "vitest";
 
+import { organizationAdminFactOf } from "../../eventing/nurturing-project-usage.pipeline.ts";
 import { MemoryNurturingMilestonesRepository } from "../../repositories/memory/memory.nurturing-milestones.repository.ts";
 import { MemoryNurturingProjectDirectoryRepository } from "../../repositories/memory/memory.nurturing-project-directory.repository.ts";
 import type {
@@ -15,7 +16,6 @@ import type {
   NurturingOrganizationAdminRepository,
 } from "../../repositories/nurturing-milestones.repository.ts";
 import type { NurturingProjectDirectoryRepository } from "../../repositories/nurturing-project-directory.repository.ts";
-import { organizationAdminFactOf } from "../../eventing/nurturing-project-usage.pipeline.ts";
 import { NURTURING_CUTOVER_AT } from "../../rules/nurturing-owner-signals.rules.ts";
 import { NurturingMilestonesService } from "../nurturing-milestones.service.ts";
 

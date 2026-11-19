@@ -10,8 +10,13 @@ import {
 } from "@langwatch/evaluator-contract";
 import { createTenantId, type Event } from "@langwatch/eventing";
 import {
+  ORGANIZATION_AGGREGATE_TYPE,
   ORGANIZATION_CREATED_EVENT_TYPE,
-  organizationSignedUpEventDataSchema,
+  ORGANIZATION_MEMBER_DISABLED_EVENT_TYPE,
+  ORGANIZATION_MEMBER_ENABLED_EVENT_TYPE,
+  ORGANIZATION_MEMBER_LISTED_EVENT_TYPE,
+  ORGANIZATION_MEMBER_REMOVED_EVENT_TYPE,
+  ORGANIZATION_SIGNED_UP_EVENT_TYPE,
 } from "@langwatch/organization-contract";
 import {
   PROMPT_CREATED_EVENT_TYPE,
@@ -39,16 +44,16 @@ import { MemoryNurturingOrganizationMemberRepository } from "../../repositories/
 import { MemoryNurturingProjectPlacementRepository } from "../../repositories/memory/memory.nurturing-project-placement.repository.ts";
 import { MemoryNurturingProjectUsageRepository } from "../../repositories/memory/memory.nurturing-project-usage.repository.ts";
 import { MemoryNurturingTraceDayRepository } from "../../repositories/memory/memory.nurturing-trace-day.repository.ts";
+import { MemoryNurturingRepositories } from "../../repositories/memory/memory.nurturing.repositories.ts";
 import type { NurturingProjectUsageOwner } from "../../repositories/nurturing-project-usage.repository.ts";
+import type { NurturingMembership } from "../../rules/nurturing-organization-member.rules.ts";
 import { countingOver } from "../../services/__tests__/nurturing-trace-counting.test-helpers.ts";
 import { NurturingCopiedProjectsService } from "../../services/nurturing-copied-projects.service.ts";
 import { NurturingOrganizationUsageService } from "../../services/nurturing-organization-usage.service.ts";
 import {
   evaluationDayKeyOf,
-  nurturingMembershipSubscriber,
   nurturingEvaluationDaySubscriber,
   nurturingFailedTraceDaySubscriber,
-  nurturingFounderMembershipSubscriber,
   type NurturingProjectUsagePeerEvent,
   nurturingProjectUsagePeerFold,
   nurturingTraceDaySubscriber,
@@ -58,6 +63,7 @@ import {
   projectUsageFactOf,
   traceSyncKeyOf,
 } from "../nurturing-project-usage.pipeline.ts";
+import { copiesOver, liveMapsOver, ownerFact } from "./nurturing-organization-copies.test-helpers.ts";
 
 const OCCURRED_AT = 1_000;
 
@@ -736,55 +742,43 @@ describe("the failed-trace count", () => {
 });
 
 describe("nurturing's member copy", () => {
-  const ORGANIZATION_SIGNED_UP = "lw.organization.signed_up";
-  const factAt = (organizationId: string, occurredAt: number) => ({
-    tenantId: organizationId,
-    organizationId,
-    userId: "user-1",
-    occurredAt,
-    organizationName: "Acme",
-  });
-  const context = {
-    tenantId: createTenantId("org-1"),
-    aggregateId: "org-1",
-    createdAt: OCCURRED_AT,
-    occurredAt: OCCURRED_AT,
-    eventId: "member-event",
-  };
-  const subscriberOf = (
-    members: MemoryNurturingOrganizationMemberRepository,
-    change: "joined" | "left" | "returned",
-  ) =>
-    nurturingMembershipSubscriber({
-      eventType: ORGANIZATION_SIGNED_UP,
-      data: organizationSignedUpEventDataSchema,
-      change,
-      members,
-    });
-  const handle = async (
-    subscriber: ReturnType<typeof subscriberOf>,
+  const memberFact = (
+    type: string,
     organizationId: string,
-    at: number,
-  ) => {
-    if (!subscriber.handle) throw new Error("a member fact is handled one at a time");
-    await subscriber.handle(subscriber.data.parse(factAt(organizationId, at)), context);
-  };
+    occurredAt: number,
+    extra: Readonly<Record<string, unknown>> = {},
+  ) =>
+    ownerFact({
+      type,
+      aggregateType: ORGANIZATION_AGGREGATE_TYPE,
+      aggregateId: organizationId,
+      tenantId: organizationId,
+      data: {
+        tenantId: organizationId,
+        organizationId,
+        userId: "user-1",
+        organizationName: "Acme",
+        occurredAt,
+        ...extra,
+      },
+    });
+  const copyOver = (members: MemoryNurturingOrganizationMemberRepository) =>
+    liveMapsOver({ ...copiesOver(MemoryNurturingRepositories.create()), members });
+  const byOrganization = (memberships: readonly NurturingMembership[]) =>
+    memberships.toSorted((a, b) => a.organizationId.localeCompare(b.organizationId));
 
   /** @scenario "Nurturing keeps its own copy of an organization's members" */
   it("keeps each change's latest time, whatever the order or how often it is delivered", async () => {
     const members = MemoryNurturingOrganizationMemberRepository.create();
-    const joined = subscriberOf(members, "joined");
-    const left = subscriberOf(members, "left");
+    const copy = copyOver(members);
 
-    await handle(left, "org-1", 3_000);
-    await handle(joined, "org-1", 1_000);
-    await handle(joined, "org-1", 1_000);
-    await handle(joined, "org-2", 2_000);
+    await copy(memberFact(ORGANIZATION_MEMBER_REMOVED_EVENT_TYPE, "org-1", 3_000));
+    await copy(memberFact(ORGANIZATION_SIGNED_UP_EVENT_TYPE, "org-1", 1_000));
+    await copy(memberFact(ORGANIZATION_SIGNED_UP_EVENT_TYPE, "org-1", 1_000));
+    await copy(memberFact(ORGANIZATION_SIGNED_UP_EVENT_TYPE, "org-2", 2_000));
 
     expect(
-      (await members.findMembershipsOfMembers({ organizationId: "org-1" })).toSorted((a, b) =>
-        a.organizationId.localeCompare(b.organizationId),
-      ),
+      byOrganization(await members.findMembershipsOfMembers({ organizationId: "org-1" })),
     ).toEqual([
       {
         organizationId: "org-1",
@@ -806,21 +800,25 @@ describe("nurturing's member copy", () => {
   /** @scenario "Nurturing keeps its own copy of an organization's members" */
   it("records the founder of a created organization as joined, and no one for a provisioned one", async () => {
     const members = MemoryNurturingOrganizationMemberRepository.create();
-    const founder = nurturingFounderMembershipSubscriber(members);
+    const copy = copyOver(members);
     const created = (organizationId: string, occurredAt: number, userId?: string) =>
-      founder.data.parse({
+      ownerFact({
+        type: ORGANIZATION_CREATED_EVENT_TYPE,
+        aggregateType: ORGANIZATION_AGGREGATE_TYPE,
+        aggregateId: organizationId,
         tenantId: organizationId,
-        organizationId,
-        organizationName: "Acme",
-        occurredAt,
-        ...(userId ? { userId } : {}),
+        data: {
+          tenantId: organizationId,
+          organizationId,
+          organizationName: "Acme",
+          occurredAt,
+          ...(userId ? { userId } : {}),
+        },
       });
-    if (!founder.handle) throw new Error("a creation fact is handled one at a time");
 
-    expect(founder.eventType).toBe(ORGANIZATION_CREATED_EVENT_TYPE);
-    await founder.handle(created("org-1", 1_000, "user-1"), context);
-    await founder.handle(created("org-1", 1_000, "user-1"), context);
-    await founder.handle(created("org-2", 2_000), context);
+    await copy(created("org-1", 1_000, "user-1"));
+    await copy(created("org-1", 1_000, "user-1"));
+    await copy(created("org-2", 2_000));
 
     expect(await members.findMembershipsOfMembers({ organizationId: "org-1" })).toEqual([
       {
@@ -832,5 +830,30 @@ describe("nurturing's member copy", () => {
       },
     ]);
     expect(await members.findMembershipsOfMembers({ organizationId: "org-2" })).toEqual([]);
+  });
+
+  /** @scenario "Nurturing keeps its own copy of an organization's members" */
+  it("joins a listed member at the time organization's membership row was created", async () => {
+    const members = MemoryNurturingOrganizationMemberRepository.create();
+    const copy = copyOver(members);
+
+    await copy(
+      memberFact(ORGANIZATION_MEMBER_LISTED_EVENT_TYPE, "org-1", 9_000, {
+        joinedAt: 1_500,
+        backfilled: true,
+      }),
+    );
+    await copy(memberFact(ORGANIZATION_MEMBER_ENABLED_EVENT_TYPE, "org-1", 4_000));
+    await copy(memberFact(ORGANIZATION_MEMBER_DISABLED_EVENT_TYPE, "org-1", 3_000));
+
+    expect(await members.findMembershipsOfMembers({ organizationId: "org-1" })).toEqual([
+      {
+        organizationId: "org-1",
+        userId: "user-1",
+        joinedAt: 1_500,
+        leftAt: 3_000,
+        returnedAt: 4_000,
+      },
+    ]);
   });
 });

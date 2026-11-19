@@ -31,19 +31,14 @@ import { copiesOver, liveMapsOver, ownerFact } from "./nurturing-organization-co
 
 /** The usage pipeline's lanes as the module declares them, for an app that syncs or one that does not. */
 const COPY_LANES = [
-  "memberFoundedOrganization",
-  "memberSignedUp",
-  "memberInviteAccepted",
-  "memberSsoAutoAdded",
-  "memberRemoved",
-  "memberDisabled",
-  "memberEnabled",
   "virtualKeys",
   "userErasureMarks",
   "identityErasureMarks",
   "projectPlacements",
   "organizationCreations",
   "organizationAdmins",
+  "organizationMembers",
+  "authMembers",
 ];
 
 /** The lanes only a deployment with a Customer.io channel registers: the folds and the syncs. */

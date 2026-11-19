@@ -127,14 +127,6 @@ Declared at `src/eventing/nurturing.pipeline.ts:333`. Events: `nurturingSignalRe
 | peer subscriber | `insightKept`                   | `lw.insight.kept` from [insight](../../../../modules/insight/README.md)                                          | `src/eventing/nurturing.pipeline.ts:668` |
 | lane aliases    | `≈ MAIN_NURTURING_LANE_ALIASES` | –                                                                                                                | `src/eventing/nurturing.pipeline.ts:675` |
 
-### Tasks
-
-Run by the tasks process, before serve.
-
-| Task                        | Class                         | Declared at                                      |
-| --------------------------- | ----------------------------- | ------------------------------------------------ |
-| `nurturing-member-backfill` | `NurturingMemberBackfillTask` | `src/tasks/nurturing-member-backfill.task.ts:69` |
-
 ## Configuration
 
 | Kind   | Leaf                | Environment variable   | Declared at                              |
@@ -146,9 +138,3 @@ Run by the tasks process, before serve.
 | config | `posthogHost`       | `POSTHOG_HOST`         | `../contract/src/nurturing.config.ts:12` |
 
 <!-- readme:generated:end -->
-
-## Hand-run tasks
-
-| Task                        | When and how                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
-| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `nurturing-member-backfill` | Run after the rollout, so existing members have a member row, and before `customer-io-plan-resync --execute`: if the resync runs first, it identifies no member without a member-copy row (the org's group call still carries the plan), so the wrong order sends nothing wrong. To repair it, after the backfill, re-run the resync; skipped members otherwise get no plan until the next live fact; dry run unless `--execute`; running it against production needs the owner's go. |

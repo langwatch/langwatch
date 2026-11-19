@@ -37,7 +37,6 @@ import {
   type PeerMapProjectionDeclaration,
   type PeerSubscriberContext,
   type PeerSubscriberDefinition,
-  type ParsingSchema,
   throttledWindow,
 } from "@langwatch/eventing";
 import {
@@ -54,12 +53,14 @@ import {
   ORGANIZATION_CREATED_EVENT_TYPE,
   ORGANIZATION_MEMBER_DISABLED_EVENT_TYPE,
   ORGANIZATION_MEMBER_ENABLED_EVENT_TYPE,
+  ORGANIZATION_MEMBER_LISTED_EVENT_TYPE,
   ORGANIZATION_MEMBER_REMOVED_EVENT_TYPE,
   ORGANIZATION_SIGNED_UP_EVENT_TYPE,
   type OrganizationCreatedEventData,
   organizationCreatedEventDataSchema,
   organizationMemberDisabledEventDataSchema,
   organizationMemberEnabledEventDataSchema,
+  organizationMemberListedEventDataSchema,
   organizationMemberRemovedEventDataSchema,
   organizationSignedUpEventDataSchema,
 } from "@langwatch/organization-contract";
@@ -534,61 +535,6 @@ function nurturingProjectUsageHost({
     aggregate: defineAggregate({ type: "nurturing_project_usage_view" }),
   })
     .withEvents([])
-    .withPeerSubscriber("memberFoundedOrganization", nurturingFounderMembershipSubscriber(members))
-    .withPeerSubscriber(
-      "memberSignedUp",
-      nurturingMembershipSubscriber({
-        eventType: ORGANIZATION_SIGNED_UP_EVENT_TYPE,
-        data: organizationSignedUpEventDataSchema,
-        change: "joined",
-        members,
-      }),
-    )
-    .withPeerSubscriber(
-      "memberInviteAccepted",
-      nurturingMembershipSubscriber({
-        eventType: INVITE_ACCEPTED_EVENT_TYPE,
-        data: inviteAcceptedEventDataSchema,
-        change: "joined",
-        members,
-      }),
-    )
-    .withPeerSubscriber(
-      "memberSsoAutoAdded",
-      nurturingMembershipSubscriber({
-        eventType: SSO_AUTO_ADDED_EVENT_TYPE,
-        data: ssoAutoAddedEventDataSchema,
-        change: "joined",
-        members,
-      }),
-    )
-    .withPeerSubscriber(
-      "memberRemoved",
-      nurturingMembershipSubscriber({
-        eventType: ORGANIZATION_MEMBER_REMOVED_EVENT_TYPE,
-        data: organizationMemberRemovedEventDataSchema,
-        change: "left",
-        members,
-      }),
-    )
-    .withPeerSubscriber(
-      "memberDisabled",
-      nurturingMembershipSubscriber({
-        eventType: ORGANIZATION_MEMBER_DISABLED_EVENT_TYPE,
-        data: organizationMemberDisabledEventDataSchema,
-        change: "left",
-        members,
-      }),
-    )
-    .withPeerSubscriber(
-      "memberEnabled",
-      nurturingMembershipSubscriber({
-        eventType: ORGANIZATION_MEMBER_ENABLED_EVENT_TYPE,
-        data: organizationMemberEnabledEventDataSchema,
-        change: "returned",
-        members,
-      }),
-    )
     // Registered whether or not a channel syncs. The marks lane is the key lane's replay
     // prerequisite (the withMigrations steps in nurturing.module.ts).
     .withPeerMapProjection(nurturingUserErasureMarksMap(virtualKeys))
@@ -597,6 +543,8 @@ function nurturingProjectUsageHost({
     .withPeerMapProjection(nurturingProjectPlacementsMap(copies))
     .withPeerMapProjection(nurturingOrganizationCreationsMap(organizationsCreated))
     .withPeerMapProjection(nurturingOrganizationAdminsMap(admins))
+    .withPeerMapProjection(nurturingOrganizationMembersMap(members))
+    .withPeerMapProjection(nurturingAuthMembersMap(members))
     .withLaneAliases([...ORGANIZATION_COPY_LANE_ALIASES]);
   // Without a channel no sync reads the usage rows, and none prunes the trace days, so none is kept.
   if (!sync) return copied;
@@ -634,55 +582,6 @@ function nurturingProjectUsageHost({
         handle: (data) => organizationCreated(data),
       })
   );
-}
-
-/** What every owner member fact carries that nurturing's member copy keeps. */
-type MembershipFact = Readonly<{ organizationId: string; userId: string; occurredAt: number }>;
-
-/**
- * Nurturing's own copy of a membership, from one owner member fact (§9), parsed by its owner's
- * schema: a join, a leave or a return, at the fact's time. Idempotent, latest time kept.
- */
-export function nurturingMembershipSubscriber<Data extends ParsingSchema<MembershipFact>>({
-  eventType,
-  data,
-  change,
-  members,
-}: Readonly<{
-  eventType: string;
-  data: Data;
-  change: NurturingMembershipChange;
-  members: Pick<NurturingOrganizationMemberRepository, "recordMembershipChange">;
-}>): PeerSubscriberDefinition<Data> {
-  return {
-    eventType,
-    data,
-    handle: ({ organizationId, userId, occurredAt }) =>
-      members.recordMembershipChange({ organizationId, userId, change, at: occurredAt }),
-  };
-}
-
-/**
- * Nurturing's own copy of a founder's membership, from organization's creation fact: an
- * organization created for an existing user (`createAndAssign`) records no signup. Joined at the
- * creation's time; a provisioned organization names no founder and records nothing.
- */
-export function nurturingFounderMembershipSubscriber(
-  members: Pick<NurturingOrganizationMemberRepository, "recordMembershipChange">,
-): PeerSubscriberDefinition<typeof organizationCreatedEventDataSchema> {
-  return {
-    eventType: ORGANIZATION_CREATED_EVENT_TYPE,
-    data: organizationCreatedEventDataSchema,
-    handle: async ({ organizationId, userId, occurredAt }) => {
-      if (!userId) return;
-      await members.recordMembershipChange({
-        organizationId,
-        userId,
-        change: "joined",
-        at: occurredAt,
-      });
-    },
-  };
 }
 
 /** Lane names under `<host pipeline>.`, which the withMigrations steps in nurturing.module.ts name. */
@@ -770,6 +669,8 @@ export function nurturingVirtualKeysMap(
 export const NURTURING_PROJECT_PLACEMENTS_PROJECTION_NAME = "projectPlacements" as const;
 export const NURTURING_ORGANIZATION_CREATIONS_PROJECTION_NAME = "organizationCreations" as const;
 export const NURTURING_ORGANIZATION_ADMINS_PROJECTION_NAME = "organizationAdmins" as const;
+export const NURTURING_ORGANIZATION_MEMBERS_PROJECTION_NAME = "organizationMembers" as const;
+export const NURTURING_AUTH_MEMBERS_PROJECTION_NAME = "authMembers" as const;
 
 /** A retired peer subscriber's queue key, as the previous release queued its jobs. */
 const retiredPeerSubscriberKey = (pipeline: string, lane: string) =>
@@ -795,6 +696,21 @@ export const ORGANIZATION_COPY_LANE_ALIASES: readonly LaneAlias[] = [
   {
     from: retiredPeerSubscriberKey(NURTURING_PIPELINE_NAME, "projectCreated"),
     to: toPeerMap(NURTURING_ORGANIZATION_ADMINS_PROJECTION_NAME),
+  },
+  ...[
+    "memberFoundedOrganization",
+    "memberSignedUp",
+    "memberInviteAccepted",
+    "memberRemoved",
+    "memberDisabled",
+    "memberEnabled",
+  ].map((lane) => ({
+    from: retiredPeerSubscriberKey(NURTURING_PROJECT_USAGE_PIPELINE_NAME, lane),
+    to: toPeerMap(NURTURING_ORGANIZATION_MEMBERS_PROJECTION_NAME),
+  })),
+  {
+    from: retiredPeerSubscriberKey(NURTURING_PROJECT_USAGE_PIPELINE_NAME, "memberSsoAutoAdded"),
+    to: toPeerMap(NURTURING_AUTH_MEMBERS_PROJECTION_NAME),
   },
 ];
 
@@ -895,6 +811,111 @@ export function nurturingOrganizationAdminsMap(
       eventTypes: [PROJECT_CREATED_EVENT_TYPE],
       map: ({ data }) => organizationAdminFactOf(data),
       store: { append: (fact) => admins.recordAdminFact(fact) },
+    },
+  };
+}
+
+const ORGANIZATION_MEMBER_EVENTS = [
+  { type: ORGANIZATION_CREATED_EVENT_TYPE, data: organizationCreatedEventDataSchema },
+  { type: ORGANIZATION_SIGNED_UP_EVENT_TYPE, data: organizationSignedUpEventDataSchema },
+  { type: INVITE_ACCEPTED_EVENT_TYPE, data: inviteAcceptedEventDataSchema },
+  { type: ORGANIZATION_MEMBER_REMOVED_EVENT_TYPE, data: organizationMemberRemovedEventDataSchema },
+  {
+    type: ORGANIZATION_MEMBER_DISABLED_EVENT_TYPE,
+    data: organizationMemberDisabledEventDataSchema,
+  },
+  { type: ORGANIZATION_MEMBER_ENABLED_EVENT_TYPE, data: organizationMemberEnabledEventDataSchema },
+  { type: ORGANIZATION_MEMBER_LISTED_EVENT_TYPE, data: organizationMemberListedEventDataSchema },
+] as const;
+
+const AUTH_MEMBER_EVENTS = [
+  { type: SSO_AUTO_ADDED_EVENT_TYPE, data: ssoAutoAddedEventDataSchema },
+] as const;
+
+/** One owner member fact as nurturing's member copy keeps it: a join, a leave or a return. */
+export type NurturingMembershipFact = Readonly<{
+  organizationId: string;
+  userId: string;
+  change: NurturingMembershipChange;
+  at: number;
+}>;
+
+/**
+ * Organization's member fact as the copy keeps it, at the fact's time. A creation joins its
+ * founder, since an organization created for an existing user (`createAndAssign`) records no
+ * signup; a provisioned one names no founder and keeps nothing. A listed member joined when
+ * organization's membership row was created.
+ */
+export function organizationMembershipFactOf(
+  event: PeerEvent<typeof ORGANIZATION_MEMBER_EVENTS>,
+): NurturingMembershipFact | null {
+  const { organizationId, occurredAt } = event.data;
+  switch (event.type) {
+    case ORGANIZATION_CREATED_EVENT_TYPE: {
+      const { userId } = event.data;
+      return userId ? { organizationId, userId, change: "joined", at: occurredAt } : null;
+    }
+    case ORGANIZATION_SIGNED_UP_EVENT_TYPE:
+    case INVITE_ACCEPTED_EVENT_TYPE:
+      return { organizationId, userId: event.data.userId, change: "joined", at: occurredAt };
+    case ORGANIZATION_MEMBER_REMOVED_EVENT_TYPE:
+    case ORGANIZATION_MEMBER_DISABLED_EVENT_TYPE:
+      return { organizationId, userId: event.data.userId, change: "left", at: occurredAt };
+    case ORGANIZATION_MEMBER_ENABLED_EVENT_TYPE:
+      return { organizationId, userId: event.data.userId, change: "returned", at: occurredAt };
+    case ORGANIZATION_MEMBER_LISTED_EVENT_TYPE:
+      return {
+        organizationId,
+        userId: event.data.userId,
+        change: "joined",
+        at: event.data.joinedAt,
+      };
+  }
+}
+
+/**
+ * The member copy's store: one statement a fact, never a batch (no `bulkAppend`), since the
+ * write's erasure check and re-check read the marks each fact meets. Each change keeps its latest
+ * time, so a redelivered, late or replayed fact leaves the row as live delivery would.
+ */
+const memberStore = (
+  members: Pick<NurturingOrganizationMemberRepository, "recordMembershipChange">,
+) => ({ append: (fact: NurturingMembershipFact) => members.recordMembershipChange(fact) });
+
+/**
+ * Nurturing's own copy of who belongs to which organization, from organization's member facts
+ * (§9), including the members organization's own step listed from before it recorded them.
+ */
+export function nurturingOrganizationMembersMap(
+  members: Pick<NurturingOrganizationMemberRepository, "recordMembershipChange">,
+): PeerMapProjectionDeclaration<NurturingMembershipFact, typeof ORGANIZATION_MEMBER_EVENTS> {
+  return {
+    events: ORGANIZATION_MEMBER_EVENTS,
+    map: {
+      name: NURTURING_ORGANIZATION_MEMBERS_PROJECTION_NAME,
+      eventTypes: ORGANIZATION_MEMBER_EVENTS.map(({ type }) => type),
+      map: organizationMembershipFactOf,
+      store: memberStore(members),
+    },
+  };
+}
+
+/** The same copy from auth's single sign-on joins: one peer projection per owner pipeline. */
+export function nurturingAuthMembersMap(
+  members: Pick<NurturingOrganizationMemberRepository, "recordMembershipChange">,
+): PeerMapProjectionDeclaration<NurturingMembershipFact, typeof AUTH_MEMBER_EVENTS> {
+  return {
+    events: AUTH_MEMBER_EVENTS,
+    map: {
+      name: NURTURING_AUTH_MEMBERS_PROJECTION_NAME,
+      eventTypes: [SSO_AUTO_ADDED_EVENT_TYPE],
+      map: ({ data: { organizationId, userId, occurredAt } }) => ({
+        organizationId,
+        userId,
+        change: "joined",
+        at: occurredAt,
+      }),
+      store: memberStore(members),
     },
   };
 }

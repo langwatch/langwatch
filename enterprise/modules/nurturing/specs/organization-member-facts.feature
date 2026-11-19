@@ -228,34 +228,3 @@ Feature: An organization's session facts reach every active member in Customer.i
     Given the owners hold no organization for the project
     When a trace_received signal is delivered
     Then Customer.io identifies the signal's admin alone
-
-  @unit
-  Scenario: A dry run of the member backfill writes nothing
-    Given the owners hold active members the member copy lacks
-    When a person runs pnpm task nurturing-member-backfill without --execute
-    Then no row is written
-    And the counts of organizations, memberships, rows to create and rows already present are printed
-
-  @unit
-  Scenario: The member backfill creates a row for each current member the copy lacks
-    Given the owners hold an active member of an organization with no row in the member copy
-    When a person runs pnpm task nurturing-member-backfill --execute
-    Then the copy holds a join for that member, at the time the owners' membership was created
-
-  @unit
-  Scenario: The member backfill leaves a member whose row exists, and a second run changes nothing
-    Given the member copy holds a row for an active member, however old
-    When the member backfill runs with --execute, twice
-    Then that row is unchanged and the second run creates no row
-
-  @unit
-  Scenario: The member backfill does not bring back a member who left
-    Given the member copy holds a leave for a person the owners still list
-    When the member backfill runs with --execute
-    Then the person's row still records the leave and is not current
-
-  @integration
-  Scenario: The member backfill skips disabled members and deactivated users
-    Given an organization with an active member, a member whose membership is disabled and a member whose user is deactivated
-    When the owners' active members of that organization are read
-    Then only the active member is listed
