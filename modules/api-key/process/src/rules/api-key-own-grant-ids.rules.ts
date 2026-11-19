@@ -6,8 +6,7 @@
 import { createHash } from "node:crypto";
 
 import type { ApiKeyScope } from "@langwatch/api-key-contract";
-import { API_KEY_OWN_GRANT_COMMAND_PREFIX, GRANT_KSUID_RESOURCE } from "@langwatch/authz-contract";
-import { getEnvironment, Instance, Ksuid } from "@langwatch/ksuid";
+import { API_KEY_OWN_GRANT_COMMAND_PREFIX } from "@langwatch/authz-contract";
 import type { Instant } from "@langwatch/time";
 
 const scopeOf = (binding: ApiKeyScope) =>
@@ -35,8 +34,8 @@ export function ownGrantCommandId({
   return `${API_KEY_OWN_GRANT_COMMAND_PREFIX}${apiKeyId}:${digest}`;
 }
 
-/** A binding's id under that command id: a rolebinding KSUID dated by the key's creation. */
-export function ownGrantBindingId({
+/** The parts of a binding's KSUID, derived from the command id so every try yields the same id. */
+export function ownGrantBindingKsuidParts({
   commandId,
   binding,
   createdAt,
@@ -44,19 +43,13 @@ export function ownGrantBindingId({
   commandId: string;
   binding: ApiKeyScope;
   createdAt: Instant;
-}): string {
+}): { timestamp: number; instanceBytes: Uint8Array; sequenceId: number } {
   const digest = createHash("sha256")
     .update(JSON.stringify([commandId, scopeOf(binding)]))
     .digest();
-  return new Ksuid({
-    environment: getEnvironment(),
-    resource: GRANT_KSUID_RESOURCE,
+  return {
     timestamp: Math.floor(createdAt.epochMilliseconds / 1000),
-    instance: new Instance(
-      Instance.schemes.RANDOM,
-      new Uint8Array(digest.buffer, digest.byteOffset, 8),
-    ),
+    instanceBytes: new Uint8Array(digest.buffer, digest.byteOffset, 8),
     sequenceId: digest.readUInt32BE(8),
-    layout: "v2",
-  }).toString();
+  };
 }

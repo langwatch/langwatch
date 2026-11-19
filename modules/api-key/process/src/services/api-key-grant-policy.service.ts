@@ -6,6 +6,7 @@ import {
   type ApiKeyScope,
 } from "@langwatch/api-key-contract";
 import {
+  GRANT_KSUID_RESOURCE,
   bindingScopeCanGrantPermission,
   permissionsConferred,
   type AuthzAccessBinding,
@@ -13,11 +14,15 @@ import {
   type AuthzGrantCaller,
   type AuthzPrincipalRef,
 } from "@langwatch/authz-contract";
+import { getEnvironment, Instance, Ksuid } from "@langwatch/ksuid";
 import { MemberNotFoundError } from "@langwatch/organization-contract";
 import { isAggregateProjectKind } from "@langwatch/project-contract";
 import { type Instant, Temporal, fromDate, nowInstant } from "@langwatch/time";
 
-import { ownGrantBindingId, ownGrantCommandId } from "../rules/api-key-own-grant-ids.rules.ts";
+import {
+  ownGrantBindingKsuidParts,
+  ownGrantCommandId,
+} from "../rules/api-key-own-grant-ids.rules.ts";
 import type { ApiKeyDependencies } from "./api-key.service.ts";
 
 /**
@@ -28,6 +33,23 @@ const createFact = ({ commandId, createdAt }: { commandId: string; createdAt: In
   commandId,
   occurredAtMs: createdAt.epochMilliseconds,
 });
+
+/** A binding's id under the create's command id: a rolebinding KSUID dated by the key's create. */
+function ownGrantBindingId(input: {
+  commandId: string;
+  binding: ApiKeyScope;
+  createdAt: Instant;
+}): string {
+  const { timestamp, instanceBytes, sequenceId } = ownGrantBindingKsuidParts(input);
+  return new Ksuid({
+    environment: getEnvironment(),
+    resource: GRANT_KSUID_RESOURCE,
+    timestamp,
+    instance: new Instance(Instance.schemes.RANDOM, instanceBytes),
+    sequenceId,
+    layout: "v2",
+  }).toString();
+}
 
 type ResolvedScope =
   | { type: "organization"; id: string; organizationId: string }
