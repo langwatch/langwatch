@@ -6,11 +6,11 @@
  */
 import { context, ROOT_CONTEXT, trace } from "@opentelemetry/api";
 import {
-  BasicTracerProvider,
+  TracerProvider,
   InMemorySpanExporter,
   type ReadableSpan,
   SimpleSpanProcessor,
-} from "@opentelemetry/sdk-trace-base";
+} from "@opentelemetry/sdk-trace";
 import { ATTR_HTTP_ROUTE, ATTR_URL_PATH } from "@opentelemetry/semantic-conventions";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
@@ -24,8 +24,8 @@ import { resetNavigationForTesting, startNavigationSpan } from "./navigation.ts"
 import { NavigationContextManager } from "./navigationContextManager.ts";
 
 const exporter = new InMemorySpanExporter();
-const provider = new BasicTracerProvider({
-  spanProcessors: [new SimpleSpanProcessor(exporter)],
+const provider = new TracerProvider({
+  spanProcessors: [new SimpleSpanProcessor({ exporter })],
 });
 const contextManager = new NavigationContextManager();
 

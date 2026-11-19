@@ -83,6 +83,11 @@ langwatch.setup(
 
 ### TypeScript Setup
 
+<Note>
+  langwatch 3.x needs OpenTelemetry JS 3.x (`@opentelemetry/api` 1.10, `@opentelemetry/sdk-trace`
+  3.x). If your app is still on OpenTelemetry JS 2.x, stay on langwatch 2.x.
+</Note>
+
 <CodeGroup>
 
 ```typescript Basic TypeScript Setup
@@ -104,8 +109,7 @@ process.on("SIGTERM", async () => {
 
 ```typescript TypeScript with Custom Configuration
 import { setupObservability } from "langwatch/observability/node";
-import { BatchSpanProcessor } from "@opentelemetry/sdk-trace-base";
-import { ConsoleSpanExporter } from "@opentelemetry/sdk-trace-base";
+import { BatchSpanProcessor, ConsoleSpanExporter } from "@opentelemetry/sdk-trace";
 
 const handle = setupObservability({
   langwatch: {
@@ -113,7 +117,7 @@ const handle = setupObservability({
     processorType: "batch",
   },
   serviceName: "my-service",
-  spanProcessors: [new BatchSpanProcessor(new ConsoleSpanExporter())],
+  spanProcessors: [new BatchSpanProcessor({ exporter: new ConsoleSpanExporter() })],
 });
 ```
 
@@ -335,8 +339,8 @@ langwatch.setup(
 
 ```typescript TypeScript with Multiple Exporters
 import { setupObservability } from "langwatch/observability/node";
-import { BatchSpanProcessor } from "@opentelemetry/sdk-trace-base";
-import { JaegerExporter } from "@opentelemetry/exporter-jaeger";
+import { BatchSpanProcessor } from "@opentelemetry/sdk-trace";
+import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-proto";
 import { LangWatchExporter } from "langwatch";
 
 const handle = setupObservability({
@@ -344,17 +348,17 @@ const handle = setupObservability({
   serviceName: "my-service",
   spanProcessors: [
     // Send to Jaeger for debugging
-    new BatchSpanProcessor(
-      new JaegerExporter({
-        endpoint: "http://localhost:14268/api/v1/traces",
+    new BatchSpanProcessor({
+      exporter: new OTLPTraceExporter({
+        url: "http://localhost:4318/v1/traces", // Jaeger's OTLP receiver
       }),
-    ),
+    }),
     // Send to LangWatch for production monitoring
-    new BatchSpanProcessor(
-      new LangWatchExporter({
+    new BatchSpanProcessor({
+      exporter: new LangWatchExporter({
         apiKey: process.env.LANGWATCH_API_KEY,
       }),
-    ),
+    }),
   ],
 });
 ```
@@ -438,7 +442,7 @@ langwatch.setup(
 
 ```typescript TypeScript Sampling Configuration
 import { setupObservability } from "langwatch/observability/node";
-import { TraceIdRatioBasedSampler, ParentBasedSampler } from "@opentelemetry/sdk-trace-base";
+import { TraceIdRatioBasedSampler, ParentBasedSampler } from "@opentelemetry/sdk-trace";
 
 const handle = setupObservability({
   langwatch: {
@@ -451,13 +455,12 @@ const handle = setupObservability({
 
 ```typescript TypeScript Performance Tuning
 import { setupObservability } from "langwatch/observability/node";
-import { TraceIdRatioBasedSampler } from "@opentelemetry/sdk-trace-base";
+import { BatchSpanProcessor, TraceIdRatioBasedSampler } from "@opentelemetry/sdk-trace";
+import { LangWatchExporter } from "langwatch";
 
 const handle = setupObservability({
-  langwatch: {
-    apiKey: process.env.LANGWATCH_API_KEY,
-    processorType: "batch",
-  },
+  // The tuned processor below is the only LangWatch export path
+  langwatch: "disabled",
   serviceName: "my-service",
 
   // Performance tuning
@@ -472,17 +475,15 @@ const handle = setupObservability({
 
   // Batch processing configuration
   spanProcessors: [
-    new BatchSpanProcessor(
-      new LangWatchExporter({
+    new BatchSpanProcessor({
+      exporter: new LangWatchExporter({
         apiKey: process.env.LANGWATCH_API_KEY,
       }),
-      {
-        maxQueueSize: 4096,
-        maxExportBatchSize: 1024,
-        scheduledDelayMillis: 1000,
-        exportTimeoutMillis: 30000,
-      },
-    ),
+      maxQueueSize: 4096,
+      maxExportBatchSize: 1024,
+      scheduledDelayMillis: 1000,
+      exportTimeoutMillis: 30000,
+    }),
   ],
 });
 ```
@@ -790,14 +791,14 @@ with langwatch.span(name="MyInitialSpanName") as span:
 
 ```typescript TypeScript Console Exporter for Debugging
 import { setupObservability } from "langwatch/observability/node";
-import { ConsoleSpanExporter } from "@opentelemetry/sdk-trace-base";
+import { ConsoleSpanExporter, SimpleSpanProcessor } from "@opentelemetry/sdk-trace";
 
 const handle = setupObservability({
   langwatch: {
     apiKey: process.env.LANGWATCH_API_KEY,
   },
   serviceName: "my-service",
-  spanProcessors: [new ConsoleSpanExporter()],
+  spanProcessors: [new SimpleSpanProcessor({ exporter: new ConsoleSpanExporter() })],
   debug: {
     consoleTracing: true,
     consoleLogging: true,

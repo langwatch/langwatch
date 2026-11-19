@@ -13,7 +13,7 @@ import {
   SimpleSpanProcessor,
   BatchSpanProcessor,
   type SpanProcessor,
-} from "@opentelemetry/sdk-trace-base";
+} from "@opentelemetry/sdk-trace";
 
 import { resolveEndpoint } from "@/internal/endpoint";
 
@@ -22,6 +22,10 @@ import { braidSpanProcessors } from "../../braids";
 import { initializeObservabilitySdkConfig } from "../../config";
 import { LangWatchLogsExporter, LangWatchTraceExporter } from "../../exporters";
 import { setLangWatchLoggerProvider } from "../../logger";
+import {
+  getBatchLogRecordProcessorOptionsFromEnv,
+  getBatchSpanProcessorOptionsFromEnv,
+} from "../../otel-env";
 import {
   callMember,
   createMergedResource,
@@ -403,8 +407,11 @@ function setupDedicatedProvider(
 
     const processor =
       langwatch.processorType === "batch"
-        ? new BatchSpanProcessor(traceExporter)
-        : new SimpleSpanProcessor(traceExporter);
+        ? new BatchSpanProcessor({
+            ...getBatchSpanProcessorOptionsFromEnv(),
+            exporter: traceExporter,
+          })
+        : new SimpleSpanProcessor({ exporter: traceExporter });
 
     addedProcessors.push(processor);
     addProcessor(processor);
@@ -412,7 +419,7 @@ function setupDedicatedProvider(
   }
 
   if (options.traceExporter) {
-    const p = new SimpleSpanProcessor(options.traceExporter);
+    const p = new SimpleSpanProcessor({ exporter: options.traceExporter });
     addedProcessors.push(p);
     addProcessor(p);
   }
@@ -486,8 +493,11 @@ function attachToExistingProvider(
 
     const processor =
       langwatch.processorType === "batch"
-        ? new BatchSpanProcessor(traceExporter)
-        : new SimpleSpanProcessor(traceExporter);
+        ? new BatchSpanProcessor({
+            ...getBatchSpanProcessorOptionsFromEnv(),
+            exporter: traceExporter,
+          })
+        : new SimpleSpanProcessor({ exporter: traceExporter });
 
     addedProcessors.push(processor);
     addProcessor(processor);
@@ -495,7 +505,7 @@ function attachToExistingProvider(
   }
 
   if (options.traceExporter) {
-    const traceExporterProcessor = new SimpleSpanProcessor(options.traceExporter);
+    const traceExporterProcessor = new SimpleSpanProcessor({ exporter: options.traceExporter });
     addedProcessors.push(traceExporterProcessor);
     addProcessor(traceExporterProcessor);
     logger.debug("Attached user-provided traceExporter to existing provider");
@@ -541,13 +551,13 @@ function applyNextJsProviderWorkaround(logger: Logger): void {
         // Access the real provider from the delegate
         const realProvider: unknown = Reflect.get(globalProvider, "_delegate");
 
-        if (isNodeTracerProvider(realProvider)) {
+        if (isAttachableTracerProvider(realProvider)) {
           // Explicitly register the real provider globally
           trace.setGlobalTracerProvider(realProvider);
-          logger.info("Successfully registered NodeTracerProvider globally for Next.js 15");
+          logger.info("Successfully registered the tracer provider globally for Next.js 15");
         } else {
           logger.error(
-            "Could not find NodeTracerProvider in proxy delegate - spans may not be exported",
+            "Could not find a tracer provider in the proxy delegate - spans may not be exported",
           );
         }
       } else {
@@ -579,7 +589,7 @@ export function createAndStartNodeSdk(
 
   // Console processors
   if (options.debug?.consoleTracing) {
-    spanProcessors.push(new SimpleSpanProcessor(new ConsoleSpanExporter()));
+    spanProcessors.push(new SimpleSpanProcessor({ exporter: new ConsoleSpanExporter() }));
     logger.debug("Console tracing enabled; adding console span exporter");
   }
   if (options.debug?.consoleLogging) {
@@ -598,13 +608,23 @@ export function createAndStartNodeSdk(
     });
 
     if (langwatch.processorType === "batch") {
-      spanProcessors.push(new BatchSpanProcessor(traceExporter));
-      logProcessors.push(new BatchLogRecordProcessor({ exporter: logExporter }));
+      spanProcessors.push(
+        new BatchSpanProcessor({
+          ...getBatchSpanProcessorOptionsFromEnv(),
+          exporter: traceExporter,
+        }),
+      );
+      logProcessors.push(
+        new BatchLogRecordProcessor({
+          ...getBatchLogRecordProcessorOptionsFromEnv(),
+          exporter: logExporter,
+        }),
+      );
       logger.debug(
         `Added LangWatch ${langwatch.processorType} SpanProcessor and LogRecordProcessor to SDK`,
       );
     } else {
-      spanProcessors.push(new SimpleSpanProcessor(traceExporter));
+      spanProcessors.push(new SimpleSpanProcessor({ exporter: traceExporter }));
       logProcessors.push(new SimpleLogRecordProcessor({ exporter: logExporter }));
       logger.debug(
         `Added LangWatch ${langwatch.processorType} SpanProcessor and LogRecordProcessor to SDK`,
@@ -613,7 +633,7 @@ export function createAndStartNodeSdk(
   }
 
   if (options.traceExporter) {
-    spanProcessors.push(new SimpleSpanProcessor(options.traceExporter));
+    spanProcessors.push(new SimpleSpanProcessor({ exporter: options.traceExporter }));
     logger.debug(`Added user-provided SpanProcessor to SDK`);
   }
 
@@ -712,8 +732,7 @@ export const ensureSetup = (): ObservabilityHandle => {
   return setupObservability();
 };
 
-function isNodeTracerProvider(value: unknown): value is apiModule.TracerProvider {
-  return (
-    typeof value === "object" && value !== null && value.constructor.name === "NodeTracerProvider"
-  );
+/** Matched by shape, not class name: OpenTelemetry JS 3.x has one `TracerProvider`. */
+function isAttachableTracerProvider(value: unknown): value is apiModule.TracerProvider {
+  return isConcreteProvider(value) && typeof readMember(value, "getTracer") === "function";
 }

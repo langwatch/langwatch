@@ -2,7 +2,7 @@ import { ChatPromptTemplate } from "@langchain/core/prompts";
 import { DynamicStructuredTool } from "@langchain/core/tools";
 import { ChatOpenAI } from "@langchain/openai";
 import { SpanStatusCode, trace } from "@opentelemetry/api";
-import { InMemorySpanExporter, SimpleSpanProcessor } from "@opentelemetry/sdk-trace-base";
+import { InMemorySpanExporter, SimpleSpanProcessor } from "@opentelemetry/sdk-trace";
 import { AgentExecutor, createToolCallingAgent } from "langchain/agents";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { z } from "zod";
@@ -31,7 +31,7 @@ describe.skipIf(!RUN_EXTERNAL)("LangChain Integration Tests", () => {
   beforeEach(async () => {
     // Reset OpenTelemetry global state
     spanExporter = new InMemorySpanExporter();
-    spanProcessor = new SimpleSpanProcessor(spanExporter);
+    spanProcessor = new SimpleSpanProcessor({ exporter: spanExporter });
 
     observabilityHandle = createIntegrationObservability({
       serviceName: "langchain-integration-test",

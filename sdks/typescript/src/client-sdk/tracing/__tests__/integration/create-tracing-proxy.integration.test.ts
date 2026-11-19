@@ -1,5 +1,5 @@
 import { SpanStatusCode, trace } from "@opentelemetry/api";
-import { InMemorySpanExporter, SimpleSpanProcessor } from "@opentelemetry/sdk-trace-base";
+import { InMemorySpanExporter, SimpleSpanProcessor } from "@opentelemetry/sdk-trace";
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 
 import { getLangWatchTracer } from "../../../../observability-sdk";
@@ -21,7 +21,7 @@ describe("createTracingProxy Integration Tests", () => {
 
     // Create in-memory exporter to capture actual span data
     spanExporter = new InMemorySpanExporter();
-    spanProcessor = new SimpleSpanProcessor(spanExporter);
+    spanProcessor = new SimpleSpanProcessor({ exporter: spanExporter });
 
     // Setup observability with real OpenTelemetry SDK.
     // `langwatch: "disabled"` prevents the default BatchSpanProcessor + LangWatchTraceExporter

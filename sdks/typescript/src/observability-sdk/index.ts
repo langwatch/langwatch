@@ -1,3 +1,5 @@
+import "../internal/otel-api-guard";
+
 export { FilterableBatchSpanProcessor, type SpanProcessingExcludeRule } from "./processors";
 export {
   LangWatchExporter,

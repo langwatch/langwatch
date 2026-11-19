@@ -5,9 +5,18 @@
 
 import { type AgentInput, AgentRole } from "@langwatch/scenario";
 import type { HttpAgentData } from "@langwatch/scenario-contract";
-import { context, trace } from "@opentelemetry/api";
-import { InMemorySpanExporter, SimpleSpanProcessor } from "@opentelemetry/sdk-trace-base";
-import { NodeTracerProvider } from "@opentelemetry/sdk-trace-node";
+import { context, propagation, trace } from "@opentelemetry/api";
+import { AsyncLocalStorageContextManager } from "@opentelemetry/context-async-hooks";
+import {
+  CompositePropagator,
+  W3CBaggagePropagator,
+  W3CTraceContextPropagator,
+} from "@opentelemetry/core";
+import {
+  InMemorySpanExporter,
+  SimpleSpanProcessor,
+  TracerProvider,
+} from "@opentelemetry/sdk-trace";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
 import { createOtelEchoServer } from "./support/otel-echo-server.ts";
@@ -16,19 +25,24 @@ import { createNativeHttpAgentAdapter } from "./support/test-scenario-http.fixtu
 const W3C_TRACEPARENT_REGEX = /^00-([a-f0-9]{32})-([a-f0-9]{16})-([0-9]{2})$/;
 
 describe("HTTP trace context propagation", () => {
-  let provider: NodeTracerProvider;
+  let provider: TracerProvider;
   let exporter: InMemorySpanExporter;
   let echoServer: Awaited<ReturnType<typeof createOtelEchoServer>>;
 
   beforeAll(async () => {
-    // Set up real TracerProvider with in-memory exporter.
-    // NodeTracerProvider.register() sets up both the global tracer provider
-    // and the W3C trace context propagator automatically.
+    // A real TracerProvider with an in-memory exporter, registered globally
+    // with the async context manager and the W3C propagators.
     exporter = new InMemorySpanExporter();
-    provider = new NodeTracerProvider({
-      spanProcessors: [new SimpleSpanProcessor(exporter)],
+    provider = new TracerProvider({
+      spanProcessors: [new SimpleSpanProcessor({ exporter })],
     });
-    provider.register();
+    trace.setGlobalTracerProvider(provider);
+    context.setGlobalContextManager(new AsyncLocalStorageContextManager().enable());
+    propagation.setGlobalPropagator(
+      new CompositePropagator({
+        propagators: [new W3CTraceContextPropagator(), new W3CBaggagePropagator()],
+      }),
+    );
 
     echoServer = await createOtelEchoServer();
   });

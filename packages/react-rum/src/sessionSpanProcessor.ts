@@ -2,7 +2,7 @@
 // attribute) because the session rotates while the page is open. See ADR-058.
 
 import type { Context } from "@opentelemetry/api";
-import type { ReadableSpan, Span, SpanProcessor } from "@opentelemetry/sdk-trace-base";
+import type { ReadableSpan, Span, SpanProcessor } from "@opentelemetry/sdk-trace";
 import { ATTR_SESSION_ID } from "@opentelemetry/semantic-conventions/incubating";
 
 import { currentSessionId } from "./session.ts";

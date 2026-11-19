@@ -5,7 +5,7 @@
  */
 
 import { type Context, trace } from "@opentelemetry/api";
-import { StackContextManager } from "@opentelemetry/sdk-trace-web";
+import { StackContextManager } from "@opentelemetry/sdk-trace";
 
 let ambient: Context | undefined;
 

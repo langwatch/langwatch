@@ -1,14 +1,14 @@
 # Vercel AI SDK with LangWatch Observability
 
-This example demonstrates how to use the Vercel AI SDK with LangWatch observability, supporting both LangWatch's native instrumentation and Vercel's OTEL instrumentation.
+This example runs an interactive chatbot on the Vercel AI SDK and traces it with LangWatch's own
+`setupObservability()`.
 
 ## Features
 
-- 🤖 Interactive AI chatbot using Vercel AI SDK
-- 📊 LangWatch observability integration
-- 🔄 Support for both LangWatch and Vercel OTEL instrumentation
-- 🎨 Markdown formatting for AI responses
-- 🧵 Thread-based conversation tracking
+- Interactive AI chatbot using the Vercel AI SDK
+- LangWatch observability through `setupObservability()`
+- Markdown formatting for AI responses
+- Thread-based conversation tracking
 
 ## Setup
 
@@ -22,47 +22,20 @@ npm install
 
 ```bash
 cp .env.example .env
-# Edit .env with your OpenAI API key
+# Edit .env with your OpenAI and LangWatch API keys
 ```
 
 ## Usage
 
-### LangWatch Instrumentation (Default)
-
-Run with LangWatch's native observability setup:
-
 ```bash
-npm run start:langwatch
+npm start
 ```
 
-Or directly with ts-node:
+## Why not `@vercel/otel`
 
-```bash
-npx ts-node --require ./src/instrumentation.ts src/index.ts
-```
-
-### Vercel OTEL Instrumentation
-
-Run with Vercel's OTEL instrumentation:
-
-```bash
-npm run start:vercel
-```
-
-Or directly with ts-node:
-
-```bash
-VERCEL=1 npx ts-node --require ./src/instrumentation.ts src/index.ts
-```
-
-## How It Works
-
-The unified instrumentation file (`src/instrumentation.ts`) automatically detects the environment:
-
-- **LangWatch Mode**: Uses `setupObservability()` from LangWatch
-- **Vercel Mode**: Uses `registerOTel()` with LangWatch's trace exporter
-
-The application automatically switches based on the `VERCEL` environment variable.
+langwatch 3.x runs on OpenTelemetry JS 3.x, and `@vercel/otel` (2.3.0 and earlier) needs
+OpenTelemetry JS 2.x. To register through `registerOTel()` with `LangWatchExporter`, stay on
+langwatch 2.x. `setupObservability()` gives the AI SDK's telemetry spans the same LangWatch export.
 
 ## Conversation Flow
 
@@ -78,21 +51,10 @@ The application automatically switches based on the `VERCEL` environment variabl
 - **Error Handling**: Errors are captured and logged
 - **Telemetry**: Vercel AI SDK telemetry is enabled
 
-## Files Structure
-
-```
-src/
-├── index.ts                    # Main application logic
-├── instrumentation.ts          # Unified instrumentation setup
-├── instrumentation-langwatch.ts # LangWatch-only instrumentation
-└── instrumentation-vercel.ts   # Vercel OTEL instrumentation
-```
-
 ## Environment Variables
 
 - `OPENAI_API_KEY`: Your OpenAI API key
-- `VERCEL`: Set to "1" to enable Vercel OTEL mode
-- `LANGWATCH_API_KEY`: Your LangWatch API key (optional)
+- `LANGWATCH_API_KEY`: Your LangWatch API key
 
 ## Troubleshooting
 

@@ -23,7 +23,7 @@ import {
   type Sampler,
   type SpanExporter,
   type SpanProcessor,
-} from "@opentelemetry/sdk-trace-base";
+} from "@opentelemetry/sdk-trace";
 
 import { createAuthoritativeOtlpConfiguration } from "./otlp-configuration.ts";
 
@@ -55,7 +55,7 @@ export function otlpSpanProcessors({ endpoint, headers }: OtlpTraceExportOptions
     ),
   );
 
-  return [new BatchSpanProcessor(exporter)];
+  return [new BatchSpanProcessor({ exporter })];
 }
 
 /**

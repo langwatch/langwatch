@@ -63,19 +63,23 @@ def chat(user_message: str):
 ## TypeScript
 
 ```bash
-npm install langwatch @opentelemetry/sdk-trace-node
+npm install langwatch @opentelemetry/sdk-trace
 ```
 
-Pass a dedicated `NodeTracerProvider` via the `tracerProvider` option.
+<Note>
+langwatch 3.x needs OpenTelemetry JS 3.x (`@opentelemetry/api` 1.10). If your app is still on OpenTelemetry JS 2.x, stay on langwatch 2.x.
+</Note>
+
+Pass a dedicated `TracerProvider` via the `tracerProvider` option.
 LangWatch attaches its exporter to it and skips global provider detection:
 
 ```typescript
-import { NodeTracerProvider } from "@opentelemetry/sdk-trace-node";
+import { TracerProvider } from "@opentelemetry/sdk-trace";
 import { setupObservability } from "langwatch/observability/node";
 
 // The other OTel SDK initializes first and owns the global provider.
 // Create a dedicated provider for LangWatch:
-const lwProvider = new NodeTracerProvider();
+const lwProvider = new TracerProvider();
 
 setupObservability({
   tracerProvider: lwProvider,

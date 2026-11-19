@@ -4,10 +4,10 @@ import { HandledError } from "@langwatch/handled-error";
 import { createRecordingMeterProvider } from "@langwatch/observability/metrics/testing";
 import { type Span, SpanStatusCode } from "@opentelemetry/api";
 import {
-  BasicTracerProvider,
+  TracerProvider,
   InMemorySpanExporter,
   SimpleSpanProcessor,
-} from "@opentelemetry/sdk-trace-base";
+} from "@opentelemetry/sdk-trace";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -104,8 +104,8 @@ describe("recordIngestDoorRefusal", () => {
 describe("withClientFaultSpan", () => {
   /** A real tracer, so the asserted status is what the SDK records, not what a double claims. */
   const exporter = new InMemorySpanExporter();
-  const tracer = new BasicTracerProvider({
-    spanProcessors: [new SimpleSpanProcessor(exporter)],
+  const tracer = new TracerProvider({
+    spanProcessors: [new SimpleSpanProcessor({ exporter })],
   }).getTracer("door-refusal-test");
   const open = <T>(run: (span: Span) => Promise<T>) => tracer.startActiveSpan("receiver", run);
   const recorded = () => {

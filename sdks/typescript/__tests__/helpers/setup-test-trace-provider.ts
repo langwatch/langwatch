@@ -2,14 +2,14 @@ import { trace } from "@opentelemetry/api";
 import {
   InMemorySpanExporter,
   SimpleSpanProcessor,
-  NodeTracerProvider,
+  TracerProvider,
   type ReadableSpan,
-} from "@opentelemetry/sdk-trace-node";
+} from "@opentelemetry/sdk-trace";
 
 export function setupTestTraceProvider() {
   const spanExporter = new InMemorySpanExporter();
-  const spanProcessor = new SimpleSpanProcessor(spanExporter);
-  const tracerProvider = new NodeTracerProvider({
+  const spanProcessor = new SimpleSpanProcessor({ exporter: spanExporter });
+  const tracerProvider = new TracerProvider({
     spanProcessors: [spanProcessor],
   });
 

@@ -1,4 +1,4 @@
-import { type ReadableSpan } from "@opentelemetry/sdk-trace-node";
+import { type ReadableSpan } from "@opentelemetry/sdk-trace";
 import { describe, expect, it, beforeAll, beforeEach } from "vitest";
 
 import { type LangWatch, attributes } from "../../../dist/index.js";

@@ -4,21 +4,24 @@
  * Auto-instrumentation via the global API is NOT isolated by this.
  */
 
-import { trace } from "@opentelemetry/api";
-import { SimpleSpanProcessor, ConsoleSpanExporter } from "@opentelemetry/sdk-trace-base";
-import { NodeTracerProvider } from "@opentelemetry/sdk-trace-node";
+import { context, trace } from "@opentelemetry/api";
+import { AsyncLocalStorageContextManager } from "@opentelemetry/context-async-hooks";
+import { ConsoleSpanExporter, SimpleSpanProcessor, TracerProvider } from "@opentelemetry/sdk-trace";
 
 // ── Step 1: Simulate another OTel SDK initializing first ────────────
-const externalProvider = new NodeTracerProvider({
-  spanProcessors: [new SimpleSpanProcessor(new ConsoleSpanExporter())],
+// 3.x has no NodeTracerProvider.register(): the context manager that carries
+// the active span across `await` is registered on its own.
+context.setGlobalContextManager(new AsyncLocalStorageContextManager().enable());
+const externalProvider = new TracerProvider({
+  spanProcessors: [new SimpleSpanProcessor({ exporter: new ConsoleSpanExporter() })],
 });
-externalProvider.register();
+trace.setGlobalTracerProvider(externalProvider);
 console.log("[External SDK] Global TracerProvider registered.\n");
 
 // ── Step 2: Create a dedicated provider for LangWatch ───────────────
 import { setupObservability } from "langwatch/observability/node";
 
-const lwProvider = new NodeTracerProvider();
+const lwProvider = new TracerProvider();
 
 const { shutdown } = setupObservability({
   tracerProvider: lwProvider,

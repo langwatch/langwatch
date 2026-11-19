@@ -1,5 +1,5 @@
 import { SpanStatusCode, trace } from "@opentelemetry/api";
-import { InMemorySpanExporter, SimpleSpanProcessor } from "@opentelemetry/sdk-trace-base";
+import { InMemorySpanExporter, SimpleSpanProcessor } from "@opentelemetry/sdk-trace";
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 
 import { getLangWatchTracer } from "../..";
@@ -48,7 +48,7 @@ describe("Tracer Integration Tests", () => {
 
     // Create in-memory exporter to capture actual span data
     spanExporter = new InMemorySpanExporter();
-    spanProcessor = new SimpleSpanProcessor(spanExporter);
+    spanProcessor = new SimpleSpanProcessor({ exporter: spanExporter });
 
     // Setup observability with real OpenTelemetry SDK
     // Use spanProcessors instead of traceExporter as we don't want to wrap in a BatchSpanProcessor
@@ -128,11 +128,10 @@ describe("Tracer Integration Tests", () => {
       const eventNames = span.events.map((e) => e.name);
       expect(eventNames).toContain("hehe");
 
-      // Verify event data format
+      // OpenTelemetry JS 3.x leaves `attributes` off an event recorded without any.
       const userEvent = span.events.find((e) => e.name === "hehe");
-      if (!userEvent?.attributes) {
-        throw new Error("Expected user event with attributes");
-      }
+      expect(userEvent).toBeDefined();
+      expect(userEvent?.attributes ?? {}).toEqual({});
     });
 
     it("handles nested spans with proper parent-child relationships", async () => {
