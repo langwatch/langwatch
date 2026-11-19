@@ -226,6 +226,18 @@ describe("the personal Sessions table", () => {
       expect(screen.getByRole("button", { name: "Open pull request #4218" })).toBeInTheDocument();
     });
 
+    /** @scenario "Active and waiting time, and compactions and cache rebuilds, share one text size" */
+    it("draws active and waiting time, and compactions and rebuilds, at one text size", () => {
+      pinSessions([sessionRow()]);
+
+      renderTable();
+
+      const fontSizeOf = (text: string) => getComputedStyle(screen.getByText(text)).fontSize;
+      expect(fontSizeOf("4h 12m active")).not.toBe("");
+      expect(fontSizeOf("38m waiting")).toBe(fontSizeOf("4h 12m active"));
+      expect(fontSizeOf("2 cache rebuilds")).toBe(fontSizeOf("3 compactions"));
+    });
+
     it("explains what the two context figures each count", async () => {
       pinSessions([sessionRow()]);
       const user = userEvent.setup();

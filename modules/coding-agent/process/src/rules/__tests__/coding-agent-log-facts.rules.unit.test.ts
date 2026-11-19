@@ -8,6 +8,7 @@
 
 import type { ContributeLogFactsCommandData } from "@langwatch/coding-agent-contract";
 import {
+  SESSION_NAME_FACT_KEY,
   SESSION_TITLE_FACT_KEY,
   SESSION_TITLE_FALLBACK_FACT_KEY,
 } from "@langwatch/coding-agent-contract";
@@ -549,6 +550,52 @@ describe("liftLogContribution", () => {
 
       expect(dispatched).toHaveLength(1);
       expect(dispatched[0]!.facts[SESSION_TITLE_FALLBACK_FACT_KEY]).toBeUndefined();
+    });
+  });
+
+  describe("when the launcher names the session in the resource attributes", () => {
+    const promptEvent = ({
+      resourceName,
+      recordName,
+    }: {
+      resourceName: string;
+      recordName?: string;
+    }) =>
+      canonicalLogRecord({
+        attributes: {
+          "event.name": "user_prompt",
+          "session.id": "sess-named",
+          prompt: "## Your skills\nInstalled: triage.",
+          ...(recordName === undefined ? {} : { "langwatch.session.name": recordName }),
+        },
+        resourceAttributes: { "service.version": "2.0.1", "langwatch.session.name": resourceName },
+      });
+
+    /** @scenario A launcher names its sessions through the resource attributes */
+    it("contributes the resource's name", () => {
+      const { lift, dispatched } = makeLift();
+
+      lift(promptEvent({ resourceName: "Scout" }));
+
+      expect(dispatched[0]!.facts[SESSION_NAME_FACT_KEY]).toBe("Scout");
+    });
+
+    /** @scenario A name on the record itself outranks the resource's name */
+    it("keeps the record's own name", () => {
+      const { lift, dispatched } = makeLift();
+
+      lift(promptEvent({ resourceName: "Scout", recordName: "pr-reviewer" }));
+
+      expect(dispatched[0]!.facts[SESSION_NAME_FACT_KEY]).toBe("pr-reviewer");
+    });
+
+    /** @scenario A blank resource name names nothing */
+    it("contributes no name for a whitespace resource name", () => {
+      const { lift, dispatched } = makeLift();
+
+      lift(promptEvent({ resourceName: "   " }));
+
+      expect(dispatched[0]!.facts[SESSION_NAME_FACT_KEY]).toBeUndefined();
     });
   });
 

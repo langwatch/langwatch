@@ -103,7 +103,18 @@ export class CodingAgentSessionLogProjection {
     const event = normalizeEventName(this.stateProjection.coerceString(attrs["event.name"]));
     if (event === null) return state;
 
-    const base = this.stateProjection.withIdentity(state, attrs);
+    // A launcher's name (OTEL_RESOURCE_ATTRIBUTES) rides every record and names
+    // an unnamed session; only the context record renames, so a harness rename
+    // is never undone by the next record that still carries the launcher's name.
+    const identified = this.stateProjection.withIdentity(state, attrs);
+    const base =
+      event === LANGWATCH.EVENT.SESSION_CONTEXT || identified.titleSource === "name"
+        ? identified
+        : this.stateProjection.withTitle({
+            state: identified,
+            value: this.stateProjection.coerceString(attrs[LANGWATCH.ATTR.NAME]),
+            source: "name",
+          });
 
     switch (event) {
       case CLAUDE.EVENT.USER_PROMPT:
