@@ -24,6 +24,7 @@ import {
   type DocsPlaygroundPolicy,
   type OrganizationCurrency,
   ORGANIZATION_KIND,
+  personalTeamName,
 } from "@langwatch/organization-contract";
 import { skipTenantCheck } from "@langwatch/prisma-client";
 import { Prisma, type PrismaClient, type Team } from "@langwatch/prisma-client/generated";
@@ -814,7 +815,7 @@ export class PrismaOrganizationRepository extends OrganizationRepository {
     const team = await transaction.team.create({
       data: {
         id: resources.teamId,
-        name: `${displayLabel}'s Workspace`,
+        name: personalTeamName({ ownerLabel: displayLabel }),
         slug: resources.teamSlug,
         organizationId: input.organizationId,
         isPersonal: true,

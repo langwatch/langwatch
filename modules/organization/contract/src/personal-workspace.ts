@@ -251,3 +251,18 @@ export const personalWorkspaceFeaturesChangedEventDataSchema: PersonalWorkspaceF
 export type PersonalWorkspaceFeaturesChangedEventData = z.infer<
   typeof personalWorkspaceFeaturesChangedEventDataSchema
 >;
+
+const PERSONAL_TEAM_SUFFIX = "'s Workspace";
+
+/** A personal team's name, "Sam Lee's Workspace"; {@link personalTeamOwnerName} reads it back. */
+export function personalTeamName({ ownerLabel }: { ownerLabel: string }): string {
+  return `${ownerLabel}${PERSONAL_TEAM_SUFFIX}`;
+}
+
+/** The owner a personal team's name carries ("Sam Lee"), or the whole name when it carries none. */
+export function personalTeamOwnerName({ teamName }: { teamName: string }): string {
+  const owner = teamName.endsWith(PERSONAL_TEAM_SUFFIX)
+    ? teamName.slice(0, -PERSONAL_TEAM_SUFFIX.length).trim()
+    : "";
+  return owner || teamName;
+}

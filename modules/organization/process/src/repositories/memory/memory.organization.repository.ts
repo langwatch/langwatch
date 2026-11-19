@@ -21,6 +21,7 @@ import {
   type DocsPlaygroundPolicy,
   type OrganizationCurrency,
   ORGANIZATION_KIND,
+  personalTeamName,
 } from "@langwatch/organization-contract";
 import { nowInstant, Temporal, toDate, type Instant } from "@langwatch/time";
 
@@ -555,7 +556,7 @@ export class MemoryOrganizationRepository extends OrganizationRepository {
     const now = nowInstant();
     const team: MemoryTeamRow = {
       id: input.resources.teamId,
-      name: `${displayLabel}'s Workspace`,
+      name: personalTeamName({ ownerLabel: displayLabel }),
       slug: input.resources.teamSlug,
       organizationId: input.workspace.organizationId,
       isPersonal: true,
