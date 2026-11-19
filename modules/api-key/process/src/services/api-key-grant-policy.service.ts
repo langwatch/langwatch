@@ -20,6 +20,15 @@ import { type Instant, Temporal, fromDate, nowInstant } from "@langwatch/time";
 import { ownGrantBindingId, ownGrantCommandId } from "./api-key-own-grant-ids.ts";
 import type { ApiKeyDependencies } from "./api-key.service.ts";
 
+/**
+ * A key's create as authz records it: its stable id, and its creation as the business time, so a
+ * late retry of the create is older than any edit and never overwrites one in the fold.
+ */
+const createFact = ({ commandId, createdAt }: { commandId: string; createdAt: Instant }) => ({
+  commandId,
+  occurredAtMs: createdAt.epochMilliseconds,
+});
+
 type ResolvedScope =
   | { type: "organization"; id: string; organizationId: string }
   | { type: "team"; id: string; organizationId: string }
@@ -360,7 +369,7 @@ export class ApiKeyGrantPolicyService {
         permissions: [...(input.permissions ?? [])].toSorted(),
         kind: "system_api_key",
         actor: input.actor,
-        ...(stableIds ? { commandId: stableIds.commandId } : {}),
+        ...(stableIds ? createFact(stableIds) : {}),
         requireProjection: true,
       });
       bindings = bindings.map((binding) =>
@@ -432,7 +441,7 @@ export class ApiKeyGrantPolicyService {
       actor: input.actor,
       source: "grants-service",
       onDuplicate: "skip",
-      ...(stableIds ? { commandId: stableIds.commandId } : {}),
+      ...(stableIds ? createFact(stableIds) : {}),
       // Both callers act on these rows next: a create activates the credential,
       // and a replace revokes whatever the attach did not keep. A durable
       // append that is not yet readable would hand out a token the resolver

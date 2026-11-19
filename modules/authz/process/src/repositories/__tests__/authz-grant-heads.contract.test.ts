@@ -647,6 +647,35 @@ describe.each(backends)("given the grant heads on the $name backend", (backend) 
     });
   });
 
+  describe.skipIf(backend.skip)("when a key's role is edited and its create folds again", () => {
+    /** @scenario "A late copy of a key's create never overwrites a later edit" */
+    it("keeps the edit, as the copy carries the key's creation time", async () => {
+      const heads = await open();
+      const projection = heads.repositories.grantProjection;
+      const roleId = id("apikey");
+      const created = {
+        id: roleId,
+        organizationId: heads.organizationId,
+        name: roleId,
+        description: null,
+        permissions: ["traces:view"],
+        kind: "system_api_key",
+        occurredAt: at(T0),
+      };
+      const edited = { ...created, permissions: ["traces:share"], occurredAt: at(T0 + 60_000) };
+
+      await projection.append({ kind: "role.upsert", row: created }, CONTEXT);
+      await projection.append({ kind: "role.upsert", row: edited }, CONTEXT);
+      await projection.append({ kind: "role.upsert", row: created }, CONTEXT);
+
+      expect(await heads.role(roleId)).toEqual({
+        name: roleId,
+        permissions: ["traces:share"],
+        deleted: false,
+      });
+    });
+  });
+
   describe.skipIf(backend.skip)("when a grant names a custom role no compat row holds", () => {
     it("lands the grant and its compat binding, as no foreign key is enforced", async () => {
       const heads = await open();

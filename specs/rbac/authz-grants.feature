@@ -451,6 +451,13 @@ Feature: Authorization grants
     And the audit trail has one row for each, and the key holds both grants live
 
   @integration
+  Scenario: A late copy of a key's create never overwrites a later edit
+    Given an API key's own role defined by its create, under the create's id and creation time
+    And the role edited afterwards
+    When a retry of the create is written and folded after the edit
+    Then the role keeps the edit, as the retry carries the older business time
+
+  @integration
   Scenario: A revoked API key grant attached again is recorded as a new grant
     Given an API key's own grant that was attached and then revoked
     When an edit grants the key again, under a fresh binding id and no command id
@@ -855,6 +862,13 @@ Feature: Authorization grants
     When both are handled
     Then exactly one audit row exists
     And any other attach, a user's under that prefix included, keeps its event id as its row id
+
+  @unit
+  Scenario: A key's create audited under its fact is dated by its append
+    Given an API key's grant appended under its create's id, carrying the key's creation time
+    When it is handled
+    Then its audit row is dated by its append, so it never lands behind an export's watermark
+    And every other row is still dated by its business time
 
   @unit @regression
   Scenario: Migrated custom bindings retain their permission restrictions

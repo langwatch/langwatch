@@ -32,14 +32,19 @@ import { memoryAuthzChannels } from "./authz-channels.fixture.ts";
 
 // Mirrors the held key in modules/api-key/process/src/services/__tests__/
 // held-key-mint.slow-fold.unit.test.ts, whose key id, content hash and creation time are minted
-// there, so only their shapes are mirrored: `apikeygrant:<keyId>:<hash>` and a rolebinding id.
+// there, so only their shapes are mirrored: a rolebinding id, and the command id
+// `ownGrantCommandId` (modules/api-key/process/src/services/api-key-own-grant-ids.ts) builds.
 const ORG = "org_1";
 const KEY = "key_held";
 const ROLE = `apikey:${KEY}`;
 const ACTOR: LedgerActor = { type: "system", id: null };
+/** `ownGrantCommandId`'s shape: the contract prefix, the key id, then a 32-hex content hash. */
+const OWN_GRANT_COMMAND_ID = new RegExp(`^${API_KEY_OWN_GRANT_COMMAND_PREFIX}${KEY}:[0-9a-f]{32}$`);
 const CREATE = {
   commandId: `${API_KEY_OWN_GRANT_COMMAND_PREFIX}${KEY}:6f1c2a9d0b7e4c3a8d5f9e2b1a0c7d64`,
   bindingId: newAuthzGrantId(),
+  // The key's creation, a minute before the test's writes, as each retry of its create sends it.
+  occurredAtMs: Date.now() - 60_000,
 };
 /** A built-in role the same create grants beside the key's own, under the same command id. */
 const EXTRA_BINDING_ID = newAuthzGrantId();
@@ -126,9 +131,16 @@ function world({ lagging = false }: { lagging?: boolean } = {}) {
    * id. `caller` stops at the grants service. An extra binding is attached first, as there.
    */
   async function grantKey(
-    ids: { commandId?: string; bindingId: string; extraBindingId?: string } = CREATE,
+    ids: {
+      commandId?: string;
+      occurredAtMs?: number;
+      bindingId: string;
+      extraBindingId?: string;
+    } = CREATE,
   ): Promise<{ attached: string[]; duplicates: string[] }> {
-    const commandId = ids.commandId ? { commandId: ids.commandId } : {};
+    const commandId = ids.commandId
+      ? { commandId: ids.commandId, occurredAtMs: ids.occurredAtMs }
+      : {};
     await ledger.defineRole({
       organizationId: ORG,
       roleId: ROLE,
@@ -208,6 +220,7 @@ describe("given an API key's own role and grant written on each try of a held-ke
         lagging: true,
       });
       if (!projection) throw new Error("the world has no lagging reader");
+      expect(CREATE.commandId).toMatch(OWN_GRANT_COMMAND_ID);
 
       // Tries 1 and 2: the role is appended, but the reader never sees it within the hold.
       await expect(grantKey()).rejects.toMatchObject(REFUSED);
@@ -265,6 +278,30 @@ describe("given an API key's own role and grant written on each try of a held-ke
       }
       const live = keyGrants().filter((row) => row.revokedAt === null);
       expect(live.map((row) => row.id).toSorted()).toEqual(grantIds.toSorted());
+    });
+  });
+
+  describe("when the key's role is edited and a late retry of its create follows", () => {
+    /** @scenario "A late copy of a key's create never overwrites a later edit" */
+    it("keeps the edit, as the retry carries the key's creation time", async () => {
+      const { ledger, grantKey, memory } = world();
+      const edited = ["traces:view", "traces:share"];
+
+      await grantKey();
+      await ledger.defineRole({
+        organizationId: ORG,
+        roleId: ROLE,
+        name: ROLE,
+        permissions: edited,
+        kind: "system_api_key",
+        actor: ACTOR,
+      });
+      // The retry waits for its own content, which the edit has replaced for good.
+      await expect(grantKey()).rejects.toMatchObject(REFUSED);
+
+      const role = memory.roleHeads.find((row) => row.id === ROLE);
+      expect(role?.permissions).toEqual(edited);
+      expect(role?.deletedAt).toBeNull();
     });
   });
 

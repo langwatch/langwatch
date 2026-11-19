@@ -232,9 +232,12 @@ describe("HeldKeyMintService over a ledger that folds slower than one try", () =
     describe("when the outbox retries until the grant is read back", () => {
       /** @scenario "A held key's retries send its own role and grant under the same ids" */
       it("sends the key's stable ids on every try, and the same role and binding", async () => {
-        const { service, ledger } = createFixture(25_000);
+        const { service, ledger, memory } = createFixture(25_000);
 
         const { result } = await outbox(() => service.createHeld({ holdKey: "run-1", key }));
+        // The key's creation, read back on every reopen: each try's business time.
+        const occurredAtMs = memory.keys()[0]?.createdAt.getTime();
+        expect(occurredAtMs).toEqual(expect.any(Number));
 
         // Mirrored by the replay in modules/authz/process/src/app/__tests__/
         // authz-api-key-own-grant.app.integration.test.ts (`grantKey`): keep the two in step.
@@ -252,6 +255,7 @@ describe("HeldKeyMintService over a ledger that folds slower than one try", () =
           kind: "system_api_key",
           actor,
           commandId,
+          occurredAtMs,
           requireProjection: true,
         };
         const attach = {
@@ -271,6 +275,7 @@ describe("HeldKeyMintService over a ledger that folds slower than one try", () =
           source: "grants-service",
           onDuplicate: "skip",
           commandId,
+          occurredAtMs,
           requireProjection: true,
         };
         // Try 1 stops at the role; tries 2 and 3 reach the attach. Nothing differs between tries.

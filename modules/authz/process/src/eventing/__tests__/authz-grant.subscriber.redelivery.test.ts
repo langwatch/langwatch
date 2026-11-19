@@ -143,6 +143,22 @@ describe("EventingAuthzAuditAdapter redelivery", () => {
     ]);
   });
 
+  /** @scenario "A key's create audited under its fact is dated by its append" */
+  it("dates a fact-keyed row by its append, and any other by its business time", async () => {
+    const store = new KeyedAuditTrailStore();
+    const adapter = EventingAuthzAuditAdapter.create({ store });
+    // Stamped with the key's creation, then appended by a retry ten minutes later.
+    const createdAt = 1_700_000_600_000;
+
+    await adapter.handler({ ...keyGrantAttached, createdAt });
+    await adapter.handler(roleDeleted);
+
+    expect([...store.rows.values()].map((row) => row.createdAt.epochMilliseconds)).toEqual([
+      createdAt,
+      roleDeleted.occurredAt,
+    ]);
+  });
+
   /** @scenario "An API key's own-role grant attached twice under one key writes one audit row" */
   it("keeps the event id as the row id for any other attach, even one carrying a key", async () => {
     const store = new KeyedAuditTrailStore();

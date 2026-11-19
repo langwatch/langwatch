@@ -945,6 +945,7 @@ export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
     kind,
     actor,
     commandId: callerCommandId,
+    occurredAtMs: callerOccurredAtMs,
     requireProjection = true,
   }: {
     organizationId: string;
@@ -956,6 +957,8 @@ export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
     actor: LedgerActor;
     /** The caller's stable id for this definition, same contract as `attachBindings`. */
     commandId?: string;
+    /** The business time the caller's fact carries, the same on each of its retries. */
+    occurredAtMs?: number;
     /**
      * Whether an unlanded projection is an error, same contract as
      * {@link EventingAuthzLedgerAdapter.attachBindings}: turned on before
@@ -968,7 +971,8 @@ export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
     if (kind === "custom") {
       await this.refuseAddedPlatformPermissions({ organizationId, roleId, permissions });
     }
-    const occurredAtMs = this.now();
+    // A caller's fixed time keeps a late retry of its fact older than any later define.
+    const occurredAtMs = callerOccurredAtMs ?? this.now();
     const role: DefineRoleCommandData["role"] = {
       roleId,
       name,

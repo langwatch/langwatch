@@ -878,7 +878,13 @@ describe("ApiKeyGrantPolicyService", () => {
       const sent = (calls: Record<string, unknown>[]) =>
         calls.flatMap((call) =>
           call.method === "defineRole" || call.method === "attachBindings"
-            ? [{ commandId: call.commandId, bindings: call.bindings }]
+            ? [
+                {
+                  commandId: call.commandId,
+                  occurredAtMs: call.occurredAtMs,
+                  bindings: call.bindings,
+                },
+              ]
             : [],
         );
 
@@ -901,12 +907,20 @@ describe("ApiKeyGrantPolicyService", () => {
         const [define, attach] = sent(first.calls);
         expect(define?.commandId).toMatch(/^apikeygrant:key-1:[0-9a-f]{32}$/);
         expect(attach?.commandId).toBe(define?.commandId);
+        // Both carry the key's creation, so a late retry never overwrites a later edit.
+        expect([define?.occurredAtMs, attach?.occurredAtMs]).toEqual([
+          created.createdAt.epochMilliseconds,
+          created.createdAt.epochMilliseconds,
+        ]);
         expect(attach?.bindings).toEqual([
           expect.objectContaining({ bindingId: expect.stringMatching(/^rolebinding_/) }),
         ]);
         expect(sent(retry.calls)).toEqual(sent(first.calls));
         expect(sent(changed.calls)[0]?.commandId).not.toBe(define?.commandId);
-        expect(sent(edit.calls).map((call) => call.commandId)).toEqual([undefined, undefined]);
+        expect(sent(edit.calls).map((call) => [call.commandId, call.occurredAtMs])).toEqual([
+          [undefined, undefined],
+          [undefined, undefined],
+        ]);
         expect(sent(edit.calls)[1]?.bindings).toEqual([
           expect.objectContaining({ bindingId: "generated-binding" }),
         ]);

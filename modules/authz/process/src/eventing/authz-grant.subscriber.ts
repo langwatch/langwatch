@@ -117,6 +117,15 @@ function isKeyedOnFact(event: AuthzGrantsEvent): boolean {
   );
 }
 
+/**
+ * A row keyed on its fact is dated by the append that wrote it: such a fact may carry its
+ * caller's fixed business time (an API key's creation), which can be well before the write, and
+ * a row dated then would land behind an export's settled watermark. Others keep `occurredAt`.
+ */
+function auditedAtMs(event: AuthzGrantsEvent): number {
+  return event.idempotencyKey && isKeyedOnFact(event) ? event.createdAt : event.occurredAt;
+}
+
 function toRow(event: AuthzGrantsEvent): AuthzAuditRow {
   const { actor } = guardFields(event);
   const verb = AUDIT_VERB_BY_EVENT_TYPE[event.type];
@@ -129,7 +138,7 @@ function toRow(event: AuthzGrantsEvent): AuthzAuditRow {
   }
   return {
     id: rowId(event),
-    createdAt: Temporal.Instant.fromEpochMilliseconds(event.occurredAt),
+    createdAt: Temporal.Instant.fromEpochMilliseconds(auditedAtMs(event)),
     userId: actor?.type === "user" ? actor.id : null,
     organizationId: event.tenantId,
     action: `${AUTHZ_AUDIT_ACTION_PREFIX}${verb}`,
