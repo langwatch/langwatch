@@ -1,5 +1,6 @@
 from typing import Any, Optional, TypeVar
 from fastapi import FastAPI
+from starlette.requests import Request as HttpRequest
 
 import numpy as np
 from pydantic import BaseModel
@@ -28,6 +29,7 @@ from scipy.spatial.distance import cdist
 import numpy as np
 
 from langevals_topic_clustering.utils import fill_embeddings
+from langevals_topic_clustering.engine_route import with_engine_route
 from langevals_topic_clustering.failures import configured_model, failure_answer
 from langevals_topic_clustering._logger import get_logger, set_log_context, clear_log_context
 
@@ -253,7 +255,9 @@ def setup_endpoints(app: FastAPI):
     @with_usage
     def topics_incremental_clustering(
         params: IncrementalClusteringParams,
+        http_request: HttpRequest,
     ) -> TopicClusteringResponse:
+        params = with_engine_route(params, http_request)
         try:
             set_log_context(project_id=params.project_id)
             logger.info(
