@@ -80,6 +80,16 @@ export class PrismaDigestUserWeekRepository
     return rows.map((row) => userWeekStateSchema.parse(row.state));
   }
 
+  async forgetUser({ userId }: { userId: string }): Promise<void> {
+    await this.database.$executeRaw`
+      ${skipTenantCheck({
+        // A person's weeks sit under each organization they were active in: they go by user.
+        SKIP_TENANT_CHECK: true,
+      })}
+      DELETE FROM "DigestUserWeek" WHERE "userId" = ${userId}
+    `;
+  }
+
   deleteBefore({ isoWeek }: { isoWeek: string }): Promise<number> {
     return this.database.$executeRaw`
       ${skipTenantCheck({

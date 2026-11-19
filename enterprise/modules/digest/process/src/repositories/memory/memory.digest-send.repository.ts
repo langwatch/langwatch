@@ -20,4 +20,11 @@ export class MemoryDigestSendRepository implements DigestSendRepository {
     this.#sends.set(key, record);
     return Promise.resolve(true);
   }
+
+  forgetUser({ userId }: { userId: string }): Promise<void> {
+    for (const [key, record] of this.#sends) {
+      if (record.userId === userId) this.#sends.delete(key);
+    }
+    return Promise.resolve();
+  }
 }

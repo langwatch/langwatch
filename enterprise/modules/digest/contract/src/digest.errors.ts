@@ -38,6 +38,34 @@ export class DigestNothingToSendError extends HandledError {
   }
 }
 
+/** A test was asked for an organization that is not enrolled in the digest. */
+export class DigestOrganizationNotEnrolledError extends HandledError {
+  declare readonly code: "digest_organization_not_enrolled";
+
+  constructor(organizationId: string) {
+    super("digest_organization_not_enrolled", "This organization is not enrolled in the digest.", {
+      meta: { organizationId },
+      httpStatus: 409,
+      fault: "customer",
+    });
+    this.name = "DigestOrganizationNotEnrolledError";
+  }
+}
+
+/** A test was asked for a member who opted out of the digest. */
+export class DigestMemberUnsubscribedError extends HandledError {
+  declare readonly code: "digest_member_unsubscribed";
+
+  constructor(userId: string) {
+    super("digest_member_unsubscribed", "This member opted out of the digest.", {
+      meta: { userId },
+      httpStatus: 409,
+      fault: "customer",
+    });
+    this.name = "DigestMemberUnsubscribedError";
+  }
+}
+
 /** No signing secret is configured, so no unsubscribe link can be signed or checked. */
 export class DigestLinksUnavailableError extends HandledError {
   declare readonly code: "digest_links_unavailable";

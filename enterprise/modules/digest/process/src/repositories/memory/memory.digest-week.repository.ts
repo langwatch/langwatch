@@ -5,7 +5,8 @@ import type {
   StoredProjectionRead,
 } from "@langwatch/eventing";
 
-type WeekState = Readonly<{ organizationId: string; isoWeek: string }>;
+/** A person's week names them; a project's week names no one. */
+type WeekState = Readonly<{ organizationId: string; isoWeek: string; userId?: string }>;
 
 /** A week fold held by this process: the projection store and its reads. */
 export class MemoryDigestWeekRepository<State extends WeekState> {
@@ -41,6 +42,13 @@ export class MemoryDigestWeekRepository<State extends WeekState> {
           (state) => state.organizationId === organizationId && isoWeeks.includes(state.isoWeek),
         ),
     );
+  }
+
+  forgetUser({ userId }: { userId: string }): Promise<void> {
+    for (const [key, row] of this.#rows) {
+      if (row.state.userId === userId) this.#rows.delete(key);
+    }
+    return Promise.resolve();
   }
 
   deleteBefore({ isoWeek }: { isoWeek: string }): Promise<number> {

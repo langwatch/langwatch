@@ -4649,6 +4649,14 @@ const presentations = {
     title: "Unsubscribe links are unavailable",
     describe: () => "This is on our side. Try again later.",
   },
+  digest_organization_not_enrolled: {
+    title: "Organization not enrolled",
+    describe: () => "Enrol this organization in the digest before sending a test.",
+  },
+  digest_member_unsubscribed: {
+    title: "Member opted out",
+    describe: () => "This member opted out of the digest, so no test is sent. Pick someone else.",
+  },
 
   // ---- automations & notifications ----
   automation_not_found: {

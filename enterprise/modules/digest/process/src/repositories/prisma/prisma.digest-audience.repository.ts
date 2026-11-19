@@ -73,6 +73,10 @@ export class PrismaDigestAudienceRepository
     });
   }
 
+  async forgetUser({ userId }: { userId: string }): Promise<void> {
+    await this.prisma.digestSubscription.deleteMany({ where: { userId } });
+  }
+
   async getSettings(): Promise<DigestSettingsRecord> {
     const row = await this.prisma.digestSettings.findUnique({ where: { id: SETTINGS_ID } });
     return { armed: row?.armed ?? false, lastPlannedWeek: row?.lastPlannedWeek ?? null };

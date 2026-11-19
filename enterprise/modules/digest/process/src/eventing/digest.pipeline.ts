@@ -29,11 +29,13 @@ import {
   recordTraceSpanEventDataSchema,
   SPAN_RECORDED_EVENT_TYPE,
 } from "@langwatch/trace-contract";
+import { USER_ERASED_EVENT_TYPE, userErasedEventDataSchema } from "@langwatch/user-contract";
 
 import type { DigestModule } from "../app/digest.app.ts";
 import type { DigestRepositories } from "../repositories/digest.repositories.ts";
 import type { ProjectWeekState, UserWeekState } from "../rules/digest-week.rules.ts";
 import type { DigestSourceService } from "../services/digest-source.service.ts";
+import type { DigestUserErasureService } from "../services/digest-user-erasure.service.ts";
 import {
   RecordProjectActivityCommand,
   RecordUserActivityCommand,
@@ -64,6 +66,7 @@ function digestActivity(deps: {
   projectWeeks: StateProjectionStore<ProjectWeekState>;
   userWeeks: StateProjectionStore<UserWeekState>;
   source: Source;
+  erasure: Pick<DigestUserErasureService, "forgetUser">;
 }) {
   const appendOptions = {
     coalesceMaxBatch: DIGEST_ACTIVITY_COALESCE_MAX_BATCH,
@@ -113,6 +116,12 @@ function digestActivity(deps: {
         data: metricFactsContributionSchema,
         handle: (data) => deps.source.codingAgentMetric(data),
         options: { enqueue: { filter: (data) => deps.source.mayFold(data.tenantId) } },
+      })
+      // User's erasure fact: digest deletes its own rows naming the person, and sends nothing.
+      .withPeerSubscriber("userErased", {
+        eventType: USER_ERASED_EVENT_TYPE,
+        data: userErasedEventDataSchema,
+        handle: ({ userId }) => deps.erasure.forgetUser({ userId }),
       })
       .withCommand("recordProjectActivity", RecordProjectActivityCommand, appendOptions)
       .withCommand("recordUserActivity", RecordUserActivityCommand, appendOptions)

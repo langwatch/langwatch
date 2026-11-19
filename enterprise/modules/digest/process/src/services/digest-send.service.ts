@@ -2,7 +2,9 @@
 import type { AuthzApi } from "@langwatch/authz-contract";
 import {
   DigestMemberNotFoundError,
+  DigestMemberUnsubscribedError,
   DigestNothingToSendError,
+  DigestOrganizationNotEnrolledError,
 } from "@langwatch/enterprise-digest-contract";
 import {
   MemberNotFoundError,
@@ -196,7 +198,9 @@ export class DigestSendService {
 
   /**
    * A member's last week, mailed to the operator alone; no send is recorded. Its unsubscribe
-   * link names the operator, the person it reached, never the member.
+   * link names the operator, the person it reached, never the member. The test send respects
+   * enrolment and opt-out as the weekly send does: it is refused for an organization not
+   * enrolled and for a member who opted out. Arming is not required, so a test can come first.
    */
   async sendTest({
     organizationId,
@@ -207,8 +211,14 @@ export class DigestSendService {
     userId: string;
     operatorId: string;
   }): Promise<void> {
+    if (!(await this.deps.audience.findEnrolled()).includes(organizationId)) {
+      throw new DigestOrganizationNotEnrolledError(organizationId);
+    }
     const member = (await this.members({ organizationId })).find((row) => row.userId === userId);
     if (!member) throw new DigestMemberNotFoundError(userId);
+    if ((await this.deps.audience.findUnsubscribed({ userIds: [userId] })).length > 0) {
+      throw new DigestMemberUnsubscribedError(userId);
+    }
     const operator = await this.deps.users.findById({ id: operatorId });
     if (!operator?.email) throw new DigestMemberNotFoundError(operatorId);
     const isoWeek = sendableWeek(this.deps.now());

@@ -5,6 +5,7 @@ import {
   DigestLinkInvalidError,
   DigestLinksUnavailableError,
 } from "@langwatch/enterprise-digest-contract";
+import type { UserApi } from "@langwatch/user-contract";
 import { z } from "zod";
 
 import type { DigestAudienceRepository } from "../repositories/digest-audience.repository.ts";
@@ -33,6 +34,8 @@ type Deps = Readonly<{
   /** The session secret; absent or empty, no token is signed or accepted. */
   secret: string | undefined;
   audience: Pick<DigestAudienceRepository, "findUnsubscribed" | "unsubscribe" | "resubscribe">;
+  /** Whether the person a link names still exists; a link for no one is an invalid link. */
+  users: Pick<UserApi, "findById">;
   now: () => number;
 }>;
 
@@ -40,8 +43,9 @@ type Deps = Readonly<{
  * The digest's one-click unsubscribe (RFC 8058) and the page behind its link. Tokens use
  * ADR-031's format, `base64url(JSON).hex(HMAC-SHA256)` with an `exp`, the HMAC taken over
  * `digest.v1:` and the JSON, compared in constant time; the token is the whole authorization,
- * so it names one person and nothing else can be done with it. Without a secret every call
- * refuses with `digest_links_unavailable`.
+ * so it names one person and nothing else can be done with it. A link naming a person who no
+ * longer exists is refused as `digest_link_invalid`, so no subscription row is written for them.
+ * Without a secret every call refuses with `digest_links_unavailable`.
  */
 export class DigestUnsubscribeService {
   static create(deps: Deps): DigestUnsubscribeService {
@@ -57,18 +61,25 @@ export class DigestUnsubscribeService {
   }
 
   async isSubscribed({ token }: { token: string }): Promise<boolean> {
-    const { u } = this.#verified(token);
+    const { u } = await this.#existing(token);
     return (await this.deps.audience.findUnsubscribed({ userIds: [u] })).length === 0;
   }
 
   async unsubscribe({ token }: { token: string }): Promise<void> {
-    const { u, s } = this.#verified(token);
+    const { u, s } = await this.#existing(token);
     await this.deps.audience.unsubscribe({ userId: u, sendId: s, at: this.deps.now() });
   }
 
   async resubscribe({ token }: { token: string }): Promise<void> {
-    const { u } = this.#verified(token);
+    const { u } = await this.#existing(token);
     await this.deps.audience.resubscribe({ userId: u });
+  }
+
+  /** The verified payload, only while its person exists; the user is read after the signature. */
+  async #existing(token: string): Promise<TokenPayload> {
+    const payload = this.#verified(token);
+    if (!(await this.deps.users.findById({ id: payload.u }))) throw new DigestLinkInvalidError();
+    return payload;
   }
 
   #verified(token: string): TokenPayload {

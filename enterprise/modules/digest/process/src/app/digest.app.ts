@@ -29,6 +29,7 @@ import { DigestSendService } from "../services/digest-send.service.ts";
 import { DigestSettingsService } from "../services/digest-settings.service.ts";
 import { DigestSourceService } from "../services/digest-source.service.ts";
 import { DigestUnsubscribeService } from "../services/digest-unsubscribe.service.ts";
+import { DigestUserErasureService } from "../services/digest-user-erasure.service.ts";
 import { DigestWeekService } from "../services/digest-week.service.ts";
 
 type DigestSetup = FeatureSetup<
@@ -54,7 +55,10 @@ export class DigestModule implements DigestApiContract {
     organizations: OrganizationApi,
     /** An enrolled organization's projects, a personal project's owner, a project's name. */
     projects: ProjectApi,
-    /** The address each email goes to, read at send time and never stored. */
+    /**
+     * The address each email goes to, read at send time and never stored; and whether the
+     * person an unsubscribe link names still exists.
+     */
     users: UserApi,
     /** The month's usage against the plan, read once per organization's send. */
     entitlement: EntitlementApi,
@@ -103,6 +107,7 @@ export class DigestModule implements DigestApiContract {
     const unsubscribes = DigestUnsubscribeService.create({
       secret,
       audience: repositories.audience,
+      users: dependencies.users,
       now: nowEpochMs,
     });
     const source = DigestSourceService.create({
@@ -142,6 +147,11 @@ export class DigestModule implements DigestApiContract {
         projectWeeks: repositories.projectWeeks,
         userWeeks: repositories.userWeeks,
         source,
+        erasure: DigestUserErasureService.create({
+          audience: repositories.audience,
+          sends: repositories.sends,
+          userWeeks: repositories.userWeeks,
+        }),
       }),
     });
   }

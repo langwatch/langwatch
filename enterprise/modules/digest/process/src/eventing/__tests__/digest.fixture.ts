@@ -41,6 +41,11 @@ import {
   SPAN_RECORDED_EVENT_VERSION_LATEST,
 } from "@langwatch/trace-contract";
 import { type Instant, Temporal } from "@langwatch/time";
+import {
+  USER_ERASED_EVENT_TYPE,
+  USER_LIFECYCLE_EVENT_VERSION,
+  userErasedEventDataSchema,
+} from "@langwatch/user-contract";
 import { z } from "zod";
 
 import { emptyProjectWeek } from "../../rules/digest-week.rules.ts";
@@ -51,8 +56,9 @@ import { DigestCommandsService } from "../../services/digest-commands.service.ts
 import { DigestSendService } from "../../services/digest-send.service.ts";
 import { DigestSourceService } from "../../services/digest-source.service.ts";
 import { DigestUnsubscribeService } from "../../services/digest-unsubscribe.service.ts";
+import { DigestUserErasureService } from "../../services/digest-user-erasure.service.ts";
 import { DigestWeekService } from "../../services/digest-week.service.ts";
-import type { ProjectActivity } from "../digest-activity.events.ts";
+import type { ProjectActivity, UserActivity } from "../digest-activity.events.ts";
 import { buildDigestSendPipeline } from "../digest-send.pipeline.ts";
 import {
   DIGEST_MEMBER_SEND_PROCESS_NAME,
@@ -102,6 +108,7 @@ export const OWNER_FACTS = {
     type: METRIC_FACTS_CONTRIBUTED_EVENT_TYPE,
     version: METRIC_FACTS_CONTRIBUTED_EVENT_VERSION_LATEST,
   },
+  userErased: { type: USER_ERASED_EVENT_TYPE, version: USER_LIFECYCLE_EVENT_VERSION },
 } as const;
 
 /** The owners' pipelines as their contracts name the facts; digest reads type and data. */
@@ -118,6 +125,7 @@ function ownerStandIn() {
       fact(SIMULATION_RUN_EVENT_TYPES.FINISHED, simulationRunFinishedEventDataSchema),
       fact(SPAN_FACTS_CONTRIBUTED_EVENT_TYPE, spanFactsContributionSchema),
       fact(METRIC_FACTS_CONTRIBUTED_EVENT_TYPE, metricFactsContributionSchema),
+      fact(USER_ERASED_EVENT_TYPE, userErasedEventDataSchema),
     ])
     .build();
 }
@@ -174,9 +182,14 @@ export function installDigest(
   const commands = DigestCommandsService.create();
   const mail = MemoryDigestMailChannel.create();
   const now = () => Date.now() + world.clockOffsetMs;
+  const users = {
+    findById: async ({ id }: { id: string }) =>
+      world.users.includes(id) ? userProfile(id, world.deactivated.has(id)) : null,
+  };
   const unsubscribes = DigestUnsubscribeService.create({
     secret,
     audience,
+    users,
     now,
   });
 
@@ -247,9 +260,7 @@ export function installDigest(
         return { teams: new Map(), projects: decided, organizationRole: null };
       },
     },
-    users: {
-      findById: async ({ id }) => (world.users.includes(id) ? userProfile(id, world.deactivated.has(id)) : null),
-    },
+    users,
     mail,
     unsubscribes,
     get publicBaseUrl() {
@@ -264,6 +275,11 @@ export function installDigest(
       projectWeeks: repositories.projectWeeks,
       userWeeks: repositories.userWeeks,
       source,
+      erasure: DigestUserErasureService.create({
+        audience: repositories.audience,
+        sends: repositories.sends,
+        userWeeks: repositories.userWeeks,
+      }),
     }),
   );
   commands.connectActivity(fold.commands);
@@ -378,6 +394,19 @@ export function installDigest(
     /** One fact on a project's week, through digest's own record command. */
     recordProject: (activity: ProjectActivity) => commands.recordProject(activity),
     ownerFact,
+    /** One fact on a person's week, through digest's own record command. */
+    recordUser: (activity: UserActivity) => commands.recordUser(activity),
+    /** User's fact that a person was erased, appended to the stand-in log; its tenant is the person. */
+    userErased: ({ userId }: { userId: string }) => {
+      const occurredAt = Date.now();
+      return ownerFact({
+        fact: OWNER_FACTS.userErased,
+        tenantId: userId,
+        aggregateId: userId,
+        occurredAt,
+        data: { tenantId: userId, userId, occurredAt, organizationIds: [ORGANIZATION] },
+      });
+    },
     /** Evaluation's settled fact, appended to its stand-in log in order. */
     evaluationCompleted: (data: EvaluationLifecycleCompletedEventData) =>
       ownerFact({

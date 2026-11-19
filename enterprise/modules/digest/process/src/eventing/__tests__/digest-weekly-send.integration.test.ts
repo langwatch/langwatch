@@ -469,6 +469,23 @@ describe("unsubscribing from the digest", () => {
     });
   });
 
+  describe("when the person a valid link names no longer exists", () => {
+    /** @scenario "A link for a person who no longer exists is refused as an invalid link" */
+    it("is refused as an invalid link and writes no subscription", async () => {
+      const token = tokenOf((await sentEmailOf(MEMBER)).oneClickUnsubscribeUrl);
+      digest.world.users = digest.world.users.filter((userId) => userId !== MEMBER);
+
+      for (const call of [
+        () => digest.unsubscribes.isSubscribed({ token }),
+        () => digest.unsubscribes.unsubscribe({ token }),
+        () => digest.unsubscribes.resubscribe({ token }),
+      ]) {
+        await expect(call()).rejects.toMatchObject({ code: "digest_link_invalid" });
+      }
+      expect(digest.repositories.audience.unsubscribeSources().has(MEMBER)).toBe(false);
+    });
+  });
+
   describe("when an unsubscribed member resubscribes from the same page", () => {
     /** @scenario "Resubscribing from the unsubscribe page" */
     it("sends them next week's email", async () => {
@@ -526,6 +543,8 @@ describe("when no signing secret is configured", () => {
 
 describe("an operator's test send", () => {
   describe("when an operator asks for a member's email", () => {
+    beforeEach(() => enrol());
+
     /** @scenario "Sending a test goes only to the operator" */
     it("mails the operator alone, marked as a test, and records no send", async () => {
       everyoneNearTheLimit();
@@ -560,6 +579,7 @@ describe("an operator's test send", () => {
 
   describe("when the member's pick has nothing to show", () => {
     it("is refused as nothing to send and mails no one", async () => {
+      await enrol();
       await expect(
         digest.sendTest({ organizationId: ORGANIZATION, userId: MEMBER, operatorId: OPERATOR }),
       ).rejects.toMatchObject({ code: "digest_nothing_to_send" });
@@ -569,9 +589,40 @@ describe("an operator's test send", () => {
 
   describe("when the person asked for is not a member", () => {
     it("is refused as not found and mails no one", async () => {
+      await enrol();
       await expect(
         digest.sendTest({ organizationId: ORGANIZATION, userId: "stranger", operatorId: OPERATOR }),
       ).rejects.toMatchObject({ code: "digest_member_not_found" });
+      expect(digest.mail).toEqual([]);
+    });
+  });
+
+  describe("when the organization is not enrolled", () => {
+    /** @scenario "A test send respects enrolment" */
+    it("is refused as not enrolled and mails no one", async () => {
+      everyoneNearTheLimit();
+
+      await expect(
+        digest.sendTest({ organizationId: ORGANIZATION, userId: MEMBER, operatorId: OPERATOR }),
+      ).rejects.toMatchObject({ code: "digest_organization_not_enrolled", httpStatus: 409 });
+      expect(digest.mail).toEqual([]);
+    });
+  });
+
+  describe("when the member opted out", () => {
+    /** @scenario "A test send respects a member's opt-out" */
+    it("is refused as opted out and mails no one", async () => {
+      await enrol();
+      everyoneNearTheLimit();
+      await digest.repositories.audience.unsubscribe({
+        userId: MEMBER,
+        sendId: `${MEMBER}:${SENT_WEEK}`,
+        at: WAKE_AT,
+      });
+
+      await expect(
+        digest.sendTest({ organizationId: ORGANIZATION, userId: MEMBER, operatorId: OPERATOR }),
+      ).rejects.toMatchObject({ code: "digest_member_unsubscribed", httpStatus: 409 });
       expect(digest.mail).toEqual([]);
     });
   });

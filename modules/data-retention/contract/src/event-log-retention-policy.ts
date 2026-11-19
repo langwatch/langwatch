@@ -79,7 +79,8 @@ export const RETENTION_CLASS_BY_AGGREGATE_TYPE: Record<string, EventLogRetention
   dataset: "indefinite",
   data_retention_extension: "indefinite",
   data_retention_storage: "indefinite",
-  digest_send: "indefinite",
+  // The send claim lives in the DigestSend row; the event only needs to outlive its week.
+  digest_send: "traces",
   entitlement_organization: "indefinite",
   evaluator: "indefinite",
   experiment_lifecycle: "indefinite",

@@ -17,4 +17,6 @@ export interface DigestSendRepository {
    * every caller after it. Only the claimer sends, so a retry never mails a second time.
    */
   claim(input: DigestSendRecord): Promise<boolean>;
+  /** Deletes every week's send row naming the person, in every organization. */
+  forgetUser(input: { userId: string }): Promise<void>;
 }

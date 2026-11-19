@@ -11,6 +11,8 @@ export interface DigestAudienceRepository {
   /** Opts the person out, recording the send whose link they used. */
   unsubscribe(input: { userId: string; sendId: string; at: number }): Promise<void>;
   resubscribe(input: { userId: string }): Promise<void>;
+  /** Deletes the person's subscription row; a second call finds nothing and changes nothing. */
+  forgetUser(input: { userId: string }): Promise<void>;
   getSettings(): Promise<DigestSettingsRecord>;
   setArmed(input: { armed: boolean }): Promise<void>;
   markPlanned(input: { isoWeek: string }): Promise<void>;

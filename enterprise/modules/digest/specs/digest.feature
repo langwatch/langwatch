@@ -6,9 +6,9 @@ Feature: Weekly digest emails
   Design: dev/docs/plans/weekly-digest.md
 
   # Built: the pick, the folds' redelivery rule, the weekly send through our own mailer, the
-  # one-click unsubscribe and the operators' switches. The other folds' peer intake, click
-  # tracking, the rate limit, the "what's new" card and the Cloud admin gallery and its metrics
-  # are @unimplemented.
+  # one-click unsubscribe, the operators' switches and clearing digest rows on user erasure. The
+  # other folds' peer intake, click tracking, the rate limit, the "what's new" card and the Cloud
+  # admin gallery and its metrics are @unimplemented.
 
   # Picking a template
 
@@ -275,6 +275,13 @@ Feature: Weekly digest emails
     When they resubscribe from the same page
     Then they receive next week's email
 
+  @integration
+  Scenario: A link for a person who no longer exists is refused as an invalid link
+    Given a valid unsubscribe link for a person who no longer exists
+    When the page is asked, or the link is used to unsubscribe or resubscribe
+    Then the answer is refused as an invalid link
+    And no subscription row is written for them
+
   @integration @unimplemented
   Scenario: A tracked link records a click and redirects
     When a valid click token for a sent email's link is followed
@@ -323,6 +330,20 @@ Feature: Weekly digest emails
     Then only the operator receives it
     And no DigestSend row is written
 
+  @integration
+  Scenario: A test send respects enrolment
+    Given an organization that is not enrolled
+    When an operator sends themself a test of a member's email
+    Then the call is refused with digest_organization_not_enrolled
+    And no email is sent
+
+  @integration
+  Scenario: A test send respects a member's opt-out
+    Given an enrolled organization and a member who unsubscribed
+    When an operator sends themself a test of that member's email
+    Then the call is refused with digest_member_unsubscribed
+    And no email is sent
+
   @integration @unimplemented
   Scenario: Metrics count sends, unique clickers and unsubscribes by template and week
     Given ten sends of digest-traces-week this week, three members who clicked twice each and one unsubscribe
@@ -334,3 +355,18 @@ Feature: Weekly digest emails
     Given an update published for this week
     When any template is rendered
     Then the card sits under the hero with its title, body and link
+
+  # User erasure
+
+  @integration
+  Scenario: Digest rows naming an erased person are cleared
+    Given a person with an opt-out, sends and folded weeks in two organizations
+    When user records that person erased, delivered twice
+    Then their subscription, sends and weeks are deleted in both organizations
+    And another person's rows remain and no email is sent
+
+  @integration
+  Scenario: Clearing digest rows for a person digest holds nothing for changes nothing
+    Given digest rows naming another person
+    When digest clears rows for a person no digest row names
+    Then every other row remains as it was

@@ -17,4 +17,7 @@ export type DigestProjectWeekRepository = StateProjectionStore<ProjectWeekState>
 
 /** A person's folded coding-agent weeks. */
 export type DigestUserWeekRepository = StateProjectionStore<UserWeekState> &
-  DigestWeekReadRepository<UserWeekState>;
+  DigestWeekReadRepository<UserWeekState> & {
+    /** Deletes every week folded for the person, in every organization. */
+    forgetUser(input: { userId: string }): Promise<void>;
+  };

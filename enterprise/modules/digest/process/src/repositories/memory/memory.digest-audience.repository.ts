@@ -47,6 +47,11 @@ export class MemoryDigestAudienceRepository implements DigestAudienceRepository 
     return Promise.resolve();
   }
 
+  forgetUser({ userId }: { userId: string }): Promise<void> {
+    this.#unsubscribed.delete(userId);
+    return Promise.resolve();
+  }
+
   /** Each standing opt-out, by person, with the send it came from. */
   unsubscribeSources(): ReadonlyMap<string, string> {
     return this.#unsubscribed;

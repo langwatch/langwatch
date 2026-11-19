@@ -70,9 +70,11 @@ unsubscribe.
 Peers, through `*Api` only: `OpsApi` (admission), `OrganizationApi` (members, admins, the
 organization's name), `ProjectApi` (an enrolled organization's projects, a personal project's
 owner, a project's name, slug and team), `AuthzApi` (which projects a member may view),
-`UserApi` (the address an email goes to) and `EntitlementApi` (the month's usage, read once per
-send). The folds listen to trace, evaluation, scenario and
-coding-agent events through peer subscribers.
+`UserApi` (the address an email goes to, and whether the person an unsubscribe link names still
+exists) and `EntitlementApi` (the month's usage, read once per send). The folds listen to trace,
+evaluation, scenario and coding-agent events through peer subscribers. A peer subscriber on
+user's `lw.user.erased` clears digest rows on user erasure: the person's `DigestSubscription`,
+`DigestSend` and `DigestUserWeek` rows, in every organization, as nurturing does.
 
 Channel binding: `NotificationApi`, for `sendEmail` only.
 
@@ -113,8 +115,11 @@ baseline are swept every hour.
 
 The rules are total. `digest_member_not_found` refuses a test for someone who is not an active
 member of the organization named. `digest_nothing_to_send` refuses a test whose pick has nothing
-to show. `digest_link_invalid` refuses an unsubscribe token that does not verify or has expired.
-`digest_links_unavailable` (503) refuses every token, and every send, when no signing secret is
+to show. The test send respects enrolment and opt-out: `digest_organization_not_enrolled` refuses
+a test for an organization not enrolled, and `digest_member_unsubscribed` one for a member who
+opted out; arming is not required. `digest_link_invalid` refuses an unsubscribe token that does
+not verify, has expired, or names a person who no longer exists, so no subscription row is
+written for them. `digest_links_unavailable` (503) refuses every token, and every send, when no signing secret is
 configured.
 
 ## Contracts and validation
