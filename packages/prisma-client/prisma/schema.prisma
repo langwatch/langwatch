@@ -4093,6 +4093,10 @@ model InstantEvalJudgeUsageBilling {
   usageBilled    Boolean
   occurredAt     DateTime
   fromCatchUp    Boolean
+  /// The event ids folded in, so a redelivery folds once.
+  appliedEventIds String[] @default([])
+  /// The fact that last changed the row; only it may tell Customer.io.
+  winnerEventId   String?
 }
 
 // The judge's own spend, one row per request, never rewritten. The organization's total is
@@ -5338,6 +5342,7 @@ model NurturingOrganization {
   // UTC day offsets 0 to 2 from the organization's creation that held a coding session.
   codingFirstDays      Int[]     @default([])
   lastTraceAt          DateTime? // moves forward only; told to a person joining later
+  adminAt              DateTime? // stamp of the fact that named adminUserId; the latest wins
   updatedAt            DateTime  @updatedAt
 }
 
@@ -5375,6 +5380,16 @@ model NurturingProjectTraceDay {
   lastTraceAt       DateTime?
   /// Append time of the newest trace_failed.
   lastFailedTraceAt DateTime?
+
+  @@id([projectId, day])
+}
+
+/// Each project and UTC day with a completed evaluation, from evaluation's lifecycle_completed,
+/// written insert-ignore. Replaces the `evaluation` rows of NurturingProjectUsageView.
+model NurturingProjectEvaluationDay {
+  projectId String
+  /// UTC `YYYY-MM-DD`.
+  day       String
 
   @@id([projectId, day])
 }

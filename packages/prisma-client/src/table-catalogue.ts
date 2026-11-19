@@ -155,6 +155,7 @@ export const prismaTableCatalogue = {
   "NurturingOrganization": "NurturingOrganization",
   "NurturingProjectUsageView": "NurturingProjectUsageView",
   "NurturingProjectTraceDay": "NurturingProjectTraceDay",
+  "NurturingProjectEvaluationDay": "NurturingProjectEvaluationDay",
   "NurturingPersonalProject": "NurturingPersonalProject",
   "NurturingTracedProject": "NurturingTracedProject",
   "BillingMeterCheckpoint": "BillingMeterCheckpoint",
@@ -1917,7 +1918,9 @@ export const prismaModelFieldCatalogue = {
     "organizationId",
     "usageBilled",
     "occurredAt",
-    "fromCatchUp"
+    "fromCatchUp",
+    "appliedEventIds",
+    "winnerEventId"
   ],
   "InstantEvalJudgeSpend": [
     "organizationId",
@@ -2559,6 +2562,7 @@ export const prismaModelFieldCatalogue = {
     "codingRepositoryKeys",
     "codingFirstDays",
     "lastTraceAt",
+    "adminAt",
     "updatedAt"
   ],
   "NurturingProjectUsageView": [
@@ -2576,6 +2580,10 @@ export const prismaModelFieldCatalogue = {
     "errorCount",
     "lastTraceAt",
     "lastFailedTraceAt"
+  ],
+  "NurturingProjectEvaluationDay": [
+    "projectId",
+    "day"
   ],
   "NurturingPersonalProject": [
     "projectId",
@@ -3919,6 +3927,7 @@ export const prismaRelationCatalogue = {
   "NurturingOrganization": {},
   "NurturingProjectUsageView": {},
   "NurturingProjectTraceDay": {},
+  "NurturingProjectEvaluationDay": {},
   "NurturingPersonalProject": {},
   "NurturingTracedProject": {},
   "BillingMeterCheckpoint": {},
