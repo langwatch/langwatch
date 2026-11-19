@@ -392,6 +392,10 @@ export const uiRouteTable: readonly UiRouteDescriptor[] = [
             page: "pages/settings/model-providers",
           },
           {
+            path: "/settings/private-endpoints",
+            page: "pages/settings/private-endpoints",
+          },
+          {
             path: "/settings/plans",
             page: "pages/settings/plans",
           },

@@ -101,6 +101,28 @@ describe("given the hosted product", () => {
   });
 });
 
+describe("given the private endpoints page", () => {
+  describe("when the menu is built", () => {
+    it("offers it to an organization manager under Organization", () => {
+      const organization = settingsMenu({
+        ...EVERYTHING_CLOSED,
+        hasOrganizationPermission: (p) => p === "organization:manage",
+      }).find((group) => group.id === "settings-organization");
+      expect(organization?.items.map((item) => item.href)).toContain("/settings/private-endpoints");
+    });
+
+    it("hides it without organization:manage, and from a lite member", () => {
+      expect(hrefsIn({})).not.toContain("/settings/private-endpoints");
+      expect(
+        hrefsIn({
+          isLiteMember: true,
+          hasOrganizationPermission: (p) => p === "organization:manage",
+        }),
+      ).not.toContain("/settings/private-endpoints");
+    });
+  });
+});
+
 describe("given a lite member", () => {
   describe("when the menu is built", () => {
     /**

@@ -10,10 +10,11 @@ Installed by ui, from the app's generated module list (`pnpm generate:modules`).
 
 ## Screens
 
-| Page key                         | URL                         | Within   | Label           | Permission | Flags |
-| -------------------------------- | --------------------------- | -------- | --------------- | ---------- | ----- |
-| `pages/settings/model-providers` | `/settings/model-providers` | settings | Model providers | –          | –     |
-| `pages/settings/model-costs`     | `/settings/model-costs`     | settings | Model costs     | –          | –     |
+| Page key                           | URL                           | Within   | Label             | Permission            | Flags |
+| ---------------------------------- | ----------------------------- | -------- | ----------------- | --------------------- | ----- |
+| `pages/settings/model-providers`   | `/settings/model-providers`   | settings | Model providers   | –                     | –     |
+| `pages/settings/model-costs`       | `/settings/model-costs`       | settings | Model costs       | –                     | –     |
+| `pages/settings/private-endpoints` | `/settings/private-endpoints` | settings | Private endpoints | `organization:manage` | –     |
 
 A URL marked (route table) is joined from `apps/ui/src/shell/ui-route-table.ts`; the screen declares no `path`.
 
@@ -30,7 +31,7 @@ Opened from lists the other modules (and `ui`, the app) whose browser source nam
 
 ## Calls
 
-- `withApi(modelProviderApi)`, tRPC contracts: `modelProvider.*`.
+- `withApi(modelProviderApi)`, tRPC contracts: `modelProvider.*`, `privateModelEndpoint.*`.
 - Client packages (package.json): `@langwatch/enterprise-managed-provider-client`, `@langwatch/feature-flag-client`, `@langwatch/model-provider-client`.
 - Lends: `EditModelProviderFormToken`, `ModelDisplayToken`, `ModelSelectorToken`.
 - Host APIs it requires: `ModelProviderHostApi`.

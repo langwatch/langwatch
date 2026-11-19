@@ -11,6 +11,7 @@ import {
   Blocks,
   Brain,
   Bug,
+  Cable,
   Building2,
   Coins,
   CreditCard,
@@ -203,6 +204,7 @@ function youGroup(): SettingsMenuGroup {
 
 function organizationGroup({
   hasPermission,
+  hasOrganizationPermission,
   isSaaS,
   enterprisePlan,
   isLiteMember,
@@ -237,6 +239,10 @@ function organizationGroup({
       // (Alex, 2026-10-11).
       ...(!isLiteMember && hasPermission("sso:view")
         ? [{ label: "Authentication", href: "/settings/authentication", icon: LogIn }]
+        : []),
+      // ADR-203: hostnames the organization points at the private endpoints staff registered.
+      ...(!isLiteMember && hasOrganizationPermission("organization:manage")
+        ? [{ label: "Private endpoints", href: "/settings/private-endpoints", icon: Cable }]
         : []),
       ...(seesBilling ? [{ label: "Usage", href: "/settings/usage", icon: Gauge }] : []),
       // Every member may upgrade, Lite included: whoever holds the card pays.

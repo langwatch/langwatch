@@ -45,6 +45,7 @@
   "/settings/members",
   "/settings/model-costs",
   "/settings/model-providers",
+  "/settings/private-endpoints",
   "/settings/plans",
   "/settings/roles",
   "/settings/braids",

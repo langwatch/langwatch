@@ -116,6 +116,7 @@ describe("given the installed web modules", () => {
           "pages/settings/api-keys",
           "pages/settings/model-providers",
           "pages/settings/model-costs",
+          "pages/settings/private-endpoints",
           "pages/settings/audit-log",
           "pages/settings/directory",
           "pages/settings/teams/[team]",
