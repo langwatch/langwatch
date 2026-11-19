@@ -300,17 +300,17 @@ Feature: Weekly digest emails
 
   # Cloud admin
 
-  @integration @unimplemented
+  @unit
   Scenario: The digest admin is refused where cloud ops is off
     Given ops's cloud-ops capability is off
-    When staff read the digest cohort
+    When staff on the ops list enrol an organization
     Then the call is refused with not_found
 
-  @integration @unimplemented
-  Scenario: Only operators on the ops list read the digest admin
+  @unit
+  Scenario: Only operators on the ops list use the digest admin
     Given a signed-in user who is not on the ops back-office list
-    When they read the digest cohort
-    Then the call is refused
+    When they enrol an organization
+    Then the call is refused with not_found
 
   @integration @unimplemented
   Scenario: The gallery previews a person's email for every eligible template
