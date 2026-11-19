@@ -221,12 +221,18 @@ browser follows it. The read cannot see a run the process holds before `run_star
 (a scheduled wake that fired, or a second tab that asked first), and the process drops a
 request while it holds one, so that request's id never runs. The server cannot answer
 the held run's id, as the service reads the row and not the process. So the browser also
-follows another run that started at or after the request, or settled after it with a
+follows another run that started at or after the request, in flight or settled with a
 conversation: per schedule the process takes events in order, so such a run held the
-request, and the request started nothing. A settled run carries no start time, and a lost
-run is settled as `failed/timeout` with no conversation just before the run that replaces
-it starts, so a settled run without a conversation is never taken for the held one; a held
-run that never reached Langy leaves the wait to its deadline. Run now answers
+request, and the request started nothing. A settled run is judged by its start, not its
+settle: a lost run's last attempt that is still alive can settle itself, with its
+conversation, after the request, and it started before it. `run_settled` names `startedAt`,
+the instant that attempt recorded `run_started`; the row keeps it as `lastRunStartedAt`,
+and the read answers it on `lastRun.startedAt`. An outcome stored before the field existed
+takes the start of the row's run in flight when that is the same run, and the browser reads
+a settled run with no start by its settle time, as before. A lost run is settled as
+`failed/timeout` with no conversation just before the run that replaces it starts, so a
+settled run without a conversation is never taken for the held one; a held run that never
+reached Langy leaves the wait to its deadline. Run now answers
 `requestedAt`, the time the server recorded the request on the clock that stamps a
 run's start, so the browser's clock never enters the comparison. A scheduled run that
 settled before the request is shown as the last run, and the wait goes on. A run that
@@ -235,7 +241,7 @@ read, and the browser reads the board once more. That read gives the verdict, an
 if it shows the requested run the wait ends as for any other read, opening Langy or telling
 how the run ended; if it shows none, or fails, the browser says the run could not be started;
 if it never answers, nothing is said and no panel opens until a later hint's read, which
-replaces the stalled one, answers it: a run it shows then opens as above. The verdict is owed for one more `INSIGHT_DAILY_RUN_EXPIRY_MS` after the deadline: a read that answers later than that says nothing and opens nothing, since a hint may only have outrun its row. Within that time, a run counts only if its `runId` is the request's, or it started, or settled, before the deadline, which is `requestedAt` plus `INSIGHT_DAILY_RUN_EXPIRY_MS`, both on the server's clock, so a browser clock that is off moves nothing. A run that is neither is one that started, or settled, after the deadline (a settled run counts as unrelated because `lastRun` carries no start time), and says nothing of the request: it gives no verdict, not even "Couldn't start the run". No run at all still says the run could not be started. An answer after the page is gone, the request is turned off or a
+replaces the stalled one, answers it: a run it shows then opens as above. The verdict is owed for one more `INSIGHT_DAILY_RUN_EXPIRY_MS` after the deadline: a read that answers later than that says nothing and opens nothing, since a hint may only have outrun its row. Within that time, a run counts only if its `runId` is the request's, or it started before the deadline, which is `requestedAt` plus `INSIGHT_DAILY_RUN_EXPIRY_MS`, both on the server's clock, so a browser clock that is off moves nothing. A run that is neither is one that started after the deadline (a settled run that names no start is judged by its settle time), and says nothing of the request: it gives no verdict, not even "Couldn't start the run". No run at all still says the run could not be started. An answer after the page is gone, the request is turned off or a
 newer request was made acts on nothing. While a run is in flight the
 dropdown offers to open it instead.
 
@@ -247,7 +253,7 @@ the last widget does not end the wait: the offer of Run now goes, "Starting a ru
 
 **The row names the run in flight.** `run_started` writes `runInFlightId`,
 `runInFlightConversationId` and `runInFlightStartedAt`, and the `run_settled` of that run
-clears them. The read names no run in flight once its start is older than
+clears them and writes `lastRunStartedAt`. The read names no run in flight once its start is older than
 `INSIGHT_DAILY_RUN_EXPIRY_MS`, a run that is lost.
 
 **Insights runs are exempt from the unattended-turn rate limit.** This is an owner

@@ -27,12 +27,15 @@ function lastRunOf(state: InsightDailyScheduleState): InsightDailyRun["lastRun"]
   };
 }
 
-/** The last run as its person reads it, with its id; a requested run's id is its request's. */
+/**
+ * The last run as its person reads it, with its id and its start; a requested run's id is its
+ * request's. A run that never reached Langy, or settled before its start was kept, names none.
+ */
 function ownLastRunOf(state: InsightDailyScheduleState): InsightDailyRunSetting["lastRun"] {
   const lastRun = lastRunOf(state);
-  return lastRun === null || state.lastRunId === null
-    ? null
-    : { ...lastRun, runId: state.lastRunId };
+  if (lastRun === null || state.lastRunId === null) return null;
+  const { lastRunId: runId, lastRunStartedAt: startedAt } = state;
+  return { ...lastRun, runId, ...(startedAt === null ? {} : { startedAt }) };
 }
 
 /** The run that started and has not settled, as folded; the read drops one that is lost. */

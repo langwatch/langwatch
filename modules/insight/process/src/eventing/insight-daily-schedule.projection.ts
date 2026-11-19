@@ -13,6 +13,7 @@ import {
   type InsightRunMaxInsights,
   type InsightRunOutcome,
   type InsightRunReason,
+  type InsightRunSettledEventData,
   type InsightScheduleOffReason,
   type InsightScheduleState,
 } from "@langwatch/insight-contract";
@@ -44,6 +45,8 @@ export interface InsightDailyScheduleState {
   /** How many insights the run found still true and renewed. */
   readonly lastRunRenewed: number | null;
   readonly lastRunConversationId: string | null;
+  /** Epoch milliseconds: when the last run's turn started; null when it never reached Langy. */
+  readonly lastRunStartedAt: number | null;
   /** The scheduled days in a row whose run ended skipped, and the slot of the newest counted. */
   readonly consecutiveSkips: number;
   readonly skipStreakSlot: number | null;
@@ -71,6 +74,7 @@ const INITIAL_INSIGHT_DAILY_SCHEDULE_STATE: InsightDailyScheduleState = {
   lastRunFiled: null,
   lastRunRenewed: null,
   lastRunConversationId: null,
+  lastRunStartedAt: null,
   consecutiveSkips: 0,
   skipStreakSlot: null,
   runInFlightId: null,
@@ -83,6 +87,18 @@ const NO_RUN_IN_FLIGHT = {
   runInFlightConversationId: null,
   runInFlightStartedAt: null,
 } as const;
+
+/**
+ * When the settled run started: as its outcome says, or, for an outcome stored before it said,
+ * as the row's run in flight says when that is the same run.
+ */
+function settledRunStartOf(
+  state: InsightDailyScheduleState,
+  data: InsightRunSettledEventData,
+): number | null {
+  if (data.startedAt !== undefined) return data.startedAt;
+  return state.runInFlightId === data.runId ? state.runInFlightStartedAt : null;
+}
 
 /** Whether the event leaves the row as it is: no event of the row's, or one it does not take. */
 function leavesRow(state: InsightDailyScheduleState, event: InsightDailyRunEvent): boolean {
@@ -135,6 +151,7 @@ function changeOf(
         lastRunFiled: event.data.filedCount,
         lastRunRenewed: event.data.renewedCount,
         lastRunConversationId: event.data.conversationId,
+        lastRunStartedAt: settledRunStartOf(state, event.data),
         consecutiveSkips: streak.count,
         skipStreakSlot: streak.slot,
         // A lost run settles after the run that replaced it started: that one is still in flight.

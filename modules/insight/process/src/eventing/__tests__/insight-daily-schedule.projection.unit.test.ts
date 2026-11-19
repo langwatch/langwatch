@@ -85,6 +85,7 @@ describe("given a run that settled", () => {
       lastRunFiled: 2,
       lastRunRenewed: 0,
       lastRunConversationId: "conversation-1",
+      lastRunStartedAt: null,
       consecutiveSkips: 0,
       skipStreakSlot: T0,
       runInFlightId: null,
@@ -225,6 +226,32 @@ describe("given a run was requested for a board", () => {
         runInFlightConversationId: "conversation-2",
         lastRunId: "run-1",
       });
+    });
+  });
+
+  describe("when the run's outcome names when its turn started", () => {
+    /** @scenario "A settled run keeps when it started on the board's row" */
+    it("keeps that start as the last run's", () => {
+      const running = applyInsightDailyRunEvent(PROJECTION.init(), started(T0 + 1_000));
+
+      const ran = applyInsightDailyRunEvent(
+        running,
+        settled(T0 + 60_000, { startedAt: T0 + 2_000 }),
+      );
+
+      expect(ran).toMatchObject({ lastRunId: "run-1", lastRunStartedAt: T0 + 2_000 });
+    });
+  });
+
+  describe("when an outcome stored before starts were kept on it settles the run", () => {
+    it("takes the start of that run in flight, and none for a run the row never saw start", () => {
+      const running = applyInsightDailyRunEvent(PROJECTION.init(), started(T0 + 1_000));
+
+      const ran = applyInsightDailyRunEvent(running, settled(T0 + 60_000));
+      const unseen = applyInsightDailyRunEvent(PROJECTION.init(), settled(T0 + 60_000));
+
+      expect(ran.lastRunStartedAt).toBe(T0 + 1_000);
+      expect(unseen.lastRunStartedAt).toBeNull();
     });
   });
 

@@ -2616,6 +2616,9 @@ model InsightDailyScheduleProjection {
   /// How many insights the run found still true and renewed.
   lastRunRenewed        Int?
   lastRunConversationId String?
+  /// When the last run's Langy turn started. NULL when it never reached Langy, and for a run
+  /// settled before the start was kept.
+  lastRunStartedAt      Float?
   /// The scheduled days in a row whose run ended skipped, and the slot of the newest counted.
   consecutiveSkips      Int     @default(0)
   skipStreakSlot        Float?

@@ -1264,6 +1264,7 @@ export const prismaModelFieldCatalogue = {
     "lastRunFiled",
     "lastRunRenewed",
     "lastRunConversationId",
+    "lastRunStartedAt",
     "consecutiveSkips",
     "skipStreakSlot",
     "runInFlightId",

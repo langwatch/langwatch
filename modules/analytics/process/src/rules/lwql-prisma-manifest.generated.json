@@ -9937,6 +9937,15 @@
           "documentation": ""
         },
         {
+          "name": "lastRunStartedAt",
+          "columnName": "lastRunStartedAt",
+          "type": "Float",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "When the last run's Langy turn started. NULL when it never reached Langy, and for a run\nsettled before the start was kept."
+        },
+        {
           "name": "consecutiveSkips",
           "columnName": "consecutiveSkips",
           "type": "Int",

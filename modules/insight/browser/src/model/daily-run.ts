@@ -203,9 +203,17 @@ export const TEMPLATE_BOARD_NOTE =
   "Langy cannot read From LangWatch boards yet. Until it can, a run on this board files nothing.";
 
 /**
- * What a Run now waits for: the run its request named, or another that started or settled after
- * the request, never a lost run (settled with no conversation); see ADR-004. Once the verdict
- * is owed (`owedSince`), another run counts only if it started or settled before that instant.
+ * When a settled run started. An outcome stored before the start was kept names none: its
+ * settle time stands in, as it did then.
+ */
+function startOfSettled(lastRun: InsightLastRun): number {
+  return lastRun.startedAt ?? lastRun.at;
+}
+
+/**
+ * What a Run now waits for: the run its request named, or another that started after the
+ * request and settled in Langy, never a lost run (no conversation, or started before); see
+ * ADR-004. Once the verdict is owed (`owedSince`), it must have started before that instant.
  */
 export function requestedRunOf({
   setting,
@@ -230,7 +238,9 @@ export function requestedRunOf({
     return { conversationId: runInFlight.conversationId };
   }
   const settledInLangy =
-    lastRun?.conversationId != null && lastRun.at >= requestedAt && lastRun.at < owedSince;
+    lastRun?.conversationId != null &&
+    startOfSettled(lastRun) >= requestedAt &&
+    startOfSettled(lastRun) < owedSince;
   if (lastRun && (lastRun.runId === requestId || settledInLangy)) {
     return { conversationId: lastRun.conversationId, settled: lastRun };
   }

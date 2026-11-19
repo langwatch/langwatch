@@ -1207,6 +1207,15 @@ Feature: The daily insights run
       And the Langy panel opens on their run's conversation once it starts
 
     @unit
+    Scenario: Run now waits past a run that started before the click and settled after it
+      Given a board that is on, whose run in flight is lost but still alive
+      And the member chose Run now
+      When that run settles in Langy, with its conversation, after the click
+      Then the board compares the run's start, not its settle, with the time the request was recorded
+      And it keeps waiting instead of taking that run for theirs
+      And a run whose outcome was stored before starts were kept reads its settle time as its start
+
+    @unit
     Scenario: Run now on a board whose run is already going follows that run
       Given a board that is on, whose run is in flight before the page shows it
       When the member chooses Run now
@@ -1351,6 +1360,14 @@ Feature: The daily insights run
       When the run starts
       Then the board's row names the run's conversation as the run in flight
       And once the run settles the row names no run in flight
+
+    @unit
+    Scenario: A settled run keeps when it started on the board's row
+      Given a run was requested for a board
+      When the run's turn starts and the run then settles
+      Then the run's outcome names when its turn started, and the board's row keeps it
+      And an outcome stored before starts were kept takes the start of that run in flight
+      And a run that never reached Langy names no start
 
     @integration
     Scenario: Run now asks for analytics:view and langy:create

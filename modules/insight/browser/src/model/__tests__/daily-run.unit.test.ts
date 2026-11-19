@@ -304,6 +304,44 @@ describe("given a member chose Run now, and the server answered request-1", () =
     });
   });
 
+  describe("when a run that started before the request settles in Langy after it", () => {
+    /** @scenario "Run now waits past a run that started before the click and settled after it" */
+    it("keeps waiting, and follows a run that started after the request", () => {
+      const lateSettle = lastRun({
+        at: NOW + 1_000,
+        startedAt: BEFORE_REQUEST,
+        runId: "run-lost",
+        conversationId: "conversation-5",
+      });
+      const startedAfter = lastRun({
+        at: NOW + 2_000,
+        startedAt: NOW + 1_000,
+        runId: "run-scheduled",
+        conversationId: "conversation-6",
+      });
+
+      expect(awaited(setting({ lastRun: lateSettle }))).toBeUndefined();
+      expect(awaited(setting({ lastRun: startedAfter }))).toEqual({
+        conversationId: "conversation-6",
+        settled: startedAfter,
+      });
+    });
+  });
+
+  describe("when a settled run names no start, as one settled before starts were kept", () => {
+    /** @scenario "Run now waits past a run that started before the click and settled after it" */
+    it("reads its settle time as its start", () => {
+      const settledBefore = lastRun({ at: BEFORE_REQUEST, conversationId: "conversation-5" });
+      const settledAfter = lastRun({ at: NOW, conversationId: "conversation-5" });
+
+      expect(awaited(setting({ lastRun: settledBefore }))).toBeUndefined();
+      expect(awaited(setting({ lastRun: settledAfter }))).toEqual({
+        conversationId: "conversation-5",
+        settled: settledAfter,
+      });
+    });
+  });
+
   describe("when a scheduled run settled before the request and before the first read", () => {
     it("keeps waiting, then follows its own run once that starts", () => {
       const scheduledSettled = lastRun({
@@ -375,6 +413,20 @@ describe("given a member chose Run now, and the server answered request-1", () =
       expect(atDeadline(started)).toEqual({
         kind: "run",
         run: { conversationId: "conversation-6" },
+      });
+    });
+
+    it("follows a run that started before the deadline and settled after it", () => {
+      const run = lastRun({
+        at: OWED_SINCE + 1_000,
+        startedAt: OWED_SINCE - 1_000,
+        runId: "run-scheduled",
+        conversationId: "conversation-6",
+      });
+
+      expect(atDeadline(setting({ lastRun: run }))).toEqual({
+        kind: "run",
+        run: { conversationId: "conversation-6", settled: run },
       });
     });
 

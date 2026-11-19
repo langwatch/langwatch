@@ -84,6 +84,7 @@ async function row({
         lastRunFiled: null,
         lastRunRenewed: null,
         lastRunConversationId: null,
+        lastRunStartedAt: null,
       },
       cursor: { acceptedAt: PASS_AT, eventId: `event-${scheduleId}` },
       occurredAt: PASS_AT,

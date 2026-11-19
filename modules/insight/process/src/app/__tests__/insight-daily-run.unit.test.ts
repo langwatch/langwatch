@@ -84,6 +84,10 @@ async function run(scope: RunScope = {}) {
 const runsOf = (userId = MEMBER) => installed.app.findDailyRuns({ projectId: PROJECT, userId });
 const insightsOf = (userId = MEMBER) => installed.app.findInsights({ projectId: PROJECT, userId });
 
+/** The person's own setting on the board, as Run now reads it. */
+const settingOf = (userId = MEMBER) =>
+  installed.app.getDailyRunSetting({ projectId: PROJECT, userId, board: BOARD });
+
 /** How the person's last run on the board ended. */
 async function lastRunOf(scope: { userId?: string; board?: InsightRunBoard } = {}) {
   const id = installed.scheduleIdOf(scope);
@@ -149,6 +153,17 @@ describe("given a member with analytics:view and a board with widgets", () => {
         }),
       ]);
       expect(await installed.runEventsOf()).toEqual([RUN_REQUESTED, RUN_STARTED, RUN_SETTLED]);
+    });
+
+    /** @scenario "A settled run keeps when it started on the board's row" */
+    it("reads when the run's turn started beside how it ended", async () => {
+      const before = nowInstant().epochMilliseconds;
+      await run();
+
+      const { lastRun } = await settingOf();
+
+      expect(lastRun?.startedAt).toBeGreaterThanOrEqual(before);
+      expect(lastRun?.startedAt).toBeLessThanOrEqual(lastRun?.at ?? 0);
     });
 
     /** @scenario "A run for one person changes nothing another person reads" */
@@ -401,6 +416,7 @@ describe("given the board a run is asked for", () => {
 
     expect(await lastRunOf()).toMatchObject({ outcome: "skipped", reason: "board_empty" });
     expect(installed.langy.starts).toEqual([]);
+    expect((await settingOf()).lastRun).not.toHaveProperty("startedAt");
   });
 
   /** @scenario "A From LangWatch board is skipped with its own reason" */

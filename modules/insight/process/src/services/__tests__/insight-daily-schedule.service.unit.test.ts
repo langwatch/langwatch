@@ -69,6 +69,7 @@ async function onWithRunInFlight({ startedAt }: { startedAt: number }): Promise<
     lastRunFiled: null,
     lastRunRenewed: null,
     lastRunConversationId: null,
+    lastRunStartedAt: null,
   };
   await repositories.dailyScheduleProjection.store(
     {

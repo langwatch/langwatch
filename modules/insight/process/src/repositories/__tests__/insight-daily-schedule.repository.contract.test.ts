@@ -71,6 +71,7 @@ function settled(overrides: Partial<InsightDailyScheduleState> = {}): InsightDai
     lastRunFiled: 2,
     lastRunRenewed: 1,
     lastRunConversationId: "conversation-1",
+    lastRunStartedAt: RAN_AT - 60_000,
     ...overrides,
   };
 }

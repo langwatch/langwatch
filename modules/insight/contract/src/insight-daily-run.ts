@@ -137,8 +137,16 @@ const insightLastRunSchema = z.object({
   conversationId: z.string().nullable(),
 });
 
-/** The last run as its own person reads it, by id: Run now waits for the run its request named. */
-const insightOwnLastRunSchema = z.object({ ...insightLastRunSchema.shape, runId: z.string() });
+/**
+ * The last run as its own person reads it, by id: Run now waits for the run its request named.
+ * `startedAt` (epoch milliseconds) is when Langy took its turn; absent for a run that never
+ * reached Langy and for one settled before the start was recorded on its outcome.
+ */
+const insightOwnLastRunSchema = z.object({
+  ...insightLastRunSchema.shape,
+  runId: z.string(),
+  startedAt: z.number().optional(),
+});
 
 /** One person's run on one board, as they read it: the board and how the last run ended. */
 const insightDailyRunSchemaDefinition = z.object({
