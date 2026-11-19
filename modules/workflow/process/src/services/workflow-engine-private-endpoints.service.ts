@@ -73,44 +73,23 @@ function runsGraph(body: object): boolean {
 }
 
 /**
- * The event with every `private_endpoints` key removed, at any depth. nlpgo no longer reads the
- * body for bindings, so this is defence in depth: a sender's own field never leaves the app, in
- * case an engine that still read it is ever reached.
+ * The event without a sender's `private_endpoints` field where older engine builds read it: the
+ * top level and `payload`. nlpgo no longer reads the body, so this is defence in depth. A deeper
+ * key of that name is tenant data (a dataset row, an input, a node parameter) and passes as sent.
  */
 function withoutSentBindings<Body extends object>(body: Body): Body {
-  return stripField(body) as Body;
+  const top = withoutField(body);
+  if (!("payload" in top) || !isRecord(top.payload)) return top;
+  const payload = withoutField(top.payload);
+  return payload === top.payload ? top : { ...top, payload };
 }
 
-function stripField(value: unknown): unknown {
-  if (Array.isArray(value)) return stripItems(value);
-  if (!isPlainObject(value)) return value;
-
-  let changed = false;
-  const out: Record<string, unknown> = {};
-  for (const [key, child] of Object.entries(value)) {
-    if (key === PRIVATE_ENDPOINTS_FIELD) {
-      changed = true;
-      continue;
-    }
-    const next = stripField(child);
-    if (next !== child) changed = true;
-    out[key] = next;
-  }
-  return changed ? out : value;
+function withoutField<Value extends object>(value: Value): Value {
+  if (!(PRIVATE_ENDPOINTS_FIELD in value)) return value;
+  const { [PRIVATE_ENDPOINTS_FIELD]: _sent, ...rest } = value as Record<string, unknown>;
+  return rest as Value;
 }
 
-function stripItems(items: unknown[]): unknown[] {
-  let changed = false;
-  const next = items.map((item) => {
-    const stripped = stripField(item);
-    if (stripped !== item) changed = true;
-    return stripped;
-  });
-  return changed ? next : items;
-}
-
-function isPlainObject(value: unknown): value is Record<string, unknown> {
-  if (typeof value !== "object" || value === null) return false;
-  const prototype: unknown = Object.getPrototypeOf(value);
-  return prototype === Object.prototype || prototype === null;
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }

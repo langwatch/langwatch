@@ -137,15 +137,11 @@ const BODIES: Record<string, { body: object; runsGraph: boolean }> = {
     body: { type: "execute_component", payload: { private_endpoints: FORGED } },
     runsGraph: false,
   },
-  "a nested envelope": {
+  "a discriminated envelope with the field at the top and in the payload": {
     body: {
       type: "execute_flow",
       private_endpoints: FORGED,
-      payload: {
-        workflow: WORKFLOW,
-        private_endpoints: FORGED,
-        payload: { private_endpoints: FORGED },
-      },
+      payload: { workflow: WORKFLOW, private_endpoints: FORGED },
     },
     runsGraph: true,
   },

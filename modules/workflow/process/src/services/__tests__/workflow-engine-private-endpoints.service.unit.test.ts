@@ -121,19 +121,15 @@ describe("WorkflowEnginePrivateEndpointsService", () => {
         type: "execute_component",
         payload: { private_endpoints: FORGED },
       },
-      "a nested envelope": {
+      "a discriminated envelope with the field at the top and in the payload": {
         type: "execute_flow",
         private_endpoints: FORGED,
-        payload: {
-          ...runEvent.payload,
-          private_endpoints: FORGED,
-          payload: { private_endpoints: FORGED, inputs: [{ private_endpoints: FORGED }] },
-        },
+        payload: { ...runEvent.payload, private_endpoints: FORGED },
       },
     };
 
     for (const [name, body] of Object.entries(cases)) {
-      it(`drops the field from ${name} at every depth`, async () => {
+      it(`drops the field from ${name}`, async () => {
         const { runtime, dispatched } = setup();
 
         await runtime.dispatch({ projectId: "acme-prod", body, origin: "workflow" });
@@ -142,6 +138,24 @@ describe("WorkflowEnginePrivateEndpointsService", () => {
         expect(JSON.stringify(dispatched[0])).not.toContain("evil.test");
       });
     }
+
+    it("leaves a deeper key of that name in the workflow data untouched", async () => {
+      const { runtime, dispatched } = setup();
+      const row = { question: "which?", private_endpoints: "a tenant's own column" };
+      const nodeParams = { id: "code", type: "code", data: { private_endpoints: ["keep"] } };
+      const body = {
+        type: "execute_flow",
+        payload: {
+          ...runEvent.payload,
+          workflow: { ...runEvent.payload.workflow, nodes: [nodeParams] },
+          inputs: [row],
+        },
+      };
+
+      await runtime.dispatch({ projectId: "acme-prod", body, origin: "workflow" });
+
+      expect(dispatched[0]?.body).toEqual(body);
+    });
 
     it("replaces headers the caller put on the input with the organization's", async () => {
       const { runtime, stream, dispatched, opened } = setup();
