@@ -141,7 +141,9 @@ Every event has the same shape:
 
 ### Reading the feed by cursor
 
-`GET /api/governance/registry/events` returns events in `sequence` order. Pass the page's `next_cursor` as `cursor` to read the next page, and store it as your position; `next_cursor` is null when you have caught up. A page can hold an empty `data` with a non-null `next_cursor` when every event on it was one this release skips: keep paging. Later releases add event types: skip a `type` your consumer does not know rather than failing on it, as LangWatch itself does. `limit` is 1 to 200, default 100; `/versions` takes the same `limit` and `cursor`. Sequences only grow, so a consumer that stores its cursor never misses or repeats an event.
+`GET /api/governance/registry/events` returns events in `sequence` order. Pass the page's `next_cursor` as `cursor` to read the next page, and store it as your position; `next_cursor` is null when you have caught up. A page can hold an empty `data` with a non-null `next_cursor` when every event on it was one this release skips: keep paging.
+
+Later releases add event types: skip a `type` your consumer does not know rather than failing on it, as LangWatch itself does. `limit` is 1 to 200, default 100; `/versions` takes the same `limit` and `cursor`. Sequences only grow, so a consumer that stores its cursor never misses or repeats an event.
 
 ```bash
 curl -s "$LANGWATCH_ENDPOINT/api/governance/registry/events?cursor=1041" \
