@@ -231,9 +231,22 @@ type cacheActionWire struct {
 	TTL  *int   `json:"ttl"`
 }
 
+// platformCredentialIDPrefix marks a credential the platform synthesized from
+// its own keys rather than one the organization stored (PLATFORM_PROVIDER_ID_PREFIX
+// in modules/model-provider/contract).
+const platformCredentialIDPrefix = "platform-"
+
+// customerCredential reports whether cred is one the organization owns. Only
+// those carry the organization's bindings: a binding must never pull a call
+// made with LangWatch's own key, or to LangWatch, to a customer's endpoint.
+func customerCredential(cred domain.Credential) bool {
+	return !strings.HasPrefix(cred.ID, platformCredentialIDPrefix) &&
+		cred.ProviderID != domain.ProviderLangWatch
+}
+
 // withPrivateEndpoints sets the organization's bindings on the config and on
-// every credential in it: the credential is what the provider router gets per
-// request, so that is where the binding has to ride.
+// every customer credential in it: the credential is what the provider router
+// gets per request, so that is where the binding has to ride.
 func withPrivateEndpoints(cfg domain.BundleConfig, eps []domain.PrivateEndpoint) domain.BundleConfig {
 	if len(eps) == 0 {
 		return cfg
@@ -241,7 +254,9 @@ func withPrivateEndpoints(cfg domain.BundleConfig, eps []domain.PrivateEndpoint)
 	cfg.PrivateEndpoints = eps
 	creds := make([]domain.Credential, len(cfg.Credentials))
 	for i, cred := range cfg.Credentials {
-		cred.PrivateEndpoints = eps
+		if customerCredential(cred) {
+			cred.PrivateEndpoints = eps
+		}
 		creds[i] = cred
 	}
 	cfg.Credentials = creds

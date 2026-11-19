@@ -78,6 +78,11 @@ func checkBoundEndpoint(scheme, port string, ep domain.PrivateEndpoint, allowLoo
 	return checkPrivateEndpointAddresses(ep, allowLoopback)
 }
 
+// privateEndpointConnectTimeout bounds one connect attempt to one registered
+// address. A blackholed first address must not spend the whole dial budget
+// before the second, healthy one is tried.
+const privateEndpointConnectTimeout = 3 * time.Second
+
 // privateEndpointDialer connects to a binding's registered addresses in
 // order, moving to the next when one refuses or times out. It holds no
 // resolver: a bound hostname is never looked up.
@@ -86,11 +91,34 @@ type privateEndpointDialer struct {
 	// it to observe which addresses are tried.
 	dial          func(ctx context.Context, network, address string) (net.Conn, error)
 	allowLoopback bool
+	// connectTimeout bounds each address's attempt; zero leaves only the
+	// caller's context and the overall timeout.
+	connectTimeout time.Duration
+	// timeout bounds the whole dial, across every address; zero leaves only
+	// the caller's context.
+	timeout time.Duration
 }
 
+// newPrivateEndpointDialer builds the production dialer: at most timeout for
+// the whole dial, and at most privateEndpointConnectTimeout per address.
 func newPrivateEndpointDialer(timeout time.Duration, allowLoopback bool) privateEndpointDialer {
-	d := &net.Dialer{Timeout: timeout, KeepAlive: 30 * time.Second}
-	return privateEndpointDialer{dial: d.DialContext, allowLoopback: allowLoopback}
+	d := &net.Dialer{KeepAlive: 30 * time.Second}
+	return privateEndpointDialer{
+		dial:           d.DialContext,
+		allowLoopback:  allowLoopback,
+		connectTimeout: privateEndpointConnectTimeout,
+		timeout:        timeout,
+	}
+}
+
+// dialOne makes one connect attempt, bounded by the per-address timeout.
+func (d privateEndpointDialer) dialOne(ctx context.Context, address string) (net.Conn, error) {
+	if d.connectTimeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, d.connectTimeout)
+		defer cancel()
+	}
+	return d.dial(ctx, "tcp", address)
 }
 
 // privateEndpointDialError is the connect failure a tenant sees. It names the
@@ -123,12 +151,17 @@ func (d privateEndpointDialer) DialEndpoint(ctx context.Context, ep domain.Priva
 	if err := checkPrivateEndpointAddresses(ep, d.allowLoopback); err != nil {
 		return nil, err
 	}
+	if d.timeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, d.timeout)
+		defer cancel()
+	}
 	var lastErr error
 	for _, addr := range ep.Addresses {
 		if ctx.Err() != nil {
 			break
 		}
-		conn, dialErr := d.dial(ctx, "tcp", net.JoinHostPort(addr.String(), port))
+		conn, dialErr := d.dialOne(ctx, net.JoinHostPort(addr.String(), port))
 		if dialErr == nil {
 			return conn, nil
 		}

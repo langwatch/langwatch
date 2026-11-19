@@ -35,6 +35,26 @@ func TestFetchConfig_PrivateEndpoints(t *testing.T) {
 		}
 	})
 
+	// @scenario "Bindings never apply to LangWatch's own credentials"
+	t.Run("bindings never ride on the platform's own credentials", func(t *testing.T) {
+		platform := `"providers":[{"id":"mp_1","type":"custom","credentials":{"api_key":"k"},"base_url":"https://llm.internal.acme.test/v1"},` +
+			`{"id":"platform-openai","type":"openai","credentials":{"api_key":"lw"}},` +
+			`{"id":"mp_lw","type":"langwatch","credentials":{"api_key":"lw2"}}]`
+		srv := &configServer{revision: "1", body: `{` + platform + `,"private_endpoints":` +
+			`[{"hostname":"llm.internal.acme.test","addresses":["10.20.1.21"],"port":443}]}`}
+		res, err := srv.start(t).FetchConfig(context.Background(), "vk_acme", "")
+		require.NoError(t, err)
+		require.Len(t, res.Config.Credentials, 3)
+		byID := map[string]domain.Credential{}
+		for _, cred := range res.Config.Credentials {
+			byID[cred.ID] = cred
+		}
+		assert.Len(t, byID["mp_1"].PrivateEndpoints, 1, "the organization's own credential is bound")
+		assert.Empty(t, byID["platform-openai"].PrivateEndpoints, "a platform key is never bound")
+		assert.Empty(t, byID["mp_lw"].PrivateEndpoints, "a call to LangWatch is never bound")
+		assert.Len(t, res.Config.PrivateEndpoints, 1)
+	})
+
 	for name, field := range map[string]string{
 		"absent": ``,
 		"null":   `,"private_endpoints":null`,

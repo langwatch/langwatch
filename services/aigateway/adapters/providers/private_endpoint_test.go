@@ -10,6 +10,7 @@ import (
 	"sync"
 	"syscall"
 	"testing"
+	"time"
 
 	bfschemas "github.com/maximhq/bifrost/core/schemas"
 	"github.com/stretchr/testify/assert"
@@ -255,6 +256,59 @@ func TestPrivateEndpointDialer(t *testing.T) {
 		assertNoRegisteredAddress(t, err)
 		assert.Contains(t, err.Error(), "llm.internal.acme.test:443")
 		assert.True(t, errors.Is(err, syscall.ECONNREFUSED), "the cause stays inspectable for logs")
+	})
+
+	// @scenario "A silent address does not hold up the next one"
+	t.Run("gives up on a silent address after the connect timeout and tries the next", func(t *testing.T) {
+		t.Parallel()
+		var mu sync.Mutex
+		var tried []string
+		d := privateEndpointDialer{
+			connectTimeout: 20 * time.Millisecond,
+			timeout:        5 * time.Second,
+			dial: func(ctx context.Context, _, address string) (net.Conn, error) {
+				mu.Lock()
+				tried = append(tried, address)
+				mu.Unlock()
+				if address == "10.20.1.21:443" {
+					<-ctx.Done() // a blackholed address: no answer, ever
+					return nil, ctx.Err()
+				}
+				client, server := net.Pipe()
+				_ = server.Close()
+				return client, nil
+			},
+		}
+		start := time.Now()
+		conn, err := d.DialEndpoint(t.Context(), acmeBinding(), "llm.internal.acme.test:443")
+		require.NoError(t, err)
+		_ = conn.Close()
+		assert.Less(t, time.Since(start), time.Second, "the first address's wait is the connect timeout, not the overall one")
+		assert.Equal(t, []string{"10.20.1.21:443", "10.20.2.34:443"}, tried)
+	})
+
+	t.Run("stops at the overall timeout across every address", func(t *testing.T) {
+		t.Parallel()
+		d := privateEndpointDialer{
+			connectTimeout: time.Second,
+			timeout:        30 * time.Millisecond,
+			dial: func(ctx context.Context, _, _ string) (net.Conn, error) {
+				<-ctx.Done()
+				return nil, ctx.Err()
+			},
+		}
+		start := time.Now()
+		_, err := d.DialEndpoint(t.Context(), acmeBinding(), "llm.internal.acme.test:443")
+		assertNoRegisteredAddress(t, err)
+		assert.Less(t, time.Since(start), 900*time.Millisecond)
+		assert.True(t, errors.Is(err, context.DeadlineExceeded))
+	})
+
+	t.Run("the production dialer allows 3s per address within the caller's budget", func(t *testing.T) {
+		t.Parallel()
+		d := newPrivateEndpointDialer(30*time.Second, false)
+		assert.Equal(t, 3*time.Second, d.connectTimeout)
+		assert.Equal(t, 30*time.Second, d.timeout)
 	})
 
 	refusedTargets := map[string]string{
