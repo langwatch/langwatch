@@ -20,22 +20,23 @@ import type { InsightDailyRunEvent } from "./insight-daily-run.events.ts";
 
 export { NO_RUN_STARTED, type InsightRunInFlightState };
 
-/** The newest run the row took, in the run order; none until it took one. */
-function newestOf(state: InsightRunInFlightState): RunOrder | null {
+/** Whether the run is older than the newest the row took; false until it took one. */
+function isOlderThanNewest(state: InsightRunInFlightState, run: RunOrder): boolean {
   const { newestRunId: runId, newestRunSlot: slot, newestRunSince: since } = state;
-  return runId === null || slot === null ? null : { runId, slot, since };
+  if (runId === null || slot === null) return false;
+  return isOlderRun({ run, newest: { runId, slot, since } });
 }
 
-/** The last settled run, in the run order; none until the row took an outcome. */
-function lastSettledOf(state: InsightRunInFlightState): RunOrder | null {
+/** Whether the run is older than the last settled one; false until the row took an outcome. */
+function isOlderThanLastSettled(state: InsightRunInFlightState, run: RunOrder): boolean {
   const { lastSettledRunId: runId, lastSettledRunSlot: slot, lastSettledRunSince: since } = state;
-  return runId === null || slot === null ? null : { runId, slot, since };
+  if (runId === null || slot === null) return false;
+  return isOlderRun({ run, newest: { runId, slot, since } });
 }
 
 /** The run an event names; an older worker drops its start, so the row's own is kept for it. */
 function runOf(state: InsightRunInFlightState, { runId, slot, since }: RunOrder): RunOrder {
-  const newest = newestOf(state);
-  const known = newest?.runId === runId ? newest.since : null;
+  const known = state.newestRunId === runId ? state.newestRunSince : null;
   return { runId, slot, since: since ?? known ?? null };
 }
 
@@ -51,14 +52,14 @@ function leavesRow(state: InsightRunInFlightState, event: InsightDailyRunEvent):
       // A start delivered again after its run settled is not a run in flight. A retried attempt
       // appends its own start under the same key: the first stands, as a replay keeps it.
       const { runId } = event.data;
-      if (isOlderRun({ run: event.data, newest: newestOf(state) })) return true;
+      if (isOlderThanNewest(state, event.data)) return true;
       return state.lastSettledRunId === runId || state.runId === runId;
     }
     case INSIGHT_DAILY_RUN_EVENT_TYPES.RUN_SETTLED:
       // The first outcome stands, and an older run's leaves a newer one's. An outcome newer than
       // the last is taken even after a newer run started: that run stays in flight.
       if (state.lastSettledRunId === event.data.runId) return true;
-      return isOlderRun({ run: runOf(state, event.data), newest: lastSettledOf(state) });
+      return isOlderThanLastSettled(state, runOf(state, event.data));
     default:
       return true;
   }
@@ -87,7 +88,7 @@ function changeOf(
         lastRunFiled: data.filedCount,
         lastRunRenewed: data.renewedCount,
         lastRunConversationId: data.conversationId,
-        ...(isOlderRun({ run, newest: newestOf(state) }) ? {} : newestFrom(run)),
+        ...(isOlderThanNewest(state, run) ? {} : newestFrom(run)),
         // The settled run's start stays as its own. One kept for the run settled before goes, so
         // a later run that never started is not read as that one.
         ...(state.runId !== null && state.runId === state.lastSettledRunId
