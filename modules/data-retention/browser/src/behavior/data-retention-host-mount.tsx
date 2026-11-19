@@ -112,7 +112,10 @@ export default function DataRetentionHostMount({ children }: { children?: ReactN
   );
   const activePlan = dataRetentionApi.plan.getActivePlan.useQuery(
     { organizationId: organizationId ?? "" },
-    { enabled: !!organizationId && session.hasPermission("organization:view"), retry: false },
+    {
+      enabled: !!organizationId && session.hasOrganizationPermission("organization:view"),
+      retry: false,
+    },
   );
   const admin = dataRetentionApi.user.isAdmin.useQuery({}, { enabled: signedIn });
   const planType = activePlan.data?.type;

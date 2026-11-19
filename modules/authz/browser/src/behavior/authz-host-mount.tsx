@@ -117,7 +117,10 @@ export default function AuthzHostMount({ children }: { children?: ReactNode }) {
   // The plan tier only: the session-cached read, not the monthly usage count.
   const activePlan = authzApi.plan.getActivePlan.useQuery(
     { organizationId: organizationId ?? "" },
-    { enabled: !!organizationId && session.hasPermission("organization:view"), retry: false },
+    {
+      enabled: !!organizationId && session.hasOrganizationPermission("organization:view"),
+      retry: false,
+    },
   );
   const planType = activePlan.data?.type;
   const plan = { isEnterprise: planType === "ENTERPRISE", isLoading: activePlan.isLoading };
