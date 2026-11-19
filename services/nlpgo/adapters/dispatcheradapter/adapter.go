@@ -82,6 +82,7 @@ func (a *Adapter) dispatch(ctx context.Context, req app.GatewayRequest, typ doma
 	if err != nil {
 		return nil, err
 	}
+	cred.PrivateEndpoints = domain.PrivateEndpointsFromContext(ctx)
 	bare := bareModel(req.Model)
 	cred = domain.WithDeploymentSelfMap(cred, bare)
 	resp, err := a.disp.Dispatch(ctx, dispatcher.Request{
@@ -105,6 +106,9 @@ func (a *Adapter) dispatchStream(ctx context.Context, req app.GatewayRequest, ty
 	if err != nil {
 		return nil, err
 	}
+	// The workflow request's private endpoint bindings (ADR-203) ride on ctx
+	// from the HTTP handler; the dispatcher reads them off the credential.
+	cred.PrivateEndpoints = domain.PrivateEndpointsFromContext(ctx)
 	bare := bareModel(req.Model)
 	cred = domain.WithDeploymentSelfMap(cred, bare)
 	iter, err := a.disp.DispatchStream(ctx, dispatcher.Request{

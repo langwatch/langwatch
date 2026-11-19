@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"context"
 	"crypto/subtle"
 	"net/http"
 
@@ -58,7 +59,19 @@ func RequireInternalSecret(secret string) func(http.Handler) http.Handler {
 				}))
 				return
 			}
-			next.ServeHTTP(w, r)
+			next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), internallyAuthenticatedKey{}, true)))
 		})
 	}
+}
+
+type internallyAuthenticatedKey struct{}
+
+// internallyAuthenticated reports whether the request presented the internal
+// secret, as opposed to reaching an install that configured none (where the
+// routes are open). Inputs only the app may set, such as an organization's
+// private endpoint bindings (ADR-203), are honoured on authenticated requests
+// alone: on an open route anyone could name addresses to dial.
+func internallyAuthenticated(ctx context.Context) bool {
+	ok, _ := ctx.Value(internallyAuthenticatedKey{}).(bool)
+	return ok
 }
