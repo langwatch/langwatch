@@ -6,6 +6,7 @@
  */
 
 import type { AnalyticsApi } from "@langwatch/analytics-contract";
+import type { ProcessStore } from "@langwatch/eventing";
 import { HandledError } from "@langwatch/handled-error";
 import type {
   InsightEntry,
@@ -25,6 +26,10 @@ import type {
   InsightDailyRunExecutor,
   RunBoardIntent,
 } from "../eventing/insight-daily-run.intent.ts";
+import {
+  INSIGHT_DAILY_RUN_PROCESS_NAME,
+  insightDailyRunStateSchema,
+} from "../eventing/insight-daily-run.process.ts";
 import type { InsightRepository } from "../repositories/insight.repository.ts";
 import { type CheckedFinding, checkRunAnswer } from "../rules/insight-daily-run-answer.rules.ts";
 import { buildDailyRunBrief } from "../rules/insight-daily-run-brief.rules.ts";
@@ -138,10 +143,17 @@ type InsightDailyRunMembers = Readonly<{
 }>;
 
 export class InsightDailyRunService implements InsightDailyRunExecutor {
+  #instances: Pick<ProcessStore, "findByRef"> | undefined;
+
   private constructor(private readonly members: InsightDailyRunMembers) {}
 
   static create(members: InsightDailyRunMembers): InsightDailyRunService {
     return new InsightDailyRunService(members);
+  }
+
+  /** The process store of the process that hosts the pipeline, lent when it is built. */
+  connect(instances: Pick<ProcessStore, "findByRef">): void {
+    this.#instances = instances;
   }
 
   /**
@@ -211,6 +223,10 @@ export class InsightDailyRunService implements InsightDailyRunExecutor {
     const { projectId, userId, scheduleId, runId, slot } = input;
     const turn = await this.askLangy(input, ready);
     if ("outcome" in turn) return turn;
+    if (await this.isHandedOn(input)) {
+      await this.stop({ projectId, userId, ...turn });
+      return failed("timeout", turn.conversationId);
+    }
     await this.members.runCommands.recordRunStarted({
       tenantId: projectId,
       occurredAt: nowInstant().epochMilliseconds,
@@ -377,6 +393,25 @@ export class InsightDailyRunService implements InsightDailyRunExecutor {
     });
   }
 
+  /**
+   * Whether the schedule's process no longer waits on this run: a newer run took it over and
+   * records it as lost, or its outcome is on the record. Its start or outcome recorded now
+   * would name it the schedule's newest after a newer run; a replay keeps the run's first
+   * outcome and would not.
+   */
+  private async isHandedOn({ projectId, scheduleId, runId }: RunInput): Promise<boolean> {
+    // No store lent, or no instance: nothing says the run was handed on.
+    if (!this.#instances) return false;
+    const instance = await this.#instances.findByRef({
+      ref: { processName: INSIGHT_DAILY_RUN_PROCESS_NAME, projectId, processKey: scheduleId },
+    });
+    if (instance === null) return false;
+    const { pendingRun } = insightDailyRunStateSchema.parse(instance.state);
+    if (pendingRun?.runId === runId) return false;
+    logger.warn({ projectId, scheduleId, runId }, "daily run was handed on; recording nothing");
+    return true;
+  }
+
   /** Best effort: the run's outcome is recorded whether or not the turn could be stopped. */
   private async stop(turn: StartedTurn & { projectId: string; userId: string }): Promise<void> {
     try {
@@ -419,6 +454,7 @@ export class InsightDailyRunService implements InsightDailyRunExecutor {
     end: RunEnd;
     startedAt: number;
   }): Promise<void> {
+    if (await this.isHandedOn(input)) return;
     const { projectId, scheduleId, userId, runId, slot, skippedDaysBefore } = input;
     const { board = input.board, ...result } = end;
     const envelope = { tenantId: projectId, scheduleId, userId, board };

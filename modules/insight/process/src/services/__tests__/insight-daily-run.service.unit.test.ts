@@ -6,11 +6,13 @@
  */
 
 import type { AnalyticsApi } from "@langwatch/analytics-contract";
+import { InMemoryProcessStore, type ProcessRef, type ProcessStore } from "@langwatch/eventing";
 import type { InsightRunSettledEventData } from "@langwatch/insight-contract";
 import type { LangyApi } from "@langwatch/langy-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
+import { INITIAL_INSIGHT_DAILY_RUN_STATE } from "../../eventing/insight-daily-run.process.ts";
 import type { InsightRepository } from "../../repositories/insight.repository.ts";
 import type { InsightCommandsService } from "../insight-commands.service.ts";
 import type { InsightDailyRunCommandsService } from "../insight-daily-run-commands.service.ts";
@@ -39,7 +41,22 @@ const neverSettles: Langy["awaitTurnSettlement"] = ({ signal }) =>
     signal.addEventListener("abort", () => resolve({ kind: "stopped" }), { once: true });
   });
 
+/** The run the schedule's process waits on, read by read; the last answer stands. */
+function processWaitingOn(pendingRunIds: readonly string[]): Pick<ProcessStore, "findByRef"> {
+  const answers = [...pendingRunIds];
+  // Assigned over a store, as `findByRef` is generic in the state it answers.
+  return Object.assign(InMemoryProcessStore.createForTesting(), {
+    findByRef: async ({ ref }: { ref: ProcessRef }) => {
+      const runId = answers.length > 1 ? answers.shift()! : answers[0]!;
+      const pendingRun = { runId, since: RUN.slot, slot: RUN.slot };
+      const state = { ...INITIAL_INSIGHT_DAILY_RUN_STATE, pendingRun };
+      return { ref, tenantId: ref.projectId, state, revision: 1, nextWakeAt: null, updatedAt: 0 };
+    },
+  });
+}
+
 function harness({ stopTurn }: { stopTurn?: Langy["stopTurn"] } = {}) {
+  const started: unknown[] = [];
   const settled: InsightRunSettledEventData[] = [];
   const stopped: unknown[] = [];
   const filed: unknown[] = [];
@@ -78,14 +95,14 @@ function harness({ stopTurn }: { stopTurn?: Langy["stopTurn"] } = {}) {
     runCommands: createApiFixture<
       Pick<InsightDailyRunCommandsService, "recordRunStarted" | "settleRun" | "turnOffSchedule">
     >({
-      recordRunStarted: async () => undefined,
+      recordRunStarted: async (input) => void started.push(input),
       settleRun: async ({ tenantId: _tenantId, occurredAt: _occurredAt, ...data }) => {
         settled.push(data);
       },
     }),
     turnDeadlineMs: 20,
   });
-  return { service, settled, stopped, filed };
+  return { service, started, settled, stopped, filed };
 }
 
 describe("given Langy's turn outlasts the run's deadline", () => {
@@ -140,5 +157,42 @@ describe("given Langy's turn outlasts the run's deadline", () => {
     await service.run(RUN);
 
     expect(settled).toEqual([expect.objectContaining({ outcome: "failed", reason: "timeout" })]);
+  });
+});
+
+describe("given a newer run took the run over before it started its turn", () => {
+  it("records neither its start nor its outcome, and stops its turn", async () => {
+    const { service, started, settled, stopped } = harness();
+    service.connect(processWaitingOn(["run-2"]));
+
+    await service.run(RUN);
+
+    expect(started).toEqual([]);
+    expect(settled).toEqual([]);
+    expect(stopped).toEqual([expect.objectContaining({ turnId: "turn-1" })]);
+  });
+});
+
+describe("given a newer run took the run over while its turn ran", () => {
+  it("records its start, and no outcome", async () => {
+    const { service, started, settled } = harness();
+    service.connect(processWaitingOn(["run-1", "run-2"]));
+
+    await service.run(RUN);
+
+    expect(started).toEqual([expect.objectContaining({ runId: "run-1" })]);
+    expect(settled).toEqual([]);
+  });
+});
+
+describe("given the schedule's process still waits on the run", () => {
+  it("records its start and its outcome", async () => {
+    const { service, started, settled } = harness();
+    service.connect(processWaitingOn(["run-1"]));
+
+    await service.run(RUN);
+
+    expect(started).toEqual([expect.objectContaining({ runId: "run-1" })]);
+    expect(settled).toEqual([expect.objectContaining({ runId: "run-1", reason: "timeout" })]);
   });
 });

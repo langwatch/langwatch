@@ -190,7 +190,11 @@ more after its slot starts nothing and waits for the next day. Off cancels the w
 the outbox carries to the run. While a run for the board is in flight neither starts a
 second, and for a wake the run in flight stands for that date. A run that outlived every
 attempt's lease is superseded: the new run is handed its id, and records it as `failed`
-with `timeout` before its own outcome. A scheduled run is named by its slot. An
+with `timeout` before its own outcome. Before it records its start, and again before its
+outcome, a run asks its schedule's process whether it still waits on it. An attempt of a
+superseded run that is still alive records neither, so an older run never follows a newer
+one onto the schedule's row: live, the row would take it, and a replay, which keeps a
+run's first outcome, would not. A scheduled run is named by its slot. An
 operator's run is no scheduled run and takes no date from the schedule. A run that ends
 `skipped` with `board_deleted` turns the schedule off (`turned_off` by `system`), for a
 schedule that is on and no other; a run on a template keeps ending `skipped` with
