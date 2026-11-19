@@ -98,7 +98,6 @@ async function requestSends({
 
 const MEMBER_PAGE = 500;
 
-
 type Deps = Readonly<{
   audience: DigestAudienceRepository;
   sends: DigestSendRepository;
