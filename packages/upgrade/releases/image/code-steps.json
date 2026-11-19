@@ -371,6 +371,38 @@
     "needsOldWritersGone": true
   },
   {
+    "id": "nurturing:replay-personal-owners-from-organization",
+    "kind": "data",
+    "mode": "background",
+    "owner": "nurturing",
+    "description": "Fills nurturing's personal-project owners from organization's personal-workspace log at deploy.",
+    "needsOldWritersGone": true
+  },
+  {
+    "id": "nurturing:replay-personal-owners-from-project",
+    "kind": "data",
+    "mode": "background",
+    "owner": "nurturing",
+    "description": "Fills nurturing's personal-project owners from the owners project listed at deploy.",
+    "needsOldWritersGone": true
+  },
+  {
+    "id": "nurturing:replay-traced-projects-from-trace",
+    "kind": "data",
+    "mode": "background",
+    "owner": "nurturing",
+    "description": "Fills nurturing's traced projects from trace's project_traced log at deploy.",
+    "needsOldWritersGone": true
+  },
+  {
+    "id": "nurturing:replay-traced-projects-from-project",
+    "kind": "data",
+    "mode": "background",
+    "owner": "nurturing",
+    "description": "Fills nurturing's traced projects from the first messages project listed at deploy.",
+    "needsOldWritersGone": true
+  },
+  {
     "id": "ops:copy-automation-migration-state",
     "kind": "data",
     "mode": "blocking",

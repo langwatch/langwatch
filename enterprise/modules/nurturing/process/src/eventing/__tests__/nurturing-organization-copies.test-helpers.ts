@@ -221,6 +221,8 @@ export function copiesOver(repositories: NurturingRepositories): NurturingUsageC
     admins: repositories.milestones,
     members: repositories.members,
     virtualKeys: repositories.virtualKeys,
+    personalProjects: repositories.personalProjects,
+    tracedProjects: repositories.tracedProjects,
   };
 }
 

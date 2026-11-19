@@ -147,6 +147,8 @@ function registeredCopyLanes({
       admins: others.milestones,
       members,
       virtualKeys,
+      personalProjects: others.personalProjects,
+      tracedProjects: others.tracedProjects,
     },
     sync: undefined,
   });
@@ -311,8 +313,6 @@ export async function gatewayFactsOver({
     evaluationsCompleted: async () => undefined,
     simulationRunsFinished: async () => undefined,
     codingSessionsStored: async () => undefined,
-    recordPersonalOwner: async () => undefined,
-    recordTracedProject: async () => undefined,
     forgetErasedUser: (input) => userErasure.forgetUser(input),
     virtualKeyCreated: (input) => gatewayFacts.virtualKeyCreated(input),
     keyBudgetCrossed: (input) => gatewayFacts.keyBudgetCrossed(input),

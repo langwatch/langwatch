@@ -236,6 +236,26 @@
       "seed": "unplanned",
       "note": "needs projects with a created fact in project's log; no seed door written yet"
     },
+    "nurturing:replay-personal-owners-from-organization": {
+      "status": "pending",
+      "seed": "unplanned",
+      "note": "needs personal_team_created facts in organization's log; the seed writes no events"
+    },
+    "nurturing:replay-personal-owners-from-project": {
+      "status": "pending",
+      "seed": "unplanned",
+      "note": "needs personal_owner_listed facts, which project's listing step records; the seed writes no events"
+    },
+    "nurturing:replay-traced-projects-from-trace": {
+      "status": "pending",
+      "seed": "unplanned",
+      "note": "needs project_traced facts in trace's log; the seed writes no events"
+    },
+    "nurturing:replay-traced-projects-from-project": {
+      "status": "pending",
+      "seed": "unplanned",
+      "note": "needs first_message_listed facts, which project's listing step records; the seed writes no events"
+    },
     "ops:checkup-canary-project": {
       "status": "pending",
       "seed": "unplanned",

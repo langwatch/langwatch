@@ -11,8 +11,12 @@ import {
   NURTURING_ORGANIZATION_ADMINS_PROJECTION_NAME,
   NURTURING_ORGANIZATION_CREATIONS_PROJECTION_NAME,
   NURTURING_ORGANIZATION_MEMBERS_PROJECTION_NAME,
+  NURTURING_PERSONAL_OWNERS_OF_ORGANIZATION_PROJECTION_NAME,
+  NURTURING_PERSONAL_OWNERS_OF_PROJECT_PROJECTION_NAME,
   NURTURING_PROJECT_PLACEMENTS_PROJECTION_NAME,
   NURTURING_PROJECT_USAGE_PIPELINE_NAME,
+  NURTURING_TRACED_PROJECTS_OF_PROJECT_PROJECTION_NAME,
+  NURTURING_TRACED_PROJECTS_OF_TRACE_PROJECTION_NAME,
   NURTURING_USER_ERASURE_MARKS_PROJECTION_NAME,
   NURTURING_VIRTUAL_KEYS_PROJECTION_NAME,
   nurturingProjectUsageEventing,
@@ -117,6 +121,50 @@ export const nurturingProcessModule: PublishedProcessModule<
       needsOldWritersGone: true,
       trailingPass: true,
       after: ["nurturing:replay-user-erasure-marks", "nurturing:replay-identity-erasure-marks"],
+      replayer,
+    }),
+    // Personal-project owners read the erasure marks as the key copy does, so they run after them.
+    // Spec: enterprise/modules/nurturing/specs/project-facts-copies.feature
+    defineProjectionReplayStep({
+      id: "nurturing:replay-personal-owners-from-organization",
+      description:
+        "Fills nurturing's personal-project owners from organization's personal-workspace log at deploy.",
+      lane: `${NURTURING_PROJECT_USAGE_PIPELINE_NAME}.${NURTURING_PERSONAL_OWNERS_OF_ORGANIZATION_PROJECTION_NAME}`,
+      needsOldWritersGone: true,
+      trailingPass: true,
+      after: ["nurturing:replay-user-erasure-marks", "nurturing:replay-identity-erasure-marks"],
+      replayer,
+    }),
+    defineProjectionReplayStep({
+      id: "nurturing:replay-personal-owners-from-project",
+      description:
+        "Fills nurturing's personal-project owners from the owners project listed at deploy.",
+      lane: `${NURTURING_PROJECT_USAGE_PIPELINE_NAME}.${NURTURING_PERSONAL_OWNERS_OF_PROJECT_PROJECTION_NAME}`,
+      needsOldWritersGone: true,
+      trailingPass: true,
+      after: [
+        "nurturing:replay-user-erasure-marks",
+        "nurturing:replay-identity-erasure-marks",
+        "project:list-personal-owner-and-first-message-facts",
+      ],
+      replayer,
+    }),
+    defineProjectionReplayStep({
+      id: "nurturing:replay-traced-projects-from-trace",
+      description: "Fills nurturing's traced projects from trace's project_traced log at deploy.",
+      lane: `${NURTURING_PROJECT_USAGE_PIPELINE_NAME}.${NURTURING_TRACED_PROJECTS_OF_TRACE_PROJECTION_NAME}`,
+      needsOldWritersGone: true,
+      trailingPass: true,
+      replayer,
+    }),
+    defineProjectionReplayStep({
+      id: "nurturing:replay-traced-projects-from-project",
+      description:
+        "Fills nurturing's traced projects from the first messages project listed at deploy.",
+      lane: `${NURTURING_PROJECT_USAGE_PIPELINE_NAME}.${NURTURING_TRACED_PROJECTS_OF_PROJECT_PROJECTION_NAME}`,
+      needsOldWritersGone: true,
+      trailingPass: true,
+      after: ["project:list-personal-owner-and-first-message-facts"],
       replayer,
     }),
   ]);

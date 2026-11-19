@@ -63,11 +63,19 @@ import {
   organizationMemberListedEventDataSchema,
   organizationMemberRemovedEventDataSchema,
   organizationSignedUpEventDataSchema,
+  PERSONAL_TEAM_CREATED_EVENT_TYPE,
+  PERSONAL_WORKSPACE_PROVISIONED_EVENT_TYPE,
+  personalTeamCreatedEventDataSchema,
+  personalWorkspaceProvisionedEventDataSchema,
 } from "@langwatch/organization-contract";
 import {
   PROJECT_CREATED_EVENT_TYPE,
+  PROJECT_FIRST_MESSAGE_LISTED_EVENT_TYPE,
+  PROJECT_PERSONAL_OWNER_LISTED_EVENT_TYPE,
   type ProjectCreatedEventData,
   projectCreatedEventDataSchema,
+  projectFirstMessageListedEventDataSchema,
+  projectPersonalOwnerListedEventDataSchema,
 } from "@langwatch/project-contract";
 import {
   PROMPT_CREATED_EVENT_TYPE,
@@ -89,6 +97,8 @@ import {
   FIRST_TRACE_RECORDED_EVENT_TYPE,
   firstTraceRecordedEventDataSchema,
   LANGY_TRACE_ORIGIN,
+  PROJECT_TRACED_EVENT_TYPE,
+  projectTracedEventDataSchema,
   SPAN_RECEIVED_EVENT_TYPE,
   type SpanReceivedEventData,
   spanReceivedEventDataSchema,
@@ -98,6 +108,7 @@ import {
   traceReceivedEventDataSchema,
 } from "@langwatch/trace-contract";
 import { USER_ERASED_EVENT_TYPE, userErasedEventDataSchema } from "@langwatch/user-contract";
+import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
 
 import type { NurturingModule } from "../app/nurturing.app.ts";
@@ -105,12 +116,20 @@ import type { NurturingVirtualKeyRepository } from "../repositories/nurturing-ga
 import type { NurturingOrganizationAdminRepository } from "../repositories/nurturing-milestones.repository.ts";
 import type { NurturingOrganizationCreatedRepository } from "../repositories/nurturing-organization-created.repository.ts";
 import type { NurturingOrganizationMemberRepository } from "../repositories/nurturing-organization-member.repository.ts";
+import type {
+  NurturingPersonalProjectRepository,
+  NurturingPersonalProjectRow,
+} from "../repositories/nurturing-personal-project.repository.ts";
 import type { NurturingProjectPlacementRepository } from "../repositories/nurturing-project-placement.repository.ts";
 import {
   NURTURING_PROJECT_USAGE_PROJECTION_VERSION,
   type NurturingProjectUsageOwner,
   type NurturingProjectUsageRepository,
 } from "../repositories/nurturing-project-usage.repository.ts";
+import type {
+  NurturingTracedProjectRepository,
+  NurturingTracedProjectRow,
+} from "../repositories/nurturing-traced-project.repository.ts";
 import type { NurturingRepositories } from "../repositories/nurturing.repositories.ts";
 import type { NurturingMembershipChange } from "../rules/nurturing-organization-member.rules.ts";
 import {
@@ -506,6 +525,8 @@ export type NurturingUsageCopies = Readonly<{
   admins: Pick<NurturingOrganizationAdminRepository, "recordAdminFact">;
   members: NurturingOrganizationMemberRepository;
   virtualKeys: NurturingVirtualKeyRepository;
+  personalProjects: NurturingPersonalProjectRepository;
+  tracedProjects: NurturingTracedProjectRepository;
 }>;
 
 /** What the usage sync needs; absent without a Customer.io channel, when nothing syncs. */
@@ -522,12 +543,16 @@ function nurturingProjectUsageHost({
   store,
   copies,
   sync,
+  logger = createLogger("langwatch:nurturing:project-facts"),
 }: Readonly<{
   store: NurturingProjectUsageRepository;
   copies: NurturingUsageCopies;
   sync: NurturingUsageSync | undefined;
+  /** Where a traced fact naming no organization is logged. */
+  logger?: ProjectFactsLogger;
 }>) {
-  const { organizationsCreated, admins, members, virtualKeys } = copies;
+  const { organizationsCreated, admins, members, virtualKeys, personalProjects, tracedProjects } =
+    copies;
   // The copies always register, as nurturing's other copies do: a channel configured later
   // then finds the projects, organizations, members and gateway keys created before it.
   const copied = definePipeline({
@@ -545,7 +570,14 @@ function nurturingProjectUsageHost({
     .withPeerMapProjection(nurturingOrganizationAdminsMap(admins))
     .withPeerMapProjection(nurturingOrganizationMembersMap(members))
     .withPeerMapProjection(nurturingAuthMembersMap(members))
-    .withLaneAliases([...ORGANIZATION_COPY_LANE_ALIASES]);
+    .withPeerMapProjection(nurturingPersonalOwnersOfOrganizationMap(personalProjects))
+    .withPeerMapProjection(nurturingPersonalOwnersOfProjectMap(personalProjects))
+    .withPeerMapProjection(nurturingTracedProjectsOfTraceMap({ tracedProjects, logger }))
+    .withPeerMapProjection(nurturingTracedProjectsOfProjectMap({ tracedProjects, logger }))
+    .withLaneAliases([
+      ...ORGANIZATION_COPY_LANE_ALIASES,
+      ...PERSONAL_AND_TRACED_PROJECT_LANE_ALIASES,
+    ]);
   // Without a channel no sync reads the usage rows, and none prunes the trace days, so none is kept.
   if (!sync) return copied;
   const { usageChanged, tracesChanged, organizationCreated } = sync;
@@ -920,6 +952,189 @@ export function nurturingAuthMembersMap(
   };
 }
 
+/** Where a map's refusal to keep a fact is logged. */
+export type ProjectFactsLogger = Readonly<{
+  warn(payload: Readonly<Record<string, unknown>>, message: string): void;
+}>;
+
+export const NURTURING_PERSONAL_OWNERS_OF_ORGANIZATION_PROJECTION_NAME =
+  "personalOwnersOfOrganization" as const;
+export const NURTURING_PERSONAL_OWNERS_OF_PROJECT_PROJECTION_NAME =
+  "personalOwnersOfProject" as const;
+export const NURTURING_TRACED_PROJECTS_OF_TRACE_PROJECTION_NAME =
+  "tracedProjectsOfTrace" as const;
+export const NURTURING_TRACED_PROJECTS_OF_PROJECT_PROJECTION_NAME =
+  "tracedProjectsOfProject" as const;
+
+/**
+ * The five peer subscriber lanes these maps replace, on the `nurturing` pipeline. A job the
+ * previous release queued under one reaches its successor map, which records the same fact.
+ */
+export const PERSONAL_AND_TRACED_PROJECT_LANE_ALIASES: readonly LaneAlias[] = [
+  {
+    from: "global:subscriber:nurturing.personalTeamCreated",
+    to: {
+      jobType: "handler",
+      lane: NURTURING_PERSONAL_OWNERS_OF_ORGANIZATION_PROJECTION_NAME,
+    },
+  },
+  {
+    from: "global:subscriber:nurturing.personalWorkspaceProvisioned",
+    to: {
+      jobType: "handler",
+      lane: NURTURING_PERSONAL_OWNERS_OF_ORGANIZATION_PROJECTION_NAME,
+    },
+  },
+  {
+    from: "global:subscriber:nurturing.personalOwnerListed",
+    to: { jobType: "handler", lane: NURTURING_PERSONAL_OWNERS_OF_PROJECT_PROJECTION_NAME },
+  },
+  {
+    from: "global:subscriber:nurturing.projectTraced",
+    to: { jobType: "handler", lane: NURTURING_TRACED_PROJECTS_OF_TRACE_PROJECTION_NAME },
+  },
+  {
+    from: "global:subscriber:nurturing.firstMessageListed",
+    to: { jobType: "handler", lane: NURTURING_TRACED_PROJECTS_OF_PROJECT_PROJECTION_NAME },
+  },
+];
+
+const PERSONAL_OWNER_OF_ORGANIZATION_EVENTS = [
+  { type: PERSONAL_TEAM_CREATED_EVENT_TYPE, data: personalTeamCreatedEventDataSchema },
+  {
+    type: PERSONAL_WORKSPACE_PROVISIONED_EVENT_TYPE,
+    data: personalWorkspaceProvisionedEventDataSchema,
+  },
+] as const;
+
+const PERSONAL_OWNER_OF_PROJECT_EVENTS = [
+  {
+    type: PROJECT_PERSONAL_OWNER_LISTED_EVENT_TYPE,
+    data: projectPersonalOwnerListedEventDataSchema,
+  },
+] as const;
+
+/**
+ * Nurturing's copy of a personal project's owner from organization's personal-workspace facts. The
+ * first owner stays and an erased one is never stored, both in the store's own write, so a
+ * redelivered, late or replayed fact leaves the row as live delivery would.
+ */
+export function nurturingPersonalOwnersOfOrganizationMap(
+  personalProjects: Pick<NurturingPersonalProjectRepository, "recordOwner">,
+): PeerMapProjectionDeclaration<
+  NurturingPersonalProjectRow,
+  typeof PERSONAL_OWNER_OF_ORGANIZATION_EVENTS
+> {
+  return {
+    events: PERSONAL_OWNER_OF_ORGANIZATION_EVENTS,
+    map: {
+      name: NURTURING_PERSONAL_OWNERS_OF_ORGANIZATION_PROJECTION_NAME,
+      eventTypes: PERSONAL_OWNER_OF_ORGANIZATION_EVENTS.map(({ type }) => type),
+      map: ({ data: { projectId, organizationId, userId } }) => ({
+        projectId,
+        organizationId,
+        ownerUserId: userId,
+      }),
+      store: { append: (row) => personalProjects.recordOwner(row) },
+    },
+  };
+}
+
+/** The same copy from project's listed owners of the personal projects it stored. */
+export function nurturingPersonalOwnersOfProjectMap(
+  personalProjects: Pick<NurturingPersonalProjectRepository, "recordOwner">,
+): PeerMapProjectionDeclaration<
+  NurturingPersonalProjectRow,
+  typeof PERSONAL_OWNER_OF_PROJECT_EVENTS
+> {
+  return {
+    events: PERSONAL_OWNER_OF_PROJECT_EVENTS,
+    map: {
+      name: NURTURING_PERSONAL_OWNERS_OF_PROJECT_PROJECTION_NAME,
+      eventTypes: [PROJECT_PERSONAL_OWNER_LISTED_EVENT_TYPE],
+      map: ({ data: { projectId, organizationId, ownerUserId } }) => ({
+        projectId,
+        organizationId,
+        ownerUserId,
+      }),
+      store: { append: (row) => personalProjects.recordOwner(row) },
+    },
+  };
+}
+
+const TRACED_PROJECT_OF_TRACE_EVENTS = [
+  { type: PROJECT_TRACED_EVENT_TYPE, data: projectTracedEventDataSchema },
+] as const;
+
+const TRACED_PROJECT_OF_PROJECT_EVENTS = [
+  { type: PROJECT_FIRST_MESSAGE_LISTED_EVENT_TYPE, data: projectFirstMessageListedEventDataSchema },
+] as const;
+
+/**
+ * A project with no organization has nothing to count against, so it is logged and mapped to no
+ * row.
+ */
+function tracedProjectOf({
+  data: { projectId, organizationId },
+  logger,
+}: Readonly<{
+  data: Readonly<{ projectId: string; organizationId: string | null }>;
+  logger: ProjectFactsLogger;
+}>): NurturingTracedProjectRow | null {
+  if (organizationId === null) {
+    logger.warn(
+      { projectId },
+      "a traced project names no organization; nurturing keeps no traced row for it",
+    );
+    return null;
+  }
+  return { projectId, organizationId };
+}
+
+/** Nurturing's copy of the projects that traced, from trace's `project_traced` fact; insert-ignore. */
+export function nurturingTracedProjectsOfTraceMap({
+  tracedProjects,
+  logger,
+}: Readonly<{
+  tracedProjects: Pick<NurturingTracedProjectRepository, "recordTraced">;
+  logger: ProjectFactsLogger;
+}>): PeerMapProjectionDeclaration<
+  NurturingTracedProjectRow,
+  typeof TRACED_PROJECT_OF_TRACE_EVENTS
+> {
+  return {
+    events: TRACED_PROJECT_OF_TRACE_EVENTS,
+    map: {
+      name: NURTURING_TRACED_PROJECTS_OF_TRACE_PROJECTION_NAME,
+      eventTypes: [PROJECT_TRACED_EVENT_TYPE],
+      map: ({ data }) => tracedProjectOf({ data, logger }),
+      store: { append: (row) => tracedProjects.recordTraced(row) },
+    },
+  };
+}
+
+/** The same copy from project's listed first messages of the projects it stored. */
+export function nurturingTracedProjectsOfProjectMap({
+  tracedProjects,
+  logger,
+}: Readonly<{
+  tracedProjects: Pick<NurturingTracedProjectRepository, "recordTraced">;
+  logger: ProjectFactsLogger;
+}>): PeerMapProjectionDeclaration<
+  NurturingTracedProjectRow,
+  typeof TRACED_PROJECT_OF_PROJECT_EVENTS
+> {
+  return {
+    events: TRACED_PROJECT_OF_PROJECT_EVENTS,
+    map: {
+      name: NURTURING_TRACED_PROJECTS_OF_PROJECT_PROJECTION_NAME,
+      eventTypes: [PROJECT_FIRST_MESSAGE_LISTED_EVENT_TYPE],
+      map: ({ data }) => tracedProjectOf({ data, logger }),
+      store: { append: (row) => tracedProjects.recordTraced(row) },
+    },
+  };
+}
+
 /** The host pipeline as a TYPE, derived from the builder above. */
 export type NurturingProjectUsagePipeline = ReturnType<
   ReturnType<typeof nurturingProjectUsageHost>["build"]
@@ -943,6 +1158,8 @@ export const nurturingProjectUsageEventing = defineEventingModule({
         admins: repositories.milestones,
         members: repositories.members,
         virtualKeys: repositories.virtualKeys,
+        personalProjects: repositories.personalProjects,
+        tracedProjects: repositories.tracedProjects,
       },
       sync: app.syncsOrganizationUsage()
         ? {

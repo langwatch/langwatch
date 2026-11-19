@@ -28,8 +28,6 @@ function nurturingRecordingDeliveries() {
     evaluationsCompleted: async ({ evaluations }) => void counted.push([...evaluations]),
     simulationRunsFinished: async () => undefined,
     codingSessionsStored: async () => undefined,
-    recordPersonalOwner: async () => undefined,
-    recordTracedProject: async () => undefined,
     forgetErasedUser: async () => undefined,
     virtualKeyCreated: async () => undefined,
     keyBudgetCrossed: async () => undefined,

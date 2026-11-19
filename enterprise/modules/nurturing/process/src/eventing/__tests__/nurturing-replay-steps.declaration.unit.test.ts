@@ -24,6 +24,14 @@ import {
   PROJECT_CREATED_FACTS_STEP,
 } from "./nurturing-organization-copies.test-helpers.ts";
 import {
+  PERSONAL_OWNERS_OF_ORGANIZATION_STEP,
+  PERSONAL_OWNERS_OF_PROJECT_STEP,
+  PROJECT_LISTING_STEP,
+  projectCopiesReplayStepsOver,
+  TRACED_PROJECTS_OF_PROJECT_STEP,
+  TRACED_PROJECTS_OF_TRACE_STEP,
+} from "./nurturing-project-copies.test-helpers.ts";
+import {
   IDENTITY_MARKS_STEP,
   KEYS_STEP,
   nurturingReplayStepsOver,
@@ -73,6 +81,7 @@ describe("given the nurturing module installed on a worker", () => {
     const expected = [
       ...nurturingReplayStepsOver(pinned.replayer),
       ...organizationCopiesReplayStepsOver(pinned.replayer),
+      ...projectCopiesReplayStepsOver(pinned.replayer),
     ];
 
     expect(steps.map(({ id }) => id)).toEqual([
@@ -84,6 +93,10 @@ describe("given the nurturing module installed on a worker", () => {
       ADMINS_STEP,
       MEMBERS_STEP,
       AUTH_MEMBERS_STEP,
+      PERSONAL_OWNERS_OF_ORGANIZATION_STEP,
+      PERSONAL_OWNERS_OF_PROJECT_STEP,
+      TRACED_PROJECTS_OF_TRACE_STEP,
+      TRACED_PROJECTS_OF_PROJECT_STEP,
     ]);
     for (const [index, step] of steps.entries()) {
       expect(step).toMatchObject({
@@ -104,6 +117,10 @@ describe("given the nurturing module installed on a worker", () => {
       [USER_MARKS_STEP, IDENTITY_MARKS_STEP, PROJECT_CREATED_FACTS_STEP],
       [USER_MARKS_STEP, IDENTITY_MARKS_STEP, MEMBER_LISTING_STEP],
       [USER_MARKS_STEP, IDENTITY_MARKS_STEP],
+      [USER_MARKS_STEP, IDENTITY_MARKS_STEP],
+      [USER_MARKS_STEP, IDENTITY_MARKS_STEP, PROJECT_LISTING_STEP],
+      undefined,
+      [PROJECT_LISTING_STEP],
     ]);
 
     // The lane and the trailing pass are only observable by running: each step asks for its lane twice.

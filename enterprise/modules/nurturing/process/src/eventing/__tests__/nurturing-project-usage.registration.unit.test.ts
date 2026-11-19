@@ -39,6 +39,10 @@ const COPY_LANES = [
   "organizationAdmins",
   "organizationMembers",
   "authMembers",
+  "personalOwnersOfOrganization",
+  "personalOwnersOfProject",
+  "tracedProjectsOfTrace",
+  "tracedProjectsOfProject",
 ];
 
 /** The lanes only a deployment with a Customer.io channel registers: the folds and the syncs. */

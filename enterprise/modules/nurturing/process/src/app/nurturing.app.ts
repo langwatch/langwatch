@@ -29,7 +29,6 @@ import { NurturingMemberFactsService } from "../services/nurturing-member-facts.
 import { NurturingMilestonesService } from "../services/nurturing-milestones.service.ts";
 import { NurturingOrganizationCreatedService } from "../services/nurturing-organization-created.service.ts";
 import { NurturingOrganizationUsageService } from "../services/nurturing-organization-usage.service.ts";
-import { NurturingProjectFactsService } from "../services/nurturing-project-facts.service.ts";
 import { NurturingTraceCountingService } from "../services/nurturing-trace-counting.service.ts";
 import { NurturingUncopiedProjectsService } from "../services/nurturing-uncopied-projects.service.ts";
 import { NurturingUserErasureService } from "../services/nurturing-user-erasure.service.ts";
@@ -161,11 +160,6 @@ export class NurturingModule implements NurturingApi {
           logger,
         })
       : void 0;
-    const projectFacts = NurturingProjectFactsService.create({
-      personalProjects: repositories.personalProjects,
-      tracedProjects: repositories.tracedProjects,
-      logger: createLogger("langwatch:nurturing:project-facts"),
-    });
     const userErasure = NurturingUserErasureService.create({
       personalProjects: repositories.personalProjects,
       organizations: repositories.milestones,
@@ -189,8 +183,6 @@ export class NurturingModule implements NurturingApi {
         evaluationsCompleted: (input) => milestones.evaluationsCompleted(input),
         simulationRunsFinished: (input) => milestones.simulationRunsFinished(input),
         codingSessionsStored: (input) => codingMilestones.sessionsStored(input),
-        recordPersonalOwner: (input) => projectFacts.recordPersonalOwner(input),
-        recordTracedProject: (input) => projectFacts.recordTracedProject(input),
         forgetErasedUser: (input) => userErasure.forgetUser(input),
         virtualKeyCreated: (input) => gatewayFacts.virtualKeyCreated(input),
         keyBudgetCrossed: (input) => gatewayFacts.keyBudgetCrossed(input),

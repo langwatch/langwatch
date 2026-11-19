@@ -133,6 +133,8 @@ function deploy({
       admins: repositories.milestones,
       members: repositories.members,
       virtualKeys: keys ? keys(repositories.virtualKeys) : repositories.virtualKeys,
+      personalProjects: repositories.personalProjects,
+      tracedProjects: repositories.tracedProjects,
     },
     sync: undefined,
   });

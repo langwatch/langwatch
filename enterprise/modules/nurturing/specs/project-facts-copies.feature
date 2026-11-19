@@ -1,11 +1,18 @@
 Feature: Nurturing keeps its own copy of personal owners and traced projects, from owners' facts
 
   Nurturing answers "who owns this personal project" and "has this organization ever traced"
-  from rows it owns, written by its peer subscribers from the owners' facts: organization's
+  from rows it owns, written by its peer maps from the owners' facts: organization's
   personal-workspace facts and project's listed owners name an owner; trace's traced fact and
   project's listed first messages name a traced project. These copies change no read yet: the
   traits a person is sent are still read where they were. Writing a copy calls no sink, so no
   Customer.io or PostHog request comes from these facts.
+
+  Each copy is a peer map on nurturing's usage host, so a deploy step replays it from its owner's
+  log, after the erasure-mark steps for the owners and after project's listing step for the lanes
+  that read project's listed facts. A replay writes the store alone and runs no subscriber: it sends
+  nothing. Every write is order-free (the first owner stays, a traced row is insert-ignore), so a
+  redelivered, late or replayed fact leaves a row as live delivery
+  would. The five subscriber lanes the maps replace are aliased to them for one release.
 
   When user records an account erased, nurturing marks it erased (NurturingErasedUser, a hash of
   its id), deletes every owner row naming it, in every organization, and clears it wherever its
@@ -137,3 +144,67 @@ Feature: Nurturing keeps its own copy of personal owners and traced projects, fr
     When user records erased an account no nurturing row names
     Then every owner and organization row is as it was
     And neither Customer.io nor PostHog receives a request
+
+  @unit
+  Scenario: Replaying the personal-owner lanes fills each owner row as live delivery would
+    Given organization's log holds personal team and workspace facts, and project's lists owners
+    When the personal-owner replay steps run after the erasure marks
+    Then each personal project has the owner live delivery of the same facts would have left
+    And neither Customer.io nor PostHog receives a request
+
+  @unit
+  Scenario: Replaying a copy twice leaves every row as it was
+    Given a copy's replay step has run, its trailing pass included
+    When the step runs again
+    Then every row of the copy is as it was
+
+  @unit
+  Scenario: A personal owner's facts delivered again or in reverse order leave the same row
+    Given two owner facts name the same personal project and owner
+    When they are delivered twice, or in reverse order
+    Then nurturing holds one owner row for the project, the same each time
+
+  @unit
+  Scenario: A personal owner erased before the replay is on no owner row after it
+    Given user-1 was erased and owned personal projects in organization's and project's logs
+    When the personal-owner steps run after the marks steps
+    Then no owner row names user-1, and another owner's row is written
+    And the owner step run before the marks would have stored user-1, which the declared order prevents
+
+  @unit
+  Scenario: A personal owner erased during the replay is on no owner row after it
+    Given user-1's erasure lands between two replayed owner facts
+    When the replay ends
+    Then no owner row names user-1
+
+  @unit
+  Scenario: Replaying the traced-project lanes fills each traced row as live delivery would
+    Given trace's log holds traced facts, one naming no organization, and project lists first messages
+    When the traced-project replay steps run
+    Then each project with an organization has one traced row, as live delivery would leave it
+    And the project with no organization is logged and has no row
+    And neither Customer.io nor PostHog receives a request
+
+  @unit
+  Scenario: A traced fact delivered again or in reverse order leaves the same rows
+    Given trace's and project's logs name the same projects
+    When the facts are delivered twice, or in reverse order
+    Then the traced rows are the same each time
+
+  @unit
+  Scenario: Jobs the previous release queued under a retired copy lane reach its successor map
+    Given the previous release queued jobs under its personalTeamCreated, personalWorkspaceProvisioned, personalOwnerListed, projectTraced and firstMessageListed lanes
+    When a worker of this release dequeues them
+    Then each reaches the map that records the same fact, and none is dead-lettered
+    And nurturing's own pipeline registers none of the five lanes
+
+  @unit
+  Scenario: A copy lane is registered whether or not a channel syncs
+    When nurturing's usage pipeline is built with or without a Customer.io channel
+    Then the personal-owner and traced-project maps are registered either way
+
+  @unit
+  Scenario: The copy steps run after the erasure marks and project's listing step
+    Given nurturing's replay steps are declared
+    Then the owner steps run after both erasure-marks steps, and the project lanes after project's listing step
+    And the steps' ids are in the image's code steps

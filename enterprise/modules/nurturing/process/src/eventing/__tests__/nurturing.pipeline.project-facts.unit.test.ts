@@ -3,7 +3,12 @@
  * @vitest-environment node
  * @see enterprise/modules/nurturing/specs/project-facts-copies.feature
  */
-import { createTenantId, type Event, type EventSubscriberDefinition } from "@langwatch/eventing";
+import {
+  createTenantId,
+  type Event,
+  type EventSubscriberDefinition,
+  type MapProjectionDefinition,
+} from "@langwatch/eventing";
 import {
   type OrganizationApi,
   PERSONAL_TEAM_CREATED_EVENT_TYPE,
@@ -34,15 +39,18 @@ import { MemoryNurturingMilestonesRepository } from "../../repositories/memory/m
 import { MemoryNurturingOrganizationMemberRepository } from "../../repositories/memory/memory.nurturing-organization-member.repository.ts";
 import { MemoryNurturingOrganizationPlanRepository } from "../../repositories/memory/memory.nurturing-organization-plan.repository.ts";
 import { MemoryNurturingPersonalProjectRepository } from "../../repositories/memory/memory.nurturing-personal-project.repository.ts";
+import { MemoryNurturingOrganizationCreatedRepository } from "../../repositories/memory/memory.nurturing-organization-created.repository.ts";
+import { MemoryNurturingProjectPlacementRepository } from "../../repositories/memory/memory.nurturing-project-placement.repository.ts";
+import { MemoryNurturingProjectUsageRepository } from "../../repositories/memory/memory.nurturing-project-usage.repository.ts";
 import { MemoryNurturingProjectDirectoryRepository } from "../../repositories/memory/memory.nurturing-project-directory.repository.ts";
 import { MemoryNurturingTracedProjectRepository } from "../../repositories/memory/memory.nurturing-traced-project.repository.ts";
 import { MemoryNurturingClaimRepository } from "../../repositories/memory/memory.nurturing.repositories.ts";
 import { unplacedMemberFacts } from "../../services/__tests__/nurturing-member-facts.test-helpers.ts";
 import { NurturingDeliveryService } from "../../services/nurturing-delivery.service.ts";
 import { NurturingMemberFactsService } from "../../services/nurturing-member-facts.service.ts";
-import { NurturingProjectFactsService } from "../../services/nurturing-project-facts.service.ts";
 import { NurturingUserErasureService } from "../../services/nurturing-user-erasure.service.ts";
 import { NurturingService } from "../../services/nurturing.service.ts";
+import { buildNurturingProjectUsagePipeline } from "../nurturing-project-usage.pipeline.ts";
 import { buildNurturingPipeline } from "../nurturing.pipeline.ts";
 
 /**
@@ -81,11 +89,6 @@ function nurturingOverCopies() {
   const tracedProjects = MemoryNurturingTracedProjectRepository.create();
   const organizations = MemoryNurturingMilestonesRepository.create({ erasedUsers });
   const { logger, lines } = createTestLogger();
-  const projectFacts = NurturingProjectFactsService.create({
-    personalProjects,
-    tracedProjects,
-    logger,
-  });
   const userErasure = NurturingUserErasureService.create({
     personalProjects,
     organizations,
@@ -99,23 +102,55 @@ function nurturingOverCopies() {
     evaluationsCompleted: async () => undefined,
     simulationRunsFinished: async () => undefined,
     codingSessionsStored: async () => undefined,
-    recordPersonalOwner: (input) => projectFacts.recordPersonalOwner(input),
-    recordTracedProject: (input) => projectFacts.recordTracedProject(input),
     forgetErasedUser: (input) => userErasure.forgetUser(input),
     virtualKeyCreated: async () => undefined,
     keyBudgetCrossed: async () => undefined,
   });
+  // The copies of project facts are maps on the usage host, writing the same rows the subscribers did.
+  const usagePipeline = buildNurturingProjectUsagePipeline({
+    store: MemoryNurturingProjectUsageRepository.create(),
+    copies: {
+      placements: MemoryNurturingProjectPlacementRepository.create(),
+      copyLanded: async () => undefined,
+      organizationsCreated: MemoryNurturingOrganizationCreatedRepository.create(),
+      admins: organizations,
+      members,
+      virtualKeys: MemoryNurturingVirtualKeyRepository.create({ erasedUsers }),
+      personalProjects,
+      tracedProjects,
+    },
+    sync: undefined,
+    logger,
+  });
   const subscribers: EventSubscriberDefinition<Event>[] = [];
+  const maps: MapProjectionDefinition<unknown, Event>[] = [];
   const registry = createApiFixture<
     Parameters<NonNullable<typeof pipeline.globalProjections>[number]["register"]>[0]
-  >({ registerEventSubscriber: (subscriber) => void subscribers.push(subscriber) });
-  for (const projection of pipeline.globalProjections ?? []) projection.register(registry);
-  /** Hands one event to every nurturing peer subscriber on its type, as the worker would. */
+  >({
+    registerEventSubscriber: (subscriber) => void subscribers.push(subscriber),
+    registerPeerMapProjection: (map) => void maps.push(map as MapProjectionDefinition<unknown, Event>),
+  });
+  for (const projection of [
+    ...(pipeline.globalProjections ?? []),
+    ...(usagePipeline.globalProjections ?? []),
+  ]) {
+    projection.register(registry);
+  }
+  /** Hands one event to every nurturing lane on its type, as the worker would. */
   const deliverFact = async (event: Event) => {
     for (const subscriber of subscribers.filter(({ eventTypes }) =>
       eventTypes.includes(event.type),
     )) {
       await subscriber.handle(event, { tenantId: event.tenantId, aggregateId: event.aggregateId });
+    }
+    for (const map of maps.filter(({ eventTypes }) => eventTypes.includes(event.type))) {
+      const record = map.map(event);
+      if (record !== null) {
+        await map.store.append(record, {
+          tenantId: event.tenantId,
+          aggregateId: event.aggregateId,
+        } as never);
+      }
     }
   };
   /** Every request either sink saw, after the fire-and-forget sends settle. */
