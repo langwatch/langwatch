@@ -89,15 +89,15 @@ const NO_RUN_IN_FLIGHT = {
 } as const;
 
 /**
- * When the settled run started: as its outcome says, or, for an outcome stored before it said,
- * as the row's run in flight says when that is the same run.
+ * When the settled run started: the row's start of that run in flight, the first recorded (a
+ * retried attempt's own is later), else as its outcome says; none for an older outcome.
  */
 function settledRunStartOf(
   state: InsightDailyScheduleState,
   data: InsightRunSettledEventData,
 ): number | null {
-  if (data.startedAt !== undefined) return data.startedAt;
-  return state.runInFlightId === data.runId ? state.runInFlightStartedAt : null;
+  if (state.runInFlightId === data.runId) return state.runInFlightStartedAt;
+  return data.startedAt ?? null;
 }
 
 /** Whether the event leaves the row as it is: no event of the row's, or one it does not take. */
@@ -109,8 +109,9 @@ function leavesRow(state: InsightDailyScheduleState, event: InsightDailyRunEvent
       // A run that found its board gone turns off a schedule that is on, and decides no other.
       return event.data.by === "system" && state.state !== "on";
     case INSIGHT_DAILY_RUN_EVENT_TYPES.RUN_STARTED:
-      // A start delivered again after its run settled is not a run in flight.
-      return state.lastRunId === event.data.runId;
+      // A start delivered again after its run settled is not a run in flight. A retried attempt
+      // appends its own start under the same key: the first stands, as a replay keeps it.
+      return state.lastRunId === event.data.runId || state.runInFlightId === event.data.runId;
     case INSIGHT_DAILY_RUN_EVENT_TYPES.RUN_SETTLED:
       // Delivery is at least once: a run settled again keeps the outcome it first recorded.
       return state.lastRunId === event.data.runId;

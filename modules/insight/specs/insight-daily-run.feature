@@ -1367,6 +1367,7 @@ Feature: The daily insights run
       When the run's turn starts and the run then settles
       Then the run's outcome names when its turn started, and the board's row keeps it
       And an outcome stored before starts were kept takes the start of that run in flight
+      And a retried attempt's later start leaves the run's first start on the row
       And a run that never reached Langy names no start
 
     @integration

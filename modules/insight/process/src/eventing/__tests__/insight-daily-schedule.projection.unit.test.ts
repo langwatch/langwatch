@@ -231,7 +231,23 @@ describe("given a run was requested for a board", () => {
 
   describe("when the run's outcome names when its turn started", () => {
     /** @scenario "A settled run keeps when it started on the board's row" */
-    it("keeps that start as the last run's", () => {
+    it("keeps that start as the last run's when the row no longer names the run in flight", () => {
+      const lost = applyInsightDailyRunEvent(PROJECTION.init(), started(T0 + 1_000));
+      const newer = applyInsightDailyRunEvent(
+        lost,
+        started(T0 + 3_600_000, { runId: "run-2", conversationId: "conversation-2" }),
+      );
+
+      const after = applyInsightDailyRunEvent(
+        newer,
+        settled(T0 + 3_600_001, { startedAt: T0 + 2_000 }),
+      );
+
+      expect(after).toMatchObject({ lastRunId: "run-1", lastRunStartedAt: T0 + 2_000 });
+    });
+
+    /** @scenario "A settled run keeps when it started on the board's row" */
+    it("keeps the run's first start over a retried attempt's later one", () => {
       const running = applyInsightDailyRunEvent(PROJECTION.init(), started(T0 + 1_000));
 
       const ran = applyInsightDailyRunEvent(
@@ -239,7 +255,15 @@ describe("given a run was requested for a board", () => {
         settled(T0 + 60_000, { startedAt: T0 + 2_000 }),
       );
 
-      expect(ran).toMatchObject({ lastRunId: "run-1", lastRunStartedAt: T0 + 2_000 });
+      expect(ran).toMatchObject({ lastRunId: "run-1", lastRunStartedAt: T0 + 1_000 });
+    });
+  });
+
+  describe("when a retried attempt records the start of a run already in flight", () => {
+    it("keeps the first start, as a replay that keeps the first of a key does", () => {
+      const running = applyInsightDailyRunEvent(PROJECTION.init(), started(T0 + 1_000));
+
+      expect(applyInsightDailyRunEvent(running, started(T0 + 2_000))).toBe(running);
     });
   });
 
