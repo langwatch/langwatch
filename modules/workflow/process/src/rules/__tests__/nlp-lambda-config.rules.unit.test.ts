@@ -83,12 +83,12 @@ describe("given a deployment that fronts the studio engine with a Lambda fleet",
         codeBlockTimeoutRawValue: undefined,
         stagingThresholdBytesRawValue: undefined,
         stagingTtlSecondsRawValue: undefined,
-        privateEndpointsVerifyKey: " ebVWLo/mVPlAeLES6KmLp5AfhTrmlb7X4OORC60ElmQ= ",
+        privateEndpointsVerifyKey: " nlpgo-verify-key ",
       });
 
       expect(buildStudioLambdaEnvironment(withKey)).toEqual({
         ...buildStudioLambdaEnvironment(without),
-        LANGWATCH_PRIVATE_ENDPOINTS_VERIFY_KEY: "ebVWLo/mVPlAeLES6KmLp5AfhTrmlb7X4OORC60ElmQ=",
+        LANGWATCH_PRIVATE_ENDPOINTS_VERIFY_KEY: "nlpgo-verify-key",
       });
       expect(Object.keys(buildStudioLambdaEnvironment(withKey))).not.toContain(
         "LANGWATCH_PRIVATE_ENDPOINTS_SIGNING_KEY",

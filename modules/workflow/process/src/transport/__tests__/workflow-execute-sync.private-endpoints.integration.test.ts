@@ -3,6 +3,8 @@
  * A relayed turn's body is the caller's, so its bindings must be the organization's alone, signed,
  * on the HTTP and the Lambda route. @see specs/security/org-private-model-endpoints.feature
  */
+import { randomBytes } from "node:crypto";
+
 import { canonicalErrorResponse, createRestRuntime } from "@langwatch/api/rest";
 import {
   type ModelProviderApi,
@@ -29,8 +31,8 @@ const INFERENCE = {
 const FORGED = [{ hostname: "evil.test", addresses: ["10.0.0.1"], port: 443 }];
 const FORGED_HEADER = "forged.envelope";
 
-/** A test-only Ed25519 seed (0x01..0x20). */
-const TEST_SEED = "AQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyA=";
+/** A fresh Ed25519 seed for this run, so no key material lives in the source. */
+const TEST_SEED = randomBytes(32).toString("base64");
 
 /** The organization's bindings, signed for acme-prod the way the model-provider module does. */
 const ORG_HEADERS = await signPrivateEndpointsHeaders({

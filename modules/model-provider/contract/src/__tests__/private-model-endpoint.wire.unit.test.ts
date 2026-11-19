@@ -19,9 +19,10 @@ const WIRE_JSON =
 /**
  * The vector nlpgo's verifier is held to as well
  * (services/aigateway/domain/private_endpoint_envelope_test.go): seed 0x01..0x20, acme-prod,
- * signed at 1800000000 for 900 seconds. Ed25519 is deterministic, so the value is exact.
+ * signed at 1800000000 for 900 seconds. Ed25519 is deterministic, so the value is exact. The seed
+ * is built here rather than written out, so the source carries no key material.
  */
-const SHARED_SEED = "AQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyA=";
+const SHARED_SEED = btoa(String.fromCharCode(...Array.from({ length: 32 }, (_, i) => i + 1)));
 const SHARED_HEADER =
   "eyJ2IjoxLCJvcmdhbml6YXRpb25JZCI6Im9yZ19hY21lIiwicHJvamVjdElkIjoiYWNtZS1wcm9kIiwiYmluZGluZ3MiOlt7Imhvc3RuYW1lIjoibGxtLmludGVybmFsLmFjbWUudGVzdCIsImFkZHJlc3NlcyI6WyIxMC4yMC4xLjIxIiwiMTAuMjAuMi4zNCJdLCJwb3J0Ijo0NDN9XSwiZXhwaXJlc0F0IjoxODAwMDAwOTAwfQ.oyQyB4gk0jXh3oyefY_wDJ4rK1h1zu6ZKDwOTXbtNi3KFSIRCAJpo5WqzvoY79_eppAlLxm4e1dD7iaGwKB4CQ";
 

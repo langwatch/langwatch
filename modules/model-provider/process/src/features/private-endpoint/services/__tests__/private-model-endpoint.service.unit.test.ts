@@ -1,3 +1,5 @@
+import { randomBytes } from "node:crypto";
+
 import { ValidationError } from "@langwatch/handled-error";
 import {
   PRIVATE_ENDPOINTS_HEADER,
@@ -18,8 +20,8 @@ const MANAGER = "user_manager";
 
 const PROJECT_ORGANIZATION: Record<string, string> = { "acme-prod": ACME, "rival-prod": RIVAL };
 
-/** A test-only Ed25519 seed (0x01..0x20). */
-const TEST_SEED = "AQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyA=";
+/** A fresh Ed25519 seed for this run, so no key material lives in the source. */
+const TEST_SEED = randomBytes(32).toString("base64");
 
 function createService({ signingKey }: { signingKey?: string } = {}): PrivateModelEndpointService {
   let next = 0;

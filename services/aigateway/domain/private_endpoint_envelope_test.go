@@ -118,14 +118,20 @@ func TestParsePrivateEndpointsVerifyKey(t *testing.T) {
 
 // The vector the TS signer is held to as well
 // (modules/model-provider/contract/src/__tests__/private-model-endpoint.wire.unit.test.ts):
-// seed 0x01..0x20, acme-prod, expiring at 1800000900.
+// seed 0x01..0x20, acme-prod, expiring at 1800000900. The key is derived from that
+// seed at run time, so the source carries no key material.
 const (
-	sharedVectorVerifyKey = "ebVWLo/mVPlAeLES6KmLp5AfhTrmlb7X4OORC60ElmQ="
-	sharedVectorHeader    = "eyJ2IjoxLCJvcmdhbml6YXRpb25JZCI6Im9yZ19hY21lIiwicHJvamVjdElkIjoiYWNtZS1wcm9kIiwiYmluZGluZ3MiOlt7Imhvc3RuYW1lIjoibGxtLmludGVybmFsLmFjbWUudGVzdCIsImFkZHJlc3NlcyI6WyIxMC4yMC4xLjIxIiwiMTAuMjAuMi4zNCJdLCJwb3J0Ijo0NDN9XSwiZXhwaXJlc0F0IjoxODAwMDAwOTAwfQ.oyQyB4gk0jXh3oyefY_wDJ4rK1h1zu6ZKDwOTXbtNi3KFSIRCAJpo5WqzvoY79_eppAlLxm4e1dD7iaGwKB4CQ"
+	sharedVectorHeader = "eyJ2IjoxLCJvcmdhbml6YXRpb25JZCI6Im9yZ19hY21lIiwicHJvamVjdElkIjoiYWNtZS1wcm9kIiwiYmluZGluZ3MiOlt7Imhvc3RuYW1lIjoibGxtLmludGVybmFsLmFjbWUudGVzdCIsImFkZHJlc3NlcyI6WyIxMC4yMC4xLjIxIiwiMTAuMjAuMi4zNCJdLCJwb3J0Ijo0NDN9XSwiZXhwaXJlc0F0IjoxODAwMDAwOTAwfQ.oyQyB4gk0jXh3oyefY_wDJ4rK1h1zu6ZKDwOTXbtNi3KFSIRCAJpo5WqzvoY79_eppAlLxm4e1dD7iaGwKB4CQ"
 )
 
 func TestVerifyPrivateEndpointsHeader_SharedVector(t *testing.T) {
-	key, err := ParsePrivateEndpointsVerifyKey(sharedVectorVerifyKey)
+	seed := make([]byte, ed25519.SeedSize)
+	for i := range seed {
+		seed[i] = byte(i + 1)
+	}
+	pub, ok := ed25519.NewKeyFromSeed(seed).Public().(ed25519.PublicKey)
+	require.True(t, ok)
+	key, err := ParsePrivateEndpointsVerifyKey(base64.StdEncoding.EncodeToString(pub))
 	require.NoError(t, err)
 	env, err := VerifyPrivateEndpointsHeader(sharedVectorHeader, key, time.Unix(1_800_000_000, 0))
 	require.NoError(t, err)

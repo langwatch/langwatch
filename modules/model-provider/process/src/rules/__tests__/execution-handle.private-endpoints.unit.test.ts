@@ -1,3 +1,5 @@
+import { randomBytes } from "node:crypto";
+
 import {
   PRIVATE_ENDPOINTS_HEADER,
   PRIVATE_ENDPOINTS_PROJECT_HEADER,
@@ -14,8 +16,8 @@ const INFERENCE = {
   port: 443,
 };
 
-/** A test-only Ed25519 seed (0x01..0x20). */
-const TEST_SEED = "AQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyA=";
+/** A fresh Ed25519 seed for this run, so no key material lives in the source. */
+const TEST_SEED = randomBytes(32).toString("base64");
 
 /** The headers the handle sends to nlpgo's proxy on one call. */
 async function headersSent(
