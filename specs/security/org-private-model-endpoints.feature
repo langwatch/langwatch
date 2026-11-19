@@ -12,8 +12,16 @@ Feature: Private model endpoints for one organization
   A host that is not bound keeps the rules in ssrf-blocking.feature.
 
   Paths covered: the credential check on save, model discovery, the nlpgo
-  playground proxy, nlpgo workflow LLM and evaluator blocks, and AI gateway
-  virtual keys. In the scenarios, "a model call" means each of these paths.
+  playground proxy, nlpgo workflow LLM blocks and the evaluators nlpgo runs
+  itself, and AI gateway virtual keys. In the scenarios, "a model call" means
+  each of these paths. The AI gateway picks up a binding change on the next
+  bundle revalidation, not on the next call; the other paths pick it up on the
+  next call. The gaps are listed under "Paths that do not honour bindings yet".
+
+  The app sends nlpgo the organization's bindings only in the
+  X-LangWatch-Private-Endpoints header: an Ed25519-signed envelope naming the
+  organization, the project and an expiry. nlpgo never reads bindings from a
+  request body.
 
   Background:
     Given BLOCK_LOCAL_HTTP_CALLS is "true"
@@ -46,6 +54,14 @@ Feature: Private model endpoints for one organization
         | an nlpgo workflow LLM block       |
         | an nlpgo evaluator block          |
         | an AI gateway virtual-key request |
+
+    @unit
+    Scenario: A silent address does not hold up the next one
+      Given 10.20.1.21 never answers
+      When a model call runs for "acme-prod" with base URL "https://llm.internal.acme.test/v1"
+      Then the attempt on 10.20.1.21 gives up after 3 seconds
+      And the call connects to 10.20.2.34
+      And the call's overall connect timeout is unchanged
 
     @unit
     Scenario: A bound hostname is never resolved
@@ -90,6 +106,19 @@ Feature: Private model endpoints for one organization
   Rule: A binding never widens what a call can reach
 
     @unit
+    Scenario: A binding carrying an address outside the private ranges is refused
+      Given a binding for "llm.internal.acme.test" carries 10.20.1.21 and 127.0.0.1
+      When a model call runs for "acme-prod" with base URL "https://llm.internal.acme.test/v1"
+      Then the call is refused
+      And no connection is opened, not even to 10.20.1.21
+
+    @unit
+    Scenario: Bindings never apply to LangWatch's own credentials
+      Given an AI gateway bundle for "acme-prod" holds a platform credential and a LangWatch provider
+      When the gateway reads the bundle
+      Then only the organization's own credentials carry the bindings
+
+    @unit
     Scenario: An IP-literal base URL is never treated as bound
       When a model call runs for "acme-prod" with base URL "https://10.20.1.21/v1"
       Then the call is refused as a private address
@@ -112,6 +141,71 @@ Feature: Private model endpoints for one organization
       And the error does not contain 10.20.1.21 or 10.20.2.34
 
   # ============================================================================
+  # How bindings reach nlpgo
+  # ============================================================================
+
+  Rule: nlpgo takes bindings only from an envelope the app signed
+
+    @unit
+    Scenario: The app's signed envelope verifies in nlpgo byte for byte
+      Given the app signs Acme's bindings for "acme-prod"
+      Then the header is the one nlpgo's verifier is tested against
+
+    @unit
+    Scenario: nlpgo honours bindings only in an envelope signed for the request's project
+      Given nlpgo holds LANGWATCH_PRIVATE_ENDPOINTS_VERIFY_KEY
+      When a request for "acme-prod" carries Acme's envelope signed for "acme-prod"
+      Then the call runs under Acme's bindings
+
+    @unit
+    Scenario Outline: nlpgo refuses <envelope> with a 400 and never falls back to DNS
+      Given nlpgo holds LANGWATCH_PRIVATE_ENDPOINTS_VERIFY_KEY
+      When a request for "acme-prod" carries <envelope>
+      Then nlpgo answers 400 with reason "invalid_private_endpoints"
+      And nothing runs
+      And the answer does not contain 10.20.1.21 or 10.20.2.34
+
+      Examples:
+        | envelope                              |
+        | an envelope with a forged signature   |
+        | an expired envelope                   |
+        | an envelope signed for "rival-prod"   |
+        | an envelope with no project to match  |
+        | an unsigned binding list              |
+
+    @unit
+    Scenario: A private_endpoints field in a workflow body is ignored
+      When a workflow request for "acme-prod" carries a private_endpoints field in its body
+      Then the workflow runs with no bindings
+      And this holds with the internal secret too
+
+    @unit
+    Scenario: Without a verify key nlpgo honours no bindings
+      Given nlpgo holds no LANGWATCH_PRIVATE_ENDPOINTS_VERIFY_KEY
+      When a request carries a valid envelope
+      Then the call runs with no bindings
+      And nlpgo logs a warning
+
+    @unit
+    Scenario: A project's studio Lambda honours signed bindings without the internal secret
+      Given a project's studio Lambda holds the verify key and no internal secret
+      When a request carries Acme's envelope signed for that project
+      Then the call runs under Acme's bindings
+
+    @unit
+    Scenario: A project's studio Lambda checks bindings against the public key alone
+      When the app creates or reconciles a project's studio Lambda
+      Then its environment carries LANGWATCH_PRIVATE_ENDPOINTS_VERIFY_KEY
+      And never the signing key or the internal secret
+
+    @integration
+    Scenario: A relayed workflow turn cannot choose its own bindings
+      Given a caller with a project key posts to "/api/scenario/execute-sync"
+      When the body or the headers carry their own private endpoints
+      Then the engine receives none of them
+      And the engine receives only the organization's envelope, on the HTTP and the Lambda route
+
+  # ============================================================================
   # Customers manage bindings
   # ============================================================================
 
@@ -124,6 +218,7 @@ Feature: Private model endpoints for one organization
       Then the binding is saved for "Acme"
       And the change is recorded in the audit log with my identity
       And the next model call for "acme-prod" to "https://llm.acme.test/v1" connects to 10.20.1.21 or 10.20.2.34
+      And an AI gateway virtual key uses the binding from its next bundle revalidation
 
     @integration
     Scenario: The settings page shows endpoints without their addresses
@@ -164,12 +259,21 @@ Feature: Private model endpoints for one organization
         | *.acme.test    |
         | localhost      |
         | acme           |
+        | langwatch.ai   |
+        | app.langwatch.ai |
+
+    @unit
+    Scenario: Two concurrent binds of one hostname save one binding
+      When two organization managers bind "race.acme.test" at the same moment
+      Then one binding is saved
+      And the other is refused on the hostname field as already bound
 
     @integration
     Scenario: Removing a binding closes the path for the next call
       When an organization manager removes the binding for "llm.internal.acme.test"
       Then the next model call for "acme-prod" to that hostname is resolved as usual
       And a private answer is refused as a private address
+      And an AI gateway virtual key stops using the binding from its next bundle revalidation
 
   # ============================================================================
   # Staff manage private endpoints
@@ -229,6 +333,27 @@ Feature: Private model endpoints for one organization
         | a workflow HTTP block        |
         | a webhook automation         |
         | a scenario HTTP agent target |
+
+  Rule: Paths that do not honour bindings yet
+
+    @unimplemented
+    Scenario Outline: <path> does not honour bindings yet
+      Given "acme-prod" has a custom provider with base URL "https://llm.internal.acme.test/v1"
+      When <path> runs for "acme-prod"
+      Then the hostname is resolved as usual
+      And a private answer is refused as a private address
+
+      Examples:
+        | path                                                  |
+        | a langevals evaluator (llm_* and ragas)              |
+        | topic clustering                                     |
+        | an agent test turn                                   |
+        | an Azure OpenAI provider                             |
+        | a Bedrock provider                                   |
+        | the LangWatch provider                               |
+        | a realtime (voice) session                           |
+        | a Codex coding-agent run                             |
+        | Voyage embeddings                                    |
 
   Rule: Installs that allow private calls see no change
 

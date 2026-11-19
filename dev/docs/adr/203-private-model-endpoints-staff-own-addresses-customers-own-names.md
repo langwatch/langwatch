@@ -34,6 +34,9 @@ connector" bound to an organization, and "a hostname suffix establishes neither
 tenant ownership nor authorization to a particular PrivateLink endpoint." Its
 full shape (a separate egress service and a signed envelope) is not built. This
 ADR is the first slice of ADR-053 Track C, which works inside today's processes.
+The signed bindings envelope below is also the first slice of ADR-053 Track A's
+signed egress envelope: organization, project, destination and expiry, verified
+by the process that dials.
 
 The customer must also be able to manage this without a support ticket for
 every change. The PrivateLink endpoint itself needs us (Terraform in our
@@ -81,9 +84,16 @@ bound in the calling project's organization:
 
 The customer can choose any name, because the name decides only which of _their
 own_ endpoints a call reaches. They never enter an address, so they cannot aim a
-call at anything else in our network. Binding a public name such as
-`api.openai.com` sends only their own calls to their own endpoint. No private
-DNS zone is needed on our side.
+call at anything else in our network. No private DNS zone is needed on our side.
+
+A binding applies only to the organization's own provider credentials. If a
+customer binds a public name such as `api.openai.com`, a call with their own
+OpenAI key goes to their endpoint. That is their choice, and it reaches only
+their own endpoint. A call made with a LangWatch platform key, or to the
+LangWatch provider, never takes a binding: the AI gateway skips platform
+credentials when it stamps bindings. nlpgo cannot yet tell a platform credential
+from a customer one, so no organization may bind `langwatch.ai` or a name under
+it.
 
 A host that is not bound follows today's rules: public addresses pass, private
 addresses are refused, and metadata addresses are always refused. An IP-literal
@@ -93,10 +103,39 @@ public address as a private endpoint address.
 **Bindings travel with the call.** Go services get no database access for this:
 
 - The TS app resolves the organization's bindings (hostname, addresses, port)
-  and attaches them to its internal call to nlpgo (`/go/proxy/v1` and workflow
-  payloads). That call is already authenticated with the internal secret.
+  and sends them to nlpgo in one header, `X-LangWatch-Private-Endpoints`, on
+  every route: `/go/proxy/v1`, the studio's streaming and synchronous workflow
+  routes, the scenario relay, and a project's own NLP Lambda.
 - The AI gateway receives them in the control-plane config bundle, next to
   `Bundle.OrganizationID`.
+
+**The signed envelope is the trust anchor for nlpgo.** The header value is
+`base64url(JSON) + "." + base64url(Ed25519 signature)`, signed over the first
+segment. The JSON is `{v: 1, organizationId, projectId, bindings, expiresAt}`,
+with `expiresAt` in Unix seconds. The app signs with
+`LANGWATCH_PRIVATE_ENDPOINTS_SIGNING_KEY`, which only the app holds.
+`signPrivateEndpointsHeaders` in `@langwatch/model-provider-contract` builds the
+header, and `ModelProviderApi.privateEndpointsHeadersForProject` is how a module
+gets it. The app also sends `X-LangWatch-Project-Id`.
+
+nlpgo verifies with `LANGWATCH_PRIVATE_ENDPOINTS_VERIFY_KEY`, a public key. It
+accepts the envelope only when the signature is valid, the envelope has not
+expired, and its `projectId` equals the request's project (the project header,
+and the body's `project_id` on workflow routes). Any failure is a 400 with
+reason `invalid_private_endpoints`; nlpgo never falls back to DNS for a refused
+envelope. With no verify key, nlpgo ignores the header and logs a warning.
+nlpgo never reads bindings from a request body: the app relays some bodies
+unread (`/api/scenario/execute-sync`), so a body field could name any address.
+
+The expiry is 15 minutes for a workflow run, which nlpgo checks once, when the
+request arrives. A scenario run gets one hour, because its child process reuses
+one envelope for every turn.
+
+**The gateway's bundle stays unsigned.** The AI gateway fetches its bundle from
+the control plane itself: it signs the request with its own internal secret
+and verifies the answer's JWT. No tenant code runs in the gateway, and no
+request body or header a tenant sends can set bindings. Signing the bundle would add a key to
+rotate without removing any reachable attacker.
 
 **One policy per call, every model path.** v1 covers every place that reaches a
 custom model endpoint:
@@ -117,6 +156,14 @@ calls, not arbitrary HTTP.
 
 ## Alternatives
 
+- **Gate bindings on the internal secret.** The first version did this: nlpgo
+  honoured bindings on any request that carried `LANGWATCH_NLP_INTERNAL_SECRET`.
+  Rejected, for two reasons. The app adds the secret to calls whose body it
+  relays from a tenant, so the secret says who sent the request, not who chose
+  the bindings. And tenant code on a project's NLP Lambda can read that
+  Lambda's environment, so any secret the Lambda needs to check bindings is a
+  secret the tenant has. A signature fixes both: the Lambda holds only the
+  public key, and only the app can produce an envelope it accepts.
 - **A hostname list on `Organization`.** It is the smallest change, but it
   trusts DNS. A tenant with control of a listed name's DNS chooses which of our
   addresses we connect to. ADR-053 rejects hostname-only authorization for this
@@ -158,10 +205,35 @@ calls, not arbitrary HTTP.
   follow-up: give both the gateway's policy.
 - Each call carries the organization's bindings, a few hundred bytes.
 - Self-hosted installs with `BLOCK_LOCAL_HTTP_CALLS=false` see no change.
+- Every deployment that wants bindings in nlpgo sets one Ed25519 key pair:
+  the signing key on the app, the verify key on nlpgo and in each project's
+  NLP Lambda environment. `@langwatch/server` generates the pair; the Helm
+  chart reads both from the app Secret.
+
+## Known gaps
+
+These paths do not honour bindings yet; the spec tags them `@unimplemented`:
+
+- langevals evaluators (`llm_*`, ragas);
+- topic clustering and agent test turns;
+- Azure OpenAI, Bedrock and the LangWatch provider;
+- realtime (voice) sessions, Codex coding-agent runs and Voyage embeddings.
+
+nlpgo credentials carry no provenance, so nlpgo refuses `langwatch.ai`
+bindings instead of skipping platform credentials as the gateway does.
+
+## Infra follow-ups
+
+- A code block on a project's NLP Lambda can open sockets inside the Lambda's
+  subnets directly, without any binding. That is out of scope here and is
+  ADR-053 Track E (isolate NLP code blocks).
+- Restricting the NLP Lambda security group's egress is a deployment task.
+- Give the TS app and nlpgo the AI gateway's private-egress NetworkPolicy (see
+  Consequences).
 
 ## References
 
-- ADR-053: tenant-aware egress and workload isolation (Track C)
+- ADR-053: tenant-aware egress and workload isolation (Tracks A, C and E)
 - ADR-195: outbound proxy in the egress fence
 - `specs/security/ssrf-blocking.feature`
 - `specs/security/tenant-aware-egress-isolation.feature`
