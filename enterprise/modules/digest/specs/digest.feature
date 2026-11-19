@@ -60,7 +60,7 @@ Feature: Weekly digest emails
 
   # Folding the week
 
-  @integration @unimplemented
+  @integration
   Scenario: Trace spans fold into the project's week as they arrive
     Given spans received for a project across two traces, one with an error
     When the digest subscriber has handled their events
@@ -72,13 +72,13 @@ Feature: Weekly digest emails
     When the digest subscriber has handled them
     Then the project's week counts all 500 and fewer than 500 appends were made
 
-  @integration @unimplemented
+  @integration
   Scenario: Coding-agent facts fold into the person's week
     Given coding-agent facts contributed for one user across three sessions
     When the digest subscriber has handled their events
     Then the user's week holds 3 sessions and the summed tokens, cost and lines
 
-  @integration @unimplemented
+  @integration
   Scenario: Scenario outcomes fold into the project's week
     Given scenario runs that finished passing and failing this week
     When the digest subscriber has handled their events
@@ -95,7 +95,7 @@ Feature: Weekly digest emails
     When its evaluation completes
     Then no week is folded for it
 
-  @integration @unimplemented
+  @integration
   Scenario: A fold holds numbers and ids, never personal data
     When any week is folded
     Then no fold row carries an email address or a name

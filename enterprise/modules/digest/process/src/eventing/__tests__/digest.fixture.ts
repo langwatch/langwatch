@@ -11,6 +11,14 @@ import {
   evaluationLifecycleCompletedEventDataSchema,
 } from "@langwatch/evaluation-contract";
 import {
+  METRIC_FACTS_CONTRIBUTED_EVENT_TYPE,
+  METRIC_FACTS_CONTRIBUTED_EVENT_VERSION_LATEST,
+  metricFactsContributionSchema,
+  SPAN_FACTS_CONTRIBUTED_EVENT_TYPE,
+  SPAN_FACTS_CONTRIBUTED_EVENT_VERSION_LATEST,
+  spanFactsContributionSchema,
+} from "@langwatch/coding-agent-contract";
+import {
   buildIntentAccessor,
   createTenantId,
   defineAggregate,
@@ -22,6 +30,16 @@ import {
 } from "@langwatch/eventing";
 import { EventStoreMemory } from "@langwatch/eventing/testing";
 import { MemberNotFoundError } from "@langwatch/organization-contract";
+import {
+  SIMULATION_EVENT_VERSIONS,
+  SIMULATION_RUN_EVENT_TYPES,
+  simulationRunFinishedEventDataSchema,
+} from "@langwatch/scenario-contract";
+import {
+  recordTraceSpanEventDataSchema,
+  SPAN_RECORDED_EVENT_TYPE,
+  SPAN_RECORDED_EVENT_VERSION_LATEST,
+} from "@langwatch/trace-contract";
 import { type Instant, Temporal } from "@langwatch/time";
 import { z } from "zod";
 
@@ -61,18 +79,41 @@ export const DIGEST_SECRET = "digest-test-secret";
 
 const OWNER_AGGREGATE_TYPE = "digest_owner_stand_in";
 
-/** Evaluation's pipeline as its contract names the fact; digest reads type and data. */
+/** The owners' facts digest folds, each as its contract names the type, version and data. */
+export const OWNER_FACTS = {
+  evaluation: {
+    type: EVALUATION_LIFECYCLE_COMPLETED_EVENT_TYPE,
+    version: EVALUATION_LIFECYCLE_EVENT_VERSION,
+  },
+  span: { type: SPAN_RECORDED_EVENT_TYPE, version: SPAN_RECORDED_EVENT_VERSION_LATEST },
+  scenario: {
+    type: SIMULATION_RUN_EVENT_TYPES.FINISHED,
+    version: SIMULATION_EVENT_VERSIONS.FINISHED,
+  },
+  codingAgentSpan: {
+    type: SPAN_FACTS_CONTRIBUTED_EVENT_TYPE,
+    version: SPAN_FACTS_CONTRIBUTED_EVENT_VERSION_LATEST,
+  },
+  codingAgentMetric: {
+    type: METRIC_FACTS_CONTRIBUTED_EVENT_TYPE,
+    version: METRIC_FACTS_CONTRIBUTED_EVENT_VERSION_LATEST,
+  },
+} as const;
+
+/** The owners' pipelines as their contracts name the facts; digest reads type and data. */
 function ownerStandIn() {
+  const fact = <Type extends string, Data extends z.ZodType>(type: Type, data: Data) =>
+    z.object({ ...EventSchema.shape, type: z.literal(type), data });
   return definePipeline({
     name: "digest_owner_stand_in",
     aggregate: defineAggregate({ type: OWNER_AGGREGATE_TYPE }),
   })
     .withEvents([
-      z.object({
-        ...EventSchema.shape,
-        type: z.literal(EVALUATION_LIFECYCLE_COMPLETED_EVENT_TYPE),
-        data: evaluationLifecycleCompletedEventDataSchema,
-      }),
+      fact(EVALUATION_LIFECYCLE_COMPLETED_EVENT_TYPE, evaluationLifecycleCompletedEventDataSchema),
+      fact(SPAN_RECORDED_EVENT_TYPE, recordTraceSpanEventDataSchema),
+      fact(SIMULATION_RUN_EVENT_TYPES.FINISHED, simulationRunFinishedEventDataSchema),
+      fact(SPAN_FACTS_CONTRIBUTED_EVENT_TYPE, spanFactsContributionSchema),
+      fact(METRIC_FACTS_CONTRIBUTED_EVENT_TYPE, metricFactsContributionSchema),
     ])
     .build();
 }
@@ -99,6 +140,8 @@ export function digestWorld() {
     clockOffsetMs: 0,
     /** The deployment's public origin, read on each send so a test can misconfigure it. */
     publicBaseUrl: BASE_URL,
+    /** The person behind each personal project, by project id; a shared project has none. */
+    personalOwners: new Map<string, string>(),
   };
 }
 
@@ -130,7 +173,10 @@ export function installDigest(
     projects: {
       listIdsByOrganization: async ({ organizationId }) =>
         organizationId === ORGANIZATION ? world.projects : [],
-      findPersonalWorkspaceOwner: async () => null,
+      findPersonalWorkspaceOwner: async ({ scopeId }) => {
+        const ownerUserId = world.personalOwners.get(scopeId);
+        return ownerUserId ? { ownerUserId } : null;
+      },
     },
     recordProject: (activity) => commands.recordProject(activity),
     recordUser: (activity) => commands.recordUser(activity),
@@ -226,6 +272,39 @@ export function installDigest(
     attempt: 1,
   });
   let ownerEvents = 0;
+  /** An owner's fact, appended to its stand-in log in order. */
+  const ownerFact = async ({
+    fact,
+    tenantId,
+    aggregateId,
+    occurredAt,
+    data,
+  }: {
+    fact: (typeof OWNER_FACTS)[keyof typeof OWNER_FACTS];
+    tenantId: string;
+    aggregateId: string;
+    occurredAt: number;
+    data: unknown;
+  }) => {
+    ownerEvents += 1;
+    const tenant = createTenantId(tenantId);
+    await owner.service.storeEvents(
+      [
+        {
+          id: `owner-event-${ownerEvents}`,
+          aggregateId,
+          aggregateType: OWNER_AGGREGATE_TYPE,
+          tenantId: tenant,
+          type: fact.type,
+          version: fact.version,
+          createdAt: occurredAt + ownerEvents,
+          occurredAt,
+          data,
+        },
+      ] as Parameters<typeof owner.service.storeEvents>[0],
+      { tenantId: tenant },
+    );
+  };
 
   return {
     world,
@@ -276,33 +355,29 @@ export function installDigest(
       sends.sendTest(input),
     /** One fact on a project's week, through digest's own record command. */
     recordProject: (activity: ProjectActivity) => commands.recordProject(activity),
+    ownerFact,
     /** Evaluation's settled fact, appended to its stand-in log in order. */
-    evaluationCompleted: async (data: EvaluationLifecycleCompletedEventData) => {
-      ownerEvents += 1;
-      const tenantId = createTenantId(data.tenantId);
-      await owner.service.storeEvents(
-        [
-          {
-            id: `owner-event-${ownerEvents}`,
-            aggregateId: data.projectId,
-            aggregateType: OWNER_AGGREGATE_TYPE,
-            tenantId,
-            type: EVALUATION_LIFECYCLE_COMPLETED_EVENT_TYPE,
-            version: EVALUATION_LIFECYCLE_EVENT_VERSION,
-            createdAt: data.occurredAt + ownerEvents,
-            occurredAt: data.occurredAt,
-            data,
-          },
-        ],
-        { tenantId },
-      );
-    },
+    evaluationCompleted: (data: EvaluationLifecycleCompletedEventData) =>
+      ownerFact({
+        fact: OWNER_FACTS.evaluation,
+        tenantId: data.tenantId,
+        aggregateId: data.projectId,
+        occurredAt: data.occurredAt,
+        data,
+      }),
     projectWeek: async ({ isoWeek }: { isoWeek: string }) => {
       const folds = await repositories.projectWeeks.findWeeks({
         isoWeeks: [isoWeek],
         organizationId: ORGANIZATION,
       });
       return folds.find((fold) => fold.projectId === PROJECT);
+    },
+    userWeek: async ({ isoWeek, userId }: { isoWeek: string; userId: string }) => {
+      const folds = await repositories.userWeeks.findWeeks({
+        isoWeeks: [isoWeek],
+        organizationId: ORGANIZATION,
+      });
+      return folds.find((fold) => fold.userId === userId);
     },
     close: () => eventing.close(),
   };
