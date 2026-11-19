@@ -118,9 +118,10 @@ function isKeyedOnFact(event: AuthzGrantsEvent): boolean {
 }
 
 /**
- * A row keyed on its fact is dated by the append that wrote it: such a fact may carry its
- * caller's fixed business time (an API key's creation), which can be well before the write, and
- * a row dated then would land behind an export's settled watermark. Others keep `occurredAt`.
+ * A row keyed on its fact is dated by the first append that wrote it (the insert keeps the first
+ * row): such a fact carries its caller's fixed business time (an API key's creation), which can
+ * be well before the write, and a row dated then would land behind an export's settled watermark.
+ * Others keep `occurredAt`. ADR-092 records this.
  */
 function auditedAtMs(event: AuthzGrantsEvent): number {
   return event.idempotencyKey && isKeyedOnFact(event) ? event.createdAt : event.occurredAt;

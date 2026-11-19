@@ -284,7 +284,7 @@ describe("given an API key's own role and grant written on each try of a held-ke
   describe("when the key's role is edited and a late retry of its create follows", () => {
     /** @scenario "A late copy of a key's create never overwrites a later edit" */
     it("keeps the edit, as the retry carries the key's creation time", async () => {
-      const { ledger, grantKey, memory } = world();
+      const { ledger, grantKey, memory, eventsOf } = world();
       const edited = ["traces:view", "traces:share"];
 
       await grantKey();
@@ -296,12 +296,22 @@ describe("given an API key's own role and grant written on each try of a held-ke
         kind: "system_api_key",
         actor: ACTOR,
       });
-      // The retry waits for its own content, which the edit has replaced for good.
+      // The retry waits for its own content, which the edit has replaced for good. api-key
+      // refuses any edit before the create activates the key, so no real retry meets this.
       await expect(grantKey()).rejects.toMatchObject(REFUSED);
 
       const role = memory.roleHeads.find((row) => row.id === ROLE);
       expect(role?.permissions).toEqual(edited);
       expect(role?.deletedAt).toBeNull();
+      // The wiring: the create's stamp reaches the event the fold guards on, below the edit's.
+      const stampOf = async (permissions: string[]) =>
+        (await eventsOf(ROLE, ROLE_DEFINED_EVENT_TYPE)).find(
+          (event) =>
+            JSON.stringify((event.data as { permissions: string[] }).permissions) ===
+            JSON.stringify(permissions),
+        )?.occurredAt;
+      expect(await stampOf(["traces:view"])).toBe(CREATE.occurredAtMs);
+      expect(await stampOf(edited)).toBeGreaterThan(CREATE.occurredAtMs);
     });
   });
 

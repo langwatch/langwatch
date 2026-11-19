@@ -58,6 +58,13 @@ Feature: API key lifecycle
     Then it receives one organization ADMIN binding
 
   @unit
+  Scenario: A key's create cannot be overtaken by an edit of the key
+    Given a key its create has written but not yet activated
+    When anyone edits the key's grants
+    Then a held key, written system-managed, is refused as not found
+    And any other key is refused as revoked, so no create retry meets a later edit
+
+  @unit
   Scenario: A system-managed key is not customer-addressable
     When a customer uses the reserved Langy session name
     Then creation, rename, read and revoke are rejected as not found or reserved

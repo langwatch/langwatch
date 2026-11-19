@@ -972,6 +972,16 @@ authz check reads. Checks **never** read ClickHouse.
   Grant, Role, RoleBinding, CustomRole, or grant AuditLog rows directly.
 ```
 
+**Audit rows keyed on their fact (tasks#1139).** An API key's own role definition, and any
+API-key grant attached under its create's `apikeygrant:` command id, carry the caller's fixed
+business time (the key's creation), and a retry appends the same fact again under a new event
+id. Such a row takes its id from the fact's idempotency key, not the event id, and is dated by
+the append that first wrote it (`event.createdAt`), not by `occurredAt`: a row dated at the
+key's creation could land behind the SIEM export's settled watermark and never be exported.
+Every other row keeps the event id and `occurredAt`. The insert keeps the first row, and
+subscribers never run on replay, so a later copy surviving the event log's merge never
+re-dates it.
+
 **Dispatch: the queue, best-effort FIFO.** Every command appends (waited) and folds
 through the GroupQueue in per-org FIFO. The ordering authority is the append
 itself — `(acceptedAt, eventId)` is the ledger's order, the projection
