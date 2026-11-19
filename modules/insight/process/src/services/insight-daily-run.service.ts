@@ -424,12 +424,13 @@ export class InsightDailyRunService implements InsightDailyRunExecutor {
   }
 
   /**
-   * The run this one replaces never recorded an outcome, so it is recorded as lost before this
-   * run's own. A repeat records it once: the outcome is keyed by the run it names.
+   * The run this one replaces is recorded as lost before this run's own. A repeat delivery
+   * records nothing: the log reads the repeat once but the projections fold it, after this
+   * run's outcome, and the lost run would read as the newest.
    */
   private async settleSuperseded(input: RunInput): Promise<void> {
     const { projectId, scheduleId, userId, board, supersedes } = input;
-    if (!supersedes) return;
+    if (!supersedes || (await this.isHandedOn(input))) return;
     await this.members.runCommands.settleRun({
       tenantId: projectId,
       occurredAt: nowInstant().epochMilliseconds,

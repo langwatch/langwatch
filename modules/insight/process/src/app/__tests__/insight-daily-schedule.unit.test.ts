@@ -154,6 +154,7 @@ describe("given a member turned their daily run on for a board", () => {
         renewedCount: 0,
         conversationId: "conversation-1",
         runId: expect.any(String),
+        startedAt: slot + 2_000,
       },
       offReason: null,
       runInFlight: null,
