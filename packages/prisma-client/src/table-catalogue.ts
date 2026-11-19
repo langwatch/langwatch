@@ -1918,9 +1918,7 @@ export const prismaModelFieldCatalogue = {
     "organizationId",
     "usageBilled",
     "occurredAt",
-    "fromCatchUp",
-    "appliedEventIds",
-    "winnerEventId"
+    "fromCatchUp"
   ],
   "InstantEvalJudgeSpend": [
     "organizationId",
@@ -2527,7 +2525,9 @@ export const prismaModelFieldCatalogue = {
     "organizationId",
     "plan",
     "occurredAt",
-    "fromCatchUp"
+    "fromCatchUp",
+    "appliedEventIds",
+    "winnerEventId"
   ],
   "NurturingVirtualKey": [
     "virtualKeyId",
