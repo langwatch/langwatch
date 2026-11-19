@@ -4,7 +4,11 @@ import type {
   StoredProjection,
   StoredProjectionRead,
 } from "@langwatch/eventing";
-import { type PrismaModelClient, prismaTables, skipTenantCheck } from "@langwatch/prisma-client";
+import {
+  type PrismaModelClient,
+  PrismaRepository,
+  skipTenantCheck,
+} from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
 import { type UserWeekState, userWeekStateSchema } from "../../rules/digest-week.rules.ts";
@@ -16,10 +20,11 @@ type PrismaDigestUserWeekDatabase = PrismaModelClient<"DigestUserWeek"> &
   Pick<PrismaClient, "$executeRaw">;
 
 /** A person's folded coding-agent weeks, one row per (organization, person, week). */
-export class PrismaDigestUserWeekRepository implements DigestUserWeekRepository {
-  /** Declared, not inherited: the model-scoped client carries no `$executeRaw`. */
-  static readonly tables = prismaTables("DigestUserWeek");
-
+export class PrismaDigestUserWeekRepository
+  extends PrismaRepository.for("DigestUserWeek")
+  implements DigestUserWeekRepository
+{
+  // Its own create, not `this.factory`: the factory's model-scoped client carries no `$executeRaw`.
   static create({
     prisma,
   }: {
@@ -28,7 +33,9 @@ export class PrismaDigestUserWeekRepository implements DigestUserWeekRepository 
     return new PrismaDigestUserWeekRepository(prisma);
   }
 
-  private constructor(private readonly database: PrismaDigestUserWeekDatabase) {}
+  private constructor(private readonly database: PrismaDigestUserWeekDatabase) {
+    super(database);
+  }
 
   get = async (
     key: string,

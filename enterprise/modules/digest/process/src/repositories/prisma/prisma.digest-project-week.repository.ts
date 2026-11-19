@@ -4,7 +4,11 @@ import type {
   StoredProjection,
   StoredProjectionRead,
 } from "@langwatch/eventing";
-import { type PrismaModelClient, prismaTables, skipTenantCheck } from "@langwatch/prisma-client";
+import {
+  type PrismaModelClient,
+  PrismaRepository,
+  skipTenantCheck,
+} from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
 import { type ProjectWeekState, projectWeekStateSchema } from "../../rules/digest-week.rules.ts";
@@ -16,10 +20,11 @@ type PrismaDigestProjectWeekDatabase = PrismaModelClient<"DigestProjectWeek"> &
   Pick<PrismaClient, "$executeRaw">;
 
 /** A project's folded weeks, one row per (project, week) under the fold's aggregate key. */
-export class PrismaDigestProjectWeekRepository implements DigestProjectWeekRepository {
-  /** Declared, not inherited: the model-scoped client carries no `$executeRaw`. */
-  static readonly tables = prismaTables("DigestProjectWeek");
-
+export class PrismaDigestProjectWeekRepository
+  extends PrismaRepository.for("DigestProjectWeek")
+  implements DigestProjectWeekRepository
+{
+  // Its own create, not `this.factory`: the factory's model-scoped client carries no `$executeRaw`.
   static create({
     prisma,
   }: {
@@ -28,7 +33,9 @@ export class PrismaDigestProjectWeekRepository implements DigestProjectWeekRepos
     return new PrismaDigestProjectWeekRepository(prisma);
   }
 
-  private constructor(private readonly database: PrismaDigestProjectWeekDatabase) {}
+  private constructor(private readonly database: PrismaDigestProjectWeekDatabase) {
+    super(database);
+  }
 
   get = async (
     key: string,
