@@ -65,8 +65,17 @@ export class TestModelProviderService implements ModelProviderApi {
   prepareExecution(): Promise<Record<string, string>> {
     return Promise.resolve({});
   }
-  prepareEvaluatorModelEnv(): Promise<Record<string, string>> {
-    return Promise.resolve({});
+  prepareLangevalsExecution(): Promise<{
+    parameters: Record<string, string>;
+    headers: Record<string, string>;
+  }> {
+    return Promise.resolve({ parameters: {}, headers: {} });
+  }
+  prepareEvaluatorModelEnv(): Promise<{
+    env: Record<string, string>;
+    headers: Record<string, string>;
+  }> {
+    return Promise.resolve({ env: {}, headers: {} });
   }
 
   runPlaygroundCompletion(): Promise<never> {

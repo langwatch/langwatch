@@ -2,6 +2,7 @@ import {
   computeClampedMaxTokens,
   EvaluatorConfigError,
   type ModelProviderApi,
+  type ModelProviderEvaluatorModelEnv,
 } from "@langwatch/model-provider-contract";
 
 import {
@@ -22,18 +23,21 @@ const GENERATION_PARAMS = [
 
 type EvaluatorModelEnvInput = Parameters<ModelProviderApi["prepareEvaluatorModelEnv"]>[0];
 
-/** The environment block an evaluator calls one model with: main's `setupModelEnv`, one to one. */
+/**
+ * The environment block an evaluator calls one model with (main's `setupModelEnv`), and the
+ * headers langevals is posted to with when the call goes through nlpgo's proxy (ADR-203).
+ */
 export class ModelProviderEvaluatorModelEnvService {
   readonly #modelProviders: Pick<
     ModelProviderApi,
-    "getExecutionProviders" | "findRowServingModel" | "prepareExecution"
+    "getExecutionProviders" | "findRowServingModel" | "prepareLangevalsExecution"
   >;
   readonly #environment: Readonly<Record<string, string | undefined>>;
 
   private constructor(options: {
     modelProviders: Pick<
       ModelProviderApi,
-      "getExecutionProviders" | "findRowServingModel" | "prepareExecution"
+      "getExecutionProviders" | "findRowServingModel" | "prepareLangevalsExecution"
     >;
     environment: Readonly<Record<string, string | undefined>>;
   }) {
@@ -44,7 +48,7 @@ export class ModelProviderEvaluatorModelEnvService {
   static create(options: {
     modelProviders: Pick<
       ModelProviderApi,
-      "getExecutionProviders" | "findRowServingModel" | "prepareExecution"
+      "getExecutionProviders" | "findRowServingModel" | "prepareLangevalsExecution"
     >;
     /** The composing process's fallback for every provider key a row did not store. */
     environment: Readonly<Record<string, string | undefined>>;
@@ -57,7 +61,7 @@ export class ModelProviderEvaluatorModelEnvService {
     model,
     embeddings,
     settings,
-  }: EvaluatorModelEnvInput): Promise<Record<string, string>> {
+  }: EvaluatorModelEnvInput): Promise<ModelProviderEvaluatorModelEnv> {
     const modelProviders = await getProjectModelProviders(this.#modelProviders, projectId);
     const provider = model.split("/")[0]!;
     const modelProvider = modelProviders[provider];
@@ -88,9 +92,9 @@ export class ModelProviderEvaluatorModelEnvService {
     }
 
     const prefix = embeddings ? "X_LITELLM_EMBEDDINGS_" : "X_LITELLM_";
-    const litellmParams = await this.#modelProviders.prepareExecution({ model, projectId });
+    const call = await this.#modelProviders.prepareLangevalsExecution({ model, projectId });
     const envResult: Record<string, string> = Object.fromEntries(
-      Object.entries(litellmParams).map(([key, value]) => [`${prefix}${key}`, value]),
+      Object.entries(call.parameters).map(([key, value]) => [`${prefix}${key}`, value]),
     );
 
     Object.assign(
@@ -102,11 +106,14 @@ export class ModelProviderEvaluatorModelEnvService {
       }),
     );
 
-    if (!embeddings) return envResult;
+    if (!embeddings) return { env: envResult, headers: call.headers };
 
     return {
-      ...envResult,
-      ...prepareEnvKeys({ modelProvider, environment: { ...this.#environment } }),
+      env: {
+        ...envResult,
+        ...prepareEnvKeys({ modelProvider, environment: { ...this.#environment } }),
+      },
+      headers: call.headers,
     };
   }
 

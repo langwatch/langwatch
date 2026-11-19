@@ -26,6 +26,8 @@ import {
   type ModelProviderCodexDeviceApproval,
   type ModelProviderCodexSignInCompletion,
   type ModelProviderCodexSignInCompletionInput,
+  type LangevalsModelCall,
+  type ModelProviderEvaluatorModelEnv,
   type ModelProviderEvaluatorModelEnvInput,
   type ModelProviderCodexDeviceSignIn,
   type ModelProviderCredentialProbeRequest,
@@ -126,6 +128,7 @@ import { ManagedModelProviderGatewayService } from "../services/managed-model-pr
 import { ModelProviderAuthorizationService } from "../services/model-provider-authorization.service.ts";
 import { ModelProviderExecutionHandleService } from "../services/model-provider-execution-handle.service.ts";
 import { ModelProviderKeysService } from "../services/model-provider-keys.service.ts";
+import { ModelProviderLangevalsExecutionService } from "../services/model-provider-langevals-execution.service.ts";
 import { ModelProviderPlaygroundService } from "../services/model-provider-playground.service.ts";
 import { ModelProviderStructuredGenerationService } from "../services/model-provider-structured-generation.service.ts";
 import { ModelProviderTextGenerationService } from "../services/model-provider-text-generation.service.ts";
@@ -460,6 +463,7 @@ export class ModelProviderModule implements ModelProviderApi {
   readonly #dataPrivacy: DataPrivacyApi;
   readonly #playground: ModelProviderPlaygroundService;
   readonly #evaluatorModelEnv: ModelProviderEvaluatorModelEnvService;
+  readonly #langevalsExecution: ModelProviderLangevalsExecutionService;
   readonly #structuredGeneration: ModelProviderStructuredGenerationService;
   readonly #textGeneration: ModelProviderTextGenerationService;
   /** Private endpoints and hostname bindings, and the bindings every model call carries. */
@@ -523,6 +527,12 @@ export class ModelProviderModule implements ModelProviderApi {
     this.#credentialProbe = infrastructure.credentialProbe;
     this.#codexAccounts = infrastructure.codexAccounts;
     this.#spans = infrastructure.spans;
+    this.#langevalsExecution = ModelProviderLangevalsExecutionService.create({
+      modelProviders: this,
+      privateEndpoints: this.#privateEndpoints,
+      executionProxyBaseUrl,
+      nlpInternalSecret,
+    });
     // The same install-wide fallback map `ModelProviderBuildConfig.environment` carries.
     this.#evaluatorModelEnv = ModelProviderEvaluatorModelEnvService.create({
       modelProviders: this,
@@ -590,9 +600,15 @@ export class ModelProviderModule implements ModelProviderApi {
     return this.#modelProviders.prepareExecution(input);
   }
 
+  prepareLangevalsExecution(
+    input: ModelProviderExecutionPrepareInput,
+  ): Promise<LangevalsModelCall> {
+    return this.#langevalsExecution.prepare(input);
+  }
+
   prepareEvaluatorModelEnv(
     input: ModelProviderEvaluatorModelEnvInput,
-  ): Promise<Record<string, string>> {
+  ): Promise<ModelProviderEvaluatorModelEnv> {
     return this.#evaluatorModelEnv.prepare(input);
   }
 

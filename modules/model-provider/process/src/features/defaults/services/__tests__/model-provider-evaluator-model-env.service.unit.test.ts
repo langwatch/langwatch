@@ -39,12 +39,16 @@ function provider(overrides: Partial<ModelProviderExecution>): ModelProviderExec
 function service(
   providers: Record<string, ModelProviderExecution>,
   findRowServingModel: ModelProviderApi["findRowServingModel"] = async () => null,
+  call: Awaited<ReturnType<ModelProviderApi["prepareLangevalsExecution"]>> = {
+    parameters: { model: "openai/gpt-5-mini", api_key: "sk-test" },
+    headers: {},
+  },
 ) {
   return ModelProviderEvaluatorModelEnvService.create({
     modelProviders: createApiFixture<ModelProviderApi>({
       getExecutionProviders: async () => providers,
       findRowServingModel,
-      prepareExecution: async () => ({ model: "openai/gpt-5-mini", api_key: "sk-test" }),
+      prepareLangevalsExecution: async () => call,
     }),
     environment: {},
   });
@@ -95,7 +99,7 @@ describe("ModelProviderEvaluatorModelEnvService", () => {
 
   describe("given a listed chat model with generation settings", () => {
     it("prefixes the parameters and clamps max_tokens to the custom ceiling", async () => {
-      const env = await service({
+      const { env } = await service({
         openai: provider({
           customModels: [{ id: "gpt-5-mini", label: "mini", type: "chat", maxTokens: 100 }],
         }),
@@ -117,7 +121,7 @@ describe("ModelProviderEvaluatorModelEnvService", () => {
   describe("given an evaluator whose settings carry temperature 1, top_p 1 and max_tokens 64000", () => {
     /** @scenario Configured generation parameters reach the evaluator engine */
     it("carries the whitelisted parameters as configured and drops a key outside the whitelist", async () => {
-      const env = await service({ openai: provider({}) }).prepare({
+      const { env } = await service({ openai: provider({}) }).prepare({
         ...base,
         model: "openai/gpt-5-mini",
         settings: { temperature: 1, top_p: 1, max_tokens: 64000, unlisted_param: "leak" },
@@ -140,12 +144,14 @@ describe("ModelProviderEvaluatorModelEnvService", () => {
       name: "Vertex AI",
       models: ["gemini-2.5-pro", "my-tuned-endpoint"],
     });
-    const prepare = (model: string, maxTokens?: number) =>
-      service({ vertex_ai: vertex }).prepare({
-        ...base,
-        model,
-        settings: maxTokens === undefined ? {} : { max_tokens: maxTokens },
-      });
+    const prepare = async (model: string, maxTokens?: number) =>
+      (
+        await service({ vertex_ai: vertex }).prepare({
+          ...base,
+          model,
+          settings: maxTokens === undefined ? {} : { max_tokens: maxTokens },
+        })
+      ).env;
 
     /** @scenario "An evaluator's max tokens fits the model it runs on, Vertex AI included" */
     it("sends nothing when max tokens is not set, and a set value held to the model's limit", async () => {
@@ -164,7 +170,7 @@ describe("ModelProviderEvaluatorModelEnvService", () => {
 
   describe("given an embeddings model", () => {
     it("prefixes with the embeddings namespace", async () => {
-      const env = await service({ openai: provider({}) }).prepare({
+      const { env } = await service({ openai: provider({}) }).prepare({
         ...base,
         embeddings: true,
         model: "openai/text-embedding-3-small",
@@ -173,6 +179,24 @@ describe("ModelProviderEvaluatorModelEnvService", () => {
       expect(env).toMatchObject({
         X_LITELLM_EMBEDDINGS_model: "openai/gpt-5-mini",
         X_LITELLM_EMBEDDINGS_api_key: "sk-test",
+      });
+    });
+  });
+
+  describe("given a model call that goes through nlpgo's proxy", () => {
+    it("prefixes the proxied parameters and hands back the headers langevals needs", async () => {
+      const headers = { "X-LangWatch-Engine-Proxy": "http://nlp/go/proxy/v1" };
+      const result = await service({ openai: provider({}) }, undefined, {
+        parameters: { model: "openai/openai/gpt-5-mini", api_base: "http://nlp/go/proxy/v1" },
+        headers,
+      }).prepare({ ...base, model: "openai/gpt-5-mini" });
+
+      expect(result).toEqual({
+        env: {
+          X_LITELLM_model: "openai/openai/gpt-5-mini",
+          X_LITELLM_api_base: "http://nlp/go/proxy/v1",
+        },
+        headers,
       });
     });
   });

@@ -197,6 +197,28 @@ export async function signPrivateEndpointsHeaders(input: {
   };
 }
 
+/**
+ * The header the app names its engine proxy in when it posts to langevals. langevals adds the
+ * engine's credential only to model calls sent to that URL (ADR-203, "Calls langevals makes").
+ */
+export const ENGINE_PROXY_URL_HEADER = "X-LangWatch-Engine-Proxy";
+
+/**
+ * How long the bindings a langevals call carries stay valid. nlpgo checks them on each model call
+ * langevals makes, and a clustering page may run for twelve minutes after it was signed.
+ */
+export const LANGEVALS_PRIVATE_ENDPOINTS_TTL_SECONDS = 30 * 60;
+
+/**
+ * One model call langevals makes for the app: the litellm parameters it goes in the body with,
+ * and the headers the app posts to langevals with. `headers` is empty unless the call's base URL
+ * host is bound, in which case the parameters send it through nlpgo's proxy.
+ */
+export type LangevalsModelCall = {
+  parameters: Record<string, string>;
+  headers: Record<string, string>;
+};
+
 /** The field to spread into the gateway config bundle; nothing when there is none. */
 export function privateEndpointsField(bindings: readonly PrivateEndpointBindingWire[]): {
   private_endpoints?: PrivateEndpointBindingWire[];

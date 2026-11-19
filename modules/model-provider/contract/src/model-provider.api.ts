@@ -45,6 +45,7 @@ import type {
 } from "./model-provider.ts";
 import type { BuiltInModel } from "./model-selection.ts";
 import type {
+  LangevalsModelCall,
   OrganizationPrivateModelEndpoint,
   PrivateEndpointBindingWire,
   PrivateEndpointsHeaders,
@@ -68,6 +69,12 @@ export interface ModelProviderEvaluatorModelEnvInput {
   model: string;
   embeddings: boolean;
   settings?: Readonly<Record<string, unknown>>;
+}
+
+/** An evaluator's model block, and the headers langevals must be posted to with for it. */
+export interface ModelProviderEvaluatorModelEnv {
+  env: Record<string, string>;
+  headers: Record<string, string>;
 }
 
 export interface ModelProviderWriteRequest {
@@ -239,12 +246,18 @@ export interface ModelProviderApi {
     input: ModelProviderExecutionPrepareInput,
   ): Promise<ModelProviderExecutionParameters>;
   /**
-   * The `X_LITELLM_*` (or `X_LITELLM_EMBEDDINGS_*`) block an evaluator calls `model` with; throws
-   * `EvaluatorConfigError` when the provider is unconfigured, disabled or does not serve the model.
+   * The parameters langevals calls `model` with, and the headers to post to langevals with. A
+   * call whose base URL host is bound goes through nlpgo's proxy (ADR-203); any other is unchanged.
+   */
+  prepareLangevalsExecution(input: ModelProviderExecutionPrepareInput): Promise<LangevalsModelCall>;
+  /**
+   * The `X_LITELLM_*` (or `X_LITELLM_EMBEDDINGS_*`) block an evaluator calls `model` with, and the
+   * headers to post to langevals with; throws `EvaluatorConfigError` when the provider is
+   * unconfigured, disabled or does not serve the model.
    */
   prepareEvaluatorModelEnv(
     input: ModelProviderEvaluatorModelEnvInput,
-  ): Promise<Record<string, string>>;
+  ): Promise<ModelProviderEvaluatorModelEnv>;
   /** Resolves a feature's configured model and returns schema-validated structured data. */
   generateStructured(input: ModelProviderStructuredGenerationInput): Promise<unknown>;
   /**
