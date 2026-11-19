@@ -213,6 +213,10 @@ const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
   // ADR-201 §1: the braid writes the authz service sent; every read and write names its
   // organization.
   AuthzBraidWrite: {},
+  // ADR-203: private model endpoints and their hostname bindings; every read and write names
+  // its organization, or a row id.
+  PrivateModelEndpoint: {},
+  PrivateModelEndpointBinding: {},
   // A request to join one organization (D12), read by organization or row id,
   // plus one READ bounded by subject: "what am I waiting on" spans every
   // organization one named user asked. Writes keyed on userId stay refused.

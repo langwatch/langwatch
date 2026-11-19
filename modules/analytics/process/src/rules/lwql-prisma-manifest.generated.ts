@@ -1520,6 +1520,26 @@ export interface LwqlPrismaRows {
     readonly createdAt: "DateTime";
     readonly updatedAt: "DateTime";
   };
+  readonly PrivateModelEndpoint: {
+    readonly id: "String";
+    readonly organizationId: "String";
+    readonly name: "String";
+    readonly region: "String";
+    readonly addresses: "String[]";
+    readonly port: "Int";
+    readonly createdById: "String?";
+    readonly createdAt: "DateTime";
+    readonly updatedAt: "DateTime";
+  };
+  readonly PrivateModelEndpointBinding: {
+    readonly id: "String";
+    readonly organizationId: "String";
+    readonly endpointId: "String";
+    readonly hostname: "String";
+    readonly createdById: "String?";
+    readonly createdAt: "DateTime";
+    readonly updatedAt: "DateTime";
+  };
   readonly Workflow: {
     readonly id: "String";
     readonly projectId: "String";

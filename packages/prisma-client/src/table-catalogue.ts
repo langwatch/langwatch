@@ -110,6 +110,8 @@ export const prismaTableCatalogue = {
   "InstantEvalJudgeUsageBilling": "InstantEvalJudgeUsageBilling",
   "InstantEvalJudgeSpend": "InstantEvalJudgeSpend",
   "CustomLLMModelCost": "CustomLLMModelCost",
+  "PrivateModelEndpoint": "PrivateModelEndpoint",
+  "PrivateModelEndpointBinding": "PrivateModelEndpointBinding",
   "Workflow": "Workflow",
   "WorkflowVersion": "WorkflowVersion",
   "AuditLog": "AuditLog",
@@ -1938,6 +1940,26 @@ export const prismaModelFieldCatalogue = {
     "createdAt",
     "updatedAt"
   ],
+  "PrivateModelEndpoint": [
+    "id",
+    "organizationId",
+    "name",
+    "region",
+    "addresses",
+    "port",
+    "createdById",
+    "createdAt",
+    "updatedAt"
+  ],
+  "PrivateModelEndpointBinding": [
+    "id",
+    "organizationId",
+    "endpointId",
+    "hostname",
+    "createdById",
+    "createdAt",
+    "updatedAt"
+  ],
   "Workflow": [
     "id",
     "projectId",
@@ -3750,6 +3772,8 @@ export const prismaRelationCatalogue = {
   "InstantEvalJudgeUsageBilling": {},
   "InstantEvalJudgeSpend": {},
   "CustomLLMModelCost": {},
+  "PrivateModelEndpoint": {},
+  "PrivateModelEndpointBinding": {},
   "Workflow": {
     "project": "Project",
     "latestVersion": "WorkflowVersion",
