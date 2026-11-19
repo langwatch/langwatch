@@ -16,8 +16,16 @@ import {
   ORGANIZATION_MEMBER_ENABLED_EVENT_TYPE,
   ORGANIZATION_MEMBER_REMOVED_EVENT_TYPE,
   ORGANIZATION_SIGNED_UP_EVENT_TYPE,
+  PERSONAL_TEAM_CREATED_EVENT_TYPE,
+  PERSONAL_WORKSPACE_PROVISIONED_EVENT_TYPE,
 } from "@langwatch/organization-contract";
-import { PROJECT_AGGREGATE_TYPE, PROJECT_CREATED_EVENT_TYPE } from "@langwatch/project-contract";
+import {
+  PROJECT_AGGREGATE_TYPE,
+  PROJECT_CREATED_EVENT_TYPE,
+  PROJECT_FIRST_MESSAGE_LISTED_EVENT_TYPE,
+  PROJECT_PERSONAL_OWNER_LISTED_EVENT_TYPE,
+} from "@langwatch/project-contract";
+import { PROJECT_TRACED_EVENT_TYPE } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { MemoryNurturingRepositories } from "../../repositories/memory/memory.nurturing.repositories.ts";
@@ -209,9 +217,83 @@ const memberCases = [
   }),
 ];
 
+/** A personal-project or traced-project fact of project-1 in org-1, with what its schema requires. */
+const projectLaneFact =
+  (type: string, aggregateType: string, extra: FactFields = {}) =>
+  (): ReplayEvent =>
+    ownerFact({
+      type,
+      aggregateType,
+      aggregateId: aggregateType === ORGANIZATION_AGGREGATE_TYPE ? "org-1" : "project-1",
+      tenantId: aggregateType === ORGANIZATION_AGGREGATE_TYPE ? "org-1" : "project-1",
+      data: {
+        tenantId: aggregateType === ORGANIZATION_AGGREGATE_TYPE ? "org-1" : "project-1",
+        organizationId: "org-1",
+        projectId: "project-1",
+        occurredAt: 700,
+        ...extra,
+      },
+    });
+
+const personalOwnerCopied = (repositories: NurturingRepositories) =>
+  repositories.personalProjects.findOwnerUserIds({ projectId: "project-1" });
+const tracedCopied = (repositories: NurturingRepositories) =>
+  repositories.tracedProjects.hasTraced({ organizationId: "org-1" });
+
+/** A retired personal-project or traced-project lane, its successor's fact, and the row it writes. */
+function projectLaneCase(
+  lane: string,
+  fact: () => ReplayEvent,
+  copied: Case["copied"],
+  expected: unknown,
+): [string, Case] {
+  return [`${lane} project`, { key: `global:subscriber:nurturing.${lane}`, fact, copied, expected }];
+}
+
+const projectCases = [
+  projectLaneCase(
+    "personalTeamCreated",
+    projectLaneFact(PERSONAL_TEAM_CREATED_EVENT_TYPE, ORGANIZATION_AGGREGATE_TYPE, {
+      userId: "user-1",
+      teamId: "team-1",
+      projectSlug: "project-1",
+    }),
+    personalOwnerCopied,
+    ["user-1"],
+  ),
+  projectLaneCase(
+    "personalWorkspaceProvisioned",
+    projectLaneFact(PERSONAL_WORKSPACE_PROVISIONED_EVENT_TYPE, ORGANIZATION_AGGREGATE_TYPE, {
+      userId: "user-1",
+    }),
+    personalOwnerCopied,
+    ["user-1"],
+  ),
+  projectLaneCase(
+    "personalOwnerListed",
+    projectLaneFact(PROJECT_PERSONAL_OWNER_LISTED_EVENT_TYPE, PROJECT_AGGREGATE_TYPE, {
+      ownerUserId: "user-1",
+    }),
+    personalOwnerCopied,
+    ["user-1"],
+  ),
+  projectLaneCase(
+    "projectTraced",
+    projectLaneFact(PROJECT_TRACED_EVENT_TYPE, "trace_project_milestone"),
+    tracedCopied,
+    true,
+  ),
+  projectLaneCase(
+    "firstMessageListed",
+    projectLaneFact(PROJECT_FIRST_MESSAGE_LISTED_EVENT_TYPE, PROJECT_AGGREGATE_TYPE),
+    tracedCopied,
+    true,
+  ),
+];
+
 describe("given a job the previous release queued under a retired copy subscriber's key", () => {
   /** @scenario "Copy jobs the previous release queued reach the peer map that replaced their lane" */
-  it.each([...cases, ...memberCases])(
+  it.each([...cases, ...memberCases, ...projectCases])(
     "routes the %s job to its successor map, which writes the copy",
     async (_name, { key, fact, copied, expected }) => {
       const { eventing, eventStore, repositories } = worker();
