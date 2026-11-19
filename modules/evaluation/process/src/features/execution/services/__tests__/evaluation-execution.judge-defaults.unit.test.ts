@@ -55,7 +55,7 @@ function buildService() {
       readThreadsTraces: async () => [trace],
     },
     spanDigest,
-    modelEnvResolver: { resolveForEvaluator: async () => ({}) },
+    modelEnvResolver: { resolveForEvaluator: async () => ({ env: {}, headers: {} }) },
     langevalsClient: {
       evaluate: async (params) => {
         evaluated.push(params);

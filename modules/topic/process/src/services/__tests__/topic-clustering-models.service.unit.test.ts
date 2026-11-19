@@ -33,7 +33,7 @@ function modelsOver({
       };
     },
     getExecutionProviders: async () => providers,
-    prepareExecution: async ({ model }) => ({ model }),
+    prepareLangevalsExecution: async ({ model }) => ({ parameters: { model }, headers: {} }),
   });
 
   return {
@@ -54,12 +54,12 @@ describe("topic clustering's models, read through the model provider", () => {
       const embeddings = await models.resolveEmbeddingsModel(PROJECT);
       await expect(models.findExecutionProviders(PROJECT)).resolves.toHaveProperty("openai");
       await expect(
-        models.prepareLitellmParams({
+        models.prepareModelCall({
           model: embeddings.model,
           modelProvider: embeddings.modelProvider,
           projectId: PROJECT,
         }),
-      ).resolves.toEqual({ model: "openai/text-embedding-3-small" });
+      ).resolves.toEqual({ parameters: { model: "openai/text-embedding-3-small" }, headers: {} });
 
       expect(asked).toEqual([
         { featureKey: "analytics.topic_clustering_llm", projectId: PROJECT },

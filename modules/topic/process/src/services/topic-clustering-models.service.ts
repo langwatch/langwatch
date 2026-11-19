@@ -1,12 +1,12 @@
 import type { ModelProviderApi, ModelProviderExecution } from "@langwatch/model-provider-contract";
-import { TopicClusteringModels } from "@langwatch/topic-contract";
+import { TopicClusteringModels, type TopicClusteringModelCall } from "@langwatch/topic-contract";
 
 const CLUSTERING_LLM_FEATURE_KEY = "analytics.topic_clustering_llm";
 const CLUSTERING_EMBEDDINGS_FEATURE_KEY = "analytics.topic_clustering_embeddings";
 
 type TopicClusteringModelProviders = Pick<
   ModelProviderApi,
-  "resolveModelForFeature" | "getExecutionProviders" | "prepareExecution"
+  "resolveModelForFeature" | "getExecutionProviders" | "prepareLangevalsExecution"
 >;
 
 /** The project's own model cascade, read through Model Provider (main's execution adapter). */
@@ -52,12 +52,13 @@ export class ModelProviderTopicClusteringModelsService extends TopicClusteringMo
     return { model: resolved.model, modelProvider };
   }
 
-  prepareLitellmParams(params: {
+  /** A call to a bound host goes through nlpgo's proxy, with the headers langevals needs for it. */
+  prepareModelCall(params: {
     model: string;
     modelProvider: ModelProviderExecution;
     projectId: string;
-  }): Promise<Record<string, string>> {
-    return this.modelProviders.prepareExecution({
+  }): Promise<TopicClusteringModelCall> {
+    return this.modelProviders.prepareLangevalsExecution({
       model: params.model,
       projectId: params.projectId,
     });

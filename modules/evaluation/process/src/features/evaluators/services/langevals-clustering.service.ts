@@ -90,6 +90,7 @@ export class LangevalsClusteringService {
       kind: route.kind,
       staging: this.staging,
       signal: input.signal,
+      ...(input.headers ? { headers: { ...input.headers } } : {}),
     });
 
     if (!response.ok) {

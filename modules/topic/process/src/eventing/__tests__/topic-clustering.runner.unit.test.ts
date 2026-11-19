@@ -75,6 +75,31 @@ describe("clusterTopicsForProject", () => {
       expect(keys).toEqual(["run:run-7:page-2", "run:run-7:page-2"]);
     });
 
+    /** @scenario "Topic clustering's model calls to a bound hostname go through nlpgo" */
+    it("sends the proxied parameters in the body and the engine headers as headers", async () => {
+      const deps = depsReading({ page: tracePage(12) });
+      deps.models.prepareModelCall.mockImplementation(async ({ model }: { model: string }) =>
+        model === "openai/gpt-5-mini"
+          ? {
+              parameters: { model: "openai/custom/judge", api_base: "http://nlp/go/proxy/v1" },
+              headers: { "X-LangWatch-Engine-Proxy": "http://nlp/go/proxy/v1" },
+            }
+          : { parameters: { model }, headers: {} },
+      );
+
+      await clusterTopicsForProject(deps, { projectId: "proj-1" });
+
+      const request = deps.evaluations.requestTopicClustering.mock.calls[0]?.[0];
+      expect(request?.headers).toEqual({ "X-LangWatch-Engine-Proxy": "http://nlp/go/proxy/v1" });
+      expect(request?.params.litellm_params).toEqual({
+        model: "openai/custom/judge",
+        api_base: "http://nlp/go/proxy/v1",
+      });
+      expect(request?.params.embeddings_litellm_params).toMatchObject({
+        model: "text-embedding-3-small",
+      });
+    });
+
     it("passes the cursor through to trace", async () => {
       const deps = depsReading({ page: tracePage(0) });
       const searchAfter: [number, string] = [1_700_000_000_000, "trace-xyz"];

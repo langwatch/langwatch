@@ -66,7 +66,7 @@ function buildService({
   });
   const resolveForEvaluator = vi
     .fn<EvaluatorModelEnvService["resolveForEvaluator"]>()
-    .mockResolvedValue({});
+    .mockResolvedValue({ env: {}, headers: {} });
   const evaluate = vi
     .fn<LangevalsEvaluatorService["evaluate"]>()
     .mockResolvedValue({ status: "processed", passed: true, score: 1 });
