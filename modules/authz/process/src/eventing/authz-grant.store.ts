@@ -205,9 +205,10 @@ function isSameDefinition({
 }
 
 /**
- * Content plus the head it was read over: a retry before the fold reads the same head, so its
- * event shares the first try's key and audit row. A, B, A reads B's head once B folds; if neither
- * folded, the second A shares the first A's key and a projection rebuild may keep B.
+ * Content plus the head it was read over, deleted heads included: a retry before the fold reads
+ * the same head, so it shares the first try's key and audit row. A, B, A and delete-then-define
+ * read a moved head, so each is a new fact. Limit: if neither A nor B folded, the second A shares
+ * the first A's key and a projection rebuild may keep B.
  */
 function apiKeyRoleCommandId({
   definition,
@@ -1027,8 +1028,8 @@ export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
       // A retried key mint restates its own role: nothing is sent once the live head says the
       // same (the bump stays, the earlier try may have timed out before its own), and a retry
       // before the fold shares the first try's id. See apiKeyRoleCommandId for A, B, then A.
-      const head = await this.options.reads.findLiveRoleHead({ roleId, organizationId });
-      if (head && isSameDefinition({ row: head, definition })) {
+      const head = await this.options.reads.findRoleHead({ roleId, organizationId });
+      if (head && head.deletedAt === null && isSameDefinition({ row: head, definition })) {
         await this.options.epoch.bump({ organizationId });
         return;
       }

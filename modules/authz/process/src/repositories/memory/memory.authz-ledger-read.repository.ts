@@ -262,20 +262,23 @@ export class MemoryAuthzLedgerReadRepository extends AuthzLedgerReadRepository {
       : null;
   }
 
-  async findLiveRoleHead({
+  async findRoleHead({
     roleId,
     organizationId,
   }: {
     roleId: string;
     organizationId: string;
   }): Promise<LedgerRoleHead | null> {
-    const row = this.liveRole({ roleId, organizationId });
+    const row = this.memory.roleHeads.find(
+      (stored) => stored.id === roleId && stored.organizationId === organizationId,
+    );
     return row
       ? {
           name: row.name,
           description: row.description,
           permissions: [...row.permissions],
           occurredAt: row.occurredAt,
+          deletedAt: row.deletedAt,
         }
       : null;
   }

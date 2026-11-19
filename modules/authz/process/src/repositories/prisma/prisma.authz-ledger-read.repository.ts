@@ -292,18 +292,31 @@ export class PrismaAuthzLedgerReadRepository extends AuthzLedgerReadRepository {
     return row ?? null;
   }
 
-  async findLiveRoleHead({
+  async findRoleHead({
     roleId,
     organizationId,
   }: {
     roleId: string;
     organizationId: string;
   }): Promise<LedgerRoleHead | null> {
-    const row = (await liveRoles(this.prisma).findFirst({
+    const row = (await this.prisma.role.findFirst({
       where: { id: roleId, organizationId },
-      select: { name: true, description: true, permissions: true, occurredAt: true },
-    })) as (LedgerRoleDefinition & { occurredAt: Date }) | null | undefined;
-    return row ? { ...row, occurredAt: fromDate(row.occurredAt) } : null;
+      select: {
+        name: true,
+        description: true,
+        permissions: true,
+        occurredAt: true,
+        deletedAt: true,
+      },
+    })) as (LedgerRoleDefinition & { occurredAt: Date; deletedAt?: Date | null }) | null;
+    if (!row) return null;
+    return {
+      name: row.name,
+      description: row.description,
+      permissions: row.permissions,
+      occurredAt: fromDate(row.occurredAt),
+      deletedAt: row.deletedAt ? fromDate(row.deletedAt) : null,
+    };
   }
 
   async hasLiveRole({

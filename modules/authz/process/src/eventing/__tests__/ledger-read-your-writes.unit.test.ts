@@ -459,13 +459,19 @@ describe("given an api key's own role defined again", () => {
       }
 
       const [first, retry] = definitions(sent);
-      expect(retry?.commandId).toBe(first?.commandId);
-      const events = definitions(sent).flatMap((data) =>
+      if (!first || !retry) throw new Error("expected a first try and a retry");
+      expect(retry.commandId).toBe(first.commandId);
+      // The retry's clock has moved on: one key, two business times, and nothing refuses it.
+      const retriedLater = { ...retry, role: { ...retry.role, occurredAtMs: 1_700_000_040_000 } };
+      const events = [first, retriedLater].flatMap((data) =>
         new DefineRoleCommand().handle({
           tenantId: createTenantId(data.tenantId),
           data,
         } as never),
       );
+      expect(events.map((event) => event.occurredAt)).toEqual([
+        1_700_000_000_000, 1_700_000_040_000,
+      ]);
       expect(new Set(events.map((event) => event.id)).size).toBe(2);
       expect(deduplicateEvents(events)).toHaveLength(1);
       const audit = new KeyedAuditTrailStore();
@@ -496,6 +502,43 @@ describe("given an api key's own role defined again", () => {
       const sentDefinitions = definitions(sent);
       expect(sentDefinitions.map((data) => data.role.permissions)).toEqual([first, second, first]);
       expect(new Set(sentDefinitions.map((data) => data.commandId)).size).toBe(3);
+    });
+  });
+
+  describe("when only the name or the description changes", () => {
+    /** @scenario "A changed API key role definition is recorded, a change back included" */
+    it.each([
+      ["name", { name: "apikey:key_1 renamed" }],
+      ["description", { description: "Reads the board" }],
+    ])("records the %s change under a new id", async (_field, change) => {
+      const { writer, db, sent } = harness({});
+      db.role.findFirst
+        .mockResolvedValueOnce(liveRow(["langy:view"], 1_000))
+        .mockResolvedValue({ ...liveRow(["langy:view"], 2_000), description: null, ...change });
+
+      await writer.defineRole({ ...apiKeyRole, ...change });
+
+      expect(definitions(sent)).toHaveLength(1);
+      expect(definitions(sent)[0]?.role).toMatchObject(change);
+    });
+  });
+
+  describe("when the role was deleted and is defined again with the same permissions", () => {
+    /** @scenario "A redefinition after a delete is recorded as a new fact" */
+    it("sends it under a new id, not the first definition's", async () => {
+      const { writer, db, sent } = harness({});
+      db.role.findFirst
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(liveRow(["langy:view"], 1_000))
+        .mockResolvedValueOnce({ ...liveRow(["langy:view"], 2_000), deletedAt: new Date(2_000) })
+        .mockResolvedValueOnce(liveRow(["langy:view"], 3_000));
+
+      await writer.defineRole(apiKeyRole);
+      await writer.defineRole(apiKeyRole);
+
+      const [original, redefined] = definitions(sent);
+      expect(redefined).toBeDefined();
+      expect(redefined?.commandId).not.toBe(original?.commandId);
     });
   });
 });

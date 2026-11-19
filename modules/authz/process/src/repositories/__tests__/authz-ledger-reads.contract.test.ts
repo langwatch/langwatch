@@ -651,10 +651,17 @@ describe.each(backends)("given the ledger reads on the $name backend", (backend)
         description: "Reads traces",
         permissions: ["traces:view", "traces:share"],
       });
-      const head = await ledgerReads.findLiveRoleHead({ roleId: kept.id, organizationId });
+      const head = await ledgerReads.findRoleHead({ roleId: kept.id, organizationId });
       expect(head?.permissions).toEqual(["traces:view", "traces:share"]);
       expect(head?.occurredAt.epochMilliseconds).toBe(at(T0).epochMilliseconds);
-      expect(await ledgerReads.findLiveRoleHead({ roleId: dropped.id, organizationId })).toBe(null);
+      expect(head?.deletedAt).toBe(null);
+      // A deleted head is still read, its occurredAt moved to the delete.
+      const deleted = await ledgerReads.findRoleHead({ roleId: dropped.id, organizationId });
+      expect(deleted?.deletedAt?.epochMilliseconds).toBe(at(T0 + 1_000).epochMilliseconds);
+      expect(deleted?.occurredAt.epochMilliseconds).toBe(at(T0 + 1_000).epochMilliseconds);
+      expect(await ledgerReads.findRoleHead({ roleId: kept.id, organizationId: id("org") })).toBe(
+        null,
+      );
       expect(await ledgerReads.hasLiveRole({ roleId: kept.id, organizationId })).toBe(true);
       expect(await ledgerReads.hasLiveRole({ roleId: dropped.id, organizationId })).toBe(false);
       expect(await ledgerReads.findLiveRole({ roleId: kept.id, organizationId: id("org") })).toBe(

@@ -415,6 +415,12 @@ Feature: Authorization grants
     And the organization's access cache is still refreshed
 
   @unit
+  Scenario: A redefinition after a delete is recorded as a new fact
+    Given an API key's own role that was defined and then deleted
+    When it is defined again with the same permissions
+    Then the definition is sent under a new command id, not the first definition's
+
+  @unit
   Scenario: A retry before the fold records one role definition and one audit row
     Given an API key's own role definition whose projection has not landed
     When the same role definition is written again before it lands
