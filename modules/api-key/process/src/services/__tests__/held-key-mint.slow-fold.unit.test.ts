@@ -34,6 +34,8 @@ function slowFoldLedger(foldMs: number) {
   const grantAppends: string[] = [];
   const roleConfirmations: { own: number; landedBy: number }[] = [];
   const attachAnswers: { attached: string[]; duplicates: string[] }[] = [];
+  const defineRoleCalls: Parameters<AuthzApi["defineRole"]>[0][] = [];
+  const attachCalls: Parameters<AuthzApi["attachBindings"]>[0][] = [];
   const landedRoles = new Map<string, { name: string; permissions: string; append: number }>();
   const landedGrants = new Map<string, string>();
 
@@ -50,7 +52,9 @@ function slowFoldLedger(foldMs: number) {
   }
 
   const grants: Pick<AuthzApi, "defineRole" | "attachBindings"> = {
-    async defineRole({ roleId, name, permissions }) {
+    async defineRole(call) {
+      defineRoleCalls.push(call);
+      const { roleId, name, permissions } = call;
       const append = roleAppends.length + 1;
       const wanted = [...permissions].toSorted().join(",");
       roleAppends.push({ roleId, append });
@@ -62,7 +66,9 @@ function slowFoldLedger(foldMs: number) {
       await confirm(matches);
       roleConfirmations.push({ own: append, landedBy: landedRoles.get(roleId)?.append ?? 0 });
     },
-    async attachBindings({ bindings, onDuplicate }) {
+    async attachBindings(call) {
+      attachCalls.push(call);
+      const { bindings, onDuplicate } = call;
       const identityOf = (binding: (typeof bindings)[number]) =>
         JSON.stringify([
           binding.principal,
@@ -86,7 +92,15 @@ function slowFoldLedger(foldMs: number) {
     },
   };
 
-  return { grants, roleAppends, grantAppends, roleConfirmations, attachAnswers };
+  return {
+    grants,
+    roleAppends,
+    grantAppends,
+    roleConfirmations,
+    attachAnswers,
+    defineRoleCalls,
+    attachCalls,
+  };
 }
 
 /** The key service as the app wires it (lifecycle and grant policy real) over the slow ledger. */
@@ -212,4 +226,59 @@ describe("HeldKeyMintService over a ledger that folds slower than one try", () =
       });
     },
   );
+
+  describe("given the role and the attach each land 25000 ms after their append", () => {
+    describe("when the outbox retries until the grant is read back", () => {
+      /** @scenario "A held key's retries send one role and one grant write, a binding id apart" */
+      it("sends one role and binding on every try, the binding id its only change", async () => {
+        const { service, ledger } = createFixture(25_000);
+
+        const { result } = await outbox(() => service.createHeld({ holdKey: "run-1", key }));
+
+        // Mirrored by the replay in modules/authz/process/src/app/__tests__/
+        // authz-api-key-own-grant.app.integration.test.ts (`grantKey`): keep the two in step.
+        const roleId = `apikey:${result.apiKeyId}`;
+        const actor = { type: "system", id: null };
+        const role = {
+          organizationId: ORG_ID,
+          roleId,
+          name: roleId,
+          permissions: ["traces:view"],
+          kind: "system_api_key",
+          actor,
+          requireProjection: true,
+        };
+        const attach = (bindingId: string) => ({
+          organizationId: ORG_ID,
+          bindings: [
+            {
+              bindingId,
+              principal: { apiKeyId: result.apiKeyId },
+              role: "CUSTOM",
+              customRoleId: roleId,
+              scopeType: "ORGANIZATION",
+              scopeId: ORG_ID,
+            },
+          ],
+          caller: { type: "system" },
+          actor,
+          source: "grants-service",
+          onDuplicate: "skip",
+          requireProjection: true,
+        });
+        // Try 1 stops at the role; tries 2 and 3 reach the attach.
+        expect(ledger.defineRoleCalls).toStrictEqual([role, role, role]);
+        expect(ledger.attachCalls).toStrictEqual([attach("rb_1"), attach("rb_2")]);
+        const [second, third] = ledger.attachCalls.map(({ bindings, ...call }) => ({
+          ...call,
+          bindings: bindings.map(({ bindingId: _bindingId, ...binding }) => binding),
+        }));
+        expect(third).toStrictEqual(second);
+        for (const call of [...ledger.defineRoleCalls, ...ledger.attachCalls]) {
+          expect(call).not.toHaveProperty("commandId");
+          expect(call).not.toHaveProperty("occurredAtMs");
+        }
+      });
+    });
+  });
 });

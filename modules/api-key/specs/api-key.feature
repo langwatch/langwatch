@@ -370,6 +370,13 @@ Feature: API key lifecycle
     Then the caller gets the key and one key exists
 
   @unit
+  Scenario: A held key's retries send one role and one grant write, a binding id apart
+    Given the grants fold 25 seconds after they are appended
+    When the caller retries until the grant is read back
+    Then every try defines the key's own role with the same payload, with no command id of its own
+    And every try that reaches the attach sends the same skipping binding, only its binding id new
+
+  @unit
   Scenario: A held key is never handed to another person
     Given a key is held under a name for one person
     When another person asks for a key under the same name

@@ -24,10 +24,12 @@ import { AuthzModule, type AuthzSetup } from "../authz.app.ts";
 import { repositoriesOver } from "./authz-braid-world.fixture.ts";
 import { memoryAuthzChannels } from "./authz-channels.fixture.ts";
 
-const ORG = "org_acme";
+// Mirrors the held key in modules/api-key/process/src/services/__tests__/
+// held-key-mint.slow-fold.unit.test.ts, whose key id the repository mints.
+const ORG = "org_1";
 const KEY = "key_held";
 const ROLE = `apikey:${KEY}`;
-const ACTOR: LedgerActor = { type: "user", id: "user_ana" };
+const ACTOR: LedgerActor = { type: "system", id: null };
 const REFUSED = { code: "authz_grant_not_confirmed" };
 
 /**
@@ -106,7 +108,10 @@ function world({ lagging = false }: { lagging?: boolean } = {}) {
   });
 
   let bindings = 0;
-  /** One try of the held-key mint's grant write: the key's role, then its binding to it. */
+  /**
+   * One try of the held-key mint's grant write, as the api-key slow-fold test pins it on every try
+   * ("sends one role and binding on every try"). `caller` stops at the grants service.
+   */
   async function grantKey(): Promise<{ attached: string[]; duplicates: string[] }> {
     await ledger.defineRole({
       organizationId: ORG,
