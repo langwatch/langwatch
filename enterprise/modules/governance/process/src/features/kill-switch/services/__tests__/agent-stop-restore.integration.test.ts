@@ -6,7 +6,14 @@ import type { AgentStopTarget } from "@langwatch/enterprise-governance-contract"
 import { parse } from "@langwatch/ksuid";
 import { describe, expect, it, vi } from "vitest";
 
-import { codeOf, type Harness, request, settled } from "./kill-switch-steps.fixtures.ts";
+import {
+  auditMomentOf,
+  auditRowOf,
+  codeOf,
+  type Harness,
+  request,
+  settled,
+} from "./kill-switch-steps.fixtures.ts";
 import {
   AGENT_ID,
   killSwitchHarness,
@@ -100,14 +107,33 @@ describe("AgentStopService restore", () => {
         .map(([call]) => call)
         .find((call) => call.milestone === "governance.agent.restore_failed");
       const row = harness.audit.find((entry) => entry.action === "governance.agent.restore_failed");
-      const failedAt = intent?.occurredAt ?? Number.NaN;
-      const failedSecond = Math.floor(failedAt / 1000) * 1000;
-      expect(failedAt).toBeGreaterThanOrEqual(Date.parse(stop.restoreRequestedAt ?? ""));
-      expect(parse(row?.idempotencyKey ?? "").date.getTime()).toBe(failedSecond);
+      const failedAt = (intent?.occurredAt ?? Number.NaN) + 1;
+      expect(failedAt).toBeGreaterThan(Date.parse(stop.restoreRequestedAt ?? ""));
+      expect(auditMomentOf(row)).toBe(failedAt);
+      expect(parse(row?.idempotencyKey ?? "").date.getTime()).toBe(
+        Math.floor(failedAt / 1000) * 1000,
+      );
       const pushed = harness.announced.find(
         (event) => event.milestone === "governance.agent.restore_failed",
       );
-      expect(pushed?.occurredAt).toBe(failedSecond);
+      expect(pushed?.occurredAt).toBe(failedAt);
+      await harness.eventing.close();
+    });
+
+    /** @scenario "A request and the milestone it causes list in causal order, even in one second" */
+    it("dates the restored row after the restore request that caused it", async () => {
+      const { harness, stopId } = await partlyStopped();
+
+      await harness.stops.restore({ organizationId: ORG, stopId, caller: PERSON });
+      const stop = await settled(harness, stopId, "restored");
+      await vi.waitFor(() =>
+        expect(auditRowOf(harness, "governance.agent.restored")).toBeDefined(),
+      );
+
+      const requested = auditRowOf(harness, "governance.agent.restore_requested");
+      const restored = auditRowOf(harness, "governance.agent.restored");
+      expect(auditMomentOf(requested)).toBe(Date.parse(stop.restoreRequestedAt ?? ""));
+      expect(auditMomentOf(restored)).toBeGreaterThan(auditMomentOf(requested));
       await harness.eventing.close();
     });
 

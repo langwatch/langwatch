@@ -9,7 +9,13 @@ import {
   type AgentStopProjectionState,
   foldAgentStop,
 } from "../../eventing/agent-stop.projection.ts";
-import { codeOf, request, settled } from "./kill-switch-steps.fixtures.ts";
+import {
+  auditMomentOf,
+  auditRowOf,
+  codeOf,
+  request,
+  settled,
+} from "./kill-switch-steps.fixtures.ts";
 import {
   AGENT_ID,
   killSwitchHarness,
@@ -56,6 +62,23 @@ describe("AgentStopService retry", () => {
         ]),
       );
       expect(harness.audit.map((row) => row.action)).toContain("governance.agent.stop_retried");
+      await harness.eventing.close();
+    });
+
+    /** @scenario "A request and the milestone it causes list in causal order, even in one second" */
+    it("dates the quarantined row after the retry that caused it", async () => {
+      const { harness, stopId } = await failedStop();
+      harness.servingEndpoints.allow({ path: STOP_PATH });
+
+      await harness.stops.retryStop({ organizationId: ORG, stopId, caller: PERSON });
+      await settled(harness, stopId, "quarantined");
+      await vi.waitFor(() =>
+        expect(auditRowOf(harness, "governance.agent.quarantined")).toBeDefined(),
+      );
+
+      const retried = auditRowOf(harness, "governance.agent.stop_retried");
+      const quarantined = auditRowOf(harness, "governance.agent.quarantined");
+      expect(auditMomentOf(quarantined)).toBeGreaterThan(auditMomentOf(retried));
       await harness.eventing.close();
     });
 

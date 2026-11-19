@@ -4,6 +4,7 @@
  */
 import type { AuditLogApi, RecordAuditLogCommand } from "@langwatch/audit-log-contract";
 import type { ProcessStore } from "@langwatch/eventing";
+import { parse } from "@langwatch/ksuid";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
@@ -62,6 +63,35 @@ describe("KillSwitchAuditService", () => {
           action: "governance.agent.aws_connection_deleted",
         }),
       ]);
+    });
+  });
+
+  describe("when a request's row is recorded with the moment it was asked", () => {
+    /** @scenario "A request and the milestone it causes list in causal order, even in one second" */
+    it("dates the row at that millisecond and keys it in the same second", async () => {
+      const rows: RecordAuditLogCommand[] = [];
+      const service = KillSwitchAuditService.create({
+        auditLog: createApiFixture<AuditLogApi>({
+          record: async (command) => {
+            rows.push(command);
+            return { id: "audit", occurredAt: command.occurredAt ?? 0 };
+          },
+        }),
+        outbox: () => undefined,
+        now: () => Date.parse("2026-11-19T18:44:02.000Z"),
+      });
+      const askedAt = Date.parse("2026-11-19T18:43:39.987Z");
+
+      await service.record({
+        organizationId: ORG,
+        action: "governance.agent.restore_requested",
+        occurredAt: askedAt,
+      });
+
+      expect(rows[0]?.occurredAt).toBe(askedAt);
+      expect(parse(rows[0]?.idempotencyKey ?? "").date.toISOString()).toBe(
+        "2026-11-19T18:43:39.000Z",
+      );
     });
   });
 });

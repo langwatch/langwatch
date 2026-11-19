@@ -486,8 +486,16 @@ Feature: Agent kill switch: stop a misbehaving agent where it runs, with approva
     Given a stop whose restore was asked at one moment and failed later
     When its "governance.agent.restore_failed" milestone is audited
     Then the row is stamped with the moment the restore failed, not the latest moment the stop recorded
-    And the webhook's occurred_at carries that same moment, both in whole seconds
+    And the webhook's occurred_at carries that same moment, both to the millisecond
     And a redelivered announcement of it names the same row
+
+  @unit @integration
+  Scenario: A request and the milestone it causes list in causal order, even in one second
+    Given a stop whose restore or retry was asked
+    When the milestone it causes is reached in the same second as the request
+    Then the request's audit row is dated at the moment it was asked, to the millisecond
+    And the milestone's row is dated after it, at least one millisecond later
+    And the audit log, newest first, lists the milestone above the request that caused it
 
   @integration
   Scenario: Restoring a stop that is not quarantined is refused

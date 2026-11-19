@@ -36,19 +36,25 @@ export class AgentStopRequestAuditService {
     return new AgentStopRequestAuditService(deps);
   }
 
-  /** One row for an accepted request, naming the stop it acted on. */
+  /**
+   * One row for an accepted request, naming the stop it acted on, dated at the moment it was asked
+   * (`occurredAt`), so it lists before any milestone the request causes.
+   */
   async record({
     action,
     stop,
     caller,
     note,
+    occurredAt,
   }: {
     action: string;
     stop: AgentStopRecord;
     caller: AgentStopCaller;
     note?: string;
+    occurredAt: number;
   }): Promise<void> {
     await this.deps.audit.record({
+      occurredAt,
       ...auditActorOf(caller),
       organizationId: stop.organizationId,
       action,

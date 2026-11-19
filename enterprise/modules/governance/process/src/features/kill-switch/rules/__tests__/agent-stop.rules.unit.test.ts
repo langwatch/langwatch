@@ -6,7 +6,10 @@ import { AGENT_STOP_EVENT_TYPES } from "@langwatch/enterprise-governance-contrac
 import { describe, expect, it } from "vitest";
 
 import { foldAgentStop } from "../../eventing/agent-stop.projection.ts";
-import { milestoneAuditKeyOf } from "../../services/agent-stop-target.service.ts";
+import {
+  milestoneAuditKeyOf,
+  milestoneMomentOf,
+} from "../../services/agent-stop-target.service.ts";
 import { isGoneErrorCode } from "../agent-stop-target.rules.ts";
 import {
   advancedStop,
@@ -120,10 +123,11 @@ describe("milestoneAuditKeyOf", () => {
       const stop = viewOfStop(failed);
       const milestone = "governance.agent.restore_failed" as const;
 
-      const first = milestoneAuditKeyOf({ stop, milestone, restoreRound: 1 });
+      const at = milestoneMomentOf({ stop });
+      const first = milestoneAuditKeyOf({ stop, milestone, restoreRound: 1, at });
 
-      expect(milestoneAuditKeyOf({ stop, milestone, restoreRound: 1 })).toBe(first);
-      expect(milestoneAuditKeyOf({ stop, milestone, restoreRound: 2 })).not.toBe(first);
+      expect(milestoneAuditKeyOf({ stop, milestone, restoreRound: 1, at })).toBe(first);
+      expect(milestoneAuditKeyOf({ stop, milestone, restoreRound: 2, at })).not.toBe(first);
     });
   });
 });

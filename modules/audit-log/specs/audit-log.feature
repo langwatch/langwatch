@@ -137,6 +137,19 @@ Feature: Audit logging
       Then the row's time is the moment in the key, not the delivery's
 
     @unit
+    Scenario: A keyed audit entry keeps the millisecond its producer gave
+      Given an audit intent keyed by an audit id, carrying a moment in milliseconds inside the key's second
+      When the outbox delivers it
+      Then the row's time is that moment to the millisecond
+      And two entries keyed in one second list in the order of their moments
+
+    @unit
+    Scenario: An audit moment that is not inside its key's second is refused
+      When a caller records a keyed entry whose moment falls in another second than its key's
+      Or a caller records an entry with a moment but no key
+      Then nothing is written and the call fails
+
+    @unit
     Scenario: An audit key that is not an audit id is refused
       When a caller records an entry keyed by an id of another kind
       Then nothing is written and the call fails

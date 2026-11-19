@@ -147,6 +147,7 @@ export class AgentStopLifecycleService {
       stop,
       caller,
       note,
+      occurredAt: at,
     });
     return viewOfStop(stop);
   }
@@ -189,7 +190,12 @@ export class AgentStopLifecycleService {
     await this.deps.send("requestRestore", { tenantId: organizationId, occurredAt: at, ...data });
     const stop = restoreRequestedStop({ stop: current, data, at });
     await this.advance({ stop, requestId: data.requestId, eventId: read.eventId });
-    await this.deps.audit.record({ action: "governance.agent.restore_requested", stop, caller });
+    await this.deps.audit.record({
+      action: "governance.agent.restore_requested",
+      stop,
+      caller,
+      occurredAt: at,
+    });
     return viewOfStop(stop);
   }
 
@@ -234,7 +240,12 @@ export class AgentStopLifecycleService {
     await this.deps.send("retry", { tenantId: organizationId, occurredAt: at, ...data });
     const stop = retriedStop({ stop: current, data, at });
     await this.advance({ stop, requestId: data.requestId, eventId: read.eventId });
-    await this.deps.audit.record({ action: "governance.agent.stop_retried", stop, caller });
+    await this.deps.audit.record({
+      action: "governance.agent.stop_retried",
+      stop,
+      caller,
+      occurredAt: at,
+    });
     return viewOfStop(stop);
   }
 

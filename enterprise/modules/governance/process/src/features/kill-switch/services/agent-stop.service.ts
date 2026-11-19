@@ -182,7 +182,12 @@ export class AgentStopService {
     await Promise.all([
       this.deps.stops.seed({ stop, at }),
       this.deps.claims.markSent({ organizationId, agentId, stopId, sentAt: this.deps.now() }),
-      this.deps.requestAudit.record({ action: "governance.agent.stop_requested", stop, caller }),
+      this.deps.requestAudit.record({
+        action: "governance.agent.stop_requested",
+        stop,
+        caller,
+        occurredAt: at,
+      }),
     ]);
     return viewOfStop(stop);
   }
