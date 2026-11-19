@@ -39,6 +39,7 @@ function worker() {
   eventing.register(
     buildNurturingProjectUsagePipeline({
       store: repositories.projectUsage,
+      evaluationDays: repositories.evaluationDays,
       copies: copiesOver(repositories),
       sync: undefined,
     }),

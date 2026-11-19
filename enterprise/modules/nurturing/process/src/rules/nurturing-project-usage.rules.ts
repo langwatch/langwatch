@@ -190,6 +190,23 @@ export function emptyProjectUsage(projectId: string): NurturingProjectUsageState
 }
 
 /**
+ * The projects' evaluation days, one usage row per project holding only its days: the shape of the
+ * retired evaluation row, so the days count toward the habit and toward nothing else.
+ */
+export function evaluationActivityOf(
+  days: readonly Readonly<{ projectId: string; day: string }>[],
+): NurturingProjectUsageState[] {
+  const byProject = new Map<string, string[]>();
+  for (const { projectId, day } of days) {
+    byProject.set(projectId, [...(byProject.get(projectId) ?? []), day]);
+  }
+  return [...byProject].map(([projectId, projectDays]) => ({
+    ...emptyProjectUsage(projectId),
+    activeDays: projectDays.toSorted(),
+  }));
+}
+
+/**
  * The fact's UTC day added to the habit activity, and days older than the window, measured from the
  * newest fact folded, dropped, so a row holds at most 31 days whatever the project does.
  */

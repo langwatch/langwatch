@@ -411,6 +411,14 @@
     "needsOldWritersGone": true
   },
   {
+    "id": "nurturing:replay-evaluation-days",
+    "kind": "data",
+    "mode": "background",
+    "owner": "nurturing",
+    "description": "Fills nurturing's evaluation days from evaluation's log since 2026-10-19.",
+    "needsOldWritersGone": true
+  },
+  {
     "id": "ops:copy-automation-migration-state",
     "kind": "data",
     "mode": "blocking",

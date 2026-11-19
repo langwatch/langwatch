@@ -34,6 +34,7 @@ import { describe, expect, it, vi } from "vitest";
 import { HttpCustomerIoChannel } from "../../channels/http/http.customer-io.channel.ts";
 import { MemoryPostHogChannel } from "../../channels/memory/memory.posthog.channel.ts";
 import { MemoryNurturingErasedUserRepository } from "../../repositories/memory/memory.nurturing-erased-user.repository.ts";
+import { MemoryNurturingEvaluationDayRepository } from "../../repositories/memory/memory.nurturing-evaluation-day.repository.ts";
 import { MemoryNurturingVirtualKeyRepository } from "../../repositories/memory/memory.nurturing-gateway-key.repository.ts";
 import { MemoryNurturingMilestonesRepository } from "../../repositories/memory/memory.nurturing-milestones.repository.ts";
 import { MemoryNurturingOrganizationMemberRepository } from "../../repositories/memory/memory.nurturing-organization-member.repository.ts";
@@ -109,6 +110,7 @@ function nurturingOverCopies() {
   // The copies of project facts are maps on the usage host, writing the same rows the subscribers did.
   const usagePipeline = buildNurturingProjectUsagePipeline({
     store: MemoryNurturingProjectUsageRepository.create(),
+    evaluationDays: MemoryNurturingEvaluationDayRepository.create(),
     copies: {
       placements: MemoryNurturingProjectPlacementRepository.create(),
       copyLanded: async () => undefined,

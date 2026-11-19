@@ -18,6 +18,7 @@ import {
 import { createTestLogger } from "@langwatch/test-harness";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { MemoryNurturingEvaluationDayRepository } from "../../repositories/memory/memory.nurturing-evaluation-day.repository.ts";
 import { MemoryNurturingMilestonesRepository } from "../../repositories/memory/memory.nurturing-milestones.repository.ts";
 import { MemoryNurturingOrganizationCreatedRepository } from "../../repositories/memory/memory.nurturing-organization-created.repository.ts";
 import { MemoryNurturingProjectPlacementRepository } from "../../repositories/memory/memory.nurturing-project-placement.repository.ts";
@@ -83,6 +84,7 @@ describe.skipIf(!databaseUrl)("given a member row in Postgres naming a person si
       const usage = NurturingOrganizationUsageService.create({
         projectUsage: MemoryNurturingProjectUsageRepository.create(),
         traceDays: MemoryNurturingTraceDayRepository.create(),
+        evaluationDays: MemoryNurturingEvaluationDayRepository.create(),
         copiedProjects: NurturingCopiedProjectsService.create({ placements, organizationsCreated }),
         placements,
         organizationsCreated,

@@ -7,6 +7,8 @@ import { NurturingModule } from "./app/nurturing.app.ts";
 import { nurturingChannels } from "./channels/nurturing-channels.registry.ts";
 import {
   NURTURING_AUTH_MEMBERS_PROJECTION_NAME,
+  NURTURING_EVALUATION_DAYS_PROJECTION_NAME,
+  NURTURING_EVALUATION_DAYS_REPLAY_SINCE,
   NURTURING_IDENTITY_ERASURE_MARKS_PROJECTION_NAME,
   NURTURING_LAST_TRACES_PROJECTION_NAME,
   NURTURING_ORGANIZATION_ADMINS_PROJECTION_NAME,
@@ -70,6 +72,17 @@ export const nurturingProcessModule: PublishedProcessModule<
       needsOldWritersGone: true,
       trailingPass: true,
       after: ["nurturing:replay-user-erasure-marks", "nurturing:replay-identity-erasure-marks"],
+      replayer,
+    }),
+    // From a fixed instant, so every run and resume replays the same span: the days the usage
+    // read can reach at release, which also re-derives every day the migration copied.
+    defineProjectionReplayStep({
+      id: "nurturing:replay-evaluation-days",
+      description: "Fills nurturing's evaluation days from evaluation's log since 2026-10-19.",
+      lane: `${NURTURING_PROJECT_USAGE_PIPELINE_NAME}.${NURTURING_EVALUATION_DAYS_PROJECTION_NAME}`,
+      since: NURTURING_EVALUATION_DAYS_REPLAY_SINCE,
+      needsOldWritersGone: true,
+      trailingPass: true,
       replayer,
     }),
     // Project's own step records every project it held before it recorded creations.

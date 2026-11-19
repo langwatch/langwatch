@@ -53,4 +53,11 @@ export class PrismaNurturingEvaluationDayRepository
       select: { projectId: true, day: true },
     });
   }
+
+  async pruneProjects({ projectIds }: Readonly<{ projectIds: readonly string[] }>): Promise<void> {
+    if (projectIds.length === 0) return;
+    await this.#database.nurturingProjectEvaluationDay.deleteMany({
+      where: { projectId: { in: [...projectIds] } },
+    });
+  }
 }

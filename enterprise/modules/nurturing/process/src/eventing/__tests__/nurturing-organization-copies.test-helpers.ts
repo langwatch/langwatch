@@ -284,8 +284,10 @@ export function liveMapsOver(
   copies: NurturingUsageCopies,
   sync?: NurturingUsageSync,
 ): (event: ReplayEvent) => Promise<void> {
+  const { projectUsage, evaluationDays } = MemoryNurturingRepositories.create();
   const pipeline = buildNurturingProjectUsagePipeline({
-    store: MemoryNurturingRepositories.create().projectUsage,
+    store: projectUsage,
+    evaluationDays,
     copies,
     sync,
   });
@@ -338,6 +340,7 @@ export function copiesDeploy({
   const log = new NurturingSeededLog(events);
   const pipeline = buildNurturingProjectUsagePipeline({
     store: repositories.projectUsage,
+    evaluationDays: repositories.evaluationDays,
     copies,
     sync,
   });

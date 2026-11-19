@@ -36,4 +36,10 @@ export class MemoryNurturingEvaluationDayRepository implements NurturingEvaluati
       ({ projectId, day }) => projectIds.includes(projectId) && day > afterDay,
     );
   }
+
+  async pruneProjects({ projectIds }: Readonly<{ projectIds: readonly string[] }>): Promise<void> {
+    for (const [key, { projectId }] of this.#days) {
+      if (projectIds.includes(projectId)) this.#days.delete(key);
+    }
+  }
 }

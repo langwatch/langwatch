@@ -33,6 +33,7 @@ import {
   TRACED_PROJECTS_OF_TRACE_STEP,
 } from "./nurturing-project-copies.test-helpers.ts";
 import {
+  EVALUATION_DAYS_STEP,
   IDENTITY_MARKS_STEP,
   KEYS_STEP,
   nurturingReplayStepsOver,
@@ -89,6 +90,7 @@ describe("given the nurturing module installed on a worker", () => {
       USER_MARKS_STEP,
       IDENTITY_MARKS_STEP,
       KEYS_STEP,
+      EVALUATION_DAYS_STEP,
       PLACEMENTS_STEP,
       ORGANIZATIONS_CREATED_STEP,
       ADMINS_STEP,
@@ -114,6 +116,7 @@ describe("given the nurturing module installed on a worker", () => {
       undefined,
       undefined,
       [USER_MARKS_STEP, IDENTITY_MARKS_STEP],
+      undefined,
       [PROJECT_CREATED_FACTS_STEP],
       undefined,
       [USER_MARKS_STEP, IDENTITY_MARKS_STEP, PROJECT_CREATED_FACTS_STEP],

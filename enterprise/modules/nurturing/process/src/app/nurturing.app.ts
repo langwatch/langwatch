@@ -138,6 +138,7 @@ export class NurturingModule implements NurturingApi {
       ? NurturingOrganizationUsageService.create({
           projectUsage: repositories.projectUsage,
           traceDays: repositories.traceDays,
+          evaluationDays: repositories.evaluationDays,
           copiedProjects,
           placements: repositories.placements,
           organizationsCreated: repositories.organizationsCreated,

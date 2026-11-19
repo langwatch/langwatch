@@ -52,6 +52,7 @@ export type CodeStepId =
   | "nurturing:replay-traced-projects-from-trace"
   | "nurturing:replay-traced-projects-from-project"
   | "nurturing:replay-last-traces"
+  | "nurturing:replay-evaluation-days"
   | "ops:copy-automation-migration-state"
   | "ops:copy-identity-authz-migration-state"
   | "ops:recopy-identity-authz-migration-state-after-rollout"

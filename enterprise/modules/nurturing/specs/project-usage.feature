@@ -2,8 +2,10 @@ Feature: Per-email usage reaches Customer.io from nurturing's own project rows
 
   Nurturing folds the owners' prompt, evaluator, scenario and simulation-run events into its own
   table (peer folds, ARCHITECTURE §9). A peer fold re-folds from one owner's event log, so there
-  are four folds, one per owner pipeline, each keeping its own row per project. Evaluations add
-  their UTC day to one more row per project, at most once a day. Traces are counted by a peer
+  are four folds, one per owner pipeline, each keeping its own row per project. Evaluation's
+  settled facts add their project's UTC day to nurturing's evaluation-day copy, a peer map written
+  insert-ignore and filled at deploy from evaluation's log; the evaluation rows a retired
+  subscriber kept in the usage table stay there, unread. Traces are counted by a peer
   subscriber on trace's span_received, which queues root spans only: a root span is one trace.
   Failed traces are counted from trace's own lw.trace.trace_failed fact, recorded once per trace
   by trace's rule (any span's error), so nurturing keeps no copy of that rule. Sample and Langy
@@ -105,16 +107,48 @@ Feature: Per-email usage reaches Customer.io from nurturing's own project rows
     And that day is not in the project's active days
 
   @unit
-  Scenario: A project's evaluation days are written one at a time
-    Given evaluations of one project on two UTC days, taken at once
-    When nurturing adds their days to the project's evaluation row
-    Then they run one after another in the project's lane, so the row keeps both days
-
-  @unit @integration
   Scenario: Evaluations mark a project's day once
-    Given several evaluations of a project complete on the same UTC day
-    Then the project's evaluation row holds that day once
-    And later evaluations that day write nothing
+    Given several evaluations of a project complete on the same UTC day, one of them delivered twice
+    Then nurturing's evaluation-day copy holds that day once for the project
+    And a burst of one project's evaluations on one day is written as one batch
+
+  @unit
+  Scenario: The deploy replay fills the evaluation days as live delivery would
+    Given evaluation's log holds settled evaluations from before the evaluation-day map existed
+    When the nurturing:replay-evaluation-days step runs, and runs again
+    Then nurturing's evaluation-day copy holds the days per-fact live delivery of the same facts holds
+    And the second run changes no row
+
+  @unit
+  Scenario: The deploy replay re-derives every day the migration copied
+    Given the replay step starts 31 days before the earliest release date, a fixed instant
+    When it runs
+    Then it fills every day the usage read reaches at release, the days the migration copied included
+    And a fact older than its instant is not replayed
+
+  @unit
+  Scenario: A deploy replay sends nothing to Customer.io or PostHog
+    Given evaluation's log holds settled evaluations
+    When the evaluation-day replay step runs
+    Then no usage sync, trace count or organization-creation send runs
+
+  @unit
+  Scenario: Evaluation days are dropped once their organization's window has passed
+    Given an organization past its counting window, whose projects hold evaluation days
+    When its usage syncs, or the hourly sweep ends its window
+    Then every evaluation day of its projects is deleted, as nothing reads them past the window
+
+  @integration
+  Scenario: The usage read leaves out the evaluation rows the retired subscriber wrote
+    Given a project's evaluation row in the usage table, as the previous release wrote it
+    When the organization's usage rows are read
+    Then the evaluation row is not among them, and it is left unchanged
+
+  @unit
+  Scenario: A job queued under a retired copy lane reaches its successor
+    Given the previous release queued a job under the evaluation-day subscriber's lane
+    When a worker of this release takes it
+    Then the evaluation-day map writes its day, and the job is neither dead-lettered nor dropped
 
   @integration
   Scenario: A project's evaluation days are kept once each, whatever order and however often they land
@@ -446,6 +480,7 @@ Feature: Per-email usage reaches Customer.io from nurturing's own project rows
     When its usage pipeline is built
     Then it registers no fold, no trace count and no sync, so a root span writes no trace day
     And it registers the placement, organization-creation, admin and member copies
+    And its evaluation-day lane registers, so its replay step runs, but keeps no day
 
   @integration
   Scenario: Each owner's fold keeps its own row per project

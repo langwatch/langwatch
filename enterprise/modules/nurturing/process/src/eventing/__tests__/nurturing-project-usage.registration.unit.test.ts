@@ -44,6 +44,7 @@ const COPY_LANES = [
   "tracedProjectsOfTrace",
   "tracedProjectsOfProject",
   "lastTraces",
+  "evaluationDays",
 ];
 
 /** The lanes only a deployment with a Customer.io channel registers: the folds and the syncs. */
@@ -56,7 +57,6 @@ const SYNC_LANES = [
   "failedTraceDayCount",
   "firstTraceUsageSync",
   "traceUsageSync",
-  "evaluationActiveDay",
   "organizationCreatedSync",
 ];
 

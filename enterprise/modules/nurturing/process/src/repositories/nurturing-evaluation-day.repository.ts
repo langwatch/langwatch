@@ -7,12 +7,14 @@ export type NurturingEvaluationDay = Readonly<{
   day: string;
 }>;
 
-/** The read of the projects' evaluation days: no write. */
+/** The read and retention of the projects' evaluation days: no write. */
 export interface NurturingEvaluationDayReadRepository {
   /** The projects' evaluation days after `afterDay`, each once. */
   findForProjects(
     input: Readonly<{ projectIds: readonly string[]; afterDay: string }>,
   ): Promise<NurturingEvaluationDay[]>;
+  /** Drops every day of the projects: past their organization's window nothing reads them. */
+  pruneProjects(input: Readonly<{ projectIds: readonly string[] }>): Promise<void>;
 }
 
 /**

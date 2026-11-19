@@ -4,12 +4,13 @@
  * scenario, simulation run), a row per project each, and subscribers on trace's span_received and
  * trace_failed adding each trace and failed trace to its project's UTC day, one statement
  * a batch, while the organization is inside its counting window.
- * Evaluations add a day per project a day. Each change syncs the organization as one Customer.io
- * group call, mirrored onto each member whose latest organization it is (the emails read person
- * attributes; members from nurturing's own copy of the owners' member facts), placed by
- * nurturing's own copy of project and organization creation. It reads no other module's table and
- * calls no other module's API. Without a Customer.io channel only the copies register: nothing
- * reads the usage rows. Why event driven: https://github.com/langwatch/tasks/issues/1131.
+ * Evaluations' UTC days are a peer map, one row per project and day. Each change syncs the
+ * organization as one Customer.io group call, mirrored onto each member whose latest organization
+ * it is (the emails read person attributes; members from nurturing's own copy of the owners'
+ * member facts), placed by nurturing's own copy of project and organization creation. It reads no
+ * other module's table and calls no other module's API. Without a Customer.io channel only the
+ * copies register: nothing reads the usage rows. Why event driven:
+ * https://github.com/langwatch/tasks/issues/1131.
  * Spec: enterprise/modules/nurturing/specs/project-usage.feature
  */
 import { SSO_AUTO_ADDED_EVENT_TYPE, ssoAutoAddedEventDataSchema } from "@langwatch/auth-contract";
@@ -37,6 +38,7 @@ import {
   type PeerMapProjectionDeclaration,
   type PeerSubscriberContext,
   type PeerSubscriberDefinition,
+  type RoutedLaneAlias,
   throttledWindow,
 } from "@langwatch/eventing";
 import {
@@ -112,6 +114,10 @@ import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
 
 import type { NurturingModule } from "../app/nurturing.app.ts";
+import type {
+  NurturingEvaluationDay,
+  NurturingEvaluationDayRepository,
+} from "../repositories/nurturing-evaluation-day.repository.ts";
 import type { NurturingVirtualKeyRepository } from "../repositories/nurturing-gateway-key.repository.ts";
 import type {
   NurturingOrganizationAdminRepository,
@@ -160,9 +166,6 @@ const USAGE_SYNC_DELAY_MS = 60_000;
  * busy it is: the owner's choice of freshness for the trace traits over one call a day.
  */
 export const TRACE_USAGE_SYNC_WINDOW_MS = 15 * 60_000;
-
-/** A project's evaluations write its day once: later ones the same day would add nothing. */
-const EVALUATION_DAY_DEDUP_TTL_MS = 24 * 60 * 60_000;
 
 /**
  * Every fold here is keyed across many owner aggregates (a project): a re-fold loads one
@@ -238,22 +241,6 @@ export function traceSyncKeyOf(event: Event): string {
   return typeof data?.organizationId === "string"
     ? `subscriber:traceUsageSync:organization:${data.organizationId}`
     : `subscriber:traceUsageSync:project:${String(event.tenantId)}`;
-}
-
-/** The project an evaluation is about: its data's project, else its tenant. */
-function evaluationProjectIdOf(event: Event): string {
-  const { data } = event as Event<{ projectId?: unknown }>;
-  return typeof data?.projectId === "string" ? data.projectId : String(event.tenantId);
-}
-
-/** The dedup key of an evaluation: its project's UTC day, so each day writes once. */
-export function evaluationDayKeyOf(event: Event): string {
-  return `subscriber:evaluationActiveDay:${evaluationProjectIdOf(event)}:${utcDayOf(event.occurredAt)}`;
-}
-
-/** The queue group of an evaluation: its project, whose one evaluation row the days share. */
-export function evaluationProjectGroupOf(event: Event): string {
-  return `evaluationActiveDay:${evaluationProjectIdOf(event)}`;
 }
 
 /** One owner's peer fold, one row per project in its store; lane `<pipeline>.<owner>Usage`. */
@@ -494,30 +481,6 @@ export function nurturingTraceUsageSyncSubscribers(tracesChanged: UsageChanged):
   };
 }
 
-/**
- * Evaluations add their UTC day to the project's evaluation row, once a day; no sync of their
- * own, the next one reads the days. One lane per project, since the row is read, then written.
- */
-export function nurturingEvaluationDaySubscriber(
-  store: NurturingProjectUsageRepository,
-): PeerSubscriberDefinition<typeof evaluationLifecycleCompletedEventDataSchema> {
-  return {
-    eventType: EVALUATION_LIFECYCLE_COMPLETED_EVENT_TYPE,
-    data: evaluationLifecycleCompletedEventDataSchema,
-    options: {
-      groupKeyFn: evaluationProjectGroupOf,
-      deduplication: {
-        makeId: evaluationDayKeyOf,
-        ttlMs: EVALUATION_DAY_DEDUP_TTL_MS,
-        extend: false,
-        replace: false,
-        shouldSurviveDispatch: true,
-      },
-    },
-    handle: ({ projectId, occurredAt }) => store.recordEvaluationDay({ projectId, occurredAt }),
-  };
-}
-
 /** Nurturing's own copies of owner facts, kept whether or not a channel syncs. */
 export type NurturingUsageCopies = Readonly<{
   placements: NurturingProjectPlacementRepository;
@@ -544,13 +507,24 @@ export type NurturingUsageSync = NurturingTraceCounting &
     organizationCreated: (data: OrganizationCreatedEventData) => Promise<void>;
   }>;
 
+/**
+ * Without a Customer.io channel nothing reads the evaluation days and nothing prunes them, so none
+ * is kept; the lane still registers, so its replay step and its alias find it.
+ */
+const KEEP_NO_EVALUATION_DAYS: Pick<NurturingEvaluationDayRepository, "recordDays"> = {
+  recordDays: async () => undefined,
+};
+
 function nurturingProjectUsageHost({
   store,
+  evaluationDays,
   copies,
   sync,
   logger = createLogger("langwatch:nurturing:project-facts"),
 }: Readonly<{
   store: NurturingProjectUsageRepository;
+  /** Read only by the usage sync, which prunes it too. */
+  evaluationDays: NurturingEvaluationDayRepository;
   copies: NurturingUsageCopies;
   sync: NurturingUsageSync | undefined;
   /** Where a traced fact naming no organization is logged. */
@@ -587,9 +561,13 @@ function nurturingProjectUsageHost({
     .withPeerMapProjection(nurturingTracedProjectsOfTraceMap({ tracedProjects, logger }))
     .withPeerMapProjection(nurturingTracedProjectsOfProjectMap({ tracedProjects, logger }))
     .withPeerMapProjection(nurturingLastTracesMap(lastTraces))
+    .withPeerMapProjection(
+      nurturingEvaluationDaysMap(sync ? evaluationDays : KEEP_NO_EVALUATION_DAYS),
+    )
     .withLaneAliases([
       ...ORGANIZATION_COPY_LANE_ALIASES,
       ...PERSONAL_AND_TRACED_PROJECT_LANE_ALIASES,
+      ...NURTURING_PROJECT_USAGE_LANE_ALIASES,
     ]);
   // Without a channel no sync reads the usage rows, and none prunes the trace days, so none is kept.
   if (!sync) return copied;
@@ -620,7 +598,6 @@ function nurturingProjectUsageHost({
       // window, 15 minutes after the window's first trace, when its root spans are counted.
       .withPeerSubscriber("firstTraceUsageSync", traceSyncs.firstTrace)
       .withPeerSubscriber("traceUsageSync", traceSyncs.laterTrace)
-      .withPeerSubscriber("evaluationActiveDay", nurturingEvaluationDaySubscriber(store))
       .withPeerSubscriber("organizationCreatedSync", {
         eventType: ORGANIZATION_CREATED_EVENT_TYPE,
         data: organizationCreatedEventDataSchema,
@@ -1197,6 +1174,73 @@ export function nurturingLastTracesMap(
   };
 }
 
+/** Lane name under `<host pipeline>.`, which a withMigrations step in nurturing.module.ts names. */
+export const NURTURING_EVALUATION_DAYS_PROJECTION_NAME = "evaluationDays" as const;
+
+const EVALUATION_DAY_EVENTS = [
+  {
+    type: EVALUATION_LIFECYCLE_COMPLETED_EVENT_TYPE,
+    data: evaluationLifecycleCompletedEventDataSchema,
+  },
+] as const;
+
+/**
+ * Where the evaluation-day replay starts: 31 days before 2026-11-19, the earliest this release can
+ * ship. The usage read reaches 30 days back, so a later release only replays days it never reads.
+ */
+export const NURTURING_EVALUATION_DAYS_REPLAY_SINCE = "2026-10-19T00:00:00Z";
+
+/** Most evaluations of one project and day the queue drains into one batch, one insert. */
+const EVALUATION_DAY_COALESCE_MAX_BATCH = 500;
+
+/** The queue group of an evaluation: its project and UTC day, the one row it can add. */
+export function evaluationDayGroupOf(event: Event): string {
+  const { data } = event as Event<{ projectId?: unknown }>;
+  const projectId = typeof data?.projectId === "string" ? data.projectId : String(event.tenantId);
+  return JSON.stringify([projectId, utcDayOf(event.occurredAt)]);
+}
+
+/**
+ * Nurturing's own evaluation days, from evaluation's settled facts (§9): the fact's project and
+ * UTC day, written insert-ignore, so a redelivered, late or replayed fact leaves the copy as live
+ * delivery would. No sync of their own: the next usage sync reads them. A burst of one project's
+ * evaluations on one day is coalesced into one write.
+ */
+export function nurturingEvaluationDaysMap(
+  evaluationDays: Pick<NurturingEvaluationDayRepository, "recordDays">,
+): PeerMapProjectionDeclaration<NurturingEvaluationDay, typeof EVALUATION_DAY_EVENTS> {
+  return {
+    events: EVALUATION_DAY_EVENTS,
+    map: {
+      name: NURTURING_EVALUATION_DAYS_PROJECTION_NAME,
+      eventTypes: [EVALUATION_LIFECYCLE_COMPLETED_EVENT_TYPE],
+      map: ({ data: { projectId, occurredAt } }) => ({ projectId, day: utcDayOf(occurredAt) }),
+      store: {
+        append: (day) => evaluationDays.recordDays([day]),
+        bulkAppend: (days) => evaluationDays.recordDays(days),
+      },
+      options: {
+        groupKeyFn: evaluationDayGroupOf,
+        coalesceMaxBatch: EVALUATION_DAY_COALESCE_MAX_BATCH,
+      },
+    },
+  };
+}
+
+/**
+ * The retired evaluation-day subscriber's lane: jobs the previous release queued under it reach
+ * the evaluation-day map, which writes the same day.
+ */
+export const NURTURING_EVALUATION_ACTIVE_DAY_LANE_ALIAS: RoutedLaneAlias = {
+  from: `global:subscriber:${NURTURING_PROJECT_USAGE_PIPELINE_NAME}.evaluationActiveDay`,
+  to: { jobType: "handler", lane: NURTURING_EVALUATION_DAYS_PROJECTION_NAME },
+};
+
+/** The host's retired lanes, each taken by its successor while an older release may hold jobs. */
+export const NURTURING_PROJECT_USAGE_LANE_ALIASES: readonly LaneAlias[] = [
+  NURTURING_EVALUATION_ACTIVE_DAY_LANE_ALIAS,
+];
+
 /** The host pipeline as a TYPE, derived from the builder above. */
 export type NurturingProjectUsagePipeline = ReturnType<
   ReturnType<typeof nurturingProjectUsageHost>["build"]
@@ -1213,6 +1257,7 @@ export const nurturingProjectUsageEventing = defineEventingModule({
   build: ({ repositories, app }: EventingSetup<NurturingRepositories, NurturingModule>) =>
     buildNurturingProjectUsagePipeline({
       store: repositories.projectUsage,
+      evaluationDays: repositories.evaluationDays,
       copies: {
         placements: repositories.placements,
         copyLanded: (input) => app.uncopiedProjectCopied(input),

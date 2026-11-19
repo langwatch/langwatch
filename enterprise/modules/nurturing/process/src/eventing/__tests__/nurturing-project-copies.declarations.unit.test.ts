@@ -52,6 +52,7 @@ describe("the five subscriber lanes the personal-project and traced-project maps
     const repositories = MemoryNurturingRepositories.create();
     return buildNurturingProjectUsagePipeline({
       store: repositories.projectUsage,
+      evaluationDays: repositories.evaluationDays,
       copies: {
         placements: repositories.placements,
         copyLanded: async () => undefined,

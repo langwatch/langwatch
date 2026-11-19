@@ -140,6 +140,7 @@ function registeredCopyLanes({
   const others = MemoryNurturingRepositories.create();
   const pipeline = buildNurturingProjectUsagePipeline({
     store: others.projectUsage,
+    evaluationDays: others.evaluationDays,
     copies: {
       placements: others.placements,
       copyLanded: async () => undefined,

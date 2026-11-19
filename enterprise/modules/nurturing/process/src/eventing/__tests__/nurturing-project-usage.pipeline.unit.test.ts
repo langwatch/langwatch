@@ -4,6 +4,7 @@
  * @see enterprise/modules/nurturing/specs/project-usage.feature
  */
 import type { CioBatchCall } from "@langwatch/enterprise-nurturing-contract";
+import { EVALUATION_LIFECYCLE_COMPLETED_EVENT_TYPE } from "@langwatch/evaluation-contract";
 import {
   EVALUATOR_CREATED_EVENT_TYPE,
   EVALUATOR_DELETED_EVENT_TYPE,
@@ -38,6 +39,7 @@ import {
 import { describe, expect, it } from "vitest";
 
 import { MemoryNurturingErasedUserRepository } from "../../repositories/memory/memory.nurturing-erased-user.repository.ts";
+import { MemoryNurturingEvaluationDayRepository } from "../../repositories/memory/memory.nurturing-evaluation-day.repository.ts";
 import { MemoryNurturingMilestonesRepository } from "../../repositories/memory/memory.nurturing-milestones.repository.ts";
 import { MemoryNurturingOrganizationCreatedRepository } from "../../repositories/memory/memory.nurturing-organization-created.repository.ts";
 import { MemoryNurturingOrganizationMemberRepository } from "../../repositories/memory/memory.nurturing-organization-member.repository.ts";
@@ -51,8 +53,8 @@ import { countingOver } from "../../services/__tests__/nurturing-trace-counting.
 import { NurturingCopiedProjectsService } from "../../services/nurturing-copied-projects.service.ts";
 import { NurturingOrganizationUsageService } from "../../services/nurturing-organization-usage.service.ts";
 import {
-  evaluationDayKeyOf,
-  nurturingEvaluationDaySubscriber,
+  evaluationDayGroupOf,
+  nurturingEvaluationDaysMap,
   nurturingFailedTraceDaySubscriber,
   type NurturingProjectUsagePeerEvent,
   nurturingProjectUsagePeerFold,
@@ -195,73 +197,77 @@ describe("traceSyncKeyOf()", () => {
   });
 });
 
-describe("evaluationDayKeyOf()", () => {
+describe("the evaluation-day map", () => {
   const DAY_MS = 24 * 60 * 60 * 1000;
   const NOON = Date.UTC(2026, 10, 20, 12);
+  const evaluated = (projectId: string, occurredAt: number) =>
+    ({
+      ...envelope(EVALUATION_LIFECYCLE_COMPLETED_EVENT_TYPE),
+      id: `evaluation-${projectId}-${occurredAt}`,
+      type: EVALUATION_LIFECYCLE_COMPLETED_EVENT_TYPE,
+      occurredAt,
+      data: {
+        tenantId: projectId,
+        projectId,
+        evaluationId: `evaluation-${occurredAt}`,
+        occurredAt,
+      },
+    }) as const;
+  /** Each fact through the map's mapping and store, one write a fact, as the live lane runs it. */
+  const deliverEach = async (
+    events: readonly ReturnType<typeof evaluated>[],
+    evaluationDays = MemoryNurturingEvaluationDayRepository.create(),
+  ) => {
+    const { map } = nurturingEvaluationDaysMap(evaluationDays);
+    for (const event of events) {
+      const record = map.map(event);
+      if (!record) continue;
+      await map.store.append(record, { aggregateId: event.id, tenantId: event.tenantId });
+    }
+    return evaluationDays;
+  };
 
   /** @scenario "Evaluations mark a project's day once" */
-  it("keys an evaluation on its project's UTC day", () => {
-    const morning = peerFact({ projectId: "project-1" }, NOON - 6 * 60 * 60 * 1000);
-    const evening = peerFact({ projectId: "project-1" }, NOON + 6 * 60 * 60 * 1000);
-    const nextDay = peerFact({ projectId: "project-1" }, NOON + DAY_MS);
+  it("keeps one row for many evaluations of a project on one UTC day, a redelivery included", async () => {
+    const morning = evaluated("project-1", NOON - 6 * 60 * 60 * 1000);
+    const evening = evaluated("project-1", NOON + 6 * 60 * 60 * 1000);
 
-    expect(evaluationDayKeyOf(morning)).toBe("subscriber:evaluationActiveDay:project-1:2026-11-20");
-    expect(evaluationDayKeyOf(evening)).toBe(evaluationDayKeyOf(morning));
-    expect(evaluationDayKeyOf(nextDay)).not.toBe(evaluationDayKeyOf(morning));
+    const days = await deliverEach([morning, evening, morning]);
+
+    await expect(
+      days.findForProjects({ projectIds: ["project-1"], afterDay: "2026-01-01" }),
+    ).resolves.toEqual([{ projectId: "project-1", day: "2026-11-20" }]);
   });
-});
 
-describe("the evaluation day row", () => {
-  const NOON = Date.UTC(2026, 10, 20, 12);
+  /** @scenario "A project's evaluation days are kept once each, whatever order and however often they land" */
+  it("holds the same days whatever order the evaluations land in", async () => {
+    const facts = [0, 1, 2].map((n) => evaluated("project-1", NOON + n * DAY_MS));
+
+    const forward = await deliverEach(facts);
+    const reverse = await deliverEach(facts.toReversed());
+
+    const read = { projectIds: ["project-1"], afterDay: "2026-01-01" };
+    const sorted = async (days: MemoryNurturingEvaluationDayRepository) =>
+      (await days.findForProjects(read)).map(({ day }) => day).toSorted();
+    expect(await sorted(forward)).toEqual(["2026-11-20", "2026-11-21", "2026-11-22"]);
+    expect(await sorted(reverse)).toEqual(await sorted(forward));
+  });
 
   /** @scenario "Evaluations mark a project's day once" */
-  it("adds the evaluation's day to the project's rows, once", async () => {
-    const store = MemoryNurturingProjectUsageRepository.create();
+  it("queues a project's evaluations of one UTC day in one group, so a burst is one write", () => {
+    const { map } = nurturingEvaluationDaysMap(MemoryNurturingEvaluationDayRepository.create());
 
-    await store.recordEvaluationDay({ projectId: "project-1", occurredAt: NOON });
-    await store.recordEvaluationDay({ projectId: "project-1", occurredAt: NOON + 1000 });
-
-    const rows = await store.findForProjects({ projectIds: ["project-1"] });
-    expect(rows.map((row) => row.activeDays)).toEqual([["2026-11-20"]]);
-  });
-});
-
-describe("the evaluation day subscriber", () => {
-  const DAY_MS = 24 * 60 * 60 * 1000;
-  const NOON = Date.UTC(2026, 10, 20, 12);
-  const evaluation = (projectId: string, occurredAt: number) => ({
-    tenantId: projectId,
-    projectId,
-    evaluationId: `evaluation-${occurredAt}`,
-    occurredAt,
-  });
-  const contextOf = (occurredAt: number) => ({
-    tenantId: createTenantId("project-1"),
-    aggregateId: `evaluation-${occurredAt}`,
-    createdAt: occurredAt,
-    occurredAt,
-    eventId: `event-${occurredAt}`,
-  });
-
-  /** @scenario "A project's evaluation days are written one at a time" */
-  it("queues a project's evaluations in one lane whatever their day, so both days are kept", async () => {
-    const store = MemoryNurturingProjectUsageRepository.create();
-    const subscriber = nurturingEvaluationDaySubscriber(store);
-    const group = subscriber.options?.groupKeyFn;
-
-    expect(group?.(peerFact(evaluation("project-1", NOON), NOON))).toBe(
-      group?.(peerFact(evaluation("project-1", NOON + DAY_MS), NOON + DAY_MS)),
+    expect(map.options?.coalesceMaxBatch).toBeGreaterThan(1);
+    expect(map.store.bulkAppend).toBeDefined();
+    expect(evaluationDayGroupOf(evaluated("project-1", NOON))).toBe(
+      evaluationDayGroupOf(evaluated("project-1", NOON + 1000)),
     );
-    expect(group?.(peerFact(evaluation("project-2", NOON), NOON))).not.toBe(
-      group?.(peerFact(evaluation("project-1", NOON), NOON)),
+    expect(evaluationDayGroupOf(evaluated("project-1", NOON + DAY_MS))).not.toBe(
+      evaluationDayGroupOf(evaluated("project-1", NOON)),
     );
-
-    if (!subscriber.handle) throw new Error("the evaluation day handles one fact at a time");
-    await subscriber.handle(evaluation("project-1", NOON), contextOf(NOON));
-    await subscriber.handle(evaluation("project-1", NOON + DAY_MS), contextOf(NOON + DAY_MS));
-
-    const rows = await store.findForProjects({ projectIds: ["project-1"] });
-    expect(rows.map((row) => row.activeDays.toSorted())).toEqual([["2026-11-20", "2026-11-21"]]);
+    expect(evaluationDayGroupOf(evaluated("project-2", NOON))).not.toBe(
+      evaluationDayGroupOf(evaluated("project-1", NOON)),
+    );
   });
 });
 
@@ -337,6 +343,7 @@ describe("the trace syncs", () => {
     const usage = NurturingOrganizationUsageService.create({
       projectUsage: MemoryNurturingProjectUsageRepository.create(),
       traceDays: MemoryNurturingTraceDayRepository.create(),
+      evaluationDays: MemoryNurturingEvaluationDayRepository.create(),
       copiedProjects: NurturingCopiedProjectsService.create({ placements, organizationsCreated }),
       placements,
       organizationsCreated,

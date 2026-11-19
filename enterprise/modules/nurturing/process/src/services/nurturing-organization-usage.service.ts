@@ -6,6 +6,7 @@ import type {
 import type { CounterHandle } from "@langwatch/observability/metrics";
 
 import type { NurturingErasedUserRepository } from "../repositories/nurturing-erased-user.repository.ts";
+import type { NurturingEvaluationDayReadRepository } from "../repositories/nurturing-evaluation-day.repository.ts";
 import type { NurturingMilestonesRepository } from "../repositories/nurturing-milestones.repository.ts";
 import type { NurturingOrganizationCreatedRepository } from "../repositories/nurturing-organization-created.repository.ts";
 import type { NurturingOrganizationMemberRepository } from "../repositories/nurturing-organization-member.repository.ts";
@@ -17,6 +18,7 @@ import { membersWhoseLatestOrganizationIs } from "../rules/nurturing-organizatio
 import {
   createdRangeOfEndedWindows,
   endedTraceWindowTraits,
+  evaluationActivityOf,
   isTraceCounted,
   organizationUsageTraits,
   windowStartDayOf,
@@ -30,6 +32,8 @@ const MEMBER_BATCH_SIZE = 100;
 type OrganizationUsageDependencies = Readonly<{
   projectUsage: NurturingProjectUsageReadRepository;
   traceDays: NurturingTraceDayReadRepository;
+  /** Nurturing's own evaluation days, read beside the trace days for the habit. */
+  evaluationDays: NurturingEvaluationDayReadRepository;
   copiedProjects: Pick<NurturingCopiedProjectsService, "copiedProjectOf">;
   /** Nurturing's own copy of each project's organization, from project's creation facts. */
   placements: Pick<NurturingProjectPlacementRepository, "findProjectIds">;
@@ -154,28 +158,34 @@ export class NurturingOrganizationUsageService {
     { organizationId, organizationCreatedAt }: CopiedOrganization,
     state: AttemptState,
   ): Promise<void> {
-    const { projectUsage, traceDays, placements, milestones, sendBatch, clock } = this.dependencies;
+    const { projectUsage, traceDays, evaluationDays, placements, milestones, sendBatch, clock } =
+      this.dependencies;
     const now = clock.nowMs();
     const windowStartDay = windowStartDayOf(now);
     const counting = isTraceCounted({ organizationCreatedAt, at: now });
     const projectIds = await placements.findProjectIds({ organizationId });
     // Inside the counting window no trace day is older than the usage window, and the window-end
     // sweep drops them all; past it, only a trace counted late around the sweep can be left.
-    if (!counting) await traceDays.pruneBefore({ projectIds, beforeDay: windowStartDay });
+    // Evaluation days keep landing past it, and only the counting window reads them.
+    if (!counting) {
+      await traceDays.pruneBefore({ projectIds, beforeDay: windowStartDay });
+      await evaluationDays.pruneProjects({ projectIds });
+    }
     const [organization] = await milestones.findOrganization({ organizationId });
     const adminUserId = organization?.adminUserId;
     if (!adminUserId) {
       this.skipped("no_admin");
       return;
     }
-    const [usage, folded] = await Promise.all([
+    const [usage, evaluated, folded] = await Promise.all([
       projectUsage.findForProjects({ projectIds }),
+      counting ? evaluationDays.findForProjects({ projectIds, afterDay: windowStartDay }) : [],
       counting ? traceDays.findForProjects({ projectIds, afterDay: windowStartDay }) : [],
     ]);
     // Past the counting window no trace is counted, so the last trace traits sent stand.
     const traces = counting ? traceCountsOf({ days: folded, windowStartDay }) : null;
     const traits = organizationUsageTraits({
-      projects: usage,
+      projects: [...usage, ...evaluationActivityOf(evaluated)],
       traces,
       now,
       organizationCreatedAt,
@@ -226,14 +236,15 @@ export class NurturingOrganizationUsageService {
   /**
    * Ends the trace window of every organization whose window ended in (`after`, `upTo`]: its trace
    * traits go once as null, on the organization and its members, so a rolling trait cannot say
-   * "active" for ever. Later syncs leave them out, and its trace rows are dropped. A refused call,
-   * an identify's too, throws, so the sweep retries; a retry sends the same nulls again.
+   * "active" for ever. Later syncs leave them out, and its trace and evaluation rows are dropped.
+   * A refused call, an identify's too, throws, so the sweep retries; a retry sends the same nulls
+   * again.
    */
   async traceWindowsEnded({
     after,
     upTo,
   }: Readonly<{ after: number; upTo: number }>): Promise<void> {
-    const { organizationsCreated, milestones, placements, traceDays, sendBatch } =
+    const { organizationsCreated, milestones, placements, traceDays, evaluationDays, sendBatch } =
       this.dependencies;
     const ended = await organizationsCreated.findOrganizationIdsCreatedBetween(
       createdRangeOfEndedWindows({ after, upTo }),
@@ -245,10 +256,11 @@ export class NurturingOrganizationUsageService {
     const mirrored: MirroredCounts = { members: 0, identifyCalls: 0 };
     try {
       for (const organizationId of ended) {
-        // Nothing reads its trace rows past the window, and a quiet organization never syncs again.
-        await traceDays.pruneProjects({
-          projectIds: await placements.findProjectIds({ organizationId }),
-        });
+        // Nothing reads its trace or evaluation rows past the window, and a quiet organization
+        // never syncs again.
+        const projectIds = await placements.findProjectIds({ organizationId });
+        await traceDays.pruneProjects({ projectIds });
+        await evaluationDays.pruneProjects({ projectIds });
         const [organization] = await milestones.findOrganization({ organizationId });
         const adminUserId = organization?.adminUserId;
         if (!adminUserId) {

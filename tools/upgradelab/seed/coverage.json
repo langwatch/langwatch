@@ -261,6 +261,11 @@
       "seed": "unplanned",
       "note": "needs first_trace_recorded or trace_received facts in trace's log; the seed writes no events"
     },
+    "nurturing:replay-evaluation-days": {
+      "status": "pending",
+      "seed": "unplanned",
+      "note": "needs evaluation lifecycle_completed facts since 2026-10-19 in the event log; no seed records one yet"
+    },
     "ops:checkup-canary-project": {
       "status": "pending",
       "seed": "unplanned",

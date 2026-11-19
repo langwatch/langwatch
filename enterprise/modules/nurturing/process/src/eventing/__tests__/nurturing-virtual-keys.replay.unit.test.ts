@@ -129,6 +129,7 @@ function deploy({
   const log = new NurturingSeededLog(events);
   const pipeline = buildNurturingProjectUsagePipeline({
     store: repositories.projectUsage,
+    evaluationDays: repositories.evaluationDays,
     copies: {
       placements: repositories.placements,
       copyLanded: async () => undefined,
