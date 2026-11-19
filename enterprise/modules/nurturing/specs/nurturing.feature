@@ -154,10 +154,13 @@ Feature: Nurturing sends the signals its owners record
     When the first evaluation nurturing counts for it settles
     Then no first_evaluation_created is sent and the traits carry the count since the cutover
 
+  # Project's backfill records no creation for a project that has one: one created fact per
+  # project, keyed "<project>:created". A backfilled fact of another of its projects does seed the
+  # organization, whichever lands first (seeded is known OR new, row 5a below).
   @unit
-  Scenario: Project's backfill is idempotent for nurturing
+  Scenario: A redelivered project creation leaves a live organization unseeded
     Given nurturing learned an organization from a live project creation
-    When project's backfill records that project again, once or many times
+    When the same creation fact is delivered again, once or many times
     Then the organization stays unseeded and its first evaluation still raises the milestone
 
   # Migration plan D.1 (DATA-NURTURING-GUARD): seeded is computed at read, so it also covers

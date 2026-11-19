@@ -19,7 +19,6 @@ import { buildNurturingPipeline } from "../nurturing.pipeline.ts";
 function registeredSubscribers(): EventSubscriberDefinition<Event>[] {
   const pipeline = buildNurturingPipeline({
     deliver: async () => undefined,
-    projectCreated: async () => undefined,
     guidedTurnFailed: async () => undefined,
     usageReportReceived: async () => undefined,
     evaluationsCompleted: async () => undefined,

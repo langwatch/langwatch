@@ -36,7 +36,6 @@ function nurturing() {
       delivered.push(input.signal);
       await delivery.deliver(input);
     },
-    projectCreated: async () => undefined,
     guidedTurnFailed: async () => undefined,
     usageReportReceived: async () => undefined,
     evaluationsCompleted: async () => undefined,

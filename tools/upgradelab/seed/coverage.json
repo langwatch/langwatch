@@ -211,6 +211,21 @@
       "seed": "unplanned",
       "note": "projection replay from the owner's event log; no seed door written yet"
     },
+    "nurturing:replay-organization-admins": {
+      "status": "pending",
+      "seed": "unplanned",
+      "note": "needs projects with an admin and organizations whose admin was erased, as the old release wrote them; no seed door written yet"
+    },
+    "nurturing:replay-organizations-created": {
+      "status": "pending",
+      "seed": "unplanned",
+      "note": "needs organizations with a created fact in organization's log; no seed door written yet"
+    },
+    "nurturing:replay-project-placements": {
+      "status": "pending",
+      "seed": "unplanned",
+      "note": "needs projects with a created fact in project's log; no seed door written yet"
+    },
     "ops:checkup-canary-project": {
       "status": "pending",
       "seed": "unplanned",

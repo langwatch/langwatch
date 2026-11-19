@@ -145,6 +145,7 @@ function registeredKeyLane({
       placements: others.placements,
       copyLanded: async () => undefined,
       organizationsCreated: others.organizationsCreated,
+      admins: others.milestones,
       members,
       virtualKeys,
     },
@@ -300,7 +301,6 @@ export async function gatewayFactsOver({
   });
   const pipeline = buildNurturingPipeline({
     deliver: (input) => delivery.deliver(input),
-    projectCreated: async () => undefined,
     guidedTurnFailed: async () => undefined,
     usageReportReceived: async () => undefined,
     evaluationsCompleted: async () => undefined,

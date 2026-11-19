@@ -94,7 +94,6 @@ function nurturingOverCopies() {
   });
   const pipeline = buildNurturingPipeline({
     deliver: (input) => delivery.deliver(input),
-    projectCreated: async () => undefined,
     guidedTurnFailed: (data) => delivery.deliverGuidedTurnFailed(data),
     usageReportReceived: (input) => delivery.deliverUsageReport(input),
     evaluationsCompleted: async () => undefined,

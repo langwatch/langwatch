@@ -14,6 +14,13 @@ import { describe, expect, it } from "vitest";
 
 import { nurturingProcessModule } from "../../nurturing.module.ts";
 import {
+  ADMINS_STEP,
+  ORGANIZATIONS_CREATED_STEP,
+  organizationCopiesReplayStepsOver,
+  PLACEMENTS_STEP,
+  PROJECT_CREATED_FACTS_STEP,
+} from "./nurturing-organization-copies.test-helpers.ts";
+import {
   IDENTITY_MARKS_STEP,
   KEYS_STEP,
   nurturingReplayStepsOver,
@@ -42,7 +49,7 @@ const runOnce = (step: MigrationStep) =>
   });
 
 describe("given the nurturing module installed on a worker", () => {
-  it("declares the two erasure marks steps and the key copy after both, on the lanes the behaviour tests pin", async () => {
+  it("declares the marks steps, then each copy after the steps it reads, on the lanes the behaviour tests pin", async () => {
     const declared = recordingReplayer();
     const state = await nurturingProcessModule.install({
       resources: new ResourceScope(),
@@ -60,9 +67,19 @@ describe("given the nurturing module installed on a worker", () => {
     });
     const steps = (state.migrationSteps ?? []).filter(isMigrationStep);
     const pinned = recordingReplayer();
-    const expected = nurturingReplayStepsOver(pinned.replayer);
+    const expected = [
+      ...nurturingReplayStepsOver(pinned.replayer),
+      ...organizationCopiesReplayStepsOver(pinned.replayer),
+    ];
 
-    expect(steps.map(({ id }) => id)).toEqual([USER_MARKS_STEP, IDENTITY_MARKS_STEP, KEYS_STEP]);
+    expect(steps.map(({ id }) => id)).toEqual([
+      USER_MARKS_STEP,
+      IDENTITY_MARKS_STEP,
+      KEYS_STEP,
+      PLACEMENTS_STEP,
+      ORGANIZATIONS_CREATED_STEP,
+      ADMINS_STEP,
+    ]);
     for (const [index, step] of steps.entries()) {
       expect(step).toMatchObject({
         id: expected[index]?.id,
@@ -77,13 +94,16 @@ describe("given the nurturing module installed on a worker", () => {
       undefined,
       undefined,
       [USER_MARKS_STEP, IDENTITY_MARKS_STEP],
+      [PROJECT_CREATED_FACTS_STEP],
+      undefined,
+      [USER_MARKS_STEP, IDENTITY_MARKS_STEP, PROJECT_CREATED_FACTS_STEP],
     ]);
 
     // The lane and the trailing pass are only observable by running: each step asks for its lane twice.
     for (const step of steps) await runOnce(step);
     for (const step of expected) await runOnce(step);
-    expect(declared.lanes).toHaveLength(6);
+    expect(declared.lanes).toHaveLength(2 * steps.length);
     expect(declared.lanes).toEqual(pinned.lanes);
-    expect(new Set(declared.lanes).size).toBe(3);
+    expect(new Set(declared.lanes).size).toBe(steps.length);
   });
 });

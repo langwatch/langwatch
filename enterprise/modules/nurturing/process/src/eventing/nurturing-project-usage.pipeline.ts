@@ -29,6 +29,7 @@ import {
   definePipeline,
   type Event,
   type EventingSetup,
+  type LaneAlias,
   type PeerEvent,
   type PeerBatchSubscriberDefinition,
   type PeerFoldProjectionDeclaration,
@@ -64,6 +65,7 @@ import {
 } from "@langwatch/organization-contract";
 import {
   PROJECT_CREATED_EVENT_TYPE,
+  type ProjectCreatedEventData,
   projectCreatedEventDataSchema,
 } from "@langwatch/project-contract";
 import {
@@ -99,6 +101,7 @@ import { z } from "zod";
 
 import type { NurturingModule } from "../app/nurturing.app.ts";
 import type { NurturingVirtualKeyRepository } from "../repositories/nurturing-gateway-key.repository.ts";
+import type { NurturingOrganizationAdminRepository } from "../repositories/nurturing-milestones.repository.ts";
 import type { NurturingOrganizationCreatedRepository } from "../repositories/nurturing-organization-created.repository.ts";
 import type { NurturingOrganizationMemberRepository } from "../repositories/nurturing-organization-member.repository.ts";
 import type { NurturingProjectPlacementRepository } from "../repositories/nurturing-project-placement.repository.ts";
@@ -121,6 +124,7 @@ import {
   type NurturingVirtualKeyFact,
   virtualKeyFactOf,
 } from "../rules/nurturing-virtual-key.rules.ts";
+import { NURTURING_PIPELINE_NAME } from "./nurturing-signal.events.ts";
 
 /** Hosts nurturing's peer folds and subscribers over the owners' facts; no event of its own. */
 export const NURTURING_PROJECT_USAGE_PIPELINE_NAME = "nurturing_project_usage" as const;
@@ -497,6 +501,8 @@ export type NurturingUsageCopies = Readonly<{
   /** A project's placement copy was written: it is no longer uncopied. */
   copyLanded: (input: Readonly<{ projectId: string }>) => Promise<void>;
   organizationsCreated: NurturingOrganizationCreatedRepository;
+  /** Each organization's admin and seeded flag, folded from project's created facts. */
+  admins: Pick<NurturingOrganizationAdminRepository, "recordAdminFact">;
   members: NurturingOrganizationMemberRepository;
   virtualKeys: NurturingVirtualKeyRepository;
 }>;
@@ -520,7 +526,7 @@ function nurturingProjectUsageHost({
   copies: NurturingUsageCopies;
   sync: NurturingUsageSync | undefined;
 }>) {
-  const { organizationsCreated, members, virtualKeys } = copies;
+  const { organizationsCreated, admins, members, virtualKeys } = copies;
   // The copies always register, as nurturing's other copies do: a channel configured later
   // then finds the projects, organizations, members and gateway keys created before it.
   const copied = definePipeline({
@@ -528,11 +534,6 @@ function nurturingProjectUsageHost({
     aggregate: defineAggregate({ type: "nurturing_project_usage_view" }),
   })
     .withEvents([])
-    .withPeerSubscriber("projectPlacement", nurturingProjectPlacementSubscriber(copies))
-    .withPeerSubscriber(
-      "organizationCreated",
-      nurturingOrganizationCreatedSubscriber(organizationsCreated),
-    )
     .withPeerSubscriber("memberFoundedOrganization", nurturingFounderMembershipSubscriber(members))
     .withPeerSubscriber(
       "memberSignedUp",
@@ -592,7 +593,11 @@ function nurturingProjectUsageHost({
     // prerequisite (the withMigrations steps in nurturing.module.ts).
     .withPeerMapProjection(nurturingUserErasureMarksMap(virtualKeys))
     .withPeerMapProjection(nurturingIdentityErasureMarksMap(virtualKeys))
-    .withPeerMapProjection(nurturingVirtualKeysMap(virtualKeys));
+    .withPeerMapProjection(nurturingVirtualKeysMap(virtualKeys))
+    .withPeerMapProjection(nurturingProjectPlacementsMap(copies))
+    .withPeerMapProjection(nurturingOrganizationCreationsMap(organizationsCreated))
+    .withPeerMapProjection(nurturingOrganizationAdminsMap(admins))
+    .withLaneAliases([...ORGANIZATION_COPY_LANE_ALIASES]);
   // Without a channel no sync reads the usage rows, and none prunes the trace days, so none is kept.
   if (!sync) return copied;
   const { usageChanged, tracesChanged, organizationCreated } = sync;
@@ -629,40 +634,6 @@ function nurturingProjectUsageHost({
         handle: (data) => organizationCreated(data),
       })
   );
-}
-
-/**
- * Nurturing's own copy of a project's organization, from project's creation fact (§9). A move
- * stays within the organization and an archived project stays counted, so only creation writes.
- */
-export function nurturingProjectPlacementSubscriber({
-  placements,
-  copyLanded,
-}: Readonly<{
-  placements: Pick<NurturingProjectPlacementRepository, "recordProject">;
-  copyLanded: NurturingUsageCopies["copyLanded"];
-}>): PeerSubscriberDefinition<typeof projectCreatedEventDataSchema> {
-  return {
-    eventType: PROJECT_CREATED_EVENT_TYPE,
-    data: projectCreatedEventDataSchema,
-    // The copy first: a forget that fails retries the fact, and the write repeats harmlessly.
-    handle: async ({ projectId, organizationId }) => {
-      await placements.recordProject({ projectId, organizationId });
-      await copyLanded({ projectId });
-    },
-  };
-}
-
-/** Nurturing's own copy of an organization's creation, the signup day of its usage traits. */
-export function nurturingOrganizationCreatedSubscriber(
-  organizationsCreated: NurturingOrganizationCreatedRepository,
-): PeerSubscriberDefinition<typeof organizationCreatedEventDataSchema> {
-  return {
-    eventType: ORGANIZATION_CREATED_EVENT_TYPE,
-    data: organizationCreatedEventDataSchema,
-    handle: ({ organizationId, occurredAt }) =>
-      organizationsCreated.recordOrganizationCreated({ organizationId, createdAt: occurredAt }),
-  };
 }
 
 /** What every owner member fact carries that nurturing's member copy keeps. */
@@ -796,6 +767,138 @@ export function nurturingVirtualKeysMap(
   };
 }
 
+export const NURTURING_PROJECT_PLACEMENTS_PROJECTION_NAME = "projectPlacements" as const;
+export const NURTURING_ORGANIZATION_CREATIONS_PROJECTION_NAME = "organizationCreations" as const;
+export const NURTURING_ORGANIZATION_ADMINS_PROJECTION_NAME = "organizationAdmins" as const;
+
+/** A retired peer subscriber's queue key, as the previous release queued its jobs. */
+const retiredPeerSubscriberKey = (pipeline: string, lane: string) =>
+  `global:subscriber:${pipeline}.${lane}`;
+
+/** This pipeline's peer map lane that takes a retired lane's jobs. */
+const toPeerMap = (lane: string) => ({ jobType: "handler", lane }) as const;
+
+/**
+ * The organization-side copy subscribers these maps replaced. A job the previous release queued
+ * under one reaches its successor map, which writes the same row the subscriber would have: every
+ * write here is order-free and idempotent, so the job may also have been replayed.
+ */
+export const ORGANIZATION_COPY_LANE_ALIASES: readonly LaneAlias[] = [
+  {
+    from: retiredPeerSubscriberKey(NURTURING_PROJECT_USAGE_PIPELINE_NAME, "projectPlacement"),
+    to: toPeerMap(NURTURING_PROJECT_PLACEMENTS_PROJECTION_NAME),
+  },
+  {
+    from: retiredPeerSubscriberKey(NURTURING_PROJECT_USAGE_PIPELINE_NAME, "organizationCreated"),
+    to: toPeerMap(NURTURING_ORGANIZATION_CREATIONS_PROJECTION_NAME),
+  },
+  {
+    from: retiredPeerSubscriberKey(NURTURING_PIPELINE_NAME, "projectCreated"),
+    to: toPeerMap(NURTURING_ORGANIZATION_ADMINS_PROJECTION_NAME),
+  },
+];
+
+const PROJECT_CREATED_EVENTS = [
+  { type: PROJECT_CREATED_EVENT_TYPE, data: projectCreatedEventDataSchema },
+] as const;
+
+const ORGANIZATION_CREATED_EVENTS = [
+  { type: ORGANIZATION_CREATED_EVENT_TYPE, data: organizationCreatedEventDataSchema },
+] as const;
+
+type NurturingPlacementFact = Readonly<{ projectId: string; organizationId: string }>;
+
+/**
+ * Nurturing's own copy of a project's organization, from project's creation fact (§9). A move
+ * stays within the organization and an archived project stays counted, so only creation writes.
+ * The upsert is order-free, so its deploy replay fills projects created before the copy existed.
+ */
+export function nurturingProjectPlacementsMap({
+  placements,
+  copyLanded,
+}: Readonly<{
+  placements: Pick<NurturingProjectPlacementRepository, "recordProject">;
+  copyLanded: NurturingUsageCopies["copyLanded"];
+}>): PeerMapProjectionDeclaration<NurturingPlacementFact, typeof PROJECT_CREATED_EVENTS> {
+  return {
+    events: PROJECT_CREATED_EVENTS,
+    map: {
+      name: NURTURING_PROJECT_PLACEMENTS_PROJECTION_NAME,
+      eventTypes: [PROJECT_CREATED_EVENT_TYPE],
+      map: ({ data: { projectId, organizationId } }) => ({ projectId, organizationId }),
+      store: {
+        // The copy first: a forget that fails retries the fact, and the write repeats harmlessly.
+        append: async (placement) => {
+          await placements.recordProject(placement);
+          await copyLanded({ projectId: placement.projectId });
+        },
+      },
+    },
+  };
+}
+
+type NurturingOrganizationCreation = Readonly<{ organizationId: string; createdAt: number }>;
+
+/**
+ * Nurturing's own copy of an organization's creation, the signup day of its usage traits. The
+ * earliest time is kept, so a redelivered, late or replayed fact changes nothing.
+ */
+export function nurturingOrganizationCreationsMap(
+  organizationsCreated: Pick<NurturingOrganizationCreatedRepository, "recordOrganizationCreated">,
+): PeerMapProjectionDeclaration<NurturingOrganizationCreation, typeof ORGANIZATION_CREATED_EVENTS> {
+  return {
+    events: ORGANIZATION_CREATED_EVENTS,
+    map: {
+      name: NURTURING_ORGANIZATION_CREATIONS_PROJECTION_NAME,
+      eventTypes: [ORGANIZATION_CREATED_EVENT_TYPE],
+      map: ({ data: { organizationId, occurredAt } }) => ({
+        organizationId,
+        createdAt: occurredAt,
+      }),
+      store: { append: (created) => organizationsCreated.recordOrganizationCreated(created) },
+    },
+  };
+}
+
+/** One project-created fact as the organization's admin row folds it. */
+export type NurturingAdminFact = Parameters<
+  NurturingOrganizationAdminRepository["recordAdminFact"]
+>[0];
+
+/**
+ * Project's created fact as its organization's row takes it: the admin it names at its stamp, and
+ * seeded when project's backfill recorded it (the organization's first milestones already
+ * happened).
+ */
+export function organizationAdminFactOf(data: ProjectCreatedEventData): NurturingAdminFact {
+  return {
+    organizationId: data.organizationId,
+    adminUserId: data.adminUserId ?? null,
+    at: data.occurredAt,
+    seeded: data.backfilled === true,
+  };
+}
+
+/**
+ * Nurturing's own organization row, admin and seeded flag, from project's created facts (§9). One
+ * statement a fact, never a batch (no `bulkAppend`): the write's erasure check and re-check read
+ * the marks each fact meets. The admin is the latest-stamped one and `seeded` only turns on, so a
+ * redelivered, late or replayed fact leaves the row as live delivery would.
+ */
+export function nurturingOrganizationAdminsMap(
+  admins: Pick<NurturingOrganizationAdminRepository, "recordAdminFact">,
+): PeerMapProjectionDeclaration<NurturingAdminFact, typeof PROJECT_CREATED_EVENTS> {
+  return {
+    events: PROJECT_CREATED_EVENTS,
+    map: {
+      name: NURTURING_ORGANIZATION_ADMINS_PROJECTION_NAME,
+      eventTypes: [PROJECT_CREATED_EVENT_TYPE],
+      map: ({ data }) => organizationAdminFactOf(data),
+      store: { append: (fact) => admins.recordAdminFact(fact) },
+    },
+  };
+}
+
 /** The host pipeline as a TYPE, derived from the builder above. */
 export type NurturingProjectUsagePipeline = ReturnType<
   ReturnType<typeof nurturingProjectUsageHost>["build"]
@@ -816,6 +919,7 @@ export const nurturingProjectUsageEventing = defineEventingModule({
         placements: repositories.placements,
         copyLanded: (input) => app.uncopiedProjectCopied(input),
         organizationsCreated: repositories.organizationsCreated,
+        admins: repositories.milestones,
         members: repositories.members,
         virtualKeys: repositories.virtualKeys,
       },

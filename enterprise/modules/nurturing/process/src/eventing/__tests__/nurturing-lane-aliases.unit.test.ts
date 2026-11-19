@@ -21,7 +21,6 @@ import {
 function laneAliases() {
   return buildNurturingPipeline({
     deliver: async () => undefined,
-    projectCreated: async () => undefined,
     guidedTurnFailed: async () => undefined,
     usageReportReceived: async () => undefined,
     evaluationsCompleted: async () => undefined,

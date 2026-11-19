@@ -6,25 +6,20 @@
  * Spec: enterprise/modules/nurturing/specs/gateway-facts.feature
  */
 import {
-  defineAggregate,
-  definePipeline,
   type ReplayEvent,
   ReplayService,
   projectionLaneReplayer,
   replayProjectionsOf,
   sealPipelineDefinition,
 } from "@langwatch/eventing";
-import { testEventSchema } from "@langwatch/eventing/testing";
 import {
   GATEWAY_VK_LIFECYCLE_EVENT_TYPE,
   type RecordVkLifecycleCommandData,
   recordVkLifecycleCommandDataSchema,
 } from "@langwatch/gateway-contract";
 import {
-  IDENTITY_PIPELINE_NAME,
   USER_ERASED_EVENT_TYPE as IDENTITY_USER_ERASED_EVENT_TYPE,
   USER_IDENTITY_AGGREGATE_TYPE,
-  userErasedPayloadSchema,
 } from "@langwatch/identity-contract";
 import { memoryRedisDouble } from "@langwatch/test-harness/client-doubles/redis";
 import {
@@ -36,8 +31,6 @@ import {
   USER_AGGREGATE_TYPE,
   USER_ERASED_EVENT_TYPE,
   USER_LIFECYCLE_EVENT_VERSION,
-  USER_LIFECYCLE_PIPELINE_NAME,
-  userErasedEventDataSchema,
 } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";
 
@@ -50,6 +43,7 @@ import {
   NURTURING_PROJECT_USAGE_PIPELINE_NAME,
 } from "../nurturing-project-usage.pipeline.ts";
 import { lifecycleFact, ORGANIZATION_ID } from "./nurturing-gateway-facts.test-helpers.ts";
+import { nurturingCopyOwners } from "./nurturing-organization-copies.test-helpers.ts";
 import {
   IDENTITY_MARKS_STEP,
   KEYS_STEP,
@@ -119,28 +113,6 @@ function identityErased(userId: string): ReplayEvent {
   };
 }
 
-/** An owner's pipeline as a stand-in declaring one event, as a worker installing nurturing registers it. */
-const ownerPipeline = (name: string, aggregateType: string) =>
-  definePipeline({ name, aggregate: defineAggregate({ type: aggregateType }) });
-
-/** The three owners' pipelines as stand-ins. */
-function owners() {
-  const gateway = ownerPipeline("governance_events", "governance_subject")
-    .withEvents([testEventSchema(GATEWAY_VK_LIFECYCLE_EVENT_TYPE, recordVkLifecycleCommandDataSchema)])
-    .build();
-  const user = ownerPipeline(USER_LIFECYCLE_PIPELINE_NAME, USER_AGGREGATE_TYPE)
-    .withEvents([testEventSchema(USER_ERASED_EVENT_TYPE, userErasedEventDataSchema)])
-    .build();
-  const identity = ownerPipeline(IDENTITY_PIPELINE_NAME, USER_IDENTITY_AGGREGATE_TYPE)
-    .withEvents([testEventSchema(IDENTITY_USER_ERASED_EVENT_TYPE, userErasedPayloadSchema)])
-    .build();
-  return [
-    sealPipelineDefinition(gateway),
-    sealPipelineDefinition(user),
-    sealPipelineDefinition(identity),
-  ];
-}
-
 /** A worker's deploy over the seeded owner logs: nurturing's own steps and its memory copies. */
 function deploy({
   events,
@@ -158,12 +130,16 @@ function deploy({
       placements: repositories.placements,
       copyLanded: async () => undefined,
       organizationsCreated: repositories.organizationsCreated,
+      admins: repositories.milestones,
       members: repositories.members,
       virtualKeys: keys ? keys(repositories.virtualKeys) : repositories.virtualKeys,
     },
     sync: undefined,
   });
-  const projections = replayProjectionsOf([...owners(), sealPipelineDefinition(pipeline)]);
+  const projections = replayProjectionsOf([
+    ...nurturingCopyOwners(),
+    sealPipelineDefinition(pipeline),
+  ]);
   const replayer = projectionLaneReplayer({
     service: new ReplayService({
       eventSource: log,

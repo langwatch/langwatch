@@ -331,6 +331,30 @@
     "needsOldWritersGone": true
   },
   {
+    "id": "nurturing:replay-project-placements",
+    "kind": "data",
+    "mode": "background",
+    "owner": "nurturing",
+    "description": "Fills nurturing's project placement copy from project's created facts at deploy.",
+    "needsOldWritersGone": true
+  },
+  {
+    "id": "nurturing:replay-organizations-created",
+    "kind": "data",
+    "mode": "background",
+    "owner": "nurturing",
+    "description": "Fills nurturing's organization creation copy from organization's log at deploy.",
+    "needsOldWritersGone": true
+  },
+  {
+    "id": "nurturing:replay-organization-admins",
+    "kind": "data",
+    "mode": "background",
+    "owner": "nurturing",
+    "description": "Fills each organization's admin and seeded flag from project's created facts at deploy.",
+    "needsOldWritersGone": true
+  },
+  {
     "id": "ops:copy-automation-migration-state",
     "kind": "data",
     "mode": "blocking",

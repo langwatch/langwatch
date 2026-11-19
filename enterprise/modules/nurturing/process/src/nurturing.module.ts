@@ -7,6 +7,9 @@ import { NurturingModule } from "./app/nurturing.app.ts";
 import { nurturingChannels } from "./channels/nurturing-channels.registry.ts";
 import {
   NURTURING_IDENTITY_ERASURE_MARKS_PROJECTION_NAME,
+  NURTURING_ORGANIZATION_ADMINS_PROJECTION_NAME,
+  NURTURING_ORGANIZATION_CREATIONS_PROJECTION_NAME,
+  NURTURING_PROJECT_PLACEMENTS_PROJECTION_NAME,
   NURTURING_PROJECT_USAGE_PIPELINE_NAME,
   NURTURING_USER_ERASURE_MARKS_PROJECTION_NAME,
   NURTURING_VIRTUAL_KEYS_PROJECTION_NAME,
@@ -61,6 +64,41 @@ export const nurturingProcessModule: PublishedProcessModule<
       needsOldWritersGone: true,
       trailingPass: true,
       after: ["nurturing:replay-user-erasure-marks", "nurturing:replay-identity-erasure-marks"],
+      replayer,
+    }),
+    // Project's own step records every project it held before it recorded creations.
+    defineProjectionReplayStep({
+      id: "nurturing:replay-project-placements",
+      description:
+        "Fills nurturing's project placement copy from project's created facts at deploy.",
+      lane: `${NURTURING_PROJECT_USAGE_PIPELINE_NAME}.${NURTURING_PROJECT_PLACEMENTS_PROJECTION_NAME}`,
+      needsOldWritersGone: true,
+      trailingPass: true,
+      after: ["project:record-created-facts"],
+      replayer,
+    }),
+    defineProjectionReplayStep({
+      id: "nurturing:replay-organizations-created",
+      description:
+        "Fills nurturing's organization creation copy from organization's log at deploy.",
+      lane: `${NURTURING_PROJECT_USAGE_PIPELINE_NAME}.${NURTURING_ORGANIZATION_CREATIONS_PROJECTION_NAME}`,
+      needsOldWritersGone: true,
+      trailingPass: true,
+      replayer,
+    }),
+    // After the marks, so no admin erased before the copy existed is stored.
+    defineProjectionReplayStep({
+      id: "nurturing:replay-organization-admins",
+      description:
+        "Fills each organization's admin and seeded flag from project's created facts at deploy.",
+      lane: `${NURTURING_PROJECT_USAGE_PIPELINE_NAME}.${NURTURING_ORGANIZATION_ADMINS_PROJECTION_NAME}`,
+      needsOldWritersGone: true,
+      trailingPass: true,
+      after: [
+        "nurturing:replay-user-erasure-marks",
+        "nurturing:replay-identity-erasure-marks",
+        "project:record-created-facts",
+      ],
       replayer,
     }),
   ]);

@@ -94,11 +94,8 @@ import {
   personalWorkspaceProvisionedEventDataSchema,
 } from "@langwatch/organization-contract";
 import {
-  PROJECT_CREATED_EVENT_TYPE,
   PROJECT_FIRST_MESSAGE_LISTED_EVENT_TYPE,
   PROJECT_PERSONAL_OWNER_LISTED_EVENT_TYPE,
-  type ProjectCreatedEventData,
-  projectCreatedEventDataSchema,
   projectFirstMessageListedEventDataSchema,
   projectPersonalOwnerListedEventDataSchema,
 } from "@langwatch/project-contract";
@@ -260,7 +257,6 @@ export type NurturingPipeline = StaticPipelineDefinition<
  */
 export function buildNurturingPipeline(deps: {
   deliver: (input: { key: string; signal: NurturingSignal }) => Promise<void>;
-  projectCreated: (data: ProjectCreatedEventData) => Promise<void>;
   guidedTurnFailed: (data: GuidedOnboardingTurnFailedEventData) => Promise<void>;
   usageReportReceived: (input: {
     data: UsageReportReceivedEventData;
@@ -394,11 +390,6 @@ export function buildNurturingPipeline(deps: {
             }),
         }),
       )
-      .withPeerSubscriber("projectCreated", {
-        eventType: PROJECT_CREATED_EVENT_TYPE,
-        data: projectCreatedEventDataSchema,
-        handle: (data) => deps.projectCreated(data),
-      })
       .withPeerSubscriber("subscriptionChanged", {
         eventType: SUBSCRIPTION_CHANGED_EVENT_TYPE,
         data: subscriptionChangedEventDataSchema,

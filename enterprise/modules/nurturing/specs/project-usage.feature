@@ -18,7 +18,7 @@ Feature: Per-email usage reaches Customer.io from nurturing's own project rows
   syncs no more) sends each organization's trace traits once as null when its window ends, so
   Customer.io removes them and a rolling trait never says "active" for ever; later syncs leave
   them out, and its trace rows are dropped. Nurturing's placement copy is written by its own
-  subscriber, so a new project's first traces can arrive before it: for a project without a copy
+  peer map, so a new project's first traces can arrive before it: for a project without a copy
   the batch fails and the queue retries it, until the copy lands, for five minutes of real time
   from when any worker first saw the project uncopied (the measured lag is seconds). That first
   sighting is a row nurturing keeps, so every worker shares the window and a restart does not open
@@ -53,8 +53,9 @@ Feature: Per-email usage reaches Customer.io from nurturing's own project rows
   other sinks' failures are; the group call stands. At a window's end it fails the sweep, which retries. A project's first trace syncs as later ones do. The
   signup day comes from its own copy of
   lw.organization.created. It reads no other module's table and calls no other module's API for
-  a usage fact, and keeps no copy for projects or
-  organizations created before it did: those send nothing. It never pulls owner state on a
+  a usage fact. Its placement, organization-creation and admin copies are peer maps over project's
+  and organization's facts, filled at deploy by replaying those logs, so a project or organization
+  whose creation the owner's log holds is copied however old; one it does not hold sends nothing. It never pulls owner state on a
   schedule, and sends counts and times only, never content. flagged_count waits on its
   definition. Without a Customer.io channel no fold, trace count or sync is registered: nothing is
   counted. The placement, organization-creation and member copies always register, so a channel
@@ -420,7 +421,7 @@ Feature: Per-email usage reaches Customer.io from nurturing's own project rows
   @unit @integration
   Scenario: A created project is placed in its organization from the creation fact
     Given project records lw.project.created for a project of an organization
-    When nurturing's placement subscriber takes it, once or redelivered
+    When nurturing's placement map takes it, once or redelivered
     Then nurturing's own copy places the project in that organization
     And the organization's projects list it
 
@@ -433,7 +434,7 @@ Feature: Per-email usage reaches Customer.io from nurturing's own project rows
   @unit @integration
   Scenario: The signup day comes from the organization's creation fact
     Given organization records lw.organization.created
-    When nurturing's subscriber takes it, once or redelivered with a later time
+    When nurturing's creation map takes it, once or redelivered with a later time
     Then nurturing keeps the earliest creation time as the organization's signup day
     And an organization created before nurturing kept the copy has no signup day
 
@@ -442,7 +443,7 @@ Feature: Per-email usage reaches Customer.io from nurturing's own project rows
     Given nurturing runs without a Customer.io channel
     When its usage pipeline is built
     Then it registers no fold, no trace count and no sync, so a root span writes no trace day
-    And it registers the placement, organization-creation and six member copies
+    And it registers the placement, organization-creation, admin and member copies
 
   @integration
   Scenario: Each owner's fold keeps its own row per project
@@ -460,3 +461,47 @@ Feature: Per-email usage reaches Customer.io from nurturing's own project rows
     Given rows for a project of the organization and for another project
     When the organization's rows are read for its projects
     Then every owner's row of its projects is returned and no other
+
+  # Projections build plan rows 1, 3 and 5a: the placement, organization-creation and admin copies
+  # are peer maps whose writes are order-free and idempotent, filled at deploy by their replay steps.
+  @unit
+  Scenario: Projects and organizations created before the copies existed are copied at deploy
+    Given project's and organization's logs hold creations from before nurturing kept the copies
+    When the deploy runs nurturing's placement, organization-creation and admin replay steps
+    Then each copy holds what live delivery of the same facts would have written
+
+  @unit
+  Scenario: Replaying the organization copies twice leaves every row as it was
+    Given the placement, organization-creation and admin steps ran
+    When each runs again
+    Then every row is byte-identical
+
+  @unit
+  Scenario: Each organization copy ends the same whatever order its facts land in, however often
+    Given project's and organization's creation facts
+    When they are delivered live in reverse order, or each twice
+    Then the placement, organization-creation and admin rows are those of one delivery in order
+
+  @unit
+  Scenario: The deploy replay names no admin erased before the copy existed
+    Given project's log names an admin that user's log records erased
+    When the deploy runs the marks steps and then the admin step, or the admin is erased while it runs
+    Then no organization names that person as admin
+
+  @unit
+  Scenario: A late project-created fact naming an erased admin names no one
+    Given an organization's admin copy and a person user's log records erased
+    When a project-created fact naming that person at a later stamp is delivered live
+    Then the organization names no admin
+
+  @unit
+  Scenario: Replaying the organization copies sends nothing
+    Given a deployment with a Customer.io channel and logs holding organization and project creations
+    When the deploy runs nurturing's replay steps
+    Then no organization-created, usage or trace sync runs
+
+  @unit
+  Scenario: Copy jobs the previous release queued reach the peer map that replaced their lane
+    Given the previous release queued jobs under the placement, organization-created and project-created subscriber keys
+    When a worker of the new release dequeues them
+    Then the placement, organization-creation and admin maps each write their copy

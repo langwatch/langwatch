@@ -23,7 +23,6 @@ function nurturing() {
   const codingBatches: CodingAgentSessionStoredEventData[][] = [];
   const pipeline = buildNurturingPipeline({
     deliver: async ({ signal }) => void delivered.push(signal),
-    projectCreated: async () => undefined,
     guidedTurnFailed: async () => undefined,
     usageReportReceived: async () => undefined,
     evaluationsCompleted: async () => undefined,
