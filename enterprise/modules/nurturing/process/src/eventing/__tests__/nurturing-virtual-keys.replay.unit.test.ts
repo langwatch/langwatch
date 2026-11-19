@@ -408,7 +408,7 @@ describe("given two holder facts share a stamp and one names an erased person", 
       [{ principalUserId: "user-next", principalUserIdAt: 2_000 }],
     ]);
     // A batch write would fold a stamp's holders in memory, where the erased one can win a tie.
-    expect(keysLaneOf(worker.projections).open((lane) => 'bulkAppend' in lane.store)).toBe(false);
+    expect(keysLaneOf(worker.projections).open((lane) => "bulkAppend" in lane.store)).toBe(false);
   });
 });
 
@@ -552,8 +552,8 @@ describe("given the module's steps", () => {
       service: new ReplayService({
         eventSource: worker.log,
         redis: memoryRedisDouble({
-        script: { hdel: async () => 0, hlen: async () => 0, lpush: async () => 0 },
-      }),
+          script: { hdel: async () => 0, hlen: async () => 0, lpush: async () => 0 },
+        }),
       }),
       projections: worker.projections,
     });

@@ -54,6 +54,7 @@ import {
   USER_ERASED_EVENT_TYPE as IDENTITY_USER_ERASED_EVENT_TYPE,
   userErasedPayloadSchema as identityUserErasedPayloadSchema,
 } from "@langwatch/identity-contract";
+import { createLogger } from "@langwatch/observability";
 import {
   INVITE_ACCEPTED_EVENT_TYPE,
   inviteAcceptedEventDataSchema,
@@ -115,7 +116,6 @@ import {
   traceReceivedEventDataSchema,
 } from "@langwatch/trace-contract";
 import { USER_ERASED_EVENT_TYPE, userErasedEventDataSchema } from "@langwatch/user-contract";
-import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
 
 import type { NurturingModule } from "../app/nurturing.app.ts";
@@ -883,6 +883,19 @@ export type NurturingMembershipFact = Readonly<{
 }>;
 
 /**
+ * What one organization member fact tells the copy: a membership change, or nothing because a
+ * provisioned organization's creation names no founder.
+ */
+export type NurturingMembershipFactResult =
+  | Readonly<{ kind: "membership"; fact: NurturingMembershipFact }>
+  | Readonly<{ kind: "none"; reason: "no-founder" }>;
+
+const membership = (fact: NurturingMembershipFact): NurturingMembershipFactResult => ({
+  kind: "membership",
+  fact,
+});
+
+/**
  * Organization's member fact as the copy keeps it, at the fact's time. A creation joins its
  * founder, since an organization created for an existing user (`createAndAssign`) records no
  * signup; a provisioned one names no founder and keeps nothing. A listed member joined when
@@ -890,28 +903,44 @@ export type NurturingMembershipFact = Readonly<{
  */
 export function organizationMembershipFactOf(
   event: PeerEvent<typeof ORGANIZATION_MEMBER_EVENTS>,
-): NurturingMembershipFact | null {
+): NurturingMembershipFactResult {
   const { organizationId, occurredAt } = event.data;
   switch (event.type) {
     case ORGANIZATION_CREATED_EVENT_TYPE: {
       const { userId } = event.data;
-      return userId ? { organizationId, userId, change: "joined", at: occurredAt } : null;
+      if (!userId) return { kind: "none", reason: "no-founder" };
+      return membership({ organizationId, userId, change: "joined", at: occurredAt });
     }
     case ORGANIZATION_SIGNED_UP_EVENT_TYPE:
     case INVITE_ACCEPTED_EVENT_TYPE:
-      return { organizationId, userId: event.data.userId, change: "joined", at: occurredAt };
+      return membership({
+        organizationId,
+        userId: event.data.userId,
+        change: "joined",
+        at: occurredAt,
+      });
     case ORGANIZATION_MEMBER_REMOVED_EVENT_TYPE:
     case ORGANIZATION_MEMBER_DISABLED_EVENT_TYPE:
-      return { organizationId, userId: event.data.userId, change: "left", at: occurredAt };
+      return membership({
+        organizationId,
+        userId: event.data.userId,
+        change: "left",
+        at: occurredAt,
+      });
     case ORGANIZATION_MEMBER_ENABLED_EVENT_TYPE:
-      return { organizationId, userId: event.data.userId, change: "returned", at: occurredAt };
+      return membership({
+        organizationId,
+        userId: event.data.userId,
+        change: "returned",
+        at: occurredAt,
+      });
     case ORGANIZATION_MEMBER_LISTED_EVENT_TYPE:
-      return {
+      return membership({
         organizationId,
         userId: event.data.userId,
         change: "joined",
         at: event.data.joinedAt,
-      };
+      });
   }
 }
 
@@ -936,7 +965,10 @@ export function nurturingOrganizationMembersMap(
     map: {
       name: NURTURING_ORGANIZATION_MEMBERS_PROJECTION_NAME,
       eventTypes: ORGANIZATION_MEMBER_EVENTS.map(({ type }) => type),
-      map: organizationMembershipFactOf,
+      map: (event) => {
+        const result = organizationMembershipFactOf(event);
+        return result.kind === "membership" ? result.fact : null;
+      },
       store: memberStore(members),
     },
   };
@@ -1082,6 +1114,13 @@ const TRACED_PROJECT_OF_PROJECT_EVENTS = [
 ] as const;
 
 /**
+ * What one traced-project fact tells the copy: its row, or none for a project with no organization.
+ */
+type TracedProjectResult =
+  | Readonly<{ kind: "traced"; row: NurturingTracedProjectRow }>
+  | Readonly<{ kind: "none"; reason: "no-organization" }>;
+
+/**
  * A project with no organization has nothing to count against, so it is logged and mapped to no
  * row.
  */
@@ -1091,18 +1130,20 @@ function tracedProjectOf({
 }: Readonly<{
   data: Readonly<{ projectId: string; organizationId: string | null }>;
   logger: ProjectFactsLogger;
-}>): NurturingTracedProjectRow | null {
+}>): TracedProjectResult {
   if (organizationId === null) {
     logger.warn(
       { projectId },
       "a traced project names no organization; nurturing keeps no traced row for it",
     );
-    return null;
+    return { kind: "none", reason: "no-organization" };
   }
-  return { projectId, organizationId };
+  return { kind: "traced", row: { projectId, organizationId } };
 }
 
-/** Nurturing's copy of the projects that traced, from trace's `project_traced` fact; insert-ignore. */
+/**
+ * Nurturing's copy of the projects that traced, from trace's `project_traced` fact; insert-ignore.
+ */
 export function nurturingTracedProjectsOfTraceMap({
   tracedProjects,
   logger,
@@ -1118,7 +1159,10 @@ export function nurturingTracedProjectsOfTraceMap({
     map: {
       name: NURTURING_TRACED_PROJECTS_OF_TRACE_PROJECTION_NAME,
       eventTypes: [PROJECT_TRACED_EVENT_TYPE],
-      map: ({ data }) => tracedProjectOf({ data, logger }),
+      map: ({ data }) => {
+        const result = tracedProjectOf({ data, logger });
+        return result.kind === "traced" ? result.row : null;
+      },
       store: { append: (row) => tracedProjects.recordTraced(row) },
     },
   };
@@ -1140,7 +1184,10 @@ export function nurturingTracedProjectsOfProjectMap({
     map: {
       name: NURTURING_TRACED_PROJECTS_OF_PROJECT_PROJECTION_NAME,
       eventTypes: [PROJECT_FIRST_MESSAGE_LISTED_EVENT_TYPE],
-      map: ({ data }) => tracedProjectOf({ data, logger }),
+      map: ({ data }) => {
+        const result = tracedProjectOf({ data, logger });
+        return result.kind === "traced" ? result.row : null;
+      },
       store: { append: (row) => tracedProjects.recordTraced(row) },
     },
   };

@@ -65,7 +65,11 @@ import {
   projectUsageFactOf,
   traceSyncKeyOf,
 } from "../nurturing-project-usage.pipeline.ts";
-import { copiesOver, liveMapsOver, ownerFact } from "./nurturing-organization-copies.test-helpers.ts";
+import {
+  copiesOver,
+  liveMapsOver,
+  ownerFact,
+} from "./nurturing-organization-copies.test-helpers.ts";
 
 const OCCURRED_AT = 1_000;
 

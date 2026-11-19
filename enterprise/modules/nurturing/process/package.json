@@ -45,7 +45,6 @@
     "@langwatch/prompt-contract": "workspace:*",
     "@langwatch/redis-client": "workspace:*",
     "@langwatch/scenario-contract": "workspace:*",
-    "@langwatch/task": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/trace-contract": "workspace:*",
     "@langwatch/upgrade": "workspace:*",

@@ -27,7 +27,11 @@ import {
   nurturingProjectPlacementsMap,
   nurturingProjectUsageEventing,
 } from "../nurturing-project-usage.pipeline.ts";
-import { copiesOver, liveMapsOver, ownerFact } from "./nurturing-organization-copies.test-helpers.ts";
+import {
+  copiesOver,
+  liveMapsOver,
+  ownerFact,
+} from "./nurturing-organization-copies.test-helpers.ts";
 
 /** The usage pipeline's lanes as the module declares them, for an app that syncs or one that does not. */
 const COPY_LANES = [

@@ -4034,9 +4034,6 @@ importers:
       '@langwatch/scenario-contract':
         specifier: workspace:*
         version: link:../../../../modules/scenario/contract
-      '@langwatch/task':
-        specifier: workspace:*
-        version: link:../../../../packages/task
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../../packages/time

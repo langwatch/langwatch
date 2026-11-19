@@ -131,15 +131,12 @@ export class MemoryOrganizationRepository extends OrganizationRepository {
         const user = this.memory.users.get(row.userId);
         return user !== undefined && user.deactivatedAt === null;
       })
-      .toSorted((left, right) =>
-        left.organizationId === right.organizationId
-          ? left.userId < right.userId
-            ? -1
-            : 1
-          : left.organizationId < right.organizationId
-            ? -1
-            : 1,
-      )
+      .toSorted((left, right) => {
+        if (left.organizationId !== right.organizationId) {
+          return left.organizationId < right.organizationId ? -1 : 1;
+        }
+        return left.userId < right.userId ? -1 : 1;
+      })
       .map((row) => ({
         organizationId: row.organizationId,
         userId: row.userId,

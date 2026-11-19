@@ -1919,7 +1919,9 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
     this.#memberListing.connect(senders);
   }
 
-  /** The `organization:list-member-facts` step's page: one page of organizations' active members. */
+  /**
+   * The `organization:list-member-facts` step's page: one page of organizations' active members.
+   */
   listMemberFactsPage(input: {
     afterOrganizationId: string | null;
     limit: number;

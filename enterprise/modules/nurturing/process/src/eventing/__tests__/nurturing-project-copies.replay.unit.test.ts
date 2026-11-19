@@ -43,6 +43,7 @@ import type { MemoryNurturingTracedProjectRepository } from "../../repositories/
 import { MemoryNurturingRepositories } from "../../repositories/memory/memory.nurturing.repositories.ts";
 import type { NurturingPersonalProjectRepository } from "../../repositories/nurturing-personal-project.repository.ts";
 import { buildNurturingProjectUsagePipeline } from "../nurturing-project-usage.pipeline.ts";
+import { allNurturingOwnerStandIns } from "./nurturing-owner-stand-ins.test-helpers.ts";
 import {
   LAST_TRACES_STEP,
   PERSONAL_OWNERS_OF_ORGANIZATION_STEP,
@@ -51,7 +52,6 @@ import {
   TRACED_PROJECTS_OF_PROJECT_STEP,
   TRACED_PROJECTS_OF_TRACE_STEP,
 } from "./nurturing-project-copies.test-helpers.ts";
-import { allNurturingOwnerStandIns } from "./nurturing-owner-stand-ins.test-helpers.ts";
 import {
   IDENTITY_MARKS_STEP,
   nurturingReplayStepsOver,
@@ -103,10 +103,20 @@ const personalTeamCreated = (projectId: string, userId: string, organizationId =
     aggregateType: "organization",
     aggregateId: organizationId,
     tenantId: organizationId,
-    data: { organizationId, userId, teamId: `team-${projectId}`, projectId, projectSlug: projectId },
+    data: {
+      organizationId,
+      userId,
+      teamId: `team-${projectId}`,
+      projectId,
+      projectSlug: projectId,
+    },
   });
 
-const personalWorkspaceProvisioned = (projectId: string, userId: string, organizationId = "org-1") =>
+const personalWorkspaceProvisioned = (
+  projectId: string,
+  userId: string,
+  organizationId = "org-1",
+) =>
   ownerFact({
     type: PERSONAL_WORKSPACE_PROVISIONED_EVENT_TYPE,
     aggregateType: "organization",
@@ -220,7 +230,9 @@ function deploy({
 }: {
   events: ReplayEvent[];
   /** Wraps the owner copy the two lanes write, to interleave a write. */
-  personalProjects?: (inner: NurturingPersonalProjectRepository) => NurturingPersonalProjectRepository;
+  personalProjects?: (
+    inner: NurturingPersonalProjectRepository,
+  ) => NurturingPersonalProjectRepository;
 }) {
   const repositories = MemoryNurturingRepositories.create();
   const warnings: Record<string, unknown>[] = [];
@@ -306,7 +318,9 @@ async function perFact({
   erased?: string[];
 }) {
   const repositories = MemoryNurturingRepositories.create();
-  for (const userId of erased) await repositories.personalProjects.forgetOwner({ ownerUserId: userId });
+  for (const userId of erased) {
+    await repositories.personalProjects.forgetOwner({ ownerUserId: userId });
+  }
   for (const row of personal) await repositories.personalProjects.recordOwner(row);
   for (const row of traced) await repositories.tracedProjects.recordTraced(row);
   for (const trace of traces) await repositories.milestones.recordLastTrace(trace);
@@ -476,11 +490,16 @@ describe("given trace's and project's logs hold traced projects from before the 
 
 describe("given trace's log holds trace times from before and after the release", () => {
   const facts = () => [
-    traceFact({ type: FIRST_TRACE_RECORDED_EVENT_TYPE, organizationId: "org-1", at: AFTER_RELEASE_MS }),
+    traceFact({
+      type: FIRST_TRACE_RECORDED_EVENT_TYPE,
+      organizationId: "org-1",
+      at: AFTER_RELEASE_MS,
+    }),
     traceFact({ organizationId: "org-1", at: AFTER_RELEASE_MS + 5_000 }),
     traceFact({ organizationId: "org-1", projectId: "project-t2", at: AFTER_RELEASE_MS + 2_000 }),
     traceFact({ organizationId: "org-2", projectId: "project-t3", at: AFTER_RELEASE_MS + 1_000 }),
-    // Already in the column, so the replay window skips it; a fact naming no organization writes nothing.
+    // Already in the column, so the replay window skips it; a fact naming no organization writes
+    // nothing.
     traceFact({ organizationId: "org-old", projectId: "project-t4", at: BEFORE_RELEASE_MS }),
     traceFact({ projectId: "project-t5", at: AFTER_RELEASE_MS + 9_000 }),
   ];

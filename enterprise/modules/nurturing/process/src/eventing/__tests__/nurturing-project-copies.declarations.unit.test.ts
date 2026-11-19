@@ -19,8 +19,8 @@ import {
 import { isMigrationStep } from "@langwatch/upgrade/step";
 import { describe, expect, it, vi } from "vitest";
 
-import { MemoryNurturingRepositories } from "../../repositories/memory/memory.nurturing.repositories.ts";
 import { nurturingProcessModule } from "../../nurturing.module.ts";
+import { MemoryNurturingRepositories } from "../../repositories/memory/memory.nurturing.repositories.ts";
 import {
   buildNurturingProjectUsagePipeline,
   NURTURING_PROJECT_USAGE_PIPELINE_NAME,
@@ -76,8 +76,10 @@ describe("the five subscriber lanes the personal-project and traced-project maps
     );
 
     const routed = Object.fromEntries(
-      aliases
-        .map((alias) => [alias.from.split(".").at(-1), "to" in alias ? alias.to.lane : "tombstone"]),
+      aliases.map((alias) => [
+        alias.from.split(".").at(-1),
+        "to" in alias ? alias.to.lane : "tombstone",
+      ]),
     );
     expect(routed).toEqual({
       personalTeamCreated: "personalOwnersOfOrganization",
@@ -88,12 +90,9 @@ describe("the five subscriber lanes the personal-project and traced-project maps
     });
     // Each successor is a registered map lane of the host, reached as a handler job.
     const lanes = (host().globalProjections ?? []).map(({ name }) => name);
-    for (const alias of aliases) {
-      expect(alias).not.toHaveProperty("tombstone");
-      if ("to" in alias) {
-        expect(alias.to.jobType).toBe("handler");
-        expect(lanes).toContain(`${NURTURING_PROJECT_USAGE_PIPELINE_NAME}.${alias.to.lane}`);
-      }
+    for (const alias of aliases) expect(alias).toMatchObject({ to: { jobType: "handler" } });
+    for (const lane of Object.values(routed)) {
+      expect(lanes).toContain(`${NURTURING_PROJECT_USAGE_PIPELINE_NAME}.${lane}`);
     }
   });
 
@@ -237,7 +236,11 @@ describe("the replay steps nurturing declares for these copies", () => {
 });
 
 describe("the last-trace copy", () => {
-  const traceFact = (organizationId: string | undefined, occurredAt: number, projectId = "project-1") => ({
+  const traceFact = (
+    organizationId: string | undefined,
+    occurredAt: number,
+    projectId = "project-1",
+  ) => ({
     type: TRACE_RECEIVED_EVENT_TYPE,
     tenantId: createTenantId(projectId),
     data: { tenantId: projectId, projectId, userId: "admin-1", occurredAt, organizationId },
@@ -263,10 +266,13 @@ describe("the last-trace copy", () => {
   /** @scenario "Five hundred trace facts of one organization are one write of the latest time" */
   it("coalesces a burst per organization, across its projects, in batches of 500", () => {
     const { map } = nurturingLastTracesMap({ recordLastTrace: async () => undefined });
-    const groupOf = (fact: ReturnType<typeof traceFact>) => map.options?.groupKeyFn?.(fact as never);
+    const groupOf = (fact: ReturnType<typeof traceFact>) =>
+      map.options?.groupKeyFn?.(fact as never);
 
     expect(map.options?.coalesceMaxBatch).toBe(500);
-    expect(groupOf(traceFact("org-1", 1, "project-1"))).toBe(groupOf(traceFact("org-1", 2, "project-2")));
+    expect(groupOf(traceFact("org-1", 1, "project-1"))).toBe(
+      groupOf(traceFact("org-1", 2, "project-2")),
+    );
     expect(groupOf(traceFact("org-1", 1))).not.toBe(groupOf(traceFact("org-2", 1)));
   });
 

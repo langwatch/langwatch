@@ -13,10 +13,7 @@ import {
   NURTURING_TRACED_PROJECTS_OF_PROJECT_PROJECTION_NAME,
   NURTURING_TRACED_PROJECTS_OF_TRACE_PROJECTION_NAME,
 } from "../nurturing-project-usage.pipeline.ts";
-import {
-  IDENTITY_MARKS_STEP,
-  USER_MARKS_STEP,
-} from "./nurturing-replay-steps.test-helpers.ts";
+import { IDENTITY_MARKS_STEP, USER_MARKS_STEP } from "./nurturing-replay-steps.test-helpers.ts";
 
 export const PERSONAL_OWNERS_OF_ORGANIZATION_STEP =
   "nurturing:replay-personal-owners-from-organization";
