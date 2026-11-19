@@ -134,6 +134,7 @@ function bootPage({
       win.dispatchEvent(event);
     },
     unload: () => win.dispatchEvent(new Event("pagehide")),
+    mounted: () => win.dispatchEvent(new Event("ui:mounted")),
     hide: () => {
       Object.defineProperty(document, "visibilityState", { value: "hidden", configurable: true });
       document.dispatchEvent(new Event("visibilitychange"));
@@ -192,13 +193,16 @@ describe("the boot report", () => {
     /** @scenario "A page drawn in time is reported for a sampled session" */
     it("sends a drawn boot span with the time to the first page", async () => {
       const page = bootPage();
-      await vi.advanceTimersByTimeAsync(1500);
+      await vi.advanceTimersByTimeAsync(1200);
+      page.mounted();
+      await vi.advanceTimersByTimeAsync(300);
       page.drawn();
 
       const [span] = page.spans();
       expect(span?.name).toBe(BOOT_SPAN_NAME);
       expect(attributeOf(span, ATTR_BOOT_OUTCOME)).toBe("drawn");
       expect(attributeOf(span, "langwatch.boot.drawn_ms")).toBe(1500);
+      expect(attributeOf(span, "langwatch.boot.mounted_ms")).toBe(1200);
       expect(attributeOf(span, "session.id")).toBe(SAMPLED_SESSION);
       await passStallThreshold();
       expect(page.spans()).toHaveLength(1);

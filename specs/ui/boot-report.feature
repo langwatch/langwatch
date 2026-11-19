@@ -58,6 +58,12 @@ Feature: Every first load reports how its boot ended
       When the boot stalls
       Then the report carries the route pattern the address matched and only the query's names
 
+    @integration
+    Scenario: The loading screen names what the workspace is waiting on
+      Given the app has mounted but the workspace has not resolved
+      When the app shows its loading screen
+      Then the screen names what it waits on: "session", "sign-in", "organizations", "plan" or "workspace"
+
   Rule: A boot the person leaves is reported before the page goes
 
     @unit

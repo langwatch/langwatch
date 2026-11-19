@@ -201,6 +201,7 @@ const SCRIPT = `(function () {
     if (drawn >= 0) values.push(["langwatch.boot.drawn_ms", drawn]);
     if (entry >= 0) values.push(["langwatch.boot.entry_ms", entry]);
     if (healthMs >= 0) values.push(["langwatch.boot.health_ms", healthMs]);
+    if (mounted >= 0) values.push(["langwatch.boot.mounted_ms", mounted]);
     if (sessionId) values.push(["session.id", sessionId]);
     if (timing) {
       values.push(["langwatch.boot.html_ms", timing.responseEnd]);
