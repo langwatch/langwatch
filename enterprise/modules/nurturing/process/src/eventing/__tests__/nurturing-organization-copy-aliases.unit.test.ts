@@ -247,7 +247,10 @@ function projectLaneCase(
   copied: Case["copied"],
   expected: unknown,
 ): [string, Case] {
-  return [`${lane} project`, { key: `global:subscriber:nurturing.${lane}`, fact, copied, expected }];
+  return [
+    `${lane} project`,
+    { key: `global:subscriber:nurturing.${lane}`, fact, copied, expected },
+  ];
 }
 
 const projectCases = [

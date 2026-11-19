@@ -103,7 +103,11 @@ describe.skipIf(!databaseUrl)("given an old evaluation usage row that still hold
 
   describe("when the usage is read for a project that has copied days", () => {
     it("returns the copied days and the other owners' days", async () => {
-      expect(activeDaysOf(await mergedUsage(), COPIED)).toEqual(["2026-11-01", "2026-11-03", "2026-11-05"]);
+      expect(activeDaysOf(await mergedUsage(), COPIED)).toEqual([
+        "2026-11-01",
+        "2026-11-03",
+        "2026-11-05",
+      ]);
     });
 
     it("leaves the old row's day out", async () => {

@@ -11,9 +11,6 @@ import { PROJECT_PERSONAL_OWNER_LISTED_EVENT_TYPE } from "@langwatch/project-con
 import { PROJECT_TRACED_EVENT_TYPE, TRACE_RECEIVED_EVENT_TYPE } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
-import type { CioBatchCall } from "@langwatch/enterprise-nurturing-contract";
-
-import { MemoryCustomerIoChannel } from "../../channels/memory/memory.customer-io.channel.ts";
 import { MemoryPostHogChannel } from "../../channels/memory/memory.posthog.channel.ts";
 import type { MemoryNurturingPersonalProjectRepository } from "../../repositories/memory/memory.nurturing-personal-project.repository.ts";
 import type { MemoryNurturingTracedProjectRepository } from "../../repositories/memory/memory.nurturing-traced-project.repository.ts";
@@ -23,23 +20,7 @@ import {
   liveMapsOver,
   ownerFact,
 } from "./nurturing-organization-copies.test-helpers.ts";
-
-/** A Customer.io fake that records every request it is asked for. */
-class RecordingCustomerIoChannel extends MemoryCustomerIoChannel {
-  readonly requests: unknown[] = [];
-  override async identifyUser(input: Parameters<MemoryCustomerIoChannel["identifyUser"]>[0]) {
-    this.requests.push(input);
-  }
-  override async trackEvent(input: Parameters<MemoryCustomerIoChannel["trackEvent"]>[0]) {
-    this.requests.push(input);
-  }
-  override async groupUser(input: Parameters<MemoryCustomerIoChannel["groupUser"]>[0]) {
-    this.requests.push(input);
-  }
-  override async batch(calls: CioBatchCall[]) {
-    this.requests.push(calls);
-  }
-}
+import { RecordingCustomerIoChannel } from "./recording-customer-io-channel.test-helpers.ts";
 
 const OCCURRED_AT = 1_700_000_000_000;
 

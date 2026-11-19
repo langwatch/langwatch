@@ -13,13 +13,13 @@ import {
   BILLING_LIFECYCLE_EVENT_VERSION,
   SUBSCRIPTION_CHANGED_EVENT_TYPE,
 } from "@langwatch/enterprise-billing-contract";
-import type { CioBatchCall } from "@langwatch/enterprise-nurturing-contract";
 import {
   EVALUATION_LIFECYCLE_AGGREGATE_TYPE,
   EVALUATION_LIFECYCLE_COMPLETED_EVENT_TYPE,
   EVALUATION_LIFECYCLE_EVENT_VERSION,
 } from "@langwatch/evaluation-contract";
 import {
+  createTenantId,
   type ReplayEvent,
   ReplayService,
   projectionLaneReplayer,
@@ -57,9 +57,8 @@ import {
 } from "@langwatch/user-contract";
 import { beforeAll, describe, expect, it } from "vitest";
 
-import { CustomerIoChannel } from "../../channels/customer-io.channel.ts";
-import { MemoryPostHogChannel } from "../../channels/memory/memory.posthog.channel.ts";
 import { NurturingModule } from "../../app/nurturing.app.ts";
+import { MemoryPostHogChannel } from "../../channels/memory/memory.posthog.channel.ts";
 import type { MemoryNurturingPersonalProjectRepository } from "../../repositories/memory/memory.nurturing-personal-project.repository.ts";
 import type { MemoryNurturingTracedProjectRepository } from "../../repositories/memory/memory.nurturing-traced-project.repository.ts";
 import { MemoryNurturingRepositories } from "../../repositories/memory/memory.nurturing.repositories.ts";
@@ -92,34 +91,11 @@ import {
   USER_MARKS_STEP,
 } from "./nurturing-replay-steps.test-helpers.ts";
 import { NurturingSeededLog } from "./nurturing-seeded-log.test-helpers.ts";
+import { RecordingCustomerIoChannel } from "./recording-customer-io-channel.test-helpers.ts";
 
 /** After both replay windows open: evaluation days since 2026-10-19, last traces since 2026-11-18. */
 const AT = Date.UTC(2026, 10, 19, 12);
 const ORGANIZATION_ID = "org-1";
-
-/**
- * A Customer.io channel that keeps every request it is asked for. The memory channel keeps
- * nothing, so it cannot show that a replay stayed silent.
- */
-class RecordingCustomerIoChannel extends CustomerIoChannel {
-  readonly requests: { method: string; input: unknown }[] = [];
-
-  async identifyUser(input: Parameters<CustomerIoChannel["identifyUser"]>[0]): Promise<void> {
-    this.requests.push({ method: "identifyUser", input });
-  }
-
-  async trackEvent(input: Parameters<CustomerIoChannel["trackEvent"]>[0]): Promise<void> {
-    this.requests.push({ method: "trackEvent", input });
-  }
-
-  async groupUser(input: Parameters<CustomerIoChannel["groupUser"]>[0]): Promise<void> {
-    this.requests.push({ method: "groupUser", input });
-  }
-
-  async batch(calls: CioBatchCall[]): Promise<void> {
-    this.requests.push({ method: "batch", input: calls });
-  }
-}
 
 let sequence = 0;
 /** An owner's fact as its log holds it, in the order the test appends it. */
@@ -438,7 +414,12 @@ describe("given every replay step run over seeded owner logs on a worker with re
     });
 
     it("holds the plan billing's log changed to", async () => {
-      await expect(rows().plans.get(ORGANIZATION_ID)).resolves.toMatchObject({
+      const context = {
+        aggregateId: ORGANIZATION_ID,
+        tenantId: createTenantId(ORGANIZATION_ID),
+      };
+
+      await expect(rows().plans.get(ORGANIZATION_ID, context)).resolves.toMatchObject({
         kind: "folded",
         state: { held: { outcome: "held", fact: { plan: "GROWTH" } } },
       });
