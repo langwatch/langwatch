@@ -63,6 +63,12 @@ vi.mock("../../../../../features/trace-drawer/behavior/use-trace-drawer-navigati
   }),
 }));
 
+vi.mock("../../../../../behavior/explorer/use-agent-call-graph.ts", () => ({
+  useAgentCallGraph: () => ({
+    isReady: true,
+    query: { data: undefined, isError: false, refetch: vi.fn() },
+  }),
+}));
 vi.mock("../../../../../features/trace-drawer/behavior/use-trace-drawer-shortcuts.ts", () => ({
   useTraceDrawerShortcuts: () => undefined,
 }));

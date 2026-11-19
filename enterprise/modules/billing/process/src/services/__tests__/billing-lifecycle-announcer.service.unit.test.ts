@@ -19,6 +19,7 @@ import type {
   RecordPricingModelChangedCommandData,
   RecordSeatCheckoutPaidCommandData,
   RecordSeatCheckoutsAbandonedCommandData,
+  RecordOverPlanChangedCommandData,
 } from "../../eventing/billing-lifecycle.events.ts";
 import type { BillingReportOrganizationLookup } from "../../repositories/billing-report-organization.repository.ts";
 import {
@@ -96,6 +97,7 @@ function announcerOver(input: {
     recordPricingModelChanged: recorder<RecordPricingModelChangedCommandData>([]),
     recordSeatCheckoutPaid: recorder<RecordSeatCheckoutPaidCommandData>([]),
     recordSeatCheckoutsAbandoned: recorder<RecordSeatCheckoutsAbandonedCommandData>([]),
+    recordOverPlanChanged: recorder<RecordOverPlanChangedCommandData>([]),
   });
   return { service, changed, started, checkouts, usageBilling, usageSends, pauses, lines };
 }
@@ -196,6 +198,7 @@ describe("BillingLifecycleAnnouncerService", () => {
       recordPricingModelChanged: recorder<RecordPricingModelChangedCommandData>([]),
       recordSeatCheckoutPaid: recorder<RecordSeatCheckoutPaidCommandData>([]),
       recordSeatCheckoutsAbandoned: recorder<RecordSeatCheckoutsAbandonedCommandData>([]),
+      recordOverPlanChanged: recorder<RecordOverPlanChangedCommandData>([]),
     });
 
     await expect(service.subscriptionActivated(activation)).resolves.toBeUndefined();

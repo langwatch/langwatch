@@ -6,7 +6,7 @@ The server half of [governance](../README.md). AI governance: ingestion sources 
 
 ## Installation
 
-`defineProcessModule("governance").withRepositories(governanceRepositories).withApi(GovernanceModule).withTransports(governanceRest, governanceCliRest, governanceIngestRest, meUsageRest, departmentsTrpcTransport, ingestionTemplatesTrpcTransport, aiToolsTrpcTransport, ingestionSourcesTrpcTransport, governanceTrpcTransport, anomalyRulesTrpcTransport, activityMonitorTrpcTransport, personalSessionsTrpcTransport, ingestionKeyTrpcTransport, sessionPolicyTrpcTransport, governancePeopleTrpcTransport, governanceAgentsTrpcTransport, governanceCostTrpcTransport).provideMiddlewareBindings(…).provideMiddlewareContext(…).withEventing(pulledUsageEventing).withEventing(ingestionPullEventing).withEventing(ingestionPullReconcileEventing).withEventing(governanceActivityMonitorEventing).withEventing(codingAssistantBillingEventing).withMigrations(…)`, `src/governance.module.ts:49`.
+`defineProcessModule("governance").withRepositories(governanceRepositories).withApi(GovernanceModule).withTransports(governanceRest, agentRegistryRest, ocsfSiemRest, governanceCliRest, governanceIngestRest, meUsageRest, departmentsTrpcTransport, ingestionTemplatesTrpcTransport, aiToolsTrpcTransport, ingestionSourcesTrpcTransport, governanceTrpcTransport, anomalyRulesTrpcTransport, activityMonitorTrpcTransport, personalSessionsTrpcTransport, ingestionKeyTrpcTransport, sessionPolicyTrpcTransport, governancePeopleTrpcTransport, governanceAgentsTrpcTransport, governanceCostTrpcTransport).provideMiddlewareBindings(…).provideMiddlewareContext(…).withEventing(pulledUsageEventing).withEventing(ingestionPullEventing).withEventing(ingestionPullReconcileEventing).withEventing(governanceActivityMonitorEventing).withEventing(codingAssistantBillingEventing).withEventing(agentRegistryEventing).withEventing(ocsfPushEventing).withMigrations(…)`, `src/governance.module.ts:74`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 The ingestion-template operations the governance REST family calls.
 
-Peers call these through the token, declared at `../contract/src/governance.api.ts:174`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/governance.api.ts:190`; nothing else in this package is public.
 
 #### `registerMcpTools`
 
@@ -356,10 +356,12 @@ templateListForUser(input: { organizationId: string }): Promise<IngestionTemplat
 templateListForOrgAdmin(input: { organizationId: string }): Promise<IngestionTemplate[]>;
 ```
 
-#### `templateGetByIdForOrg`
+#### `templateGetByIdForMember`
+
+The member shape, at `aiTools:view`: `ottlRules` is empty, as in `templateListForUser`.
 
 ```typescript
-templateGetByIdForOrg(input: { id: string; organizationId: string }): Promise<IngestionTemplate>;
+templateGetByIdForMember(input: { id: string; organizationId: string; }): Promise<IngestionTemplate>;
 ```
 
 #### `templateCreateOrg`
@@ -610,10 +612,10 @@ governanceQuarantineFillStats(input: QuarantineFillInput): Promise<QuarantineFil
 governanceRecordWorkspaceView(input: RecordWorkspaceViewInput): Promise<RecordWorkspaceViewResult>;
 ```
 
-#### `findActorWorkspace`
+#### `getActorWorkspace`
 
 ```typescript
-findActorWorkspace(input: { organizationId: string; actor: string; }): Promise<GovernanceActorWorkspace | null>;
+getActorWorkspace(input: { organizationId: string; actor: string; }): Promise<GovernanceActorWorkspaceLookup>;
 ```
 
 #### `departmentList`
@@ -706,7 +708,208 @@ personalBudgetOverview(input: { organizationId: string; includeTopModels?: boole
 cliBootstrap(input: { organizationId: string }, by: GovernanceCaller): Promise<CliBootstrapResult>;
 ```
 
+#### `listRegistryAgents`
+
+The organisation's agent registry, a page at a time (specs/agent-registry.feature).
+
+```typescript
+listRegistryAgents(input: { organizationId: string; limit: number; cursor?: string; updatedSince?: string; status?: AgentRegistryStatus; }): Promise<AgentRegistryPage>;
+```
+
+#### `getRegistryAgent`
+
+Throws `agent_registry_entry_not_found` for an id outside the organisation.
+
+```typescript
+getRegistryAgent(input: { organizationId: string; id: string }): Promise<AgentRegistryEntry>;
+```
+
+#### `listRegistryAgentVersions`
+
+One agent's changes after a sequence, oldest first; each carries the entry at its version.
+
+```typescript
+listRegistryAgentVersions(input: { organizationId: string; id: string; cursor?: string; limit: number; }): Promise<AgentRegistryEventPage>;
+```
+
+#### `listRegistryEvents`
+
+The organisation's change feed after a sequence, in order.
+
+```typescript
+listRegistryEvents(input: { organizationId: string; after?: string; limit: number; }): Promise<AgentRegistryEventPage>;
+```
+
+#### `getRegistryArdManifest`
+
+```typescript
+getRegistryArdManifest(input: { organizationId: string }): Promise<ArdManifest>;
+```
+
+#### `searchRegistryArd`
+
+```typescript
+searchRegistryArd(input: { organizationId: string; request: ArdSearchRequest; }): Promise<ArdSearchResponse>;
+```
+
+#### `listOcsfEvents`
+
+The organisation's governance events as OCSF 1.9.0, after the cursor.
+
+```typescript
+listOcsfEvents(input: OcsfExportWindow & { sourceType?: string; sourceId?: string }): Promise<OcsfEventsPage>;
+```
+
+#### `listOcsfProjectTraces`
+
+The organisation's project traces as OCSF 1.9.0, one event per trace.
+
+```typescript
+listOcsfProjectTraces(input: OcsfExportWindow & { projectId?: string }): Promise<OcsfEventsPage>;
+```
+
+#### `listOcsfAudit`
+
+The organisation's audit log as OCSF 1.9.0, oldest first.
+
+```typescript
+listOcsfAudit(input: OcsfExportWindow): Promise<OcsfEventsPage>;
+```
+
+#### `ingestOcsfEvents`
+
+Stores OCSF events another source sent; one row per (source, metadata.uid).
+
+```typescript
+ingestOcsfEvents(input: OcsfIngestRequest & { organizationId: string }): Promise<OcsfIngestResponse>;
+```
+
 ## REST transport
+
+### `agentRegistryRest`
+
+|             |                                           |
+| ----------- | ----------------------------------------- |
+| Declared at | `src/transport/agent-registry.rest.ts:38` |
+| Base URL    | none: each route's path is its address    |
+| Addressing  | literal                                   |
+| Credential  | organization                              |
+
+#### `GET /api/governance/registry/agents` · `listRegistryAgents`
+
+List the organisation's agent registry
+
+Permission `governance:view`. Entitlement `enterprise` (feature `AGENT_REGISTRY`). Declared at `src/transport/agent-registry.rest.ts:45`.
+
+Answers at `/api/governance/registry/agents`, `/api/v1/governance/registry/agents`.
+
+```typescript
+// Query: agentRegistryListQuerySchema, ../contract/src/features/registry/agent-registry.ts:147
+interface Query {
+  limit?: number;
+  cursor?: string;
+  updated_since?: string;
+  status?: "active" | "removed";
+}
+type Response = z.infer<typeof agentRegistryListResponseSchema>; // ../contract/src/features/registry/agent-registry.ts:157
+```
+
+#### `GET /api/governance/registry/agents/:agentId` · `getRegistryAgent`
+
+Get one registry agent
+
+Permission `governance:view`. Entitlement `enterprise` (feature `AGENT_REGISTRY`). Declared at `src/transport/agent-registry.rest.ts:68`.
+
+Answers at `/api/governance/registry/agents/:agentId`, `/api/v1/governance/registry/agents/:agentId`.
+
+```typescript
+// Params: agentRegistryParamsSchema, ../contract/src/features/registry/agent-registry.ts:165
+interface Params {
+  agentId: string;
+}
+type Response = z.infer<typeof agentRegistryDetailResponseSchema>; // ../contract/src/features/registry/agent-registry.ts:172
+```
+
+#### `GET /api/governance/registry/agents/:agentId/versions` · `listRegistryAgentVersions`
+
+List one registry agent's versions
+
+Permission `governance:view`. Entitlement `enterprise` (feature `AGENT_REGISTRY`). Declared at `src/transport/agent-registry.rest.ts:89`.
+
+Answers at `/api/governance/registry/agents/:agentId/versions`, `/api/v1/governance/registry/agents/:agentId/versions`.
+
+```typescript
+type Params = z.infer<typeof agentRegistryParamsSchema>; // ../contract/src/features/registry/agent-registry.ts:165
+// Query: agentRegistryEventsQuerySchema, ../contract/src/features/registry/agent-registry.ts:192
+interface Query {
+  limit?: number;
+  cursor?: string;
+}
+type Response = z.infer<typeof agentRegistryEventsResponseSchema>; // ../contract/src/features/registry/agent-registry.ts:203
+```
+
+#### `GET /api/governance/registry/events` · `listRegistryEvents`
+
+Read the registry change feed
+
+Permission `governance:view`. Entitlement `enterprise` (feature `AGENT_REGISTRY`). Declared at `src/transport/agent-registry.rest.ts:116`.
+
+Answers at `/api/governance/registry/events`, `/api/v1/governance/registry/events`.
+
+```typescript
+type Query = z.infer<typeof agentRegistryEventsQuerySchema>; // ../contract/src/features/registry/agent-registry.ts:192
+type Response = z.infer<typeof agentRegistryEventsResponseSchema>; // ../contract/src/features/registry/agent-registry.ts:203
+```
+
+#### `GET /api/governance/registry/schema` · `getRegistrySchema`
+
+Get the registry's JSON Schemas
+
+Permission `governance:view`. Entitlement `enterprise` (feature `AGENT_REGISTRY`). Declared at `src/transport/agent-registry.rest.ts:137`.
+
+Answers at `/api/governance/registry/schema`, `/api/v1/governance/registry/schema`.
+
+```typescript
+// Response: agentRegistrySchemaResponseSchema, ../contract/src/features/registry/agent-registry.ts:215
+interface Response {
+  entry: Record<string, unknown>;
+  event: Record<string, unknown>;
+}
+```
+
+#### `GET /api/governance/registry/ard.json` · `getRegistryArdManifest`
+
+Get the registry as an ARD manifest
+
+Permission `governance:view`. Entitlement `enterprise` (feature `AGENT_REGISTRY`). Declared at `src/transport/agent-registry.rest.ts:151`.
+
+Answers at `/api/governance/registry/ard.json`, `/api/v1/governance/registry/ard.json`.
+
+```typescript
+type Response = z.infer<typeof ardManifestSchema>; // ../contract/src/features/registry/agent-registry-ard.ts:41
+```
+
+#### `POST /api/governance/registry/ard/search` · `searchRegistryArd`
+
+Search the registry (ARD search)
+
+Permission `governance:view`. Entitlement `enterprise` (feature `AGENT_REGISTRY`). Declared at `src/transport/agent-registry.rest.ts:165`.
+
+Answers at `/api/governance/registry/ard/search`, `/api/v1/governance/registry/ard/search`.
+
+```typescript
+// Body: ardSearchRequestSchema, ../contract/src/features/registry/agent-registry-ard.ts:55
+interface Body {
+  query: {
+    text: string;
+    filter?: Record<string, string | string[]>;
+  };
+  federation?: "auto" | "referrals" | "none";
+  pageSize?: number;
+  pageToken?: string;
+}
+type Response = z.infer<typeof ardSearchResponseSchema>; // ../contract/src/features/registry/agent-registry-ard.ts:70
+```
 
 ### `governanceCliRest`
 
@@ -794,7 +997,7 @@ interface Query {
 
 #### `GET /api/auth/cli/governance/ingest/sources/:sourceId/health` · `readCliIngestionSourceHealth`
 
-Permission `activityMonitor:view`. Entitlement `enterprise` (feature `INGESTION_SOURCES`). Declared at `src/transport/governance-cli.rest.ts:120`.
+Permission `activityMonitor:view`. Entitlement `enterprise` (feature `ACTIVITY_MONITOR`). Declared at `src/transport/governance-cli.rest.ts:122`.
 
 Answers at `/api/auth/cli/governance/ingest/sources/:sourceId/health`, `/api/v1/auth/cli/governance/ingest/sources/:sourceId/health`.
 
@@ -804,35 +1007,35 @@ type Params = z.infer<typeof governanceCliSourceParamsSchema>; // ../contract/sr
 
 #### `GET /api/auth/cli/governance/status` · `readCliGovernanceStatus`
 
-Authenticated: the CLI bearer is one user's device session; every route answers for that user's own seat and the minting routes refuse an inactive seat. Entitlement `enterprise` (feature `INGESTION_SOURCES`). Declared at `src/transport/governance-cli.rest.ts:133`.
+Authenticated: the CLI bearer is one user's device session; every route answers for that user's own seat and the minting routes refuse an inactive seat. Entitlement `enterprise` (feature `INGESTION_SOURCES`). Declared at `src/transport/governance-cli.rest.ts:135`.
 
 Answers at `/api/auth/cli/governance/status`, `/api/v1/auth/cli/governance/status`.
 
 #### `GET /api/auth/cli/governance/ingestion-templates` · `listCliIngestionTemplates`
 
-Authenticated: the CLI bearer is one user's device session; every route answers for that user's own seat and the minting routes refuse an inactive seat. Declared at `src/transport/governance-cli.rest.ts:140`.
+Authenticated: the CLI bearer is one user's device session; every route answers for that user's own seat and the minting routes refuse an inactive seat. Declared at `src/transport/governance-cli.rest.ts:142`.
 
 Answers at `/api/auth/cli/governance/ingestion-templates`, `/api/v1/auth/cli/governance/ingestion-templates`.
 
 #### `POST /api/auth/cli/governance/ingestion-key` · `mintCliIngestionKey`
 
-Authenticated: the CLI bearer is one user's device session; every route answers for that user's own seat and the minting routes refuse an inactive seat. Declared at `src/transport/governance-cli.rest.ts:146`.
+Authenticated: the CLI bearer is one user's device session; every route answers for that user's own seat and the minting routes refuse an inactive seat. Declared at `src/transport/governance-cli.rest.ts:148`.
 
 Answers at `/api/auth/cli/governance/ingestion-key`, `/api/v1/auth/cli/governance/ingestion-key`.
 
 ```typescript
-// Rawbody: "text" (inline, src/transport/governance-cli.rest.ts:149)
+// Rawbody: "text" (inline, src/transport/governance-cli.rest.ts:151)
 ```
 
 #### `GET /api/auth/cli/governance/ingestion-keys` · `listCliIngestionKeys`
 
-Authenticated: the CLI bearer is one user's device session; every route answers for that user's own seat and the minting routes refuse an inactive seat. Declared at `src/transport/governance-cli.rest.ts:155`.
+Authenticated: the CLI bearer is one user's device session; every route answers for that user's own seat and the minting routes refuse an inactive seat. Declared at `src/transport/governance-cli.rest.ts:157`.
 
 Answers at `/api/auth/cli/governance/ingestion-keys`, `/api/v1/auth/cli/governance/ingestion-keys`.
 
 #### `GET /api/auth/cli/governance/ingestion-keys/:lookup_id` · `readCliIngestionKeyState`
 
-Authenticated: the CLI bearer is one user's device session; every route answers for that user's own seat and the minting routes refuse an inactive seat. Declared at `src/transport/governance-cli.rest.ts:161`.
+Authenticated: the CLI bearer is one user's device session; every route answers for that user's own seat and the minting routes refuse an inactive seat. Declared at `src/transport/governance-cli.rest.ts:163`.
 
 Answers at `/api/auth/cli/governance/ingestion-keys/:lookup_id`, `/api/v1/auth/cli/governance/ingestion-keys/:lookup_id`.
 
@@ -1048,6 +1251,97 @@ interface Query {
   windowEndMs?: number;
 }
 type Response = z.infer<typeof meUsageResponseSchema>; // ../contract/src/features/personal/personal-usage.ts:168
+```
+
+### `ocsfSiemRest`
+
+|             |                                        |
+| ----------- | -------------------------------------- |
+| Declared at | `src/transport/ocsf-siem.rest.ts:30`   |
+| Base URL    | none: each route's path is its address |
+| Addressing  | literal                                |
+| Credential  | organization                           |
+
+#### `GET /api/governance/ocsf/events` · `listOcsfEvents`
+
+Export governance events as OCSF 1.9.0
+
+Permission `complianceExport:view`. Entitlement `enterprise` (feature `OCSF_EXPORT`). Declared at `src/transport/ocsf-siem.rest.ts:37`.
+
+Answers at `/api/governance/ocsf/events`, `/api/v1/governance/ocsf/events`.
+
+```typescript
+// Query: ocsfEventsQuerySchema, ../contract/src/features/ocsf/ocsf-siem.ts:87
+interface Query {
+  limit?: number;
+  since?: string;
+  until?: string;
+  cursor?: string;
+  source_type?: string;
+  source_id?: string;
+}
+// Response: ocsfEventsPageSchema, ../contract/src/features/ocsf/ocsf-siem.ts:122
+interface Response {
+  ocsf_version: string;
+  data: Record<string, unknown>[];
+  next_cursor: string;
+  has_more: boolean;
+}
+```
+
+#### `GET /api/governance/ocsf/traces` · `listOcsfProjectTraces`
+
+Export project traces as OCSF 1.9.0
+
+Permission `complianceExport:view`. Entitlement `enterprise` (feature `OCSF_EXPORT`). Declared at `src/transport/ocsf-siem.rest.ts:61`.
+
+Answers at `/api/governance/ocsf/traces`, `/api/v1/governance/ocsf/traces`.
+
+```typescript
+// Query: ocsfTracesQuerySchema, ../contract/src/features/ocsf/ocsf-siem.ts:96
+interface Query {
+  limit?: number;
+  since?: string;
+  until?: string;
+  cursor?: string;
+  project_id?: string;
+}
+type Response = z.infer<typeof ocsfEventsPageSchema>; // ../contract/src/features/ocsf/ocsf-siem.ts:122
+```
+
+#### `GET /api/governance/ocsf/audit` · `listOcsfAudit`
+
+Export the audit log as OCSF 1.9.0
+
+Permission `complianceExport:view`. Entitlement `enterprise` (feature `OCSF_EXPORT`). Declared at `src/transport/ocsf-siem.rest.ts:84`.
+
+Answers at `/api/governance/ocsf/audit`, `/api/v1/governance/ocsf/audit`.
+
+```typescript
+// Query: ocsfAuditQuerySchema, ../contract/src/features/ocsf/ocsf-siem.ts:104
+interface Query {
+  limit?: number;
+  since?: string;
+  until?: string;
+  cursor?: string;
+}
+type Response = z.infer<typeof ocsfEventsPageSchema>; // ../contract/src/features/ocsf/ocsf-siem.ts:122
+```
+
+#### `POST /api/governance/ocsf/ingest` · `ingestOcsfEvents`
+
+Push OCSF events in from another source
+
+Permission `governance:manage`. Entitlement `enterprise` (feature `OCSF_EXPORT`). Declared at `src/transport/ocsf-siem.rest.ts:106`.
+
+Answers at `/api/governance/ocsf/ingest`, `/api/v1/governance/ocsf/ingest`.
+
+```typescript
+type Body = z.infer<typeof ocsfIngestRequestSchema>; // ../contract/src/features/ocsf/ocsf-siem.ts:168
+// Response: ocsfIngestResponseSchema, ../contract/src/features/ocsf/ocsf-siem.ts:179
+interface Response {
+  accepted: number;
+}
 ```
 
 ## tRPC transport
@@ -2179,11 +2473,30 @@ Declared at `src/eventing/pulled-usage.pipeline.ts:167`. Events: `pulledUsageObs
 | ClickHouse fold projection | `≈ this.costRollup`       | –                                                 | `src/eventing/pulled-usage.pipeline.ts:183` |
 | ClickHouse map projection  | `≈ this.costCharges`      | –                                                 | `src/eventing/pulled-usage.pipeline.ts:186` |
 
+### Pipeline `governance_ocsf_push` (aggregate `global`)
+
+Declared at `src/features/ocsf/eventing/ocsf-push.pipeline.ts:40`.
+
+| Kind            | Name           | Handles                                                                                                               | Declared at                                           |
+| --------------- | -------------- | --------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------- |
+| process manager | `ocsfSiemPush` | every 1 d (`OCSF_PUSH_PRUNE_INTERVAL_MS = 24 * 60 * 60 * 1000`); intents `pruneDelivered`, `requestDelivery` (outbox) | `src/features/ocsf/eventing/ocsf-push.pipeline.ts:46` |
+
+### Pipeline `governance_agent_registry` (aggregate `global`)
+
+Declared at `src/features/registry/eventing/agent-registry.pipeline.ts:89`.
+
+| Kind            | Name                                    | Handles                                                                                                                             | Declared at                                                     |
+| --------------- | --------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
+| process manager | `agentRegistryDelivery`                 | every 1 d (`AGENT_REGISTRY_DELIVERY_PRUNE_INTERVAL_MS = 24 * 60 * 60 * 1000`); intents `pruneDelivered`, `requestDelivery` (outbox) | `src/features/registry/eventing/agent-registry.pipeline.ts:107` |
+| process manager | `agentRegistryTraffic`                  | every 15 min (`AGENT_REGISTRY_TRAFFIC_INTERVAL_MS = 15 * 60 * 1000`); intents `pass` (outbox)                                       | `src/features/registry/eventing/agent-registry.pipeline.ts:124` |
+| peer subscriber | `reconcileAgentRegistryOnAgentChanged`  | `lw.agent.changed` from [agent](../../../../modules/agent/README.md)                                                                | `src/features/registry/eventing/agent-registry.pipeline.ts:95`  |
+| peer subscriber | `reconcileAgentRegistryOnAgentArchived` | `lw.agent.archived` from [agent](../../../../modules/agent/README.md)                                                               | `src/features/registry/eventing/agent-registry.pipeline.ts:101` |
+
 ## Configuration
 
 | Kind   | Leaf                       | Environment variable                  | Declared at                               |
 | ------ | -------------------------- | ------------------------------------- | ----------------------------------------- |
-| secret | `–`                        | `GOVERNANCE_ERASURE_PSEUDONYM_SECRET` | `src/app/governance.app.ts:511`           |
+| secret | `–`                        | `GOVERNANCE_ERASURE_PSEUDONYM_SECRET` | `src/app/governance.app.ts:545`           |
 | config | `gatewayPublicUrl`         | `LW_GATEWAY_PUBLIC_URL`               | `../contract/src/governance.config.ts:41` |
 | config | `gatewayInternalUrl`       | `LW_GATEWAY_INTERNAL_URL`             | `../contract/src/governance.config.ts:42` |
 | config | `gatewayLegacyUrl`         | `LW_GATEWAY_BASE_URL`                 | `../contract/src/governance.config.ts:43` |

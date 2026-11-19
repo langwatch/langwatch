@@ -188,6 +188,12 @@ Feature: Coding agent terminal view
     When the reader scrolls through the transcript
     Then the bottom bar stays fixed and keeps showing the session name and running stats
 
+  @integration
+  Scenario: The terminal screen stays dark in both colour modes
+    When the Terminal tab renders the session in light mode and in dark mode
+    Then the screen is the same dark terminal in both
+    And its text colours stay readable on that screen
+
   # A coding-agent session is many traces: one per turn. The Terminal tab opens
   # on ONE of them, so the session's earlier turns are simply not on screen, and
   # a reader who scrolls up hits the top of a turn rather than the top of the

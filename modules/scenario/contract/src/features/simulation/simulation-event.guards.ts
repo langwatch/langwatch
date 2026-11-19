@@ -7,6 +7,7 @@ import type {
   SimulationProcessingEvent,
   SimulationRunAgentInstanceRecordedEvent,
   SimulationRunHooksRecordedEvent,
+  SimulationRunRedTeamReportRecordedEvent,
   SimulationRunCancelRequestedEvent,
   SimulationRunCutAtLimitRecordedEvent,
   SimulationRunDeletedEvent,
@@ -84,6 +85,12 @@ export function isSimulationRunHooksRecordedEvent(
   event: SimulationProcessingEvent,
 ): event is SimulationRunHooksRecordedEvent {
   return event.type === SIMULATION_RUN_EVENT_TYPES.HOOKS_RECORDED;
+}
+
+export function isSimulationRunRedTeamReportRecordedEvent(
+  event: SimulationProcessingEvent,
+): event is SimulationRunRedTeamReportRecordedEvent {
+  return event.type === SIMULATION_RUN_EVENT_TYPES.RED_TEAM_REPORT_RECORDED;
 }
 
 export function isSimulationRunCancelRequestedEvent(

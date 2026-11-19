@@ -4,6 +4,8 @@
  */
 
 import { HandledError } from "@langwatch/handled-error";
+
+import type { BilledSeatKind } from "./stripe-prices.ts";
 export { OrganizationNotFoundError } from "@langwatch/organization-contract";
 
 /** Billing requires an email; 422 validates the account field, not auth. */
@@ -52,17 +54,39 @@ export class InvalidPlanError extends HandledError {
   }
 }
 
-/** A seat count below the minimum: the full seats in use, and never below one. */
+/** A seat count below the minimum for its kind: the seats of that kind in use. */
 export class SeatQuantityBelowInUseError extends HandledError {
   declare readonly code: "seat_quantity_below_in_use";
 
-  constructor({ requested, minimum }: { requested: number; minimum: number }) {
-    super("seat_quantity_below_in_use", `Seats can't go below ${minimum}`, {
+  constructor({
+    seat,
+    requested,
+    minimum,
+  }: {
+    seat: BilledSeatKind;
+    requested: number;
+    minimum: number;
+  }) {
+    const label = seat === "developer" ? "Developer seats" : "Seats";
+    super("seat_quantity_below_in_use", `${label} can't go below ${minimum}`, {
       httpStatus: 422,
       fault: "customer",
-      meta: { requested, minimum },
+      meta: { seat, requested, minimum },
     });
     this.name = "SeatQuantityBelowInUseError";
+  }
+}
+
+/** A failed payment is unpaid: buying seats would charge the same card, so it waits for payment. */
+export class SeatsHeldForPaymentError extends HandledError {
+  declare readonly code: "seats_held_for_payment";
+
+  constructor() {
+    super("seats_held_for_payment", "A payment failed. Update the card on file to add seats.", {
+      httpStatus: 402,
+      fault: "customer",
+    });
+    this.name = "SeatsHeldForPaymentError";
   }
 }
 

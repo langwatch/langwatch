@@ -26,6 +26,13 @@ export interface DatasetChunkRepository {
 
   readChunk(params: { projectId: string; datasetId: string; index: number }): Promise<unknown[]>;
 
+  /** One chunk's rows and the bytes storage handed over for them, for a scan bounded on bytes. */
+  readMeasuredChunk(params: {
+    projectId: string;
+    datasetId: string;
+    index: number;
+  }): Promise<{ rows: unknown[]; byteSize: number }>;
+
   /** Overwrites one chunk with exactly these records (ADR-032 Decision 3). */
   rewriteChunk(params: {
     projectId: string;

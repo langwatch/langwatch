@@ -407,6 +407,8 @@ export interface LwqlPrismaRows {
     readonly privateDataplaneSeenAt: "DateTime?";
     readonly maxSessionDurationDays: "Int";
     readonly mfaRequired: "Boolean";
+    readonly docsPlaygroundSessionsEnabled: "Boolean";
+    readonly docsPlaygroundSessionsDisabledAt: "DateTime?";
     readonly lockoutAfterFailedAttempts: "Int";
     readonly lockoutMinutes: "Int";
     readonly sessionIdleTimeoutMinutes: "Int";
@@ -456,6 +458,7 @@ export interface LwqlPrismaRows {
     readonly maxMembers: "Int";
     readonly maxMembersLite: "Int?";
     readonly liteSeatsUnlimited: "Boolean";
+    readonly maxMembersDeveloper: "Int?";
     readonly issuedAt: "DateTime";
     readonly expiresAt: "DateTime";
     readonly source: "IssuedLicenseSource";
@@ -501,6 +504,7 @@ export interface LwqlPrismaRows {
     readonly maxMembers: "Int";
     readonly maxMembersLite: "Int?";
     readonly liteSeatsUnlimited: "Boolean";
+    readonly maxMembersDeveloper: "Int?";
     readonly licenseTermDays: "Int";
     readonly services: "String[]";
     readonly expiresAt: "DateTime";
@@ -627,6 +631,37 @@ export interface LwqlPrismaRows {
     readonly projectionVersion: "String";
     readonly createdAt: "DateTime";
     readonly updatedAt: "DateTime";
+  };
+  readonly OrganizationSeatPeak: {
+    readonly organizationId: "String";
+    readonly openedAt: "Float";
+    readonly fullSeats: "Int";
+    readonly liteSeats: "Int";
+    readonly developerSeats: "Int";
+    readonly latestChangeAt: "Float";
+    readonly mismatches: "Int";
+  };
+  readonly OrganizationSeatPeakHolder: {
+    readonly organizationId: "String";
+    readonly holderKind: "String";
+    readonly holderId: "String";
+    readonly seat: "String";
+    readonly lastChangedAt: "Float";
+    readonly lastChangeId: "String?";
+    readonly expiresAt: "Float?";
+    readonly expiredByFold: "Boolean";
+    readonly suppressedBy: "String?";
+    readonly restoredByFold: "Boolean";
+  };
+  readonly OrganizationSeatPeakMonth: {
+    readonly organizationId: "String";
+    readonly month: "String";
+    readonly fullPeak: "Int";
+    readonly fullPeakAt: "Float";
+    readonly litePeak: "Int";
+    readonly litePeakAt: "Float";
+    readonly fullAtEnd: "Int";
+    readonly liteAtEnd: "Int";
   };
   readonly Project: {
     readonly id: "String";
@@ -1706,6 +1741,9 @@ export interface LwqlPrismaRows {
     readonly fields: "Json?";
     readonly callerVoice: "Json?";
     readonly testSuiteId: "String?";
+    readonly kind: "String";
+    readonly redTeam: "Json?";
+    readonly sourceTemplateId: "String?";
     readonly version: "Int";
     readonly lastUpdatedById: "String?";
     readonly archivedAt: "DateTime?";
@@ -1740,6 +1778,8 @@ export interface LwqlPrismaRows {
     readonly scope: "Json?";
     readonly fields: "Json?";
     readonly evaluators: "Json?";
+    readonly templateId: "String?";
+    readonly templateVersion: "Int?";
     readonly archivedAt: "DateTime?";
     readonly createdAt: "DateTime";
     readonly updatedAt: "DateTime";
@@ -1761,6 +1801,7 @@ export interface LwqlPrismaRows {
     readonly maxWorkflows: "Int?";
     readonly maxRetentionDays: "Int?";
     readonly maxMembersLite: "Int?";
+    readonly maxMembersDeveloper: "Int?";
     readonly maxTeams: "Int?";
     readonly maxPrompts: "Int?";
     readonly maxEvaluators: "Int?";
@@ -1788,6 +1829,11 @@ export interface LwqlPrismaRows {
     readonly seatRepairFlaggedAt: "DateTime?";
     readonly seatLineLeaseToken: "String?";
     readonly seatLineLeaseUntil: "DateTime?";
+    readonly paymentRecoveryInvoiceId: "String?";
+    readonly paymentRecoveryStartedAt: "DateTime?";
+    readonly paymentRecoveryNoticeDay: "Int?";
+    readonly overPlanSince: "DateTime?";
+    readonly overPlanEndedAt: "DateTime?";
   };
   readonly Invoice: {
     readonly id: "String";
@@ -1837,6 +1883,26 @@ export interface LwqlPrismaRows {
     readonly lastAppliedEventId: "String?";
     readonly updatedAt: "DateTime";
   };
+  readonly AuthzOrganizationPolicy: {
+    readonly organizationId: "String";
+    readonly braidsOrganizationAdminsOnly: "Boolean";
+    readonly braidsEnabled: "Boolean";
+    readonly updatedByUserId: "String";
+    readonly updatedAt: "DateTime";
+  };
+  readonly AuthzBraidWrite: {
+    readonly organizationId: "String";
+    readonly commandId: "String";
+    readonly grantId: "String";
+    readonly readerProjectId: "String";
+    readonly ownerProjectId: "String";
+    readonly termsKey: "String";
+    readonly condition: "Json";
+    readonly expiresAt: "DateTime?";
+    readonly replacesGrantId: "String?";
+    readonly createdByUserId: "String?";
+    readonly createdAt: "DateTime";
+  };
   readonly RoleBinding: {
     readonly id: "String";
     readonly organizationId: "String";
@@ -1868,6 +1934,7 @@ export interface LwqlPrismaRows {
     readonly expiresAt: "DateTime?";
     readonly maxViews: "Int?";
     readonly condition: "Json?";
+    readonly replacesGrantId: "String?";
     readonly occurredAt: "DateTime";
     readonly createdAt: "DateTime";
     readonly updatedAt: "DateTime";
@@ -1918,6 +1985,20 @@ export interface LwqlPrismaRows {
     readonly createdAt: "DateTime";
     readonly updatedAt: "DateTime";
   };
+  readonly SigningKey: {
+    readonly id: "String";
+    readonly organizationId: "String";
+    readonly projectId: "String";
+    readonly name: "String";
+    readonly publicId: "String";
+    readonly secretCiphertext: "String";
+    readonly createdByUserId: "String";
+    readonly createdAt: "DateTime";
+    readonly rotatedAt: "DateTime?";
+    readonly verifiesUntil: "DateTime?";
+    readonly revokedAt: "DateTime?";
+    readonly lastUsedAt: "DateTime?";
+  };
   readonly ProjectActiveDay: {
     readonly id: "String";
     readonly projectId: "String";
@@ -1927,6 +2008,21 @@ export interface LwqlPrismaRows {
   readonly NurturingProject: {
     readonly projectId: "String";
     readonly organizationId: "String";
+  };
+  readonly NurturingUncopiedProject: {
+    readonly projectId: "String";
+    readonly firstSeenAt: "DateTime";
+  };
+  readonly NurturingOrganizationMember: {
+    readonly organizationId: "String";
+    readonly userId: "String";
+    readonly joinedAt: "DateTime?";
+    readonly leftAt: "DateTime?";
+    readonly returnedAt: "DateTime?";
+  };
+  readonly NurturingOrganizationCreated: {
+    readonly organizationId: "String";
+    readonly createdAt: "DateTime";
   };
   readonly NurturingOrganization: {
     readonly organizationId: "String";
@@ -1943,6 +2039,31 @@ export interface LwqlPrismaRows {
     readonly codingFirstDays: "Int[]";
     readonly lastTraceAt: "DateTime?";
     readonly updatedAt: "DateTime";
+  };
+  readonly NurturingProjectUsageView: {
+    readonly projectId: "String";
+    readonly owner: "String";
+    readonly folded: "Json";
+    readonly appliedEventIds: "String[]";
+    readonly projectionVersion: "String";
+    readonly updatedAt: "DateTime";
+  };
+  readonly NurturingProjectTraceDay: {
+    readonly projectId: "String";
+    readonly day: "String";
+    readonly traceCount: "Int";
+    readonly errorCount: "Int";
+    readonly lastTraceAt: "DateTime?";
+    readonly lastFailedTraceAt: "DateTime?";
+  };
+  readonly NurturingPersonalProject: {
+    readonly projectId: "String";
+    readonly organizationId: "String";
+    readonly ownerUserId: "String";
+  };
+  readonly NurturingTracedProject: {
+    readonly projectId: "String";
+    readonly organizationId: "String";
   };
   readonly BillingMeterCheckpoint: {
     readonly id: "String";
@@ -2534,6 +2655,37 @@ export interface LwqlPrismaRows {
     readonly lastSeenAt: "DateTime";
     readonly createdAt: "DateTime";
     readonly updatedAt: "DateTime";
+  };
+  readonly AgentRegistryEntry: {
+    readonly id: "String";
+    readonly organizationId: "String";
+    readonly sourceKey: "String";
+    readonly source: "String";
+    readonly status: "String";
+    readonly version: "Int";
+    readonly fingerprint: "String";
+    readonly entry: "Json";
+    readonly firstSeenAt: "DateTime";
+    readonly lastSeenAt: "DateTime?";
+    readonly removedAt: "DateTime?";
+    readonly createdAt: "DateTime";
+    readonly updatedAt: "DateTime";
+  };
+  readonly AgentRegistryEvent: {
+    readonly id: "String";
+    readonly organizationId: "String";
+    readonly sequence: "BigInt";
+    readonly type: "String";
+    readonly entryId: "String";
+    readonly fromVersion: "Int?";
+    readonly toVersion: "Int?";
+    readonly payload: "Json";
+    readonly occurredAt: "DateTime";
+    readonly deliveryRecordedAt: "DateTime?";
+  };
+  readonly AgentRegistryBaseline: {
+    readonly organizationId: "String";
+    readonly baselinedAt: "DateTime";
   };
   readonly IdentityMatch: {
     readonly id: "String";

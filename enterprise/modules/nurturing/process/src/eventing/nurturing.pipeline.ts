@@ -60,6 +60,8 @@ import {
   GUIDED_ONBOARDING_TURN_FAILED_EVENT_TYPE,
   type GuidedOnboardingTurnFailedEventData,
   guidedOnboardingTurnFailedEventDataSchema,
+  LANGY_FIRST_MESSAGE_SEEN_EVENT_TYPE,
+  langyFirstMessageSeenEventDataSchema,
 } from "@langwatch/langy-contract";
 import {
   GUIDED_ONBOARDING_RECORDED_EVENT_TYPE,
@@ -77,11 +79,19 @@ import {
   membersInvitedEventDataSchema,
   ORGANIZATION_SIGNED_UP_EVENT_TYPE,
   organizationSignedUpEventDataSchema,
+  PERSONAL_TEAM_CREATED_EVENT_TYPE,
+  PERSONAL_WORKSPACE_PROVISIONED_EVENT_TYPE,
+  personalTeamCreatedEventDataSchema,
+  personalWorkspaceProvisionedEventDataSchema,
 } from "@langwatch/organization-contract";
 import {
   PROJECT_CREATED_EVENT_TYPE,
+  PROJECT_FIRST_MESSAGE_LISTED_EVENT_TYPE,
+  PROJECT_PERSONAL_OWNER_LISTED_EVENT_TYPE,
   type ProjectCreatedEventData,
   projectCreatedEventDataSchema,
+  projectFirstMessageListedEventDataSchema,
+  projectPersonalOwnerListedEventDataSchema,
 } from "@langwatch/project-contract";
 import {
   PROMPT_CREATED_EVENT_TYPE,
@@ -97,13 +107,17 @@ import {
 import {
   FIRST_TRACE_RECORDED_EVENT_TYPE,
   firstTraceRecordedEventDataSchema,
+  PROJECT_TRACED_EVENT_TYPE,
+  projectTracedEventDataSchema,
   TRACE_RECEIVED_EVENT_TYPE,
   traceReceivedEventDataSchema,
 } from "@langwatch/trace-contract";
 import {
   USER_CREATED_EVENT_TYPE,
+  USER_ERASED_EVENT_TYPE,
   USER_REGISTERED_EVENT_TYPE,
   userCreatedEventDataSchema,
+  userErasedEventDataSchema,
   userLifecycleEventDataSchema,
 } from "@langwatch/user-contract";
 import {
@@ -113,7 +127,10 @@ import {
 import { z } from "zod";
 
 import type { NurturingModule } from "../app/nurturing.app.ts";
-import { appOpenedSignals } from "../rules/nurturing-app-opened.rules.ts";
+import {
+  appOpenedSignals,
+  langyFirstMessageSeenSignal,
+} from "../rules/nurturing-app-opened.rules.ts";
 import {
   insightFiledSignal,
   insightReaderSignal,
@@ -253,6 +270,19 @@ export function buildNurturingPipeline(deps: {
     sessions: readonly CodingAgentSessionStoredEventData[];
     deliver: (signal: NurturingSignal) => Promise<void>;
   }) => Promise<void>;
+  /** Copies a personal project's owner into nurturing's own row; never delivers. */
+  recordPersonalOwner: (input: {
+    projectId: string;
+    organizationId: string;
+    ownerUserId: string;
+  }) => Promise<void>;
+  /** Copies a traced project into nurturing's own row; never delivers. */
+  recordTracedProject: (input: {
+    projectId: string;
+    organizationId: string | null;
+  }) => Promise<void>;
+  /** Takes an erased account out of nurturing's own rows; never delivers. */
+  forgetErasedUser: (input: { userId: string }) => Promise<void>;
 }): NurturingPipeline {
   const deliverSignal = (signal: NurturingSignal) =>
     deps.deliver({ key: nurturingSignalKey(signal), signal });
@@ -532,10 +562,52 @@ export function buildNurturingPipeline(deps: {
             }),
         }),
       )
+      // Copies only: these five write nurturing's own rows and deliver nothing.
+      .withPeerSubscriber("personalTeamCreated", {
+        eventType: PERSONAL_TEAM_CREATED_EVENT_TYPE,
+        data: personalTeamCreatedEventDataSchema,
+        handle: ({ projectId, organizationId, userId }) =>
+          deps.recordPersonalOwner({ projectId, organizationId, ownerUserId: userId }),
+      })
+      .withPeerSubscriber("personalWorkspaceProvisioned", {
+        eventType: PERSONAL_WORKSPACE_PROVISIONED_EVENT_TYPE,
+        data: personalWorkspaceProvisionedEventDataSchema,
+        handle: ({ projectId, organizationId, userId }) =>
+          deps.recordPersonalOwner({ projectId, organizationId, ownerUserId: userId }),
+      })
+      .withPeerSubscriber("personalOwnerListed", {
+        eventType: PROJECT_PERSONAL_OWNER_LISTED_EVENT_TYPE,
+        data: projectPersonalOwnerListedEventDataSchema,
+        handle: ({ projectId, organizationId, ownerUserId }) =>
+          deps.recordPersonalOwner({ projectId, organizationId, ownerUserId }),
+      })
+      .withPeerSubscriber("projectTraced", {
+        eventType: PROJECT_TRACED_EVENT_TYPE,
+        data: projectTracedEventDataSchema,
+        handle: ({ projectId, organizationId }) =>
+          deps.recordTracedProject({ projectId, organizationId }),
+      })
+      .withPeerSubscriber("firstMessageListed", {
+        eventType: PROJECT_FIRST_MESSAGE_LISTED_EVENT_TYPE,
+        data: projectFirstMessageListedEventDataSchema,
+        handle: ({ projectId, organizationId }) =>
+          deps.recordTracedProject({ projectId, organizationId }),
+      })
+      // User's erasure fact: nurturing deletes its own rows naming the account, and sends nothing.
+      .withPeerSubscriber("userErased", {
+        eventType: USER_ERASED_EVENT_TYPE,
+        data: userErasedEventDataSchema,
+        handle: ({ userId }) => deps.forgetErasedUser({ userId }),
+      })
       .withPeerSubscriber("appPageOpened", {
         eventType: APP_PAGE_OPENED_EVENT_TYPE,
         data: appPageOpenedEventDataSchema,
         handle: (data) => deliverEach(appOpenedSignals({ data })),
+      })
+      .withPeerSubscriber("langyFirstMessageSeen", {
+        eventType: LANGY_FIRST_MESSAGE_SEEN_EVENT_TYPE,
+        data: langyFirstMessageSeenEventDataSchema,
+        handle: (data) => deliverSignal(langyFirstMessageSeenSignal({ data })),
       })
       // Insight's facts for PostHog: one signal per event, never its words or ids.
       .withPeerSubscriber("insightFiled", {

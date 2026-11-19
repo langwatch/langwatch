@@ -6,7 +6,7 @@ import { buildSdkIdentityHeaders } from "@/internal/api/request-headers";
  */
 
 import { normalizeEndpoint } from "../../../internal/endpoint";
-import { type GovernanceConfig, loadConfig, saveConfig } from "./config";
+import { assertConfigWritable, type GovernanceConfig, loadConfig, saveConfig } from "./config";
 import {
   createIngestionKey,
   createProjectLoginKey,
@@ -219,6 +219,8 @@ async function withProjectSession<T>(
     baseUrl: cfg.control_plane_url,
     fetchImpl: boundedFetch(opts.fetchImpl ?? fetch, opts.timeoutMs ?? SESSION_REQUEST_TIMEOUT_MS),
   };
+  // An older server rotates the device session here, which spends the refresh token.
+  assertConfigWritable();
   try {
     const child = await forkProjectSession(flow, {
       refreshToken: cfg.refresh_token,

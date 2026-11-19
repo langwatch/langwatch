@@ -152,6 +152,27 @@ export class PageTooDeepError extends HandledError {
 }
 
 /**
+ * A trace recorded while the organization is over its plan: stored, not shown until the card is
+ * updated or the members fit (specs/billing/over-plan-trace-withholding.feature).
+ */
+export class TraceWithheldOverPlanError extends HandledError {
+  declare readonly code: "trace_withheld_over_plan";
+
+  constructor(input: { traceId: string; members: number; maxMembers: number }) {
+    super(
+      "trace_withheld_over_plan",
+      "This trace was recorded while the organization is over its plan. It is saved and will show once the plan is upgraded or the members fit it.",
+      {
+        httpStatus: 403,
+        meta: { traceId: input.traceId, members: input.members, maxMembers: input.maxMembers },
+        ...remediation("trace_withheld_over_plan"),
+      },
+    );
+    this.name = "TraceWithheldOverPlanError";
+  }
+}
+
+/**
  * A trace- or thread-id array above the plan's bound. Refused rather than
  * silently dropped, so a caller paging through a large export learns the
  * bound at the first oversized request.
@@ -173,6 +194,12 @@ export class TraceIdsTooManyError extends HandledError {
   }
 }
 
+/** The registry keys a trace page may be refused above. */
+export type TracePageSizeBound =
+  | "tracesPageSizeMax"
+  | "tracesDownloadPageSizeMax"
+  | "tracesWithSpansPageSizeMax";
+
 /**
  * A trace page above the plan's bound, named by its registry key. Refused
  * rather than clamped, so a caller learns its plan's page size instead of
@@ -181,13 +208,7 @@ export class TraceIdsTooManyError extends HandledError {
 export class TracePageSizeTooLargeError extends HandledError {
   declare readonly code: "trace_page_size_too_large";
 
-  constructor({
-    maxPageSize,
-    bound,
-  }: {
-    maxPageSize: number;
-    bound: "tracesPageSizeMax" | "tracesDownloadPageSizeMax";
-  }) {
+  constructor({ maxPageSize, bound }: { maxPageSize: number; bound: TracePageSizeBound }) {
     super(
       "trace_page_size_too_large",
       `At most ${maxPageSize} traces can be read in one page under this plan. Ask for a smaller pageSize and page forward with scrollId.`,

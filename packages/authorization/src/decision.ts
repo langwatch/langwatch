@@ -19,6 +19,8 @@ export const authzDenialReasonSchema = z.enum([
   "lite-member-restricted",
   "developer-restricted",
   "owner-ceiling",
+  // ADR-201 §2: the organisation keeps braids to its admins, so no project binding braids.
+  "braids-kept-to-organisation-admins",
 ]);
 export type AuthzDenialReason = z.infer<typeof authzDenialReasonSchema>;
 

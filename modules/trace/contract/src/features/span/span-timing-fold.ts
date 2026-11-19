@@ -31,15 +31,7 @@ export function accumulateSpanTiming({
     };
   }
 
-  const occurredAt =
-    state.occurredAt > 0 ? Math.min(state.occurredAt, span.startTimeUnixMs) : span.startTimeUnixMs;
-  const currentEnd = state.occurredAt > 0 ? state.occurredAt + state.totalDurationMs : 0;
-  // Never negative: the spans come from the customer's own machines, so a
-  // clock that ran backwards mid-span sends an end before its start, and a
-  // negative trace duration is neither renderable nor aggregatable.
-  const totalDurationMs = Math.max(0, Math.max(currentEnd, span.endTimeUnixMs) - occurredAt);
-
-  return { occurredAt, totalDurationMs };
+  return mergeTimeWindow({ state, startMs: span.startTimeUnixMs, endMs: span.endTimeUnixMs });
 }
 
 /** How far a log record's own time may sit from its accept time before it is a broken clock. */
@@ -71,9 +63,24 @@ export function accumulateLogTiming({
     return { occurredAt: state.occurredAt, totalDurationMs: state.totalDurationMs };
   }
 
-  const occurredAt = state.occurredAt > 0 ? Math.min(state.occurredAt, timeUnixMs) : timeUnixMs;
-  const currentEnd = state.occurredAt > 0 ? state.occurredAt + state.totalDurationMs : timeUnixMs;
-  const totalDurationMs = Math.max(0, Math.max(currentEnd, timeUnixMs) - occurredAt);
+  return mergeTimeWindow({ state, startMs: timeUnixMs, endMs: timeUnixMs });
+}
+
+/** Widens the trace window (an `occurredAt` of 0 means none yet) to cover `startMs`..`endMs`. */
+function mergeTimeWindow({
+  state,
+  startMs,
+  endMs,
+}: {
+  state: Pick<TraceSummaryData, "occurredAt" | "totalDurationMs">;
+  startMs: number;
+  endMs: number;
+}): { occurredAt: number; totalDurationMs: number } {
+  const occurredAt = state.occurredAt > 0 ? Math.min(state.occurredAt, startMs) : startMs;
+  const currentEnd = state.occurredAt > 0 ? state.occurredAt + state.totalDurationMs : 0;
+  // Never negative: a customer clock that ran backwards mid-span sends an end before its
+  // start, and a negative trace duration is neither renderable nor aggregatable.
+  const totalDurationMs = Math.max(0, Math.max(currentEnd, endMs) - occurredAt);
 
   return { occurredAt, totalDurationMs };
 }

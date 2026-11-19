@@ -1,4 +1,6 @@
 import {
+  GROWTH_INCLUDED_RETENTION_DAYS,
+  GROWTH_RETENTION_OPTIONS,
   INDEFINITE_RETENTION_DAYS,
   type RetentionCategory,
   type RetentionScopeType,
@@ -41,22 +43,20 @@ export const retentionUnitCollection = createListCollection({
 
 export type RetentionPreset = { value: string; label: string; days: number };
 
-// Presets round up to cover the full period plus buffer. Plan-gated by tier:
-// PAID → {35, 63}; ENTERPRISE → full list + custom. Server re-enforces at
-// the mutation boundary; these lists only shape the UI.
+// Presets round up to cover the full period plus buffer. Plan-gated by tier: PAID → the
+// Growth options (35, 63, 91, 182, 371); ENTERPRISE → full list + custom. Server re-enforces
+// at the mutation boundary; these lists only shape the UI.
 
-/** Paid (non-enterprise) menu: "~1 month" / "~2 months" only. */
-export const PAID_RETENTION_PRESETS: RetentionPreset[] = [
-  { value: "35", label: "1 month", days: 35 },
-  { value: "63", label: "2 months", days: 63 },
-];
+/** Paid (non-enterprise) menu: the Growth options offered at upgrade, up to 1 year. */
+export const PAID_RETENTION_PRESETS: RetentionPreset[] = GROWTH_RETENTION_OPTIONS.map((option) => ({
+  value: String(option.days),
+  label: option.label,
+  days: option.days,
+}));
 
-/** Enterprise / self-hosted menu: the paid short options plus longer windows. */
+/** Enterprise / self-hosted menu: the paid options plus longer windows. */
 export const ENTERPRISE_RETENTION_PRESETS: RetentionPreset[] = [
-  { value: "35", label: "1 month", days: 35 },
-  { value: "63", label: "2 months", days: 63 },
-  { value: "91", label: "3 months", days: 91 },
-  { value: "371", label: "1 year", days: 371 },
+  ...PAID_RETENTION_PRESETS,
   { value: "1827", label: "5 years", days: 1827 },
 ];
 
@@ -78,35 +78,70 @@ export function legacyLabel(days: number): string {
     : `Current: ${days} days (legacy)`;
 }
 
-export type RetentionMenuItem = { value: string; label: string };
+export type RetentionMenuItem = { value: string; label: string; disabled?: boolean };
+
+/** Whether saving `retentionDays` adds storage to the bill, so it goes through the billed write. */
+export function retentionLengthBillsStorage({
+  storageBilled,
+  retentionDays,
+}: {
+  storageBilled: boolean;
+  retentionDays: number;
+}): boolean {
+  if (!storageBilled) return false;
+  return (
+    retentionDays === INDEFINITE_RETENTION_DAYS || retentionDays > GROWTH_INCLUDED_RETENTION_DAYS
+  );
+}
+
+/** Why a billed length is greyed out for a reader who cannot change the subscription. */
+export const BILLED_LENGTH_LOCKED_NOTE = "needs billing access";
+
+function lockedWhenBilled({
+  item,
+  days,
+  billedLocked,
+}: {
+  item: RetentionMenuItem;
+  days: number;
+  billedLocked: boolean;
+}): RetentionMenuItem {
+  if (!billedLocked || !retentionLengthBillsStorage({ storageBilled: true, retentionDays: days })) {
+    return item;
+  }
+  return { ...item, label: `${item.label} (${BILLED_LENGTH_LOCKED_NOTE})`, disabled: true };
+}
 
 /**
  * Builds the plan-gated retention menu (legacy, presets, keep-forever for
- * admins, custom for enterprise). Pure function for unit-testability.
+ * admins, custom for enterprise). `billedLocked` disables the lengths that
+ * bill storage, for a reader without `subscription:manage`.
  */
 export function buildRetentionMenuItems({
   isEnterprise,
   isPlatformAdmin,
   legacyDays,
+  billedLocked = false,
 }: {
   isEnterprise: boolean;
   isPlatformAdmin: boolean;
   legacyDays: number | null;
+  billedLocked?: boolean;
 }): RetentionMenuItem[] {
   return [
     ...(legacyDays !== null
       ? [{ value: LEGACY_PRESET_VALUE, label: legacyLabel(legacyDays) }]
       : []),
-    ...retentionPresetsForTier(isEnterprise).map((p) => ({
-      value: p.value,
-      label: p.label,
-    })),
+    ...retentionPresetsForTier(isEnterprise).map((p) =>
+      lockedWhenBilled({ item: { value: p.value, label: p.label }, days: p.days, billedLocked }),
+    ),
     ...(isPlatformAdmin
       ? [
-          {
-            value: INDEFINITE_PRESET_VALUE,
-            label: "No retention (keep forever)",
-          },
+          lockedWhenBilled({
+            item: { value: INDEFINITE_PRESET_VALUE, label: "No retention (keep forever)" },
+            days: INDEFINITE_RETENTION_DAYS,
+            billedLocked,
+          }),
         ]
       : []),
     ...(isEnterprise ? [{ value: CUSTOM_PRESET_VALUE, label: "Custom…" }] : []),

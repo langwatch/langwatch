@@ -19,10 +19,15 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { useAnalyticsPeriod } from "../../../../behavior/use-analytics-period.ts";
 import { useFrameDiagnostic } from "../../../../behavior/use-frame-diagnostic.ts";
+import { useSpanDataFloor } from "../../../../behavior/use-span-data-floor.ts";
 import { useWidgetQueryRecords } from "../../../../behavior/use-widget-query-records.ts";
 import { usePublishWidgetCompleteness } from "../../../../behavior/widget-completeness-sink.ts";
 import { projectAwaitsFirstTrace, useAnalyticsHost } from "../../../../model/analytics-host.ts";
 import { declaredParamDefaults } from "../../../../model/dashboard-widget/params-snapshot.ts";
+import {
+  readsSpanMetrics,
+  spanDataFloorNotice,
+} from "../../../../model/dashboard-widget/span-data-floor.ts";
 import { withheldWords } from "../../../../model/dashboard-widget/widget-access.ts";
 import {
   awaitsFirstAnswer,
@@ -294,8 +299,44 @@ function WidgetFrameOverWindow({
           {cover}
         </Box>
       )}
+      {/* An empty span widget may only lack history, so its empty face keeps the notice. */}
+      {(!cover || face.kind === "no_traffic") && readsSpanMetrics(definition.queries) && (
+        <SpanDataFloorNotice
+          projectId={projectId}
+          queries={definition.queries}
+          periodStart={timeWindow.start}
+        />
+      )}
       <FrameDiagnosticBadge diagnostic={diagnostic} />
     </Box>
+  );
+}
+
+/** Where span history starts, on a span widget whose period begins earlier (analytics ADR-006). */
+function SpanDataFloorNotice({
+  projectId,
+  queries,
+  periodStart,
+}: {
+  readonly projectId: string;
+  readonly queries: readonly { readonly sql: string }[];
+  readonly periodStart: number;
+}) {
+  const floor = useSpanDataFloor({ projectId });
+  const notice = spanDataFloorNotice({ queries, periodStart, floor });
+  if (!notice) return null;
+  return (
+    <Text
+      as="output"
+      position="absolute"
+      bottom={1}
+      left={2}
+      textStyle="xs"
+      color="fg.muted"
+      data-testid="widget-span-floor-notice"
+    >
+      {notice}
+    </Text>
   );
 }
 

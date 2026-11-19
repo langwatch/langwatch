@@ -20,6 +20,7 @@ import {
   type TraceAnalyticsRow,
 } from "../trace-derived.projection.ts";
 import { TraceAnalyticsStore } from "../trace-derived.store.ts";
+import { memoryEvaluationAnalytics } from "./trace-evaluation-analytics.fixtures.ts";
 import {
   createSpanReceivedEvent,
   createTestRuntime,
@@ -166,6 +167,7 @@ describe("traceAnalytics storage anchor", () => {
         })();
         const store = TraceAnalyticsStore.create({
           storage,
+          evaluationAnalytics: memoryEvaluationAnalytics(),
           defaultRetentionDays: () => 90,
           authorize: ownProofAuthorizer,
         });

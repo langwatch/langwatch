@@ -19,6 +19,8 @@ const FAILURE_REASONS: Readonly<Record<string, string>> = {
   connect_budget_exhausted: "The hosted usage budget for this license is spent.",
   instant_eval_classifier_unavailable: "The judge did not answer.",
   instant_eval_stalled: "This Instant Eval stopped before it finished.",
+  instant_eval_decision_model_key_invalid:
+    "Your model provider refused the key for this Instant Evals model. Check it in Settings > Model Providers.",
 };
 
 const UNKNOWN_REASON = "This Instant Eval could not finish.";

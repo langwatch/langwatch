@@ -11,11 +11,13 @@ function resolve(
     isOrgScope = false,
     isOnOwnPersonalProject = false,
     organizationRole = "MEMBER",
+    sidebarHint = null,
   }: {
     isPersonalScope?: boolean;
     isOrgScope?: boolean;
     isOnOwnPersonalProject?: boolean;
     organizationRole?: string;
+    sidebarHint?: "llm-ops" | "dashboards" | null;
   } = {},
 ) {
   return resolveShellRoute({
@@ -24,6 +26,7 @@ function resolve(
     isOrgScope,
     isOnOwnPersonalProject,
     organizationRole,
+    sidebarHint,
   });
 }
 
@@ -74,6 +77,33 @@ describe("resolveShellRoute", () => {
         resolve("/personal-mia-abc123/dashboards", { isOnOwnPersonalProject: true })
           .activeProductId,
       ).toBe("dashboards");
+    });
+  });
+
+  describe("given the reader came to a dashboard from LLM Ops", () => {
+    /** @scenario A dashboard opened from LLM Ops keeps the LLM Ops sidebar */
+    it("draws the LLM Ops sidebar and leaves the address's product alone", () => {
+      const route = resolve("/acme-app/dashboards/agent-flight-deck", { sidebarHint: "llm-ops" });
+      expect(route.activeProductId).toBe("llm-ops");
+      expect(route.seatRefusal).toBeNull();
+    });
+
+    /** @scenario A deep link to a dashboard draws the Dashboards sidebar */
+    it("draws the Dashboards sidebar with no hint", () => {
+      expect(resolve("/acme-app/dashboards").activeProductId).toBe("dashboards");
+    });
+
+    /** @scenario Choosing Dashboards in the product switcher or icon rail draws the Dashboards sidebar */
+    it("draws the Dashboards sidebar when the hint says dashboards", () => {
+      expect(resolve("/acme-app/dashboards", { sidebarHint: "dashboards" }).activeProductId).toBe(
+        "dashboards",
+      );
+    });
+
+    it("ignores the hint away from Dashboards", () => {
+      expect(resolve("/gateway/budgets", { sidebarHint: "llm-ops" }).activeProductId).toBe(
+        "gateway",
+      );
     });
   });
 

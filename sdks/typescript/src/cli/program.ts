@@ -1081,7 +1081,7 @@ function registerGovernanceCommands(program: Command): void {
   const templatesCmd = governanceCmd
     .command("ingestion-templates")
     .description(
-      "CRUD on IngestionTemplate rows. Reads use aiTools:view; mutations use aiTools:manage.",
+      "CRUD on IngestionTemplate rows, with your device login. Every verb needs aiTools:manage.",
     );
 
   templatesCmd
@@ -1626,13 +1626,22 @@ function registerEvaluatorCommands(program: Command): void {
   emitsResult(
     evaluatorCmd
       .command("create <name>")
-      .description("Create a new evaluator")
-      .requiredOption(
+      .description("Create a new evaluator: a built-in one (--type) or a custom code one (--code)")
+      .option(
         "--type <evaluatorType>",
-        "Evaluator type (e.g. langevals/llm_boolean; see `langwatch evaluator types`)",
+        "Built-in evaluator type (e.g. langevals/llm_boolean; see `langwatch evaluator types`)",
+      )
+      .option(
+        "--code <file>",
+        "Python file for a custom code evaluator (a class Code with __call__)",
+      )
+      .option(
+        "--input <name[:type]>",
+        "An input of the code evaluator, type defaulting to str (repeatable)",
+        collectParam,
       )
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
-    async (name: string, options: { type: string }) => {
+    async (name: string, options: { type?: string; code?: string; input?: string[] }) => {
       try {
         const { createEvaluatorCommand: impl } = await import("./commands/evaluators/create.js");
         return await impl(name, options);
@@ -1958,21 +1967,27 @@ function registerLangyCommands(program: Command): void {
         "Share control of this folder with the Langy session that requested it (what a bare `langwatch langy` does today)",
       )
       .option(
+        "--as <email>",
+        "The email of the person who asked Langy, as the card's command names it; a login that is someone else's offers to sign in as them",
+      )
+      .option(
         "-o, --output <format>",
         "Not available: this command is an interactive session and prints as it goes",
       ),
-  ).action(async (options: { shareControl?: boolean; output?: string }, command: Command) => {
-    // `--json` and `--jq` are global, so they never reach the command's own
-    // options. They are read here and passed on, or the refusal below would
-    // miss them now that the format gate lets this command through.
-    const globals: { json?: unknown; jq?: unknown } = command.optsWithGlobals();
-    const { langyCommand: impl } = await import("./commands/langy/index.js");
-    return impl({
-      ...options,
-      ...(globals.json !== undefined ? { json: true } : {}),
-      ...(globals.jq !== undefined ? { jq: true } : {}),
-    });
-  });
+  ).action(
+    async (options: { shareControl?: boolean; as?: string; output?: string }, command: Command) => {
+      // `--json` and `--jq` are global, so they never reach the command's own
+      // options. They are read here and passed on, or the refusal below would
+      // miss them now that the format gate lets this command through.
+      const globals: { json?: unknown; jq?: unknown } = command.optsWithGlobals();
+      const { langyCommand: impl } = await import("./commands/langy/index.js");
+      return impl({
+        ...options,
+        ...(globals.json !== undefined ? { json: true } : {}),
+        ...(globals.jq !== undefined ? { jq: true } : {}),
+      });
+    },
+  );
 }
 
 function registerAgentCommands(program: Command): void {
@@ -4135,6 +4150,47 @@ function registerTestSuiteCommands(program: Command): void {
     async (suite: string) => {
       const { archiveTestSuiteCommand: impl } = await import("./commands/test-suites/archive.js");
       return impl(suite);
+    },
+  );
+
+  emitsResult(
+    testSuiteCmd
+      .command("templates")
+      .description("List the suite templates: everyday archetypes and red team packs")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async () => {
+      const { listSuiteTemplatesCommand: impl } =
+        await import("./commands/test-suites/templates.js");
+      return impl();
+    },
+  );
+
+  emitsResult(
+    testSuiteCmd
+      .command("apply-template <templateId>")
+      .description("Create a test suite from a template, fitted to the agent under test")
+      .requiredOption("--agent-name <name>", "The name of the agent under test")
+      .option("--tool <tool>", "A tool the agent can call. Repeat for more.", collectParam)
+      .option(
+        "--must-never <rule>",
+        "Something the agent must never do. Repeat for more.",
+        collectParam,
+      )
+      .option("--name <name>", "The suite name. Defaults to the template title.")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (
+      templateId: string,
+      options: { agentName: string; tool?: string[]; mustNever?: string[]; name?: string },
+    ) => {
+      const { applySuiteTemplateCommand: impl } =
+        await import("./commands/test-suites/templates.js");
+      return impl({
+        templateId,
+        agentName: options.agentName,
+        tools: options.tool,
+        mustNever: options.mustNever,
+        name: options.name,
+      });
     },
   );
 

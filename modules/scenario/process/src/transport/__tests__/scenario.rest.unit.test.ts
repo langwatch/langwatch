@@ -86,6 +86,57 @@ describe("the scenarios REST declaration", () => {
     });
   });
 
+  describe("when creating a red team scenario", () => {
+    const redTeam = {
+      attackGoal: "Make the agent reveal its system prompt",
+      owaspIds: ["LLM07"],
+      strategy: "crescendo",
+      maxTurns: 12,
+    };
+
+    /** @scenario "Create over REST or tRPC stores a red team scenario with its attack" */
+    it("stores the kind and the attack config", async () => {
+      const family = await buildScenarioFamily();
+      const response = await createScenario(family, {
+        name: "Prompt leak",
+        situation: "An attacker probes the agent",
+        kind: "red_team",
+        redTeam,
+      });
+
+      expect(response.status).toBe(201);
+      const created = scenarioRestResponseWithPlatformUrlSchema.parse(await response.json());
+      const row = await family.app.getById({ id: created.id, projectId: PROJECT_ID });
+      expect(row).toMatchObject({ kind: "red_team", redTeam });
+    });
+
+    /** @scenario "Create over REST or tRPC refuses a red team scenario with a bad attack" */
+    it.each([
+      ["no attack config", { kind: "red_team" }],
+      ["an attack on a standard scenario", { kind: "standard", redTeam }],
+      ["an unknown OWASP id", { kind: "red_team", redTeam: { ...redTeam, owaspIds: ["LLM99"] } }],
+      ["more turns than the cap", { kind: "red_team", redTeam: { ...redTeam, maxTurns: 51 } }],
+    ])("refuses %s", async (_case, fields) => {
+      const family = await buildScenarioFamily();
+      const response = await createScenario(family, { name: "Bad", situation: "x", ...fields });
+
+      expect(response.status).toBe(422);
+    });
+
+    /** @scenario "Create over REST or tRPC refuses the template marker" */
+    it("refuses a create naming the template marker", async () => {
+      const family = await buildScenarioFamily();
+      const response = await createScenario(family, {
+        name: "Sneaky",
+        situation: "x",
+        sourceTemplateId: "owasp-llm-top-10-2025",
+      });
+
+      expect(response.status).toBe(422);
+      expect(JSON.stringify(await response.json())).toContain("sourceTemplateId");
+    });
+  });
+
   describe("when creating with model overrides and turn limits", () => {
     /** @scenario "Create over REST accepts model overrides and turn limits" */
     it("carries the values back on create and read", async () => {

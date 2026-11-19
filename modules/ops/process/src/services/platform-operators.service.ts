@@ -1,5 +1,6 @@
 import type { LedgerActor } from "@langwatch/authorization";
-import type { AuthzApi } from "@langwatch/authz-contract";
+import type { AuthzApi, PlatformOperator } from "@langwatch/authz-contract";
+import type { MailRender, PlatformOperatorChangeEmailProps } from "@langwatch/mail";
 import {
   isEmailUnconfigured,
   type NotificationService as NotificationApi,
@@ -55,6 +56,17 @@ type PlatformOperatorSeedRecorder = Readonly<{
   }): Promise<void>;
 }>;
 
+/** Where every operator is told of a grant or a revoke, and what the mail calls this install. */
+export type PlatformOperatorChangeNotice = Readonly<{
+  mail: Pick<NotificationApi, "sendEmail">;
+  renderer: Pick<MailRender, "renderPlatformOperatorChange">;
+  installation: string;
+  /** Absolute; null when the install has no public address, and the mail then links nothing. */
+  operatorsUrl: string | null;
+}>;
+
+const TASK_ACTOR_NAME = "The grant-platform-operator task";
+
 type PlatformOperatorsServiceOptions = Readonly<{
   authz: Pick<
     AuthzApi,
@@ -66,6 +78,7 @@ type PlatformOperatorsServiceOptions = Readonly<{
   mail: Pick<NotificationApi, "getMailDelivery">;
   /** `cloud` is the seed's own: a deployment LangWatch runs. */
   deployment: Readonly<{ cloud: boolean; isLocalDevelopment: boolean }>;
+  notice: PlatformOperatorChangeNotice;
 }>;
 
 /** Who ADMIN_EMAILS names that the seed may take, and whether an unverified one was passed over. */
@@ -111,12 +124,21 @@ export class PlatformOperatorsService {
   }): Promise<OpsPlatformOperator> {
     const granter = signedInOperator(operator);
     const user = await this.#eligibleUserOf(email);
+    const holding = await this.#holdingBeforeChange(user.id);
     const held = await this.options.authz.grantPlatformOperator({
       principal: { type: "user", id: user.id },
       caller: { type: "user", id: granter.id },
       actor: { type: "user", id: granter.id },
       source: "grants-service",
     });
+    if (holding === "not-held") {
+      await this.#tellOperators({
+        change: "granted",
+        grantId: held.grantId,
+        subject: user,
+        actorName: nameOf(granter),
+      });
+    }
     return { ...held, name: user.name, email: user.email };
   }
 
@@ -128,11 +150,30 @@ export class PlatformOperatorsService {
     operator: OpsOperator | null;
   }): Promise<void> {
     const revoker = signedInOperator(operator);
+    const holders = await this.#holdersBeforeChange();
     await this.options.authz.revokePlatformOperator({
       grantId,
       caller: { type: "user", id: revoker.id },
       actor: { type: "user", id: revoker.id },
     });
+    if (holders === "unknown") return;
+    const target = holders.find((holder) => holder.grantId === grantId);
+    // The revoke already stands: a failed lookup only costs the notice, as a failed send does.
+    let subject: UserProfile | null = null;
+    try {
+      subject = target ? await this.options.users.findById({ id: target.userId }) : null;
+    } catch (error) {
+      logger.error({ error, grantId }, "the platform operators were not told of a revoke");
+      return;
+    }
+    if (!subject) {
+      logger.warn(
+        { grantId },
+        "the platform operators were not told of a revoke of an inactive holder",
+      );
+      return;
+    }
+    await this.#tellOperators({ change: "revoked", grantId, subject, actorName: nameOf(revoker) });
   }
 
   /**
@@ -143,12 +184,21 @@ export class PlatformOperatorsService {
     const user = await this.#eligibleUserOf(email, {
       canGrantUnverified: await this.#isEmailUnconfigured(),
     });
+    const holding = await this.#holdingBeforeChange(user.id);
     const held = await this.options.authz.grantPlatformOperator({
       principal: { type: "user", id: user.id },
       caller: { type: "system" },
       actor: PLATFORM_OPERATOR_TASK_ACTOR,
       source: "grants-service",
     });
+    if (holding === "not-held") {
+      await this.#tellOperators({
+        change: "granted",
+        grantId: held.grantId,
+        subject: user,
+        actorName: TASK_ACTOR_NAME,
+      });
+    }
     return { ...held, name: user.name, email: user.email };
   }
 
@@ -341,6 +391,71 @@ export class PlatformOperatorsService {
       .toSorted((a, b) => a.createdAt.getTime() - b.createdAt.getTime())[0]?.id;
   }
 
+  /** Read only for the notice, so a failed read skips the notice and never the change itself. */
+  async #holdersBeforeChange(): Promise<PlatformOperator[] | "unknown"> {
+    try {
+      return await this.options.authz.listPlatformOperators();
+    } catch (error) {
+      logger.error({ error }, "the platform operators will not be told of this role change");
+      return "unknown";
+    }
+  }
+
+  async #holdingBeforeChange(userId: string): Promise<"held" | "not-held" | "unknown"> {
+    const holders = await this.#holdersBeforeChange();
+    if (holders === "unknown") return "unknown";
+    return holders.some((holder) => holder.userId === userId) ? "held" : "not-held";
+  }
+
+  /**
+   * Tells every holder, and the person whose role changed, so a grant nobody expected is seen
+   * by someone who can revoke it. The change already stands: a failed send is logged, not thrown.
+   */
+  async #tellOperators({
+    change,
+    grantId,
+    subject,
+    actorName,
+  }: {
+    change: PlatformOperatorChangeEmailProps["change"];
+    grantId: string;
+    subject: UserProfile;
+    actorName: string;
+  }): Promise<void> {
+    const { mail, renderer, installation, operatorsUrl } = this.options.notice;
+    try {
+      const { subject: title, html } = await renderer.renderPlatformOperatorChange({
+        installation,
+        change,
+        subjectName: subject.name ?? subject.email ?? subject.id,
+        subjectEmail: subject.email,
+        actorName,
+        operatorsUrl,
+      });
+      const holders = await this.list();
+      const recipients = new Set(
+        [...holders.map((holder) => holder.email), subject.email].flatMap((email) =>
+          email ? [email.toLowerCase()] : [],
+        ),
+      );
+      await Promise.all(
+        [...recipients].map((to) =>
+          mail.sendEmail({
+            to,
+            subject: title,
+            html,
+            idempotencyKey: `platform-operator-${change}:${grantId}:${to}`,
+          }),
+        ),
+      );
+    } catch (error) {
+      logger.error(
+        { error, change, userId: subject.id },
+        "the platform operators were not told of a role change",
+      );
+    }
+  }
+
   /**
    * Who the page and the task may grant: an active account with a verified address, since
    * whoever registered an unclaimed one first would operate; where grants are staff-only, staff.
@@ -369,6 +484,11 @@ function waiting(reason: string): PlatformOperatorSeedOutcome {
 function nobody(reason: string): PlatformOperatorSeedOutcome {
   logger.warn({ reason }, `no platform operator was seeded; ${RECOVERY_HINT}`);
   return { via: "none", userIds: [], reason };
+}
+
+/** How the mail names whoever changed the role: their name, else their address. */
+function nameOf(operator: OpsOperator): string {
+  return operator.name ?? operator.email ?? "Another platform operator";
 }
 
 /** Grant and revoke need a real signed-in session: an impersonation never changes who operates. */

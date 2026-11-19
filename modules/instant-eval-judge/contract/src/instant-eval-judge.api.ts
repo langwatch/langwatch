@@ -57,12 +57,17 @@ export interface InstantEvalJudgeApi {
 export const InstantEvalJudgeApi = moduleApi<InstantEvalJudgeApi>()("instant-eval-judge");
 
 /** The request shapes an own decision model speaks, one channel each (ADR-182 decision 8). */
-export const INSTANT_EVAL_DECISION_WIRES = ["openai_decisions", "jev", "cloudflare_jev"] as const;
+export const INSTANT_EVAL_DECISION_WIRES = [
+  "openai_decisions",
+  "jev",
+  "cloudflare_jev",
+  "gemini_decisions",
+] as const;
 
 export type InstantEvalDecisionWire = (typeof INSTANT_EVAL_DECISION_WIRES)[number];
 
-/** How the key travels: `Authorization: Bearer`, or Azure's `api-key` header. */
-export type InstantEvalDecisionAuthHeader = "bearer" | "api_key";
+/** How the key travels: `Authorization: Bearer`, Azure's `api-key` or Google's `x-goog-api-key`. */
+export type InstantEvalDecisionAuthHeader = "bearer" | "api_key" | "goog_api_key";
 
 /**
  * An organization's own decision model, resolved by the caller from Default models. The judge
@@ -326,6 +331,11 @@ export interface InstantEvalClassifierLimits {
   readonly transcriptFitBytesPerInputToken: number;
   /** Below any judged text measured; the too-large retry cuts at this ratio. */
   readonly retryBytesPerInputToken: number;
+  /**
+   * Tokens the judge bills on every request beyond the text and the questions.
+   * Provisional: read off e2e bills (190 to 220 per row), not yet measured alone.
+   */
+  readonly requestOverheadTokens: number;
 }
 
 /** The shipped classifier's caps, measured against the live API. */
@@ -339,4 +349,5 @@ export const INSTANT_EVAL_CLASSIFIER_LIMITS: InstantEvalClassifierLimits = {
   fitBytesPerInputToken: 2,
   transcriptFitBytesPerInputToken: 2.4,
   retryBytesPerInputToken: 1.5,
+  requestOverheadTokens: 200,
 };
