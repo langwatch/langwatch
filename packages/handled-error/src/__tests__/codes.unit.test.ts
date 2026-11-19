@@ -117,7 +117,11 @@ const CODE_PATTERNS = [
 /**
  * Strings that match a pattern above without being a raisable code.
  */
-const NON_CODE_LITERALS = new Set(["unknown"]);
+const NON_CODE_LITERALS = new Set([
+  "unknown",
+  // A kill switch target outcome code (KillSwitchPlatformError), recorded on the stop, never raised.
+  "source_not_configured",
+]);
 
 /**
  * One code per declaration shape, each chosen because the pattern for that shape is the
