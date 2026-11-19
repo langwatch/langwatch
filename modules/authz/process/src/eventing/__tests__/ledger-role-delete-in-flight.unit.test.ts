@@ -1,8 +1,7 @@
 /**
- * An API key's own role deleted without waiting is still seen by the next define of that role:
- * the adapter marks it at once, so the define's hold never confirms on a role about to go. Any
- * other role's delete is left to the fold. The real adapter runs over the memory repositories;
- * no command ever folds.
+ * An API key's own role deleted without waiting is marked at once, so the next define of it never
+ * confirms on a role about to go; any other role's delete is left to the fold. The real adapter
+ * runs over the memory repositories; no command ever folds.
  * @see specs/rbac/authz-grants.feature
  */
 import type { LedgerActor } from "@langwatch/authorization";

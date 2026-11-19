@@ -1,9 +1,8 @@
 /**
  * @vitest-environment node
- * An API key's own role and grant, sent as the held-key mint sends them each try, over the authz
- * app's grants pipeline in memory. The key service is not composed: api-key-process cannot depend
- * on authz-process, so each try sends what `ApiKeyGrantPolicyService.writeBindings` sends: the
- * key's stable command id and binding id on its create, none of its own on an edit.
+ * A key's own role and grant, sent as the held-key mint sends them each try, over the grants
+ * pipeline in memory. api-key-process cannot depend on authz-process, so each try sends what
+ * `ApiKeyGrantPolicyService.writeBindings` sends: stable ids on a create, none on an edit.
  * @see specs/rbac/authz-grants.feature
  */
 import type { LedgerActor } from "@langwatch/authorization";
@@ -33,7 +32,7 @@ import { memoryAuthzChannels } from "./authz-channels.fixture.ts";
 // Mirrors the held key in modules/api-key/process/src/services/__tests__/
 // held-key-mint.slow-fold.unit.test.ts, whose key id, content hash and creation time are minted
 // there, so only their shapes are mirrored: a rolebinding id, and the command id
-// `ownGrantCommandId` (modules/api-key/process/src/services/api-key-own-grant-ids.ts) builds.
+// `ownGrantCommandId` (modules/api-key/process/src/rules/api-key-own-grant-ids.rules.ts) builds.
 const ORG = "org_1";
 const KEY = "key_held";
 const ROLE = `apikey:${KEY}`;
@@ -329,9 +328,8 @@ describe("given an API key's own role and grant written on each try of a held-ke
       if (!secondId) throw new Error("the second grant was not attached");
 
       expect(secondId).not.toBe(firstId);
-      expect(keyGrants().filter((row) => row.revokedAt === null).map((row) => row.id)).toEqual([
-        secondId,
-      ]);
+      const live = keyGrants().filter((row) => row.revokedAt === null);
+      expect(live.map((row) => row.id)).toEqual([secondId]);
       expect(await eventsOf(secondId, GRANT_ATTACHED_EVENT_TYPE)).toHaveLength(1);
       expect(auditRows("attach", "grantId", firstId)).toHaveLength(1);
       expect(auditRows("attach", "grantId", secondId)).toHaveLength(1);

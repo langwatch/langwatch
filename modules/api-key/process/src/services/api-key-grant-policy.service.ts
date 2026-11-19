@@ -17,7 +17,7 @@ import { MemberNotFoundError } from "@langwatch/organization-contract";
 import { isAggregateProjectKind } from "@langwatch/project-contract";
 import { type Instant, Temporal, fromDate, nowInstant } from "@langwatch/time";
 
-import { ownGrantBindingId, ownGrantCommandId } from "./api-key-own-grant-ids.ts";
+import { ownGrantBindingId, ownGrantCommandId } from "../rules/api-key-own-grant-ids.rules.ts";
 import type { ApiKeyDependencies } from "./api-key.service.ts";
 
 /**
