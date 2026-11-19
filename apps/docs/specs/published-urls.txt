@@ -879,6 +879,7 @@
 /platform/data-retention
 /platform/members-and-teams
 /platform/model-providers
+/platform/private-endpoints
 /platform/rbac
 /platform/roles-and-access
 /platform/scim
