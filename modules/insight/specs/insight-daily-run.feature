@@ -595,10 +595,156 @@ Feature: The daily insights run
       And a run that replaces no other names none
 
     @unit
+    Scenario: A run's start and its outcome share one queue per schedule
+      Given the daily run pipeline
+      When its commands that record a run's start and its outcome are registered
+      Then both serialize on the schedule, with no lane of their own
+
+    @unit
     Scenario: A settled run keeps its first outcome
       Given a run recorded as filed
       When the same run is settled again as failed
       Then the run's row still reads filed
+
+  Rule: Runs are ordered by when the schedule's process started them
+    Each run carries when the process started it. A slot is no such order: an operator's run is
+    for the moment it was asked, and a late wake keeps its earlier slot. A run an older worker
+    carried has no start, and is ordered by its slot, which is never after its start.
+
+    @unit
+    Scenario: Two runs that carry their start are ordered by it, whatever their slots
+      Given two runs that carry their start, the later one for an earlier slot
+      When they are compared
+      Then the one that started later is the newer
+
+    @unit
+    Scenario: A run's slot is never after its start
+      Given an operator's run, one on a clock behind the request's, and a late wake's run
+      When the schedule's process starts each
+      Then each run's start is at or after its slot
+
+    @unit
+    Scenario: A run that carries no start is ordered by its slot against the other's start
+      Given a run that started an hour after its slot and carries its start
+      And a run that carries no start, for a slot three hours after that run's
+      When they are compared
+      Then the one that carries no start is the newer
+      And one that carries no start, for a slot before that run's start, is the older
+
+    @unit
+    Scenario: Two runs that carry no start are ordered by their slot
+      Given two runs that carry no start
+      When they are compared
+      Then the one for the later slot is the newer
+
+    @unit
+    Scenario: Two runs that started at the same instant are ordered by their run id
+      Given two runs that started at the same instant, for different slots
+      When they are compared
+      Then the one with the greater run id is the newer, the same way each time
+
+    @unit
+    Scenario: A late wake's run after an operator's run shows in flight and as the last run
+      Given an operator's run that settled
+      And the day's wake that came late, so its run is for an earlier slot than the operator's
+      When the wake's run starts, and then files
+      Then it is the run in flight while it runs
+      And its filed outcome is the last run
+
+    @unit
+    Scenario: The run's row counts the skipped days the schedule's process counts
+      Given a scheduled run that was skipped
+      And an operator's run that was skipped, then a late wake's run that was skipped
+      When the run's row and the schedule's process fold the three outcomes
+      Then both count 2 skipped days
+
+    @unit
+    Scenario: A repeated outcome of a replaced run leaves the newer run as the last run
+      Given a run that recorded the run it replaced as lost, and then filed
+      When the replaced run's outcome is recorded again
+      Then the last run still reads the newer run's filed outcome
+      And no run is in flight
+
+    @unit
+    Scenario: A late outcome of an older run leaves the newer run in flight
+      Given a run that recorded the run it replaced as lost, and started
+      When an even older run's outcome arrives late
+      Then the newer run is still in flight
+      And the last run is still the lost run
+
+    @unit
+    Scenario: A late start of an older run names no run in flight
+      Given a newer run that started and settled after an older one
+      When the older run's start is recorded after the newer run's events
+      Then no run is in flight
+
+    @unit
+    Scenario: A lost run's own late outcome, once recorded as lost, leaves the row
+      Given an operator's run handed over before runs carried their start, and lost
+      And a late wake's run for an earlier slot that recorded it as lost, and started
+      When the lost run's own outcome, which carries no start, arrives late
+      Then the late wake's run is still in flight
+      And the last run is still the lost run
+
+    @unit
+    Scenario: A run that started after the slot of one that carries none is taken
+      Given an operator's run that carries no start and settled, for a later slot
+      When a late wake's run that carries its start starts, for an earlier slot, and files
+      Then it is the run in flight while it runs
+      And its filed outcome is the last run
+
+    @unit
+    Scenario: A later run that carries no start is taken after one that carries its start
+      Given a late wake's run that carries its start and settled
+      When an operator's later run that an older worker carried without its start starts
+      And it files
+      Then it is the run in flight while it runs
+      And its filed outcome is the last run
+
+    @unit
+    Scenario: A lost run's outcome that carries no start is ordered by its run's own start
+      Given an operator's run that settled
+      And a late wake's run for an earlier slot that started after it
+      When an older worker records the wake's run as lost, without its start
+      Then the wake's run's timeout is the last run
+      And the run in flight row keeps the wake's run's start as its newest
+
+    @unit
+    Scenario: A lost run's outcome that lands after its replacement started is the last run
+      Given a run that settled, a run that was lost, and the run that replaced it, started
+      When the outcome the replacing run recorded for the lost run lands after that start
+      Then the lost run's timeout is the last run
+      And the replacing run is still in flight, until its own outcome is the last run
+
+    @unit
+    Scenario: A run started from process state an older release kept is taken
+      Given a run in flight row whose newest run carries its start, and was lost
+      And the schedule's process state as an older release kept it, its pending run with no slot
+      When the process starts the next run, which records the lost run, and it files
+      Then the lost run is handed over with its start as its slot
+      And the run in flight row takes the next run in flight, and then as the last run
+
+    @unit
+    Scenario: A board with no run in flight row reads its last run from the run's row
+      Given a run's row whose last run filed
+      And no run in flight row, as on every board before Run now
+      When its person reads the setting
+      Then the last run is the run's row's
+
+    @unit
+    Scenario: A run in flight row with only a start reads its last run from the run's row
+      Given a run's row whose last run filed
+      And a run in flight row that took a newer run's start and no outcome yet
+      When its person reads the setting
+      Then the last run is the run's row's
+      And the newer run is in flight
+
+    @unit
+    Scenario: The setting, the run list and the operator's list read the same last run
+      Given a run's row whose last run filed
+      And a run in flight row that took a newer run's outcome
+      When the setting, the person's run list and the operator's list read the board
+      Then all three read the run in flight row's last run
 
   Rule: A run's events belong to one schedule
 

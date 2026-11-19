@@ -113,8 +113,9 @@ const defineInsightDailyRunPipeline = (deps: InsightDailyRunPipelineDeps) =>
     .withCommand("turnOffSchedule", TurnOffInsightScheduleCommand)
     .withCommand("requestScheduleRearm", RequestInsightScheduleRearmCommand)
     .withCommand("requestRun", RequestInsightRunCommand)
-    .withCommand("recordRunStarted", RecordInsightRunStartedCommand)
-    .withCommand("settleRun", SettleInsightRunCommand)
+    // One queue per schedule for both: a lost run's outcome lands before its replacement's start.
+    .withCommand("recordRunStarted", RecordInsightRunStartedCommand, { serializeByAggregate: true })
+    .withCommand("settleRun", SettleInsightRunCommand, { serializeByAggregate: true })
     // One line per run, in its own lane: a slow audit log holds no run back.
     .withEventSubscriber("dailyRunAudit", {
       events: [INSIGHT_DAILY_RUN_EVENT_TYPES.RUN_SETTLED],

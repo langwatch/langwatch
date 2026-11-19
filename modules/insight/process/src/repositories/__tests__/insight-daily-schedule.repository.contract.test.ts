@@ -19,7 +19,10 @@ import { cleanupTestRows } from "@langwatch/test-harness/prisma";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 
 import type { InsightDailyScheduleState } from "../../eventing/insight-daily-schedule.projection.ts";
-import type { InsightRunInFlightState } from "../../eventing/insight-run-in-flight.projection.ts";
+import {
+  type InsightRunInFlightState,
+  NO_RUN_STARTED,
+} from "../../eventing/insight-run-in-flight.projection.ts";
 import { dailyScheduleId } from "../../rules/insight-daily-run.rules.ts";
 import type { InsightRepositories } from "../insight.repositories.ts";
 import { MemoryInsightRepositories } from "../memory/memory.insight.repositories.ts";
@@ -100,8 +103,9 @@ function contractCases(backend: Backend): void {
   const storeStarted = async ({
     scheduleId,
     ...state
-  }: InsightRunInFlightState & { scheduleId: string }) => {
-    await backend.repositories().runInFlightProjection.store(foldedAt(state, RAN_AT), {
+  }: Partial<InsightRunInFlightState> & { scheduleId: string }) => {
+    const row = { ...NO_RUN_STARTED, ...state };
+    await backend.repositories().runInFlightProjection.store(foldedAt(row, RAN_AT), {
       tenantId: createTenantId(backend.projectId()),
       aggregateId: scheduleId,
       key: scheduleId,
@@ -337,7 +341,7 @@ function contractCases(backend: Backend): void {
     it("answers that run in flight beside the last run", async () => {
       const scheduleId = await store(ON);
       const started = { runId: "run-2", conversationId: "conversation-2", startedAt: RAN_AT + 1 };
-      await storeStarted({ scheduleId, ...started, lastSettledRunId: "run-1" });
+      await storeStarted({ scheduleId, ...started });
 
       const [setting] = await settingOf({ userId: OWNER, scheduleId });
 
@@ -356,13 +360,71 @@ function contractCases(backend: Backend): void {
         runId: "run-1",
         conversationId: "conversation-1",
         startedAt: RAN_AT - 60_000,
-        lastSettledRunId: "run-1",
       });
 
       const [setting] = await settingOf({ userId: OWNER, scheduleId });
 
       expect(setting?.runInFlight).toBeNull();
       expect(setting?.lastRun).toMatchObject({ runId: "run-1", startedAt: RAN_AT - 60_000 });
+    });
+  });
+
+  describe("when a schedule's run in flight row took a newer outcome than its run row", () => {
+    /** The newer run's outcome, as the run in flight row keeps it. */
+    const NEWER = {
+      at: RAN_AT + 60_000,
+      outcome: "skipped",
+      reason: "no_access",
+      filedCount: 0,
+      renewedCount: 0,
+      conversationId: null,
+    } as const;
+    const storeNewer = async () => {
+      const scheduleId = await store(ON);
+      await storeStarted({
+        scheduleId,
+        runId: "run-2",
+        conversationId: "conversation-2",
+        startedAt: RAN_AT + 1,
+        lastSettledRunId: "run-2",
+        lastRunAt: NEWER.at,
+        lastRunOutcome: NEWER.outcome,
+        lastRunReason: NEWER.reason,
+        lastRunFiled: NEWER.filedCount,
+        lastRunRenewed: NEWER.renewedCount,
+        lastRunConversationId: NEWER.conversationId,
+        newestRunId: "run-2",
+        newestRunSlot: RAN_AT,
+        newestRunSince: RAN_AT + 1,
+      });
+      return scheduleId;
+    };
+
+    it("answers the run in flight row's last run on the setting, with its start", async () => {
+      const scheduleId = await storeNewer();
+
+      const [setting] = await settingOf({ userId: OWNER, scheduleId });
+
+      expect(setting?.runInFlight).toBeNull();
+      expect(setting?.lastRun).toEqual({ ...NEWER, runId: "run-2", startedAt: RAN_AT + 1 });
+    });
+
+    it("answers the run in flight row's last run on the person's run list", async () => {
+      const scheduleId = await storeNewer();
+      await store({ boardId: "dashboard-other", lastRunAt: RAN_AT + 30_000 });
+
+      const runs = await runsOf(OWNER);
+
+      expect(runs.map(({ id }) => id)[0]).toBe(scheduleId);
+      expect(runs[0]?.lastRun).toEqual(NEWER);
+    });
+
+    it("answers the run in flight row's last run on the operator's list", async () => {
+      const scheduleId = await storeNewer();
+
+      const decided = await backend.repositories().dailySchedules.findDecided({ take: 500 });
+
+      expect(decided.find((row) => row.scheduleId === scheduleId)?.lastRun).toEqual(NEWER);
     });
   });
 

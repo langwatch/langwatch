@@ -10,7 +10,10 @@ import {
   type InsightOnSchedule,
   onScheduleFromState,
 } from "../../rules/insight-daily-schedule-row.rules.ts";
-import { NO_RUN_STARTED } from "../../rules/insight-run-in-flight.rules.ts";
+import {
+  type InsightRunInFlightState,
+  NO_RUN_STARTED,
+} from "../../rules/insight-run-in-flight.rules.ts";
 import type { InsightDailyScheduleRepository } from "../insight-daily-schedule.repository.ts";
 import { InsightMemoryStore } from "./insight-memory.store.ts";
 
@@ -32,7 +35,13 @@ export class MemoryInsightDailyScheduleRepository implements InsightDailySchedul
     const prefix = `${projectId}:`;
     return [...this.rows.schedules.entries()]
       .filter(([key, row]) => key.startsWith(prefix) && row.state.userId === userId)
-      .map(([key, row]) => dailyRunFromState({ id: key.slice(prefix.length), state: row.state }))
+      .map(([key, row]) =>
+        dailyRunFromState({
+          id: key.slice(prefix.length),
+          state: row.state,
+          started: this.startedOf(key),
+        }),
+      )
       .toSorted(byNewestRun);
   }
 
@@ -48,8 +57,7 @@ export class MemoryInsightDailyScheduleRepository implements InsightDailySchedul
     const key = InsightMemoryStore.scheduleKey({ projectId, scheduleId });
     const row = this.rows.schedules.get(key);
     if (!row || row.state.userId !== userId) return [];
-    const started = this.rows.runsInFlight.get(key)?.state ?? NO_RUN_STARTED;
-    return [dailyRunSettingFromState(row.state, started)];
+    return [dailyRunSettingFromState(row.state, this.startedOf(key))];
   }
 
   async findOnPage({
@@ -86,11 +94,21 @@ export class MemoryInsightDailyScheduleRepository implements InsightDailySchedul
       .slice(0, take);
   }
 
-  /** Every row with the project and the schedule its key names. */
+  /** Every row with the project and the schedule its key names, beside its run in flight row. */
   private everyRow() {
     return [...this.rows.schedules.entries()].map(([key, row]) => {
       const at = key.lastIndexOf(":");
-      return { scheduleId: key.slice(at + 1), projectId: key.slice(0, at), state: row.state };
+      return {
+        scheduleId: key.slice(at + 1),
+        projectId: key.slice(0, at),
+        state: row.state,
+        started: this.startedOf(key),
+      };
     });
+  }
+
+  /** The schedule's run in flight row under the same key; `NO_RUN_STARTED` when it has none. */
+  private startedOf(key: string): InsightRunInFlightState {
+    return this.rows.runsInFlight.get(key)?.state ?? NO_RUN_STARTED;
   }
 }

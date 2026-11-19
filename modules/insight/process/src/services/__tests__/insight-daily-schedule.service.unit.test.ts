@@ -15,6 +15,7 @@ import type { InsightDailyScheduleState } from "../../eventing/insight-daily-sch
 import type { InsightRepositories } from "../../repositories/insight.repositories.ts";
 import { MemoryInsightRepositories } from "../../repositories/memory/memory.insight.repositories.ts";
 import { dailyScheduleId } from "../../rules/insight-daily-run.rules.ts";
+import { NO_RUN_STARTED } from "../../rules/insight-run-in-flight.rules.ts";
 import type { InsightDailyRunCommandsService } from "../insight-daily-run-commands.service.ts";
 import { InsightDailyScheduleService } from "../insight-daily-schedule.service.ts";
 
@@ -83,7 +84,7 @@ async function onWithRunInFlight({ startedAt }: { startedAt: number }): Promise<
   await repositories.runInFlightProjection.store(
     {
       ...folded,
-      state: { ...started, lastSettledRunId: null },
+      state: { ...NO_RUN_STARTED, ...started },
       version: INSIGHT_RUN_IN_FLIGHT_PROJECTION_VERSION,
     },
     context,

@@ -220,7 +220,7 @@ export class InsightDailyRunService implements InsightDailyRunExecutor {
   }
 
   private async start(input: RunInput, ready: ReadyRun): Promise<StartedTurn | RunEnd> {
-    const { projectId, userId, scheduleId, runId, slot } = input;
+    const { projectId, userId, scheduleId, runId, slot, since } = input;
     const turn = await this.askLangy(input, ready);
     if ("outcome" in turn) return turn;
     if (await this.isHandedOn(input)) {
@@ -235,6 +235,7 @@ export class InsightDailyRunService implements InsightDailyRunExecutor {
       board: ready.board,
       runId,
       slot,
+      since,
       ...turn,
     });
     return turn;
@@ -424,9 +425,9 @@ export class InsightDailyRunService implements InsightDailyRunExecutor {
   }
 
   /**
-   * The run this one replaces is recorded as lost first. A repeat is skipped only once the
-   * process has folded this run's outcome. Rare trade: a takeover after the 60-minute expiry
-   * leaves the replaced run unrecorded.
+   * The run this one replaces is recorded as lost first, with its own start. A repeat once the
+   * process folded this run's outcome is skipped; one before is an older run's, which the run in
+   * flight row drops. Rare trade: a takeover after the 60-minute expiry leaves it unrecorded.
    */
   private async settleSuperseded(input: RunInput): Promise<void> {
     const { projectId, scheduleId, userId, board, supersedes } = input;
@@ -458,7 +459,7 @@ export class InsightDailyRunService implements InsightDailyRunExecutor {
     startedAt: number;
   }): Promise<void> {
     if (await this.isHandedOn(input)) return;
-    const { projectId, scheduleId, userId, runId, slot, skippedDaysBefore } = input;
+    const { projectId, scheduleId, userId, runId, slot, since, skippedDaysBefore } = input;
     const { board = input.board, ...result } = end;
     const envelope = { tenantId: projectId, scheduleId, userId, board };
     const settledAt = nowInstant().epochMilliseconds;
@@ -467,6 +468,7 @@ export class InsightDailyRunService implements InsightDailyRunExecutor {
       occurredAt: settledAt,
       runId,
       slot,
+      since,
       ...result,
       // A run's outcome is stored once (its command is keyed by the run), so the first one is new.
       idLayout: "v2",

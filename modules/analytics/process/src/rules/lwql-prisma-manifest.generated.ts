@@ -974,6 +974,17 @@ export interface LwqlPrismaRows {
     readonly conversationId: "String?";
     readonly startedAt: "Float?";
     readonly lastSettledRunId: "String?";
+    readonly lastRunAt: "Float?";
+    readonly lastRunOutcome: "String?";
+    readonly lastRunReason: "String?";
+    readonly lastRunFiled: "Int?";
+    readonly lastRunRenewed: "Int?";
+    readonly lastRunConversationId: "String?";
+    readonly newestRunId: "String?";
+    readonly newestRunSlot: "Float?";
+    readonly newestRunSince: "Float?";
+    readonly lastSettledRunSlot: "Float?";
+    readonly lastSettledRunSince: "Float?";
     readonly createdAt: "Float";
     readonly updatedAt: "Float";
     readonly occurredAt: "Float";

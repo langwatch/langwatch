@@ -255,6 +255,20 @@ describe("given a run that replaces a lost one", () => {
     expect(settled[0]).toMatchObject({ runId: "run-0", outcome: "failed", reason: "timeout" });
   });
 
+  it("records the lost run and this run each with its own start", async () => {
+    const { service, started, settled } = harness();
+    service.connect(processWaitingOn(["run-1"]));
+    const supersedes = { ...SUPERSEDING.supersedes, since: 1_000 };
+
+    await service.run({ ...SUPERSEDING, since: 2_000, supersedes });
+
+    expect(started).toEqual([expect.objectContaining({ runId: "run-1", since: 2_000 })]);
+    expect(settled).toEqual([
+      expect.objectContaining({ runId: "run-0", since: 1_000 }),
+      expect.objectContaining({ runId: "run-1", since: 2_000 }),
+    ]);
+  });
+
   it("records nothing for the lost run once the process waits on another run", async () => {
     const { service, settled } = harness();
     service.connect(processWaitingOn(["run-2"]));

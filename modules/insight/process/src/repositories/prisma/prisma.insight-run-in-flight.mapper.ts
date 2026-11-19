@@ -1,11 +1,29 @@
+import { insightRunOutcomeSchema, insightRunReasonSchema } from "@langwatch/insight-contract";
 import type { Prisma } from "@langwatch/prisma-client/generated";
 
 import type { InsightRunInFlightState } from "../../eventing/insight-run-in-flight.projection.ts";
 
 export type InsightRunInFlightRow = Prisma.InsightRunInFlightProjectionGetPayload<object>;
 
-/** Every column is the state's own type, so the read narrows nothing. */
+/** The outcome and the reason are TEXT, so the read narrows them back; an unknown one refuses. */
 export function runInFlightStateFromRow(row: InsightRunInFlightRow): InsightRunInFlightState {
-  const { runId, conversationId, startedAt, lastSettledRunId } = row;
-  return { runId, conversationId, startedAt, lastSettledRunId };
+  return {
+    runId: row.runId,
+    conversationId: row.conversationId,
+    startedAt: row.startedAt,
+    lastSettledRunId: row.lastSettledRunId,
+    lastRunAt: row.lastRunAt,
+    lastRunOutcome:
+      row.lastRunOutcome === null ? null : insightRunOutcomeSchema.parse(row.lastRunOutcome),
+    lastRunReason:
+      row.lastRunReason === null ? null : insightRunReasonSchema.parse(row.lastRunReason),
+    lastRunFiled: row.lastRunFiled,
+    lastRunRenewed: row.lastRunRenewed,
+    lastRunConversationId: row.lastRunConversationId,
+    newestRunId: row.newestRunId,
+    newestRunSlot: row.newestRunSlot,
+    newestRunSince: row.newestRunSince,
+    lastSettledRunSlot: row.lastSettledRunSlot,
+    lastSettledRunSince: row.lastSettledRunSince,
+  };
 }

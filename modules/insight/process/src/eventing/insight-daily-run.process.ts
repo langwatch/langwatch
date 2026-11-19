@@ -48,7 +48,10 @@ const scheduleSchema = z.object({
 /** The schedule's fields came after the first instances, each with a default. */
 export const insightDailyRunStateSchema = z.object({
   lastRequestId: z.string().nullable(),
-  /** The run whose outcome is not recorded yet; `slot` is absent on an older instance. */
+  /**
+   * The run whose outcome is not recorded yet; `slot` is absent on an older instance. `since`
+   * is when it started, every release keeps it, and it orders the schedule's runs (ADR-004).
+   */
   pendingRun: z
     .object({ runId: z.string(), since: z.number(), slot: z.number().optional() })
     .nullable(),
@@ -125,9 +128,18 @@ function isRunInFlight({ pendingRun }: InsightDailyRunState, context: Context): 
   return pendingRun !== null && now - pendingRun.since < INSIGHT_DAILY_RUN_EXPIRY_MS;
 }
 
+type PendingRun = NonNullable<InsightDailyRunState["pendingRun"]>;
+type LostRun = NonNullable<z.input<typeof runBoardIntentSchema>["supersedes"]>;
+
+/** The lost run as the run that replaces it records it; an older instance kept no slot. */
+function lostRunOf({ runId, since, slot = since }: PendingRun): LostRun {
+  return { runId, slot, since };
+}
+
 /**
- * The one way a run starts, for a wake and for a request alike: one `runBoard` intent. A run
- * still pending here outlived every lease, so the new run is handed it to record as lost.
+ * The one way a run starts, for a wake and for a request alike: one `runBoard` intent that
+ * carries when it started. A run still pending here outlived every lease, so the new run is
+ * handed it to record as lost.
  */
 function startRun({
   state,
@@ -146,7 +158,8 @@ function startRun({
       context.intent(INSIGHT_DAILY_RUN_INTENT, `run:${run.runId}`, {
         scheduleId: context.key,
         ...run,
-        ...(lost ? { supersedes: { runId: lost.runId, slot: lost.slot ?? lost.since } } : {}),
+        since,
+        ...(lost ? { supersedes: lostRunOf(lost) } : {}),
       }),
     ],
   };

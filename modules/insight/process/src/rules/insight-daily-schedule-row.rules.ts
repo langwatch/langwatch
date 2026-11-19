@@ -14,8 +14,19 @@ import type {
 import type { InsightDailyScheduleState } from "../eventing/insight-daily-schedule.projection.ts";
 import type { InsightRunInFlightState } from "../eventing/insight-run-in-flight.projection.ts";
 
+/** How a last run ended, as the run's row and the run in flight row both keep it. */
+type LastRunColumns = Pick<
+  InsightDailyScheduleState,
+  | "lastRunAt"
+  | "lastRunOutcome"
+  | "lastRunReason"
+  | "lastRunFiled"
+  | "lastRunRenewed"
+  | "lastRunConversationId"
+>;
+
 /** How the row's last run ended; null until a run recorded an outcome. */
-function lastRunOf(state: InsightDailyScheduleState): InsightDailyRun["lastRun"] {
+function lastRunOf(state: LastRunColumns): InsightDailyRun["lastRun"] {
   const { lastRunAt, lastRunOutcome } = state;
   if (lastRunAt === null || lastRunOutcome === null) return null;
   return {
@@ -29,6 +40,20 @@ function lastRunOf(state: InsightDailyScheduleState): InsightDailyRun["lastRun"]
 }
 
 /**
+ * The last run and its id, for every read alike. The run in flight row orders runs, so it
+ * answers once it took an outcome; until then, as on a board from before it, the run's row does.
+ */
+function newestLastRunOf(
+  state: InsightDailyScheduleState,
+  started: InsightRunInFlightState,
+): { runId: string | null; lastRun: InsightDailyRun["lastRun"] } {
+  if (started.lastRunOutcome !== null) {
+    return { runId: started.lastSettledRunId, lastRun: lastRunOf(started) };
+  }
+  return { runId: state.lastRunId, lastRun: lastRunOf(state) };
+}
+
+/**
  * The last run as its person reads it, with its id and its start; a requested run's id is its
  * request's. A run that never reached Langy names no start.
  */
@@ -36,8 +61,7 @@ function ownLastRunOf(
   state: InsightDailyScheduleState,
   started: InsightRunInFlightState,
 ): InsightDailyRunSetting["lastRun"] {
-  const lastRun = lastRunOf(state);
-  const { lastRunId: runId } = state;
+  const { runId, lastRun } = newestLastRunOf(state, started);
   if (lastRun === null || runId === null) return null;
   const { startedAt } = started;
   const ownStart = started.runId === runId && startedAt !== null;
@@ -58,18 +82,23 @@ function runInFlightOf(
   return { runId, conversationId, startedAt };
 }
 
-/** One run row as its person reads it; `lastRun` is null until a run recorded an outcome. */
+/**
+ * One run row as its person reads it, beside its run in flight row (`NO_RUN_STARTED` for a
+ * schedule that has none); `lastRun` is null until a run recorded an outcome.
+ */
 export function dailyRunFromState({
   id,
   state,
+  started,
 }: {
   id: string;
   state: InsightDailyScheduleState;
+  started: InsightRunInFlightState;
 }): InsightDailyRun {
   return {
     id,
     board: { kind: state.boardKind, id: state.boardId, name: state.boardName },
-    lastRun: lastRunOf(state),
+    lastRun: newestLastRunOf(state, started).lastRun,
   };
 }
 
@@ -143,15 +172,20 @@ export function onScheduleFromState({
 /** A schedule as an operator lists it, before its armed wake is read from its process. */
 export type InsightDecidedSchedule = Omit<InsightOperatorDailySchedule, "nextRunAt">;
 
-/** The row as an operator lists it; none while its person never turned it on or off. */
+/**
+ * The row as an operator lists it, beside its run in flight row (`NO_RUN_STARTED` for a
+ * schedule that has none); none while its person never turned it on or off.
+ */
 export function decidedScheduleFromState({
   scheduleId,
   projectId,
   state,
+  started,
 }: {
   scheduleId: string;
   projectId: string;
   state: InsightDailyScheduleState;
+  started: InsightRunInFlightState;
 }): InsightDecidedSchedule[] {
   if (state.state === "undecided") return [];
   const board = { kind: state.boardKind, id: state.boardId, name: state.boardName };
@@ -164,7 +198,7 @@ export function decidedScheduleFromState({
       userId,
       board,
       settings,
-      lastRun: lastRunOf(state),
+      lastRun: newestLastRunOf(state, started).lastRun,
       offReason,
       state: state.state,
       consecutiveSkips,

@@ -10307,7 +10307,7 @@
     {
       "name": "InsightRunInFlightProjection",
       "tableName": "InsightRunInFlightProjection",
-      "documentation": "A daily insights schedule's last run that started, folded from its run events (modules/insight,\nADR-004): in flight until it settles, and the start of the last run once it has.",
+      "documentation": "A daily insights schedule's last run that started, folded from its run events (modules/insight,\nADR-004): in flight until it settles, then the last run: its start and how it ended.",
       "primaryKey": [
         "id"
       ],
@@ -10364,7 +10364,106 @@
           "kind": "scalar",
           "isList": false,
           "isOptional": true,
-          "documentation": "The last run that settled, started or not. NULL until one did."
+          "documentation": "The last run that settled, started or not, and how it ended. NULL until one did."
+        },
+        {
+          "name": "lastRunAt",
+          "columnName": "lastRunAt",
+          "type": "Float",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "lastRunOutcome",
+          "columnName": "lastRunOutcome",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "filed | nothing | failed | skipped"
+        },
+        {
+          "name": "lastRunReason",
+          "columnName": "lastRunReason",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "lastRunFiled",
+          "columnName": "lastRunFiled",
+          "type": "Int",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "lastRunRenewed",
+          "columnName": "lastRunRenewed",
+          "type": "Int",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "How many insights the run found still true and renewed."
+        },
+        {
+          "name": "lastRunConversationId",
+          "columnName": "lastRunConversationId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "newestRunId",
+          "columnName": "newestRunId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "The newest run the row took, started or settled: its id, its slot and when it started\n(NULL on a run that did not carry it). An older run's event leaves the row. NULL until one."
+        },
+        {
+          "name": "newestRunSlot",
+          "columnName": "newestRunSlot",
+          "type": "Float",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "newestRunSince",
+          "columnName": "newestRunSince",
+          "type": "Float",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "lastSettledRunSlot",
+          "columnName": "lastSettledRunSlot",
+          "type": "Float",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "The last settled run's slot and when it started (NULL on a run that did not carry it). An\noutcome of a run older than it leaves the row. NULL until one settled."
+        },
+        {
+          "name": "lastSettledRunSince",
+          "columnName": "lastSettledRunSince",
+          "type": "Float",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
         },
         {
           "name": "createdAt",

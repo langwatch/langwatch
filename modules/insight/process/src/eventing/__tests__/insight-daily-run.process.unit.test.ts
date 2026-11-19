@@ -21,6 +21,8 @@ import {
   type InsightDailyRunState,
   insightRunRequested,
   insightRunSettled,
+  insightScheduleConfigured,
+  insightScheduleWake,
 } from "../insight-daily-run.process.ts";
 
 const T0 = Date.UTC(2026, 9, 10, 9, 37);
@@ -82,7 +84,7 @@ describe("the daily run process", () => {
         {
           intentType: "runBoard",
           messageKey: "run:run-1",
-          payload: { ...SCHEDULE, maxInsights: 3, runId: "run-1", slot: T0 },
+          payload: { ...SCHEDULE, maxInsights: 3, runId: "run-1", slot: T0, since: T0 },
         },
       ]);
     });
@@ -164,7 +166,8 @@ describe("the daily run process", () => {
       expect(first.intents?.[0]?.payload).not.toHaveProperty("supersedes");
       expect(lost.intents?.[0]?.payload).toMatchObject({
         runId: "run-2",
-        supersedes: { runId: "run-1", slot: T0 },
+        since: T0 + longest,
+        supersedes: { runId: "run-1", slot: T0, since: T0 },
       });
     });
 
@@ -173,6 +176,28 @@ describe("the daily run process", () => {
 
       expect(held.intents).toEqual([]);
     });
+  });
+});
+
+describe("given an operator's run and a late wake's run", () => {
+  const HOUR = 60 * 60_000;
+  const settings = { ...SCHEDULE, hour: 9, timezone: "UTC", maxInsights: 3 } as const;
+  const fresh = INITIAL_INSIGHT_DAILY_RUN_STATE;
+  const on = insightScheduleConfigured(fresh, settings, context(T0 - HOUR)).state;
+  const runOf = ({ intents }: { intents?: readonly { payload: unknown }[] }) =>
+    runBoardIntentSchema.parse(intents?.[0]?.payload);
+  const at = (now: number) => ({ ...context(now), at: T0 });
+
+  /** @scenario "A run's slot is never after its start" */
+  it("starts each run at or after its slot, also on a clock behind the event's", () => {
+    const asked = runOf(insightRunRequested(fresh, requested("run-1"), at(T0 + 5_000)));
+    const behind = runOf(insightRunRequested(fresh, requested("run-2"), at(T0 - 5_000)));
+    const lateWake = runOf(insightScheduleWake(on, at(T0 + 2 * HOUR)));
+
+    for (const { slot, since } of [asked, behind, lateWake]) {
+      expect(since).toBeGreaterThanOrEqual(slot);
+    }
+    expect(lateWake.since).toBeGreaterThan(lateWake.slot);
   });
 });
 

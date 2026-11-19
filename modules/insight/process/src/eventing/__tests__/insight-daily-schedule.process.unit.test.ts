@@ -154,7 +154,14 @@ describe("given a schedule that is on and its slot is due", () => {
       {
         intentType: "runBoard",
         messageKey: `run:slot:${slot}`,
-        payload: { ...SCHEDULE, maxInsights: 3, runId: `slot:${slot}`, slot, skippedDaysBefore: 0 },
+        payload: {
+          ...SCHEDULE,
+          maxInsights: 3,
+          runId: `slot:${slot}`,
+          slot,
+          skippedDaysBefore: 0,
+          since: slot + 2_000,
+        },
       },
     ]);
     // The same intent a request writes, but for the run's name.
@@ -242,7 +249,8 @@ describe("given a scheduled run that never recorded an outcome", () => {
     expect(next.intents?.[0]?.payload).toMatchObject({
       runId: `slot:${second}`,
       slot: second,
-      supersedes: { runId: `slot:${first}`, slot: first },
+      since: second,
+      supersedes: { runId: `slot:${first}`, slot: first, since: first },
     });
     expect(next.state.pendingRun).toEqual({ runId: `slot:${second}`, since: second, slot: second });
   });
