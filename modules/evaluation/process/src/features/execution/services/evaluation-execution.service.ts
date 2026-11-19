@@ -379,6 +379,38 @@ export class EvaluationExecutionService {
       });
     }
 
+    return this.runLangevalsEvaluation({
+      builtInType,
+      evaluator,
+      data: data.data,
+      settings,
+      droppedCategories,
+      projectId,
+      idempotencyKey,
+      signal,
+    });
+  }
+
+  /** A built-in evaluator langevals runs, with the model env and headers its provider needs. */
+  private async runLangevalsEvaluation({
+    builtInType,
+    evaluator,
+    data,
+    settings,
+    droppedCategories,
+    projectId,
+    idempotencyKey,
+    signal,
+  }: {
+    builtInType: EvaluatorTypes;
+    evaluator: NonNullable<(typeof AVAILABLE_EVALUATORS)[EvaluatorTypes]>;
+    data: Record<string, unknown>;
+    settings: Record<string, unknown> | undefined;
+    droppedCategories: string[];
+    projectId: string;
+    idempotencyKey: string | undefined;
+    signal: AbortSignal | undefined;
+  }): Promise<SingleEvaluationResult> {
     const evaluatorEnv = await this.deps.modelEnvResolver.resolveForEvaluator({
       evaluatorType: builtInType,
       evaluator,
@@ -388,7 +420,7 @@ export class EvaluationExecutionService {
 
     const result = await this.deps.langevalsClient.evaluate({
       evaluatorType: builtInType,
-      data: data.data,
+      data,
       settings: settings ?? {},
       env: evaluatorEnv.env,
       headers: evaluatorEnv.headers,
@@ -399,7 +431,7 @@ export class EvaluationExecutionService {
 
     return this.deps.evaluators.augmentResult({
       evaluatorType: builtInType,
-      mappedData: data.data,
+      mappedData: data,
       settings,
       droppedCategories,
       result,
