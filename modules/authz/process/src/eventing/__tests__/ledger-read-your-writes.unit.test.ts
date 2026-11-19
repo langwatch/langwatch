@@ -2,6 +2,7 @@
  * Bounded read-your-writes hold; caller can require projection or pass if
  * fold converges.
  */
+import type { DefineRoleCommandData } from "@langwatch/authz-contract";
 import { HandledError } from "@langwatch/handled-error";
 import { toDate } from "@langwatch/time";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -389,5 +390,86 @@ describe("given a role deletion", () => {
       where: { id: "role_1", organizationId: ORG_ID, deletedAt: null },
       select: { id: true },
     });
+  });
+});
+
+describe("given an api key's own role defined again", () => {
+  const apiKeyRole = {
+    organizationId: ORG_ID,
+    roleId: "apikey:key_1",
+    name: "apikey:key_1",
+    permissions: ["langy:view"],
+    kind: "system_api_key" as const,
+    actor: ACTOR,
+  };
+  const liveRow = (permissions: string[]) => ({
+    name: "apikey:key_1",
+    description: null,
+    permissions,
+  });
+  const definedPermissions = (sent: { verb: string; data: unknown }[]) =>
+    sent
+      .filter((entry) => entry.verb === "defineRole")
+      .map((entry) => (entry.data as DefineRoleCommandData).role.permissions);
+
+  describe("when a retry restates the definition the live role already carries", () => {
+    /** @scenario "A retried API key role definition records no second definition" */
+    it("records one role definition, not a second for the retry", async () => {
+      const { writer, db, sent, epoch } = harness({});
+      db.role.findFirst.mockResolvedValueOnce(null).mockResolvedValue(liveRow(["langy:view"]));
+
+      await writer.defineRole(apiKeyRole);
+      await writer.defineRole(apiKeyRole);
+
+      expect(definedPermissions(sent)).toEqual([["langy:view"]]);
+      expect(epoch.bump).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe("when the role changes and then changes back", () => {
+    /** @scenario "A changed API key role definition is recorded, a change back included" */
+    it("records every change, the change back included", async () => {
+      const { writer, db, sent } = harness({});
+      const first = ["langy:view"];
+      const second = ["langy:view", "traces:view"];
+      db.role.findFirst
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(liveRow(first))
+        .mockResolvedValueOnce(liveRow(first))
+        .mockResolvedValueOnce(liveRow(second))
+        .mockResolvedValueOnce(liveRow(second))
+        .mockResolvedValueOnce(liveRow(first));
+
+      await writer.defineRole({ ...apiKeyRole, permissions: first });
+      await writer.defineRole({ ...apiKeyRole, permissions: second });
+      await writer.defineRole({ ...apiKeyRole, permissions: first });
+
+      expect(definedPermissions(sent)).toEqual([first, second, first]);
+    });
+  });
+});
+
+describe("given a custom role defined again with the definition it already carries", () => {
+  /** @scenario "A custom role definition is recorded even when it restates the live row" */
+  it("still records the definition each time", async () => {
+    const { writer, db, sent } = harness({});
+    db.role.findFirst.mockResolvedValue({
+      name: "custom_viewer",
+      description: null,
+      permissions: ["traces:view"],
+    });
+    const customRole = {
+      organizationId: ORG_ID,
+      roleId: "role_1",
+      name: "custom_viewer",
+      permissions: ["traces:view"],
+      kind: "custom" as const,
+      actor: ACTOR,
+    };
+
+    await writer.defineRole(customRole);
+    await writer.defineRole(customRole);
+
+    expect(sent.filter((entry) => entry.verb === "defineRole")).toHaveLength(2);
   });
 });

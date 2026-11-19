@@ -965,6 +965,15 @@ export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
     if (kind === "custom") {
       await this.refuseAddedPlatformPermissions({ organizationId, roleId, permissions });
     }
+    const definition = { organizationId, roleId, name, description, permissions };
+    // A retried key mint restates its own role; when the live row already says the same, a second
+    // role_defined would only add an audit entry. Compared with the live row, not a content-derived
+    // command id, so A then B then A still records the change back to A. The bump stays: the
+    // earlier try may have timed out before reaching its own.
+    if (kind === "system_api_key" && (await this.isLiveRole(definition))) {
+      await this.options.epoch.bump({ organizationId });
+      return;
+    }
     const occurredAtMs = this.now();
     const role: DefineRoleCommandData["role"] = {
       roleId,
@@ -994,21 +1003,36 @@ export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
       // The CANONICAL Role head, like every other read-your-writes check
       // here: a deleted row confirms nothing, and the compat CustomRole rows
       // can carry a definition the fold never authored.
-      check: async () => {
-        const row = await this.options.reads.findLiveRole({ roleId, organizationId });
-        return (
-          row !== null &&
-          row.name === name &&
-          (row.description ?? null) === (description || null) &&
-          samePermissions({
-            stored: row.permissions,
-            wanted: permissions,
-          })
-        );
-      },
+      check: () => this.isLiveRole(definition),
       required: requireProjection,
     });
     await this.options.epoch.bump({ organizationId });
+  }
+
+  /** Whether the canonical live Role row already carries exactly this definition. */
+  private async isLiveRole({
+    organizationId,
+    roleId,
+    name,
+    description,
+    permissions,
+  }: {
+    organizationId: string;
+    roleId: string;
+    name: string;
+    description: string | undefined;
+    permissions: string[];
+  }): Promise<boolean> {
+    const row = await this.options.reads.findLiveRole({ roleId, organizationId });
+    return (
+      row !== null &&
+      row.name === name &&
+      (row.description ?? null) === (description || null) &&
+      samePermissions({
+        stored: row.permissions,
+        wanted: permissions,
+      })
+    );
   }
 
   /**

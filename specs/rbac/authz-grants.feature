@@ -408,6 +408,25 @@ Feature: Authorization grants
     Then the write is not confirmed
 
   @unit
+  Scenario: A retried API key role definition records no second definition
+    Given an API key's own role whose live row already carries the requested definition
+    When the same role definition is written again
+    Then no second role definition is recorded
+    And the organization's access cache is still refreshed
+
+  @unit
+  Scenario: A changed API key role definition is recorded, a change back included
+    Given an API key's own role defined once
+    When it is redefined with other permissions and then with the first ones again
+    Then each of the three definitions is recorded
+
+  @unit
+  Scenario: A custom role definition is recorded even when it restates the live row
+    Given a custom role whose live row already carries the requested definition
+    When the same role definition is written again
+    Then the definition is recorded again
+
+  @unit
   Scenario: Deleting a role binding twice answers not found the second time
     Given a role binding whose grant was revoked but whose compatibility row has not been removed yet
     When the binding is looked up for deletion

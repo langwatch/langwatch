@@ -8,7 +8,7 @@ import { EventEmitter } from "node:events";
  */
 import type { AgentApi } from "@langwatch/agent-contract";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
-import type { AuthzApi } from "@langwatch/authz-contract";
+import { AuthzGrantNotConfirmedError, type AuthzApi } from "@langwatch/authz-contract";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import type { DatasetApi } from "@langwatch/dataset-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
@@ -280,6 +280,24 @@ describe("LangyModule.startUnattendedTurn", () => {
         turnId: "turn_1",
       });
       expect(dispatched).toHaveBeenCalledOnce();
+    });
+  });
+
+  describe("given a turn whose held session key mint is refused while its grant lands", () => {
+    /** @scenario "A held key's refusal reaches the caller with the pace it asked for" */
+    it("lets the refusal reach the caller with the pace the mint asked for", async () => {
+      const { startUnattendedTurn, unattendedDispatched } = await harness();
+      unattendedDispatched.mockImplementationOnce(async (input) => {
+        await input.unattended.countTurn();
+        throw new AuthzGrantNotConfirmedError({ retryable: true, retryAfterMs: 40_000 });
+      });
+
+      await expect(startUnattendedTurn("project-free")).rejects.toMatchObject({
+        code: "authz_grant_not_confirmed",
+        retryable: true,
+        retryAfterMs: 40_000,
+        meta: { retryAfterMs: 40_000 },
+      });
     });
   });
 
