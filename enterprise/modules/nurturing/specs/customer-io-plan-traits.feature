@@ -157,6 +157,13 @@ Feature: Customer.io knows each team's real plan
     Then the older fact and the tied catch-up leave the copy unchanged, so they send nothing
     And the newer catch-up replaces it
 
+  @integration
+  Scenario: The plan fold's row keeps the ids it folded and the fact that won
+    Given the plan fold stored an organization's plan, won by one subscription fact
+    When a delivery of an older fact stores the fold's state again
+    Then the row still holds the winning fact and its event id
+    And it holds the ids of that latest delivery, so a redelivery of it folds nothing
+
   @unit
   Scenario: A catch-up fact with no Customer.io channel fails visibly
     Given the deployment names no Customer.io key

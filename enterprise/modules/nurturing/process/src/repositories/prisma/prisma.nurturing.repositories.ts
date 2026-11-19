@@ -4,6 +4,7 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
 import type { NurturingRepositories } from "../nurturing.repositories.ts";
 import { PrismaNurturingErasedUserRepository } from "./prisma.nurturing-erased-user.repository.ts";
+import { PrismaNurturingEvaluationDayRepository } from "./prisma.nurturing-evaluation-day.repository.ts";
 import { PrismaNurturingVirtualKeyRepository } from "./prisma.nurturing-gateway-key.repository.ts";
 import { PrismaNurturingMemberSourceRepository } from "./prisma.nurturing-member-source.repository.ts";
 import { PrismaNurturingMilestonesRepository } from "./prisma.nurturing-milestones.repository.ts";
@@ -19,16 +20,17 @@ import { PrismaNurturingTracedProjectRepository } from "./prisma.nurturing-trace
 import { PrismaNurturingUncopiedProjectRepository } from "./prisma.nurturing-uncopied-project.repository.ts";
 
 /**
- * Nurturing's own tables: its organizations, usage view, trace days, erasure marks, and its
- * copies of project placements, organization creations, members, plans, gateway keys, personal
- * owners and traced projects, and the projects it saw with no placement copy. The copies that
- * read the marks each read them over the same client, so they share them as the table does.
+ * Nurturing's own tables: its organizations, usage view, trace and evaluation days, erasure marks,
+ * and its copies of project placements, organization creations, members, plans, gateway keys,
+ * personal owners and traced projects, and the projects it saw with no placement copy. The copies
+ * that read the marks each read them over the same client, so they share them as the table does.
  */
 const ownedRepositories = prismaRepositories({
   milestones: PrismaNurturingMilestonesRepository,
   erasedUsers: PrismaNurturingErasedUserRepository,
   projectUsage: PrismaNurturingProjectUsageRepository,
   traceDays: PrismaNurturingTraceDayRepository,
+  evaluationDays: PrismaNurturingEvaluationDayRepository,
   placements: PrismaNurturingProjectPlacementRepository,
   organizationsCreated: PrismaNurturingOrganizationCreatedRepository,
   members: PrismaNurturingOrganizationMemberRepository,

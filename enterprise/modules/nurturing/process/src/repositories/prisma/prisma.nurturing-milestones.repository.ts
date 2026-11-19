@@ -112,8 +112,59 @@ export class PrismaNurturingMilestonesRepository
   }
 
   /**
+   * One upsert, order-free as the key copy's holder is: a later stamp replaces the admin, one stamp
+   * keeps the greater id (byte order, as the memory twin compares), and GREATEST keeps the latest
+   * stamp. A marked admin is written NULL at the fact's stamp, so it clears an admin stamped
+   * earlier. The upsert writes nothing when it would change nothing, so a redelivered or replayed
+   * fact leaves the row, `updatedAt` included, as it was. The re-check after it clears an admin
+   * whose erasure raced the upsert; the upsert's own mark check only shortens how long such a
+   * row is visible.
+   */
+  async recordAdminFact({
+    organizationId,
+    adminUserId,
+    at,
+    seeded,
+  }: Parameters<NurturingOrganizationAdminRepository["recordAdminFact"]>[0]): Promise<void> {
+    const adminAt = adminUserId === null ? null : new Date(at);
+    const marked = PrismaNurturingErasedUserRepository.markExists(adminUserId);
+    await this.#database.$executeRaw`
+      INSERT INTO "NurturingOrganization" AS known
+        ("organizationId", "adminUserId", "adminAt", "seeded", "updatedAt")
+      VALUES (${organizationId}, CASE WHEN ${marked} THEN NULL ELSE ${adminUserId} END,
+              (${adminAt}::timestamptz AT TIME ZONE 'UTC')::timestamp(3), ${seeded}, now())
+      ON CONFLICT ("organizationId") DO UPDATE SET
+        "adminUserId" = CASE
+            WHEN EXCLUDED."adminAt" > COALESCE(known."adminAt", '-infinity'::timestamp)
+              THEN EXCLUDED."adminUserId"
+            WHEN EXCLUDED."adminAt" = known."adminAt"
+              THEN GREATEST(known."adminUserId" COLLATE "C", EXCLUDED."adminUserId" COLLATE "C")
+            ELSE known."adminUserId" END,
+        "adminAt" = GREATEST(known."adminAt", EXCLUDED."adminAt"),
+        "seeded" = known."seeded" OR EXCLUDED."seeded",
+        "updatedAt" = now()
+      WHERE EXCLUDED."adminAt" > COALESCE(known."adminAt", '-infinity'::timestamp)
+         OR (EXCLUDED."adminAt" = known."adminAt"
+             AND known."adminUserId" COLLATE "C" IS DISTINCT FROM
+                 GREATEST(known."adminUserId" COLLATE "C", EXCLUDED."adminUserId" COLLATE "C"))
+         OR (EXCLUDED."seeded" AND NOT known."seeded")
+    `;
+    if (adminUserId === null) return;
+    // The upsert can read no mark for an admin whose erasure has not committed it yet, then land
+    // after the erasure's clearing UPDATE passed. This separate statement closes that race: if it
+    // starts after the mark commits, it sees the mark; if before, the upsert committed before the
+    // mark, so the erasure's UPDATE, which starts after its mark, sees the row. The cleared admin
+    // keeps its stamp, as `forgetAdmin` clears one, so no older fact refills it.
+    await this.#database.$executeRaw`
+      UPDATE "NurturingOrganization"
+         SET "adminUserId" = NULL, "updatedAt" = now()
+       WHERE "organizationId" = ${organizationId} AND "adminUserId" = ${adminUserId} AND ${marked}`;
+  }
+
+  /**
    * Marks the account erased first, so no read names them admin from then on, even where a late
-   * fact stores them again; then clears the rows naming them.
+   * fact stores them again; then clears the rows naming them. Each keeps its admin's stamp, so no
+   * older fact refills it.
    */
   async forgetAdmin({ adminUserId }: Readonly<{ adminUserId: string }>): Promise<void> {
     await this.#erasedUsers.markErased({ userId: adminUserId });

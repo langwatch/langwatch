@@ -19,6 +19,31 @@ type MemoryOrganization = NurturingOrganizationRow &
     codingFirstDays: number[];
   }>;
 
+/** A row as Postgres creates it: every column at its default. */
+function newOrganization(organizationId: string): MemoryOrganization {
+  return {
+    organizationId,
+    adminUserId: null,
+    seeded: false,
+    evaluationCount: 0,
+    simulationRunCount: 0,
+    codingFirstSessionAt: null,
+    codingAgentTypes: [],
+    codingActiveDays: 0,
+    codingLastActiveDay: null,
+    codingTerminalTypes: [],
+    codingRepositoryKeys: [],
+    codingFirstDays: [],
+  };
+}
+
+/** The greater id, as GREATEST under `COLLATE "C"` compares ids (ASCII); null when both are. */
+function greaterIdOf(known: string | null, incoming: string | null): string | null {
+  if (known === null) return incoming;
+  if (incoming === null) return known;
+  return incoming > known ? incoming : known;
+}
+
 /** The Postgres twin's semantics over nurturing's own organizations. */
 export class MemoryNurturingMilestonesRepository
   implements
@@ -29,6 +54,8 @@ export class MemoryNurturingMilestonesRepository
 {
   readonly #organizations = new Map<string, MemoryOrganization>();
   readonly #lastTraceAt = new Map<string, number>();
+  /** The `adminAt` column: the stamp of the fact that named the row's admin. */
+  readonly #adminAt = new Map<string, number>();
 
   /** `erasedUsers` is the marks every memory copy of one composition shares. */
   static create({
@@ -72,21 +99,37 @@ export class MemoryNurturingMilestonesRepository
       organizationId,
       known
         ? { ...known, adminUserId: adminUserId ?? known.adminUserId }
-        : {
-            organizationId,
-            adminUserId,
-            seeded,
-            evaluationCount: 0,
-            simulationRunCount: 0,
-            codingFirstSessionAt: null,
-            codingAgentTypes: [],
-            codingActiveDays: 0,
-            codingLastActiveDay: null,
-            codingTerminalTypes: [],
-            codingRepositoryKeys: [],
-            codingFirstDays: [],
-          },
+        : { ...newOrganization(organizationId), adminUserId, seeded },
     );
+  }
+
+  /**
+   * As the Postgres upsert and its re-check fold it. The mark is read before the row, so no other
+   * write lands between the read of the row and its write.
+   */
+  async recordAdminFact({
+    organizationId,
+    adminUserId,
+    at,
+    seeded,
+  }: Parameters<NurturingOrganizationAdminRepository["recordAdminFact"]>[0]): Promise<void> {
+    const [erased] =
+      adminUserId === null ? [] : await this.#erasedUsers.findErased({ userIds: [adminUserId] });
+    const named = erased ? null : adminUserId;
+    const known = this.#organizations.get(organizationId) ?? newOrganization(organizationId);
+    const knownAt = this.#adminAt.get(organizationId);
+    let admin = known.adminUserId;
+    if (adminUserId !== null && (knownAt === undefined || at >= knownAt)) {
+      admin = knownAt === at ? greaterIdOf(known.adminUserId, named) : named;
+      this.#adminAt.set(organizationId, at);
+    }
+    // As the re-check does: a marked admin the row already named at this stamp goes.
+    if (erased && admin === adminUserId) admin = null;
+    this.#organizations.set(organizationId, {
+      ...known,
+      adminUserId: admin,
+      seeded: known.seeded || seeded,
+    });
   }
 
   async forgetAdmin({ adminUserId }: Readonly<{ adminUserId: string }>): Promise<void> {

@@ -113,6 +113,12 @@ Feature: Per-email usage reaches Customer.io from nurturing's own project rows
     Then the project's evaluation row holds that day once
     And later evaluations that day write nothing
 
+  @integration
+  Scenario: A project's evaluation days are kept once each, whatever order and however often they land
+    Given evaluations of a project completed on three UTC days
+    When their days are written one at a time, in one order or its reverse, then again in one batch with repeats
+    Then nurturing's evaluation-day copy holds each of the three days once for the project
+
   @unit @integration
   Scenario: A trace is its root span, counted on its project's day
     Given root spans of a project's traces appended on one UTC day

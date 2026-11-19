@@ -15,9 +15,10 @@ Feature: Nurturing keeps its own copy of personal owners and traced projects, fr
   is written when nurturing handles lw.user.erased, after user has committed the erasure: a
   signal about the account delivered in between, however long that handling lags or retries,
   still sends, and an identify then can recreate its Customer.io person, which nurturing never
-  deletes. Accepted
-  residue: a personal-owner fact delivered after the erasure (a delayed listing or a redelivered
-  workspace fact) writes the owner row again, as the owner copy does not read the marks.
+  deletes. A personal-owner fact delivered after the mark (a delayed listing, a redelivered
+  workspace fact or a replay) writes no owner row for the account: the owner write reads the
+  marks, and reads them again after the write, so a fact racing the erasure leaves no owner row
+  either.
 
   @unit @integration
   Scenario: A new personal workspace leaves one owner row naming its member
@@ -74,6 +75,48 @@ Feature: Nurturing keeps its own copy of personal owners and traced projects, fr
     When a late project-created fact names user-1 admin of it again
     Then nurturing reads the organization as having no admin
     And so no plan, usage or gateway key send names user-1 its admin
+
+  @unit @integration
+  Scenario: A personal-owner fact landing after the owner's erasure writes no owner row
+    Given user-1 owned a personal project and was erased
+    When a personal-owner fact naming user-1 lands late, for that project or another
+    Then nurturing holds no owner row naming user-1, and user-2's owner row is written as before
+
+  @integration
+  Scenario: A personal-owner fact landing while its owner's erasure commits leaves no owner row
+    Given nurturing wrote an owner row naming user-1
+    And user-1's erasure mark has committed but its delete has not run
+    When the owner fact is delivered again
+    Then nurturing holds no owner row naming user-1
+
+  @integration
+  Scenario: A personal-owner fact for a marked owner writes no row even if its re-check never runs
+    Given user-1 is marked erased
+    When an owner fact naming user-1 is written and the worker stops before its re-check
+    Then the write fails, so the fact is retried
+    And nurturing holds no owner row naming user-1
+
+  @unit @integration
+  Scenario: A late project-created fact naming an erased admin writes no admin
+    Given an organization's row names user-2 admin, from a fact stamped T1
+    And user-1 was erased
+    When a project-created fact stamped T2, after T1, names user-1 admin
+    Then the organization's row names no admin, stamped T2
+    And a fact stamped before T2 naming another admin does not fill it
+
+  @integration
+  Scenario: A project-created fact landing while its admin's erasure commits leaves no admin
+    Given nurturing named user-1 admin of an organization
+    And user-1's erasure mark has committed but its clearing has not run
+    When the project-created fact is delivered again
+    Then the organization's row names no admin
+
+  @integration
+  Scenario: A project-created fact for a marked admin writes no admin even if its re-check never runs
+    Given user-1 is marked erased
+    When a project-created fact naming user-1 admin is written and the worker stops before its re-check
+    Then the write fails, so the fact is retried
+    And the organization's row names no admin
 
   @unit
   Scenario: A signal about an erased account, delivered late, sends them nothing

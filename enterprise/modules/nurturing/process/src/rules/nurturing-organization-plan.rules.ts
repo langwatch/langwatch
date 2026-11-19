@@ -15,6 +15,21 @@ export type NurturingPlanHeld =
   | Readonly<{ outcome: "none" }>;
 
 /**
+ * The plan fold's state: the fact the copy holds and the fact event that last changed it, the one
+ * whose delivery may tell Customer.io.
+ */
+export type NurturingPlanFoldState = Readonly<{
+  held: NurturingPlanHeld;
+  /** The id of the event that last changed the copy; null until one did. */
+  winnerEventId: string | null;
+  /**
+   * Epoch ms of the latest fact folded, as the fold executor reads it. Always the held fact's own
+   * stamp: a later fact always wins, so no folded fact is later than the held one.
+   */
+  LastEventOccurredAt: number;
+}>;
+
+/**
  * Whether a subscription fact changes nurturing's plan copy, as ADR-174 decision 17 folds billing's
  * facts: the newest stamp wins, and a real fact wins a tie over a catch-up. So a newer catch-up
  * corrects a wrong plan, and on any other tie the held fact stays.

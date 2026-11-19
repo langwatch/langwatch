@@ -2,8 +2,8 @@
 
 /**
  * Nurturing's erasure marks (`NurturingErasedUser`): one per erased account, a hash of its id and
- * never the id. The member, organization and key copies, and every send to a person, read them
- * here; the personal-owner copy does not, its rows being accepted residue.
+ * never the id. The member, organization, key and personal-owner copies, and every send to a
+ * person, read them here.
  */
 export interface NurturingErasedUserRepository {
   /** Marks the account erased; marking it again changes nothing. */

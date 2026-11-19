@@ -202,6 +202,24 @@ Feature: Nurturing sends the signals its owners record
     When they all settle
     Then every one succeeds and the organization has one row
 
+  # Admin map (projections build plan, row 5a): the admin and seeded flag are folded order-free
+  # from project's created facts, so a late, redelivered or replayed fact leaves the row as live
+  # delivery would. The admin is the latest-stamped one, no longer the latest delivered; seeded
+  # turns on for any backfilled fact, no longer only the first delivered.
+  @unit @integration
+  Scenario: The organization's admin is the latest-stamped one whatever order the facts land in
+    Given project's created facts for one organization naming admins at different stamps
+    And a later fact naming no admin, from project's backfill
+    When they land in one order, or in its reverse
+    Then the organization's admin is the one the latest-stamped fact naming an admin names
+    And the organization is seeded
+
+  @integration
+  Scenario: A redelivered project-created fact leaves the organization's row as it was
+    Given nurturing folded a project's created fact into its organization's row
+    When the same fact is delivered again
+    Then the row is unchanged, its update time included
+
   @unit
   Scenario: An evaluation in an organization nurturing never learned raises nothing
     Given a project its owners hold, in an organization nurturing never learned

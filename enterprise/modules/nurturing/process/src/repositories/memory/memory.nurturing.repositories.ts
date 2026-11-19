@@ -5,6 +5,7 @@ import { nowInstant } from "@langwatch/time";
 import type { NurturingClaimRepository } from "../nurturing-claim.repository.ts";
 import type { NurturingRepositories } from "../nurturing.repositories.ts";
 import { MemoryNurturingErasedUserRepository } from "./memory.nurturing-erased-user.repository.ts";
+import { MemoryNurturingEvaluationDayRepository } from "./memory.nurturing-evaluation-day.repository.ts";
 import { MemoryNurturingVirtualKeyRepository } from "./memory.nurturing-gateway-key.repository.ts";
 import { MemoryNurturingMemberSourceRepository } from "./memory.nurturing-member-source.repository.ts";
 import { MemoryNurturingMilestonesRepository } from "./memory.nurturing-milestones.repository.ts";
@@ -58,7 +59,8 @@ export class MemoryNurturingRepositories {
       virtualKeys: MemoryNurturingVirtualKeyRepository.create({ erasedUsers }),
       projectUsage: MemoryNurturingProjectUsageRepository.create(),
       traceDays: MemoryNurturingTraceDayRepository.create(),
-      personalProjects: MemoryNurturingPersonalProjectRepository.create(),
+      evaluationDays: MemoryNurturingEvaluationDayRepository.create(),
+      personalProjects: MemoryNurturingPersonalProjectRepository.create({ erasedUsers }),
       tracedProjects: MemoryNurturingTracedProjectRepository.create(),
       uncopiedProjects: MemoryNurturingUncopiedProjectRepository.create(),
       claims: MemoryNurturingClaimRepository.create(),
