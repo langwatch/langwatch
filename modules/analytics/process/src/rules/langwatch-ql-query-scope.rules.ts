@@ -287,10 +287,9 @@ function buildWindowPredicates({
 }
 
 /**
- * The members' picks as one predicate on a view's rows. A fanned-out view keeps only the lowest
- * project's copy (tasks#1212), so a pick on that copy would drop a row a sibling's window admits:
- * its picks run on the per-project copies, under the same row policy, and admit the row's keys.
- * The plain `IN` list leads.
+ * One predicate for the members' picks. A fanned-out view keeps only the lowest project's copy
+ * (tasks#1212), which alone would drop a row a sibling's window admits, so the picks run on the
+ * per-project copies, under the same row policy, and admit the row's keys. Plain `IN` list leads.
  */
 function windowPredicate({
   view,
