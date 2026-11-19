@@ -6,9 +6,11 @@ import {
   ModelProviderDisabledError,
   type ModelProviderApi,
   ModelProviderUnavailableError,
+  type PrivateEndpointBindingWire,
 } from "@langwatch/model-provider-contract";
 import type { LanguageModel } from "ai";
 
+import type { PrivateModelEndpointService } from "../features/private-endpoint/services/private-model-endpoint.service.ts";
 import { handleForParameters } from "../rules/execution-handle.rules.ts";
 import {
   getProjectModelProviders,
@@ -38,6 +40,8 @@ type ModelProviderExecutionHandleInput = {
   projectId: string;
   model?: string;
   featureKey?: string;
+  /** The project's organization's bound hostnames, when the caller already read them. */
+  privateEndpointBindings?: readonly PrivateEndpointBindingWire[];
 };
 
 /**
@@ -70,6 +74,8 @@ export type ModelProviderExecutionHandleOptions = {
   codexHandles?: ModelProviderCodexHandle;
   /** Writes each answered call's usage to the spend ledger; absent writes nothing (ADR-193). */
   metering?: Pick<ModelProviderUsageMeteringService, "metered">;
+  /** Where the organization's bound hostnames are read, sent to nlpgo with the call (ADR-203). */
+  privateEndpoints?: Pick<PrivateModelEndpointService, "bindingsForOrganization">;
 };
 
 async function resolveModel({
@@ -235,6 +241,11 @@ export class ModelProviderExecutionHandleService {
       parameters: litellmParams,
       executionProxyBaseUrl: input.executionProxyBaseUrl,
       internalSecret: input.nlpInternalSecret,
+      privateEndpoints:
+        input.privateEndpointBindings ??
+        (await input.privateEndpoints?.bindingsForOrganization({
+          organizationId: project.team.organizationId,
+        })),
     });
     return input.metering
       ? input.metering.metered(handle, {

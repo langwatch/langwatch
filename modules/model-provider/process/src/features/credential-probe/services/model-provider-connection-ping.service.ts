@@ -12,6 +12,7 @@ import {
   findModelProviderDefinition,
   type ModelProvider,
   type ModelProviderCredentialVerdict,
+  type PrivateEndpointBindingWire,
 } from "@langwatch/model-provider-contract";
 import { createLogger } from "@langwatch/observability";
 import { LANGY_VK_SECRET_NAME, type SecretApi } from "@langwatch/secret-contract";
@@ -65,10 +66,13 @@ export class ModelProviderConnectionPingService {
     row,
     projectId,
     credential,
+    privateEndpoints,
   }: {
     row: Pick<ModelProvider, "id" | "provider" | "customModels">;
     projectId: string | undefined;
     credential: ModelProviderCredentialVerdict;
+    /** The row's organization's bound hostnames, which the ping carries to nlpgo. */
+    privateEndpoints?: readonly PrivateEndpointBindingWire[];
   }): Promise<ModelProviderCredentialVerdict> {
     if (credential.outcome === "refused") return credential;
     if (credential.outcome === "unchecked" && UNPINGABLE_CREDENTIALS.includes(credential.reason)) {
@@ -81,7 +85,7 @@ export class ModelProviderConnectionPingService {
     const reply =
       row.provider === CODEX_PROVIDER_KEY
         ? await this.sendThroughGateway({ model, projectId })
-        : await this.send({ row, model, projectId });
+        : await this.send({ row, model, projectId, privateEndpoints });
     if (reply.outcome === "generated") return { outcome: "verified", valid: true };
     return this.refusalOf({
       provider: row.provider,
@@ -94,10 +98,12 @@ export class ModelProviderConnectionPingService {
     row,
     model,
     projectId,
+    privateEndpoints,
   }: {
     row: Pick<ModelProvider, "id" | "provider">;
     model: string;
     projectId: string;
+    privateEndpoints: readonly PrivateEndpointBindingWire[] | undefined;
   }): Promise<ModelProviderPingReply> {
     try {
       const parameters = await this.options.execution.prepareRow({ id: row.id, model, projectId });
@@ -105,6 +111,7 @@ export class ModelProviderConnectionPingService {
         providerKey: row.provider,
         model: `${row.provider}/${model}`,
         parameters,
+        ...(privateEndpoints && privateEndpoints.length > 0 ? { privateEndpoints } : {}),
       });
     } catch (error) {
       return {

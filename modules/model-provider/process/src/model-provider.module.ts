@@ -17,6 +17,7 @@ import { modelDefaultsRest } from "./transport/model-defaults.rest.ts";
 import { modelProviderRest } from "./transport/model-provider.rest.ts";
 import { modelProviderTrpcTransport } from "./transport/model-provider.trpc.ts";
 import { playgroundRest } from "./transport/playground.rest.ts";
+import { privateModelEndpointTrpcTransport } from "./transport/private-model-endpoint.trpc.ts";
 import { translateTrpcTransport } from "./transport/translate.trpc.ts";
 
 export const modelProviderProcessModule: PublishedProcessModule<
@@ -34,6 +35,7 @@ export const modelProviderProcessModule: PublishedProcessModule<
     modelProviderTrpcTransport,
     llmModelCostTrpcTransport,
     translateTrpcTransport,
+    privateModelEndpointTrpcTransport,
   )
   .provideMiddlewareContext({
     modelDefaultsRestCredential: (request) => {

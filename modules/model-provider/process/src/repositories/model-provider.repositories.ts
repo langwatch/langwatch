@@ -2,6 +2,7 @@ import type { ModelCostRepository } from "./model-cost.repository.ts";
 import type { ModelDefaultRepository } from "./model-default.repository.ts";
 import type { ModelProviderRateLimitRepository } from "./model-provider-rate-limit.repository.ts";
 import type { ModelProviderRepository } from "./model-provider.repository.ts";
+import type { PrivateModelEndpointRepository } from "./private-model-endpoint.repository.ts";
 
 /**
  * The stores this module owns. Chosen once, at boot, by the registry
@@ -13,4 +14,6 @@ export interface ModelProviderRepositories {
   readonly costs: ModelCostRepository;
   /** The fixed windows a connection test is metered in. */
   readonly rateLimits: ModelProviderRateLimitRepository;
+  /** Private endpoints staff register and the hostnames organizations bind (ADR-203). */
+  readonly privateEndpoints: PrivateModelEndpointRepository;
 }

@@ -308,6 +308,46 @@ export class TestModelProviderService implements ModelProviderApi {
   applyCodexCodingDefaults(): Promise<void> {
     return Promise.resolve();
   }
+
+  privateEndpointBindingsForOrganization(): Promise<[]> {
+    return Promise.resolve([]);
+  }
+
+  privateEndpointBindingsForProject(): Promise<[]> {
+    return Promise.resolve([]);
+  }
+
+  listPrivateEndpointsForOrganization(): Promise<[]> {
+    return Promise.resolve([]);
+  }
+
+  listPrivateEndpointsForStaff(): Promise<[]> {
+    return Promise.resolve([]);
+  }
+
+  bindPrivateEndpointHostname(): Promise<never> {
+    return Promise.reject(new Error("Not used by Coding agent tests."));
+  }
+
+  rebindPrivateEndpointHostname(): Promise<never> {
+    return Promise.reject(new Error("Not used by Coding agent tests."));
+  }
+
+  unbindPrivateEndpointHostname(): Promise<never> {
+    return Promise.reject(new Error("Not used by Coding agent tests."));
+  }
+
+  registerPrivateEndpoint(): Promise<never> {
+    return Promise.reject(new Error("Not used by Coding agent tests."));
+  }
+
+  updatePrivateEndpoint(): Promise<never> {
+    return Promise.reject(new Error("Not used by Coding agent tests."));
+  }
+
+  removePrivateEndpoint(): Promise<never> {
+    return Promise.reject(new Error("Not used by Coding agent tests."));
+  }
 }
 
 /** The log and metric reactions, inert unless a test hands its own. */

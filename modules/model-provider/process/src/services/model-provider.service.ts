@@ -57,6 +57,7 @@ import { ModelProviderDefaultsWriteService } from "../features/defaults/services
 import { ModelProviderDefaultsService } from "../features/defaults/services/model-provider-defaults.service.ts";
 import { ModelProviderOnboardingDefaultsService } from "../features/defaults/services/model-provider-onboarding-defaults.service.ts";
 import { ModelProviderCostsService } from "../features/model-cost/services/model-provider-costs.service.ts";
+import type { PrivateModelEndpointService } from "../features/private-endpoint/services/private-model-endpoint.service.ts";
 import type { ModelCostRepository } from "../repositories/model-cost.repository.ts";
 import type { ModelDefaultRepository } from "../repositories/model-default.repository.ts";
 import type { ModelProviderRepository } from "../repositories/model-provider.repository.ts";
@@ -94,6 +95,8 @@ interface ModelProviderServiceOptions {
   ids: ModelProviderIdService;
   /** The own-decision-model flag (ADR-182 decision 4). */
   isOwnDecisionModelAllowed: OwnDecisionModelGate;
+  /** Private endpoints and hostname bindings (ADR-203). */
+  privateEndpoints: PrivateModelEndpointService;
 }
 
 /**
@@ -157,6 +160,7 @@ export class ModelProviderService {
       }),
       ids: options.ids,
       scopes,
+      privateEndpoints: options.privateEndpoints,
     });
     this.costs = ModelProviderCostsService.create({
       costs: options.costs,
@@ -426,6 +430,9 @@ export class ModelProviderService {
         ...parsed,
         model: resolved.model,
         modelProviders: this,
+        privateEndpoints: await this.options.privateEndpoints.bindingsForProject({
+          projectId: parsed.projectId,
+        }),
       }),
     };
   }

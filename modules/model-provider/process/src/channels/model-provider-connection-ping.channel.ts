@@ -1,9 +1,14 @@
-import type { ModelProviderExecutionParameters } from "@langwatch/model-provider-contract";
+import type {
+  ModelProviderExecutionParameters,
+  PrivateEndpointBindingWire,
+} from "@langwatch/model-provider-contract";
 
 export type ModelProviderPingRequest = Readonly<{
   providerKey: string;
   model: string;
   parameters: ModelProviderExecutionParameters;
+  /** The row's organization's bound hostnames (ADR-203), sent to nlpgo with the ping. */
+  privateEndpoints?: readonly PrivateEndpointBindingWire[];
 }>;
 
 /** What a provider said to one token of generation, in its own words when it refused. */

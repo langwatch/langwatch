@@ -6,6 +6,7 @@ import {
   type ModelProviderCredentialVerdict,
   type ModelProviderApi,
   type ModelProviderUncheckedReason,
+  type PrivateEndpointBindingWire,
 } from "@langwatch/model-provider-contract";
 
 import {
@@ -32,6 +33,8 @@ export abstract class ModelProviderCredentialProbe {
     customKeys: Record<string, string>;
     /** The model about to run on it; Azure probes this deployment and skips without one. */
     model?: string;
+    /** The calling organization's bound hostnames (ADR-203); a bound host is never resolved. */
+    privateEndpoints?: readonly PrivateEndpointBindingWire[];
   }): Promise<ModelProviderCredentialVerdict>;
   /**
    * The stored (or this deployment's own environment) credential, probed
@@ -43,11 +46,13 @@ export abstract class ModelProviderCredentialProbe {
     provider: string;
     customBaseUrl: string | undefined;
     modelProviders: Pick<ModelProviderApi, "findProviderForProject">;
+    privateEndpoints?: readonly PrivateEndpointBindingWire[];
   }): Promise<ModelProviderCredentialVerdict>;
   /** Refuses a credential write whose endpoint the egress fence would refuse to reach. */
   abstract assertEndpointAllowed(input: {
     provider: string;
     customKeys: Record<string, unknown>;
+    privateEndpoints?: readonly PrivateEndpointBindingWire[];
   }): Promise<void>;
 }
 
@@ -195,6 +200,7 @@ export class HttpModelProviderCredentialProbeService extends ModelProviderCreden
     environment,
     egress,
     deployedBaseUrls,
+    privateEndpoints,
   }: {
     projectId: string;
     provider: string;
@@ -208,6 +214,7 @@ export class HttpModelProviderCredentialProbeService extends ModelProviderCreden
     environment: Readonly<Record<string, string | undefined>>;
     egress: ModelProviderEgress;
     deployedBaseUrls?: DeployedBaseUrls;
+    privateEndpoints?: readonly PrivateEndpointBindingWire[];
   }): Promise<ModelProviderCredentialVerdict> {
     const providerDef = findModelProviderDefinition(provider);
     if (!providerDef) {
@@ -271,6 +278,7 @@ export class HttpModelProviderCredentialProbeService extends ModelProviderCreden
       customKeys,
       egress,
       deployedBaseUrls,
+      privateEndpoints,
     });
   }
 
@@ -285,6 +293,7 @@ export class HttpModelProviderCredentialProbeService extends ModelProviderCreden
     model,
     egress,
     deployedBaseUrls = {},
+    privateEndpoints,
   }: {
     provider: string;
     customKeys: Record<string, string>;
@@ -292,6 +301,7 @@ export class HttpModelProviderCredentialProbeService extends ModelProviderCreden
     model?: string;
     egress: ModelProviderEgress;
     deployedBaseUrls?: DeployedBaseUrls;
+    privateEndpoints?: readonly PrivateEndpointBindingWire[];
   }): Promise<ModelProviderCredentialVerdict> {
     // Get provider definition from registry
     const providerDef = findModelProviderDefinition(provider);
@@ -349,6 +359,7 @@ export class HttpModelProviderCredentialProbeService extends ModelProviderCreden
         ...(probedModel ? { model: probedModel } : {}),
       },
       egress,
+      privateEndpoints,
     });
   }
 
@@ -382,6 +393,7 @@ export class HttpModelProviderCredentialProbeService extends ModelProviderCreden
     provider: string;
     customKeys: Record<string, string>;
     model?: string;
+    privateEndpoints?: readonly PrivateEndpointBindingWire[];
   }): Promise<ModelProviderCredentialVerdict> {
     return HttpModelProviderCredentialProbeService.validateProviderApiKey({
       provider: input.provider,
@@ -389,18 +401,21 @@ export class HttpModelProviderCredentialProbeService extends ModelProviderCreden
       model: input.model,
       egress: this.egress,
       deployedBaseUrls: this.deployedBaseUrls,
+      privateEndpoints: input.privateEndpoints,
     });
   }
 
   async assertEndpointAllowed(input: {
     provider: string;
     customKeys: Record<string, unknown>;
+    privateEndpoints?: readonly PrivateEndpointBindingWire[];
   }): Promise<void> {
     const endpointField = findModelProviderDefinition(input.provider)?.endpointKey;
     const endpoint = endpointField ? input.customKeys[endpointField] : undefined;
     if (typeof endpoint !== "string" || endpoint.trim() === "") return;
 
-    await this.egress.assertDestination(endpoint.trim()).catch((error: unknown) => {
+    const destination = { privateEndpoints: input.privateEndpoints };
+    await this.egress.assertDestination(endpoint.trim(), destination).catch((error: unknown) => {
       throw new ModelProviderInvalidError(
         error instanceof Error ? error.message : "The endpoint is not allowed",
         "endpoint_not_allowed",
@@ -413,6 +428,7 @@ export class HttpModelProviderCredentialProbeService extends ModelProviderCreden
     provider: string;
     customBaseUrl: string | undefined;
     modelProviders: Pick<ModelProviderApi, "findProviderForProject">;
+    privateEndpoints?: readonly PrivateEndpointBindingWire[];
   }): Promise<ModelProviderCredentialVerdict> {
     return HttpModelProviderCredentialProbeService.validateKeyWithCustomUrl({
       ...input,

@@ -2,7 +2,7 @@ import { generate, KSUID_RESOURCES } from "@langwatch/ksuid";
 
 /** Generates identifiers for records owned by Model Provider. */
 export abstract class ModelProviderIdService {
-  abstract generate(input: { type: "provider" | "default" | "cost" }): string;
+  abstract generate(input: { type: ModelProviderIdType }): string;
 }
 
 /**
@@ -14,7 +14,12 @@ const KSUID_RESOURCE = {
   provider: KSUID_RESOURCES.MODEL_PROVIDER,
   default: KSUID_RESOURCES.MODEL_DEFAULT_CONFIG,
   cost: "modelcost",
+  private_endpoint: "pvtendpoint",
+  private_endpoint_binding: "pvtbinding",
 } as const;
+
+/** The kinds of row this module mints an id for. */
+export type ModelProviderIdType = keyof typeof KSUID_RESOURCE;
 
 export class PrefixedModelProviderIdService extends ModelProviderIdService {
   static create(): PrefixedModelProviderIdService {
@@ -25,7 +30,7 @@ export class PrefixedModelProviderIdService extends ModelProviderIdService {
     super();
   }
 
-  generate(input: { type: "provider" | "default" | "cost" }): string {
+  generate(input: { type: ModelProviderIdType }): string {
     return generate(KSUID_RESOURCE[input.type]).toString();
   }
 }

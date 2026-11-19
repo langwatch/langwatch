@@ -1,9 +1,10 @@
 import { createOpenAI } from "@ai-sdk/openai";
-import type {
-  ModelProviderApi,
-  ModelProviderPlaygroundCompletion,
-  ModelProviderPlaygroundRequest,
-  ModelProviderPlaygroundStatus,
+import {
+  privateEndpointsHeaders,
+  type ModelProviderApi,
+  type ModelProviderPlaygroundCompletion,
+  type ModelProviderPlaygroundRequest,
+  type ModelProviderPlaygroundStatus,
 } from "@langwatch/model-provider-contract";
 import { nlpInternalSecretHeaders } from "@langwatch/process/nlp-internal-secret";
 import {
@@ -13,6 +14,7 @@ import {
 } from "@langwatch/project-contract";
 import { streamText, type ModelMessage } from "ai";
 
+import type { PrivateModelEndpointService } from "../features/private-endpoint/services/private-model-endpoint.service.ts";
 import { getProjectModelProviders } from "../rules/legacy-model-provider.rules.ts";
 import type { ModelProviderUsageMeteringService } from "./model-provider-usage-metering.service.ts";
 
@@ -31,6 +33,7 @@ export class ModelProviderPlaygroundService {
   readonly #executionProxyBaseUrl: string;
   readonly #nlpInternalSecret: string | undefined;
   readonly #metering: Pick<ModelProviderUsageMeteringService, "metered"> | undefined;
+  readonly #privateEndpoints: Pick<PrivateModelEndpointService, "bindingsForProject"> | undefined;
 
   private constructor(options: Parameters<typeof ModelProviderPlaygroundService.create>[0]) {
     this.#modelProviders = options.modelProviders;
@@ -38,6 +41,7 @@ export class ModelProviderPlaygroundService {
     this.#executionProxyBaseUrl = options.executionProxyBaseUrl;
     this.#nlpInternalSecret = options.nlpInternalSecret;
     this.#metering = options.metering;
+    this.#privateEndpoints = options.privateEndpoints;
   }
 
   static create(options: {
@@ -49,6 +53,8 @@ export class ModelProviderPlaygroundService {
     nlpInternalSecret?: string | undefined;
     /** Writes each completion's usage to the spend ledger; absent writes nothing. */
     metering?: Pick<ModelProviderUsageMeteringService, "metered">;
+    /** The project's organization's bound hostnames, sent to nlpgo with the call (ADR-203). */
+    privateEndpoints?: Pick<PrivateModelEndpointService, "bindingsForProject">;
   }): ModelProviderPlaygroundService {
     return new ModelProviderPlaygroundService(options);
   }
@@ -76,6 +82,9 @@ export class ModelProviderPlaygroundService {
         Object.entries(litellmParams).map(([key, value]) => [`x-litellm-${key}`, value]),
       ),
       ...nlpInternalSecretHeaders({ secret: this.#nlpInternalSecret }),
+      ...privateEndpointsHeaders(
+        (await this.#privateEndpoints?.bindingsForProject({ projectId: input.projectId })) ?? [],
+      ),
     };
     const vercelProvider = createOpenAI({
       apiKey: litellmParams.api_key,

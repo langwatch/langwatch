@@ -369,6 +369,31 @@ describe("redactAuditArgs", () => {
       });
     });
   });
+
+  describe("given staff registering a private endpoint for an organization", () => {
+    describe("when the change is recorded in that organization's audit trail", () => {
+      it("keeps the endpoint's name and port but not its addresses", () => {
+        for (const action of ["privateModelEndpoint.register", "privateModelEndpoint.update"]) {
+          const redacted = redactAuditArgs({
+            input: {
+              organizationId: "org_acme",
+              name: "Inference",
+              addresses: ["10.20.1.21", "10.20.2.34"],
+              port: 443,
+            },
+            action,
+          }) as Record<string, unknown>;
+
+          expect(JSON.stringify(redacted)).not.toContain("10.20.");
+          expect(redacted).toMatchObject({
+            organizationId: "org_acme",
+            name: "Inference",
+            port: 443,
+          });
+        }
+      });
+    });
+  });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -397,6 +422,7 @@ const NAMESPACE_KINDS: [string, string][] = [
   ["license.upload", "license"],
   ["llmModelCost.createOrUpdate", "llm_model_cost"],
   ["modelProvider.codexSignInPoll", "model_provider"],
+  ["privateModelEndpoint.register", "private_model_endpoint"],
   ["scimToken.generate", "scim_token"],
   ["subscription.create", "subscription"],
   ["webhookEndpoints.create", "webhook_endpoint"],

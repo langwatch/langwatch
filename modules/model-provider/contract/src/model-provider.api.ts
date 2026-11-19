@@ -44,6 +44,18 @@ import type {
   TranslateOutput,
 } from "./model-provider.ts";
 import type { BuiltInModel } from "./model-selection.ts";
+import type {
+  OrganizationPrivateModelEndpoint,
+  PrivateEndpointBindingWire,
+  PrivateModelEndpointBinding,
+  PrivateModelEndpointBindInput,
+  PrivateModelEndpointRebindInput,
+  PrivateModelEndpointRegisterInput,
+  PrivateModelEndpointRemoveInput,
+  PrivateModelEndpointUnbindInput,
+  PrivateModelEndpointUpdateInput,
+  StaffPrivateModelEndpoint,
+} from "./private-model-endpoint.ts";
 
 export interface ModelProviderCaller {
   readonly id: string;
@@ -378,6 +390,43 @@ export interface ModelProviderApi {
    * and `ModelProviderCustomKeysMissingError` for a row that stores none.
    */
   getCustomKeys(input: { modelProviderId: string }): Promise<ModelProviderCustomKeys>;
+
+  // ── private model endpoints (ADR-203) ───────────────────────────────────
+  /**
+   * The organization's hostname bindings in the wire shape nlpgo and the gateway read; empty when
+   * it has none. Only model calls send these: never HTTP blocks, webhooks or agent targets.
+   */
+  privateEndpointBindingsForOrganization(input: {
+    organizationId: string;
+  }): Promise<PrivateEndpointBindingWire[]>;
+  /** The same, for the organization a project belongs to; empty for an unknown project. */
+  privateEndpointBindingsForProject(input: {
+    projectId: string;
+  }): Promise<PrivateEndpointBindingWire[]>;
+  /** The organization's endpoints and bound hostnames, never their addresses. */
+  listPrivateEndpointsForOrganization(input: {
+    organizationId: string;
+  }): Promise<OrganizationPrivateModelEndpoint[]>;
+  /** Binds a hostname to one of the organization's own endpoints; another's is not found. */
+  bindPrivateEndpointHostname(
+    input: PrivateModelEndpointBindInput,
+    by: ModelProviderCaller,
+  ): Promise<PrivateModelEndpointBinding>;
+  rebindPrivateEndpointHostname(
+    input: PrivateModelEndpointRebindInput,
+  ): Promise<PrivateModelEndpointBinding>;
+  unbindPrivateEndpointHostname(input: PrivateModelEndpointUnbindInput): Promise<void>;
+  /** Ops: one organization's endpoints with their addresses. */
+  listPrivateEndpointsForStaff(input: {
+    organizationId: string;
+  }): Promise<StaffPrivateModelEndpoint[]>;
+  registerPrivateEndpoint(
+    input: PrivateModelEndpointRegisterInput,
+    by: ModelProviderCaller,
+  ): Promise<StaffPrivateModelEndpoint>;
+  updatePrivateEndpoint(input: PrivateModelEndpointUpdateInput): Promise<StaffPrivateModelEndpoint>;
+  /** Removes the endpoint and every binding to it. */
+  removePrivateEndpoint(input: PrivateModelEndpointRemoveInput): Promise<void>;
 }
 
 export const ModelProviderApi = moduleApi<ModelProviderApi>()("model-provider");

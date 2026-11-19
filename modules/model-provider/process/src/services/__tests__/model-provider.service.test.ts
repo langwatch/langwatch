@@ -28,6 +28,8 @@ import { MemoryModelProviderCodexGatewayPingChannel } from "../../channels/memor
 import { MemoryModelProviderConnectionPingChannel } from "../../channels/memory/memory.model-provider-connection-ping.channel.ts";
 import { CodexTokenRefresher } from "../../features/codex/services/codex-oauth-model-provider-token-refresher.service.ts";
 import { ModelProviderConnectionRateLimiter } from "../../features/credential-probe/services/windowed-model-provider-connection-rate-limiter.service.ts";
+import { PrivateModelEndpointService } from "../../features/private-endpoint/services/private-model-endpoint.service.ts";
+import { MemoryPrivateModelEndpointRepository } from "../../repositories/memory/memory.private-model-endpoint.repository.ts";
 import type { ModelCostRepository } from "../../repositories/model-cost.repository.ts";
 import type {
   ModelDefaultConfigSaveInput,
@@ -382,6 +384,7 @@ const project = projectWithTeamSchema.parse({
 function createProjects(): ProjectApi {
   return createApiFixture<ProjectApi>(
     {
+      findOrganizationId: () => Promise.resolve(project.team.organizationId),
       getWithTeam: () => Promise.resolve(project),
       findWithTeam: () => Promise.resolve(project),
       listNamesByIds: () =>
@@ -840,6 +843,7 @@ function service(
 ) {
   return ModelProviderService.create({
     isOwnDecisionModelAllowed: () => Promise.resolve(false),
+    privateEndpoints: noPrivateEndpoints(),
     repository: providers,
     projects: createProjects(),
     organizations: organizationApi(),
@@ -1388,6 +1392,7 @@ describe("ModelProviderService", () => {
     ];
     const modelProviders = ModelProviderService.create({
       isOwnDecisionModelAllowed: () => Promise.resolve(false),
+      privateEndpoints: noPrivateEndpoints(),
       repository: new Providers(),
       projects: createProjects(),
       organizations: organizationApi(),
@@ -1423,6 +1428,7 @@ describe("ModelProviderService", () => {
     const managed = new ManagedCatalog();
     const modelProviders = ModelProviderService.create({
       isOwnDecisionModelAllowed: () => Promise.resolve(false),
+      privateEndpoints: noPrivateEndpoints(),
       repository: providers,
       projects: createProjects(),
       organizations: organizationApi(),
@@ -1853,6 +1859,7 @@ describe("ModelProviderService", () => {
     const defaults = new Defaults();
     const modelProviders = ModelProviderService.create({
       isOwnDecisionModelAllowed: () => Promise.resolve(false),
+      privateEndpoints: noPrivateEndpoints(),
       repository: providers,
       projects: createProjects(),
       organizations: organizationApi(),
@@ -1904,6 +1911,7 @@ describe("ModelProviderService", () => {
 
     await ModelProviderService.create({
       isOwnDecisionModelAllowed: () => Promise.resolve(false),
+      privateEndpoints: noPrivateEndpoints(),
       repository: providers,
       projects: createProjects(),
       organizations: organizationApi(),
@@ -2459,3 +2467,12 @@ describe("ModelProviderService", () => {
     ]);
   });
 });
+
+/** No organization in these suites binds a hostname. */
+function noPrivateEndpoints(): PrivateModelEndpointService {
+  return PrivateModelEndpointService.create({
+    repository: MemoryPrivateModelEndpointRepository.create(),
+    ids: { generate: () => "pvtendpoint_unused" },
+    projects: createProjects(),
+  });
+}

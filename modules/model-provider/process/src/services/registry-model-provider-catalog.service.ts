@@ -23,6 +23,7 @@ import {
   type ModelProviderApiKeyValidation,
   type ModelProviderCredentialVerdict,
   type ModelProviderSummary,
+  type PrivateEndpointBindingWire,
 } from "@langwatch/model-provider-contract";
 import { Temporal, toDate, type Instant } from "@langwatch/time";
 import { z } from "zod";
@@ -61,6 +62,7 @@ export abstract class ModelProviderCatalog {
   abstract validateApiKey(
     provider: string,
     customKeys: Record<string, unknown>,
+    privateEndpoints?: readonly PrivateEndpointBindingWire[],
   ): Promise<ModelProviderApiKeyValidation>;
   /**
    * Probes a stored credential and reports which of the three verdicts it is. Abstract rather
@@ -69,11 +71,16 @@ export abstract class ModelProviderCatalog {
   abstract testConnection(
     provider: string,
     customKeys: Record<string, unknown>,
+    privateEndpoints?: readonly PrivateEndpointBindingWire[],
   ): Promise<ModelProviderCredentialVerdict>;
-  /** Refuses a credential write whose endpoint this deployment's egress fence would refuse. */
+  /**
+   * Refuses a credential write whose endpoint this deployment's egress fence would refuse; the
+   * owning organization's bound hostnames (ADR-203) are judged at their registered addresses.
+   */
   abstract assertEndpointAllowed(
     provider: string,
     customKeys: Record<string, unknown>,
+    privateEndpoints?: readonly PrivateEndpointBindingWire[],
   ): Promise<void>;
   metadata(provider: string): {
     models: string[];
@@ -308,10 +315,12 @@ export class RegistryModelProviderCatalogService extends ModelProviderCatalog {
   async validateApiKey(
     provider: string,
     customKeys: Record<string, unknown>,
+    privateEndpoints?: readonly PrivateEndpointBindingWire[],
   ): Promise<ModelProviderApiKeyValidation> {
     const result = await this.options.probe.probe({
       provider,
       customKeys: customKeysSchema.parse(customKeys),
+      privateEndpoints,
     });
     return { valid: result.valid, message: result.valid ? undefined : result.outcome };
   }
@@ -324,15 +333,21 @@ export class RegistryModelProviderCatalogService extends ModelProviderCatalog {
   testConnection(
     provider: string,
     customKeys: Record<string, unknown>,
+    privateEndpoints?: readonly PrivateEndpointBindingWire[],
   ): Promise<ModelProviderCredentialVerdict> {
     return this.options.probe.probe({
       provider,
       customKeys: customKeysSchema.parse(customKeys),
+      privateEndpoints,
     });
   }
 
-  assertEndpointAllowed(provider: string, customKeys: Record<string, unknown>): Promise<void> {
-    return this.options.probe.assertEndpointAllowed({ provider, customKeys });
+  assertEndpointAllowed(
+    provider: string,
+    customKeys: Record<string, unknown>,
+    privateEndpoints?: readonly PrivateEndpointBindingWire[],
+  ): Promise<void> {
+    return this.options.probe.assertEndpointAllowed({ provider, customKeys, privateEndpoints });
   }
 
   pickExecutionValue(input: {

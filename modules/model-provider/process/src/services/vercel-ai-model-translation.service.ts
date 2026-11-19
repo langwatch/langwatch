@@ -1,4 +1,7 @@
-import type { ModelProviderApi } from "@langwatch/model-provider-contract";
+import type {
+  ModelProviderApi,
+  PrivateEndpointBindingWire,
+} from "@langwatch/model-provider-contract";
 import { generateText } from "ai";
 
 import {
@@ -15,6 +18,8 @@ export abstract class ModelTranslation {
       ModelProviderApi,
       "resolveModelForFeature" | "findAlternateModel" | "getExecutionProviders"
     >;
+    /** The project's organization's bound hostnames, sent to nlpgo with the call. */
+    privateEndpoints?: readonly PrivateEndpointBindingWire[];
   }): Promise<string>;
 }
 
@@ -42,6 +47,7 @@ export class VercelAiModelTranslationService extends ModelTranslation {
       ModelProviderApi,
       "resolveModelForFeature" | "findAlternateModel" | "getExecutionProviders" | "prepareExecution"
     >;
+    privateEndpoints?: readonly PrivateEndpointBindingWire[];
   }): Promise<string> {
     const model = await ModelProviderExecutionHandleService.getVercelAIModel({
       ...this.options,
@@ -49,6 +55,7 @@ export class VercelAiModelTranslationService extends ModelTranslation {
       projectId: input.projectId,
       model: input.model,
       featureKey: "translate.text",
+      ...(input.privateEndpoints ? { privateEndpointBindings: input.privateEndpoints } : {}),
     });
     const result = await generateText({
       model,
