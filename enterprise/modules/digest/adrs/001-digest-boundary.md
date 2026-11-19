@@ -130,3 +130,15 @@ failure before the claim, rendering included, fails the send intent, which retri
 failure after the claim is not resent, so that member misses the week. The email goes out as
 HTML only: `SendEmailCommand` takes no plain-text part, so the template's rendered text is not
 sent. Clicks are not tracked: links in the email go straight to their targets.
+
+A person in several enrolled organizations is sent one email a week, from the organization where
+their week had the most activity (traces of the projects they may view plus their own coding-agent
+sessions), the lowest organization id on a tie. Each organization's send asks the same question of
+the same finished week, so one answers yes. A pick that cannot be built falls through to the next
+eligible template. A deactivated profile is not mailed. A plan that could not read one organization
+leaves the week unplanned, so the next hourly wake retries it; requests already made are keyed and
+not repeated.
+
+Resubscribing uses the same purpose-bound, expiring token as unsubscribing; it only restores an
+email the person chose to receive. Accepted. The pages are served `no-store` with
+`Referrer-Policy: no-referrer`, since the token is in their address.

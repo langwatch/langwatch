@@ -59,6 +59,26 @@ describe("the digest's unsubscribe pages", () => {
     });
   });
 
+  describe("when a page is answered, its address carries a token", () => {
+    /** @scenario "The unsubscribe pages are neither cached nor leak their address" */
+    it.each([
+      ["GET", "/api/digest/unsubscribe"],
+      ["POST", "/api/digest/unsubscribe"],
+      ["POST", "/api/digest/resubscribe"],
+    ] as const)("%s %s is not stored and sends no referrer", async (method, path) => {
+      const send = mount({
+        isSubscribed: async () => true,
+        unsubscribe: async () => {},
+        resubscribe: async () => {},
+      });
+
+      const response = await send(method, path);
+
+      expect(response.headers.get("cache-control")).toBe("no-store");
+      expect(response.headers.get("referrer-policy")).toBe("no-referrer");
+    });
+  });
+
   describe("when no signing secret is configured", () => {
     /** @scenario "Without a signing secret no link is signed or honoured" */
     it.each([

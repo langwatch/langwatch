@@ -72,6 +72,28 @@ export function pickFocusProject(week: OrganizationWeek): ProjectWeekState | und
   )[0];
 }
 
+/** What a member's week in one organization amounts to: traces of the projects shown plus their own sessions. */
+export function weekActivity({ week, userId }: { week: OrganizationWeek; userId: string }): number {
+  const user = week.users.get(userId);
+  return (
+    week.projects.reduce((total, { traces }) => total + traces, 0) +
+    (user ? userWeekTotals(user).sessions : 0)
+  );
+}
+
+/**
+ * Which organization's week a person in several enrolled ones is sent: the one with the most
+ * activity, the lowest organization id on a tie, so every attempt at the week agrees.
+ */
+export function homeOrganization(
+  candidates: readonly Readonly<{ organizationId: string; activity: number }>[],
+): string | undefined {
+  return candidates.toSorted(
+    (left, right) =>
+      right.activity - left.activity || left.organizationId.localeCompare(right.organizationId),
+  )[0]?.organizationId;
+}
+
 /** The week with only the projects a member may view, in this week's folds and its history. */
 export function weekVisibleTo({
   week,

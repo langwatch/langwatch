@@ -5,7 +5,8 @@
  * no one); the RFC 8058 header and the page's button POST to it. The signed token is the whole
  * authorization, so no session is resolved. A bad or expired token answers 400; with no signing
  * secret configured, 503. Every page refuses to be framed, since its button changes a
- * subscription in one click.
+ * subscription in one click, and is neither stored nor passed on by Referer, since its address
+ * holds the token.
  * Spec: enterprise/modules/digest/specs/digest.feature
  */
 import { publicRoute } from "@langwatch/api/access";
@@ -22,6 +23,9 @@ const HTML = "text/html; charset=UTF-8";
 const UNFRAMEABLE = {
   "Content-Security-Policy": "frame-ancestors 'none'",
   "X-Frame-Options": "DENY",
+  // The token rides in the URL and the form action: nothing may keep the page or pass it on.
+  "Cache-Control": "no-store",
+  "Referrer-Policy": "no-referrer",
 } as const;
 
 const TOKEN_IS_THE_AUTHORIZATION =
@@ -95,8 +99,8 @@ export const digestUnsubscribeRest = defineRestRouter(DigestApi)
   .build();
 
 /**
- * A page as one chunk: only the stream producer takes headers, and the anti-framing pair must
- * ride every page whatever the surface's own floor holds.
+ * A page as one chunk: only the stream producer takes headers, and the anti-framing, no-store and
+ * no-referrer headers must ride every page whatever the surface's own floor holds.
  */
 function htmlPage(response: RestBytesProducer<typeof HTML>, html: string) {
   const bytes = new TextEncoder().encode(html);

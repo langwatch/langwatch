@@ -43,6 +43,7 @@ import {
 import { type Instant, Temporal } from "@langwatch/time";
 import { z } from "zod";
 
+import { emptyProjectWeek } from "../../rules/digest-week.rules.ts";
 import { MemoryDigestMailChannel } from "../../channels/memory/memory.digest.channels.ts";
 import { MemoryDigestAudienceRepository } from "../../repositories/memory/memory.digest-audience.repository.ts";
 import { MemoryDigestRepositories } from "../../repositories/memory/memory.digest.repositories.ts";
@@ -63,6 +64,9 @@ import { buildDigestPipeline } from "../digest.pipeline.ts";
 
 export const ORGANIZATION = "org-1";
 export const PROJECT = "project-1";
+/** A second organization a test may enrol, with its own project and members. */
+export const OTHER_ORGANIZATION = "org-2";
+export const OTHER_PROJECT = "project-2";
 export const ADMIN = "user-admin";
 export const MEMBER = "user-member";
 export const OTHER_MEMBER = "user-other";
@@ -130,6 +134,14 @@ export function digestWorld() {
   ];
   return {
     members,
+    /** The second organization's members; it has none until a test gives it some. */
+    otherMembers: [] as WorldMember[],
+    /** Organizations whose member list cannot be read, as a deleted one's would not be. */
+    failingOrganizations: new Set<string>(),
+    /** Organizations the organization module has no name for. */
+    unnamedOrganizations: new Set<string>(),
+    /** People whose profile is deactivated. */
+    deactivated: new Set<string>(),
     projects: [PROJECT],
     /** The projects each person may not view; everyone may view every other. */
     hiddenFrom: new Map<string, readonly string[]>(),
@@ -182,6 +194,13 @@ export function installDigest(
     recordUser: (activity) => commands.recordUser(activity),
     now,
   });
+  const membersIn = (organizationId: string) =>
+    organizationId === ORGANIZATION
+      ? world.members
+      : organizationId === OTHER_ORGANIZATION
+        ? world.otherMembers
+        : [];
+  const knownProject = (id: string) => world.projects.includes(id) || id === OTHER_PROJECT;
   const sends = DigestSendService.create({
     audience: repositories.audience,
     sends: repositories.sends,
@@ -196,25 +215,28 @@ export function installDigest(
     }),
     organizations: {
       listMembers: async ({ organizationId }) => {
-        const members = organizationId === ORGANIZATION ? world.members : [];
+        if (world.failingOrganizations.has(organizationId)) {
+          throw new Error(`${organizationId} cannot be read`);
+        }
+        const members = membersIn(organizationId);
         return { members, totalCount: members.length };
       },
       getMember: async ({ organizationId, userId }) => {
-        const members = organizationId === ORGANIZATION ? world.members : [];
+        const members = membersIn(organizationId);
         const member = members.find((row) => row.userId === userId);
         if (!member) throw new MemberNotFoundError(userId);
         return member;
       },
       findProvisioningSummary: async (organizationId) =>
-        organizationId === ORGANIZATION
+        !world.unnamedOrganizations.has(organizationId)
           ? { id: ORGANIZATION, name: "Acme", slug: "acme", createdAt: Temporal.Now.instant() }
           : null,
     },
     projects: {
       findSummaryById: async (projectId) =>
-        world.projects.includes(projectId) ? { name: "Support bot", slug: "support-bot" } : null,
+        knownProject(projectId) ? { name: "Support bot", slug: "support-bot" } : null,
       listNamesByIds: async ({ projectIds }) =>
-        projectIds.filter((id) => world.projects.includes(id)).map(projectIdentity),
+        projectIds.filter(knownProject).map(projectIdentity),
     },
     access: {
       canBatchByIds: async ({ principal, projects }) => {
@@ -226,7 +248,7 @@ export function installDigest(
       },
     },
     users: {
-      findById: async ({ id }) => (world.users.includes(id) ? userProfile(id) : null),
+      findById: async ({ id }) => (world.users.includes(id) ? userProfile(id, world.deactivated.has(id)) : null),
     },
     mail,
     unsubscribes,
@@ -365,6 +387,33 @@ export function installDigest(
         occurredAt: data.occurredAt,
         data,
       }),
+    /** A project's finished week as the fold would have left it, for a test that needs numbers. */
+    seedProjectWeek: ({
+      organizationId,
+      projectId,
+      isoWeek = SENT_WEEK,
+      traces,
+    }: {
+      organizationId: string;
+      projectId: string;
+      isoWeek?: string;
+      traces: number;
+    }) =>
+      repositories.projectWeeks.store(
+        {
+          state: { ...emptyProjectWeek(), organizationId, projectId, isoWeek, traces },
+          cursor: { acceptedAt: 0, eventId: `seed-${organizationId}-${projectId}-${isoWeek}` },
+          occurredAt: 0,
+          createdAt: 0,
+          updatedAt: 0,
+          version: "1",
+        },
+        {
+          aggregateId: projectId,
+          tenantId: createTenantId(projectId),
+          key: `seed:${organizationId}:${projectId}:${isoWeek}`,
+        },
+      ),
     projectWeek: async ({ isoWeek }: { isoWeek: string }) => {
       const folds = await repositories.projectWeeks.findWeeks({
         isoWeeks: [isoWeek],
@@ -400,7 +449,7 @@ function projectIdentity(id: string) {
   };
 }
 
-function userProfile(id: string) {
+function userProfile(id: string, deactivated: boolean) {
   const at = new Date("2026-01-01T00:00:00Z");
   return {
     id,
@@ -412,6 +461,6 @@ function userProfile(id: string) {
     createdAt: at,
     updatedAt: at,
     lastLoginAt: null,
-    deactivatedAt: null,
+    deactivatedAt: deactivated ? at : null,
   };
 }

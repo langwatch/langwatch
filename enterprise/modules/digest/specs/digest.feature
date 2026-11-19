@@ -199,6 +199,32 @@ Feature: Weekly digest emails
     When the week's emails are sent
     Then that member receives none and no send is recorded for them
 
+  @integration
+  Scenario: A member of two enrolled organizations is sent the busier one's week
+    Given a member of two enrolled organizations
+    When both organizations' sends are handled, in either order
+    Then they receive one email, from the organization where their week had the most activity
+    And on equal activity from the organization with the lowest id
+
+  @integration
+  Scenario: A pick that cannot be built falls through to the next eligible template
+    Given a member whose first eligible template lacks something it needs to show
+    When their email is sent
+    Then they receive the next eligible template that can be built
+
+  @integration
+  Scenario: A deactivated person is sent nothing
+    Given the send is armed and a member whose profile is deactivated
+    When the week's emails are sent
+    Then that member receives none and no send is recorded for them
+
+  @integration
+  Scenario: One unreadable organization does not stall the others' plan
+    Given two enrolled organizations, the first of which cannot be read
+    When the scheduled wake runs
+    Then the other organization's sends are asked
+    And the week stays unplanned so the next wake retries the unreadable one
+
   @integration @unimplemented
   Scenario: Every link in a sent email is a tracked redirect
     When a digest email is sent
@@ -237,6 +263,11 @@ Feature: Weekly digest emails
   Scenario: The unsubscribe page cannot be framed
     When any unsubscribe or resubscribe page is answered
     Then it carries X-Frame-Options DENY and a frame-ancestors 'none' policy
+
+  @unit
+  Scenario: The unsubscribe pages are neither cached nor leak their address
+    When any unsubscribe or resubscribe page is answered
+    Then it carries Cache-Control no-store and Referrer-Policy no-referrer
 
   @integration
   Scenario: Resubscribing from the unsubscribe page

@@ -10,6 +10,7 @@ import {
   type OrganizationRestMemberSummary,
 } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
+import { createLogger } from "@langwatch/observability";
 import type { UserApi } from "@langwatch/user-contract";
 
 import type { DigestMailChannel } from "../channels/digest-mail.channel.ts";
@@ -25,11 +26,13 @@ import {
   digestMessageId,
   digestTemplateInput,
   type DigestTemplateProps,
+  homeOrganization,
   type OrganizationWeek,
   pickFocusProject,
+  weekActivity,
   weekVisibleTo,
 } from "../rules/digest-email.rules.ts";
-import { type DigestTemplatePick, pickDigestTemplate } from "../rules/digest-template.rules.ts";
+import { type DigestTemplatePick, eligibleDigestTemplates } from "../rules/digest-template.rules.ts";
 import { oldestKeptWeek, plannableWeek, sendableWeek } from "../rules/digest-week.rules.ts";
 import { renderDigestMail } from "./digest-mail.render.ts";
 import type { DigestUnsubscribeService } from "./digest-unsubscribe.service.ts";
@@ -39,6 +42,8 @@ type Member = Readonly<{ userId: string; admin: boolean }>;
 
 /** A member's standing when their email is sent, which may differ from the plan's. */
 type Membership = Readonly<{ kind: "active"; admin: boolean }> | Readonly<{ kind: "gone" }>;
+
+const logger = createLogger("langwatch:digest");
 
 const MEMBER_PAGE = 500;
 
@@ -114,12 +119,21 @@ export class DigestSendService {
     if (settings.lastPlannedWeek !== null && settings.lastPlannedWeek >= isoWeek) return;
     const enrolled = await this.deps.audience.findEnrolled();
     if (enrolled.length === 0) return;
+    let failed = 0;
     for (const organizationId of enrolled) {
-      for (const member of await this.members({ organizationId })) {
-        await this.deps.requestSend({ ...member, organizationId, isoWeek, occurredAt: at });
+      // One organization failing (a deleted one, say) must not keep the rest from being asked.
+      try {
+        for (const member of await this.members({ organizationId })) {
+          await this.deps.requestSend({ ...member, organizationId, isoWeek, occurredAt: at });
+        }
+      } catch (error) {
+        failed += 1;
+        logger.error({ error, organizationId, isoWeek }, "the digest could not plan an organization");
       }
     }
-    await this.deps.audience.markPlanned({ isoWeek });
+    // Left unplanned so the next wake tries the failed ones again; a request is keyed by
+    // organization, person and week, so the organizations that went through are not asked twice.
+    if (failed === 0) await this.deps.audience.markPlanned({ isoWeek });
   }
 
   /**
@@ -145,7 +159,8 @@ export class DigestSendService {
     const membership = await this.#membership({ organizationId, userId });
     if (membership.kind === "gone") return;
     const user = await this.deps.users.findById({ id: userId });
-    if (!user?.email) return;
+    if (!user?.email || user.deactivatedAt !== null) return;
+    if (!(await this.#isHomeOrganization({ organizationId, userId, isoWeek, enrolled }))) return;
     const week = await this.#visibleWeek({
       week: await this.deps.weeks.organizationWeek({ organizationId, isoWeek }),
       userId,
@@ -239,6 +254,45 @@ export class DigestSendService {
     return members;
   }
 
+  /**
+   * A person in several enrolled organizations is sent one email a week, from the organization
+   * where their week had the most activity (lowest id on a tie). Every organization's send asks
+   * the same question of the same finished week, so exactly one of them answers yes.
+   */
+  async #isHomeOrganization({
+    organizationId,
+    userId,
+    isoWeek,
+    enrolled,
+  }: {
+    organizationId: string;
+    userId: string;
+    isoWeek: string;
+    enrolled: readonly string[];
+  }): Promise<boolean> {
+    const others = enrolled.filter((id) => id !== organizationId);
+    if (others.length === 0) return true;
+    const candidates = [organizationId];
+    for (const other of others) {
+      const standing = await this.#membership({ organizationId: other, userId });
+      if (standing.kind === "active") candidates.push(other);
+    }
+    if (candidates.length === 1) return true;
+    const ranked = await Promise.all(
+      candidates.map(async (candidate) => ({
+        organizationId: candidate,
+        activity: weekActivity({
+          week: await this.#visibleWeek({
+            week: await this.deps.weeks.organizationWeek({ organizationId: candidate, isoWeek }),
+            userId,
+          }),
+          userId,
+        }),
+      })),
+    );
+    return homeOrganization(ranked) === organizationId;
+  }
+
   /** The member's standing now; a member removed since the plan answers not-found. */
   async #membership({
     organizationId,
@@ -291,20 +345,24 @@ export class DigestSendService {
     recipient: Readonly<{ userId: string; sendId: string }>;
   }): Promise<Composed | null> {
     const baseUrl = this.#baseUrl();
-    const pick = pickDigestTemplate(digestTemplateInput({ week, ...member }));
     const unsubscribeUrl = `${baseUrl}${DIGEST_UNSUBSCRIBE_PATH}?token=${encodeURIComponent(
       this.deps.unsubscribes.token(recipient),
     )}`;
-    const props = buildDigestTemplateProps({
-      pick,
-      week,
-      userId: member.userId,
-      names: await this.#names({ week, pick }),
-      baseUrl,
-      unsubscribeUrl,
-      now: this.deps.now(),
-    });
-    return props ? { pick, props, oneClick: unsubscribeUrl } : null;
+    // The first eligible template whose props build: one that cannot (a name not found) must
+    // not cost the member the email a lower-ranked template could send.
+    for (const pick of eligibleDigestTemplates(digestTemplateInput({ week, ...member }))) {
+      const props = buildDigestTemplateProps({
+        pick,
+        week,
+        userId: member.userId,
+        names: await this.#names({ week, pick }),
+        baseUrl,
+        unsubscribeUrl,
+        now: this.deps.now(),
+      });
+      if (props) return { pick, props, oneClick: unsubscribeUrl };
+    }
+    return null;
   }
 
   /** Only the names the picked template shows are read. */
