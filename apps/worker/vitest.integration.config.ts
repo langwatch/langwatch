@@ -6,11 +6,9 @@ import { defineConfig } from "vitest/config";
  */
 
 /*
- * WHAT IT NEEDS: a build toolchain, and for the live suites Postgres, Redis and
- * ClickHouse at `LANGWATCH_TEST_DATABASE_URL`, `LANGWATCH_TEST_REDIS_URL` and
- * `LANGWATCH_TEST_CLICKHOUSE_URL` (memory-store suites need none). A file added
- * here that reaches a datastore says so rather than relying on a repository-wide
- * rule to notice.
+ * WHAT IT NEEDS: a build toolchain; live suites need Postgres, Redis and
+ * ClickHouse at LANGWATCH_TEST_*_URL (memory-store suites need none). A file
+ * added here that reaches a datastore says so.
  */
 export default defineConfig({
   test: {
