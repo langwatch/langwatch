@@ -1,8 +1,8 @@
 /**
- * The last run of a daily schedule that started, folded onto a row of its own: its id, its
- * Langy conversation and when it started, beside the last run that settled. The read names it
- * in flight while it has not settled, and once it has, its start is the last run's (ADR-004).
- * The row is keyed by the schedule id, which is also its aggregate id.
+ * The last started run of a daily schedule, folded onto a row of its own: id, Langy
+ * conversation and start, beside the last run that settled. The read names it in flight until
+ * it settles, then its start is the last run's (ADR-004). Keyed by the schedule id, also the
+ * aggregate id.
  */
 
 import type { StateProjectionDefinition, StateProjectionStore } from "@langwatch/eventing";
@@ -12,25 +12,13 @@ import {
 } from "@langwatch/insight-contract";
 
 import { isOwnScheduleId } from "../rules/insight-daily-run.rules.ts";
+import {
+  NO_RUN_STARTED,
+  type InsightRunInFlightState,
+} from "../rules/insight-run-in-flight.rules.ts";
 import type { InsightDailyRunEvent } from "./insight-daily-run.events.ts";
 
-export interface InsightRunInFlightState {
-  /** The last run that started, its conversation and when; null until one started. */
-  readonly runId: string | null;
-  readonly conversationId: string | null;
-  /** Epoch milliseconds. */
-  readonly startedAt: number | null;
-  /** The last run that settled, started or not; null until one did. */
-  readonly lastSettledRunId: string | null;
-}
-
-/** What a schedule with no row reads: no run started, none settled. */
-export const NO_RUN_STARTED: InsightRunInFlightState = {
-  runId: null,
-  conversationId: null,
-  startedAt: null,
-  lastSettledRunId: null,
-};
+export { NO_RUN_STARTED, type InsightRunInFlightState };
 
 /** Whether the event leaves the row as it is. */
 function leavesRow(state: InsightRunInFlightState, event: InsightDailyRunEvent): boolean {

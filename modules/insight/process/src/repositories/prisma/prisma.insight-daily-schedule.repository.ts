@@ -2,7 +2,6 @@ import type { InsightDailyRun, InsightDailyRunSetting } from "@langwatch/insight
 import { type PrismaModelClient, prismaTables, skipTenantCheck } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
-import { NO_RUN_STARTED } from "../../eventing/insight-run-in-flight.projection.ts";
 import {
   byNewestRun,
   dailyRunFromState,
@@ -12,6 +11,7 @@ import {
   type InsightOnSchedule,
   onScheduleFromState,
 } from "../../rules/insight-daily-schedule-row.rules.ts";
+import { NO_RUN_STARTED } from "../../rules/insight-run-in-flight.rules.ts";
 import type { InsightDailyScheduleRepository } from "../insight-daily-schedule.repository.ts";
 import {
   dailyScheduleStateFromRow,

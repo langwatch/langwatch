@@ -1,6 +1,5 @@
 import type { InsightDailyRun, InsightDailyRunSetting } from "@langwatch/insight-contract";
 
-import { NO_RUN_STARTED } from "../../eventing/insight-run-in-flight.projection.ts";
 import {
   byNewestRun,
   byOnThenId,
@@ -11,6 +10,7 @@ import {
   type InsightOnSchedule,
   onScheduleFromState,
 } from "../../rules/insight-daily-schedule-row.rules.ts";
+import { NO_RUN_STARTED } from "../../rules/insight-run-in-flight.rules.ts";
 import type { InsightDailyScheduleRepository } from "../insight-daily-schedule.repository.ts";
 import { InsightMemoryStore } from "./insight-memory.store.ts";
 

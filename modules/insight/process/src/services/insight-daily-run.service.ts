@@ -397,10 +397,9 @@ export class InsightDailyRunService implements InsightDailyRunExecutor {
   }
 
   /**
-   * Whether the schedule's process no longer waits on this run: a newer run took it over and
-   * records it as lost, or its outcome is on the record. Its start or outcome recorded now
-   * would name it the schedule's newest after a newer run; a replay keeps the run's first
-   * outcome and would not.
+   * Whether the schedule's process no longer waits on this run: a newer run took it over, or
+   * its outcome is on the record. Recording its start or outcome now would name it the newest
+   * after a newer run; a replay keeps the first outcome and would not.
    */
   private async isHandedOn({ projectId, scheduleId, runId }: RunInput): Promise<boolean> {
     // No store lent, or no instance: nothing says the run was handed on.

@@ -167,11 +167,7 @@ describe("given a run was requested for a board", () => {
       const running = applyInsightRunInFlightEvent(PROJECTION.init(), started(T0 + 1_000));
 
       const retried = applyInsightRunInFlightEvent(running, started(T0 + 2_000));
-      const { setting } = foldAll([
-        started(T0 + 1_000),
-        started(T0 + 2_000),
-        settled(T0 + 60_000),
-      ]);
+      const { setting } = foldAll([started(T0 + 1_000), started(T0 + 2_000), settled(T0 + 60_000)]);
 
       expect(retried).toBe(running);
       expect(setting.lastRun?.startedAt).toBe(T0 + 1_000);

@@ -47,6 +47,7 @@ and [the daily run](./specs/insight-daily-run.feature). Decisions: [ADRs](./adrs
 | Postgres table | `InsightDailyScheduleProjection` | `process/src/repositories/prisma/prisma.insight-daily-schedule-projection.repository.ts:28` |
 | Postgres table | `InsightProjection`              | `process/src/repositories/prisma/prisma.insight-projection.repository.ts:39`                |
 | Postgres table | `InsightReaderProjection`        | `process/src/repositories/prisma/prisma.insight-reader-projection.repository.ts:27`         |
+| Postgres table | `InsightRunInFlightProjection`   | `process/src/repositories/prisma/prisma.insight-run-in-flight-projection.repository.ts:14`  |
 | Postgres table | `InsightProjection`              | `process/src/repositories/prisma/prisma.insight.repository.ts:22`                           |
 | Postgres table | `InsightReaderProjection`        | `process/src/repositories/prisma/prisma.insight.repository.ts:22`                           |
 

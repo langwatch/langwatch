@@ -63,8 +63,13 @@ const answersOneFinding: Langy["awaitTurnSettlement"] = async ({ turnId }) => {
   const finding = { title: "Checkout cost doubled", body: "Cost rose to 96.", tone: "bad" };
   const fence = "```";
   const block = JSON.stringify({ findings: [finding] });
-  const text = ["I read the board.", "", `${fence}${INSIGHT_RUN_FINDINGS_FENCE_TAG}`, block, fence]
-    .join("\n");
+  const text = [
+    "I read the board.",
+    "",
+    `${fence}${INSIGHT_RUN_FINDINGS_FENCE_TAG}`,
+    block,
+    fence,
+  ].join("\n");
   return {
     kind: "settled",
     settlement: {
