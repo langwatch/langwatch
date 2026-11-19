@@ -7903,8 +7903,8 @@ model SignInProviderMount {
 }
 
 // ── Weekly digest (enterprise/modules/digest) ────────────────────────────────
-// Ids and numbers only: names and addresses are read from the user module when
-// an email is rendered, never stored here.
+// Ids and numbers only: names and addresses stay with the user module and are
+// read when an email is rendered, never stored here.
 
 /// An organization enrolled in the weekly digest. No row: not enrolled, so nothing sends.
 model DigestCohortOrganization {
@@ -7913,10 +7913,11 @@ model DigestCohortOrganization {
   enrolledAt     DateTime @default(now())
 }
 
-/// A person who unsubscribed from the digest. No row: subscribed.
+/// A person who opted out of the digest. No row: subscribed.
 model DigestSubscription {
   userId                 String    @id
   unsubscribedAt         DateTime?
+  /// The send whose unsubscribe link or one-click header the person used.
   unsubscribedFromSendId String?
   updatedAt              DateTime  @updatedAt
 }
@@ -7959,43 +7960,17 @@ model DigestUserWeek {
   @@index([isoWeek])
 }
 
-/// One person's digest for one ISO week. Unique per (user, week), so a redelivery sends nothing.
+/// One person's digest for one ISO week, accepted by our own mailer. The id is `userId:isoWeek`.
 model DigestSend {
-  id             String    @id
+  id             String   @id
   userId         String
   organizationId String
   isoWeek        String
   templateId     String
-  /// `{ linkKey: url }`: a click token names a key, and the redirect reads the address here.
-  links          Json
-  messageId      String?
-  sentAt         DateTime?
-  createdAt      DateTime  @default(now())
+  sentAt         DateTime
+  createdAt      DateTime @default(now())
 
-  @@unique([userId, isoWeek])
   @@index([isoWeek, templateId])
-}
-
-/// One followed link of a sent digest.
-model DigestClick {
-  id      String   @id
-  sendId  String
-  linkKey String
-  at      DateTime @default(now())
-
-  @@index([sendId])
-}
-
-/// The "what's new" card for one ISO week.
-model DigestUpdate {
-  isoWeek   String   @id
-  title     String
-  body      String
-  gradient  String
-  linkLabel String
-  linkUrl   String
-  updatedBy String
-  updatedAt DateTime @updatedAt
 }
 
 /// The digest's one settings row. `armed` is the weekly send's master switch; it starts off.

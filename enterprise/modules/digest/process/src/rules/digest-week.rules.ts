@@ -2,12 +2,13 @@
 /** ISO weeks, and the two weekly folds: pure state and the functions that grow it. */
 import { z } from "zod";
 
-const DAY_MS = 24 * 60 * 60 * 1000;
+const HOUR_MS = 60 * 60 * 1000;
+const DAY_MS = 24 * HOUR_MS;
 const WEEK_MS = 7 * DAY_MS;
 /** The send goes out after Monday 08:00 UTC, for the week that just ended. */
 export const SEND_HOUR_UTC = 8;
-/** Folds kept: this week and the four the scenario baseline averages over. */
-export const WEEKS_KEPT = 5;
+/** The weeks before the sent one that the scenario baseline averages over. */
+export const BASELINE_WEEKS = 4;
 
 /** Upper bounds of the latency histogram's buckets; one overflow bucket follows. */
 export const LATENCY_BUCKETS_MS = [100, 250, 500, 1_000, 2_000, 5_000, 10_000, 30_000, 60_000];
@@ -46,14 +47,15 @@ export function weeksBefore({ isoWeek, count }: { isoWeek: string; count: number
 /** The finished week a send at `now` covers: last week once Monday 08:00 UTC has passed. */
 export function sendableWeek(now: number): string {
   const current = isoWeekOf(now);
-  const opensAt = weekStartOf(current) + SEND_HOUR_UTC * 60 * 60 * 1000;
+  const opensAt = weekStartOf(current) + SEND_HOUR_UTC * HOUR_MS;
   const [lastWeek, weekBefore] = weeksBefore({ isoWeek: current, count: 2 });
   return (now >= opensAt ? lastWeek : weekBefore) ?? current;
 }
 
-/** The oldest week kept at `now`; anything before it is swept. */
+/** The oldest week kept at `now`: the sendable week's baseline still needs its four. */
 export function oldestKeptWeek(now: number): string {
-  return weeksBefore({ isoWeek: isoWeekOf(now), count: WEEKS_KEPT - 1 }).at(-1) ?? isoWeekOf(now);
+  const sendable = sendableWeek(now);
+  return weeksBefore({ isoWeek: sendable, count: BASELINE_WEEKS }).at(-1) ?? sendable;
 }
 
 /** `Sep 22 to 28`, the way a template names the week it covers. */
@@ -90,7 +92,6 @@ export const projectWeekStateSchema = z.object({
   evaluators: z.record(z.string(), outcomeCountsSchema),
   scenarios: outcomeCountsSchema,
   scenarioFailures: z.record(z.string(), z.number()),
-  suiteItems: outcomeCountsSchema,
 });
 export type ProjectWeekState = z.infer<typeof projectWeekStateSchema>;
 
@@ -127,7 +128,6 @@ export function emptyProjectWeek(): ProjectWeekState {
     evaluators: {},
     scenarios: noOutcomes(),
     scenarioFailures: {},
-    suiteItems: noOutcomes(),
   };
 }
 
@@ -206,15 +206,11 @@ export function userWeekTotals(state: UserWeekState): {
   linesChanged: number;
   commits: number;
   pullRequests: number;
-  topRepository: string | undefined;
 } {
   const sum = (metric: string) =>
     Object.values(state.series)
       .filter((series) => series.metric === metric)
       .reduce((total, series) => total + series.value, 0);
-  const topRepository = Object.entries(state.repositories).toSorted(
-    ([, left], [, right]) => right - left,
-  )[0]?.[0];
   return {
     sessions: state.sessions.length + state.sessionOverflow,
     tokens: Math.round(sum("token_usage")),
@@ -223,6 +219,5 @@ export function userWeekTotals(state: UserWeekState): {
     linesChanged: Math.round(sum("lines_of_code")),
     commits: Math.round(sum("commit")),
     pullRequests: Math.round(sum("pull_request")),
-    topRepository,
   };
 }

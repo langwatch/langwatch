@@ -1,44 +1,34 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-import { moduleApi } from "@langwatch/kernel/module-api";
+import { moduleApi } from "@langwatch/module";
 import type { OpsOperator } from "@langwatch/ops-contract";
 
 import type {
-  DigestCohortInput,
-  DigestCohortRow,
-  DigestMemberRow,
-  DigestMetricRow,
-  DigestPreview,
-  DigestPreviewInput,
   DigestSendTestInput,
+  DigestSetArmedInput,
   DigestSetEnrolledInput,
   DigestSettings,
-  DigestUnsubscribePage,
-  DigestUpdate,
+  DigestTokenQuery,
 } from "./digest.ts";
 
 type Operated = Readonly<{ operator: OpsOperator | null }>;
 
 /**
- * Weekly digest emails. The Cloud-admin ops admit through `OpsApi.admitCloudAdmin` and answer
- * not_found where cloud ops is off (§3.5); the token ops are the public unsubscribe and click pair.
+ * The weekly digest. The operator controls admit Cloud admin staff through
+ * `OpsApi.admitCloudAdmin`, so they answer not_found where cloud ops is off (§3.5); the token
+ * operations serve the public unsubscribe address, whose signed token is the authorization.
  */
 export interface DigestApi {
-  listCohort(input: DigestCohortInput & Operated): Promise<DigestCohortRow[]>;
-  listMembers(input: { organizationId: string } & Operated): Promise<DigestMemberRow[]>;
-  preview(input: DigestPreviewInput & Operated): Promise<DigestPreview>;
-  setEnrolled(input: DigestSetEnrolledInput & Operated): Promise<void>;
-  listUpdates(input: Operated): Promise<DigestUpdate[]>;
-  saveUpdate(input: DigestUpdate & Operated): Promise<void>;
-  getSettings(input: Operated): Promise<DigestSettings>;
-  setArmed(input: { armed: boolean } & Operated): Promise<DigestSettings>;
+  setEnrolled(input: DigestSetEnrolledInput & Operated): Promise<DigestSettings>;
+  setArmed(input: DigestSetArmedInput & Operated): Promise<DigestSettings>;
+  /** Mails the member's week to the operator alone; no send is recorded. */
   sendTest(input: DigestSendTestInput & Operated): Promise<void>;
-  listMetrics(input: Operated): Promise<DigestMetricRow[]>;
 
-  readUnsubscribe(input: { token: string }): Promise<DigestUnsubscribePage>;
-  unsubscribe(input: { token: string }): Promise<void>;
-  resubscribe(input: { token: string }): Promise<void>;
-  /** Records the click and answers the stored address; the token never carries it. */
-  followLink(input: { token: string }): Promise<string>;
+  /** Whether the person the token names still receives the digest. */
+  isSubscribed(input: DigestTokenQuery): Promise<boolean>;
+  /** Opts the person out and records the send the link came from; asking twice changes nothing. */
+  unsubscribe(input: DigestTokenQuery): Promise<void>;
+  /** Opts the person back in, from the same link. */
+  resubscribe(input: DigestTokenQuery): Promise<void>;
 }
 
 export const DigestApi = moduleApi<DigestApi>()("digest");

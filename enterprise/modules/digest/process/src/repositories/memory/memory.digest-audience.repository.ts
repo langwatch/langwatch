@@ -1,6 +1,4 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-import type { DigestUpdate } from "@langwatch/enterprise-digest-contract";
-
 import type {
   DigestAudienceRepository,
   DigestSettingsRecord,
@@ -12,8 +10,8 @@ export class MemoryDigestAudienceRepository implements DigestAudienceRepository 
   }
 
   readonly #enrolled = new Set<string>();
+  /** Each opted-out person, with the send their unsubscribe came from. */
   readonly #unsubscribed = new Map<string, string>();
-  readonly #updates = new Map<string, DigestUpdate>();
   #settings: DigestSettingsRecord = { armed: false, lastPlannedWeek: null };
 
   private constructor() {}
@@ -49,8 +47,9 @@ export class MemoryDigestAudienceRepository implements DigestAudienceRepository 
     return Promise.resolve();
   }
 
-  listUnsubscribeSends(): Promise<string[]> {
-    return Promise.resolve([...this.#unsubscribed.values()]);
+  /** The send a person's standing opt-out came from, if they opted out. */
+  unsubscribedFrom({ userId }: { userId: string }): string | undefined {
+    return this.#unsubscribed.get(userId);
   }
 
   getSettings(): Promise<DigestSettingsRecord> {
@@ -64,19 +63,6 @@ export class MemoryDigestAudienceRepository implements DigestAudienceRepository 
 
   markPlanned({ isoWeek }: { isoWeek: string }): Promise<void> {
     this.#settings = { ...this.#settings, lastPlannedWeek: isoWeek };
-    return Promise.resolve();
-  }
-
-  listUpdates(): Promise<DigestUpdate[]> {
-    return Promise.resolve(
-      [...this.#updates.values()].toSorted((left, right) =>
-        right.isoWeek.localeCompare(left.isoWeek),
-      ),
-    );
-  }
-
-  saveUpdate({ by: _by, ...update }: DigestUpdate & { by: string }): Promise<void> {
-    this.#updates.set(update.isoWeek, update);
     return Promise.resolve();
   }
 }

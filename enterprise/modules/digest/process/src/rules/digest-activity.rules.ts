@@ -7,7 +7,6 @@ import {
 } from "@langwatch/coding-agent-contract";
 import type { EvaluationLifecycleCompletedEventData } from "@langwatch/evaluation-contract";
 import type { SimulationRunFinishedEventData } from "@langwatch/scenario-contract";
-import type { SuiteRunItemCompletedEventData } from "@langwatch/suite-contract";
 import { type NormalizedSpan, NormalizedStatusCode } from "@langwatch/trace-contract";
 
 import type { ProjectFact, UserActivity } from "../eventing/digest-activity.events.ts";
@@ -47,19 +46,6 @@ export function scenarioFact(data: SimulationRunFinishedEventData): ProjectFact 
   const outcome: Outcome =
     verdict === "success" ? "passed" : verdict === "failure" ? "failed" : "other";
   return { kind: "scenario", scenarioId: data.scenarioId ?? null, outcome };
-}
-
-const SUITE_PASSED = new Set(["success", "passed", "pass"]);
-const SUITE_FAILED = new Set(["failure", "failed", "fail", "error"]);
-
-export function suiteItemFact(data: SuiteRunItemCompletedEventData): ProjectFact {
-  const verdict = (data.verdict ?? data.status).toLowerCase();
-  const outcome: Outcome = SUITE_PASSED.has(verdict)
-    ? "passed"
-    : SUITE_FAILED.has(verdict)
-      ? "failed"
-      : "other";
-  return { kind: "suiteItem", outcome };
 }
 
 /** The repository a coding-agent fact was stamped with, `owner/name`, when it carried one. */

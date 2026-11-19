@@ -211,7 +211,13 @@ export const prismaTableCatalogue = {
   "SelfHostedInstanceReport": "SelfHostedInstanceReport",
   "WebPushSubscription": "WebPushSubscription",
   "WebPushVapidKey": "WebPushVapidKey",
-  "SignInProviderMount": "SignInProviderMount"
+  "SignInProviderMount": "SignInProviderMount",
+  "DigestCohortOrganization": "DigestCohortOrganization",
+  "DigestSubscription": "DigestSubscription",
+  "DigestProjectWeek": "DigestProjectWeek",
+  "DigestUserWeek": "DigestUserWeek",
+  "DigestSend": "DigestSend",
+  "DigestSettings": "DigestSettings"
 } as const;
 
 export const prismaModelFieldCatalogue = {
@@ -3376,6 +3382,58 @@ export const prismaModelFieldCatalogue = {
     "mounted",
     "lastAppliedEventId",
     "updatedAt"
+  ],
+  "DigestCohortOrganization": [
+    "organizationId",
+    "enrolledBy",
+    "enrolledAt"
+  ],
+  "DigestSubscription": [
+    "userId",
+    "unsubscribedAt",
+    "unsubscribedFromSendId",
+    "updatedAt"
+  ],
+  "DigestProjectWeek": [
+    "id",
+    "projectId",
+    "organizationId",
+    "isoWeek",
+    "state",
+    "occurredAt",
+    "lastEventId",
+    "acceptedAt",
+    "projectionVersion",
+    "createdAt",
+    "updatedAt"
+  ],
+  "DigestUserWeek": [
+    "id",
+    "userId",
+    "organizationId",
+    "isoWeek",
+    "state",
+    "occurredAt",
+    "lastEventId",
+    "acceptedAt",
+    "projectionVersion",
+    "createdAt",
+    "updatedAt"
+  ],
+  "DigestSend": [
+    "id",
+    "userId",
+    "organizationId",
+    "isoWeek",
+    "templateId",
+    "sentAt",
+    "createdAt"
+  ],
+  "DigestSettings": [
+    "id",
+    "armed",
+    "lastPlannedWeek",
+    "updatedAt"
   ]
 } as const;
 
@@ -4005,7 +4063,13 @@ export const prismaRelationCatalogue = {
   "SelfHostedInstanceReport": {},
   "WebPushSubscription": {},
   "WebPushVapidKey": {},
-  "SignInProviderMount": {}
+  "SignInProviderMount": {},
+  "DigestCohortOrganization": {},
+  "DigestSubscription": {},
+  "DigestProjectWeek": {},
+  "DigestUserWeek": {},
+  "DigestSend": {},
+  "DigestSettings": {}
 } as const;
 
 export type PrismaTableModel = keyof typeof prismaTableCatalogue;

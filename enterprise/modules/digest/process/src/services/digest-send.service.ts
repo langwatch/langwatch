@@ -1,189 +1,185 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import {
   DigestMemberNotFoundError,
-  type DigestPreview,
-  type DigestTemplateId,
+  DigestNothingToSendError,
 } from "@langwatch/enterprise-digest-contract";
-import { generate } from "@langwatch/ksuid";
-import type { NotificationService } from "@langwatch/notification-contract";
-import type { OrganizationApi } from "@langwatch/organization-contract";
+import type {
+  OrganizationApi,
+  OrganizationRestMemberSummary,
+} from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { UserApi } from "@langwatch/user-contract";
 
+import type { DigestMailChannel } from "../channels/digest-mail.channel.ts";
+import { type DigestSendRequest, digestSendKey } from "../eventing/digest-send.events.ts";
 import type { DigestAudienceRepository } from "../repositories/digest-audience.repository.ts";
 import type { DigestSendRepository } from "../repositories/digest-send.repository.ts";
-import { eligibleTemplates, pickTemplate } from "../rules/digest-template.rules.ts";
+import type {
+  DigestProjectWeekRepository,
+  DigestUserWeekRepository,
+} from "../repositories/digest-week.repository.ts";
 import {
-  latencyPercentile,
-  oldestKeptWeek,
-  userWeekTotals,
-  weekLabel,
-} from "../rules/digest-week.rules.ts";
-import type { DigestLinkService } from "./digest-link.service.ts";
-import type { DigestWeekService, OrganizationWeek } from "./digest-week.service.ts";
+  digestMessageId,
+  digestTemplateInput,
+  digestTemplateProps,
+  type DigestTemplateProps,
+  focusProjectOf,
+  type OrganizationWeek,
+} from "../rules/digest-email.rules.ts";
+import { type DigestTemplatePick, pickDigestTemplate } from "../rules/digest-template.rules.ts";
+import { oldestKeptWeek, sendableWeek } from "../rules/digest-week.rules.ts";
+import type { DigestUnsubscribeService } from "./digest-unsubscribe.service.ts";
+import type { DigestWeekService } from "./digest-week.service.ts";
 
-/** Renders one template's props; `@langwatch/mail` parses them with the template's own schema. */
-export type DigestRender = (input: {
-  templateId: DigestTemplateId;
-  props: Record<string, unknown>;
-}) => Promise<{ subject: string; html: string }>;
-
-export type DigestMember = Readonly<{ userId: string; admin: boolean }>;
-export type PlannedSend = Readonly<{ week: OrganizationWeek; member: DigestMember }>;
-
-/** Turns a link key and its target into the address the email carries. */
-type Linker = (key: string, target: string) => string;
+type Member = Readonly<{ userId: string; admin: boolean }>;
 
 const MEMBER_PAGE = 500;
-const TOP_ROWS = 3;
 
-/** The weekly send, the gallery's preview and the operator's test, over one composition. */
+/** The address both the email's unsubscribe link (GET, a page) and its RFC 8058 header (POST) use. */
+export const DIGEST_UNSUBSCRIBE_PATH = "/api/digest/unsubscribe";
+
+type Deps = Readonly<{
+  audience: DigestAudienceRepository;
+  sends: DigestSendRepository;
+  projectWeeks: Pick<DigestProjectWeekRepository, "deleteBefore">;
+  userWeeks: Pick<DigestUserWeekRepository, "deleteBefore">;
+  weeks: DigestWeekService;
+  /** Who an organization's members are, which are admins, and the organization's name. */
+  organizations: Readonly<{
+    listMembers(input: { organizationId: string; offset?: number; limit?: number }): Promise<{
+      members: readonly Pick<OrganizationRestMemberSummary, "userId" | "role" | "disabledAt">[];
+      totalCount: number;
+    }>;
+    findProvisioningSummary: OrganizationApi["findProvisioningSummary"];
+  }>;
+  projects: Pick<ProjectApi, "findSummaryById">;
+  /** The address an email goes to, read when it is sent and never stored. */
+  users: Pick<UserApi, "findById">;
+  mail: DigestMailChannel;
+  unsubscribes: Pick<DigestUnsubscribeService, "token">;
+  /** The deployment's public origin; absent, a send refuses by name, since no link could work. */
+  publicBaseUrl: string | undefined;
+  requestSend: (request: DigestSendRequest & { occurredAt: number }) => Promise<void>;
+  now: () => number;
+}>;
+
+/** One email ready to hand to the mail channel. */
+type Composed = Readonly<{ pick: DigestTemplatePick; props: DigestTemplateProps; oneClick: string }>;
+
+/**
+ * The weekly send. A plan asks one send per enrolled member; each send picks the member's
+ * template, renders it through `@langwatch/mail` and sends it through our own mailer
+ * (`NotificationApi.sendEmail`), with a one-click unsubscribe the digest's own route honours.
+ */
 export class DigestSendService {
-  static create(deps: {
-    weeks: DigestWeekService;
-    sends: DigestSendRepository;
-    audience: DigestAudienceRepository;
-    links: DigestLinkService;
-    projectWeeks: { deleteBefore(input: { isoWeek: string }): Promise<number> };
-    userWeeks: { deleteBefore(input: { isoWeek: string }): Promise<number> };
-    organizations: Pick<OrganizationApi, "listMembers" | "findProvisioningSummary">;
-    projects: Pick<ProjectApi, "findSummaryById">;
-    users: Pick<UserApi, "findById">;
-    notifications: Pick<NotificationService, "sendEmail">;
-    render: DigestRender;
-    publicBaseUrl: string | undefined;
-    now: () => number;
-  }): DigestSendService {
+  static create(deps: Deps): DigestSendService {
     return new DigestSendService(deps);
   }
 
-  private constructor(private readonly deps: Parameters<typeof DigestSendService.create>[0]) {}
+  private constructor(private readonly deps: Deps) {}
 
-  /** The scheduled send for one finished week: inert unless armed, once per week. */
-  async sendWeek({ isoWeek }: { isoWeek: string }): Promise<void> {
-    const oldest = oldestKeptWeek(this.deps.now());
-    await this.deps.projectWeeks.deleteBefore({ isoWeek: oldest });
-    await this.deps.userWeeks.deleteBefore({ isoWeek: oldest });
+  /** The hourly wake's work: sweep old folds, then, armed and not yet planned, ask the sends. */
+  async planWeek({ isoWeek, at }: { isoWeek: string; at: number }): Promise<void> {
+    const oldest = oldestKeptWeek(at);
+    await Promise.all([
+      this.deps.projectWeeks.deleteBefore({ isoWeek: oldest }),
+      this.deps.userWeeks.deleteBefore({ isoWeek: oldest }),
+    ]);
     const settings = await this.deps.audience.getSettings();
-    if (!settings.armed || settings.lastPlannedWeek === isoWeek) return;
-    // ponytail: one intent sends the whole week; split into per-member intents past a few thousand.
-    for (const planned of await this.planWeek({ isoWeek })) await this.sendPlanned(planned);
+    if (!settings.armed) return;
+    if (settings.lastPlannedWeek !== null && settings.lastPlannedWeek >= isoWeek) return;
+    const enrolled = await this.deps.audience.listEnrolled();
+    if (enrolled.length === 0) return;
+    for (const organizationId of enrolled) {
+      for (const member of await this.members({ organizationId })) {
+        await this.deps.requestSend({ ...member, organizationId, isoWeek, occurredAt: at });
+      }
+    }
     await this.deps.audience.markPlanned({ isoWeek });
   }
 
-  /** Every enrolled organization's members, with the organization's week read once. */
-  async planWeek({ isoWeek }: { isoWeek: string }): Promise<PlannedSend[]> {
-    const planned: PlannedSend[] = [];
-    for (const organizationId of await this.deps.audience.listEnrolled()) {
-      const week = await this.deps.weeks.organizationWeek({ organizationId, isoWeek });
-      for (const member of await this.members({ organizationId })) planned.push({ week, member });
-    }
-    return planned;
-  }
-
-  /** One person's email; skipped if unsubscribed, unenrolled since planning, or already sent. */
-  async sendPlanned({ week, member }: PlannedSend): Promise<void> {
-    const [enrolled, unsubscribed] = await Promise.all([
-      this.deps.audience.listEnrolled(),
-      this.deps.audience.listUnsubscribed({ userIds: [member.userId] }),
-    ]);
-    if (!enrolled.includes(week.organizationId) || unsubscribed.length > 0) return;
-    const user = await this.deps.users.findById({ id: member.userId });
-    if (!user?.email) return;
-    const templateId = pickTemplate(this.deps.weeks.templateInput({ week, ...member }));
-
-    const id = generate("dgs").toString();
-    const targets: Record<string, string> = {};
-    const collect: Linker = (key, target) => {
-      targets[key] = target;
-      return target;
-    };
-    if (!(await this.#props({ templateId, week, member, link: collect, sendId: id }))) return;
-
-    const send = await this.deps.sends.claim({
-      id,
-      userId: member.userId,
-      organizationId: week.organizationId,
-      isoWeek: week.isoWeek,
-      templateId,
-      links: targets,
-    });
-    if (send.sentAt !== null) return;
-    const tracked: Linker = (key) =>
-      `${this.#base()}/api/digest/c/${this.deps.links.clickToken({ sendId: send.id, linkKey: key })}`;
-    const props = await this.#props({
-      templateId: send.templateId,
-      week,
-      member,
-      link: tracked,
-      sendId: send.id,
-    });
-    if (!props) return;
-    const { subject, html } = await this.deps.render({ templateId: send.templateId, props });
-    const unsubscribeToken = this.deps.links.unsubscribeToken({
-      userId: member.userId,
-      sendId: send.id,
-    });
-    await this.deps.notifications.sendEmail({
-      to: user.email,
-      subject,
-      html,
-      unsubscribe: { url: `${this.#base()}/api/digest/unsubscribe?token=${unsubscribeToken}` },
-      idempotencyKey: `digest:${member.userId}:${week.isoWeek}`,
-    });
-    await this.deps.sends.markSent({ id: send.id, sentAt: this.deps.now() });
-  }
-
-  /** Every template this member is eligible for, rendered with direct links, the pick marked. */
-  async preview({
-    organizationId,
+  /**
+   * One member's week, sent once; skipped if disarmed, unenrolled or opted out since the plan,
+   * when the person has no address, or when the picked template has nothing to show.
+   */
+  async sendDigest({
     userId,
+    organizationId,
     isoWeek,
-  }: {
-    organizationId: string;
-    userId: string;
-    isoWeek: string;
-  }): Promise<DigestPreview> {
-    const member = await this.#member({ organizationId, userId });
+    admin,
+  }: DigestSendRequest & { at: number }): Promise<void> {
+    const [settings, enrolled, unsubscribed, sent] = await Promise.all([
+      this.deps.audience.getSettings(),
+      this.deps.audience.listEnrolled(),
+      this.deps.audience.listUnsubscribed({ userIds: [userId] }),
+      this.deps.sends.isSent({ userId, isoWeek }),
+    ]);
+    if (!settings.armed || !enrolled.includes(organizationId)) return;
+    if (unsubscribed.length > 0 || sent) return;
+    const user = await this.deps.users.findById({ id: userId });
+    if (!user?.email) return;
     const week = await this.deps.weeks.organizationWeek({ organizationId, isoWeek });
-    const input = this.deps.weeks.templateInput({ week, ...member });
-    const picked = pickTemplate(input);
-    const templates: DigestPreview["templates"] = [];
-    for (const templateId of eligibleTemplates(input)) {
-      const props = await this.#props({ templateId, week, member, link: direct, sendId: "" });
-      if (!props) continue;
-      const rendered = await this.deps.render({ templateId, props });
-      templates.push({ templateId, picked: templateId === picked, ...rendered });
-    }
-    return { userId, isoWeek, templates };
+    const composed = await this.#compose({
+      week,
+      member: { userId, admin },
+      recipient: { userId, sendId: digestSendKey({ userId, isoWeek }) },
+    });
+    if (!composed) return;
+    // A failure after the mailer accepted retries with the same key: the mailer drops the repeat.
+    await this.deps.mail.send({
+      to: user.email,
+      templateId: composed.pick.template,
+      props: composed.props,
+      oneClickUnsubscribeUrl: composed.oneClick,
+      idempotencyKey: digestMessageId({ userId, isoWeek }),
+      test: false,
+    });
+    await this.deps.sends.recordSent({
+      userId,
+      organizationId,
+      isoWeek,
+      templateId: composed.pick.template,
+      sentAt: this.deps.now(),
+    });
   }
 
-  /** A member's email sent to the operator alone; no send row is written. */
+  /**
+   * A member's last week, mailed to the operator alone; no send is recorded. Its unsubscribe
+   * link names the operator, the person it reached, never the member.
+   */
   async sendTest({
     organizationId,
     userId,
-    templateId,
-    isoWeek,
-    to,
+    operatorId,
   }: {
     organizationId: string;
     userId: string;
-    templateId: DigestTemplateId | undefined;
-    isoWeek: string;
-    to: string;
+    operatorId: string;
   }): Promise<void> {
-    const member = await this.#member({ organizationId, userId });
+    const member = (await this.members({ organizationId })).find((row) => row.userId === userId);
+    if (!member) throw new DigestMemberNotFoundError(userId);
+    const operator = await this.deps.users.findById({ id: operatorId });
+    if (!operator?.email) throw new DigestMemberNotFoundError(operatorId);
+    const isoWeek = sendableWeek(this.deps.now());
     const week = await this.deps.weeks.organizationWeek({ organizationId, isoWeek });
-    const chosen = templateId ?? pickTemplate(this.deps.weeks.templateInput({ week, ...member }));
-    const props = await this.#props({ templateId: chosen, week, member, link: direct, sendId: "" });
-    if (!props) return;
-    const { subject, html } = await this.deps.render({ templateId: chosen, props });
-    await this.deps.notifications.sendEmail({ to, subject: `[Test] ${subject}`, html });
+    const composed = await this.#compose({
+      week,
+      member,
+      recipient: { userId: operatorId, sendId: `test:${isoWeek}` },
+    });
+    if (!composed) throw new DigestNothingToSendError(userId);
+    await this.deps.mail.send({
+      to: operator.email,
+      templateId: composed.pick.template,
+      props: composed.props,
+      oneClickUnsubscribeUrl: composed.oneClick,
+      test: true,
+    });
   }
 
   /** An organization's active members, admins marked; names stay with the user module. */
-  async members({ organizationId }: { organizationId: string }): Promise<DigestMember[]> {
-    const members: DigestMember[] = [];
+  async members({ organizationId }: { organizationId: string }): Promise<Member[]> {
+    const members: Member[] = [];
     for (let offset = 0; ; offset += MEMBER_PAGE) {
       const page = await this.deps.organizations.listMembers({
         organizationId,
@@ -191,168 +187,60 @@ export class DigestSendService {
         limit: MEMBER_PAGE,
       });
       for (const row of page.members) {
-        if (row.disabledAt === null) members.push({ userId: row.userId, admin: row.role === "ADMIN" });
+        if (row.disabledAt !== null) continue;
+        members.push({ userId: row.userId, admin: row.role === "ADMIN" });
       }
       if (page.members.length < MEMBER_PAGE || offset + MEMBER_PAGE >= page.totalCount) break;
     }
     return members;
   }
 
-  async #member({
-    organizationId,
-    userId,
-  }: {
-    organizationId: string;
-    userId: string;
-  }): Promise<DigestMember> {
-    const member = (await this.members({ organizationId })).find((row) => row.userId === userId);
-    if (!member) throw new DigestMemberNotFoundError(userId);
-    return member;
-  }
-
-  #base(): string {
-    const base = this.deps.publicBaseUrl;
-    if (!base) throw new Error("digest needs the deployment's public base URL to write its links");
-    return base.replace(/\/$/, "");
-  }
-
-  /** One template's props, or none when its data is missing (no card, no project). */
-  async #props({
-    templateId,
+  /** The member's pick and its props, with an unsubscribe signed for whoever receives it. */
+  async #compose({
     week,
     member,
-    link,
-    sendId,
+    recipient,
   }: {
-    templateId: DigestTemplateId;
     week: OrganizationWeek;
-    member: DigestMember;
-    link: Linker;
-    sendId: string;
-  }): Promise<Record<string, unknown> | undefined> {
-    const base = this.#base();
-    const unsubscribeTarget = sendId
-      ? `${base}/digest/unsubscribe?token=${this.deps.links.unsubscribeToken({ userId: member.userId, sendId })}`
-      : `${base}/digest/unsubscribe`;
-    const common = {
-      weekLabel: weekLabel(week.isoWeek),
-      unsubscribeUrl: link("unsubscribe", unsubscribeTarget),
-      ...(week.update
-        ? {
-            whatsNew: {
-              title: week.update.title,
-              body: week.update.body,
-              gradient: week.update.gradient,
-              linkLabel: week.update.linkLabel,
-              linkUrl: link("update", week.update.linkUrl),
-            },
-          }
-        : {}),
-    };
-    switch (templateId) {
-      case "digest-plan-pressure": {
-        const organization = await this.deps.organizations.findProvisioningSummary(
-          week.organizationId,
-        );
-        return {
-          ...common,
-          organizationName: organization?.name ?? "Your organization",
-          usagePercentage: week.planUsagePercent,
-          used: week.used,
-          limit: week.limit,
-          unit: "traces",
-          resetsOn: nextMonthLabel(this.deps.now()),
-          samplingUrl: link("sampling", `${base}/settings/usage`),
-          redactionUrl: link("redaction", `${base}/settings`),
-          upgradeUrl: link("upgrade", `${base}/settings/subscription`),
-        };
-      }
-      case "digest-scenarios-trend": {
-        const trend = week.trend;
-        const project = trend && (await this.deps.projects.findSummaryById(trend.project.projectId));
-        if (!trend || !project) return undefined;
-        return {
-          ...common,
-          projectName: project.name,
-          direction: trend.trend.direction,
-          failureRatePercent: trend.trend.failureRatePercent,
-          baselinePercent: trend.trend.baselinePercent,
-          runs: trend.project.scenarios.runs,
-          failed: trend.project.scenarios.failed,
-          scenariosUrl: link("scenarios", `${base}/${project.slug}/simulations`),
-        };
-      }
-      case "digest-coding-agent-week": {
-        const user = week.users.get(member.userId);
-        if (!user) return undefined;
-        const totals = userWeekTotals(user);
-        return {
-          ...common,
-          sessions: totals.sessions,
-          tokens: totals.tokens,
-          costUsd: totals.costUsd,
-          activeMinutes: Math.round(totals.activeSeconds / 60),
-          ...(totals.linesChanged > 0 ? { linesChanged: totals.linesChanged } : {}),
-          ...(totals.commits > 0 ? { commits: totals.commits } : {}),
-          ...(totals.pullRequests > 0 ? { pullRequests: totals.pullRequests } : {}),
-          ...(totals.topRepository ? { topRepo: totals.topRepository } : {}),
-          weekUrl: link("week", base),
-        };
-      }
-      case "digest-traces-week": {
-        const busiest = week.busiest;
-        const project = busiest && (await this.deps.projects.findSummaryById(busiest.projectId));
-        if (!busiest || !project) return undefined;
-        const previous = week.lastWeek.find((fold) => fold.projectId === busiest.projectId);
-        return {
-          ...common,
-          projectName: project.name,
-          traces: busiest.traces,
-          ...(previous && previous.traces > 0
-            ? { changePercent: ((busiest.traces - previous.traces) / previous.traces) * 100 }
-            : {}),
-          errors: busiest.errors,
-          costUsd: busiest.costUsd,
-          tokens: Math.round(busiest.tokens),
-          p50Milliseconds: latencyPercentile({ latency: busiest.latency, percentile: 50 }),
-          p95Milliseconds: latencyPercentile({ latency: busiest.latency, percentile: 95 }),
-          topModels: Object.entries(busiest.models)
-            .toSorted(([, left], [, right]) => right - left)
-            .slice(0, TOP_ROWS)
-            .map(([name, traces]) => ({ name, traces })),
-          evaluations: Object.entries(busiest.evaluators)
-            .filter(([, counts]) => counts.passed + counts.failed > 0)
-            .toSorted(([, left], [, right]) => right.runs - left.runs)
-            .slice(0, TOP_ROWS)
-            .map(([name, counts]) => ({
-              name,
-              passRatePercent: (counts.passed / (counts.passed + counts.failed)) * 100,
-            })),
-          tracesUrl: link("traces", `${base}/${project.slug}/messages`),
-        };
-      }
-      case "digest-whats-new": {
-        if (!week.update) return undefined;
-        return {
-          weekLabel: common.weekLabel,
-          unsubscribeUrl: common.unsubscribeUrl,
-          update: common.whatsNew,
-          nudge: {
-            text: "See what your agents did this week in LangWatch.",
-            label: "Open LangWatch",
-            url: link("nudge", base),
-          },
-        };
-      }
-    }
+    member: Member;
+    recipient: Readonly<{ userId: string; sendId: string }>;
+  }): Promise<Composed | null> {
+    const baseUrl = this.#baseUrl();
+    const pick = pickDigestTemplate(digestTemplateInput({ week, ...member }));
+    const unsubscribeUrl = `${baseUrl}${DIGEST_UNSUBSCRIBE_PATH}?token=${encodeURIComponent(
+      this.deps.unsubscribes.token(recipient),
+    )}`;
+    const props = digestTemplateProps({
+      pick,
+      week,
+      userId: member.userId,
+      names: await this.#names({ week, pick }),
+      baseUrl,
+      unsubscribeUrl,
+      now: this.deps.now(),
+    });
+    return props ? { pick, props, oneClick: unsubscribeUrl } : null;
   }
-}
 
-const direct: Linker = (_key, target) => target;
+  /** Only the names the picked template shows are read. */
+  async #names({ week, pick }: { week: OrganizationWeek; pick: DigestTemplatePick }) {
+    if (pick.template === "digest-plan-pressure") {
+      const organization = await this.deps.organizations.findProvisioningSummary(
+        week.organizationId,
+      );
+      return { organizationName: organization?.name ?? null, project: null };
+    }
+    const focus = focusProjectOf(week);
+    const showsProject =
+      pick.template === "digest-scenarios-trend" || pick.template === "digest-traces-week";
+    const project =
+      showsProject && focus ? await this.deps.projects.findSummaryById(focus.projectId) : null;
+    return { organizationName: null, project };
+  }
 
-/** `Nov 1`: when a monthly plan count starts again. */
-function nextMonthLabel(now: number): string {
-  const date = new Date(now);
-  const first = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 1));
-  return first.toLocaleString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
+  #baseUrl(): string {
+    const base = this.deps.publicBaseUrl;
+    if (!base) throw new Error("digest needs the deployment's public base URL (BASE_HOST) to send");
+    return base.replace(/\/$/, "");
+  }
 }

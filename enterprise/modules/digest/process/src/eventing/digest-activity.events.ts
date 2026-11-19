@@ -48,7 +48,6 @@ export const projectActivitySchema = z.object({
       scenarioId: z.string().nullable(),
       outcome: outcomeSchema,
     }),
-    z.object({ kind: z.literal("suiteItem"), outcome: outcomeSchema }),
   ]),
 });
 export type ProjectActivity = z.infer<typeof projectActivitySchema>;

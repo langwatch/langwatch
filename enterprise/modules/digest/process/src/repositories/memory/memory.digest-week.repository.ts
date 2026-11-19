@@ -23,7 +23,7 @@ export class MemoryDigestWeekRepository<State extends WeekState> {
   };
 
   store = (projection: StoredProjection<State>, context: ProjectionStoreContext): Promise<void> => {
-    this.#rows.set(context.aggregateId, projection);
+    this.#rows.set(context.key ?? context.aggregateId, projection);
     return Promise.resolve();
   };
 

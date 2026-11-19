@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-import { defineRepositories } from "@langwatch/kernel";
+import { defineRepositories } from "@langwatch/process";
 
 import { MemoryDigestRepositories } from "./memory/memory.digest.repositories.ts";
 import { PostgresDigestRepositories } from "./prisma/prisma.digest.repositories.ts";

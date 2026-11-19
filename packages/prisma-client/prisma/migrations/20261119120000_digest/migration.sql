@@ -59,36 +59,10 @@ CREATE TABLE IF NOT EXISTS "DigestSend" (
     "organizationId" TEXT NOT NULL,
     "isoWeek" TEXT NOT NULL,
     "templateId" TEXT NOT NULL,
-    "links" JSONB NOT NULL,
-    "messageId" TEXT,
-    "sentAt" TIMESTAMP(3),
+    "sentAt" TIMESTAMP(3) NOT NULL,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "DigestSend_pkey" PRIMARY KEY ("id")
-);
-
--- CreateTable
-CREATE TABLE IF NOT EXISTS "DigestClick" (
-    "id" TEXT NOT NULL,
-    "sendId" TEXT NOT NULL,
-    "linkKey" TEXT NOT NULL,
-    "at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-
-    CONSTRAINT "DigestClick_pkey" PRIMARY KEY ("id")
-);
-
--- CreateTable
-CREATE TABLE IF NOT EXISTS "DigestUpdate" (
-    "isoWeek" TEXT NOT NULL,
-    "title" TEXT NOT NULL,
-    "body" TEXT NOT NULL,
-    "gradient" TEXT NOT NULL,
-    "linkLabel" TEXT NOT NULL,
-    "linkUrl" TEXT NOT NULL,
-    "updatedBy" TEXT NOT NULL,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
-
-    CONSTRAINT "DigestUpdate_pkey" PRIMARY KEY ("isoWeek")
 );
 
 -- CreateTable
@@ -114,10 +88,4 @@ CREATE INDEX IF NOT EXISTS "DigestUserWeek_organizationId_isoWeek_idx" ON "Diges
 CREATE INDEX IF NOT EXISTS "DigestUserWeek_isoWeek_idx" ON "DigestUserWeek"("isoWeek");
 
 -- CreateIndex
-CREATE UNIQUE INDEX IF NOT EXISTS "DigestSend_userId_isoWeek_key" ON "DigestSend"("userId", "isoWeek");
-
--- CreateIndex
 CREATE INDEX IF NOT EXISTS "DigestSend_isoWeek_templateId_idx" ON "DigestSend"("isoWeek", "templateId");
-
--- CreateIndex
-CREATE INDEX IF NOT EXISTS "DigestClick_sendId_idx" ON "DigestClick"("sendId");

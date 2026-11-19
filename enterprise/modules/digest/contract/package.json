@@ -2,7 +2,7 @@
   "name": "@langwatch/enterprise-digest-contract",
   "version": "0.1.0",
   "private": true,
-  "description": "Weekly digest emails: the Api, the Cloud-admin gallery's tRPC declarations, and the public unsubscribe and click shapes.",
+  "description": "Weekly digest emails: the operator controls' and unsubscribe Api, its tRPC declaration, config and the template ids.",
   "license": "SEE LICENSE IN ../../../LICENSE.md",
   "files": [
     "src"
@@ -17,12 +17,13 @@
     }
   },
   "scripts": {
-    "typecheck": "tsc -b",
-    "test": "vitest run --passWithNoTests"
+    "typecheck": "GOMAXPROCS=2 GOMEMLIMIT=2GiB tsc -b",
+    "test": "vitest run --fsModuleCache --passWithNoTests"
   },
   "dependencies": {
+    "@langwatch/config": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
-    "@langwatch/kernel": "workspace:*",
+    "@langwatch/module": "workspace:*",
     "@langwatch/ops-contract": "workspace:*",
     "zod": "catalog:"
   },

@@ -1,5 +1,4 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-import { type DigestUpdate, digestUpdateSchema } from "@langwatch/enterprise-digest-contract";
 import { PrismaRepository } from "@langwatch/prisma-client";
 
 import type {
@@ -10,12 +9,7 @@ import type {
 const SETTINGS_ID = "singleton";
 
 export class PrismaDigestAudienceRepository
-  extends PrismaRepository.for(
-    "DigestCohortOrganization",
-    "DigestSubscription",
-    "DigestSettings",
-    "DigestUpdate",
-  )
+  extends PrismaRepository.for("DigestCohortOrganization", "DigestSubscription", "DigestSettings")
   implements DigestAudienceRepository
 {
   static readonly create = this.factory((prisma) => new PrismaDigestAudienceRepository(prisma));
@@ -76,17 +70,8 @@ export class PrismaDigestAudienceRepository
     await this.prisma.digestSubscription.deleteMany({ where: { userId } });
   }
 
-  async listUnsubscribeSends(): Promise<string[]> {
-    const rows = await this.prisma.digestSubscription.findMany({
-      where: { unsubscribedFromSendId: { not: null } },
-      select: { unsubscribedFromSendId: true },
-    });
-    return rows.flatMap((row) => (row.unsubscribedFromSendId ? [row.unsubscribedFromSendId] : []));
-  }
-
   async getSettings(): Promise<DigestSettingsRecord> {
-    const rows = await this.prisma.digestSettings.findMany({ where: { id: SETTINGS_ID } });
-    const row = rows[0];
+    const row = await this.prisma.digestSettings.findUnique({ where: { id: SETTINGS_ID } });
     return { armed: row?.armed ?? false, lastPlannedWeek: row?.lastPlannedWeek ?? null };
   }
 
@@ -103,20 +88,6 @@ export class PrismaDigestAudienceRepository
       where: { id: SETTINGS_ID },
       create: { id: SETTINGS_ID, lastPlannedWeek: isoWeek },
       update: { lastPlannedWeek: isoWeek },
-    });
-  }
-
-  async listUpdates(): Promise<DigestUpdate[]> {
-    const rows = await this.prisma.digestUpdate.findMany({ orderBy: { isoWeek: "desc" } });
-    return rows.map((row) => digestUpdateSchema.parse(row));
-  }
-
-  async saveUpdate({ by, ...update }: DigestUpdate & { by: string }): Promise<void> {
-    const columns = { ...update, updatedBy: by };
-    await this.prisma.digestUpdate.upsert({
-      where: { isoWeek: update.isoWeek },
-      create: columns,
-      update: columns,
     });
   }
 }

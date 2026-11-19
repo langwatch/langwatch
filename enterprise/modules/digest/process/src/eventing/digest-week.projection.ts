@@ -87,8 +87,6 @@ export function applyProjectActivity({
             ? countCapped({ counts: next.scenarioFailures, key: fact.scenarioId, cap: MAX_SCENARIOS })
             : next.scenarioFailures,
       };
-    case "suiteItem":
-      return { ...next, suiteItems: addOutcome({ counts: next.suiteItems, outcome: fact.outcome }) };
   }
 }
 

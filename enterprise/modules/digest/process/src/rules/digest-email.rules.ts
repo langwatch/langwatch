@@ -1,0 +1,262 @@
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+/** What one person's weekly email says: the template input, and the picked template's props. */
+import type { UsageStats } from "@langwatch/entitlement-contract";
+
+import type { DigestTemplateInput, DigestTemplatePick } from "./digest-template.rules.ts";
+import {
+  BASELINE_WEEKS,
+  latencyPercentile,
+  type OutcomeCounts,
+  type ProjectWeekState,
+  userWeekTotals,
+  type UserWeekState,
+  weekLabel,
+  weeksBefore,
+} from "./digest-week.rules.ts";
+
+/** A template's props, as `@langwatch/mail`'s digest-*.tsx schema reads them. */
+export type DigestTemplateProps = Readonly<Record<string, unknown>>;
+
+/** The names an email shows, read from their owners when it is rendered and never stored. */
+export type DigestNames = Readonly<{
+  organizationName: string | null;
+  /** The focus project's name and the slug its links are built on, when it has one. */
+  project: Readonly<{ name: string; slug: string }> | null;
+}>;
+
+/** The month's count against a finite plan limit; null when the plan has none to press on. */
+export type PlanUsage = Readonly<{ used: number; limit: number }>;
+
+/** One organization's finished week: its folds and its plan usage, read once. */
+export type OrganizationWeek = Readonly<{
+  organizationId: string;
+  isoWeek: string;
+  planUsage: PlanUsage | null;
+  /** Each project's fold for the week. */
+  projects: readonly ProjectWeekState[];
+  /** Each project's folds for the weeks before it, as far back as the baseline reads. */
+  history: readonly ProjectWeekState[];
+  users: ReadonlyMap<string, UserWeekState>;
+}>;
+
+const TOP_ROWS = 3;
+
+/** Multiplied before dividing, so 900 of 1,000 reads exactly 90. */
+const percentOf = ({ part, whole }: { part: number; whole: number }): number =>
+  whole > 0 ? (part * 100) / whole : 0;
+
+/** The idempotency key a member's week is sent under: a retry is not a second email. */
+export function digestMessageId({ userId, isoWeek }: { userId: string; isoWeek: string }): string {
+  return `digest:${userId}:${isoWeek}`;
+}
+
+/** An uncapped plan reports its limit as MAX_SAFE_INTEGER (entitlement's contract). */
+export function planUsageOf(
+  usage: Pick<UsageStats, "currentMonthMessagesCount" | "maxMonthlyUsageLimit">,
+): PlanUsage | null {
+  const limit = usage.maxMonthlyUsageLimit;
+  if (usage.currentMonthMessagesCount === null || limit <= 0 || limit >= Number.MAX_SAFE_INTEGER) {
+    return null;
+  }
+  return { used: usage.currentMonthMessagesCount, limit };
+}
+
+/** The project the email is about: the busiest by traces, then by scenario runs. */
+export function focusProjectOf(week: OrganizationWeek): ProjectWeekState | undefined {
+  return week.projects.toSorted(
+    (left, right) => right.traces - left.traces || right.scenarios.runs - left.scenarios.runs,
+  )[0];
+}
+
+function baselineOf({
+  week,
+  projectId,
+}: {
+  week: OrganizationWeek;
+  projectId: string;
+}): OutcomeCounts[] {
+  return weeksBefore({ isoWeek: week.isoWeek, count: BASELINE_WEEKS }).map(
+    (isoWeek) =>
+      week.history.find((fold) => fold.projectId === projectId && fold.isoWeek === isoWeek)
+        ?.scenarios ?? { runs: 0, passed: 0, failed: 0 },
+  );
+}
+
+/** What the template rules read for one member of the organization. */
+export function digestTemplateInput({
+  week,
+  userId,
+  admin,
+}: {
+  week: OrganizationWeek;
+  userId: string;
+  admin: boolean;
+}): DigestTemplateInput {
+  const user = week.users.get(userId);
+  const focus = focusProjectOf(week);
+  const usage = week.planUsage;
+  return {
+    member: {
+      isOrganizationAdmin: admin,
+      codingAgentSessions: user ? userWeekTotals(user).sessions : 0,
+    },
+    organization: {
+      monthlyLimitUsedPercent: usage ? percentOf({ part: usage.used, whole: usage.limit }) : null,
+    },
+    project: focus
+      ? {
+          traces: focus.traces,
+          scenarioRuns: focus.scenarios.runs,
+          scenarioFailures: focus.scenarios.failed,
+          baselineWeeks: baselineOf({ week, projectId: focus.projectId }).map(
+            ({ runs, failed }) => ({ runs, failures: failed }),
+          ),
+        }
+      : null,
+  };
+}
+
+/**
+ * The picked template's props (`@langwatch/mail` digest-*.tsx), links built on the deployment's
+ * origin; null when the template has nothing to show, so nothing is sent. "What's new" has no
+ * published card yet (the update editor is not built), so it never sends.
+ */
+export function digestTemplateProps({
+  pick,
+  week,
+  userId,
+  names,
+  baseUrl,
+  unsubscribeUrl,
+  now,
+}: {
+  pick: DigestTemplatePick;
+  week: OrganizationWeek;
+  userId: string;
+  names: DigestNames;
+  baseUrl: string;
+  /** The page behind the email's own unsubscribe link. */
+  unsubscribeUrl: string;
+  now: number;
+}): DigestTemplateProps | null {
+  const common = { weekLabel: weekLabel(week.isoWeek), unsubscribeUrl };
+  const focus = focusProjectOf(week);
+  const project = names.project;
+  switch (pick.template) {
+    case "digest-plan-pressure": {
+      const usage = week.planUsage;
+      if (!usage || !names.organizationName) return null;
+      return {
+        ...common,
+        organizationName: names.organizationName,
+        usagePercentage: percentOf({ part: usage.used, whole: usage.limit }),
+        used: usage.used,
+        limit: usage.limit,
+        unit: "traces",
+        resetsOn: nextMonthLabel(now),
+        samplingUrl: `${baseUrl}/settings/usage`,
+        redactionUrl: `${baseUrl}/settings`,
+        upgradeUrl: `${baseUrl}/settings/subscription`,
+      };
+    }
+    case "digest-scenarios-trend": {
+      if (!focus || !project || focus.scenarios.runs === 0) return null;
+      const baseline = baselineOf({ week, projectId: focus.projectId });
+      return {
+        ...common,
+        projectName: project.name,
+        direction: pick.direction === "more_failing" ? "worse" : "better",
+        failureRatePercent: percentOf({
+          part: focus.scenarios.failed,
+          whole: focus.scenarios.runs,
+        }),
+        baselinePercent: percentOf({
+          part: baseline.reduce((sum, counts) => sum + counts.failed, 0),
+          whole: baseline.reduce((sum, counts) => sum + counts.runs, 0),
+        }),
+        runs: focus.scenarios.runs,
+        failed: focus.scenarios.failed,
+        scenariosUrl: `${baseUrl}/${project.slug}/simulations/scenarios`,
+      };
+    }
+    case "digest-coding-agent-week": {
+      const user = week.users.get(userId);
+      if (!user) return null;
+      const totals = userWeekTotals(user);
+      if (totals.sessions === 0) return null;
+      const topRepo = Object.entries(user.repositories).toSorted(
+        ([, left], [, right]) => right - left,
+      )[0]?.[0];
+      return {
+        ...common,
+        sessions: totals.sessions,
+        tokens: totals.tokens,
+        costUsd: totals.costUsd,
+        activeMinutes: Math.round(totals.activeSeconds / 60),
+        ...(totals.linesChanged > 0 ? { linesChanged: totals.linesChanged } : {}),
+        ...(totals.commits > 0 ? { commits: totals.commits } : {}),
+        ...(totals.pullRequests > 0 ? { pullRequests: totals.pullRequests } : {}),
+        ...(topRepo ? { topRepo } : {}),
+        weekUrl: baseUrl,
+      };
+    }
+    case "digest-traces-week":
+      if (!focus || !project || focus.traces === 0) return null;
+      return {
+        ...common,
+        projectName: project.name,
+        ...tracesWeekNumbers({ week, focus }),
+        tracesUrl: `${baseUrl}/${project.slug}/traces`,
+      };
+    case "digest-whats-new":
+      return null;
+  }
+}
+
+/** `Dec 1`: when a monthly plan count starts again. */
+function nextMonthLabel(now: number): string {
+  const date = new Date(now);
+  const first = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 1));
+  return first.toLocaleString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
+}
+
+function tracesWeekNumbers({
+  week,
+  focus,
+}: {
+  week: OrganizationWeek;
+  focus: ProjectWeekState;
+}): DigestTemplateProps {
+  const [lastWeek] = weeksBefore({ isoWeek: week.isoWeek, count: 1 });
+  const previous = week.history.find(
+    (fold) => fold.projectId === focus.projectId && fold.isoWeek === lastWeek,
+  );
+  return {
+    traces: focus.traces,
+    ...(previous && previous.traces > 0
+      ? {
+          changePercent: percentOf({
+            part: focus.traces - previous.traces,
+            whole: previous.traces,
+          }),
+        }
+      : {}),
+    errors: focus.errors,
+    costUsd: focus.costUsd,
+    tokens: Math.round(focus.tokens),
+    p50Milliseconds: latencyPercentile({ latency: focus.latency, percentile: 50 }),
+    p95Milliseconds: latencyPercentile({ latency: focus.latency, percentile: 95 }),
+    topModels: Object.entries(focus.models)
+      .toSorted(([, left], [, right]) => right - left)
+      .slice(0, TOP_ROWS)
+      .map(([name, traces]) => ({ name, traces })),
+    evaluations: Object.entries(focus.evaluators)
+      .filter(([, counts]) => counts.passed + counts.failed > 0)
+      .toSorted(([, left], [, right]) => right.runs - left.runs)
+      .slice(0, TOP_ROWS)
+      .map(([name, counts]) => ({
+        name,
+        passRatePercent: percentOf({ part: counts.passed, whole: counts.passed + counts.failed }),
+      })),
+  };
+}

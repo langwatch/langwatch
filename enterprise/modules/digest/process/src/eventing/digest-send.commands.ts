@@ -1,0 +1,23 @@
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+import { defineCommand } from "@langwatch/eventing";
+
+import {
+  DIGEST_SEND_AGGREGATE_TYPE,
+  DIGEST_SEND_EVENT_VERSION,
+  DIGEST_SEND_REQUESTED_EVENT_TYPE,
+  digestSendKey,
+  digestSendRequestedEventDataSchema,
+  REQUEST_DIGEST_SEND_COMMAND_TYPE,
+} from "./digest-send.events.ts";
+
+/** Keyed by the person and week, so a plan carried out twice asks each member once. */
+export const RequestDigestSendCommand = defineCommand({
+  commandType: REQUEST_DIGEST_SEND_COMMAND_TYPE,
+  eventType: DIGEST_SEND_REQUESTED_EVENT_TYPE,
+  eventVersion: DIGEST_SEND_EVENT_VERSION,
+  aggregateType: DIGEST_SEND_AGGREGATE_TYPE,
+  schema: digestSendRequestedEventDataSchema,
+  aggregateId: digestSendKey,
+  idempotencyKey: ({ organizationId, userId, isoWeek }) =>
+    `${organizationId}:${digestSendKey({ userId, isoWeek })}:send_requested`,
+});
