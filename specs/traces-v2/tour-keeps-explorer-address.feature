@@ -31,3 +31,10 @@ Feature: Trace tour keeps the explorer state in the address
     Given the address fragment carries a query and a tour step
     When the explorer rewrites the fragment for its own state
     Then the tour step is still in the fragment
+
+  @integration
+  Scenario: A tour step alone still restores the last-used lens
+    Given the user last used a built-in lens
+    And the address fragment carries only a tour step
+    When the traces page loads
+    Then the last-used lens is restored

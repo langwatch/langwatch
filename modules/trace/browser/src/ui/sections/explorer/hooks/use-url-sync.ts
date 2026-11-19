@@ -86,7 +86,7 @@ function runsForRestoredQuery({
 
 function readFragment(): string {
   if (typeof window === "undefined") return "";
-  return window.location.hash;
+  return splitTourStep(window.location.hash).rest;
 }
 
 /**
