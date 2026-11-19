@@ -77,6 +77,12 @@ type BundleConfig struct {
 	// Populated from the config endpoint so they travel with policy config.
 	Credentials []Credential
 
+	// PrivateEndpoints are the private endpoint bindings of the key's
+	// organization (ADR-203), from the config endpoint's private_endpoints.
+	// Decode also stamps them onto every credential above, which is how they
+	// reach the provider router on each request. Empty keeps today's rules.
+	PrivateEndpoints []PrivateEndpoint
+
 	// ModelAliases maps friendly names to canonical provider/model pairs.
 	ModelAliases map[string]ModelAlias
 
