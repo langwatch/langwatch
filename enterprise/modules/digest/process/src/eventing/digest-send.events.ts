@@ -29,5 +29,5 @@ export const DigestSendRequestedEventSchema = z.object({
  * A person's week, under the asking organization's tenant: a member of two enrolled
  * organizations has two, and the `DigestSend` claim keeps their email to one.
  */
-export const digestSendKey = ({ userId, isoWeek }: { userId: string; isoWeek: string }) =>
+export const digestSendKey = ({ userId, isoWeek }: { userId: string; isoWeek: string }): string =>
   `${userId}:${isoWeek}`;

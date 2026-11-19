@@ -27,20 +27,18 @@ export class MemoryDigestWeekRepository<State extends WeekState> {
     return Promise.resolve();
   };
 
-  listWeeks({
+  findWeeks({
     isoWeeks,
     organizationId,
   }: {
     isoWeeks: readonly string[];
-    organizationId?: string;
+    organizationId: string;
   }): Promise<State[]> {
     return Promise.resolve(
       [...this.#rows.values()]
         .map((row) => row.state)
         .filter(
-          (state) =>
-            isoWeeks.includes(state.isoWeek) &&
-            (organizationId === undefined || state.organizationId === organizationId),
+          (state) => state.organizationId === organizationId && isoWeeks.includes(state.isoWeek),
         ),
     );
   }

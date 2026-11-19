@@ -21,9 +21,18 @@ import {
   type IntentContext,
 } from "@langwatch/eventing";
 import { EventStoreMemory } from "@langwatch/eventing/testing";
-import { Temporal } from "@langwatch/time";
+import { MemberNotFoundError } from "@langwatch/organization-contract";
+import { type Instant, Temporal } from "@langwatch/time";
 import { z } from "zod";
 
+import { MemoryDigestMailChannel } from "../../channels/memory/memory.digest.channels.ts";
+import { MemoryDigestAudienceRepository } from "../../repositories/memory/memory.digest-audience.repository.ts";
+import { MemoryDigestRepositories } from "../../repositories/memory/memory.digest.repositories.ts";
+import { DigestCommandsService } from "../../services/digest-commands.service.ts";
+import { DigestSendService } from "../../services/digest-send.service.ts";
+import { DigestSourceService } from "../../services/digest-source.service.ts";
+import { DigestUnsubscribeService } from "../../services/digest-unsubscribe.service.ts";
+import { DigestWeekService } from "../../services/digest-week.service.ts";
 import type { ProjectActivity } from "../digest-activity.events.ts";
 import { buildDigestSendPipeline } from "../digest-send.pipeline.ts";
 import {
@@ -33,14 +42,6 @@ import {
   digestPlanWake,
 } from "../digest-send.process.ts";
 import { buildDigestPipeline } from "../digest.pipeline.ts";
-import { MemoryDigestMailChannel } from "../../channels/memory/memory.digest.channels.ts";
-import { MemoryDigestAudienceRepository } from "../../repositories/memory/memory.digest-audience.repository.ts";
-import { MemoryDigestRepositories } from "../../repositories/memory/memory.digest.repositories.ts";
-import { DigestCommandsService } from "../../services/digest-commands.service.ts";
-import { DigestSendService } from "../../services/digest-send.service.ts";
-import { DigestSourceService } from "../../services/digest-source.service.ts";
-import { DigestUnsubscribeService } from "../../services/digest-unsubscribe.service.ts";
-import { DigestWeekService } from "../../services/digest-week.service.ts";
 
 export const ORGANIZATION = "org-1";
 export const PROJECT = "project-1";
@@ -76,15 +77,21 @@ function ownerStandIn() {
     .build();
 }
 
+/** One member as the organization module answers them. */
+type WorldMember = Readonly<{ userId: string; role: string; disabledAt: Instant | null }>;
+
 /** What the test controls: who the organization's members are, and its projects. */
 export function digestWorld() {
+  const members: WorldMember[] = [
+    { userId: ADMIN, role: "ADMIN", disabledAt: null },
+    { userId: MEMBER, role: "MEMBER", disabledAt: null },
+    { userId: OTHER_MEMBER, role: "MEMBER", disabledAt: null },
+  ];
   return {
-    members: [
-      { userId: ADMIN, role: "ADMIN", disabledAt: null },
-      { userId: MEMBER, role: "MEMBER", disabledAt: null },
-      { userId: OTHER_MEMBER, role: "MEMBER", disabledAt: null },
-    ],
+    members,
     projects: [PROJECT],
+    /** The projects each person may not view; everyone may view every other. */
+    hiddenFrom: new Map<string, readonly string[]>(),
     usage: { currentMonthMessagesCount: 10, maxMonthlyUsageLimit: 1_000 },
     /** People the user module knows, by id; anyone else has no address. */
     users: [ADMIN, MEMBER, OTHER_MEMBER, OPERATOR],
@@ -144,6 +151,12 @@ export function installDigest(
         const members = organizationId === ORGANIZATION ? world.members : [];
         return { members, totalCount: members.length };
       },
+      getMember: async ({ organizationId, userId }) => {
+        const members = organizationId === ORGANIZATION ? world.members : [];
+        const member = members.find((row) => row.userId === userId);
+        if (!member) throw new MemberNotFoundError(userId);
+        return member;
+      },
       findProvisioningSummary: async (organizationId) =>
         organizationId === ORGANIZATION
           ? { id: ORGANIZATION, name: "Acme", slug: "acme", createdAt: Temporal.Now.instant() }
@@ -152,6 +165,17 @@ export function installDigest(
     projects: {
       findSummaryById: async (projectId) =>
         world.projects.includes(projectId) ? { name: "Support bot", slug: "support-bot" } : null,
+      listNamesByIds: async ({ projectIds }) =>
+        projectIds.filter((id) => world.projects.includes(id)).map(projectIdentity),
+    },
+    access: {
+      canBatchByIds: async ({ principal, projects }) => {
+        const viewer = principal.type === "user" ? principal.id : "";
+        const hidden = world.hiddenFrom.get(viewer) ?? [];
+        const decided = new Map<string, boolean>();
+        for (const { projectId } of projects) decided.set(projectId, !hidden.includes(projectId));
+        return { teams: new Map(), projects: decided, organizationRole: null };
+      },
     },
     users: {
       findById: async ({ id }) => (world.users.includes(id) ? userProfile(id) : null),
@@ -269,10 +293,13 @@ export function installDigest(
         { tenantId },
       );
     },
-    projectWeek: async ({ isoWeek }: { isoWeek: string }) =>
-      (await repositories.projectWeeks.listWeeks({ isoWeeks: [isoWeek] })).find(
-        (fold) => fold.projectId === PROJECT,
-      ),
+    projectWeek: async ({ isoWeek }: { isoWeek: string }) => {
+      const folds = await repositories.projectWeeks.findWeeks({
+        isoWeeks: [isoWeek],
+        organizationId: ORGANIZATION,
+      });
+      return folds.find((fold) => fold.projectId === PROJECT);
+    },
     close: () => eventing.close(),
   };
 }
@@ -280,6 +307,20 @@ export function installDigest(
 export type InstalledDigest = ReturnType<typeof installDigest>;
 
 /** A person as the user module answers them: digest reads only the address. */
+/** A project as the project module names it; every project sits on the one team. */
+function projectIdentity(id: string) {
+  return {
+    id,
+    name: "Support bot",
+    slug: "support-bot",
+    teamId: "team-1",
+    organizationId: ORGANIZATION,
+    isPersonal: false,
+    ownerUserId: null,
+    kind: "project",
+  };
+}
+
 function userProfile(id: string) {
   const at = new Date("2026-01-01T00:00:00Z");
   return {

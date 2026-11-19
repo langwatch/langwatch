@@ -28,7 +28,8 @@ export const planWeekIntentSchema = z.object({
 });
 export type PlanWeekIntent = z.infer<typeof planWeekIntentSchema>;
 
-export const sendDigestIntentSchema = digestSendRequestedEventDataSchema.extend({
+export const sendDigestIntentSchema = z.object({
+  ...digestSendRequestedEventDataSchema.shape,
   at: z.number().int().nonnegative(),
 });
 export type SendDigestIntent = z.infer<typeof sendDigestIntentSchema>;
@@ -50,14 +51,11 @@ type MemberSendIntents = { sendDigest: IntentSpec<typeof sendDigestIntentSchema>
  * on Monday waits for 08:00, and a planned week is never planned again.
  */
 export const digestPlanWake: WakeHandler<DigestPlanState, PlanIntents> = (_state, context) => {
-  const isoWeek = plannableWeek(context.at);
-  return {
-    state: { lastWakeAt: context.at },
-    intents:
-      isoWeek === null
-        ? []
-        : [context.intent("planWeek", `plan:${context.at}`, { isoWeek, at: context.at })],
-  };
+  const plannable = plannableWeek(context.at);
+  const state = { lastWakeAt: context.at };
+  if (plannable.kind === "closed") return { state, intents: [] };
+  const plan = { isoWeek: plannable.isoWeek, at: context.at };
+  return { state, intents: [context.intent("planWeek", `plan:${context.at}`, plan)] };
 };
 
 /** One person's week: the first ask becomes the `sendDigest`; its key dedupes a redelivery. */

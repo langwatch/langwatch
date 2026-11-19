@@ -10,11 +10,7 @@ export class HttpDigestChannels {
   static readonly requires = [] as const;
   static readonly binds = { notifications: NotificationApi } as const;
 
-  static create({
-    bound,
-  }: {
-    bound: BoundApis<typeof HttpDigestChannels.binds>;
-  }): DigestChannels {
+  static create({ bound }: { bound: BoundApis<typeof HttpDigestChannels.binds> }): DigestChannels {
     return { mail: SesDigestMailChannel.create({ notifications: bound.notifications }) };
   }
 }

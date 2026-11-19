@@ -8,12 +8,12 @@ import { mailTemplates } from "@langwatch/mail";
 import { describe, expect, it } from "vitest";
 
 import {
+  buildDigestTemplateProps,
+  derivePlanUsage,
   type DigestNames,
   type DigestTemplateProps,
   digestTemplateInput,
-  digestTemplateProps,
   type OrganizationWeek,
-  planUsageOf,
 } from "../digest-email.rules.ts";
 import { pickDigestTemplate } from "../digest-template.rules.ts";
 import { emptyProjectWeek, type ProjectWeekState } from "../digest-week.rules.ts";
@@ -36,7 +36,13 @@ const NAMES: DigestNames = {
 };
 
 /** The props as the template itself reads them: its own schema refuses a wrong shape. */
-function parsedBy({ templateId, props }: { templateId: string; props: DigestTemplateProps | null }) {
+function parsedBy({
+  templateId,
+  props,
+}: {
+  templateId: string;
+  props: DigestTemplateProps | undefined;
+}) {
   const template = mailTemplates.find((candidate) => candidate.id === templateId);
   if (!template || !props) throw new Error(`no ${templateId} props to parse`);
   return template.schema.parse(props);
@@ -56,7 +62,7 @@ function propsFor({
   );
   return {
     pick,
-    props: digestTemplateProps({
+    props: buildDigestTemplateProps({
       pick,
       week: organizationWeek,
       userId: "u",
@@ -80,7 +86,7 @@ function week(overrides: Partial<OrganizationWeek> = {}): OrganizationWeek {
   };
 }
 
-describe("planUsageOf()", () => {
+describe("derivePlanUsage()", () => {
   describe("when the plan is uncapped", () => {
     it("has no usage to press on", () => {
       const uncapped = {
@@ -88,7 +94,7 @@ describe("planUsageOf()", () => {
         maxMonthlyUsageLimit: Number.MAX_SAFE_INTEGER,
       };
 
-      expect(planUsageOf(uncapped)).toBeNull();
+      expect(derivePlanUsage(uncapped)).toBeUndefined();
     });
   });
 
@@ -96,12 +102,12 @@ describe("planUsageOf()", () => {
     it("has no usage to press on", () => {
       const unknown = { currentMonthMessagesCount: null, maxMonthlyUsageLimit: 1_000 };
 
-      expect(planUsageOf(unknown)).toBeNull();
+      expect(derivePlanUsage(unknown)).toBeUndefined();
     });
   });
 });
 
-describe("digestTemplateProps()", () => {
+describe("buildDigestTemplateProps()", () => {
   describe("when the busiest project traced 1,200 times, up from 1,000 last week", () => {
     const busy = week({
       projects: [
@@ -143,7 +149,7 @@ describe("digestTemplateProps()", () => {
     });
 
     it("sends nothing when the project's name cannot be read", () => {
-      expect(propsFor({ week: busy, names: { ...NAMES, project: null } }).props).toBeNull();
+      expect(propsFor({ week: busy, names: { ...NAMES, project: null } }).props).toBeUndefined();
     });
   });
 
@@ -193,7 +199,7 @@ describe("digestTemplateProps()", () => {
       const { pick, props } = propsFor({ week: week() });
 
       expect(pick.template).toBe("digest-whats-new");
-      expect(props).toBeNull();
+      expect(props).toBeUndefined();
     });
   });
 });

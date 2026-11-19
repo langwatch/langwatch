@@ -21,11 +21,11 @@ Weekly digest emails: folds the week's usage, picks a template per person and se
 | Postgres table  | `DigestCohortOrganization`      | `process/src/repositories/prisma/prisma.digest-audience.repository.ts:12`     |
 | Postgres table  | `DigestSubscription`            | `process/src/repositories/prisma/prisma.digest-audience.repository.ts:12`     |
 | Postgres table  | `DigestSettings`                | `process/src/repositories/prisma/prisma.digest-audience.repository.ts:12`     |
-| Postgres table  | `DigestProjectWeek`             | `process/src/repositories/prisma/prisma.digest-project-week.repository.ts:15` |
+| Postgres table  | `DigestProjectWeek`             | `process/src/repositories/prisma/prisma.digest-project-week.repository.ts:21` |
 | Postgres table  | `DigestSend`                    | `process/src/repositories/prisma/prisma.digest-send.repository.ts:11`         |
-| Postgres table  | `DigestUserWeek`                | `process/src/repositories/prisma/prisma.digest-user-week.repository.ts:15`    |
+| Postgres table  | `DigestUserWeek`                | `process/src/repositories/prisma/prisma.digest-user-week.repository.ts:21`    |
 | Stores required |                                 | `process/src/channels/http/http.digest.channels.ts:10`                        |
-| Secrets         | `unsubscribe` (NEXTAUTH_SECRET) | `process/src/app/digest.app.ts:60`                                            |
+| Secrets         | `unsubscribe` (NEXTAUTH_SECRET) | `process/src/app/digest.app.ts:64`                                            |
 | Config          | `publicBaseUrl` (BASE_HOST)     | `contract/src/digest.config.ts:5`                                             |
 
 Anything else digest needs belongs to another module and is reached through its `*Api`.
@@ -34,6 +34,7 @@ Anything else digest needs belongs to another module and is reached through its 
 
 | Name            | Token             | Module                                                  |
 | --------------- | ----------------- | ------------------------------------------------------- |
+| `authz`         | `AuthzApi`        | [authz](../../../modules/authz/README.md)               |
 | `entitlement`   | `EntitlementApi`  | [entitlement](../../../modules/entitlement/README.md)   |
 | `ops`           | `OpsApi`          | [ops](../../../modules/ops/README.md)                   |
 | `organizations` | `OrganizationApi` | [organization](../../../modules/organization/README.md) |

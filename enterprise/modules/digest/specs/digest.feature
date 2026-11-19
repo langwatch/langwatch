@@ -160,6 +160,26 @@ Feature: Weekly digest emails
     Then its members receive none
 
   @integration
+  Scenario: A member who left or was disabled after planning is skipped
+    Given the week's sends are planned for an enrolled organization
+    When a member leaves it, or is disabled, before their send is handled
+    Then that member receives none
+
+  @integration
+  Scenario: A member's role is read when their email is sent
+    Given the week's sends are planned while a member is an organization admin
+    When they become a plain member before their send is handled
+    Then their email is picked for a plain member
+
+  @integration
+  Scenario: A member's email shows only the projects they may view
+    Given a project whose scenarios got worse this week
+    And a member who may not view that project
+    When the week's emails are sent
+    Then that member's email does not name the project
+    And a member who may view it is sent its scenarios trend
+
+  @integration
   Scenario: Disarming after the week is planned sends nothing more
     Given the week's sends are planned for an enrolled organization
     When the send is disarmed before its sends are handled
@@ -204,7 +224,7 @@ Feature: Weekly digest emails
     Given no session secret is configured
     When a member's week is sent, or the unsubscribe address is asked
     Then no email is sent and no send is recorded
-    And the address answers 503 with digest_links_unavailable, not a server fault
+    And the address answers 503, its digest_links_unavailable code masked like any platform fault
 
   @unit
   Scenario: The unsubscribe page cannot be framed

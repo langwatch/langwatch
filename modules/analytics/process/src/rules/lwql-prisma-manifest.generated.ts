@@ -2844,4 +2844,56 @@ export interface LwqlPrismaRows {
     readonly lastAppliedEventId: "String";
     readonly updatedAt: "DateTime";
   };
+  readonly DigestCohortOrganization: {
+    readonly organizationId: "String";
+    readonly enrolledBy: "String";
+    readonly enrolledAt: "DateTime";
+  };
+  readonly DigestSubscription: {
+    readonly userId: "String";
+    readonly unsubscribedAt: "DateTime?";
+    readonly unsubscribedFromSendId: "String?";
+    readonly updatedAt: "DateTime";
+  };
+  readonly DigestProjectWeek: {
+    readonly id: "String";
+    readonly projectId: "String";
+    readonly organizationId: "String";
+    readonly isoWeek: "String";
+    readonly state: "Json";
+    readonly occurredAt: "DateTime";
+    readonly lastEventId: "String";
+    readonly acceptedAt: "DateTime";
+    readonly projectionVersion: "String";
+    readonly createdAt: "DateTime";
+    readonly updatedAt: "DateTime";
+  };
+  readonly DigestUserWeek: {
+    readonly id: "String";
+    readonly userId: "String";
+    readonly organizationId: "String";
+    readonly isoWeek: "String";
+    readonly state: "Json";
+    readonly occurredAt: "DateTime";
+    readonly lastEventId: "String";
+    readonly acceptedAt: "DateTime";
+    readonly projectionVersion: "String";
+    readonly createdAt: "DateTime";
+    readonly updatedAt: "DateTime";
+  };
+  readonly DigestSend: {
+    readonly id: "String";
+    readonly userId: "String";
+    readonly organizationId: "String";
+    readonly isoWeek: "String";
+    readonly templateId: "String";
+    readonly sentAt: "DateTime";
+    readonly createdAt: "DateTime";
+  };
+  readonly DigestSettings: {
+    readonly id: "String";
+    readonly armed: "Boolean";
+    readonly lastPlannedWeek: "String?";
+    readonly updatedAt: "DateTime";
+  };
 }

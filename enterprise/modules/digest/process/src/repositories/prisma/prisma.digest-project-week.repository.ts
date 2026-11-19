@@ -4,24 +4,37 @@ import type {
   StoredProjection,
   StoredProjectionRead,
 } from "@langwatch/eventing";
-import { PrismaRepository } from "@langwatch/prisma-client";
+import { type PrismaModelClient, prismaTables, skipTenantCheck } from "@langwatch/prisma-client";
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
 import { type ProjectWeekState, projectWeekStateSchema } from "../../rules/digest-week.rules.ts";
 import type { DigestProjectWeekRepository } from "../digest-week.repository.ts";
 import { readWeekRow, weekCursorColumns } from "./prisma.digest-week.mapper.ts";
 
+/** The week rows, plus the raw SQL the retention sweep across organizations needs. */
+type PrismaDigestProjectWeekDatabase = PrismaModelClient<"DigestProjectWeek"> &
+  Pick<PrismaClient, "$executeRaw">;
+
 /** A project's folded weeks, one row per (project, week) under the fold's aggregate key. */
-export class PrismaDigestProjectWeekRepository
-  extends PrismaRepository.for("DigestProjectWeek")
-  implements DigestProjectWeekRepository
-{
-  static readonly create = this.factory((prisma) => new PrismaDigestProjectWeekRepository(prisma));
+export class PrismaDigestProjectWeekRepository implements DigestProjectWeekRepository {
+  /** Declared, not inherited: the model-scoped client carries no `$executeRaw`. */
+  static readonly tables = prismaTables("DigestProjectWeek");
+
+  static create({
+    prisma,
+  }: {
+    prisma: PrismaDigestProjectWeekDatabase;
+  }): PrismaDigestProjectWeekRepository {
+    return new PrismaDigestProjectWeekRepository(prisma);
+  }
+
+  private constructor(private readonly database: PrismaDigestProjectWeekDatabase) {}
 
   get = async (
     key: string,
     _context: ProjectionStoreContext,
   ): Promise<StoredProjectionRead<ProjectWeekState>> => {
-    const row = await this.prisma.digestProjectWeek.findUnique({ where: { id: key } });
+    const row = await this.database.digestProjectWeek.findUnique({ where: { id: key } });
     if (!row) return { kind: "empty" };
     return readWeekRow({ row, state: projectWeekStateSchema.parse(row.state) });
   };
@@ -39,31 +52,34 @@ export class PrismaDigestProjectWeekRepository
       state,
       ...weekCursorColumns(projection),
     };
-    await this.prisma.digestProjectWeek.upsert({
+    await this.database.digestProjectWeek.upsert({
       where: { id },
       create: { id, ...columns },
       update: columns,
     });
   };
 
-  async listWeeks({
+  async findWeeks({
     isoWeeks,
     organizationId,
   }: {
     isoWeeks: readonly string[];
-    organizationId?: string;
+    organizationId: string;
   }): Promise<ProjectWeekState[]> {
-    const rows = await this.prisma.digestProjectWeek.findMany({
-      where: { isoWeek: { in: [...isoWeeks] }, ...(organizationId ? { organizationId } : {}) },
+    const rows = await this.database.digestProjectWeek.findMany({
+      where: { organizationId, isoWeek: { in: [...isoWeeks] } },
       select: { state: true },
     });
     return rows.map((row) => projectWeekStateSchema.parse(row.state));
   }
 
-  async deleteBefore({ isoWeek }: { isoWeek: string }): Promise<number> {
-    const { count } = await this.prisma.digestProjectWeek.deleteMany({
-      where: { isoWeek: { lt: isoWeek } },
-    });
-    return count;
+  deleteBefore({ isoWeek }: { isoWeek: string }): Promise<number> {
+    return this.database.$executeRaw`
+      ${skipTenantCheck({
+        // Retention sweeps every organization's weeks older than any send still reads.
+        SKIP_TENANT_CHECK: true,
+      })}
+      DELETE FROM "DigestProjectWeek" WHERE "isoWeek" < ${isoWeek}
+    `;
   }
 }

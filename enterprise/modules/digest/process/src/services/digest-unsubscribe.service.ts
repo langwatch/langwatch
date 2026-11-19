@@ -32,7 +32,7 @@ const SIGNED_PURPOSE = "digest.v1:";
 type Deps = Readonly<{
   /** The session secret; absent or empty, no token is signed or accepted. */
   secret: string | undefined;
-  audience: Pick<DigestAudienceRepository, "listUnsubscribed" | "unsubscribe" | "resubscribe">;
+  audience: Pick<DigestAudienceRepository, "findUnsubscribed" | "unsubscribe" | "resubscribe">;
   now: () => number;
 }>;
 
@@ -58,7 +58,7 @@ export class DigestUnsubscribeService {
 
   async isSubscribed({ token }: { token: string }): Promise<boolean> {
     const { u } = this.#verified(token);
-    return (await this.deps.audience.listUnsubscribed({ userIds: [u] })).length === 0;
+    return (await this.deps.audience.findUnsubscribed({ userIds: [u] })).length === 0;
   }
 
   async unsubscribe({ token }: { token: string }): Promise<void> {

@@ -7913,7 +7913,7 @@ model DigestCohortOrganization {
   enrolledAt     DateTime @default(now())
 }
 
-/// A person who opted out of the digest. No row: subscribed.
+/// A person's opt-out of the digest. No row, or no `unsubscribedAt`: subscribed.
 model DigestSubscription {
   userId                 String    @id
   unsubscribedAt         DateTime?
@@ -7941,7 +7941,7 @@ model DigestProjectWeek {
   @@index([isoWeek])
 }
 
-/// A person's ISO week of coding-agent activity, folded from the agents' facts.
+/// A person's ISO week of coding-agent activity in one organization, folded from the agents' facts.
 model DigestUserWeek {
   id                String   @id
   userId            String

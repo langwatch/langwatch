@@ -129,6 +129,11 @@ const GLOBAL_MODELS = [
   // Identity's sign-in switch (sign-in-switch.feature): keyed by userId alone, read on the
   // sign-in path before any tenant is known, like AccountCredential; written in raw SQL only.
   "IdentitySignInSwitch",
+  // A person's opt-out of the weekly digest, keyed by userId alone and honoured in every
+  // organization they belong to, like WebPushSubscription.
+  "DigestSubscription",
+  // The digest's one settings row (the weekly send's switch), like InstanceIdentity.
+  "DigestSettings",
 ] as const;
 
 /**

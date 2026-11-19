@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+import { AuthzApi } from "@langwatch/authz-contract";
 import {
   DigestApi,
   type DigestApi as DigestApiContract,
@@ -7,7 +8,7 @@ import {
 } from "@langwatch/enterprise-digest-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { EventingCommands, ProcessStore } from "@langwatch/eventing";
-import { OpsApi, type OpsOperator } from "@langwatch/ops-contract";
+import { OpsApi } from "@langwatch/ops-contract";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import type { FeatureSetup } from "@langwatch/process";
 import { ProjectApi } from "@langwatch/project-contract";
@@ -23,6 +24,7 @@ import {
 import { buildDigestPipeline, type DigestPipeline } from "../eventing/digest.pipeline.ts";
 import type { DigestRepositories } from "../repositories/digest.repositories.ts";
 import { DigestCommandsService } from "../services/digest-commands.service.ts";
+import { DigestOperatorsService } from "../services/digest-operators.service.ts";
 import { DigestSendService } from "../services/digest-send.service.ts";
 import { DigestSettingsService } from "../services/digest-settings.service.ts";
 import { DigestSourceService } from "../services/digest-source.service.ts";
@@ -44,6 +46,8 @@ type DigestSetup = FeatureSetup<
 export class DigestModule implements DigestApiContract {
   static readonly contract = DigestApi;
   static readonly dependencies = {
+    /** Which of the week's projects each member may view; the email shows no other. */
+    authz: AuthzApi,
     /** Admits Cloud admin staff, and answers not_found where cloud ops is off. */
     ops: OpsApi,
     /** Who an enrolled organization's members are, which are admins, and its name. */
@@ -59,7 +63,7 @@ export class DigestModule implements DigestApiContract {
   /** Unsubscribe links are signed with auth's session key, as automation's are (ADR-031). */
   static readonly secrets = { unsubscribe: sessionSecret } as const;
 
-  readonly #ops: Pick<OpsApi, "admitCloudAdmin" | "admitOperator">;
+  readonly #operators: DigestOperatorsService;
   readonly #commands: DigestCommandsService;
   readonly #settings: DigestSettingsService;
   readonly #sends: DigestSendService;
@@ -67,14 +71,14 @@ export class DigestModule implements DigestApiContract {
   readonly #pipeline: DigestPipeline;
 
   private constructor(parts: {
-    ops: Pick<OpsApi, "admitCloudAdmin" | "admitOperator">;
+    operators: DigestOperatorsService;
     commands: DigestCommandsService;
     settings: DigestSettingsService;
     sends: DigestSendService;
     unsubscribes: DigestUnsubscribeService;
     pipeline: DigestPipeline;
   }) {
-    this.#ops = parts.ops;
+    this.#operators = parts.operators;
     this.#commands = parts.commands;
     this.#settings = parts.settings;
     this.#sends = parts.sends;
@@ -120,6 +124,7 @@ export class DigestModule implements DigestApiContract {
       }),
       organizations: dependencies.organizations,
       projects: dependencies.projects,
+      access: dependencies.authz,
       users: dependencies.users,
       mail: channels.mail,
       unsubscribes,
@@ -128,7 +133,7 @@ export class DigestModule implements DigestApiContract {
       now: nowEpochMs,
     });
     return new DigestModule({
-      ops: dependencies.ops,
+      operators: DigestOperatorsService.create({ ops: dependencies.ops }),
       commands,
       settings: DigestSettingsService.create({ audience: repositories.audience }),
       sends,
@@ -163,15 +168,23 @@ export class DigestModule implements DigestApiContract {
   }
 
   setEnrolled: DigestApiContract["setEnrolled"] = async ({ operator, organizationId, enrolled }) =>
-    this.#settings.setEnrolled({ organizationId, enrolled, by: await this.#manager(operator) });
+    this.#settings.setEnrolled({
+      organizationId,
+      enrolled,
+      by: await this.#operators.admitManager(operator),
+    });
 
   setArmed: DigestApiContract["setArmed"] = async ({ operator, armed }) => {
-    await this.#manager(operator);
+    await this.#operators.admitManager(operator);
     return this.#settings.setArmed({ armed });
   };
 
   sendTest: DigestApiContract["sendTest"] = async ({ operator, organizationId, userId }) =>
-    this.#sends.sendTest({ organizationId, userId, operatorId: await this.#manager(operator) });
+    this.#sends.sendTest({
+      organizationId,
+      userId,
+      operatorId: await this.#operators.admitManager(operator),
+    });
 
   isSubscribed: DigestApiContract["isSubscribed"] = ({ token }) =>
     this.#unsubscribes.isSubscribed({ token });
@@ -181,11 +194,4 @@ export class DigestModule implements DigestApiContract {
 
   resubscribe: DigestApiContract["resubscribe"] = ({ token }) =>
     this.#unsubscribes.resubscribe({ token });
-
-  /** Cloud admin staff who hold `ops:manage`; anyone else learns nothing of the surface (§3.5). */
-  async #manager(operator: OpsOperator | null): Promise<string> {
-    const staff = await this.#ops.admitCloudAdmin(operator);
-    await this.#ops.admitOperator(operator, "ops:manage");
-    return staff.id;
-  }
 }

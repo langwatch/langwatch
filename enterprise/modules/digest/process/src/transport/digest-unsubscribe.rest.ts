@@ -28,8 +28,6 @@ const TOKEN_IS_THE_AUTHORIZATION =
   "RFC 8058 one-click unsubscribe from the weekly digest: the email arrives where no session " +
   "exists, and the HMAC token naming one person is the whole authorization";
 
-const NO_KEY_REACHES_IT = "a public token route: no API key, Langy's included, is ever read here";
-
 const TOKEN_ERRORS = [
   { status: 400, description: "The token is missing, invalid, expired or tampered with" },
   { status: 503, description: "No signing secret is configured, so no link can be checked" },
@@ -61,7 +59,8 @@ export const digestUnsubscribeRest = defineRestRouter(DigestApi)
   )
 
   .post(UNSUBSCRIBE_PATH, "unsubscribeFromDigest")
-  .withoutConfirmation(NO_KEY_REACHES_IT)
+  // An opt-out is a recorded preference, as automation's one-click unsubscribe keeps records.
+  .keepsRecords()
   .withAudit("digest.unsubscribe")
   .withQuery(digestTokenQuerySchema)
   .withAccess(publicRoute({ reason: TOKEN_IS_THE_AUTHORIZATION }))
@@ -77,7 +76,8 @@ export const digestUnsubscribeRest = defineRestRouter(DigestApi)
   })
 
   .post(RESUBSCRIBE_PATH, "resubscribeToDigest")
-  .withoutConfirmation(NO_KEY_REACHES_IT)
+  // Resubscribing clears the opt-out on the person's row; it removes nothing.
+  .keepsRecords()
   .withAudit("digest.resubscribe")
   .withQuery(digestTokenQuerySchema)
   .withAccess(publicRoute({ reason: TOKEN_IS_THE_AUTHORIZATION }))

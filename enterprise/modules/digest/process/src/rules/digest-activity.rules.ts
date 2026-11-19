@@ -18,8 +18,14 @@ const numberOf = (value: unknown): number => {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
 };
 
-const textOf = (value: unknown): string | null =>
-  typeof value === "string" && value.trim() !== "" ? value : null;
+const extractText = (value: unknown): string | undefined =>
+  typeof value === "string" && value.trim() !== "" ? value : undefined;
+
+const outcomeOf = ({ passed, failed }: { passed: boolean; failed: boolean }): Outcome => {
+  if (passed) return "passed";
+  if (failed) return "failed";
+  return "other";
+};
 
 export function spanFact(span: NormalizedSpan): ProjectFact {
   const attributes = span.spanAttributes;
@@ -32,27 +38,29 @@ export function spanFact(span: NormalizedSpan): ProjectFact {
       numberOf(attributes["gen_ai.usage.output_tokens"]),
     costUsd: numberOf(span.cost),
     durationMs: numberOf(span.durationMs),
-    model: textOf(attributes["gen_ai.response.model"]) ?? textOf(attributes["gen_ai.request.model"]),
+    model:
+      extractText(attributes["gen_ai.response.model"]) ??
+      extractText(attributes["gen_ai.request.model"]) ??
+      null,
   };
 }
 
 export function evaluationFact(data: EvaluationLifecycleCompletedEventData): ProjectFact {
-  const outcome: Outcome = data.passed === true ? "passed" : data.passed === false ? "failed" : "other";
+  const outcome = outcomeOf({ passed: data.passed === true, failed: data.passed === false });
   return { kind: "evaluation", evaluatorType: data.evaluatorType ?? null, outcome };
 }
 
 export function scenarioFact(data: SimulationRunFinishedEventData): ProjectFact {
   const verdict = data.results?.verdict;
-  const outcome: Outcome =
-    verdict === "success" ? "passed" : verdict === "failure" ? "failed" : "other";
+  const outcome = outcomeOf({ passed: verdict === "success", failed: verdict === "failure" });
   return { kind: "scenario", scenarioId: data.scenarioId ?? null, outcome };
 }
 
 /** The repository a coding-agent fact was stamped with, `owner/name`, when it carried one. */
-export function repositoryOf(
+export function extractRepository(
   facts: Pick<SpanFactsContribution, "repositoryOwner" | "repositoryName">,
-): string | null {
-  if (!facts.repositoryName) return null;
+): string | undefined {
+  if (!facts.repositoryName) return undefined;
   return facts.repositoryOwner
     ? `${facts.repositoryOwner}/${facts.repositoryName}`
     : facts.repositoryName;

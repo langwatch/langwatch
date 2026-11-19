@@ -3057,6 +3057,9 @@ importers:
       '@langwatch/api':
         specifier: workspace:*
         version: link:../../../../packages/api
+      '@langwatch/authz-contract':
+        specifier: workspace:*
+        version: link:../../../../modules/authz/contract
       '@langwatch/coding-agent-contract':
         specifier: workspace:*
         version: link:../../../../modules/coding-agent/contract

@@ -16,8 +16,8 @@ import type {
 import type { DigestAudienceRepository } from "../repositories/digest-audience.repository.ts";
 import {
   evaluationFact,
+  extractRepository,
   metricSeries,
-  repositoryOf,
   scenarioFact,
   spanFact,
 } from "../rules/digest-activity.rules.ts";
@@ -32,7 +32,7 @@ const MAX_REMEMBERED_OWNERS = 10_000;
 type Cohort = Readonly<{ organizationOf: ReadonlyMap<string, string>; loadedAt: number }>;
 
 type Deps = Readonly<{
-  audience: Pick<DigestAudienceRepository, "listEnrolled">;
+  audience: Pick<DigestAudienceRepository, "findEnrolled">;
   projects: Pick<ProjectApi, "listIdsByOrganization" | "findPersonalWorkspaceOwner">;
   recordProject: (activity: ProjectActivity) => Promise<void>;
   recordUser: (activity: UserActivity) => Promise<void>;
@@ -105,7 +105,7 @@ export class DigestSourceService {
     return this.#user({
       contribution: data,
       sourceKey: `coding-agent-span:${data.traceId}:${data.spanId}`,
-      repository: repositoryOf(data),
+      repository: extractRepository(data) ?? null,
       series: null,
     });
   }
@@ -210,7 +210,7 @@ export class DigestSourceService {
   }
 
   async #load(): Promise<Cohort> {
-    const enrolled = await this.deps.audience.listEnrolled();
+    const enrolled = await this.deps.audience.findEnrolled();
     const pairs = await Promise.all(
       enrolled.map(async (organizationId) =>
         (await this.deps.projects.listIdsByOrganization({ organizationId })).map(

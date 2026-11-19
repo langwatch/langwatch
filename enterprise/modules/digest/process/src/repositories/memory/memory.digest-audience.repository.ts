@@ -16,7 +16,7 @@ export class MemoryDigestAudienceRepository implements DigestAudienceRepository 
 
   private constructor() {}
 
-  listEnrolled(): Promise<string[]> {
+  findEnrolled(): Promise<string[]> {
     return Promise.resolve([...this.#enrolled]);
   }
 
@@ -33,7 +33,7 @@ export class MemoryDigestAudienceRepository implements DigestAudienceRepository 
     return Promise.resolve();
   }
 
-  listUnsubscribed({ userIds }: { userIds: readonly string[] }): Promise<string[]> {
+  findUnsubscribed({ userIds }: { userIds: readonly string[] }): Promise<string[]> {
     return Promise.resolve(userIds.filter((userId) => this.#unsubscribed.has(userId)));
   }
 
@@ -47,9 +47,9 @@ export class MemoryDigestAudienceRepository implements DigestAudienceRepository 
     return Promise.resolve();
   }
 
-  /** The send a person's standing opt-out came from, if they opted out. */
-  unsubscribedFrom({ userId }: { userId: string }): string | undefined {
-    return this.#unsubscribed.get(userId);
+  /** Each standing opt-out, by person, with the send it came from. */
+  unsubscribeSources(): ReadonlyMap<string, string> {
+    return this.#unsubscribed;
   }
 
   getSettings(): Promise<DigestSettingsRecord> {

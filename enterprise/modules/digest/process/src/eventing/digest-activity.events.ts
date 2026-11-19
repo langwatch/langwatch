@@ -88,7 +88,25 @@ export type UserActivityRecordedEvent = z.infer<typeof userActivityRecordedEvent
 
 export type DigestEvent = ProjectActivityRecordedEvent | UserActivityRecordedEvent;
 
-export const projectWeekKey = ({ projectId, isoWeek }: { projectId: string; isoWeek: string }) =>
-  `project:${projectId}:${isoWeek}`;
-export const userWeekKey = ({ userId, isoWeek }: { userId: string; isoWeek: string }) =>
-  `user:${userId}:${isoWeek}`;
+/** A project's week; a project belongs to one organization, so it is that organization's. */
+export const projectWeekKey = ({
+  projectId,
+  isoWeek,
+}: {
+  projectId: string;
+  isoWeek: string;
+}): string => `project:${projectId}:${isoWeek}`;
+
+/**
+ * A person's week within one organization: a member of two enrolled organizations has a fold in
+ * each, read by that organization alone.
+ */
+export const userWeekKey = ({
+  organizationId,
+  userId,
+  isoWeek,
+}: {
+  organizationId: string;
+  userId: string;
+  isoWeek: string;
+}): string => `user:${organizationId}:${userId}:${isoWeek}`;

@@ -23,9 +23,12 @@ import {
   type DigestEvent,
   PROJECT_ACTIVITY_RECORDED_EVENT_TYPE,
   type ProjectActivity,
+  type ProjectFact,
   USER_ACTIVITY_RECORDED_EVENT_TYPE,
   type UserActivity,
 } from "./digest-activity.events.ts";
+
+type FactOf<Kind extends ProjectFact["kind"]> = Extract<ProjectFact, { kind: Kind }>;
 
 export function applyProjectActivity({
   state,
@@ -42,52 +45,86 @@ export function applyProjectActivity({
   };
   const fact = activity.fact;
   switch (fact.kind) {
-    case "span": {
-      const bucket = latencyBucketOf(fact.durationMs);
-      const latency = next.latency.map((count, index) =>
-        fact.root && index === bucket ? count + 1 : count,
-      );
-      return {
-        ...next,
-        spans: next.spans + 1,
-        traces: next.traces + (fact.root ? 1 : 0),
-        errors: next.errors + (fact.error ? 1 : 0),
-        tokens: next.tokens + fact.tokens,
-        costUsd: next.costUsd + fact.costUsd,
-        latency,
-        models: fact.model
-          ? countCapped({ counts: next.models, key: fact.model, cap: MAX_MODELS })
-          : next.models,
-      };
-    }
-    case "evaluation": {
-      const evaluator = fact.evaluatorType ?? "custom";
-      const known = next.evaluators[evaluator];
-      const capped = known === undefined && Object.keys(next.evaluators).length >= MAX_EVALUATORS;
-      return {
-        ...next,
-        evaluations: addOutcome({ counts: next.evaluations, outcome: fact.outcome }),
-        evaluators: capped
-          ? next.evaluators
-          : {
-              ...next.evaluators,
-              [evaluator]: addOutcome({
-                counts: known ?? { runs: 0, passed: 0, failed: 0 },
-                outcome: fact.outcome,
-              }),
-            },
-      };
-    }
+    case "span":
+      return applySpan({ state: next, fact });
+    case "evaluation":
+      return applyEvaluation({ state: next, fact });
     case "scenario":
-      return {
-        ...next,
-        scenarios: addOutcome({ counts: next.scenarios, outcome: fact.outcome }),
-        scenarioFailures:
-          fact.outcome === "failed" && fact.scenarioId
-            ? countCapped({ counts: next.scenarioFailures, key: fact.scenarioId, cap: MAX_SCENARIOS })
-            : next.scenarioFailures,
-      };
+      return applyScenario({ state: next, fact });
   }
+}
+
+function applySpan({
+  state,
+  fact,
+}: {
+  state: ProjectWeekState;
+  fact: FactOf<"span">;
+}): ProjectWeekState {
+  const bucket = latencyBucketOf(fact.durationMs);
+  return {
+    ...state,
+    spans: state.spans + 1,
+    traces: state.traces + (fact.root ? 1 : 0),
+    errors: state.errors + (fact.error ? 1 : 0),
+    tokens: state.tokens + fact.tokens,
+    costUsd: state.costUsd + fact.costUsd,
+    latency: state.latency.map((count, index) =>
+      fact.root && index === bucket ? count + 1 : count,
+    ),
+    models: fact.model
+      ? countCapped({ counts: state.models, key: fact.model, cap: MAX_MODELS })
+      : state.models,
+  };
+}
+
+function applyEvaluation({
+  state,
+  fact,
+}: {
+  state: ProjectWeekState;
+  fact: FactOf<"evaluation">;
+}): ProjectWeekState {
+  const evaluations = addOutcome({ counts: state.evaluations, outcome: fact.outcome });
+  const evaluator = fact.evaluatorType ?? "custom";
+  // Own keys only: an evaluator named `constructor` must not read the prototype's.
+  const known = Object.hasOwn(state.evaluators, evaluator)
+    ? state.evaluators[evaluator]
+    : undefined;
+  if (known === undefined && Object.keys(state.evaluators).length >= MAX_EVALUATORS) {
+    return { ...state, evaluations };
+  }
+  return {
+    ...state,
+    evaluations,
+    evaluators: {
+      ...state.evaluators,
+      [evaluator]: addOutcome({
+        counts: known ?? { runs: 0, passed: 0, failed: 0 },
+        outcome: fact.outcome,
+      }),
+    },
+  };
+}
+
+function applyScenario({
+  state,
+  fact,
+}: {
+  state: ProjectWeekState;
+  fact: FactOf<"scenario">;
+}): ProjectWeekState {
+  const scenarios = addOutcome({ counts: state.scenarios, outcome: fact.outcome });
+  if (fact.outcome !== "failed" || !fact.scenarioId) return { ...state, scenarios };
+  return {
+    ...state,
+    scenarios,
+    scenarioFailures: countCapped({
+      counts: state.scenarioFailures,
+      key: fact.scenarioId,
+      cap: MAX_SCENARIOS,
+    }),
+  };
 }
 
 export function applyUserActivity({

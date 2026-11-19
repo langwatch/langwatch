@@ -16,7 +16,7 @@ export class DigestSettingsService {
   async read(): Promise<DigestSettings> {
     const [settings, enrolled] = await Promise.all([
       this.deps.audience.getSettings(),
-      this.deps.audience.listEnrolled(),
+      this.deps.audience.findEnrolled(),
     ]);
     return { armed: settings.armed, enrolledOrganizationIds: enrolled.toSorted() };
   }

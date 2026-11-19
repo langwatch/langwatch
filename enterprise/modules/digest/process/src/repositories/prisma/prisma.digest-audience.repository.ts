@@ -14,7 +14,7 @@ export class PrismaDigestAudienceRepository
 {
   static readonly create = this.factory((prisma) => new PrismaDigestAudienceRepository(prisma));
 
-  async listEnrolled(): Promise<string[]> {
+  async findEnrolled(): Promise<string[]> {
     const rows = await this.prisma.digestCohortOrganization.findMany({
       select: { organizationId: true },
     });
@@ -41,7 +41,7 @@ export class PrismaDigestAudienceRepository
     });
   }
 
-  async listUnsubscribed({ userIds }: { userIds: readonly string[] }): Promise<string[]> {
+  async findUnsubscribed({ userIds }: { userIds: readonly string[] }): Promise<string[]> {
     const rows = await this.prisma.digestSubscription.findMany({
       where: { userId: { in: [...userIds] }, unsubscribedAt: { not: null } },
       select: { userId: true },
@@ -67,7 +67,10 @@ export class PrismaDigestAudienceRepository
   }
 
   async resubscribe({ userId }: { userId: string }): Promise<void> {
-    await this.prisma.digestSubscription.deleteMany({ where: { userId } });
+    await this.prisma.digestSubscription.updateMany({
+      where: { userId },
+      data: { unsubscribedAt: null, unsubscribedFromSendId: null },
+    });
   }
 
   async getSettings(): Promise<DigestSettingsRecord> {

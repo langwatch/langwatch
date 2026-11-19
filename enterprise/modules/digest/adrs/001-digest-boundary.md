@@ -37,7 +37,10 @@ unsubscribe.
   verifies here. It names the person and the send, is signed with the session secret, and is the
   whole authorization.
 - An opted-out member is never sent the digest. The opt-out is read when each send is handled,
-  not when the week is planned.
+  not when the week is planned. So are membership and role: a member who left or was disabled
+  since the plan is skipped, and the pick reads the role they hold now.
+- A member's email shows only the projects they hold `project:view` on (`AuthzApi`): the busiest
+  project is picked from those, and no other project's name or numbers reach them.
 - A template with nothing to show sends nothing: no email and no `DigestSend` row.
 - Safe by default: the send is disarmed and no organization is enrolled, so installing the
   module sends nothing. Only projects of enrolled organizations fold.
@@ -56,15 +59,17 @@ unsubscribe.
   unsubscribes no one); `POST /api/digest/unsubscribe` is the one-click opt-out;
   `POST /api/digest/resubscribe` undoes it from the same page. A token whose signature does not
   match, or whose `exp` has passed, is refused with `digest_link_invalid` (400) and changes
-  nothing; with no signing secret every route answers `digest_links_unavailable` (503). Every
+  nothing; with no signing secret every route answers 503 (`digest_links_unavailable`, which the
+  wire masks as `internal_error` like every platform fault that is not a transient refusal). Every
   page carries `X-Frame-Options: DENY` and `Content-Security-Policy: frame-ancestors 'none'`.
 
 ## Dependencies
 
 Peers, through `*Api` only: `OpsApi` (admission), `OrganizationApi` (members, admins, the
 organization's name), `ProjectApi` (an enrolled organization's projects, a personal project's
-owner, a project's name and slug), `UserApi` (the address an email goes to) and `EntitlementApi`
-(the month's usage, read once per send). The folds listen to trace, evaluation, scenario and
+owner, a project's name, slug and team), `AuthzApi` (which projects a member may view),
+`UserApi` (the address an email goes to) and `EntitlementApi` (the month's usage, read once per
+send). The folds listen to trace, evaluation, scenario and
 coding-agent events through peer subscribers.
 
 Channel binding: `NotificationApi`, for `sendEmail` only.

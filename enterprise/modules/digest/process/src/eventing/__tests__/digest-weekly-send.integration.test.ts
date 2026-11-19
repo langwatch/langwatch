@@ -137,12 +137,14 @@ describe("the weekly digest send", () => {
   });
 
   describe("when the send is armed and an organization with three members is enrolled", () => {
-    /** @scenario "Each enrolled member gets one email a week" */
-    it("mails each member once, however often the wake and the sends run", async () => {
+    beforeEach(async () => {
       await enrol();
       await arm();
       everyoneNearTheLimit();
+    });
 
+    /** @scenario "Each enrolled member gets one email a week" */
+    it("mails each member once, however often the wake and the sends run", async () => {
       const planned = await planAndCollect({ expected: 3 });
       for (const payload of planned) await digest.carryOut(payload);
       await digest.plan({ at: NEXT_WAKE_AT });
@@ -163,12 +165,9 @@ describe("the weekly digest send", () => {
 
     /** @scenario "Each enrolled member gets one email a week" */
     it("gives every email an RFC 8058 one-click unsubscribe, the same address its footer opens", async () => {
-      await enrol();
-      await arm();
-      everyoneNearTheLimit();
-
       for (const payload of await planAndCollect({ expected: 3 })) await digest.carryOut(payload);
 
+      expect(digest.mail).toHaveLength(3);
       for (const mail of digest.mail) {
         expect(mail.oneClickUnsubscribeUrl).toMatch(
           new RegExp(`^${BASE_URL}/api/digest/unsubscribe\\?token=.+`),
@@ -179,12 +178,14 @@ describe("the weekly digest send", () => {
   });
 
   describe("when the send is armed early on Monday, before 08:00 UTC", () => {
-    /** @scenario "Arming before Monday 08:00 UTC sends last week once, from 08:00" */
-    it("plans nothing until 08:00, then mails each member last week alone", async () => {
+    beforeEach(async () => {
       await enrol();
       await arm();
       everyoneNearTheLimit();
+    });
 
+    /** @scenario "Arming before Monday 08:00 UTC sends last week once, from 08:00" */
+    it("plans nothing until 08:00, then mails each member last week alone", async () => {
       for (const hour of [3, 4, 5, 6, 7]) {
         expect(await digest.wake({ at: mondayAt(hour) })).toBe(0);
       }
@@ -199,17 +200,14 @@ describe("the weekly digest send", () => {
       await digest.wake({ at: mondayAt(9) });
       await sendPlanned();
 
-      expect(digest.mail.map((mail) => mail.idempotencyKey).toSorted()).toEqual(
+      const keys = digest.mail.map((mail) => mail.idempotencyKey ?? "");
+      expect(keys.toSorted((left, right) => left.localeCompare(right))).toEqual(
         MEMBERS.map((userId) => `digest:${userId}:${SENT_WEEK}`).toSorted(),
       );
     });
 
     /** @scenario "Arming before Monday 08:00 UTC sends last week once, from 08:00" */
     it("refuses a plan of any week but the one its slot may send", async () => {
-      await enrol();
-      await arm();
-      everyoneNearTheLimit();
-
       await digest.plan({ at: mondayAt(3), isoWeek: "2026-W45" });
       await digest.plan({ at: mondayAt(3), isoWeek: SENT_WEEK });
       await digest.plan({ at: WAKE_AT, isoWeek: "2026-W45" });
@@ -226,7 +224,9 @@ describe("the weekly digest send", () => {
       everyoneNearTheLimit();
       digest.mailChannel.failAfterAccepting();
 
-      await expect(sendFor({ userId: MEMBER, isoWeek: SENT_WEEK })).rejects.toThrow();
+      await expect(sendFor({ userId: MEMBER, isoWeek: SENT_WEEK })).rejects.toThrow(
+        "the connection closed after the mailer accepted the email",
+      );
       await sendFor({ userId: MEMBER, isoWeek: SENT_WEEK });
 
       expect(recipients()).toEqual([emailOf(MEMBER)]);
@@ -367,7 +367,7 @@ describe("unsubscribing from the digest", () => {
       await digest.unsubscribes.unsubscribe({ token });
 
       expect(await digest.unsubscribes.isSubscribed({ token })).toBe(false);
-      expect(digest.repositories.audience.unsubscribedFrom({ userId: MEMBER })).toBe(
+      expect(digest.repositories.audience.unsubscribeSources().get(MEMBER)).toBe(
         `${MEMBER}:${SENT_WEEK}`,
       );
       await sendFor({ userId: MEMBER, isoWeek: "2026-W47" });
@@ -390,7 +390,7 @@ describe("unsubscribing from the digest", () => {
           code: "digest_link_invalid",
         });
       }
-      expect(await digest.repositories.audience.listUnsubscribed({ userIds: MEMBERS })).toEqual([]);
+      expect(await digest.repositories.audience.findUnsubscribed({ userIds: MEMBERS })).toEqual([]);
     });
   });
 
@@ -409,7 +409,7 @@ describe("unsubscribing from the digest", () => {
       await expect(digest.unsubscribes.unsubscribe({ token })).rejects.toMatchObject({
         code: "digest_link_invalid",
       });
-      expect(await digest.repositories.audience.listUnsubscribed({ userIds: MEMBERS })).toEqual([]);
+      expect(await digest.repositories.audience.findUnsubscribed({ userIds: MEMBERS })).toEqual([]);
     });
   });
 
@@ -519,7 +519,7 @@ describe("an operator's test send", () => {
       await digest.unsubscribes.unsubscribe({ token });
 
       expect(
-        await digest.repositories.audience.listUnsubscribed({ userIds: [MEMBER, OPERATOR] }),
+        await digest.repositories.audience.findUnsubscribed({ userIds: [MEMBER, OPERATOR] }),
       ).toEqual([OPERATOR]);
     });
   });
@@ -605,16 +605,18 @@ describe("the digest fold", () => {
         await digest.recordProject(spanIn({ isoWeek, sourceKey: `span-${index}` }));
       }
       await vi.waitFor(async () => {
-        const kept = await digest.repositories.projectWeeks.listWeeks({
+        const kept = await digest.repositories.projectWeeks.findWeeks({
           isoWeeks: [...weeks, current],
+          organizationId: ORGANIZATION,
         });
         expect(kept).toHaveLength(7);
       });
 
       await digest.plan();
 
-      const kept = await digest.repositories.projectWeeks.listWeeks({
+      const kept = await digest.repositories.projectWeeks.findWeeks({
         isoWeeks: [...weeks, current],
+        organizationId: ORGANIZATION,
       });
       expect(kept.map((fold) => fold.isoWeek).toSorted()).toEqual([
         "2026-W42",

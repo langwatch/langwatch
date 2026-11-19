@@ -6,10 +6,8 @@
  * @see enterprise/modules/digest/specs/digest.feature
  */
 import { canonicalErrorResponse, createRestRuntime } from "@langwatch/api/rest";
-import {
-  type DigestApi,
-  DigestLinksUnavailableError,
-} from "@langwatch/enterprise-digest-contract";
+import { type DigestApi, DigestLinksUnavailableError } from "@langwatch/enterprise-digest-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { describe, expect, it } from "vitest";
 
@@ -29,7 +27,7 @@ function mount(app: Partial<DigestApi>) {
     },
   });
   const hono = runtime.mount(digestUnsubscribeRest.router(), {
-    app: () => app as DigestApi,
+    app: () => createApiFixture<DigestApi>(app, "DigestApi"),
     credential: "public",
     onError: canonicalErrorResponse,
   });
@@ -57,7 +55,7 @@ describe("the digest's unsubscribe pages", () => {
       expect(response.headers.get("content-type")).toBe("text/html; charset=UTF-8");
       expect(response.headers.get("x-frame-options")).toBe("DENY");
       expect(response.headers.get("content-security-policy")).toBe("frame-ancestors 'none'");
-      expect(await response.text()).toContain("<form method=\"post\"");
+      expect(await response.text()).toContain('<form method="post"');
     });
   });
 
@@ -67,7 +65,7 @@ describe("the digest's unsubscribe pages", () => {
       ["GET", "/api/digest/unsubscribe"],
       ["POST", "/api/digest/unsubscribe"],
       ["POST", "/api/digest/resubscribe"],
-    ] as const)("%s %s answers 503 with the unavailable code", async (method, path) => {
+    ] as const)("%s %s answers 503, its code masked as a platform fault", async (method, path) => {
       const unavailable = async (): Promise<never> => {
         throw new DigestLinksUnavailableError();
       };
@@ -80,7 +78,9 @@ describe("the digest's unsubscribe pages", () => {
       const response = await send(method, path);
 
       expect(response.status).toBe(503);
-      expect(await response.json()).toMatchObject({ code: "digest_links_unavailable" });
+      // A 5xx the caller did not cause keeps its code off the wire unless it is a transient
+      // refusal (TRANSIENT_REFUSAL_CODES); a missing secret is not one, retrying fixes nothing.
+      expect(await response.json()).toMatchObject({ code: "internal_error" });
     });
   });
 });

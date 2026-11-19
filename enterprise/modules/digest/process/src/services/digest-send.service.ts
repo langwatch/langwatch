@@ -1,11 +1,13 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+import type { AuthzApi } from "@langwatch/authz-contract";
 import {
   DigestMemberNotFoundError,
   DigestNothingToSendError,
 } from "@langwatch/enterprise-digest-contract";
-import type {
-  OrganizationApi,
-  OrganizationRestMemberSummary,
+import {
+  MemberNotFoundError,
+  type OrganizationApi,
+  type OrganizationRestMemberSummary,
 } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { UserApi } from "@langwatch/user-contract";
@@ -19,12 +21,13 @@ import type {
   DigestUserWeekRepository,
 } from "../repositories/digest-week.repository.ts";
 import {
+  buildDigestTemplateProps,
   digestMessageId,
   digestTemplateInput,
-  digestTemplateProps,
   type DigestTemplateProps,
-  focusProjectOf,
   type OrganizationWeek,
+  pickFocusProject,
+  weekVisibleTo,
 } from "../rules/digest-email.rules.ts";
 import { type DigestTemplatePick, pickDigestTemplate } from "../rules/digest-template.rules.ts";
 import { oldestKeptWeek, plannableWeek, sendableWeek } from "../rules/digest-week.rules.ts";
@@ -32,6 +35,9 @@ import type { DigestUnsubscribeService } from "./digest-unsubscribe.service.ts";
 import type { DigestWeekService } from "./digest-week.service.ts";
 
 type Member = Readonly<{ userId: string; admin: boolean }>;
+
+/** A member's standing when their email is sent, which may differ from the plan's. */
+type Membership = Readonly<{ kind: "active"; admin: boolean }> | Readonly<{ kind: "gone" }>;
 
 const MEMBER_PAGE = 500;
 
@@ -50,9 +56,16 @@ type Deps = Readonly<{
       members: readonly Pick<OrganizationRestMemberSummary, "userId" | "role" | "disabledAt">[];
       totalCount: number;
     }>;
+    getMember(input: {
+      organizationId: string;
+      userId: string;
+    }): Promise<Pick<OrganizationRestMemberSummary, "role" | "disabledAt">>;
     findProvisioningSummary: OrganizationApi["findProvisioningSummary"];
   }>;
-  projects: Pick<ProjectApi, "findSummaryById">;
+  /** A project's name, and each project's team, which is what its access is decided on. */
+  projects: Pick<ProjectApi, "findSummaryById" | "listNamesByIds">;
+  /** Which of the week's projects a member may view; the email shows no other. */
+  access: Pick<AuthzApi, "canBatchByIds">;
   /** The address an email goes to, read when it is sent and never stored. */
   users: Pick<UserApi, "findById">;
   mail: DigestMailChannel;
@@ -64,7 +77,11 @@ type Deps = Readonly<{
 }>;
 
 /** One email ready to hand to the mail channel. */
-type Composed = Readonly<{ pick: DigestTemplatePick; props: DigestTemplateProps; oneClick: string }>;
+type Composed = Readonly<{
+  pick: DigestTemplatePick;
+  props: DigestTemplateProps;
+  oneClick: string;
+}>;
 
 /**
  * The weekly send. A plan asks one send per enrolled member; each send picks the member's
@@ -89,11 +106,12 @@ export class DigestSendService {
       this.deps.userWeeks.deleteBefore({ isoWeek: oldest }),
     ]);
     // Only the week the plan's own slot may send: before Monday 08:00 that is none (ADR-001).
-    if (plannableWeek(at) !== isoWeek) return;
+    const plannable = plannableWeek(at);
+    if (plannable.kind === "closed" || plannable.isoWeek !== isoWeek) return;
     const settings = await this.deps.audience.getSettings();
     if (!settings.armed) return;
     if (settings.lastPlannedWeek !== null && settings.lastPlannedWeek >= isoWeek) return;
-    const enrolled = await this.deps.audience.listEnrolled();
+    const enrolled = await this.deps.audience.findEnrolled();
     if (enrolled.length === 0) return;
     for (const organizationId of enrolled) {
       for (const member of await this.members({ organizationId })) {
@@ -105,29 +123,34 @@ export class DigestSendService {
 
   /**
    * One member's week, sent at most once: only the caller that claims the week sends it. Skipped
-   * if disarmed, unenrolled or opted out since the plan, when the person has no address, or when
-   * the picked template has nothing to show.
+   * if disarmed, unenrolled or opted out since the plan, when the person left or was disabled
+   * since, has no address, or when the picked template has nothing to show. Their role and the
+   * projects they may view are read now, not taken from the plan.
    */
   async sendDigest({
     userId,
     organizationId,
     isoWeek,
-    admin,
   }: DigestSendRequest & { at: number }): Promise<void> {
     const [settings, enrolled, unsubscribed, sent] = await Promise.all([
       this.deps.audience.getSettings(),
-      this.deps.audience.listEnrolled(),
-      this.deps.audience.listUnsubscribed({ userIds: [userId] }),
+      this.deps.audience.findEnrolled(),
+      this.deps.audience.findUnsubscribed({ userIds: [userId] }),
       this.deps.sends.isSent({ userId, isoWeek }),
     ]);
     if (!settings.armed || !enrolled.includes(organizationId)) return;
     if (unsubscribed.length > 0 || sent) return;
+    const membership = await this.#membership({ organizationId, userId });
+    if (membership.kind === "gone") return;
     const user = await this.deps.users.findById({ id: userId });
     if (!user?.email) return;
-    const week = await this.deps.weeks.organizationWeek({ organizationId, isoWeek });
+    const week = await this.#visibleWeek({
+      week: await this.deps.weeks.organizationWeek({ organizationId, isoWeek }),
+      userId,
+    });
     const composed = await this.#compose({
       week,
-      member: { userId, admin },
+      member: { userId, admin: membership.admin },
       recipient: { userId, sendId: digestSendKey({ userId, isoWeek }) },
     });
     if (!composed) return;
@@ -169,7 +192,11 @@ export class DigestSendService {
     const operator = await this.deps.users.findById({ id: operatorId });
     if (!operator?.email) throw new DigestMemberNotFoundError(operatorId);
     const isoWeek = sendableWeek(this.deps.now());
-    const week = await this.deps.weeks.organizationWeek({ organizationId, isoWeek });
+    // The member's own view: the operator sees what the member would be sent.
+    const week = await this.#visibleWeek({
+      week: await this.deps.weeks.organizationWeek({ organizationId, isoWeek }),
+      userId,
+    });
     const composed = await this.#compose({
       week,
       member,
@@ -188,7 +215,8 @@ export class DigestSendService {
   /** An organization's active members, admins marked; names stay with the user module. */
   async members({ organizationId }: { organizationId: string }): Promise<Member[]> {
     const members: Member[] = [];
-    for (let offset = 0; ; offset += MEMBER_PAGE) {
+    let total = Number.POSITIVE_INFINITY;
+    for (let offset = 0; offset < total; offset += MEMBER_PAGE) {
       const page = await this.deps.organizations.listMembers({
         organizationId,
         offset,
@@ -198,9 +226,51 @@ export class DigestSendService {
         if (row.disabledAt !== null) continue;
         members.push({ userId: row.userId, admin: row.role === "ADMIN" });
       }
-      if (page.members.length < MEMBER_PAGE || offset + MEMBER_PAGE >= page.totalCount) break;
+      // A short page is the last one, whatever the count said.
+      total = page.members.length < MEMBER_PAGE ? offset : page.totalCount;
     }
     return members;
+  }
+
+  /** The member's standing now; a member removed since the plan answers not-found. */
+  async #membership({
+    organizationId,
+    userId,
+  }: {
+    organizationId: string;
+    userId: string;
+  }): Promise<Membership> {
+    try {
+      const member = await this.deps.organizations.getMember({ organizationId, userId });
+      if (member.disabledAt !== null) return { kind: "gone" };
+      return { kind: "active", admin: member.role === "ADMIN" };
+    } catch (error) {
+      if (error instanceof MemberNotFoundError) return { kind: "gone" };
+      throw error;
+    }
+  }
+
+  /** The week as the member may see it: only the projects they hold `project:view` on. */
+  async #visibleWeek({
+    week,
+    userId,
+  }: {
+    week: OrganizationWeek;
+    userId: string;
+  }): Promise<OrganizationWeek> {
+    if (week.projects.length === 0) return week;
+    const identities = await this.deps.projects.listNamesByIds({
+      projectIds: week.projects.map(({ projectId }) => projectId),
+    });
+    const decided = await this.deps.access.canBatchByIds({
+      principal: { type: "user", id: userId },
+      permission: "project:view",
+      organizationId: week.organizationId,
+      teams: [...new Set(identities.map(({ teamId }) => teamId))].map((teamId) => ({ teamId })),
+      projects: identities.map(({ id, teamId }) => ({ projectId: id, teamId })),
+    });
+    const visible = identities.filter(({ id }) => decided.projects.get(id) === true);
+    return weekVisibleTo({ week, visibleProjectIds: new Set(visible.map(({ id }) => id)) });
   }
 
   /** The member's pick and its props, with an unsubscribe signed for whoever receives it. */
@@ -218,7 +288,7 @@ export class DigestSendService {
     const unsubscribeUrl = `${baseUrl}${DIGEST_UNSUBSCRIBE_PATH}?token=${encodeURIComponent(
       this.deps.unsubscribes.token(recipient),
     )}`;
-    const props = digestTemplateProps({
+    const props = buildDigestTemplateProps({
       pick,
       week,
       userId: member.userId,
@@ -238,7 +308,7 @@ export class DigestSendService {
       );
       return { organizationName: organization?.name ?? null, project: null };
     }
-    const focus = focusProjectOf(week);
+    const focus = pickFocusProject(week);
     const showsProject =
       pick.template === "digest-scenarios-trend" || pick.template === "digest-traces-week";
     const project =

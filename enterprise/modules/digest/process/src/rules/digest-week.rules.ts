@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /** ISO weeks, and the two weekly folds: pure state and the functions that grow it. */
+import { Temporal } from "@langwatch/time";
 import { z } from "zod";
 
 const HOUR_MS = 60 * 60 * 1000;
 const DAY_MS = 24 * HOUR_MS;
 const WEEK_MS = 7 * DAY_MS;
+const MONTH_LABELS = "Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec".split(" ");
 /** The send goes out after Monday 08:00 UTC, for the week that just ended. */
 export const SEND_HOUR_UTC = 8;
 /** The weeks before the sent one that the scenario baseline averages over. */
@@ -19,23 +21,35 @@ export const MAX_SESSIONS = 200;
 export const MAX_SERIES = 500;
 export const MAX_REPOSITORIES = 20;
 
+/** Whether a plan at a moment may send, and the week it sends when it may. */
+export type PlannableWeek = { kind: "open"; isoWeek: string } | { kind: "closed" };
+
+const utcDayOf = (epochMs: number) =>
+  Temporal.Instant.fromEpochMilliseconds(epochMs).toZonedDateTimeISO("UTC").toPlainDate();
+
+/** `Dec 1`, the way a template names a day. */
+const dayLabel = ({ month, day }: { month: number; day: number }) =>
+  `${MONTH_LABELS[month - 1]} ${day}`;
+
+const mondayOf = (isoWeek: string) => {
+  const [yearPart, weekPart] = isoWeek.split("-W");
+  // Week 1 is the week that holds January 4th.
+  const jan4 = Temporal.PlainDate.from({ year: Number(yearPart), month: 1, day: 4 });
+  return jan4.subtract({ days: jan4.dayOfWeek - 1 }).add({ weeks: Number(weekPart) - 1 });
+};
+
 /** The ISO 8601 week an instant falls in, `2026-W39`. */
 export function isoWeekOf(epochMs: number): string {
-  const date = new Date(epochMs);
-  const day = (date.getUTCDay() + 6) % 7;
-  const thursday = Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate() - day + 3);
-  const year = new Date(thursday).getUTCFullYear();
-  const week = Math.floor((thursday - Date.UTC(year, 0, 1)) / WEEK_MS) + 1;
-  return `${year}-W${String(week).padStart(2, "0")}`;
+  const day = utcDayOf(epochMs);
+  // A week belongs to the year its Thursday falls in, which is what makes 2026-W53.
+  const thursday = day.add({ days: 4 - day.dayOfWeek });
+  const week = Math.floor((thursday.dayOfYear - 1) / 7) + 1;
+  return `${thursday.year}-W${String(week).padStart(2, "0")}`;
 }
 
 /** Monday 00:00 UTC of an ISO week. */
 export function weekStartOf(isoWeek: string): number {
-  const [yearPart, weekPart] = isoWeek.split("-W");
-  const year = Number(yearPart);
-  const jan4 = Date.UTC(year, 0, 4);
-  const jan4Day = (new Date(jan4).getUTCDay() + 6) % 7;
-  return jan4 - jan4Day * DAY_MS + (Number(weekPart) - 1) * WEEK_MS;
+  return mondayOf(isoWeek).toZonedDateTime("UTC").epochMilliseconds;
 }
 
 /** The `count` weeks before `isoWeek`, newest first. */
@@ -54,12 +68,12 @@ export function sendableWeek(now: number): string {
 
 /**
  * The week a plan at `now` may send: last week once this week's send opened at Monday 08:00
- * UTC, and none before then. The sendable week before 08:00 is the week before last, so planning
+ * UTC, and closed before then. The sendable week before 08:00 is the week before last, so planning
  * it would mail a second, older week to anyone armed in those hours.
  */
-export function plannableWeek(now: number): string | null {
+export function plannableWeek(now: number): PlannableWeek {
   const opensAt = weekStartOf(isoWeekOf(now)) + SEND_HOUR_UTC * HOUR_MS;
-  return now >= opensAt ? sendableWeek(now) : null;
+  return now >= opensAt ? { kind: "open", isoWeek: sendableWeek(now) } : { kind: "closed" };
 }
 
 /** The oldest week kept at `now`: the sendable week's baseline still needs its four. */
@@ -70,14 +84,15 @@ export function oldestKeptWeek(now: number): string {
 
 /** `Sep 22 to 28`, the way a template names the week it covers. */
 export function weekLabel(isoWeek: string): string {
-  const start = new Date(weekStartOf(isoWeek));
-  const end = new Date(weekStartOf(isoWeek) + 6 * DAY_MS);
-  const month = (date: Date) => date.toLocaleString("en-US", { month: "short", timeZone: "UTC" });
-  const endText =
-    start.getUTCMonth() === end.getUTCMonth()
-      ? String(end.getUTCDate())
-      : `${month(end)} ${end.getUTCDate()}`;
-  return `${month(start)} ${start.getUTCDate()} to ${endText}`;
+  const start = mondayOf(isoWeek);
+  const end = start.add({ days: 6 });
+  const endText = start.month === end.month ? String(end.day) : dayLabel(end);
+  return `${dayLabel(start)} to ${endText}`;
+}
+
+/** `Dec 1`: the first of the month after the one `now` falls in, when a monthly count resets. */
+export function nextMonthLabel(now: number): string {
+  return dayLabel(utcDayOf(now).with({ day: 1 }).add({ months: 1 }));
 }
 
 const outcomeCountsSchema = z.object({
@@ -165,8 +180,10 @@ export function countCapped({
   by?: number;
   cap: number;
 }): Record<string, number> {
-  if (counts[key] === undefined && Object.keys(counts).length >= cap) return counts;
-  return { ...counts, [key]: (counts[key] ?? 0) + by };
+  // Own keys only: a key named `constructor` must not read the prototype's.
+  const current = Object.hasOwn(counts, key) ? counts[key] : undefined;
+  if (current === undefined && Object.keys(counts).length >= cap) return counts;
+  return { ...counts, [key]: (current ?? 0) + by };
 }
 
 export function addOutcome({

@@ -4638,8 +4638,7 @@ const presentations = {
   },
   digest_link_invalid: {
     title: "This link isn't valid",
-    describe: () =>
-      "It may have expired or been changed. Use the link from the latest email.",
+    describe: () => "It may have expired or been changed. Use the link from the latest email.",
   },
   digest_nothing_to_send: {
     title: "Nothing to send this week",

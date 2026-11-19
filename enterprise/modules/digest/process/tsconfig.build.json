@@ -27,6 +27,9 @@
       "path": "../../../../packages/api/tsconfig.build.json"
     },
     {
+      "path": "../../../../modules/authz/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../../../modules/coding-agent/contract/tsconfig.build.json"
     },
     {

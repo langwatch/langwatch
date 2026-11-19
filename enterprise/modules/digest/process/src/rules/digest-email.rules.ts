@@ -6,6 +6,7 @@ import type { DigestTemplateInput, DigestTemplatePick } from "./digest-template.
 import {
   BASELINE_WEEKS,
   latencyPercentile,
+  nextMonthLabel,
   type OutcomeCounts,
   type ProjectWeekState,
   userWeekTotals,
@@ -39,6 +40,9 @@ export type OrganizationWeek = Readonly<{
   users: ReadonlyMap<string, UserWeekState>;
 }>;
 
+/** What every template's props open with. */
+type CommonProps = Readonly<{ weekLabel: string; unsubscribeUrl: string }>;
+
 const TOP_ROWS = 3;
 
 /** Multiplied before dividing, so 900 of 1,000 reads exactly 90. */
@@ -51,21 +55,36 @@ export function digestMessageId({ userId, isoWeek }: { userId: string; isoWeek: 
 }
 
 /** An uncapped plan reports its limit as MAX_SAFE_INTEGER (entitlement's contract). */
-export function planUsageOf(
+export function derivePlanUsage(
   usage: Pick<UsageStats, "currentMonthMessagesCount" | "maxMonthlyUsageLimit">,
-): PlanUsage | null {
+): PlanUsage | undefined {
   const limit = usage.maxMonthlyUsageLimit;
   if (usage.currentMonthMessagesCount === null || limit <= 0 || limit >= Number.MAX_SAFE_INTEGER) {
-    return null;
+    return undefined;
   }
   return { used: usage.currentMonthMessagesCount, limit };
 }
 
 /** The project the email is about: the busiest by traces, then by scenario runs. */
-export function focusProjectOf(week: OrganizationWeek): ProjectWeekState | undefined {
+export function pickFocusProject(week: OrganizationWeek): ProjectWeekState | undefined {
   return week.projects.toSorted(
     (left, right) => right.traces - left.traces || right.scenarios.runs - left.scenarios.runs,
   )[0];
+}
+
+/** The week with only the projects a member may view, in this week's folds and its history. */
+export function weekVisibleTo({
+  week,
+  visibleProjectIds,
+}: {
+  week: OrganizationWeek;
+  visibleProjectIds: ReadonlySet<string>;
+}): OrganizationWeek {
+  return {
+    ...week,
+    projects: week.projects.filter(({ projectId }) => visibleProjectIds.has(projectId)),
+    history: week.history.filter(({ projectId }) => visibleProjectIds.has(projectId)),
+  };
 }
 
 function baselineOf({
@@ -93,7 +112,7 @@ export function digestTemplateInput({
   admin: boolean;
 }): DigestTemplateInput {
   const user = week.users.get(userId);
-  const focus = focusProjectOf(week);
+  const focus = pickFocusProject(week);
   const usage = week.planUsage;
   return {
     member: {
@@ -118,10 +137,10 @@ export function digestTemplateInput({
 
 /**
  * The picked template's props (`@langwatch/mail` digest-*.tsx), links built on the deployment's
- * origin; null when the template has nothing to show, so nothing is sent. "What's new" has no
+ * origin; none when the template has nothing to show, so nothing is sent. "What's new" has no
  * published card yet (the update editor is not built), so it never sends.
  */
-export function digestTemplateProps({
+export function buildDigestTemplateProps({
   pick,
   week,
   userId,
@@ -138,86 +157,135 @@ export function digestTemplateProps({
   /** The page behind the email's own unsubscribe link. */
   unsubscribeUrl: string;
   now: number;
-}): DigestTemplateProps | null {
+}): DigestTemplateProps | undefined {
   const common = { weekLabel: weekLabel(week.isoWeek), unsubscribeUrl };
-  const focus = focusProjectOf(week);
-  const project = names.project;
   switch (pick.template) {
-    case "digest-plan-pressure": {
-      const usage = week.planUsage;
-      if (!usage || !names.organizationName) return null;
-      return {
-        ...common,
-        organizationName: names.organizationName,
-        usagePercentage: percentOf({ part: usage.used, whole: usage.limit }),
-        used: usage.used,
-        limit: usage.limit,
-        unit: "traces",
-        resetsOn: nextMonthLabel(now),
-        samplingUrl: `${baseUrl}/settings/usage`,
-        redactionUrl: `${baseUrl}/settings`,
-        upgradeUrl: `${baseUrl}/settings/subscription`,
-      };
-    }
-    case "digest-scenarios-trend": {
-      if (!focus || !project || focus.scenarios.runs === 0) return null;
-      const baseline = baselineOf({ week, projectId: focus.projectId });
-      return {
-        ...common,
-        projectName: project.name,
-        direction: pick.direction === "more_failing" ? "worse" : "better",
-        failureRatePercent: percentOf({
-          part: focus.scenarios.failed,
-          whole: focus.scenarios.runs,
-        }),
-        baselinePercent: percentOf({
-          part: baseline.reduce((sum, counts) => sum + counts.failed, 0),
-          whole: baseline.reduce((sum, counts) => sum + counts.runs, 0),
-        }),
-        runs: focus.scenarios.runs,
-        failed: focus.scenarios.failed,
-        scenariosUrl: `${baseUrl}/${project.slug}/simulations/scenarios`,
-      };
-    }
-    case "digest-coding-agent-week": {
-      const user = week.users.get(userId);
-      if (!user) return null;
-      const totals = userWeekTotals(user);
-      if (totals.sessions === 0) return null;
-      const topRepo = Object.entries(user.repositories).toSorted(
-        ([, left], [, right]) => right - left,
-      )[0]?.[0];
-      return {
-        ...common,
-        sessions: totals.sessions,
-        tokens: totals.tokens,
-        costUsd: totals.costUsd,
-        activeMinutes: Math.round(totals.activeSeconds / 60),
-        ...(totals.linesChanged > 0 ? { linesChanged: totals.linesChanged } : {}),
-        ...(totals.commits > 0 ? { commits: totals.commits } : {}),
-        ...(totals.pullRequests > 0 ? { pullRequests: totals.pullRequests } : {}),
-        ...(topRepo ? { topRepo } : {}),
-        weekUrl: baseUrl,
-      };
-    }
+    case "digest-plan-pressure":
+      return buildPlanPressureProps({ week, names, baseUrl, now, common });
+    case "digest-scenarios-trend":
+      return buildScenariosTrendProps({ week, names, baseUrl, direction: pick.direction, common });
+    case "digest-coding-agent-week":
+      return buildCodingAgentWeekProps({ user: week.users.get(userId), baseUrl, common });
     case "digest-traces-week":
-      if (!focus || !project || focus.traces === 0) return null;
-      return {
-        ...common,
-        projectName: project.name,
-        ...tracesWeekNumbers({ week, focus }),
-        tracesUrl: `${baseUrl}/${project.slug}/traces`,
-      };
+      return buildTracesWeekProps({ week, names, baseUrl, common });
     case "digest-whats-new":
-      return null;
+      return undefined;
   }
 }
 
-/** `Dec 1`: when a monthly plan count starts again. */
-function nextMonthLabel(now: number): string {
-  const date = new Date(now);
-  const first = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 1));
-  return first.toLocaleString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
+function buildPlanPressureProps({
+  week,
+  names,
+  baseUrl,
+  now,
+  common,
+}: {
+  week: OrganizationWeek;
+  names: DigestNames;
+  baseUrl: string;
+  now: number;
+  common: CommonProps;
+}): DigestTemplateProps | undefined {
+  const usage = week.planUsage;
+  if (!usage || !names.organizationName) return undefined;
+  return {
+    ...common,
+    organizationName: names.organizationName,
+    usagePercentage: percentOf({ part: usage.used, whole: usage.limit }),
+    used: usage.used,
+    limit: usage.limit,
+    unit: "traces",
+    resetsOn: nextMonthLabel(now),
+    samplingUrl: `${baseUrl}/settings/usage`,
+    redactionUrl: `${baseUrl}/settings`,
+    upgradeUrl: `${baseUrl}/settings/subscription`,
+  };
+}
+
+function buildScenariosTrendProps({
+  week,
+  names,
+  baseUrl,
+  direction,
+  common,
+}: {
+  week: OrganizationWeek;
+  names: DigestNames;
+  baseUrl: string;
+  direction: Extract<DigestTemplatePick, { template: "digest-scenarios-trend" }>["direction"];
+  common: CommonProps;
+}): DigestTemplateProps | undefined {
+  const focus = pickFocusProject(week);
+  const project = names.project;
+  if (!focus || !project || focus.scenarios.runs === 0) return undefined;
+  const baseline = baselineOf({ week, projectId: focus.projectId });
+  return {
+    ...common,
+    projectName: project.name,
+    direction: direction === "more_failing" ? "worse" : "better",
+    failureRatePercent: percentOf({
+      part: focus.scenarios.failed,
+      whole: focus.scenarios.runs,
+    }),
+    baselinePercent: percentOf({
+      part: baseline.reduce((sum, counts) => sum + counts.failed, 0),
+      whole: baseline.reduce((sum, counts) => sum + counts.runs, 0),
+    }),
+    runs: focus.scenarios.runs,
+    failed: focus.scenarios.failed,
+    scenariosUrl: `${baseUrl}/${project.slug}/simulations/scenarios`,
+  };
+}
+
+function buildCodingAgentWeekProps({
+  user,
+  baseUrl,
+  common,
+}: {
+  user: UserWeekState | undefined;
+  baseUrl: string;
+  common: CommonProps;
+}): DigestTemplateProps | undefined {
+  if (!user) return undefined;
+  const totals = userWeekTotals(user);
+  if (totals.sessions === 0) return undefined;
+  const topRepo = Object.entries(user.repositories).toSorted(
+    ([, left], [, right]) => right - left,
+  )[0]?.[0];
+  return {
+    ...common,
+    sessions: totals.sessions,
+    tokens: totals.tokens,
+    costUsd: totals.costUsd,
+    activeMinutes: Math.round(totals.activeSeconds / 60),
+    ...(totals.linesChanged > 0 ? { linesChanged: totals.linesChanged } : {}),
+    ...(totals.commits > 0 ? { commits: totals.commits } : {}),
+    ...(totals.pullRequests > 0 ? { pullRequests: totals.pullRequests } : {}),
+    ...(topRepo ? { topRepo } : {}),
+    weekUrl: baseUrl,
+  };
+}
+
+function buildTracesWeekProps({
+  week,
+  names,
+  baseUrl,
+  common,
+}: {
+  week: OrganizationWeek;
+  names: DigestNames;
+  baseUrl: string;
+  common: CommonProps;
+}): DigestTemplateProps | undefined {
+  const focus = pickFocusProject(week);
+  const project = names.project;
+  if (!focus || !project || focus.traces === 0) return undefined;
+  return {
+    ...common,
+    projectName: project.name,
+    ...tracesWeekNumbers({ week, focus }),
+    tracesUrl: `${baseUrl}/${project.slug}/traces`,
+  };
 }
 
 function tracesWeekNumbers({

@@ -12,7 +12,9 @@ export type DigestWeekRow = Readonly<{
   updatedAt: Date;
 }>;
 
-export function weekCursorColumns<State>(projection: StoredProjection<State>) {
+export function weekCursorColumns<State>(
+  projection: StoredProjection<State>,
+): Omit<DigestWeekRow, "state"> {
   return {
     occurredAt: new Date(projection.occurredAt),
     lastEventId: projection.cursor.eventId,
