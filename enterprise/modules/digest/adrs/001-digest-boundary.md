@@ -24,9 +24,11 @@ unsubscribe.
 - Mail leaves digest only through its mail channel, bound to `NotificationApi` (§5 channel
   binding). Digest owns no rendering code, no SMTP or provider client and no mail credential.
 - A member's week is sent at most once: the send intent is keyed by person and ISO week, and the
-  `DigestSend` row is claimed (inserted once, on its id) before the mailer is called. Only the
-  attempt that claimed the row sends; a failure after the claim loses that week's email rather
-  than send it twice, since SMTP does not dedupe a retry. The mailer is also given the
+  `DigestSend` row is claimed (inserted once, on its id) before the mailer is called. The email is
+  rendered and its `SendEmailCommand` parsed before the claim, so a template or envelope refusal
+  claims nothing and the retry can still send it; the mail channel only sends. Only the attempt
+  that claimed the row sends; a failure after the claim loses that week's email rather than send
+  it twice, since SMTP does not dedupe a retry. The mailer is also given the
   idempotency key `digest:{userId}:{isoWeek}`.
 - A week is planned only from Monday 08:00 UTC, and the plan covers last week. Before 08:00 on
   Monday the wake plans nothing, so arming in those hours never sends the week before last.
@@ -124,7 +126,7 @@ routes read.
 ## Consequences
 
 Digest depends on `@langwatch/mail` for its templates and on notification for delivery. A
-failure before the claim fails the send intent, which retries; a mailer failure after the claim
-is not resent, so that member misses the week. The email goes out as HTML only:
-`SendEmailCommand` takes no plain-text part, so the template's rendered text is not sent. Clicks
-are not tracked: links in the email go straight to their targets.
+failure before the claim, rendering included, fails the send intent, which retries; a mailer
+failure after the claim is not resent, so that member misses the week. The email goes out as
+HTML only: `SendEmailCommand` takes no plain-text part, so the template's rendered text is not
+sent. Clicks are not tracked: links in the email go straight to their targets.

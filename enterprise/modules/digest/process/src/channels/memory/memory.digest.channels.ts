@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-import { type DigestMail, DigestMailChannel } from "../digest-mail.channel.ts";
+import { DigestMailChannel, type RenderedDigestMail } from "../digest-mail.channel.ts";
 import type { DigestChannels } from "../digest.channels.ts";
 
 /** Every weekly email recorded in-process instead of sent. */
@@ -17,7 +17,7 @@ export class MemoryDigestMailChannel extends DigestMailChannel {
     return new MemoryDigestMailChannel();
   }
 
-  readonly sent: DigestMail[] = [];
+  readonly sent: RenderedDigestMail[] = [];
   #failNext = false;
 
   private constructor() {
@@ -29,7 +29,7 @@ export class MemoryDigestMailChannel extends DigestMailChannel {
     this.#failNext = true;
   }
 
-  send(mail: DigestMail): Promise<void> {
+  send(mail: RenderedDigestMail): Promise<void> {
     this.sent.push(mail);
     if (!this.#failNext) return Promise.resolve();
     this.#failNext = false;

@@ -31,6 +31,7 @@ import {
 } from "../rules/digest-email.rules.ts";
 import { type DigestTemplatePick, pickDigestTemplate } from "../rules/digest-template.rules.ts";
 import { oldestKeptWeek, plannableWeek, sendableWeek } from "../rules/digest-week.rules.ts";
+import { renderDigestMail } from "./digest-mail.render.ts";
 import type { DigestUnsubscribeService } from "./digest-unsubscribe.service.ts";
 import type { DigestWeekService } from "./digest-week.service.ts";
 
@@ -125,7 +126,8 @@ export class DigestSendService {
    * One member's week, sent at most once: only the caller that claims the week sends it. Skipped
    * if disarmed, unenrolled or opted out since the plan, when the person left or was disabled
    * since, has no address, or when the picked template has nothing to show. Their role and the
-   * projects they may view are read now, not taken from the plan.
+   * projects they may view are read now, not taken from the plan. The email is rendered before
+   * the week is claimed: an email that cannot be rendered throws, claims nothing, and is retried.
    */
   async sendDigest({
     userId,
@@ -154,6 +156,16 @@ export class DigestSendService {
       recipient: { userId, sendId: digestSendKey({ userId, isoWeek }) },
     });
     if (!composed) return;
+    // Rendered and checked before the claim: a refusal fails this attempt and leaves the week
+    // unclaimed, so the retry can still send it.
+    const rendered = await renderDigestMail({
+      to: user.email,
+      templateId: composed.pick.template,
+      props: composed.props,
+      oneClickUnsubscribeUrl: composed.oneClick,
+      idempotencyKey: digestMessageId({ userId, isoWeek }),
+      test: false,
+    });
     // Claimed before the mailer is called, since SMTP does not dedupe a retry: a failure past
     // the claim loses this week's email rather than risk sending it twice (ADR-001).
     const claimed = await this.deps.sends.claim({
@@ -164,14 +176,7 @@ export class DigestSendService {
       sentAt: this.deps.now(),
     });
     if (!claimed) return;
-    await this.deps.mail.send({
-      to: user.email,
-      templateId: composed.pick.template,
-      props: composed.props,
-      oneClickUnsubscribeUrl: composed.oneClick,
-      idempotencyKey: digestMessageId({ userId, isoWeek }),
-      test: false,
-    });
+    await this.deps.mail.send(rendered);
   }
 
   /**
@@ -203,13 +208,15 @@ export class DigestSendService {
       recipient: { userId: operatorId, sendId: `test:${isoWeek}` },
     });
     if (!composed) throw new DigestNothingToSendError(userId);
-    await this.deps.mail.send({
-      to: operator.email,
-      templateId: composed.pick.template,
-      props: composed.props,
-      oneClickUnsubscribeUrl: composed.oneClick,
-      test: true,
-    });
+    await this.deps.mail.send(
+      await renderDigestMail({
+        to: operator.email,
+        templateId: composed.pick.template,
+        props: composed.props,
+        oneClickUnsubscribeUrl: composed.oneClick,
+        test: true,
+      }),
+    );
   }
 
   /** An organization's active members, admins marked; names stay with the user module. */

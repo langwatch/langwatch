@@ -158,7 +158,10 @@ describe("the weekly digest send", () => {
           templateId: "digest-plan-pressure",
           idempotencyKey: `digest:${userId}:${SENT_WEEK}`,
           test: false,
+          email: { to: emailOf(userId), idempotencyKey: `digest:${userId}:${SENT_WEEK}` },
         });
+        expect(mail?.email.subject).not.toBe("");
+        expect(mail?.email.html).not.toBe("");
         expect(await digest.repositories.sends.isSent({ userId, isoWeek: SENT_WEEK })).toBe(true);
       }
     });
@@ -173,6 +176,7 @@ describe("the weekly digest send", () => {
           new RegExp(`^${BASE_URL}/api/digest/unsubscribe\\?token=.+`),
         );
         expect(mail.props.unsubscribeUrl).toBe(mail.oneClickUnsubscribeUrl);
+        expect(mail.email.unsubscribe).toEqual({ url: mail.oneClickUnsubscribeUrl });
       }
     });
   });
@@ -227,9 +231,39 @@ describe("the weekly digest send", () => {
       await expect(sendFor({ userId: MEMBER, isoWeek: SENT_WEEK })).rejects.toThrow(
         "the connection closed after the mailer accepted the email",
       );
+      expect(await digest.repositories.sends.isSent({ userId: MEMBER, isoWeek: SENT_WEEK })).toBe(
+        true,
+      );
       await sendFor({ userId: MEMBER, isoWeek: SENT_WEEK });
 
       expect(recipients()).toEqual([emailOf(MEMBER)]);
+    });
+  });
+
+  describe("when a member's email cannot be rendered", () => {
+    /** @scenario "An email that cannot be rendered claims nothing and is sent on a retry" */
+    it("fails the attempt without claiming the week, so the retry mails them once", async () => {
+      await enrol();
+      await arm();
+      everyoneNearTheLimit();
+      // No scheme: neither the template's links nor notification's unsubscribe URL accept it.
+      digest.world.publicBaseUrl = "app.example.test";
+
+      await expect(sendFor({ userId: MEMBER, isoWeek: SENT_WEEK })).rejects.toThrow();
+
+      expect(digest.mail).toEqual([]);
+      expect(await digest.repositories.sends.isSent({ userId: MEMBER, isoWeek: SENT_WEEK })).toBe(
+        false,
+      );
+
+      digest.world.publicBaseUrl = BASE_URL;
+      await sendFor({ userId: MEMBER, isoWeek: SENT_WEEK });
+      await sendFor({ userId: MEMBER, isoWeek: SENT_WEEK });
+
+      expect(recipients()).toEqual([emailOf(MEMBER)]);
+      expect(await digest.repositories.sends.isSent({ userId: MEMBER, isoWeek: SENT_WEEK })).toBe(
+        true,
+      );
     });
   });
 

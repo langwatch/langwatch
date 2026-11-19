@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import type { DigestTemplateId } from "@langwatch/enterprise-digest-contract";
+import type { SendEmailCommand } from "@langwatch/notification-contract";
 
-/** One person's weekly email as digest hands it over: the template, its props, the envelope. */
+/** One person's weekly email as digest composes it: the template, its props, the envelope. */
 export type DigestMail = Readonly<{
   to: string;
   templateId: DigestTemplateId;
@@ -16,9 +17,15 @@ export type DigestMail = Readonly<{
 }>;
 
 /**
- * Where the weekly email leaves digest. Digest owns none of the rendering or the envelope:
- * the template is `@langwatch/mail`'s and the sender is notification's (ADR-001).
+ * A composed email after it rendered and its command parsed: nothing left that can refuse it
+ * but the mailer. A send claims its week only once it holds one of these.
+ */
+export type RenderedDigestMail = DigestMail & Readonly<{ email: SendEmailCommand }>;
+
+/**
+ * Where the weekly email leaves digest, already rendered. Digest owns none of the rendering or
+ * the envelope: the template is `@langwatch/mail`'s and the sender is notification's (ADR-001).
  */
 export abstract class DigestMailChannel {
-  abstract send(mail: DigestMail): Promise<void>;
+  abstract send(mail: RenderedDigestMail): Promise<void>;
 }

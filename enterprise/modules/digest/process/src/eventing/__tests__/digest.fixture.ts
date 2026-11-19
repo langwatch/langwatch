@@ -97,6 +97,8 @@ export function digestWorld() {
     users: [ADMIN, MEMBER, OTHER_MEMBER, OPERATOR],
     /** How far this process's clock runs ahead of the wall clock. */
     clockOffsetMs: 0,
+    /** The deployment's public origin, read on each send so a test can misconfigure it. */
+    publicBaseUrl: BASE_URL,
   };
 }
 
@@ -182,7 +184,9 @@ export function installDigest(
     },
     mail,
     unsubscribes,
-    publicBaseUrl: BASE_URL,
+    get publicBaseUrl() {
+      return world.publicBaseUrl;
+    },
     requestSend: (request) => commands.requestSend(request),
     now,
   });

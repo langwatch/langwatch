@@ -136,9 +136,16 @@ Feature: Weekly digest emails
 
   @integration
   Scenario: A send retried after the mailer failed is not sent twice
-    Given a member's week was claimed and handed to the mailer
+    Given a member's email was rendered, their week claimed and the email handed to the mailer
     When the mailer call fails and the send is retried, or two attempts run at once
     Then the member receives exactly one email for that week
+
+  @integration
+  Scenario: An email that cannot be rendered claims nothing and is sent on a retry
+    Given the send is armed and a member whose email the template or the mailer's command refuses
+    When their send is handled
+    Then the attempt fails, no send is recorded for them and no email is sent
+    And once it renders, the retried send mails them exactly once
 
   @integration
   Scenario: An organization admin near the plan limit is sent the plan's numbers
