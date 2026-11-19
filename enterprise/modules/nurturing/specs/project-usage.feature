@@ -119,6 +119,20 @@ Feature: Per-email usage reaches Customer.io from nurturing's own project rows
     When their days are written one at a time, in one order or its reverse, then again in one batch with repeats
     Then nurturing's evaluation-day copy holds each of the three days once for the project
 
+  @integration
+  Scenario: The migration copies each evaluation usage row's days and deletes nothing
+    Given evaluation usage rows whose active days are two, three and none, and a row of another owner
+    When the migration's copy runs
+    Then nurturing's evaluation-day copy holds one row per active day of each evaluation row
+    And every old usage row is exactly as it was
+
+  @integration
+  Scenario: The copy can run again without adding or changing a row
+    Given the migration's copy has already run
+    When the copy runs again
+    Then no evaluation-day row is added or changed
+    And no old usage row is changed
+
   @unit @integration
   Scenario: A trace is its root span, counted on its project's day
     Given root spans of a project's traces appended on one UTC day

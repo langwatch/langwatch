@@ -6,6 +6,7 @@
  * left exactly as they were.
  * Spec: enterprise/modules/nurturing/specs/project-usage.feature
  */
+import { randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -18,7 +19,6 @@ import {
   type PrismaQueryExecutor,
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 class AllowTestQueries extends PrismaQueryGuard {
@@ -57,7 +57,7 @@ function copyScopedTo({ projectIds }: { projectIds: string[] }): string {
 }
 
 describe.skipIf(!databaseUrl)("the nurturing evaluation-day copy migration", () => {
-  const ns = `eval-day-${nanoid(8)}`;
+  const ns = `eval-day-${randomUUID().slice(0, 8)}`;
   const TWO_DAYS = `project-two-${ns}`;
   const THREE_DAYS = `project-three-${ns}`;
   const NO_DAYS = `project-none-${ns}`;
