@@ -39,7 +39,9 @@ const COPY_LANES = [
   "memberRemoved",
   "memberDisabled",
   "memberEnabled",
-  "virtualKeyCopy",
+  "virtualKeys",
+  "userErasureMarks",
+  "identityErasureMarks",
 ];
 
 /** The lanes only a deployment with a Customer.io channel registers: the folds and the syncs. */
@@ -109,8 +111,9 @@ describe("the usage pipeline's registration", () => {
       Parameters<NonNullable<typeof pipeline.globalProjections>[number]["register"]>[0]
     >({
       registerEventSubscriber: (subscriber) => void subscribers.push(subscriber),
-      // The folds register too; this test reads only the event subscribers.
+      // The folds and maps register too; this test reads only the event subscribers.
       registerPeerFoldProjection: () => {},
+      registerPeerMapProjection: () => {},
       registerSubscriber: () => {},
     });
     for (const projection of pipeline.globalProjections ?? []) projection.register(registry);

@@ -7,6 +7,7 @@
  */
 import { randomUUID } from "node:crypto";
 
+import { createTenantId } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import {
   PrismaConfigService,
@@ -16,6 +17,7 @@ import {
 } from "@langwatch/prisma-client";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { nurturingVirtualKeysMap } from "../../../eventing/nurturing-project-usage.pipeline.ts";
 import {
   erasedUserHashOf,
   type NurturingVirtualKeyFact,
@@ -50,6 +52,15 @@ const fact = (overrides: Partial<NurturingVirtualKeyFact>): NurturingVirtualKeyF
   occurredAt: 1_000,
   ...overrides,
 });
+
+/** One fact written as the usage pipeline's key lane writes it, live or on replay. */
+const keyLane = (keys: PrismaNurturingVirtualKeyRepository) =>
+  nurturingVirtualKeysMap(keys).map.store;
+const writeFact = (
+  keys: PrismaNurturingVirtualKeyRepository,
+  next: NurturingVirtualKeyFact,
+  tenant = "project-1",
+) => keyLane(keys).append(next, { tenantId: createTenantId(tenant), aggregateId: `vk:${next.virtualKeyId}` });
 
 /** Runs the same steps on Postgres and then on the memory twin, so both hold the same facts. */
 async function onEach<Repository>(
@@ -402,16 +413,16 @@ describe.skipIf(!databaseUrl)("given nurturing's key copy in Postgres", () => {
       const madeKey = keyId("racing-creator");
       const held = fact({ virtualKeyId: heldKey, principalUserId: person });
       const made = fact({ virtualKeyId: madeKey, actorUserId: person });
-      await keys.recordKeyFact({ fact: held });
-      await keys.recordKeyFact({ fact: made });
+      await writeFact(keys, held);
+      await writeFact(keys, made);
       // The erasure's mark has committed but its clearing UPDATE has not run, as when the fact's
       // upsert read no mark and wrote them back after that UPDATE had passed the row.
       await connection.client.nurturingErasedUser.create({
         data: { userIdHash: erasedUserHashOf(person) },
       });
 
-      await keys.recordKeyFact({ fact: held });
-      await keys.recordKeyFact({ fact: made });
+      await writeFact(keys, held);
+      await writeFact(keys, made);
 
       const [holderCleared] = await keys.findKey({
         organizationId: firstOrganization,
@@ -425,6 +436,76 @@ describe.skipIf(!databaseUrl)("given nurturing's key copy in Postgres", () => {
       await expect(
         keys.findKey({ organizationId: firstOrganization, virtualKeyId: madeKey }),
       ).resolves.toMatchObject([{ creatorUserId: null, principalUserId: "user-first" }]);
+    });
+  });
+  describe("when the key lane writes facts of one stamp in both orders, and again", () => {
+    /** @scenario "Two holder facts at one stamp, one naming an erased person, end the same in either order" */
+    it("makes the other person the holder in either order, with no batch write to fold them in memory", async () => {
+      const person = erasedPerson("erased-tied-lane");
+      const erasedFirst = keyId("lane-tie-erased-first");
+      const otherFirst = keyId("lane-tie-other-first");
+      const naming = (virtualKeyId: string, principalUserId: string) =>
+        fact({ virtualKeyId, action: "rotated", principalUserId, occurredAt: 2_000 });
+      await keys.forgetUser({ userId: person });
+
+      await writeFact(keys, naming(erasedFirst, person));
+      await writeFact(keys, naming(erasedFirst, "user-next"));
+      await writeFact(keys, naming(otherFirst, "user-next"));
+      await writeFact(keys, naming(otherFirst, person));
+
+      for (const virtualKeyId of [erasedFirst, otherFirst]) {
+        await expect(keys.findKey({ organizationId: firstOrganization, virtualKeyId })).resolves.toMatchObject([
+          { principalUserId: "user-next", principalUserIdAt: 2_000 },
+        ]);
+      }
+      // A bulkAppend would fold a stamp's holders in memory, where the erased one can win the tie.
+      expect(keyLane(keys).bulkAppend).toBeUndefined();
+    });
+
+    /** @scenario "Replaying the key copy twice leaves every row as it was" */
+    it("leaves the row byte-identical when every fact is written a second time in reverse", async () => {
+      const virtualKeyId = keyId("lane-twice");
+      const facts = [
+        fact({ virtualKeyId, occurredAt: 1_000 }),
+        fact({ virtualKeyId, action: "rotated", principalUserId: "user-next", occurredAt: 2_000 }),
+        fact({ virtualKeyId, action: "revoked", occurredAt: 3_000 }),
+      ];
+      for (const next of facts) await writeFact(keys, next);
+      const where = { organizationId: firstOrganization, virtualKeyId };
+      const first = JSON.stringify(await keys.findKey(where));
+
+      for (const next of facts.toReversed()) await writeFact(keys, next);
+
+      expect(JSON.stringify(await keys.findKey(where))).toBe(first);
+    });
+
+    /** @scenario "A key whose facts sit under two tenants ends the same in either tenant order" */
+    it("holds the per-fact row whichever tenant each fact arrives under, in either order", async () => {
+      const created = (virtualKeyId: string) => fact({ virtualKeyId, occurredAt: 1_000 });
+      const rotated = (virtualKeyId: string) =>
+        fact({ virtualKeyId, action: "rotated", principalUserId: "user-next", occurredAt: 2_000 });
+      const createdFirst = keyId("lane-tenants-created-first");
+      const rotatedFirst = keyId("lane-tenants-rotated-first");
+      const twin = MemoryNurturingVirtualKeyRepository.create();
+
+      await writeFact(keys, created(createdFirst), "project-1");
+      await writeFact(keys, rotated(createdFirst), "project-2");
+      await writeFact(keys, rotated(rotatedFirst), "project-2");
+      await writeFact(keys, created(rotatedFirst), "project-1");
+      for (const next of [created(createdFirst), rotated(createdFirst)]) {
+        await twin.recordKeyFact({ fact: next });
+      }
+      for (const next of [rotated(rotatedFirst), created(rotatedFirst)]) {
+        await twin.recordKeyFact({ fact: next });
+      }
+
+      for (const virtualKeyId of [createdFirst, rotatedFirst]) {
+        const where = { organizationId: firstOrganization, virtualKeyId };
+        const held = await keys.findKey(where);
+
+        expect(held).toEqual(await twin.findKey(where));
+        expect(held).toMatchObject([{ keyCreatedAt: 1_000, principalUserId: "user-next" }]);
+      }
     });
   });
 });

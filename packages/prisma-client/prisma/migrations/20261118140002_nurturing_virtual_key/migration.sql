@@ -3,7 +3,8 @@
 -- who created it (from the created fact alone), the person it acts for and its purpose (each the
 -- latest non-null value by the fact's time), and when it was last disabled, enabled and revoked.
 -- Every column folds order-free, so a redelivery or a late fact changes nothing. A budget
--- crossing reads its key's name, holder and state here. A key created before this copy has no
+-- crossing reads its key's name, holder and state here. A key created before this copy is filled
+-- at deploy by nurturing's replay steps from gateway's log; one with no fact left in it has no
 -- row, and its crossings send nothing.
 --
 -- Expand only: a new table nobody else reads or writes. Nothing is altered or dropped.

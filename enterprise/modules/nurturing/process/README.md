@@ -6,7 +6,7 @@ The server half of [nurturing](../README.md). Product analytics and lifecycle me
 
 ## Installation
 
-`defineProcessModule("nurturing").withRepositories(nurturingRepositories).withChannels(nurturingChannels).withApi(NurturingModule).withEventing(nurturingEventing).withEventing(nurturingProjectUsageEventing).withEventing(nurturingTraceWindowEndEventing).withTasks(…)`, `src/nurturing.module.ts:17`.
+`defineProcessModule("nurturing").withRepositories(nurturingRepositories).withChannels(nurturingChannels).withApi(NurturingModule).withEventing(nurturingEventing).withEventing(nurturingProjectUsageEventing).withEventing(nurturingTraceWindowEndEventing).withTasks(…).withMigrations(…)`, `src/nurturing.module.ts:18`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -53,7 +53,9 @@ Declared at `src/eventing/nurturing-project-usage.pipeline.ts:517`.
 | peer subscriber      | `memberRemoved`                                                   | `lw.organization.member_removed` from [organization](../../../../modules/organization/README.md)  | `src/eventing/nurturing-project-usage.pipeline.ts:555` |
 | peer subscriber      | `memberDisabled`                                                  | `lw.organization.member_disabled` from [organization](../../../../modules/organization/README.md) | `src/eventing/nurturing-project-usage.pipeline.ts:564` |
 | peer subscriber      | `memberEnabled`                                                   | `lw.organization.member_enabled` from [organization](../../../../modules/organization/README.md)  | `src/eventing/nurturing-project-usage.pipeline.ts:573` |
-| peer subscriber      | `virtualKeyCopy`                                                  | `lw.governance.vk_lifecycle` from [gateway](../../../../modules/gateway/README.md)                | `src/eventing/nurturing-project-usage.pipeline.ts:582` |
+| peer map projection  | `virtualKeys`                                                     | `lw.governance.vk_lifecycle` from [gateway](../../../../modules/gateway/README.md)                | `src/eventing/nurturing-project-usage.pipeline.ts:595` |
+| peer map projection  | `userErasureMarks`                                                | `lw.user.erased` from [user](../../../../modules/user/README.md)                                  | `src/eventing/nurturing-project-usage.pipeline.ts:593` |
+| peer map projection  | `identityErasureMarks`                                            | `lw.identity.user_erased` from [identity](../../../../modules/identity/README.md)                 | `src/eventing/nurturing-project-usage.pipeline.ts:594` |
 | peer subscriber      | `traceDayCount`                                                   | `lw.obs.trace.span_received` from [trace](../../../../modules/trace/README.md)                    | `src/eventing/nurturing-project-usage.pipeline.ts:606` |
 | peer subscriber      | `failedTraceDayCount`                                             | `lw.trace.trace_failed` from [trace](../../../../modules/trace/README.md)                         | `src/eventing/nurturing-project-usage.pipeline.ts:607` |
 | peer subscriber      | `firstTraceUsageSync`                                             | `lw.trace.first_trace_recorded` from [trace](../../../../modules/trace/README.md)                 | `src/eventing/nurturing-project-usage.pipeline.ts:610` |

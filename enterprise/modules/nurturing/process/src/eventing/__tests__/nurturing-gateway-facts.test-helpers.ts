@@ -1,12 +1,16 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import type { CioBatchCall } from "@langwatch/enterprise-nurturing-contract";
-import { createTenantId, type Event, type EventSubscriberDefinition } from "@langwatch/eventing";
+import {
+  createTenantId,
+  type Event,
+  type EventSubscriberDefinition,
+  type MapProjectionDefinition,
+} from "@langwatch/eventing";
 import {
   type GATEWAY_BUDGET_CROSSING_EVENT_TYPE,
   GATEWAY_VK_LIFECYCLE_EVENT_TYPE,
   type RecordBudgetCrossingCommandData,
   type RecordVkLifecycleCommandData,
-  recordVkLifecycleCommandDataSchema,
 } from "@langwatch/gateway-contract";
 import {
   INVITE_ACCEPTED_EVENT_TYPE,
@@ -32,16 +36,22 @@ import { MemoryNurturingOrganizationMemberRepository } from "../../repositories/
 import { MemoryNurturingOrganizationPlanRepository } from "../../repositories/memory/memory.nurturing-organization-plan.repository.ts";
 import { MemoryNurturingPersonalProjectRepository } from "../../repositories/memory/memory.nurturing-personal-project.repository.ts";
 import { MemoryNurturingProjectDirectoryRepository } from "../../repositories/memory/memory.nurturing-project-directory.repository.ts";
-import { MemoryNurturingClaimRepository } from "../../repositories/memory/memory.nurturing.repositories.ts";
+import {
+  MemoryNurturingClaimRepository,
+  MemoryNurturingRepositories,
+} from "../../repositories/memory/memory.nurturing.repositories.ts";
 import type { NurturingClaimRepository } from "../../repositories/nurturing-claim.repository.ts";
+import type { NurturingVirtualKeyFact } from "../../rules/nurturing-virtual-key.rules.ts";
 import { NurturingDeliveryService } from "../../services/nurturing-delivery.service.ts";
 import { NurturingGatewayFactsService } from "../../services/nurturing-gateway-facts.service.ts";
 import { NurturingMemberFactsService } from "../../services/nurturing-member-facts.service.ts";
 import { NurturingUserErasureService } from "../../services/nurturing-user-erasure.service.ts";
 import { NurturingService } from "../../services/nurturing.service.ts";
 import {
+  buildNurturingProjectUsagePipeline,
+  NURTURING_PROJECT_USAGE_PIPELINE_NAME,
+  NURTURING_VIRTUAL_KEYS_PROJECTION_NAME,
   nurturingMembershipSubscriber,
-  nurturingVirtualKeyCopySubscriber,
 } from "../nurturing-project-usage.pipeline.ts";
 import { buildNurturingPipeline } from "../nurturing.pipeline.ts";
 
@@ -115,6 +125,41 @@ export function gatewayEvent(
     data: fact.data,
     idempotencyKey: `${subject}:${fact.data.occurred_at}`,
   } as Event;
+}
+
+/** The usage pipeline's key lane as a worker registers it, whatever the sync flag. */
+function registeredKeyLane({
+  virtualKeys,
+  members,
+}: Readonly<{
+  virtualKeys: MemoryNurturingVirtualKeyRepository;
+  members: MemoryNurturingOrganizationMemberRepository;
+}>): MapProjectionDefinition<NurturingVirtualKeyFact, Event> {
+  const others = MemoryNurturingRepositories.create();
+  const pipeline = buildNurturingProjectUsagePipeline({
+    store: others.projectUsage,
+    copies: {
+      placements: others.placements,
+      copyLanded: async () => undefined,
+      organizationsCreated: others.organizationsCreated,
+      members,
+      virtualKeys,
+    },
+    sync: undefined,
+  });
+  let lane: MapProjectionDefinition<NurturingVirtualKeyFact, Event> | undefined;
+  const registry = createApiFixture<
+    Parameters<NonNullable<typeof pipeline.globalProjections>[number]["register"]>[0]
+  >({
+    registerEventSubscriber: () => undefined,
+    registerPeerMapProjection: (map) => {
+      const keys = `${NURTURING_PROJECT_USAGE_PIPELINE_NAME}.${NURTURING_VIRTUAL_KEYS_PROJECTION_NAME}`;
+      if (map.name === keys) lane = map as unknown as MapProjectionDefinition<NurturingVirtualKeyFact, Event>;
+    },
+  });
+  for (const projection of pipeline.globalProjections ?? []) projection.register(registry);
+  if (!lane) throw new Error("the usage pipeline registers no key lane");
+  return lane;
 }
 
 /** User's erasure fact for one account. */
@@ -256,7 +301,8 @@ export async function gatewayFactsOver({
     Parameters<NonNullable<typeof pipeline.globalProjections>[number]["register"]>[0]
   >({ registerEventSubscriber: (subscriber) => void subscribers.push(subscriber) });
   for (const projection of pipeline.globalProjections ?? []) projection.register(registry);
-  const keyCopy = nurturingVirtualKeyCopySubscriber(virtualKeys);
+  // The key copy as the usage pipeline registers it: the live lane's parse, then its store.
+  const keyLane = registeredKeyLane({ virtualKeys, members });
   const memberCopy = nurturingMembershipSubscriber({
     eventType: INVITE_ACCEPTED_EVENT_TYPE,
     data: inviteAcceptedEventDataSchema,
@@ -277,14 +323,13 @@ export async function gatewayFactsOver({
       });
     }
     if (event.type === GATEWAY_VK_LIFECYCLE_EVENT_TYPE) {
-      if (!keyCopy.handle) throw new Error("the key copy handles one fact at a time");
-      await keyCopy.handle(recordVkLifecycleCommandDataSchema.parse(event.data), {
-        tenantId: event.tenantId,
-        aggregateId: event.aggregateId,
-        createdAt: event.createdAt,
-        occurredAt: event.occurredAt,
-        eventId: event.id,
-      });
+      const fact = keyLane.map(event);
+      if (fact) {
+        await keyLane.store.append(fact, {
+          tenantId: event.tenantId,
+          aggregateId: event.aggregateId,
+        });
+      }
     }
     const lanes = subscribers.filter(({ eventTypes }) => eventTypes.includes(event.type));
     for (const lane of lanes) {

@@ -74,7 +74,9 @@ organization), `NurturingOrganizationCreated` (an organization's creation),
 `NurturingOrganizationMember` (memberships), `NurturingOrganizationPlan` (an
 organization's plan, folded from billing's `subscription_changed` facts),
 `NurturingVirtualKey` (a gateway key's organization, name, creator, holder,
-purpose and state, folded order-free from gateway's `vk_lifecycle` facts),
+purpose and state, folded order-free from gateway's `vk_lifecycle` facts by a
+peer map, one statement a fact, which a deploy-time replay fills from gateway's
+log),
 `NurturingPersonalProject` (a personal project's owner) and `NurturingTracedProject`
 (a project that traced).
 It also owns `NurturingOrganization` (admin, milestone counts, coding signals,
@@ -102,7 +104,10 @@ nothing, and an organization's fact still reaches its other members; a guided
 turn's failure and an organization's creation read the marks too. A member list
 read from the owner (`getAllMembers`) does not read the marks: it relies on the
 owner deleting the person's `OrganizationUser` and `User` rows in the same
-transaction as the fact that records the erasure. The mark is written by
+transaction as the fact that records the erasure. Erasures from before nurturing
+kept marks are marked at deploy by two replay steps, over user's `lw.user.erased`
+and identity's `lw.identity.user_erased`, which run before the key copy's replay
+so a replayed key names none of them. The mark is written by
 nurturing's `userErased` subscriber, after the owner has committed the erasure:
 until it runs, however long it lags or retries, a signal about the person still
 sends, and an identify can recreate their Customer.io person, which nurturing
@@ -137,8 +142,8 @@ beats it landed first.
 
 The Customer.io service and the PostHog client are built in `NurturingModule.create`
 only when their key is set; the PostHog client is closed with the process. The
-copies' subscribers always register. The per-project usage folds, the trace
-counting, the usage sync and the founder's group call on an organization's
+copies' subscribers and the key copy's map always register. The per-project
+usage folds, the trace counting, the usage sync and the founder's group call on an organization's
 creation register only with a Customer.io channel. Owners
 send the command in any role; the subscribers run in the worker. The founder's
 call carries the name and creation time but no plan, so a replay or retry never

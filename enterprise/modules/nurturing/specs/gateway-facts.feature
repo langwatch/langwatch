@@ -1,7 +1,9 @@
 Feature: Customer.io hears when a person's gateway key is created and when its budget nears or hits its limit
   Gateway records a key's lifecycle and its budget's crossings as its own facts. Nurturing copies
   each key from the lifecycle facts and reads only its own copies (ADR-001): the key's name, the
-  person it acts for, the person who created it, its purpose and its state. One person hears each
+  person it acts for, the person who created it, its purpose and its state. The copy is a peer map
+  over those facts, one statement a fact, so a replay fills it at deploy from gateway's log, after
+  the erasure marks are filled from user's and identity's erasure facts. One person hears each
   fact: the key's holder if they are a current member of its organization, else its creator if
   they are, else the organization's admin if they are, else no one. Connect and Langy keys send
   nothing. A key no person holds or made goes to the organization's admin.
@@ -76,7 +78,7 @@ Feature: Customer.io hears when a person's gateway key is created and when its b
 
   @unit
   Scenario: A crossing for a key nurturing never copied sends nothing and warns
-    Given a crossing naming a key nurturing holds no copy of
+    Given a crossing naming a key nurturing holds no copy of, no fact of it being left in gateway's log
     When it is delivered
     Then Customer.io receives no call
     And a warning is logged
@@ -195,6 +197,84 @@ Feature: Customer.io hears when a person's gateway key is created and when its b
     Given a person was erased
     When two holder facts stamped T, one naming them and one naming another person, arrive in either order
     Then the key copy names the other person as holder, stamped T
+    And the key copy's lane has no batch write, which would fold the two in memory
+
+  @unit
+  Scenario: A key created before the copy existed is copied at deploy from gateway's log
+    Given gateway's log holds a key's facts and nurturing holds no copy of it
+    When the deploy steps run
+    Then the key copy equals the one live delivery of the same facts would have left
+
+  @unit
+  Scenario: A key with no created fact in the log is copied with no creation time
+    Given gateway's log holds a key's rotated fact and no created fact
+    When the deploy steps run
+    Then the key copy names no creation time
+
+  @unit
+  Scenario: A fact naming another organization changes no copied key
+    Given a copied key and a later fact for it naming another organization
+    When the deploy steps run
+    Then the key copy is as the first organization's facts left it
+
+  @unit
+  Scenario: Replaying the key copy twice leaves every row as it was
+    Given the deploy steps have run
+    When the key copy's step runs again, trailing pass included
+    Then every row is byte-identical
+
+  @unit
+  Scenario: The deploy replay stores no person erased before the copy existed
+    Given user's log and identity's log each hold a person's erasure, and no mark exists
+    And gateway's log names both as creator or holder
+    When the deploy steps run in their declared order
+    Then both people are marked and the key copy names neither
+    And the key step is declared after both marks steps
+    And a key step run first would store them, and a marks step run after it clears them
+    And a marks step whose write fails fails the step
+
+  @unit
+  Scenario: A resumed replay stores no erased person and moves no stamp back
+    Given the marks steps and the key step have run
+    When the key step runs again from its own report
+    Then the rows are as they were and name no erased person
+
+  @unit @integration
+  Scenario: A key whose facts sit under two tenants ends the same in either tenant order
+    Given a key's created fact under one event tenant and its later fact under another
+    When they arrive in either tenant order, live or by replay
+    Then the key copy equals the one per-fact delivery leaves
+
+  @unit
+  Scenario: A person erased during the deploy replay is on no key after it
+    Given the key step is replaying facts naming a person
+    When their erasure commits between two writes
+    Then no key copy names them when the step ends
+
+  @unit
+  Scenario: A key fact delivered during the cutover is in the copy after the trailing pass
+    Given a fact lands in gateway's log after the first pass discovered its aggregates
+    When the key step finishes
+    Then the key copy holds that fact, the trailing pass having replayed from the first pass's cursor
+
+  @unit
+  Scenario: A failed key write fails the replay step, which resumes and fills the key on its next run
+    Given the key copy's write fails
+    When the key step runs
+    Then the step fails
+    And its next run, the write healthy again, fills the key
+
+  @unit
+  Scenario: A key fact the contract refuses fails the replay and the live lane alike
+    Given a key fact whose data gateway's contract refuses
+    When the key step runs, or the live lane maps it
+    Then both fail, the live job blocking its group rather than being dead-lettered
+
+  @unit
+  Scenario: The key copy's replay step names the lane the usage pipeline declares
+    Given the module's replay steps
+    When each runs dry
+    Then each resolves a lane of the usage pipeline, and the subscriber's old lane name is refused as unknown
 
   @unit
   Scenario: A key fact naming an erased person sends nothing to them
@@ -237,6 +317,8 @@ Feature: Customer.io hears when a person's gateway key is created and when its b
   # AC 12: "scope without a key"                 -> Scenario: A crossing of an organization, project or team budget sends nothing
   #                                               -> Scenario: A crossing of a budget attributed per end user sends nothing
   # AC 13: "uncopied key warns"                  -> Scenario: A crossing for a key nurturing never copied sends nothing and warns
+  # Key copy as a peer map (PR 9649): the scenarios from "A key created before the copy existed" to
+  #   "The key copy's replay step names the lane" -> eventing/__tests__/nurturing-virtual-keys.replay.unit.test.ts
   # AC 14: "crossing recipient chain"            -> Scenario: The key's holder hears it first, then its creator, then the organization's admin
   # AC 15: "failure retries, no second success"  -> Scenario: A refused Customer.io call is retried without repeating the call that went
   #                                               -> Scenario: A retry that picks another recipient identifies them too

@@ -5,6 +5,7 @@ import { defineProcessModule, type PublishedProcessModule } from "@langwatch/pro
 import { NurturingModule } from "./app/nurturing.app.ts";
 import { nurturingChannels } from "./channels/nurturing-channels.registry.ts";
 import { nurturingProjectUsageEventing } from "./eventing/nurturing-project-usage.pipeline.ts";
+import { nurturingReplaySteps } from "./eventing/nurturing-replay-steps.ts";
 import { nurturingTraceWindowEndEventing } from "./eventing/nurturing-trace-window-end.pipeline.ts";
 import { nurturingEventing } from "./eventing/nurturing.pipeline.ts";
 import { nurturingRepositories } from "./repositories/nurturing-repositories.registry.ts";
@@ -26,4 +27,5 @@ export const nurturingProcessModule: PublishedProcessModule<
     NurturingMemberBackfillTask.create({
       peers: { source: repositories.memberSource, members: repositories.members },
     }),
-  ]);
+  ])
+  .withMigrations(({ replayer }) => nurturingReplaySteps(replayer));
