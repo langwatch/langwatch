@@ -124,6 +124,67 @@ describe("given a run's judgements", () => {
       expect(matched.judgments[0]?.passed).toBe(true);
     });
 
+    it("keeps skipped and failed judgements whose passed verdict is null when matched is false", async () => {
+      await repository.insert([
+        record({ TraceId: "trace-bool-pass", QuestionId: "q1", Kind: "boolean", Passed: 1 }),
+        record({ TraceId: "trace-bool-fail", QuestionId: "q1", Kind: "boolean", Passed: 0 }),
+        record({
+          TraceId: "trace-bool-skipped",
+          QuestionId: "q1",
+          Kind: "boolean",
+          Status: "skipped",
+          Passed: null,
+        }),
+        record({
+          TraceId: "trace-bool-failed",
+          QuestionId: "q1",
+          Kind: "boolean",
+          Status: "failed",
+          Passed: null,
+        }),
+        record({
+          TraceId: "trace-cat-failed",
+          QuestionId: "mood",
+          Kind: "category",
+          Status: "failed",
+          Passed: null,
+        }),
+      ]);
+
+      const unmatched = await repository.getPage({
+        ...WINDOW,
+        projectId: THIS_PROJECT,
+        limit: 100,
+        matched: false,
+      });
+      const unmatchedSkipped = await repository.getPage({
+        ...WINDOW,
+        projectId: THIS_PROJECT,
+        limit: 100,
+        matched: false,
+        status: "skipped",
+      });
+      const unmatchedFailed = await repository.getPage({
+        ...WINDOW,
+        projectId: THIS_PROJECT,
+        limit: 100,
+        matched: false,
+        status: "failed",
+      });
+
+      expect(unmatched.judgments.map((one) => one.traceId)).toEqual([
+        "trace-bool-fail",
+        "trace-bool-failed",
+        "trace-bool-skipped",
+        "trace-cat-failed",
+      ]);
+      expect(unmatchedSkipped.judgments.map((one) => one.traceId)).toEqual(["trace-bool-skipped"]);
+      expect(unmatchedFailed.judgments.map((one) => one.traceId)).toEqual([
+        "trace-bool-failed",
+        "trace-cat-failed",
+      ]);
+    });
+
     it("reads a category's distribution back as numbers, and an unwritten one as none", async () => {
       await repository.insert([record({ TraceId: "trace-f", Probabilities: "" })]);
 

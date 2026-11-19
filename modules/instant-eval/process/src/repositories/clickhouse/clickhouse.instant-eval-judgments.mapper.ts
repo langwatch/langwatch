@@ -145,11 +145,9 @@ export function buildFilters(query: InstantEvalJudgmentQuery): {
   if (query.matched !== undefined) {
     // A match is a boolean question that passed. A score or category question
     // has no yes, so `matched` over one of those is its judged rows.
-    having.push(
-      query.matched
-        ? "(Passed = 1 OR (Kind != 'boolean' AND Status = 'judged'))"
-        : "NOT (Passed = 1 OR (Kind != 'boolean' AND Status = 'judged'))",
-    );
+    // Wrap `Passed = 1` in `ifNull` so NULL values are not dropped under `NOT`.
+    const matchedPredicate = "(ifNull(Passed = 1, 0) OR (Kind != 'boolean' AND Status = 'judged'))";
+    having.push(query.matched ? matchedPredicate : `NOT ${matchedPredicate}`);
   }
 
   return { where, having, parameters };

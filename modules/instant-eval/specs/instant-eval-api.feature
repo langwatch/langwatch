@@ -217,6 +217,13 @@ Feature: The Instant Eval run over REST, one LWQL statement, judged as a job
     When the results are read for one question and matches only
     Then every judgement belongs to that question and passed
 
+  @integration @regression
+  Scenario: Unmatched results include skipped and failed judgements whose passed verdict is unset
+    Given a run with passed, failed-check, skipped and errored judgements across boolean and non-boolean questions
+    When the results are read with matched set to false
+    Then skipped and failed judgements are returned alongside boolean judgements that did not pass
+    And combining matched set to false with status skipped or failed returns those judgements
+
   @integration
   Scenario: A sample re-reads the text that was judged without judging it again
     Given a finished run
