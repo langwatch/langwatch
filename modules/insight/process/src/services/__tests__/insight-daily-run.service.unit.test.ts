@@ -7,7 +7,10 @@
 
 import type { AnalyticsApi } from "@langwatch/analytics-contract";
 import { InMemoryProcessStore, type ProcessRef, type ProcessStore } from "@langwatch/eventing";
-import type { InsightRunSettledEventData } from "@langwatch/insight-contract";
+import {
+  INSIGHT_RUN_FINDINGS_FENCE_TAG,
+  type InsightRunSettledEventData,
+} from "@langwatch/insight-contract";
 import type { LangyApi } from "@langwatch/langy-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
@@ -55,7 +58,30 @@ function processWaitingOn(pendingRunIds: readonly string[]): Pick<ProcessStore, 
   });
 }
 
-function harness({ stopTurn }: { stopTurn?: Langy["stopTurn"] } = {}) {
+/** A turn that answers one finding at once, in the fenced block a run reads. */
+const answersOneFinding: Langy["awaitTurnSettlement"] = async ({ turnId }) => {
+  const finding = { title: "Checkout cost doubled", body: "Cost rose to 96.", tone: "bad" };
+  const fence = "```";
+  const block = JSON.stringify({ findings: [finding] });
+  const text = ["I read the board.", "", `${fence}${INSIGHT_RUN_FINDINGS_FENCE_TAG}`, block, fence]
+    .join("\n");
+  return {
+    kind: "settled",
+    settlement: {
+      succeeded: true,
+      outcome: "completed",
+      text,
+      messageId: `message-of-${turnId}`,
+      parts: [{ type: "text", text }],
+      error: null,
+    },
+  };
+};
+
+function harness({
+  stopTurn,
+  awaitTurnSettlement = neverSettles,
+}: { stopTurn?: Langy["stopTurn"]; awaitTurnSettlement?: Langy["awaitTurnSettlement"] } = {}) {
   const started: unknown[] = [];
   const settled: InsightRunSettledEventData[] = [];
   const stopped: unknown[] = [];
@@ -70,7 +96,7 @@ function harness({ stopTurn }: { stopTurn?: Langy["stopTurn"] } = {}) {
     }),
     langy: createApiFixture<Langy>({
       startUnattendedTurn: async () => ({ conversationId: "conversation-1", turnId: "turn-1" }),
-      awaitTurnSettlement: neverSettles,
+      awaitTurnSettlement,
       stopTurn:
         stopTurn ??
         (async (input) => {
@@ -194,5 +220,20 @@ describe("given the schedule's process still waits on the run", () => {
 
     expect(started).toEqual([expect.objectContaining({ runId: "run-1" })]);
     expect(settled).toEqual([expect.objectContaining({ runId: "run-1", reason: "timeout" })]);
+  });
+});
+
+describe("given a newer run took the run over before its answer was filed", () => {
+  it("files nothing and records no outcome", async () => {
+    const { service, started, settled, filed } = harness({
+      awaitTurnSettlement: answersOneFinding,
+    });
+    service.connect(processWaitingOn(["run-1", "run-2"]));
+
+    await service.run(RUN);
+
+    expect(started).toEqual([expect.objectContaining({ runId: "run-1" })]);
+    expect(filed).toEqual([]);
+    expect(settled).toEqual([]);
   });
 });

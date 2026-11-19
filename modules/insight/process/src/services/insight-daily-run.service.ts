@@ -322,6 +322,9 @@ export class InsightDailyRunService implements InsightDailyRunExecutor {
       slot,
     });
     const acts = decideRunFindings({ findings, insights });
+    // Taken over during the turn: its replacement files for the board, and its outcome is not
+    // recorded either (settle asks the same).
+    if (await this.isHandedOn(input)) return failed("timeout", conversationId);
     const write = { input, ready, source: { conversationId, messageId: settlement.messageId } };
     for (const act of acts) {
       if (act.kind === "renew") await this.renew({ ...write, ...act });
