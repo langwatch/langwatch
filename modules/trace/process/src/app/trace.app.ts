@@ -233,6 +233,7 @@ import { TraceSummaryStore } from "../eventing/trace-summary.store.ts";
 import { EventingTraceTopicAssignment } from "../eventing/trace-topic-assignment.commands.ts";
 import type { TraceBraidReadsRepository } from "../features/braid/repositories/trace-braid-reads.repository.ts";
 import {
+  ownerAudienceNamed,
   selectedSpanOwnerOf,
   verifiedMarksOf,
 } from "../features/braid/rules/braided-span-owner.rules.ts";
@@ -815,6 +816,8 @@ export interface TraceAppDependencies {
   requestBounds: Pick<EntitlementApi, "requestBound">;
   /** The plan the merged read asks before honouring braids; below Enterprise they pause (§9). */
   braidPlans: Pick<EntitlementApi, "getActivePlan">;
+  /** The organisation's "Braids enabled" setting the merged read also asks; off pauses braids. */
+  braidSettings: Pick<AuthzApi, "getOrganizationPolicy">;
   /** Owner names, the viewer's standing on an owner and the read audit (ADR-201 §5, §8). */
   braidDirectory: TraceBraidDirectory;
   /** Prices braided spans without a cost of their own for the header. */
@@ -939,6 +942,7 @@ type TraceReaderCompositionOptions = {
    */
   requestBounds: TraceAppDependencies["requestBounds"];
   braidPlans: TraceAppDependencies["braidPlans"];
+  braidSettings: TraceAppDependencies["braidSettings"];
   braidDirectory: TraceAppDependencies["braidDirectory"];
   /** The export door's rate window and in-flight slots, built by the app from its registry. */
   exportBounds: TraceAppDependencies["exportBounds"];
@@ -1034,6 +1038,7 @@ export class TraceModule implements TraceApi, CollectorApp {
         ...(publicBaseUrl === undefined ? {} : { publicBaseUrl }),
         requestBounds: dependencies.plans,
         braidPlans: dependencies.plans,
+        braidSettings: dependencies.authz,
         braidDirectory: { authz: dependencies.authz, projects: dependencies.projects },
         ingestAllowance: TraceIngestAllowanceService.create({ entitlement: dependencies.plans }),
         exportBounds: TraceExportBoundsService.create({
@@ -1338,6 +1343,7 @@ export class TraceModule implements TraceApi, CollectorApp {
         foldReadAuthorizer({ authz: options.protections.authz, codePath })(params),
       requestBounds: options.requestBounds,
       braidPlans: options.braidPlans,
+      braidSettings: options.braidSettings,
       braidDirectory: options.braidDirectory,
       exportBounds: options.exportBounds,
       shareReadLimiter: options.shareReadLimiter,
@@ -1546,7 +1552,11 @@ export class TraceModule implements TraceApi, CollectorApp {
     });
     this.#exportProgress = TraceExportProgressService.create({ updates: this.#tenantUpdates });
     const { authorizeRead } = dependencies;
-    this.#braidPause = TraceBraidPauseService.create({ plans: dependencies.braidPlans });
+    this.#braidPause = TraceBraidPauseService.create({
+      plans: dependencies.braidPlans,
+      settings: dependencies.braidSettings,
+      logger,
+    });
     this.#braidDetail = TraceBraidDetailService.create({ directory: dependencies.braidDirectory });
     // The one holder of the span store and the braid reads: each returns an owner's span, or
     // totals and counts of them, audited (ADR-201 §8).
@@ -2038,10 +2048,17 @@ export class TraceModule implements TraceApi, CollectorApp {
     const selected = selectedSpanOwnerOf({ authorization, ownerProjectId: input.ownerProjectId });
     const braidOwner = selected.kind === "braid" ? selected.ownerProjectId : undefined;
     // A braided span: its owner's policy, the viewer's standing on the owner (ADR-201 §5).
-    const protections = await this.resolveViewerProtections({
+    const resolved = await this.resolveViewerProtections({
       projectId: braidOwner ?? input.projectId,
       userId: input.viewerUserId,
     });
+    const protections =
+      braidOwner === undefined
+        ? resolved
+        : ownerAudienceNamed({
+            protections: resolved,
+            ownerName: await this.#braidDetail.ownerName({ ownerProjectId: braidOwner }),
+          });
     await this.assertTraceNotWithheld({
       authorization,
       traceId: input.traceId,
@@ -3130,6 +3147,10 @@ export class TraceModule implements TraceApi, CollectorApp {
 
   readTraceEventsForViewer(input: TraceDrawerReadInput): Promise<DerivedTraceEvent[]> {
     return this.#drawer.traceEvents(input);
+  }
+
+  readLangwatchSignalsForViewer(input: TraceDrawerReadInput): Promise<SpanLangwatchSignals[]> {
+    return this.#drawer.langwatchSignals(input);
   }
 
   /** One trace's summary fold, read from the named member when the header names one. */

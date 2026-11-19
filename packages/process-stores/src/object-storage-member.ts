@@ -53,6 +53,9 @@ function lazyBackend(build: () => ObjectBackend): ObjectBackend {
     digest: async (at) => held().digest(at),
     remove: async (at) => held().remove(at),
     signUpload: async (at, facts) => held().signUpload(at, facts),
+    get uploadRoute() {
+      return held().uploadRoute;
+    },
     signDownload: async (at, facts) => held().signDownload(at, facts),
     probe: async () => held().probe(),
   };
@@ -251,6 +254,7 @@ export function buildObjectStorage(options: {
     digest: async (at) => (await locate(at)).digest(at),
     remove: async (at) => (await locate(at)).remove(at),
     signUpload: async (at, facts) => (await place(at.projectId)).signUpload(at, facts),
+    uploadRoute: async (projectId) => (await place(projectId)).uploadRoute,
     signDownload: async (at, facts) => (await locate(at)).signDownload(at, facts),
     destination: async (projectId) => (await place(projectId)).destination,
     probe: async (projectId) => (await place(projectId)).probe(),

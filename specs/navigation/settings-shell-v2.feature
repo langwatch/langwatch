@@ -96,10 +96,11 @@ Feature: Settings shell
     And the entry draws the Braids mark, the one its pages' titles and empty states draw
 
   @unit
-  Scenario: The organization's braids page lights the one Braids entry
+  Scenario: The organization's braids page lights its Organization entry
     Given the settings menu offers the Braids page
     When I open the organization's braids page
-    Then the one Braids entry is the active entry
+    Then the Organization group's General entry is the active entry
+    And the Braids entry under Project is not lit, since the page is organisation-wide
 
   @unit @integration
   Scenario: Authentication is offered unlocked on every plan

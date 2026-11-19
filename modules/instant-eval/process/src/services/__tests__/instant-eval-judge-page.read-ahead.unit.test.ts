@@ -164,6 +164,7 @@ async function pipeline({
     budget: { assertWithinBudget: async () => undefined },
     gatewayBudget: { assertWithinGatewayBudget: async () => undefined },
     readAhead,
+    ownModels: { isOwnDecisionModel: async () => false },
     now: () => AT.epochMilliseconds,
   });
 

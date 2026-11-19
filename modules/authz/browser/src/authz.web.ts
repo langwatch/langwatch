@@ -1,12 +1,10 @@
 /**
- * What a browser installs when it installs authz: the Roles & access settings
- * page, whose Access tab /settings/role-bindings now redirects to, and the
- * project and organisation Braids pages (ADR-201), both behind `release_braids`.
+ * What a browser installs when it installs authz: the Roles & access page and the project and
+ * organisation Braids pages (ADR-201 §9; read-only with Remove while `release_braids` is off).
  */
 
 import { authzWebConfigSchema } from "@langwatch/authz-contract";
 import { defineBrowserModule } from "@langwatch/browser";
-import { FrontendFlags } from "@langwatch/feature-flag-contract";
 
 import { authzApi } from "./behavior/authz-api.ts";
 import { RoleDetailDrawerToken } from "./model/role-detail-drawer.ts";
@@ -17,6 +15,10 @@ export const authzWeb = defineBrowserModule("authz")
   .withHosts({
     requires: ["AuthzHostApi"],
     mounts: { AuthzHostApi: { load: () => import("./behavior/authz-host-mount.tsx") } },
+  })
+  /** The settings menu's Braids entry while `release_braids` is off (Alex, 2026-11-18). */
+  .withCapabilities({
+    braidsPresence: { load: () => import("./behavior/braids-presence.ts") },
   })
   .withScreens({
     // Placed by the application's settings table until a settings anchor
@@ -34,7 +36,6 @@ export const authzWeb = defineBrowserModule("authz")
       path: "/settings/braids",
       within: "settings",
       label: "Braids",
-      flags: [FrontendFlags.release_braids],
       requires: "project:view",
       load: () => import("./ui/sections/braids/braids.screen.tsx"),
     },
@@ -42,7 +43,6 @@ export const authzWeb = defineBrowserModule("authz")
       path: "/settings/organization-braids",
       within: "settings",
       label: "Braids",
-      flags: [FrontendFlags.release_braids],
       requires: "organization:manage",
       load: () => import("./ui/sections/braids/organization-braids.screen.tsx"),
     },

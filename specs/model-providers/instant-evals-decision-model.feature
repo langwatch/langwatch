@@ -340,10 +340,17 @@ Feature: Instant Evals decision model column in Default models
 
   @unit
   Scenario: A run whose own decision model cannot answer skips its rows by reason
-    Given a run page whose own decision model refused the key, rate limited or was down
+    Given a run page whose own decision model rate limited, was down, or refused the key for some rows
     When the page's judgements are written
     Then each row is skipped under that reason, not counted as a failure
     And the page is not thrown back to be judged again
+
+  @unit
+  Scenario: A run whose own decision model refused the key for every row fails
+    Given a run page whose own decision model refused the key for every row
+    When the page is judged
+    Then the run fails with "instant_eval_decision_model_key_invalid"
+    And nothing is written for that page
 
   @integration
   Scenario: The search bar stays on LangWatch's classifier with an own decision model

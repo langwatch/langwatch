@@ -392,6 +392,8 @@ export interface TraceApi extends TraceOtlpIngestApi {
   readSpanResourcesForViewer(input: TraceDrawerReadInput): Promise<TraceResourceInfoDto>;
   /** The drawer timeline, each braided span's events protected by its owner. */
   readTraceEventsForViewer(input: TraceDrawerReadInput): Promise<DerivedTraceEvent[]>;
+  /** Signal buckets per span, the trace opened and owners grouped as the span tree is. */
+  readLangwatchSignalsForViewer(input: TraceDrawerReadInput): Promise<SpanLangwatchSignals[]>;
   /** `GET /api/traces/facets` for an API key: the discovery payload or one field's paged values. */
   readTraceFacetsForApiKey(input: {
     projectId: string;

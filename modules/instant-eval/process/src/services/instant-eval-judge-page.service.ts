@@ -5,6 +5,7 @@
  * @see modules/instant-eval/specs/instant-eval-pipeline.feature
  */
 
+import { InstantEvalDecisionModelKeyInvalidError } from "@langwatch/instant-eval-contract";
 import {
   instantEvalSpentPriceUsd,
   isInstantEvalSpendBillable,
@@ -31,6 +32,7 @@ import {
   cutPageAtStop,
   INSTANT_EVAL_CANCEL_POLL_MS,
   pageDeadlineMs,
+  pageOutcomeFor,
   pageStopFor,
   pageStopReason,
   type InstantEvalPageStop,
@@ -79,6 +81,11 @@ const EMPTY_INSTANT_EVAL_PAGE: InstantEvalPageOutcome = {
 
 type InstantEvalJudgePageInput = Parameters<InstantEvalRunExecutor["judgePage"]>[0];
 
+/** Whether a project judges on its own decision model rather than LangWatch's. */
+type InstantEvalOwnDecisionModels = {
+  isOwnDecisionModel(input: { projectId: string }): Promise<boolean>;
+};
+
 type InstantEvalJudgePageDeps = {
   context: InstantEvalRunContextService;
   rowSource: Pick<InstantEvalRowSourceService, "keys">;
@@ -90,6 +97,8 @@ type InstantEvalJudgePageDeps = {
   gatewayBudget: Pick<InstantEvalGatewayBudgetService, "assertWithinGatewayBudget">;
   /** The next page of each run, read while the current one judges. */
   readAhead?: InstantEvalReadAheadService;
+  /** Only an own model's refused key fails a run; LangWatch's is not the customer's to fix. */
+  ownModels: InstantEvalOwnDecisionModels;
   concurrency?: number;
   now?: () => number;
 };
@@ -105,6 +114,7 @@ export class InstantEvalJudgePageService {
   private readonly gatewayBudget: InstantEvalJudgePageDeps["gatewayBudget"];
   private readonly readAhead: InstantEvalReadAheadService;
   private readonly judgeRows: InstantEvalJudgeRowsService;
+  private readonly ownModels: InstantEvalOwnDecisionModels;
   private readonly now: () => number;
 
   private constructor(options: Required<InstantEvalJudgePageDeps>) {
@@ -117,6 +127,7 @@ export class InstantEvalJudgePageService {
     this.budget = options.budget;
     this.gatewayBudget = options.gatewayBudget;
     this.readAhead = options.readAhead;
+    this.ownModels = options.ownModels;
     this.judgeRows = InstantEvalJudgeRowsService.create({
       judge: options.judge,
       concurrency: options.concurrency,
@@ -134,6 +145,7 @@ export class InstantEvalJudgePageService {
     budget,
     gatewayBudget,
     readAhead = InstantEvalReadAheadService.create(),
+    ownModels,
     concurrency = INSTANT_EVAL_JUDGE_CONCURRENCY,
     now = () => nowInstant().epochMilliseconds,
   }: InstantEvalJudgePageDeps): InstantEvalJudgePageService {
@@ -147,6 +159,7 @@ export class InstantEvalJudgePageService {
       budget,
       gatewayBudget,
       readAhead,
+      ownModels,
       concurrency,
       now,
     });
@@ -196,6 +209,16 @@ export class InstantEvalJudgePageService {
     if (keyPage.keys.length === 0) return EMPTY_INSTANT_EVAL_PAGE;
 
     const { judged, stop } = await this.#judgeKeys({ loaded, rows, input });
+    // Every row refused for the own model's key is a run that cannot judge anything; skips
+    // would read as "nothing matched". Runs only: a judged query keeps them as skips.
+    // A stopped page is cut instead: its unjudged rows were never refused.
+    if (
+      stop === null &&
+      isEveryRowKeyRefused(judged.usage) &&
+      (await this.ownModels.isOwnDecisionModel({ projectId }))
+    ) {
+      throw new InstantEvalDecisionModelKeyInvalidError();
+    }
     const cut = cutPageAtStop({ judged, keys: keyPage.keys });
     const counters = await this.#write({
       loaded,
@@ -228,7 +251,7 @@ export class InstantEvalJudgePageService {
       "Instant Eval page profile",
     );
 
-    return outcomeFor({ input, cut, keyPage, counters, usage: judged.usage, stop });
+    return pageOutcomeFor({ input, cut, keyPage, counters, usage: judged.usage, stop });
   }
 
   /**
@@ -450,43 +473,7 @@ export class InstantEvalJudgePageService {
   }
 }
 
-/**
- * Where the next page starts and whether there is one. A page cut short ends
- * where its judging did; one that judged nothing stays where it started, so
- * the next intent asks for the same rows. A cancelled run has no next page.
- */
-function outcomeFor({
-  input,
-  cut,
-  keyPage,
-  counters,
-  usage,
-  stop,
-}: {
-  input: InstantEvalJudgePageInput;
-  cut: ReturnType<typeof cutPageAtStop>;
-  keyPage: InstantEvalKeyPage;
-  counters: InstantEvalPageCounters;
-  usage: InstantEvalJudgeUsage;
-  stop: InstantEvalPageStop | null;
-}): InstantEvalPageOutcome {
-  const resumeFrom = cut.last ?? (cut.isCutShort ? null : keyPage.keys.at(-1));
-  const cursor =
-    resumeFrom === null || resumeFrom === undefined
-      ? { traceId: input.afterTraceId, spanId: input.afterSpanId }
-      : { traceId: resumeFrom.traceId, spanId: resumeFrom.spanId || null };
-  const hasRowsLeft = (cut.isCutShort || keyPage.hasMore) && input.remaining - counters.rows > 0;
-
-  return {
-    ...counters,
-    inputTokens: usage.inputTokens,
-    requests: usage.requests,
-    costNanoUsd: usage.costNanoUsd,
-    routedInputTokens: usage.routedInputTokens,
-    cursor: cursor.traceId,
-    // Empty when the statement has one row per trace, which is what tells the
-    // next key pass to compare the trace alone.
-    cursorSpanId: cursor.spanId,
-    hasNextPage: stop === "cancelled" ? false : hasRowsLeft,
-  };
+/** Whether the page sent rows and every one came back as a refused own-model key. */
+function isEveryRowKeyRefused(usage: InstantEvalJudgeUsage): boolean {
+  return usage.requests > 0 && usage.skipped.classifier_key_invalid === usage.requests;
 }

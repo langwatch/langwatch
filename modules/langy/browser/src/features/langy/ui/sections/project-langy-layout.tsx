@@ -6,6 +6,7 @@ import { memo, type ReactNode, useEffect, useLayoutEffect } from "react";
 
 import { useLangyStore } from "../../../../behavior/langy.store.ts";
 import { useLangyConversationDeepLink } from "../../../../behavior/use-langy-conversation-deep-link.ts";
+import { useLangyPromptLink } from "../../../../behavior/use-langy-prompt-link.ts";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 import {
   LANGY_DOCK_GAP,
@@ -33,6 +34,7 @@ export default function ProjectLangyLayout({ children }: { children?: ReactNode 
   });
   useLangyScopeReset();
   useLangyConversationDeepLink();
+  useLangyPromptLink();
   useLangyWebPush();
 
   return (

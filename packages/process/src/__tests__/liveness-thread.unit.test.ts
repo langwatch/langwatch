@@ -8,6 +8,7 @@ import {
   HEARTBEAT_STALL_BUDGET_MS,
   LIVENESS_PATH,
   startHeartbeat,
+  PUBLIC_LISTENER_TIMEOUTS,
   startLivenessThread,
   type LivenessThread,
 } from "../lifecycle/liveness-thread.ts";
@@ -49,6 +50,7 @@ async function bootThread({
   proxyPort: number;
 }): Promise<LivenessThread> {
   const thread = await startLivenessThread({
+    requestTimeoutMs: PUBLIC_LISTENER_TIMEOUTS.requestTimeout,
     port: 0,
     heartbeat,
     stallBudgetMs,

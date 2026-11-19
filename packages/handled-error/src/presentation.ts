@@ -886,7 +886,12 @@ const presentations = {
   braids_not_enabled: {
     title: "Braids aren't switched on here",
     describe: () =>
-      "This organisation can't manage braids yet. Braids it already has keep showing their spans.",
+      "This organisation can't manage braids yet. Removing a braid and revoking a signing key still work.",
+  },
+  braids_turned_off: {
+    title: "Braids is turned off",
+    describe: () =>
+      "An organisation admin can turn Braids on in organisation settings. Until then, existing braids are paused and kept.",
   },
   broadcaster_not_active: {
     title: "Live updates disconnected",
@@ -2749,6 +2754,9 @@ const presentations = {
     // is a message they can forward as-is.
     title: "You don't have access to this",
     describe: (error) => {
+      if (str(error, "denialReason", "") === "braids-kept-to-organisation-admins") {
+        return "Your organisation keeps braids to its admins, so only they can create, change or remove them. Ask an organisation admin.";
+      }
       const permission = str(error, "permission", "");
       return permission
         ? `Ask an organization admin to grant you "${permission}" on this project.`
@@ -3834,6 +3842,11 @@ const presentations = {
     title: "The judgements couldn't be made right now",
     describe: () => "The query ran, but nothing could be judged. Try again in a moment.",
   },
+  instant_eval_decision_model_key_invalid: {
+    title: "The Instant Evals model's key couldn't be used",
+    describe: () =>
+      "Your model provider refused the key for this project's Instant Evals model, or it has none. Check it in Settings > Model Providers.",
+  },
   instant_eval_estimate_unavailable: {
     title: "We couldn't work out the size of this run",
     describe: () => "The estimate failed on our side. Try again, or start the run without one.",
@@ -4329,6 +4342,11 @@ const presentations = {
   stored_object_files_rate_limited: {
     title: "Too many files opened at once",
     describe: () => "Wait a moment, then open the file again.",
+  },
+  stored_object_write_conflict: {
+    // Every row write lost to another writer; nothing failed, so a retry settles it.
+    title: "The file changed while we were updating it",
+    describe: () => "Try again in a moment.",
   },
   dataset_not_ready: {
     // A state, not a breakage — the rows are still being prepared. Waiting is
