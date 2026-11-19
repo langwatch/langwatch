@@ -373,12 +373,27 @@ func handleSync(ctx context.Context, w http.ResponseWriter, proxy PlaygroundProx
 		writeHandlerError(ctx, w, dispatchFailure(ctx, err, "dispatcher_error"))
 		return
 	}
+	// A typed route answers in its own OpenAI or Anthropic shape, never with a
+	// redirect: a caller's SDK follows one and would carry the headers it sent
+	// here (the engine credential among them) to wherever the upstream points.
+	// Passthrough keeps the provider's answer verbatim.
+	typed := req.Type != domain.RequestTypePassthrough
+	if typed && resp.StatusCode >= 300 && resp.StatusCode < 400 {
+		writeHandlerError(ctx, w, herr.New(ctx, nlpgodomain.ErrGatewayUnavailable,
+			herr.M{"reason": "upstream_redirect", "upstream_status": resp.StatusCode},
+			fmt.Errorf("upstream answered with a redirect (%d)", resp.StatusCode)))
+		return
+	}
 	// Forward the upstream content-type so the playground sees JSON as JSON.
 	for k, vv := range resp.Headers {
 		// Skip hop-by-hop and length headers — net/http will recompute.
 		switch strings.ToLower(k) {
 		case "content-length", "transfer-encoding", "connection":
 			continue
+		case "location":
+			if typed {
+				continue
+			}
 		}
 		for _, v := range vv {
 			w.Header().Add(k, v)
