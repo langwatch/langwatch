@@ -5,7 +5,7 @@ ARG CLICKHOUSE_VERSION=26.8.36.3
 ARG CLICKHOUSE_DIGEST=sha256:d426d2f612e1e189c90f9a3f8dcd85a03c6851273833817a296bb327e63aa7a7
 
 # Stage 1: Build Go config generator
-FROM golang:1.27.3-alpine AS builder
+FROM golang:1.27.4-alpine AS builder
 WORKDIR /build
 COPY go.mod go.sum ./
 RUN go mod download

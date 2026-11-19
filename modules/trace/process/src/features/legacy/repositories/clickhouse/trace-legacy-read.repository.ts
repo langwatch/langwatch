@@ -705,7 +705,7 @@ const joinedSpanRowSchema = z.looseObject({
   ParentTraceId: chString.nullable(),
   ParentIsRemote: chBoolean.nullable(),
   Sampled: chBoolean,
-  StartTime: chNumber,
+  StartTimeMs: chNumber,
   EndTime: chNumber,
   DurationMs: chNumber,
   SpanName: chString,
@@ -2288,8 +2288,8 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
       // ID_BOUND_SKIP: bounded by the page's own trace occurrence windows.
       query: `
         SELECT
-          t.TraceId AS TraceId,
-          t.SpanId AS SpanId,
+          t.TraceId,
+          t.SpanId,
           toUnixTimestamp64Milli(t.StartTime) AS StartTimeMs,
           toUnixTimestamp64Milli(t.EndTime) AS EndTimeMs,
           mapFilter((k, v) -> startsWith(k, 'event.'), t.SpanAttributes) AS EventAttrs
@@ -2941,7 +2941,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
           ParentTraceId,
           ParentIsRemote,
           Sampled,
-          toUnixTimestamp64Milli(StartTime) AS StartTime,
+          toUnixTimestamp64Milli(StartTime) AS StartTimeMs,
           toUnixTimestamp64Milli(EndTime) AS EndTime,
           DurationMs,
           SpanName,
@@ -3048,7 +3048,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
       ParentTraceId: string | null;
       ParentIsRemote: boolean | null;
       Sampled: boolean;
-      StartTime: number;
+      StartTimeMs: number;
       EndTime: number;
       DurationMs: number;
       SpanName: string;
@@ -3093,7 +3093,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
       parentTraceId: row.ParentTraceId,
       parentIsRemote: row.ParentIsRemote,
       sampled: row.Sampled,
-      startTimeUnixMs: row.StartTime,
+      startTimeUnixMs: row.StartTimeMs,
       endTimeUnixMs: row.EndTime,
       durationMs: row.DurationMs,
       name: row.SpanName,

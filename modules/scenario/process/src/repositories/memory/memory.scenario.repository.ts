@@ -28,7 +28,11 @@ import {
 import { fromDate, type Instant, Temporal, toDate } from "@langwatch/time";
 
 import { DEFAULT_SUITE_NAME } from "../../rules/default-suite.rules.ts";
-import { ScenarioRepository, type ScenarioPlanRecord } from "../scenario.repository.ts";
+import {
+  ScenarioRepository,
+  type ScenarioPlanRecord,
+  type TestSuiteCap,
+} from "../scenario.repository.ts";
 
 export class MemoryScenarioRepository extends ScenarioRepository {
   static create(): MemoryScenarioRepository {
@@ -47,10 +51,13 @@ export class MemoryScenarioRepository extends ScenarioRepository {
     return sealed;
   }
 
+  private readonly sourceTemplateIds = new Map<string, string>();
+
   async create(
-    input: ScenarioCreateInput & { id: string; actor: ScenarioActor },
+    input: ScenarioCreateInput & { id: string; actor: ScenarioActor; sourceTemplateId?: string },
   ): Promise<Scenario> {
-    const { actor: _, ...scenarioInput } = input;
+    const { actor: _, sourceTemplateId, ...scenarioInput } = input;
+    if (sourceTemplateId) this.sourceTemplateIds.set(input.id, sourceTemplateId);
     const row: Scenario = {
       ...scenarioInput,
       parameters: scenarioInput.parameters ?? null,
@@ -61,6 +68,8 @@ export class MemoryScenarioRepository extends ScenarioRepository {
       minTurns: scenarioInput.minTurns ?? null,
       fields: scenarioInput.fields ?? {},
       testSuiteId: scenarioInput.testSuiteId ?? null,
+      kind: scenarioInput.kind ?? "standard",
+      redTeam: scenarioInput.redTeam ?? null,
       version: 1,
       lastUpdatedById: scenarioInput.lastUpdatedById ?? null,
       archivedAt: null,
@@ -108,11 +117,53 @@ export class MemoryScenarioRepository extends ScenarioRepository {
     return (await this.findAll(input)).length;
   }
 
+  countActiveTestSuitesByProjects(input: { projectIds: string[] }): Promise<number> {
+    const projectIds = new Set(input.projectIds);
+    return Promise.resolve(
+      [...this.testSuites.values()].filter(
+        (testSuite) =>
+          projectIds.has(testSuite.projectId) &&
+          testSuite.archivedAt === null &&
+          !(
+            testSuite.templateId === null &&
+            testSuite.name.toLowerCase() === DEFAULT_SUITE_NAME.toLowerCase()
+          ) &&
+          (testSuite.templateId !== null ||
+            [...this.rows.values()].some(
+              (row) => row.testSuiteId === testSuite.id && row.archivedAt === null,
+            )),
+      ).length,
+    );
+  }
+
+  async createCappedTestSuite(
+    input: ScenarioTestSuiteCreateInput & { id: string; cap: TestSuiteCap },
+  ): Promise<{ testSuite: ScenarioTestSuite } | { current: number }> {
+    const { cap, ...suite } = input;
+    const current = await this.countActiveTestSuitesByProjects({ projectIds: cap.projectIds });
+    if (current >= cap.max) return { current };
+    return { testSuite: await this.createTestSuite(suite) };
+  }
+
+  #isInItsTemplateSuite(row: Scenario): boolean {
+    const sourceTemplateId = this.sourceTemplateIds.get(row.id);
+    const suite = row.testSuiteId === null ? undefined : this.testSuites.get(row.testSuiteId);
+    return (
+      sourceTemplateId !== undefined &&
+      suite !== undefined &&
+      suite.archivedAt === null &&
+      suite.templateId === sourceTemplateId
+    );
+  }
+
   countActiveByProjects(input: { projectIds: string[] }): Promise<number> {
     const projectIds = new Set(input.projectIds);
     return Promise.resolve(
       [...this.rows.values()].filter(
-        (row) => projectIds.has(row.projectId) && row.archivedAt === null,
+        (row) =>
+          projectIds.has(row.projectId) &&
+          row.archivedAt === null &&
+          !this.#isInItsTemplateSuite(row),
       ).length,
     );
   }
@@ -265,6 +316,8 @@ export class MemoryScenarioRepository extends ScenarioRepository {
       scope: null,
       fields: input.fields ?? [],
       evaluators: input.evaluators ?? [],
+      templateId: input.templateId ?? null,
+      templateVersion: input.templateVersion ?? null,
       archivedAt: null,
       createdAt: toDate(Temporal.Instant.fromEpochMilliseconds(0)),
       updatedAt: toDate(Temporal.Instant.fromEpochMilliseconds(0)),
@@ -322,7 +375,14 @@ export class MemoryScenarioRepository extends ScenarioRepository {
     if (!testSuite || testSuite.projectId !== input.projectId)
       throw new ScenarioTestSuiteNotFoundError();
 
-    const archived = { ...testSuite, archivedAt: testSuite.archivedAt ?? toDate(input.archivedAt) };
+    if (testSuite.archivedAt) return testSuite;
+    const archivedAt = toDate(input.archivedAt);
+    for (const row of this.rows.values()) {
+      if (row.testSuiteId === testSuite.id && row.archivedAt === null) {
+        this.rows.set(row.id, { ...row, archivedAt });
+      }
+    }
+    const archived = { ...testSuite, archivedAt };
     this.testSuites.set(archived.id, archived);
     return archived;
   }

@@ -30,7 +30,13 @@ import {
 } from "./shell-rc";
 import { envForTool } from "./tool-env";
 import { isToolResolvable } from "./tool-presence";
-import { aliasShellFor, infoRunKind, runInfoRun, toolNotFoundMessage } from "./wrapper-info-run";
+import {
+  aliasShellFor,
+  infoRunKind,
+  runInfoRun,
+  shellQuote,
+  toolNotFoundMessage,
+} from "./wrapper-info-run";
 import { resolveWrapperMode } from "./wrapper-mode";
 import {
   parseProjectScopeFlags,
@@ -44,9 +50,6 @@ import { classifyIngestionSetupError, recoverExpiredSession } from "./wrapper-se
  * runs, streaming each completed turn's I/O instead of one burst on exit.
  */
 const CODEX_IO_POLL_MS = 2_500;
-
-/** Single-quote a string for safe interpolation into a `sh -c` command. */
-const shellQuote = (s: string): string => `'${s.replace(/'/g, "'\\''")}'`;
 
 /**
  * Provider families the tool needs upstream, checked by `preflightWrapper`
@@ -467,6 +470,17 @@ function reportModeResult(modeResult: WrapperModeResult): void {
     process.stderr.write(
       `${lwTag()} removed the langwatch telemetry env from ` +
         `.claude/settings.local.json (the gateway captures this session).\n`,
+    );
+  } else if (pin?.action === "tracked") {
+    process.stderr.write(
+      `${lwTag()} did not pin claude telemetry in .claude/settings.local.json: ` +
+        `git tracks that file, so the ingest key would land in your next commit. ` +
+        `Run \`git rm --cached .claude/settings.local.json\` to keep it local.\n`,
+    );
+  } else if (pin?.action === "unverified") {
+    process.stderr.write(
+      `${lwTag()} did not pin claude telemetry in .claude/settings.local.json this run: ` +
+        `git did not say in time whether it tracks that file.\n`,
     );
   } else if (pin?.action === "skipped") {
     process.stderr.write(

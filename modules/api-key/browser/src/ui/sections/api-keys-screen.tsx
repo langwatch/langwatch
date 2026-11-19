@@ -613,7 +613,7 @@ export default function ApiKeysScreen() {
           Create new secret key
         </PageLayout.HeaderButton>
       </PageLayout.Header>
-      <VStack gap={6} width="full" align="stretch" paddingTop={4}>
+      <VStack gap={6} width="full" align="stretch">
         <Text color="fg.muted">
           Keys that let your code and tools talk to LangWatch. Do not share your API keys or expose
           them in the browser or other client-side code.
@@ -625,9 +625,10 @@ export default function ApiKeysScreen() {
           {/* Personal + service keys (ingestSourceType == null); the page heading titles them. */}
           {!isLoadingKeys && serviceApiKeys.length === 0 && legacyKeys.keys.length === 0 ? (
             <NoDataInfoBlock
+              size="inline"
               title="No API keys"
               description="Create one to get started."
-              icon={<Key size={24} />}
+              icon={<Key size={20} />}
               testId="api-keys-empty"
             />
           ) : (

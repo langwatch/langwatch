@@ -4,6 +4,8 @@ import type { ApiKeyRepositories } from "../api-key.repositories.ts";
 import { MemoryApiKeyAnswerCacheRepository } from "./memory.api-key-answer-cache.repository.ts";
 import { MemoryApiKeyDatabase } from "./memory.api-key.database.ts";
 import { MemoryApiKeyRepository } from "./memory.api-key.repository.ts";
+import { MemorySigningKeyUsageRepository } from "./memory.signing-key-usage.repository.ts";
+import { MemorySigningKeyRepository } from "./memory.signing-key.repository.ts";
 
 /** The API-key aggregate with no datastore behind it, for a boot that needs none. */
 export class MemoryApiKeyRepositories {
@@ -16,6 +18,8 @@ export class MemoryApiKeyRepositories {
       sandboxKeys: MemorySharedCredentialStore.create(),
       runKeys: MemorySharedCredentialStore.create(),
       heldKeys: MemorySharedCredentialStore.create(),
+      signingKeys: MemorySigningKeyRepository.create(),
+      signingKeyUsage: MemorySigningKeyUsageRepository.create(),
     };
   }
 }

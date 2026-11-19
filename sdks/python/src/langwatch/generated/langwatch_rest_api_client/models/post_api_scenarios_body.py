@@ -6,11 +6,13 @@ from typing import TYPE_CHECKING, Any, TypeVar, cast
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
 
+from ..models.post_api_scenarios_body_kind import PostApiScenariosBodyKind
 from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
     from ..models.post_api_scenarios_body_fields import PostApiScenariosBodyFields
     from ..models.post_api_scenarios_body_parameters_item import PostApiScenariosBodyParametersItem
+    from ..models.post_api_scenarios_body_red_team import PostApiScenariosBodyRedTeam
 
 
 T = TypeVar("T", bound="PostApiScenariosBody")
@@ -40,6 +42,11 @@ class PostApiScenariosBody:
             identifier: text, a number or a boolean, in the field's own type. A field the suite does not declare answers 422
             scenario_field_unknown; a value of the wrong type answers 422 scenario_field_type_invalid. An empty value clears
             the field.
+        kind (PostApiScenariosBodyKind | Unset): Absent or "standard" plays a user simulator. "red_team" plays an
+            attacker and requires redTeam; a standard scenario with redTeam answers 422 scenario_red_team_config_mismatch.
+        red_team (PostApiScenariosBodyRedTeam | Unset): The attack a red_team scenario plays: goal, OWASP ids, strategy
+            and turn budget.
+        source_template_id (Any | Unset): Refused: only applying a suite template marks a scenario with its template.
     """
 
     name: str
@@ -53,6 +60,9 @@ class PostApiScenariosBody:
     min_turns: int | None | Unset = UNSET
     test_suite_id: None | str | Unset = UNSET
     fields: PostApiScenariosBodyFields | Unset = UNSET
+    kind: PostApiScenariosBodyKind | Unset = UNSET
+    red_team: PostApiScenariosBodyRedTeam | Unset = UNSET
+    source_template_id: Any | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -109,6 +119,16 @@ class PostApiScenariosBody:
         if not isinstance(self.fields, Unset):
             fields = self.fields.to_dict()
 
+        kind: str | Unset = UNSET
+        if not isinstance(self.kind, Unset):
+            kind = self.kind.value
+
+        red_team: dict[str, Any] | Unset = UNSET
+        if not isinstance(self.red_team, Unset):
+            red_team = self.red_team.to_dict()
+
+        source_template_id = self.source_template_id
+
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
         field_dict.update(
@@ -135,6 +155,12 @@ class PostApiScenariosBody:
             field_dict["testSuiteId"] = test_suite_id
         if fields is not UNSET:
             field_dict["fields"] = fields
+        if kind is not UNSET:
+            field_dict["kind"] = kind
+        if red_team is not UNSET:
+            field_dict["redTeam"] = red_team
+        if source_template_id is not UNSET:
+            field_dict["sourceTemplateId"] = source_template_id
 
         return field_dict
 
@@ -142,6 +168,7 @@ class PostApiScenariosBody:
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
         from ..models.post_api_scenarios_body_fields import PostApiScenariosBodyFields
         from ..models.post_api_scenarios_body_parameters_item import PostApiScenariosBodyParametersItem
+        from ..models.post_api_scenarios_body_red_team import PostApiScenariosBodyRedTeam
 
         d = dict(src_dict)
         name = d.pop("name")
@@ -213,6 +240,22 @@ class PostApiScenariosBody:
         else:
             fields = PostApiScenariosBodyFields.from_dict(_fields)
 
+        _kind = d.pop("kind", UNSET)
+        kind: PostApiScenariosBodyKind | Unset
+        if isinstance(_kind, Unset):
+            kind = UNSET
+        else:
+            kind = PostApiScenariosBodyKind(_kind)
+
+        _red_team = d.pop("redTeam", UNSET)
+        red_team: PostApiScenariosBodyRedTeam | Unset
+        if isinstance(_red_team, Unset):
+            red_team = UNSET
+        else:
+            red_team = PostApiScenariosBodyRedTeam.from_dict(_red_team)
+
+        source_template_id = d.pop("sourceTemplateId", UNSET)
+
         post_api_scenarios_body = cls(
             name=name,
             situation=situation,
@@ -225,6 +268,9 @@ class PostApiScenariosBody:
             min_turns=min_turns,
             test_suite_id=test_suite_id,
             fields=fields,
+            kind=kind,
+            red_team=red_team,
+            source_template_id=source_template_id,
         )
 
         post_api_scenarios_body.additional_properties = d

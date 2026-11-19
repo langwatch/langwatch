@@ -4,6 +4,7 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { Encryption } from "@langwatch/process-stores";
 
 import type { GovernanceRepositories } from "../governance.repositories.ts";
+import { PrismaAgentRegistryRepository } from "./prisma.agent-registry.repository.ts";
 import { PrismaAggregateReconcileLockRepository } from "./prisma.aggregate-reconcile-lock.repository.ts";
 import { PrismaAiToolCatalogRepository } from "./prisma.ai-tool-catalog.repository.ts";
 import { PrismaAnomalyRuleRepository } from "./prisma.anomaly-rule.repository.ts";
@@ -20,6 +21,7 @@ import { PrismaIngestionPullLifecycleRepository } from "./prisma.ingestion-pull-
 import { PrismaIngestionPullRunProjectionRepository } from "./prisma.ingestion-pull-run-projection.repository.ts";
 import { PrismaIngestionSourceRepository } from "./prisma.ingestion-source.repository.ts";
 import { PrismaIngestionTemplateRepository } from "./prisma.ingestion-template.repository.ts";
+import { PrismaOcsfPushIntentStore } from "./prisma.ocsf-push-intent.store.ts";
 import { PrismaOrganizationSupportContactRepository } from "./prisma.organization-support-contact.repository.ts";
 import { PrismaSpendSpikeAnomalyRepository } from "./prisma.spend-spike-anomaly.repository.ts";
 
@@ -45,6 +47,7 @@ export class PostgresGovernanceRepositories {
     | "rateLimits"
   > {
     return {
+      agentRegistry: PrismaAgentRegistryRepository.create(prisma),
       aggregateReconcileLock: PrismaAggregateReconcileLockRepository.create(prisma),
       aiTools: PrismaAiToolCatalogRepository.create(prisma),
       anomalyRules: PrismaAnomalyRuleRepository.create(prisma),
@@ -62,6 +65,7 @@ export class PostgresGovernanceRepositories {
         cipher: encryption,
       }),
       ingestionTemplates: PrismaIngestionTemplateRepository.create(prisma),
+      ocsfPushIntents: PrismaOcsfPushIntentStore.create(prisma),
       setupState: PrismaGovernanceSetupStateRepository.create(prisma),
       spendSpikeAnomalies: PrismaSpendSpikeAnomalyRepository.create(prisma),
       supportContacts: PrismaOrganizationSupportContactRepository.create({ prisma }),

@@ -20,9 +20,25 @@ describe("given the Answer quality widgets", () => {
   it("takes the app's outcome before the outcome judge's label, and compares reasons", () => {
     const { sql, tsx } = buildOf("ans-outcomes");
     expect(OUTCOME_JUDGE).toBe("Conversation Outcome Judge");
-    expect(sql.trend).toContain(
-      "if(t.Attributes['metadata.outcome'] != '', t.Attributes['metadata.outcome'], ifNull(j.label, ''))",
-    );
+    // A sent outcome (sent = 1) wins over the judge's label (sent = 0), then the latest row; one
+    // fixed-size key, so outcome and reason come from one row.
+    const key =
+      "toUInt64(r.sent) * 4611686018427387904 + toUInt64(dateDiff('millisecond', toDateTime64(0, 3), r.row_at))";
+    expect(sql.trend).toContain(`argMax(r.outcome, ${key}) AS outcome`);
+    // The reasons query reads trace_metrics once with the judge joined on: no union of two reads.
+    expect(sql.reasons).toContain("argMax(r.reason, r.precedence) AS reason");
+    expect(sql.reasons).toContain("LEFT JOIN (");
+    expect(sql.reasons).not.toContain("UNION ALL");
+    expect(sql.reasons).toContain("min(outcome) AS kind");
+    expect(sql.trend).toContain("GROUP BY sipHash128(r.trace_id)");
+    // Only a widget that reads the topic keeps it per trace.
+    expect(sql.trend).not.toContain("LEFT JOIN topics");
+    expect(sql.trend).toContain("MetadataOutcome AS outcome");
+    expect(sql.trend).toContain("ifNull(argMax(Label, OccurredAt), '') AS outcome");
+    // Only the reasons query reads a reason, from the typed column: no query opens the map.
+    expect(sql.reasons).toContain("t.MetadataOutcomeReason");
+    expect(sql.trend).not.toContain("reason");
+    for (const text of Object.values(sql)) expect(text).not.toContain("Attributes[");
     expect(sql.trend).toContain(`EvaluatorName = '${OUTCOME_JUDGE}'`);
     for (const outcome of ["misunderstood", "capability_gap", "refusal", "handover"]) {
       expect(sql.trend).toContain(`countIf(outcome = '${outcome}') AS ${outcome}`);
@@ -68,7 +84,7 @@ describe("given the Answer quality widgets", () => {
   /** @scenario "AC44 Answer quality: Retrieval or generation splits failed searches by cause" */
   it("gives each failed search one cause, an empty search first", () => {
     const { sql } = buildOf("rag-failure-source");
-    expect(sql.trend).toContain("JSONLength(SpanAttributes['langwatch.rag.contexts']) = 0");
+    expect(sql.trend).toContain("SpanType = 'rag' AND RagContextCount = 0");
     expect(sql.trend).toContain(
       "countIf(s.found_nothing = 1 AND (s.errored = 1 OR ifNull(j.failed, 0) = 1)) AS retrieval",
     );
@@ -81,7 +97,8 @@ describe("given the Answer quality widgets", () => {
   /** @scenario "AC45 Answer quality: Empty retrieval rate counts questions whose search returned nothing" */
   it("divides empty searches by searches per bucket", () => {
     const { sql, tsx } = buildOf("rag-empty-retrieval");
-    expect(sql.trend).toContain("SpanAttributes['langwatch.span.type'] = 'rag'");
+    expect(sql.trend).toContain("SpanType = 'rag'");
+    expect(sql.trend).not.toContain("SpanAttributes");
     expect(sql.trend).toContain("countIf(found_nothing = 1) AS empty_searches");
     expect(tsx).toContain("ratio(row.empty_searches, row.questions)");
   });
@@ -93,7 +110,11 @@ describe("given the What users ask widgets", () => {
     const { sql } = buildOf("ask-cannot");
     expect(sql.topics).toContain("WHERE outcome = 'capability_gap'");
     expect(sql.topics).toContain("topK(1)(reason)[1] AS reason");
-    expect(sql.topics).toContain("nullIf(t.Attributes['metadata.topic'], '')");
+    expect(sql.topics).toContain(
+      "any(coalesce(nullIf(p.TopicName, ''), nullIf(m.meta_topic, ''))) AS topic",
+    );
+    expect(sql.topics).toContain("LEFT JOIN topics AS p ON p.TopicId = m.topic_id");
+    expect(sql.topics).toContain("MetadataOutcomeReason AS reason");
   });
 
   /** @scenario "AC47 What users ask: Rising and new topics compares topic shares with the period before" */
@@ -110,9 +131,11 @@ describe("given the What users ask widgets", () => {
   /** @scenario "AC48 What users ask: Topics people ask about shows volume, success and cannot-do per topic" */
   it("shows traces, resolved share and capability gaps, with checks when nothing is judged", () => {
     const { sql, tsx } = buildOf("ans-topics");
-    expect(sql.topics).toContain("countIf(c.outcome = 'resolved') AS resolved");
-    expect(sql.topics).toContain("countIf(c.outcome = 'capability_gap') AS cannot");
-    expect(sql.topics).toContain("AND IsGuardrail = 0");
+    expect(sql.topics).toContain("countIf(outcome = 'resolved') AS resolved");
+    expect(sql.topics).toContain("countIf(outcome = 'capability_gap') AS cannot");
+    // Checks are counted per evaluation, topped by the trace's columns on the row.
+    expect(sql.topics).toContain("FROM trace_evaluation_metrics AS e");
+    expect(sql.topics).toContain("AND e.IsGuardrail = 0");
     expect(tsx).toContain('byOutcome ? "Resolved" : "Checks passed"');
   });
 

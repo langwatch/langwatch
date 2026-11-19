@@ -17,6 +17,7 @@ import type {
   UserWaitBuffer,
   UserWaitEvents,
 } from "../../../rules/langy-local-user-wait-record.rules.ts";
+import type { LangyActorUserReader } from "../../../services/langy-actor-session.service.ts";
 import { LocalCallDispatcherService } from "./langy-local-call-dispatcher.service.ts";
 import {
   ControlRequestService,
@@ -50,6 +51,9 @@ export type LocalControlRepositories = {
 
 type Timing = { offlineWaitMs?: number; pollIntervalMs?: number; now?: () => number };
 
+/** Names the person whose machine a call runs on, for the panel's activity line. */
+type ActivityNames = { users?: LangyActorUserReader };
+
 /** Told every answered card, so a confirmation card's click is recorded where it is spent. */
 type AnswerListener = { onAnswered?: (wait: StoredUserWait) => Promise<void> };
 
@@ -67,7 +71,8 @@ export class LangyLocalControlRuntimeService implements LocalControlRuntime {
       events: UserWaitEvents;
       buffer: UserWaitBuffer & LocalCallBuffer;
     } & Timing &
-      AnswerListener,
+      AnswerListener &
+      ActivityNames,
   ): LangyLocalControlRuntimeService {
     return new LangyLocalControlRuntimeService(input);
   }
@@ -90,6 +95,7 @@ export class LangyLocalControlRuntimeService implements LocalControlRuntime {
     events,
     buffer,
     onAnswered,
+    users,
     ...timing
   }: LocalControlRepositories & {
     workspace: LangyLocalWorkspaceChannel;
@@ -98,7 +104,8 @@ export class LangyLocalControlRuntimeService implements LocalControlRuntime {
     events: UserWaitEvents;
     buffer: UserWaitBuffer & LocalCallBuffer;
   } & Timing &
-    AnswerListener) {
+    AnswerListener &
+    ActivityNames) {
     const { offlineWaitMs, pollIntervalMs, now } = timing;
     const clock = now ? { now } : {};
     const polling = pollIntervalMs !== undefined ? { pollIntervalMs } : {};
@@ -109,6 +116,7 @@ export class LangyLocalControlRuntimeService implements LocalControlRuntime {
       workspace,
       presence,
       buffer,
+      ...(users ? { users } : {}),
       ...clock,
       ...(offlineWaitMs !== undefined ? { offlineWaitMs } : {}),
       ...polling,

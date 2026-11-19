@@ -117,6 +117,7 @@ export function CodeGroup({ children }: { children?: ReactNode }) {
             value={tabValue({ label: item.label })}
             padding="0"
             data-docs-panel=""
+            data-docs-findable=""
             data-code-title={item.source ? codeFilename(item.source) : item.label}
           >
             {item.source ? (

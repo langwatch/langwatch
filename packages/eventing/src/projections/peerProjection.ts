@@ -2,6 +2,7 @@ import type { z } from "zod";
 
 import type { ParsingSchema } from "../domain/eventSchemas.ts";
 import type { Event } from "../domain/types.ts";
+import type { TriggerContext, TriggerOptions } from "../pipeline/processManagerDefinition.ts";
 import { ConfigurationError } from "../services/errorHandling.ts";
 import type { FoldProjectionDefinition } from "./foldProjection.types.ts";
 import type { MapProjectionDefinition, MapProjectionOptions } from "./mapProjection.types.ts";
@@ -30,6 +31,14 @@ export interface PeerFoldProjectionDeclaration<
   readonly events: Events;
   readonly fold: FoldProjectionDefinition<State, PeerEvent<Events>>;
 }
+
+/** A subscriber on a peer fold: named, handed the event and the fold's committed state. */
+export type PeerFoldSubscriberSpec<State> = TriggerOptions<Event, State> & {
+  readonly name: string;
+  /** Only these owner event types; omit for every event the fold takes. */
+  readonly events?: readonly string[];
+  handler: (event: Event, context: TriggerContext<State>) => Promise<void>;
+};
 
 /** A peer map: the owner events it consumes and the host's own map over them (§9). */
 export interface PeerMapProjectionDeclaration<

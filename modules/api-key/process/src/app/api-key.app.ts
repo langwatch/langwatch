@@ -43,12 +43,22 @@ import {
   apiKeyServerConfig,
   docsOriginsOf,
   type ApiKeyServerConfig,
+  type DocsSessionAvailability,
   type DocsSessionKeyMinted,
   type DocsSessionRevoked,
   type MintDocsSessionKeyInput,
   type RevokeDocsSessionKeysInput,
+  type BraidSignatureVerdict,
+  type CreateSigningKeyInput,
+  type FindSigningKeysInput,
+  type IssuedSigningKey,
+  type ProjectSigning,
+  type RevokeSigningKeyInput,
+  type RotateSigningKeyInput,
+  type SigningKey,
+  type VerifyBraidSignatureInput,
 } from "@langwatch/api-key-contract";
-import { PermissionDeniedError } from "@langwatch/authorization";
+import { ImpersonationCannotMintCredentialError } from "@langwatch/authorization";
 import { AuthzApi, newAuthzGrantId } from "@langwatch/authz-contract";
 import { ConfigParseError } from "@langwatch/config";
 import { createLogger } from "@langwatch/observability";
@@ -64,10 +74,16 @@ import {
 } from "@langwatch/secrets";
 import type { Instant } from "@langwatch/time";
 
+import type { ApiKeyChannels } from "../channels/api-key.channels.ts";
+import {
+  buildDocsPlaygroundRevocationPipeline,
+  type DocsPlaygroundRevocationPipeline,
+} from "../eventing/docs-playground-revocation.pipeline.ts";
 import type { ApiKeyRepositories } from "../repositories/api-key.repositories.ts";
 import { AgentSandboxKeyService } from "../services/agent-sandbox-key.service.ts";
 import { ApiKeyTokenService } from "../services/api-key-token.service.ts";
 import { ApiKeyService } from "../services/api-key.service.ts";
+import { BraidSignatureVerificationService } from "../services/braid-signature-verification.service.ts";
 import { DocsSessionKeyService } from "../services/docs-session-key.service.ts";
 import { HeldKeyMintService } from "../services/held-key-mint.service.ts";
 import { IngestionKeyMintService } from "../services/ingestion-key-mint.service.ts";
@@ -81,6 +97,7 @@ import {
 } from "../services/project-provisioning.service.ts";
 import { RunKeyMintService } from "../services/run-key-mint.service.ts";
 import { SharedKeyMintService } from "../services/shared-key-mint.service.ts";
+import { SigningKeyService } from "../services/signing-key.service.ts";
 import type { ApiKeyOrganizationsDoorApi } from "../transport/api-key-organizations.rest.ts";
 import type { ApiKeyProjectsDoorApi } from "../transport/api-key-projects.rest.ts";
 
@@ -106,6 +123,8 @@ type ApiKeySetup = Readonly<{
     projects: ProjectApi;
   }>;
   secrets: ScopedSecrets;
+  /** Built by the container from the channel registry; the release flags braid keys sit behind. */
+  channels: ApiKeyChannels;
   /** The docs origins a docs session key may be handed to (ADR-185); absent registers none. */
   config?: ApiKeyServerConfig | undefined;
 }>;
@@ -201,10 +220,10 @@ export class ApiKeyModule implements ApiKeyApi, ApiKeyProjectsDoorApi, ApiKeyOrg
       legacyGrants: LegacyApiKeyGrantService.create({
         authz: authorization,
         grants: authorization,
-        // The peer's own derivation, asked for rather than reimplemented: a
+        // The peer's own grant id, asked for rather than reimplemented: a
         // second copy that drifted would write bindings the revocation
         // queries never find.
-        deriveBindingId: (input) => authorization.deriveGrantId(input),
+        resolveBindingId: (input) => authorization.resolveGrantId(input),
         diagnostics: createLogger("langwatch:api-key"),
       }),
       tokens: ApiKeyTokenService.create(pepper, previousPepper),
@@ -250,8 +269,23 @@ export class ApiKeyModule implements ApiKeyApi, ApiKeyProjectsDoorApi, ApiKeyOrg
       organizations: setup.dependencies.organizations,
     });
 
+    const braidSignatures = BraidSignatureVerificationService.create({
+      keys: setup.repositories.signingKeys,
+      usage: setup.repositories.signingKeyUsage,
+    });
+    const signingKeys = SigningKeyService.create({
+      keys: setup.repositories.signingKeys,
+      usage: setup.repositories.signingKeyUsage,
+      projects: setup.dependencies.projects,
+      flags: setup.channels.flags,
+      settings: setup.dependencies.authorization,
+      braidSignatures,
+    });
+
     return new ApiKeyModule({
       service,
+      signingKeys,
+      braidSignatures,
       authorization,
       runKeys,
       heldKeys,
@@ -265,6 +299,8 @@ export class ApiKeyModule implements ApiKeyApi, ApiKeyProjectsDoorApi, ApiKeyOrg
 
   private constructor(deps: {
     service: ApiKeyService;
+    signingKeys: SigningKeyService;
+    braidSignatures: BraidSignatureVerificationService;
     authorization: AuthzApi;
     runKeys: RunKeyMintService;
     heldKeys: HeldKeyMintService;
@@ -275,6 +311,8 @@ export class ApiKeyModule implements ApiKeyApi, ApiKeyProjectsDoorApi, ApiKeyOrg
     organizationProvisioning: OrganizationProvisioningService;
   }) {
     this.#service = deps.service;
+    this.#signingKeys = deps.signingKeys;
+    this.#braidSignatures = deps.braidSignatures;
     this.#authorization = deps.authorization;
     this.#runKeys = deps.runKeys;
     this.#heldKeys = deps.heldKeys;
@@ -286,6 +324,8 @@ export class ApiKeyModule implements ApiKeyApi, ApiKeyProjectsDoorApi, ApiKeyOrg
   }
 
   readonly #service: ApiKeyService;
+  readonly #signingKeys: SigningKeyService;
+  readonly #braidSignatures: BraidSignatureVerificationService;
   readonly #authorization: AuthzApi;
   readonly #runKeys: RunKeyMintService;
   readonly #heldKeys: HeldKeyMintService;
@@ -337,8 +377,15 @@ export class ApiKeyModule implements ApiKeyApi, ApiKeyProjectsDoorApi, ApiKeyOrg
   mintDocsSessionKey(input: MintDocsSessionKeyInput): Promise<DocsSessionKeyMinted> {
     return this.#docsSessionKeys.mint(input);
   }
+  getDocsSessionAvailability(input: { projectId: string }): Promise<DocsSessionAvailability> {
+    return this.#docsSessionKeys.availability(input);
+  }
   revokeDocsSessionKeys(input: RevokeDocsSessionKeysInput): Promise<DocsSessionRevoked> {
     return this.#docsSessionKeys.revoke(input);
+  }
+  /** Revokes an organisation's docs session keys once it turns the playground session off. */
+  docsPlaygroundRevocationPipeline(): DocsPlaygroundRevocationPipeline {
+    return buildDocsPlaygroundRevocationPipeline({ docsSessionKeys: this.#docsSessionKeys });
   }
   async resolveOrganizationToken(
     input: OrganizationApiKeyResolutionInput,
@@ -695,11 +742,7 @@ export class ApiKeyModule implements ApiKeyApi, ApiKeyProjectsDoorApi, ApiKeyOrg
   ): Promise<{ token: string; apiKey: ApiKey; assignedToUserId: string | null }> {
     // An operator acting as a member holds no grant to issue credentials as them.
     if (by.impersonatorId) {
-      throw new PermissionDeniedError({
-        permission: "organization:view",
-        scope: { type: "organization", id: input.organizationId },
-        denialReason: "no-grant",
-      });
+      throw new ImpersonationCannotMintCredentialError();
     }
     await this.#ensureMember(input.organizationId, by);
     const isService = input.keyType === "service";
@@ -771,11 +814,7 @@ export class ApiKeyModule implements ApiKeyApi, ApiKeyProjectsDoorApi, ApiKeyOrg
     by: ApiKeyCaller,
   ): Promise<{ token: string; apiKey: ApiKey }> {
     if (by.impersonatorId) {
-      throw new PermissionDeniedError({
-        permission: "organization:view",
-        scope: { type: "organization", id: input.organizationId },
-        denialReason: "no-grant",
-      });
+      throw new ImpersonationCannotMintCredentialError();
     }
     await this.#ensureMember(input.organizationId, by);
     const callerIsAdmin = await this.#isOrganizationAdmin(input.organizationId, by);
@@ -818,6 +857,30 @@ export class ApiKeyModule implements ApiKeyApi, ApiKeyProjectsDoorApi, ApiKeyOrg
     await this.#ensureMember(input.organizationId, by);
     if (!(await this.#isOrganizationAdmin(input.organizationId, by))) return [];
     return this.#service.getOrgMembers({ organizationId: input.organizationId });
+  }
+
+  async findSigningKeys(input: FindSigningKeysInput): Promise<SigningKey[]> {
+    return this.#signingKeys.find(input);
+  }
+
+  async findProjectSigning(input: FindSigningKeysInput): Promise<ProjectSigning> {
+    return this.#signingKeys.findProjectSigning(input);
+  }
+
+  async createSigningKey(input: CreateSigningKeyInput): Promise<IssuedSigningKey> {
+    return this.#signingKeys.create(input);
+  }
+
+  async rotateSigningKey(input: RotateSigningKeyInput): Promise<IssuedSigningKey> {
+    return this.#signingKeys.rotate(input);
+  }
+
+  async revokeSigningKey(input: RevokeSigningKeyInput): Promise<SigningKey> {
+    return this.#signingKeys.revoke(input);
+  }
+
+  async verifyBraidSignature(input: VerifyBraidSignatureInput): Promise<BraidSignatureVerdict> {
+    return this.#braidSignatures.verify(input);
   }
 
   #ensureMember(organizationId: string, by: ApiKeyCaller): Promise<void> {

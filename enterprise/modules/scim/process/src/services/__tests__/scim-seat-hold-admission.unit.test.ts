@@ -44,6 +44,7 @@ class OneSeatPlan implements Pick<EntitlementApi, "getActivePlan"> {
       free: false,
       maxMembers: 1,
       maxMembersLite: 0,
+      maxMembersDeveloper: 0,
       maxMessagesPerMonth: 1,
       canPublish: true,
       prices: { USD: 0, EUR: 0 },

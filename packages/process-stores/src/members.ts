@@ -10,6 +10,8 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { RedisConnection } from "@langwatch/redis-client";
 import type { Instant } from "@langwatch/time";
 
+export { readableBody } from "./object-storage-backend.ts";
+
 /** Now, read from one place, so a test moves time without touching a module. */
 export interface Clock {
   now(): Instant;
@@ -63,6 +65,9 @@ export type SignedObjectUpload =
   | Readonly<{ kind: "direct"; url: string; headers: Readonly<Record<string, string>> }>
   | Readonly<{ kind: "through-process" }>;
 
+/** Where an account sends clients' upload bytes: straight to the bucket, or through the process. */
+export type ObjectUploadRoute = SignedObjectUpload["kind"];
+
 /** Where one project's objects live. */
 export type ObjectStorageDestination =
   | Readonly<{ kind: "s3"; bucket: string }>
@@ -83,11 +88,15 @@ export interface ObjectStorage {
   ): Promise<ObjectDigest>;
   /** The object's bytes; an absent object refuses with StoredObjectNotFoundError. */
   read(at: StoredObjectAddress): Promise<AsyncIterable<Uint8Array>>;
+  /** Whether an object is stored at the address, asked of its headers alone: no body is opened. */
+  exists(at: StoredObjectAddress): Promise<boolean>;
   /** The backend's SHA-256 where it holds one, else the object streamed back through the hash. */
   digest(at: StoredObjectAddress): Promise<ObjectDigest>;
   /** Removes the object; an absent one is already removed. */
   remove(at: StoredObjectAddress): Promise<void>;
   signUpload(at: StoredObjectAddress, facts: UploadFacts): Promise<SignedObjectUpload>;
+  /** Where the project's account sends clients' upload bytes, from its setting: signs nothing. */
+  uploadRoute(projectId: string): Promise<ObjectUploadRoute>;
   /** A GET URL a remote reader fetches the object from; a backend with no URL to sign refuses. */
   signDownload(at: StoredObjectAddress, facts: DownloadFacts): Promise<string>;
   destination(projectId: string): Promise<ObjectStorageDestination>;

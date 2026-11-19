@@ -114,8 +114,13 @@ function fakeProjects(traceDestinationProject: ProjectWithTeam | null = null): P
   );
 }
 
+/** Records the page it is handed, one `rowWritten` call per row. */
 class FakeSink implements GovernanceOcsfEventSink {
-  insertEvent = vi.fn(async (_input: GovernanceOcsfEventInput) => {});
+  rowWritten = vi.fn(async (_input: GovernanceOcsfEventInput) => {});
+
+  async insertEvents(rows: GovernanceOcsfEventInput[]): Promise<void> {
+    for (const row of rows) await this.rowWritten(row);
+  }
 }
 class FakeEntitlement implements PulledUsageEntitlements {
   readonly calls = vi.fn();
@@ -334,7 +339,7 @@ describe("IngestionPullWorkerService", () => {
       nextCursor: "next",
       eventCount: 1,
     });
-    expect(sink.insertEvent).toHaveBeenCalledWith(
+    expect(sink.rowWritten).toHaveBeenCalledWith(
       expect.objectContaining({
         tenantId: "gov-project",
         eventId: "http_custom:source-1:event-1",
@@ -343,7 +348,7 @@ describe("IngestionPullWorkerService", () => {
       }),
     );
 
-    const [row] = sink.insertEvent.mock.calls[0]!;
+    const [row] = sink.rowWritten.mock.calls[0]!;
     expect(JSON.parse(row.rawOcsfJson)).toMatchObject({
       class_uid: 6003,
       category_uid: 6,
@@ -367,7 +372,7 @@ describe("IngestionPullWorkerService", () => {
     await expect(service.run({ sourceId: "source-1", cursor: "held" })).rejects.toBeInstanceOf(
       IngestionPullDeadlineExceededError,
     );
-    expect(sink.insertEvent).not.toHaveBeenCalled();
+    expect(sink.rowWritten).not.toHaveBeenCalled();
   });
 
   it("keeps collected events when an adapter reports errors after advancing", async () => {
@@ -385,7 +390,7 @@ describe("IngestionPullWorkerService", () => {
       nextCursor: "after-unreadable-row",
       eventCount: 1,
     });
-    expect(sink.insertEvent).toHaveBeenCalledTimes(1);
+    expect(sink.rowWritten).toHaveBeenCalledTimes(1);
   });
 
   it("fails without writing when an adapter reports errors and makes no progress", async () => {
@@ -400,7 +405,7 @@ describe("IngestionPullWorkerService", () => {
     await expect(service.run({ sourceId: "source-1", cursor: "held" })).rejects.toThrow(
       "reported 1 error",
     );
-    expect(sink.insertEvent).not.toHaveBeenCalled();
+    expect(sink.rowWritten).not.toHaveBeenCalled();
   });
 
   it("routes conversations through the trace port under the destination project", async () => {
@@ -469,7 +474,7 @@ describe("IngestionPullWorkerService", () => {
       service.run({ sourceId: "source-1", cursor: "held", pulledUsage: usage }),
     ).resolves.toMatchObject({ nextCursor: "next", eventCount: 2 });
 
-    expect(sink.insertEvent).toHaveBeenCalledTimes(2);
+    expect(sink.rowWritten).toHaveBeenCalledTimes(2);
     expect(usage.records).toHaveBeenCalledTimes(2);
     expect(entitlement.calls).toHaveBeenCalledTimes(1);
 
@@ -499,7 +504,7 @@ describe("IngestionPullWorkerService", () => {
     await expect(
       service.run({ sourceId: "source-1", cursor: "held", pulledUsage: usage }),
     ).rejects.toThrow("event store unavailable");
-    expect(sink.insertEvent).toHaveBeenCalledTimes(1);
+    expect(sink.rowWritten).toHaveBeenCalledTimes(1);
   });
 
   it("fails closed when the pulled-usage entitlement cannot be resolved", async () => {
@@ -516,7 +521,7 @@ describe("IngestionPullWorkerService", () => {
     await expect(
       service.run({ sourceId: "source-1", cursor: "held", pulledUsage: usage }),
     ).rejects.toThrow("entitlement unavailable");
-    expect(sink.insertEvent).not.toHaveBeenCalled();
+    expect(sink.rowWritten).not.toHaveBeenCalled();
     expect(usage.records).not.toHaveBeenCalled();
   });
 
@@ -537,7 +542,7 @@ describe("IngestionPullWorkerService", () => {
     await expect(
       service.run({ sourceId: "source-1", cursor: "held", pulledUsage: usage }),
     ).resolves.toMatchObject({ nextCursor: "next", eventCount: 2 });
-    expect(sink.insertEvent).toHaveBeenCalledTimes(2);
+    expect(sink.rowWritten).toHaveBeenCalledTimes(2);
     expect(usage.records).toHaveBeenCalledTimes(1);
     expect(diagnostics.error).toHaveBeenCalledWith(
       expect.stringContaining("could not map"),
@@ -684,7 +689,7 @@ describe("given a pull carrying an event that names an erased person", () => {
       await service.run({ sourceId: "source-1", cursor: null });
 
       expect(traceIngestion.ingest).not.toHaveBeenCalled();
-      expect(sink.insertEvent).not.toHaveBeenCalled();
+      expect(sink.rowWritten).not.toHaveBeenCalled();
     });
   });
 
@@ -747,7 +752,7 @@ describe("given a directory listing that names an erased person", () => {
 
     await service.run({ sourceId: "source-1", cursor: null });
 
-    expect(sink.insertEvent).not.toHaveBeenCalled();
+    expect(sink.rowWritten).not.toHaveBeenCalled();
     expect(JSON.stringify(discover.mock.calls)).not.toContain(ERASED);
     expect(JSON.stringify(departmentSync.mock.calls)).not.toContain(ERASED);
   });
@@ -765,7 +770,7 @@ describe("given a pull where person discovery itself breaks", () => {
 
     await service.run({ sourceId: "source-1", cursor: null });
 
-    expect(sink.insertEvent).toHaveBeenCalled();
+    expect(sink.rowWritten).toHaveBeenCalled();
     expect(traceIngestion.ingest).toHaveBeenCalledTimes(1);
     expect(identityMatch).not.toHaveBeenCalled();
     expect(diagnostics.error).toHaveBeenCalledWith(

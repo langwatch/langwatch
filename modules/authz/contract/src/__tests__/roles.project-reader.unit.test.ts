@@ -84,6 +84,24 @@ describe("project-reader role", () => {
       }
     });
 
+    describe("when the binding carries a condition", () => {
+      /** @scenario "A grant carrying a condition never answers a yes/no decision" */
+      it("grants a user nothing, for any permission at any scope", () => {
+        for (const roleKey of ["project-reader", "admin", "custom:role_1"] as const) {
+          for (const scopeType of ["PROJECT", "TEAM", "ORGANIZATION"] as const) {
+            const granted = ALL_PERMISSIONS.filter((permission) =>
+              bindingGrants({
+                binding: { roleKey, scopeType, conditioned: true },
+                grants: grants({ customRolePermissions: new Map([["role_1", ["traces:view"]]]) }),
+                permission,
+              }),
+            );
+            expect(granted).toEqual([]);
+          }
+        }
+      });
+    });
+
     it("never escalates through the matcher either", () => {
       for (const permission of ["traces:manage", "project:manage", "prompts:view"]) {
         expect(

@@ -18,6 +18,7 @@ import type { TraceFilterWhere } from "../../../rules/trace-filter-hidden-origin
 // The PORT rather than the concrete legacy service: the export reads one
 // method, and typing it at the port lets a process hand over whatever it
 // composed its legacy read as.
+import { withheldEndDate } from "../../../rules/trace-withholding.rules.ts";
 import type { TraceLegacyRead } from "../../../services/trace-viewer.service.ts";
 import {
   CSV_NEWLINE,
@@ -98,6 +99,7 @@ export class TraceExportService {
         projectId: request.projectId,
         startDate: request.startDate,
         endDate: request.endDate,
+        ...withheldEndDate({ query: request, protections }),
         filters: request.filters,
         traceIds: request.traceIds,
         pageSize: 1,
@@ -210,6 +212,7 @@ export class TraceExportService {
         projectId: request.projectId,
         startDate: request.startDate,
         endDate: request.endDate,
+        ...withheldEndDate({ query: request, protections }),
         filters: request.filters,
         traceIds: request.traceIds,
         pageSize: BATCH_SIZE,

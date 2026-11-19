@@ -18,6 +18,7 @@ import {
   type OrganizationUsageCount,
   type PricingModel,
   type SignInSecurityPolicy,
+  type DocsPlaygroundPolicy,
   type OrganizationCurrency,
   ORGANIZATION_KIND,
 } from "@langwatch/organization-contract";
@@ -31,6 +32,8 @@ import {
   type StoredOrganizationSettings,
   type OrganizationTeamProject,
   type OrganizationPresenceSettingRow,
+  type OrganizationOperatorQuery,
+  type OrganizationOperatorRow,
 } from "../organization.repository.ts";
 import type {
   MemoryOrganizationDatabase,
@@ -67,6 +70,31 @@ export class MemoryOrganizationRepository extends OrganizationRepository {
     if (limit === undefined || ids.length <= limit) return { ids, next: null };
     const page = ids.slice(0, limit);
     return { ids: page, next: page[page.length - 1] ?? null };
+  }
+
+  async findOperatorRows(input: OrganizationOperatorQuery): Promise<OrganizationOperatorRow[]> {
+    const needle = "query" in input ? input.query.toLowerCase() : "";
+    const matches = (row: MemoryOrganizationRow) =>
+      "organizationIds" in input
+        ? input.organizationIds.includes(row.id)
+        : [row.id, row.name, row.slug].some((value) => value.toLowerCase().includes(needle));
+    const rows = [...this.memory.organizations.values()]
+      .filter((row) => row.kind !== ORGANIZATION_KIND.SYSTEM && matches(row))
+      .toSorted(
+        (left, right) =>
+          left.name.localeCompare(right.name) ||
+          left.createdAt.epochMilliseconds - right.createdAt.epochMilliseconds,
+      )
+      .slice(0, "limit" in input ? input.limit : undefined);
+    return rows.map((row) => ({
+      id: row.id,
+      name: row.name,
+      slug: row.slug,
+      createdAt: row.createdAt,
+      memberCount: this.memory.organizationUsers.filter(
+        (member) => member.organizationId === row.id,
+      ).length,
+    }));
   }
 
   async findPresenceSettingPage({
@@ -177,6 +205,36 @@ export class MemoryOrganizationRepository extends OrganizationRepository {
     maxSessionDurationDays: number;
   }): Promise<void> {
     this.requireOrganization(organizationId).maxSessionDurationDays = maxSessionDurationDays;
+  }
+
+  async getDocsPlaygroundPolicy({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<DocsPlaygroundPolicy> {
+    const organization = this.memory.organizations.get(organizationId);
+    if (!organization)
+      return { docsPlaygroundSessionsEnabled: false, docsPlaygroundSessionsDisabledAt: null };
+    return {
+      docsPlaygroundSessionsEnabled: organization.docsPlaygroundSessionsEnabled ?? true,
+      docsPlaygroundSessionsDisabledAt: organization.docsPlaygroundSessionsDisabledAt
+        ? toDate(organization.docsPlaygroundSessionsDisabledAt)
+        : null,
+    };
+  }
+
+  async saveDocsPlaygroundPolicy({
+    organizationId,
+    docsPlaygroundSessionsEnabled,
+    changedAt,
+  }: {
+    organizationId: string;
+    docsPlaygroundSessionsEnabled: boolean;
+    changedAt: Instant;
+  }): Promise<void> {
+    const organization = this.requireOrganization(organizationId);
+    organization.docsPlaygroundSessionsEnabled = docsPlaygroundSessionsEnabled;
+    if (!docsPlaygroundSessionsEnabled) organization.docsPlaygroundSessionsDisabledAt = changedAt;
   }
 
   async getSignInSecurityPolicy({

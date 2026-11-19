@@ -76,6 +76,16 @@ const isEndedSeatHoldSweep = (clause: unknown): boolean => {
   return Object.keys(where).length === 1 && isDateComparison(where.heldUntil, "lte");
 };
 
+/** Nurturing's hourly trace window sweep: organizations created in one span, and nothing looser. */
+const isTraceWindowEndSweep = (clause: unknown): boolean => {
+  if (!clause || typeof clause !== "object") return false;
+  const where = clause as Record<string, unknown>;
+  const createdAt = clauseField(where, "createdAt");
+  if (Object.keys(where).length !== 1 || !createdAt || typeof createdAt !== "object") return false;
+  const bound = createdAt as Record<string, unknown>;
+  return Object.keys(bound).length === 2 && bound.gt instanceof Date && bound.lte instanceof Date;
+};
+
 const isNonEmptyStringList = (value: unknown): boolean => {
   const list = clauseField(value, "in");
   if (!Array.isArray(list)) return false;
@@ -87,6 +97,16 @@ const isNonEmptyStringList = (value: unknown): boolean => {
 const hasUserBound = (clause: unknown): boolean => {
   const userId = clauseField(clause, "userId");
   return typeof userId === "string" || isNonEmptyStringList(userId);
+};
+
+/** One named owner's personal teams: a non-empty `ownerUserId` beside `isPersonal: true`. */
+const isOwnPersonalTeam = (clause: unknown): boolean => {
+  const ownerUserId = clauseField(clause, "ownerUserId");
+  return (
+    typeof ownerUserId === "string" &&
+    ownerUserId.trim().length > 0 &&
+    clauseField(clause, "isPersonal") === true
+  );
 };
 
 const isOrganizationIdValue = (value: unknown): boolean =>
@@ -168,7 +188,11 @@ const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
   },
   OrganizationAccessNotice: {},
   OrganizationSeatLease: {},
-  Team: {},
+  // "Which personal teams does this person own" is a READ bounded by the named owner: a personal
+  // team has exactly one. Any other Team query, and every write, still names its organization.
+  Team: {
+    extraBound: ({ clause, action }) => READ_ACTIONS.has(action) && isOwnPersonalTeam(clause),
+  },
   OrganizationInvite: {
     // inviteCode is a globally-unique acceptance token; the invite row it
     // names belongs to exactly one organization. "Is this address invited
@@ -182,6 +206,13 @@ const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
   // an inline scope) on every call site.
   CustomRole: {},
   Group: {},
+  // ADR-201 §4: a project's braid signing keys; every read and write names its organization.
+  SigningKey: {},
+  // ADR-201 §2: an organization's braid setting, one row keyed by organizationId.
+  AuthzOrganizationPolicy: {},
+  // ADR-201 §1: the braid writes the authz service sent; every read and write names its
+  // organization.
+  AuthzBraidWrite: {},
   // A request to join one organization (D12), read by organization or row id,
   // plus one READ bounded by subject: "what am I waiting on" spans every
   // organization one named user asked. Writes keyed on userId stay refused.
@@ -198,6 +229,10 @@ const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
   // SCIM's peer fold of identity's SSO connection facts, one row per connection carrying its
   // `organizationId`; written by the row id, read by organization.
   ScimSsoConnectionView: {},
+  // Organization's seat peak (ADR-002): counts, holders and months, each keyed by it.
+  OrganizationSeatPeak: {},
+  OrganizationSeatPeakHolder: {},
+  OrganizationSeatPeakMonth: {},
   // Trace's fold of governance's coding-assistant billing fact, one row per
   // (organizationId, sourceType); every read and write names its organization.
   TraceIngestSourceBilling: {},
@@ -227,6 +262,10 @@ const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
   // cost row, and there is no query shape that wants more than one tenant's.
   DiscoveredPerson: {},
   DiscoveredAgent: {},
+  // The governance agent registry and its feed: every read and write names one organization.
+  AgentRegistryEntry: {},
+  AgentRegistryEvent: {},
+  AgentRegistryBaseline: {},
   IdentityMatch: {},
   // Candidate matches the suggestion job computed (ADR-128 §12). The job
   // rewrites one organization's rows per pass and the review surface reads one
@@ -313,7 +352,24 @@ const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
   // Nurturing's read model: an organization row by its id, and a project's
   // organization by the project id, which belongs to exactly one organization.
   NurturingOrganization: {},
+  // The hourly trace window sweep reads, fleet-wide, the organizations created in one span:
+  // exactly `{ createdAt: { gt: <Date>, lte: <Date> } }`.
+  NurturingOrganizationCreated: {
+    extraBound: ({ clause, action }) => READ_ACTIONS.has(action) && isTraceWindowEndSweep(clause),
+  },
+  // Nurturing's member copy: an organization's rows, or a READ of the named members' other rows.
+  NurturingOrganizationMember: {
+    extraBound: ({ clause, action }) => READ_ACTIONS.has(action) && hasUserBound(clause),
+  },
   NurturingProject: {
+    extraBound: ({ clause }) => typeof clauseField(clause, "projectId") === "string",
+  },
+  // Nurturing's copies of personal owners and traced projects: by the organization, which the
+  // base predicate admits, or by the project id, which belongs to exactly one organization.
+  NurturingPersonalProject: {
+    extraBound: ({ clause }) => typeof clauseField(clause, "projectId") === "string",
+  },
+  NurturingTracedProject: {
     extraBound: ({ clause }) => typeof clauseField(clause, "projectId") === "string",
   },
 };

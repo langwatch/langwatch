@@ -47,7 +47,9 @@ export async function getEvaluator(idOrSlug: string): Promise<EvaluatorSummary> 
 /** Creates a new evaluator. */
 export async function createEvaluator(data: {
   name: string;
+  type?: "evaluator" | "code" | "workflow";
   config: Record<string, unknown>;
+  workflowId?: string;
 }): Promise<EvaluatorSummary> {
   return makeRequest("POST", "/api/v1/evaluators", data) as Promise<EvaluatorSummary>;
 }

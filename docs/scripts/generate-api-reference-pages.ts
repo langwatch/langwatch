@@ -339,6 +339,13 @@ const ENDPOINT_GROUPS: EndpointGroup[] = [
       "Manage AI agent configurations. Create, update, and organize agents that are tracked and evaluated in LangWatch.",
   },
   {
+    name: "Agent Registry",
+    dirName: "governance-agent-registry",
+    pathPrefixes: ["/api/governance/registry"],
+    overviewDescription:
+      "Read every AI agent in your organization with its endpoints, model, instructions, tools and owner, as JSON or as an ARD v0.91 manifest, and follow its changes through the change feed. Needs an organization API key.",
+  },
+  {
     name: "Coding Agents",
     dirName: "coding-agents",
     pathPrefixes: ["/api/v1/coding-agent", "/api/coding-agent"],
@@ -508,6 +515,19 @@ const ENDPOINT_GROUPS: EndpointGroup[] = [
     pathPrefixes: ["/api/scim-tokens"],
     overviewDescription:
       "Mint, list and revoke the bearer tokens an identity provider uses to reach the SCIM endpoints. Token values are shown once, when they are created, and never again.",
+  },
+  {
+    name: "OCSF SIEM Export",
+    dirName: "governance-ocsf",
+    pathPrefixes: ["/api/governance/ocsf"],
+    overviewDescription:
+      "Pull governance events, project traces and the audit log as OCSF 1.9.0 API Activity events with an organisation API key, and push OCSF events from your other tools into LangWatch. Each stream pages with a cursor, so a SIEM polls by passing next_cursor back.",
+    endpointOrder: [
+      "GET /api/v1/governance/ocsf/events",
+      "GET /api/v1/governance/ocsf/traces",
+      "GET /api/v1/governance/ocsf/audit",
+      "POST /api/v1/governance/ocsf/ingest",
+    ],
   },
   {
     name: "SCIM",

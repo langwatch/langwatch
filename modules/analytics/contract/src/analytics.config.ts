@@ -1,4 +1,4 @@
-import { Config, type ConfigOf, publicBaseUrl } from "@langwatch/config";
+import { clickhouseCluster, Config, type ConfigOf, publicBaseUrl } from "@langwatch/config";
 import { z } from "zod";
 
 /**
@@ -16,7 +16,7 @@ export const analyticsServerConfig = Config.define((c) => ({
     accessModelMode: c.env("LWQL_ACCESS_MODEL_MODE", z.string().optional()),
     sqlSingleNode: c.env("LWQL_ACCESS_MODEL_SQL_SINGLE_NODE", z.string().optional()),
     /** The replicas' cluster, so the credential probe reads on each one (#8858). */
-    clickhouseCluster: c.env("CLICKHOUSE_CLUSTER", z.string().optional()),
+    clickhouseCluster,
     /** Members one group project's statement may name; never above the key set's 10,000. */
     aggregateMaxMembers: c.env(
       "LWQL_AGGREGATE_MAX_MEMBERS",

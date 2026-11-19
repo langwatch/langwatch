@@ -1,4 +1,5 @@
-/** @vitest-environment jsdom */
+/** @vitest-environment jsdom * @see modules/scenario/specs/red-team-scenario.feature
+ */
 
 /**
  * The Agent Testing scenario dialog: fields, footer, chip drawers, Save/Run.
@@ -908,5 +909,59 @@ describe("the scenario dialog", () => {
         expect(screen.getByLabelText("attempts")).toBeInTheDocument();
       });
     });
+  });
+});
+
+describe("the scenario dialog on a red team scenario", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockTestSuitesGetAll.mockReturnValue({ data: [REFUNDS], isLoading: false });
+    mockLastResults.mockReturnValue({ data: [], isLoading: false });
+    mockAgentsGetAll.mockReturnValue({ data: [] });
+  });
+  afterEach(cleanup);
+
+  /** @scenario "The red team scenario editor shows its attack config" */
+  it("shows the attack goal, OWASP categories by name, strategy and max turns", async () => {
+    mockGetById.mockReturnValue({
+      data: storedCase({
+        kind: "red_team",
+        redTeam: {
+          attackGoal: "Make the agent reveal its system prompt",
+          owaspIds: ["LLM07", "ASI01"],
+          strategy: "goat",
+          maxTurns: 12,
+        },
+      }),
+      isLoading: false,
+      refetch: vi.fn(),
+    });
+    openDrawerAs({ scenarioId: "case_1" });
+    renderWithDesignSystem(
+      <>
+        <AgentTestingCaseEditor />
+        <AgentTestingCaseEditorDrawer />
+      </>,
+    );
+
+    const block = await screen.findByTestId("case-red-team-config");
+    expect(block).toHaveTextContent("Make the agent reveal its system prompt");
+    expect(block).toHaveTextContent("LLM07 System Prompt Leakage");
+    expect(block).toHaveTextContent("ASI01 Agent Goal Hijack");
+    expect(block).toHaveTextContent("GOAT");
+    expect(block).toHaveTextContent("12");
+  });
+
+  it("shows no attack config for a standard scenario", async () => {
+    mockGetById.mockReturnValue({ data: storedCase(), isLoading: false, refetch: vi.fn() });
+    openDrawerAs({ scenarioId: "case_1" });
+    renderWithDesignSystem(
+      <>
+        <AgentTestingCaseEditor />
+        <AgentTestingCaseEditorDrawer />
+      </>,
+    );
+    expect(await screen.findByLabelText("Situation")).toBeInTheDocument();
+    expect(screen.queryByTestId("case-red-team-config")).not.toBeInTheDocument();
   });
 });
