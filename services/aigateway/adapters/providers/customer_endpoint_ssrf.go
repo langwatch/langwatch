@@ -9,6 +9,8 @@ import (
 	"net/url"
 	"strings"
 
+	bfschemas "github.com/maximhq/bifrost/core/schemas"
+
 	"github.com/langwatch/langwatch/pkg/ssrf"
 	"github.com/langwatch/langwatch/services/aigateway/domain"
 )
@@ -20,6 +22,10 @@ type customerEndpointPolicy struct {
 	requireHTTPS bool
 	allowedHosts map[string]struct{}
 	resolve      endpointResolver
+	// allowLoopbackPrivateEndpoints lets a private endpoint binding carry a
+	// loopback address. Test-only: it lets a local TLS server stand in for a
+	// PrivateLink endpoint. Production never sets it.
+	allowLoopbackPrivateEndpoints bool
 }
 
 type endpointResolutionError struct{ cause error }
@@ -47,7 +53,7 @@ func newCustomerEndpointPolicy(blockLocal, requireHTTPS bool, allowedHosts []str
 }
 
 func normalizeEndpointHost(host string) string {
-	return strings.TrimSuffix(strings.ToLower(strings.TrimSpace(host)), ".")
+	return domain.NormalizeEndpointHost(host)
 }
 
 func defaultEndpointResolver(ctx context.Context, host string) ([]net.IP, error) {
@@ -98,6 +104,14 @@ func isAlwaysBlockedEndpointHost(host string) bool {
 }
 
 func validateCustomerEndpoint(ctx context.Context, rawURL string, policy customerEndpointPolicy) error {
+	return validateCustomerEndpointFor(ctx, rawURL, policy, nil)
+}
+
+// validateCustomerEndpointFor is validateCustomerEndpoint for a caller whose
+// organization has private endpoint bindings. A host bound in bindings is
+// checked against its binding and never resolved (ADR-203); every other host
+// gets exactly today's rules.
+func validateCustomerEndpointFor(ctx context.Context, rawURL string, policy customerEndpointPolicy, bindings []domain.PrivateEndpoint) error {
 	u, err := url.Parse(rawURL)
 	if err != nil {
 		return fmt.Errorf("customer endpoint is not a valid URL")
@@ -118,6 +132,10 @@ func validateCustomerEndpoint(ctx context.Context, rawURL string, policy custome
 	}
 	if isAlwaysBlockedEndpointHost(host) {
 		return fmt.Errorf("customer endpoint host is reserved for cloud metadata")
+	}
+
+	if ep, bound := domain.PrivateEndpointFor(bindings, host); bound {
+		return checkBoundEndpoint(scheme, u.Port(), ep, policy.allowLoopbackPrivateEndpoints)
 	}
 
 	_, allowlisted := policy.allowedHosts[host]
@@ -145,18 +163,65 @@ func validateCustomerEndpoint(ctx context.Context, rawURL string, policy custome
 
 func validateCredentialEndpoints(ctx context.Context, cred domain.Credential, policy customerEndpointPolicy) error {
 	if baseURL := credBaseURL(cred); baseURL != "" {
-		if err := validateCustomerEndpoint(ctx, baseURL, policy); err != nil {
+		if err := validateCustomerEndpointFor(ctx, baseURL, policy, cred.PrivateEndpoints); err != nil {
 			return fmt.Errorf("base_url rejected: %w", err)
 		}
 	}
 	if cred.ProviderID == domain.ProviderAzure {
 		if endpoint := credExtra(cred, "endpoint", "api_base"); endpoint != "" {
-			if err := validateCustomerEndpoint(ctx, endpoint, policy); err != nil {
+			if err := validateCustomerEndpointFor(ctx, endpoint, policy, cred.PrivateEndpoints); err != nil {
 				return fmt.Errorf("azure endpoint rejected: %w", err)
 			}
 		}
 	}
+	if ep, bound := boundEndpointForCredential(cred); bound && !privateEndpointProviderSupported(cred) {
+		return fmt.Errorf("customer endpoint %s is bound to a private endpoint, which %s credentials cannot use yet",
+			ep.Hostname, cred.ProviderID)
+	}
 	return nil
+}
+
+// credentialEndpointURLs lists the customer-configured URLs a credential
+// reaches, the same ones validateCredentialEndpoints checks.
+func credentialEndpointURLs(cred domain.Credential) []string {
+	var urls []string
+	if baseURL := credBaseURL(cred); baseURL != "" {
+		urls = append(urls, baseURL)
+	}
+	if cred.ProviderID == domain.ProviderAzure {
+		if endpoint := credExtra(cred, "endpoint", "api_base"); endpoint != "" {
+			urls = append(urls, endpoint)
+		}
+	}
+	return urls
+}
+
+// urlHost is the normalized host of a URL, or "" when it does not parse.
+func urlHost(raw string) string {
+	u, err := url.Parse(raw)
+	if err != nil {
+		return ""
+	}
+	return normalizeEndpointHost(u.Hostname())
+}
+
+// privateEndpointProviderSupported reports whether a bound credential's
+// dispatch can be pinned to its binding. Only the Bifrost lanes reached
+// through a per-endpoint provider can: the OpenAI-compatible lane (mapped to
+// an OpenAI-type provider for the pinned call) and the URL-derived
+// Anthropic, Gemini and OpenAI Responses providers. Azure and Bedrock cannot
+// be derived per endpoint in Bifrost, and the direct HTTP lanes (the
+// LangWatch provider, realtime mints, Azure audio) share one connection pool
+// across tenants, so a bound credential on any of them is refused rather
+// than sent through DNS.
+func privateEndpointProviderSupported(cred domain.Credential) bool {
+	switch cred.ProviderID {
+	case domain.ProviderAzure, domain.ProviderBedrock, domain.ProviderLangWatch,
+		domain.ProviderOpenAICodex, domain.ProviderVoyage:
+		return false
+	}
+	provider := mapProvider(cred)
+	return provider == bfschemas.VLLM || isURLDerivedProvider(provider)
 }
 
 func isRetryableEndpointResolutionError(err error) bool {

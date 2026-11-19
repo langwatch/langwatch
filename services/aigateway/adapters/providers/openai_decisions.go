@@ -53,7 +53,7 @@ func (r *BifrostRouter) dispatchDecisions(
 	}
 	bfCtx := bfschemas.NewBifrostContext(withCredential(ctx, cred), time.Time{})
 
-	resp, berr := r.bf.Passthrough(bfCtx, r.responsesProvider(cred, provider), bfReq)
+	resp, berr := r.bf.Passthrough(bfCtx, r.pinnedProvider(cred, r.responsesProvider(cred, provider)), bfReq)
 	if berr != nil {
 		if answer, ok := r.responseFromBifrostError(berr, bfCtx, req.Type); ok {
 			return answer, nil

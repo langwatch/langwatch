@@ -89,6 +89,12 @@ type BifrostRouter struct {
 	// openAIBaseURL overrides OpenAI's host for the direct audio lanes
 	// (tests only), the same override the Bifrost account carries.
 	openAIBaseURL string
+	// privateProxy tunnels calls pinned to a private endpoint (ADR-203);
+	// see private_endpoint_bifrost.go. Shared with the account.
+	privateProxy *privateEndpointProxy
+	// privateClients are the per-binding HTTP clients model discovery uses
+	// for a bound base URL.
+	privateClients *privateEndpointClients
 }
 
 // BifrostOptions configures the bifrost router.
@@ -109,6 +115,9 @@ type BifrostOptions struct {
 	// provider, so tests can drive the real Responses stream pipeline against
 	// a local server.
 	OpenAIBackendURL string
+	// privateEndpointSeam is a test-only override for private endpoint
+	// bindings (loopback addresses, an extra CA). Zero in production.
+	privateEndpointSeam privateEndpointSeam
 }
 
 // allowsPrivateNetwork reports whether bifrost may dial private addresses:
@@ -126,12 +135,15 @@ func NewBifrostRouter(ctx context.Context, opts BifrostOptions) (*BifrostRouter,
 		pool = 1000
 	}
 	compatEndpoints := newAnthropicCompatRegistry(anthropicCompatMaxEndpoints)
+	privateProxy := newPrivateEndpointProxy(compatEndpoints, opts.Logger, opts.privateEndpointSeam.allowLoopback)
 	bf, err := bifrost.Init(ctx, bfschemas.BifrostConfig{
 		Account: &account{
-			anthropicCompat:     compatEndpoints,
-			openAIBaseURL:       opts.OpenAIBackendURL,
-			logger:              opts.Logger,
-			allowPrivateNetwork: opts.allowsPrivateNetwork(),
+			anthropicCompat:          compatEndpoints,
+			openAIBaseURL:            opts.OpenAIBackendURL,
+			logger:                   opts.Logger,
+			allowPrivateNetwork:      opts.allowsPrivateNetwork(),
+			privateProxy:             privateProxy,
+			privateEndpointCACertPEM: opts.privateEndpointSeam.caCertPEM,
 		},
 		InitialPoolSize: pool,
 		Logger:          &bifrostLogger{logger: opts.Logger},
@@ -164,6 +176,7 @@ func NewBifrostRouter(ctx context.Context, opts BifrostOptions) (*BifrostRouter,
 		opts.RequireHTTPSCustomerEndpoints,
 		opts.AllowedEndpointHosts,
 	)
+	endpointPolicy.allowLoopbackPrivateEndpoints = opts.privateEndpointSeam.allowLoopback
 	return &BifrostRouter{
 		bf:              bf,
 		logger:          opts.Logger,
@@ -178,6 +191,8 @@ func NewBifrostRouter(ctx context.Context, opts BifrostOptions) (*BifrostRouter,
 
 		elevenLabsClient: newElevenLabsAudioClient(endpointPolicy),
 		openAIBaseURL:    opts.OpenAIBackendURL,
+		privateProxy:     privateProxy,
+		privateClients:   newPrivateEndpointClients(opts.privateEndpointSeam),
 	}, nil
 }
 
@@ -196,6 +211,7 @@ func (r *BifrostRouter) Close() {
 		return
 	}
 	r.bf.Shutdown()
+	r.privateProxy.close()
 }
 
 func (r *BifrostRouter) validateCredentialEndpoints(ctx context.Context, cred domain.Credential) error {
@@ -234,6 +250,14 @@ func (r *BifrostRouter) Dispatch(ctx context.Context, req *domain.Request, cred 
 	// model dispatch, no usage on the answer. It branches before the
 	// provider mapping because the route already named the vendor.
 	if req.Type == domain.RequestTypeRealtimeSession {
+		// The mint runs on a client shared by every tenant, so it cannot be
+		// pinned to one organization's private endpoint; refuse rather than
+		// resolve a bound name (ADR-203).
+		if ep, bound := boundEndpointForCredential(cred); bound {
+			return nil, herr.NewLight(ctx, domain.ErrBadRequest, herr.M{
+				"reason": "customer endpoint " + ep.Hostname + " is bound to a private endpoint, which realtime sessions cannot use yet",
+			})
+		}
 		return r.dispatchRealtimeSession(ctx, req, cred)
 	}
 
@@ -365,6 +389,7 @@ func (r *BifrostRouter) Dispatch(ctx context.Context, req *domain.Request, cred 
 
 	bfCtx := bfschemas.NewBifrostContext(withCredential(dispatchCtx, cred), time.Time{})
 
+	bfReq.Provider = r.pinnedProvider(cred, bfReq.Provider)
 	resp, berr := r.bf.ChatCompletionRequest(bfCtx, bfReq)
 	if berr != nil {
 		// Raw-forward paths (/v1/messages, OpenAI-compat chat) ask Bifrost
@@ -488,6 +513,7 @@ func (r *BifrostRouter) dispatchResponses(
 	}
 	bfCtx := bfschemas.NewBifrostContext(rawForwardCtx(withCredential(ctx, cred)), time.Time{})
 
+	bfReq.Provider = r.pinnedProvider(cred, bfReq.Provider)
 	resp, berr := r.bf.ResponsesRequest(bfCtx, bfReq)
 	if berr != nil {
 		if answer, ok := r.responseFromBifrostError(berr, bfCtx, req.Type); ok {
@@ -539,6 +565,7 @@ func (r *BifrostRouter) dispatchEmbeddings(
 	}
 	bfCtx := bfschemas.NewBifrostContext(withCredential(ctx, cred), time.Time{})
 
+	bfReq.Provider = r.pinnedProvider(cred, bfReq.Provider)
 	resp, berr := r.bf.EmbeddingRequest(bfCtx, bfReq)
 	if berr != nil {
 		if answer, ok := r.responseFromBifrostError(berr, bfCtx, req.Type); ok {
@@ -760,6 +787,7 @@ func (r *BifrostRouter) DispatchStream(ctx context.Context, req *domain.Request,
 
 	bfCtx := bfschemas.NewBifrostContext(withCredential(dispatchCtx, cred), time.Time{})
 
+	bfReq.Provider = r.pinnedProvider(cred, bfReq.Provider)
 	ch, berr := r.bf.ChatCompletionStreamRequest(bfCtx, bfReq)
 	if berr != nil {
 		return nil, errFromBifrost(ctx, berr, bifrostResponseHeaders(bfCtx))
@@ -847,7 +875,7 @@ func (r *BifrostRouter) dispatchMessagesStream(
 	}
 	bfCtx := bfschemas.NewBifrostContext(withCredential(ctx, cred), time.Time{})
 
-	ch, berr := r.bf.PassthroughStream(bfCtx, provider, bfReq)
+	ch, berr := r.bf.PassthroughStream(bfCtx, r.pinnedProvider(cred, provider), bfReq)
 	if berr != nil {
 		return nil, errFromBifrost(ctx, berr, bifrostResponseHeaders(bfCtx))
 	}
@@ -934,6 +962,7 @@ func (r *BifrostRouter) dispatchResponsesStream(
 	}
 	bfCtx := bfschemas.NewBifrostContext(rawForwardCtx(withCredential(ctx, cred)), time.Time{})
 
+	bfReq.Provider = r.pinnedProvider(cred, bfReq.Provider)
 	ch, berr := r.bf.ResponsesStreamRequest(bfCtx, bfReq)
 	if berr != nil {
 		return nil, errFromBifrost(ctx, berr, bifrostResponseHeaders(bfCtx))
@@ -957,7 +986,7 @@ func (r *BifrostRouter) dispatchPassthrough(
 	bfReq := passthroughRequest(req, model)
 	bfCtx := bfschemas.NewBifrostContext(withCredential(ctx, cred), time.Time{})
 
-	resp, berr := r.bf.Passthrough(bfCtx, provider, bfReq)
+	resp, berr := r.bf.Passthrough(bfCtx, r.pinnedProvider(cred, provider), bfReq)
 	if berr != nil {
 		if answer, ok := r.responseFromBifrostError(berr, bfCtx, req.Type); ok {
 			return answer, nil
@@ -1001,7 +1030,7 @@ func (r *BifrostRouter) dispatchPassthroughStream(
 	bfReq := passthroughRequest(req, model)
 	bfCtx := bfschemas.NewBifrostContext(withCredential(ctx, cred), time.Time{})
 
-	ch, berr := r.bf.PassthroughStream(bfCtx, provider, bfReq)
+	ch, berr := r.bf.PassthroughStream(bfCtx, r.pinnedProvider(cred, provider), bfReq)
 	if berr != nil {
 		return nil, errFromBifrost(ctx, berr, bifrostResponseHeaders(bfCtx))
 	}
@@ -1348,6 +1377,11 @@ type account struct {
 	// allowPrivateNetwork lifts bifrost's own dial-time private-IP refusal
 	// (see BifrostOptions.allowsPrivateNetwork); link-local stays refused.
 	allowPrivateNetwork bool
+	// privateProxy is the CONNECT proxy providers pinned to a private
+	// endpoint dial through. See private_endpoint_bifrost.go.
+	privateProxy *privateEndpointProxy
+	// privateEndpointCACertPEM is a test-only extra CA for pinned providers.
+	privateEndpointCACertPEM string
 }
 
 func (a *account) GetConfiguredProviders() ([]bfschemas.ModelProvider, error) {
@@ -1359,7 +1393,15 @@ func (a *account) GetKeysForProvider(ctx context.Context, provider bfschemas.Mod
 	if cred.ID == "" {
 		return nil, fmt.Errorf("no credential on context for provider %s", provider)
 	}
-	key := credentialToBifrostKey(cred, provider, a.azureAPIVersionWarnLogger(cred))
+	keyProvider := provider
+	if isPrivateEndpointProvider(provider) {
+		// A pinned provider takes the key shape of the type it was derived
+		// onto (see privateEndpointBaseEndpoint).
+		if endpoint, ok := a.anthropicCompat.lookup(string(provider)); ok {
+			keyProvider = endpoint.baseType
+		}
+	}
+	key := credentialToBifrostKey(cred, keyProvider, a.azureAPIVersionWarnLogger(cred))
 	return []bfschemas.Key{key}, nil
 }
 
@@ -1413,7 +1455,7 @@ func (a *account) GetConfigForProvider(provider bfschemas.ModelProvider) (*bfsch
 		Concurrency: standardProviderConcurrency,
 		BufferSize:  standardProviderBufferSize,
 	}
-	if isURLDerivedProvider(provider) {
+	if isURLDerivedProvider(provider) || isPrivateEndpointProvider(provider) {
 		endpoint, ok := a.anthropicCompat.lookup(string(provider))
 		if !ok {
 			return nil, fmt.Errorf("no endpoint registered for URL-derived provider %q", provider)
@@ -1447,7 +1489,20 @@ func (a *account) GetConfigForProvider(provider bfschemas.ModelProvider) (*bfsch
 	if provider == bfschemas.OpenAI && a.openAIBaseURL != "" {
 		cfg.NetworkConfig.BaseURL = a.openAIBaseURL
 	}
-	if proxyURL := os.Getenv("LW_GATEWAY_OUTBOUND_PROXY"); proxyURL != "" {
+	if isPrivateEndpointProvider(provider) {
+		// Every connection of a pinned provider goes through the private
+		// endpoint proxy, which dials the binding's registered addresses
+		// only. The debug outbound proxy below must never replace it.
+		proxy, err := a.privateProxy.proxyConfig(string(provider))
+		if err != nil {
+			return nil, err
+		}
+		cfg.ProxyConfig = proxy
+		if a.privateEndpointCACertPEM != "" {
+			ca := envVar(a.privateEndpointCACertPEM)
+			cfg.NetworkConfig.CACertPEM = &ca
+		}
+	} else if proxyURL := os.Getenv("LW_GATEWAY_OUTBOUND_PROXY"); proxyURL != "" {
 		// Debug-only: route outbound provider traffic through an HTTP proxy
 		// (e.g. `http://localhost:8888` for mitmproxy). Lets operators
 		// capture the exact request Bifrost sends to provider APIs —
@@ -1783,6 +1838,9 @@ type anthropicCompatEndpoint struct {
 	// registry that holds these entries is shared by both; only the
 	// derivation and the prefix differ.
 	baseType bfschemas.ModelProvider
+	// pin is the private endpoint binding a "private-url-" provider dials
+	// (ADR-203). Nil for every other derived provider.
+	pin *domain.PrivateEndpoint
 }
 
 // anthropicCompatMaxEndpoints bounds the endpoint registry. Every distinct

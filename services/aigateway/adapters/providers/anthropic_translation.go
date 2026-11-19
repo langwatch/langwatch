@@ -167,6 +167,7 @@ func (r *BifrostRouter) dispatchMessagesTranslated(
 		return nil, anthropicUpstreamError(http.StatusBadRequest, err.Error())
 	}
 
+	bfReq.Provider = r.pinnedProvider(cred, bfReq.Provider)
 	resp, berr := r.bf.ResponsesRequest(bfCtx, bfReq)
 	if berr != nil {
 		return nil, anthropicErrorFromBifrost(berr)
@@ -255,6 +256,7 @@ func (r *BifrostRouter) dispatchMessagesTranslatedStream(
 		return nil, anthropicUpstreamError(http.StatusBadRequest, err.Error())
 	}
 
+	bfReq.Provider = r.pinnedProvider(cred, bfReq.Provider)
 	ch, berr := r.bf.ResponsesStreamRequest(bfCtx, bfReq)
 	if berr != nil {
 		return nil, anthropicErrorFromBifrost(berr)
