@@ -1015,13 +1015,16 @@ function projectSegments(table: readonly UiRouteDescriptor[]): string[] {
 }
 
 /**
- * Every deep `/:project/...` page in the table with `:project` swapped for `me`. A static `me`
- * outranks `:project`, so each twin beats its project page at any depth; the `/me/<segment>/*`
- * rows alone score lower than a deeper project page and would lose to it.
+ * Every deep `/:project/<segment>/<more>` page in the table with `:project` swapped for `me`. A
+ * static `me` outranks `:project`, so each twin beats its project page at any depth; the
+ * `/me/<segment>/*` rows score lower than a deeper project page and would lose to it. One-segment
+ * pages and a bare `/*` tail are already covered by those rows.
  */
 function projectPageTwins(table: readonly UiRouteDescriptor[]): string[] {
   const twins = uiRouteDescriptors(table).flatMap((descriptor) =>
-    descriptor.path?.startsWith("/:project/") ? [descriptor.path.replace(":project", "me")] : [],
+    descriptor.path?.match(/^\/:project\/[^/]+\/(?!\*$)/)
+      ? [descriptor.path.replace(":project", "me")]
+      : [],
   );
   return [...new Set(twins)];
 }
