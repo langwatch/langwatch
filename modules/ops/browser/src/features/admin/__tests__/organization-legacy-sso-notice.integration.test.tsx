@@ -24,6 +24,14 @@ vi.mock("../../../behavior/ops-api.ts", () => ({
       },
     },
     organizationSeatPeak: { get: { useQuery: () => ({ data: undefined, isLoading: true }) } },
+    // The drawer also lists private endpoints; they stay loading here.
+    useUtils: () => ({}),
+    privateModelEndpoint: {
+      listForStaff: { useQuery: () => ({ data: undefined, isLoading: true }) },
+      register: { useMutation: () => ({}) },
+      update: { useMutation: () => ({}) },
+      remove: { useMutation: () => ({}) },
+    },
   },
 }));
 

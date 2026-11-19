@@ -34,6 +34,7 @@ import { Currency, PRICING_MODEL_LABELS, PricingModel } from "../../model/admin-
 import { AdminDate, EmptyCell, formatDate, SectionHeading } from "../elements/admin-cells.tsx";
 import { AdminTable } from "./admin-table-shell.tsx";
 import { LegacySsoDomainNotice } from "./legacy-sso-domain-notice.tsx";
+import { PrivateEndpointsSection } from "./private-endpoints-section.tsx";
 import { SeatPeakSummary } from "./seat-peak-summary.tsx";
 /**
  * Read-facing Organization shape - excludes the s3 credential fields. The
@@ -378,6 +379,7 @@ export function OrganizationEditDrawer({
           <BillingFields form={form} setField={setField} />
           <LimitFields form={form} setField={setField} error={fieldErrors.datasetAttachmentMaxMb} />
           <SeatPeakSummary organizationId={organization.id} />
+          <PrivateEndpointsSection organizationId={organization.id} />
           <AuthenticationSection organization={organization} />
           <LicenseFields form={form} setField={setField} />
           <CustomS3Fields form={form} setField={setField} />

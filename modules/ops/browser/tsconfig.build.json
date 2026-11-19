@@ -36,6 +36,9 @@
       "path": "../../prompt/client/tsconfig.build.json"
     },
     {
+      "path": "../../organization/contract/tsconfig.build.json"
+    },
+    {
       "path": "../contract/tsconfig.build.json"
     },
     {
@@ -45,10 +48,10 @@
       "path": "../../../packages/observability/tsconfig.build.json"
     },
     {
-      "path": "../../identity/contract/tsconfig.build.json"
+      "path": "../../model-provider/contract/tsconfig.build.json"
     },
     {
-      "path": "../../organization/contract/tsconfig.build.json"
+      "path": "../../identity/contract/tsconfig.build.json"
     },
     {
       "path": "../../feature-flag/contract/tsconfig.build.json"

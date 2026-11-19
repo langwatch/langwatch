@@ -6,6 +6,7 @@
 import { createModuleApi, type ContractApiMap, type OutputsFromMap } from "@langwatch/api/web";
 import type { ssoConnectionTrpc } from "@langwatch/enterprise-sso-contract";
 import type { identityLookupTrpc } from "@langwatch/identity-contract";
+import type { privateModelEndpointTrpc } from "@langwatch/model-provider-contract";
 import type {
   licenseRegistryTrpc,
   opsDashboardTrpc,
@@ -77,7 +78,8 @@ type BorrowedProcedures = {
 
 /**
  * The whole `ops.*`, `selfHostedNotices.*`, `bugReports.*`, `prompts.*`, `ssoConnections.*`,
- * `identityLookup.*`, `organizationSeatPeak.*` and `organization.*` surface this package calls.
+ * `identityLookup.*`, `organizationSeatPeak.*`, `privateModelEndpoint.*` and `organization.*`
+ * surface this package calls.
  */
 export type OpsApiMap = ContractApiMap<typeof opsDashboardTrpc> &
   ContractApiMap<typeof opsEventLogTrpc> &
@@ -93,6 +95,7 @@ export type OpsApiMap = ContractApiMap<typeof opsDashboardTrpc> &
   ContractApiMap<typeof ssoConnectionTrpc> &
   ContractApiMap<typeof identityLookupTrpc> &
   ContractApiMap<typeof organizationSeatPeakTrpc> &
+  ContractApiMap<typeof privateModelEndpointTrpc> &
   BorrowedProcedures;
 
 /**

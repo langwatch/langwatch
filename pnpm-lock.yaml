@@ -12293,6 +12293,9 @@ importers:
       '@langwatch/identity-contract':
         specifier: workspace:*
         version: link:../../identity/contract
+      '@langwatch/model-provider-contract':
+        specifier: workspace:*
+        version: link:../../model-provider/contract
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../../../packages/observability
