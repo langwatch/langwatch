@@ -69,6 +69,7 @@ export class DigestSourceService {
   spanRecorded(span: NormalizedSpan): Promise<void> {
     return this.#project({
       projectId: span.tenantId,
+      // The span's own start, as the client reported it, decides its week (ADR-001, Runtime).
       occurredAt: span.startTimeUnixMs,
       sourceKey: `span:${span.traceId}:${span.spanId}`,
       fact: spanFact(span),

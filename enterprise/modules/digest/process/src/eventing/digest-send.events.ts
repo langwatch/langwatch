@@ -15,6 +15,12 @@ export const digestSendRequestedEventDataSchema = z.object({
   isoWeek: z.string().min(1),
   /** An organization admin may be sent the plan-pressure email. */
   admin: z.boolean(),
+  /**
+   * For a person in several enrolled organizations, the one whose week they are sent, decided
+   * once at plan time so every organization's send agrees even if the folds change in between.
+   * Null on a request asked before it was stored: the send then ranks the organizations itself.
+   */
+  homeOrganizationId: z.string().min(1).nullable().default(null),
 });
 export type DigestSendRequest = z.infer<typeof digestSendRequestedEventDataSchema>;
 

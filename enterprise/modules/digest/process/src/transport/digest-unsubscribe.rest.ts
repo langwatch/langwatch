@@ -17,6 +17,8 @@ import {
 } from "@langwatch/api/rest";
 import { DigestApi, digestTokenQuerySchema } from "@langwatch/enterprise-digest-contract";
 
+import { DIGEST_UNSUBSCRIBE_PATH } from "../services/digest-send.service.ts";
+
 const HTML = "text/html; charset=UTF-8";
 
 /** Never framed: `frame-ancestors` says so to current browsers, `X-Frame-Options` to older ones. */
@@ -37,7 +39,6 @@ const TOKEN_ERRORS = [
   { status: 503, description: "No signing secret is configured, so no link can be checked" },
 ];
 
-const UNSUBSCRIBE_PATH = "/api/digest/unsubscribe";
 const RESUBSCRIBE_PATH = "/api/digest/resubscribe";
 
 export const digestUnsubscribeRest = defineRestRouter(DigestApi)
@@ -46,7 +47,7 @@ export const digestUnsubscribeRest = defineRestRouter(DigestApi)
   // The address is printed in emails already sent: it never moves, and has no /api/v1 twin.
   .withAddressing("literal", { v1Twin: false })
 
-  .get(UNSUBSCRIBE_PATH, "readDigestSubscription")
+  .get(DIGEST_UNSUBSCRIBE_PATH, "readDigestSubscription")
   .withQuery(digestTokenQuerySchema)
   .withAccess(publicRoute({ reason: TOKEN_IS_THE_AUTHORIZATION }))
   .withResponse("bytes", { produces: HTML })
@@ -62,7 +63,7 @@ export const digestUnsubscribeRest = defineRestRouter(DigestApi)
     ),
   )
 
-  .post(UNSUBSCRIBE_PATH, "unsubscribeFromDigest")
+  .post(DIGEST_UNSUBSCRIBE_PATH, "unsubscribeFromDigest")
   // An opt-out is a recorded preference, as automation's one-click unsubscribe keeps records.
   .keepsRecords()
   .withAudit("digest.unsubscribe")
@@ -120,7 +121,7 @@ const askPage = (token: string) =>
   page({
     heading: "Unsubscribe from the weekly summary?",
     body: "You will stop receiving LangWatch's weekly email about your usage.",
-    action: { path: withToken(UNSUBSCRIBE_PATH, token), label: "Unsubscribe" },
+    action: { path: withToken(DIGEST_UNSUBSCRIBE_PATH, token), label: "Unsubscribe" },
   });
 
 const unsubscribedPage = (token: string) =>
@@ -134,7 +135,7 @@ const resubscribedPage = (token: string) =>
   page({
     heading: "You are subscribed again",
     body: "You will receive next week's summary.",
-    action: { path: withToken(UNSUBSCRIBE_PATH, token), label: "Unsubscribe" },
+    action: { path: withToken(DIGEST_UNSUBSCRIBE_PATH, token), label: "Unsubscribe" },
   });
 
 function page({

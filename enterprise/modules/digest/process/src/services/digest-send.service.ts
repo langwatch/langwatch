@@ -125,12 +125,10 @@ export class DigestSendService {
     const enrolled = await this.deps.audience.findEnrolled();
     if (enrolled.length === 0) return;
     let failed = 0;
-    for (const organizationId of enrolled) {
-      // One organization failing (a deleted one, say) must not keep the rest from being asked.
+    // One organization failing (a deleted one, say) must not keep the rest from being asked.
+    const attempt = async (organizationId: string, work: () => Promise<void>) => {
       try {
-        for (const member of await this.members({ organizationId })) {
-          await this.deps.requestSend({ ...member, organizationId, isoWeek, occurredAt: at });
-        }
+        await work();
       } catch (error) {
         failed += 1;
         logger.error(
@@ -138,6 +136,38 @@ export class DigestSendService {
           "the digest could not plan an organization",
         );
       }
+    };
+    const rosters = new Map<string, Member[]>();
+    for (const organizationId of enrolled) {
+      await attempt(organizationId, async () => {
+        rosters.set(organizationId, await this.members({ organizationId }));
+      });
+    }
+    const organizationsOf = new Map<string, string[]>();
+    for (const [organizationId, members] of rosters) {
+      for (const { userId } of members) {
+        organizationsOf.set(userId, [...(organizationsOf.get(userId) ?? []), organizationId]);
+      }
+    }
+    // Decided once here, not by each organization's send, so the sends cannot disagree.
+    const homes = new Map<string, string | null>();
+    for (const [organizationId, members] of rosters) {
+      await attempt(organizationId, async () => {
+        for (const member of members) {
+          if (!homes.has(member.userId)) {
+            const candidates = organizationsOf.get(member.userId) ?? [organizationId];
+            const home = await this.#rankHome({ userId: member.userId, isoWeek, candidates });
+            homes.set(member.userId, home ?? null);
+          }
+          await this.deps.requestSend({
+            ...member,
+            organizationId,
+            isoWeek,
+            homeOrganizationId: homes.get(member.userId) ?? null,
+            occurredAt: at,
+          });
+        }
+      });
     }
     // Left unplanned so the next wake tries the failed ones again; a request is keyed by
     // organization, person and week, so the organizations that went through are not asked twice.
@@ -155,6 +185,7 @@ export class DigestSendService {
     userId,
     organizationId,
     isoWeek,
+    homeOrganizationId,
   }: DigestSendRequest & { at: number }): Promise<void> {
     const [settings, enrolled, unsubscribed, sent] = await Promise.all([
       this.deps.audience.getSettings(),
@@ -168,7 +199,8 @@ export class DigestSendService {
     if (membership.kind === "gone") return;
     const user = await this.deps.users.findById({ id: userId });
     if (!user?.email || user.deactivatedAt !== null) return;
-    if (!(await this.#isHomeOrganization({ organizationId, userId, isoWeek, enrolled }))) return;
+    const choice = { organizationId, userId, isoWeek, enrolled, homeOrganizationId };
+    if (!(await this.#isHomeOrganization(choice))) return;
     const week = await this.#visibleWeek({
       week: await this.deps.weeks.organizationWeek({ organizationId, isoWeek }),
       userId,
@@ -220,8 +252,9 @@ export class DigestSendService {
     if (!(await this.deps.audience.findEnrolled()).includes(organizationId)) {
       throw new DigestOrganizationNotEnrolledError(organizationId);
     }
-    const member = (await this.members({ organizationId })).find((row) => row.userId === userId);
-    if (!member) throw new DigestMemberNotFoundError(userId);
+    const membership = await this.#membership({ organizationId, userId });
+    if (membership.kind === "gone") throw new DigestMemberNotFoundError(userId);
+    const member = { userId, admin: membership.admin };
     if ((await this.deps.audience.findUnsubscribed({ userIds: [userId] })).length > 0) {
       throw new DigestMemberUnsubscribedError(userId);
     }
@@ -271,29 +304,54 @@ export class DigestSendService {
   }
 
   /**
-   * A person in several enrolled organizations is sent one email a week, from the organization
-   * where their week had the most activity (lowest id on a tie). Every organization's send asks
-   * the same question of the same finished week, so exactly one of them answers yes.
+   * A person in several enrolled organizations is sent one email a week, from the home the plan
+   * stored on the request. With none stored (a request asked before it was), or a stored home
+   * that can no longer send (unenrolled, or the person left it), the send ranks the
+   * organizations they are still in now.
    */
   async #isHomeOrganization({
     organizationId,
     userId,
     isoWeek,
     enrolled,
+    homeOrganizationId,
   }: {
     organizationId: string;
     userId: string;
     isoWeek: string;
     enrolled: readonly string[];
+    homeOrganizationId: string | null;
   }): Promise<boolean> {
-    const others = enrolled.filter((id) => id !== organizationId);
-    if (others.length === 0) return true;
+    if (homeOrganizationId === organizationId) return true;
+    if (
+      homeOrganizationId !== null &&
+      enrolled.includes(homeOrganizationId) &&
+      (await this.#membership({ organizationId: homeOrganizationId, userId })).kind === "active"
+    ) {
+      return false;
+    }
     const candidates = [organizationId];
-    for (const other of others) {
+    for (const other of enrolled.filter((id) => id !== organizationId)) {
       const standing = await this.#membership({ organizationId: other, userId });
       if (standing.kind === "active") candidates.push(other);
     }
-    if (candidates.length === 1) return true;
+    return (await this.#rankHome({ userId, isoWeek, candidates })) === organizationId;
+  }
+
+  /**
+   * Of the organizations a person is in, the one where their week had the most activity (lowest
+   * id on a tie); none when there are no candidates.
+   */
+  async #rankHome({
+    userId,
+    isoWeek,
+    candidates,
+  }: {
+    userId: string;
+    isoWeek: string;
+    candidates: readonly string[];
+  }): Promise<string | undefined> {
+    if (candidates.length <= 1) return candidates[0];
     const ranked = await Promise.all(
       candidates.map(async (candidate) => ({
         organizationId: candidate,
@@ -306,7 +364,7 @@ export class DigestSendService {
         }),
       })),
     );
-    return pickHomeOrganization(ranked) === organizationId;
+    return pickHomeOrganization(ranked);
   }
 
   /** The member's standing now; a member removed since the plan answers not-found. */

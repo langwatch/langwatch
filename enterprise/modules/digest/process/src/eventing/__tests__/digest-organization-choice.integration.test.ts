@@ -118,6 +118,55 @@ describe("a member of two enrolled organizations", () => {
       expect(digest.mail.map((mail) => mail.props.traces)).toEqual([1_200]);
     });
   });
+
+  describe("when the ranking changes between the plan and the sends", () => {
+    /** MEMBER's two planned send intents, by asking organization. */
+    async function plannedSendsOfMember() {
+      await digest.plan();
+      const planned = (await asked(4)) as { userId: string; organizationId: string }[];
+      const ofMember = (organizationId: string) =>
+        planned.find((send) => send.userId === MEMBER && send.organizationId === organizationId);
+      return { first: ofMember(ORGANIZATION), second: ofMember(OTHER_ORGANIZATION) };
+    }
+
+    /** @scenario "The home organization is chosen once, when the week is planned" */
+    it("sends exactly one email, from the organization busier at plan time", async () => {
+      await memberInBothOrganizations({ traces: { first: 5_000, second: 1_200 } });
+      const { first, second } = await plannedSendsOfMember();
+      expect([first, second]).toEqual([
+        expect.objectContaining({ homeOrganizationId: ORGANIZATION }),
+        expect.objectContaining({ homeOrganizationId: ORGANIZATION }),
+      ]);
+
+      // Ranked at send time, each send would answer "not me": the second before the change,
+      // the first after it.
+      await digest.carryOut(second);
+      await digest.seedProjectWeek({
+        organizationId: OTHER_ORGANIZATION,
+        projectId: OTHER_PROJECT,
+        traces: 9_000,
+      });
+      await digest.carryOut(first);
+
+      expect(digest.mail.map((mail) => [mail.to, mail.props.traces])).toEqual([
+        [emailOf(MEMBER), 5_000],
+      ]);
+    });
+
+    /** @scenario "The home organization is chosen once, when the week is planned" */
+    it("sends the other organization's email when they left the planned home", async () => {
+      await memberInBothOrganizations({ traces: { first: 1_200, second: 5_000 } });
+      const { first } = await plannedSendsOfMember();
+      expect(first).toEqual(expect.objectContaining({ homeOrganizationId: OTHER_ORGANIZATION }));
+      digest.world.otherMembers = [];
+
+      await digest.carryOut(first);
+
+      expect(digest.mail.map((mail) => [mail.to, mail.props.traces])).toEqual([
+        [emailOf(MEMBER), 1_200],
+      ]);
+    });
+  });
 });
 
 describe("when the picked template cannot be built", () => {

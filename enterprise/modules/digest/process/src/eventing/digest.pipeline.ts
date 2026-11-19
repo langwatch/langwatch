@@ -99,6 +99,8 @@ function digestActivity(deps: {
         handle: (data) => deps.source.evaluationCompleted(data),
         options: { enqueue: { filter: (data) => deps.source.mayFold(data.projectId) } },
       })
+      // No enqueue filter: the finished fact's data names no project (only the job's tenant
+      // does, which a filter is not shown), so the handler drops runs outside the cohort.
       .withPeerSubscriber("scenarioRunFinished", {
         eventType: SIMULATION_RUN_EVENT_TYPES.FINISHED,
         data: simulationRunFinishedEventDataSchema,

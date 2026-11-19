@@ -207,6 +207,13 @@ Feature: Weekly digest emails
     And on equal activity from the organization with the lowest id
 
   @integration
+  Scenario: The home organization is chosen once, when the week is planned
+    Given a member of two enrolled organizations, one busier for them when the week is planned
+    When the other organization becomes busier before both sends are handled
+    Then they receive exactly one email, from the organization that was busier at plan time
+    And if they leave that organization before its send, the other organization's send mails them
+
+  @integration
   Scenario: A pick that cannot be built falls through to the next eligible template
     Given a member whose first eligible template lacks something it needs to show
     When their email is sent

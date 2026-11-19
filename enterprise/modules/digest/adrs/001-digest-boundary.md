@@ -95,6 +95,15 @@ baseline are swept every hour.
 - `digest` folds the owners' facts into weeks. Each fact is keyed by its source, and a repeat
   within an hour is dropped before it is appended. An enqueue filter keeps jobs to the enrolled
   cohort's projects.
+- The owners' facts reach the folds through peer subscribers that record digest's own fact, not
+  through peer fold projections. A fold's `apply` is synchronous, but turning an owner's fact
+  into digest's needs reads: the project's enrolled organization, and for a coding-agent fact
+  the personal project's owner (`ProjectApi`). A peer fold also takes no enqueue filter, so
+  every span on the platform would mint a job; the peer subscriber's filter keeps jobs to the
+  cohort. The cost is a second append per cohort fact.
+- A fact's week is the time its owner gives it: a span's start as the client reported it, an
+  evaluation's completion, a run's finish. A fact that arrives after its week's emails went out
+  is not in them, and a client's clock skew or a backfill can put a span in another week.
 - `digest_send`: a scheduled process manager wakes hourly and, from Monday 08:00 UTC, hands the
   outbox one plan of last week; before 08:00 on Monday it hands none. A plan of any other week
   than the one its slot may send is refused. Armed and not yet planned, the plan asks one send
@@ -138,11 +147,13 @@ sent. Clicks are not tracked: links in the email go straight to their targets.
 
 A person in several enrolled organizations is sent one email a week, from the organization where
 their week had the most activity (traces of the projects they may view plus their own coding-agent
-sessions), the lowest organization id on a tie. Each organization's send asks the same question of
-the same finished week, so one answers yes. A pick that cannot be built falls through to the next
-eligible template. A deactivated profile is not mailed. A plan that could not read one organization
-leaves the week unplanned, so the next hourly wake retries it; requests already made are keyed and
-not repeated.
+sessions), the lowest organization id on a tie. The plan decides it once and stores it on each send
+request, so the sends agree even if the week's folds change before they run. A send whose stored
+home can no longer send (unenrolled, or the person left it), or a request with none stored, ranks
+the organizations the person is still in when it runs. A pick that cannot be built falls through to
+the next eligible template. A deactivated profile is not mailed. A plan that could not read one
+organization leaves the week unplanned, so the next hourly wake retries it; requests already made
+are keyed and not repeated.
 
 Resubscribing uses the same purpose-bound, expiring token as unsubscribing; it only restores an
 email the person chose to receive. Accepted. The pages are served `no-store` with
