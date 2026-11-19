@@ -18,6 +18,8 @@ const push = vi.hoisted(() => ({
   subscribed: [] as unknown[],
   forgotten: [] as unknown[],
   browserEndpoint: null as string | null,
+  /** Storing the subscription fails, as when the request never reaches LangWatch. */
+  saveFails: false,
 }));
 
 vi.mock("@langwatch/browser-host/web-push", async (importOriginal) => {
@@ -47,6 +49,7 @@ vi.mock("../../../../../behavior/langy-api.ts", () => ({
       subscribeWebPush: {
         useMutation: () => ({
           mutateAsync: async (input: unknown) => {
+            if (push.saveFails) throw new TypeError("Failed to fetch");
             push.subscribed.push(input);
           },
         }),
@@ -80,7 +83,12 @@ vi.mock("../../../../../behavior/langy-api.ts", () => ({
   },
 }));
 
-import { LangyNotificationsMenuGroup } from "../langy-notifications-menu-group.tsx";
+import { langyPushSetupProblem } from "../../../../../model/langy-notifications.ts";
+import { resetLangyPushSetupFailure } from "../../../behavior/use-langy-web-push.ts";
+import {
+  LANGY_NOTIFICATIONS_MENU_RETRY,
+  LangyNotificationsMenuGroup,
+} from "../langy-notifications-menu-group.tsx";
 import {
   LANGY_NOTIFICATIONS_BLOCKED_LINE,
   LANGY_NOTIFICATIONS_DECLINE_LABEL,
@@ -88,6 +96,7 @@ import {
   LANGY_NOTIFICATIONS_ENABLE_LABEL,
   LANGY_NOTIFICATIONS_ENABLED_LINE,
   LANGY_NOTIFICATIONS_OFFER_QUESTION,
+  LANGY_NOTIFICATIONS_RETRY_LABEL,
   LangyNotificationsOfferCard,
 } from "../langy-notifications-offer-card.tsx";
 
@@ -144,6 +153,8 @@ beforeEach(() => {
   push.subscribed = [];
   push.forgotten = [];
   push.browserEndpoint = null;
+  push.saveFails = false;
+  resetLangyPushSetupFailure();
 });
 
 afterEach(() => {
@@ -250,6 +261,33 @@ describe("the notifications offer card", () => {
     });
   });
 
+  describe("given I enabled notifications but this browser could not be saved for them", () => {
+    it("says why instead of claiming they are on, and settles once trying again works", async () => {
+      installNotification({ permission: "default", answer: "granted" });
+      push.saveFails = true;
+      const view = renderCard();
+      const rerender = () =>
+        view.rerender(
+          <DesignSystemProvider forcedTheme="light">
+            <LangyNotificationsOfferCard />
+          </DesignSystemProvider>,
+        );
+
+      fireEvent.click(screen.getByRole("button", { name: LANGY_NOTIFICATIONS_ENABLE_LABEL }));
+      await waitFor(() => expect(save).toHaveBeenCalledWith({ topic: "langy", choice: "enabled" }));
+      rerender();
+
+      expect(await screen.findByText(langyPushSetupProblem("save_failed").line)).toBeDefined();
+      expect(screen.queryByText(LANGY_NOTIFICATIONS_ENABLED_LINE)).toBeNull();
+
+      push.saveFails = false;
+      fireEvent.click(screen.getByRole("button", { name: LANGY_NOTIFICATIONS_RETRY_LABEL }));
+
+      expect(await screen.findByText(LANGY_NOTIFICATIONS_ENABLED_LINE)).toBeDefined();
+      expect(push.subscribed).toHaveLength(1);
+    });
+  });
+
   describe("given the answer has not been read yet", () => {
     it("renders nothing rather than offering what may be answered", () => {
       stored.loading = true;
@@ -302,6 +340,27 @@ describe("the Notifications section of Langy's menu", () => {
       );
       expect(save).toHaveBeenCalledWith({ topic: "langy", choice: "declined" });
       expect(push.browserEndpoint).toBeNull();
+    });
+  });
+
+  describe("given I turn notifications on but this browser could not be saved for them", () => {
+    it("says why under the Notifications item and offers to set it up again", async () => {
+      installNotification({ permission: "granted" });
+      push.saveFails = true;
+      renderMenu();
+
+      fireEvent.click(await screen.findByText("Notifications", { selector: "p" }));
+
+      expect(await screen.findByText(langyPushSetupProblem("save_failed").line)).toBeDefined();
+
+      push.saveFails = false;
+      fireEvent.click(await screen.findByText(LANGY_NOTIFICATIONS_MENU_RETRY));
+
+      await waitFor(() => expect(push.subscribed).toHaveLength(1));
+      await waitFor(() =>
+        expect(screen.queryByText(langyPushSetupProblem("save_failed").line)).toBeNull(),
+      );
+      expect(screen.queryByText(LANGY_NOTIFICATIONS_MENU_RETRY)).toBeNull();
     });
   });
 
