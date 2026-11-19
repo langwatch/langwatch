@@ -36,7 +36,9 @@ function worker() {
   const eventStore = EventStoreMemory.createForTesting();
   const eventing = new EventSourcing({ eventStore });
   // Every peer lane's owner must be registered, or starting consumers refuses the lane.
-  for (const owner of allNurturingOwnerStandIns()) owner.open((definition) => eventing.register(definition));
+  for (const owner of allNurturingOwnerStandIns()) {
+    owner.open((definition) => eventing.register(definition));
+  }
   eventing.register(
     buildNurturingProjectUsagePipeline({
       store: repositories.projectUsage,
