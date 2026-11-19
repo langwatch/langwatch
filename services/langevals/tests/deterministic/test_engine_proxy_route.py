@@ -120,6 +120,8 @@ def test_a_routed_judge_call_goes_to_the_proxy_with_the_bindings_and_the_credent
     call = calls[0]
     assert call["api_base"] == PROXY
     assert call["extra_headers"] == {**SIGNED, "X-LangWatch-NLP-Secret": "engine-secret"}
+    assert call["client"]._client.follow_redirects is False
+    assert str(call["client"].base_url).rstrip("/") == PROXY
 
 
 # @scenario "langevals sends the engine credential only to the engine proxy"
@@ -134,6 +136,7 @@ def test_a_direct_call_never_carries_the_credential_even_when_the_request_names_
 
     assert calls[0]["api_base"] == "https://api.example.com/v1"
     assert "engine-secret" not in json.dumps(calls[0], default=str)
+    assert "client" not in calls[0]
 
 
 def test_a_routed_call_without_the_engine_headers_carries_no_credential(calls):

@@ -11,14 +11,24 @@ request header, never in the body (a body can be staged in a customer's own
 bucket), together with the proxy's URL. This module adds the credential to a
 call's extra headers only when the call goes to exactly that proxy, so it can
 never reach a model provider.
+
+A call that carries the credential never follows a redirect either: the OpenAI
+SDK follows one by default, and httpx drops only `Authorization` when it leaves
+the origin, so the credential header would go wherever a `Location` points.
 """
 
 import json
 from typing import Any, Mapping, Optional
 from urllib.parse import urlsplit
 
+import httpx
+from openai import AsyncOpenAI, OpenAI
+
 ENGINE_PROXY_HEADER = "X-LangWatch-Engine-Proxy"
 ENGINE_SECRET_HEADER = "X-LangWatch-NLP-Secret"
+
+# The api key a proxied call sends; nlpgo reads the credential header, not this.
+ENGINE_PROXY_API_KEY = "langwatch-engine-proxy"
 
 # The env prefixes an evaluator's model blocks arrive under.
 EVALUATOR_ENV_PREFIXES = ("X_LITELLM_", "X_LITELLM_EMBEDDINGS_")
@@ -100,3 +110,49 @@ def evaluator_env_with_engine_credential(
     for prefix in EVALUATOR_ENV_PREFIXES:
         env = with_engine_credential(env, route, prefix)
     return env
+
+
+def _carries_engine_credential(extra_headers: Any) -> bool:
+    if isinstance(extra_headers, str):
+        try:
+            extra_headers = json.loads(extra_headers)
+        except ValueError:
+            return False
+    if not isinstance(extra_headers, Mapping):
+        return False
+    return any(str(key).lower() == ENGINE_SECRET_HEADER.lower() for key in extra_headers)
+
+
+_no_redirect_clients: dict = {}
+
+
+def _no_redirect_http_client(is_async: bool) -> httpx.Client | httpx.AsyncClient:
+    """One shared httpx client per kind that never follows a redirect."""
+    if is_async not in _no_redirect_clients:
+        kind = httpx.AsyncClient if is_async else httpx.Client
+        _no_redirect_clients[is_async] = kind(follow_redirects=False)
+    return _no_redirect_clients[is_async]
+
+
+def without_redirects_for_engine_credential(kwargs: dict, is_async: bool) -> dict:
+    """The litellm call arguments, with a client that never follows a redirect if they carry the credential.
+
+    litellm's own OpenAI client follows redirects. A call whose extra headers
+    hold the engine credential gets an OpenAI client of its own for its
+    `api_base` instead, so an upstream 3xx fails the call rather than carrying
+    the credential to the `Location`. Any other call comes back as it was.
+    """
+    api_base = kwargs.get("api_base")
+    if not api_base or not _carries_engine_credential(kwargs.get("extra_headers")):
+        return kwargs
+    client_class = AsyncOpenAI if is_async else OpenAI
+    options: dict = {}
+    if isinstance(kwargs.get("max_retries"), int):
+        options["max_retries"] = kwargs["max_retries"]
+    client = client_class(
+        api_key=kwargs.get("api_key") or ENGINE_PROXY_API_KEY,
+        base_url=api_base,
+        http_client=_no_redirect_http_client(is_async),
+        **options,
+    )
+    return {**kwargs, "client": client}
