@@ -246,7 +246,7 @@ describe("given a newer run took the run over before its answer was filed", () =
 describe("given a run that replaces a lost one", () => {
   const SUPERSEDING = { ...RUN, supersedes: { runId: "run-0", slot: RUN.slot - 86_400_000 } };
 
-  it("records the lost run as failed with timeout while the process still waits on this run", async () => {
+  it("records the lost run as timed out while the process waits on this run", async () => {
     const { service, settled } = harness();
     service.connect(processWaitingOn(["run-1"]));
 
