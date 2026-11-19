@@ -19,7 +19,10 @@ import {
  * looks like in the bundle.
  */
 import type { LangyMirrorTier } from "@langwatch/langy-contract";
-import { modelProviders } from "@langwatch/model-provider-contract";
+import {
+  modelProviders,
+  type PrivateEndpointBindingWire,
+} from "@langwatch/model-provider-contract";
 import { type Instant, toDate } from "@langwatch/time";
 
 type GuardrailWire = {
@@ -221,6 +224,11 @@ export type GatewayConfigPayload = {
    * token; carrying it here bounds how long a stale value can be held, since the ETag moves.
    */
   expires_at: number | null;
+  /**
+   * The organization's hostnames bound to its private model endpoints (ADR-203), absent when it
+   * bound none. The gateway dials these addresses for a bound host and never resolves the name.
+   */
+  private_endpoints?: PrivateEndpointBindingWire[];
 };
 
 type BundlePolicyRules = GatewayConfigPayload["policy_rules"];

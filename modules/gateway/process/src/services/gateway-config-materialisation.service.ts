@@ -3,6 +3,8 @@
  * model provider absorbed the old gateway credential's fields, and a key's eligible-provider set
  * computes from its scope graph plus the optional routing policy's ordering.
  */
+import { createHash } from "node:crypto";
+
 import {
   type GatewayConnectUpstream,
   type ModelProvider,
@@ -17,6 +19,8 @@ import {
   ModelProviderCustomKeysMissingError,
   ModelProviderNotFoundError,
   PLATFORM_PROVIDER_ID_PREFIX,
+  type PrivateEndpointBindingWire,
+  privateEndpointsField,
 } from "@langwatch/model-provider-contract";
 import { createLogger } from "@langwatch/observability";
 import type { ProjectApi } from "@langwatch/project-contract";
@@ -52,8 +56,11 @@ const logger = createLogger("langwatch:gateway:config-materialiser");
  */
 export const CONFIG_SPEND_READ_TIMEOUT_MS = 2_000;
 
-/** The one model-provider read the bundle needs. */
-export type GatewayCustomKeys = Pick<ModelProviderApi, "getCustomKeys">;
+/** The model-provider reads the bundle needs: row keys and the organization's bound hostnames. */
+export type GatewayCustomKeys = Pick<
+  ModelProviderApi,
+  "getCustomKeys" | "privateEndpointBindingsForOrganization"
+>;
 
 const NO_KEYS: GatewayModelProviderCredentials = { readCustomKeys: () => ({}) };
 const PLAIN_KEYS: GatewayModelProviderCredentials = {
@@ -185,7 +192,13 @@ export class GatewayConfigMaterialiserService {
       vk.traceProjectId && this.traceExportKeys
         ? await this.traceExportKeys.findKeyIds(vk.traceProjectId)
         : [];
-    return [token, ...keyIds].join(".");
+    const bindings = await this.privateEndpointsOf(vk.organizationId);
+    return [token, ...keyIds, ...privateEndpointsVersion(bindings)].join(".");
+  }
+
+  /** The organization's bound hostnames (ADR-203); the gateway pins model calls to them. */
+  private privateEndpointsOf(organizationId: string): Promise<PrivateEndpointBindingWire[]> {
+    return this.modelProviders.privateEndpointBindingsForOrganization({ organizationId });
   }
 
   /** The trace project's export token; never `Project.apiKey`. */
@@ -234,6 +247,7 @@ export class GatewayConfigMaterialiserService {
       })),
     });
     const otlpToken = await this.traceExportToken(vk, traceProject);
+    const privateEndpoints = await this.privateEndpointsOf(vk.organizationId);
 
     return {
       revision: vk.revision.toString(),
@@ -284,6 +298,7 @@ export class GatewayConfigMaterialiserService {
       metadata: config.metadata ?? {},
       vk_tags: config.metadata?.tags ?? [],
       expires_at: toExpiresAtWire(vk.expiresAt),
+      ...privateEndpointsField(privateEndpoints),
     };
   }
 
@@ -430,4 +445,16 @@ async function settleBefore<T>({
   } finally {
     signal.removeEventListener("abort", onAbort);
   }
+}
+
+/**
+ * The bindings' share of the ETag: none adds nothing, so a bundle without bindings keeps the
+ * token it had. Any change to a hostname, address or port moves it, and the gateway refetches.
+ */
+function privateEndpointsVersion(bindings: readonly PrivateEndpointBindingWire[]): string[] {
+  if (bindings.length === 0) return [];
+  const digest = createHash("sha256")
+    .update(JSON.stringify(privateEndpointsField(bindings)))
+    .digest("base64url");
+  return [`pe-${digest.slice(0, 16)}`];
 }
