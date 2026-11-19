@@ -41,7 +41,6 @@ import {
   MemoryNurturingRepositories,
 } from "../../repositories/memory/memory.nurturing.repositories.ts";
 import type { NurturingClaimRepository } from "../../repositories/nurturing-claim.repository.ts";
-import type { NurturingVirtualKeyFact } from "../../rules/nurturing-virtual-key.rules.ts";
 import { NurturingDeliveryService } from "../../services/nurturing-delivery.service.ts";
 import { NurturingGatewayFactsService } from "../../services/nurturing-gateway-facts.service.ts";
 import { NurturingMemberFactsService } from "../../services/nurturing-member-facts.service.ts";
@@ -127,14 +126,18 @@ export function gatewayEvent(
   } as Event;
 }
 
-/** The usage pipeline's key lane as a worker registers it, whatever the sync flag. */
+/**
+ * The usage pipeline's key lane as a worker registers it, whatever the sync flag: the live lane's
+ * parse of an event, then its store. Takes the lane at the registry's own generic, so no record or
+ * event type is asserted.
+ */
 function registeredKeyLane({
   virtualKeys,
   members,
 }: Readonly<{
   virtualKeys: MemoryNurturingVirtualKeyRepository;
   members: MemoryNurturingOrganizationMemberRepository;
-}>): MapProjectionDefinition<NurturingVirtualKeyFact, Event> {
+}>): (event: Event) => Promise<void> {
   const others = MemoryNurturingRepositories.create();
   const pipeline = buildNurturingProjectUsagePipeline({
     store: others.projectUsage,
@@ -147,38 +150,32 @@ function registeredKeyLane({
     },
     sync: undefined,
   });
-  let lane: MapProjectionDefinition<unknown, Event> | undefined;
+  let apply: ((event: Event) => Promise<void>) | undefined;
   const registry = createApiFixture<
     Parameters<NonNullable<typeof pipeline.globalProjections>[number]["register"]>[0]
   >({
     registerEventSubscriber: () => undefined,
-    registerPeerMapProjection: (map) => {
+    registerPeerMapProjection: <MapRecord, Own extends Event>(
+      map: MapProjectionDefinition<MapRecord, Own>,
+    ) => {
       const keys = `${NURTURING_PROJECT_USAGE_PIPELINE_NAME}.${NURTURING_VIRTUAL_KEYS_PROJECTION_NAME}`;
-      if (map.name === keys) lane = map;
+      if (map.name !== keys) return;
+      // The router hands a lane only the event types it declares; narrowing by them is that contract.
+      const isOwn = (event: Event): event is Own => map.eventTypes.includes(event.type);
+      apply = async (event) => {
+        if (!isOwn(event)) return;
+        const record = map.map(event);
+        if (record === null) return;
+        await map.store.append(record, {
+          tenantId: event.tenantId,
+          aggregateId: event.aggregateId,
+        });
+      };
     },
   });
   for (const projection of pipeline.globalProjections ?? []) projection.register(registry);
-  if (!lane) throw new Error("the usage pipeline registers no key lane");
-  return keyFactLaneOf(lane);
-}
-
-const isKeyFact = (record: unknown): record is NurturingVirtualKeyFact =>
-  typeof record === "object" && record !== null && "virtualKeyId" in record;
-
-/** The registered lane read as the key copy's fact lane; a record that is no key fact fails loudly. */
-function keyFactLaneOf(
-  lane: MapProjectionDefinition<unknown, Event>,
-): MapProjectionDefinition<NurturingVirtualKeyFact, Event> {
-  return {
-    ...lane,
-    map: (event) => {
-      const record = lane.map(event);
-      if (record === null) return null;
-      if (!isKeyFact(record)) throw new Error("the key lane mapped a record that is no key fact");
-      return record;
-    },
-    store: { append: (fact, context) => lane.store.append(fact, context) },
-  };
+  if (!apply) throw new Error("the usage pipeline registers no key lane");
+  return apply;
 }
 
 /** User's erasure fact for one account. */
@@ -341,15 +338,7 @@ export async function gatewayFactsOver({
         eventId: event.id,
       });
     }
-    if (event.type === GATEWAY_VK_LIFECYCLE_EVENT_TYPE) {
-      const fact = keyLane.map(event);
-      if (fact) {
-        await keyLane.store.append(fact, {
-          tenantId: event.tenantId,
-          aggregateId: event.aggregateId,
-        });
-      }
-    }
+    if (event.type === GATEWAY_VK_LIFECYCLE_EVENT_TYPE) await keyLane(event);
     const lanes = subscribers.filter(({ eventTypes }) => eventTypes.includes(event.type));
     for (const lane of lanes) {
       await lane.handle(event, { tenantId: event.tenantId, aggregateId: event.aggregateId });
