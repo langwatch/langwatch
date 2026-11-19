@@ -19,6 +19,13 @@ export type AuthzRevocationMark = {
   revokedReason: string | null;
 };
 
+/** A role marked deleted ahead of its fold, at the instant its delete fact carries. */
+export type AuthzRoleDeletionMark = {
+  organizationId: string;
+  roleId: string;
+  deletedAt: Instant;
+};
+
 /**
  * The synchronous deny: it can only mark live grants of the named organization revoked, and
  * never moves an earlier mark. Every backing counts the write it makes outside the queue.
@@ -48,5 +55,16 @@ export abstract class AuthzRevocationRepository {
     await this.markRevoked({ organizationId, grantIds, revokedAt, revokedReason });
   }
 
+  /**
+   * The role's delete, written ahead of its fold with the fold's own guards: a define that reads
+   * the Role head next sees it, so it neither skips nor confirms on a role about to go.
+   */
+  async enforceRoleDeletion(mark: AuthzRoleDeletionMark): Promise<void> {
+    authzDirectProjectionWriteTotal.inc({ reason: "revocation" });
+    await this.markRoleDeleted(mark);
+  }
+
   protected abstract markRevoked(mark: AuthzRevocationMark): Promise<void>;
+
+  protected abstract markRoleDeleted(mark: AuthzRoleDeletionMark): Promise<void>;
 }

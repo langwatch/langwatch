@@ -421,10 +421,17 @@ Feature: Authorization grants
     Then the definition is sent under a new command id, not the first definition's
 
   @unit
+  Scenario: A define after a delete not waited for is sent and not confirmed
+    Given an API key's own role, live with the definition a retry restates
+    When the role is deleted without waiting for the fold and then defined again
+    Then the delete is marked on the Role row at once
+    And the definition is sent and refused, the role staying deleted
+
+  @unit
   Scenario: A retry before the fold records one role definition and one audit row
     Given an API key's own role definition whose projection has not landed
     When the same role definition is written again before it lands
-    Then the retry is sent under the first try's command id
+    Then the retry is sent under the first try's command id, its permissions in any order
     And the event log keeps one role definition and the audit trail one row
 
   @unit
@@ -839,7 +846,7 @@ Feature: Authorization grants
     When both are handled
     Then exactly one audit row exists
     And a role definition on another role that shares the key still gets its own row
-    And any other event's audit row is still keyed on its event id
+    And a custom role's definition, and any other event, is still keyed on its event id
 
   @unit
   Scenario: An API key's own-role grant attached twice under one key writes one audit row

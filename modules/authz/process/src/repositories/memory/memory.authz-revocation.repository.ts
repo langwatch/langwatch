@@ -3,6 +3,7 @@ import { nowInstant, Temporal } from "@langwatch/time";
 import {
   type AuthzRevocationMark,
   AuthzRevocationRepository,
+  type AuthzRoleDeletionMark,
 } from "../authz-revocation.repository.ts";
 import type { AuthzMemoryStore } from "./authz-memory.store.ts";
 
@@ -31,5 +32,24 @@ export class MemoryAuthzRevocationRepository extends AuthzRevocationRepository {
       row.revokedReason = revokedReason;
       row.updatedAt = updatedAt;
     }
+  }
+
+  protected async markRoleDeleted({
+    organizationId,
+    roleId,
+    deletedAt,
+  }: AuthzRoleDeletionMark): Promise<void> {
+    const at = Temporal.Instant.fromEpochMilliseconds(deletedAt.epochMilliseconds);
+    const row = this.memory.roleHeads.find(
+      (stored) =>
+        stored.id === roleId &&
+        stored.organizationId === organizationId &&
+        stored.deletedAt === null &&
+        stored.occurredAt.epochMilliseconds <= at.epochMilliseconds,
+    );
+    if (!row) return;
+    row.deletedAt = at;
+    row.occurredAt = at;
+    row.updatedAt = Temporal.Instant.fromEpochMilliseconds(nowInstant().epochMilliseconds);
   }
 }

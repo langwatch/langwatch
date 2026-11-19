@@ -28,11 +28,12 @@ import {
   type AuthzSharedProjectGrant,
   type DefineRoleCommandData,
   type GrantEventSource,
+  GRANT_KSUID_RESOURCE,
   GrantPrincipalNotFoundError,
   newAuthzGrantId,
   type RevokeGrantCommandData,
 } from "@langwatch/authz-contract";
-import { Instance, Ksuid } from "@langwatch/ksuid";
+import { getEnvironment, Instance, Ksuid } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import { Temporal, nowInstant } from "@langwatch/time";
 import { z } from "zod";
@@ -229,7 +230,8 @@ function apiKeyRoleCommandId({
       JSON.stringify({
         name: definition.name,
         description: definition.description || null,
-        permissions: definition.permissions,
+        // Sorted, as the skip compares them: the same set in another order is the same fact.
+        permissions: [...definition.permissions].toSorted(),
         base: base ? base.occurredAt.epochMilliseconds : "none",
       }),
     )
@@ -270,8 +272,8 @@ function apiKeyGrantId({
     )
     .digest();
   return new Ksuid({
-    environment: "prod",
-    resource: "grant",
+    environment: getEnvironment(),
+    resource: GRANT_KSUID_RESOURCE,
     // Both instants stand still across retries before the fold, so the id does too.
     timestamp: Math.floor(Math.max(role.occurredAt.epochMilliseconds, lastChangedAtMs) / 1000),
     instance: new Instance(
@@ -1198,6 +1200,7 @@ export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
     awaitProjection?: boolean;
   }): Promise<void> {
     refusePlatformTenant(organizationId);
+    const occurredAtMs = this.now();
     await (
       await this.commands()
     ).commands.deleteRole.send({
@@ -1206,7 +1209,13 @@ export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
       commandId: this.options.newCommandId?.() ?? newCommandId(),
       roleId,
       actor,
-      occurredAtMs: this.now(),
+      occurredAtMs,
+    });
+    // Marked now, as a grant revoke is: a delete not waited for is never in flight unseen.
+    await this.options.revocation.enforceRoleDeletion({
+      organizationId,
+      roleId,
+      deletedAt: Temporal.Instant.fromEpochMilliseconds(occurredAtMs),
     });
     if (awaitProjection) {
       await this.awaitProjection({

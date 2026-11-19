@@ -176,6 +176,16 @@ describe("given a caller that only needs the role retired", () => {
       });
 
       expect(sent.map((command) => command.verb)).toEqual(["deleteRole"]);
+      // Marked at once with the fold's guards, so the delete is never in flight unseen.
+      expect(db.role.updateMany).toHaveBeenCalledWith({
+        where: {
+          id: "role_1",
+          organizationId: ORG_ID,
+          deletedAt: null,
+          occurredAt: { lte: new Date(1_700_000_000_000) },
+        },
+        data: { deletedAt: new Date(1_700_000_000_000), occurredAt: new Date(1_700_000_000_000) },
+      });
       expect(db.role.findFirst).not.toHaveBeenCalled();
       expect(epoch.bump).toHaveBeenCalledWith({ organizationId: ORG_ID });
     });

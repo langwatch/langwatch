@@ -18,6 +18,7 @@ import {
   type AuthzAuditRow,
 } from "../repositories/authz-audit-trail.repository.ts";
 import type { AuthzLedgerReadRepository } from "../repositories/authz-ledger-read.repository.ts";
+import { SYSTEM_API_KEY_ROLE_KIND } from "../repositories/eventing/eventing.authz-read.mapper.ts";
 import { type AuthzGrantsEvent, isApiKeyGrantFact } from "./authz-grant.events.ts";
 
 const AUTHZ_AUDIT_ACTION_PREFIX = "authz.grants." as const;
@@ -97,7 +98,7 @@ function isAuditable(event: AuthzGrantsEvent): boolean {
 }
 
 /**
- * A role definition's row, and an API key's own-role grant's, is keyed on its fact, as the event
+ * An API key's own role definition, and its own-role grant, is audited on its fact, as the event
  * log keeps one: a retry before the fold appends again under the same idempotency key but a new
  * event id, and writes no second row. Every other event keeps its event-id row.
  */
@@ -107,7 +108,7 @@ function rowId(event: AuthzGrantsEvent): string {
 }
 
 function isKeyedOnFact(event: AuthzGrantsEvent): boolean {
-  if (event.type === ROLE_DEFINED_EVENT_TYPE) return true;
+  if (event.type === ROLE_DEFINED_EVENT_TYPE) return event.data.kind === SYSTEM_API_KEY_ROLE_KIND;
   return event.type === GRANT_ATTACHED_EVENT_TYPE && isApiKeyGrantFact(event.idempotencyKey);
 }
 

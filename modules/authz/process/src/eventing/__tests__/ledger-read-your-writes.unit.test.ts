@@ -541,6 +541,24 @@ describe("given an api key's own role defined again", () => {
       expect(redefined?.commandId).not.toBe(original?.commandId);
     });
   });
+
+  describe("when a retry before the fold lists the same permissions in another order", () => {
+    /** @scenario "A retry before the fold records one role definition and one audit row" */
+    it("sends it under the first try's command id", async () => {
+      const { writer, sent } = harness({});
+      const permissions = ["langy:view", "traces:view"];
+
+      for (const listed of [permissions, permissions.toReversed()]) {
+        await expect(
+          writer.defineRole({ ...apiKeyRole, permissions: listed }),
+        ).rejects.toMatchObject({ code: "authz_grant_not_confirmed" });
+      }
+
+      const [first, retry] = definitions(sent);
+      expect(retry?.role.permissions).toEqual(["traces:view", "langy:view"]);
+      expect(retry?.commandId).toBe(first?.commandId);
+    });
+  });
 });
 
 describe("given a custom role defined again with the definition it already carries", () => {

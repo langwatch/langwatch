@@ -3,11 +3,15 @@ import { toDate } from "@langwatch/time";
 import {
   type AuthzRevocationMark,
   AuthzRevocationRepository,
+  type AuthzRoleDeletionMark,
 } from "../authz-revocation.repository.ts";
 
-/** The one write this repository performs, and no other. */
+/** The two writes this repository performs, and no other. */
 type RevocationDatabase = {
   grant: {
+    updateMany(args: unknown): Promise<unknown>;
+  };
+  role: {
     updateMany(args: unknown): Promise<unknown>;
   };
 };
@@ -35,6 +39,18 @@ export class PrismaAuthzRevocationRepository extends AuthzRevocationRepository {
     await this.database.grant.updateMany({
       where: { organizationId, id: { in: grantIds }, revokedAt: null },
       data: { revokedAt: toDate(revokedAt), revokedReason },
+    });
+  }
+
+  protected async markRoleDeleted({
+    organizationId,
+    roleId,
+    deletedAt,
+  }: AuthzRoleDeletionMark): Promise<void> {
+    const at = toDate(deletedAt);
+    await this.database.role.updateMany({
+      where: { id: roleId, organizationId, deletedAt: null, occurredAt: { lte: at } },
+      data: { deletedAt: at, occurredAt: at },
     });
   }
 }

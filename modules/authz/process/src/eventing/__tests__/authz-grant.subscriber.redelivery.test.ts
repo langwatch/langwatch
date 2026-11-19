@@ -114,6 +114,21 @@ describe("EventingAuthzAuditAdapter redelivery", () => {
     expect([...store.rows.keys()]).toEqual(["authz-evt-evt_role_deleted"]);
   });
 
+  /** @scenario "A role definition appended twice under one idempotency key writes one audit row" */
+  it("keeps the event id as the row id for a custom role's definition", async () => {
+    const store = new KeyedAuditTrailStore();
+    const adapter = EventingAuthzAuditAdapter.create({ store });
+    const customRole = { ...roleDefined, data: { ...roleDefined.data, kind: "custom" as const } };
+
+    await adapter.handler({ ...customRole, id: "evt_first_append" });
+    await adapter.handler({ ...customRole, id: "evt_second_append" });
+
+    expect([...store.rows.keys()]).toEqual([
+      "authz-evt-evt_first_append",
+      "authz-evt-evt_second_append",
+    ]);
+  });
+
   /** @scenario "An API key's own-role grant attached twice under one key writes one audit row" */
   it("leaves one audit row when an API key's own-role grant is appended twice", async () => {
     const store = new KeyedAuditTrailStore();

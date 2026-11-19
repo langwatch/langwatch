@@ -34,7 +34,10 @@ function gateReadFailures(): number {
 
 function revocations(): PrismaAuthzRevocationRepository {
   return PrismaAuthzRevocationRepository.create({
-    database: { grant: { updateMany: async () => ({ count: 0 }) } },
+    database: {
+      grant: { updateMany: async () => ({ count: 0 }) },
+      role: { updateMany: async () => ({ count: 0 }) },
+    },
   });
 }
 
