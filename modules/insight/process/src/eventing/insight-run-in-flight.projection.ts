@@ -1,8 +1,7 @@
 /**
- * The last started run of a daily schedule, folded onto a row of its own: id, Langy
- * conversation and start, beside the last run that settled. The read names it in flight until
- * it settles, then its start is the last run's (ADR-004). Keyed by the schedule id, also the
- * aggregate id.
+ * A row per schedule, keyed by schedule id (the aggregate id): the last started run (id, Langy
+ * conversation, start) beside the last settled run. It reads as in flight until it settles
+ * (ADR-004).
  */
 
 import type { StateProjectionDefinition, StateProjectionStore } from "@langwatch/eventing";
