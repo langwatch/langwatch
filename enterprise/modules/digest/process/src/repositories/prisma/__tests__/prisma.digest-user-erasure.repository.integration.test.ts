@@ -25,7 +25,12 @@ import { PrismaDigestUserWeekRepository } from "../prisma.digest-user-week.repos
 
 const databaseUrl = process.env.LANGWATCH_TEST_DATABASE_URL;
 const run = randomUUID();
-const organizationIds = [`test-digest-erasure-a-${run}`, `test-digest-erasure-b-${run}`];
+// A send row is one per person and week, so each organization's send is of its own week.
+const organizations = [
+  { organizationId: `test-digest-erasure-a-${run}`, sendWeek: "2026-W45" },
+  { organizationId: `test-digest-erasure-b-${run}`, sendWeek: "2026-W46" },
+];
+const organizationIds = organizations.map(({ organizationId }) => organizationId);
 const erased = `test-digest-erasure-erased-${run}`;
 const kept = `test-digest-erasure-kept-${run}`;
 const ISO_WEEK = "2026-W46";
@@ -51,11 +56,11 @@ describe.skipIf(!databaseUrl)("given digest rows naming two people in two organi
 
     for (const userId of [erased, kept]) {
       await audience.unsubscribe({ userId, sendId: `${userId}:${ISO_WEEK}`, at: AT });
-      for (const organizationId of organizationIds) {
+      for (const { organizationId, sendWeek } of organizations) {
         await sends.claim({
           userId,
           organizationId,
-          isoWeek: ISO_WEEK,
+          isoWeek: sendWeek,
           templateId: "digest-coding-agent-week",
           sentAt: AT,
         });

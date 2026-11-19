@@ -379,7 +379,8 @@ export function installDigest(
       processStore.leaseDueMessages({
         now: Date.now() + 60_000,
         limit: 100,
-        leaseDurationMs: 1,
+        // Outlives the test: a lease that lapsed would hand the same intent out on the next call.
+        leaseDurationMs: 24 * 60 * 60 * 1000,
         processNames: [DIGEST_MEMBER_SEND_PROCESS_NAME],
       }),
     /** Carries one send intent out the way the outbox does. */
