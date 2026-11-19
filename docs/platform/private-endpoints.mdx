@@ -1,0 +1,275 @@
+---
+title: "Private endpoints"
+description: "Connect LangWatch Cloud to a model gateway in your own AWS network over PrivateLink, with no public endpoint, and use it as a custom model provider."
+sidebarTitle: Private endpoints
+keywords: private endpoints, privatelink, aws, vpc endpoint service, litellm, model gateway, openai-compatible, custom provider, private network, langwatch
+---
+
+<Note>
+  Private endpoints are for LangWatch Cloud. A self-hosted LangWatch runs in
+  your own network and reaches a private model gateway directly, so this page
+  does not apply to it.
+</Note>
+
+## What it is
+
+Some teams run their own model gateway, such as a LiteLLM proxy or another
+OpenAI-compatible service, inside a private network with no public endpoint. A
+private endpoint lets LangWatch Cloud call that gateway over AWS PrivateLink.
+The traffic stays on the AWS network and never crosses the public internet.
+
+The work is split in two:
+
+- **LangWatch staff** create the PrivateLink connection to your gateway and
+  register it as a private endpoint for your organization.
+- **You** choose the hostname LangWatch uses for it, in **Settings > Private
+  endpoints**, and add a custom model provider that points at that hostname.
+
+You can change hostnames yourself at any time. You need LangWatch again only
+when the PrivateLink connection itself changes.
+
+## When to use it
+
+Use a private endpoint when all of these are true:
+
+- You use LangWatch Cloud.
+- Your model gateway runs in AWS and has no public endpoint.
+- The gateway speaks the OpenAI API, for example LiteLLM or vLLM.
+
+If your gateway already has a public HTTPS endpoint, add it as a [custom model
+provider](/platform/model-providers) instead. You do not need a private
+endpoint.
+
+## How it works
+
+1. Your gateway sits behind an internal Application Load Balancer (ALB) that
+   holds a TLS certificate for a hostname such as `llm.internal.example.com`.
+2. A Network Load Balancer (NLB) in front of that ALB is shared as a VPC
+   endpoint service.
+3. LangWatch connects an interface endpoint in its own AWS account to your
+   endpoint service, and registers it for your organization.
+4. You bind `llm.internal.example.com` to that private endpoint in LangWatch.
+5. A model provider with the base URL `https://llm.internal.example.com/v1`
+   now reaches your gateway over PrivateLink. LangWatch uses the hostname for
+   TLS, so your certificate is checked as usual.
+
+## Before you start
+
+- Ask your LangWatch contact for two values: the AWS account to allow, and
+  the AWS region LangWatch connects from. This page does not list them.
+- Your gateway must serve HTTPS on port 443 behind an internal ALB.
+- The ALB's certificate must be issued by a public certificate authority, for
+  example a public certificate from AWS Certificate Manager. The hostname does
+  not need a public DNS record. LangWatch checks the certificate against the
+  public trust store and cannot trust a private certificate authority.
+- To bind a hostname in LangWatch, you need the `organization:manage`
+  permission. Organization administrators have it.
+
+## 1. Set up the endpoint service in AWS
+
+Do these steps in the AWS account and region where your gateway runs.
+
+<Steps>
+  <Step title="Put a Network Load Balancer in front of the ALB">
+    Create an internal NLB in the same VPC as the ALB. Create a target group
+    of the **Application Load Balancer** type, on protocol TCP and port 443,
+    and register your internal ALB as its target. Add a TCP listener on port
+    443 that forwards to this target group.
+
+    The NLB passes TLS through untouched. The ALB keeps terminating TLS with
+    your certificate.
+  </Step>
+  <Step title="Allow the traffic through your security groups">
+    The ALB's security group must accept TCP 443 from the NLB. If the NLB has
+    a security group, it must accept TCP 443 for PrivateLink traffic, or you
+    can turn off inbound rule checks for PrivateLink traffic on the NLB.
+  </Step>
+  <Step title="Create a VPC endpoint service on the NLB">
+    In the VPC console, open **Endpoint services** and create a service for
+    the NLB. Keep **Acceptance required** turned on, so that you approve each
+    connection.
+
+    If LangWatch connects from a different region than yours, add that region
+    under **Supported Regions**. This turns on cross-region PrivateLink for the
+    service.
+  </Step>
+  <Step title="Allow LangWatch's AWS account">
+    On the endpoint service, open **Allow principals** and add the AWS account
+    your LangWatch contact gave you, as
+    `arn:aws:iam::<account-id>:root`. Only that account can request a
+    connection.
+  </Step>
+  <Step title="Send LangWatch two values">
+    Send your LangWatch contact:
+
+    - the **service name** of the endpoint service, which starts with
+      `com.amazonaws.vpce.`;
+    - the **hostname** your certificate covers, for example
+      `llm.internal.example.com`.
+  </Step>
+  <Step title="Accept the connection request">
+    When LangWatch creates its side of the connection, a request appears under
+    **Endpoint connections** on your endpoint service. Accept it. Until you do,
+    the connection stays pending and calls cannot reach your gateway.
+  </Step>
+</Steps>
+
+## 2. What LangWatch does
+
+LangWatch staff create the interface endpoint for your service and register it
+as a private endpoint for your organization. A private endpoint has a name
+and a region, for example "Model gateway" in `eu-west-1`.
+
+The network addresses of the endpoint and the port it accepts are set by
+LangWatch staff only. You never enter an address, and LangWatch never shows
+you one.
+
+When this is done, your LangWatch contact tells you, and the endpoint appears
+in **Settings > Private endpoints**.
+
+## 3. Bind your hostname
+
+Open **Settings > Private endpoints**. The page lists the private endpoints
+LangWatch registered for your organization, with their name, region, status
+and bound hostnames. Before LangWatch registers one, the page is empty.
+
+<Frame>
+  <img src="/images/platform/private-endpoints-empty-light.png" alt="The Private endpoints page with no endpoints yet. It says LangWatch staff set private endpoints up on request." className="block dark:hidden" />
+  <img src="/images/platform/private-endpoints-empty-dark.png" alt="The Private endpoints page with no endpoints yet. It says LangWatch staff set private endpoints up on request." className="hidden dark:block" />
+</Frame>
+
+Only members with the `organization:manage` permission see this page and can
+change it. Other members do not see it in the settings menu.
+
+<Steps>
+  <Step title="Open the dialog">
+    On the endpoint's row, click **Add hostname**.
+  </Step>
+  <Step title="Enter the hostname">
+    Pick the private endpoint and enter the hostname your certificate covers,
+    for example `llm.internal.example.com`. Click **Add**.
+  </Step>
+</Steps>
+
+<Frame>
+  <img src="/images/platform/private-endpoints-bind-light.png" alt="The Add hostname dialog with the Model gateway (eu-west-1) private endpoint selected and llm.internal.example.com as the hostname." className="block dark:hidden" />
+  <img src="/images/platform/private-endpoints-bind-dark.png" alt="The Add hostname dialog with the Model gateway (eu-west-1) private endpoint selected and llm.internal.example.com as the hostname." className="hidden dark:block" />
+</Frame>
+
+The hostname appears on the endpoint's row, and the status changes from
+**Unbound** to **In use**. Use **Change** to move a hostname to another name
+or endpoint, and **Remove** to delete it. Every change is written to the
+[Audit log](/platform/audit-log).
+
+<Frame>
+  <img src="/images/platform/private-endpoints-bound-light.png" alt="The Private endpoints page with the Model gateway endpoint in eu-west-1, status In use, and the hostname llm.internal.example.com." className="block dark:hidden" />
+  <img src="/images/platform/private-endpoints-bound-dark.png" alt="The Private endpoints page with the Model gateway endpoint in eu-west-1, status In use, and the hostname llm.internal.example.com." className="hidden dark:block" />
+</Frame>
+
+A hostname must be a full name, such as `llm.internal.example.com`. These are
+refused:
+
+| You enter | LangWatch says |
+|-----------|----------------|
+| An IP address, such as `10.0.0.5` | Enter a hostname, not an IP address. |
+| A wildcard, such as `*.example.com` | Wildcards are not supported; bind each hostname. |
+| A single word, such as `gateway` | Enter a fully qualified hostname, such as llm.example.com. |
+| `localhost` | localhost cannot be bound. |
+| A hostname you already bound | llm.internal.example.com is already bound in this organization. |
+
+You can bind more than one hostname to the same endpoint, for example one per
+certificate name.
+
+## 4. Add the model provider
+
+<Steps>
+  <Step title="Open Model providers">
+    Open **Settings > Model providers** and click **Add model provider**.
+  </Step>
+  <Step title="Choose the custom provider">
+    Choose **Custom (OpenAI-compatible)**.
+  </Step>
+  <Step title="Enter the base URL and key">
+    Set **CUSTOM_BASE_URL** to `https://llm.internal.example.com/v1`, with
+    your own hostname. Enter the key your gateway expects in
+    **CUSTOM_API_KEY**, for example a LiteLLM virtual key. Add the models your
+    gateway serves under **Custom models**.
+  </Step>
+  <Step title="Save and test">
+    Save, then use **Test Connection** in the row menu. The test runs through
+    the private endpoint.
+  </Step>
+</Steps>
+
+<Frame>
+  <img src="/images/platform/private-endpoints-provider-light.png" alt="The Custom (OpenAI-compatible) provider form named Model gateway, with the base URL https://llm.internal.example.com/v1." className="block dark:hidden" />
+  <img src="/images/platform/private-endpoints-provider-dark.png" alt="The Custom (OpenAI-compatible) provider form named Model gateway, with the base URL https://llm.internal.example.com/v1." className="hidden dark:block" />
+</Frame>
+
+See [Model Providers](/platform/model-providers) for scopes, custom models and
+default models.
+
+## Security model
+
+- **Only your organization can use your private endpoint.** A binding belongs
+  to one organization. If another organization enters the same hostname, its
+  calls do not reach your endpoint. They are resolved through public DNS like
+  any other address.
+- **LangWatch never looks your hostname up in DNS.** A call to a bound
+  hostname goes straight to the private endpoint LangWatch registered for you.
+  The hostname is used only for TLS and the `Host` header. Changing a public
+  DNS record cannot redirect your calls.
+- **Calls use HTTPS on the registered port only.** A call to a bound hostname
+  over `http`, or on any other port, is refused before a connection opens.
+- **IP addresses are never accepted.** You bind names, not addresses, and a
+  base URL that is an IP address is never treated as bound. You cannot point
+  a call at anything in LangWatch's network other than your own endpoint.
+- **The certificate is always checked.** LangWatch verifies your gateway's
+  certificate against the hostname, as for any public provider.
+- **Bindings cover model calls only.** Workflow HTTP blocks, webhooks and HTTP
+  agent targets in Agent Testing ignore bindings. They cannot reach your
+  private endpoint.
+
+## Limits
+
+Private endpoints are new. These parts of LangWatch use a bound hostname
+today:
+
+- saving a provider and **Test Connection**;
+- listing the models a provider serves;
+- the prompt playground and prompts;
+- LLM and evaluator blocks in Workflows;
+- the simulator, the judge and prompt or workflow targets in Agent Testing;
+- the LangWatch AI Gateway, through virtual keys.
+
+These do not use it yet, so a provider on a private endpoint does not work
+for them:
+
+- evaluators that run in the LangWatch evaluators service (the built-in
+  evaluator library);
+- topic clustering;
+- some background Agent Testing jobs.
+
+For those features, set a public model provider as the default model, or ask
+your LangWatch contact about timing.
+
+Only the **Custom (OpenAI-compatible)** provider, and providers that take a
+custom base URL such as OpenAI or Anthropic, can use a private endpoint.
+Azure OpenAI, Bedrock, Voyage AI and Codex cannot. A call from one of those to
+a bound hostname is refused with a message that the credentials cannot use a
+private endpoint yet.
+
+## Troubleshooting
+
+| What you see | What it means | What to do |
+|--------------|---------------|------------|
+| `is bound to a private endpoint that accepts port 443 only` | The base URL names another port, such as `:8443`. | Remove the port from the base URL. |
+| `is bound to a private endpoint and must be reached over https` | The base URL starts with `http://`. | Use `https://`. |
+| `could not connect to the private endpoint` | LangWatch reached its side of the connection, but your gateway did not answer. | Check that you accepted the connection request, that the NLB target group shows the ALB as healthy, and that the security groups allow TCP 443. |
+| A TLS or certificate error that names your hostname | The certificate on the ALB does not cover the hostname, or a private certificate authority issued it. | Bind the exact name the certificate covers, or use a public certificate. |
+| The call is refused as a private address | The hostname is not bound in this organization, so LangWatch resolved it through DNS and found a private address. | Check the spelling on **Settings > Private endpoints**, and check that the provider belongs to a project in the same organization. |
+| The endpoint is missing from **Settings > Private endpoints** | LangWatch has not registered it yet, or you are in another organization. | Ask your LangWatch contact. |
+
+Error messages never include the private endpoint's addresses. Send your
+LangWatch contact the hostname, the time of the call and the full error text
+if you need help.
