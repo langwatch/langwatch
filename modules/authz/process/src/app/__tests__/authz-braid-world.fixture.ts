@@ -141,10 +141,24 @@ export async function braidWorld({
   enterprise = true,
   epochCacheEnabled = false,
   braidsReleased = true,
-}: { enterprise?: boolean; epochCacheEnabled?: boolean; braidsReleased?: boolean } = {}) {
+  braidsEnabled = true,
+}: {
+  enterprise?: boolean;
+  epochCacheEnabled?: boolean;
+  braidsReleased?: boolean;
+  /** The organisation's "Braids enabled" setting; a world turns it on unless a test says not. */
+  braidsEnabled?: boolean;
+} = {}) {
   const memory = AuthzMemoryStore.create();
   seedOrganisation(memory);
   const repositories = repositoriesOver(memory);
+  if (braidsEnabled) {
+    await repositories.organizationPolicies.setBraidsEnabled({
+      organizationId: ORG,
+      braidsEnabled: true,
+      updatedByUserId: "seed",
+    });
+  }
   const channels = memoryAuthzChannels({ braidsReleasedFor: braidsReleased ? [ORG] : [] });
   const app = AuthzModule.create({
     dependencies: {},

@@ -64,6 +64,11 @@ beforeEach(() => {
   const { state } = braidsFake;
   state.project = { intoOtherProjects: [], fromOtherProjects: [] };
   state.keptToAdmins = false;
+  state.braidsEnabled = true;
+  state.policyFails = false;
+  state.policyLoading = false;
+  state.policyRefreshFails = false;
+  state.pendingSave = undefined;
   state.remove.mockClear();
 });
 
@@ -358,6 +363,25 @@ describe("BraidsScreen", () => {
       expect(screen.getByTestId("braids-signing-keys-paused")).toBeInTheDocument();
       expect(screen.queryByTestId("new-signing-key")).not.toBeInTheDocument();
     });
+
+    /** @scenario After leaving Enterprise the page says braids are paused and kept */
+    it("says upgrading alone does not resume braids the organisation turned off", () => {
+      braidsFake.state.project = { intoOtherProjects: [liveBraid()], fromOtherProjects: [] };
+      braidsFake.state.braidsEnabled = false;
+      renderAs({ isEnterprise: false });
+      expect(screen.getByTestId("braids-plan-paused")).toHaveTextContent(
+        /Your braid is kept and starts working again once you upgrade and an organisation admin/,
+      );
+    });
+
+    it("says upgrading resumes braids only if Braids is on while the setting is unread", () => {
+      braidsFake.state.project = { intoOtherProjects: [liveBraid()], fromOtherProjects: [] };
+      braidsFake.state.policyFails = true;
+      renderAs({ isEnterprise: false });
+      expect(screen.getByTestId("braids-plan-paused")).toHaveTextContent(
+        /if Braids is on for your organisation/,
+      );
+    });
   });
 
   describe("given release_braids is off for the organisation", () => {
@@ -385,6 +409,85 @@ describe("BraidsScreen", () => {
       await openRowMenu();
       expect(await screen.findByRole("menuitem", { name: "Remove braid" })).toBeInTheDocument();
       expect(screen.queryByRole("menuitem", { name: "Edit" })).not.toBeInTheDocument();
+    });
+
+    /** @scenario With release_braids off and Braids turned off the pages say the braids are paused */
+    it("says the braids are paused rather than applying, and marks each paused", () => {
+      braidsFake.state.braidsEnabled = false;
+      braidsFake.state.project = { intoOtherProjects: [liveBraid()], fromOtherProjects: [] };
+      renderAs({ braidsReleased: false });
+
+      const banner = screen.getByTestId("braids-not-enabled");
+      expect(banner).toHaveTextContent(/paused and kept.*remove them here/);
+      expect(banner).not.toHaveTextContent(/still apply/);
+      expect(screen.queryByTestId("braids-turned-off")).toBeNull();
+      const row = within(screen.getByTestId("braids-section-into")).getByTestId("braid-row");
+      expect(within(row).getByTestId("braid-paused")).toBeInTheDocument();
+    });
+
+    describe.each([
+      { setting: "on", braidsEnabled: true, resumes: /when you upgrade\./ },
+      { setting: "off", braidsEnabled: false, resumes: /an organisation admin turns Braids on/ },
+    ])(
+      "and the organisation is below Enterprise with Braids $setting",
+      ({ braidsEnabled, resumes }) => {
+        /** @scenario With release_braids off below Enterprise the pages say the braids are paused by the plan */
+        it("says the braids are paused by the plan, not applying, and marks each paused", () => {
+          braidsFake.state.braidsEnabled = braidsEnabled;
+          braidsFake.state.project = { intoOtherProjects: [liveBraid()], fromOtherProjects: [] };
+          renderAs({ isEnterprise: false, braidsReleased: false });
+
+          const notice = screen.getByTestId("braids-not-enabled");
+          expect(notice).toHaveTextContent(/paused and kept, since they need the Enterprise plan/);
+          expect(notice).not.toHaveTextContent(/still apply/);
+          expect(screen.getByTestId("braids-plan-paused")).toHaveTextContent(resumes);
+          const row = within(screen.getByTestId("braids-section-into")).getByTestId("braid-row");
+          expect(within(row).getByTestId("braid-paused")).toBeInTheDocument();
+        });
+      },
+    );
+  });
+
+  describe("given the organisation has Braids turned off", () => {
+    /** @scenario While Braids is off the project page sends an organisation admin to turn it on */
+    it("links an organisation admin to the organisation page and lists the braid paused with only Remove", async () => {
+      braidsFake.state.braidsEnabled = false;
+      braidsFake.state.project = { intoOtherProjects: [liveBraid()], fromOtherProjects: [] };
+      renderAs({ grants: new Set([...ADMIN, "organization:manage"]) });
+
+      const banner = screen.getByTestId("braids-turned-off");
+      expect(banner).toHaveTextContent(/Braids is off for your organisation/);
+      expect(banner).toHaveTextContent(/paused and kept/);
+      expect(within(banner).getByRole("link", { name: "Turn on Braids" })).toHaveAttribute(
+        "href",
+        "/settings/organization-braids",
+      );
+      const row = within(screen.getByTestId("braids-section-into")).getByTestId("braid-row");
+      expect(within(row).getByTestId("braid-paused")).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /New braid/ })).not.toBeInTheDocument();
+      expect(screen.queryByTestId("new-signing-key")).not.toBeInTheDocument();
+      await openRowMenu();
+      expect(await screen.findByRole("menuitem", { name: "Remove braid" })).toBeInTheDocument();
+      expect(screen.queryByRole("menuitem", { name: "Edit" })).not.toBeInTheDocument();
+    });
+
+    /** @scenario While Braids is off the project page tells a project admin to ask an organisation admin */
+    it("tells a project admin to ask an organisation admin, with no link to the organisation page", () => {
+      braidsFake.state.braidsEnabled = false;
+      renderAs();
+
+      const banner = screen.getByTestId("braids-turned-off");
+      expect(banner).toHaveTextContent(/Ask an organisation admin to turn it on/);
+      expect(within(banner).queryByRole("link", { name: "Turn on Braids" })).toBeNull();
+      expect(screen.queryByRole("button", { name: /New braid/ })).not.toBeInTheDocument();
+    });
+
+    it("keeps the upsell below Enterprise when the organisation has no braids", () => {
+      braidsFake.state.braidsEnabled = false;
+      renderAs({ isEnterprise: false });
+
+      expect(screen.getByTestId("braids-enterprise-upsell")).toBeVisible();
+      expect(screen.queryByTestId("braids-turned-off")).toBeNull();
     });
   });
 });

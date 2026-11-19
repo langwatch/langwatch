@@ -133,6 +133,7 @@ export function filesystemBackend(options: { root: string }): ObjectBackend {
     },
 
     signUpload: () => Promise.resolve({ kind: "through-process" }),
+    uploadRoute: "through-process",
     signDownload: (at) => Promise.reject(new UnsignableDownloadError("file", at.key)),
 
     async probe() {

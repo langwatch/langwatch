@@ -3,17 +3,31 @@
 # this file is the release flag braid management sits behind. Signing keys: the api-key
 # module's signing-keys.feature.
 #
-# Bound by unit and integration tests in authz, navigation and api-key.
+# Since 2026-11-18 (decided by Alex) the flag defaults on and stays as LangWatch's kill switch;
+# an organisation admin turns Braids on in settings (braids.feature, "An organisation turns
+# Braids on in settings"). The scenarios below with the flag off are the kill switch.
+#
+# Bound by unit and integration tests in authz, navigation, api-key and feature-flag.
 
 @authz @braids
-Feature: Braid management behind the release_braids flag
+Feature: Braid management behind the release_braids kill switch
   As LangWatch
-  I want braid management switched on per organisation
-  So that braids roll out gradually without breaking the braids an organisation already has
+  I want to be able to switch braid management off for an organisation
+  So that a problem can be contained without breaking the braids an organisation already has
 
   Background:
     Given an Enterprise organisation with plain projects "orchestrator" and "specialists"
     And ana, an organisation admin
+
+  Rule: The flag is a kill switch, on unless LangWatch switches it off
+
+    @unit
+    Scenario: release_braids is on by default
+      Given an organisation LangWatch has not switched off
+      When release_braids is read for it
+      Then it is on, on LangWatch Cloud and on a self-hosted install
+      # Whether the organisation uses Braids is its own setting, bound in braids.feature under
+      # "An organisation turns Braids on in settings".
 
   Rule: Off, the Braids screens list existing braids read-only so an admin can end them
     # Decided by Alex, 2026-11-18 (option 2a): braids keep applying while the flag is off, so
@@ -25,6 +39,34 @@ Feature: Braid management behind the release_braids flag
       When ana opens the project Braids page or the organisation Braids page
       Then each opens instead of answering not-found
       And it says Braids is not enabled, existing braids still apply, and they can be removed here
+
+    @integration
+    Scenario: With release_braids off and Braids turned off the pages say the braids are paused
+      Given release_braids is off for the organisation
+      And the organisation has Braids turned off
+      And a live braid from "specialists" into "orchestrator"
+      When ana opens the project Braids page or the organisation Braids page
+      Then it says Braids is not enabled, existing braids are paused and kept, and they can be removed
+      And each braid is marked paused
+
+    @integration
+    Scenario: With release_braids off below Enterprise the pages say the braids are paused by the plan
+      # Trace reads never honour a braid below Enterprise, flag on or off.
+      Given release_braids is off for the organisation
+      And the organisation has left Enterprise
+      And a live braid from "specialists" into "orchestrator"
+      When ana opens the project Braids page or the organisation Braids page
+      Then it says Braids is not enabled and existing braids are paused and kept, not that they apply
+      And a banner says braids need the Enterprise plan, whether Braids is turned on or off
+      And each braid is marked paused
+
+    @integration
+    Scenario: With release_braids off the Enable Braids row offers Retry when the setting can't be read
+      Given release_braids is off for the organisation
+      And reading the organisation's Braids settings fails
+      When ana opens Braids in the organisation settings
+      Then the Enable Braids row says the setting couldn't be read and shows no switch
+      And Retry reads the setting again
 
     @integration
     Scenario: With release_braids off the project Braids page lists braids with only Remove
@@ -59,9 +101,18 @@ Feature: Braid management behind the release_braids flag
     @integration
     Scenario: With release_braids off every braid management procedure refuses with braids_not_enabled
       Given release_braids is off for the organisation
-      When ana creates or changes braids, lists braid targets, counts who would see the spans, or reads or sets who may braid
+      When ana creates or changes braids, lists braid targets, counts who would see the spans, sets who may braid or turns Braids on
       Then each call is refused with braids_not_enabled
       And no braid is written
+
+    @integration
+    Scenario: With release_braids off an organisation admin can still turn Braids off
+      # The kill switch leaves braids applying; turning the setting off only narrows access.
+      Given a live braid from "specialists" into "orchestrator" with Braids turned on
+      And release_braids is then switched off for the organisation
+      When ana reads the organisation's Braids settings and turns Braids off
+      Then the settings answer Braids on, and turning it off is accepted
+      And the organisation Braids page offers the Enable Braids switch only while Braids is on
 
     @unit
     Scenario: With release_braids off the braid dialog's trace reads refuse with braids_not_enabled
@@ -92,7 +143,7 @@ Feature: Braid management behind the release_braids flag
       Given release_braids is off for the organisation
       When another module reads the organisation's authz settings or counts a project's members holding a permission
       Then each answers as it does with the flag on
-      And the Braids screen's own reads of the same are refused with braids_not_enabled
+      And the Braids screen's count of who would see the spans is refused with braids_not_enabled
 
     @unit
     Scenario: release_braids is answered for each organisation on its own

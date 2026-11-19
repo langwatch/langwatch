@@ -51,7 +51,7 @@ Feature: Braids
 
     @integration
     Scenario: Braids need the Enterprise plan
-      Given an organisation below Enterprise
+      Given an organisation below Enterprise that has Braids turned on
       When ana asks to create or change a braid
       Then each is refused with enterprise_plan_required naming the Braids feature
       And removing a braid and listing the organisation's braids are not refused
@@ -606,3 +606,55 @@ Feature: Braids
       And the braid is still listed, marked paused
       And an admin can still remove it
       And returning to Enterprise shows the braided spans again without recreating the braid
+
+  Rule: An organisation turns Braids on in settings
+    # Decided by Alex, 2026-11-18: "Braids is on by default, but has to be enabled in settings."
+    # release_braids is LangWatch's kill switch and defaults on (braids-release-flag.feature);
+    # this setting is the organisation admins' own, stored beside who may braid (ADR-201 §9).
+
+    @unit
+    Scenario: Braids is off for a new organisation
+      Given an organisation that has never turned Braids on
+      When its settings are read
+      Then Braids is off
+
+    @integration
+    Scenario: Only an organisation admin may turn Braids on or off
+      Given tom is an admin of the team holding "specialists"
+      When tom asks to turn Braids on
+      Then the change is refused as a permission denial
+      And ana's change is accepted
+
+    @integration
+    Scenario: Below Enterprise Braids cannot be turned on
+      Given an organisation below Enterprise
+      When ana asks to turn Braids on
+      Then the change is refused with enterprise_plan_required naming the Braids feature
+      And Braids stays off
+
+    @integration
+    Scenario: While Braids is turned off, management refuses and removal still works
+      Given a live braid from "specialists" into "orchestrator"
+      And ana turns Braids off
+      When ana creates or changes a braid, lists braid targets or counts who would see the spans
+      Then each call is refused with braids_turned_off
+      And the braid is still listed, and ana can still remove it
+      And the organisation's settings can still be read, so Braids can be turned on again
+
+    @unit
+    Scenario: Turning Braids off pauses braids within thirty seconds and keeps them
+      Given a live braid from "specialists" into "orchestrator"
+      When ana turns Braids off
+      Then within thirty seconds no "orchestrator" trace shows a "specialists" span
+      And the braid is still listed
+
+    @unit
+    Scenario: Turning Braids on again resumes the braids it paused
+      Given a live braid from "specialists" into "orchestrator" while Braids is turned off
+      When ana turns Braids on
+      Then "orchestrator" traces show the "specialists" spans again without recreating the braid
+
+    @unit
+    Scenario: Turning Braids on and off is in the audit log
+      When ana turns Braids on and then off
+      Then the audit log holds an entry for each, naming ana, the new value and the previous one

@@ -31,6 +31,12 @@ export class MemoryStoredObjectRecordRepository implements StoredObjectRecordRep
     this.#values.set(key(value), value);
   }
 
+  async insert(value: StoredObjectRecord): Promise<boolean> {
+    if (this.#values.has(key(value))) return false;
+    this.#values.set(key(value), value);
+    return true;
+  }
+
   async transition(input: {
     expected: Pick<StoredObjectRecord, "status" | "generation">;
     next: StoredObjectRecord;

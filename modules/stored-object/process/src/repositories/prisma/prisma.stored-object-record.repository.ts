@@ -57,6 +57,15 @@ export class PrismaStoredObjectRecordRepository implements StoredObjectRecordRep
     });
   }
 
+  async insert(value: StoredObjectRecord): Promise<boolean> {
+    const result = await this.prisma.storedObject.createMany({
+      data: [toRow(value)],
+      skipDuplicates: true,
+    });
+
+    return result.count === 1;
+  }
+
   async transition(input: {
     expected: Pick<StoredObjectRecord, "status" | "generation">;
     next: StoredObjectRecord;

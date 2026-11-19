@@ -1,5 +1,22 @@
 # Changelog
 
+## [3.25.0](https://github.com/langwatch/langwatch/compare/langwatch@v3.24.0...langwatch@v3.25.0) (2026-11-18)
+
+
+### Features
+
+* **braids:** on by default, turned on per organisation in settings ([#9695](https://github.com/langwatch/langwatch/issues/9695)) ([d26a498](https://github.com/langwatch/langwatch/commit/d26a49831dd68e9ac0e0d48eba7a307022f1fcc5))
+* **coding-agent:** name sessions from langwatch.session.name in the OTel resource attributes ([#9705](https://github.com/langwatch/langwatch/issues/9705)) ([2c3fe3d](https://github.com/langwatch/langwatch/commit/2c3fe3d59b739300da81c2ba416a1aee3e99faad))
+
+
+### Bug Fixes
+
+* **automation:** log a transient refusal in graph trigger activity at warn ([#9694](https://github.com/langwatch/langwatch/issues/9694)) ([1b4e46c](https://github.com/langwatch/langwatch/commit/1b4e46c75655a5b8cbc0789431d7b5537ca53182))
+* **braids:** close the trace-id hole and fix the end-to-end findings ([#9689](https://github.com/langwatch/langwatch/issues/9689)) ([7227c4d](https://github.com/langwatch/langwatch/commit/7227c4d74fa5501b15f53331e66c0ba67cb3daa3))
+* **instant-eval:** fail a run whose own decision model key is refused on every row ([#9653](https://github.com/langwatch/langwatch/issues/9653)) ([f94a17d](https://github.com/langwatch/langwatch/commit/f94a17d4dd80f4a9c8ca8cb3cb8e2bb280918798))
+* **langy:** the skip-all switch turns on with one click and stays on ([#9361](https://github.com/langwatch/langwatch/issues/9361)) ([6391517](https://github.com/langwatch/langwatch/commit/6391517b5e811798c05e116d38be6eaee11871a3))
+* **stored-object:** review follow-ups from [#9668](https://github.com/langwatch/langwatch/issues/9668) ([#9674](https://github.com/langwatch/langwatch/issues/9674)) ([c93c86a](https://github.com/langwatch/langwatch/commit/c93c86ab698a3fbc3e001eaf4fb426d9f4e3200c))
+
 ## [3.24.0](https://github.com/langwatch/langwatch/compare/langwatch@v3.23.0...langwatch@v3.24.0) (2026-11-18)
 
 

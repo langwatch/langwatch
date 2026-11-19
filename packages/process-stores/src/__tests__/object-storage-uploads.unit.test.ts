@@ -93,6 +93,23 @@ describe("given the shared backend is Azure Blob", () => {
 
       expect(upload).toEqual({ kind: "through-process" });
     });
+
+    /** @scenario "The storage checkup reads where uploads go from the account's setting" */
+    it("says uploads go through the process without signing one", async () => {
+      const environment = {
+        STORED_OBJECTS_BACKEND: "azure",
+        AZURE_BLOB_ACCOUNT_NAME: "lwacct",
+        AZURE_BLOB_CONTAINER: "lw-container",
+        AZURE_BLOB_ACCOUNT_KEY: accountKey,
+        STORED_OBJECTS_UPLOADS: "through-langwatch",
+      };
+      const settings = parseProcessConfig({ owners: [storesOwner], environment }).stores
+        .objectStorage;
+      const opened = await openObjectStorage({ settings, environment });
+      closers.push(opened.close);
+
+      await expect(opened.storage.uploadRoute(PLATFORM_TENANT_ID)).resolves.toBe("through-process");
+    });
   });
 });
 
@@ -107,7 +124,7 @@ describe("given an organisation with its own S3 account", () => {
     });
 
   /** Projects "acme-project" and "other-project" belong to org123 and org456. */
-  const storageWith = (options: {
+  const memberWith = (options: {
     shared: "direct" | "through-langwatch";
     entry: Record<string, string>;
   }) => {
@@ -139,9 +156,23 @@ describe("given an organisation with its own S3 account", () => {
       },
     });
     closers.push(async () => built.close?.());
-    return (projectId: string) =>
-      built.value.signUpload({ projectId, key: `${projectId}/object-1` }, facts);
+    return built.value;
   };
+  const storageWith = (options: Parameters<typeof memberWith>[0]) => {
+    const member = memberWith(options);
+    return (projectId: string) =>
+      member.signUpload({ projectId, key: `${projectId}/object-1` }, facts);
+  };
+
+  describe("when a checkup asks where each project's uploads go", () => {
+    /** @scenario "The storage checkup reads where uploads go from the account's setting" */
+    it("answers from each account's own setting", async () => {
+      const member = memberWith({ shared: "direct", entry: { uploads: "through-langwatch" } });
+
+      await expect(member.uploadRoute("acme-project")).resolves.toBe("through-process");
+      await expect(member.uploadRoute("other-project")).resolves.toBe("direct");
+    });
+  });
 
   describe("when the shared account uploads directly and the organisation's is set to through-langwatch", () => {
     /** @scenario "A per-organisation S3 account keeps its own upload setting" */

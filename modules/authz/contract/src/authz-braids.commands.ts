@@ -206,6 +206,8 @@ const authzOrganizationPolicySchemaDefinition = z
     ...organizationShape,
     /** While on, only organisation-wide bindings confer `braids:manage`. */
     braidsOrganizationAdminsOnly: z.boolean(),
+    /** While off, braid management refuses and braided spans pause (Alex, 2026-11-18). */
+    braidsEnabled: z.boolean(),
     updatedByUserId: z.string().nullable(),
     updatedAtMs: z.number().int().nullable(),
   })
@@ -238,6 +240,20 @@ export interface AuthzSetBraidsPolicyInputSchema extends Named<
 export const authzSetBraidsPolicyInputSchema: AuthzSetBraidsPolicyInputSchema =
   authzSetBraidsPolicyInputSchemaDefinition;
 export type AuthzSetBraidsPolicyInput = z.infer<typeof authzSetBraidsPolicyInputSchema>;
+
+const authzSetBraidsEnabledInputSchemaDefinition = z
+  .object({
+    ...organizationShape,
+    braidsEnabled: z.boolean(),
+    actor: ledgerActorSchema,
+  })
+  .strict();
+export interface AuthzSetBraidsEnabledInputSchema extends Named<
+  typeof authzSetBraidsEnabledInputSchemaDefinition
+> {}
+export const authzSetBraidsEnabledInputSchema: AuthzSetBraidsEnabledInputSchema =
+  authzSetBraidsEnabledInputSchemaDefinition;
+export type AuthzSetBraidsEnabledInput = z.infer<typeof authzSetBraidsEnabledInputSchema>;
 
 /** Every live braid in an organisation, for its admins' Braids screen. */
 const authzOrganizationBraidsSchemaDefinition = z.array(authzBraidSchema);
