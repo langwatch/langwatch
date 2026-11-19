@@ -97,4 +97,4 @@ exclude_lines = [
 ]
 
 [dependency-groups]
-dev = ["mypy>=1.17.1", "ruff>=0.12.10"]
+dev = ["mypy>=1.17.1", "ruff>=0.12.10", "pytest>=7.0.0"]
