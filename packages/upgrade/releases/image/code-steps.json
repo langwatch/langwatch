@@ -391,6 +391,14 @@
     "needsOldWritersGone": true
   },
   {
+    "id": "organization:list-member-facts",
+    "kind": "data",
+    "mode": "background",
+    "owner": "organization",
+    "description": "Lists every organization's active members, neither disabled nor deactivated, with when each joined.",
+    "needsOldWritersGone": true
+  },
+  {
     "id": "project:record-created-facts",
     "kind": "data",
     "mode": "background",

@@ -50,6 +50,7 @@ export type CodeStepId =
   | "ops:fill-event-log-id-index"
   | "organization:record-presence-settings"
   | "organization:record-seat-peak-opening-snapshots"
+  | "organization:list-member-facts"
   | "project:record-created-facts"
   | "project:list-personal-owner-and-first-message-facts"
   | "prompt:seed-tags-for-untagged-organizations"

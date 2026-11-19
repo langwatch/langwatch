@@ -226,6 +226,11 @@
       "seed": "unplanned",
       "note": "needs ADMIN_EMAILS operators; cloud profile sets none"
     },
+    "organization:list-member-facts": {
+      "status": "pending",
+      "seed": "unplanned",
+      "note": "needs organizations with active, disabled and deactivated members, as the old release wrote them; no seed door written yet"
+    },
     "organization:record-presence-settings": {
       "status": "pending",
       "seed": "unplanned",

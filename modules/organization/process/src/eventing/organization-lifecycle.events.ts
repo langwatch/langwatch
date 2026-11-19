@@ -23,6 +23,9 @@ import {
   ORGANIZATION_MEMBER_REMOVED_EVENT_TYPE,
   ORGANIZATION_MEMBER_REMOVED_EVENT_VERSION,
   organizationMemberRemovedEventDataSchema,
+  ORGANIZATION_MEMBER_LISTED_EVENT_TYPE,
+  ORGANIZATION_MEMBER_LISTED_EVENT_VERSION,
+  organizationMemberListedEventDataSchema,
   ORGANIZATION_MEMBER_DEPARTMENT_CHANGED_EVENT_TYPE,
   ORGANIZATION_MEMBER_DEPARTMENT_CHANGED_EVENT_VERSION,
   organizationMemberDepartmentChangedEventDataSchema,
@@ -77,6 +80,7 @@ export const RECORD_MEMBER_DISABLED_COMMAND_TYPE =
   "lw.organization.record_member_disabled" as const;
 export const RECORD_MEMBER_REMOVED_COMMAND_TYPE = "lw.organization.record_member_removed" as const;
 export const RECORD_MEMBER_ENABLED_COMMAND_TYPE = "lw.organization.record_member_enabled" as const;
+export const RECORD_MEMBER_LISTED_COMMAND_TYPE = "lw.organization.record_member_listed" as const;
 export const RECORD_MEMBER_DEPARTMENT_CHANGED_COMMAND_TYPE =
   "lw.organization.record_member_department_changed" as const;
 
@@ -272,6 +276,18 @@ export const organizationMemberRemovedEventSchema = z.object({
   data: organizationMemberRemovedEventDataSchema,
 });
 export type OrganizationMemberRemovedEvent = z.infer<typeof organizationMemberRemovedEventSchema>;
+
+/** An existing active membership listed by the upgrade step; versioned on its own. */
+export const recordMemberListedCommandDataSchema = organizationMemberListedEventDataSchema;
+export type RecordMemberListedCommandData = z.infer<typeof recordMemberListedCommandDataSchema>;
+
+export const organizationMemberListedEventSchema = z.object({
+  ...EventSchema.shape,
+  type: z.literal(ORGANIZATION_MEMBER_LISTED_EVENT_TYPE),
+  version: z.literal(ORGANIZATION_MEMBER_LISTED_EVENT_VERSION),
+  data: organizationMemberListedEventDataSchema,
+});
+export type OrganizationMemberListedEvent = z.infer<typeof organizationMemberListedEventSchema>;
 
 /** A member's department set or cleared (M8487-DEPT-CHANGE). */
 export const recordMemberDepartmentChangedCommandDataSchema =
