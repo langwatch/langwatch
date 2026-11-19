@@ -17,7 +17,7 @@ import {
 } from "@langwatch/api/rest";
 import { DigestApi, digestTokenQuerySchema } from "@langwatch/enterprise-digest-contract";
 
-import { DIGEST_UNSUBSCRIBE_PATH } from "../services/digest-send.service.ts";
+import { DIGEST_UNSUBSCRIBE_PATH } from "../rules/digest-mail.rules.ts";
 
 const HTML = "text/html; charset=UTF-8";
 

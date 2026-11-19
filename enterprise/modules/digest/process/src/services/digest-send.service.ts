@@ -34,7 +34,7 @@ import {
   weekActivity,
   weekVisibleTo,
 } from "../rules/digest-email.rules.ts";
-import { renderDigestMail } from "../rules/digest-mail.rules.ts";
+import { DIGEST_UNSUBSCRIBE_PATH, renderDigestMail } from "../rules/digest-mail.rules.ts";
 import {
   type DigestTemplatePick,
   eligibleDigestTemplates,
@@ -50,10 +50,54 @@ type Membership = Readonly<{ kind: "active"; admin: boolean }> | Readonly<{ kind
 
 const logger = createLogger("langwatch:digest");
 
+/**
+ * Asks each organization's sends. A person's home organization is decided once here, not by each
+ * organization's send, so the sends cannot disagree.
+ */
+async function requestSends({
+  rosters,
+  organizationsOf,
+  attempt,
+  rankHome,
+  requestSend,
+  isoWeek,
+  at,
+}: {
+  rosters: ReadonlyMap<string, Member[]>;
+  organizationsOf: ReadonlyMap<string, string[]>;
+  attempt: (organizationId: string, work: () => Promise<void>) => Promise<void>;
+  rankHome: (query: {
+    userId: string;
+    isoWeek: string;
+    candidates: readonly string[];
+  }) => Promise<string | undefined>;
+  requestSend: (request: DigestSendRequest & { occurredAt: number }) => Promise<void>;
+  isoWeek: string;
+  at: number;
+}): Promise<void> {
+  const homes = new Map<string, string | null>();
+  for (const [organizationId, members] of rosters) {
+    await attempt(organizationId, async () => {
+      for (const member of members) {
+        if (!homes.has(member.userId)) {
+          const candidates = organizationsOf.get(member.userId) ?? [organizationId];
+          const home = await rankHome({ userId: member.userId, isoWeek, candidates });
+          homes.set(member.userId, home ?? null);
+        }
+        await requestSend({
+          ...member,
+          organizationId,
+          isoWeek,
+          homeOrganizationId: homes.get(member.userId) ?? null,
+          occurredAt: at,
+        });
+      }
+    });
+  }
+}
+
 const MEMBER_PAGE = 500;
 
-/** The address both the email's unsubscribe link (GET, a page) and its RFC 8058 header (POST) use. */
-export const DIGEST_UNSUBSCRIBE_PATH = "/api/digest/unsubscribe";
 
 type Deps = Readonly<{
   audience: DigestAudienceRepository;
@@ -150,25 +194,15 @@ export class DigestSendService {
       }
     }
     // Decided once here, not by each organization's send, so the sends cannot disagree.
-    const homes = new Map<string, string | null>();
-    for (const [organizationId, members] of rosters) {
-      await attempt(organizationId, async () => {
-        for (const member of members) {
-          if (!homes.has(member.userId)) {
-            const candidates = organizationsOf.get(member.userId) ?? [organizationId];
-            const home = await this.#rankHome({ userId: member.userId, isoWeek, candidates });
-            homes.set(member.userId, home ?? null);
-          }
-          await this.deps.requestSend({
-            ...member,
-            organizationId,
-            isoWeek,
-            homeOrganizationId: homes.get(member.userId) ?? null,
-            occurredAt: at,
-          });
-        }
-      });
-    }
+    await requestSends({
+      rosters,
+      organizationsOf,
+      attempt,
+      rankHome: (query) => this.#rankHome(query),
+      requestSend: this.deps.requestSend,
+      isoWeek,
+      at,
+    });
     // Left unplanned so the next wake tries the failed ones again; a request is keyed by
     // organization, person and week, so the organizations that went through are not asked twice.
     if (failed === 0) await this.deps.audience.markPlanned({ isoWeek });

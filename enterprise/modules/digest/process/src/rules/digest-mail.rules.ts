@@ -5,6 +5,12 @@ import { sendEmailCommandSchema } from "@langwatch/notification-contract";
 import type { DigestMail, RenderedDigestMail } from "../channels/digest-mail.channel.ts";
 
 /**
+ * The address both the email's unsubscribe link (GET, a page) and its RFC 8058 header (POST) use.
+ * It lives here, not in the send service, so the route can name it without a transport naming a service.
+ */
+export const DIGEST_UNSUBSCRIBE_PATH = "/api/digest/unsubscribe";
+
+/**
  * Renders a composed digest email with its `@langwatch/mail` template and parses the command
  * notification will take. Everything that can refuse the email short of the mailer refuses it
  * here, so a send can do this before it claims the week and a refusal leaves the week unclaimed.
