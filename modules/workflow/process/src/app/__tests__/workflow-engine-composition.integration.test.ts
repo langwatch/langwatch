@@ -44,7 +44,11 @@ async function appAt({
   return WorkflowModule.create({
     dependencies: {
       modelProviders: createApiFixture<ModelProviderApi>(
-        { getForProject: async () => ({}), getExecutionProviders: async () => ({}) },
+        {
+          getForProject: async () => ({}),
+          getExecutionProviders: async () => ({}),
+          privateEndpointBindingsForProject: async () => [],
+        },
         "ModelProviderApi",
       ),
       agents: createApiFixture<AgentApi>({}, "AgentApi"),
