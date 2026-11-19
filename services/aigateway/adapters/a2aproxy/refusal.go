@@ -59,8 +59,7 @@ func (c *call) markRefused(r refusal) {
 // HTTP 200 for JSON-RPC, the HTTP status for HTTP+JSON.
 func (c *call) refuse(r refusal) {
 	c.markRefused(r)
-	c.w.Header().Set("Content-Type", "application/json")
-	setNoStore(c.w.Header())
+	setJSONReply(c.w.Header())
 	if c.binding == bindingJSONRPC {
 		c.w.WriteHeader(http.StatusOK)
 	} else {

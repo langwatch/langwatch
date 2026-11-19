@@ -108,7 +108,8 @@ const maxJSONDepth = 64
 
 var errTooDeep = errors.New("the JSON nests too deeply")
 
-// protocolValueKeys hold ids and enum values, never content the guardrail needs.
+// protocolValueKeys hold ids and enum values. Their key names are not content,
+// but their values are still scanned: a sender chooses what it puts there.
 var protocolValueKeys = map[string]bool{
 	"jsonrpc": true, "method": true, "id": true, "messageId": true, "contextId": true,
 	"taskId": true, "artifactId": true, "role": true, "kind": true, "mediaType": true,
@@ -298,7 +299,7 @@ func (w *tokenWalker) appendValue(s string) {
 	if w.withParts && s != "" && !content {
 		w.notePart(key, s)
 	}
-	if s == "" || (!content && protocolValueKeys[key]) {
+	if s == "" {
 		return
 	}
 	if !content {
