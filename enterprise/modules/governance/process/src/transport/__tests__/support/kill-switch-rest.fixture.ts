@@ -248,9 +248,7 @@ export async function buildKillSwitchRest({
     eventStore: EventStoreMemory.createForTesting(),
     processStore,
   });
-  const pipeline = eventing.register(
-    app.agentStopPipeline({ processStore }),
-  );
+  const pipeline = eventing.register(app.agentStopPipeline({ processStore }));
   app.connectAgentStop(pipeline.commands);
   const call = mountKillSwitchRest({ app, grants, planType });
   return { app, repositories, eventing, disabled, call };
