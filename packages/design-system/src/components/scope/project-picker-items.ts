@@ -75,6 +75,27 @@ export function filterProjectPickerItems({
   return items.filter((item) => item.kind === "project" && item.searchText.includes(needle));
 }
 
+/** A team with the entries the query kept under it; a team left with none is dropped. */
+export interface ProjectPickerVisibleGroup {
+  team: ProjectPickerGroup["team"];
+  items: ProjectPickerItem[];
+}
+
+export function groupProjectPickerItems({
+  groups,
+  items,
+}: {
+  groups: readonly ProjectPickerGroup[];
+  items: readonly ProjectPickerItem[];
+}): ProjectPickerVisibleGroup[] {
+  return groups
+    .map((group) => ({
+      team: group.team,
+      items: items.filter((item) => item.teamId === group.team.teamId),
+    }))
+    .filter((group) => group.items.length > 0);
+}
+
 /**
  * What picking a value means: opening a project, starting the create flow for a
  * team, or nothing (the current project, or a value that left the list).

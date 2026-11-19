@@ -54,6 +54,26 @@ function searchFor(text: string) {
 }
 
 describe("ProjectPicker", () => {
+  describe("given a long current project name", () => {
+    it("bounds the chip and names the project in full on hover", () => {
+      const name = "Customer support assistant for the European billing desk";
+      renderWithDesignSystem(
+        <ProjectPicker
+          groups={GROUPS}
+          currentProjectId="web"
+          currentProjectName={name}
+          showTeamHeaders
+          onOpenProject={vi.fn()}
+        />,
+      );
+
+      expect(screen.getByRole("button", { name: "Switch project" })).toHaveStyle({
+        maxWidth: "260px",
+      });
+      expect(screen.getByTitle(name)).toHaveTextContent(name);
+    });
+  });
+
   describe("when opened", () => {
     it("offers a per-team New Project while the list is unfiltered", async () => {
       const { onCreateProjectForTeam } = renderPicker();

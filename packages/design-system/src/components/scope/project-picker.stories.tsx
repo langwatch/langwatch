@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
+import { Box } from "../../primitives.ts";
 import { ProjectPicker } from "./project-picker.tsx";
 
 const meta = {
@@ -78,4 +79,19 @@ export const LongProjectName: Story = {
   args: {
     currentProjectName: "Customer support assistant for the European billing desk",
   },
+};
+
+/** A page header on a narrow screen: the chip stays bounded and the long name truncates. */
+export const NarrowHeader: Story = {
+  args: {
+    align: "end",
+    currentProjectName: "Customer support assistant for the European billing desk",
+  },
+  decorators: [
+    (Story) => (
+      <Box width="320px" display="flex" justifyContent="flex-end" borderWidth="1px" padding={2}>
+        <Story />
+      </Box>
+    ),
+  ],
 };

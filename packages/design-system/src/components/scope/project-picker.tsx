@@ -13,31 +13,17 @@ import {
 import { AggregateProjectAvatar, ProjectAvatar } from "../display/project-avatar.tsx";
 import {
   filterProjectPickerItems,
+  groupProjectPickerItems,
   type ProjectPickerGroup,
   type ProjectPickerItem,
+  type ProjectPickerVisibleGroup,
   projectPickerItems,
   resolveProjectPick,
 } from "./project-picker-items.ts";
 
 export type { ProjectPickerGroup, ProjectPickerItem } from "./project-picker-items.ts";
 
-/**
- * The one project picker: a chip opening a focused search over the projects by team,
- * the current one ticked, Enter picking the first match. Holds no data: the caller
- * hands the groups and follows the pick. Spec: specs/navigation/one-project-picker.feature
- */
-export function ProjectPicker({
-  groups,
-  currentProjectId,
-  currentProjectName,
-  currentProjectIsAggregate = false,
-  showTeamHeaders,
-  onOpenProject,
-  onCreateProjectForTeam,
-  triggerTestId,
-  tourAnchor,
-  align = "start",
-}: {
+export interface ProjectPickerProps {
   groups: ProjectPickerGroup[];
   currentProjectId: string;
   currentProjectName: string;
@@ -49,27 +35,23 @@ export function ProjectPicker({
   tourAnchor?: string;
   /** Which edge of the chip the popup lines up with; "end" for a chip at a header's right. */
   align?: "start" | "end";
-}) {
+}
+
+/**
+ * The one project picker: a chip opening a focused search over the projects by team,
+ * the current one ticked, Enter picking the first match. Holds no data: the caller
+ * hands the groups and follows the pick. Spec: specs/navigation/one-project-picker.feature
+ */
+export function ProjectPicker(props: ProjectPickerProps) {
+  const { groups, currentProjectId, align = "start" } = props;
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
-  const allItems = projectPickerItems(groups);
-  const filteredItems = filterProjectPickerItems({ items: allItems, query });
-  const collection = createListCollection({
-    items: filteredItems,
-    itemToValue: (item) => item.value,
-    itemToString: (item) => item.label,
-  });
-  const visibleGroups = groups
-    .map((group) => ({
-      team: group.team,
-      items: filteredItems.filter((item) => item.teamId === group.team.teamId),
-    }))
-    .filter((group) => group.items.length > 0);
+  const { allItems, collection, visibleGroups } = projectPickerView({ groups, query });
 
   const pick = (value: string) => {
     const outcome = resolveProjectPick({ value, items: allItems, groups, currentProjectId });
-    if (outcome?.kind === "create") onCreateProjectForTeam?.(outcome.team);
-    if (outcome?.kind === "open") onOpenProject(outcome.href);
+    if (outcome?.kind === "create") props.onCreateProjectForTeam?.(outcome.team);
+    if (outcome?.kind === "open") props.onOpenProject(outcome.href);
   };
 
   return (
@@ -101,66 +83,94 @@ export function ProjectPicker({
       positioning={{ placement: `bottom-${align}`, gutter: 4, sameWidth: false }}
       width="auto"
     >
-      <ProjectPickerTrigger
-        currentProjectName={currentProjectName}
-        currentProjectIsAggregate={currentProjectIsAggregate}
-        triggerTestId={triggerTestId}
-        tourAnchor={tourAnchor}
+      <ProjectPickerTrigger {...props} />
+      <ProjectPickerPopup
+        visibleGroups={visibleGroups}
+        showTeamHeaders={props.showTeamHeaders}
+        currentProjectId={currentProjectId}
+        query={query}
       />
-      <Portal>
-        <Combobox.Positioner>
-          <Combobox.Content
-            minWidth="260px"
-            maxWidth="360px"
-            maxHeight="360px"
-            overflowY="auto"
-            padding={0}
-          >
-            <ProjectSearchHeader />
-            <Combobox.Empty paddingX={3} paddingY={2} color="fg.muted" textStyle="bodySm">
-              {`No projects match "${query.trim()}"`}
-            </Combobox.Empty>
-            <Box padding={1}>
-              {visibleGroups.map((group) => (
-                <Combobox.ItemGroup key={group.team.teamId}>
-                  <Combobox.ItemGroupLabel
-                    paddingX={2}
-                    paddingTop={2}
-                    paddingBottom={1}
-                    color="fg.muted"
-                    textStyle="groupLabel"
-                  >
-                    {showTeamHeaders ? group.team.label : "Projects"}
-                  </Combobox.ItemGroupLabel>
-                  {group.items.map((item) => (
-                    <ProjectItemRow
-                      key={item.value}
-                      item={item}
-                      isCurrent={item.value === currentProjectId}
-                    />
-                  ))}
-                </Combobox.ItemGroup>
-              ))}
-            </Box>
-          </Combobox.Content>
-        </Combobox.Positioner>
-      </Portal>
     </Combobox.Root>
   );
 }
 
-/** The chip that opens the popup. */
+/** What the popup offers for a query: every entry, the kept ones as a collection, by team. */
+function projectPickerView({ groups, query }: { groups: ProjectPickerGroup[]; query: string }) {
+  const allItems = projectPickerItems(groups);
+  const filteredItems = filterProjectPickerItems({ items: allItems, query });
+  const collection = createListCollection({
+    items: filteredItems,
+    itemToValue: (item) => item.value,
+    itemToString: (item) => item.label,
+  });
+  const visibleGroups = groupProjectPickerItems({ groups, items: filteredItems });
+  return { allItems, collection, visibleGroups };
+}
+
+/** The portaled popup: the search field, the empty state and the team groups. */
+function ProjectPickerPopup({
+  visibleGroups,
+  showTeamHeaders,
+  currentProjectId,
+  query,
+}: {
+  visibleGroups: ProjectPickerVisibleGroup[];
+  showTeamHeaders: boolean;
+  currentProjectId: string;
+  query: string;
+}) {
+  return (
+    <Portal>
+      <Combobox.Positioner>
+        <Combobox.Content
+          minWidth="260px"
+          maxWidth="360px"
+          maxHeight="360px"
+          overflowY="auto"
+          padding={0}
+        >
+          <ProjectSearchHeader />
+          <Combobox.Empty paddingX={3} paddingY={2} color="fg.muted" textStyle="bodySm">
+            {`No projects match "${query.trim()}"`}
+          </Combobox.Empty>
+          <Box padding={1}>
+            {visibleGroups.map((group) => (
+              <Combobox.ItemGroup key={group.team.teamId}>
+                <Combobox.ItemGroupLabel
+                  paddingX={2}
+                  paddingTop={2}
+                  paddingBottom={1}
+                  color="fg.muted"
+                  textStyle="groupLabel"
+                >
+                  {showTeamHeaders ? group.team.label : "Projects"}
+                </Combobox.ItemGroupLabel>
+                {group.items.map((item) => (
+                  <ProjectItemRow
+                    key={item.value}
+                    item={item}
+                    isCurrent={item.value === currentProjectId}
+                  />
+                ))}
+              </Combobox.ItemGroup>
+            ))}
+          </Box>
+        </Combobox.Content>
+      </Combobox.Positioner>
+    </Portal>
+  );
+}
+
+/** The chip that opens the popup; a long name truncates, named in full on hover. */
 function ProjectPickerTrigger({
   currentProjectName,
-  currentProjectIsAggregate,
+  currentProjectIsAggregate = false,
   triggerTestId,
   tourAnchor,
-}: {
-  currentProjectName: string;
-  currentProjectIsAggregate: boolean;
-  triggerTestId: string | undefined;
-  tourAnchor: string | undefined;
-}) {
+}: Pick<
+  ProjectPickerProps,
+  "currentProjectName" | "currentProjectIsAggregate" | "triggerTestId" | "tourAnchor"
+>) {
   return (
     // Ark positions the listbox against the CONTROL, so the trigger must live
     // inside one that generates a layout box.
@@ -177,6 +187,8 @@ function ProjectPickerTrigger({
           height="32px"
           color="fg"
           gap={2}
+          minWidth={0}
+          maxWidth="260px"
           _hover={{ backgroundColor: "bg.muted" }}
         >
           {currentProjectIsAggregate ? (
@@ -184,8 +196,14 @@ function ProjectPickerTrigger({
           ) : (
             <ProjectAvatar name={currentProjectName} />
           )}
-          <Text whiteSpace="nowrap">{currentProjectName}</Text>
-          <ChevronsUpDown size={12} color="var(--chakra-colors-fg-muted)" />
+          <Text truncate minWidth={0} title={currentProjectName}>
+            {currentProjectName}
+          </Text>
+          <ChevronsUpDown
+            size={12}
+            color="var(--chakra-colors-fg-muted)"
+            style={{ flexShrink: 0 }}
+          />
         </Button>
       </Combobox.Trigger>
     </Combobox.Control>
