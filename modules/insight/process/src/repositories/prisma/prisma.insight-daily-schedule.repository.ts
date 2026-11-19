@@ -2,6 +2,7 @@ import type { InsightDailyRun, InsightDailyRunSetting } from "@langwatch/insight
 import { type PrismaModelClient, prismaTables, skipTenantCheck } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
+import { NO_RUN_STARTED } from "../../eventing/insight-run-in-flight.projection.ts";
 import {
   byNewestRun,
   dailyRunFromState,
@@ -16,7 +17,7 @@ import {
   dailyScheduleStateFromRow,
   type InsightDailyScheduleRow,
 } from "./prisma.insight-daily-schedule.mapper.ts";
-import { runInFlightStateFromRow } from "./prisma.insight-run-in-flight-projection.repository.ts";
+import { runInFlightStateFromRow } from "./prisma.insight-run-in-flight.mapper.ts";
 
 /** The run rows and their run in flight rows, plus the raw SQL a read across projects needs. */
 type InsightDailyScheduleDatabase = PrismaModelClient<
@@ -74,7 +75,7 @@ export class PrismaInsightDailyScheduleRepository implements InsightDailySchedul
     const started = await this.database.insightRunInFlightProjection.findFirst({
       where: { id: scheduleId, projectId },
     });
-    const startedState = started ? runInFlightStateFromRow(started) : undefined;
+    const startedState = started ? runInFlightStateFromRow(started) : NO_RUN_STARTED;
     return rows.map((row) =>
       dailyRunSettingFromState(dailyScheduleStateFromRow(row), startedState),
     );

@@ -12,10 +12,7 @@ import type {
 } from "@langwatch/insight-contract";
 
 import type { InsightDailyScheduleState } from "../eventing/insight-daily-schedule.projection.ts";
-import {
-  type InsightRunInFlightState,
-  NO_RUN_STARTED,
-} from "../eventing/insight-run-in-flight.projection.ts";
+import type { InsightRunInFlightState } from "../eventing/insight-run-in-flight.projection.ts";
 
 /** How the row's last run ended; null until a run recorded an outcome. */
 function lastRunOf(state: InsightDailyScheduleState): InsightDailyRun["lastRun"] {
@@ -85,21 +82,28 @@ export const UNDECIDED_DAILY_RUN_SETTING: InsightDailyRunSetting = {
   runInFlight: null,
 };
 
+/** What the person chose for the row; null until they turned it on once. */
+function settingsOf({
+  hour,
+  timezone,
+  maxInsights,
+}: InsightDailyScheduleState): InsightDailyRunSetting["settings"] {
+  return hour === null || timezone === null || maxInsights === null
+    ? null
+    : { hour, timezone, maxInsights };
+}
+
 /**
- * The row's setting as its person reads it, with its run in flight row, if any; `settings` is
- * null until they turned it on once.
+ * The row's setting as its person reads it, beside its run in flight row (`NO_RUN_STARTED`
+ * for a schedule that has none).
  */
 export function dailyRunSettingFromState(
   state: InsightDailyScheduleState,
-  started: InsightRunInFlightState = NO_RUN_STARTED,
+  started: InsightRunInFlightState,
 ): InsightDailyRunSetting {
-  const { hour, timezone, maxInsights } = state;
   return {
     state: state.state,
-    settings:
-      hour === null || timezone === null || maxInsights === null
-        ? null
-        : { hour, timezone, maxInsights },
+    settings: settingsOf(state),
     lastRun: ownLastRunOf(state, started),
     offReason: state.offReason,
     runInFlight: runInFlightOf(state, started),
@@ -130,7 +134,7 @@ export function onScheduleFromState({
   projectId: string;
   state: InsightDailyScheduleState;
 }): InsightOnSchedule[] {
-  const { settings } = dailyRunSettingFromState(state);
+  const settings = settingsOf(state);
   if (state.state !== "on" || settings === null) return [];
   const board = { kind: state.boardKind, id: state.boardId, name: state.boardName };
   return [{ scheduleId, projectId, userId: state.userId, board, settings }];
@@ -152,7 +156,7 @@ export function decidedScheduleFromState({
   if (state.state === "undecided") return [];
   const board = { kind: state.boardKind, id: state.boardId, name: state.boardName };
   const { userId, consecutiveSkips, offReason } = state;
-  const { settings } = dailyRunSettingFromState(state);
+  const settings = settingsOf(state);
   return [
     {
       scheduleId,

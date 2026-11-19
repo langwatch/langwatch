@@ -6,6 +6,7 @@
 
 import type { DashboardApi } from "@langwatch/dashboard-contract";
 import { createTenantId } from "@langwatch/eventing";
+import { INSIGHT_RUN_IN_FLIGHT_PROJECTION_VERSION } from "@langwatch/insight-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { nowInstant } from "@langwatch/time";
 import { beforeEach, describe, expect, it } from "vitest";
@@ -80,7 +81,11 @@ async function onWithRunInFlight({ startedAt }: { startedAt: number }): Promise<
   );
   const started = { runId: "slot:1", conversationId: "conversation-1", startedAt };
   await repositories.runInFlightProjection.store(
-    { ...folded, state: { ...started, lastSettledRunId: null }, version: "2026-11-19" },
+    {
+      ...folded,
+      state: { ...started, lastSettledRunId: null },
+      version: INSIGHT_RUN_IN_FLIGHT_PROJECTION_VERSION,
+    },
     context,
   );
 }

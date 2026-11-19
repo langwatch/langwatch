@@ -37,7 +37,9 @@ function leavesRow(state: InsightRunInFlightState, event: InsightDailyRunEvent):
   switch (event.type) {
     case INSIGHT_DAILY_RUN_EVENT_TYPES.RUN_STARTED:
       // A start delivered again after its run settled is not a run in flight. A retried attempt
-      // appends its own start under the same key: the first stands, as a replay keeps it.
+      // appends its own start under the same key: the first stands, as a replay keeps it. A start
+      // delivered again after a newer run's events never reaches here: the fold drops an event
+      // older than the row's cursor (`applyStateEvent`, packages/eventing stateProjectionExecutor).
       return state.lastSettledRunId === event.data.runId || state.runId === event.data.runId;
     case INSIGHT_DAILY_RUN_EVENT_TYPES.RUN_SETTLED:
       return state.lastSettledRunId === event.data.runId;

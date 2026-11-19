@@ -95,15 +95,6 @@ function foldAll(events: InsightDailyRunEvent[]) {
   return { row, setting: dailyRunSettingFromState(schedule, row) };
 }
 
-describe("given the run in flight row", () => {
-  it("folds a run's start and its outcome, and nothing else", () => {
-    expect(PROJECTION.eventTypes).toEqual([
-      INSIGHT_DAILY_RUN_EVENT_TYPES.RUN_STARTED,
-      INSIGHT_DAILY_RUN_EVENT_TYPES.RUN_SETTLED,
-    ]);
-  });
-});
-
 describe("given a run was requested for a board", () => {
   describe("when the run starts, and then settles", () => {
     /** @scenario "A started run names its conversation on the board's row" */

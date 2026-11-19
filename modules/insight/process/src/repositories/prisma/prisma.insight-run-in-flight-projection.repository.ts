@@ -5,16 +5,9 @@ import type {
   StoredProjectionRead,
 } from "@langwatch/eventing";
 import { PrismaRepository } from "@langwatch/prisma-client";
-import type { Prisma } from "@langwatch/prisma-client/generated";
 
 import type { InsightRunInFlightState } from "../../eventing/insight-run-in-flight.projection.ts";
-
-export type InsightRunInFlightRow = Prisma.InsightRunInFlightProjectionGetPayload<object>;
-
-export function runInFlightStateFromRow(row: InsightRunInFlightRow): InsightRunInFlightState {
-  const { runId, conversationId, startedAt, lastSettledRunId } = row;
-  return { runId, conversationId, startedAt, lastSettledRunId };
-}
+import { runInFlightStateFromRow } from "./prisma.insight-run-in-flight.mapper.ts";
 
 /** Postgres row I/O for a schedule's run in flight row; the row id is the schedule id. */
 export class PrismaInsightRunInFlightProjectionRepository

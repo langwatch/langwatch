@@ -8,7 +8,10 @@
 import { describe, expect, it } from "vitest";
 
 import type { InsightDailyScheduleState } from "../../eventing/insight-daily-schedule.projection.ts";
-import type { InsightRunInFlightState } from "../../eventing/insight-run-in-flight.projection.ts";
+import {
+  type InsightRunInFlightState,
+  NO_RUN_STARTED,
+} from "../../eventing/insight-run-in-flight.projection.ts";
 import { dailyRunSettingFromState } from "../insight-daily-schedule-row.rules.ts";
 
 const STARTED_AT = Date.UTC(2026, 10, 19, 9, 0);
@@ -43,7 +46,7 @@ const settingBeside = (row: InsightRunInFlightState) => dailyRunSettingFromState
 describe("given a run row with no run in flight row, as before Run now", () => {
   /** @scenario "A settled run keeps when it started on the board's row" */
   it("names no run in flight, and no start for its last run, so its settle time stands in", () => {
-    const setting = dailyRunSettingFromState(settledRow());
+    const setting = settingBeside(NO_RUN_STARTED);
 
     expect(setting.runInFlight).toBeNull();
     expect(setting.lastRun).toMatchObject({ runId: "run-1", at: SETTLED_AT });
@@ -95,5 +98,20 @@ describe("given a run row that took a run's outcome before its run in flight row
 
     expect(setting.runInFlight).toBeNull();
     expect(setting.lastRun).toMatchObject({ runId: "run-1", startedAt: STARTED_AT });
+  });
+});
+
+describe("given a run in flight row that took a newer run's outcome before the run row did", () => {
+  it("names no run in flight, and no start for the run row's last run", () => {
+    const setting = settingBeside({
+      runId: "run-2",
+      conversationId: "conversation-2",
+      startedAt: SETTLED_AT + 1_000,
+      lastSettledRunId: "run-2",
+    });
+
+    expect(setting.runInFlight).toBeNull();
+    expect(setting.lastRun).toMatchObject({ runId: "run-1" });
+    expect(setting.lastRun).not.toHaveProperty("startedAt");
   });
 });

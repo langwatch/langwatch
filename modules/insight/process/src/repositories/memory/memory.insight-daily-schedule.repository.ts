@@ -1,5 +1,6 @@
 import type { InsightDailyRun, InsightDailyRunSetting } from "@langwatch/insight-contract";
 
+import { NO_RUN_STARTED } from "../../eventing/insight-run-in-flight.projection.ts";
 import {
   byNewestRun,
   byOnThenId,
@@ -47,7 +48,7 @@ export class MemoryInsightDailyScheduleRepository implements InsightDailySchedul
     const key = InsightMemoryStore.scheduleKey({ projectId, scheduleId });
     const row = this.rows.schedules.get(key);
     if (!row || row.state.userId !== userId) return [];
-    const started = this.rows.runsInFlight.get(key)?.state;
+    const started = this.rows.runsInFlight.get(key)?.state ?? NO_RUN_STARTED;
     return [dailyRunSettingFromState(row.state, started)];
   }
 
