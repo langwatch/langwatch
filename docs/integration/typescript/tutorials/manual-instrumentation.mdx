@@ -366,7 +366,7 @@ Configure multiple exporters for different destinations:
 
 ```typescript
 import { BatchSpanProcessor } from "@opentelemetry/sdk-trace";
-import { JaegerExporter } from "@opentelemetry/exporter-jaeger";
+import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-proto";
 import { LangWatchExporter } from "langwatch";
 
 const handle = setupObservability({
@@ -374,8 +374,8 @@ const handle = setupObservability({
   spanProcessors: [
     // Send to Jaeger for debugging
     new BatchSpanProcessor({
-      exporter: new JaegerExporter({
-        endpoint: "http://localhost:14268/api/v1/traces",
+      exporter: new OTLPTraceExporter({
+        url: "http://localhost:4318/v1/traces", // Jaeger's OTLP receiver
       }),
     }),
     // Send to LangWatch for production monitoring

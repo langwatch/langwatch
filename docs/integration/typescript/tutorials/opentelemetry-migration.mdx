@@ -93,12 +93,12 @@ const handle = setupObservability({
   ```typescript
   import { NodeSDK } from "@opentelemetry/sdk-node";
   import { BatchSpanProcessor } from "@opentelemetry/sdk-trace";
-  import { JaegerExporter } from "@opentelemetry/exporter-jaeger";
+  import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-proto";
 
   const sdk = new NodeSDK({
     serviceName: "my-service",
     spanProcessors: [
-      new BatchSpanProcessor({ exporter: new JaegerExporter() })
+      new BatchSpanProcessor({ exporter: new OTLPTraceExporter() })
     ],
     instrumentations: [new HttpInstrumentation()],
     sampler: new TraceIdRatioBasedSampler(0.1),
@@ -113,7 +113,7 @@ const handle = setupObservability({
   ```typescript
   import { setupObservability } from "langwatch/observability/node";
   import { BatchSpanProcessor } from "@opentelemetry/sdk-trace";
-  import { JaegerExporter } from "@opentelemetry/exporter-jaeger";
+  import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-proto";
 
   const handle = setupObservability({
     langwatch: {
@@ -121,7 +121,7 @@ const handle = setupObservability({
     },
     serviceName: "my-service",
     spanProcessors: [
-      new BatchSpanProcessor({ exporter: new JaegerExporter() })
+      new BatchSpanProcessor({ exporter: new OTLPTraceExporter() })
     ],
     instrumentations: [new HttpInstrumentation()],
     sampler: new TraceIdRatioBasedSampler(0.1),

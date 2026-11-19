@@ -30698,7 +30698,7 @@ Configure multiple exporters for different destinations:
 
 ```typescript
 import { BatchSpanProcessor } from "@opentelemetry/sdk-trace";
-import { JaegerExporter } from "@opentelemetry/exporter-jaeger";
+import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-proto";
 import { LangWatchExporter } from "langwatch";
 
 const handle = setupObservability({
@@ -30706,8 +30706,8 @@ const handle = setupObservability({
   spanProcessors: [
     // Send to Jaeger for debugging
     new BatchSpanProcessor({
-      exporter: new JaegerExporter({
-        endpoint: "http://localhost:14268/api/v1/traces",
+      exporter: new OTLPTraceExporter({
+        url: "http://localhost:4318/v1/traces", // Jaeger's OTLP receiver
       }),
     }),
     // Send to LangWatch for production monitoring
@@ -30977,12 +30977,12 @@ const handle = setupObservability({
   ```typescript
   import { NodeSDK } from "@opentelemetry/sdk-node";
   import { BatchSpanProcessor } from "@opentelemetry/sdk-trace";
-  import { JaegerExporter } from "@opentelemetry/exporter-jaeger";
+  import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-proto";
 
   const sdk = new NodeSDK({
     serviceName: "my-service",
     spanProcessors: [
-      new BatchSpanProcessor({ exporter: new JaegerExporter() })
+      new BatchSpanProcessor({ exporter: new OTLPTraceExporter() })
     ],
     instrumentations: [new HttpInstrumentation()],
     sampler: new TraceIdRatioBasedSampler(0.1),
@@ -30997,7 +30997,7 @@ const handle = setupObservability({
   ```typescript
   import { setupObservability } from "langwatch/observability/node";
   import { BatchSpanProcessor } from "@opentelemetry/sdk-trace";
-  import { JaegerExporter } from "@opentelemetry/exporter-jaeger";
+  import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-proto";
 
   const handle = setupObservability({
     langwatch: {
@@ -31005,7 +31005,7 @@ const handle = setupObservability({
     },
     serviceName: "my-service",
     spanProcessors: [
-      new BatchSpanProcessor({ exporter: new JaegerExporter() })
+      new BatchSpanProcessor({ exporter: new OTLPTraceExporter() })
     ],
     instrumentations: [new HttpInstrumentation()],
     sampler: new TraceIdRatioBasedSampler(0.1),
@@ -35566,7 +35566,7 @@ langwatch.setup(
 ```typescript TypeScript with Multiple Exporters
 import { setupObservability } from "langwatch/observability/node";
 import { BatchSpanProcessor } from "@opentelemetry/sdk-trace";
-import { JaegerExporter } from "@opentelemetry/exporter-jaeger";
+import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-proto";
 import { LangWatchExporter } from "langwatch";
 
 const handle = setupObservability({
@@ -35575,8 +35575,8 @@ const handle = setupObservability({
   spanProcessors: [
     // Send to Jaeger for debugging
     new BatchSpanProcessor({
-      exporter: new JaegerExporter({
-        endpoint: "http://localhost:14268/api/v1/traces",
+      exporter: new OTLPTraceExporter({
+        url: "http://localhost:4318/v1/traces", // Jaeger's OTLP receiver
       }),
     }),
     // Send to LangWatch for production monitoring
@@ -35681,13 +35681,12 @@ const handle = setupObservability({
 
 ```typescript TypeScript Performance Tuning
 import { setupObservability } from "langwatch/observability/node";
-import { TraceIdRatioBasedSampler } from "@opentelemetry/sdk-trace";
+import { BatchSpanProcessor, TraceIdRatioBasedSampler } from "@opentelemetry/sdk-trace";
+import { LangWatchExporter } from "langwatch";
 
 const handle = setupObservability({
-  langwatch: {
-    apiKey: process.env.LANGWATCH_API_KEY,
-    processorType: "batch",
-  },
+  // The tuned processor below is the only LangWatch export path
+  langwatch: "disabled",
   serviceName: "my-service",
 
   // Performance tuning
