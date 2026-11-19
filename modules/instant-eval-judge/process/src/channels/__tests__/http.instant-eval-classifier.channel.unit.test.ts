@@ -18,6 +18,7 @@ import { MockAgent } from "undici";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { MemoryInstantEvalRateLimiter } from "../../__tests__/support/instant-eval-rate-limiter.test-fakes.ts";
+import { INSTANT_EVAL_CLASSIFIER_BREAKER } from "../../rules/instant-eval-classifier-breaker.rules.ts";
 import {
   HttpInstantEvalClassifierChannel,
   JEV_DEFAULT_BASE_URL,
@@ -381,6 +382,50 @@ describe("given a judge that is down for every send", () => {
       expect(held.verdicts).toHaveLength(1);
       expect(sends).toBe(2);
       expect(waits.length).toBeGreaterThan(4);
+    });
+  });
+
+  describe("when a text is held back behind a probe that never settles", () => {
+    /** @scenario "A text held behind a probe that never settles still gives up" */
+    it("spends an attempt on each held-back turn and skips the text", async () => {
+      const clock = { now: 0 };
+      let isProbeStuck = false;
+      const limiter: InstantEvalRateLimiter = {
+        acquire: () => (isProbeStuck ? new Promise<void>(() => {}) : Promise.resolve()),
+      };
+      const channel = HttpInstantEvalClassifierChannel.create({
+        apiKey: "test-key",
+        dispatcher: agent,
+        sleep: async (ms: number) => {
+          waits.push(ms);
+          if (waits.length > 20) throw new Error("held back forever");
+        },
+        now: () => clock.now,
+      });
+      const classify = (text: string) =>
+        channel.classify({ projectId: "project-1", text, questions: [QUESTION], limiter });
+      let sends = 0;
+      endpoint()
+        .intercept({ path: "/v1/systemone", method: "POST" })
+        .reply(500, () => {
+          sends += 1;
+          return "upstream down";
+        })
+        .persist();
+      for (let i = 0; i < 4; i++) await classify(`text ${i}`);
+
+      clock.now = 10_000;
+      isProbeStuck = true;
+      void classify("probe");
+      const { probeAnsweredWithinMs } = INSTANT_EVAL_CLASSIFIER_BREAKER;
+      clock.now = 10_000 + probeAnsweredWithinMs;
+      waits = [];
+
+      const held = await classify("held");
+
+      expect(held.skippedReason).toBe("classifier_failed");
+      expect(waits).toEqual([1_000, 2_000, 4_000, 8_000]);
+      expect(sends).toBe(16);
     });
   });
 
