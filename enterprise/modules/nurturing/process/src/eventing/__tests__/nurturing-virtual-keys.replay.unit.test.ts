@@ -49,7 +49,7 @@ import {
   buildNurturingProjectUsagePipeline,
   NURTURING_PROJECT_USAGE_PIPELINE_NAME,
 } from "../nurturing-project-usage.pipeline.ts";
-import { nurturingReplaySteps } from "../nurturing-replay-steps.ts";
+import { nurturingReplaySteps } from "../../migrations/replay.nurturing.migration.ts";
 import { lifecycleFact, ORGANIZATION_ID } from "./nurturing-gateway-facts.test-helpers.ts";
 import { NurturingSeededLog } from "./nurturing-seeded-log.test-helpers.ts";
 
@@ -536,7 +536,7 @@ describe("given the key copy's write or a fact's schema fails", () => {
     await expect(worker.run(KEYS_STEP)).rejects.toMatchObject({
       code: "projection_lane_replay_failed",
     });
-    expect(() => open((lane) => lane.map(refused as never))).toThrow();
+    expect(() => open((lane) => lane.map(refused as never))).toThrow(/organization_id/);
     // Left unset, a spent write blocks its group (mapProjection.types.ts onExhausted), as asked.
     expect(definition.options?.onExhausted).toBeUndefined();
   });

@@ -147,19 +147,38 @@ function registeredKeyLane({
     },
     sync: undefined,
   });
-  let lane: MapProjectionDefinition<NurturingVirtualKeyFact, Event> | undefined;
+  let lane: MapProjectionDefinition<unknown, Event> | undefined;
   const registry = createApiFixture<
     Parameters<NonNullable<typeof pipeline.globalProjections>[number]["register"]>[0]
   >({
     registerEventSubscriber: () => undefined,
     registerPeerMapProjection: (map) => {
       const keys = `${NURTURING_PROJECT_USAGE_PIPELINE_NAME}.${NURTURING_VIRTUAL_KEYS_PROJECTION_NAME}`;
-      if (map.name === keys) lane = map as unknown as MapProjectionDefinition<NurturingVirtualKeyFact, Event>;
+      if (map.name === keys) lane = map;
     },
   });
   for (const projection of pipeline.globalProjections ?? []) projection.register(registry);
   if (!lane) throw new Error("the usage pipeline registers no key lane");
-  return lane;
+  return keyFactLaneOf(lane);
+}
+
+const isKeyFact = (record: unknown): record is NurturingVirtualKeyFact =>
+  typeof record === "object" && record !== null && "virtualKeyId" in record;
+
+/** The registered lane read as the key copy's fact lane; a record that is no key fact fails loudly. */
+function keyFactLaneOf(
+  lane: MapProjectionDefinition<unknown, Event>,
+): MapProjectionDefinition<NurturingVirtualKeyFact, Event> {
+  return {
+    ...lane,
+    map: (event) => {
+      const record = lane.map(event);
+      if (record === null) return null;
+      if (!isKeyFact(record)) throw new Error("the key lane mapped a record that is no key fact");
+      return record;
+    },
+    store: { append: (fact, context) => lane.store.append(fact, context) },
+  };
 }
 
 /** User's erasure fact for one account. */

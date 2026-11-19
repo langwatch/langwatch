@@ -10,7 +10,7 @@ import {
   NURTURING_PROJECT_USAGE_PIPELINE_NAME,
   NURTURING_USER_ERASURE_MARKS_PROJECTION_NAME,
   NURTURING_VIRTUAL_KEYS_PROJECTION_NAME,
-} from "./nurturing-project-usage.pipeline.ts";
+} from "../eventing/nurturing-project-usage.pipeline.ts";
 
 const laneOf = (projection: string) => `${NURTURING_PROJECT_USAGE_PIPELINE_NAME}.${projection}`;
 
