@@ -114,11 +114,18 @@ describe("<SignInError/>", () => {
   });
 
   describe("when linking is refused due to a different email (settings flow)", () => {
-    it("keeps the user in settings rather than offering a logout", () => {
+    /** @scenario "Linking an account with a different email sends me back to Security and says what to do" */
+    it("says what to do and goes back to Security, not the sign-in policy", () => {
       renderError("DIFFERENT_EMAIL_NOT_ALLOWED");
       expect(screen.getByText(/can't link this account/i)).toBeTruthy();
-      const back = screen.getByRole("link", { name: /back to settings/i });
-      expect(back.getAttribute("href")).toBe("/settings/authentication");
+      expect(
+        screen.getByText(
+          "The account you picked uses a different email from your LangWatch address. Link an account that has your LangWatch address as a verified email, or add that address to it first.",
+        ),
+      ).toBeTruthy();
+      const back = screen.getByRole("link", { name: "Back to Settings" });
+      expect(back.getAttribute("href")).toBe("/settings/security");
+      expect(screen.queryByRole("link", { name: /back to sign in/i })).toBeNull();
     });
   });
 });

@@ -159,6 +159,7 @@ function harness(
     isEnabled: async () => true,
     isReleased: async () => false,
     isQueryIdentityAvailable: () => true,
+    ensureQueryTenant: async () => true,
     resolveCaller: async ({ projectId }) => ({
       project: { id: projectId, lwqlKey: "key-1" },
       protections: { catalogue: { permissions: [] }, canSeeCosts: true },
@@ -672,5 +673,47 @@ describe("reading runs back", () => {
     await expect(
       service.getResultsPage({ projectId: "project-1", runId: "instanteval_1", limit: 10 }),
     ).rejects.toMatchObject({ code: "instant_eval_not_enabled" });
+  });
+});
+
+describe("a project the key map holds no row for", () => {
+  /** @scenario "A project with no key-map row is given one before it runs, or is refused" */
+  it("refuses a run, an estimate and a sample when the row cannot be written", async () => {
+    const { service, statements, creates, budget, sampled } = harness({
+      peers: { ensureQueryTenant: async () => false },
+    });
+    const request = { projectId: "project-1", actor: ACTOR, input: { sql: "SELECT 1" } };
+
+    await expect(service.createRun(request)).rejects.toMatchObject({
+      code: "instant_eval_not_enabled",
+    });
+    await expect(service.estimateRun(request)).rejects.toMatchObject({
+      code: "instant_eval_not_enabled",
+    });
+    await expect(
+      service.getSample({ projectId: "project-1", actor: ACTOR, runId: "run-1", rows: 3 }),
+    ).rejects.toMatchObject({ code: "instant_eval_not_enabled" });
+    expect(statements.accepted).toEqual([]);
+    expect(budget.reserved).toEqual([]);
+    expect(creates.created).toEqual([]);
+    expect(sampled).toEqual([]);
+  });
+
+  /** @scenario "A project with no key-map row is given one before it runs, or is refused" */
+  it("ensures the project's row first, then runs as before", async () => {
+    const ensured: string[] = [];
+    const { service, creates } = harness({
+      peers: {
+        ensureQueryTenant: async ({ projectId }) => {
+          ensured.push(projectId);
+          return true;
+        },
+      },
+    });
+
+    await service.createRun({ projectId: "project-1", actor: ACTOR, input: { sql: "SELECT 1" } });
+
+    expect(ensured).toEqual(["project-1"]);
+    expect(creates.created).toEqual([{ runId: "instanteval_new", rowLimit: 10_000, name: null }]);
   });
 });

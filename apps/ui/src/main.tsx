@@ -70,6 +70,9 @@ import {
 import "nprogress/nprogress.css";
 import "./styles/globals.scss";
 
+// Every file the entry imports has loaded and run: the boot report (vite/boot-report.ts) says so.
+document.dispatchEvent(new Event("lw-boot:entry"));
+
 /** A provider position no module has declared yet: an honest pass-through. */
 function UiPendingProvider({ children }: { children: ReactNode }) {
   return <>{children}</>;

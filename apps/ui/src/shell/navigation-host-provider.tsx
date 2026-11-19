@@ -98,6 +98,25 @@ function setGraphicsQualityFromMenu(value: string): void {
   if (value === "auto" || value === "on" || value === "off") setGraphicsQualityOverride(value);
 }
 
+/** What the shell's loading screen waits on, for the boot report (specs/ui/boot-report.feature). */
+function waitingReasonOf({
+  isSessionSettled,
+  signedIn,
+  isOrganizationsLoading,
+  isPlanLoading,
+}: {
+  isSessionSettled: boolean;
+  signedIn: boolean;
+  isOrganizationsLoading: boolean;
+  isPlanLoading: boolean;
+}): string {
+  if (!isSessionSettled) return "session";
+  if (!signedIn) return "sign-in";
+  if (isOrganizationsLoading) return "organizations";
+  if (isPlanLoading) return "plan";
+  return "workspace";
+}
+
 export function UiNavigationHost({
   children,
   commandBar = false,
@@ -117,7 +136,7 @@ export function UiNavigationHost({
 }) {
   const { host, failure } = useNavigationHostReading({ commandBar, rootHostServices, process });
 
-  if (failure.departing) return <LoadingScreen />;
+  if (failure.departing) return <LoadingScreen reason="departing" />;
   if (failure.copy) {
     return (
       <UiPageFailure
@@ -365,7 +384,16 @@ function useNavigationHostReading({
           commandBar: commandBarAnswer,
           langy,
           accountMenu,
-          waiting: <LoadingScreen />,
+          waiting: (
+            <LoadingScreen
+              reason={waitingReasonOf({
+                isSessionSettled: session.isSettled(),
+                signedIn,
+                isOrganizationsLoading: organizations.isLoading,
+                isPlanLoading: facts.isPlanLoading,
+              })}
+            />
+          ),
           notFound: <UiPageNotFound />,
           hasPermission: (permission) => session.hasPermission(permission),
           hasOrganizationPermission: (permission) => session.hasOrganizationPermission(permission),

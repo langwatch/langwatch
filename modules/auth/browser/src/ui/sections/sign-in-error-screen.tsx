@@ -247,11 +247,11 @@ function SignInErrorDescription({
     return (
       <VStack gap={4} align="stretch">
         <Text>
-          You cannot link an account with a different email address. Please use the same email
-          address as your current account.
+          The account you picked uses a different email from your LangWatch address. Link an account
+          that has your LangWatch address as a verified email, or add that address to it first.
         </Text>
         <Button {...FRONT_DOOR_PRIMARY_STYLE} asChild>
-          <Link href="/settings/authentication">Back to Settings</Link>
+          <Link href="/settings/security">Back to Settings</Link>
         </Button>
       </VStack>
     );

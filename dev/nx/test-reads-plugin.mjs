@@ -18,6 +18,7 @@ export const reads = {
     "docs/self-hosting/connect.mdx",
     "docs/self-hosting/configuration/environment-variables.mdx",
     "docs/features/instant-evals/limits-and-cost.mdx",
+    "docs/features/braids.mdx",
     "docs/self-hosting/data-and-telemetry.mdx",
     "docs/workflows/overview.mdx",
     "docs/governance/agent-registry.mdx",

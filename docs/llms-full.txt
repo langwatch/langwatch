@@ -44184,7 +44184,9 @@ While Braids is off, nobody in the organisation can create or change a braid or 
 
 Turning Braids off **pauses** the organisation's braids and keeps them. Within thirty seconds no trace shows braided spans, and each braid is listed as paused. Admins can still remove a braid or revoke a signing key. Turn Braids on again and the braided spans show again, without recreating any braid.
 
-On a self-hosted install Braids needs an Enterprise licence. The `release_braids` feature flag is on by default; it is LangWatch's switch for turning braid management off for an organisation, and an organisation admin still turns Braids on as above.
+On a self-hosted install Braids needs an Enterprise licence. The `release_braids` feature flag is on by default, so an organisation admin only has to turn Braids on as above.
+
+Turning the flag off for an organisation stops braid management there, not the braids themselves: existing braids keep applying and are listed with **Remove** only, signing keys are listed with **Revoke** only, and **Enable Braids** cannot be turned on until the flag is on again. To pause the braids, turn Braids off in the organisation settings.
 
 ## When to use a braid
 
@@ -44217,7 +44219,7 @@ For spans to line up, both services must send their spans to LangWatch, and the 
 
 ## Create a braid
 
-Braids are managed under **Braids** in a project's settings. The page has three tabs: braids into other projects, braids from other projects, and the project's signing keys.
+Braids are managed under **Braids** in a project's settings. The page lists braids into other projects, braids from other projects, and the project's signing keys. A project with no braids yet shows a short introduction in place of the two braid lists.
 
 To create one, open Braids in the settings of the project the spans come from, and click **New braid**.
 
@@ -44308,7 +44310,7 @@ Signed calls close that gap. The calling project signs its tags with a signing k
 
 ### Signing keys
 
-Signing keys belong to the project that makes the calls: in the example, **Web orchestrator**. Manage them on the **Signing keys** tab of Braids in that project's settings.
+Signing keys belong to the project that makes the calls: in the example, **Web orchestrator**. Manage them in the **Signing keys** section of Braids in that project's settings.
 
 - **Create** a key and give it a name, such as "Production". Its secret, which starts with `lwsk_`, is shown once, with setup snippets for TypeScript, Python and Go. Store it where your calling service reads its secrets, for example as `LANGWATCH_SIGNING_KEY`.
 - **Rotate** a key to get a new secret. The old secret keeps verifying for 7 days, so you can roll out the new one without a gap.
@@ -45618,7 +45620,7 @@ langwatch instant-eval run \
   --target threads --last 7d
 ```
 
-You can ask up to ten questions per run, all of the same text. Put each `--criteria`, `--threshold`, `--score`, `--category` and `--id` after the `--ask` it belongs to. You pay for the text plus the questions, in one judge request per row, so ten questions cost about the same as one.
+You can ask up to ten questions per run, all of the same text. Put each `--criteria`, `--threshold`, `--score`, `--category` and `--id` after the `--ask` it belongs to. You pay for the text, the questions and a small fixed part of every request, in one judge request per row, so ten questions cost about the same as one.
 
 ## Questions from a file
 
@@ -78397,7 +78399,9 @@ GROUP BY TraceId, ConversationId
 
 An organization without a paid plan also gets `freeBudgetRemainingUsd`, what is left of its $1 free budget. Once that is spent, a new run and a judged query answer `402` with `instant_eval_free_budget_exhausted`, carrying `spentUsd` and `budgetUsd` in `meta`, until the organization upgrades. The rate is on [Pricing](/pricing#instant-evals).
 
-On any plan, a [gateway budget](/ai-gateway/budgets) set to block on the project, its team or the organization also applies. Once it is reached, a new run and a judged query answer `402` with `instant_eval_gateway_budget_exceeded`, carrying `budgetId`, `scope`, `window`, `limitUsd` and `spentUsd` in `meta`. A run under way stops before its next page and keeps the verdicts it wrote. A budget set to warn never refuses, and a project on its own decision model is not checked.
+On any plan, a [gateway budget](/ai-gateway/budgets) set to block on the project, its team or the organization also applies. Once it is reached, a new run and a judged query answer `402` with `instant_eval_gateway_budget_exceeded`, carrying `budgetId`, `scope`, `window`, `limitUsd` and `spentUsd` in `meta`. A run under way stops before its next page and keeps the verdicts it wrote.
+
+A budget set to warn never refuses. A run on your own decision model is checked too, as its provider usage counts against these budgets.
 
 ## Row Limits
 
@@ -82220,7 +82224,7 @@ Each plan includes a base volume of events stored for a default window. For exam
 
 Instant Evals are priced separately from events. A judged query or run is charged per input token sent to the judge, at **$0.0546 per million input tokens**. Output is free. Judging ten thousand conversations of average size costs about a quarter of a dollar.
 
-Input tokens are the text the judge reads plus the questions asked about it. One request carries every question about one text, so a statement with three eval columns costs about the same as one with a single column.
+Input tokens are the text the judge reads, the questions asked about it and a small fixed part of every request. One request carries every question about one text, so a statement with three eval columns costs about the same as one with a single column.
 
 `POST /api/v1/instant-evals/estimate` returns the price of a run before it starts, from the rows the statement matches and a sample of their size. See [Running an Instant Eval](/api-reference/instant-evals/running-an-instant-eval).
 
