@@ -41,6 +41,8 @@ const neverSettles: Langy["awaitTurnSettlement"] = ({ signal }) =>
 
 function harness({ stopTurn }: { stopTurn?: Langy["stopTurn"] } = {}) {
   const settled: InsightRunSettledEventData[] = [];
+  /** When each start was recorded, as `run_started` stamps it. */
+  const starts: number[] = [];
   const stopped: unknown[] = [];
   const filed: unknown[] = [];
   const service = InsightDailyRunService.create({
@@ -78,20 +80,20 @@ function harness({ stopTurn }: { stopTurn?: Langy["stopTurn"] } = {}) {
     runCommands: createApiFixture<
       Pick<InsightDailyRunCommandsService, "recordRunStarted" | "settleRun" | "turnOffSchedule">
     >({
-      recordRunStarted: async () => undefined,
+      recordRunStarted: async ({ occurredAt }) => void starts.push(occurredAt),
       settleRun: async ({ tenantId: _tenantId, occurredAt: _occurredAt, ...data }) => {
         settled.push(data);
       },
     }),
     turnDeadlineMs: 20,
   });
-  return { service, settled, stopped, filed };
+  return { service, settled, starts, stopped, filed };
 }
 
 describe("given Langy's turn outlasts the run's deadline", () => {
   /** @scenario "A turn that does not finish in time is stopped and recorded as failed" */
   it("stops the turn and records the run as failed with the reason timeout", async () => {
-    const { service, settled, stopped, filed } = harness();
+    const { service, settled, starts, stopped, filed } = harness();
 
     await service.run(RUN);
 
@@ -115,6 +117,7 @@ describe("given Langy's turn outlasts the run's deadline", () => {
         filedCount: 0,
         renewedCount: 0,
         conversationId: "conversation-1",
+        startedAt: starts[0],
         idLayout: "v2",
       },
     ]);
