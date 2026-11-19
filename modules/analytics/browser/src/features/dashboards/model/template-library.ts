@@ -5,7 +5,10 @@
  * @see modules/dashboard/specs/dashboards-finder.feature
  */
 
-import { CHART_GRID_COLUMNS } from "../../../model/chart-grid.ts";
+import {
+  CHART_GRID_DEFAULT_COL_SPAN,
+  CHART_GRID_DEFAULT_ROW_SPAN,
+} from "../../../model/chart-grid.ts";
 import {
   AGENT_KINDS,
   type AgentKind,
@@ -125,8 +128,13 @@ const PLACEHOLDERS: Readonly<Record<QuestionType, PreviewPlaceholder>> = {
   prove: "tile",
 };
 
-/** An unbuilt widget has no size yet; it is sketched half wide, at the shortest card height. */
-const UNBUILT_LAYOUT = { gridColumn: 0, gridRow: 0, colSpan: CHART_GRID_COLUMNS / 2, rowSpan: 3 };
+/** An unbuilt widget has no size yet; it is sketched at the default new-widget footprint. */
+const UNBUILT_LAYOUT = {
+  gridColumn: 0,
+  gridRow: 0,
+  colSpan: CHART_GRID_DEFAULT_COL_SPAN,
+  rowSpan: CHART_GRID_DEFAULT_ROW_SPAN,
+};
 
 function previewOf(template: CatalogueTemplate): TemplatePreview {
   if (TEMPLATE_PREVIEW_IDS.has(template.id)) {

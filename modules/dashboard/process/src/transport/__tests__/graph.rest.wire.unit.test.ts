@@ -3,6 +3,10 @@
  * The `/api/graphs` wire: the size a graph posted without one lands at, and that
  * it reads back, lists and renames at that size. Spec: dashboard-service.feature.
  */
+import {
+  CHART_GRID_DEFAULT_COL_SPAN,
+  CHART_GRID_DEFAULT_ROW_SPAN,
+} from "@langwatch/analytics-contract/chart-grid";
 import { canonicalErrorResponse, createRestRuntime } from "@langwatch/api/rest";
 import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { describe, expect, it } from "vitest";
@@ -60,7 +64,7 @@ function mountedGraphs() {
 }
 
 const GRAPH = { name: "Latency", graph: { graphType: "line" } };
-const SIZE = { colSpan: 1, rowSpan: 1 };
+const SIZE = { colSpan: CHART_GRID_DEFAULT_COL_SPAN, rowSpan: CHART_GRID_DEFAULT_ROW_SPAN };
 const sizeOf = (graph: { colSpan: number; rowSpan: number }) => ({
   colSpan: graph.colSpan,
   rowSpan: graph.rowSpan,
@@ -68,8 +72,8 @@ const sizeOf = (graph: { colSpan: number; rowSpan: number }) => ({
 
 describe("the graphs REST family", () => {
   describe("when a graph is posted without a size", () => {
-    /** @scenario "A graph created over REST without a size is 1 by 1, as on main" */
-    it("is one column by one row", async () => {
+    /** @scenario "A graph created over REST without a size lands at the grid's default of four by five" */
+    it("is four columns by five rows", async () => {
       const graphs = mountedGraphs();
 
       const created = await graphs.create(GRAPH);
@@ -80,7 +84,7 @@ describe("the graphs REST family", () => {
       });
     });
 
-    /** @scenario "A graph created over REST without a size is 1 by 1, as on main" */
+    /** @scenario "A graph created over REST without a size lands at the grid's default of four by five" */
     it("keeps a size the caller sent", async () => {
       const graphs = mountedGraphs();
 
@@ -91,8 +95,8 @@ describe("the graphs REST family", () => {
   });
 
   describe("when a graph posted without a size is read, listed and renamed", () => {
-    /** @scenario "A graph created over REST without a size reads back, lists and renames at 1 by 1" */
-    it("answers one column by one row each time", async () => {
+    /** @scenario "A graph created over REST without a size reads back, lists and renames at four by five" */
+    it("answers four columns by five rows each time", async () => {
       const graphs = mountedGraphs();
       const created = await graphs.create(GRAPH);
 

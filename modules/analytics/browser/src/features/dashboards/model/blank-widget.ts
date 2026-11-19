@@ -5,7 +5,8 @@
  */
 
 import {
-  CHART_GRID_COLUMNS,
+  CHART_GRID_DEFAULT_COL_SPAN,
+  CHART_GRID_DEFAULT_ROW_SPAN,
   chartGridBottomRow,
   type ChartGridPlacement,
 } from "../../../model/chart-grid.ts";
@@ -22,9 +23,6 @@ export const BLANK_WIDGET: DashboardWidgetDraft = {
   queries: STARTER_WIDGET_QUERIES,
 };
 
-/** The starter chart's height, as tall as a template's half-wide chart. */
-const BLANK_WIDGET_ROWS = 5;
-
 /** Where a new widget lands: the left half of a new row at the bottom of the board. */
 export function blankWidgetSlot(
   placements: readonly ChartGridPlacement[],
@@ -32,7 +30,7 @@ export function blankWidgetSlot(
   return {
     gridColumn: 0,
     gridRow: chartGridBottomRow(placements),
-    colSpan: CHART_GRID_COLUMNS / 2,
-    rowSpan: BLANK_WIDGET_ROWS,
+    colSpan: CHART_GRID_DEFAULT_COL_SPAN,
+    rowSpan: CHART_GRID_DEFAULT_ROW_SPAN,
   };
 }
