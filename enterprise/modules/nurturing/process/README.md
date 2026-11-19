@@ -6,7 +6,7 @@ The server half of [nurturing](../README.md). Product analytics and lifecycle me
 
 ## Installation
 
-`defineProcessModule("nurturing").withRepositories(nurturingRepositories).withChannels(nurturingChannels).withApi(NurturingModule).withEventing(nurturingEventing).withEventing(nurturingProjectUsageEventing).withEventing(nurturingTraceWindowEndEventing).withTasks(…).withMigrations(…)`, `src/nurturing.module.ts:18`.
+`defineProcessModule("nurturing").withRepositories(nurturingRepositories).withChannels(nurturingChannels).withApi(NurturingModule).withEventing(nurturingEventing).withEventing(nurturingProjectUsageEventing).withEventing(nurturingTraceWindowEndEventing).withTasks(…).withMigrations(…)`, `src/nurturing.module.ts:24`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
