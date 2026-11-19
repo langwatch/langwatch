@@ -70,9 +70,9 @@ describe("the address policy with private endpoint bindings", () => {
 
     /** @scenario "A refusal does not reveal the registered addresses" */
     it("names the hostname and the port, never an address", async () => {
-      const failure = await strict(`https://${HOSTNAME}:8443/v1`, {
+      const failure = (await strict(`https://${HOSTNAME}:8443/v1`, {
         privateEndpoints: BINDINGS,
-      }).catch((error: unknown) => error as Error);
+      }).catch((error: unknown) => error)) as Error;
 
       expect(failure.message).toContain(HOSTNAME);
       expect(failure.message).toContain("8443");
@@ -102,6 +102,43 @@ describe("the address policy with private endpoint bindings", () => {
           privateEndpoints: [{ hostname: HOSTNAME, addresses: ["169.254.169.254"], port: 443 }],
         }),
       ).rejects.toThrow(/no usable address/);
+    });
+
+    /**
+     * The same gate as Go's privateEndpointAddressAllowed: one bad address refuses the binding.
+     * @scenario "A binding carrying an address outside the private ranges is refused"
+     */
+    it.each([
+      ["loopback", "127.0.0.1"],
+      ["IPv6 loopback", "::1"],
+      ["link-local", "169.254.10.1"],
+      ["a public address", "8.8.8.8"],
+      ["a documentation address", "203.0.113.10"],
+      ["IPv6 link-local", "fe80::1"],
+      ["multicast", "224.0.0.1"],
+      ["the unspecified address", "0.0.0.0"],
+      ["a name, not an address", "llm.internal.acme.test"],
+    ])("refuses a binding carrying %s, even beside a good address", async (_name, bad) => {
+      await expect(
+        strict(`https://${HOSTNAME}/v1`, {
+          privateEndpoints: [{ hostname: HOSTNAME, addresses: ["10.20.1.21", bad], port: 443 }],
+        }),
+      ).rejects.toThrow(/no usable address/);
+    });
+
+    it.each([
+      ["RFC 1918 10/8", "10.1.2.3"],
+      ["RFC 1918 172.16/12", "172.31.0.9"],
+      ["RFC 1918 192.168/16", "192.168.4.4"],
+      ["RFC 6598 shared space", "100.64.1.1"],
+      ["RFC 4193 unique-local", "fd12:3456::1"],
+      ["an IPv4-mapped private address", "::ffff:10.0.0.1"],
+    ])("admits a binding at %s", async (_name, address) => {
+      const result = await strict(`https://${HOSTNAME}/v1`, {
+        privateEndpoints: [{ hostname: HOSTNAME, addresses: [address], port: 443 }],
+      });
+
+      expect(result).toMatchObject({ type: "bound", addresses: [address] });
     });
   });
 
@@ -239,9 +276,9 @@ describe("the pinned fetch to a bound hostname", () => {
   });
 
   it("verifies the certificate for the hostname, not the address", async () => {
-    const failure = await fetchValidatedDestination(bound(["127.0.0.1"]), undefined, {
+    const failure = (await fetchValidatedDestination(bound(["127.0.0.1"]), undefined, {
       rejectUnauthorized: true,
-    }).catch((error: unknown) => error as Error);
+    }).catch((error: unknown) => error)) as Error;
 
     expect(failure.message).toContain(HOSTNAME);
     expect(failure.message).not.toContain("127.0.0.1");
@@ -268,11 +305,11 @@ describe("the pinned fetch to a bound hostname", () => {
     if (!address || typeof address === "string") throw new Error("server is not listening");
     await new Promise<void>((resolve) => closed.close(() => resolve()));
 
-    const failure = await fetchValidatedDestination(
+    const failure = (await fetchValidatedDestination(
       { ...bound(["127.0.0.1"]), port: address.port },
       undefined,
       { rejectUnauthorized: false },
-    ).catch((error: unknown) => error as Error);
+    ).catch((error: unknown) => error)) as Error;
 
     expect(failure.message).toContain(HOSTNAME);
     expect(failure.message).not.toContain("127.0.0.1");

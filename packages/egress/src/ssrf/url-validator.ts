@@ -3,7 +3,7 @@ import { isIP } from "node:net";
 
 import { createLogger } from "@langwatch/observability";
 
-import { classify as classifyEgressAddress } from "./address.ts";
+import { classify as classifyEgressAddress, isPrivateEndpointAddress } from "./address.ts";
 import {
   BLOCKED_CLOUD_DOMAINS,
   BLOCKED_METADATA_HOSTS,
@@ -396,8 +396,9 @@ function resolveBound(ctx: ValidationContext, binding: PrivateEndpointBinding): 
       `"${ctx.hostname}" is bound to a private endpoint that accepts port ${binding.port} only, not ${ctx.port}`,
     );
   }
-  const addresses = binding.addresses.filter((address) => isIP(address) !== 0);
-  if (addresses.length === 0 || addresses.some(isMetadataAddress)) {
+  // One address outside the private endpoint ranges makes the whole binding corrupt, as in Go.
+  const addresses = [...binding.addresses];
+  if (addresses.length === 0 || !addresses.every(isPrivateEndpointAddress)) {
     logger.error(
       { url: ctx.logUrl, hostname: ctx.hostname, reason: "private_endpoint_unusable" },
       "Private endpoint binding refused: no usable registered address",

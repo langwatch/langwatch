@@ -284,6 +284,32 @@ export function classify(ip: string): Category {
 }
 
 /**
+ * The ranges a private model endpoint's registered address may sit in (ADR-203): private-use
+ * (RFC 1918), unique-local (RFC 4193) and shared (RFC 6598), which an AWS VPC may carry as a
+ * secondary CIDR. Mirrors Go's privateEndpointAddressAllowed in services/aigateway.
+ */
+const PRIVATE_ENDPOINT_PREFIXES: Prefix[] = [
+  parsePrefix({ cidr: "10.0.0.0/8", rfc: "RFC1918 private" }),
+  parsePrefix({ cidr: "172.16.0.0/12", rfc: "RFC1918 private" }),
+  parsePrefix({ cidr: "192.168.0.0/16", rfc: "RFC1918 private" }),
+  parsePrefix({ cidr: "100.64.0.0/10", rfc: "RFC6598 shared address space" }),
+  parsePrefix({ cidr: "fc00::/7", rfc: "RFC4193 unique-local" }),
+];
+
+/**
+ * Whether ip may be dialled as a private endpoint's registered address: inside one of the
+ * private endpoint ranges and never cloud metadata. Loopback, link-local, public and every other
+ * range are refused, and so is an unparseable address.
+ */
+export function isPrivateEndpointAddress(ip: string): boolean {
+  const raw = ipToBytes(ip);
+  if (!raw) return false;
+  const addr = unmap(raw);
+  if (isMetadataAddress(addr)) return false;
+  return PRIVATE_ENDPOINT_PREFIXES.some((prefix) => prefixContains({ prefix, addr }));
+}
+
+/**
  * Whether ip is globally routable — the only class a strict egress boundary may
  * dial. Use where every non-public address must be refused. Mirrors Go's
  * ssrf.IsPublicAddress.
