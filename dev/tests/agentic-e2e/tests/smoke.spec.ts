@@ -15,7 +15,8 @@ test("app loads after authentication", async ({ page }) => {
 
   // Verify we're not bounced to login and the authenticated shell renders.
   await expect(page).not.toHaveURL(/\/auth\/signin/);
-  await expect(page.locator('a[href="/settings"]').first()).toBeVisible({
+  // From a project the entry opens the project's settings (settings-shell-v2.feature).
+  await expect(page.getByRole("link", { name: "Settings", exact: true }).first()).toBeVisible({
     timeout: 30000,
   });
 });
