@@ -19,6 +19,7 @@ import { cleanupTestRows } from "@langwatch/test-harness/prisma";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 
 import type { InsightDailyScheduleState } from "../../eventing/insight-daily-schedule.projection.ts";
+import type { InsightRunInFlightState } from "../../eventing/insight-run-in-flight.projection.ts";
 import { dailyScheduleId } from "../../rules/insight-daily-run.rules.ts";
 import type { InsightRepositories } from "../insight.repositories.ts";
 import { MemoryInsightRepositories } from "../memory/memory.insight.repositories.ts";
@@ -37,7 +38,10 @@ const RAN_AT = Date.UTC(2026, 9, 10, 9, 40);
 const BOARD = { kind: "dashboard", id: "dashboard-1", name: "Costs" } as const;
 
 function folded(state: InsightDailyScheduleState): StoredProjection<InsightDailyScheduleState> {
-  const at = state.lastRunAt ?? RAN_AT;
+  return foldedAt(state, state.lastRunAt ?? RAN_AT);
+}
+
+function foldedAt<State>(state: State, at: number): StoredProjection<State> {
   return {
     state,
     cursor: { acceptedAt: at, eventId: `event_${randomUUID()}` },
@@ -61,9 +65,6 @@ function settled(overrides: Partial<InsightDailyScheduleState> = {}): InsightDai
     maxInsights: null,
     consecutiveSkips: 0,
     skipStreakSlot: null,
-    runInFlightId: null,
-    runInFlightConversationId: null,
-    runInFlightStartedAt: null,
     lastRunId: "run-1",
     lastRunAt: RAN_AT,
     lastRunOutcome: "filed",
@@ -71,7 +72,6 @@ function settled(overrides: Partial<InsightDailyScheduleState> = {}): InsightDai
     lastRunFiled: 2,
     lastRunRenewed: 1,
     lastRunConversationId: "conversation-1",
-    lastRunStartedAt: RAN_AT - 60_000,
     ...overrides,
   };
 }
@@ -94,6 +94,18 @@ function contractCases(backend: Backend): void {
       key: scheduleId,
     });
     return scheduleId;
+  };
+
+  /** Writes the schedule's run in flight row the way its own fold does. */
+  const storeStarted = async ({
+    scheduleId,
+    ...state
+  }: InsightRunInFlightState & { scheduleId: string }) => {
+    await backend.repositories().runInFlightProjection.store(foldedAt(state, RAN_AT), {
+      tenantId: createTenantId(backend.projectId()),
+      aggregateId: scheduleId,
+      key: scheduleId,
+    });
   };
 
   const runsOf = (userId: string, projectId = backend.projectId()) =>
@@ -320,6 +332,40 @@ function contractCases(backend: Backend): void {
     });
   });
 
+  describe("when a schedule's run in flight row names a run that started after its last", () => {
+    /** @scenario "A started run names its conversation on the board's row" */
+    it("answers that run in flight beside the last run", async () => {
+      const scheduleId = await store(ON);
+      const started = { runId: "run-2", conversationId: "conversation-2", startedAt: RAN_AT + 1 };
+      await storeStarted({ scheduleId, ...started, lastSettledRunId: "run-1" });
+
+      const [setting] = await settingOf({ userId: OWNER, scheduleId });
+
+      expect(setting?.runInFlight).toEqual(started);
+      expect(setting?.lastRun).toMatchObject({ runId: "run-1" });
+      expect(setting?.lastRun).not.toHaveProperty("startedAt");
+    });
+  });
+
+  describe("when a schedule's run in flight row kept the start of its last run", () => {
+    /** @scenario "A settled run keeps when it started on the board's row" */
+    it("answers no run in flight, and that start as the last run's", async () => {
+      const scheduleId = await store(ON);
+      await storeStarted({
+        scheduleId,
+        runId: "run-1",
+        conversationId: "conversation-1",
+        startedAt: RAN_AT - 60_000,
+        lastSettledRunId: "run-1",
+      });
+
+      const [setting] = await settingOf({ userId: OWNER, scheduleId });
+
+      expect(setting?.runInFlight).toBeNull();
+      expect(setting?.lastRun).toMatchObject({ runId: "run-1", startedAt: RAN_AT - 60_000 });
+    });
+  });
+
   describe("when schedules are on in two projects, beside ones that are off or undecided", () => {
     /** Every page from the start, kept to the two projects this backend owns. */
     const onSchedules = async ({ take }: { take: number }) => {
@@ -402,6 +448,8 @@ describe.skipIf(!databaseUrl)("given the Postgres daily schedule repositories", 
     cleanupTestRows(database(), [
       ["insightDailyScheduleProjection", { projectId }],
       ["insightDailyScheduleProjection", { projectId: otherProjectId }],
+      ["insightRunInFlightProjection", { projectId }],
+      ["insightRunInFlightProjection", { projectId: otherProjectId }],
     ]);
 
   beforeEach(clean);

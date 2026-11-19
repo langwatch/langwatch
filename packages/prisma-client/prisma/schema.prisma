@@ -2688,17 +2688,9 @@ model InsightDailyScheduleProjection {
   /// How many insights the run found still true and renewed.
   lastRunRenewed        Int?
   lastRunConversationId String?
-  /// When the last run's Langy turn started. NULL when it never reached Langy, and for a run
-  /// settled before the start was kept.
-  lastRunStartedAt      Float?
   /// The scheduled days in a row whose run ended skipped, and the slot of the newest counted.
   consecutiveSkips      Int     @default(0)
   skipStreakSlot        Float?
-  /// The run that started and has not settled, its Langy conversation and when it started.
-  /// NULL when none is in flight.
-  runInFlightId         String?
-  runInFlightConversationId String?
-  runInFlightStartedAt  Float?
   createdAt             Float
   updatedAt             Float
   occurredAt            Float
@@ -2708,6 +2700,26 @@ model InsightDailyScheduleProjection {
 
   /// Named by hand: the generated name is longer than Postgres keeps.
   @@unique([projectId, userId, boardKind, boardId], map: "InsightDailySchedule_projectId_userId_board_key")
+}
+
+/// A daily insights schedule's last run that started, folded from its run events (modules/insight,
+/// ADR-004): in flight until it settles, and the start of the last run once it has.
+model InsightRunInFlightProjection {
+  /// The schedule id, which is also its aggregate id.
+  id                String  @id
+  projectId         String
+  /// The last run that started, its Langy conversation and when. NULL until one started.
+  runId             String?
+  conversationId    String?
+  startedAt         Float?
+  /// The last run that settled, started or not. NULL until one did.
+  lastSettledRunId  String?
+  createdAt         Float
+  updatedAt         Float
+  occurredAt        Float
+  acceptedAt        Float
+  lastEventId       String
+  projectionVersion String
 }
 
 model SavedView {

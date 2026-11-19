@@ -42,11 +42,7 @@ export function dailyScheduleStateFromRow(row: InsightDailyScheduleRow): Insight
     lastRunFiled: row.lastRunFiled,
     lastRunRenewed: row.lastRunRenewed,
     lastRunConversationId: row.lastRunConversationId,
-    lastRunStartedAt: row.lastRunStartedAt,
     consecutiveSkips: row.consecutiveSkips,
     skipStreakSlot: row.skipStreakSlot,
-    runInFlightId: row.runInFlightId,
-    runInFlightConversationId: row.runInFlightConversationId,
-    runInFlightStartedAt: row.runInFlightStartedAt,
   };
 }

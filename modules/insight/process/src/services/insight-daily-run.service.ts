@@ -77,9 +77,6 @@ type ReadyRun = Readonly<{
 
 type StartedTurn = Readonly<{ conversationId: string; turnId: string }>;
 
-/** The turn Langy took, and the instant the run's start was recorded at. */
-type StartedRun = Readonly<{ turn: StartedTurn; startedAt: number }>;
-
 /** What a run that wrote nothing counts, whatever ended it. */
 const NOTHING_WRITTEN = { filedCount: 0, renewedCount: 0 } as const;
 
@@ -152,19 +149,16 @@ export class InsightDailyRunService implements InsightDailyRunExecutor {
    * run never ends without an outcome on its row.
    */
   async run(input: RunInput): Promise<void> {
-    const attemptStartedAt = nowInstant().epochMilliseconds;
-    let runStartedAt: number | undefined;
-    const settle = (end: RunEnd) => this.settle({ input, end, attemptStartedAt, runStartedAt });
+    const startedAt = nowInstant().epochMilliseconds;
+    const settle = (end: RunEnd) => this.settle({ input, end, startedAt });
     let conversationId: string | null = null;
     try {
       await this.settleSuperseded(input);
       const ready = await this.prepare(input);
       if ("outcome" in ready) return await settle(ready);
-      const started = await this.start(input, ready);
-      if ("outcome" in started) return await settle({ ...started, board: ready.board });
-      const { turn } = started;
+      const turn = await this.start(input, ready);
+      if ("outcome" in turn) return await settle({ ...turn, board: ready.board });
       conversationId = turn.conversationId;
-      runStartedAt = started.startedAt;
       const end = await this.finish(input, ready, turn);
       await settle({ ...end, board: ready.board });
     } catch (error) {
@@ -213,14 +207,13 @@ export class InsightDailyRunService implements InsightDailyRunExecutor {
     return newest.length > 0;
   }
 
-  private async start(input: RunInput, ready: ReadyRun): Promise<StartedRun | RunEnd> {
+  private async start(input: RunInput, ready: ReadyRun): Promise<StartedTurn | RunEnd> {
     const { projectId, userId, scheduleId, runId, slot } = input;
     const turn = await this.askLangy(input, ready);
     if ("outcome" in turn) return turn;
-    const startedAt = nowInstant().epochMilliseconds;
     await this.members.runCommands.recordRunStarted({
       tenantId: projectId,
-      occurredAt: startedAt,
+      occurredAt: nowInstant().epochMilliseconds,
       scheduleId,
       userId,
       board: ready.board,
@@ -228,7 +221,7 @@ export class InsightDailyRunService implements InsightDailyRunExecutor {
       slot,
       ...turn,
     });
-    return { turn, startedAt };
+    return turn;
   }
 
   private async askLangy(input: RunInput, { gate, windows }: ReadyRun) {
@@ -414,19 +407,17 @@ export class InsightDailyRunService implements InsightDailyRunExecutor {
   }
 
   /**
-   * Records how the run ended and when its turn started, and turns its schedule off when that
-   * end leaves it nothing to run for. Carried out twice, it is counted twice, recorded once.
+   * Records how the run ended, and turns its schedule off when that end leaves it nothing to
+   * run for. A run the outbox carries out twice is counted twice; its outcome is recorded once.
    */
   private async settle({
     input,
     end,
-    attemptStartedAt,
-    runStartedAt,
+    startedAt,
   }: {
     input: RunInput;
     end: RunEnd;
-    attemptStartedAt: number;
-    runStartedAt: number | undefined;
+    startedAt: number;
   }): Promise<void> {
     const { projectId, scheduleId, userId, runId, slot, skippedDaysBefore } = input;
     const { board = input.board, ...result } = end;
@@ -438,12 +429,11 @@ export class InsightDailyRunService implements InsightDailyRunExecutor {
       runId,
       slot,
       ...result,
-      ...(runStartedAt === undefined ? {} : { startedAt: runStartedAt }),
       // A run's outcome is stored once (its command is keyed by the run), so the first one is new.
       idLayout: "v2",
     });
     const { outcome, reason } = result;
-    this.members.metrics.settled({ outcome, reason, durationMs: settledAt - attemptStartedAt });
+    this.members.metrics.settled({ outcome, reason, durationMs: settledAt - startedAt });
     if (!turnsScheduleOff({ end: result, skippedDaysBefore })) return;
     const offReason: InsightScheduleOffReason =
       reason === "board_deleted" ? "board_deleted" : "skipped_days";

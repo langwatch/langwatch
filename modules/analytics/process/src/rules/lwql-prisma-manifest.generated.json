@@ -10231,15 +10231,6 @@
           "documentation": ""
         },
         {
-          "name": "lastRunStartedAt",
-          "columnName": "lastRunStartedAt",
-          "type": "Float",
-          "kind": "scalar",
-          "isList": false,
-          "isOptional": true,
-          "documentation": "When the last run's Langy turn started. NULL when it never reached Langy, and for a run\nsettled before the start was kept."
-        },
-        {
           "name": "consecutiveSkips",
           "columnName": "consecutiveSkips",
           "type": "Int",
@@ -10258,17 +10249,99 @@
           "documentation": ""
         },
         {
-          "name": "runInFlightId",
-          "columnName": "runInFlightId",
+          "name": "createdAt",
+          "columnName": "createdAt",
+          "type": "Float",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "updatedAt",
+          "columnName": "updatedAt",
+          "type": "Float",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "occurredAt",
+          "columnName": "occurredAt",
+          "type": "Float",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "acceptedAt",
+          "columnName": "acceptedAt",
+          "type": "Float",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "lastEventId",
+          "columnName": "lastEventId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "projectionVersion",
+          "columnName": "projectionVersion",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        }
+      ]
+    },
+    {
+      "name": "InsightRunInFlightProjection",
+      "tableName": "InsightRunInFlightProjection",
+      "documentation": "A daily insights schedule's last run that started, folded from its run events (modules/insight,\nADR-004): in flight until it settles, and the start of the last run once it has.",
+      "primaryKey": [
+        "id"
+      ],
+      "fields": [
+        {
+          "name": "id",
+          "columnName": "id",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "The schedule id, which is also its aggregate id."
+        },
+        {
+          "name": "projectId",
+          "columnName": "projectId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "runId",
+          "columnName": "runId",
           "type": "String",
           "kind": "scalar",
           "isList": false,
           "isOptional": true,
-          "documentation": "The run that started and has not settled, its Langy conversation and when it started.\nNULL when none is in flight."
+          "documentation": "The last run that started, its Langy conversation and when. NULL until one started."
         },
         {
-          "name": "runInFlightConversationId",
-          "columnName": "runInFlightConversationId",
+          "name": "conversationId",
+          "columnName": "conversationId",
           "type": "String",
           "kind": "scalar",
           "isList": false,
@@ -10276,13 +10349,22 @@
           "documentation": ""
         },
         {
-          "name": "runInFlightStartedAt",
-          "columnName": "runInFlightStartedAt",
+          "name": "startedAt",
+          "columnName": "startedAt",
           "type": "Float",
           "kind": "scalar",
           "isList": false,
           "isOptional": true,
           "documentation": ""
+        },
+        {
+          "name": "lastSettledRunId",
+          "columnName": "lastSettledRunId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "The last run that settled, started or not. NULL until one did."
         },
         {
           "name": "createdAt",

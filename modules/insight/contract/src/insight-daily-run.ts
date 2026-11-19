@@ -140,7 +140,7 @@ const insightLastRunSchema = z.object({
 /**
  * The last run as its own person reads it, by id: Run now waits for the run its request named.
  * `startedAt` (epoch milliseconds) is when Langy took its turn; absent for a run that never
- * reached Langy and for one settled before the start was recorded on its outcome.
+ * reached Langy and for one settled before the row kept its start.
  */
 const insightOwnLastRunSchema = z.object({
   ...insightLastRunSchema.shape,

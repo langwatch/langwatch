@@ -958,12 +958,22 @@ export interface LwqlPrismaRows {
     readonly lastRunFiled: "Int?";
     readonly lastRunRenewed: "Int?";
     readonly lastRunConversationId: "String?";
-    readonly lastRunStartedAt: "Float?";
     readonly consecutiveSkips: "Int";
     readonly skipStreakSlot: "Float?";
-    readonly runInFlightId: "String?";
-    readonly runInFlightConversationId: "String?";
-    readonly runInFlightStartedAt: "Float?";
+    readonly createdAt: "Float";
+    readonly updatedAt: "Float";
+    readonly occurredAt: "Float";
+    readonly acceptedAt: "Float";
+    readonly lastEventId: "String";
+    readonly projectionVersion: "String";
+  };
+  readonly InsightRunInFlightProjection: {
+    readonly id: "String";
+    readonly projectId: "String";
+    readonly runId: "String?";
+    readonly conversationId: "String?";
+    readonly startedAt: "Float?";
+    readonly lastSettledRunId: "String?";
     readonly createdAt: "Float";
     readonly updatedAt: "Float";
     readonly occurredAt: "Float";

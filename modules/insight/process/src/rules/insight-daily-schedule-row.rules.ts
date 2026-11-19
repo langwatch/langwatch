@@ -12,6 +12,10 @@ import type {
 } from "@langwatch/insight-contract";
 
 import type { InsightDailyScheduleState } from "../eventing/insight-daily-schedule.projection.ts";
+import {
+  type InsightRunInFlightState,
+  NO_RUN_STARTED,
+} from "../eventing/insight-run-in-flight.projection.ts";
 
 /** How the row's last run ended; null until a run recorded an outcome. */
 function lastRunOf(state: InsightDailyScheduleState): InsightDailyRun["lastRun"] {
@@ -29,23 +33,31 @@ function lastRunOf(state: InsightDailyScheduleState): InsightDailyRun["lastRun"]
 
 /**
  * The last run as its person reads it, with its id and its start; a requested run's id is its
- * request's. A run that never reached Langy, or settled before its start was kept, names none.
+ * request's. A run that never reached Langy names no start.
  */
-function ownLastRunOf(state: InsightDailyScheduleState): InsightDailyRunSetting["lastRun"] {
+function ownLastRunOf(
+  state: InsightDailyScheduleState,
+  started: InsightRunInFlightState,
+): InsightDailyRunSetting["lastRun"] {
   const lastRun = lastRunOf(state);
-  if (lastRun === null || state.lastRunId === null) return null;
-  const { lastRunId: runId, lastRunStartedAt: startedAt } = state;
-  return { ...lastRun, runId, ...(startedAt === null ? {} : { startedAt }) };
+  const { lastRunId: runId } = state;
+  if (lastRun === null || runId === null) return null;
+  const { startedAt } = started;
+  const ownStart = started.runId === runId && startedAt !== null;
+  return { ...lastRun, runId, ...(ownStart ? { startedAt } : {}) };
 }
 
-/** The run that started and has not settled, as folded; the read drops one that is lost. */
-function runInFlightOf(state: InsightDailyScheduleState): InsightDailyRunSetting["runInFlight"] {
-  const {
-    runInFlightId: runId,
-    runInFlightConversationId: conversationId,
-    runInFlightStartedAt: startedAt,
-  } = state;
+/**
+ * The last run that started, while neither row names it settled: the two rows fold apart, so
+ * either may be the first to take its outcome. The read drops one that is lost.
+ */
+function runInFlightOf(
+  state: InsightDailyScheduleState,
+  started: InsightRunInFlightState,
+): InsightDailyRunSetting["runInFlight"] {
+  const { runId, conversationId, startedAt, lastSettledRunId } = started;
   if (runId === null || conversationId === null || startedAt === null) return null;
+  if (runId === lastSettledRunId || runId === state.lastRunId) return null;
   return { runId, conversationId, startedAt };
 }
 
@@ -73,8 +85,14 @@ export const UNDECIDED_DAILY_RUN_SETTING: InsightDailyRunSetting = {
   runInFlight: null,
 };
 
-/** The row's setting as its person reads it; `settings` is null until they turned it on once. */
-export function dailyRunSettingFromState(state: InsightDailyScheduleState): InsightDailyRunSetting {
+/**
+ * The row's setting as its person reads it, with its run in flight row, if any; `settings` is
+ * null until they turned it on once.
+ */
+export function dailyRunSettingFromState(
+  state: InsightDailyScheduleState,
+  started: InsightRunInFlightState = NO_RUN_STARTED,
+): InsightDailyRunSetting {
   const { hour, timezone, maxInsights } = state;
   return {
     state: state.state,
@@ -82,9 +100,9 @@ export function dailyRunSettingFromState(state: InsightDailyScheduleState): Insi
       hour === null || timezone === null || maxInsights === null
         ? null
         : { hour, timezone, maxInsights },
-    lastRun: ownLastRunOf(state),
+    lastRun: ownLastRunOf(state, started),
     offReason: state.offReason,
-    runInFlight: runInFlightOf(state),
+    runInFlight: runInFlightOf(state, started),
   };
 }
 

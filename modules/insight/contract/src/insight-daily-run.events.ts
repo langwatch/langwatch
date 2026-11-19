@@ -51,9 +51,8 @@ export const insightRunStartedEventDataSchema: InsightRunStartedEventDataSchema 
 export type InsightRunStartedEventData = z.infer<typeof insightRunStartedEventDataSchema>;
 
 /**
- * How the run ended. A run skipped before Langy took the turn names no conversation and no
- * `startedAt`. `renewedCount` came with renewal: an event stored before it reads as none
- * renewed; `startedAt` came with Run now: an event stored before it names no start.
+ * How the run ended. A run skipped before Langy took the turn names no conversation.
+ * `renewedCount` came with renewal: an event stored before it reads as none renewed.
  */
 const insightRunSettledEventDataSchemaDefinition = z.object({
   ...scheduleRefShape,
@@ -64,8 +63,6 @@ const insightRunSettledEventDataSchemaDefinition = z.object({
   filedCount: z.number().int().nonnegative(),
   renewedCount: z.number().int().nonnegative().default(0),
   conversationId: z.string().min(1).nullable(),
-  /** Epoch milliseconds: when this attempt recorded the run's start. */
-  startedAt: z.number().int().nonnegative().optional(),
   /**
    * The run's audit key layout. An event stored before it, or by an older release, has none and
    * reads as v1-legacy, so its key never changes (#9575).

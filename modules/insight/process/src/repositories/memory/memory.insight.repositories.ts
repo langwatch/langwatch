@@ -4,6 +4,7 @@ import { MemoryInsightDailyScheduleProjectionRepository } from "./memory.insight
 import { MemoryInsightDailyScheduleRepository } from "./memory.insight-daily-schedule.repository.ts";
 import { MemoryInsightProjectionRepository } from "./memory.insight-projection.repository.ts";
 import { MemoryInsightReaderProjectionRepository } from "./memory.insight-reader-projection.repository.ts";
+import { MemoryInsightRunInFlightProjectionRepository } from "./memory.insight-run-in-flight-projection.repository.ts";
 import { MemoryInsightRepository } from "./memory.insight.repository.ts";
 
 /** The memory tier: the projections write the rows the read repository joins. */
@@ -18,6 +19,7 @@ export class MemoryInsightRepositories {
       insightReaderProjection: MemoryInsightReaderProjectionRepository.create({ rows }),
       dailySchedules: MemoryInsightDailyScheduleRepository.create({ rows }),
       dailyScheduleProjection: MemoryInsightDailyScheduleProjectionRepository.create({ rows }),
+      runInFlightProjection: MemoryInsightRunInFlightProjectionRepository.create({ rows }),
     };
   }
 }

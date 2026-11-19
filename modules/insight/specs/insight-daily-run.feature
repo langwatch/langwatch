@@ -1365,10 +1365,11 @@ Feature: The daily insights run
     Scenario: A settled run keeps when it started on the board's row
       Given a run was requested for a board
       When the run's turn starts and the run then settles
-      Then the run's outcome names when its turn started, and the board's row keeps it
-      And an outcome stored before starts were kept takes the start of that run in flight
+      Then the schedule's run in flight row keeps when its turn started as the last run's start
+      And it names no run in flight
       And a retried attempt's later start leaves the run's first start on the row
-      And a run that never reached Langy names no start
+      And a later run that never reached Langy names no start and no run in flight
+      And a schedule with no run in flight row names no start, read by its settle time
 
     @integration
     Scenario: Run now asks for analytics:view and langy:create

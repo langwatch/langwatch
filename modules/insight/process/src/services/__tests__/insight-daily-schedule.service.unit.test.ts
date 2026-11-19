@@ -59,9 +59,6 @@ async function onWithRunInFlight({ startedAt }: { startedAt: number }): Promise<
     maxInsights: 3,
     consecutiveSkips: 0,
     skipStreakSlot: null,
-    runInFlightId: "slot:1",
-    runInFlightConversationId: "conversation-1",
-    runInFlightStartedAt: startedAt,
     lastRunId: null,
     lastRunAt: null,
     lastRunOutcome: null,
@@ -69,18 +66,22 @@ async function onWithRunInFlight({ startedAt }: { startedAt: number }): Promise<
     lastRunFiled: null,
     lastRunRenewed: null,
     lastRunConversationId: null,
-    lastRunStartedAt: null,
   };
+  const folded = {
+    cursor: { acceptedAt: now, eventId: "event-1" },
+    occurredAt: now,
+    createdAt: now,
+    updatedAt: now,
+  };
+  const context = { tenantId: createTenantId(PROJECT), aggregateId: scheduleId, key: scheduleId };
   await repositories.dailyScheduleProjection.store(
-    {
-      state,
-      cursor: { acceptedAt: now, eventId: "event-1" },
-      occurredAt: now,
-      createdAt: now,
-      updatedAt: now,
-      version: "2026-10-10",
-    },
-    { tenantId: createTenantId(PROJECT), aggregateId: scheduleId, key: scheduleId },
+    { ...folded, state, version: "2026-10-10" },
+    context,
+  );
+  const started = { runId: "slot:1", conversationId: "conversation-1", startedAt };
+  await repositories.runInFlightProjection.store(
+    { ...folded, state: { ...started, lastSettledRunId: null }, version: "2026-11-19" },
+    context,
   );
 }
 

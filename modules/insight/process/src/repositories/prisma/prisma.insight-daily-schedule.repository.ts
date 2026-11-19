@@ -16,15 +16,21 @@ import {
   dailyScheduleStateFromRow,
   type InsightDailyScheduleRow,
 } from "./prisma.insight-daily-schedule.mapper.ts";
+import { runInFlightStateFromRow } from "./prisma.insight-run-in-flight-projection.repository.ts";
 
-/** The run rows, plus the raw SQL a read across projects needs. */
-type InsightDailyScheduleDatabase = PrismaModelClient<"InsightDailyScheduleProjection"> &
+/** The run rows and their run in flight rows, plus the raw SQL a read across projects needs. */
+type InsightDailyScheduleDatabase = PrismaModelClient<
+  "InsightDailyScheduleProjection" | "InsightRunInFlightProjection"
+> &
   Pick<PrismaClient, "$queryRaw">;
 
 /** The run rows one person reads: each of their queries carries `projectId` and the person. */
 export class PrismaInsightDailyScheduleRepository implements InsightDailyScheduleRepository {
   /** Declared, not inherited: the model-scoped client carries no `$queryRaw`. */
-  static readonly tables = prismaTables("InsightDailyScheduleProjection");
+  static readonly tables = prismaTables(
+    "InsightDailyScheduleProjection",
+    "InsightRunInFlightProjection",
+  );
 
   static create({
     prisma,
@@ -63,7 +69,15 @@ export class PrismaInsightDailyScheduleRepository implements InsightDailySchedul
     const rows = await this.database.insightDailyScheduleProjection.findMany({
       where: { id: scheduleId, projectId, userId },
     });
-    return rows.map((row) => dailyRunSettingFromState(dailyScheduleStateFromRow(row)));
+    if (rows.length === 0) return [];
+    // Its own table, read apart: a run in flight is folded by its own projection (ADR-004).
+    const started = await this.database.insightRunInFlightProjection.findFirst({
+      where: { id: scheduleId, projectId },
+    });
+    const startedState = started ? runInFlightStateFromRow(started) : undefined;
+    return rows.map((row) =>
+      dailyRunSettingFromState(dailyScheduleStateFromRow(row), startedState),
+    );
   }
 
   async findOnPage({

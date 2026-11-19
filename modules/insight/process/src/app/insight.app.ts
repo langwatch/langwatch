@@ -153,6 +153,7 @@ export class InsightModule implements InsightApiContract {
       dailyRunCommands,
       dailyRunPipeline: buildInsightDailyRunPipeline({
         scheduleStore: repositories.dailyScheduleProjection,
+        runInFlightStore: repositories.runInFlightProjection,
         runs,
         reconcile: scheduleReconcile,
         audit: InsightDailyRunAuditService.create({ auditLog: dependencies.auditLog }),

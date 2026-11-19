@@ -225,14 +225,13 @@ follows another run that started at or after the request, in flight or settled w
 conversation: per schedule the process takes events in order, so such a run held the
 request, and the request started nothing. A settled run is judged by its start, not its
 settle: a lost run's last attempt that is still alive can settle itself, with its
-conversation, after the request, and it started before it. The row keeps the run's start
-as `lastRunStartedAt`, and the read answers it on `lastRun.startedAt`: the start of the
-row's run in flight when that is the same run, else the `startedAt` its `run_settled`
-names, the instant that attempt recorded `run_started`. The row's start wins because a
-retried attempt appends its own, later `run_started` under the run's key; the row keeps
-the first, as a replay does, so a run is judged by the same start in flight and settled.
-An outcome stored before the field existed, of a run the row no longer holds, names no
-start, and the browser reads a settled run with no start by its settle time, as before. A lost run is settled as
+conversation, after the request, and it started before it. The read answers the last
+run's start on `lastRun.startedAt`, from the schedule's last started run when that is its
+last run (below). A retried attempt appends its own, later `run_started` under the run's
+key; the row keeps the first, as a replay does, so a run is judged by the same start in
+flight and settled. A last run with no start kept (one that never reached Langy, or
+settled before the run in flight table existed) names none, and the browser reads that
+settled run by its settle time, as before. A lost run is settled as
 `failed/timeout` with no conversation just before the run that replaces it starts, so a
 settled run without a conversation is never taken for the held one; a held run that never
 reached Langy leaves the wait to its deadline. Run now answers
@@ -254,10 +253,18 @@ through the host of that moment. Turning the run off ends the wait at once, also
 write is then refused and when it is sent before Run now has answered, so a board switched off opens no panel and says nothing more. Losing
 the last widget does not end the wait: the offer of Run now goes, "Starting a run." stays.
 
-**The row names the run in flight.** `run_started` writes `runInFlightId`,
-`runInFlightConversationId` and `runInFlightStartedAt`, and the `run_settled` of that run
-clears them and writes `lastRunStartedAt`. A second `run_started` of the run in flight
-leaves the row. The read names no run in flight once its start is older than
+**A row of its own names the last started run.** The projection `insightRunInFlight`
+folds `run_started` and `run_settled` into `InsightRunInFlightProjection`, one row per
+schedule, beside the schedule's row and not on it: the schedule's projection table is
+never altered (postgres-migration skill), and a new table is added in one release.
+`run_started` writes `runId`, `conversationId` and `startedAt`: the last run that started,
+not only one in flight. Its `run_settled` keeps them, so they carry the settled run's start,
+and writes `lastSettledRunId`; the `run_settled` of a later run clears a start kept for the
+run settled before, so a run that never started is not read as the earlier one. A second
+`run_started` of the run it names, or of a run already settled, leaves the row. The setting
+reads both rows apart, with no join. It names that run in flight only while neither row
+names it settled, as the two projections fold in their own lanes and either may take the
+outcome first, and no run in flight once its start is older than
 `INSIGHT_DAILY_RUN_EXPIRY_MS`, a run that is lost.
 
 **Insights runs are exempt from the unattended-turn rate limit.** This is an owner
@@ -418,13 +425,11 @@ contract; insight knows nothing of ops.
 - The clean-up reads a member's rows per project of the organisation. The row has no
   index on the person; a project's rows that are on are few.
 - There is still no cap on how many boards a person turns on.
-- `InsightDailyScheduleProjection` gained `runInFlightId`, `runInFlightConversationId` and
-  `runInFlightStartedAt` (migration `20261111190000`), all nullable. A row folded before the
-  migration names no run in flight until its next run starts.
-- `InsightDailyScheduleProjection` gained `lastRunStartedAt` (migration `20261119120000`),
-  nullable, and `run_settled` an optional `startedAt`; neither the projection's version
-  nor the event's changed and nothing is backfilled. A row folded before the migration
-  names no start until its next run settles, and the browser reads its settle time.
+- `InsightRunInFlightProjection` is a new table (migration `20261119130000`), created
+  empty and not replayed: Run now is new, so no earlier run is in flight, and a schedule
+  with no row reads no run in flight and no start, the browser reading its last run by its
+  settle time, as before. Its first `run_started` writes the row. The schedule's table and
+  projection version are unchanged.
 - With no rate limit, a person can start Insights runs as fast as they choose Run now; one
   run in flight per board is the only bound. Revisit once what is worth running is known.
 - The run events and a pass's request are per-run rows and age with the `traces`

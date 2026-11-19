@@ -84,9 +84,14 @@ import {
   createInsightDailyScheduleProjection,
   type InsightDailyScheduleState,
 } from "./insight-daily-schedule.projection.ts";
+import {
+  createInsightRunInFlightProjection,
+  type InsightRunInFlightState,
+} from "./insight-run-in-flight.projection.ts";
 
 interface InsightDailyRunPipelineDeps {
   scheduleStore: StateProjectionStore<InsightDailyScheduleState>;
+  runInFlightStore: StateProjectionStore<InsightRunInFlightState>;
   runs: InsightDailyRunExecutor;
   reconcile: InsightDailyScheduleReconciler;
   audit: Pick<InsightDailyRunAuditService, "recordSettled">;
@@ -103,6 +108,7 @@ const defineInsightDailyRunPipeline = (deps: InsightDailyRunPipelineDeps) =>
   })
     .withEvents(INSIGHT_DAILY_RUN_EVENT_SCHEMAS)
     .withPostgresProjection(createInsightDailyScheduleProjection({ store: deps.scheduleStore }))
+    .withPostgresProjection(createInsightRunInFlightProjection({ store: deps.runInFlightStore }))
     .withCommand("configureSchedule", ConfigureInsightScheduleCommand)
     .withCommand("turnOffSchedule", TurnOffInsightScheduleCommand)
     .withCommand("requestScheduleRearm", RequestInsightScheduleRearmCommand)

@@ -94,6 +94,8 @@ export const INSIGHT_DAILY_RUN_EVENT_VERSION = "2026-10-10";
 
 export const INSIGHT_DAILY_SCHEDULE_PROJECTION_VERSION = "2026-10-10";
 
+export const INSIGHT_RUN_IN_FLIGHT_PROJECTION_VERSION = "2026-11-19";
+
 export const INSIGHT_DAILY_SCHEDULE_AGGREGATE_TYPE = "insight_daily_schedule";
 
 export const INSIGHT_DAILY_RUN_PIPELINE_NAME = "insight_daily_run";

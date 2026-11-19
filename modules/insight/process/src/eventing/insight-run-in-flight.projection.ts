@@ -1,0 +1,100 @@
+/**
+ * The last run of a daily schedule that started, folded onto a row of its own: its id, its
+ * Langy conversation and when it started, beside the last run that settled. The read names it
+ * in flight while it has not settled, and once it has, its start is the last run's (ADR-004).
+ * The row is keyed by the schedule id, which is also its aggregate id.
+ */
+
+import type { StateProjectionDefinition, StateProjectionStore } from "@langwatch/eventing";
+import {
+  INSIGHT_DAILY_RUN_EVENT_TYPES,
+  INSIGHT_RUN_IN_FLIGHT_PROJECTION_VERSION,
+} from "@langwatch/insight-contract";
+
+import { isOwnScheduleId } from "../rules/insight-daily-run.rules.ts";
+import type { InsightDailyRunEvent } from "./insight-daily-run.events.ts";
+
+export interface InsightRunInFlightState {
+  /** The last run that started, its conversation and when; null until one started. */
+  readonly runId: string | null;
+  readonly conversationId: string | null;
+  /** Epoch milliseconds. */
+  readonly startedAt: number | null;
+  /** The last run that settled, started or not; null until one did. */
+  readonly lastSettledRunId: string | null;
+}
+
+/** What a schedule with no row reads: no run started, none settled. */
+export const NO_RUN_STARTED: InsightRunInFlightState = {
+  runId: null,
+  conversationId: null,
+  startedAt: null,
+  lastSettledRunId: null,
+};
+
+/** Whether the event leaves the row as it is. */
+function leavesRow(state: InsightRunInFlightState, event: InsightDailyRunEvent): boolean {
+  switch (event.type) {
+    case INSIGHT_DAILY_RUN_EVENT_TYPES.RUN_STARTED:
+      // A start delivered again after its run settled is not a run in flight. A retried attempt
+      // appends its own start under the same key: the first stands, as a replay keeps it.
+      return state.lastSettledRunId === event.data.runId || state.runId === event.data.runId;
+    case INSIGHT_DAILY_RUN_EVENT_TYPES.RUN_SETTLED:
+      return state.lastSettledRunId === event.data.runId;
+    default:
+      return true;
+  }
+}
+
+/** What the event writes on the row it changes. */
+function changeOf(
+  state: InsightRunInFlightState,
+  event: InsightDailyRunEvent,
+): Partial<InsightRunInFlightState> {
+  switch (event.type) {
+    case INSIGHT_DAILY_RUN_EVENT_TYPES.RUN_STARTED: {
+      const { runId, conversationId } = event.data;
+      return { runId, conversationId, startedAt: event.occurredAt };
+    }
+    case INSIGHT_DAILY_RUN_EVENT_TYPES.RUN_SETTLED:
+      return {
+        lastSettledRunId: event.data.runId,
+        // The settled run's start stays as its own. One kept for the run settled before goes, so
+        // a later run that never started is not read as that one.
+        ...(state.runId !== null && state.runId === state.lastSettledRunId
+          ? { runId: null, conversationId: null, startedAt: null }
+          : {}),
+      };
+    default:
+      return {};
+  }
+}
+
+export function applyInsightRunInFlightEvent(
+  state: InsightRunInFlightState,
+  event: InsightDailyRunEvent,
+): InsightRunInFlightState {
+  if (leavesRow(state, event)) return state;
+  const { userId, board } = event.data;
+  // A row is its own person's and board's: an event that names another's schedule is not theirs.
+  const owner = { projectId: String(event.tenantId), userId, board };
+  if (!isOwnScheduleId({ scheduleId: event.aggregateId, ...owner })) return state;
+  return { ...state, ...changeOf(state, event) };
+}
+
+export function createInsightRunInFlightProjection(deps: {
+  store: StateProjectionStore<InsightRunInFlightState>;
+}): StateProjectionDefinition<InsightRunInFlightState, InsightDailyRunEvent> {
+  return {
+    name: "insightRunInFlight",
+    version: INSIGHT_RUN_IN_FLIGHT_PROJECTION_VERSION,
+    eventTypes: [
+      INSIGHT_DAILY_RUN_EVENT_TYPES.RUN_STARTED,
+      INSIGHT_DAILY_RUN_EVENT_TYPES.RUN_SETTLED,
+    ],
+    init: () => NO_RUN_STARTED,
+    apply: applyInsightRunInFlightEvent,
+    store: deps.store,
+    key: (event) => event.aggregateId,
+  };
+}
