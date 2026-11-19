@@ -37,3 +37,16 @@ export class DigestNothingToSendError extends HandledError {
     this.name = "DigestNothingToSendError";
   }
 }
+
+/** No signing secret is configured, so no unsubscribe link can be signed or checked. */
+export class DigestLinksUnavailableError extends HandledError {
+  declare readonly code: "digest_links_unavailable";
+
+  constructor() {
+    super("digest_links_unavailable", "Unsubscribe links are not available right now.", {
+      httpStatus: 503,
+      fault: "platform",
+    });
+    this.name = "DigestLinksUnavailableError";
+  }
+}

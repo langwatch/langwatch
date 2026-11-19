@@ -23,12 +23,19 @@ unsubscribe.
   sent through our own mailer, `NotificationApi.sendEmail`. No third party sends it.
 - Mail leaves digest only through its mail channel, bound to `NotificationApi` (§5 channel
   binding). Digest owns no rendering code, no SMTP or provider client and no mail credential.
-- A member's week is sent at most once: the send intent is keyed by person and ISO week, the
-  `DigestSend` row is checked before sending, and the mailer is given the idempotency key
-  `digest:{userId}:{isoWeek}`.
+- A member's week is sent at most once: the send intent is keyed by person and ISO week, and the
+  `DigestSend` row is claimed (inserted once, on its id) before the mailer is called. Only the
+  attempt that claimed the row sends; a failure after the claim loses that week's email rather
+  than send it twice, since SMTP does not dedupe a retry. The mailer is also given the
+  idempotency key `digest:{userId}:{isoWeek}`.
+- A week is planned only from Monday 08:00 UTC, and the plan covers last week. Before 08:00 on
+  Monday the wake plans nothing, so arming in those hours never sends the week before last.
 - Every email carries an unsubscribe link and the RFC 8058 one-click header, both to
-  `/api/digest/unsubscribe?token=`. The token is ADR-031's format, an HMAC-SHA256 over the
-  person and the send, signed with the session secret; it is the whole authorization.
+  `/api/digest/unsubscribe?token=`. The token is ADR-031's format with its `exp` (epoch seconds,
+  180 days after minting): `base64url(JSON).hex(HMAC-SHA256)`, the HMAC taken over `digest.v1:`
+  followed by the JSON, so a token signed with the same secret for another purpose never
+  verifies here. It names the person and the send, is signed with the session secret, and is the
+  whole authorization.
 - An opted-out member is never sent the digest. The opt-out is read when each send is handled,
   not when the week is planned.
 - A template with nothing to show sends nothing: no email and no `DigestSend` row.
@@ -48,7 +55,9 @@ unsubscribe.
   `GET /api/digest/unsubscribe` answers a page that changes nothing (a link scanner's prefetch
   unsubscribes no one); `POST /api/digest/unsubscribe` is the one-click opt-out;
   `POST /api/digest/resubscribe` undoes it from the same page. A token whose signature does not
-  match is refused with `digest_link_invalid` (400) and changes nothing.
+  match, or whose `exp` has passed, is refused with `digest_link_invalid` (400) and changes
+  nothing; with no signing secret every route answers `digest_links_unavailable` (503). Every
+  page carries `X-Frame-Options: DENY` and `Content-Security-Policy: frame-ancestors 'none'`.
 
 ## Dependencies
 
@@ -65,7 +74,7 @@ Channel binding: `NotificationApi`, for `sendEmail` only.
 Postgres, owned by digest: `DigestCohortOrganization` (enrolled organizations),
 `DigestSubscription` (a person's opt-out and the send it came from; no row is subscribed),
 `DigestProjectWeek` and `DigestUserWeek` (the folds), `DigestSend` (one row per person and week,
-id `userId:isoWeek`, written once the mailer accepted the email) and `DigestSettings` (`armed`,
+id `userId:isoWeek`, claimed just before the email is handed to the mailer) and `DigestSettings` (`armed`,
 the last planned week). Rows hold ids and numbers only: names and addresses are read from their
 owners when an email is rendered and never stored. Folds older than the sent week's four-week
 baseline are swept every hour.
@@ -77,9 +86,10 @@ baseline are swept every hour.
 - `digest` folds the owners' facts into weeks. Each fact is keyed by its source, and a repeat
   within an hour is dropped before it is appended. An enqueue filter keeps jobs to the enrolled
   cohort's projects.
-- `digest_send`: a scheduled process manager wakes hourly and hands the outbox one plan of the
-  sendable week (last week, once Monday 08:00 UTC has passed). Armed and not yet planned, the
-  plan asks one send per enrolled member; each ask becomes one `sendDigest` intent keyed by the
+- `digest_send`: a scheduled process manager wakes hourly and, from Monday 08:00 UTC, hands the
+  outbox one plan of last week; before 08:00 on Monday it hands none. A plan of any other week
+  than the one its slot may send is refused. Armed and not yet planned, the plan asks one send
+  per enrolled member; each ask becomes one `sendDigest` intent keyed by the
   person and week. The send is skipped when the switch is off, the organization was unenrolled
   or the member opted out since the plan, or when the person has no address.
 
@@ -88,14 +98,17 @@ baseline are swept every hour.
 - Config: `publicBaseUrl` (`BASE_HOST`), the origin every link in the email is built on. A send
   without it is refused by name.
 - Secret: `NEXTAUTH_SECRET` (the shared session secret), which signs and verifies unsubscribe
-  tokens. Without it no token is signed or accepted.
+  tokens. Without it no token is signed or accepted: a send fails before anything is mailed or
+  claimed, and the REST routes answer `digest_links_unavailable` (503).
 - Thresholds are constants in the rules.
 
 ## Errors
 
 The rules are total. `digest_member_not_found` refuses a test for someone who is not an active
 member of the organization named. `digest_nothing_to_send` refuses a test whose pick has nothing
-to show. `digest_link_invalid` refuses an unsubscribe token that does not verify.
+to show. `digest_link_invalid` refuses an unsubscribe token that does not verify or has expired.
+`digest_links_unavailable` (503) refuses every token, and every send, when no signing secret is
+configured.
 
 ## Contracts and validation
 
@@ -105,6 +118,8 @@ routes read.
 
 ## Consequences
 
-Digest depends on `@langwatch/mail` for its templates and on notification for delivery; a mailer
-failure fails the send intent, which retries with the same idempotency key. Clicks are not
-tracked: links in the email go straight to their targets.
+Digest depends on `@langwatch/mail` for its templates and on notification for delivery. A
+failure before the claim fails the send intent, which retries; a mailer failure after the claim
+is not resent, so that member misses the week. The email goes out as HTML only:
+`SendEmailCommand` takes no plain-text part, so the template's rendered text is not sent. Clicks
+are not tracked: links in the email go straight to their targets.

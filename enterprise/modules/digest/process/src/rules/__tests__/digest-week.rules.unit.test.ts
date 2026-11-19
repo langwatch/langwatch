@@ -11,6 +11,7 @@ import {
   latencyPercentile,
   LATENCY_BUCKETS_MS,
   oldestKeptWeek,
+  plannableWeek,
   sendableWeek,
   weekLabel,
   weeksBefore,
@@ -69,6 +70,29 @@ describe("sendableWeek()", () => {
     it("covers last year's final week", () => {
       expect(sendableWeek(at("2026-01-05T08:30:00Z"))).toBe("2026-W01");
       expect(sendableWeek(at("2026-01-01T00:00:00Z"))).toBe("2025-W52");
+    });
+  });
+});
+
+describe("plannableWeek()", () => {
+  describe("when Monday 08:00 UTC has not passed", () => {
+    it("is none, so a plan never reaches back to the week before last", () => {
+      expect(plannableWeek(at("2026-11-16T00:00:00Z"))).toBeNull();
+      expect(plannableWeek(at("2026-11-16T07:59:59Z"))).toBeNull();
+    });
+  });
+
+  describe("when Monday 08:00 UTC has passed", () => {
+    it("is last week from then until the week ends", () => {
+      expect(plannableWeek(at("2026-11-16T08:00:00Z"))).toBe("2026-W46");
+      expect(plannableWeek(at("2026-11-22T23:59:59Z"))).toBe("2026-W46");
+    });
+  });
+
+  describe("when the week that just ended belongs to last year", () => {
+    it("is last year's final week once Monday 08:00 UTC has passed", () => {
+      expect(plannableWeek(at("2027-01-04T07:00:00Z"))).toBeNull();
+      expect(plannableWeek(at("2027-01-04T08:30:00Z"))).toBe("2026-W53");
     });
   });
 });

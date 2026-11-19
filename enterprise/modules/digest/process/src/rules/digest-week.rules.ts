@@ -52,6 +52,16 @@ export function sendableWeek(now: number): string {
   return (now >= opensAt ? lastWeek : weekBefore) ?? current;
 }
 
+/**
+ * The week a plan at `now` may send: last week once this week's send opened at Monday 08:00
+ * UTC, and none before then. The sendable week before 08:00 is the week before last, so planning
+ * it would mail a second, older week to anyone armed in those hours.
+ */
+export function plannableWeek(now: number): string | null {
+  const opensAt = weekStartOf(isoWeekOf(now)) + SEND_HOUR_UTC * HOUR_MS;
+  return now >= opensAt ? sendableWeek(now) : null;
+}
+
 /** The oldest week kept at `now`: the sendable week's baseline still needs its four. */
 export function oldestKeptWeek(now: number): string {
   const sendable = sendableWeek(now);

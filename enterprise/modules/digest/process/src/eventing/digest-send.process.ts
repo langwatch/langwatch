@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
- * The weekly send's two processes. An hourly wake hands the outbox one plan of the sendable
- * week; the plan asks one send per enrolled member, and each ask becomes one `sendDigest`
- * intent keyed by the person and week, so a second ask or wake sends nothing more.
+ * The weekly send's two processes. An hourly wake from Monday 08:00 UTC hands the outbox one
+ * plan of last week; the plan asks one send per enrolled member, and each ask becomes one
+ * `sendDigest` intent keyed by the person and week, so a second ask or wake sends nothing more.
  * Spec: enterprise/modules/digest/specs/digest.feature
  */
 import type { EventHandler, IntentSpec, WakeHandler } from "@langwatch/eventing";
 import { z } from "zod";
 
-import { sendableWeek } from "../rules/digest-week.rules.ts";
+import { plannableWeek } from "../rules/digest-week.rules.ts";
 import {
   type DigestSendRequest,
   digestSendRequestedEventDataSchema,
@@ -44,18 +44,20 @@ type PlanIntents = { planWeek: IntentSpec<typeof planWeekIntentSchema> };
 type MemberSendIntents = { sendDigest: IntentSpec<typeof sendDigestIntentSchema> };
 
 /**
- * Pure: asks for the sendable week on every wake. The plan is the gate (armed, not yet planned),
- * so arming mid-week still sends last week, and a planned week is never planned again.
+ * Pure: asks for last week on every wake from Monday 08:00 UTC, and nothing before it. The plan
+ * is the gate (armed, not yet planned), so arming mid-week still sends last week, arming early
+ * on Monday waits for 08:00, and a planned week is never planned again.
  */
-export const digestPlanWake: WakeHandler<DigestPlanState, PlanIntents> = (_state, context) => ({
-  state: { lastWakeAt: context.at },
-  intents: [
-    context.intent("planWeek", `plan:${context.at}`, {
-      isoWeek: sendableWeek(context.at),
-      at: context.at,
-    }),
-  ],
-});
+export const digestPlanWake: WakeHandler<DigestPlanState, PlanIntents> = (_state, context) => {
+  const isoWeek = plannableWeek(context.at);
+  return {
+    state: { lastWakeAt: context.at },
+    intents:
+      isoWeek === null
+        ? []
+        : [context.intent("planWeek", `plan:${context.at}`, { isoWeek, at: context.at })],
+  };
+};
 
 /** One person's week: the first ask becomes the one `sendDigest`; the key keeps it the one. */
 export const digestSendRequested: EventHandler<

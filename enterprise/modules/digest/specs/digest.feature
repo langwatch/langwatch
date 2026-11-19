@@ -128,6 +128,19 @@ Feature: Weekly digest emails
     And every email carries an RFC 8058 one-click unsubscribe
 
   @integration
+  Scenario: Arming before Monday 08:00 UTC sends last week once, from 08:00
+    Given an enrolled organization with three members
+    When the send is armed at 03:00 UTC on a Monday and the wake runs every hour
+    Then nothing is planned before 08:00
+    And from 08:00 each member receives exactly one email, for last week
+
+  @integration
+  Scenario: A send retried after the mailer failed is not sent twice
+    Given a member's week was claimed and handed to the mailer
+    When the mailer call fails and the send is retried, or two attempts run at once
+    Then the member receives exactly one email for that week
+
+  @integration
   Scenario: An organization admin near the plan limit is sent the plan's numbers
     Given the send is armed and an enrolled organization at 90% of its monthly limit
     When the week's emails are sent
@@ -175,8 +188,28 @@ Feature: Weekly digest emails
   @integration
   Scenario: A forged or tampered unsubscribe token is refused
     When the unsubscribe page is asked with a token whose signature does not match
+    And the same holds for a token signed with that secret for another purpose
     Then the answer is refused as an invalid link
     And no subscription changes
+
+  @integration
+  Scenario: An expired unsubscribe link is refused
+    Given an unsubscribe link minted 180 days ago
+    When it is asked or posted
+    Then the answer is refused as an invalid link
+    And no subscription changes
+
+  @integration
+  Scenario: Without a signing secret no link is signed or honoured
+    Given no session secret is configured
+    When a member's week is sent, or the unsubscribe address is asked
+    Then no email is sent and no send is recorded
+    And the address answers 503 with digest_links_unavailable, not a server fault
+
+  @unit
+  Scenario: The unsubscribe page cannot be framed
+    When any unsubscribe or resubscribe page is answered
+    Then it carries X-Frame-Options DENY and a frame-ancestors 'none' policy
 
   @integration
   Scenario: Resubscribing from the unsubscribe page

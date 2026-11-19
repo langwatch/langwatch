@@ -73,12 +73,12 @@ Until the "what's new" editor exists no card is published, so a person whose pic
 
 - Subscribers on trace, coding-agent, evaluation and scenario events → `recordActivity` →
   the two weekly fold projections, all week long.
-- Scheduled process manager (`digest_send`), hourly wake: hands the outbox one plan of the sendable
-  week (last week, once Monday 08:00 UTC has passed). When settings are armed and that week is not
+- Scheduled process manager (`digest_send`), hourly wake: from Monday 08:00 UTC hands the outbox
+  one plan of last week, and before then none. When settings are armed and that week is not
   yet planned, the plan asks one send per enrolled member, and each ask becomes one `sendDigest`
   intent keyed `(userId, isoWeek)`, so a redelivery sends nothing. The intent reads the finished
-  week's folds, picks the template, renders it and sends it with the idempotency key
-  `digest:{userId}:{isoWeek}`, then writes the `DigestSend` row. Disarmed sends, unsubscribed users,
+  week's folds, picks the template, renders it, claims the `DigestSend` row and, only if it took
+  the claim, sends it with the idempotency key `digest:{userId}:{isoWeek}`. Disarmed sends, unsubscribed users,
   people with no address and members of organizations no longer enrolled are skipped when the intent
   is handled. The same wake sweeps folds older than the sent week's four-week baseline.
 

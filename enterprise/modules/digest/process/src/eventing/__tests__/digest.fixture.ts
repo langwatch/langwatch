@@ -27,7 +27,9 @@ import type { ProjectActivity } from "../digest-activity.events.ts";
 import { buildDigestSendPipeline } from "../digest-send.pipeline.ts";
 import {
   DIGEST_MEMBER_SEND_PROCESS_NAME,
+  DIGEST_PLAN_INITIAL_STATE,
   DIGEST_PLAN_PROCESS_NAME,
+  digestPlanWake,
 } from "../digest-send.process.ts";
 import { buildDigestPipeline } from "../digest.pipeline.ts";
 import { MemoryDigestMailChannel } from "../../channels/memory/memory.digest.channels.ts";
@@ -52,6 +54,8 @@ export const emailOf = (userId: string) => `${userId}@example.test`;
 export const WAKE_AT = Date.parse("2026-11-16T09:00:00Z");
 export const NEXT_WAKE_AT = WAKE_AT + 60 * 60 * 1000;
 export const SENT_WEEK = "2026-W46";
+/** The session secret the fixture signs unsubscribe links with. */
+export const DIGEST_SECRET = "digest-test-secret";
 
 const OWNER_AGGREGATE_TYPE = "digest_owner_stand_in";
 
@@ -88,7 +92,10 @@ export function digestWorld() {
   };
 }
 
-export function installDigest(world = digestWorld()) {
+export function installDigest(
+  world = digestWorld(),
+  { secret = DIGEST_SECRET }: { secret?: string } = {},
+) {
   // The concrete twin, so a test can read which send an opt-out came from.
   const audience = MemoryDigestAudienceRepository.create();
   const repositories = { ...MemoryDigestRepositories.create(), audience };
@@ -103,7 +110,7 @@ export function installDigest(world = digestWorld()) {
   const mail = MemoryDigestMailChannel.create();
   const now = () => Date.now() + world.clockOffsetMs;
   const unsubscribes = DigestUnsubscribeService.create({
-    secret: "digest-test-secret",
+    secret,
     audience,
     now,
   });
@@ -190,11 +197,35 @@ export function installDigest(world = digestWorld()) {
     repositories,
     /** Every email handed to the mail channel, in order. */
     mail: mail.sent,
+    /** The mail channel itself, for a test that makes it fail. */
+    mailChannel: mail,
     unsubscribes,
     /** The hourly wake's plan of the sendable week, as the outbox carries it out. */
     plan: async ({ at = WAKE_AT, isoWeek = SENT_WEEK }: { at?: number; isoWeek?: string } = {}) => {
       const spec = intentOf({ processName: DIGEST_PLAN_PROCESS_NAME, intent: "planWeek" });
       await spec.run(spec.schema.parse({ isoWeek, at }), context(DIGEST_PLAN_PROCESS_NAME));
+    },
+    /**
+     * The hourly wake at `at`: its own handler decides whether a plan is asked, and each plan it
+     * asks is carried out as the outbox would. Answers how many plans it asked.
+     */
+    wake: async ({ at }: { at: number }) => {
+      const { intents = [] } = digestPlanWake(DIGEST_PLAN_INITIAL_STATE, {
+        at,
+        now: at,
+        key: DIGEST_PLAN_PROCESS_NAME,
+        projectId: ORGANIZATION,
+        intent: ((intentType: string, messageKey: string, payload: unknown) => ({
+          intentType,
+          messageKey,
+          payload,
+        })) as never,
+      });
+      const spec = intentOf({ processName: DIGEST_PLAN_PROCESS_NAME, intent: "planWeek" });
+      for (const intent of intents) {
+        await spec.run(spec.schema.parse(intent.payload), context(DIGEST_PLAN_PROCESS_NAME));
+      }
+      return intents.length;
     },
     /** Every send intent still pending, oldest first; leasing them hands them out once. */
     leaseSends: () =>

@@ -18,13 +18,21 @@ export class MemoryDigestMailChannel extends DigestMailChannel {
   }
 
   readonly sent: DigestMail[] = [];
+  #failNext = false;
 
   private constructor() {
     super();
   }
 
+  /** The next email is taken, then the call fails: a connection lost after the mailer accepted. */
+  failAfterAccepting(): void {
+    this.#failNext = true;
+  }
+
   send(mail: DigestMail): Promise<void> {
     this.sent.push(mail);
-    return Promise.resolve();
+    if (!this.#failNext) return Promise.resolve();
+    this.#failNext = false;
+    return Promise.reject(new Error("the connection closed after the mailer accepted the email"));
   }
 }

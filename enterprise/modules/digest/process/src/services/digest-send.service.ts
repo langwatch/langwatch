@@ -27,7 +27,7 @@ import {
   type OrganizationWeek,
 } from "../rules/digest-email.rules.ts";
 import { type DigestTemplatePick, pickDigestTemplate } from "../rules/digest-template.rules.ts";
-import { oldestKeptWeek, sendableWeek } from "../rules/digest-week.rules.ts";
+import { oldestKeptWeek, plannableWeek, sendableWeek } from "../rules/digest-week.rules.ts";
 import type { DigestUnsubscribeService } from "./digest-unsubscribe.service.ts";
 import type { DigestWeekService } from "./digest-week.service.ts";
 
@@ -78,13 +78,18 @@ export class DigestSendService {
 
   private constructor(private readonly deps: Deps) {}
 
-  /** The hourly wake's work: sweep old folds, then, armed and not yet planned, ask the sends. */
+  /**
+   * The hourly wake's work: sweep old folds, then, for the week the slot may send, armed and not
+   * yet planned, ask the sends.
+   */
   async planWeek({ isoWeek, at }: { isoWeek: string; at: number }): Promise<void> {
     const oldest = oldestKeptWeek(at);
     await Promise.all([
       this.deps.projectWeeks.deleteBefore({ isoWeek: oldest }),
       this.deps.userWeeks.deleteBefore({ isoWeek: oldest }),
     ]);
+    // Only the week the plan's own slot may send: before Monday 08:00 that is none (ADR-001).
+    if (plannableWeek(at) !== isoWeek) return;
     const settings = await this.deps.audience.getSettings();
     if (!settings.armed) return;
     if (settings.lastPlannedWeek !== null && settings.lastPlannedWeek >= isoWeek) return;
@@ -99,8 +104,9 @@ export class DigestSendService {
   }
 
   /**
-   * One member's week, sent once; skipped if disarmed, unenrolled or opted out since the plan,
-   * when the person has no address, or when the picked template has nothing to show.
+   * One member's week, sent at most once: only the caller that claims the week sends it. Skipped
+   * if disarmed, unenrolled or opted out since the plan, when the person has no address, or when
+   * the picked template has nothing to show.
    */
   async sendDigest({
     userId,
@@ -125,7 +131,16 @@ export class DigestSendService {
       recipient: { userId, sendId: digestSendKey({ userId, isoWeek }) },
     });
     if (!composed) return;
-    // A failure after the mailer accepted retries with the same key: the mailer drops the repeat.
+    // Claimed before the mailer is called, since SMTP does not dedupe a retry: a failure past
+    // the claim loses this week's email rather than risk sending it twice (ADR-001).
+    const claimed = await this.deps.sends.claim({
+      userId,
+      organizationId,
+      isoWeek,
+      templateId: composed.pick.template,
+      sentAt: this.deps.now(),
+    });
+    if (!claimed) return;
     await this.deps.mail.send({
       to: user.email,
       templateId: composed.pick.template,
@@ -133,13 +148,6 @@ export class DigestSendService {
       oneClickUnsubscribeUrl: composed.oneClick,
       idempotencyKey: digestMessageId({ userId, isoWeek }),
       test: false,
-    });
-    await this.deps.sends.recordSent({
-      userId,
-      organizationId,
-      isoWeek,
-      templateId: composed.pick.template,
-      sentAt: this.deps.now(),
     });
   }
 

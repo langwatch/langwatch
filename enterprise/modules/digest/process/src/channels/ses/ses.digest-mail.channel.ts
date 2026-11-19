@@ -22,6 +22,7 @@ export class SesDigestMailChannel extends DigestMailChannel {
   async send(mail: DigestMail): Promise<void> {
     const template = mailTemplates.find((candidate) => candidate.id === mail.templateId);
     if (!template) throw new Error(`@langwatch/mail holds no ${mail.templateId} template`);
+    // The rendered plain-text part is left behind: `SendEmailCommand` is strict and takes none.
     const { subject, html } = await renderMailTemplate(template, mail.props);
     await this.notifications.sendEmail({
       to: mail.to,

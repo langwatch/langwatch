@@ -3,7 +3,7 @@ import { PrismaRepository } from "@langwatch/prisma-client";
 
 import type { DigestSendRecord, DigestSendRepository } from "../digest-send.repository.ts";
 
-/** One row per person and week; its id is the pair, so a second record is a no-op upsert. */
+/** One row per person and week; its id is the pair, so only the first insert of a week lands. */
 const sendIdOf = ({ userId, isoWeek }: { userId: string; isoWeek: string }) =>
   `${userId}:${isoWeek}`;
 
@@ -21,12 +21,12 @@ export class PrismaDigestSendRepository
     return row !== null;
   }
 
-  async recordSent({ sentAt, ...send }: DigestSendRecord): Promise<void> {
-    const id = sendIdOf(send);
-    await this.prisma.digestSend.upsert({
-      where: { id },
-      create: { id, ...send, sentAt: new Date(sentAt) },
-      update: {},
+  async claim({ sentAt, ...send }: DigestSendRecord): Promise<boolean> {
+    // ON CONFLICT DO NOTHING: two racing attempts both return, and only one counts a row.
+    const { count } = await this.prisma.digestSend.createMany({
+      data: [{ id: sendIdOf(send), ...send, sentAt: new Date(sentAt) }],
+      skipDuplicates: true,
     });
+    return count === 1;
   }
 }

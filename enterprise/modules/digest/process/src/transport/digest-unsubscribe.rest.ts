@@ -3,20 +3,37 @@
  * The weekly digest's unsubscribe address, `/api/digest/unsubscribe?token=`. The email's footer
  * link opens it (GET, a page that changes nothing, so a link scanner's prefetch unsubscribes
  * no one); the RFC 8058 header and the page's button POST to it. The signed token is the whole
- * authorization, so no session is resolved. A bad token answers 400.
+ * authorization, so no session is resolved. A bad or expired token answers 400; with no signing
+ * secret configured, 503. Every page refuses to be framed, since its button changes a
+ * subscription in one click.
  * Spec: enterprise/modules/digest/specs/digest.feature
  */
 import { publicRoute } from "@langwatch/api/access";
-import { defineRestRouter, MANAGEMENT_API_VERSION } from "@langwatch/api/rest";
+import {
+  defineRestRouter,
+  MANAGEMENT_API_VERSION,
+  type RestBytesProducer,
+} from "@langwatch/api/rest";
 import { DigestApi, digestTokenQuerySchema } from "@langwatch/enterprise-digest-contract";
 
 const HTML = "text/html; charset=UTF-8";
+
+/** Never framed: `frame-ancestors` says so to current browsers, `X-Frame-Options` to older ones. */
+const UNFRAMEABLE = {
+  "Content-Security-Policy": "frame-ancestors 'none'",
+  "X-Frame-Options": "DENY",
+} as const;
 
 const TOKEN_IS_THE_AUTHORIZATION =
   "RFC 8058 one-click unsubscribe from the weekly digest: the email arrives where no session " +
   "exists, and the HMAC token naming one person is the whole authorization";
 
 const NO_KEY_REACHES_IT = "a public token route: no API key, Langy's included, is ever read here";
+
+const TOKEN_ERRORS = [
+  { status: 400, description: "The token is missing, invalid, expired or tampered with" },
+  { status: 503, description: "No signing secret is configured, so no link can be checked" },
+];
 
 const UNSUBSCRIBE_PATH = "/api/digest/unsubscribe";
 const RESUBSCRIBE_PATH = "/api/digest/resubscribe";
@@ -34,12 +51,12 @@ export const digestUnsubscribeRest = defineRestRouter(DigestApi)
   .withDocs({
     hide: true,
     summary: "The weekly digest's unsubscribe page",
-    errors: [{ status: 400, description: "The token is missing, invalid or tampered with" }],
+    errors: TOKEN_ERRORS,
   })
   .handle(async ({ app, input, response }) =>
-    response.buffer(
+    htmlPage(
+      response,
       (await app.isSubscribed(input)) ? askPage(input.token) : unsubscribedPage(input.token),
-      { mediaType: HTML },
     ),
   )
 
@@ -52,11 +69,11 @@ export const digestUnsubscribeRest = defineRestRouter(DigestApi)
   .withDocs({
     hide: true,
     summary: "RFC 8058 one-click unsubscribe from the weekly digest",
-    errors: [{ status: 400, description: "The token is missing, invalid or tampered with" }],
+    errors: TOKEN_ERRORS,
   })
   .handle(async ({ app, input, response }) => {
     await app.unsubscribe(input);
-    return response.buffer(unsubscribedPage(input.token), { mediaType: HTML });
+    return htmlPage(response, unsubscribedPage(input.token));
   })
 
   .post(RESUBSCRIBE_PATH, "resubscribeToDigest")
@@ -68,14 +85,28 @@ export const digestUnsubscribeRest = defineRestRouter(DigestApi)
   .withDocs({
     hide: true,
     summary: "Resubscribe to the weekly digest from its unsubscribe page",
-    errors: [{ status: 400, description: "The token is missing, invalid or tampered with" }],
+    errors: TOKEN_ERRORS,
   })
   .handle(async ({ app, input, response }) => {
     await app.resubscribe(input);
-    return response.buffer(resubscribedPage(input.token), { mediaType: HTML });
+    return htmlPage(response, resubscribedPage(input.token));
   })
 
   .build();
+
+/**
+ * A page as one chunk: only the stream producer takes headers, and the anti-framing pair must
+ * ride every page whatever the surface's own floor holds.
+ */
+function htmlPage(response: RestBytesProducer<typeof HTML>, html: string) {
+  const bytes = new TextEncoder().encode(html);
+  return response.stream(
+    (async function* () {
+      yield bytes;
+    })(),
+    { mediaType: HTML, byteLength: bytes.byteLength, headers: UNFRAMEABLE },
+  );
+}
 
 // The token was verified before any page is written, so it is our own base64url and hex;
 // it is still URL-encoded, which leaves nothing an attribute could be broken out of.

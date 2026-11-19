@@ -14,9 +14,10 @@ export class MemoryDigestSendRepository implements DigestSendRepository {
     return Promise.resolve(this.#sends.has(`${userId}:${isoWeek}`));
   }
 
-  recordSent(record: DigestSendRecord): Promise<void> {
+  claim(record: DigestSendRecord): Promise<boolean> {
     const key = `${record.userId}:${record.isoWeek}`;
-    if (!this.#sends.has(key)) this.#sends.set(key, record);
-    return Promise.resolve();
+    if (this.#sends.has(key)) return Promise.resolve(false);
+    this.#sends.set(key, record);
+    return Promise.resolve(true);
   }
 }

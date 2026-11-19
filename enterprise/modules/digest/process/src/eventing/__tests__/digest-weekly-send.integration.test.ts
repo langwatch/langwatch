@@ -6,12 +6,17 @@
  * channel's memory tier recording each email instead of our mailer sending it.
  * @see enterprise/modules/digest/specs/digest.feature
  */
+import { createHmac } from "node:crypto";
+
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { isoWeekOf } from "../../rules/digest-week.rules.ts";
+import { LINK_LIFETIME_SECONDS } from "../../services/digest-unsubscribe.service.ts";
 import {
   ADMIN,
   BASE_URL,
+  DIGEST_SECRET,
+  digestWorld,
   emailOf,
   installDigest,
   type InstalledDigest,
@@ -30,6 +35,9 @@ const MEMBERS = [ADMIN, MEMBER, OTHER_MEMBER];
 const COHORT_REFRESH_MS = 61 * 1000;
 /** An instant inside the sent week. */
 const IN_SENT_WEEK = Date.parse("2026-11-11T12:00:00Z");
+/** An hour of the Monday the sent week's email goes out, 2026-W47's first day. */
+const mondayAt = (hour: number) => Date.UTC(2026, 10, 16, hour);
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 let digest: InstalledDigest;
 
@@ -77,8 +85,16 @@ async function sendPlanned(): Promise<number> {
 }
 
 /** Plans the week and waits until each member's ask has become a send intent. */
-async function planAndCollect({ at = WAKE_AT, expected }: { at?: number; expected: number }) {
-  await digest.plan({ at });
+async function planAndCollect({
+  at = WAKE_AT,
+  expected,
+  plan = () => digest.plan({ at }),
+}: {
+  at?: number;
+  expected: number;
+  plan?: () => Promise<unknown>;
+}) {
+  await plan();
   const seen: unknown[] = [];
   await vi.waitFor(async () => {
     seen.push(...(await digest.leaseSends()).map((message) => message.payload));
@@ -159,6 +175,77 @@ describe("the weekly digest send", () => {
         );
         expect(mail.props.unsubscribeUrl).toBe(mail.oneClickUnsubscribeUrl);
       }
+    });
+  });
+
+  describe("when the send is armed early on Monday, before 08:00 UTC", () => {
+    /** @scenario "Arming before Monday 08:00 UTC sends last week once, from 08:00" */
+    it("plans nothing until 08:00, then mails each member last week alone", async () => {
+      await enrol();
+      await arm();
+      everyoneNearTheLimit();
+
+      for (const hour of [3, 4, 5, 6, 7]) {
+        expect(await digest.wake({ at: mondayAt(hour) })).toBe(0);
+      }
+      expect((await digest.repositories.audience.getSettings()).lastPlannedWeek).toBeNull();
+      expect(await sendPlanned()).toBe(0);
+
+      const planned = await planAndCollect({
+        expected: 3,
+        plan: () => digest.wake({ at: mondayAt(8) }),
+      });
+      for (const payload of planned) await digest.carryOut(payload);
+      await digest.wake({ at: mondayAt(9) });
+      await sendPlanned();
+
+      expect(digest.mail.map((mail) => mail.idempotencyKey).toSorted()).toEqual(
+        MEMBERS.map((userId) => `digest:${userId}:${SENT_WEEK}`).toSorted(),
+      );
+    });
+
+    /** @scenario "Arming before Monday 08:00 UTC sends last week once, from 08:00" */
+    it("refuses a plan of any week but the one its slot may send", async () => {
+      await enrol();
+      await arm();
+      everyoneNearTheLimit();
+
+      await digest.plan({ at: mondayAt(3), isoWeek: "2026-W45" });
+      await digest.plan({ at: mondayAt(3), isoWeek: SENT_WEEK });
+      await digest.plan({ at: WAKE_AT, isoWeek: "2026-W45" });
+
+      expect((await digest.repositories.audience.getSettings()).lastPlannedWeek).toBeNull();
+    });
+  });
+
+  describe("when the mailer fails after it accepted a member's email", () => {
+    /** @scenario "A send retried after the mailer failed is not sent twice" */
+    it("does not hand the email over again when the outbox retries", async () => {
+      await enrol();
+      await arm();
+      everyoneNearTheLimit();
+      digest.mailChannel.failAfterAccepting();
+
+      await expect(sendFor({ userId: MEMBER, isoWeek: SENT_WEEK })).rejects.toThrow();
+      await sendFor({ userId: MEMBER, isoWeek: SENT_WEEK });
+
+      expect(recipients()).toEqual([emailOf(MEMBER)]);
+    });
+  });
+
+  describe("when two attempts at one member's week run at once", () => {
+    /** @scenario "A send retried after the mailer failed is not sent twice" */
+    it("lets only the attempt that claimed the week send it", async () => {
+      await enrol();
+      await arm();
+      everyoneNearTheLimit();
+
+      await Promise.all([
+        sendFor({ userId: MEMBER, isoWeek: SENT_WEEK }),
+        sendFor({ userId: MEMBER, isoWeek: SENT_WEEK }),
+      ]);
+
+      expect(recipients()).toEqual([emailOf(MEMBER)]);
     });
   });
 
@@ -307,6 +394,47 @@ describe("unsubscribing from the digest", () => {
     });
   });
 
+  describe("when the link has outlived its lifetime", () => {
+    /** @scenario "An expired unsubscribe link is refused" */
+    it("is honoured to its last day, then refused as an invalid link", async () => {
+      const token = tokenOf((await sentEmailOf(MEMBER)).oneClickUnsubscribeUrl);
+
+      digest.world.clockOffsetMs = (LINK_LIFETIME_SECONDS - 24 * 60 * 60) * 1000;
+      expect(await digest.unsubscribes.isSubscribed({ token })).toBe(true);
+
+      digest.world.clockOffsetMs = LINK_LIFETIME_SECONDS * 1000;
+      await expect(digest.unsubscribes.isSubscribed({ token })).rejects.toMatchObject({
+        code: "digest_link_invalid",
+      });
+      await expect(digest.unsubscribes.unsubscribe({ token })).rejects.toMatchObject({
+        code: "digest_link_invalid",
+      });
+      expect(await digest.repositories.audience.listUnsubscribed({ userIds: MEMBERS })).toEqual([]);
+    });
+  });
+
+  describe("when a token is signed with the same secret for another purpose", () => {
+    /** @scenario "A forged or tampered unsubscribe token is refused" */
+    it("is refused; only the digest's own purpose verifies", async () => {
+      const serialized = JSON.stringify({
+        u: MEMBER,
+        s: "x",
+        exp: Math.floor((Date.now() + DAY_MS) / 1000),
+      });
+      const signedAs = (bytes: string) =>
+        `${Buffer.from(serialized).toString("base64url")}.${createHmac("sha256", DIGEST_SECRET)
+          .update(bytes)
+          .digest("hex")}`;
+
+      await expect(
+        digest.unsubscribes.isSubscribed({ token: signedAs(serialized) }),
+      ).rejects.toMatchObject({ code: "digest_link_invalid" });
+      expect(
+        await digest.unsubscribes.isSubscribed({ token: signedAs(`digest.v1:${serialized}`) }),
+      ).toBe(true);
+    });
+  });
+
   describe("when an unsubscribed member resubscribes from the same page", () => {
     /** @scenario "Resubscribing from the unsubscribe page" */
     it("sends them next week's email", async () => {
@@ -321,6 +449,43 @@ describe("unsubscribing from the digest", () => {
         `digest:${MEMBER}:${SENT_WEEK}`,
         `digest:${MEMBER}:2026-W47`,
       ]);
+    });
+  });
+});
+
+describe("when no signing secret is configured", () => {
+  beforeEach(async () => {
+    await digest.close();
+    digest = installDigest(digestWorld(), { secret: "" });
+  });
+
+  /** @scenario "Without a signing secret no link is signed or honoured" */
+  it("sends no member their week, and records no send", async () => {
+    await enrol();
+    await arm();
+    everyoneNearTheLimit();
+
+    await expect(sendFor({ userId: MEMBER, isoWeek: SENT_WEEK })).rejects.toMatchObject({
+      code: "digest_links_unavailable",
+    });
+
+    expect(digest.mail).toEqual([]);
+    expect(await digest.repositories.sends.isSent({ userId: MEMBER, isoWeek: SENT_WEEK })).toBe(
+      false,
+    );
+  });
+
+  /** @scenario "Without a signing secret no link is signed or honoured" */
+  it("refuses every link as unavailable, not as a server fault", async () => {
+    const payload = Buffer.from(JSON.stringify({ u: MEMBER, s: "x", exp: 0 }));
+    const token = `${payload.toString("base64url")}.${"0".repeat(64)}`;
+
+    await expect(digest.unsubscribes.isSubscribed({ token })).rejects.toMatchObject({
+      code: "digest_links_unavailable",
+      httpStatus: 503,
+    });
+    await expect(digest.unsubscribes.unsubscribe({ token })).rejects.toMatchObject({
+      code: "digest_links_unavailable",
     });
   });
 });
