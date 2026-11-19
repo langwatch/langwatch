@@ -487,11 +487,12 @@ export function cloudAdminGroup(): SettingsMenuGroup {
 export function settingsMenu(gates: SettingsMenuGates): SettingsMenuGroup[] {
   const groups: SettingsMenuGroup[] = [
     youGroup(),
+    // Right under You: from a project, Settings lands on its General page (ADR-098 amendment).
+    projectGroup(gates),
     organizationGroup(gates),
     accessGroup(gates),
     aiInfrastructureGroup(gates),
     dataControlsGroup(gates),
-    projectGroup(gates),
   ];
 
   return groups.filter((group) => group.items.length > 0);
