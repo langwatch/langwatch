@@ -59,10 +59,18 @@ describe("normalizeEndpointAddresses", () => {
       ).toEqual(["10.20.1.21", "fd12::5", "172.16.0.9"]);
     });
 
-    it("accepts every private range", () => {
-      expect(
-        normalizeEndpointAddresses(["10.0.0.1", "172.31.255.254", "192.168.1.1", "fd00::1"]),
-      ).toHaveLength(4);
+    /** @scenario "Ops accepts an address in each private range the dial admits" */
+    it("accepts every private range the dial gate admits", () => {
+      const addresses = [
+        "10.0.0.1",
+        "172.31.255.254",
+        "192.168.1.1",
+        "100.64.0.1",
+        "100.127.255.254",
+        "fd00::1",
+      ];
+
+      expect(normalizeEndpointAddresses(addresses)).toEqual(addresses);
     });
   });
 
@@ -76,6 +84,8 @@ describe("normalizeEndpointAddresses", () => {
       ["169.254.169.254", "metadata"],
       ["fd00:ec2::254", "metadata"],
       ["172.32.0.1", "not a private address"],
+      ["100.63.255.255", "not a private address"],
+      ["100.128.0.1", "not a private address"],
       ["llm.acme.test", "not an IP address"],
     ])("refuses %j on the addresses field", (address, reason) => {
       const errors = fieldErrorsOf(() => normalizeEndpointAddresses(["10.20.1.21", address]));

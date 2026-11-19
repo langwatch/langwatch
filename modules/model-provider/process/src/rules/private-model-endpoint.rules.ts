@@ -19,10 +19,15 @@ function refuse(
   throw new PrivateModelEndpointInvalidError({ field, reason });
 }
 
-/** RFC 1918: 10/8, 172.16/12 and 192.168/16, where a PrivateLink interface address lives. */
+/**
+ * RFC 1918 (10/8, 172.16/12, 192.168/16) and RFC 6598 shared space (100.64/10), where a
+ * PrivateLink interface address lives: an AWS VPC may carry 100.64/10 as a secondary CIDR. The
+ * same ranges the dial gate admits for a bound hostname (packages/egress, pkg/ssrf).
+ */
 function isPrivateIpv4(address: string): boolean {
   const [first = -1, second = -1] = address.split(".").map(Number);
   if (first === 10) return true;
+  if (first === 100) return second >= 64 && second <= 127;
   if (first === 172) return second >= 16 && second <= 31;
   return first === 192 && second === 168;
 }
@@ -105,7 +110,7 @@ function assertRegistrableAddress(address: string): void {
   if (!isPrivateAddress(address)) {
     refuse(
       "addresses",
-      `${address} is not a private address (10/8, 172.16/12, 192.168/16 or fc00::/7).`,
+      `${address} is not a private address (10/8, 172.16/12, 192.168/16, 100.64/10 or fc00::/7).`,
     );
   }
 }

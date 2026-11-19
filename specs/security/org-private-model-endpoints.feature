@@ -359,6 +359,19 @@ Feature: Private model endpoints for one organization
         | port      | 0               |
         | port      | 70000           |
 
+    @unit
+    Scenario Outline: Ops accepts an address in each private range the dial admits
+      When I register a private endpoint with addresses "<address>"
+      Then the address is saved
+
+      Examples:
+        | address        |
+        | 10.0.0.1       |
+        | 172.31.255.254 |
+        | 192.168.1.1    |
+        | 100.64.0.1     |
+        | fd00::1        |
+
     @integration
     Scenario: Removing a private endpoint closes every binding to it
       When staff remove private endpoint "Inference"
