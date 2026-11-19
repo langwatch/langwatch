@@ -37,7 +37,8 @@ export interface SsrfPolicy {
 export type SsrfValidationResult =
   | SsrfResolvedResult
   | SsrfAllowlistedResult
-  | SsrfUnresolvedResult;
+  | SsrfUnresolvedResult
+  | SsrfBoundResult;
 
 interface SsrfResultBase {
   originalUrl: string;
@@ -62,8 +63,33 @@ export interface SsrfUnresolvedResult extends SsrfResultBase {
   reason: "dns-failed" | "no-records";
 }
 
+/**
+ * A destination whose hostname the caller bound to fixed private addresses (ADR-203). It is never
+ * resolved: the connection dials one of `addresses`, and the hostname stays for SNI and `Host`.
+ */
+export interface SsrfBoundResult extends SsrfResultBase {
+  type: "bound";
+  addresses: string[];
+}
+
+/** A hostname bound to the private endpoint addresses it is dialled at, on one port. */
+export interface PrivateEndpointBinding {
+  hostname: string;
+  addresses: readonly string[];
+  port: number;
+}
+
+/** What one call adds to the policy. Absent or empty, the call is judged exactly as before. */
+export interface SsrfValidationOptions {
+  /** The calling organization's bindings; only model calls pass them (ADR-203). */
+  privateEndpoints?: readonly PrivateEndpointBinding[];
+}
+
 /** The validator a caller holds: one URL in, an admitted destination or a throw. */
-export type SsrfUrlValidator = (url: string) => Promise<SsrfValidationResult>;
+export type SsrfUrlValidator = (
+  url: string,
+  options?: SsrfValidationOptions,
+) => Promise<SsrfValidationResult>;
 
 interface ValidationContext {
   url: string;
@@ -344,6 +370,58 @@ async function resolveAllowlisted(ctx: ValidationContext): Promise<SsrfAllowlist
   return buildAllowlistedResult(ctx, addresses[0]);
 }
 
+/** The binding naming this exact host. An IP literal is never bound, whatever a binding says. */
+function findBinding(
+  ctx: ValidationContext,
+  bindings: readonly PrivateEndpointBinding[] | undefined,
+): PrivateEndpointBinding | undefined {
+  if (!bindings || bindings.length === 0 || isIP(ctx.hostname) !== 0) return undefined;
+  return bindings.find(
+    (binding) => withoutTrailingDot(binding.hostname.trim().toLowerCase()) === ctx.hostname,
+  );
+}
+
+/**
+ * A bound host is reached over https on its endpoint's one port, at a registered address. A
+ * refusal names the host and port only: the addresses are staff's, never the caller's to read.
+ */
+function resolveBound(ctx: ValidationContext, binding: PrivateEndpointBinding): SsrfBoundResult {
+  if (ctx.parsedUrl.protocol !== "https:") {
+    throw new Error(
+      `"${ctx.hostname}" is bound to a private endpoint and must be reached over https`,
+    );
+  }
+  if (ctx.port !== binding.port) {
+    throw new Error(
+      `"${ctx.hostname}" is bound to a private endpoint that accepts port ${binding.port} only, not ${ctx.port}`,
+    );
+  }
+  const addresses = binding.addresses.filter((address) => isIP(address) !== 0);
+  if (addresses.length === 0 || addresses.some(isMetadataAddress)) {
+    logger.error(
+      { url: ctx.logUrl, hostname: ctx.hostname, reason: "private_endpoint_unusable" },
+      "Private endpoint binding refused: no usable registered address",
+    );
+    throw new Error(`"${ctx.hostname}" is bound to a private endpoint with no usable address`);
+  }
+  logger.debug({ url: ctx.logUrl, hostname: ctx.hostname }, "Host bound to a private endpoint");
+  return { ...buildResultBase(ctx), type: "bound", addresses };
+}
+
+/** A name with no records: admitted unresolved where local addresses are allowed, else refused. */
+function handleNoRecords(ctx: ValidationContext, policy: SsrfPolicy): SsrfUnresolvedResult {
+  const { logUrl: url, hostname } = ctx;
+  if (!policy.blockLocal) {
+    logger.debug(
+      { url, hostname },
+      "No DNS records found; not blocking because the policy allows local addresses",
+    );
+    return buildUnresolvedResult(ctx, "no-records");
+  }
+  logger.error({ url, hostname }, "No DNS records found - blocking request");
+  throw new Error(`Unable to resolve hostname "${hostname}". Please verify the URL is correct.`);
+}
+
 /** The URL, refused unless it parses and speaks http or https. */
 function parseHttpUrl(url: string): URL {
   let parsedUrl: URL;
@@ -363,7 +441,10 @@ function parseHttpUrl(url: string): URL {
 
 /** Builds a validator for one address policy. */
 export function createSsrfUrlValidator(policy: SsrfPolicy): SsrfUrlValidator {
-  return async function validateUrlForSsrf(url: string): Promise<SsrfValidationResult> {
+  return async function validateUrlForSsrf(
+    url: string,
+    options?: SsrfValidationOptions,
+  ): Promise<SsrfValidationResult> {
     const parsedUrl = parseHttpUrl(url);
 
     const hostname = bareHostname(parsedUrl);
@@ -377,6 +458,9 @@ export function createSsrfUrlValidator(policy: SsrfPolicy): SsrfUrlValidator {
     // Always refused, before anything an operator can relax is consulted. The one exception is
     // an on-premise host the operator named exactly.
     validateNotMetadataEndpoint(ctx);
+    // A bound name is never resolved, so no suffix rule about what a name resolves to applies.
+    const binding = findBinding(ctx, options?.privateEndpoints);
+    if (binding) return resolveBound(ctx, binding);
     const allowlisted = isAllowlisted(ctx, policy);
     if (!(allowlisted && isOnPremiseDomain(hostname))) validateNotBlockedCloudDomain(ctx);
 
@@ -395,19 +479,7 @@ export function createSsrfUrlValidator(policy: SsrfPolicy): SsrfUrlValidator {
       return handleDnsFailure(ctx, policy, dnsError);
     }
 
-    if (allAddresses.length === 0) {
-      if (!policy.blockLocal) {
-        logger.debug(
-          { url: logUrl, hostname },
-          "No DNS records found; not blocking because the policy allows local addresses",
-        );
-        return buildUnresolvedResult(ctx, "no-records");
-      }
-      logger.error({ url: logUrl, hostname }, "No DNS records found - blocking request");
-      throw new Error(
-        `Unable to resolve hostname "${hostname}". Please verify the URL is correct.`,
-      );
-    }
+    if (allAddresses.length === 0) return handleNoRecords(ctx, policy);
 
     validateResolvedAddresses(ctx, allAddresses, policy.blockLocal);
 
