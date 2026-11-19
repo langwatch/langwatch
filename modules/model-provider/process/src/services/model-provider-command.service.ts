@@ -54,8 +54,7 @@ type ModelProviderCommandOptions = {
   onboardingDefaults: ModelProviderOnboardingDefaultsService;
   ids: ModelProviderIdService;
   scopes: ModelProviderScopeService;
-  /** The bound hostnames a save check and Test Connection carry (ADR-203). */
-  privateEndpoints: PrivateModelEndpointService;
+  bindings: PrivateModelEndpointService;
 };
 
 export class ModelProviderCommandService {
@@ -202,19 +201,17 @@ export class ModelProviderCommandService {
 
     await this.options.connectionRateLimiter.assertAvailable({ organizationId });
 
-    const privateEndpoints = await this.options.privateEndpoints.bindingsForOrganization({
-      organizationId,
-    });
+    const bound = await this.options.bindings.bindingsForOrganization({ organizationId });
     const credential = await this.options.catalog.testConnection(
       provider.provider,
       provider.customKeys ?? {},
-      privateEndpoints,
+      bound,
     );
     return this.options.connectionPing.verify({
       row: provider,
       projectId: parsed.projectId,
       credential,
-      privateEndpoints,
+      privateEndpoints: bound,
     });
   }
 
@@ -364,7 +361,7 @@ export class ModelProviderCommandService {
     routingHandle: string | null | undefined;
   }): Promise<ModelProvider> {
     const { parsed, existing, scopes, organizationId, routingHandle } = input;
-    const customKeys = await this.credentialsForWrite({ input: parsed, existing, organizationId });
+    const customKeys = await this.credentialsForWrite(parsed, existing, organizationId);
     const extraHeaders = this.headersForWrite(parsed, existing);
     const models = modelsForWrite(parsed, existing);
     const rateLimits = rateLimitsForWrite(parsed, existing);
@@ -394,15 +391,11 @@ export class ModelProviderCommandService {
     });
   }
 
-  private async credentialsForWrite({
-    input,
-    existing,
-    organizationId,
-  }: {
-    input: ModelProviderWriteInput;
-    existing: ModelProvider | null;
-    organizationId: string;
-  }): Promise<Record<string, unknown> | null> {
+  private async credentialsForWrite(
+    input: ModelProviderWriteInput,
+    existing: ModelProvider | null,
+    organizationId: string,
+  ): Promise<Record<string, unknown> | null> {
     if (input.customKeys === undefined) {
       return existing?.customKeys ?? null;
     }
@@ -426,10 +419,8 @@ export class ModelProviderCommandService {
       incoming: normalized,
       stored: existing?.customKeys ?? null,
     });
-    const privateEndpoints = await this.options.privateEndpoints.bindingsForOrganization({
-      organizationId,
-    });
-    await this.options.catalog.assertEndpointAllowed(input.provider, merged, privateEndpoints);
+    const bound = await this.options.bindings.bindingsForOrganization({ organizationId });
+    await this.options.catalog.assertEndpointAllowed(input.provider, merged, bound);
     return merged;
   }
 

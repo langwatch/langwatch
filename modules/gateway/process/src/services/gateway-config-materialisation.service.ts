@@ -247,7 +247,6 @@ export class GatewayConfigMaterialiserService {
       })),
     });
     const otlpToken = await this.traceExportToken(vk, traceProject);
-    const privateEndpoints = await this.privateEndpointsOf(vk.organizationId);
 
     return {
       revision: vk.revision.toString(),
@@ -298,7 +297,7 @@ export class GatewayConfigMaterialiserService {
       metadata: config.metadata ?? {},
       vk_tags: config.metadata?.tags ?? [],
       expires_at: toExpiresAtWire(vk.expiresAt),
-      ...privateEndpointsField(privateEndpoints),
+      ...privateEndpointsField(await this.privateEndpointsOf(vk.organizationId)),
     };
   }
 

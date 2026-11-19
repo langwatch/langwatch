@@ -140,27 +140,11 @@ export class ModelProviderService {
       query: this.query,
       catalog: options.catalog,
     });
-    this.commands = ModelProviderCommandService.create({
-      repository: options.repository,
-      defaults: options.defaults,
-      credentialPolicy: options.credentialPolicy,
-      catalog: options.catalog,
-      connectionRateLimiter: options.connectionRateLimiter,
-      connectionPing: ModelProviderConnectionPingService.create({
-        channel: options.connectionPing,
-        codexChannel: options.codexGatewayPing,
-        secrets: options.secrets,
-        execution: this.execution,
-      }),
+    this.commands = createCommands({
+      options,
+      execution: this.execution,
       writeAuthorization,
-      onboardingDefaults: ModelProviderOnboardingDefaultsService.create({
-        defaults: options.defaults,
-        ids: options.ids,
-        scopes,
-      }),
-      ids: options.ids,
       scopes,
-      privateEndpoints: options.privateEndpoints,
     });
     this.costs = ModelProviderCostsService.create({
       costs: options.costs,
@@ -436,4 +420,40 @@ export class ModelProviderService {
       }),
     };
   }
+}
+
+/** The write side, over the same scopes and write authorization the reads use. */
+function createCommands({
+  options,
+  execution,
+  writeAuthorization,
+  scopes,
+}: {
+  options: ModelProviderServiceOptions;
+  execution: ModelProviderExecutionService;
+  writeAuthorization: ModelProviderWriteAuthorizationService;
+  scopes: ModelProviderScopeService;
+}): ModelProviderCommandService {
+  return ModelProviderCommandService.create({
+    repository: options.repository,
+    defaults: options.defaults,
+    credentialPolicy: options.credentialPolicy,
+    catalog: options.catalog,
+    connectionRateLimiter: options.connectionRateLimiter,
+    connectionPing: ModelProviderConnectionPingService.create({
+      channel: options.connectionPing,
+      codexChannel: options.codexGatewayPing,
+      secrets: options.secrets,
+      execution,
+    }),
+    writeAuthorization,
+    onboardingDefaults: ModelProviderOnboardingDefaultsService.create({
+      defaults: options.defaults,
+      ids: options.ids,
+      scopes,
+    }),
+    ids: options.ids,
+    scopes,
+    bindings: options.privateEndpoints,
+  });
 }
