@@ -247,6 +247,12 @@ Feature: A2A proxy on the gateway
     And the reply does not name the upstream URL
 
   @unit
+  Scenario: an extended Agent Card error reply is relayed without a gateway card URL
+    When the upstream answers the extended Agent Card call with a JSON-RPC or HTTP+JSON error
+    Then the caller receives the error reply unchanged
+    And the reply carries no gateway card URL
+
+  @unit
   Scenario: the Agent Card is scanned before it reaches the caller
     Given the caller's key has a response guardrail that denies a token
     When the upstream Agent Card carries the token in its description

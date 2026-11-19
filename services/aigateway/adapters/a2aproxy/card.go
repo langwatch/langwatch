@@ -127,15 +127,16 @@ func sameEndpoint(u, upstream string) bool {
 }
 
 // rewriteReplyCard rewrites the card in an extended Agent Card reply, bare
-// (HTTP+JSON) or as a JSON-RPC result. A reply it cannot read is unchanged.
+// (HTTP+JSON) or as a JSON-RPC result. An error reply, or one it cannot read,
+// is unchanged.
 func rewriteReplyCard(body []byte, upstream, proxy string) []byte {
 	var reply map[string]any
 	if json.Unmarshal(body, &reply) != nil {
 		return body
 	}
-	card := reply
-	if result, ok := reply["result"].(map[string]any); ok {
-		card = result
+	card, ok := replyCard(reply)
+	if !ok {
+		return body
 	}
 	rewriteCard(card, upstream, proxy)
 	out, err := json.Marshal(reply)
@@ -143,6 +144,20 @@ func rewriteReplyCard(body []byte, upstream, proxy string) []byte {
 		return body
 	}
 	return out
+}
+
+// replyCard finds the Agent Card in a reply: an object result, or a bare body
+// that is no JSON-RPC or error envelope. An error reply carries no card.
+func replyCard(reply map[string]any) (map[string]any, bool) {
+	if result, ok := reply["result"].(map[string]any); ok {
+		return result, true
+	}
+	for _, key := range []string{"result", "error", "jsonrpc"} {
+		if _, found := reply[key]; found {
+			return nil, false
+		}
+	}
+	return reply, true
 }
 
 func proxyBase(public string, r *http.Request, target string) string {

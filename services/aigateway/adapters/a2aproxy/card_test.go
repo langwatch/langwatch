@@ -125,3 +125,25 @@ func TestCardAdvertisesOnlyTheServedEndpointAndV02PathWorks(t *testing.T) {
 	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
 	assert.JSONEq(t, `{"url":"http://gw.acme.test/a2a/billing","supportedInterfaces":[{"url":"http://gw.acme.test/a2a/billing"}]}`, rec.Body.String())
 }
+
+// @scenario "an extended Agent Card error reply is relayed without a gateway card URL"
+func TestRewriteReplyCardLeavesErrorRepliesAlone(t *testing.T) {
+	const upstream, proxy = "https://agent.test", "https://gw.test/a2a/agent"
+	for name, body := range map[string]string{
+		"JSON-RPC error envelope": `{"jsonrpc":"2.0","id":1,"error":{"code":-32001,"message":"no card"}}`,
+		"HTTP+JSON error body":    `{"error":{"code":404,"message":"no card"}}`,
+		"JSON-RPC null result":    `{"jsonrpc":"2.0","id":1,"result":null}`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			assert.Equal(t, body, string(rewriteReplyCard([]byte(body), upstream, proxy)))
+		})
+	}
+	for name, body := range map[string]string{
+		"JSON-RPC result card": `{"jsonrpc":"2.0","id":1,"result":{"name":"a","url":"https://agent.test"}}`,
+		"bare card":            `{"name":"a","url":"https://agent.test"}`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			assert.Contains(t, string(rewriteReplyCard([]byte(body), upstream, proxy)), proxy)
+		})
+	}
+}
