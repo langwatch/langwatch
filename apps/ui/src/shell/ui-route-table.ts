@@ -1014,6 +1014,18 @@ function projectSegments(table: readonly UiRouteDescriptor[]): string[] {
   return [...new Set([...fromTable, ...MODULE_PROJECT_SEGMENTS])];
 }
 
+/**
+ * Every deep `/:project/...` page in the table with `:project` swapped for `me`. A static `me`
+ * outranks `:project`, so each twin beats its project page at any depth; the `/me/<segment>/*`
+ * rows alone score lower than a deeper project page and would lose to it.
+ */
+function projectPageTwins(table: readonly UiRouteDescriptor[]): string[] {
+  const twins = uiRouteDescriptors(table).flatMap((descriptor) =>
+    descriptor.path?.startsWith("/:project/") ? [descriptor.path.replace(":project", "me")] : [],
+  );
+  return [...new Set(twins)];
+}
+
 /** Every page under `/coding-agents/`, as the path after it: `sessions`, `budget/request`. */
 function codingAgentsPages(table: readonly UiRouteDescriptor[]): string[] {
   return uiRouteDescriptors(table).flatMap((descriptor) => {
@@ -1037,8 +1049,8 @@ const toCodingAgents = { from: "/me", to: "/coding-agents", mapSegment: KEPT_SEG
 
 /**
  * Moved /me to /coding-agents; CLIs still print /me links. Mounted above the chrome, which would
- * wait for a project and never redirect. /:project/<segment> outranks /me/*, so each project first
- * segment gets /me twins derived from the rows. Spec: coding-agents-url-move.feature
+ * wait for a project and never redirect. /:project/<segment> outranks /me/*, so every project
+ * page gets a /me twin derived from the table. Spec: coding-agents-url-move.feature
  */
 export const uiCodingAgentsRedirectRoutes: readonly UiRedirectRouteDescriptor[] = [
   {
@@ -1048,6 +1060,16 @@ export const uiCodingAgentsRedirectRoutes: readonly UiRedirectRouteDescriptor[] 
       from: "/me/devices",
       to: "/coding-agents/configure",
       pinParams: { tab: "devices" },
+    },
+  },
+  {
+    // A device's own address has no page of its own; it still belongs on the Devices tab.
+    path: "/me/devices/*",
+    redirect: {
+      from: "/me/devices",
+      to: "/coding-agents/configure",
+      pinParams: { tab: "devices" },
+      mapSegment: {},
     },
   },
   ...codingAgentsPageList
@@ -1060,6 +1082,7 @@ export const uiCodingAgentsRedirectRoutes: readonly UiRedirectRouteDescriptor[] 
     { path: `/me/${segment}`, redirect: toCodingAgents },
     { path: `/me/${segment}/*`, redirect: toCodingAgents },
   ]),
+  ...projectPageTwins(uiRouteTable).map((path) => ({ path, redirect: toCodingAgents })),
   { path: "/me/*", redirect: toCodingAgents },
   { path: "/me", redirect: toCodingAgents },
 ];

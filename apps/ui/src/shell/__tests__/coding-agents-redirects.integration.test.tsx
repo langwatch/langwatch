@@ -165,6 +165,31 @@ describe("legacy /me redirects", () => {
     });
   });
 
+  describe("when a deep old address meets the real project routes", () => {
+    /** @scenario Every old address a project page also matches lands on Coding agents */
+    it.each(["/me/messages/t1/spans", "/me/evaluations/new", "/me/analytics/custom/abc"])(
+      "moves %s to the Coding agents home, not a project page",
+      async (from) => {
+        const projectPages: RouteObject[] = uiRoutePatterns()
+          .filter((pattern) => pattern.startsWith("/:project/"))
+          .map((path) => ({ path, element: <div>project page</div> }));
+        const router = createMemoryRouter(
+          [
+            ...legacyRedirectRoutes,
+            ...projectPages,
+            { path: "/coding-agents/*", element: <div>coding agents</div> },
+          ],
+          { initialEntries: [from] },
+        );
+        render(<RouterProvider router={router} />);
+
+        await waitFor(() => {
+          expect(addressOf(router)).toBe("/coding-agents");
+        });
+      },
+    );
+  });
+
   describe("when the old budget request address is cold-loaded", () => {
     /** @scenario An old deep link keeps its sub-path, query and hash */
     it("keeps its nested page", async () => {
@@ -180,6 +205,17 @@ describe("legacy /me redirects", () => {
     /** @scenario The old devices address lands on the devices tab */
     it("lands on configure with the devices tab pinned", async () => {
       const router = renderRouterAt(["/me/devices?tab=keys"]);
+
+      await waitFor(() => {
+        expect(addressOf(router)).toBe("/coding-agents/configure?tab=devices");
+      });
+    });
+  });
+
+  describe("when an old address for one device is cold-loaded", () => {
+    /** @scenario The old devices address lands on the devices tab */
+    it("lands on configure with the devices tab pinned", async () => {
+      const router = renderRouterAt(["/me/devices/dev_123"]);
 
       await waitFor(() => {
         expect(addressOf(router)).toBe("/coding-agents/configure?tab=devices");
