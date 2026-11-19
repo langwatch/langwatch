@@ -283,9 +283,9 @@ describe("LangyModule.startUnattendedTurn", () => {
     });
   });
 
-  describe("given a turn whose held session key mint is refused while its grant lands", () => {
+  describe("given a turn below the module refused while its held key's grant lands", () => {
     /** @scenario "A held key's refusal reaches the caller with the pace it asked for" */
-    it("lets the refusal reach the caller with the pace the mint asked for", async () => {
+    it("passes the refusal through to the caller with the pace it carries", async () => {
       const { startUnattendedTurn, unattendedDispatched } = await harness();
       unattendedDispatched.mockImplementationOnce(async (input) => {
         await input.unattended.countTurn();

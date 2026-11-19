@@ -651,6 +651,10 @@ describe.each(backends)("given the ledger reads on the $name backend", (backend)
         description: "Reads traces",
         permissions: ["traces:view", "traces:share"],
       });
+      const head = await ledgerReads.findLiveRoleHead({ roleId: kept.id, organizationId });
+      expect(head?.permissions).toEqual(["traces:view", "traces:share"]);
+      expect(head?.occurredAt.epochMilliseconds).toBe(at(T0).epochMilliseconds);
+      expect(await ledgerReads.findLiveRoleHead({ roleId: dropped.id, organizationId })).toBe(null);
       expect(await ledgerReads.hasLiveRole({ roleId: kept.id, organizationId })).toBe(true);
       expect(await ledgerReads.hasLiveRole({ roleId: dropped.id, organizationId })).toBe(false);
       expect(await ledgerReads.findLiveRole({ roleId: kept.id, organizationId: id("org") })).toBe(

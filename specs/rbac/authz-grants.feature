@@ -415,6 +415,13 @@ Feature: Authorization grants
     And the organization's access cache is still refreshed
 
   @unit
+  Scenario: A retry before the fold records one role definition and one audit row
+    Given an API key's own role definition whose projection has not landed
+    When the same role definition is written again before it lands
+    Then the retry is sent under the first try's command id
+    And the event log keeps one role definition and the audit trail one row
+
+  @unit
   Scenario: A changed API key role definition is recorded, a change back included
     Given an API key's own role defined once
     When it is redefined with other permissions and then with the first ones again
@@ -797,6 +804,13 @@ Feature: Authorization grants
     Given a fact delivered twice
     When it is handled
     Then exactly one audit row exists
+
+  @unit
+  Scenario: A fact appended twice under one idempotency key writes one audit row
+    Given one fact appended twice, each append with its own event id and the same idempotency key
+    When both are handled
+    Then exactly one audit row exists
+    And a fact on another aggregate that shares the key still gets its own row
 
   @unit @regression
   Scenario: Migrated custom bindings retain their permission restrictions

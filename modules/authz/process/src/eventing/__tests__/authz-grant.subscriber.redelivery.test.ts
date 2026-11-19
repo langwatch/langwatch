@@ -42,4 +42,28 @@ describe("EventingAuthzAuditAdapter redelivery", () => {
 
     expect([...store.rows.keys()]).toEqual(["authz-evt-evt_role_deleted"]);
   });
+
+  /** @scenario "A fact appended twice under one idempotency key writes one audit row" */
+  it("leaves one audit row when one fact is appended twice under new event ids", async () => {
+    const store = new KeyedAuditTrailStore();
+    const adapter = EventingAuthzAuditAdapter.create({ store });
+    const keyed = { ...roleDeleted, idempotencyKey: "cmd_1:0" };
+
+    await adapter.handler({ ...keyed, id: "evt_first_append" });
+    await adapter.handler({ ...keyed, id: "evt_second_append" });
+
+    expect([...store.rows.keys()]).toEqual(["authz-evt-org_acme:role_1:cmd_1:0"]);
+  });
+
+  /** @scenario "A fact appended twice under one idempotency key writes one audit row" */
+  it("keeps a row for each fact that shares a key across aggregates", async () => {
+    const store = new KeyedAuditTrailStore();
+    const adapter = EventingAuthzAuditAdapter.create({ store });
+    const keyed = { ...roleDeleted, idempotencyKey: "cmd_1:0" };
+
+    await adapter.handler(keyed);
+    await adapter.handler({ ...keyed, id: "evt_other", aggregateId: "role_2" });
+
+    expect(store.rows.size).toBe(2);
+  });
 });

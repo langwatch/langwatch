@@ -16,6 +16,7 @@ import {
   type LedgerGrantIdentity,
   type LedgerBraidRow,
   type LedgerRoleDefinition,
+  type LedgerRoleHead,
 } from "../authz-ledger-read.repository.ts";
 import type { AuthzReadRepository } from "../authz-read.repository.ts";
 import {
@@ -289,6 +290,20 @@ export class PrismaAuthzLedgerReadRepository extends AuthzLedgerReadRepository {
       select: { name: true, description: true, permissions: true },
     })) as LedgerRoleDefinition | null | undefined;
     return row ?? null;
+  }
+
+  async findLiveRoleHead({
+    roleId,
+    organizationId,
+  }: {
+    roleId: string;
+    organizationId: string;
+  }): Promise<LedgerRoleHead | null> {
+    const row = (await liveRoles(this.prisma).findFirst({
+      where: { id: roleId, organizationId },
+      select: { name: true, description: true, permissions: true, occurredAt: true },
+    })) as (LedgerRoleDefinition & { occurredAt: Date }) | null | undefined;
+    return row ? { ...row, occurredAt: fromDate(row.occurredAt) } : null;
   }
 
   async hasLiveRole({

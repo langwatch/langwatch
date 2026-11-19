@@ -3,11 +3,18 @@
  * fold converges.
  */
 import type { DefineRoleCommandData } from "@langwatch/authz-contract";
+import { createTenantId, deduplicateEvents } from "@langwatch/eventing";
 import { HandledError } from "@langwatch/handled-error";
 import { toDate } from "@langwatch/time";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import {
+  type AuthzAuditRow,
+  AuthzAuditTrailRepository,
+} from "../../repositories/authz-audit-trail.repository.ts";
 import { grantFactToRow } from "../../repositories/prisma/prisma.authz-grant.mapper.ts";
+import { DefineRoleCommand } from "../authz-grant.commands.ts";
+import { EventingAuthzAuditAdapter } from "../authz-grant.subscriber.ts";
 import { ACTOR, binding, harness, ORG_ID } from "./support/eventing.authz-ledger-fork.harness.ts";
 
 /** A Grant row as Postgres returns it: Dates where the mapped shape holds Instants. */
@@ -272,7 +279,8 @@ describe("given a role definition whose projection does not land inside the wind
     /** @scenario "A role definition is confirmed by the canonical Role projection" */
     it("confirms the defined role's name and permissions", async () => {
       const { writer, db } = harness({});
-      db.role.findFirst.mockResolvedValue({
+      // No head before the write; the projected row afterwards.
+      db.role.findFirst.mockResolvedValueOnce(null).mockResolvedValue({
         name: "apikey:key_1",
         description: null,
         permissions: ["langy:view"],
@@ -393,6 +401,15 @@ describe("given a role deletion", () => {
   });
 });
 
+/** An audit store that keeps the first row per id, as the Prisma insert's skipDuplicates does. */
+class KeyedAuditTrailStore extends AuthzAuditTrailRepository {
+  readonly rows = new Map<string, AuthzAuditRow>();
+
+  async insert(row: AuthzAuditRow): Promise<void> {
+    if (!this.rows.has(row.id)) this.rows.set(row.id, row);
+  }
+}
+
 describe("given an api key's own role defined again", () => {
   const apiKeyRole = {
     organizationId: ORG_ID,
@@ -402,49 +419,83 @@ describe("given an api key's own role defined again", () => {
     kind: "system_api_key" as const,
     actor: ACTOR,
   };
-  const liveRow = (permissions: string[]) => ({
+  /** The live head as Postgres returns it; `occurredAt` is the fact that set it. */
+  const liveRow = (permissions: string[], occurredAtMs: number) => ({
     name: "apikey:key_1",
     description: null,
     permissions,
+    occurredAt: new Date(occurredAtMs),
   });
-  const definedPermissions = (sent: { verb: string; data: unknown }[]) =>
+  const definitions = (sent: { verb: string; data: unknown }[]) =>
     sent
       .filter((entry) => entry.verb === "defineRole")
-      .map((entry) => (entry.data as DefineRoleCommandData).role.permissions);
+      .map((entry) => entry.data as DefineRoleCommandData);
 
   describe("when a retry restates the definition the live role already carries", () => {
     /** @scenario "A retried API key role definition records no second definition" */
     it("records one role definition, not a second for the retry", async () => {
       const { writer, db, sent, epoch } = harness({});
-      db.role.findFirst.mockResolvedValueOnce(null).mockResolvedValue(liveRow(["langy:view"]));
+      db.role.findFirst
+        .mockResolvedValueOnce(null)
+        .mockResolvedValue(liveRow(["langy:view"], 1_000));
 
       await writer.defineRole(apiKeyRole);
       await writer.defineRole(apiKeyRole);
 
-      expect(definedPermissions(sent)).toEqual([["langy:view"]]);
+      expect(definitions(sent).map((data) => data.role.permissions)).toEqual([["langy:view"]]);
       expect(epoch.bump).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe("when a retry arrives before the first try's definition has folded", () => {
+    /** @scenario "A retry before the fold records one role definition and one audit row" */
+    it("reuses the first try's command id: one role_defined, one audit row", async () => {
+      const { writer, sent } = harness({});
+
+      for (let attempt = 0; attempt < 2; attempt++) {
+        await expect(writer.defineRole(apiKeyRole)).rejects.toMatchObject({
+          code: "authz_grant_not_confirmed",
+        });
+      }
+
+      const [first, retry] = definitions(sent);
+      expect(retry?.commandId).toBe(first?.commandId);
+      const events = definitions(sent).flatMap((data) =>
+        new DefineRoleCommand().handle({
+          tenantId: createTenantId(data.tenantId),
+          data,
+        } as never),
+      );
+      expect(new Set(events.map((event) => event.id)).size).toBe(2);
+      expect(deduplicateEvents(events)).toHaveLength(1);
+      const audit = new KeyedAuditTrailStore();
+      const adapter = EventingAuthzAuditAdapter.create({ store: audit });
+      for (const event of events) await adapter.handler(event);
+      expect(audit.rows.size).toBe(1);
     });
   });
 
   describe("when the role changes and then changes back", () => {
     /** @scenario "A changed API key role definition is recorded, a change back included" */
-    it("records every change, the change back included", async () => {
+    it("records every change, the change back included, under its own id", async () => {
       const { writer, db, sent } = harness({});
       const first = ["langy:view"];
       const second = ["langy:view", "traces:view"];
       db.role.findFirst
         .mockResolvedValueOnce(null)
-        .mockResolvedValueOnce(liveRow(first))
-        .mockResolvedValueOnce(liveRow(first))
-        .mockResolvedValueOnce(liveRow(second))
-        .mockResolvedValueOnce(liveRow(second))
-        .mockResolvedValueOnce(liveRow(first));
+        .mockResolvedValueOnce(liveRow(first, 1_000))
+        .mockResolvedValueOnce(liveRow(first, 1_000))
+        .mockResolvedValueOnce(liveRow(second, 2_000))
+        .mockResolvedValueOnce(liveRow(second, 2_000))
+        .mockResolvedValueOnce(liveRow(first, 3_000));
 
       await writer.defineRole({ ...apiKeyRole, permissions: first });
       await writer.defineRole({ ...apiKeyRole, permissions: second });
       await writer.defineRole({ ...apiKeyRole, permissions: first });
 
-      expect(definedPermissions(sent)).toEqual([first, second, first]);
+      const sentDefinitions = definitions(sent);
+      expect(sentDefinitions.map((data) => data.role.permissions)).toEqual([first, second, first]);
+      expect(new Set(sentDefinitions.map((data) => data.commandId)).size).toBe(3);
     });
   });
 });

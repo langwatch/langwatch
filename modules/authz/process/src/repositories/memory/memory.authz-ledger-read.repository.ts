@@ -15,6 +15,7 @@ import {
   type LedgerGrantIdentity,
   type LedgerBraidRow,
   type LedgerRoleDefinition,
+  type LedgerRoleHead,
 } from "../authz-ledger-read.repository.ts";
 import type { AuthzReadRepository } from "../authz-read.repository.ts";
 import { NOT_A_BRAID, sharedProjectReadsOf } from "../eventing/eventing.authz-read.mapper.ts";
@@ -258,6 +259,24 @@ export class MemoryAuthzLedgerReadRepository extends AuthzLedgerReadRepository {
     const row = this.liveRole({ roleId, organizationId });
     return row
       ? { name: row.name, description: row.description, permissions: [...row.permissions] }
+      : null;
+  }
+
+  async findLiveRoleHead({
+    roleId,
+    organizationId,
+  }: {
+    roleId: string;
+    organizationId: string;
+  }): Promise<LedgerRoleHead | null> {
+    const row = this.liveRole({ roleId, organizationId });
+    return row
+      ? {
+          name: row.name,
+          description: row.description,
+          permissions: [...row.permissions],
+          occurredAt: row.occurredAt,
+        }
       : null;
   }
 

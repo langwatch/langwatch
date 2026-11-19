@@ -3,6 +3,8 @@
  * behind every grant mutation, waiting (bounded) for the projection to land
  * attach- and role-shaped writes before returning (ADR-007's breaker doctrine).
  */
+import { createHash } from "node:crypto";
+
 import {
   type GrantCondition,
   isGrantablePermission,
@@ -37,7 +39,11 @@ import { z } from "zod";
 import type { AuthzCompatibilityLedger } from "../app/authz.app.ts";
 import type { AuthzEpochRepository } from "../repositories/authz-epoch.repository.ts";
 import { BindingMissingError, type GrantWrite } from "../repositories/authz-grant.repository.ts";
-import type { AuthzLedgerReadRepository } from "../repositories/authz-ledger-read.repository.ts";
+import type {
+  AuthzLedgerReadRepository,
+  LedgerRoleDefinition,
+  LedgerRoleHead,
+} from "../repositories/authz-ledger-read.repository.ts";
 import type { AuthzMembershipStampRepository } from "../repositories/authz-membership-stamp.repository.ts";
 import type { ScopeLineageRepository } from "../repositories/authz-read.repository.ts";
 import type { AuthzRevocationRepository } from "../repositories/authz-revocation.repository.ts";
@@ -172,6 +178,56 @@ function refuseMintedOnlyPermissions(permissions: readonly string[]): void {
   throw new GrantValidationError("A role cannot list a permission that is never granted", {
     permissions: minted,
   });
+}
+
+/** One role definition as `defineRole` is asked for it. */
+type RoleDefinition = {
+  organizationId: string;
+  roleId: string;
+  name: string;
+  description: string | undefined;
+  permissions: string[];
+};
+
+/** Whether a stored role row says exactly what the definition asks for. */
+function isSameDefinition({
+  row,
+  definition,
+}: {
+  row: LedgerRoleDefinition;
+  definition: RoleDefinition;
+}): boolean {
+  return (
+    row.name === definition.name &&
+    (row.description ?? null) === (definition.description || null) &&
+    samePermissions({ stored: row.permissions, wanted: definition.permissions })
+  );
+}
+
+/**
+ * Content plus the head it was read over: a retry before the fold reads the same head, so its
+ * event shares the first try's key and audit row. A, B, A reads B's head once B folds; if neither
+ * folded, the second A shares the first A's key and a projection rebuild may keep B.
+ */
+function apiKeyRoleCommandId({
+  definition,
+  base,
+}: {
+  definition: RoleDefinition;
+  base: LedgerRoleHead | null;
+}): string {
+  const digest = createHash("sha256")
+    .update(
+      JSON.stringify({
+        name: definition.name,
+        description: definition.description || null,
+        permissions: definition.permissions,
+        base: base ? base.occurredAt.epochMilliseconds : "none",
+      }),
+    )
+    .digest("hex")
+    .slice(0, 32);
+  return `apikeyrole:${definition.roleId}:${digest}`;
 }
 
 /**
@@ -966,13 +1022,17 @@ export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
       await this.refuseAddedPlatformPermissions({ organizationId, roleId, permissions });
     }
     const definition = { organizationId, roleId, name, description, permissions };
-    // A retried key mint restates its own role; when the live row already says the same, a second
-    // role_defined would only add an audit entry. Compared with the live row, not a content-derived
-    // command id, so A then B then A still records the change back to A. The bump stays: the
-    // earlier try may have timed out before reaching its own.
-    if (kind === "system_api_key" && (await this.isLiveRole(definition))) {
-      await this.options.epoch.bump({ organizationId });
-      return;
+    let commandId = this.options.newCommandId?.() ?? newCommandId();
+    if (kind === "system_api_key") {
+      // A retried key mint restates its own role: nothing is sent once the live head says the
+      // same (the bump stays, the earlier try may have timed out before its own), and a retry
+      // before the fold shares the first try's id. See apiKeyRoleCommandId for A, B, then A.
+      const head = await this.options.reads.findLiveRoleHead({ roleId, organizationId });
+      if (head && isSameDefinition({ row: head, definition })) {
+        await this.options.epoch.bump({ organizationId });
+        return;
+      }
+      commandId = apiKeyRoleCommandId({ definition, base: head });
     }
     const occurredAtMs = this.now();
     const role: DefineRoleCommandData["role"] = {
@@ -988,7 +1048,7 @@ export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
     ).commands.defineRole.send({
       tenantId: organizationId,
       organizationId,
-      commandId: this.options.newCommandId?.() ?? newCommandId(),
+      commandId,
       role,
       actor,
     });
@@ -1010,29 +1070,12 @@ export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
   }
 
   /** Whether the canonical live Role row already carries exactly this definition. */
-  private async isLiveRole({
-    organizationId,
-    roleId,
-    name,
-    description,
-    permissions,
-  }: {
-    organizationId: string;
-    roleId: string;
-    name: string;
-    description: string | undefined;
-    permissions: string[];
-  }): Promise<boolean> {
-    const row = await this.options.reads.findLiveRole({ roleId, organizationId });
-    return (
-      row !== null &&
-      row.name === name &&
-      (row.description ?? null) === (description || null) &&
-      samePermissions({
-        stored: row.permissions,
-        wanted: permissions,
-      })
-    );
+  private async isLiveRole(definition: RoleDefinition): Promise<boolean> {
+    const row = await this.options.reads.findLiveRole({
+      roleId: definition.roleId,
+      organizationId: definition.organizationId,
+    });
+    return row !== null && isSameDefinition({ row, definition });
   }
 
   /**

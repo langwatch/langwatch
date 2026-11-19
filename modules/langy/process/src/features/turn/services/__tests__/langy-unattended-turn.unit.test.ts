@@ -71,8 +71,14 @@ class SessionKeyScope extends LangySessionKeyRepository {
   async revoke(): Promise<void> {}
 }
 
-/** The real key service over the permissions the person holds; `created` is what it asked for. */
-function sessionKeysHolding(held: AuthzEffectivePermissionsOutput) {
+/**
+ * The real key service over the permissions the person holds; `created` is what it asked for.
+ * `heldRefusal` is what the held key's mint throws, as the api-key module does while a grant lands.
+ */
+function sessionKeysHolding(
+  held: AuthzEffectivePermissionsOutput,
+  { heldRefusal }: { heldRefusal?: Error } = {},
+) {
   const created: string[][] = [];
   const apiKeys: ApiKeyApi = Object.create(null);
   apiKeys.create = async (input) => {
@@ -81,6 +87,7 @@ function sessionKeysHolding(held: AuthzEffectivePermissionsOutput) {
   };
   // An unattended turn's key is held across its retries, so it is asked for by name.
   apiKeys.createHeld = async ({ key }) => {
+    if (heldRefusal) throw heldRefusal;
     created.push([...(key.permissions ?? [])]);
     return { token: "session-key", apiKeyId: "key-1", created: true };
   };
@@ -305,20 +312,18 @@ describe("an unattended Langy turn", () => {
 
     /** @scenario "A held key's refusal reaches the caller with the pace it asked for" */
     it("lets a held key's refusal reach the caller with the pace it asked for", async () => {
-      const refusal = new AuthzGrantNotConfirmedError({ retryable: true, retryAfterMs: 40_000 });
-      const fixture = makeFixture({
-        sessionKeys: {
-          mint: async () => {
-            throw refusal;
-          },
-          revoke: async () => undefined,
-        },
+      const keys = sessionKeysHolding(held, {
+        heldRefusal: new AuthzGrantNotConfirmedError({ retryable: true, retryAfterMs: 40_000 }),
       });
+      const fixture = makeFixture({ sessionKeys: keys.service });
 
       await expect(fixture.start(unattendedTurn)).rejects.toMatchObject({
         code: "authz_grant_not_confirmed",
+        retryable: true,
         retryAfterMs: 40_000,
       });
+      expect(keys.created).toEqual([]);
+      expect(fixture.dispatch).not.toHaveBeenCalled();
     });
 
     /** @scenario "A chat turn keeps the full ceiling and its GitHub token" */

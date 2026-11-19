@@ -96,8 +96,13 @@ function isAuditable(event: AuthzGrantsEvent): boolean {
   return true;
 }
 
-function rowId(eventId: string): string {
-  return `authz-evt-${eventId}`;
+/**
+ * One row per fact, as the event log keeps one: two appends of a fact share its idempotency key
+ * within the aggregate but not the event id, so a deterministic retry writes no second row.
+ */
+function rowId(event: AuthzGrantsEvent): string {
+  if (!event.idempotencyKey) return `authz-evt-${event.id}`;
+  return `authz-evt-${event.tenantId}:${event.aggregateId}:${event.idempotencyKey}`;
 }
 
 function toRow(event: AuthzGrantsEvent): AuthzAuditRow {
@@ -111,7 +116,7 @@ function toRow(event: AuthzGrantsEvent): AuthzAuditRow {
     throw new UnmappedAuthzAuditEventError(event.type);
   }
   return {
-    id: rowId(event.id),
+    id: rowId(event),
     createdAt: Temporal.Instant.fromEpochMilliseconds(event.occurredAt),
     userId: actor?.type === "user" ? actor.id : null,
     organizationId: event.tenantId,
