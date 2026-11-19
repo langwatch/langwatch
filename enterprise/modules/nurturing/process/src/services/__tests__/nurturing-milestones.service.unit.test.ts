@@ -158,7 +158,8 @@ describe("NurturingMilestonesService", () => {
 
   /** @scenario "An evaluation in an organization nurturing never learned raises nothing" */
   it("raises nothing for a placed project whose organization it never learned", async () => {
-    expect(await settleAndCount(serviceOver(), settled("eval-1"))).toEqual([]);
+    const { service } = serviceOver();
+    expect(await settleAndCount(service, settled("eval-1"))).toEqual([]);
   });
 
   /** @scenario "An evaluation in a project nurturing never saw created counts toward its organization" */
