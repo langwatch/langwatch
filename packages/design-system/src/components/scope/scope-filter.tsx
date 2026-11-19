@@ -4,7 +4,8 @@ import { useRef, useState } from "react";
 import { Box, Button, HStack, Text } from "../../primitives.ts";
 import { SearchInput } from "../forms/search-input.tsx";
 import { Menu } from "../overlays/menu.tsx";
-import { NamedScope } from "./scope-name-badge.tsx";
+import { hintedRowLabel, NamedScope, ProjectHintBadge } from "./scope-name-badge.tsx";
+import { projectSearchText, sameNameHints, type ScopeProjectChoice } from "./scope-project-hint.ts";
 
 // Read-side scope filter; read-only twin of picker; presentational only.
 
@@ -12,7 +13,8 @@ import { NamedScope } from "./scope-name-badge.tsx";
 export interface AvailableScopes {
   organization?: { id: string; name: string } | null;
   teams: { id: string; name: string }[];
-  projects: { id: string; name: string; teamId?: string | null }[];
+  /** `hint` tells a same-name project apart (a personal workspace's owner); else its team does. */
+  projects: ScopeProjectChoice[];
 }
 
 /**
@@ -71,6 +73,7 @@ export function ScopeFilter({
     fallback: "This Project",
   });
   const otherProjects = available.projects.filter((project) => project.id !== currentProjectId);
+  const hints = sameNameHints({ projects: available.projects, teams: available.teams });
   const moreScopes = {
     organization:
       available.organization && namesMatch({ name: available.organization.name, query: moreQuery })
@@ -78,7 +81,7 @@ export function ScopeFilter({
         : null,
     teams: available.teams.filter((team) => namesMatch({ name: team.name, query: moreQuery })),
     projects: available.projects.filter((project) =>
-      namesMatch({ name: project.name, query: moreQuery }),
+      projectMatches({ project, teams: available.teams, query: moreQuery }),
     ),
   };
   const noMoreScopes =
@@ -127,6 +130,8 @@ export function ScopeFilter({
             thisProjectLabel={currentProjectId ? thisProjectLabel : null}
             currentProjectId={currentProject?.id ?? null}
             projects={currentProject ? [currentProject, ...otherProjects] : otherProjects}
+            teams={available.teams}
+            hints={hints}
             onChange={onChange}
           />
         )}
@@ -168,6 +173,7 @@ export function ScopeFilter({
             {moreScopes.organization && (
               <ScopeOptionItem
                 icon={<Building2 size={14} />}
+                id={moreScopes.organization.id}
                 label={moreScopes.organization.name}
                 hint="Organization"
                 onClick={() =>
@@ -184,6 +190,7 @@ export function ScopeFilter({
               <ScopeOptionItem
                 key={`TEAM:${team.id}`}
                 icon={<Users size={14} />}
+                id={team.id}
                 label={team.name}
                 hint="Team"
                 onClick={() =>
@@ -200,8 +207,10 @@ export function ScopeFilter({
               <ScopeOptionItem
                 key={`PROJECT:${project.id}`}
                 icon={<Folder size={14} />}
+                id={project.id}
                 label={project.name}
                 hint="Project"
+                badge={hints.get(project.id)}
                 onClick={() =>
                   onChange({
                     kind: "specific",
@@ -238,6 +247,19 @@ function namesMatch({ name, query }: { name: string; query: string }): boolean {
   return name.toLowerCase().includes(query.trim().toLowerCase());
 }
 
+/** True when the project's name, hint or team contains the query, ignoring case. */
+function projectMatches({
+  project,
+  teams,
+  query,
+}: {
+  project: ScopeProjectChoice;
+  teams: AvailableScopes["teams"];
+  query: string;
+}): boolean {
+  return projectSearchText({ project, teams }).includes(query.trim().toLowerCase());
+}
+
 /** The kind and, when known, the name as a badge; or a plain label when no name is known. */
 function namedOr({
   kind,
@@ -268,11 +290,15 @@ function ProjectSubmenu({
   thisProjectLabel,
   currentProjectId,
   projects,
+  teams,
+  hints,
   onChange,
 }: {
   thisProjectLabel: ScopeLabel | null;
   currentProjectId: string | null;
   projects: AvailableScopes["projects"];
+  teams: AvailableScopes["teams"];
+  hints: Map<string, string>;
   onChange: (next: ScopeFilterValue) => void;
 }) {
   const [query, setQuery] = useState("");
@@ -280,7 +306,7 @@ function ProjectSubmenu({
   const searchRef = useRef<HTMLInputElement>(null);
 
   const matchesOf = (text: string) =>
-    projects.filter((project) => namesMatch({ name: project.name, query: text }));
+    projects.filter((project) => projectMatches({ project, teams, query: text }));
   const matching = matchesOf(query);
 
   const changeQuery = (next: string) => {
@@ -340,6 +366,10 @@ function ProjectSubmenu({
             <Menu.Item
               key={project.id}
               value={projectItemValue(project.id)}
+              aria-label={hintedRowLabel({
+                parts: [project.name, project.id === currentProjectId && "Current"],
+                hint: hints.get(project.id),
+              })}
               onClick={() =>
                 onChange({
                   kind: "specific",
@@ -350,14 +380,17 @@ function ProjectSubmenu({
               }
               data-testid={`filter-project-option-${project.id}`}
             >
-              <HStack gap={2}>
+              <HStack gap={2} width="full" minWidth={0}>
                 <Folder size={14} />
-                <Text>{project.name}</Text>
+                <Text as="span" truncate>
+                  {project.name}
+                </Text>
                 {project.id === currentProjectId && (
-                  <Text fontSize="xs" color="fg.muted">
+                  <Text as="span" fontSize="xs" color="fg.muted" flexShrink={0}>
                     Current
                   </Text>
                 )}
+                <ProjectHintBadge hint={hints.get(project.id)} />
               </HStack>
             </Menu.Item>
           ))}
@@ -378,8 +411,9 @@ function ProjectSubmenu({
   );
 }
 
-function scopeItemValue({ hint, label }: { hint: string; label: string }): string {
-  return `${hint}:${label}`;
+/** Keyed by id, so two same-name rows stay two menu items. */
+function scopeItemValue({ hint, id }: { hint: string; id: string }): string {
+  return `${hint}:${id}`;
 }
 
 /** The More Scopes row a query lands on first: the organization, then teams, then projects. */
@@ -392,11 +426,13 @@ function firstScopeItemValue({
 }): string | null {
   const matches = (name: string) => namesMatch({ name, query });
   if (available.organization && matches(available.organization.name))
-    return scopeItemValue({ hint: "Organization", label: available.organization.name });
+    return scopeItemValue({ hint: "Organization", id: available.organization.id });
   const team = available.teams.find((candidate) => matches(candidate.name));
-  if (team) return scopeItemValue({ hint: "Team", label: team.name });
-  const project = available.projects.find((candidate) => matches(candidate.name));
-  return project ? scopeItemValue({ hint: "Project", label: project.name }) : null;
+  if (team) return scopeItemValue({ hint: "Team", id: team.id });
+  const project = available.projects.find((candidate) =>
+    projectMatches({ project: candidate, teams: available.teams, query }),
+  );
+  return project ? scopeItemValue({ hint: "Project", id: project.id }) : null;
 }
 
 function projectItemValue(projectId: string): string {
@@ -405,27 +441,35 @@ function projectItemValue(projectId: string): string {
 
 function ScopeOptionItem({
   icon,
+  id,
   label,
   hint,
+  badge,
   onClick,
 }: {
   icon: React.ReactNode;
+  id: string;
   label: string;
   hint: string;
+  badge?: string;
   onClick: () => void;
 }) {
   return (
     <Menu.Item
-      value={scopeItemValue({ hint, label })}
+      value={scopeItemValue({ hint, id })}
+      aria-label={hintedRowLabel({ parts: [label, hint], hint: badge })}
       onClick={onClick}
       data-testid={`filter-scope-${hint.toLowerCase()}-${label.toLowerCase()}`}
     >
-      <HStack gap={2}>
+      <HStack gap={2} width="full" minWidth={0}>
         {icon}
-        <Text>{label}</Text>
-        <Text fontSize="xs" color="fg.muted">
+        <Text as="span" truncate>
+          {label}
+        </Text>
+        <Text as="span" fontSize="xs" color="fg.muted" flexShrink={0}>
           {hint}
         </Text>
+        <ProjectHintBadge hint={badge} />
       </HStack>
     </Menu.Item>
   );
@@ -461,3 +505,4 @@ function scopeTypePrefix(scopeType: "ORGANIZATION" | "TEAM" | "PROJECT"): string
 }
 
 export * from "./scope-filter-address.ts";
+export { personalWorkspaceHint, type ScopeProjectChoice } from "./scope-project-hint.ts";

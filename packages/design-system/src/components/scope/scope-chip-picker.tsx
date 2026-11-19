@@ -14,7 +14,8 @@ import {
 } from "../../primitives.ts";
 import { Select } from "../forms/select.tsx";
 import { ProviderScopeChips } from "./provider-scope-chips.tsx";
-import { ScopeNameBadge } from "./scope-name-badge.tsx";
+import { hintedRowLabel, ProjectHintBadge, ScopeNameBadge } from "./scope-name-badge.tsx";
+import { projectSearchText, sameNameHints } from "./scope-project-hint.ts";
 
 /**
  * ORGANIZATION/TEAM/PROJECT mirror Prisma's `ModelProviderScopeType`.
@@ -73,6 +74,8 @@ interface ScopeOption {
   scopeType: ScopeChipPickerScopeType;
   scopeId: string;
   personalOnly?: boolean;
+  /** Tells a same-name project apart: its owner or team, drawn as a badge. */
+  hint?: string;
 }
 
 /** A known name as a badge; the plain words when the picker was not given one. */
@@ -198,6 +201,9 @@ const COMPACT_TRIGGER = {
  */
 const SCOPE_SEARCH_THRESHOLD = 8;
 
+/** Keys the dropdown itself handles while the search field has focus. */
+const LIST_KEYS = new Set(["ArrowDown", "ArrowUp", "Enter", "Escape", "Tab"]);
+
 /**
  * The search field pinned to the top of a long scope dropdown.
  *
@@ -237,6 +243,10 @@ function ScopeSearchField({
           color="fg"
           value={value}
           onChange={(event) => onChange(event.target.value)}
+          onKeyDown={(event) => {
+            // Space would pick the highlighted option; only list keys reach the select.
+            if (!LIST_KEYS.has(event.key)) event.stopPropagation();
+          }}
           _placeholder={{ color: "fg.subtle" }}
           _focusVisible={{ outline: "none" }}
         />
@@ -478,8 +488,9 @@ export function ScopeChipPicker<T extends ScopeChipPickerScopeType = ScopeTriadT
   projectName?: string;
   /** Teams the caller can pick. Falls back to `[{id:teamId, name:teamName}]`. */
   availableTeams?: { id: string; name: string }[];
-  /** Projects the caller can pick. Falls back to `[{id:projectId, name:projectName}]`. */
-  availableProjects?: { id: string; name: string; teamId?: string }[];
+  /** Projects the caller can pick. Falls back to `[{id:projectId, name:projectName}]`.
+   *  `hint` tells a same-name project apart (a personal workspace's owner); else its team does. */
+  availableProjects?: { id: string; name: string; teamId?: string; hint?: string }[];
   /** Departments the caller can pick. Only consulted when DEPARTMENT is in
    *  `allowedScopeTypes`. Sourced from `api.departments.list`. */
   availableDepartments?: { id: string; name: string }[];
@@ -537,6 +548,11 @@ export function ScopeChipPicker<T extends ScopeChipPickerScopeType = ScopeTriadT
     (allowedScopeTypes ?? DEFAULT_SCOPE_TYPES) as ScopeChipPickerScopeType[],
   );
 
+  const projectChoices = listedOrCurrent({
+    listed: availableProjects,
+    currentId: projectId,
+    currentName: projectName ?? "Project",
+  });
   const options = buildScopeOptions({
     allowed,
     organizationId,
@@ -547,11 +563,8 @@ export function ScopeChipPicker<T extends ScopeChipPickerScopeType = ScopeTriadT
       currentId: teamId,
       currentName: teamName ?? "Team",
     }),
-    projects: listedOrCurrent({
-      listed: availableProjects,
-      currentId: projectId,
-      currentName: projectName ?? "Project",
-    }),
+    projects: projectChoices,
+    projectHints: sameNameHints({ projects: projectChoices, teams: availableTeams ?? [] }),
     personalScopes,
   });
 
@@ -707,6 +720,7 @@ function buildScopeOptions({
   availableDepartments,
   teams,
   projects,
+  projectHints,
   personalScopes,
 }: {
   allowed: Set<ScopeChipPickerScopeType>;
@@ -715,6 +729,7 @@ function buildScopeOptions({
   availableDepartments: { id: string; name: string }[] | undefined;
   teams: { id: string; name: string }[];
   projects: { id: string; name: string }[];
+  projectHints: Map<string, string>;
   personalScopes: boolean;
 }): ScopeOption[] {
   const organization = organizationId && allowed.has("ORGANIZATION") ? organizationId : null;
@@ -727,7 +742,12 @@ function buildScopeOptions({
   }
   out.push(...departments.map((dept) => optionFor("DEPARTMENT", dept)));
   if (allowed.has("TEAM")) out.push(...teams.map((team) => optionFor("TEAM", team)));
-  if (allowed.has("PROJECT")) out.push(...projects.map((project) => optionFor("PROJECT", project)));
+  if (allowed.has("PROJECT")) {
+    for (const project of projects) {
+      const hint = projectHints.get(project.id);
+      out.push({ ...optionFor("PROJECT", project), ...(hint ? { hint } : {}) });
+    }
+  }
   if (!personalScopes) return out;
   if (organization) {
     out.push({
@@ -762,20 +782,16 @@ function searchScopeOptions({
   options: ScopeOption[];
   search: string;
   availableTeams: { id: string; name: string }[] | undefined;
-  availableProjects: { id: string; teamId?: string }[] | undefined;
+  availableProjects: { id: string; name: string; teamId?: string; hint?: string }[] | undefined;
 }): ScopeOption[] {
   const needle = search.trim().toLowerCase();
   if (!needle) return options;
-  const teamNameById = new Map((availableTeams ?? []).map((t) => [t.id, t.name] as const));
-  const teamIdByProjectId = new Map(
-    (availableProjects ?? []).map((p) => [p.id, p.teamId] as const),
-  );
+  const teams = availableTeams ?? [];
+  const projectById = new Map((availableProjects ?? []).map((p) => [p.id, p] as const));
   return options.filter((option) => {
-    const teamName =
-      option.scopeType === "PROJECT"
-        ? teamNameById.get(teamIdByProjectId.get(option.scopeId) ?? "")
-        : undefined;
-    return `${teamName ?? ""} ${option.label}`.toLowerCase().includes(needle);
+    const project = option.scopeType === "PROJECT" ? projectById.get(option.scopeId) : undefined;
+    const text = project ? projectSearchText({ project, teams }) : option.label.toLowerCase();
+    return text.includes(needle);
   });
 }
 
@@ -896,12 +912,19 @@ function OptionGroup({
   return (
     <Select.ItemGroup label={label}>
       {options.map((option) => (
-        <Select.Item key={option.value} item={option}>
-          <HStack gap={2} minWidth={0} paddingLeft={indent ? 2 : undefined}>
+        <Select.Item
+          key={option.value}
+          item={option}
+          aria-label={hintedRowLabel({ parts: [option.label], hint: option.hint })}
+        >
+          <HStack gap={2} minWidth={0} flex={1} paddingLeft={indent ? 2 : undefined}>
             <Box display="flex" flexShrink={0}>
               {icon}
             </Box>
-            <Text truncate>{option.label}</Text>
+            <Text as="span" truncate>
+              {option.label}
+            </Text>
+            <ProjectHintBadge hint={option.hint} />
           </HStack>
         </Select.Item>
       ))}
@@ -969,6 +992,7 @@ function SelectedScope({
         <Text truncate maxWidth="full" color="fg" textStyle="bodySm">
           {option.label}
         </Text>
+        <ProjectHintBadge hint={option.hint} />
       </HStack>
     );
   }
@@ -1256,10 +1280,14 @@ function SelectedScopeChips({
   options: ScopeOption[];
 }) {
   if (scopes.length === 0) return "Pick one or more scopes";
-  const named = scopes.map((v) => ({
-    scopeType: v.scopeType,
-    scopeId: v.scopeId,
-    name: options.find((o) => o.value === entryKey(v))?.label,
-  }));
+  const named = scopes.map((v) => {
+    const option = options.find((o) => o.value === entryKey(v));
+    return {
+      scopeType: v.scopeType,
+      scopeId: v.scopeId,
+      name: option?.label,
+      ...(option?.hint ? { detail: option.hint } : {}),
+    };
+  });
   return <ProviderScopeChips scopes={named} />;
 }

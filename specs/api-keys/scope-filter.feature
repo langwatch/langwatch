@@ -116,7 +116,7 @@ Feature: API Keys scope filter
   Scenario: Typing in the project search narrows the list by name
     Given I have opened the "This Project" submenu
     When I type part of a project name, in any letter case, into the search box
-    Then only the projects whose names contain that text stay listed
+    Then only the projects whose names, teams or owners contain that text stay listed
     And the menu stays open with the search box still focused
 
   @integration
@@ -176,6 +176,7 @@ Feature: API Keys scope filter
     And the search box has focus, so typing narrows the list straight away
     When I type part of a name, in any letter case, into the search box
     Then only the organization, teams and projects whose names contain that text stay listed
+    And a project also stays when its team or owner name contains the text
     And the menu stays open with the search box still focused
 
   @integration

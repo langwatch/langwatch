@@ -42,3 +42,24 @@ export function NamedScope({
     </HStack>
   );
 }
+
+/** What tells a same-name project apart, as a badge at the row's far end. */
+export function ProjectHintBadge({ hint }: { hint: string | undefined }) {
+  if (!hint) return null;
+  return (
+    <HStack as="span" marginInlineStart="auto" paddingInlineStart={2} minWidth={0} flexShrink={1}>
+      <ScopeNameBadge name={hint} maxWidth="10rem" />
+    </HStack>
+  );
+}
+
+/** A row's accessible name when it carries a hint: "Eval Harness, Research". */
+export function hintedRowLabel({
+  parts,
+  hint,
+}: {
+  parts: (string | false | undefined)[];
+  hint: string | undefined;
+}): string | undefined {
+  return hint ? [...parts, hint].filter(Boolean).join(", ") : undefined;
+}

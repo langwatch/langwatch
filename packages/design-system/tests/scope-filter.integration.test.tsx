@@ -286,8 +286,8 @@ describe("given the scope filter", () => {
       const search = await openProjectSubmenu({ user });
 
       await user.click(search);
-      await user.keyboard("o");
-      // "o" matches Support Bot only: Web App and Billing API have no "o".
+      await user.keyboard("u");
+      // "u" matches Support Bot only: neither the other names nor their team has one.
       await waitFor(() =>
         expect(screen.getByTestId("filter-project-option-project_3")).toHaveAttribute(
           "data-highlighted",
