@@ -5,10 +5,11 @@
  * the same pinned ids and lane constants: a module-side change to either breaks here.
  * Spec: enterprise/modules/nurturing/specs/gateway-facts.feature
  */
+import type { ProjectionLaneReplayer } from "@langwatch/eventing";
 import { ResourceScope } from "@langwatch/process";
 import { ScopedSecrets } from "@langwatch/secrets";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import { isMigrationStep, type LaneReplayer, type MigrationStep } from "@langwatch/upgrade/step";
+import { isMigrationStep, type MigrationStep } from "@langwatch/upgrade/step";
 import { describe, expect, it } from "vitest";
 
 import { nurturingProcessModule } from "../../nurturing.module.ts";
@@ -22,7 +23,7 @@ import {
 /** Answers every lane with an empty replay, remembering the lanes asked for and in what order. */
 function recordingReplayer() {
   const lanes: string[] = [];
-  const replayer: LaneReplayer = {
+  const replayer: ProjectionLaneReplayer = {
     async replayLane({ lane }) {
       lanes.push(lane);
       return { lane, kind: "map", aggregatesReplayed: 0, totalEvents: 0, replayedThrough: "1" };
