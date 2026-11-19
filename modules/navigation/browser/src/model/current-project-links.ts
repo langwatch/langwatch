@@ -1,7 +1,6 @@
 import { scopeFilterAddressWrite } from "@langwatch/design-system/scope-filter";
 
-const PROJECT_SETTINGS_HREF = "/settings/project";
-const API_KEYS_HREF = "/settings/api-keys";
+import { API_KEYS_HREF, PROJECT_SETTINGS_HREF } from "./settings-menu.ts";
 
 /**
  * Where the switcher's current-project header leads, each only when the reader can open it:

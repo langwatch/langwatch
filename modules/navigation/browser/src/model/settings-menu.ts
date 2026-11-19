@@ -71,6 +71,11 @@ export interface SettingsMenuItem {
   isLocked?: boolean;
 }
 
+/** The project's settings page; the switcher's current-project header links here too. */
+export const PROJECT_SETTINGS_HREF = "/settings/project";
+/** The API keys page; the switcher's current-project header links here too. */
+export const API_KEYS_HREF = "/settings/api-keys";
+
 /** Settings entry active check by path prefix; uses pathname, not router pattern */
 export function isSettingsMenuItemActive({
   item,
@@ -224,7 +229,7 @@ function organizationGroup({
       // Keys sit here rather than in Access, where four enterprise entries
       // came first and left a page most readers use at the bottom of a group
       // they cannot open.
-      ...(!isLiteMember ? [{ label: "API keys", href: "/settings/api-keys", icon: KeyRound }] : []),
+      ...(!isLiteMember ? [{ label: "API keys", href: API_KEYS_HREF, icon: KeyRound }] : []),
       ...(!isLiteMember && hasPermission("auditLog:view")
         ? enterpriseEntry({
             item: { label: "Audit log", href: "/settings/audit-log", icon: ScrollText },
@@ -365,7 +370,7 @@ function projectGroup({
     id: "settings-project",
     label: "Project",
     items: [
-      { label: "General", href: "/settings/project", icon: FolderOpen },
+      { label: "General", href: PROJECT_SETTINGS_HREF, icon: FolderOpen },
       {
         label: "Annotation scores",
         href: "/settings/annotation-scores",
