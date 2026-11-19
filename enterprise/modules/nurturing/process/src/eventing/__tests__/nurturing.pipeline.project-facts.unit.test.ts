@@ -134,6 +134,8 @@ function nurturingOverCopies() {
     Parameters<NonNullable<typeof pipeline.globalProjections>[number]["register"]>[0]
   >({
     registerEventSubscriber: (subscriber) => void subscribers.push(subscriber),
+    registerPeerFoldProjection: () => undefined,
+    registerSubscriber: () => undefined,
     registerPeerMapProjection: (map) =>
       void maps.push(map as MapProjectionDefinition<unknown, Event>),
   });

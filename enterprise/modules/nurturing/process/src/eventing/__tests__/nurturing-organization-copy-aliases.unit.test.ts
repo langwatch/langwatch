@@ -26,16 +26,17 @@ import { buildNurturingProjectUsagePipeline } from "../nurturing-project-usage.p
 import {
   copiesOver,
   liveEventOf,
-  nurturingCopyOwnerPipelines,
   ownerFact,
 } from "./nurturing-organization-copies.test-helpers.ts";
+import { allNurturingOwnerStandIns } from "./nurturing-owner-stand-ins.test-helpers.ts";
 
 /** A worker of the new release: the copy owners and the usage pipeline, consuming. */
 function worker() {
   const repositories = MemoryNurturingRepositories.create();
   const eventStore = EventStoreMemory.createForTesting();
   const eventing = new EventSourcing({ eventStore });
-  for (const owner of nurturingCopyOwnerPipelines()) eventing.register(owner);
+  // Every peer lane's owner must be registered, or starting consumers refuses the lane.
+  for (const owner of allNurturingOwnerStandIns()) owner.open((definition) => eventing.register(definition));
   eventing.register(
     buildNurturingProjectUsagePipeline({
       store: repositories.projectUsage,

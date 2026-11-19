@@ -521,7 +521,10 @@ describe("given trace's log holds trace times from before and after the release"
   /** @scenario "Replaying the last-trace lane twice, or in reverse order, leaves each time as it was" */
   it("leaves the same times in reverse order and after a second run", async () => {
     const forward = deploy({ events: facts() });
-    const reversed = deploy({ events: inReverse(facts()) });
+    // The old fact stays out of the flip: flipped, it would stretch the range and push the rest below the replay window.
+    const reversed = deploy({
+      events: inReverse(facts().filter(({ timestamp }) => timestamp >= AFTER_RELEASE_MS)),
+    });
     await forward.runAll();
     await reversed.runAll();
     const first = JSON.stringify(await forward.state(["org-1", "org-2"]));
