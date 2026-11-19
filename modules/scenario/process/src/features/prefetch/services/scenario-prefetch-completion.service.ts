@@ -2,7 +2,7 @@ import { ApiKeyPermissionDeniedError } from "@langwatch/api-key-contract";
 import { HandledError } from "@langwatch/handled-error";
 import {
   ModelNotConfiguredError,
-  type PrivateEndpointBindingWire,
+  type PrivateEndpointsHeaders,
 } from "@langwatch/model-provider-contract";
 import { createLogger } from "@langwatch/observability";
 import { resolveRunModels } from "@langwatch/scenario-contract";
@@ -173,7 +173,7 @@ export class ScenarioPrefetchCompletionService {
       "Prefetch complete",
     );
 
-    const privateEndpoints = await this.options.modelParameters.privateEndpointsFor(
+    const privateEndpointsHeaders = await this.options.modelParameters.privateEndpointsHeadersFor(
       input.context.projectId,
     );
 
@@ -185,7 +185,7 @@ export class ScenarioPrefetchCompletionService {
       prepared,
       traceWaitTimeoutMs,
       runKey,
-      privateEndpoints,
+      privateEndpointsHeaders,
     });
   }
 
@@ -439,7 +439,7 @@ export class ScenarioPrefetchCompletionService {
     prepared: PreparedModels;
     traceWaitTimeoutMs: number | undefined;
     runKey: string;
-    privateEndpoints: PrivateEndpointBindingWire[];
+    privateEndpointsHeaders: PrivateEndpointsHeaders;
   }): ScenarioExecutionPrefetchResult {
     const { context, target, validated, models, prepared, traceWaitTimeoutMs, runKey } = input;
     const modelParams = prepared.adapter?.success ? prepared.adapter.params : void 0;
@@ -467,7 +467,9 @@ export class ScenarioPrefetchCompletionService {
         target,
         ...(target.type === "voice" ? { callerVoice: validated.scenario.callerVoice } : {}),
         ...(traceWaitTimeoutMs !== void 0 ? { traceWaitTimeoutMs } : {}),
-        ...(input.privateEndpoints.length > 0 ? { privateEndpoints: input.privateEndpoints } : {}),
+        ...(Object.keys(input.privateEndpointsHeaders).length > 0
+          ? { privateEndpointsHeaders: { ...input.privateEndpointsHeaders } }
+          : {}),
       },
       telemetry: {
         endpoint: this.options.config.langwatchEndpoint,

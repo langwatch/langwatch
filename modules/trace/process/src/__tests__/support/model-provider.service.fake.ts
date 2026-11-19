@@ -236,6 +236,10 @@ export class TestModelProviderService implements ModelProviderApi {
     return Promise.resolve([]);
   }
 
+  privateEndpointsHeadersForProject(): Promise<Record<string, string>> {
+    return Promise.resolve({});
+  }
+
   listPrivateEndpointsForOrganization(): Promise<[]> {
     return Promise.resolve([]);
   }

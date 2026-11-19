@@ -15,7 +15,7 @@ import { DatasetApi } from "@langwatch/dataset-contract";
 import type { EventingCommands, StaticPipelineDefinition } from "@langwatch/eventing";
 import { NotFoundError, ValidationError } from "@langwatch/handled-error";
 import { generate } from "@langwatch/ksuid";
-import { ModelProviderApi } from "@langwatch/model-provider-contract";
+import { ModelProviderApi, type PrivateEndpointsHeaders } from "@langwatch/model-provider-contract";
 import { createLogger } from "@langwatch/observability";
 import type { FeatureSetup } from "@langwatch/process";
 import { SecretApi } from "@langwatch/secret-contract";
@@ -1390,6 +1390,11 @@ export type WorkflowNlpDispatchInput = {
   timeoutMs?: number;
   /** The caller's cancellation, which stops the engine call. */
   signal?: AbortSignal;
+  /**
+   * The organization's signed private endpoint headers (ADR-203), merged into the engine call.
+   * Only the private endpoints wrapper sets them; it replaces whatever a caller put here.
+   */
+  privateEndpointsHeaders?: PrivateEndpointsHeaders;
 };
 
 export type WorkflowNlpDispatchResponse = {

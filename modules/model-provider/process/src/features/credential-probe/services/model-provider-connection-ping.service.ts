@@ -28,6 +28,7 @@ import {
   findPingModels,
 } from "../../../rules/provider-ping.rules.ts";
 import type { ModelProviderExecutionService } from "../../../services/model-provider-execution.service.ts";
+import type { PrivateModelEndpointService } from "../../private-endpoint/services/private-model-endpoint.service.ts";
 
 const logger = createLogger("langwatch:modelProviders:connectionPing");
 
@@ -40,6 +41,8 @@ type ModelProviderConnectionPingOptions = {
   secrets: Pick<SecretApi, "getValues">;
   /** Prepares the row itself: a `<row id>/<model>` reference only resolves `mp_` ids. */
   execution: Pick<ModelProviderExecutionService, "prepareRow">;
+  /** Signs the organization's bindings for the ping's project; absent, the ping carries none. */
+  privateEndpoints?: Pick<PrivateModelEndpointService, "headersForProject">;
 };
 
 const NO_GATEWAY_CREDENTIAL =
@@ -107,11 +110,18 @@ export class ModelProviderConnectionPingService {
   }): Promise<ModelProviderPingReply> {
     try {
       const parameters = await this.options.execution.prepareRow({ id: row.id, model, projectId });
+      // nlpgo takes bindings only in an envelope signed for this project (ADR-203).
+      const privateEndpointsHeaders =
+        privateEndpoints && privateEndpoints.length > 0
+          ? await this.options.privateEndpoints?.headersForProject({ projectId })
+          : undefined;
       return await this.options.channel.ping({
         providerKey: row.provider,
         model: `${row.provider}/${model}`,
         parameters,
-        ...(privateEndpoints && privateEndpoints.length > 0 ? { privateEndpoints } : {}),
+        ...(privateEndpointsHeaders && Object.keys(privateEndpointsHeaders).length > 0
+          ? { privateEndpointsHeaders }
+          : {}),
       });
     } catch (error) {
       return {

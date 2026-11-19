@@ -2,7 +2,6 @@ package domain
 
 import (
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -11,9 +10,9 @@ import (
 )
 
 // PrivateEndpointsHeader carries an organization's private endpoint bindings
-// on the app's internal call to nlpgo's playground proxy: base64url (no
-// padding) of the same JSON array the workflow payload and the gateway config
-// carry. See ADR-203.
+// on the app's calls to nlpgo, on every route: a signed envelope (see
+// private_endpoint_envelope.go) around the same JSON array the gateway config
+// carries. It is the only way bindings reach nlpgo. See ADR-203.
 const PrivateEndpointsHeader = "X-LangWatch-Private-Endpoints"
 
 // PrivateEndpoint is one hostname an organization bound to a private endpoint
@@ -112,6 +111,9 @@ func validateBindingHostname(host string) error {
 	if len(host) > 253 {
 		return errors.New("hostname is too long")
 	}
+	if IsLangWatchHostname(host) {
+		return errors.New("hostname must not be a LangWatch domain")
+	}
 	for _, label := range strings.Split(host, ".") {
 		if label == "" || len(label) > 63 {
 			return errors.New("hostname must be a DNS name")
@@ -123,36 +125,6 @@ func validateBindingHostname(host string) error {
 		}
 	}
 	return nil
-}
-
-// DecodePrivateEndpointsHeader decodes the X-LangWatch-Private-Endpoints
-// header value: base64url without padding of the JSON array. An empty value
-// means no bindings.
-func DecodePrivateEndpointsHeader(value string) ([]PrivateEndpoint, error) {
-	value = strings.TrimSpace(value)
-	if value == "" {
-		return nil, nil
-	}
-	raw, err := base64.RawURLEncoding.DecodeString(value)
-	if err != nil {
-		return nil, fmt.Errorf("%w: header is not base64url without padding", ErrPrivateEndpointsMalformed)
-	}
-	return ParsePrivateEndpoints(raw)
-}
-
-// EncodePrivateEndpointsHeader is the inverse of DecodePrivateEndpointsHeader.
-// The TS app owns the production encoder; this exists for tests and tools.
-func EncodePrivateEndpointsHeader(eps []PrivateEndpoint) string {
-	wire := make([]privateEndpointWire, 0, len(eps))
-	for _, ep := range eps {
-		addrs := make([]string, 0, len(ep.Addresses))
-		for _, a := range ep.Addresses {
-			addrs = append(addrs, a.String())
-		}
-		wire = append(wire, privateEndpointWire{Hostname: ep.Hostname, Addresses: addrs, Port: ep.Port})
-	}
-	raw, _ := json.Marshal(wire)
-	return base64.RawURLEncoding.EncodeToString(raw)
 }
 
 // NormalizeEndpointHost lowercases a host and drops a trailing dot, the form
@@ -210,4 +182,22 @@ func WithPrivateEndpoints(ctx context.Context, eps []PrivateEndpoint) context.Co
 func PrivateEndpointsFromContext(ctx context.Context) []PrivateEndpoint {
 	eps, _ := ctx.Value(privateEndpointsCtxKey{}).([]PrivateEndpoint)
 	return eps
+}
+
+// langWatchDomains are LangWatch's own domains. No organization may bind a
+// name under them: nlpgo's credentials carry no provenance, so a binding on
+// one of these names could pull a call meant for LangWatch, with whatever
+// credential the platform attached, to the organization's endpoint.
+var langWatchDomains = []string{"langwatch.ai"}
+
+// IsLangWatchHostname reports whether host is one of LangWatch's own domains
+// or a name under one.
+func IsLangWatchHostname(host string) bool {
+	host = NormalizeEndpointHost(host)
+	for _, d := range langWatchDomains {
+		if host == d || strings.HasSuffix(host, "."+d) {
+			return true
+		}
+	}
+	return false
 }

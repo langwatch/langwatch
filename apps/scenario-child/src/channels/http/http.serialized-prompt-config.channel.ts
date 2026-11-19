@@ -5,7 +5,7 @@
  */
 
 import { createSandboxedLiquid } from "@langwatch/automation-contract";
-import type { PrivateEndpointBindingWire } from "@langwatch/model-provider-contract";
+import type { PrivateEndpointsHeaders } from "@langwatch/model-provider-contract";
 import { createLogger, type Logger } from "@langwatch/observability";
 import type { AgentInput } from "@langwatch/scenario";
 import { AgentRole } from "@langwatch/scenario";
@@ -39,7 +39,7 @@ export class HttpSerializedPromptConfigChannel extends SerializedAgentChannel {
     nlpInternalSecret?: string | undefined;
     logger?: Logger;
     parameters?: RunParameterValues;
-    privateEndpoints?: readonly PrivateEndpointBindingWire[] | undefined;
+    privateEndpointsHeaders?: PrivateEndpointsHeaders | undefined;
   }): HttpSerializedPromptConfigChannel {
     return new HttpSerializedPromptConfigChannel(options);
   }
@@ -53,8 +53,8 @@ export class HttpSerializedPromptConfigChannel extends SerializedAgentChannel {
   private readonly nlpServiceUrl: string;
   private readonly nlpInternalSecret: string | undefined;
   private readonly parameters: RunParameterValues;
-  /** The organization's bound hostnames (ADR-203), sent on the target's model call. */
-  private readonly privateEndpoints: readonly PrivateEndpointBindingWire[] | undefined;
+  /** The organization's signed private endpoint headers (ADR-203), for the target's model call. */
+  private readonly privateEndpointsHeaders: PrivateEndpointsHeaders | undefined;
 
   constructor(options: {
     config: PromptConfigData;
@@ -65,7 +65,7 @@ export class HttpSerializedPromptConfigChannel extends SerializedAgentChannel {
     logger?: Logger;
     /** The run's resolved values, read from the template as `params.NAME`. */
     parameters?: RunParameterValues;
-    privateEndpoints?: readonly PrivateEndpointBindingWire[] | undefined;
+    privateEndpointsHeaders?: PrivateEndpointsHeaders | undefined;
   }) {
     super();
     this.name = "SerializedPromptConfigAdapter";
@@ -74,7 +74,7 @@ export class HttpSerializedPromptConfigChannel extends SerializedAgentChannel {
     this.nlpServiceUrl = options.nlpServiceUrl;
     this.nlpInternalSecret = options.nlpInternalSecret;
     this.parameters = options.parameters ?? {};
-    this.privateEndpoints = options.privateEndpoints;
+    this.privateEndpointsHeaders = options.privateEndpointsHeaders;
     this.logger = options.logger ?? createLogger("langwatch:scenarios:prompt-adapter");
   }
 
@@ -116,7 +116,7 @@ export class HttpSerializedPromptConfigChannel extends SerializedAgentChannel {
       litellmParams: this.litellmParams,
       nlpServiceUrl: this.nlpServiceUrl,
       nlpInternalSecret: this.nlpInternalSecret,
-      privateEndpoints: this.privateEndpoints,
+      privateEndpointsHeaders: this.privateEndpointsHeaders,
     });
 
     const result = await generateText({

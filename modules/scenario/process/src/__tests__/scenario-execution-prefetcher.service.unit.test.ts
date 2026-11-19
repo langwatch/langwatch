@@ -2813,14 +2813,13 @@ describe("prefetchWithFixture, when choosing where the child posts a turn", () =
 });
 
 describe("prefetchWithFixture, given the organization bound a hostname to a private endpoint", () => {
-  const binding = {
-    hostname: "llm.internal.acme.test",
-    addresses: ["10.20.1.21", "10.20.2.34"],
-    port: 443,
+  const signed = {
+    "X-LangWatch-Private-Endpoints": "signed-for-the-project",
+    "X-LangWatch-Project-Id": "proj_123",
   };
-  const promptDeps = (privateEndpoints: (typeof binding)[]) =>
+  const promptDeps = (privateEndpointsHeaders: Record<string, string>) =>
     createMockDeps({
-      privateEndpoints,
+      privateEndpointsHeaders,
       promptFetcher: {
         findByIdOrHandle: vi.fn().mockResolvedValue({
           id: "prompt_123",
@@ -2832,14 +2831,14 @@ describe("prefetchWithFixture, given the organization bound a hostname to a priv
     });
 
   describe("when the run is prepared", () => {
-    it("hands the child the bindings for its model calls", async () => {
+    it("hands the child the signed headers for its model calls", async () => {
       const result = await prefetchWithFixture({
         context: defaultContext,
         target: { type: "prompt", referenceId: "prompt_123" },
-        deps: promptDeps([binding]),
+        deps: promptDeps(signed),
       });
 
-      expect(result.success && result.data.privateEndpoints).toEqual([binding]);
+      expect(result.success && result.data.privateEndpointsHeaders).toEqual(signed);
     });
   });
 
@@ -2848,10 +2847,10 @@ describe("prefetchWithFixture, given the organization bound a hostname to a priv
       const result = await prefetchWithFixture({
         context: defaultContext,
         target: { type: "prompt", referenceId: "prompt_123" },
-        deps: promptDeps([]),
+        deps: promptDeps({}),
       });
 
-      expect(result.success && "privateEndpoints" in result.data).toBe(false);
+      expect(result.success && "privateEndpointsHeaders" in result.data).toBe(false);
     });
   });
 });

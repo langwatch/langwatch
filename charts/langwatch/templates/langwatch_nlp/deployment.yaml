@@ -139,6 +139,16 @@ spec:
                   key: {{ include "langwatch.nlpInternalSecretKey" . }}
                   optional: true
 
+            # The public key private endpoint bindings are checked with
+            # (ADR-203). Only a binding set the app signed is honoured; the
+            # internal secret above authorizes none. Unset ignores bindings.
+            - name: LANGWATCH_PRIVATE_ENDPOINTS_VERIFY_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "langwatch.appSecretName" . }}
+                  key: LANGWATCH_PRIVATE_ENDPOINTS_VERIFY_KEY
+                  optional: true
+
             {{- with .Values.langwatch_nlp.extraEnvs}}
             {{- include "langwatch.assertNoReservedTimeoutEnvs" (dict "envs" . "path" "langwatch_nlp.extraEnvs") }}
             {{- toYaml . | nindent 12 }}

@@ -1,5 +1,9 @@
 import { ValidationError } from "@langwatch/handled-error";
-import { PrivateModelEndpointNotFoundError } from "@langwatch/model-provider-contract";
+import {
+  PRIVATE_ENDPOINTS_HEADER,
+  PRIVATE_ENDPOINTS_PROJECT_HEADER,
+  PrivateModelEndpointNotFoundError,
+} from "@langwatch/model-provider-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { beforeEach, describe, expect, it } from "vitest";
@@ -14,7 +18,10 @@ const MANAGER = "user_manager";
 
 const PROJECT_ORGANIZATION: Record<string, string> = { "acme-prod": ACME, "rival-prod": RIVAL };
 
-function createService(): PrivateModelEndpointService {
+/** A test-only Ed25519 seed (0x01..0x20). */
+const TEST_SEED = "AQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyA=";
+
+function createService({ signingKey }: { signingKey?: string } = {}): PrivateModelEndpointService {
   let next = 0;
   return PrivateModelEndpointService.create({
     repository: MemoryPrivateModelEndpointRepository.create(),
@@ -22,6 +29,25 @@ function createService(): PrivateModelEndpointService {
     projects: createApiFixture<ProjectApi>({
       findOrganizationId: async (projectId: string) => PROJECT_ORGANIZATION[projectId],
     }),
+    signingKey,
+  });
+}
+
+/** Acme's one endpoint with one hostname bound to it. */
+async function seedAcme(service: PrivateModelEndpointService): Promise<void> {
+  const endpoint = await service.register({
+    organizationId: ACME,
+    name: "Inference",
+    region: "eu-west-1",
+    addresses: ["10.20.1.21"],
+    port: 443,
+    actorId: STAFF,
+  });
+  await service.bind({
+    organizationId: ACME,
+    endpointId: endpoint.id,
+    hostname: "llm.internal.acme.test",
+    actorId: MANAGER,
   });
 }
 
@@ -98,6 +124,66 @@ describe("PrivateModelEndpointService", () => {
 
         expect(refusal).toBeInstanceOf(ValidationError);
         expect((refusal as ValidationError).meta?.fieldErrors).toHaveProperty("hostname");
+      });
+    });
+
+    describe("when two managers bind one new hostname at the same moment", () => {
+      /** @scenario "Two concurrent binds of one hostname save one binding" */
+      it("saves one binding and refuses the other on the hostname field", async () => {
+        const bindRace = () =>
+          service
+            .bind({
+              organizationId: ACME,
+              endpointId: inferenceId,
+              hostname: "race.acme.test",
+              actorId: MANAGER,
+            })
+            .then(
+              () => "bound" as const,
+              (error: unknown) => error,
+            );
+
+        const outcomes = await Promise.all([bindRace(), bindRace()]);
+
+        expect(outcomes.filter((outcome) => outcome === "bound")).toHaveLength(1);
+        const refusal = outcomes.find((outcome) => outcome !== "bound");
+        expect(refusal).toBeInstanceOf(ValidationError);
+        expect((refusal as ValidationError).meta?.fieldErrors).toHaveProperty("hostname");
+        const [listed] = await service.listForOrganization({ organizationId: ACME });
+        expect(listed?.bindings.map((binding) => binding.hostname)).toEqual([
+          "llm.internal.acme.test",
+          "race.acme.test",
+        ]);
+      });
+    });
+
+    describe("when nlpgo's headers are asked for an Acme project", () => {
+      it("signs the bindings for that project with the deployment's key", async () => {
+        const signed = createService({ signingKey: TEST_SEED });
+        await seedAcme(signed);
+
+        const headers = await signed.headersForProject({ projectId: "acme-prod" });
+
+        expect(headers[PRIVATE_ENDPOINTS_PROJECT_HEADER]).toBe("acme-prod");
+        const [payload] = (headers[PRIVATE_ENDPOINTS_HEADER] ?? "").split(".");
+        expect(JSON.parse(Buffer.from(payload ?? "", "base64url").toString())).toMatchObject({
+          v: 1,
+          organizationId: ACME,
+          projectId: "acme-prod",
+          bindings: [{ hostname: "llm.internal.acme.test" }],
+        });
+      });
+
+      it("sends none when the deployment holds no signing key", async () => {
+        expect(await service.headersForProject({ projectId: "acme-prod" })).toEqual({});
+      });
+
+      it("sends none for a project of an organization that bound nothing", async () => {
+        const signed = createService({ signingKey: TEST_SEED });
+        await seedAcme(signed);
+
+        expect(await signed.headersForProject({ projectId: "rival-prod" })).toEqual({});
+        expect(await signed.headersForProject({ projectId: "nobody" })).toEqual({});
       });
     });
   });

@@ -1,8 +1,5 @@
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
-import {
-  privateEndpointsHeaders,
-  type PrivateEndpointBindingWire,
-} from "@langwatch/model-provider-contract";
+import type { PrivateEndpointsHeaders } from "@langwatch/model-provider-contract";
 import { nlpInternalSecretHeaders } from "@langwatch/process/nlp-internal-secret";
 
 import type { MeterableModel } from "./vercel-provider-usage.rules.ts";
@@ -19,15 +16,15 @@ export function handleForParameters(input: {
   executionProxyBaseUrl: string;
   /** The engine hop's shared credential, as the process resolved it. */
   internalSecret?: string | undefined;
-  /** The calling organization's bound hostnames (ADR-203); none sends no header. */
-  privateEndpoints?: readonly PrivateEndpointBindingWire[];
+  /** The project's signed private endpoint bindings (ADR-203); none sends no header. */
+  privateEndpointsHeaders?: PrivateEndpointsHeaders | undefined;
 }): MeterableModel {
   const headers = {
     ...Object.fromEntries(
       Object.entries(input.parameters).map(([key, value]) => [`x-litellm-${key}`, value]),
     ),
     ...nlpInternalSecretHeaders({ secret: input.internalSecret }),
-    ...privateEndpointsHeaders(input.privateEndpoints ?? []),
+    ...input.privateEndpointsHeaders,
   };
   const vercelProvider = createOpenAICompatible({
     name: input.providerKey,

@@ -45,12 +45,18 @@ export type StudioLambdaConfig = Readonly<{
   codeBlockTimeoutSeconds: number;
   stagingThresholdBytes: number;
   stagingTtlSeconds: number;
+  /** The key nlpgo checks private endpoint bindings against; absent, it honours none. */
+  privateEndpointsVerifyKey?: string | undefined;
 }>;
 
 /** The account, image and network fields, as `LANGWATCH_NLP_LAMBDA_CONFIG` decodes to JSON. */
 export type StudioLambdaFleetFields = Omit<
   StudioLambdaConfig,
-  "langwatchEndpoint" | "codeBlockTimeoutSeconds" | "stagingThresholdBytes" | "stagingTtlSeconds"
+  | "langwatchEndpoint"
+  | "codeBlockTimeoutSeconds"
+  | "stagingThresholdBytes"
+  | "stagingTtlSeconds"
+  | "privateEndpointsVerifyKey"
 >;
 
 /**
@@ -118,6 +124,10 @@ export function buildStudioLambdaEnvironment(config: StudioLambdaConfig): Record
     AWS_LWA_INVOKE_MODE: "RESPONSE_STREAM",
     CACHE_BUCKET: config.cacheBucket,
     NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS: String(config.codeBlockTimeoutSeconds),
+    // Only when set, so a deployment without the key keeps its functions' fingerprint.
+    ...(config.privateEndpointsVerifyKey
+      ? { LANGWATCH_PRIVATE_ENDPOINTS_VERIFY_KEY: config.privateEndpointsVerifyKey }
+      : {}),
   };
 }
 
@@ -152,6 +162,7 @@ export function buildStudioLambdaConfig(input: {
   codeBlockTimeoutRawValue: string | undefined;
   stagingThresholdBytesRawValue: unknown;
   stagingTtlSecondsRawValue: unknown;
+  privateEndpointsVerifyKey?: string | undefined;
 }): StudioLambdaConfig {
   const { fields } = input;
 
@@ -174,5 +185,6 @@ export function buildStudioLambdaConfig(input: {
       input.stagingTtlSecondsRawValue,
       STUDIO_STAGING_TTL_SECONDS_DEFAULT,
     ),
+    privateEndpointsVerifyKey: input.privateEndpointsVerifyKey?.trim() || undefined,
   };
 }

@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 Callable model-provider operations shared by process peers after composition.
 
-Peers call these through the token, declared at `../contract/src/model-provider.api.ts:211`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/model-provider.api.ts:212`; nothing else in this package is public.
 
 #### `estimateCost`
 
@@ -392,6 +392,14 @@ The same, for the organization a project belongs to; empty for an unknown projec
 
 ```typescript
 privateEndpointBindingsForProject(input: { projectId: string; }): Promise<PrivateEndpointBindingWire[]>;
+```
+
+#### `privateEndpointsHeadersForProject`
+
+The headers that carry a project's bindings to nlpgo (ADR-203): the organization's bindings, signed for this project, and the project id. Spread them into the request's headers. Empty when nothing is bound or no signing key is set. Valid for `ttlSeconds` (default 15 minutes).
+
+```typescript
+privateEndpointsHeadersForProject(input: { projectId: string; ttlSeconds?: number | undefined; }): Promise<PrivateEndpointsHeaders>;
 ```
 
 #### `listPrivateEndpointsForOrganization`
@@ -950,7 +958,7 @@ Contract `../contract/src/private-model-endpoint.trpc.ts:21`, router `src/transp
 
 ```typescript
 // privateModelEndpoint.listForOrganization
-// Input: privateModelEndpointOrganizationInputSchema, ../contract/src/private-model-endpoint.ts:200
+// Input: privateModelEndpointOrganizationInputSchema, ../contract/src/private-model-endpoint.ts:319
 interface Input {
   organizationId: string;
 }
@@ -968,13 +976,13 @@ type Output = {
 }[];
 
 // privateModelEndpoint.bind
-// Input: privateModelEndpointBindInputSchema, ../contract/src/private-model-endpoint.ts:162
+// Input: privateModelEndpointBindInputSchema, ../contract/src/private-model-endpoint.ts:281
 interface Input {
   organizationId: string;
   endpointId: string;
   hostname: string;
 }
-// Output: privateModelEndpointBindingSchema, ../contract/src/private-model-endpoint.ts:110
+// Output: privateModelEndpointBindingSchema, ../contract/src/private-model-endpoint.ts:229
 interface Output {
   id: string;
   endpointId: string;
@@ -982,28 +990,28 @@ interface Output {
 }
 
 // privateModelEndpoint.rebind
-// Input: privateModelEndpointRebindInputSchema, ../contract/src/private-model-endpoint.ts:178
+// Input: privateModelEndpointRebindInputSchema, ../contract/src/private-model-endpoint.ts:297
 interface Input {
   organizationId: string;
   bindingId: string;
   endpointId: string;
   hostname: string;
 }
-type Output = z.infer<typeof privateModelEndpointBindingSchema>; // ../contract/src/private-model-endpoint.ts:110
+type Output = z.infer<typeof privateModelEndpointBindingSchema>; // ../contract/src/private-model-endpoint.ts:229
 
 // privateModelEndpoint.unbind
-// Input: privateModelEndpointUnbindInputSchema, ../contract/src/private-model-endpoint.ts:189
+// Input: privateModelEndpointUnbindInputSchema, ../contract/src/private-model-endpoint.ts:308
 interface Input {
   organizationId: string;
   bindingId: string;
 }
 
 // privateModelEndpoint.listForStaff
-type Input = z.infer<typeof privateModelEndpointOrganizationInputSchema>; // ../contract/src/private-model-endpoint.ts:200
+type Input = z.infer<typeof privateModelEndpointOrganizationInputSchema>; // ../contract/src/private-model-endpoint.ts:319
 // Output: z.array(staffPrivateModelEndpointSchema) (inline, ../contract/src/private-model-endpoint.trpc.ts:41)
 
 // privateModelEndpoint.register
-// Input: privateModelEndpointRegisterInputSchema, ../contract/src/private-model-endpoint.ts:215
+// Input: privateModelEndpointRegisterInputSchema, ../contract/src/private-model-endpoint.ts:334
 interface Input {
   organizationId: string;
   name: string;
@@ -1011,10 +1019,10 @@ interface Input {
   addresses: string[];
   port?: number;
 }
-type Output = z.infer<typeof staffPrivateModelEndpointSchema>; // ../contract/src/private-model-endpoint.ts:148
+type Output = z.infer<typeof staffPrivateModelEndpointSchema>; // ../contract/src/private-model-endpoint.ts:267
 
 // privateModelEndpoint.update
-// Input: privateModelEndpointUpdateInputSchema, ../contract/src/private-model-endpoint.ts:235
+// Input: privateModelEndpointUpdateInputSchema, ../contract/src/private-model-endpoint.ts:354
 interface Input {
   organizationId: string;
   endpointId: string;
@@ -1023,10 +1031,10 @@ interface Input {
   addresses: string[];
   port: number;
 }
-type Output = z.infer<typeof staffPrivateModelEndpointSchema>; // ../contract/src/private-model-endpoint.ts:148
+type Output = z.infer<typeof staffPrivateModelEndpointSchema>; // ../contract/src/private-model-endpoint.ts:267
 
 // privateModelEndpoint.remove
-// Input: privateModelEndpointRemoveInputSchema, ../contract/src/private-model-endpoint.ts:246
+// Input: privateModelEndpointRemoveInputSchema, ../contract/src/private-model-endpoint.ts:365
 interface Input {
   organizationId: string;
   endpointId: string;
@@ -1073,8 +1081,8 @@ Run by the tasks process, before serve.
 
 | Kind   | Leaf                                         | Environment variable                           | Declared at                                   |
 | ------ | -------------------------------------------- | ---------------------------------------------- | --------------------------------------------- |
-| secret | `...ModelProviderModule.platformCredentials` | ≈ `...ModelProviderModule.platformCredentials` | `src/app/model-provider.app.ts:276`           |
-| secret | `...ModelProviderModule.operationalSecrets`  | ≈ `...ModelProviderModule.operationalSecrets`  | `src/app/model-provider.app.ts:277`           |
+| secret | `...ModelProviderModule.platformCredentials` | ≈ `...ModelProviderModule.platformCredentials` | `src/app/model-provider.app.ts:281`           |
+| secret | `...ModelProviderModule.operationalSecrets`  | ≈ `...ModelProviderModule.operationalSecrets`  | `src/app/model-provider.app.ts:282`           |
 | config | `blockLocalHttpCalls`                        | `BLOCK_LOCAL_HTTP_CALLS`                       | `../contract/src/model-provider.config.ts:31` |
 | config | `allowedProxyHosts`                          | `ALLOWED_PROXY_HOSTS`                          | `../contract/src/model-provider.config.ts:32` |
 | config | `defaultModel`                               | `LANGWATCH_DEFAULT_MODEL`                      | `../contract/src/model-provider.config.ts:33` |

@@ -3,13 +3,33 @@ import type { Named } from "@langwatch/module";
  * Private model endpoints (ADR-203): staff register the addresses, organizations bind hostnames.
  * The wire shape below is the one contract every TS caller sends to nlpgo and the AI gateway.
  */
+import { nowEpochMs } from "@langwatch/time";
 import { z } from "zod";
 
-/** The header nlpgo's `/go/proxy/v1` reads the calling organization's bindings from. */
+/**
+ * The header nlpgo reads an organization's bindings from, on every route: `/go/proxy/v1` and the
+ * workflow routes alike. Its value is a signed envelope ({@link signPrivateEndpointsHeaders}).
+ */
 export const PRIVATE_ENDPOINTS_HEADER = "X-LangWatch-Private-Endpoints";
 
-/** The top-level field a workflow payload and the gateway config bundle carry bindings in. */
+/** The project a call runs for, sent next to the bindings; nlpgo checks the envelope against it. */
+export const PRIVATE_ENDPOINTS_PROJECT_HEADER = "X-LangWatch-Project-Id";
+
+/** The field the gateway config bundle carries bindings in. nlpgo never reads it. */
 export const PRIVATE_ENDPOINTS_FIELD = "private_endpoints";
+
+/** Where the app reads its Ed25519 signing key for bindings: base64 of the 32-byte seed. */
+export const PRIVATE_ENDPOINTS_SIGNING_KEY_ENV = "LANGWATCH_PRIVATE_ENDPOINTS_SIGNING_KEY";
+
+/** Where nlpgo reads the matching public key: base64 of the 32 raw bytes. */
+export const PRIVATE_ENDPOINTS_VERIFY_KEY_ENV = "LANGWATCH_PRIVATE_ENDPOINTS_VERIFY_KEY";
+
+/**
+ * How long a signed envelope is honoured. nlpgo checks it once, when the request arrives, and a
+ * run keeps the bindings it was admitted with; so this covers the wait between signing and the
+ * engine reading the request (staging, a cold Lambda), not the run itself.
+ */
+export const PRIVATE_ENDPOINTS_TTL_SECONDS = 15 * 60;
 
 /** One bound hostname: lowercased, no trailing dot, dialled at `addresses` on `port`. */
 const privateEndpointBindingWireSchemaDefinition = z.object({
@@ -48,12 +68,13 @@ function utf8Of(text: string): number[] {
   return bytes;
 }
 
-/** Base64url without padding (RFC 4648 §5), the encoding the header carries the JSON in. */
-function base64UrlOf(text: string): string {
-  const bytes = utf8Of(text);
+/** Base64url without padding (RFC 4648 §5) of raw bytes. */
+function base64UrlOfBytes(bytes: ArrayLike<number>): string {
   let out = "";
   for (let at = 0; at < bytes.length; at += 3) {
-    const [a = 0, b = 0, c = 0] = bytes.slice(at, at + 3);
+    const a = bytes[at] ?? 0;
+    const b = bytes[at + 1] ?? 0;
+    const c = bytes[at + 2] ?? 0;
     const chunk = (a << 16) | (b << 8) | c;
     const width = Math.min(3, bytes.length - at) + 1;
     for (let index = 0; index < width; index++) {
@@ -63,22 +84,120 @@ function base64UrlOf(text: string): string {
   return out;
 }
 
-/** The header value for a set of bindings: base64url (no padding) of the JSON array. */
-export function encodePrivateEndpointsHeader(
-  bindings: readonly PrivateEndpointBindingWire[],
-): string {
-  return base64UrlOf(JSON.stringify(bindings.map(toWire)));
+const INVALID_SIGNING_KEY = `${PRIVATE_ENDPOINTS_SIGNING_KEY_ENV} must be base64 of a 32-byte Ed25519 private key seed.`;
+
+/** The 32-byte seed in a signing key, base64 in either alphabet, padding optional; else throws. */
+function getSigningSeed(text: string): Uint8Array {
+  const clean = text.trim().replace(/=+$/, "").replace(/\+/g, "-").replace(/\//g, "_");
+  const out: number[] = [];
+  let buffer = 0;
+  let bits = 0;
+  for (const char of clean) {
+    const value = BASE64URL.indexOf(char);
+    if (value === -1) throw new Error(INVALID_SIGNING_KEY);
+    buffer = (buffer << 6) | value;
+    bits += 6;
+    if (bits >= 8) {
+      bits -= 8;
+      out.push((buffer >> bits) & 0xff);
+    }
+  }
+  if (out.length !== 32) throw new Error(INVALID_SIGNING_KEY);
+  return Uint8Array.from(out);
 }
 
-/** The header to merge into an nlpgo proxy call; nothing when the organization has no binding. */
-export function privateEndpointsHeaders(
-  bindings: readonly PrivateEndpointBindingWire[],
-): Record<string, string> {
-  if (bindings.length === 0) return {};
-  return { [PRIVATE_ENDPOINTS_HEADER]: encodePrivateEndpointsHeader(bindings) };
+/** The slice of WebCrypto the signer needs; Node 20+ and every current browser have it. */
+type Ed25519Subtle = {
+  importKey(
+    format: "pkcs8",
+    keyData: Uint8Array,
+    algorithm: { name: "Ed25519" },
+    extractable: false,
+    usages: ["sign"],
+  ): Promise<unknown>;
+  sign(algorithm: { name: "Ed25519" }, key: unknown, data: Uint8Array): Promise<ArrayBuffer>;
+};
+
+function subtle(): Ed25519Subtle {
+  const crypto = (globalThis as { crypto?: { subtle?: Ed25519Subtle } }).crypto;
+  if (!crypto?.subtle) throw new Error("This runtime has no WebCrypto to sign bindings with.");
+  return crypto.subtle;
 }
 
-/** The field to spread into a workflow payload or config bundle; nothing when there is none. */
+/** The fixed PKCS#8 prefix of an Ed25519 private key (RFC 8410), before its 32-byte seed. */
+const ED25519_PKCS8_PREFIX = [
+  0x30, 0x2e, 0x02, 0x01, 0x00, 0x30, 0x05, 0x06, 0x03, 0x2b, 0x65, 0x70, 0x04, 0x22, 0x04, 0x20,
+];
+
+const importedKeys = new Map<string, Promise<unknown>>();
+
+/** The signing key, imported once per value. */
+function signingKeyOf(seedBase64: string): Promise<unknown> {
+  const cached = importedKeys.get(seedBase64);
+  if (cached) return cached;
+  const seed = getSigningSeed(seedBase64);
+  const imported = subtle().importKey(
+    "pkcs8",
+    Uint8Array.from([...ED25519_PKCS8_PREFIX, ...seed]),
+    { name: "Ed25519" },
+    false,
+    ["sign"],
+  );
+  importedKeys.set(seedBase64, imported);
+  return imported;
+}
+
+/** What a signed envelope says: whose bindings, for which project, until when (Unix seconds). */
+export type PrivateEndpointsEnvelope = {
+  v: 1;
+  organizationId: string;
+  projectId: string;
+  bindings: PrivateEndpointBindingWire[];
+  expiresAt: number;
+};
+
+/** The headers a call to nlpgo carries the bindings in; empty when there are none to send. */
+export type PrivateEndpointsHeaders = Readonly<Record<string, string>>;
+
+/**
+ * Signs an organization's bindings for one project's calls to nlpgo (ADR-203): headers to merge
+ * into the request, empty when nothing is bound. Value: `base64url(JSON) "." base64url(Ed25519
+ * signature of the first segment)`, checked by nlpgo with the public key.
+ */
+export async function signPrivateEndpointsHeaders(input: {
+  organizationId: string;
+  projectId: string;
+  bindings: readonly PrivateEndpointBindingWire[];
+  /** Base64 of the 32-byte Ed25519 seed, as {@link PRIVATE_ENDPOINTS_SIGNING_KEY_ENV} holds it. */
+  signingKey: string;
+  /** How long nlpgo honours it; {@link PRIVATE_ENDPOINTS_TTL_SECONDS} by default. */
+  ttlSeconds?: number;
+  /** Epoch milliseconds; tests fix it. */
+  now?: number;
+}): Promise<PrivateEndpointsHeaders> {
+  if (input.bindings.length === 0) return {};
+  const envelope: PrivateEndpointsEnvelope = {
+    v: 1,
+    organizationId: input.organizationId,
+    projectId: input.projectId,
+    bindings: input.bindings.map(toWire),
+    expiresAt:
+      Math.floor((input.now ?? nowEpochMs()) / 1000) +
+      (input.ttlSeconds ?? PRIVATE_ENDPOINTS_TTL_SECONDS),
+  };
+  const payload = base64UrlOfBytes(utf8Of(JSON.stringify(envelope)));
+  const signature = await subtle().sign(
+    { name: "Ed25519" },
+    await signingKeyOf(input.signingKey),
+    Uint8Array.from(utf8Of(payload)),
+  );
+  return {
+    [PRIVATE_ENDPOINTS_HEADER]: `${payload}.${base64UrlOfBytes(new Uint8Array(signature))}`,
+    [PRIVATE_ENDPOINTS_PROJECT_HEADER]: input.projectId,
+  };
+}
+
+/** The field to spread into the gateway config bundle; nothing when there is none. */
 export function privateEndpointsField(bindings: readonly PrivateEndpointBindingWire[]): {
   private_endpoints?: PrivateEndpointBindingWire[];
 } {

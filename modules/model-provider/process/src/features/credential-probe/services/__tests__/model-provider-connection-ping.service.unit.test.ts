@@ -48,6 +48,12 @@ function setup(
       codexChannel,
       secrets,
       execution,
+      privateEndpoints: {
+        headersForProject: async ({ projectId }) => ({
+          "X-LangWatch-Private-Endpoints": `signed-for-${projectId}`,
+          "X-LangWatch-Project-Id": projectId,
+        }),
+      },
     }),
   };
 }
@@ -73,6 +79,28 @@ describe("ModelProviderConnectionPingService", () => {
           parameters: { api_key: "sk-stored" },
         });
         expect(channel.sent[0]?.model).toMatch(/^openai\//);
+        expect(channel.sent[0]?.privateEndpointsHeaders).toBeUndefined();
+      });
+    });
+
+    describe("when the organization bound private endpoints", () => {
+      it("sends nlpgo the bindings signed for the ping's project, never the raw list", async () => {
+        const { pings, channel } = setup();
+
+        await pings.verify({
+          row: ROW,
+          projectId: "project_1",
+          credential: VERIFIED,
+          privateEndpoints: [
+            { hostname: "llm.internal.acme.test", addresses: ["10.20.1.21"], port: 443 },
+          ],
+        });
+
+        expect(channel.sent[0]?.privateEndpointsHeaders).toEqual({
+          "X-LangWatch-Private-Endpoints": "signed-for-project_1",
+          "X-LangWatch-Project-Id": "project_1",
+        });
+        expect(JSON.stringify(channel.sent[0])).not.toContain("10.20.1.21");
       });
     });
 

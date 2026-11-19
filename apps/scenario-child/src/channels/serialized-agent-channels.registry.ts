@@ -3,7 +3,7 @@
  * class and stop signal in one row. A new runtime is a new row; `build` does not change.
  */
 
-import type { PrivateEndpointBindingWire } from "@langwatch/model-provider-contract";
+import type { PrivateEndpointsHeaders } from "@langwatch/model-provider-contract";
 import { createLogger, type Logger } from "@langwatch/observability";
 import type { AgentAdapter } from "@langwatch/scenario";
 import {
@@ -40,13 +40,18 @@ import { HttpSerializedPromptConfigChannel } from "./http/http.serialized-prompt
 import { HttpSerializedWorkflowAgentChannel } from "./http/http.serialized-workflow-agent.channel.ts";
 import type { NlpFetchTimeouts } from "./nlp-fetch.channel.ts";
 
-/** The job's route as a transport; a job queued before the route existed posts direct. */
+/**
+ * The job's route as a transport; a job queued before the route existed posts direct. Only a
+ * workflow target's LLM blocks take the organization's bindings, so a code target passes none.
+ */
 function executeSyncTransportOf({
   input,
   projectApiKey,
+  privateEndpointsHeaders,
 }: {
   input: AgentAdapterBuildInput;
   projectApiKey: string;
+  privateEndpointsHeaders?: PrivateEndpointsHeaders | undefined;
 }): ExecuteSyncTransport {
   const route = input.executeSyncRoute;
   return childExecuteSyncTransport({
@@ -54,6 +59,7 @@ function executeSyncTransportOf({
     nlpServiceUrl: route?.mode === "direct" ? route.nlpServiceUrl : input.nlpServiceUrl,
     nlpInternalSecret: input.nlpInternalSecret,
     projectApiKey,
+    privateEndpointsHeaders,
   });
 }
 
@@ -73,10 +79,11 @@ export type AgentAdapterBuildInput = {
   /** The scenario run a connected agent's calls belong to; absent outside a scenario run. */
   run?: ConnectedCallRun;
   /**
-   * The organization's bound hostnames (ADR-203), for a prompt or workflow target's model calls.
+   * The organization's signed private endpoint headers (ADR-203), for a prompt or workflow
+   * target's model calls.
    * An HTTP agent target never receives them: a binding authorizes model calls only.
    */
-  privateEndpoints?: readonly PrivateEndpointBindingWire[] | undefined;
+  privateEndpointsHeaders?: PrivateEndpointsHeaders | undefined;
 };
 
 /**
@@ -139,7 +146,7 @@ export const SERIALIZED_AGENT_RUNTIMES = {
         nlpInternalSecret: input.nlpInternalSecret,
         parameters: input.parameters,
         logger: input.logger,
-        privateEndpoints: input.privateEndpoints,
+        privateEndpointsHeaders: input.privateEndpointsHeaders,
       });
     },
   }),
@@ -188,9 +195,13 @@ export const SERIALIZED_AGENT_RUNTIMES = {
         nlpInternalSecret: input.nlpInternalSecret,
         projectApiKey: input.projectApiKey,
         parameters: input.parameters,
-        privateEndpoints: input.privateEndpoints,
+        privateEndpointsHeaders: input.privateEndpointsHeaders,
         timeouts: nlpTimeouts,
-        transport: executeSyncTransportOf({ input, projectApiKey: input.projectApiKey }),
+        transport: executeSyncTransportOf({
+          input,
+          projectApiKey: input.projectApiKey,
+          privateEndpointsHeaders: input.privateEndpointsHeaders,
+        }),
       });
     },
   }),

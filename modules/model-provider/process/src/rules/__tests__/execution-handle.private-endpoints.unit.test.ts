@@ -1,4 +1,9 @@
-import { PRIVATE_ENDPOINTS_HEADER } from "@langwatch/model-provider-contract";
+import {
+  PRIVATE_ENDPOINTS_HEADER,
+  PRIVATE_ENDPOINTS_PROJECT_HEADER,
+  type PrivateEndpointsHeaders,
+  signPrivateEndpointsHeaders,
+} from "@langwatch/model-provider-contract";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { handleForParameters } from "../execution-handle.rules.ts";
@@ -9,8 +14,13 @@ const INFERENCE = {
   port: 443,
 };
 
+/** A test-only Ed25519 seed (0x01..0x20). */
+const TEST_SEED = "AQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyA=";
+
 /** The headers the handle sends to nlpgo's proxy on one call. */
-async function headersSent(privateEndpoints: (typeof INFERENCE)[] | undefined): Promise<Headers> {
+async function headersSent(
+  privateEndpointsHeaders: PrivateEndpointsHeaders | undefined,
+): Promise<Headers> {
   let sent = new Headers();
   vi.stubGlobal("fetch", async (_url: string, init: RequestInit) => {
     sent = new Headers(init.headers);
@@ -21,7 +31,7 @@ async function headersSent(privateEndpoints: (typeof INFERENCE)[] | undefined): 
     model: "custom/llama",
     parameters: { api_key: "sk-test", api_base: "https://llm.internal.acme.test/v1" },
     executionProxyBaseUrl: "http://nlp.test/go/proxy/v1",
-    privateEndpoints,
+    privateEndpointsHeaders,
   });
   await Promise.resolve(
     model.doGenerate({ prompt: [{ role: "user", content: [{ type: "text", text: "hi" }] }] }),
@@ -36,20 +46,25 @@ describe("handleForParameters", () => {
 
   describe("given the organization bound a hostname", () => {
     /** @scenario "<path> reaches the private endpoint through a bound hostname" */
-    it("sends nlpgo the bindings in the private endpoints header beside the provider parameters", async () => {
-      const sent = await headersSent([INFERENCE]);
-      const header = sent.get(PRIVATE_ENDPOINTS_HEADER);
+    it("sends nlpgo the signed bindings and their project beside the provider parameters", async () => {
+      const signed = await signPrivateEndpointsHeaders({
+        organizationId: "org_acme",
+        projectId: "acme-prod",
+        bindings: [INFERENCE],
+        signingKey: TEST_SEED,
+      });
+
+      const sent = await headersSent(signed);
 
       expect(sent.get("x-litellm-api_base")).toBe("https://llm.internal.acme.test/v1");
-      expect(JSON.parse(Buffer.from(header ?? "", "base64url").toString("utf8"))).toEqual([
-        INFERENCE,
-      ]);
+      expect(sent.get(PRIVATE_ENDPOINTS_HEADER)).toBe(signed[PRIVATE_ENDPOINTS_HEADER]);
+      expect(sent.get(PRIVATE_ENDPOINTS_PROJECT_HEADER)).toBe("acme-prod");
     });
   });
 
   describe("given the organization bound nothing", () => {
     it("sends no private endpoints header at all", async () => {
-      expect((await headersSent([])).has(PRIVATE_ENDPOINTS_HEADER)).toBe(false);
+      expect((await headersSent({})).has(PRIVATE_ENDPOINTS_HEADER)).toBe(false);
       expect((await headersSent(undefined)).has(PRIVATE_ENDPOINTS_HEADER)).toBe(false);
     });
   });

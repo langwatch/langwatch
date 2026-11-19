@@ -37,6 +37,7 @@ async function appAt({
     relayTurnCeilingMs: void 0,
     publicBaseUrl: void 0,
     nlpCodeBlockTimeoutSeconds: void 0,
+    privateEndpointsVerifyKey: void 0,
   };
   const secrets = new ScopedSecrets(async (handle, build) =>
     build(handle === nlpInternalSecret ? internalSecret : undefined),
@@ -47,7 +48,7 @@ async function appAt({
         {
           getForProject: async () => ({}),
           getExecutionProviders: async () => ({}),
-          privateEndpointBindingsForProject: async () => [],
+          privateEndpointsHeadersForProject: async () => ({}),
         },
         "ModelProviderApi",
       ),

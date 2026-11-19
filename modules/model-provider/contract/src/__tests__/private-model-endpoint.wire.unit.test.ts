@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  encodePrivateEndpointsHeader,
   PRIVATE_ENDPOINTS_HEADER,
+  PRIVATE_ENDPOINTS_PROJECT_HEADER,
   privateEndpointsField,
-  privateEndpointsHeaders,
+  signPrivateEndpointsHeaders,
 } from "../private-model-endpoint.ts";
 
 const INFERENCE = {
@@ -16,51 +16,70 @@ const INFERENCE = {
 const WIRE_JSON =
   '[{"hostname":"llm.internal.acme.test","addresses":["10.20.1.21","10.20.2.34"],"port":443}]';
 
-/** Node's `Buffer.from(WIRE_JSON).toString("base64url")`, fixed so this lib needs no Node types. */
-const WIRE_HEADER =
-  "W3siaG9zdG5hbWUiOiJsbG0uaW50ZXJuYWwuYWNtZS50ZXN0IiwiYWRkcmVzc2VzIjpbIjEwLjIwLjEuMjEiLCIxMC4yMC4yLjM0Il0sInBvcnQiOjQ0M31d";
+/**
+ * The vector nlpgo's verifier is held to as well
+ * (services/aigateway/domain/private_endpoint_envelope_test.go): seed 0x01..0x20, acme-prod,
+ * signed at 1800000000 for 900 seconds. Ed25519 is deterministic, so the value is exact.
+ */
+const SHARED_SEED = "AQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyA=";
+const SHARED_HEADER =
+  "eyJ2IjoxLCJvcmdhbml6YXRpb25JZCI6Im9yZ19hY21lIiwicHJvamVjdElkIjoiYWNtZS1wcm9kIiwiYmluZGluZ3MiOlt7Imhvc3RuYW1lIjoibGxtLmludGVybmFsLmFjbWUudGVzdCIsImFkZHJlc3NlcyI6WyIxMC4yMC4xLjIxIiwiMTAuMjAuMi4zNCJdLCJwb3J0Ijo0NDN9XSwiZXhwaXJlc0F0IjoxODAwMDAwOTAwfQ.oyQyB4gk0jXh3oyefY_wDJ4rK1h1zu6ZKDwOTXbtNi3KFSIRCAJpo5WqzvoY79_eppAlLxm4e1dD7iaGwKB4CQ";
+
+function sign(overrides: Partial<Parameters<typeof signPrivateEndpointsHeaders>[0]> = {}) {
+  return signPrivateEndpointsHeaders({
+    organizationId: "org_acme",
+    projectId: "acme-prod",
+    bindings: [INFERENCE],
+    signingKey: SHARED_SEED,
+    ttlSeconds: 900,
+    now: 1_800_000_000_000,
+    ...overrides,
+  });
+}
 
 describe("the private endpoints wire contract", () => {
   describe("given an organization with one binding", () => {
-    it("encodes the header as unpadded base64url of the contract JSON", () => {
-      expect(encodePrivateEndpointsHeader([INFERENCE])).toBe(WIRE_HEADER);
-    });
-
-    it("names the header nlpgo reads", () => {
-      expect(privateEndpointsHeaders([INFERENCE])).toEqual({
-        "X-LangWatch-Private-Endpoints": WIRE_HEADER,
+    /** @scenario "The app's signed envelope verifies in nlpgo byte for byte" */
+    it("signs the envelope exactly as nlpgo verifies it", async () => {
+      expect(await sign()).toEqual({
+        [PRIVATE_ENDPOINTS_HEADER]: SHARED_HEADER,
+        [PRIVATE_ENDPOINTS_PROJECT_HEADER]: "acme-prod",
       });
       expect(PRIVATE_ENDPOINTS_HEADER).toBe("X-LangWatch-Private-Endpoints");
+      expect(PRIVATE_ENDPOINTS_PROJECT_HEADER).toBe("X-LangWatch-Project-Id");
     });
 
-    it("puts the same array in the top-level private_endpoints field", () => {
+    it("reads the seed in either base64 alphabet, padded or not", async () => {
+      const urlSafe = SHARED_SEED.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+
+      expect(await sign({ signingKey: urlSafe })).toEqual(await sign());
+    });
+
+    it("lowercases the hostname, drops a trailing dot and keeps exactly the three fields", async () => {
+      const loose = { ...INFERENCE, hostname: "LLM.Internal.Acme.Test.", id: "x" };
+
+      expect(await sign({ bindings: [loose] })).toEqual(await sign());
+      expect(privateEndpointsField([loose]).private_endpoints).toEqual([INFERENCE]);
+    });
+
+    it("puts the array in the gateway bundle's private_endpoints field", () => {
       expect(JSON.stringify(privateEndpointsField([INFERENCE]))).toBe(
         `{"private_endpoints":${WIRE_JSON}}`,
       );
     });
-
-    it("lowercases the hostname, drops a trailing dot and keeps exactly the three fields", () => {
-      const loose = { ...INFERENCE, hostname: "LLM.Internal.Acme.Test.", id: "x" };
-
-      expect(privateEndpointsField([loose]).private_endpoints).toEqual([INFERENCE]);
-    });
   });
 
-  describe("given every padding length and multi-byte characters", () => {
-    it.each([
-      ["a", "W3siaG9zdG5hbWUiOiJhIiwiYWRkcmVzc2VzIjpbXSwicG9ydCI6MX1d"],
-      ["ab", "W3siaG9zdG5hbWUiOiJhYiIsImFkZHJlc3NlcyI6W10sInBvcnQiOjF9XQ"],
-      ["abc", "W3siaG9zdG5hbWUiOiJhYmMiLCJhZGRyZXNzZXMiOltdLCJwb3J0IjoxfV0"],
-      ["abcd", "W3siaG9zdG5hbWUiOiJhYmNkIiwiYWRkcmVzc2VzIjpbXSwicG9ydCI6MX1d"],
-      ["é€😀", "W3siaG9zdG5hbWUiOiLDqeKCrPCfmIAiLCJhZGRyZXNzZXMiOltdLCJwb3J0IjoxfV0"],
-    ])("matches Node's base64url for %j", (hostname, expected) => {
-      expect(encodePrivateEndpointsHeader([{ hostname, addresses: [], port: 1 }])).toBe(expected);
+  describe("given a signing key that is not a 32-byte seed", () => {
+    it("refuses to sign", async () => {
+      await expect(sign({ signingKey: "c2hvcnQ=" })).rejects.toThrow(
+        "LANGWATCH_PRIVATE_ENDPOINTS_SIGNING_KEY",
+      );
     });
   });
 
   describe("given an organization with no binding", () => {
-    it("sends no header and no field", () => {
-      expect(privateEndpointsHeaders([])).toEqual({});
+    it("sends no header and no field", async () => {
+      expect(await sign({ bindings: [] })).toEqual({});
       expect(privateEndpointsField([])).toEqual({});
     });
   });

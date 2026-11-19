@@ -35,6 +35,7 @@ async function postRun({ repositories }: { repositories: WorkflowRepositories })
     relayTurnCeilingMs: void 0,
     publicBaseUrl: void 0,
     nlpCodeBlockTimeoutSeconds: void 0,
+    privateEndpointsVerifyKey: void 0,
   };
   const secrets = new ScopedSecrets(async (_handle, build) => build(undefined));
   const app = await WorkflowModule.create({

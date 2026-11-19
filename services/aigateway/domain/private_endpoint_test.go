@@ -2,10 +2,8 @@ package domain
 
 import (
 	"context"
-	"encoding/base64"
 	"errors"
 	"net/netip"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -56,6 +54,8 @@ func TestParsePrivateEndpoints(t *testing.T) {
 		{"zoned address", `[{"hostname":"a.test","addresses":["fe80::1%eth0"],"port":443}]`},
 		{"port zero", `[{"hostname":"a.test","addresses":["10.0.0.1"],"port":0}]`},
 		{"port too large", `[{"hostname":"a.test","addresses":["10.0.0.1"],"port":70000}]`},
+		{"a LangWatch domain", `[{"hostname":"langwatch.ai","addresses":["10.0.0.1"],"port":443}]`},
+		{"a name under a LangWatch domain", `[{"hostname":"app.LangWatch.ai.","addresses":["10.0.0.1"],"port":443}]`},
 		{"duplicate hostname", `[{"hostname":"a.test","addresses":["10.0.0.1"],"port":443},{"hostname":"A.test","addresses":["10.0.0.2"],"port":443}]`},
 	}
 	for _, tc := range malformed {
@@ -71,44 +71,6 @@ func TestParsePrivateEndpoints(t *testing.T) {
 		require.Error(t, err)
 		assert.NotContains(t, err.Error(), "10.20.9.9")
 	})
-}
-
-func TestDecodePrivateEndpointsHeader(t *testing.T) {
-	t.Run("decodes base64url without padding", func(t *testing.T) {
-		header := base64.RawURLEncoding.EncodeToString([]byte(acmeBindings))
-		eps, err := DecodePrivateEndpointsHeader(header)
-		require.NoError(t, err)
-		require.Len(t, eps, 1)
-		assert.Equal(t, "llm.internal.acme.test", eps[0].Hostname)
-	})
-
-	t.Run("round-trips the encoder", func(t *testing.T) {
-		eps, err := ParsePrivateEndpoints([]byte(acmeBindings))
-		require.NoError(t, err)
-		back, err := DecodePrivateEndpointsHeader(EncodePrivateEndpointsHeader(eps))
-		require.NoError(t, err)
-		assert.Equal(t, eps, back)
-	})
-
-	t.Run("empty header means no bindings", func(t *testing.T) {
-		eps, err := DecodePrivateEndpointsHeader("")
-		require.NoError(t, err)
-		assert.Empty(t, eps)
-	})
-
-	for name, value := range map[string]string{
-		"padded base64":     base64.RawURLEncoding.EncodeToString([]byte(acmeBindings)) + "=",
-		"standard alphabet": strings.Repeat("/+", 8),
-		"not base64":        "!!!",
-		"base64 of junk":    base64.RawURLEncoding.EncodeToString([]byte("not json")),
-		"base64 of object":  base64.RawURLEncoding.EncodeToString([]byte(`{"hostname":"a.test"}`)),
-	} {
-		t.Run("refuses "+name, func(t *testing.T) {
-			_, err := DecodePrivateEndpointsHeader(value)
-			require.Error(t, err)
-			assert.True(t, errors.Is(err, ErrPrivateEndpointsMalformed))
-		})
-	}
 }
 
 func TestPrivateEndpointFor(t *testing.T) {

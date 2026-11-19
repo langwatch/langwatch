@@ -10,8 +10,11 @@ import {
   type PrivateModelEndpointRemoveInput,
   type PrivateModelEndpointUnbindInput,
   type PrivateModelEndpointUpdateInput,
+  type PrivateEndpointsHeaders,
+  signPrivateEndpointsHeaders,
   type StaffPrivateModelEndpoint,
 } from "@langwatch/model-provider-contract";
+import { createLogger } from "@langwatch/observability";
 import type { ProjectApi } from "@langwatch/project-contract";
 
 import type {
@@ -26,6 +29,8 @@ import {
   validateEndpointPort,
 } from "../../../rules/private-model-endpoint.rules.ts";
 
+const logger = createLogger("langwatch:model-provider:private-endpoints");
+
 /** How the service mints a row id. */
 interface PrivateModelEndpointIds {
   generate(input: Readonly<{ type: "private_endpoint" | "private_endpoint_binding" }>): string;
@@ -39,21 +44,26 @@ export class PrivateModelEndpointService {
   readonly #repository: PrivateModelEndpointRepository;
   readonly #ids: PrivateModelEndpointIds;
   readonly #projects: ProjectApi;
+  readonly #signingKey: string | undefined;
 
   private constructor(deps: {
     repository: PrivateModelEndpointRepository;
     ids: PrivateModelEndpointIds;
     projects: ProjectApi;
+    signingKey?: string | undefined;
   }) {
     this.#repository = deps.repository;
     this.#ids = deps.ids;
     this.#projects = deps.projects;
+    this.#signingKey = deps.signingKey;
   }
 
   static create(deps: {
     repository: PrivateModelEndpointRepository;
     ids: PrivateModelEndpointIds;
     projects: ProjectApi;
+    /** LANGWATCH_PRIVATE_ENDPOINTS_SIGNING_KEY; unset sends no bindings to nlpgo. */
+    signingKey?: string | undefined;
   }): PrivateModelEndpointService {
     return new PrivateModelEndpointService(deps);
   }
@@ -89,6 +99,38 @@ export class PrivateModelEndpointService {
     return organizationId ? this.bindingsForOrganization({ organizationId }) : [];
   }
 
+  /**
+   * The signed headers a call to nlpgo carries for one project (ADR-203): the organization's
+   * bindings, signed for that project, valid for `ttlSeconds`. Empty when the organization bound
+   * nothing, or when this deployment holds no signing key (the call then keeps today's rules).
+   */
+  async headersForProject({
+    projectId,
+    ttlSeconds,
+  }: {
+    projectId: string;
+    ttlSeconds?: number | undefined;
+  }): Promise<PrivateEndpointsHeaders> {
+    const organizationId = await this.#projects.findOrganizationId(projectId);
+    if (!organizationId) return {};
+    const bindings = await this.bindingsForOrganization({ organizationId });
+    if (bindings.length === 0) return {};
+    if (!this.#signingKey) {
+      logger.warn(
+        { organizationId, projectId },
+        "the organization bound private endpoints, but LANGWATCH_PRIVATE_ENDPOINTS_SIGNING_KEY is not set; sending none",
+      );
+      return {};
+    }
+    return signPrivateEndpointsHeaders({
+      organizationId,
+      projectId,
+      bindings,
+      signingKey: this.#signingKey,
+      ...(ttlSeconds === undefined ? {} : { ttlSeconds }),
+    });
+  }
+
   // ── organization managers ─────────────────────────────────────────────────
 
   async listForOrganization({
@@ -108,7 +150,7 @@ export class PrivateModelEndpointService {
     await this.#requireEndpoint({ organizationId: input.organizationId, id: input.endpointId });
     await this.#refuseTakenHostname({ organizationId: input.organizationId, hostname });
 
-    const saved = await this.#repository.saveBinding({
+    const saved = await this.#saveBinding({
       id: this.#ids.generate({ type: "private_endpoint_binding" }),
       organizationId: input.organizationId,
       endpointId: input.endpointId,
@@ -125,7 +167,7 @@ export class PrivateModelEndpointService {
     await this.#requireEndpoint({ organizationId, id: input.endpointId });
     await this.#refuseTakenHostname({ organizationId, hostname, exceptId: existing.id });
 
-    const saved = await this.#repository.saveBinding({
+    const saved = await this.#saveBinding({
       ...existing,
       endpointId: input.endpointId,
       hostname,
@@ -228,9 +270,28 @@ export class PrivateModelEndpointService {
   }): Promise<void> {
     const taken = await this.#repository.findBindingByHostname({ organizationId, hostname });
     if (!taken || taken.id === exceptId) return;
-    const reason = `${hostname} is already bound in this organization.`;
-    throw new PrivateModelEndpointInvalidError({ field: "hostname", reason });
+    throw hostnameTaken(hostname);
   }
+
+  /**
+   * Saves a binding. Two binds of one hostname can both pass `#refuseTakenHostname`; the unique
+   * index refuses the second, and that refusal reads the same as the check's.
+   */
+  async #saveBinding(
+    record: PrivateModelEndpointBindingRecord,
+  ): Promise<PrivateModelEndpointBindingRecord> {
+    try {
+      return await this.#repository.saveBinding(record);
+    } catch (error) {
+      if (this.#repository.isHostnameTaken(error)) throw hostnameTaken(record.hostname);
+      throw error;
+    }
+  }
+}
+
+function hostnameTaken(hostname: string): PrivateModelEndpointInvalidError {
+  const reason = `${hostname} is already bound in this organization.`;
+  return new PrivateModelEndpointInvalidError({ field: "hostname", reason });
 }
 
 /** The staff-owned fields, each validated; a refusal names its field. */

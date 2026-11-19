@@ -47,6 +47,7 @@ import type { BuiltInModel } from "./model-selection.ts";
 import type {
   OrganizationPrivateModelEndpoint,
   PrivateEndpointBindingWire,
+  PrivateEndpointsHeaders,
   PrivateModelEndpointBinding,
   PrivateModelEndpointBindInput,
   PrivateModelEndpointRebindInput,
@@ -403,6 +404,15 @@ export interface ModelProviderApi {
   privateEndpointBindingsForProject(input: {
     projectId: string;
   }): Promise<PrivateEndpointBindingWire[]>;
+  /**
+   * The headers that carry a project's bindings to nlpgo (ADR-203): the organization's bindings,
+   * signed for this project, and the project id. Spread them into the request's headers. Empty
+   * when nothing is bound or no signing key is set. Valid for `ttlSeconds` (default 15 minutes).
+   */
+  privateEndpointsHeadersForProject(input: {
+    projectId: string;
+    ttlSeconds?: number | undefined;
+  }): Promise<PrivateEndpointsHeaders>;
   /** The organization's endpoints and bound hostnames, never their addresses. */
   listPrivateEndpointsForOrganization(input: {
     organizationId: string;

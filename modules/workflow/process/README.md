@@ -888,5 +888,6 @@ Declared at `src/eventing/workflow-nlp-lambda-cleanup.pipeline.ts:31`.
 | config | `relayTurnCeilingMs`         | `NLP_FETCH_MAX_TIMEOUT_MS`                | `../contract/src/workflow.config.ts:128` |
 | config | `publicBaseUrl`              | `BASE_HOST`                               | `../contract/src/workflow.config.ts:130` |
 | config | `nlpCodeBlockTimeoutSeconds` | `NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS` | `../contract/src/workflow.config.ts:132` |
+| config | `privateEndpointsVerifyKey`  | `LANGWATCH_PRIVATE_ENDPOINTS_VERIFY_KEY`  | `../contract/src/workflow.config.ts:137` |
 
 <!-- readme:generated:end -->

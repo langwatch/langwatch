@@ -118,7 +118,7 @@ export const { nlpFetchMaxTimeoutMs } = Config.define((c) => ({
   ),
 }));
 
-export const workflowConfig = Config.define(() => ({
+export const workflowConfig = Config.define((c) => ({
   /** The shared NLP engine's address; the process owner holds the same leaf. */
   nlpServiceUrl,
   /** Above this many bytes a payload is staged rather than sent inline. */
@@ -130,6 +130,17 @@ export const workflowConfig = Config.define(() => ({
   publicBaseUrl,
   /** The engine's code-block ceiling, raw; the process owner holds the same leaf. */
   nlpCodeBlockTimeoutSeconds,
+  /**
+   * The Ed25519 public key a project's studio Lambda checks private endpoint bindings against
+   * (ADR-203), base64. Public by design: tenant code on the Lambda may read it and gains nothing.
+   */
+  privateEndpointsVerifyKey: c.env(
+    "LANGWATCH_PRIVATE_ENDPOINTS_VERIFY_KEY",
+    z
+      .string()
+      .optional()
+      .transform((value) => value?.trim() || void 0),
+  ),
 }));
 
 export type WorkflowServerConfig = ConfigOf<typeof workflowConfig>;

@@ -827,6 +827,26 @@ app.kubernetes.io/instance: {{ .Release.Name }}
       name: {{ include "langwatch.appSecretName" . }}
       key: {{ include "langwatch.nlpInternalSecretKey" . }}
       optional: true
+{{/* Private model endpoints (ADR-203). The app signs an organization's
+     bindings with the private key; the NLP service, and every per-project NLP
+     Lambda the app creates, checks them with the public key, which the app
+     therefore also reads. Both are optional keys of the app Secret and are not
+     generated: an install without them sends and honours no bindings, which is
+     today's behaviour. Generate a pair with
+     `openssl genpkey -algorithm ed25519 -outform DER | tail -c 32 | base64` (private)
+     and the matching public key; see .env.example. */}}
+- name: LANGWATCH_PRIVATE_ENDPOINTS_SIGNING_KEY
+  valueFrom:
+    secretKeyRef:
+      name: {{ include "langwatch.appSecretName" . }}
+      key: LANGWATCH_PRIVATE_ENDPOINTS_SIGNING_KEY
+      optional: true
+- name: LANGWATCH_PRIVATE_ENDPOINTS_VERIFY_KEY
+  valueFrom:
+    secretKeyRef:
+      name: {{ include "langwatch.appSecretName" . }}
+      key: LANGWATCH_PRIVATE_ENDPOINTS_VERIFY_KEY
+      optional: true
 - name: LANGEVALS_ENDPOINT
   value: {{ .Values.app.upstreams.langevals.scheme | default "http" }}://{{ .Values.app.upstreams.langevals.name | default (printf "%s-langevals" .Release.Name) }}:{{ .Values.app.upstreams.langevals.port | default 5562 }}
 

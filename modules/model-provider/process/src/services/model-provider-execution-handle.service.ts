@@ -6,7 +6,7 @@ import {
   ModelProviderDisabledError,
   type ModelProviderApi,
   ModelProviderUnavailableError,
-  type PrivateEndpointBindingWire,
+  type PrivateEndpointsHeaders,
 } from "@langwatch/model-provider-contract";
 import type { LanguageModel } from "ai";
 
@@ -40,8 +40,8 @@ type ModelProviderExecutionHandleInput = {
   projectId: string;
   model?: string;
   featureKey?: string;
-  /** The project's organization's bound hostnames, when the caller already read them. */
-  privateEndpointBindings?: readonly PrivateEndpointBindingWire[];
+  /** The project's signed private endpoint headers, when the caller already made them. */
+  privateEndpointsHeaders?: PrivateEndpointsHeaders;
 };
 
 /**
@@ -75,7 +75,7 @@ export type ModelProviderExecutionHandleOptions = {
   /** Writes each answered call's usage to the spend ledger; absent writes nothing (ADR-193). */
   metering?: Pick<ModelProviderUsageMeteringService, "metered">;
   /** Where the organization's bound hostnames are read, sent to nlpgo with the call (ADR-203). */
-  privateEndpoints?: Pick<PrivateModelEndpointService, "bindingsForOrganization">;
+  privateEndpoints?: Pick<PrivateModelEndpointService, "headersForProject">;
 };
 
 async function resolveModel({
@@ -241,11 +241,9 @@ export class ModelProviderExecutionHandleService {
       parameters: litellmParams,
       executionProxyBaseUrl: input.executionProxyBaseUrl,
       internalSecret: input.nlpInternalSecret,
-      privateEndpoints:
-        input.privateEndpointBindings ??
-        (await input.privateEndpoints?.bindingsForOrganization({
-          organizationId: project.team.organizationId,
-        })),
+      privateEndpointsHeaders:
+        input.privateEndpointsHeaders ??
+        (await input.privateEndpoints?.headersForProject({ projectId })),
     });
     return input.metering
       ? input.metering.metered(handle, {

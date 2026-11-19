@@ -75,7 +75,7 @@ func executeSyncHandler(application *app.App) http.HandlerFunc {
 			writeHandlerError(r.Context(), w, *herrErr)
 			return
 		}
-		privateEndpoints, herrErr := decodeWorkflowPrivateEndpoints(r, body)
+		privateEndpoints, herrErr := privateEndpointsFromHeader(r, req.ProjectID)
 		if herrErr != nil {
 			writeHandlerError(r.Context(), w, *herrErr)
 			return
@@ -441,7 +441,7 @@ func decodeStudioStreamRequest(w http.ResponseWriter, r *http.Request) (*app.Wor
 		writeHandlerError(r.Context(), w, *herrErr)
 		return nil, nil
 	}
-	privateEndpoints, herrErr := decodeWorkflowPrivateEndpoints(r, body)
+	privateEndpoints, herrErr := privateEndpointsFromHeader(r, req.ProjectID)
 	if herrErr != nil {
 		writeHandlerError(r.Context(), w, *herrErr)
 		return nil, nil

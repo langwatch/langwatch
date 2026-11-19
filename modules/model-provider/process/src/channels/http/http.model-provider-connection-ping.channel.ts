@@ -35,7 +35,7 @@ export class HttpModelProviderConnectionPingChannel extends ModelProviderConnect
     providerKey,
     model,
     parameters,
-    privateEndpoints,
+    privateEndpointsHeaders,
   }: ModelProviderPingRequest): Promise<ModelProviderPingReply> {
     try {
       await generateText({
@@ -45,7 +45,7 @@ export class HttpModelProviderConnectionPingChannel extends ModelProviderConnect
           parameters,
           executionProxyBaseUrl: this.executionProxyBaseUrl,
           internalSecret: this.internalSecret,
-          privateEndpoints,
+          privateEndpointsHeaders,
         }),
         prompt: PING_PROMPT,
         maxOutputTokens: 1,

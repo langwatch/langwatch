@@ -414,7 +414,7 @@ export class ModelProviderService {
         ...parsed,
         model: resolved.model,
         modelProviders: this,
-        privateEndpoints: await this.options.privateEndpoints.bindingsForProject({
+        privateEndpointsHeaders: await this.options.privateEndpoints.headersForProject({
           projectId: parsed.projectId,
         }),
       }),
@@ -445,6 +445,7 @@ function createCommands({
       codexChannel: options.codexGatewayPing,
       secrets: options.secrets,
       execution,
+      privateEndpoints: options.privateEndpoints,
     }),
     writeAuthorization,
     onboardingDefaults: ModelProviderOnboardingDefaultsService.create({

@@ -7,13 +7,13 @@ import type { WorkflowNlpDispatchInput } from "../../app/workflow.app.ts";
 import type { WorkflowStudioStreamInput } from "../../channels/nlp-lambda.channel.ts";
 import { WorkflowEnginePrivateEndpointsService } from "../workflow-engine-private-endpoints.service.ts";
 
-const INFERENCE = {
-  hostname: "llm.internal.acme.test",
-  addresses: ["10.20.1.21", "10.20.2.34"],
-  port: 443,
+/** What the model-provider module signs for acme-prod; the signing itself is tested there. */
+const ACME_HEADERS = {
+  "X-LangWatch-Private-Endpoints": "signed-for-acme-prod",
+  "X-LangWatch-Project-Id": "acme-prod",
 };
 
-const BINDINGS: Record<string, (typeof INFERENCE)[]> = { "acme-prod": [INFERENCE] };
+const HEADERS: Record<string, Record<string, string>> = { "acme-prod": ACME_HEADERS };
 
 /** A graph with an LLM block and an HTTP block, both aimed at the bound hostname. */
 const runEvent = {
@@ -41,9 +41,9 @@ function setup() {
   const dispatched: WorkflowNlpDispatchInput[] = [];
   const service = WorkflowEnginePrivateEndpointsService.create({
     modelProviders: createApiFixture<ModelProviderApi>({
-      privateEndpointBindingsForProject: async ({ projectId }) => {
+      privateEndpointsHeadersForProject: async ({ projectId }) => {
         asked.push(projectId);
-        return BINDINGS[projectId] ?? [];
+        return HEADERS[projectId] ?? {};
       },
     }),
   });
@@ -68,70 +68,109 @@ function setup() {
   return { stream, runtime, asked, opened, dispatched };
 }
 
+const FORGED = [{ hostname: "evil.test", addresses: ["10.0.0.1"], port: 443 }];
+const FORGED_HEADERS = {
+  "X-LangWatch-Private-Endpoints": "evil.test",
+  "X-LangWatch-Project-Id": "x",
+};
+
 describe("WorkflowEnginePrivateEndpointsService", () => {
   describe("given a project whose organization bound a hostname", () => {
     describe("when a run is opened on the streaming route", () => {
       /** @scenario "<path> reaches the private endpoint through a bound hostname" */
-      it("carries the bindings in the payload's private_endpoints and leaves the graph as sent", async () => {
+      it("hands the signed headers to the transport and leaves the event as sent", async () => {
         const { stream, opened } = setup();
 
         await stream.open({ projectId: "acme-prod", body: runEvent as never, origin: "workflow" });
 
-        expect(opened[0]?.body).toEqual({
-          ...runEvent,
-          payload: { ...runEvent.payload, private_endpoints: [INFERENCE] },
-        });
+        expect(opened[0]?.privateEndpointsHeaders).toEqual(ACME_HEADERS);
+        expect(opened[0]?.body).toEqual(runEvent);
       });
     });
 
     describe("when a run is dispatched on the synchronous route", () => {
-      it("carries the bindings there too", async () => {
+      it("hands the signed headers to the transport there too", async () => {
         const { runtime, dispatched } = setup();
 
         await runtime.dispatch({ projectId: "acme-prod", body: runEvent, origin: "scenario" });
 
-        expect(dispatched[0]?.body).toMatchObject({ payload: { private_endpoints: [INFERENCE] } });
+        expect(dispatched[0]?.privateEndpointsHeaders).toEqual(ACME_HEADERS);
+        expect(dispatched[0]?.body).toEqual(runEvent);
       });
     });
 
     describe("when the graph holds an HTTP block", () => {
       /** @scenario "<path> ignores bindings" */
-      it("puts the bindings only at the payload's top level, never on the HTTP block", async () => {
+      it("never writes the bindings into the graph", async () => {
         const { runtime, dispatched } = setup();
 
         await runtime.dispatch({ projectId: "acme-prod", body: runEvent, origin: "workflow" });
 
-        const sent = dispatched[0]?.body as typeof runEvent;
-        expect(sent.payload.workflow).toEqual(runEvent.payload.workflow);
-        expect(JSON.stringify(sent.payload.workflow)).not.toContain("10.20.");
+        expect(JSON.stringify(dispatched[0]?.body)).not.toContain("10.20.");
       });
     });
   });
 
-  describe("given a sender that names its own private_endpoints", () => {
-    it("drops them and sends only the organization's", async () => {
-      const { runtime, dispatched } = setup();
-      const forged = {
+  describe("given a sender that names its own bindings", () => {
+    const cases: Record<string, WorkflowNlpDispatchInput["body"]> = {
+      "a flat body with a top-level field": {
+        ...runEvent.payload,
+        private_endpoints: FORGED,
+      },
+      "a payload with the field and no workflow": {
+        type: "execute_component",
+        payload: { private_endpoints: FORGED },
+      },
+      "a nested envelope": {
         type: "execute_flow",
-        private_endpoints: [{ hostname: "evil.test", addresses: ["10.0.0.1"], port: 443 }],
+        private_endpoints: FORGED,
         payload: {
           ...runEvent.payload,
-          private_endpoints: [{ hostname: "evil.test", addresses: ["10.0.0.1"], port: 443 }],
+          private_endpoints: FORGED,
+          payload: { private_endpoints: FORGED, inputs: [{ private_endpoints: FORGED }] },
         },
-      };
+      },
+    };
 
-      await runtime.dispatch({ projectId: "rival-prod", body: forged, origin: "workflow" });
+    for (const [name, body] of Object.entries(cases)) {
+      it(`drops the field from ${name} at every depth`, async () => {
+        const { runtime, dispatched } = setup();
 
-      expect(JSON.stringify(dispatched[0]?.body)).not.toContain("evil.test");
+        await runtime.dispatch({ projectId: "acme-prod", body, origin: "workflow" });
+
+        expect(JSON.stringify(dispatched[0]?.body)).not.toContain("private_endpoints");
+        expect(JSON.stringify(dispatched[0])).not.toContain("evil.test");
+      });
+    }
+
+    it("replaces headers the caller put on the input with the organization's", async () => {
+      const { runtime, stream, dispatched, opened } = setup();
+
+      await runtime.dispatch({
+        projectId: "acme-prod",
+        body: runEvent,
+        origin: "workflow",
+        privateEndpointsHeaders: FORGED_HEADERS,
+      });
+      await stream.open({
+        projectId: "rival-prod",
+        body: runEvent as never,
+        origin: "workflow",
+        privateEndpointsHeaders: FORGED_HEADERS,
+      });
+
+      expect(dispatched[0]?.privateEndpointsHeaders).toEqual(ACME_HEADERS);
+      expect(opened[0]?.privateEndpointsHeaders).toEqual({});
     });
   });
 
   describe("given an organization with no binding", () => {
-    it("sends no private_endpoints field", async () => {
+    it("hands the transport no headers", async () => {
       const { runtime, dispatched } = setup();
 
       await runtime.dispatch({ projectId: "rival-prod", body: runEvent, origin: "workflow" });
 
+      expect(dispatched[0]?.privateEndpointsHeaders).toEqual({});
       expect(dispatched[0]?.body).toEqual(runEvent);
     });
   });
@@ -144,6 +183,7 @@ describe("WorkflowEnginePrivateEndpointsService", () => {
       await runtime.dispatch({ projectId: "acme-prod", body: probe, origin: "workflow" });
 
       expect(dispatched[0]?.body).toBe(probe);
+      expect(dispatched[0]?.privateEndpointsHeaders).toEqual({});
       expect(asked).toEqual([]);
     });
   });

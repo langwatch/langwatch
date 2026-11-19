@@ -99,7 +99,7 @@ func buildPlaygroundProxyRequest(r *http.Request, catalog litellm.OutputTokensLo
 
 	// The organization's private endpoint bindings (ADR-203) describe the
 	// caller, so they ride on the credential the dispatcher receives.
-	privateEndpoints, refused := privateEndpointsFromHeader(r)
+	privateEndpoints, refused := privateEndpointsFromHeader(r, "")
 	if refused != nil {
 		return playgroundProxyRequest{}, false, refused
 	}
@@ -609,9 +609,10 @@ func (a *shimAdapter) DispatchStream(ctx context.Context, req playgroundProxyReq
 //     reaches here, and this list is a denylist over everything else, so
 //     leaving it out would hand our own internal secret to whichever
 //     provider or customer-configured endpoint the call fans out to.
-//   - X-LangWatch-Private-Endpoints — the organization's private endpoint
-//     bindings, already parsed onto the credential. They name addresses
-//     inside our network and must never reach a provider.
+//   - X-LangWatch-Private-Endpoints and X-LangWatch-Project-Id — the
+//     organization's signed private endpoint bindings and the project they
+//     are checked against, already parsed onto the credential. They name
+//     addresses inside our network and must never reach a provider.
 //   - Hop-by-hop headers per RFC 7230 §6.1.
 //   - Host (the upstream provider sets its own).
 //   - Content-Length (the dispatcher recomputes this for the outbound
@@ -646,7 +647,8 @@ func filterPassthroughHeaders(in http.Header) map[string]string {
 		}
 		// The bindings name staff-owned addresses and are consumed above;
 		// they never go to a provider.
-		if strings.EqualFold(lk, domain.PrivateEndpointsHeader) {
+		if strings.EqualFold(lk, domain.PrivateEndpointsHeader) ||
+			strings.EqualFold(lk, domain.PrivateEndpointsProjectHeader) {
 			continue
 		}
 		switch lk {

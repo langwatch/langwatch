@@ -234,6 +234,7 @@ function forwarded(app: ModelProviderModule): ModelProviderApi {
     privateEndpointBindingsForOrganization: (...args) =>
       app.privateEndpointBindingsForOrganization(...args),
     privateEndpointBindingsForProject: (...args) => app.privateEndpointBindingsForProject(...args),
+    privateEndpointsHeadersForProject: (...args) => app.privateEndpointsHeadersForProject(...args),
     listPrivateEndpointsForOrganization: (...args) =>
       app.listPrivateEndpointsForOrganization(...args),
     bindPrivateEndpointHostname: (...args) => app.bindPrivateEndpointHostname(...args),

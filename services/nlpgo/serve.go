@@ -2,6 +2,7 @@ package nlpgo
 
 import (
 	"context"
+	"crypto/ed25519"
 	"net/http"
 	"time"
 
@@ -9,6 +10,7 @@ import (
 
 	"github.com/langwatch/langwatch/pkg/contexts"
 	"github.com/langwatch/langwatch/pkg/lifecycle"
+	gatewaydomain "github.com/langwatch/langwatch/services/aigateway/domain"
 	"github.com/langwatch/langwatch/services/nlpgo/adapters/httpapi"
 	"github.com/langwatch/langwatch/services/nlpgo/adapters/litellm"
 	"github.com/langwatch/langwatch/services/nlpgo/app"
@@ -115,11 +117,13 @@ func newRouterDeps(in routerDepsInput) httpapi.RouterDeps {
 		Version:             in.Version,
 		MaxRequestBodyBytes: in.Cfg.Server.MaxRequestBodyBytes,
 		InternalSecret:      in.Cfg.InternalSecret,
-		PlaygroundProxy:     in.Playground.Proxy,
-		ModelCatalog:        in.Playground.ModelCatalog,
-		OTel:                in.Deps.OTel,
-		StreamHeartbeat:     resolveStreamHeartbeat(in.Cfg.Engine.StreamHeartbeatSeconds),
-		StreamIdleTimeout:   resolveStreamIdleTimeout(in.Cfg.Engine.StreamIdleTimeoutSeconds),
+		// LoadConfig already refused a malformed key.
+		PrivateEndpointsVerifyKey: mustPrivateEndpointsVerifyKey(in.Cfg.PrivateEndpointsVerifyKey),
+		PlaygroundProxy:           in.Playground.Proxy,
+		ModelCatalog:              in.Playground.ModelCatalog,
+		OTel:                      in.Deps.OTel,
+		StreamHeartbeat:           resolveStreamHeartbeat(in.Cfg.Engine.StreamHeartbeatSeconds),
+		StreamIdleTimeout:         resolveStreamIdleTimeout(in.Cfg.Engine.StreamIdleTimeoutSeconds),
 	}
 }
 
@@ -166,4 +170,14 @@ func buildServices(deps *Deps, srv *http.Server) []lifecycle.Service {
 		lifecycle.Closer("profiling", deps.Profiler.Shutdown),
 		lifecycle.ListenServer("http", srv),
 	}
+}
+
+// mustPrivateEndpointsVerifyKey decodes a verify key LoadConfig has already
+// validated; a value that still does not decode leaves bindings ignored.
+func mustPrivateEndpointsVerifyKey(raw string) ed25519.PublicKey {
+	key, err := gatewaydomain.ParsePrivateEndpointsVerifyKey(raw)
+	if err != nil {
+		return nil
+	}
+	return key
 }
