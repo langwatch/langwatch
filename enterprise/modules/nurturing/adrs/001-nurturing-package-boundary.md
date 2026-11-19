@@ -161,6 +161,11 @@ the `customer-io-plan-resync` task, is never claimed. Every `subscription_change
 wins, and a real fact wins a tie. Customer.io hears a fact only when it changes that row, and the row is
 written once the calls are sent, so a refused catch-up's retry sends again unless a fact that
 beats it landed first.
+**Corrected (2026-11-19):** the plan copy's row is written by the fold first, and
+the plan send runs after it, from the fold's subscriber; a refused send retries
+its own job and sends again unless a newer fact won the fold. Nurturing also owns
+`NurturingProjectEvaluationDay` (evaluation days per project and UTC day). The
+personal-project copy and the admin write also write and re-check the erasure mark.
 
 ## Runtime and registration
 

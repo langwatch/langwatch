@@ -5351,8 +5351,9 @@ model NurturingOrganization {
 /// organization for the per-email traits. Traces are counted in NurturingProjectTraceDay.
 model NurturingProjectUsageView {
   projectId         String
-  /// The owner pipeline whose peer fold wrote the row (prompt, evaluator, scenario, simulation),
-  /// or `evaluation`: the project's evaluation days, written by a subscriber, at most once a day.
+  /// The owner pipeline whose peer fold wrote the row (prompt, evaluator, scenario, simulation).
+  /// Evaluation days are not kept here: the evaluation-days map and its replay write them to
+  /// NurturingProjectEvaluationDay.
   owner             String
   /// The project's usage as the fold folded it (NurturingProjectUsageState).
   folded            Json
