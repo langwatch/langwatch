@@ -11,6 +11,7 @@ import {
   evaluationLifecycleCompletedEventDataSchema,
 } from "@langwatch/evaluation-contract";
 import {
+  buildIntentAccessor,
   createTenantId,
   defineAggregate,
   definePipeline,
@@ -182,6 +183,12 @@ export function installDigest(
     if (!spec) throw new Error(`${processName} registered no ${intent} intent`);
     return spec;
   };
+  /** The registered plan's own intents, so the wake emits through the runtime's accessor. */
+  const planIntents = () => {
+    const intents = sendDefinition.processManagers.get(DIGEST_PLAN_PROCESS_NAME)?.config.intents;
+    if (!intents) throw new Error(`${DIGEST_PLAN_PROCESS_NAME} is not registered`);
+    return intents;
+  };
   const context = (processName: string): IntentContext => ({
     processName,
     projectId: ORGANIZATION,
@@ -215,11 +222,7 @@ export function installDigest(
         now: at,
         key: DIGEST_PLAN_PROCESS_NAME,
         projectId: ORGANIZATION,
-        intent: ((intentType: string, messageKey: string, payload: unknown) => ({
-          intentType,
-          messageKey,
-          payload,
-        })) as never,
+        intent: buildIntentAccessor(planIntents()),
       });
       const spec = intentOf({ processName: DIGEST_PLAN_PROCESS_NAME, intent: "planWeek" });
       for (const intent of intents) {

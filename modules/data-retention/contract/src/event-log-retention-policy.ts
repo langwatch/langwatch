@@ -58,6 +58,8 @@ export const RETENTION_CLASS_BY_AGGREGATE_TYPE: Record<string, EventLogRetention
   pulled_usage: "traces",
   webhook_spend_delivery: "traces",
   ingestion_pull: "traces",
+  // Digest's weekly facts from spans, evaluations, scenario runs and coding-agent sessions.
+  digest_week: "traces",
   experiment_run: "experiments",
   // Edit and save nudges for a dataset's history; the versions themselves live in Postgres.
   dataset_history: "experiments",
@@ -77,6 +79,7 @@ export const RETENTION_CLASS_BY_AGGREGATE_TYPE: Record<string, EventLogRetention
   dataset: "indefinite",
   data_retention_extension: "indefinite",
   data_retention_storage: "indefinite",
+  digest_send: "indefinite",
   entitlement_organization: "indefinite",
   evaluator: "indefinite",
   experiment_lifecycle: "indefinite",

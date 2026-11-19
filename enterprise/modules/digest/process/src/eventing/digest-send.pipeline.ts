@@ -9,7 +9,6 @@ import {
   definePipeline,
   type EventingSetup,
 } from "@langwatch/eventing";
-import { createLogger } from "@langwatch/observability";
 import { nowEpochMs } from "@langwatch/time";
 
 import type { DigestModule } from "../app/digest.app.ts";
@@ -20,6 +19,7 @@ import {
   DIGEST_SEND_PIPELINE_NAME,
   DigestSendRequestedEventSchema,
 } from "./digest-send.events.ts";
+import { runDigestPlan } from "./digest-send.intent.ts";
 import {
   DIGEST_MEMBER_SEND_INITIAL_STATE,
   DIGEST_MEMBER_SEND_PROCESS_NAME,
@@ -36,10 +36,6 @@ import {
   sendDigestIntentSchema,
 } from "./digest-send.process.ts";
 
-const digestLogger = createLogger("langwatch:digest");
-
-/** Outbox rows are bookkeeping, one plan per wake, pruned after a week. */
-const PLAN_ROW_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
 /** A plan asks one send per member: a few calls each, well inside the lease. */
 const PLAN_LEASE_MS = 10 * 60 * 1000;
 /** One member's send reads the week's folds and mails the picked template once. */
@@ -68,18 +64,15 @@ function digestSend(deps: {
         .state(digestPlanStateSchema, DIGEST_PLAN_INITIAL_STATE)
         .schedule({ everyMs: DIGEST_PLAN_INTERVAL_MS })
         .onWake(digestPlanWake)
-        .intent("planWeek", planWeekIntentSchema, async (plan) => {
-          await deps.runner.planWeek(plan);
-          await deps
-            .deleteDispatchedBefore({
-              processName: DIGEST_PLAN_PROCESS_NAME,
-              before: nowEpochMs() - PLAN_ROW_RETENTION_MS,
-            })
-            .catch((error: unknown) => {
-              digestLogger.warn({ error }, "the digest plan's outbox rows could not be pruned");
-              return 0;
-            });
-        })
+        .intent(
+          "planWeek",
+          planWeekIntentSchema,
+          runDigestPlan({
+            planWeek: (plan) => deps.runner.planWeek(plan),
+            deleteDispatchedBefore: deps.deleteDispatchedBefore,
+            now: nowEpochMs,
+          }),
+        )
         .outbox({ leaseDurationMs: PLAN_LEASE_MS, concurrency: 1, batchSize: 1, maxAttempts: 3 }),
     )
     .withProcessManager(DIGEST_MEMBER_SEND_PROCESS_NAME, (pm) =>

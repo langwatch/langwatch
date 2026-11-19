@@ -25,6 +25,9 @@ export const DigestSendRequestedEventSchema = z.object({
   data: digestSendRequestedEventDataSchema,
 });
 
-/** One aggregate per person and week, whichever enrolled organization asked first. */
+/**
+ * A person's week, under the asking organization's tenant: a member of two enrolled
+ * organizations has two, and the `DigestSend` claim keeps their email to one.
+ */
 export const digestSendKey = ({ userId, isoWeek }: { userId: string; isoWeek: string }) =>
   `${userId}:${isoWeek}`;

@@ -2,7 +2,8 @@
 /**
  * The weekly send's two processes. An hourly wake from Monday 08:00 UTC hands the outbox one
  * plan of last week; the plan asks one send per enrolled member, and each ask becomes one
- * `sendDigest` intent keyed by the person and week, so a second ask or wake sends nothing more.
+ * `sendDigest` intent keyed by the person and week within the asking organization, so a second
+ * ask or wake queues nothing more. Across organizations the send's claim keeps it to one email.
  * Spec: enterprise/modules/digest/specs/digest.feature
  */
 import type { EventHandler, IntentSpec, WakeHandler } from "@langwatch/eventing";
@@ -59,7 +60,7 @@ export const digestPlanWake: WakeHandler<DigestPlanState, PlanIntents> = (_state
   };
 };
 
-/** One person's week: the first ask becomes the one `sendDigest`; the key keeps it the one. */
+/** One person's week: the first ask becomes the `sendDigest`; its key dedupes a redelivery. */
 export const digestSendRequested: EventHandler<
   DigestMemberSendState,
   DigestSendRequest,
