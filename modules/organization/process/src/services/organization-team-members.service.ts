@@ -226,6 +226,9 @@ export class OrganizationTeamMembersService {
       organizationId: parsed.organizationId,
       name: parsed.name,
     });
+    // The team exists now: a grants projection slower than the read-your-writes
+    // window must not fail the create and strand the team (#9714). The appends are
+    // durable, so the wait stays best-effort and the fold converges.
     const creator = parsed.members.filter(isCreatorAsAdmin);
     if (creator.length > 0) {
       await this.attachTeamMembers({
@@ -234,6 +237,7 @@ export class OrganizationTeamMembersService {
         members: creator,
         caller: { type: "system" },
         actor: parsed.actor,
+        requireProjection: false,
       });
     }
     if (others.length > 0) {
@@ -243,6 +247,7 @@ export class OrganizationTeamMembersService {
         members: others,
         caller: parsed.caller,
         actor: parsed.actor,
+        requireProjection: false,
       });
     }
 
@@ -392,6 +397,7 @@ export class OrganizationTeamMembersService {
     members: OrganizationTeamMemberInput[];
     caller: AuthzGrantCaller;
     actor: LedgerActor;
+    requireProjection?: boolean;
   }): Promise<unknown> {
     return this.deps.grants.attachBindings({
       organizationId: input.organizationId,
@@ -405,6 +411,9 @@ export class OrganizationTeamMembersService {
       caller: input.caller,
       actor: input.actor,
       onDuplicate: "skip",
+      ...(input.requireProjection === undefined
+        ? {}
+        : { requireProjection: input.requireProjection }),
     });
   }
 

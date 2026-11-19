@@ -1,4 +1,5 @@
 import {
+  AuthzGrantNotConfirmedError,
   permissionsConferred,
   type AuthzAccessBinding,
   type AuthzApi,
@@ -367,6 +368,32 @@ describe("OrganizationService team membership", () => {
       [{ type: "system" }, [{ userId: "lead" }]],
       [{ type: "user", id: "lead" }, [{ userId: "newcomer" }]],
     ]);
+  });
+
+  /** @scenario Creating a team still succeeds when its creator's grant lands late */
+  it("returns the new team when the creator's grant is sent but not yet readable (#9714)", async () => {
+    const { service, teams, calls } = buildService();
+    vi.spyOn(teams, "getBySlug").mockRejectedValue(new TeamNotFoundError("new"));
+    // As the store does when the fold lags: a required wait that runs out throws.
+    calls.attach.mockImplementation(async (input: { requireProjection?: boolean }) => {
+      if (input.requireProjection !== false) throw new AuthzGrantNotConfirmedError();
+      return { attached: ["new_binding"], duplicates: [] };
+    });
+
+    const created = await service.createTeamWithMembers({
+      organizationId: "org_1",
+      name: "New",
+      members: [{ userId: "lead", role: "ADMIN" }],
+      caller: { type: "user", id: "lead" },
+      actor: { type: "user", id: "lead" },
+    });
+
+    expect(created).toMatchObject({ organizationId: "org_1" });
+    expect(calls.attach).toHaveBeenCalledWith(
+      expect.objectContaining({
+        bindings: [expect.objectContaining({ principal: { userId: "lead" }, role: "ADMIN" })],
+      }),
+    );
   });
 
   /** @scenario Creating a staffed team is bounded by its creator, who still becomes its admin */

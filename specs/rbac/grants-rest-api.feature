@@ -336,6 +336,13 @@ Feature: Roles and grants REST API, and the role bindings API it supersedes
     And the other member is written only if I hold what their role confers
 
   @unit
+  Scenario: Creating a team still succeeds when its creator's grant lands late
+    Given the grants projection takes longer than the read-your-writes window
+    When I create a team naming myself as its admin
+    Then the team is created and returned to me
+    And my admin grant is still sent, to land when the projection catches up
+
+  @unit
   Scenario: Minting a SCIM token requires a full organization admin
     Given I hold "organization:manage" but not every permission of the organization admin role
     When I mint a SCIM token
