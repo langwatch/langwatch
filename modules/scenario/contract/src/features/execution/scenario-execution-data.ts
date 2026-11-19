@@ -1,4 +1,5 @@
 import { agentHooksSchema } from "@langwatch/agent-contract";
+import { privateEndpointBindingWireSchema } from "@langwatch/model-provider-contract";
 import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
@@ -547,6 +548,12 @@ const ChildProcessJobDataSchemaDefinition = z
     callerVoice: callerVoiceConfigSchema.optional(),
     /** Skip the agent's teardown hook so the run's test data stays; absent is false (ADR-180). */
     keepData: z.boolean().optional(),
+    /**
+     * The organization's hostnames bound to its private model endpoints (ADR-203), sent on the
+     * simulator's, judge's and prompt target's model calls. Absent when it bound none. Never sent
+     * on an HTTP agent target's requests: a binding authorizes model calls only.
+     */
+    privateEndpoints: z.array(privateEndpointBindingWireSchema).optional(),
   })
   .superRefine((data, ctx) => {
     if (data.script) return;

@@ -2,6 +2,7 @@ import {
   ModelProviderInvalidError,
   ModelProviderNotFoundError,
   type ModelProviderApi,
+  type PrivateEndpointBindingWire,
 } from "@langwatch/model-provider-contract";
 import { createLogger } from "@langwatch/observability";
 import {
@@ -24,6 +25,11 @@ export class ScenarioModelParametersService {
   }
 
   private constructor(private readonly modelProviders: ModelProviderApi) {}
+
+  /** The project's organization's bound hostnames, for the child's model calls (ADR-203). */
+  privateEndpointsFor(projectId: string): Promise<PrivateEndpointBindingWire[]> {
+    return this.modelProviders.privateEndpointBindingsForProject({ projectId });
+  }
 
   async prepare(input: { projectId: string; model: string }): Promise<ModelParamsResult> {
     const { projectId, model } = input;

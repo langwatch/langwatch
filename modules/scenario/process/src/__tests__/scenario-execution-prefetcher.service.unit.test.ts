@@ -2811,3 +2811,47 @@ describe("prefetchWithFixture, when choosing where the child posts a turn", () =
     });
   });
 });
+
+describe("prefetchWithFixture, given the organization bound a hostname to a private endpoint", () => {
+  const binding = {
+    hostname: "llm.internal.acme.test",
+    addresses: ["10.20.1.21", "10.20.2.34"],
+    port: 443,
+  };
+  const promptDeps = (privateEndpoints: (typeof binding)[]) =>
+    createMockDeps({
+      privateEndpoints,
+      promptFetcher: {
+        findByIdOrHandle: vi.fn().mockResolvedValue({
+          id: "prompt_123",
+          prompt: "You are helpful",
+          messages: [],
+          model: "openai/gpt-4",
+        }),
+      },
+    });
+
+  describe("when the run is prepared", () => {
+    it("hands the child the bindings for its model calls", async () => {
+      const result = await prefetchWithFixture({
+        context: defaultContext,
+        target: { type: "prompt", referenceId: "prompt_123" },
+        deps: promptDeps([binding]),
+      });
+
+      expect(result.success && result.data.privateEndpoints).toEqual([binding]);
+    });
+  });
+
+  describe("when the organization bound nothing", () => {
+    it("leaves the field out of the job", async () => {
+      const result = await prefetchWithFixture({
+        context: defaultContext,
+        target: { type: "prompt", referenceId: "prompt_123" },
+        deps: promptDeps([]),
+      });
+
+      expect(result.success && "privateEndpoints" in result.data).toBe(false);
+    });
+  });
+});

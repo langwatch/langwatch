@@ -6,6 +6,7 @@
 
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import type { LanguageModelV3 } from "@ai-sdk/provider";
+import { privateEndpointsHeaders } from "@langwatch/model-provider-contract";
 import { nlpInternalSecretHeaders } from "@langwatch/process/nlp-internal-secret";
 import { defaultSettingsMiddleware, wrapLanguageModel } from "ai";
 import { z } from "zod";
@@ -134,7 +135,7 @@ export class HttpLitellmModelChannel implements LitellmModelChannel {
   private constructor() {}
 
   model(input: LitellmModelInput): LanguageModelV3 {
-    const { litellmParams, nlpServiceUrl, nlpInternalSecret } = input;
+    const { litellmParams, nlpServiceUrl, nlpInternalSecret, privateEndpoints } = input;
     const providerKey = litellmParams.model.split("/")[0] || undefined;
     const headers = {
       ...Object.fromEntries(
@@ -144,6 +145,7 @@ export class HttpLitellmModelChannel implements LitellmModelChannel {
         ]),
       ),
       ...nlpInternalSecretHeaders({ secret: nlpInternalSecret }),
+      ...privateEndpointsHeaders(privateEndpoints ?? []),
     };
 
     const vercelProvider = createOpenAICompatible({

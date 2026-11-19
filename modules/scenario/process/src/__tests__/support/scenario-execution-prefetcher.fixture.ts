@@ -5,6 +5,7 @@ import {
   ModelProviderNotFoundError,
   type ModelProvider,
   type ModelProviderApi,
+  type PrivateEndpointBindingWire,
 } from "@langwatch/model-provider-contract";
 import { projectSchema, type ProjectApi } from "@langwatch/project-contract";
 import { versionedPromptSchema, type PromptApi } from "@langwatch/prompt-contract";
@@ -111,6 +112,8 @@ export interface ScenarioPrefetchFixture {
   projectSecretsFetcher: ProjectSecretsFetcher;
   traceWaitBudgetResolver: TraceWaitBudgetResolver;
   disabledProviders?: ReadonlySet<string>;
+  /** The organization's bound hostnames (ADR-203); none when absent. */
+  privateEndpoints?: PrivateEndpointBindingWire[];
   /**
    * A real model-provider service in place of the in-memory stand-in. A
    * case whose subject IS the model-provider boundary (the codex execution
@@ -358,6 +361,7 @@ function modelProviderService(deps: ScenarioPrefetchFixture): ModelProviderApi {
       source: "feature_override",
       scope: "project",
     }),
+    privateEndpointBindingsForProject: async () => deps.privateEndpoints ?? [],
     findProviderForProject: async (input) =>
       deps.disabledProviders?.has(input.provider) ? disabledProvider(input.provider) : null,
     prepareExecution: async (input) => {

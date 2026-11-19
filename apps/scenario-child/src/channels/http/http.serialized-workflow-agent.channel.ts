@@ -5,6 +5,10 @@
 
 import { randomBytes } from "crypto";
 
+import {
+  type PrivateEndpointBindingWire,
+  privateEndpointsField,
+} from "@langwatch/model-provider-contract";
 import { injectTraceContextHeaders } from "@langwatch/observability/tracing";
 import type { AgentInput } from "@langwatch/scenario";
 import { AgentRole } from "@langwatch/scenario";
@@ -41,6 +45,7 @@ export class HttpSerializedWorkflowAgentChannel extends SerializedAgentChannel {
     nlpInternalSecret?: string | undefined;
     /** How the turn reaches the project's engine; absent posts to `nlpServiceUrl` directly. */
     transport?: ExecuteSyncTransport;
+    privateEndpoints?: readonly PrivateEndpointBindingWire[] | undefined;
   }): HttpSerializedWorkflowAgentChannel {
     return new HttpSerializedWorkflowAgentChannel(options);
   }
@@ -65,6 +70,11 @@ export class HttpSerializedWorkflowAgentChannel extends SerializedAgentChannel {
   private readonly nlpInternalSecret: string | undefined;
   /** How the turn reaches the project's engine. */
   private readonly transport: ExecuteSyncTransport;
+  /**
+   * The organization's bound hostnames (ADR-203) for the workflow's LLM blocks. On the relay
+   * route the control plane replaces them with its own read; on the direct route they ride as sent.
+   */
+  private readonly privateEndpoints: readonly PrivateEndpointBindingWire[];
 
   constructor({
     config,
@@ -74,6 +84,7 @@ export class HttpSerializedWorkflowAgentChannel extends SerializedAgentChannel {
     timeouts,
     nlpInternalSecret,
     transport,
+    privateEndpoints,
   }: {
     config: WorkflowAgentData;
     nlpServiceUrl: string;
@@ -82,6 +93,7 @@ export class HttpSerializedWorkflowAgentChannel extends SerializedAgentChannel {
     timeouts?: NlpFetchTimeouts;
     nlpInternalSecret?: string | undefined;
     transport?: ExecuteSyncTransport;
+    privateEndpoints?: readonly PrivateEndpointBindingWire[] | undefined;
   }) {
     super();
     this.config = config;
@@ -91,6 +103,7 @@ export class HttpSerializedWorkflowAgentChannel extends SerializedAgentChannel {
     this.timeouts = timeouts ?? {};
     this.nlpInternalSecret = nlpInternalSecret;
     this.transport = transport ?? directExecuteSyncTransport({ nlpServiceUrl, nlpInternalSecret });
+    this.privateEndpoints = privateEndpoints ?? [];
     this.name = "SerializedWorkflowAgentAdapter";
   }
 
@@ -208,6 +221,7 @@ export class HttpSerializedWorkflowAgentChannel extends SerializedAgentChannel {
         manual_execution_mode: false,
         do_not_trace: true,
         run_evaluations: false,
+        ...privateEndpointsField(this.privateEndpoints),
       },
     };
 

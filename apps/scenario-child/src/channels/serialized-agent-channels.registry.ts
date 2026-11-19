@@ -3,6 +3,7 @@
  * class and stop signal in one row. A new runtime is a new row; `build` does not change.
  */
 
+import type { PrivateEndpointBindingWire } from "@langwatch/model-provider-contract";
 import { createLogger, type Logger } from "@langwatch/observability";
 import type { AgentAdapter } from "@langwatch/scenario";
 import {
@@ -71,6 +72,11 @@ export type AgentAdapterBuildInput = {
   logger?: Logger;
   /** The scenario run a connected agent's calls belong to; absent outside a scenario run. */
   run?: ConnectedCallRun;
+  /**
+   * The organization's bound hostnames (ADR-203), for a prompt or workflow target's model calls.
+   * An HTTP agent target never receives them: a binding authorizes model calls only.
+   */
+  privateEndpoints?: readonly PrivateEndpointBindingWire[] | undefined;
 };
 
 /**
@@ -133,6 +139,7 @@ export const SERIALIZED_AGENT_RUNTIMES = {
         nlpInternalSecret: input.nlpInternalSecret,
         parameters: input.parameters,
         logger: input.logger,
+        privateEndpoints: input.privateEndpoints,
       });
     },
   }),
@@ -181,6 +188,7 @@ export const SERIALIZED_AGENT_RUNTIMES = {
         nlpInternalSecret: input.nlpInternalSecret,
         projectApiKey: input.projectApiKey,
         parameters: input.parameters,
+        privateEndpoints: input.privateEndpoints,
         timeouts: nlpTimeouts,
         transport: executeSyncTransportOf({ input, projectApiKey: input.projectApiKey }),
       });
