@@ -12,6 +12,8 @@ export type TopicClusteringRequest = Readonly<{
   projectId: string;
   signal: AbortSignal;
   requestKey?: string;
+  /** Headers the model calls need langevals posted with (ADR-203); never part of the body. */
+  headers?: Readonly<Record<string, string>>;
 }> &
   (
     | Readonly<{ mode: "batch"; params: BatchClusteringParams }>

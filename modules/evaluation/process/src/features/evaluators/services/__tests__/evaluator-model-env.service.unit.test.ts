@@ -13,13 +13,22 @@ function definitionOf(evaluatorType: string): EvaluatorDefinition {
 
 type PrepareInput = Parameters<ModelProviderApi["prepareEvaluatorModelEnv"]>[0];
 
-function service(options: { calls?: PrepareInput[]; azure?: Record<string, string> } = {}) {
+function service(
+  options: {
+    calls?: PrepareInput[];
+    azure?: Record<string, string>;
+    headers?: (input: PrepareInput) => Record<string, string>;
+  } = {},
+) {
   return EvaluatorModelEnvService.create({
     modelProviders: createApiFixture<ModelProviderApi>({
       prepareEvaluatorModelEnv: async (input) => {
         options.calls?.push(input);
         return {
-          [input.embeddings ? "X_LITELLM_EMBEDDINGS_model" : "X_LITELLM_model"]: input.model,
+          env: {
+            [input.embeddings ? "X_LITELLM_EMBEDDINGS_model" : "X_LITELLM_model"]: input.model,
+          },
+          headers: options.headers?.(input) ?? {},
         };
       },
     }),
@@ -37,13 +46,14 @@ describe("EvaluatorModelEnvService", () => {
   describe("given a judge evaluator with a model and an embeddings model", () => {
     it("layers both model blocks over the evaluator's own variables", async () => {
       const calls: PrepareInput[] = [];
-      const env = await service({ calls }).resolveForEvaluator({
+      const { env, headers } = await service({ calls }).resolveForEvaluator({
         evaluatorType: "ragas/faithfulness",
         evaluator: definitionOf("ragas/faithfulness"),
         projectId: "project-1",
         settings: { model: "openai/gpt-5-mini", embeddings_model: "openai/text-embedding-3-small" },
       });
 
+      expect(headers).toEqual({});
       expect(env).toMatchObject({
         X_LITELLM_model: "openai/gpt-5-mini",
         X_LITELLM_EMBEDDINGS_model: "openai/text-embedding-3-small",
@@ -55,7 +65,7 @@ describe("EvaluatorModelEnvService", () => {
   describe("given the moderation evaluator names a model", () => {
     it("does not resolve a model block for it", async () => {
       const calls: PrepareInput[] = [];
-      const env = await service({ calls }).resolveForEvaluator({
+      const { env } = await service({ calls }).resolveForEvaluator({
         evaluatorType: "openai/moderation",
         evaluator: definitionOf("openai/moderation"),
         projectId: "project-1",
@@ -77,14 +87,30 @@ describe("EvaluatorModelEnvService", () => {
           evaluator: definitionOf("azure/prompt_injection"),
           projectId: "project-1",
         }),
-      ).resolves.toEqual(azure);
+      ).resolves.toEqual({ env: azure, headers: {} });
       await expect(
         service().resolveForEvaluator({
           evaluatorType: "azure/prompt_injection",
           evaluator: definitionOf("azure/prompt_injection"),
           projectId: "project-1",
         }),
-      ).resolves.toEqual({});
+      ).resolves.toEqual({ env: {}, headers: {} });
+    });
+  });
+
+  describe("given a model block that goes through nlpgo's proxy", () => {
+    it("carries the headers langevals must be posted with next to the env", async () => {
+      const { headers } = await service({
+        headers: (input): Record<string, string> =>
+          input.embeddings ? {} : { "X-LangWatch-Engine-Proxy": "http://nlp/go/proxy/v1" },
+      }).resolveForEvaluator({
+        evaluatorType: "ragas/faithfulness",
+        evaluator: definitionOf("ragas/faithfulness"),
+        projectId: "project-1",
+        settings: { model: "custom/judge", embeddings_model: "openai/text-embedding-3-small" },
+      });
+
+      expect(headers).toEqual({ "X-LangWatch-Engine-Proxy": "http://nlp/go/proxy/v1" });
     });
   });
 });

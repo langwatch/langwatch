@@ -15,7 +15,7 @@ import { DatasetApi } from "@langwatch/dataset-contract";
 import type { EventingCommands, StaticPipelineDefinition } from "@langwatch/eventing";
 import { NotFoundError, ValidationError } from "@langwatch/handled-error";
 import { generate } from "@langwatch/ksuid";
-import { ModelProviderApi } from "@langwatch/model-provider-contract";
+import { ModelProviderApi, type PrivateEndpointsHeaders } from "@langwatch/model-provider-contract";
 import { createLogger } from "@langwatch/observability";
 import type { FeatureSetup } from "@langwatch/process";
 import { SecretApi } from "@langwatch/secret-contract";
@@ -122,6 +122,7 @@ import { WorkflowCommitMessageService } from "../services/workflow-commit-messag
 import { WorkflowCopyLineageService } from "../services/workflow-copy-lineage.service.ts";
 import { ContractWorkflowDslMigrationService } from "../services/workflow-dsl-migration.service.ts";
 import { WorkflowEngineAttachmentLimitService } from "../services/workflow-engine-attachment-limit.service.ts";
+import { WorkflowEnginePrivateEndpointsService } from "../services/workflow-engine-private-endpoints.service.ts";
 import { WorkflowExecuteSyncRelayService } from "../services/workflow-execute-sync-relay.service.ts";
 import { WorkflowHttpSecretsService } from "../services/workflow-http-secrets.service.ts";
 import { WorkflowLinkedRowsService } from "../services/workflow-linked-rows.service.ts";
@@ -524,8 +525,13 @@ export class WorkflowModule implements WorkflowApi, WorkflowBrowserApi {
       dispatchKeyFloorMs: dispatchKeyFloorMs({ onLambda: engine.fleet !== undefined }),
     });
     const attachmentLimits = WorkflowEngineAttachmentLimitService.create({ datasets });
+    const privateEndpoints = WorkflowEnginePrivateEndpointsService.create({
+      modelProviders: setup.dependencies.modelProviders,
+    });
     const spend = WorkflowProviderSpendService.create({ spend: setup.channels.spend });
-    const nlpRuntime = spend.meteredRuntime(attachmentLimits.limitedRuntime(engine.runtime));
+    const nlpRuntime = spend.meteredRuntime(
+      privateEndpoints.boundRuntime(attachmentLimits.limitedRuntime(engine.runtime)),
+    );
     const ids = KsuidWorkflowId.create();
     const workflows = WorkflowService.create({
       repository: setup.repositories.workflows,
@@ -543,7 +549,7 @@ export class WorkflowModule implements WorkflowApi, WorkflowBrowserApi {
 
     const modelProviders = setup.dependencies.modelProviders;
     const studioDispatch = WorkflowStudioDispatchService.create({
-      stream: attachmentLimits.limitedStream(engine.stream),
+      stream: privateEndpoints.boundStream(attachmentLimits.limitedStream(engine.stream)),
       modelProviders,
       spend,
     });
@@ -1384,6 +1390,11 @@ export type WorkflowNlpDispatchInput = {
   timeoutMs?: number;
   /** The caller's cancellation, which stops the engine call. */
   signal?: AbortSignal;
+  /**
+   * The organization's signed private endpoint headers (ADR-203), merged into the engine call.
+   * Only the private endpoints wrapper sets them; it replaces whatever a caller put here.
+   */
+  privateEndpointsHeaders?: PrivateEndpointsHeaders;
 };
 
 export type WorkflowNlpDispatchResponse = {

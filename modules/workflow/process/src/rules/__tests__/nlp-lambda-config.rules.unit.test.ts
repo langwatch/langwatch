@@ -67,6 +67,36 @@ describe("given a deployment that fronts the studio engine with a Lambda fleet",
         NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS: "600",
       });
     });
+
+    /** @scenario "A project's studio Lambda checks bindings against the public key alone" */
+    it("gives the function the verify key when one is set, and nothing else new", () => {
+      const without = buildStudioLambdaConfig({
+        fields: FIELDS,
+        langwatchEndpoint: "https://app.langwatch.test",
+        codeBlockTimeoutRawValue: undefined,
+        stagingThresholdBytesRawValue: undefined,
+        stagingTtlSecondsRawValue: undefined,
+      });
+      const withKey = buildStudioLambdaConfig({
+        fields: FIELDS,
+        langwatchEndpoint: "https://app.langwatch.test",
+        codeBlockTimeoutRawValue: undefined,
+        stagingThresholdBytesRawValue: undefined,
+        stagingTtlSecondsRawValue: undefined,
+        privateEndpointsVerifyKey: " nlpgo-verify-key ",
+      });
+
+      expect(buildStudioLambdaEnvironment(withKey)).toEqual({
+        ...buildStudioLambdaEnvironment(without),
+        LANGWATCH_PRIVATE_ENDPOINTS_VERIFY_KEY: "nlpgo-verify-key",
+      });
+      expect(Object.keys(buildStudioLambdaEnvironment(withKey))).not.toContain(
+        "LANGWATCH_PRIVATE_ENDPOINTS_SIGNING_KEY",
+      );
+      expect(Object.keys(buildStudioLambdaEnvironment(withKey))).not.toContain(
+        "LANGWATCH_NLP_INTERNAL_SECRET",
+      );
+    });
   });
 
   describe("when an operator sets the code-block ceiling", () => {

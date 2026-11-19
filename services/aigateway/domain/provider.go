@@ -135,6 +135,15 @@ type Credential struct {
 	// be ruled out by a model it does not list, so it stays a candidate for
 	// a model no other provider claims.
 	Models []string
+
+	// PrivateEndpoints are the calling organization's private endpoint
+	// bindings (ADR-203). A base URL whose host is bound here is dialed at
+	// the binding's registered addresses and never resolved. They describe
+	// the caller, not the provider row: the gateway stamps them from the
+	// config bundle and nlpgo from the app's request. Nil keeps today's
+	// endpoint rules. A pointer, not a slice, so Credential stays small
+	// enough to range over by value.
+	PrivateEndpoints *PrivateEndpointSet
 }
 
 // ServesModel reports whether this credential declares the given model, by

@@ -55,7 +55,7 @@ function buildService({ earlier }: { earlier: TraceEvaluationData[] }) {
     runs: { findTraceEvaluations },
     authz: { authorizeInternal },
     spanDigest: { format: async () => "", formatThread: async () => "" },
-    modelEnvResolver: { resolveForEvaluator: async () => ({}) },
+    modelEnvResolver: { resolveForEvaluator: async () => ({ env: {}, headers: {} }) },
     langevalsClient: { evaluate: async () => ({ status: "processed", passed: true }) },
     evaluators: createApiFixture<EvaluatorApi>({ augmentResult: ({ result }) => result }),
     workflowExecutor: {

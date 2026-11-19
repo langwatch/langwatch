@@ -6,6 +6,7 @@ package httpapi
 
 import (
 	"context"
+	"crypto/ed25519"
 	"net/http"
 	"time"
 
@@ -59,6 +60,10 @@ type RouterDeps struct {
 	// the process. nil → no per-request flush (tests, dev runs without
 	// telemetry).
 	OTel *otelsetup.Provider
+	// PrivateEndpointsVerifyKey checks the signed private endpoint bindings
+	// the app sends (ADR-203), from LANGWATCH_PRIVATE_ENDPOINTS_VERIFY_KEY.
+	// nil ignores every binding, so calls keep today's endpoint rules.
+	PrivateEndpointsVerifyKey ed25519.PublicKey
 }
 
 // NewRouter assembles the chi router.
@@ -88,6 +93,7 @@ func NewRouter(deps RouterDeps) http.Handler {
 	// app actually drives lives under /go and is guarded.
 	r.Route("/go", func(g chi.Router) {
 		g.Use(RequireInternalSecret(deps.InternalSecret))
+		g.Use(withPrivateEndpointsVerifyKey(deps.PrivateEndpointsVerifyKey))
 		g.Get("/version", versionHandler(deps.Version))
 		g.Route("/studio", func(s chi.Router) {
 			if deps.OTel != nil {

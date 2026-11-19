@@ -134,7 +134,7 @@ export class HttpLitellmModelChannel implements LitellmModelChannel {
   private constructor() {}
 
   model(input: LitellmModelInput): LanguageModelV3 {
-    const { litellmParams, nlpServiceUrl, nlpInternalSecret } = input;
+    const { litellmParams, nlpServiceUrl, nlpInternalSecret, privateEndpointsHeaders } = input;
     const providerKey = litellmParams.model.split("/")[0] || undefined;
     const headers = {
       ...Object.fromEntries(
@@ -144,6 +144,7 @@ export class HttpLitellmModelChannel implements LitellmModelChannel {
         ]),
       ),
       ...nlpInternalSecretHeaders({ secret: nlpInternalSecret }),
+      ...privateEndpointsHeaders,
     };
 
     const vercelProvider = createOpenAICompatible({

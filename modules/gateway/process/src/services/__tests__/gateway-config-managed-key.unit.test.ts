@@ -129,6 +129,7 @@ async function bundleForLicenseServices(connectServices: string[]) {
       getCustomKeys: async () => {
         throw new Error("a managed key's bundle never reads a customer row");
       },
+      privateEndpointBindingsForOrganization: async () => [],
     }),
     assembly: GatewayConfigAssemblyService.create({ repository, platformProviders, projects }),
   });

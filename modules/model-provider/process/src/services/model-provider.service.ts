@@ -57,6 +57,7 @@ import { ModelProviderDefaultsWriteService } from "../features/defaults/services
 import { ModelProviderDefaultsService } from "../features/defaults/services/model-provider-defaults.service.ts";
 import { ModelProviderOnboardingDefaultsService } from "../features/defaults/services/model-provider-onboarding-defaults.service.ts";
 import { ModelProviderCostsService } from "../features/model-cost/services/model-provider-costs.service.ts";
+import type { PrivateModelEndpointService } from "../features/private-endpoint/services/private-model-endpoint.service.ts";
 import type { ModelCostRepository } from "../repositories/model-cost.repository.ts";
 import type { ModelDefaultRepository } from "../repositories/model-default.repository.ts";
 import type { ModelProviderRepository } from "../repositories/model-provider.repository.ts";
@@ -94,6 +95,8 @@ interface ModelProviderServiceOptions {
   ids: ModelProviderIdService;
   /** The own-decision-model flag (ADR-182 decision 4). */
   isOwnDecisionModelAllowed: OwnDecisionModelGate;
+  /** Private endpoints and hostname bindings (ADR-203). */
+  privateEndpoints: PrivateModelEndpointService;
 }
 
 /**
@@ -137,25 +140,10 @@ export class ModelProviderService {
       query: this.query,
       catalog: options.catalog,
     });
-    this.commands = ModelProviderCommandService.create({
-      repository: options.repository,
-      defaults: options.defaults,
-      credentialPolicy: options.credentialPolicy,
-      catalog: options.catalog,
-      connectionRateLimiter: options.connectionRateLimiter,
-      connectionPing: ModelProviderConnectionPingService.create({
-        channel: options.connectionPing,
-        codexChannel: options.codexGatewayPing,
-        secrets: options.secrets,
-        execution: this.execution,
-      }),
+    this.commands = createCommands({
+      options,
+      execution: this.execution,
       writeAuthorization,
-      onboardingDefaults: ModelProviderOnboardingDefaultsService.create({
-        defaults: options.defaults,
-        ids: options.ids,
-        scopes,
-      }),
-      ids: options.ids,
       scopes,
     });
     this.costs = ModelProviderCostsService.create({
@@ -426,7 +414,47 @@ export class ModelProviderService {
         ...parsed,
         model: resolved.model,
         modelProviders: this,
+        privateEndpointsHeaders: await this.options.privateEndpoints.headersForProject({
+          projectId: parsed.projectId,
+        }),
       }),
     };
   }
+}
+
+/** The write side, over the same scopes and write authorization the reads use. */
+function createCommands({
+  options,
+  execution,
+  writeAuthorization,
+  scopes,
+}: {
+  options: ModelProviderServiceOptions;
+  execution: ModelProviderExecutionService;
+  writeAuthorization: ModelProviderWriteAuthorizationService;
+  scopes: ModelProviderScopeService;
+}): ModelProviderCommandService {
+  return ModelProviderCommandService.create({
+    repository: options.repository,
+    defaults: options.defaults,
+    credentialPolicy: options.credentialPolicy,
+    catalog: options.catalog,
+    connectionRateLimiter: options.connectionRateLimiter,
+    connectionPing: ModelProviderConnectionPingService.create({
+      channel: options.connectionPing,
+      codexChannel: options.codexGatewayPing,
+      secrets: options.secrets,
+      execution,
+      privateEndpoints: options.privateEndpoints,
+    }),
+    writeAuthorization,
+    onboardingDefaults: ModelProviderOnboardingDefaultsService.create({
+      defaults: options.defaults,
+      ids: options.ids,
+      scopes,
+    }),
+    ids: options.ids,
+    scopes,
+    bindings: options.privateEndpoints,
+  });
 }

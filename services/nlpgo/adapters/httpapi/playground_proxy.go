@@ -97,6 +97,14 @@ func buildPlaygroundProxyRequest(r *http.Request, catalog litellm.OutputTokensLo
 		return playgroundProxyRequest{}, false, &e
 	}
 
+	// The organization's private endpoint bindings (ADR-203) describe the
+	// caller, so they ride on the credential the dispatcher receives.
+	privateEndpoints, refused := privateEndpointsFromHeader(r, "")
+	if refused != nil {
+		return playgroundProxyRequest{}, false, refused
+	}
+	cred.PrivateEndpoints = domain.NewPrivateEndpointSet(privateEndpoints)
+
 	raw, err := io.ReadAll(r.Body)
 	if err != nil {
 		e := herr.New(ctx, nlpgodomain.ErrBadRequest, herr.M{
@@ -365,12 +373,27 @@ func handleSync(ctx context.Context, w http.ResponseWriter, proxy PlaygroundProx
 		writeHandlerError(ctx, w, dispatchFailure(ctx, err, "dispatcher_error"))
 		return
 	}
+	// A typed route answers in its own OpenAI or Anthropic shape, never with a
+	// redirect: a caller's SDK follows one and would carry the headers it sent
+	// here (the engine credential among them) to wherever the upstream points.
+	// Passthrough keeps the provider's answer verbatim.
+	typed := req.Type != domain.RequestTypePassthrough
+	if typed && resp.StatusCode >= 300 && resp.StatusCode < 400 {
+		writeHandlerError(ctx, w, herr.New(ctx, nlpgodomain.ErrGatewayUnavailable,
+			herr.M{"reason": "upstream_redirect", "upstream_status": resp.StatusCode},
+			fmt.Errorf("upstream answered with a redirect (%d)", resp.StatusCode)))
+		return
+	}
 	// Forward the upstream content-type so the playground sees JSON as JSON.
 	for k, vv := range resp.Headers {
 		// Skip hop-by-hop and length headers — net/http will recompute.
 		switch strings.ToLower(k) {
 		case "content-length", "transfer-encoding", "connection":
 			continue
+		case "location":
+			if typed {
+				continue
+			}
 		}
 		for _, v := range vv {
 			w.Header().Add(k, v)
@@ -601,6 +624,10 @@ func (a *shimAdapter) DispatchStream(ctx context.Context, req playgroundProxyReq
 //     reaches here, and this list is a denylist over everything else, so
 //     leaving it out would hand our own internal secret to whichever
 //     provider or customer-configured endpoint the call fans out to.
+//   - X-LangWatch-Private-Endpoints and X-LangWatch-Project-Id — the
+//     organization's signed private endpoint bindings and the project they
+//     are checked against, already parsed onto the credential. They name
+//     addresses inside our network and must never reach a provider.
 //   - Hop-by-hop headers per RFC 7230 §6.1.
 //   - Host (the upstream provider sets its own).
 //   - Content-Length (the dispatcher recomputes this for the outbound
@@ -631,6 +658,12 @@ func filterPassthroughHeaders(in http.Header) map[string]string {
 			continue
 		}
 		if strings.EqualFold(lk, InternalSecretHeader) {
+			continue
+		}
+		// The bindings name staff-owned addresses and are consumed above;
+		// they never go to a provider.
+		if strings.EqualFold(lk, domain.PrivateEndpointsHeader) ||
+			strings.EqualFold(lk, domain.PrivateEndpointsProjectHeader) {
 			continue
 		}
 		switch lk {

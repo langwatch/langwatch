@@ -2,6 +2,7 @@
  * The NLP engine's Lambda and streaming doors, as this module's services and
  * app reach them: one interface per conduit, implemented under `aws/` and `http/`.
  */
+import type { PrivateEndpointsHeaders } from "@langwatch/model-provider-contract";
 import type { StudioClientEvent, WorkflowRunOrigin } from "@langwatch/workflow-contract";
 
 /** One project's resolved function, as the shared cache holds it. */
@@ -108,6 +109,8 @@ export type WorkflowStudioStreamInput = {
   projectId: string;
   body: StudioClientEvent;
   origin: WorkflowRunOrigin;
+  /** The organization's signed private endpoint headers (ADR-203), merged into the call. */
+  privateEndpointsHeaders?: PrivateEndpointsHeaders;
 };
 
 /**

@@ -1,5 +1,6 @@
 from typing import Any, Optional
 from fastapi import FastAPI
+from starlette.requests import Request as HttpRequest
 from pydantic import BaseModel
 from langevals_topic_clustering.usage import with_usage
 from langevals_topic_clustering.build_response import build_response
@@ -22,6 +23,7 @@ from langevals_topic_clustering.types import (
     TraceWithEmbeddings,
 )
 from scipy.cluster.hierarchy import linkage, fcluster
+from langevals_topic_clustering.engine_route import with_engine_route
 from langevals_topic_clustering.failures import configured_model, failure_answer
 from langevals_topic_clustering._logger import get_logger, set_log_context, clear_log_context
 
@@ -98,7 +100,9 @@ def setup_endpoints(app: FastAPI):
     @with_usage
     def topics_batch_clustering(
         params: BatchClusteringParams,
+        http_request: HttpRequest,
     ) -> TopicClusteringResponse:
+        params = with_engine_route(params, http_request)
         try:
             set_log_context(project_id=params.project_id)
             logger.info("Starting batch clustering", trace_count=len(params.traces))

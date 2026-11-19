@@ -1,4 +1,5 @@
 import type { LanguageModelV3 } from "@ai-sdk/provider";
+import type { PrivateEndpointsHeaders } from "@langwatch/model-provider-contract";
 import type { LiteLLMParams } from "@langwatch/scenario-contract";
 
 export type LitellmModelInput = Readonly<{
@@ -6,6 +7,8 @@ export type LitellmModelInput = Readonly<{
   nlpServiceUrl: string;
   /** The engine hop's shared credential, as the parent stated it for this child. */
   nlpInternalSecret?: string | undefined;
+  /** The organization's signed private endpoint headers (ADR-203), sent to nlpgo's proxy. */
+  privateEndpointsHeaders?: PrivateEndpointsHeaders | undefined;
 }>;
 
 /** Language models served through the NLP engine's LiteLLM proxy. */

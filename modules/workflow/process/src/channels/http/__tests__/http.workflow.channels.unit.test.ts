@@ -56,6 +56,7 @@ const config: WorkflowServerConfig = {
   relayTurnCeilingMs: void 0,
   publicBaseUrl: "https://app.test",
   nlpCodeBlockTimeoutSeconds: void 0,
+  privateEndpointsVerifyKey: void 0,
 };
 
 async function composeWith(fleet: object) {

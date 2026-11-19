@@ -4,6 +4,7 @@ import {
   RedirectRefusedError,
   type SsrfUrlValidator,
 } from "@langwatch/egress";
+import type { PrivateEndpointBindingWire } from "@langwatch/model-provider-contract";
 
 /** One outbound probe's answer, as the credential prober reads it. */
 export type ModelProviderEgressResponse = {
@@ -18,6 +19,13 @@ type ModelProviderEgressRequest = {
   headers: Record<string, string>;
   body?: string;
   signal: AbortSignal;
+  /** The calling organization's bound hostnames (ADR-203); a bound host is never resolved. */
+  privateEndpoints?: readonly PrivateEndpointBindingWire[];
+};
+
+/** What a destination check adds to the deployment's policy for one call. */
+export type ModelProviderEgressDestinationOptions = {
+  privateEndpoints?: readonly PrivateEndpointBindingWire[];
 };
 
 /**
@@ -32,7 +40,10 @@ export abstract class ModelProviderEgress {
   ): Promise<ModelProviderEgressResponse>;
   abstract isRedirectRefusal(error: unknown): boolean;
   /** Throws when the fence would refuse the URL; a saved endpoint is held to the probe's policy. */
-  abstract assertDestination(url: string): Promise<void>;
+  abstract assertDestination(
+    url: string,
+    options?: ModelProviderEgressDestinationOptions,
+  ): Promise<void>;
 }
 
 /** The address policy a deployment fences its outbound probes with. */
@@ -76,7 +87,7 @@ export class SsrfModelProviderEgressService extends ModelProviderEgress {
     url: string,
     request: ModelProviderEgressRequest,
   ): Promise<ModelProviderEgressResponse> {
-    const validated = await this.validate(url);
+    const validated = await this.validate(url, { privateEndpoints: request.privateEndpoints });
     const response = await fetchValidatedDestination(
       validated,
       {
@@ -99,7 +110,10 @@ export class SsrfModelProviderEgressService extends ModelProviderEgress {
     return error instanceof RedirectRefusedError;
   }
 
-  async assertDestination(url: string): Promise<void> {
-    await this.validate(url);
+  async assertDestination(
+    url: string,
+    options?: ModelProviderEgressDestinationOptions,
+  ): Promise<void> {
+    await this.validate(url, { privateEndpoints: options?.privateEndpoints });
   }
 }

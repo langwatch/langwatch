@@ -1,6 +1,9 @@
 import { ApiKeyPermissionDeniedError } from "@langwatch/api-key-contract";
 import { HandledError } from "@langwatch/handled-error";
-import { ModelNotConfiguredError } from "@langwatch/model-provider-contract";
+import {
+  ModelNotConfiguredError,
+  type PrivateEndpointsHeaders,
+} from "@langwatch/model-provider-contract";
 import { createLogger } from "@langwatch/observability";
 import { resolveRunModels } from "@langwatch/scenario-contract";
 import type {
@@ -170,6 +173,10 @@ export class ScenarioPrefetchCompletionService {
       "Prefetch complete",
     );
 
+    const privateEndpointsHeaders = await this.options.modelParameters.privateEndpointsHeadersFor(
+      input.context.projectId,
+    );
+
     return this.successResult({
       context: input.context,
       target: input.target,
@@ -178,6 +185,7 @@ export class ScenarioPrefetchCompletionService {
       prepared,
       traceWaitTimeoutMs,
       runKey,
+      privateEndpointsHeaders,
     });
   }
 
@@ -431,6 +439,7 @@ export class ScenarioPrefetchCompletionService {
     prepared: PreparedModels;
     traceWaitTimeoutMs: number | undefined;
     runKey: string;
+    privateEndpointsHeaders: PrivateEndpointsHeaders;
   }): ScenarioExecutionPrefetchResult {
     const { context, target, validated, models, prepared, traceWaitTimeoutMs, runKey } = input;
     const modelParams = prepared.adapter?.success ? prepared.adapter.params : void 0;
@@ -458,6 +467,9 @@ export class ScenarioPrefetchCompletionService {
         target,
         ...(target.type === "voice" ? { callerVoice: validated.scenario.callerVoice } : {}),
         ...(traceWaitTimeoutMs !== void 0 ? { traceWaitTimeoutMs } : {}),
+        ...(Object.keys(input.privateEndpointsHeaders).length > 0
+          ? { privateEndpointsHeaders: { ...input.privateEndpointsHeaders } }
+          : {}),
       },
       telemetry: {
         endpoint: this.options.config.langwatchEndpoint,

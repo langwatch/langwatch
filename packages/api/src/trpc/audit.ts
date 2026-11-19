@@ -105,6 +105,7 @@ export function deriveAuditTarget(
     license: "license",
     llmModelCost: "llm_model_cost",
     modelProvider: "model_provider",
+    privateModelEndpoint: "private_model_endpoint",
     scimToken: "scim_token",
     subscription: "subscription",
     webhookEndpoints: "webhook_endpoint",
@@ -201,6 +202,9 @@ const REDACTED_VALUE_FIELDS_BY_ACTION: Record<string, readonly string[]> = {
   "suites.run": ["parameters"],
   "scenarios.run": ["parameters"],
   "scenarios.testHttpAgent": ["templateVariables"],
+  // The organization reads its own audit trail; staff own a private endpoint's addresses (ADR-203).
+  "privateModelEndpoint.register": ["addresses"],
+  "privateModelEndpoint.update": ["addresses"],
 };
 
 /**

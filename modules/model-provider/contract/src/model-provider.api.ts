@@ -44,6 +44,20 @@ import type {
   TranslateOutput,
 } from "./model-provider.ts";
 import type { BuiltInModel } from "./model-selection.ts";
+import type {
+  LangevalsModelCall,
+  OrganizationPrivateModelEndpoint,
+  PrivateEndpointBindingWire,
+  PrivateEndpointsHeaders,
+  PrivateModelEndpointBinding,
+  PrivateModelEndpointBindInput,
+  PrivateModelEndpointRebindInput,
+  PrivateModelEndpointRegisterInput,
+  PrivateModelEndpointRemoveInput,
+  PrivateModelEndpointUnbindInput,
+  PrivateModelEndpointUpdateInput,
+  StaffPrivateModelEndpoint,
+} from "./private-model-endpoint.ts";
 
 export interface ModelProviderCaller {
   readonly id: string;
@@ -55,6 +69,12 @@ export interface ModelProviderEvaluatorModelEnvInput {
   model: string;
   embeddings: boolean;
   settings?: Readonly<Record<string, unknown>>;
+}
+
+/** An evaluator's model block, and the headers langevals must be posted to with for it. */
+export interface ModelProviderEvaluatorModelEnv {
+  env: Record<string, string>;
+  headers: Record<string, string>;
 }
 
 export interface ModelProviderWriteRequest {
@@ -226,12 +246,18 @@ export interface ModelProviderApi {
     input: ModelProviderExecutionPrepareInput,
   ): Promise<ModelProviderExecutionParameters>;
   /**
-   * The `X_LITELLM_*` (or `X_LITELLM_EMBEDDINGS_*`) block an evaluator calls `model` with; throws
-   * `EvaluatorConfigError` when the provider is unconfigured, disabled or does not serve the model.
+   * The parameters langevals calls `model` with, and the headers to post to langevals with. A
+   * call whose base URL host is bound goes through nlpgo's proxy (ADR-203); any other is unchanged.
+   */
+  prepareLangevalsExecution(input: ModelProviderExecutionPrepareInput): Promise<LangevalsModelCall>;
+  /**
+   * The `X_LITELLM_*` (or `X_LITELLM_EMBEDDINGS_*`) block an evaluator calls `model` with, and the
+   * headers to post to langevals with; throws `EvaluatorConfigError` when the provider is
+   * unconfigured, disabled or does not serve the model.
    */
   prepareEvaluatorModelEnv(
     input: ModelProviderEvaluatorModelEnvInput,
-  ): Promise<Record<string, string>>;
+  ): Promise<ModelProviderEvaluatorModelEnv>;
   /** Resolves a feature's configured model and returns schema-validated structured data. */
   generateStructured(input: ModelProviderStructuredGenerationInput): Promise<unknown>;
   /**
@@ -378,6 +404,52 @@ export interface ModelProviderApi {
    * and `ModelProviderCustomKeysMissingError` for a row that stores none.
    */
   getCustomKeys(input: { modelProviderId: string }): Promise<ModelProviderCustomKeys>;
+
+  // ── private model endpoints (ADR-203) ───────────────────────────────────
+  /**
+   * The organization's hostname bindings in the wire shape nlpgo and the gateway read; empty when
+   * it has none. Only model calls send these: never HTTP blocks, webhooks or agent targets.
+   */
+  privateEndpointBindingsForOrganization(input: {
+    organizationId: string;
+  }): Promise<PrivateEndpointBindingWire[]>;
+  /** The same, for the organization a project belongs to; empty for an unknown project. */
+  privateEndpointBindingsForProject(input: {
+    projectId: string;
+  }): Promise<PrivateEndpointBindingWire[]>;
+  /**
+   * The headers that carry a project's bindings to nlpgo (ADR-203): the organization's bindings,
+   * signed for this project, and the project id. Spread them into the request's headers. Empty
+   * when nothing is bound or no signing key is set. Valid for `ttlSeconds` (default 15 minutes).
+   */
+  privateEndpointsHeadersForProject(input: {
+    projectId: string;
+    ttlSeconds?: number | undefined;
+  }): Promise<PrivateEndpointsHeaders>;
+  /** The organization's endpoints and bound hostnames, never their addresses. */
+  listPrivateEndpointsForOrganization(input: {
+    organizationId: string;
+  }): Promise<OrganizationPrivateModelEndpoint[]>;
+  /** Binds a hostname to one of the organization's own endpoints; another's is not found. */
+  bindPrivateEndpointHostname(
+    input: PrivateModelEndpointBindInput,
+    by: ModelProviderCaller,
+  ): Promise<PrivateModelEndpointBinding>;
+  rebindPrivateEndpointHostname(
+    input: PrivateModelEndpointRebindInput,
+  ): Promise<PrivateModelEndpointBinding>;
+  unbindPrivateEndpointHostname(input: PrivateModelEndpointUnbindInput): Promise<void>;
+  /** Ops: one organization's endpoints with their addresses. */
+  listPrivateEndpointsForStaff(input: {
+    organizationId: string;
+  }): Promise<StaffPrivateModelEndpoint[]>;
+  registerPrivateEndpoint(
+    input: PrivateModelEndpointRegisterInput,
+    by: ModelProviderCaller,
+  ): Promise<StaffPrivateModelEndpoint>;
+  updatePrivateEndpoint(input: PrivateModelEndpointUpdateInput): Promise<StaffPrivateModelEndpoint>;
+  /** Removes the endpoint and every binding to it. */
+  removePrivateEndpoint(input: PrivateModelEndpointRemoveInput): Promise<void>;
 }
 
 export const ModelProviderApi = moduleApi<ModelProviderApi>()("model-provider");

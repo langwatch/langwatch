@@ -24,6 +24,7 @@ function process_(role: "api" | "worker") {
         relayTurnCeilingMs: undefined,
         publicBaseUrl: undefined,
         nlpCodeBlockTimeoutSeconds: undefined,
+        privateEndpointsVerifyKey: undefined,
       },
     })
     .withStores(memoryStores())

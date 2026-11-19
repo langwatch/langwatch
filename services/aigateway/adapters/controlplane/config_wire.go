@@ -60,6 +60,18 @@ type configWire struct {
 	// Status is "active" or "revoked". Empty from a control plane older than
 	// the field, which reads as active.
 	Status string `json:"status"`
+	// PrivateEndpoints are the organization's private endpoint bindings
+	// (ADR-203): [{"hostname","addresses","port"}]. Held raw so a malformed
+	// list fails the fetch rather than decoding to "no bindings"; absent or
+	// empty means none.
+	PrivateEndpoints json.RawMessage `json:"private_endpoints"`
+}
+
+// privateEndpoints decodes the bindings. A malformed list is an error: taking
+// the rest of the config and dropping the bindings would send a bound
+// hostname through DNS, which is what a binding forbids.
+func (w *configWire) privateEndpoints() ([]domain.PrivateEndpoint, error) {
+	return domain.ParsePrivateEndpoints(w.PrivateEndpoints)
 }
 
 // keyExpiry reads the key's own expiration date off the wire as the tri-state
@@ -217,6 +229,39 @@ type cacheMatchersWire struct {
 type cacheActionWire struct {
 	Mode string `json:"mode"`
 	TTL  *int   `json:"ttl"`
+}
+
+// platformCredentialIDPrefix marks a credential the platform synthesized from
+// its own keys rather than one the organization stored (PLATFORM_PROVIDER_ID_PREFIX
+// in modules/model-provider/contract).
+const platformCredentialIDPrefix = "platform-"
+
+// customerCredential reports whether cred is one the organization owns. Only
+// those carry the organization's bindings: a binding must never pull a call
+// made with LangWatch's own key, or to LangWatch, to a customer's endpoint.
+func customerCredential(cred domain.Credential) bool {
+	return !strings.HasPrefix(cred.ID, platformCredentialIDPrefix) &&
+		cred.ProviderID != domain.ProviderLangWatch
+}
+
+// withPrivateEndpoints sets the organization's bindings on the config and on
+// every customer credential in it: the credential is what the provider router
+// gets per request, so that is where the binding has to ride.
+func withPrivateEndpoints(cfg domain.BundleConfig, eps []domain.PrivateEndpoint) domain.BundleConfig {
+	if len(eps) == 0 {
+		return cfg
+	}
+	cfg.PrivateEndpoints = eps
+	set := domain.NewPrivateEndpointSet(eps)
+	creds := make([]domain.Credential, len(cfg.Credentials))
+	for i, cred := range cfg.Credentials {
+		if customerCredential(cred) {
+			cred.PrivateEndpoints = set
+		}
+		creds[i] = cred
+	}
+	cfg.Credentials = creds
+	return cfg
 }
 
 func (w *configWire) toDomain() domain.BundleConfig {

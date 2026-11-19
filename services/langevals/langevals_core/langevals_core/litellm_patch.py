@@ -10,6 +10,7 @@ import litellm.cost_calculator
 from openai import OpenAI, AzureOpenAI
 import json
 
+from langevals_core.engine_proxy import without_redirects_for_engine_credential
 from langevals_core.model_capabilities import output_tokens_parameter
 from langevals_core.model_pricing import register_langwatch_model_pricing
 from langevals_core.request_env import current_request_env
@@ -797,7 +798,9 @@ def patch_litellm():
 
     def patched_completion(*args, **kwargs):
         requested_model = kwargs.get("model")
-        kwargs = patch_litellm_params(kwargs)
+        kwargs = without_redirects_for_engine_credential(
+            patch_litellm_params(kwargs), is_async=False
+        )
         while True:
             try:
                 response = complete(args, kwargs)
@@ -816,7 +819,9 @@ def patch_litellm():
 
     async def patched_acompletion(*args, **kwargs):
         requested_model = kwargs.get("model")
-        kwargs = patch_litellm_params(kwargs)
+        kwargs = without_redirects_for_engine_credential(
+            patch_litellm_params(kwargs), is_async=True
+        )
         while True:
             try:
                 response = await acomplete(args, kwargs)
@@ -835,7 +840,9 @@ def patch_litellm():
 
     def patched_embedding(*args, **kwargs):
         requested_model = kwargs.get("model")
-        kwargs = patch_litellm_embedding_params(kwargs)
+        kwargs = without_redirects_for_engine_credential(
+            patch_litellm_embedding_params(kwargs), is_async=False
+        )
         response = originals["embedding"](*args, **kwargs)
         record_usage(requested_model, response)
         return response

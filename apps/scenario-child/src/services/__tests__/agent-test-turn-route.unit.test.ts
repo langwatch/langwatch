@@ -77,9 +77,37 @@ function codeTurn(executeSyncRoute: ExecuteSyncRoute) {
   });
 }
 
+const SIGNED = {
+  "X-LangWatch-Private-Endpoints": "signed-for-acme-prod",
+  "X-LangWatch-Project-Id": "acme-prod",
+};
+
+function workflowTurn(executeSyncRoute: ExecuteSyncRoute) {
+  return AgentTestTurnJobSchema.parse({
+    kind: "agent-test-turn",
+    adapterData: {
+      type: "workflow",
+      agentId: "agent_wf",
+      workflowId: "wf_1",
+      workflow: { workflow_id: "wf_1", nodes: [], edges: [] },
+      inputs: [{ identifier: "input", type: "str" }],
+      outputs: [{ identifier: "output", type: "str" }],
+      secrets: {},
+    },
+    executeSyncRoute,
+    message: "ping",
+    timeoutMs: 5_000,
+    nlpTimeouts: {},
+    privateEndpointsHeaders: SIGNED,
+  });
+}
+
 /** Where the turn posted and with which headers; the answer itself is not under test. */
-async function postOf(executeSyncRoute: ExecuteSyncRoute) {
-  await runAgentTestTurn({ job: codeTurn(executeSyncRoute), runtime }).catch(() => undefined);
+async function postOf(
+  executeSyncRoute: ExecuteSyncRoute,
+  turn: (route: ExecuteSyncRoute) => ReturnType<typeof codeTurn> = codeTurn,
+) {
+  await runAgentTestTurn({ job: turn(executeSyncRoute), runtime }).catch(() => undefined);
   const [url, init] = mockFetch.mock.calls[0] as [string, { headers: Record<string, string> }];
   return { url, headers: init.headers };
 }
@@ -111,6 +139,35 @@ describe("runAgentTestTurn", () => {
       const { url } = await postOf({ mode: "direct", nlpServiceUrl: ENGINE });
 
       expect(url).toMatch(new RegExp(`^${ENGINE}/`));
+    });
+  });
+
+  describe("given a workflow agent's turn whose job carries the organization's bindings", () => {
+    /** @scenario "An agent test turn carries the organization's signed bindings" */
+    it("sends the signed bindings to the engine on the direct route", async () => {
+      const { url, headers } = await postOf(
+        { mode: "direct", nlpServiceUrl: ENGINE },
+        workflowTurn,
+      );
+
+      expect(url).toMatch(new RegExp(`^${ENGINE}/`));
+      expect(headers).toMatchObject(SIGNED);
+    });
+
+    it("sends none to the relay, which signs its own", async () => {
+      const { headers } = await postOf({ mode: "relay", relayBaseUrl: RELAY }, workflowTurn);
+
+      expect(JSON.stringify(headers)).not.toContain("signed-for-acme-prod");
+    });
+  });
+
+  describe("given a code agent's turn", () => {
+    it("sends no bindings to the engine: a code block is not a model call", async () => {
+      const { headers } = await postOf({ mode: "direct", nlpServiceUrl: ENGINE }, (route) =>
+        AgentTestTurnJobSchema.parse({ ...codeTurn(route), privateEndpointsHeaders: SIGNED }),
+      );
+
+      expect(JSON.stringify(headers)).not.toContain("signed-for-acme-prod");
     });
   });
 });

@@ -100,6 +100,7 @@ func (r *BifrostRouter) dispatchSpeech(
 	}
 	bfCtx := bfschemas.NewBifrostContext(withCredential(ctx, cred), time.Time{})
 
+	bfReq.Provider = r.pinnedProvider(cred, bfReq.Provider)
 	resp, berr := r.bf.SpeechRequest(bfCtx, bfReq)
 	if berr != nil {
 		if answer, ok := r.responseFromBifrostError(berr, bfCtx, req.Type); ok {
@@ -169,6 +170,7 @@ func (r *BifrostRouter) dispatchTranscription(
 	}
 	bfCtx := bfschemas.NewBifrostContext(withCredential(ctx, cred), time.Time{})
 
+	bfReq.Provider = r.pinnedProvider(cred, bfReq.Provider)
 	resp, berr := r.bf.TranscriptionRequest(bfCtx, bfReq)
 	if berr != nil {
 		if answer, ok := r.responseFromBifrostError(berr, bfCtx, req.Type); ok {

@@ -105,6 +105,7 @@ export class HttpWorkflowChannels {
         codeBlockTimeoutRawValue: config.nlpCodeBlockTimeoutSeconds,
         stagingThresholdBytesRawValue: config.stagingThresholdBytes,
         stagingTtlSecondsRawValue: config.stagingTtlSeconds,
+        privateEndpointsVerifyKey: config.privateEndpointsVerifyKey,
       });
       const credentials = fleetClientCredentials(lambdaConfig.credentials);
       const lambda = new LambdaClient({

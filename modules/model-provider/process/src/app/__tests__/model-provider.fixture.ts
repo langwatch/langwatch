@@ -39,6 +39,7 @@ export function createModelProviderTestProjects(): ProjectApi {
   return createApiFixture<ProjectApi>({
     getWithTeam: async (id: string) => testProject(id),
     findWithTeam: async (id: string) => testProject(id),
+    findOrganizationId: async () => "organization-1",
   });
 }
 

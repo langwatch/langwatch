@@ -343,6 +343,12 @@ func modelsDiscoveryCacheKey(creds []domain.Credential) string {
 			_, _ = sum.Write([]byte(field))
 			_, _ = sum.Write([]byte{0x1f})
 		}
+		// A binding decides where the probe connects, so a changed binding
+		// must not serve the catalog fetched through the old one.
+		if ep, bound := boundEndpointForCredential(cred); bound {
+			_, _ = sum.Write([]byte(ep.Identity()))
+			_, _ = sum.Write([]byte{0x1f})
+		}
 		for _, id := range deploymentMapModelIDs(cred) {
 			_, _ = sum.Write([]byte(id))
 			_, _ = sum.Write([]byte{0x1f})
@@ -399,10 +405,23 @@ func (r *BifrostRouter) ListModels(ctx context.Context, creds []domain.Credentia
 	return catalog.models, catalog.gaps, nil
 }
 
+// discoveryClientFor is the client a credential's catalog probe uses: the
+// shared discovery client, or for a base URL bound to a private endpoint the
+// binding's own pinned client, which never resolves the hostname (ADR-203).
+func (r *BifrostRouter) discoveryClientFor(cred domain.Credential) *http.Client {
+	if ep, bound := boundEndpointForCredential(cred); bound {
+		return r.privateClients.client(ep)
+	}
+	return r.discoveryHTTP
+}
+
 func (r *BifrostRouter) discoveryCache() *modelsDiscoveryCache {
 	r.discoveryOnce.Do(func() {
 		r.discoveryModels = &modelsDiscoveryCache{}
 		r.discoveryHTTP = newModelsDiscoveryClient(r.endpointPolicy)
+		if r.privateClients == nil {
+			r.privateClients = newPrivateEndpointClients(privateEndpointSeam{})
+		}
 	})
 	return r.discoveryModels
 }
@@ -478,7 +497,7 @@ func (r *BifrostRouter) discoverModels(ctx context.Context, creds []domain.Crede
 				}
 				return
 			}
-			ids, err := fetchUpstreamModels(ctx, r.discoveryHTTP, probe, cred.APIKey)
+			ids, err := fetchUpstreamModels(ctx, r.discoveryClientFor(cred), probe, cred.APIKey)
 			if err != nil {
 				if r.logger != nil {
 					r.logger.Warn("model discovery failed for endpoint, skipping",

@@ -1,9 +1,14 @@
-import type { ModelProviderExecutionParameters } from "@langwatch/model-provider-contract";
+import type {
+  ModelProviderExecutionParameters,
+  PrivateEndpointsHeaders,
+} from "@langwatch/model-provider-contract";
 
 export type ModelProviderPingRequest = Readonly<{
   providerKey: string;
   model: string;
   parameters: ModelProviderExecutionParameters;
+  /** The organization's bindings, signed for the project (ADR-203), sent to nlpgo with the ping. */
+  privateEndpointsHeaders?: PrivateEndpointsHeaders;
 }>;
 
 /** What a provider said to one token of generation, in its own words when it refused. */

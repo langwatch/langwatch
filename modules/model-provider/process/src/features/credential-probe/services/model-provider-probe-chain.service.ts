@@ -2,6 +2,7 @@ import {
   ProviderEndpointRedirectedError,
   ProviderUnreachableError,
   type ModelProviderCredentialVerdict,
+  type PrivateEndpointBindingWire,
 } from "@langwatch/model-provider-contract";
 
 import {
@@ -263,11 +264,13 @@ async function probeOnce({
   context,
   deadline,
   egress,
+  privateEndpoints,
 }: {
   candidate: ProbeRequest;
   context: ProbeContext;
   deadline: AbortSignal;
   egress: ModelProviderEgress;
+  privateEndpoints: readonly PrivateEndpointBindingWire[] | undefined;
 }): Promise<{ accepted: true; failure?: undefined } | { accepted: false; failure: RankedFailure }> {
   let response: ProbeResponse;
   try {
@@ -279,6 +282,7 @@ async function probeOnce({
       headers: candidate.headers,
       ...(candidate.body === undefined ? {} : { body: candidate.body }),
       signal: deadline,
+      ...(privateEndpoints ? { privateEndpoints } : {}),
     });
   } catch (err) {
     return {
@@ -308,10 +312,13 @@ export async function runProbeChain({
   candidates,
   context,
   egress,
+  privateEndpoints,
 }: {
   candidates: ProbeRequest[];
   context: ProbeContext;
   egress: ModelProviderEgress;
+  /** The calling organization's bound hostnames; absent, the probe is judged as before. */
+  privateEndpoints?: readonly PrivateEndpointBindingWire[];
 }): Promise<ModelProviderCredentialVerdict> {
   const failures: RankedFailure[] = [];
 
@@ -326,7 +333,7 @@ export async function runProbeChain({
       break;
     }
 
-    const outcome = await probeOnce({ candidate, context, deadline, egress });
+    const outcome = await probeOnce({ candidate, context, deadline, egress, privateEndpoints });
 
     if (outcome.accepted) {
       return verified();

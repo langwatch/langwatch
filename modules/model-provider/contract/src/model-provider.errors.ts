@@ -1,4 +1,4 @@
-import { HandledError, remediation } from "@langwatch/handled-error";
+import { HandledError, remediation, ValidationError } from "@langwatch/handled-error";
 
 import { CODING_ASSISTANT_SURFACES_ONLY_NEEDLE } from "./catalog/codex-refusal-message.ts";
 import type { ModelRole } from "./catalog/model-feature-registry.ts";
@@ -873,5 +873,32 @@ export class EvaluatorConfigError extends HandledError {
       ...options,
     });
     this.name = "EvaluatorConfigError";
+  }
+}
+
+/** A private endpoint or binding the caller's organization does not hold (ADR-203). */
+export class PrivateModelEndpointNotFoundError extends HandledError {
+  declare readonly code: "private_model_endpoint_not_found";
+
+  constructor() {
+    super("private_model_endpoint_not_found", "Private endpoint not found", {
+      httpStatus: 404,
+      fault: "customer",
+    });
+    this.name = "PrivateModelEndpointNotFoundError";
+  }
+}
+
+/** A private endpoint or binding field that cannot be saved; `field` names it (ADR-203). */
+export class PrivateModelEndpointInvalidError extends ValidationError {
+  constructor({
+    field,
+    reason,
+  }: {
+    field: "hostname" | "addresses" | "port" | "name" | "region";
+    reason: string;
+  }) {
+    super(reason, { meta: { fieldErrors: { [field]: [reason] } } });
+    this.name = "PrivateModelEndpointInvalidError";
   }
 }

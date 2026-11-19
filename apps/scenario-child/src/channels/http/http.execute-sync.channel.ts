@@ -1,10 +1,11 @@
-import { injectTraceContextHeaders } from "@langwatch/observability/tracing";
 /**
  * The execute_sync POST over HTTP: straight to the engine with its internal secret (self-hosted),
  * or to the control plane with the project key, which reaches that project's own engine (SaaS).
  * The credential that invokes per-project engines never reaches the child.
  * @see specs/scenarios/execute-sync-relay.feature
  */
+import { type PrivateEndpointsHeaders } from "@langwatch/model-provider-contract";
+import { injectTraceContextHeaders } from "@langwatch/observability/tracing";
 import { nlpInternalSecretHeaders } from "@langwatch/process/nlp-internal-secret";
 import { fetch as undiciFetch } from "undici";
 
@@ -40,21 +41,33 @@ function httpExecuteSyncTransport({
   };
 }
 
-/** Posts straight to the engine, the way a self-hosted install does. */
+/**
+ * Posts straight to the engine, the way a self-hosted install does. The organization's bound
+ * hostnames (ADR-203), as the parent put them in the job, ride in the private endpoints header:
+ * the engine reads bindings from that header alone, never from the event.
+ */
 export function directExecuteSyncTransport({
   nlpServiceUrl,
   nlpInternalSecret,
+  privateEndpointsHeaders,
 }: {
   nlpServiceUrl: string;
   nlpInternalSecret?: string | undefined;
+  privateEndpointsHeaders?: PrivateEndpointsHeaders | undefined;
 }): ExecuteSyncTransport {
   return httpExecuteSyncTransport({
     endpoint: `${nlpServiceUrl.replace(/\/$/, "")}${EXECUTE_SYNC_ENGINE_PATH}`,
-    headers: () => nlpInternalSecretHeaders({ secret: nlpInternalSecret }),
+    headers: () => ({
+      ...nlpInternalSecretHeaders({ secret: nlpInternalSecret }),
+      ...privateEndpointsHeaders,
+    }),
   });
 }
 
-/** Posts to the control plane with the project key; `traceparent` joins its span to this trace. */
+/**
+ * Posts to the control plane with the project key; `traceparent` joins its span to this trace.
+ * It sends no bindings: the control plane reads the organization's own and sets them itself.
+ */
 export function relayExecuteSyncTransport({
   relayBaseUrl,
   projectApiKey,
@@ -80,12 +93,15 @@ export function childExecuteSyncTransport({
   nlpServiceUrl,
   nlpInternalSecret,
   projectApiKey,
+  privateEndpointsHeaders,
 }: {
   relayBaseUrl: string | undefined;
   nlpServiceUrl: string;
   nlpInternalSecret?: string | undefined;
   projectApiKey: string;
+  /** Sent on the direct route only; see {@link directExecuteSyncTransport}. */
+  privateEndpointsHeaders?: PrivateEndpointsHeaders | undefined;
 }): ExecuteSyncTransport {
   if (relayBaseUrl) return relayExecuteSyncTransport({ relayBaseUrl, projectApiKey });
-  return directExecuteSyncTransport({ nlpServiceUrl, nlpInternalSecret });
+  return directExecuteSyncTransport({ nlpServiceUrl, nlpInternalSecret, privateEndpointsHeaders });
 }

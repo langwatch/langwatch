@@ -5,6 +5,7 @@
 
 import { randomBytes } from "crypto";
 
+import { type PrivateEndpointsHeaders } from "@langwatch/model-provider-contract";
 import { injectTraceContextHeaders } from "@langwatch/observability/tracing";
 import type { AgentInput } from "@langwatch/scenario";
 import { AgentRole } from "@langwatch/scenario";
@@ -39,8 +40,13 @@ export class HttpSerializedWorkflowAgentChannel extends SerializedAgentChannel {
     timeouts?: NlpFetchTimeouts;
     /** The engine hop's shared credential, as the parent stated it for this child. */
     nlpInternalSecret?: string | undefined;
-    /** How the turn reaches the project's engine; absent posts to `nlpServiceUrl` directly. */
+    /**
+     * How the turn reaches the project's engine; absent posts to `nlpServiceUrl` directly. A
+     * given transport carries the bindings itself (header on the direct route, none on the relay).
+     */
     transport?: ExecuteSyncTransport;
+    /** The organization's signed private endpoint headers (ADR-203); direct transport only. */
+    privateEndpointsHeaders?: PrivateEndpointsHeaders | undefined;
   }): HttpSerializedWorkflowAgentChannel {
     return new HttpSerializedWorkflowAgentChannel(options);
   }
@@ -74,6 +80,7 @@ export class HttpSerializedWorkflowAgentChannel extends SerializedAgentChannel {
     timeouts,
     nlpInternalSecret,
     transport,
+    privateEndpointsHeaders,
   }: {
     config: WorkflowAgentData;
     nlpServiceUrl: string;
@@ -82,6 +89,7 @@ export class HttpSerializedWorkflowAgentChannel extends SerializedAgentChannel {
     timeouts?: NlpFetchTimeouts;
     nlpInternalSecret?: string | undefined;
     transport?: ExecuteSyncTransport;
+    privateEndpointsHeaders?: PrivateEndpointsHeaders | undefined;
   }) {
     super();
     this.config = config;
@@ -90,7 +98,9 @@ export class HttpSerializedWorkflowAgentChannel extends SerializedAgentChannel {
     this.parameters = parameters ?? {};
     this.timeouts = timeouts ?? {};
     this.nlpInternalSecret = nlpInternalSecret;
-    this.transport = transport ?? directExecuteSyncTransport({ nlpServiceUrl, nlpInternalSecret });
+    this.transport =
+      transport ??
+      directExecuteSyncTransport({ nlpServiceUrl, nlpInternalSecret, privateEndpointsHeaders });
     this.name = "SerializedWorkflowAgentAdapter";
   }
 

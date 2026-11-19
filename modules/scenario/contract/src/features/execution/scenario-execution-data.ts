@@ -547,6 +547,12 @@ const ChildProcessJobDataSchemaDefinition = z
     callerVoice: callerVoiceConfigSchema.optional(),
     /** Skip the agent's teardown hook so the run's test data stays; absent is false (ADR-180). */
     keepData: z.boolean().optional(),
+    /**
+     * The organization's private endpoint bindings (ADR-203), signed by the parent for this project
+     * as nlpgo's headers. Merged into every model call to nlpgo; never onto an HTTP agent target's
+     * requests. Absent when the organization bound none.
+     */
+    privateEndpointsHeaders: z.record(z.string(), z.string()).optional(),
   })
   .superRefine((data, ctx) => {
     if (data.script) return;
@@ -590,6 +596,12 @@ const AgentTestTurnJobSchemaDefinition = z.object({
     engineCodeBlockTimeoutSeconds: z.number().optional(),
     maxTimeoutMs: z.number().optional(),
   }),
+  /**
+   * The organization's private endpoint bindings (ADR-203), signed by the parent for this
+   * project. Only a workflow target's direct call to nlpgo sends them. Absent when the
+   * organization bound none.
+   */
+  privateEndpointsHeaders: z.record(z.string(), z.string()).optional(),
 });
 export interface AgentTestTurnJobSchema extends Named<typeof AgentTestTurnJobSchemaDefinition> {}
 export const AgentTestTurnJobSchema: AgentTestTurnJobSchema = AgentTestTurnJobSchemaDefinition;

@@ -1,6 +1,7 @@
 /**
  * The NLP engine, reached over HTTP.
  */
+import type { PrivateEndpointsHeaders } from "@langwatch/model-provider-contract";
 import { nlpInternalSecretHeaders } from "@langwatch/process/nlp-internal-secret";
 
 import {
@@ -74,6 +75,8 @@ type NlpDispatchRequest = Readonly<{
   parentTrace?: { traceId: string; parentSpanId: string };
   timeoutMs?: number;
   signal?: AbortSignal;
+  /** The organization's signed private endpoint headers (ADR-203); none sends no header. */
+  privateEndpointsHeaders?: PrivateEndpointsHeaders;
 }>;
 
 /** How the adapter is composed, whichever engine it reaches. */
@@ -160,6 +163,9 @@ export class HttpWorkflowNlpRuntimeAdapter implements WorkflowNlpRuntime {
       ...(input.parentTrace ? { parentTrace: input.parentTrace } : {}),
       ...(input.timeoutMs === undefined ? {} : { timeoutMs: input.timeoutMs }),
       ...(input.signal ? { signal: input.signal } : {}),
+      ...(input.privateEndpointsHeaders
+        ? { privateEndpointsHeaders: input.privateEndpointsHeaders }
+        : {}),
     });
   }
 
@@ -182,6 +188,8 @@ export class HttpWorkflowNlpRuntimeAdapter implements WorkflowNlpRuntime {
       "Content-Type": "application/json",
       "X-LangWatch-Origin": request.origin,
       ...nlpInternalSecretHeaders({ secret: this.options.internalSecret }),
+      // The only place a workflow run's bindings travel: nlpgo never reads them from the body.
+      ...request.privateEndpointsHeaders,
     };
 
     // Causality depth is forwarded ONLY when the caller is part of an

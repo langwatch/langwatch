@@ -50,8 +50,17 @@ export class TestModelProviderService implements ModelProviderApi {
   prepareExecution(): Promise<Record<string, string>> {
     return Promise.resolve({});
   }
-  prepareEvaluatorModelEnv(): Promise<Record<string, string>> {
-    return Promise.resolve({});
+  prepareLangevalsExecution(): Promise<{
+    parameters: Record<string, string>;
+    headers: Record<string, string>;
+  }> {
+    return Promise.resolve({ parameters: {}, headers: {} });
+  }
+  prepareEvaluatorModelEnv(): Promise<{
+    env: Record<string, string>;
+    headers: Record<string, string>;
+  }> {
+    return Promise.resolve({ env: {}, headers: {} });
   }
 
   runPlaygroundCompletion(): Promise<never> {
@@ -224,5 +233,49 @@ export class TestModelProviderService implements ModelProviderApi {
 
   applyCodexCodingDefaults(): Promise<void> {
     return Promise.resolve();
+  }
+
+  privateEndpointBindingsForOrganization(): Promise<[]> {
+    return Promise.resolve([]);
+  }
+
+  privateEndpointBindingsForProject(): Promise<[]> {
+    return Promise.resolve([]);
+  }
+
+  privateEndpointsHeadersForProject(): Promise<Record<string, string>> {
+    return Promise.resolve({});
+  }
+
+  listPrivateEndpointsForOrganization(): Promise<[]> {
+    return Promise.resolve([]);
+  }
+
+  listPrivateEndpointsForStaff(): Promise<[]> {
+    return Promise.resolve([]);
+  }
+
+  bindPrivateEndpointHostname(): Promise<never> {
+    return Promise.reject(new Error("Not used by Workflow tests."));
+  }
+
+  rebindPrivateEndpointHostname(): Promise<never> {
+    return Promise.reject(new Error("Not used by Workflow tests."));
+  }
+
+  unbindPrivateEndpointHostname(): Promise<never> {
+    return Promise.reject(new Error("Not used by Workflow tests."));
+  }
+
+  registerPrivateEndpoint(): Promise<never> {
+    return Promise.reject(new Error("Not used by Workflow tests."));
+  }
+
+  updatePrivateEndpoint(): Promise<never> {
+    return Promise.reject(new Error("Not used by Workflow tests."));
+  }
+
+  removePrivateEndpoint(): Promise<never> {
+    return Promise.reject(new Error("Not used by Workflow tests."));
   }
 }

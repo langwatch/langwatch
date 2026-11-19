@@ -28,6 +28,7 @@ import { nowInstant, toDate } from "@langwatch/time";
 import type { ModelProviderConnectionPingService } from "../features/credential-probe/services/model-provider-connection-ping.service.ts";
 import type { ModelProviderConnectionRateLimiter } from "../features/credential-probe/services/windowed-model-provider-connection-rate-limiter.service.ts";
 import type { ModelProviderOnboardingDefaultsService } from "../features/defaults/services/model-provider-onboarding-defaults.service.ts";
+import type { PrivateModelEndpointService } from "../features/private-endpoint/services/private-model-endpoint.service.ts";
 import type { ModelDefaultRepository } from "../repositories/model-default.repository.ts";
 import type { ModelProviderRepository } from "../repositories/model-provider.repository.ts";
 import {
@@ -53,6 +54,7 @@ type ModelProviderCommandOptions = {
   onboardingDefaults: ModelProviderOnboardingDefaultsService;
   ids: ModelProviderIdService;
   scopes: ModelProviderScopeService;
+  bindings: PrivateModelEndpointService;
 };
 
 export class ModelProviderCommandService {
@@ -199,14 +201,17 @@ export class ModelProviderCommandService {
 
     await this.options.connectionRateLimiter.assertAvailable({ organizationId });
 
+    const bound = await this.options.bindings.bindingsForOrganization({ organizationId });
     const credential = await this.options.catalog.testConnection(
       provider.provider,
       provider.customKeys ?? {},
+      bound,
     );
     return this.options.connectionPing.verify({
       row: provider,
       projectId: parsed.projectId,
       credential,
+      privateEndpoints: bound,
     });
   }
 
@@ -356,7 +361,7 @@ export class ModelProviderCommandService {
     routingHandle: string | null | undefined;
   }): Promise<ModelProvider> {
     const { parsed, existing, scopes, organizationId, routingHandle } = input;
-    const customKeys = await this.credentialsForWrite(parsed, existing);
+    const customKeys = await this.credentialsForWrite(parsed, existing, organizationId);
     const extraHeaders = this.headersForWrite(parsed, existing);
     const models = modelsForWrite(parsed, existing);
     const rateLimits = rateLimitsForWrite(parsed, existing);
@@ -389,6 +394,7 @@ export class ModelProviderCommandService {
   private async credentialsForWrite(
     input: ModelProviderWriteInput,
     existing: ModelProvider | null,
+    organizationId: string,
   ): Promise<Record<string, unknown> | null> {
     if (input.customKeys === undefined) {
       return existing?.customKeys ?? null;
@@ -413,7 +419,8 @@ export class ModelProviderCommandService {
       incoming: normalized,
       stored: existing?.customKeys ?? null,
     });
-    await this.options.catalog.assertEndpointAllowed(input.provider, merged);
+    const bound = await this.options.bindings.bindingsForOrganization({ organizationId });
+    await this.options.catalog.assertEndpointAllowed(input.provider, merged, bound);
     return merged;
   }
 

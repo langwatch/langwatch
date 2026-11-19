@@ -88,6 +88,7 @@ async function appWith({
     relayTurnCeilingMs: void 0,
     publicBaseUrl: "https://app.test",
     nlpCodeBlockTimeoutSeconds: void 0,
+    privateEndpointsVerifyKey: void 0,
   };
   const secrets = new ScopedSecrets(async (handle, build) =>
     build(handle === WorkflowModule.secrets.nlpLambdaFleet ? fleetSecret : undefined),

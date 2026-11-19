@@ -1,4 +1,4 @@
-import { randomBytes } from "node:crypto";
+import { generateKeyPairSync, randomBytes } from "node:crypto";
 import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
@@ -27,10 +27,23 @@ const PERSISTENT_SECRET_KEYS = [
   // Same deal for the app -> NLP engine hop: both processes read this one file,
   // so a rotation that only reaches one of them makes every studio run 401.
   "LANGWATCH_NLP_INTERNAL_SECRET",
+  // One Ed25519 pair: the app signs private endpoint bindings, the engine checks
+  // them. A pair regenerated on one side only makes every bound run fail.
+  "LANGWATCH_PRIVATE_ENDPOINTS_SIGNING_KEY",
+  "LANGWATCH_PRIVATE_ENDPOINTS_VERIFY_KEY",
 ] as const;
 
 const hex = (bytes: number) => randomBytes(bytes).toString("hex");
 const b64 = (bytes: number) => randomBytes(bytes).toString("base64");
+
+/** A fresh Ed25519 pair as base64 raw keys: the 32-byte seed and the 32-byte public key. */
+function ed25519Pair(): { signingKey: string; verifyKey: string } {
+  const { privateKey, publicKey } = generateKeyPairSync("ed25519");
+  // The DER encodings end in the raw key: pkcs8 in the seed, spki in the public key.
+  const seed = privateKey.export({ format: "der", type: "pkcs8" }).subarray(-32);
+  const raw = publicKey.export({ format: "der", type: "spki" }).subarray(-32);
+  return { signingKey: seed.toString("base64"), verifyKey: raw.toString("base64") };
+}
 
 type PortBoundEnvEntry = {
   /** The value the current port allocation calls for. */
@@ -133,6 +146,11 @@ export function buildEnv({ ports, baseHost, overrides = {} }: EnvScaffoldInput):
   // every /go/* route. Both read this same file (services/nlpgo.ts passes it
   // through), so one generated value covers both ends.
   set("LANGWATCH_NLP_INTERNAL_SECRET", hex(32));
+  // The app signs the organization's private endpoint bindings with the first
+  // and the engine checks them with the second (ADR-203). Both read this file.
+  const privateEndpoints = ed25519Pair();
+  set("LANGWATCH_PRIVATE_ENDPOINTS_SIGNING_KEY", privateEndpoints.signingKey);
+  set("LANGWATCH_PRIVATE_ENDPOINTS_VERIFY_KEY", privateEndpoints.verifyKey);
   set("LANGEVALS_ENDPOINT", portBound.LANGEVALS_ENDPOINT.expected);
   // LANGWATCH_ENDPOINT is where the engine POSTs evaluator runs and dataset
   // uploads; the default is the cloud app, which 401s for self-host. Pin it

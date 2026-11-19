@@ -62,6 +62,9 @@ export class LambdaWorkflowStudioStreamChannel implements WorkflowStudioStream {
       "Content-Type": "application/json",
       "X-LangWatch-Origin": input.origin,
       ...nlpInternalSecretHeaders({ secret: this.options.internalSecret }),
+      // The Lambda Web Adapter turns these into the request's headers, so the bindings reach
+      // nlpgo in the same header as on the HTTP route, and stay there when the body is staged.
+      ...input.privateEndpointsHeaders,
       ...s3CacheKeyHeaders({
         projectId: input.projectId,
         salt: this.options.cacheKeySalt,

@@ -34,7 +34,9 @@ function buildService(
 ) {
   const resolveForEvaluator =
     overrides.resolveForEvaluator ??
-    vi.fn<EvaluatorModelEnvService["resolveForEvaluator"]>().mockResolvedValue({});
+    vi
+      .fn<EvaluatorModelEnvService["resolveForEvaluator"]>()
+      .mockResolvedValue({ env: {}, headers: {} });
   const evaluate =
     overrides.evaluate ??
     vi

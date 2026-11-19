@@ -1,11 +1,17 @@
 import { isAzureEvaluatorType } from "@langwatch/evaluation-contract";
 import type { AVAILABLE_EVALUATORS, EvaluatorTypes } from "@langwatch/evaluator-contract";
-import type { ModelProviderApi } from "@langwatch/model-provider-contract";
+import type {
+  ModelProviderApi,
+  ModelProviderEvaluatorModelEnv,
+} from "@langwatch/model-provider-contract";
 
 import type { AzureSafetyCredentialsService } from "./azure-safety-credentials.service.ts";
 import type { EvaluatorEnvironmentService } from "./evaluator-environment.service.ts";
 
-/** The environment one evaluator runs with: its own variables, then its model's and embeddings'. */
+/**
+ * The environment one evaluator runs with (its own variables, then its model's and embeddings'),
+ * and the headers langevals is posted to with when a model call goes through nlpgo (ADR-203).
+ */
 export class EvaluatorModelEnvService {
   readonly #modelProviders: Pick<ModelProviderApi, "prepareEvaluatorModelEnv">;
   readonly #azureSafety: Pick<AzureSafetyCredentialsService, "resolveForTenant">;
@@ -39,34 +45,37 @@ export class EvaluatorModelEnvService {
     evaluator: (typeof AVAILABLE_EVALUATORS)[EvaluatorTypes];
     projectId: string;
     settings?: Record<string, unknown>;
-  }): Promise<Record<string, string>> {
-    let evaluatorEnv = await this.#ownEnvironment({ evaluatorType, evaluator, projectId });
+  }): Promise<ModelProviderEvaluatorModelEnv> {
+    let resolved: ModelProviderEvaluatorModelEnv = {
+      env: await this.#ownEnvironment({ evaluatorType, evaluator, projectId }),
+      headers: {},
+    };
 
     if (settings && typeof settings.model === "string" && evaluatorType !== "openai/moderation") {
-      evaluatorEnv = {
-        ...evaluatorEnv,
-        ...(await this.#modelProviders.prepareEvaluatorModelEnv({
+      resolved = merged(
+        resolved,
+        await this.#modelProviders.prepareEvaluatorModelEnv({
           projectId,
           model: settings.model,
           embeddings: false,
           settings,
-        })),
-      };
+        }),
+      );
     }
 
     if (settings && typeof settings.embeddings_model === "string") {
-      evaluatorEnv = {
-        ...evaluatorEnv,
-        ...(await this.#modelProviders.prepareEvaluatorModelEnv({
+      resolved = merged(
+        resolved,
+        await this.#modelProviders.prepareEvaluatorModelEnv({
           projectId,
           model: settings.embeddings_model,
           embeddings: true,
           settings,
-        })),
-      };
+        }),
+      );
     }
 
-    return evaluatorEnv;
+    return resolved;
   }
 
   /** Azure reads the tenant's provider row only; the rest read the install's variables. */
@@ -88,4 +97,15 @@ export class EvaluatorModelEnvService {
       }),
     );
   }
+}
+
+/** The later block's variables and headers over the earlier one's. */
+function merged(
+  earlier: ModelProviderEvaluatorModelEnv,
+  later: ModelProviderEvaluatorModelEnv,
+): ModelProviderEvaluatorModelEnv {
+  return {
+    env: { ...earlier.env, ...later.env },
+    headers: { ...earlier.headers, ...later.headers },
+  };
 }

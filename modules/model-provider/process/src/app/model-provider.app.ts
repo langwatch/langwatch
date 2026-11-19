@@ -26,6 +26,8 @@ import {
   type ModelProviderCodexDeviceApproval,
   type ModelProviderCodexSignInCompletion,
   type ModelProviderCodexSignInCompletionInput,
+  type LangevalsModelCall,
+  type ModelProviderEvaluatorModelEnv,
   type ModelProviderEvaluatorModelEnvInput,
   type ModelProviderCodexDeviceSignIn,
   type ModelProviderCredentialProbeRequest,
@@ -71,6 +73,17 @@ import {
   type PlatformProviderEntry,
   type ModelProviderUsageCount,
   type ModelProviderCustomKeys,
+  type OrganizationPrivateModelEndpoint,
+  type PrivateEndpointBindingWire,
+  type PrivateEndpointsHeaders,
+  type PrivateModelEndpointBinding,
+  type PrivateModelEndpointBindInput,
+  type PrivateModelEndpointRebindInput,
+  type PrivateModelEndpointRegisterInput,
+  type PrivateModelEndpointRemoveInput,
+  type PrivateModelEndpointUnbindInput,
+  type PrivateModelEndpointUpdateInput,
+  type StaffPrivateModelEndpoint,
 } from "@langwatch/model-provider-contract";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import type { FeatureSetup } from "@langwatch/process";
@@ -108,12 +121,14 @@ import {
 } from "../features/model-cost/services/model-cost-preview.service.ts";
 import { ModelCostRegexSafetyService } from "../features/model-cost/services/model-cost-regex-safety.service.ts";
 import { ModelLimitsService } from "../features/model-cost/services/model-limits.service.ts";
+import { PrivateModelEndpointService } from "../features/private-endpoint/services/private-model-endpoint.service.ts";
 import type { ModelProviderRepositories } from "../repositories/model-provider.repositories.ts";
 import { AiCallFailureService } from "../services/ai-call-failure.service.ts";
 import { ManagedModelProviderGatewayService } from "../services/managed-model-provider-gateway.service.ts";
 import { ModelProviderAuthorizationService } from "../services/model-provider-authorization.service.ts";
 import { ModelProviderExecutionHandleService } from "../services/model-provider-execution-handle.service.ts";
 import { ModelProviderKeysService } from "../services/model-provider-keys.service.ts";
+import { ModelProviderLangevalsExecutionService } from "../services/model-provider-langevals-execution.service.ts";
 import { ModelProviderPlaygroundService } from "../services/model-provider-playground.service.ts";
 import { ModelProviderStructuredGenerationService } from "../services/model-provider-structured-generation.service.ts";
 import { ModelProviderTextGenerationService } from "../services/model-provider-text-generation.service.ts";
@@ -121,7 +136,10 @@ import { ModelProviderUsageMeteringService } from "../services/model-provider-us
 import { ModelProviderWriteAuthorizationService } from "../services/model-provider-write-authorization.service.ts";
 import { ModelProviderService as ModelProviderGateway } from "../services/model-provider.service.ts";
 import { PlatformProviderChainService } from "../services/platform-provider-chain.service.ts";
-import { PrefixedModelProviderIdService } from "../services/prefixed-model-provider-id.service.ts";
+import {
+  PrefixedModelProviderIdService,
+  type ModelProviderIdType,
+} from "../services/prefixed-model-provider-id.service.ts";
 import {
   RegistryModelProviderCatalogService,
   type ModelProviderCatalog,
@@ -174,7 +192,7 @@ export interface ModelProviderInfrastructure {
 
 /** The identifier format this deployment mints a provider, default or cost in. */
 interface ModelProviderIdFactory {
-  generate(input: Readonly<{ type: "provider" | "default" | "cost" }>): string;
+  generate(input: Readonly<{ type: ModelProviderIdType }>): string;
 }
 
 /** The two answers the Codex device ceremony asks of this deployment. */
@@ -257,6 +275,10 @@ export class ModelProviderModule implements ModelProviderApi {
     doublewordCatalog: Secret.load("DOUBLEWORD_API_KEY", { optional: true }),
     /** The engine hop's shared credential: the same handle the process owner holds. */
     nlpInternal: nlpInternalSecret,
+    /** Signs the private endpoint bindings sent to nlpgo (ADR-203); nlpgo holds the public half. */
+    privateEndpointsSigning: Secret.load("LANGWATCH_PRIVATE_ENDPOINTS_SIGNING_KEY", {
+      optional: true,
+    }),
   } as const;
   static readonly secrets = {
     ...ModelProviderModule.platformCredentials,
@@ -266,11 +288,16 @@ export class ModelProviderModule implements ModelProviderApi {
   static async create(setup: ModelProviderSetup): Promise<ModelProviderModule> {
     const platformChain = await ModelProviderModule.resolvePlatformChain(setup.secrets);
     return setup.secrets.into(ModelProviderModule.secrets.nlpInternal, (nlpInternalSecret) =>
-      ModelProviderModule.withPlatformChain(setup, {
-        platformChain,
-        nlpInternalSecret,
-        environment: { ...setup.config.providerFallbacks },
-      }),
+      setup.secrets.into(
+        ModelProviderModule.secrets.privateEndpointsSigning,
+        (privateEndpointsSigningKey) =>
+          ModelProviderModule.withPlatformChain(setup, {
+            platformChain,
+            nlpInternalSecret,
+            privateEndpointsSigningKey,
+            environment: { ...setup.config.providerFallbacks },
+          }),
+      ),
     );
   }
 
@@ -294,10 +321,12 @@ export class ModelProviderModule implements ModelProviderApi {
     {
       platformChain,
       nlpInternalSecret,
+      privateEndpointsSigningKey,
       environment,
     }: {
       platformChain: PlatformProviderChainService;
       nlpInternalSecret: string | undefined;
+      privateEndpointsSigningKey: string | undefined;
       environment: Readonly<Record<string, string | undefined>>;
     },
   ): ModelProviderModule {
@@ -326,6 +355,7 @@ export class ModelProviderModule implements ModelProviderApi {
       infrastructure,
       executionProxyBaseUrl,
       nlpInternalSecret,
+      privateEndpointsSigningKey,
       platformChain,
       environment,
     });
@@ -391,6 +421,7 @@ export class ModelProviderModule implements ModelProviderApi {
     infrastructure: ModelProviderInfrastructure;
     executionProxyBaseUrl?: string;
     platformChain?: PlatformProviderChainService;
+    privateEndpointsSigningKey?: string;
   }): ModelProviderModule {
     return new ModelProviderModule({
       repositories: setup.repositories,
@@ -399,6 +430,7 @@ export class ModelProviderModule implements ModelProviderApi {
       executionProxyBaseUrl:
         setup.executionProxyBaseUrl ?? "http://nlp-engine-not-configured.invalid",
       nlpInternalSecret: void 0,
+      privateEndpointsSigningKey: setup.privateEndpointsSigningKey,
       platformChain: setup.platformChain ?? PlatformProviderChainService.create(),
       environment: {},
     });
@@ -431,8 +463,11 @@ export class ModelProviderModule implements ModelProviderApi {
   readonly #dataPrivacy: DataPrivacyApi;
   readonly #playground: ModelProviderPlaygroundService;
   readonly #evaluatorModelEnv: ModelProviderEvaluatorModelEnvService;
+  readonly #langevalsExecution: ModelProviderLangevalsExecutionService;
   readonly #structuredGeneration: ModelProviderStructuredGenerationService;
   readonly #textGeneration: ModelProviderTextGenerationService;
+  /** Private endpoints and hostname bindings, and the bindings every model call carries. */
+  readonly #privateEndpoints: PrivateModelEndpointService;
 
   private readonly platformChain: PlatformProviderChainService;
 
@@ -442,6 +477,7 @@ export class ModelProviderModule implements ModelProviderApi {
     infrastructure,
     executionProxyBaseUrl,
     nlpInternalSecret,
+    privateEndpointsSigningKey,
     platformChain,
     environment,
   }: {
@@ -450,11 +486,18 @@ export class ModelProviderModule implements ModelProviderApi {
     infrastructure: ModelProviderInfrastructure;
     executionProxyBaseUrl: string;
     nlpInternalSecret: string | undefined;
+    privateEndpointsSigningKey: string | undefined;
     platformChain: PlatformProviderChainService;
     environment: Readonly<Record<string, string | undefined>>;
   }) {
     this.platformChain = platformChain;
     this.#dataPrivacy = dependencies.dataPrivacy;
+    this.#privateEndpoints = PrivateModelEndpointService.create({
+      repository: repositories.privateEndpoints,
+      ids: infrastructure.ids,
+      projects: dependencies.projects,
+      signingKey: privateEndpointsSigningKey,
+    });
     this.#modelProviders = ModelProviderGateway.create({
       repository: repositories.providers,
       defaults: repositories.defaults,
@@ -471,6 +514,7 @@ export class ModelProviderModule implements ModelProviderApi {
       ids: infrastructure.ids,
       codexTokenRefresher: infrastructure.codexTokenRefresher,
       connectionRateLimiter: infrastructure.connectionRateLimiter,
+      privateEndpoints: this.#privateEndpoints,
       isOwnDecisionModelAllowed: ({ organizationId }) =>
         dependencies.featureFlags.isEnabled("release_instant_evals_own_decision_model", {
           kind: "organization",
@@ -483,6 +527,12 @@ export class ModelProviderModule implements ModelProviderApi {
     this.#credentialProbe = infrastructure.credentialProbe;
     this.#codexAccounts = infrastructure.codexAccounts;
     this.#spans = infrastructure.spans;
+    this.#langevalsExecution = ModelProviderLangevalsExecutionService.create({
+      modelProviders: this,
+      privateEndpoints: this.#privateEndpoints,
+      executionProxyBaseUrl,
+      nlpInternalSecret,
+    });
     // The same install-wide fallback map `ModelProviderBuildConfig.environment` carries.
     this.#evaluatorModelEnv = ModelProviderEvaluatorModelEnvService.create({
       modelProviders: this,
@@ -495,6 +545,7 @@ export class ModelProviderModule implements ModelProviderApi {
       executionProxyBaseUrl,
       nlpInternalSecret,
       metering,
+      privateEndpoints: this.#privateEndpoints,
     });
     const execution = ModelProviderExecutionHandleService.create({
       modelProviders: this.#modelProviders,
@@ -502,6 +553,7 @@ export class ModelProviderModule implements ModelProviderApi {
       executionProxyBaseUrl,
       nlpInternalSecret,
       metering,
+      privateEndpoints: this.#privateEndpoints,
     });
     this.#structuredGeneration = ModelProviderStructuredGenerationService.create({
       execution,
@@ -548,9 +600,15 @@ export class ModelProviderModule implements ModelProviderApi {
     return this.#modelProviders.prepareExecution(input);
   }
 
+  prepareLangevalsExecution(
+    input: ModelProviderExecutionPrepareInput,
+  ): Promise<LangevalsModelCall> {
+    return this.#langevalsExecution.prepare(input);
+  }
+
   prepareEvaluatorModelEnv(
     input: ModelProviderEvaluatorModelEnvInput,
-  ): Promise<Record<string, string>> {
+  ): Promise<ModelProviderEvaluatorModelEnv> {
     return this.#evaluatorModelEnv.prepare(input);
   }
 
@@ -621,17 +679,22 @@ export class ModelProviderModule implements ModelProviderApi {
     input: ModelProviderCredentialProbeRequest,
     by: ModelProviderCaller,
   ): Promise<ModelProviderCredentialVerdict> {
-    await this.#providerAuthorization.assertCanWrite(by.id, [probedTenantScope(input)]);
+    const scope = probedTenantScope(input);
+    await this.#providerAuthorization.assertCanWrite(by.id, [scope]);
 
     return this.#credentialProbe.probe({
       provider: input.provider,
       customKeys: input.customKeys,
       model: input.model,
+      privateEndpoints:
+        scope.scopeType === "PROJECT"
+          ? await this.#privateEndpoints.bindingsForProject({ projectId: scope.scopeId })
+          : await this.#privateEndpoints.bindingsForOrganization({ organizationId: scope.scopeId }),
     });
   }
 
   /** Probes the stored (or environment-fed) credential against a base URL. */
-  validateStoredKey(
+  async validateStoredKey(
     input: ModelProviderStoredCredentialProbeRequest,
   ): Promise<ModelProviderCredentialVerdict> {
     return this.#credentialProbe.probeStored({
@@ -639,6 +702,9 @@ export class ModelProviderModule implements ModelProviderApi {
       provider: input.provider,
       customBaseUrl: input.customBaseUrl,
       modelProviders: this.#modelProviders,
+      privateEndpoints: await this.#privateEndpoints.bindingsForProject({
+        projectId: input.projectId,
+      }),
     });
   }
 
@@ -762,6 +828,73 @@ export class ModelProviderModule implements ModelProviderApi {
         this.platformChain.with("vertex_ai", credential),
       )
       .chain();
+  }
+
+  // ── private model endpoints (ADR-203) ──────────────────────────────────────
+
+  privateEndpointBindingsForOrganization(input: {
+    organizationId: string;
+  }): Promise<PrivateEndpointBindingWire[]> {
+    return this.#privateEndpoints.bindingsForOrganization(input);
+  }
+
+  privateEndpointBindingsForProject(input: {
+    projectId: string;
+  }): Promise<PrivateEndpointBindingWire[]> {
+    return this.#privateEndpoints.bindingsForProject(input);
+  }
+
+  privateEndpointsHeadersForProject(input: {
+    projectId: string;
+    ttlSeconds?: number | undefined;
+  }): Promise<PrivateEndpointsHeaders> {
+    return this.#privateEndpoints.headersForProject(input);
+  }
+
+  listPrivateEndpointsForOrganization(input: {
+    organizationId: string;
+  }): Promise<OrganizationPrivateModelEndpoint[]> {
+    return this.#privateEndpoints.listForOrganization(input);
+  }
+
+  bindPrivateEndpointHostname(
+    input: PrivateModelEndpointBindInput,
+    by: ModelProviderCaller,
+  ): Promise<PrivateModelEndpointBinding> {
+    return this.#privateEndpoints.bind({ ...input, actorId: by.id });
+  }
+
+  rebindPrivateEndpointHostname(
+    input: PrivateModelEndpointRebindInput,
+  ): Promise<PrivateModelEndpointBinding> {
+    return this.#privateEndpoints.rebind(input);
+  }
+
+  unbindPrivateEndpointHostname(input: PrivateModelEndpointUnbindInput): Promise<void> {
+    return this.#privateEndpoints.unbind(input);
+  }
+
+  listPrivateEndpointsForStaff(input: {
+    organizationId: string;
+  }): Promise<StaffPrivateModelEndpoint[]> {
+    return this.#privateEndpoints.listForStaff(input);
+  }
+
+  registerPrivateEndpoint(
+    input: PrivateModelEndpointRegisterInput,
+    by: ModelProviderCaller,
+  ): Promise<StaffPrivateModelEndpoint> {
+    return this.#privateEndpoints.register({ ...input, actorId: by.id });
+  }
+
+  updatePrivateEndpoint(
+    input: PrivateModelEndpointUpdateInput,
+  ): Promise<StaffPrivateModelEndpoint> {
+    return this.#privateEndpoints.update(input);
+  }
+
+  removePrivateEndpoint(input: PrivateModelEndpointRemoveInput): Promise<void> {
+    return this.#privateEndpoints.remove(input);
   }
 
   // ── default models ─────────────────────────────────────────────────────────

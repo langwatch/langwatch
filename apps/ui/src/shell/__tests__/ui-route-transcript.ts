@@ -58,6 +58,7 @@ export const expectedUiRouteTranscript: readonly string[] = [
   "    redirect /settings/members -> /settings/directory (from /settings/members)",
   "    route /settings/model-costs -> pages/settings/model-costs",
   "    route /settings/model-providers -> pages/settings/model-providers",
+  "    route /settings/private-endpoints -> pages/settings/private-endpoints",
   "    route /settings/plans -> pages/settings/plans",
   "    route /settings/roles -> pages/settings/roles",
   "    route /settings/braids -> pages/settings/braids",

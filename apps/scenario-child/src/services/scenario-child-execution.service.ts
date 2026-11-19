@@ -179,15 +179,18 @@ function buildRunCast({
     jobData.target.type === "voice"
       ? buildCallerVoiceSimulatorConfig(jobData.callerVoice ?? DEFAULT_CALLER_VOICE)
       : null;
+  const { privateEndpointsHeaders } = jobData;
   const simulatorModel = models.model({
     litellmParams: roleModelParams.simulator,
     nlpServiceUrl,
     nlpInternalSecret,
+    privateEndpointsHeaders,
   });
   const judgeModel = models.judgeModel({
     litellmParams: roleModelParams.judge,
     nlpServiceUrl,
     nlpInternalSecret,
+    privateEndpointsHeaders,
   });
   const baseJudge = ScenarioRunner.judgeAgent({ criteria: scenario.criteria, model: judgeModel });
   if (isRedTeamRun(scenario)) {
@@ -470,6 +473,7 @@ async function executeScenarioChildValue({
     httpPort: runtime.httpPort,
     logger,
     run: callRunOf(jobData),
+    privateEndpointsHeaders: jobData.privateEndpointsHeaders,
   });
   const hookTarget = hookTargetOf({ jobData, adapter });
   const cast = buildRunCast({

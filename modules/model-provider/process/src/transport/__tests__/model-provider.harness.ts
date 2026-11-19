@@ -83,9 +83,13 @@ export class RecordingCredentialProbe extends ModelProviderCredentialProbe {
     super();
   }
 
-  probe(input: {
+  probe({
+    privateEndpoints: _bindings,
+    ...input
+  }: {
     provider: string;
     customKeys: Record<string, string>;
+    privateEndpoints?: unknown;
   }): Promise<ModelProviderCredentialVerdict> {
     this.probed.push(input);
 
@@ -189,6 +193,7 @@ function forwarded(app: ModelProviderModule): ModelProviderApi {
     findRowServingModel: (...args) => app.findRowServingModel(...args),
     getExecutionProviders: (...args) => app.getExecutionProviders(...args),
     prepareExecution: (...args) => app.prepareExecution(...args),
+    prepareLangevalsExecution: (...args) => app.prepareLangevalsExecution(...args),
     prepareEvaluatorModelEnv: (...args) => app.prepareEvaluatorModelEnv(...args),
     generateStructured: (...args) => app.generateStructured(...args),
     generateText: (...args) => app.generateText(...args),
@@ -227,5 +232,18 @@ function forwarded(app: ModelProviderModule): ModelProviderApi {
     resolveDecisionModel: (...args) => app.resolveDecisionModel(...args),
     listDecisionModelsForProject: (...args) => app.listDecisionModelsForProject(...args),
     listDecisionModelsForScopes: (...args) => app.listDecisionModelsForScopes(...args),
+    privateEndpointBindingsForOrganization: (...args) =>
+      app.privateEndpointBindingsForOrganization(...args),
+    privateEndpointBindingsForProject: (...args) => app.privateEndpointBindingsForProject(...args),
+    privateEndpointsHeadersForProject: (...args) => app.privateEndpointsHeadersForProject(...args),
+    listPrivateEndpointsForOrganization: (...args) =>
+      app.listPrivateEndpointsForOrganization(...args),
+    bindPrivateEndpointHostname: (...args) => app.bindPrivateEndpointHostname(...args),
+    rebindPrivateEndpointHostname: (...args) => app.rebindPrivateEndpointHostname(...args),
+    unbindPrivateEndpointHostname: (...args) => app.unbindPrivateEndpointHostname(...args),
+    listPrivateEndpointsForStaff: (...args) => app.listPrivateEndpointsForStaff(...args),
+    registerPrivateEndpoint: (...args) => app.registerPrivateEndpoint(...args),
+    updatePrivateEndpoint: (...args) => app.updatePrivateEndpoint(...args),
+    removePrivateEndpoint: (...args) => app.removePrivateEndpoint(...args),
   };
 }

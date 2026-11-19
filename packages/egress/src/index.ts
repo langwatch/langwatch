@@ -6,11 +6,14 @@ export {
   isPrivateOrLocalhostIP,
 } from "./ssrf/url-validator.ts";
 export type {
+  PrivateEndpointBinding,
   SsrfAllowlistedResult,
+  SsrfBoundResult,
   SsrfPolicy,
   SsrfResolvedResult,
   SsrfUnresolvedResult,
   SsrfUrlValidator,
+  SsrfValidationOptions,
   SsrfValidationResult,
 } from "./ssrf/url-validator.ts";
 export {

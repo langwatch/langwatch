@@ -2811,3 +2811,46 @@ describe("prefetchWithFixture, when choosing where the child posts a turn", () =
     });
   });
 });
+
+describe("prefetchWithFixture, given the organization bound a hostname to a private endpoint", () => {
+  const signed = {
+    "X-LangWatch-Private-Endpoints": "signed-for-the-project",
+    "X-LangWatch-Project-Id": "proj_123",
+  };
+  const promptDeps = (privateEndpointsHeaders: Record<string, string>) =>
+    createMockDeps({
+      privateEndpointsHeaders,
+      promptFetcher: {
+        findByIdOrHandle: vi.fn().mockResolvedValue({
+          id: "prompt_123",
+          prompt: "You are helpful",
+          messages: [],
+          model: "openai/gpt-4",
+        }),
+      },
+    });
+
+  describe("when the run is prepared", () => {
+    it("hands the child the signed headers for its model calls", async () => {
+      const result = await prefetchWithFixture({
+        context: defaultContext,
+        target: { type: "prompt", referenceId: "prompt_123" },
+        deps: promptDeps(signed),
+      });
+
+      expect(result.success && result.data.privateEndpointsHeaders).toEqual(signed);
+    });
+  });
+
+  describe("when the organization bound nothing", () => {
+    it("leaves the field out of the job", async () => {
+      const result = await prefetchWithFixture({
+        context: defaultContext,
+        target: { type: "prompt", referenceId: "prompt_123" },
+        deps: promptDeps({}),
+      });
+
+      expect(result.success && "privateEndpointsHeaders" in result.data).toBe(false);
+    });
+  });
+});

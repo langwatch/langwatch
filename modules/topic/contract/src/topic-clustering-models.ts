@@ -7,6 +7,15 @@ export interface TopicClusteringProviderConfig {
   readonly enabled: boolean;
 }
 
+/**
+ * One model call the clustering service makes: its litellm parameters, and the headers langevals
+ * must be posted with for it (empty unless the call goes through nlpgo's proxy, ADR-203).
+ */
+export interface TopicClusteringModelCall {
+  readonly parameters: Record<string, string>;
+  readonly headers: Record<string, string>;
+}
+
 export abstract class TopicClusteringModels<
   ProviderConfig extends TopicClusteringProviderConfig = TopicClusteringProviderConfig,
 > {
@@ -18,9 +27,9 @@ export abstract class TopicClusteringModels<
     projectId: string,
   ): Promise<{ model: string; modelProvider: ProviderConfig }>;
 
-  abstract prepareLitellmParams(params: {
+  abstract prepareModelCall(params: {
     model: string;
     modelProvider: ProviderConfig;
     projectId: string;
-  }): Promise<Record<string, string>>;
+  }): Promise<TopicClusteringModelCall>;
 }

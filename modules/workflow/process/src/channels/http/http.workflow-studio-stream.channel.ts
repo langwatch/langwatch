@@ -42,6 +42,7 @@ export class HttpWorkflowStudioStreamAdapter implements WorkflowStudioStream {
         "Content-Type": "application/json",
         "X-LangWatch-Origin": input.origin,
         ...nlpInternalSecretHeaders({ secret: this.options.internalSecret }),
+        ...input.privateEndpointsHeaders,
         ...s3CacheKeyHeaders({
           projectId: input.projectId,
           salt: this.options.cacheKeySalt,

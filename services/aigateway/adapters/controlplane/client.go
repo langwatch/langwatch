@@ -390,10 +390,17 @@ func (c *Client) FetchConfig(ctx context.Context, vkID, ifNoneMatch string) (dom
 	if err != nil {
 		return domain.ConfigFetchResult{}, fmt.Errorf("config fetch expires_at: %w", err)
 	}
+	// Malformed private endpoint bindings fail the whole fetch for the same
+	// reason: the caller keeps the bundle it holds rather than one whose
+	// bound hostnames would silently fall back to DNS.
+	privateEndpoints, err := wire.privateEndpoints()
+	if err != nil {
+		return domain.ConfigFetchResult{}, fmt.Errorf("config fetch private_endpoints: %w", err)
+	}
 	// A response with no ETag header stores none, so the next fetch goes out
 	// unconditional and gets the config outright.
 	return domain.ConfigFetchResult{
-		Config:                wire.toDomain(),
+		Config:                withPrivateEndpoints(wire.toDomain(), privateEndpoints),
 		ETag:                  resp.Header.Get("ETag"),
 		VirtualKeyExpiresAt:   keyExpiry,
 		VirtualKeyExpiryKnown: keyExpiryKnown,

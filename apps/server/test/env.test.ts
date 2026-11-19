@@ -83,6 +83,32 @@ describe("buildEnv", () => {
       expect(value).toMatch(/^[a-f0-9]{64}$/);
     });
 
+    it("generates one Ed25519 pair for signing and checking private endpoint bindings", async () => {
+      const { createPrivateKey, createPublicKey, sign, verify } = await import("node:crypto");
+      const valueOf = (key: string) =>
+        env
+          .split("\n")
+          .find((line) => line.startsWith(`${key}=`))
+          ?.slice(key.length + 1) ?? "";
+      const seed = Buffer.from(valueOf("LANGWATCH_PRIVATE_ENDPOINTS_SIGNING_KEY"), "base64");
+      const raw = Buffer.from(valueOf("LANGWATCH_PRIVATE_ENDPOINTS_VERIFY_KEY"), "base64");
+      expect(seed).toHaveLength(32);
+      expect(raw).toHaveLength(32);
+
+      const privateKey = createPrivateKey({
+        key: Buffer.concat([Buffer.from("302e020100300506032b657004220420", "hex"), seed]),
+        format: "der",
+        type: "pkcs8",
+      });
+      const publicKey = createPublicKey({
+        key: Buffer.concat([Buffer.from("302a300506032b6570032100", "hex"), raw]),
+        format: "der",
+        type: "spki",
+      });
+      const message = Buffer.from("envelope");
+      expect(verify(null, message, publicKey, sign(null, message, privateKey))).toBe(true);
+    });
+
     it("does not force the removed Go-engine feature flag (routing is unconditional)", () => {
       expect(env).not.toContain("release_nlp_go_engine_enabled");
       expect(env).not.toContain("LANGWATCH_NPX_NLP");

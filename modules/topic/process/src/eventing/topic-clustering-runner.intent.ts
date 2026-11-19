@@ -15,6 +15,7 @@ import {
   type TopicClusteringTopic,
   type TopicClusteringTrace,
   type TopicClusteringModels,
+  type TopicClusteringProviderConfig,
 } from "@langwatch/topic-contract";
 import type { TraceApi } from "@langwatch/trace-contract";
 
@@ -363,28 +364,13 @@ const batchClusterTraces = async ({
   if (!topicModel) {
     return { kind: "not_configured" };
   }
-  const embeddingsModel = await deps.models.resolveEmbeddingsModel(projectId);
+  const calls = await clusteringModelCalls({ deps, projectId, topicModel });
   const fetched = await requestClustering(deps, {
     projectId,
     mode: "batch",
     ...requestKeyOf(runContext),
-    params: {
-      project_id: projectId,
-      litellm_params: await deps.models.prepareLitellmParams({
-        model: topicModel.model,
-        modelProvider: topicModel.modelProvider,
-        projectId,
-      }),
-      embeddings_litellm_params: {
-        ...(await deps.models.prepareLitellmParams({
-          model: embeddingsModel.model,
-          modelProvider: embeddingsModel.modelProvider,
-          projectId,
-        })),
-        dimensions: OPENAI_EMBEDDING_DIMENSION,
-      },
-      traces,
-    },
+    headers: calls.headers,
+    params: { project_id: projectId, ...calls.params, traces },
   });
 
   if (fetched.kind === "not_configured") {
@@ -442,30 +428,13 @@ const incrementalClustering = async ({
   if (!topicModel) {
     return { kind: "not_configured" };
   }
-  const embeddingsModel = await deps.models.resolveEmbeddingsModel(projectId);
+  const calls = await clusteringModelCalls({ deps, projectId, topicModel });
   const fetched = await requestClustering(deps, {
     projectId,
     mode: "incremental",
     ...requestKeyOf(runContext),
-    params: {
-      project_id: projectId,
-      litellm_params: await deps.models.prepareLitellmParams({
-        model: topicModel.model,
-        modelProvider: topicModel.modelProvider,
-        projectId,
-      }),
-      embeddings_litellm_params: {
-        ...(await deps.models.prepareLitellmParams({
-          model: embeddingsModel.model,
-          modelProvider: embeddingsModel.modelProvider,
-          projectId,
-        })),
-        dimensions: OPENAI_EMBEDDING_DIMENSION,
-      },
-      traces,
-      topics,
-      subtopics,
-    },
+    headers: calls.headers,
+    params: { project_id: projectId, ...calls.params, traces, topics, subtopics },
   });
 
   if (fetched.kind === "not_configured") {
@@ -643,6 +612,34 @@ function assignmentOccurredAt(traceOccurredAtMs: number | undefined): number {
     ? traceOccurredAtMs
     : nowInstant().epochMilliseconds;
 }
+
+/**
+ * The naming and embeddings calls' litellm parameters, and the headers langevals is posted with:
+ * a call to a bound host goes through nlpgo's proxy and needs them (ADR-203).
+ */
+const clusteringModelCalls = async ({
+  deps,
+  projectId,
+  topicModel,
+}: {
+  deps: TopicClusteringRunnerDeps;
+  projectId: string;
+  topicModel: { model: string; modelProvider: TopicClusteringProviderConfig };
+}) => {
+  const embeddingsModel = await deps.models.resolveEmbeddingsModel(projectId);
+  const naming = await deps.models.prepareModelCall({ ...topicModel, projectId });
+  const embeddings = await deps.models.prepareModelCall({ ...embeddingsModel, projectId });
+  return {
+    headers: { ...naming.headers, ...embeddings.headers },
+    params: {
+      litellm_params: naming.parameters,
+      embeddings_litellm_params: {
+        ...embeddings.parameters,
+        dimensions: OPENAI_EMBEDDING_DIMENSION,
+      },
+    },
+  };
+};
 
 /** The outbox page a clustering call serves, so a retried page reports its spend once. */
 const requestKeyOf = (runContext: ClusteringRunContext | undefined): { requestKey?: string } =>

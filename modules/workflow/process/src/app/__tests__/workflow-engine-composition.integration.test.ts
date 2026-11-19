@@ -37,6 +37,7 @@ async function appAt({
     relayTurnCeilingMs: void 0,
     publicBaseUrl: void 0,
     nlpCodeBlockTimeoutSeconds: void 0,
+    privateEndpointsVerifyKey: void 0,
   };
   const secrets = new ScopedSecrets(async (handle, build) =>
     build(handle === nlpInternalSecret ? internalSecret : undefined),
@@ -44,7 +45,11 @@ async function appAt({
   return WorkflowModule.create({
     dependencies: {
       modelProviders: createApiFixture<ModelProviderApi>(
-        { getForProject: async () => ({}), getExecutionProviders: async () => ({}) },
+        {
+          getForProject: async () => ({}),
+          getExecutionProviders: async () => ({}),
+          privateEndpointsHeadersForProject: async () => ({}),
+        },
         "ModelProviderApi",
       ),
       agents: createApiFixture<AgentApi>({}, "AgentApi"),

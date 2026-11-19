@@ -4,6 +4,7 @@ import { MemoryModelDefaultRepository } from "./memory.model-default.repository.
 import { MemoryModelProviderRateLimitRepository } from "./memory.model-provider-rate-limit.repository.ts";
 import { MemoryModelProviderDatabase } from "./memory.model-provider.database.ts";
 import { MemoryModelProviderRepository } from "./memory.model-provider.repository.ts";
+import { MemoryPrivateModelEndpointRepository } from "./memory.private-model-endpoint.repository.ts";
 
 /**
  * The twins over one store. No credential codec: nothing is encoded on
@@ -20,6 +21,7 @@ export class MemoryModelProviderRepositories {
       defaults: MemoryModelDefaultRepository.create({ database }),
       costs: MemoryModelCostRepository.create({ database }),
       rateLimits: MemoryModelProviderRateLimitRepository.create(),
+      privateEndpoints: MemoryPrivateModelEndpointRepository.create(),
     };
   }
 }

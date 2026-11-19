@@ -118,7 +118,7 @@ export class LangevalsEvaluatorService {
     params: LangevalsEvaluateParams,
     retriesLeft: number,
   ): Promise<SingleEvaluationResult> {
-    const { evaluatorType, data, settings, env, idempotencyKey, signal } = params;
+    const { evaluatorType, data, settings, env, headers, idempotencyKey, signal } = params;
     const url = `${this.config.endpoint}/${evaluatorType}/evaluate`;
     const startTime = performance.now();
     const controller = new AbortController();
@@ -130,7 +130,7 @@ export class LangevalsEvaluatorService {
         url,
         kind: "evaluation",
         staging: this.staging,
-        headers: idempotencyKey ? { "Idempotency-Key": idempotencyKey } : {},
+        headers: { ...headers, ...(idempotencyKey ? { "Idempotency-Key": idempotencyKey } : {}) },
         signal: withCallerSignal({ own: controller.signal, caller: signal }),
         body: evaluationBody({ evaluatorType, data, settings, env }),
       });
@@ -310,6 +310,8 @@ export type LangevalsEvaluateParams = Readonly<{
   data: Record<string, unknown>;
   settings: Record<string, unknown>;
   env: Record<string, string>;
+  /** Headers the model calls need langevals posted with (ADR-203); never part of the body. */
+  headers?: Readonly<Record<string, string>>;
   idempotencyKey?: string;
   /** The project whose stored credentials ran the evaluator; its usage is billed there. */
   projectId?: string;

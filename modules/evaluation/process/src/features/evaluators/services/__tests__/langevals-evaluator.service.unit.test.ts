@@ -69,6 +69,30 @@ afterEach(() => {
 });
 
 describe("LangevalsEvaluatorService", () => {
+  describe("given the model call goes through nlpgo's proxy", () => {
+    /** @scenario "The engine credential reaches langevals in a header, never in the body" */
+    it("posts the engine headers as headers and keeps them out of the body", async () => {
+      const fetchMock = vi.fn((_url: string, _init: RequestInit) =>
+        Promise.resolve(Response.json([{ status: "processed", passed: true, score: 1 }])),
+      );
+      vi.stubGlobal("fetch", fetchMock);
+
+      await httpService().evaluate({
+        ...params,
+        headers: { "X-LangWatch-NLP-Secret": "engine-secret" },
+        idempotencyKey: "key-1",
+      });
+
+      const init = fetchMock.mock.calls[0]![1];
+      expect(init.headers).toMatchObject({
+        "X-LangWatch-NLP-Secret": "engine-secret",
+        "Idempotency-Key": "key-1",
+      });
+      expect(init.body).toBeInstanceOf(Uint8Array);
+      expect(new TextDecoder().decode(init.body as Uint8Array)).not.toContain("engine-secret");
+    });
+  });
+
   describe("given the evaluator service does not answer before the timeout", () => {
     describe("when the failure reaches the caller", () => {
       /** @scenario "An evaluator timeout names the evaluator, not the address dialled" */

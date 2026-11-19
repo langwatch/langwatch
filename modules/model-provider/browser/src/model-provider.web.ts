@@ -10,13 +10,13 @@ import {
   ModelDisplayToken,
   ModelSelectorToken,
 } from "@langwatch/model-provider-client";
-import { modelProviderTrpc } from "@langwatch/model-provider-contract";
+import { modelProviderTrpc, privateModelEndpointTrpc } from "@langwatch/model-provider-contract";
 
 import { modelProviderApi } from "./behavior/model-provider-api.ts";
 import { reportModelFailure } from "./ui/sections/model-failure-interceptor/index.ts";
 
 export const modelProviderWeb = defineBrowserModule("model-provider")
-  .withApi(modelProviderApi, { contracts: [modelProviderTrpc] })
+  .withApi(modelProviderApi, { contracts: [modelProviderTrpc, privateModelEndpointTrpc] })
   // specs/model-providers/missing-model-popup.feature
   .withFailureInterceptors([reportModelFailure])
   .withHosts({
@@ -39,6 +39,14 @@ export const modelProviderWeb = defineBrowserModule("model-provider")
       within: "settings",
       label: "Model costs",
       load: () => import("./ui/sections/model-costs-screen.tsx"),
+    },
+    // ADR-203: the organization binds its own hostnames to the endpoints staff registered.
+    "pages/settings/private-endpoints": {
+      path: "/settings/private-endpoints",
+      within: "settings",
+      label: "Private endpoints",
+      requires: "organization:manage",
+      load: () => import("./features/private-endpoints/ui/sections/private-endpoints.screen.tsx"),
     },
   })
   /** The names are the wire (§10): Settings and evaluator open these by address. */

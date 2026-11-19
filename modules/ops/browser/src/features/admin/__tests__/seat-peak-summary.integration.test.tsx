@@ -32,6 +32,14 @@ vi.mock("../../../behavior/ops-api.ts", () => ({
       },
     },
     ssoConnections: { getAll: { useQuery: () => ({ data: { connections: [], total: 0 } }) } },
+    // The drawer also lists private endpoints; they stay loading here.
+    useUtils: () => ({}),
+    privateModelEndpoint: {
+      listForStaff: { useQuery: () => ({ data: undefined, isLoading: true }) },
+      register: { useMutation: () => ({}) },
+      update: { useMutation: () => ({}) },
+      remove: { useMutation: () => ({}) },
+    },
   },
 }));
 

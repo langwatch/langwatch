@@ -259,6 +259,10 @@ export class AgentTestService {
       throw new AgentTestRefusedError({ reason: prefetch.error });
     }
 
+    const privateEndpointsHeaders =
+      await this.options.modelProviders.privateEndpointsHeadersForProject({
+        projectId: input.projectId,
+      });
     const answer = await this.options.turns.run({
       job: {
         kind: "agent-test-turn",
@@ -268,6 +272,9 @@ export class AgentTestService {
         message: input.message,
         timeoutMs: this.options.maxCallTimeoutMs,
         nlpTimeouts: usableTimeouts(this.options.nlpTimeouts),
+        ...(Object.keys(privateEndpointsHeaders).length > 0
+          ? { privateEndpointsHeaders: { ...privateEndpointsHeaders } }
+          : {}),
       },
       environment: { labels: prefetch.data.scenario.labels, telemetry: prefetch.telemetry },
       logContext: { projectId: input.projectId, scenarioId: AGENT_TEST_SCENARIO_ID },

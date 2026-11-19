@@ -7,11 +7,13 @@ package nlpgo
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"strings"
 
 	"github.com/langwatch/langwatch/pkg/clog"
 	"github.com/langwatch/langwatch/pkg/config"
+	gatewaydomain "github.com/langwatch/langwatch/services/aigateway/domain"
 	"github.com/langwatch/langwatch/services/nlpgo/app"
 )
 
@@ -34,10 +36,15 @@ type Config struct {
 	// Spelled without the NLPGO_ prefix because the app reads the same
 	// variable, and in docker compose both read one .env file. One name, one
 	// value, no way for the two sides to disagree.
-	InternalSecret string        `env:"LANGWATCH_NLP_INTERNAL_SECRET"`
-	Server         config.Server `env:"SERVER"`
-	Log            clog.Config   `env:"LOG"`
-	OTel           config.OTel   `env:"OTEL"`
+	InternalSecret string `env:"LANGWATCH_NLP_INTERNAL_SECRET"`
+	// PrivateEndpointsVerifyKey is the Ed25519 public key (base64 of the 32
+	// raw bytes) the app's signed private endpoint bindings are checked with
+	// (ADR-203). Empty ignores every binding. A public key, so it may sit in
+	// any environment, including a per-project NLP Lambda's.
+	PrivateEndpointsVerifyKey string        `env:"LANGWATCH_PRIVATE_ENDPOINTS_VERIFY_KEY"`
+	Server                    config.Server `env:"SERVER"`
+	Log                       clog.Config   `env:"LOG"`
+	OTel                      config.OTel   `env:"OTEL"`
 
 	// LangWatchEndpoint is where customer studio traces route (see configureNLPGoOTel).
 	LangWatchEndpoint string `env:"LANGWATCH_ENDPOINT"`
@@ -180,6 +187,10 @@ func LoadConfig(ctx context.Context) (Config, error) {
 	// configured", or the engine starts demanding a secret nothing can
 	// present and refuses every request the app makes.
 	cfg.InternalSecret = strings.TrimSpace(cfg.InternalSecret)
+	cfg.PrivateEndpointsVerifyKey = strings.TrimSpace(cfg.PrivateEndpointsVerifyKey)
+	if _, err := gatewaydomain.ParsePrivateEndpointsVerifyKey(cfg.PrivateEndpointsVerifyKey); err != nil {
+		return Config{}, fmt.Errorf("LANGWATCH_PRIVATE_ENDPOINTS_VERIFY_KEY: %w", err)
+	}
 	cfg.OTel.SampleRatioSet = os.Getenv("OTEL_SAMPLE_RATIO") != ""
 	if err := cfg.OTel.Resolve(); err != nil {
 		return Config{}, err

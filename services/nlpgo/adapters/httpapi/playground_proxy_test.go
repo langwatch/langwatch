@@ -653,3 +653,72 @@ func TestPlaygroundProxy_DoublyPrefixedReasoningModelKeepsTheNameRule(t *testing
 	assert.NotContains(t, string(fake.gotRequest.Body), `"max_tokens"`)
 	assert.Contains(t, string(fake.gotRequest.Body), `"max_completion_tokens"`)
 }
+
+// A typed route never hands its caller a redirect: the caller's SDK would
+// follow it with every header it sent here, the engine credential included.
+func TestPlaygroundProxy_TypedRouteNeverReturnsARedirect(t *testing.T) {
+	noFollow := &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error {
+		return http.ErrUseLastResponse
+	}}
+	post := func(t *testing.T, srv *httptest.Server, path string) *http.Response {
+		t.Helper()
+		body := `{"model":"openai/gpt-5-mini","messages":[{"role":"user","content":"hi"}]}`
+		req, _ := http.NewRequest(http.MethodPost, srv.URL+path, strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("x-litellm-model", "openai/gpt-5-mini")
+		req.Header.Set("x-litellm-api_key", "sk-test")
+		resp, err := noFollow.Do(req)
+		require.NoError(t, err)
+		t.Cleanup(func() { _ = resp.Body.Close() })
+		return resp
+	}
+
+	for _, status := range []int{301, 302, 303, 307, 308} {
+		t.Run("upstream answers "+http.StatusText(status), func(t *testing.T) {
+			fake := &fakeProxy{syncResp: &playgroundProxyResponse{
+				StatusCode: status,
+				Headers:    http.Header{"Location": []string{"https://elsewhere.test/v1"}},
+			}}
+			srv := newProxyTestServer(t, fake)
+
+			resp := post(t, srv, "/go/proxy/v1/chat/completions")
+
+			assert.Equal(t, http.StatusBadGateway, resp.StatusCode)
+			assert.Empty(t, resp.Header.Get("Location"))
+			body, _ := io.ReadAll(resp.Body)
+			assert.Contains(t, string(body), "upstream_redirect")
+			assert.NotContains(t, string(body), "elsewhere.test")
+		})
+	}
+
+	t.Run("a non-redirect answer loses its Location header", func(t *testing.T) {
+		fake := &fakeProxy{syncResp: &playgroundProxyResponse{
+			StatusCode: http.StatusOK,
+			Headers: http.Header{
+				"Content-Type": []string{"application/json"},
+				"Location":     []string{"https://elsewhere.test/v1"},
+			},
+			Body: []byte(`{"id":"chatcmpl-1"}`),
+		}}
+		srv := newProxyTestServer(t, fake)
+
+		resp := post(t, srv, "/go/proxy/v1/chat/completions")
+
+		assert.Equal(t, http.StatusOK, resp.StatusCode)
+		assert.Empty(t, resp.Header.Get("Location"))
+	})
+
+	t.Run("passthrough keeps the provider's answer verbatim", func(t *testing.T) {
+		fake := &fakeProxy{syncResp: &playgroundProxyResponse{
+			StatusCode: http.StatusFound,
+			Headers:    http.Header{"Location": []string{"https://elsewhere.test/v1"}},
+		}}
+		srv := newProxyTestServer(t, fake)
+
+		resp := post(t, srv, "/go/proxy/v1beta/models/gemini-2.0-flash:generateContent")
+
+		assert.Equal(t, domain.RequestTypePassthrough, fake.gotRequest.Type)
+		assert.Equal(t, http.StatusFound, resp.StatusCode)
+		assert.Equal(t, "https://elsewhere.test/v1", resp.Header.Get("Location"))
+	})
+}

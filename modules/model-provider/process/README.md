@@ -6,7 +6,7 @@ The server half of [model-provider](../README.md). Model providers: the provider
 
 ## Installation
 
-`defineProcessModule("model-provider").withRepositories(modelProviderRepositories).withChannels(modelProviderChannels).withApi(ModelProviderModule).withTransports(modelProviderRest, modelDefaultsRest, playgroundRest, modelProviderTrpcTransport, llmModelCostTrpcTransport, translateTrpcTransport).provideMiddlewareContext(…).withTasks(…).withMigrations(…)`, `src/model-provider.module.ts:26`.
+`defineProcessModule("model-provider").withRepositories(modelProviderRepositories).withChannels(modelProviderChannels).withApi(ModelProviderModule).withTransports(modelProviderRest, modelDefaultsRest, playgroundRest, modelProviderTrpcTransport, llmModelCostTrpcTransport, translateTrpcTransport, privateModelEndpointTrpcTransport).provideMiddlewareContext(…).withTasks(…).withMigrations(…)`, `src/model-provider.module.ts:27`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 Callable model-provider operations shared by process peers after composition.
 
-Peers call these through the token, declared at `../contract/src/model-provider.api.ts:199`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/model-provider.api.ts:219`; nothing else in this package is public.
 
 #### `estimateCost`
 
@@ -72,12 +72,20 @@ getExecutionProviders(input: ModelProviderListProjectInput): Promise<Record<stri
 prepareExecution(input: ModelProviderExecutionPrepareInput): Promise<ModelProviderExecutionParameters>;
 ```
 
-#### `prepareEvaluatorModelEnv`
+#### `prepareLangevalsExecution`
 
-The `X_LITELLM_*` (or `X_LITELLM_EMBEDDINGS_*`) block an evaluator calls `model` with; throws `EvaluatorConfigError` when the provider is unconfigured, disabled or does not serve the model.
+The parameters langevals calls `model` with, and the headers to post to langevals with. A call whose base URL host is bound goes through nlpgo's proxy (ADR-203); any other is unchanged.
 
 ```typescript
-prepareEvaluatorModelEnv(input: ModelProviderEvaluatorModelEnvInput): Promise<Record<string, string>>;
+prepareLangevalsExecution(input: ModelProviderExecutionPrepareInput): Promise<LangevalsModelCall>;
+```
+
+#### `prepareEvaluatorModelEnv`
+
+The `X_LITELLM_*` (or `X_LITELLM_EMBEDDINGS_*`) block an evaluator calls `model` with, and the headers to post to langevals with; throws `EvaluatorConfigError` when the provider is unconfigured, disabled or does not serve the model.
+
+```typescript
+prepareEvaluatorModelEnv(input: ModelProviderEvaluatorModelEnvInput): Promise<ModelProviderEvaluatorModelEnv>;
 ```
 
 #### `generateStructured`
@@ -376,6 +384,86 @@ One row's decrypted custom keys, for a peer with no session to authorize with (t
 
 ```typescript
 getCustomKeys(input: { modelProviderId: string }): Promise<ModelProviderCustomKeys>;
+```
+
+#### `privateEndpointBindingsForOrganization`
+
+The organization's hostname bindings in the wire shape nlpgo and the gateway read; empty when it has none. Only model calls send these: never HTTP blocks, webhooks or agent targets.
+
+```typescript
+privateEndpointBindingsForOrganization(input: { organizationId: string; }): Promise<PrivateEndpointBindingWire[]>;
+```
+
+#### `privateEndpointBindingsForProject`
+
+The same, for the organization a project belongs to; empty for an unknown project.
+
+```typescript
+privateEndpointBindingsForProject(input: { projectId: string; }): Promise<PrivateEndpointBindingWire[]>;
+```
+
+#### `privateEndpointsHeadersForProject`
+
+The headers that carry a project's bindings to nlpgo (ADR-203): the organization's bindings, signed for this project, and the project id. Spread them into the request's headers. Empty when nothing is bound or no signing key is set. Valid for `ttlSeconds` (default 15 minutes).
+
+```typescript
+privateEndpointsHeadersForProject(input: { projectId: string; ttlSeconds?: number | undefined; }): Promise<PrivateEndpointsHeaders>;
+```
+
+#### `listPrivateEndpointsForOrganization`
+
+The organization's endpoints and bound hostnames, never their addresses.
+
+```typescript
+listPrivateEndpointsForOrganization(input: { organizationId: string; }): Promise<OrganizationPrivateModelEndpoint[]>;
+```
+
+#### `bindPrivateEndpointHostname`
+
+Binds a hostname to one of the organization's own endpoints; another's is not found.
+
+```typescript
+bindPrivateEndpointHostname(input: PrivateModelEndpointBindInput, by: ModelProviderCaller): Promise<PrivateModelEndpointBinding>;
+```
+
+#### `rebindPrivateEndpointHostname`
+
+```typescript
+rebindPrivateEndpointHostname(input: PrivateModelEndpointRebindInput): Promise<PrivateModelEndpointBinding>;
+```
+
+#### `unbindPrivateEndpointHostname`
+
+```typescript
+unbindPrivateEndpointHostname(input: PrivateModelEndpointUnbindInput): Promise<void>;
+```
+
+#### `listPrivateEndpointsForStaff`
+
+Ops: one organization's endpoints with their addresses.
+
+```typescript
+listPrivateEndpointsForStaff(input: { organizationId: string; }): Promise<StaffPrivateModelEndpoint[]>;
+```
+
+#### `registerPrivateEndpoint`
+
+```typescript
+registerPrivateEndpoint(input: PrivateModelEndpointRegisterInput, by: ModelProviderCaller): Promise<StaffPrivateModelEndpoint>;
+```
+
+#### `updatePrivateEndpoint`
+
+```typescript
+updatePrivateEndpoint(input: PrivateModelEndpointUpdateInput): Promise<StaffPrivateModelEndpoint>;
+```
+
+#### `removePrivateEndpoint`
+
+Removes the endpoint and every binding to it.
+
+```typescript
+removePrivateEndpoint(input: PrivateModelEndpointRemoveInput): Promise<void>;
 ```
 
 ## REST transport
@@ -861,6 +949,106 @@ interface Input {
 type Output = z.infer<typeof modelDefaultInheritedValuesSchema>; // ../contract/src/model-provider.ts:652
 ```
 
+### `privateModelEndpoint`
+
+Contract `../contract/src/private-model-endpoint.trpc.ts:21`, router `src/transport/private-model-endpoint.trpc.ts:15`.
+
+| Procedure                                  | Kind     | Gate                             | Input                                         | Output                              |
+| ------------------------------------------ | -------- | -------------------------------- | --------------------------------------------- | ----------------------------------- |
+| `privateModelEndpoint.listForOrganization` | query    | Permission `organization:manage` | `privateModelEndpointOrganizationInputSchema` | inline                              |
+| `privateModelEndpoint.bind`                | mutation | Permission `organization:manage` | `privateModelEndpointBindInputSchema`         | `privateModelEndpointBindingSchema` |
+| `privateModelEndpoint.rebind`              | mutation | Permission `organization:manage` | `privateModelEndpointRebindInputSchema`       | `privateModelEndpointBindingSchema` |
+| `privateModelEndpoint.unbind`              | mutation | Permission `organization:manage` | `privateModelEndpointUnbindInputSchema`       | –                                   |
+| `privateModelEndpoint.listForStaff`        | query    | Platform permission `ops:view`   | `privateModelEndpointOrganizationInputSchema` | inline                              |
+| `privateModelEndpoint.register`            | mutation | Platform permission `ops:manage` | `privateModelEndpointRegisterInputSchema`     | `staffPrivateModelEndpointSchema`   |
+| `privateModelEndpoint.update`              | mutation | Platform permission `ops:manage` | `privateModelEndpointUpdateInputSchema`       | `staffPrivateModelEndpointSchema`   |
+| `privateModelEndpoint.remove`              | mutation | Platform permission `ops:manage` | `privateModelEndpointRemoveInputSchema`       | –                                   |
+
+```typescript
+// privateModelEndpoint.listForOrganization
+// Input: privateModelEndpointOrganizationInputSchema, ../contract/src/private-model-endpoint.ts:341
+interface Input {
+  organizationId: string;
+}
+// Output: inline, ../contract/src/private-model-endpoint.trpc.ts:25
+type Output = {
+  id: string;
+  name: string;
+  region: string;
+  status: "in_use" | "unbound";
+  bindings: {
+    id: string;
+    endpointId: string;
+    hostname: string;
+  }[];
+}[];
+
+// privateModelEndpoint.bind
+// Input: privateModelEndpointBindInputSchema, ../contract/src/private-model-endpoint.ts:303
+interface Input {
+  organizationId: string;
+  endpointId: string;
+  hostname: string;
+}
+// Output: privateModelEndpointBindingSchema, ../contract/src/private-model-endpoint.ts:251
+interface Output {
+  id: string;
+  endpointId: string;
+  hostname: string;
+}
+
+// privateModelEndpoint.rebind
+// Input: privateModelEndpointRebindInputSchema, ../contract/src/private-model-endpoint.ts:319
+interface Input {
+  organizationId: string;
+  bindingId: string;
+  endpointId: string;
+  hostname: string;
+}
+type Output = z.infer<typeof privateModelEndpointBindingSchema>; // ../contract/src/private-model-endpoint.ts:251
+
+// privateModelEndpoint.unbind
+// Input: privateModelEndpointUnbindInputSchema, ../contract/src/private-model-endpoint.ts:330
+interface Input {
+  organizationId: string;
+  bindingId: string;
+}
+
+// privateModelEndpoint.listForStaff
+type Input = z.infer<typeof privateModelEndpointOrganizationInputSchema>; // ../contract/src/private-model-endpoint.ts:341
+// Output: z.array(staffPrivateModelEndpointSchema) (inline, ../contract/src/private-model-endpoint.trpc.ts:41)
+
+// privateModelEndpoint.register
+// Input: privateModelEndpointRegisterInputSchema, ../contract/src/private-model-endpoint.ts:356
+interface Input {
+  organizationId: string;
+  name: string;
+  region: string;
+  addresses: string[];
+  port?: number;
+}
+type Output = z.infer<typeof staffPrivateModelEndpointSchema>; // ../contract/src/private-model-endpoint.ts:289
+
+// privateModelEndpoint.update
+// Input: privateModelEndpointUpdateInputSchema, ../contract/src/private-model-endpoint.ts:376
+interface Input {
+  organizationId: string;
+  endpointId: string;
+  name: string;
+  region: string;
+  addresses: string[];
+  port: number;
+}
+type Output = z.infer<typeof staffPrivateModelEndpointSchema>; // ../contract/src/private-model-endpoint.ts:289
+
+// privateModelEndpoint.remove
+// Input: privateModelEndpointRemoveInputSchema, ../contract/src/private-model-endpoint.ts:387
+interface Input {
+  organizationId: string;
+  endpointId: string;
+}
+```
+
 ### `translate`
 
 Contract `../contract/src/translate.trpc.ts:32`, router `src/transport/translate.trpc.ts:10`.
@@ -901,8 +1089,8 @@ Run by the tasks process, before serve.
 
 | Kind   | Leaf                                         | Environment variable                           | Declared at                                   |
 | ------ | -------------------------------------------- | ---------------------------------------------- | --------------------------------------------- |
-| secret | `...ModelProviderModule.platformCredentials` | ≈ `...ModelProviderModule.platformCredentials` | `src/app/model-provider.app.ts:262`           |
-| secret | `...ModelProviderModule.operationalSecrets`  | ≈ `...ModelProviderModule.operationalSecrets`  | `src/app/model-provider.app.ts:263`           |
+| secret | `...ModelProviderModule.platformCredentials` | ≈ `...ModelProviderModule.platformCredentials` | `src/app/model-provider.app.ts:284`           |
+| secret | `...ModelProviderModule.operationalSecrets`  | ≈ `...ModelProviderModule.operationalSecrets`  | `src/app/model-provider.app.ts:285`           |
 | config | `blockLocalHttpCalls`                        | `BLOCK_LOCAL_HTTP_CALLS`                       | `../contract/src/model-provider.config.ts:31` |
 | config | `allowedProxyHosts`                          | `ALLOWED_PROXY_HOSTS`                          | `../contract/src/model-provider.config.ts:32` |
 | config | `defaultModel`                               | `LANGWATCH_DEFAULT_MODEL`                      | `../contract/src/model-provider.config.ts:33` |

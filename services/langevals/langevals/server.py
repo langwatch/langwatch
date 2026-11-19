@@ -28,7 +28,12 @@ from langevals.utils import (
 dotenv.load_dotenv()
 
 from fastapi import FastAPI, HTTPException, Request
+from starlette.requests import Request as HttpRequest
 from typing import Callable, List, Optional
+from langevals_core.engine_proxy import (
+    engine_route,
+    evaluator_env_with_engine_credential,
+)
 from langevals_core.base_evaluator import (
     DEFAULT_RETRIES,
     RETRY_MAX_WAIT_SECONDS,
@@ -365,6 +370,7 @@ def create_evaluator_routes(evaluator_cls):
     )
     def evaluate(
         req: Request,
+        http_request: HttpRequest,
     ) -> List[result_type | EvaluationResultSkipped | EvaluationResultError]:  # type: ignore
         # Sync endpoint: FastAPI runs it in a worker thread, so a long
         # evaluation never blocks the event loop and /healthcheck stays
@@ -377,7 +383,12 @@ def create_evaluator_routes(evaluator_cls):
                 # entry's evaluation context; nothing about this request
                 # touches os.environ, which is what lets requests with
                 # different credentials run at the same time.
-                evaluator = evaluator_cls(settings=(req.settings or {}), env=req.env)  # type: ignore
+                # A model block the app sent through its engine proxy gets the
+                # engine's credential, from this request's headers (ADR-203).
+                env = evaluator_env_with_engine_credential(
+                    req.env, engine_route(http_request.headers)
+                )
+                evaluator = evaluator_cls(settings=(req.settings or {}), env=env)  # type: ignore
                 return evaluator.evaluate_batch(
                     req.data,
                     max_evaluations_in_parallel=MAX_EVALUATIONS_IN_PARALLEL,

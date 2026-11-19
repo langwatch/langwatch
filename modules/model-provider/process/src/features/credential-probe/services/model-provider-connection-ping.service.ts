@@ -12,6 +12,7 @@ import {
   findModelProviderDefinition,
   type ModelProvider,
   type ModelProviderCredentialVerdict,
+  type PrivateEndpointBindingWire,
 } from "@langwatch/model-provider-contract";
 import { createLogger } from "@langwatch/observability";
 import { LANGY_VK_SECRET_NAME, type SecretApi } from "@langwatch/secret-contract";
@@ -27,6 +28,7 @@ import {
   findPingModels,
 } from "../../../rules/provider-ping.rules.ts";
 import type { ModelProviderExecutionService } from "../../../services/model-provider-execution.service.ts";
+import type { PrivateModelEndpointService } from "../../private-endpoint/services/private-model-endpoint.service.ts";
 
 const logger = createLogger("langwatch:modelProviders:connectionPing");
 
@@ -39,6 +41,8 @@ type ModelProviderConnectionPingOptions = {
   secrets: Pick<SecretApi, "getValues">;
   /** Prepares the row itself: a `<row id>/<model>` reference only resolves `mp_` ids. */
   execution: Pick<ModelProviderExecutionService, "prepareRow">;
+  /** Signs the organization's bindings for the ping's project; absent, the ping carries none. */
+  privateEndpoints?: Pick<PrivateModelEndpointService, "headersForProject">;
 };
 
 const NO_GATEWAY_CREDENTIAL =
@@ -65,10 +69,13 @@ export class ModelProviderConnectionPingService {
     row,
     projectId,
     credential,
+    privateEndpoints,
   }: {
     row: Pick<ModelProvider, "id" | "provider" | "customModels">;
     projectId: string | undefined;
     credential: ModelProviderCredentialVerdict;
+    /** The row's organization's bound hostnames, which the ping carries to nlpgo. */
+    privateEndpoints?: readonly PrivateEndpointBindingWire[];
   }): Promise<ModelProviderCredentialVerdict> {
     if (credential.outcome === "refused") return credential;
     if (credential.outcome === "unchecked" && UNPINGABLE_CREDENTIALS.includes(credential.reason)) {
@@ -81,7 +88,7 @@ export class ModelProviderConnectionPingService {
     const reply =
       row.provider === CODEX_PROVIDER_KEY
         ? await this.sendThroughGateway({ model, projectId })
-        : await this.send({ row, model, projectId });
+        : await this.send({ row, model, projectId, privateEndpoints });
     if (reply.outcome === "generated") return { outcome: "verified", valid: true };
     return this.refusalOf({
       provider: row.provider,
@@ -94,17 +101,27 @@ export class ModelProviderConnectionPingService {
     row,
     model,
     projectId,
+    privateEndpoints,
   }: {
     row: Pick<ModelProvider, "id" | "provider">;
     model: string;
     projectId: string;
+    privateEndpoints: readonly PrivateEndpointBindingWire[] | undefined;
   }): Promise<ModelProviderPingReply> {
     try {
       const parameters = await this.options.execution.prepareRow({ id: row.id, model, projectId });
+      // nlpgo takes bindings only in an envelope signed for this project (ADR-203).
+      const privateEndpointsHeaders =
+        privateEndpoints && privateEndpoints.length > 0
+          ? await this.options.privateEndpoints?.headersForProject({ projectId })
+          : undefined;
       return await this.options.channel.ping({
         providerKey: row.provider,
         model: `${row.provider}/${model}`,
         parameters,
+        ...(privateEndpointsHeaders && Object.keys(privateEndpointsHeaders).length > 0
+          ? { privateEndpointsHeaders }
+          : {}),
       });
     } catch (error) {
       return {

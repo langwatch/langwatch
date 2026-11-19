@@ -14,6 +14,7 @@ import (
 
 	"github.com/langwatch/langwatch/pkg/clog"
 	"github.com/langwatch/langwatch/pkg/herr"
+	gatewaydomain "github.com/langwatch/langwatch/services/aigateway/domain"
 	"github.com/langwatch/langwatch/services/nlpgo/adapters/litellm"
 	"github.com/langwatch/langwatch/services/nlpgo/adapters/llmexecutor"
 	"github.com/langwatch/langwatch/services/nlpgo/app"
@@ -74,7 +75,13 @@ func executeSyncHandler(application *app.App) http.HandlerFunc {
 			writeHandlerError(r.Context(), w, *herrErr)
 			return
 		}
+		privateEndpoints, herrErr := privateEndpointsFromHeader(r, req.ProjectID)
+		if herrErr != nil {
+			writeHandlerError(r.Context(), w, *herrErr)
+			return
+		}
 		ctx := enrichRequestLogContext(r.Context(), req)
+		ctx = gatewaydomain.WithPrivateEndpoints(ctx, privateEndpoints)
 		if req.Origin != "" {
 			ctx = withOrigin(ctx, req.Origin)
 		}
@@ -403,13 +410,13 @@ func normalizeInputs(v any) map[string]any {
 // decodeStudioStreamRequest reads the /go/studio/execute body, answers a
 // bare Studio control event in place, and decodes the workflow request.
 // Returns nil once the response has been written and the caller must stop.
-func decodeStudioStreamRequest(w http.ResponseWriter, r *http.Request) *app.WorkflowRequest {
+func decodeStudioStreamRequest(w http.ResponseWriter, r *http.Request) (*app.WorkflowRequest, []gatewaydomain.PrivateEndpoint) {
 	body, err := readStudioRequestBody(r, stagedPayloadClient)
 	if err != nil {
 		writeHandlerError(r.Context(), w, herr.New(r.Context(), domain.ErrBadRequest, herr.M{
 			"reason": "read_body",
 		}, err))
-		return nil
+		return nil, nil
 	}
 	// Studio fires `is_alive` (every ~7s) and `stop_execution` (on
 	// user-initiated stop) as bare control events with no workflow
@@ -426,15 +433,20 @@ func decodeStudioStreamRequest(w http.ResponseWriter, r *http.Request) *app.Work
 	// client-context disconnection.
 	if peeked := peekStudioControlEventType(body); peeked != "" {
 		emitStudioControlEvent(w, peeked)
-		return nil
+		return nil, nil
 	}
 
 	req, herrErr := decodeStudioClientEvent(r, body)
 	if herrErr != nil {
 		writeHandlerError(r.Context(), w, *herrErr)
-		return nil
+		return nil, nil
 	}
-	return req
+	privateEndpoints, herrErr := privateEndpointsFromHeader(r, req.ProjectID)
+	if herrErr != nil {
+		writeHandlerError(r.Context(), w, *herrErr)
+		return nil, nil
+	}
+	return req, privateEndpoints
 }
 
 // studioStreamContext folds the decoded request's identity, origin and
@@ -547,11 +559,12 @@ func executeStreamHandler(application *app.App, configuredHeartbeat, configuredI
 			}, errors.New("workflow executor missing from app")))
 			return
 		}
-		req := decodeStudioStreamRequest(w, r)
+		req, privateEndpoints := decodeStudioStreamRequest(w, r)
 		if req == nil {
 			return
 		}
-		ctx, span := startStudioSpan(studioStreamContext(r, req), req, req.APIKey)
+		streamCtx := gatewaydomain.WithPrivateEndpoints(studioStreamContext(r, req), privateEndpoints)
+		ctx, span := startStudioSpan(streamCtx, req, req.APIKey)
 		defer span.End()
 		clog.Get(ctx).Info("execute_flow_received", zap.Bool("stream", true))
 

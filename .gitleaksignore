@@ -75,3 +75,14 @@ f483fe302e7c3dfb100e1d6fa9c99b6d9a049c20:specs/server/feature-configuration.feat
 # It was never a credential; the test now builds it with sha("pw"), so only
 # this pull request's history still carries the literal.
 394229f593f12061ac86dc2c53b294cb27b8a6d8:infra/clickhouse-serverless/internal/access/caps_test.go:generic-api-key:218
+
+# The private endpoints suites embedded a test-only Ed25519 key pair: the public
+# half of the counting seed 0x01..0x20 as a verify key (a cross-language vector
+# the TS signer and Go verifier share), and the same value passed through the
+# NLP Lambda config. A key derived from 0x01..0x20 signs nothing outside those
+# tests and was never a credential. The suites now derive or generate their keys
+# at run time and use a plain placeholder where no key is used, so the tree is
+# clean; only this pull request's history still carries the literals.
+d08bc92506c999ad30f6deecbba1a70a3ded6c1e:modules/workflow/process/src/rules/__tests__/nlp-lambda-config.rules.unit.test.ts:generic-api-key:86
+d08bc92506c999ad30f6deecbba1a70a3ded6c1e:modules/workflow/process/src/rules/__tests__/nlp-lambda-config.rules.unit.test.ts:generic-api-key:91
+d08bc92506c999ad30f6deecbba1a70a3ded6c1e:services/aigateway/domain/private_endpoint_envelope_test.go:generic-api-key:123

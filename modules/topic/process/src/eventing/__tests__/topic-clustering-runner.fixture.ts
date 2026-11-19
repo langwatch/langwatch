@@ -35,7 +35,9 @@ export function fakeRunnerDeps(overrides: Partial<TopicClusteringRunnerDeps> = {
         model: "text-embedding-3-small",
         modelProvider: { enabled: true },
       }),
-      prepareLitellmParams: vi.fn().mockResolvedValue({ model: "gpt-5-mini" }),
+      prepareModelCall: vi
+        .fn()
+        .mockResolvedValue({ parameters: { model: "gpt-5-mini" }, headers: {} }),
     },
     evaluations: {
       requestTopicClustering: vi.fn().mockResolvedValue({

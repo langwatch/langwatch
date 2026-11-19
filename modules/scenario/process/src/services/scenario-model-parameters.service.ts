@@ -2,6 +2,7 @@ import {
   ModelProviderInvalidError,
   ModelProviderNotFoundError,
   type ModelProviderApi,
+  type PrivateEndpointsHeaders,
 } from "@langwatch/model-provider-contract";
 import { createLogger } from "@langwatch/observability";
 import {
@@ -18,12 +19,29 @@ export type ModelParamsResult =
   | { success: true; params: LiteLLMParams }
   | { success: false; reason: ModelParamsFailureReason; message: string };
 
+/**
+ * How long a scenario run's signed bindings stay valid. The child signs nothing; it sends the
+ * envelope the parent signed at prefetch on every turn, so it has to outlast the run.
+ */
+const SCENARIO_RUN_PRIVATE_ENDPOINTS_TTL_SECONDS = 60 * 60;
+
 export class ScenarioModelParametersService {
   static create(modelProviders: ModelProviderApi): ScenarioModelParametersService {
     return new ScenarioModelParametersService(modelProviders);
   }
 
   private constructor(private readonly modelProviders: ModelProviderApi) {}
+
+  /**
+   * The project's organization's bindings, signed for the child's calls to nlpgo (ADR-203). The
+   * child sends them on every turn of the run, so they are signed for the whole run, not one call.
+   */
+  privateEndpointsHeadersFor(projectId: string): Promise<PrivateEndpointsHeaders> {
+    return this.modelProviders.privateEndpointsHeadersForProject({
+      projectId,
+      ttlSeconds: SCENARIO_RUN_PRIVATE_ENDPOINTS_TTL_SECONDS,
+    });
+  }
 
   async prepare(input: { projectId: string; model: string }): Promise<ModelParamsResult> {
     const { projectId, model } = input;

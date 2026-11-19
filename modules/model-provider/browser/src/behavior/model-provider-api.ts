@@ -7,6 +7,7 @@ import { createModuleApi, type ContractApiMap } from "@langwatch/api/web";
 import type {
   modelProviderTrpc,
   llmModelCostTrpc,
+  privateModelEndpointTrpc,
   translateTrpc,
 } from "@langwatch/model-provider-contract";
 
@@ -41,6 +42,7 @@ type BorrowedProcedures = {
 export type ModelProviderApiMap = ContractApiMap<typeof modelProviderTrpc> &
   ContractApiMap<typeof llmModelCostTrpc> &
   ContractApiMap<typeof translateTrpc> &
+  ContractApiMap<typeof privateModelEndpointTrpc> &
   BorrowedProcedures;
 
 export const modelProviderApi = createModuleApi<ModelProviderApiMap>();

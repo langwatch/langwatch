@@ -313,7 +313,8 @@
                   "platform/secrets",
                   "platform/scim",
                   "platform/scim-groups",
-                  "platform/model-providers"
+                  "platform/model-providers",
+                  "platform/private-endpoints"
                 ]
               }
             ]

@@ -159,6 +159,7 @@ func (r *BifrostRouter) dispatchImageGeneration(
 	}
 	bfCtx := imageDispatchContext(ctx, cred)
 
+	bfReq.Provider = r.pinnedProvider(cred, bfReq.Provider)
 	resp, berr := r.bf.ImageGenerationRequest(bfCtx, bfReq)
 	if berr != nil {
 		if answer, ok := r.responseFromBifrostError(berr, bfCtx, req.Type); ok {
@@ -214,6 +215,7 @@ func (r *BifrostRouter) dispatchImageEdit(
 	}
 	bfCtx := imageDispatchContext(ctx, cred)
 
+	bfReq.Provider = r.pinnedProvider(cred, bfReq.Provider)
 	resp, berr := r.bf.ImageEditRequest(bfCtx, bfReq)
 	if berr != nil {
 		if answer, ok := r.responseFromBifrostError(berr, bfCtx, req.Type); ok {

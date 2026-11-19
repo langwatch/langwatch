@@ -15,6 +15,7 @@ import { type OutboundProxyConfig, resolveProxyForDestination } from "../proxy/o
 import { classify } from "./address.ts";
 import {
   redactUrlForLog,
+  type SsrfBoundResult,
   type SsrfUrlValidator,
   type SsrfValidationResult,
 } from "./url-validator.ts";
@@ -171,14 +172,14 @@ const ORIGIN_BOUND_HEADERS = ["authorization", "cookie", "proxy-authorization", 
 const METADATA_REFUSAL =
   "This hostname resolves to a cloud metadata endpoint, which is not allowed for security reasons";
 
-/** The pinned address, or every address the system resolver gives, each one checked. */
+/** The pinned addresses, or every address the system resolver gives, each one checked. */
 function resolveForConnect({
   hostname,
-  pinnedIp,
+  pinnedIps,
   done,
 }: {
   hostname: string;
-  pinnedIp: string | null;
+  pinnedIps: readonly string[] | null;
   done: (err: Error | null, addresses: LookupAddress[]) => void;
 }): void {
   const check = (addresses: LookupAddress[]) => {
@@ -189,16 +190,18 @@ function resolveForConnect({
     }
     done(null, addresses);
   };
-  if (pinnedIp) return check([{ address: pinnedIp, family: isIP(pinnedIp) === 6 ? 6 : 4 }]);
+  if (pinnedIps) {
+    return check(pinnedIps.map((ip) => ({ address: ip, family: isIP(ip) === 6 ? 6 : 4 })));
+  }
   dns.lookup(hostname, { all: true }, (err, addresses) => (err ? done(err, []) : check(addresses)));
 }
 
 function createGuardedAgent({
-  pinnedIp,
+  pinnedIps,
   tls,
   timeouts,
 }: {
-  pinnedIp: string | null;
+  pinnedIps: readonly string[] | null;
   tls: EgressTlsPolicy;
   timeouts: AgentTimeoutOptions;
 }): Agent {
@@ -206,10 +209,12 @@ function createGuardedAgent({
     ...timeouts,
     connect: {
       rejectUnauthorized: tls.rejectUnauthorized,
+      // Several pinned addresses: the next is tried when one refuses.
+      ...(pinnedIps && pinnedIps.length > 1 ? { autoSelectFamily: true } : {}),
       lookup: (hostname, options, callback) => {
         resolveForConnect({
           hostname,
-          pinnedIp,
+          pinnedIps,
           done: (err, addresses) => {
             const first = addresses[0];
             if (err || !first) return callback(err, []);
@@ -256,6 +261,13 @@ function createDispatcher({
   tls: EgressTlsPolicy;
 }): { dispatcher: Dispatcher; proxy: URL | undefined } {
   const timeouts = resolveAgentTimeouts(init);
+  // A bound host is dialled at its registered addresses, never handed to a proxy that resolves it.
+  if (validated.type === "bound") {
+    return {
+      dispatcher: createGuardedAgent({ pinnedIps: validated.addresses, tls, timeouts }),
+      proxy: undefined,
+    };
+  }
   const proxyUrl =
     init?.proxy && !init.bypassProxy?.(validated)
       ? resolveProxyForDestination({
@@ -281,7 +293,7 @@ function createDispatcher({
 
   const resolvedIp = getResolvedIpForPinning(validated);
   const dispatcher = createGuardedAgent({
-    pinnedIp: resolvedIp && isIP(resolvedIp) !== 0 ? resolvedIp : null,
+    pinnedIps: resolvedIp && isIP(resolvedIp) !== 0 ? [resolvedIp] : null,
     tls,
     timeouts,
   });
@@ -295,6 +307,7 @@ function getResolvedIpForPinning(result: SsrfValidationResult): string | null {
     case "allowlisted":
       return result.resolvedIp ?? null;
     case "unresolved":
+    case "bound":
       return null;
   }
 }
@@ -388,7 +401,17 @@ function failureFor({
   if (proxy && isProxyFailure({ error: err, proxy })) {
     return new OutboundProxyUnreachableError({ proxy, detail: (cause ?? err).message });
   }
-  return formatConnectionError(cause ?? err, validated.hostname, validated.port);
+  const failure = formatConnectionError(cause ?? err, validated.hostname, validated.port);
+  return validated.type === "bound" ? withoutAddresses(failure, validated) : failure;
+}
+
+/** A bound host's failure names the host, never the registered addresses a socket error carries. */
+function withoutAddresses(failure: Error, validated: SsrfBoundResult): Error {
+  const message = validated.addresses.reduce(
+    (text, address) => text.split(address).join(validated.hostname),
+    failure.message,
+  );
+  return message === failure.message ? failure : new Error(message);
 }
 
 async function followRedirect({

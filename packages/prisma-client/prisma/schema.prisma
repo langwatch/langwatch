@@ -4140,6 +4140,37 @@ model CustomLLMModelCost {
   @@index([projectId])
 }
 
+/// A private endpoint staff registered for one organization (ADR-203): the exact addresses of a
+/// PrivateLink endpoint's interfaces and the one port it serves. Owned by model-provider.
+model PrivateModelEndpoint {
+  id             String   @id
+  organizationId String
+  name           String
+  region         String
+  addresses      String[]
+  port           Int
+  createdById    String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @default(now()) @updatedAt
+
+  @@index([organizationId])
+}
+
+/// A hostname an organization bound to one of its own private endpoints (ADR-203). The endpoint
+/// is a plain column: the owning service removes the bindings with the endpoint.
+model PrivateModelEndpointBinding {
+  id             String   @id
+  organizationId String
+  endpointId     String
+  hostname       String
+  createdById    String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @default(now()) @updatedAt
+
+  @@unique([organizationId, hostname])
+  @@index([endpointId])
+}
+
 model Workflow {
   id                   String            @id @default(nanoid())
   projectId            String
