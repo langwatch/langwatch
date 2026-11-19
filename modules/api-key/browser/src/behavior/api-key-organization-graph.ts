@@ -5,8 +5,8 @@
  */
 
 import { useUiHostServices } from "@langwatch/browser-host/capabilities";
-import { useMemo } from "react";
 
+import { availableScopesOf } from "../model/api-key-available-scopes.ts";
 import type {
   ApiKeyAvailableScopes,
   ApiKeyOrganization,
@@ -87,23 +87,15 @@ export function useApiKeyOrganizationGraph(input: {
     { enabled: !!session.currentUser() },
   );
   const graph = asOrganizationGraph(graphQuery.data);
+  const viewerUserId = session.currentUser()?.id;
 
-  return useMemo(() => {
-    const organization = graph?.find((candidate) => candidate.id === input.organizationId);
-    const activeProject = findActiveProject(organization, input.projectId);
-    const teams = organization?.teams ?? [];
-    const availableScopes: ApiKeyAvailableScopes = {
-      organization: organization ? { id: organization.id, name: organization.name } : null,
-      teams: teams.map((team) => ({ id: team.id, name: team.name })),
-      projects: teams.flatMap((team) =>
-        team.projects.map((project) => ({ id: project.id, name: project.name, teamId: team.id })),
-      ),
-    };
-    const hostOrganizations = graph?.map((entry) => ({
-      id: entry.id,
-      name: entry.name,
-      teams: toHostTeams(entry),
-    }));
-    return { organization, activeProject, availableScopes, hostOrganizations };
-  }, [graph, input.organizationId, input.projectId]);
+  const organization = graph?.find((candidate) => candidate.id === input.organizationId);
+  const activeProject = findActiveProject(organization, input.projectId);
+  const availableScopes = availableScopesOf({ organization, viewerUserId });
+  const hostOrganizations = graph?.map((entry) => ({
+    id: entry.id,
+    name: entry.name,
+    teams: toHostTeams(entry),
+  }));
+  return { organization, activeProject, availableScopes, hostOrganizations };
 }

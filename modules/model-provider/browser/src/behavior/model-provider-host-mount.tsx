@@ -12,6 +12,8 @@ import {
   type UiSession,
 } from "@langwatch/browser-host/capabilities";
 import type { UiScopeHost } from "@langwatch/browser-host/use-organization-team-project";
+import { personalWorkspaceHint } from "@langwatch/design-system/scope-filter";
+import { personalTeamOwnerName } from "@langwatch/organization-contract";
 import { useMemo, type ReactNode } from "react";
 
 import {
@@ -31,26 +33,45 @@ import {
 
 const NO_ORGANIZATIONS: ModelProviderScopeGraphOrganization[] = [];
 
+/** "Sam Lee", or "Alex Rivera (you)" for the reader's own; nothing for a shared team. */
+function ownerHintOf({
+  team,
+  viewerUserId,
+}: {
+  team: ModelProviderScopeGraphOrganization["teams"][number];
+  viewerUserId: string | undefined;
+}): string | undefined {
+  if (!team.isPersonal) return void 0;
+  return personalWorkspaceHint({
+    ownerName: personalTeamOwnerName({ teamName: team.name }),
+    isViewer: !!viewerUserId && team.ownerUserId === viewerUserId,
+  });
+}
+
 /** The active organization's teams and projects; null when the graph has no such organization. */
 export function scopesFromGraph({
   organizations,
   organizationId,
+  viewerUserId,
 }: {
   organizations: readonly ModelProviderScopeGraphOrganization[];
   organizationId: string | undefined;
+  viewerUserId: string | undefined;
 }): ModelProviderAvailableScopes | null {
   const organization = organizations.find((candidate) => candidate.id === organizationId);
   if (!organization) return null;
   return {
     organization: { id: organization.id, name: organization.name },
     teams: organization.teams.map((team) => ({ id: team.id, name: team.name })),
-    projects: organization.teams.flatMap((team) =>
-      team.projects.map((project) => ({
+    projects: organization.teams.flatMap((team) => {
+      const hint = ownerHintOf({ team, viewerUserId });
+      return team.projects.map((project) => ({
         id: project.id,
-        name: `${project.name} · ${team.name}`,
+        name: project.name,
         teamId: team.id,
-      })),
-    ),
+        ...(hint ? { hint } : {}),
+      }));
+    }),
   };
 }
 
@@ -118,6 +139,7 @@ class HostServiceModelProviderHost extends ModelProviderHostApi {
     const reach = scopesFromGraph({
       organizations: this.organizations,
       organizationId: this.hostScope.organizationId,
+      viewerUserId: this.session.currentUser()?.id,
     });
     if (reach) return reach;
     const organization = this.scopeHost?.organization();

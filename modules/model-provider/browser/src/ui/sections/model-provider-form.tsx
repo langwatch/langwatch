@@ -374,7 +374,11 @@ function ProviderCredentialsArea({
 
 /** Azure's own gateway toggle; every other provider has nothing to switch. */
 type OrganizationTeams = {
-  teams?: { id: string; name: string; projects: { id: string; name: string }[] }[];
+  teams?: {
+    id: string;
+    name: string;
+    projects: { id: string; name: string; hint?: string }[];
+  }[];
 };
 
 function availableTeamsOf(organization: OrganizationTeams | undefined) {
@@ -384,12 +388,11 @@ function availableTeamsOf(organization: OrganizationTeams | undefined) {
   }));
 }
 
-/** Projects read as "project · team", so two same-named projects stay apart. */
+/** Projects by name; the picker badges a same-name one with its owner or team. */
 function availableProjectsOf(organization: OrganizationTeams | undefined) {
   return (organization?.teams ?? []).flatMap((candidateTeam) =>
     candidateTeam.projects.map((candidateProject) => ({
-      id: candidateProject.id,
-      name: `${candidateProject.name} · ${candidateTeam.name}`,
+      ...candidateProject,
       teamId: candidateTeam.id,
     })),
   );

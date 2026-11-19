@@ -32,6 +32,7 @@ import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { apiKeyApi } from "../../behavior/api-key-api.ts";
 import { type LegacyProjectKey, useLegacyKeys } from "../../behavior/use-legacy-keys.ts";
 import { apiKeyRowAnchorId } from "../../model/api-key-anchor.ts";
+import { withOwnerHints } from "../../model/api-key-available-scopes.ts";
 import { maskedKeyHint } from "../../model/api-key-details.ts";
 import type { CreateApiKeyInput } from "../../model/api-key-form.ts";
 import { API_KEY_SCOPE_QUERY_KEY, useApiKeyHost } from "../../model/api-key-host.ts";
@@ -369,7 +370,10 @@ export default function ApiKeysScreen() {
   const apiKeys = apiKeyApi.apiKey.list.useQuery({ organizationId });
   const myBindings = apiKeyApi.apiKey.myBindings.useQuery({ organizationId });
   const orgProjects = apiKeyApi.apiKey.orgProjects.useQuery({ organizationId });
-  const availableProjects = orgProjects.data ?? [];
+  const availableProjects = withOwnerHints({
+    projects: orgProjects.data ?? [],
+    scopes: host.availableScopes(),
+  });
   const orgTeams = apiKeyApi.apiKey.orgTeams.useQuery({ organizationId });
   const orgMembers = apiKeyApi.apiKey.orgMembers.useQuery({ organizationId });
   // An empty member list is how the page knows the reader is not an

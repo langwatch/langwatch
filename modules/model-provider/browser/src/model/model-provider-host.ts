@@ -27,7 +27,8 @@ export type ModelProviderHostScope = {
 export type ModelProviderAvailableScopes = {
   organization: { id: string; name: string } | null;
   teams: { id: string; name: string }[];
-  projects: { id: string; name: string; teamId?: string | null }[];
+  /** `hint` names a personal workspace's owner, so same-name rows read apart. */
+  projects: { id: string; name: string; teamId?: string | null; hint?: string }[];
 };
 
 /** The path parameters and query string a screen was opened with. */

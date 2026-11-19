@@ -93,6 +93,30 @@ const [scopes, setScopes] = useState<ScopeChipPickerEntry[]>([]);
 />
 ```
 
+## Same-name projects: the hint badge
+
+Two projects can share a name: every personal workspace is called "Personal
+Workspace", and two teams may each own an "Eval Harness". When a name repeats
+in the list, `ScopeChipPicker` and `ScopeFilter` draw a green badge at the end
+of each such row: the project's `hint` when the caller gave one, otherwise its
+team's name. A unique name gets nothing, and search matches the name, the hint
+and the team.
+
+Pass `hint` for a personal workspace's project so it names its owner rather
+than "Sam Lee's Workspace":
+
+```ts
+hint: personalWorkspaceHint({
+  ownerName: personalTeamOwnerName({ teamName: team.name }), // @langwatch/organization-contract
+  isViewer: team.ownerUserId === viewerUserId, // "Alex Rivera (you)"
+}),
+```
+
+Build hints only from rows the reader already receives (the organization graph
+is narrowed per viewer); never widen a read to name somebody. Never suffix the
+team into the project name: the badge does that, only where it is needed.
+Spec: `specs/components/scope-picker-same-name-projects.feature`.
+
 ## Rendering a scope: `ProviderScopeChips`
 
 ```tsx

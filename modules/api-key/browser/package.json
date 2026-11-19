@@ -29,6 +29,7 @@
     "@langwatch/design-system": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/organization-client": "workspace:*",
+    "@langwatch/organization-contract": "workspace:*",
     "@langwatch/project-client": "workspace:*",
     "@langwatch/project-contract": "workspace:*",
     "@langwatch/time": "workspace:*",

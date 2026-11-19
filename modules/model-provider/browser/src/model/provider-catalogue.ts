@@ -83,6 +83,10 @@ export function scopeNamesOf(available: ModelProviderAvailableScopes): Map<strin
   const names = new Map<string, string>();
   if (available.organization) names.set(available.organization.id, available.organization.name);
   for (const team of available.teams) names.set(team.id, team.name);
-  for (const project of available.projects) names.set(project.id, project.name);
+  // A row's chip reads "project · owner or team", so two same-name projects stay apart.
+  for (const project of available.projects) {
+    const where = project.hint ?? names.get(project.teamId ?? "");
+    names.set(project.id, where ? `${project.name} · ${where}` : project.name);
+  }
   return names;
 }

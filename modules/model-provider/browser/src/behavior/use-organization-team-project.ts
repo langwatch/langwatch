@@ -16,7 +16,7 @@ export type OrganizationTeamProjectReading = {
         teams: {
           id: string;
           name: string;
-          projects: { id: string; name: string }[];
+          projects: { id: string; name: string; hint?: string }[];
         }[];
       }
     | undefined;
@@ -39,7 +39,11 @@ export function useOrganizationTeamProject(): OrganizationTeamProjectReading {
         name: team.name,
         projects: available.projects
           .filter((project) => project.teamId === team.id)
-          .map((project) => ({ id: project.id, name: project.name })),
+          .map((project) => ({
+            id: project.id,
+            name: project.name,
+            ...(project.hint ? { hint: project.hint } : {}),
+          })),
       })),
     };
   }, [available]);

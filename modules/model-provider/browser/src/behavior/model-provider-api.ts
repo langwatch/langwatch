@@ -14,7 +14,13 @@ import type {
 export type ModelProviderScopeGraphOrganization = {
   id: string;
   name: string;
-  teams: { id: string; name: string; projects: { id: string; name: string }[] }[];
+  teams: {
+    id: string;
+    name: string;
+    isPersonal?: boolean;
+    ownerUserId?: string | null;
+    projects: { id: string; name: string }[];
+  }[];
 };
 
 /** What `instantEval.access` answers, narrowed to what the Instant Evals column reads. */

@@ -31,6 +31,7 @@
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/model-provider-client": "workspace:*",
     "@langwatch/model-provider-contract": "workspace:*",
+    "@langwatch/organization-contract": "workspace:*",
     "@langwatch/prompt-contract": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@tanstack/react-query": "catalog:",

@@ -20,7 +20,8 @@ export type ApiKeyHostScope = {
 export type ApiKeyAvailableScopes = {
   organization: { id: string; name: string } | null;
   teams: { id: string; name: string }[];
-  projects: { id: string; name: string; teamId?: string | null }[];
+  /** `hint` names a personal workspace's owner, so same-name rows read apart. */
+  projects: { id: string; name: string; teamId?: string | null; hint?: string }[];
 };
 
 // CLI authorize organization graph: wider than visible scopes (adds ownerUserId, kind, slug),

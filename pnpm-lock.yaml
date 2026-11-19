@@ -5665,6 +5665,9 @@ importers:
       '@langwatch/organization-client':
         specifier: workspace:*
         version: link:../../organization/client
+      '@langwatch/organization-contract':
+        specifier: workspace:*
+        version: link:../../organization/contract
       '@langwatch/project-client':
         specifier: workspace:*
         version: link:../../project/client
@@ -11165,6 +11168,9 @@ importers:
       '@langwatch/model-provider-contract':
         specifier: workspace:*
         version: link:../contract
+      '@langwatch/organization-contract':
+        specifier: workspace:*
+        version: link:../../organization/contract
       '@langwatch/prompt-contract':
         specifier: workspace:*
         version: link:../../prompt/contract
