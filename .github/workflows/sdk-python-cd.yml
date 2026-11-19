@@ -19,7 +19,7 @@ jobs:
     if: startsWith(github.event.release.tag_name, 'python-sdk@') || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
     runs-on: ubuntu-latest
     outputs:
-      version: ${{ steps.get_version.outputs.version }}
+      version: ${{ steps.wheel_version.outputs.version }}
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
@@ -43,6 +43,19 @@ jobs:
           cd sdks/python
           uv run python -m build
 
+      - name: Read the wheel version
+        id: wheel_version
+        run: |
+          wheels=(sdks/python/dist/langwatch-*.whl)
+          if [ "${#wheels[@]}" -ne 1 ] || [ ! -f "${wheels[0]}" ]; then
+            echo "::error::Expected exactly one langwatch wheel, found: ${wheels[*]}"
+            exit 1
+          fi
+          name="$(basename "${wheels[0]}")"
+          version="${name#langwatch-}"
+          version="${version%%-*}"
+          echo "version=${version}" >> $GITHUB_OUTPUT
+
       # A fresh venv in a temp dir, PyPI only: the uv workspace would resolve
       # langwatch-ksuid locally and hide a dependency PyPI cannot serve.
       # Retries cover a dependency released minutes ago still propagating.
@@ -63,13 +76,6 @@ jobs:
           echo "::error::A dependency of langwatch is not on PyPI; release it first (e.g. langwatch-ksuid). See the resolver output above."
           exit 1
 
-      - name: Publish package
-        uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33
-        with:
-          packages_dir: sdks/python/dist/
-          user: __token__
-          password: ${{ secrets.PYPI_API_TOKEN }}
-
       - name: Get version from tag or manifest
         id: get_version
         run: |
@@ -79,6 +85,23 @@ jobs:
             VERSION=$(cat .github/.release-please-manifest.json | jq -r '."sdks/python"')
           fi
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
+
+      - name: Check the wheel version matches the release version
+        env:
+          WHEEL_VERSION: ${{ steps.wheel_version.outputs.version }}
+          RELEASE_VERSION: ${{ steps.get_version.outputs.version }}
+        run: |
+          if [ "$WHEEL_VERSION" != "$RELEASE_VERSION" ]; then
+            echo "::error::Wheel version $WHEEL_VERSION does not match release version $RELEASE_VERSION"
+            exit 1
+          fi
+
+      - name: Publish package
+        uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33
+        with:
+          packages_dir: sdks/python/dist/
+          user: __token__
+          password: ${{ secrets.PYPI_API_TOKEN }}
 
       - name: Notify Slack
         env:
