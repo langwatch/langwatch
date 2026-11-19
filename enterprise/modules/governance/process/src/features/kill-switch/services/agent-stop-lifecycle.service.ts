@@ -2,11 +2,15 @@
 
 import {
   type AgentStopCaller,
+  type AgentStopDecidedEventData,
+  AgentStopNotPendingError,
   AgentStopNotRestorableError,
   AgentStopNotRetryableError,
+  AgentStopPlanChangedError,
   type AgentStopPlanTarget,
   type AgentStopRestoreRequestedEventData,
   type AgentStopRetryRequestedEventData,
+  AgentStopSelfApprovalError,
   type AgentStopTargetsDroppedEventData,
   type AgentStopView,
 } from "@langwatch/enterprise-governance-contract";
@@ -17,14 +21,19 @@ import { targetKeyOf } from "../rules/agent-stop-target.rules.ts";
 import {
   advancedStop,
   type AgentStopRecord,
+  approvedStop,
+  deniedStop,
   isOpenStatus,
+  isRequester,
   isRestorableStatus,
   isRetryableStatus,
+  isSamePlan,
   restoreRequestedStop,
   retriedStop,
   targetsDroppedStop,
   viewOfStop,
 } from "../rules/agent-stop.rules.ts";
+import type { AgentStopClaimService } from "./agent-stop-claim.service.ts";
 import type { AgentStopPlanService } from "./agent-stop-plan.service.ts";
 import type { AgentStopRequestAuditService } from "./agent-stop-request-audit.service.ts";
 import type { AgentStopCommandSend } from "./agent-stop.service.ts";
@@ -46,6 +55,7 @@ export function agentLockKey({
 interface AgentStopLifecycleDependencies {
   stops: Pick<AgentStopRepository, "getStop" | "getStopWithCursor" | "findByAgent" | "advance">;
   plans: Pick<AgentStopPlanService, "findTargets">;
+  claims: Pick<AgentStopClaimService, "withDecision">;
   locks: KillSwitchLockRepository;
   audit: Pick<AgentStopRequestAuditService, "record">;
   send: AgentStopCommandSend;
@@ -54,14 +64,91 @@ interface AgentStopLifecycleDependencies {
 }
 
 /**
- * What an open stop accepts after its request: a restore, a retry, and the targets a plan edit
- * drops. Each decides on the stop's row read under its agent's lock, by the fold's own rule.
+ * What an open stop accepts after its request: a decision, a restore, a retry, and the targets a
+ * plan edit drops. Each decides on the stop's row read under its agent's lock, by the fold's own rule.
  */
 export class AgentStopLifecycleService {
   private constructor(private readonly deps: AgentStopLifecycleDependencies) {}
 
   static create(deps: AgentStopLifecycleDependencies): AgentStopLifecycleService {
     return new AgentStopLifecycleService(deps);
+  }
+
+  /**
+   * An approval or denial, decided and advanced as a restore is, under the agent's lock, so one
+   * landing after a plan edit closed the stop is refused `agent_stop_not_pending`, not answered.
+   */
+  decide(input: {
+    organizationId: string;
+    stopId: string;
+    note?: string;
+    expectedTargetIds?: readonly string[];
+    caller: AgentStopCaller;
+    approve: boolean;
+  }): Promise<AgentStopView> {
+    return this.withStopLock({ ...input, run: (read) => this.decideLocked({ ...input, read }) });
+  }
+
+  private async decideLocked({
+    organizationId,
+    stopId,
+    note,
+    expectedTargetIds,
+    caller,
+    approve,
+    read,
+  }: {
+    organizationId: string;
+    stopId: string;
+    note?: string;
+    expectedTargetIds?: readonly string[];
+    caller: AgentStopCaller;
+    approve: boolean;
+    read: { stop: AgentStopRecord; eventId: string };
+  }): Promise<AgentStopView> {
+    const current = read.stop;
+    if (current.status !== "pending_approval") {
+      throw new AgentStopNotPendingError({ stopId, status: current.status });
+    }
+    if (approve && isRequester({ caller, stop: current })) {
+      throw new AgentStopSelfApprovalError(stopId);
+    }
+    const stopTargetIds = current.targets.map((target) => target.id);
+    if (expectedTargetIds && !isSamePlan(stopTargetIds, expectedTargetIds)) {
+      throw new AgentStopPlanChangedError(current.agentId);
+    }
+    const requestId = this.deps.newId();
+    const data: AgentStopDecidedEventData = {
+      stopId,
+      organizationId,
+      decidedByUserId: caller.userId,
+      decidedByApiKeyId: caller.apiKeyId,
+      note: note ?? null,
+      requestId,
+    };
+    const at = this.deps.now();
+    await this.deps.claims.withDecision({
+      organizationId,
+      stopId,
+      status: current.status,
+      decision: approve ? "approve" : "deny",
+      at,
+      send: () =>
+        this.deps.send(approve ? "approve" : "deny", {
+          tenantId: organizationId,
+          occurredAt: at,
+          ...data,
+        }),
+    });
+    const stop = (approve ? approvedStop : deniedStop)({ stop: current, data, at });
+    await this.advance({ stop, requestId, eventId: read.eventId });
+    await this.deps.audit.record({
+      action: approve ? "governance.agent.stop_approved" : "governance.agent.stop_denied",
+      stop,
+      caller,
+      note,
+    });
+    return viewOfStop(stop);
   }
 
   /**

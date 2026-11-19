@@ -75154,6 +75154,7 @@ A rollback never runs migrations and never needs a down migration. Every migrati
 - The previous version starts on the newer schema.
 - The Upgrades page shows **Rolled back** while the older version runs. Background steps that an older version can undo are reopened, and run again after you upgrade again.
 - Data the newer version wrote stays. Features the older version does not know about are unavailable until you upgrade again.
+- The agent registry's change feed and `/versions` skip an event type the running version does not know, so they keep answering after a rollback. LangWatch 3.25 and earlier refuse such an event, so a release adds a feed event type only once every version it can roll back to skips unknown types.
 
 ### Helm
 

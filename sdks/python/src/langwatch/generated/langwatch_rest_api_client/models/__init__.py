@@ -2078,39 +2078,6 @@ from .get_api_governance_registry_agents_by_id_versions_response_200_data_item_a
 from .get_api_governance_registry_agents_by_id_versions_response_200_data_item_agent_tools_item_status import (
     GetApiGovernanceRegistryAgentsByIdVersionsResponse200DataItemAgentToolsItemStatus,
 )
-from .get_api_governance_registry_agents_by_id_versions_response_200_data_item_stop import (
-    GetApiGovernanceRegistryAgentsByIdVersionsResponse200DataItemStop,
-)
-from .get_api_governance_registry_agents_by_id_versions_response_200_data_item_stop_approval import (
-    GetApiGovernanceRegistryAgentsByIdVersionsResponse200DataItemStopApproval,
-)
-from .get_api_governance_registry_agents_by_id_versions_response_200_data_item_stop_requested_by import (
-    GetApiGovernanceRegistryAgentsByIdVersionsResponse200DataItemStopRequestedBy,
-)
-from .get_api_governance_registry_agents_by_id_versions_response_200_data_item_stop_severity import (
-    GetApiGovernanceRegistryAgentsByIdVersionsResponse200DataItemStopSeverity,
-)
-from .get_api_governance_registry_agents_by_id_versions_response_200_data_item_stop_status import (
-    GetApiGovernanceRegistryAgentsByIdVersionsResponse200DataItemStopStatus,
-)
-from .get_api_governance_registry_agents_by_id_versions_response_200_data_item_stop_targets_item import (
-    GetApiGovernanceRegistryAgentsByIdVersionsResponse200DataItemStopTargetsItem,
-)
-from .get_api_governance_registry_agents_by_id_versions_response_200_data_item_stop_targets_item_state import (
-    GetApiGovernanceRegistryAgentsByIdVersionsResponse200DataItemStopTargetsItemState,
-)
-from .get_api_governance_registry_agents_by_id_versions_response_200_data_item_stop_targets_item_target_type_0 import (
-    GetApiGovernanceRegistryAgentsByIdVersionsResponse200DataItemStopTargetsItemTargetType0,
-)
-from .get_api_governance_registry_agents_by_id_versions_response_200_data_item_stop_targets_item_target_type_1 import (
-    GetApiGovernanceRegistryAgentsByIdVersionsResponse200DataItemStopTargetsItemTargetType1,
-)
-from .get_api_governance_registry_agents_by_id_versions_response_200_data_item_stop_targets_item_target_type_2 import (
-    GetApiGovernanceRegistryAgentsByIdVersionsResponse200DataItemStopTargetsItemTargetType2,
-)
-from .get_api_governance_registry_agents_by_id_versions_response_200_data_item_stop_trigger import (
-    GetApiGovernanceRegistryAgentsByIdVersionsResponse200DataItemStopTrigger,
-)
 from .get_api_governance_registry_agents_by_id_versions_response_200_data_item_type import (
     GetApiGovernanceRegistryAgentsByIdVersionsResponse200DataItemType,
 )
@@ -2371,39 +2338,6 @@ from .get_api_governance_registry_events_response_200_data_item_agent_tools_item
 )
 from .get_api_governance_registry_events_response_200_data_item_agent_tools_item_status import (
     GetApiGovernanceRegistryEventsResponse200DataItemAgentToolsItemStatus,
-)
-from .get_api_governance_registry_events_response_200_data_item_stop import (
-    GetApiGovernanceRegistryEventsResponse200DataItemStop,
-)
-from .get_api_governance_registry_events_response_200_data_item_stop_approval import (
-    GetApiGovernanceRegistryEventsResponse200DataItemStopApproval,
-)
-from .get_api_governance_registry_events_response_200_data_item_stop_requested_by import (
-    GetApiGovernanceRegistryEventsResponse200DataItemStopRequestedBy,
-)
-from .get_api_governance_registry_events_response_200_data_item_stop_severity import (
-    GetApiGovernanceRegistryEventsResponse200DataItemStopSeverity,
-)
-from .get_api_governance_registry_events_response_200_data_item_stop_status import (
-    GetApiGovernanceRegistryEventsResponse200DataItemStopStatus,
-)
-from .get_api_governance_registry_events_response_200_data_item_stop_targets_item import (
-    GetApiGovernanceRegistryEventsResponse200DataItemStopTargetsItem,
-)
-from .get_api_governance_registry_events_response_200_data_item_stop_targets_item_state import (
-    GetApiGovernanceRegistryEventsResponse200DataItemStopTargetsItemState,
-)
-from .get_api_governance_registry_events_response_200_data_item_stop_targets_item_target_type_0 import (
-    GetApiGovernanceRegistryEventsResponse200DataItemStopTargetsItemTargetType0,
-)
-from .get_api_governance_registry_events_response_200_data_item_stop_targets_item_target_type_1 import (
-    GetApiGovernanceRegistryEventsResponse200DataItemStopTargetsItemTargetType1,
-)
-from .get_api_governance_registry_events_response_200_data_item_stop_targets_item_target_type_2 import (
-    GetApiGovernanceRegistryEventsResponse200DataItemStopTargetsItemTargetType2,
-)
-from .get_api_governance_registry_events_response_200_data_item_stop_trigger import (
-    GetApiGovernanceRegistryEventsResponse200DataItemStopTrigger,
 )
 from .get_api_governance_registry_events_response_200_data_item_type import (
     GetApiGovernanceRegistryEventsResponse200DataItemType,
@@ -12122,17 +12056,6 @@ __all__ = (
     "GetApiGovernanceRegistryAgentsByIdVersionsResponse200DataItemAgentToolsItemInputSchema",
     "GetApiGovernanceRegistryAgentsByIdVersionsResponse200DataItemAgentToolsItemOutputSchemaType0",
     "GetApiGovernanceRegistryAgentsByIdVersionsResponse200DataItemAgentToolsItemStatus",
-    "GetApiGovernanceRegistryAgentsByIdVersionsResponse200DataItemStop",
-    "GetApiGovernanceRegistryAgentsByIdVersionsResponse200DataItemStopApproval",
-    "GetApiGovernanceRegistryAgentsByIdVersionsResponse200DataItemStopRequestedBy",
-    "GetApiGovernanceRegistryAgentsByIdVersionsResponse200DataItemStopSeverity",
-    "GetApiGovernanceRegistryAgentsByIdVersionsResponse200DataItemStopStatus",
-    "GetApiGovernanceRegistryAgentsByIdVersionsResponse200DataItemStopTargetsItem",
-    "GetApiGovernanceRegistryAgentsByIdVersionsResponse200DataItemStopTargetsItemState",
-    "GetApiGovernanceRegistryAgentsByIdVersionsResponse200DataItemStopTargetsItemTargetType0",
-    "GetApiGovernanceRegistryAgentsByIdVersionsResponse200DataItemStopTargetsItemTargetType1",
-    "GetApiGovernanceRegistryAgentsByIdVersionsResponse200DataItemStopTargetsItemTargetType2",
-    "GetApiGovernanceRegistryAgentsByIdVersionsResponse200DataItemStopTrigger",
     "GetApiGovernanceRegistryAgentsByIdVersionsResponse200DataItemType",
     "GetApiGovernanceRegistryAgentsByIdVersionsResponse400",
     "GetApiGovernanceRegistryAgentsByIdVersionsResponse400Fault",
@@ -12240,17 +12163,6 @@ __all__ = (
     "GetApiGovernanceRegistryEventsResponse200DataItemAgentToolsItemInputSchema",
     "GetApiGovernanceRegistryEventsResponse200DataItemAgentToolsItemOutputSchemaType0",
     "GetApiGovernanceRegistryEventsResponse200DataItemAgentToolsItemStatus",
-    "GetApiGovernanceRegistryEventsResponse200DataItemStop",
-    "GetApiGovernanceRegistryEventsResponse200DataItemStopApproval",
-    "GetApiGovernanceRegistryEventsResponse200DataItemStopRequestedBy",
-    "GetApiGovernanceRegistryEventsResponse200DataItemStopSeverity",
-    "GetApiGovernanceRegistryEventsResponse200DataItemStopStatus",
-    "GetApiGovernanceRegistryEventsResponse200DataItemStopTargetsItem",
-    "GetApiGovernanceRegistryEventsResponse200DataItemStopTargetsItemState",
-    "GetApiGovernanceRegistryEventsResponse200DataItemStopTargetsItemTargetType0",
-    "GetApiGovernanceRegistryEventsResponse200DataItemStopTargetsItemTargetType1",
-    "GetApiGovernanceRegistryEventsResponse200DataItemStopTargetsItemTargetType2",
-    "GetApiGovernanceRegistryEventsResponse200DataItemStopTrigger",
     "GetApiGovernanceRegistryEventsResponse200DataItemType",
     "GetApiGovernanceRegistryEventsResponse400",
     "GetApiGovernanceRegistryEventsResponse400Fault",

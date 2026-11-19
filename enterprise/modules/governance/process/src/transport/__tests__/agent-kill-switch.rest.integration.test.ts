@@ -279,6 +279,60 @@ describe("the retry route and the stop plan route", () => {
     });
   });
 
+  describe("given an organisation key saving the plan", () => {
+    /** @scenario "Saving a stop plan writes one audit row naming the agent" */
+    it("writes one stop_plan_set row naming the agent and the key, and no generic row", async () => {
+      const { call, audited, doorRows, eventing } = await buildKillSwitchRest();
+
+      const saved = await call({
+        method: "PUT",
+        path: `/api/governance/agents/${AGENT_ID}/stop-plan`,
+        body: JSON.stringify({ targets: [] }),
+      });
+
+      expect(saved.status).toBe(200);
+      await vi.waitFor(() =>
+        expect(audited.map((row) => row.action)).toEqual(["governance.agent.stop_plan_set"]),
+      );
+      expect(audited[0]).toMatchObject({
+        userId: KEYS.onCall.userId,
+        targetKind: "governance_agent",
+        targetId: AGENT_ID,
+        metadata: expect.objectContaining({
+          targetName: "support-bot",
+          apiKeyId: KEYS.onCall.apiKeyId,
+        }),
+      });
+      expect(doorRows).toEqual([]);
+      await eventing.close();
+    });
+
+    /** @scenario "Saving a stop plan writes one audit row naming the agent" */
+    it("writes one stop_plan_set row with the refusal's code for a refused save", async () => {
+      const { call, audited, doorRows, eventing } = await buildKillSwitchRest();
+
+      const refused = await call({
+        method: "PUT",
+        path: `/api/governance/agents/${AGENT_ID}/stop-plan`,
+        body: JSON.stringify({ targets: [], expectedVersion: 7 }),
+      });
+
+      expect(refused.status).toBe(409);
+      expect(((await refused.json()) as { code: string }).code).toBe("agent_stop_plan_conflict");
+      await vi.waitFor(() => expect(audited).toHaveLength(1));
+      expect(audited[0]).toMatchObject({
+        action: "governance.agent.stop_plan_set",
+        error: "agent_stop_plan_conflict",
+        userId: KEYS.onCall.userId,
+        targetKind: "governance_agent",
+        targetId: AGENT_ID,
+        metadata: expect.objectContaining({ targetName: "support-bot" }),
+      });
+      expect(doorRows).toEqual([]);
+      await eventing.close();
+    });
+  });
+
   describe("given a stop waiting for an approval", () => {
     it("refuses a retry with 409 agent_stop_not_retryable", async () => {
       const { call, eventing } = await buildKillSwitchRest();

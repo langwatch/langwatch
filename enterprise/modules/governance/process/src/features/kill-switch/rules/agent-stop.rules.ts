@@ -93,6 +93,24 @@ export function approvalOf({
   return severity === "critical" ? "immediate" : "required";
 }
 
+/** True when the plan holds exactly the target ids the caller confirmed. */
+export function isSamePlan(targetIds: readonly string[], expected: readonly string[]): boolean {
+  const held = new Set(targetIds);
+  return held.size === new Set(expected).size && expected.every((id) => held.has(id));
+}
+
+/** The requesting key, or the person behind it (the key's owner, or another key they own). */
+export function isRequester({
+  caller,
+  stop,
+}: {
+  caller: { userId: string | null; apiKeyId: string | null };
+  stop: AgentStopRecord;
+}): boolean {
+  if (caller.apiKeyId && caller.apiKeyId === stop.requestedByApiKeyId) return true;
+  return caller.userId !== null && caller.userId === stop.requestedByUserId;
+}
+
 export function isOpenStatus(status: AgentStopStatus): boolean {
   return AGENT_STOP_OPEN_STATUSES.includes(status);
 }
@@ -664,6 +682,9 @@ function resettle({ stop, at }: { stop: AgentStopRecord; at: number }): AgentSto
       return settleRestore({ stop: { ...stop, status: "restoring" }, at });
     case "quarantined":
       return stop.targets.some(isLive) ? stop : settleEmpty({ stop, at });
+    case "pending_approval":
+      // Nothing was applied yet, so a stop left with no target has nothing to wait for.
+      return stop.targets.length > 0 ? stop : settleEmpty({ stop, at });
     default:
       return stop;
   }

@@ -55,22 +55,17 @@ function milestoneRoundOf({
 }
 
 /**
- * The audit key of one announced milestone: derived from the stop, milestone and its rounds, so a
- * redelivered announcement names one row. Its moment is the stop's latest recorded time.
+ * When a milestone was reached, in whole seconds: the intent's moment, or for an intent queued
+ * without it the stop's latest recorded time. The audit key holds seconds, so the webhook's
+ * occurred_at and the audit row name one moment, and a redelivery names it again.
  */
-export function milestoneAuditKeyOf({
+export function milestoneMomentOf({
   stop,
-  milestone,
-  restoreRound,
-  retryRound = 0,
+  occurredAt,
 }: {
   stop: AgentStopView;
-  milestone: AgentStopWebhookEventType;
-  restoreRound: number;
-  retryRound?: number;
-}): string {
-  const round = milestoneRoundOf({ restoreRound, retryRound });
-  const digest = createHash("sha256").update(`${stop.id}\u001f${milestone}\u001f${round}`).digest();
+  occurredAt?: number;
+}): number {
   const moments = [
     stop.requestedAt,
     stop.decidedAt,
@@ -78,10 +73,34 @@ export function milestoneAuditKeyOf({
     stop.restoreRequestedAt,
     stop.restoredAt,
   ].flatMap((at) => (at ? [Temporal.Instant.from(at).epochMilliseconds] : []));
+  const at = occurredAt ?? Math.max(...moments);
+  return Math.floor(at / 1000) * 1000;
+}
+
+/**
+ * The audit key of one announced milestone: derived from the stop, milestone and its rounds, so a
+ * redelivered announcement names one row. Its moment is `milestoneMomentOf`.
+ */
+export function milestoneAuditKeyOf({
+  stop,
+  milestone,
+  restoreRound,
+  retryRound = 0,
+  occurredAt,
+}: {
+  stop: AgentStopView;
+  milestone: AgentStopWebhookEventType;
+  restoreRound: number;
+  retryRound?: number;
+  occurredAt?: number;
+}): string {
+  const round = milestoneRoundOf({ restoreRound, retryRound });
+  const digest = createHash("sha256").update(`${stop.id}\u001f${milestone}\u001f${round}`).digest();
+  const at = milestoneMomentOf({ stop, ...(occurredAt === undefined ? {} : { occurredAt }) });
   return new Ksuid({
     environment: getEnvironment(),
     resource: AUDIT_KEY_RESOURCE,
-    timestamp: Math.floor(Math.max(...moments) / 1000),
+    timestamp: Math.floor(at / 1000),
     instance: new Instance(Instance.schemes.RANDOM, new Uint8Array(digest.subarray(0, 8))),
     sequenceId: digest.readUInt32BE(8) >>> 1,
   }).toString();
@@ -232,21 +251,29 @@ export class AgentStopTargetService implements AgentStopIntentExecutors {
   }
 
   /**
-   * The registry feed (webhooks) first, then the audit row; both carry every target's outcome. The
+   * The webhooks first, then the audit row; both carry every target's outcome. The
    * request's own row was written by whoever asked, so a stop_requested milestone is pushed only.
    */
   async announce(intent: AgentStopAnnounceIntent): Promise<void> {
-    const { organizationId, milestone, restoreRound, retryRound, stop } = intent;
+    const { organizationId, milestone, restoreRound, retryRound, occurredAt, stop } = intent;
     const round = milestoneRoundOf({ restoreRound, retryRound });
+    const at = milestoneMomentOf({ stop, ...(occurredAt === undefined ? {} : { occurredAt }) });
     await this.deps.registry.announceStop({
       organizationId,
       eventId: `${stop.id}_${milestone.replace("governance.agent.", "")}_${round}`,
       milestone,
+      occurredAt: at,
       stop,
     });
     if (milestone === "governance.agent.stop_requested") return;
     await this.deps.auditLog.record({
-      idempotencyKey: milestoneAuditKeyOf({ stop, milestone, restoreRound, retryRound }),
+      idempotencyKey: milestoneAuditKeyOf({
+        stop,
+        milestone,
+        restoreRound,
+        retryRound,
+        occurredAt: at,
+      }),
       organizationId,
       action: milestone,
       targetKind: AGENT_STOP_AUDIT_TARGET_KIND,

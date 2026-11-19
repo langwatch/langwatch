@@ -7,6 +7,7 @@ import type {
   AgentStopView,
   AgentStopWebhookEventType,
 } from "@langwatch/enterprise-governance-contract";
+import { InMemoryProcessStore } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import {
   PrismaConfigService,
@@ -20,7 +21,11 @@ import type { WebhookApi, WebhookEndpointView } from "@langwatch/webhook-contrac
 import { nanoid } from "nanoid";
 import { afterAll, describe, expect, it } from "vitest";
 
-import type { AgentRegistryDeliveryIntent } from "../../../features/registry/eventing/agent-registry-delivery.process.ts";
+import { OutboxAgentRegistryDelivery } from "../../../features/registry/eventing/agent-registry-delivery.intent.ts";
+import {
+  AGENT_REGISTRY_DELIVERY_PROCESS_KEY,
+  AGENT_REGISTRY_DELIVERY_PROCESS_NAME,
+} from "../../../features/registry/eventing/agent-registry-delivery.process.ts";
 import type { RegistryDraft } from "../../../features/registry/rules/registry-entry.rules.ts";
 import { planRegistryChanges } from "../../../features/registry/rules/registry-reconcile.rules.ts";
 import { AgentRegistryService } from "../../../features/registry/services/agent-registry.service.ts";
@@ -173,19 +178,19 @@ describe.skipIf(!connection)("PrismaAgentRegistryRepository", () => {
         ["alpha", "active", 2],
       ]);
 
-      const events = await repository().findEventsAfter({ organizationId, limit: 10 });
+      const { events } = await repository().listEventsAfter({ organizationId, limit: 10 });
       expect(events.map((event) => event.type)).toEqual([
         "governance.agent.registered",
         "governance.agent.registered",
         "governance.agent.versioned",
         "governance.agent.removed",
       ]);
-      const after = await repository().findEventsAfter({
+      const after = await repository().listEventsAfter({
         organizationId,
         after: BigInt(events[1]?.sequence ?? "0"),
         limit: 10,
       });
-      expect(after.map((event) => event.type)).toEqual([
+      expect(after.events.map((event) => event.type)).toEqual([
         "governance.agent.versioned",
         "governance.agent.removed",
       ]);
@@ -323,9 +328,9 @@ describe.skipIf(!connection)("PrismaAgentRegistryRepository", () => {
     });
   });
 
-  describe("given a kill switch milestone appended twice at once with one event id", () => {
-    /** @scenario "A kill switch milestone is appended to the registry feed once however often it is announced" */
-    it("stores one event carrying the stop and answers both calls with it", async () => {
+  describe("given an event another release wrote with a type this release does not know", () => {
+    /** @scenario An event another release wrote with a type this release does not know is left out of the feed and versions */
+    it("leaves it out of the feed, the versions and the undelivered events, and pages past it", async () => {
       const organizationId = await seeded();
       const [alpha] = await repository().findEntries({
         organizationId,
@@ -333,32 +338,116 @@ describe.skipIf(!connection)("PrismaAgentRegistryRepository", () => {
         limit: 1,
       });
       if (!alpha) throw new Error("no seeded entry");
-      const append = () =>
-        repository().appendStopEvent({
+      await prisma().agentRegistryEvent.create({
+        data: {
+          id: `${ns}-foreign`,
           organizationId,
-          event: {
-            id: `${ns}-stop-requested`,
-            type: "governance.agent.stop_requested",
-            entryId: alpha.id,
-            occurredAt: Temporal.Instant.from("2026-11-12T00:00:00Z"),
-            stop: stopView({ agentId: alpha.id, status: "pending_approval" }),
-          },
+          type: "governance.agent.a_later_release_type",
+          entryId: alpha.id,
+          fromVersion: null,
+          toVersion: null,
+          payload: JSON.parse(JSON.stringify({ tool: null, agent: alpha, later: { field: 1 } })),
+          occurredAt: new Date("2026-11-12T00:00:00Z"),
+          deliveryRecordedAt: null,
+        },
+      });
+      await reconcile({
+        organizationId,
+        drafts: [
+          { ...draft("alpha"), model: { provider: "openai", model: "gpt-5-mini", parameters: {} } },
+          draft("gamma"),
+        ],
+        at: "2026-11-13T00:00:00Z",
+      });
+
+      const feed: string[] = [];
+      let after: bigint | undefined;
+      for (let page = 0; page < 10; page++) {
+        const read = await repository().listEventsAfter({
+          organizationId,
+          limit: 1,
+          ...(after === undefined ? {} : { after }),
         });
+        feed.push(...read.events.map((event) => event.type));
+        if (read.next === null) break;
+        after = read.next;
+      }
+      const versions = await repository().listEventsOfEntry({
+        organizationId,
+        entryId: alpha.id,
+        limit: 10,
+      });
+      const undelivered = await repository().findUndeliveredEvents({ organizationId, limit: 10 });
 
-      const [first, second] = await Promise.all([append(), append()]);
-
-      expect(second).toEqual(first);
-      const feed = await repository().findEventsAfter({ organizationId, limit: 10 });
-      const stops = feed.filter((event) => event.type === "governance.agent.stop_requested");
-      expect(stops).toHaveLength(1);
-      expect(stops[0]?.stop).toMatchObject({ id: "agentstop-1", status: "pending_approval" });
-      expect(Number(stops[0]?.sequence)).toBeGreaterThan(Number(feed[0]?.sequence));
+      expect(feed).toEqual([
+        "governance.agent.registered",
+        "governance.agent.registered",
+        "governance.agent.versioned",
+        "governance.agent.removed",
+        "governance.agent.registered",
+      ]);
+      expect(versions.events.map((event) => event.type)).toEqual([
+        "governance.agent.registered",
+        "governance.agent.versioned",
+      ]);
+      expect(undelivered.map((event) => event.type)).toEqual([
+        "governance.agent.versioned",
+        "governance.agent.removed",
+        "governance.agent.registered",
+      ]);
     });
   });
 
-  describe("given each kill switch milestone of one stop announced through the registry", () => {
-    /** @scenario "Each kill switch milestone reaches the registry feed and each subscribed webhook once" */
-    it("appends one feed event and records one webhook intent per milestone, once", async () => {
+  describe("given more undelivered events this release cannot read than one fan-out takes", () => {
+    /** @scenario An undelivered event this release cannot read never holds back the events after it */
+    it("pages past them to the readable events and leaves them undelivered", async () => {
+      const organizationId = await seeded();
+      const [alpha] = await repository().findEntries({ organizationId, limit: 1 });
+      if (!alpha) throw new Error("no seeded entry");
+      const pushed = await repository().findUndeliveredEvents({ organizationId, limit: 10 });
+      await repository().markDeliveryRecorded({
+        organizationId,
+        eventIds: pushed.map((event) => event.id),
+        at: Temporal.Instant.from("2026-11-11T00:00:01Z"),
+      });
+      const unreadable = ["a", "b", "c"].map((suffix) => `${ns}-unreadable-${suffix}`);
+      await prisma().agentRegistryEvent.createMany({
+        data: unreadable.map((id) => ({
+          id,
+          organizationId,
+          type: "governance.agent.versioned",
+          entryId: alpha.id,
+          fromVersion: 1,
+          toVersion: 2,
+          payload: { agent: { written_by: "a later release" } },
+          occurredAt: new Date("2026-11-12T00:00:00Z"),
+          deliveryRecordedAt: null,
+        })),
+      });
+      await reconcile({
+        organizationId,
+        drafts: [draft("alpha"), draft("gamma")],
+        at: "2026-11-13T00:00:00Z",
+      });
+
+      const undelivered = await repository().findUndeliveredEvents({ organizationId, limit: 2 });
+
+      expect(undelivered.map((event) => event.type)).toEqual([
+        "governance.agent.versioned",
+        "governance.agent.registered",
+      ]);
+      expect(undelivered.filter((event) => unreadable.includes(event.id))).toEqual([]);
+      const left = await prisma().agentRegistryEvent.findMany({
+        where: { organizationId, id: { in: unreadable } },
+        select: { deliveryRecordedAt: true },
+      });
+      expect(left.map((row) => row.deliveryRecordedAt)).toEqual([null, null, null]);
+    });
+  });
+
+  describe("given each kill switch milestone of one stop announced twice through the registry", () => {
+    /** @scenario A kill switch milestone is pushed to each subscribed webhook and written to no registry feed */
+    it("records one webhook intent per milestone and writes no registry event row", async () => {
       const organizationId = await seeded();
       const [alpha] = await repository().findEntries({
         organizationId,
@@ -366,7 +455,7 @@ describe.skipIf(!connection)("PrismaAgentRegistryRepository", () => {
         limit: 1,
       });
       if (!alpha) throw new Error("no seeded entry");
-      const intents: AgentRegistryDeliveryIntent[] = [];
+      const processStore = InMemoryProcessStore.createForTesting();
       const registry = AgentRegistryService.create({
         registry: repository(),
         discoveredAgents: MemoryGovernanceRepositories.create().discoveredAgents,
@@ -378,17 +467,12 @@ describe.skipIf(!connection)("PrismaAgentRegistryRepository", () => {
           getAll: async () => [governanceEndpoint(organizationId)],
         }),
         entitlements: { hasEnterprisePlan: async () => true },
-        outbox: () => ({
-          record: async (batch) => {
-            intents.push(...batch);
-          },
-        }),
+        outbox: () => OutboxAgentRegistryDelivery.create(processStore),
         publicBaseUrl: "https://app.langwatch.test",
         logger: createTestLogger().logger,
         now: () => Temporal.Instant.from("2026-11-12T00:00:00Z"),
       });
-      await registry.fanOutPending({ organizationId });
-      intents.length = 0;
+      const rowsBefore = await prisma().agentRegistryEvent.count({ where: { organizationId } });
       const milestones: [AgentStopWebhookEventType, AgentStopView["status"]][] = [
         ["governance.agent.stop_requested", "pending_approval"],
         ["governance.agent.quarantined", "quarantined"],
@@ -402,22 +486,26 @@ describe.skipIf(!connection)("PrismaAgentRegistryRepository", () => {
           organizationId,
           eventId: `${ns}-${milestone}`,
           milestone,
+          occurredAt: Date.parse("2026-11-12T00:00:00Z"),
           stop: stopView({ agentId: alpha.id, status }),
         });
 
       for (const milestone of milestones) await announce(milestone);
-      for (const milestone of milestones) await announce(milestone);
+      await Promise.all(milestones.map(announce));
 
-      const feed = await repository().findEventsAfter({ organizationId, limit: 20 });
-      expect(feed.filter((event) => event.stop).map((event) => event.type)).toEqual(
-        milestones.map(([milestone]) => milestone),
+      const messages = await processStore.findMessagesByRef({
+        ref: {
+          processName: AGENT_REGISTRY_DELIVERY_PROCESS_NAME,
+          projectId: organizationId,
+          processKey: AGENT_REGISTRY_DELIVERY_PROCESS_KEY,
+        },
+      });
+      expect(messages.map((message) => message.messageKey)).toEqual(
+        milestones.map(([milestone]) => `agent-registry:${ns}-${milestone}:hook-governance`),
       );
-      expect(intents.map((intent) => [intent.endpointId, intent.eventType])).toEqual(
-        milestones.map(([milestone]) => ["hook-governance", milestone]),
+      await expect(prisma().agentRegistryEvent.count({ where: { organizationId } })).resolves.toBe(
+        rowsBefore,
       );
-      await expect(
-        repository().findUndeliveredEvents({ organizationId, limit: 10 }),
-      ).resolves.toEqual([]);
     });
   });
 });

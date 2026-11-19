@@ -8,6 +8,7 @@ import {
   databricksGeniePullConfigSchema,
 } from "@langwatch/enterprise-governance-contract";
 import type { GatewayApi } from "@langwatch/gateway-contract";
+import { HandledError } from "@langwatch/handled-error";
 import { type Instant, Temporal } from "@langwatch/time";
 
 import type { BedrockAgentAliasChannel } from "../../../channels/bedrock-agent-alias.channel.ts";
@@ -20,7 +21,11 @@ import type { GovernanceAwsConnectionRepository } from "../../../repositories/go
 import type { KillSwitchLockRepository } from "../../../repositories/kill-switch-lock.repository.ts";
 import type { SourceCredentialAccessService } from "../../ingestion-source/services/source-credential-access.service.ts";
 import type { AgentStopApplyIntent } from "../eventing/agent-stop.process.ts";
-import { BEDROCK_INVOCATION_STATES } from "../rules/agent-stop-target.rules.ts";
+import {
+  BEDROCK_INVOCATION_STATES,
+  isSameBedrockAlias,
+  workspaceKeyOf,
+} from "../rules/agent-stop-target.rules.ts";
 
 export type Direction = "stop" | "restore";
 
@@ -41,36 +46,34 @@ const AGENT_STOP_CLOSED_STATUSES = AGENT_STOP_STATUSES.filter(
   (status) => !AGENT_STOP_OPEN_STATUSES.includes(status),
 );
 
-function isOnKey({
-  outcome,
-  virtualKeyId,
-}: {
-  outcome: AgentStopTargetOutcome;
-  virtualKeyId: string;
-}): boolean {
-  return (
-    outcome.target.kind === "gateway_virtual_key" && outcome.target.virtualKeyId === virtualKeyId
-  );
-}
-
 /**
  * Applied, or an apply that may already have run. A stop being restored, or whose restore failed,
- * is letting the key go, so two restores of stops sharing a key never both keep it disabled.
+ * is letting the target go, so two restores of stops sharing one never both keep it stopped.
  */
 function isHolding(outcome: AgentStopTargetOutcome): boolean {
   return outcome.state === "applied" || outcome.state === "pending";
 }
 
+/** Being restored, or its restore failed: a later restore of that stop may still turn it on. */
+function isReleasing(outcome: AgentStopTargetOutcome): boolean {
+  return outcome.state === "reverting" || outcome.state === "revert_failed";
+}
+
 /** What every platform call reads off its intent, an apply or a revert. */
 export type AgentStopTargetWork = Omit<AgentStopApplyIntent, "retryRound">;
 
-/** A call's outcome: whether it changed the platform, and whether a shared key was left disabled. */
+/** A call's outcome: whether it changed the platform, and whether a shared target was left stopped. */
 type CallOutcome = { changed: boolean; keptDisabled?: boolean };
+
+/** Whether another stop's target names the resource a call acts on. */
+type SameResource = (other: AgentStopTarget) => boolean | Promise<boolean>;
+
+type ServingEndpointCall = { workspaceUrl: string; token: string; endpointName: string };
 
 /**
  * The platform calls of a stop's targets: a Databricks serving endpoint, a Bedrock alias or a
- * gateway virtual key, stopped or restored. A shared virtual key is written under its own lock, and
- * stays disabled on restore while another open stop holds it.
+ * gateway virtual key, stopped or restored. Each is written under a lock of its own resource, and
+ * a shared one stays stopped on restore while another open stop holds it.
  */
 export class AgentStopPlatformService {
   private constructor(private readonly deps: AgentStopPlatformDependencies) {}
@@ -141,8 +144,10 @@ export class AgentStopPlatformService {
   }): Promise<CallOutcome> {
     const { organizationId } = intent;
     const command = { id: virtualKeyId, organizationId, actorUserId: intent.actorUserId };
+    const isSame: SameResource = (other) =>
+      other.kind === "gateway_virtual_key" && other.virtualKeyId === virtualKeyId;
     if (direction === "restore") {
-      if (await this.isKeyHeldByAnotherStop({ intent, virtualKeyId })) {
+      if (await this.isHeldByAnotherStop({ intent, isSame })) {
         return { changed: false, keptDisabled: true };
       }
       signal.throwIfAborted();
@@ -151,16 +156,11 @@ export class AgentStopPlatformService {
     }
     return this.stopUnlessAlreadyStopped({
       intent,
-      // A key another stop holds, or a closed stop's restore left disabled, is this stop's change too.
+      // A key another stop holds or may still enable, or a closed stop left disabled, is this stop's too.
       isStopped: async () => {
         const key = await this.deps.virtualKeys.findVirtualKeyById(virtualKeyId, organizationId);
         if (key === null || key.status === "ACTIVE") return false;
-        if (await this.isKeyHeldByAnotherStop({ intent, virtualKeyId })) return false;
-        return !(await this.isKeptDisabledByClosedStop({
-          intent,
-          virtualKeyId,
-          disabledAt: key.disabledAt,
-        }));
+        return !(await this.isLeftOffByAnotherStop({ intent, isSame, disabledAt: key.disabledAt }));
       },
       stop: () => {
         signal.throwIfAborted();
@@ -172,6 +172,10 @@ export class AgentStopPlatformService {
     });
   }
 
+  /**
+   * An alias another open stop holds stays rejecting on restore, and a stop that finds it left off
+   * by another stop counts it as its own change, so the last restore accepts invocations again.
+   */
   private async callBedrock({
     intent,
     target,
@@ -180,7 +184,7 @@ export class AgentStopPlatformService {
     intent: AgentStopTargetWork;
     target: Extract<AgentStopTarget, { kind: "bedrock_agent_alias" }>;
     direction: Direction;
-  }): Promise<{ changed: boolean }> {
+  }): Promise<CallOutcome> {
     const alias = {
       credentials: await this.deps.awsConnections.getCredentials({
         organizationId: intent.organizationId,
@@ -190,82 +194,194 @@ export class AgentStopPlatformService {
       agentId: target.agentId,
       agentAliasId: target.agentAliasId,
     };
-    if (direction === "restore") {
-      await this.deps.bedrock.setInvocationState({
-        ...alias,
-        state: BEDROCK_INVOCATION_STATES.restore,
-      });
-      return { changed: true };
-    }
-    return this.stopUnlessAlreadyStopped({
-      intent,
-      isStopped: async () =>
-        (await this.deps.bedrock.getInvocationState(alias)) === BEDROCK_INVOCATION_STATES.stop,
-      stop: () =>
-        this.deps.bedrock.setInvocationState({ ...alias, state: BEDROCK_INVOCATION_STATES.stop }),
+    const isSame: SameResource = (other) => isSameBedrockAlias({ target, other });
+    const { region, agentId, agentAliasId } = target;
+    return this.deps.locks.withLock({
+      key: `bedrock-alias:${intent.organizationId}:${region}:${agentId}:${agentAliasId}`,
+      run: async ({ signal }) => {
+        if (direction === "restore") {
+          if (await this.isHeldByAnotherStop({ intent, isSame })) {
+            return { changed: false, keptDisabled: true };
+          }
+          signal.throwIfAborted();
+          await this.deps.bedrock.setInvocationState({
+            ...alias,
+            state: BEDROCK_INVOCATION_STATES.restore,
+          });
+          return { changed: true };
+        }
+        return this.stopUnlessAlreadyStopped({
+          intent,
+          isStopped: async () =>
+            (await this.deps.bedrock.getInvocationState(alias)) ===
+              BEDROCK_INVOCATION_STATES.stop &&
+            !(await this.isLeftOffByAnotherStop({ intent, isSame })),
+          stop: () => {
+            signal.throwIfAborted();
+            return this.deps.bedrock.setInvocationState({
+              ...alias,
+              state: BEDROCK_INVOCATION_STATES.stop,
+            });
+          },
+        });
+      },
     });
   }
 
   /**
-   * Another open stop holds the key once its apply ran: it recorded the key as not stopped before
-   * disabling it, and the target is applied or its apply is in flight. A stop waiting for approval
-   * holds nothing.
+   * An endpoint another open stop holds stays stopped on restore. A stop always calls stop and
+   * counts the endpoint as its own change, since the channel cannot read whether it was stopped.
    */
-  private async isKeyHeldByAnotherStop({
+  private async callServingEndpointLocked({
     intent,
-    virtualKeyId,
+    target,
+    call,
+    direction,
+    signal,
   }: {
     intent: AgentStopTargetWork;
-    virtualKeyId: string;
+    target: Extract<AgentStopTarget, { kind: "databricks_serving_endpoint" }>;
+    call: ServingEndpointCall;
+    direction: Direction;
+    signal: AbortSignal;
+  }): Promise<CallOutcome> {
+    const { organizationId } = intent;
+    if (direction === "restore") {
+      const workspace = workspaceKeyOf(call.workspaceUrl);
+      const workspaces = new Map<string, Promise<string | null>>();
+      const isSame: SameResource = async (other) => {
+        if (other.kind !== "databricks_serving_endpoint") return false;
+        if (other.endpointName !== target.endpointName) return false;
+        if (other.ingestionSourceId === target.ingestionSourceId) return true;
+        const known = workspaces.get(other.ingestionSourceId);
+        const found =
+          known ?? this.workspaceOf({ organizationId, ingestionSourceId: other.ingestionSourceId });
+        workspaces.set(other.ingestionSourceId, found);
+        return (await found) === workspace;
+      };
+      if (await this.isHeldByAnotherStop({ intent, isSame })) {
+        return { changed: false, keptDisabled: true };
+      }
+      signal.throwIfAborted();
+      await this.deps.servingEndpoints.startEndpoint(call);
+      return { changed: true };
+    }
+    signal.throwIfAborted();
+    await this.deps.servingEndpoints.stopEndpoint(call);
+    // Marks the endpoint as this stop's, so a later 404 on it reads as deleted, not wrong.
+    await this.deps.priorStates.recordOnce({
+      organizationId,
+      stopId: intent.stopId,
+      targetId: intent.target.id,
+      wasStopped: false,
+      recordedAt: this.deps.now(),
+    });
+    return { changed: true };
+  }
+
+  /** The workspace a Databricks source names, or null for a source gone or not configured. */
+  private async workspaceOf({
+    organizationId,
+    ingestionSourceId,
+  }: {
+    organizationId: string;
+    ingestionSourceId: string;
+  }): Promise<string | null> {
+    try {
+      return await this.deps.sourceCredentials.withSourceCredentials({
+        organizationId,
+        ingestionSourceId,
+        use: async ({ config }) => {
+          const parsed = databricksGeniePullConfigSchema.safeParse(config);
+          return parsed.success ? workspaceKeyOf(parsed.data.workspaceUrl) : null;
+        },
+      });
+    } catch (error) {
+      if (HandledError.isHandled(error)) return null;
+      throw error;
+    }
+  }
+
+  /**
+   * Another open stop holds the resource once its apply ran: it recorded the resource as not
+   * stopped before stopping it, and the target is applied or its apply is in flight. A stop
+   * waiting for approval holds nothing. `includeReleasing` also counts one letting it go.
+   */
+  private async isHeldByAnotherStop({
+    intent,
+    isSame,
+    includeReleasing = false,
+  }: {
+    intent: AgentStopTargetWork;
+    isSame: SameResource;
+    includeReleasing?: boolean;
   }): Promise<boolean> {
     const open = await this.deps.stops.findAllByStatuses({
       organizationId: intent.organizationId,
       statuses: AGENT_STOP_OPEN_STATUSES,
     });
-    const candidates = open.flatMap((stop) =>
-      stop.id === intent.stopId
-        ? []
-        : stop.targets
-            .filter((outcome) => isOnKey({ outcome, virtualKeyId }) && isHolding(outcome))
-            .map((outcome) => ({ stopId: stop.id, targetId: outcome.id })),
-    );
-    for (const candidate of candidates) {
-      const [wasStopped] = await this.deps.priorStates.findPriorStates({
-        organizationId: intent.organizationId,
-        ...candidate,
-      });
-      if (wasStopped === false) return true;
+    for (const stop of open) {
+      if (stop.id === intent.stopId) continue;
+      for (const outcome of stop.targets) {
+        const counts = isHolding(outcome) || (includeReleasing && isReleasing(outcome));
+        if (!counts || !(await isSame(outcome.target))) continue;
+        const [wasStopped] = await this.deps.priorStates.findPriorStates({
+          organizationId: intent.organizationId,
+          stopId: stop.id,
+          targetId: outcome.id,
+        });
+        if (wasStopped === false) return true;
+      }
     }
     return false;
   }
 
   /**
-   * A closed stop's restore kept this disable for a holder that let it go, so nobody owns it now.
-   * A key disabled after that restore was disabled by someone else and stays theirs.
+   * Off because of another stop, so a new stop must count it as its own change: another open stop
+   * holds it, or is letting it go and may still turn it on (reverting, or its revert failed), or a
+   * closed stop's restore kept it off for a holder that let it go.
+   */
+  private async isLeftOffByAnotherStop(input: {
+    intent: AgentStopTargetWork;
+    isSame: SameResource;
+    disabledAt?: Instant | null;
+  }): Promise<boolean> {
+    return (
+      (await this.isHeldByAnotherStop({ ...input, includeReleasing: true })) ||
+      (await this.isKeptDisabledByClosedStop(input))
+    );
+  }
+
+  /**
+   * A closed stop's restore kept this target off for a holder that let it go, so nobody owns it
+   * now. A key disabled after that restore was disabled by someone else and stays theirs; an alias
+   * answers no such moment (`disabledAt` undefined), so any kept-off alias counts.
    */
   private async isKeptDisabledByClosedStop({
     intent,
-    virtualKeyId,
+    isSame,
     disabledAt,
   }: {
     intent: AgentStopTargetWork;
-    virtualKeyId: string;
-    disabledAt: Instant | null;
+    isSame: SameResource;
+    disabledAt?: Instant | null;
   }): Promise<boolean> {
     if (disabledAt === null) return false;
     const closed = await this.deps.stops.findAllByStatuses({
       organizationId: intent.organizationId,
       statuses: AGENT_STOP_CLOSED_STATUSES,
     });
-    return closed.some((stop) =>
-      stop.targets.some(
-        (outcome) =>
-          isOnKey({ outcome, virtualKeyId }) &&
-          outcome.keptDisabled === true &&
-          outcome.revertedAt !== null &&
-          Temporal.Instant.compare(disabledAt, Temporal.Instant.from(outcome.revertedAt)) <= 0,
-      ),
-    );
+    for (const stop of closed) {
+      for (const outcome of stop.targets) {
+        if (outcome.keptDisabled !== true || outcome.revertedAt === null) continue;
+        if (!(await isSame(outcome.target))) continue;
+        const revertedAt = Temporal.Instant.from(outcome.revertedAt);
+        if (disabledAt === undefined || Temporal.Instant.compare(disabledAt, revertedAt) <= 0) {
+          return true;
+        }
+      }
+    }
+    return false;
   }
 
   /** One platform call for the intent's target, in `direction`. */
@@ -298,20 +414,11 @@ export class AgentStopPlatformService {
               workspaceUrl,
             });
             const call = { workspaceUrl, token, endpointName: target.endpointName };
-            if (direction === "restore") {
-              await this.deps.servingEndpoints.startEndpoint(call);
-              return { changed: true };
-            }
-            await this.deps.servingEndpoints.stopEndpoint(call);
-            // Marks the endpoint as this stop's, so a later 404 on it reads as deleted, not wrong.
-            await this.deps.priorStates.recordOnce({
-              organizationId,
-              stopId: intent.stopId,
-              targetId: intent.target.id,
-              wasStopped: false,
-              recordedAt: this.deps.now(),
+            return this.deps.locks.withLock({
+              key: `serving-endpoint:${organizationId}:${workspaceKeyOf(workspaceUrl)}:${target.endpointName}`,
+              run: ({ signal }) =>
+                this.callServingEndpointLocked({ intent, target, call, direction, signal }),
             });
-            return { changed: true };
           },
         });
       case "bedrock_agent_alias":

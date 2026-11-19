@@ -1,18 +1,22 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import type {
-  AgentRegistryEvent,
+  AgentStopMilestoneEvent,
   AgentStopView,
   AgentStopWebhookEventType,
 } from "@langwatch/enterprise-governance-contract";
 import { generate } from "@langwatch/ksuid";
 import { createLogger, type Logger } from "@langwatch/observability";
 import type { OrganizationApi } from "@langwatch/organization-contract";
-import { nowInstant, type Instant } from "@langwatch/time";
+import { nowInstant, type Instant, Temporal } from "@langwatch/time";
 import { eventMatches, type WebhookApi } from "@langwatch/webhook-contract";
 
 import type { AgentRegistryRepository } from "../../../repositories/agent-registry.repository.ts";
 import type { AgentRegistryDeliveryIntent } from "../eventing/agent-registry-delivery.process.ts";
-import { changedSince, planRegistryChanges } from "../rules/registry-reconcile.rules.ts";
+import {
+  changedSince,
+  planRegistryChanges,
+  registryTimestamp,
+} from "../rules/registry-reconcile.rules.ts";
 import {
   AgentRegistrySourcesService,
   type AgentRegistrySourcesDependencies,
@@ -223,31 +227,50 @@ export class AgentRegistryService {
   }
 
   /**
-   * Appends a kill switch milestone to the entry's feed, then fans it out like any registry event.
-   * The event id is the caller's, so a redelivered announcement appends and pushes once.
+   * Pushes a kill switch milestone to each subscribed webhook through the registry's outbox.
+   * No feed row: released readers refuse an unknown event type (docs/governance/kill-switch.mdx).
+   * The event id and `occurredAt` (epoch ms) are the caller's, so a redelivery records each
+   * endpoint's intent once and stamps the same moment.
    */
   async announceStop({
     organizationId,
     eventId,
     milestone,
+    occurredAt,
     stop,
   }: {
     organizationId: string;
     eventId: string;
     milestone: AgentStopWebhookEventType;
+    occurredAt: number;
     stop: AgentStopView;
-  }): Promise<AgentRegistryEvent> {
-    const event = await this.deps.registry.appendStopEvent({
-      organizationId,
-      event: {
-        id: eventId,
-        type: milestone,
-        entryId: stop.agentId,
-        occurredAt: this.deps.now(),
-        stop,
-      },
-    });
-    await this.fanOutPending({ organizationId });
+  }): Promise<AgentStopMilestoneEvent> {
+    const outbox = this.deps.outbox();
+    if (!outbox) throw new Error("A kill switch milestone is announced only where the outbox runs");
+    const event: AgentStopMilestoneEvent = {
+      id: eventId,
+      type: milestone,
+      organization_id: organizationId,
+      agent_id: stop.agentId,
+      from_version: null,
+      to_version: null,
+      tool: null,
+      occurred_at: registryTimestamp(Temporal.Instant.fromEpochMilliseconds(occurredAt)),
+      agent: await this.deps.registry.getEntry({ organizationId, id: stop.agentId }),
+      stop,
+    };
+    const endpoints = (await this.deps.webhooks.getAll({ organizationId })).filter(
+      (endpoint) => endpoint.status === "ACTIVE" && eventMatches(endpoint.enabledEvents, milestone),
+    );
+    await outbox.record(
+      endpoints.map((endpoint) => ({
+        organizationId,
+        eventId,
+        eventType: milestone,
+        endpointId: endpoint.id,
+        body: event,
+      })),
+    );
     return event;
   }
 

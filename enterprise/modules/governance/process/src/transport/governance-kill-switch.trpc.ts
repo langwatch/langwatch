@@ -48,8 +48,9 @@ export const governanceKillSwitchTrpcTransport: TrpcRouterDeclaration<
 
   .procedure("setPlan")
   .withEntitlement("enterprise", AGENT_REGISTRY)
+  .withoutAudit(SELF_AUDITED)
   .withPermission("governance:manage")
-  .handle(({ app, input }) => app.setAgentStopPlan(input))
+  .handle(({ app, input, actor }) => app.setAgentStopPlan({ ...input, caller: personOf(actor) }))
 
   .procedure("awsConnections")
   .withEntitlement("enterprise", AGENT_REGISTRY)

@@ -6,6 +6,7 @@
 import {
   AGENT_STOP_RESTORABLE_STATUSES,
   AGENT_STOP_RETRYABLE_STATUSES,
+  AGENT_STOP_TARGET_KINDS,
   type AgentKillSwitchSummary,
   type AgentStopSeverity,
   type AgentStopStatus,
@@ -103,52 +104,110 @@ export function summariesByRowId(
   return byRow;
 }
 
-/** Another open stop holds a key while its target is applied or an approved stop is about to apply it. */
-function holdsSharedKey({
+/** Whether `other` acts on what `target` acts on, as far as the browser can tell. */
+function isSameResource({
+  target,
+  other,
+}: {
+  target: AgentStopTarget;
+  other: AgentStopTarget;
+}): boolean {
+  switch (target.kind) {
+    case "gateway_virtual_key":
+      return other.kind === target.kind && other.virtualKeyId === target.virtualKeyId;
+    case "databricks_serving_endpoint":
+      return (
+        other.kind === target.kind &&
+        other.endpointName === target.endpointName &&
+        other.ingestionSourceId === target.ingestionSourceId
+      );
+    case "bedrock_agent_alias":
+      return (
+        other.kind === target.kind &&
+        other.region === target.region &&
+        other.agentId === target.agentId &&
+        other.agentAliasId === target.agentAliasId
+      );
+  }
+}
+
+/** Another open stop holds a target while it is applied or an approved stop is about to apply it. */
+function isHolding({
   holder,
   outcome,
-  keys,
 }: {
   holder: AgentStopView;
   outcome: AgentStopView["targets"][number];
-  keys: ReadonlySet<string>;
 }): boolean {
-  if (outcome.target.kind !== "gateway_virtual_key") return false;
-  if (!keys.has(outcome.target.virtualKeyId)) return false;
   if (outcome.state === "applied") return true;
   return outcome.state === "pending" && holder.status === "stopping";
 }
 
+export type SharedTargetHolders = { kind: AgentStopTargetKind; holders: string[] };
+
+/** Whether `holder`, another agent's open stop, holds one of `targets`. */
+function holdsAnyOf({
+  holder,
+  targets,
+}: {
+  holder: AgentStopView;
+  targets: readonly AgentStopTarget[];
+}): boolean {
+  return holder.targets.some(
+    (outcome) =>
+      isHolding({ holder, outcome }) &&
+      targets.some((target) => isSameResource({ target, other: outcome.target })),
+  );
+}
+
 /**
- * The other agents whose open stop holds one of `stop`'s virtual keys disabled: restoring `stop`
- * leaves that key disabled until they are restored too.
+ * The other agents whose open stop holds one of `stop`'s targets, per target kind: restoring
+ * `stop` leaves that target off until they are restored too.
  */
-export function sharedKeyHoldersOf({
+export function sharedTargetHoldersOf({
   stop,
   summaries,
 }: {
   stop: AgentStopView | null;
   summaries: readonly AgentKillSwitchSummary[];
-}): string[] {
+}): SharedTargetHolders[] {
   if (!stop) return [];
-  const keys = new Set(
-    stop.targets.flatMap((outcome) =>
-      outcome.target.kind === "gateway_virtual_key" ? [outcome.target.virtualKeyId] : [],
-    ),
+  const others = summaries.flatMap(({ openStop }) =>
+    openStop && openStop.id !== stop.id ? [openStop] : [],
   );
-  if (keys.size === 0) return [];
-  return summaries.flatMap(({ openStop }) => {
-    if (!openStop || openStop.id === stop.id) return [];
-    const holds = openStop.targets.some((outcome) =>
-      holdsSharedKey({ holder: openStop, outcome, keys }),
-    );
-    return holds ? [openStop.agentName] : [];
+  return AGENT_STOP_TARGET_KINDS.flatMap((kind) => {
+    const targets = stop.targets.flatMap(({ target }) => (target.kind === kind ? [target] : []));
+    if (targets.length === 0) return [];
+    const holders = others
+      .filter((holder) => holdsAnyOf({ holder, targets }))
+      .map((holder) => holder.agentName);
+    return holders.length > 0 ? [{ kind, holders }] : [];
   });
 }
 
-/** The Restore dialog's note on a shared virtual key, worded for one holder or several. */
-export function sharedKeyNoteOf({ holders }: { holders: readonly string[] }): string {
+const SHARED_TARGET_WORDS: Record<AgentStopTargetKind, { noun: string; stays: string }> = {
+  gateway_virtual_key: { noun: "virtual key", stays: "stays disabled" },
+  databricks_serving_endpoint: { noun: "serving endpoint", stays: "stays stopped" },
+  bedrock_agent_alias: { noun: "Bedrock alias", stays: "stays off" },
+};
+
+/** The Restore dialog's note on a shared target, worded for its kind and for one holder or several. */
+export function sharedTargetNoteOf({ kind, holders }: SharedTargetHolders): string {
+  const { noun, stays } = SHARED_TARGET_WORDS[kind];
   const names = new Intl.ListFormat("en-GB", { type: "conjunction" }).format(holders);
   const verb = holders.length > 1 ? "are" : "is";
-  return `The virtual key stays disabled while ${names} ${verb} still stopped.`;
+  return `The ${noun} ${stays} while ${names} ${verb} still stopped.`;
+}
+
+/** The Restore toast's line on what stays off, or null when nothing is shared. */
+export function sharedTargetToastOf({
+  shared,
+}: {
+  shared: readonly SharedTargetHolders[];
+}): string | null {
+  const [only] = shared;
+  if (!only) return null;
+  if (shared.length > 1) return "The shared targets stay off.";
+  const { noun, stays } = SHARED_TARGET_WORDS[only.kind];
+  return `The shared ${noun} ${stays}.`;
 }

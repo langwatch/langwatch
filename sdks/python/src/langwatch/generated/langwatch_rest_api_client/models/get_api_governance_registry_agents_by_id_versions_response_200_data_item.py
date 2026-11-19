@@ -8,14 +8,10 @@ from attrs import define as _attrs_define
 from ..models.get_api_governance_registry_agents_by_id_versions_response_200_data_item_type import (
     GetApiGovernanceRegistryAgentsByIdVersionsResponse200DataItemType,
 )
-from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
     from ..models.get_api_governance_registry_agents_by_id_versions_response_200_data_item_agent import (
         GetApiGovernanceRegistryAgentsByIdVersionsResponse200DataItemAgent,
-    )
-    from ..models.get_api_governance_registry_agents_by_id_versions_response_200_data_item_stop import (
-        GetApiGovernanceRegistryAgentsByIdVersionsResponse200DataItemStop,
     )
 
 
@@ -28,7 +24,7 @@ class GetApiGovernanceRegistryAgentsByIdVersionsResponse200DataItem:
     Attributes:
         id (str):
         sequence (str):
-        type_ (GetApiGovernanceRegistryAgentsByIdVersionsResponse200DataItemType):
+        type_ (GetApiGovernanceRegistryAgentsByIdVersionsResponse200DataItemType | str):
         organization_id (str):
         agent_id (str):
         from_version (int | None):
@@ -36,12 +32,11 @@ class GetApiGovernanceRegistryAgentsByIdVersionsResponse200DataItem:
         tool (None | str):
         occurred_at (str):
         agent (GetApiGovernanceRegistryAgentsByIdVersionsResponse200DataItemAgent):
-        stop (GetApiGovernanceRegistryAgentsByIdVersionsResponse200DataItemStop | Unset):
     """
 
     id: str
     sequence: str
-    type_: GetApiGovernanceRegistryAgentsByIdVersionsResponse200DataItemType
+    type_: GetApiGovernanceRegistryAgentsByIdVersionsResponse200DataItemType | str
     organization_id: str
     agent_id: str
     from_version: int | None
@@ -49,14 +44,17 @@ class GetApiGovernanceRegistryAgentsByIdVersionsResponse200DataItem:
     tool: None | str
     occurred_at: str
     agent: GetApiGovernanceRegistryAgentsByIdVersionsResponse200DataItemAgent
-    stop: GetApiGovernanceRegistryAgentsByIdVersionsResponse200DataItemStop | Unset = UNSET
 
     def to_dict(self) -> dict[str, Any]:
         id = self.id
 
         sequence = self.sequence
 
-        type_ = self.type_.value
+        type_: str
+        if isinstance(self.type_, GetApiGovernanceRegistryAgentsByIdVersionsResponse200DataItemType):
+            type_ = self.type_.value
+        else:
+            type_ = self.type_
 
         organization_id = self.organization_id
 
@@ -75,10 +73,6 @@ class GetApiGovernanceRegistryAgentsByIdVersionsResponse200DataItem:
 
         agent = self.agent.to_dict()
 
-        stop: dict[str, Any] | Unset = UNSET
-        if not isinstance(self.stop, Unset):
-            stop = self.stop.to_dict()
-
         field_dict: dict[str, Any] = {}
 
         field_dict.update(
@@ -95,8 +89,6 @@ class GetApiGovernanceRegistryAgentsByIdVersionsResponse200DataItem:
                 "agent": agent,
             }
         )
-        if stop is not UNSET:
-            field_dict["stop"] = stop
 
         return field_dict
 
@@ -105,16 +97,24 @@ class GetApiGovernanceRegistryAgentsByIdVersionsResponse200DataItem:
         from ..models.get_api_governance_registry_agents_by_id_versions_response_200_data_item_agent import (
             GetApiGovernanceRegistryAgentsByIdVersionsResponse200DataItemAgent,
         )
-        from ..models.get_api_governance_registry_agents_by_id_versions_response_200_data_item_stop import (
-            GetApiGovernanceRegistryAgentsByIdVersionsResponse200DataItemStop,
-        )
 
         d = dict(src_dict)
         id = d.pop("id")
 
         sequence = d.pop("sequence")
 
-        type_ = GetApiGovernanceRegistryAgentsByIdVersionsResponse200DataItemType(d.pop("type"))
+        def _parse_type_(data: object) -> GetApiGovernanceRegistryAgentsByIdVersionsResponse200DataItemType | str:
+            try:
+                if not isinstance(data, str):
+                    raise TypeError()
+                type_type = GetApiGovernanceRegistryAgentsByIdVersionsResponse200DataItemType(data)
+
+                return type_type
+            except (TypeError, ValueError, AttributeError, KeyError):
+                pass
+            return cast(GetApiGovernanceRegistryAgentsByIdVersionsResponse200DataItemType | str, data)
+
+        type_ = _parse_type_(d.pop("type"))
 
         organization_id = d.pop("organization_id")
 
@@ -145,13 +145,6 @@ class GetApiGovernanceRegistryAgentsByIdVersionsResponse200DataItem:
 
         agent = GetApiGovernanceRegistryAgentsByIdVersionsResponse200DataItemAgent.from_dict(d.pop("agent"))
 
-        _stop = d.pop("stop", UNSET)
-        stop: GetApiGovernanceRegistryAgentsByIdVersionsResponse200DataItemStop | Unset
-        if isinstance(_stop, Unset):
-            stop = UNSET
-        else:
-            stop = GetApiGovernanceRegistryAgentsByIdVersionsResponse200DataItemStop.from_dict(_stop)
-
         get_api_governance_registry_agents_by_id_versions_response_200_data_item = cls(
             id=id,
             sequence=sequence,
@@ -163,7 +156,6 @@ class GetApiGovernanceRegistryAgentsByIdVersionsResponse200DataItem:
             tool=tool,
             occurred_at=occurred_at,
             agent=agent,
-            stop=stop,
         )
 
         return get_api_governance_registry_agents_by_id_versions_response_200_data_item

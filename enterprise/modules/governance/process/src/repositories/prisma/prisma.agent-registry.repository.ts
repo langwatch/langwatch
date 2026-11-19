@@ -7,9 +7,6 @@ import {
   type AgentRegistryEntry,
   type AgentRegistryEvent,
   type AgentRegistryStatus,
-  type AgentStopView,
-  type AgentStopWebhookEventType,
-  agentStopViewSchema,
 } from "@langwatch/enterprise-governance-contract";
 import { createLogger } from "@langwatch/observability";
 import { skipTenantCheck } from "@langwatch/prisma-client";
@@ -26,6 +23,7 @@ import {
   AgentRegistryRepository,
   type RegistryEntryPage,
   type RegistryEntryPosition,
+  type RegistryEventPage,
 } from "../agent-registry.repository.ts";
 
 const logger = createLogger("langwatch:governance:prisma-agent-registry-repository");
@@ -37,7 +35,6 @@ const REGISTRY_TRANSACTION_MAX_WAIT_MS = 10_000;
 const eventPayloadSchema = z.object({
   tool: z.string().nullable(),
   agent: agentRegistryEntrySchema,
-  stop: agentStopViewSchema.optional(),
 });
 
 type EventRow = {
@@ -53,13 +50,28 @@ type EventRow = {
 };
 
 function eventOf(row: EventRow): AgentRegistryEvent {
-  const payload = eventPayloadSchema.parse(row.payload);
-  const event = registryEventOf({
+  return registryEventOfRow({
+    row,
+    type: eventTypeSchema.parse(row.type),
+    payload: eventPayloadSchema.parse(row.payload),
+  });
+}
+
+function registryEventOfRow({
+  row,
+  type,
+  payload,
+}: {
+  row: EventRow;
+  type: AgentRegistryEvent["type"];
+  payload: z.infer<typeof eventPayloadSchema>;
+}): AgentRegistryEvent {
+  return registryEventOf({
     organizationId: row.organizationId,
     sequence: row.sequence,
     draft: {
       id: row.id,
-      type: eventTypeSchema.parse(row.type),
+      type,
       entryId: row.entryId,
       fromVersion: row.fromVersion,
       toVersion: row.toVersion,
@@ -68,7 +80,41 @@ function eventOf(row: EventRow): AgentRegistryEvent {
       occurredAt: row.occurredAt.toISOString(),
     },
   });
-  return payload.stop ? { ...event, stop: payload.stop } : event;
+}
+
+/** A read skips an event another release wrote with a type or payload this one cannot read. */
+function readableEventsOf(rows: readonly EventRow[]): AgentRegistryEvent[] {
+  return rows.flatMap((row) => {
+    const type = eventTypeSchema.safeParse(row.type);
+    const payload = eventPayloadSchema.safeParse(row.payload);
+    if (type.success && payload.success) {
+      return [registryEventOfRow({ row, type: type.data, payload: payload.data })];
+    }
+    logger.warn(
+      {
+        eventId: row.id,
+        type: row.type,
+        paths: payload.success ? [] : payload.error.issues.map((issue) => issue.path.join(".")),
+      },
+      "Skipped an agent registry event this release cannot read",
+    );
+    return [];
+  });
+}
+
+/** A full page passes on its last row's sequence, readable or not, so a reader pages past it. */
+function eventPageOf({
+  rows,
+  limit,
+}: {
+  rows: readonly EventRow[];
+  limit: number;
+}): RegistryEventPage {
+  const last = rows.at(-1);
+  return {
+    events: readableEventsOf(rows),
+    next: rows.length === limit && last ? last.sequence : null,
+  };
 }
 
 function entryOf(value: Prisma.JsonValue): AgentRegistryEntry {
@@ -294,7 +340,7 @@ SELECT pg_advisory_xact_lock(hashtextextended(${`agent-registry:${organizationId
     return entryOf(row.entry);
   }
 
-  async findEventsAfter({
+  async listEventsAfter({
     organizationId,
     after,
     limit,
@@ -302,16 +348,16 @@ SELECT pg_advisory_xact_lock(hashtextextended(${`agent-registry:${organizationId
     organizationId: string;
     after?: bigint;
     limit: number;
-  }): Promise<AgentRegistryEvent[]> {
+  }): Promise<RegistryEventPage> {
     const rows = await this.prisma.agentRegistryEvent.findMany({
       where: { organizationId, ...(after === undefined ? {} : { sequence: { gt: after } }) },
       orderBy: { sequence: "asc" },
       take: limit,
     });
-    return rows.map(eventOf);
+    return eventPageOf({ rows, limit });
   }
 
-  async findEventsOfEntry({
+  async listEventsOfEntry({
     organizationId,
     entryId,
     after,
@@ -321,7 +367,7 @@ SELECT pg_advisory_xact_lock(hashtextextended(${`agent-registry:${organizationId
     entryId: string;
     after?: bigint;
     limit: number;
-  }): Promise<AgentRegistryEvent[]> {
+  }): Promise<RegistryEventPage> {
     const rows = await this.prisma.agentRegistryEvent.findMany({
       where: {
         organizationId,
@@ -331,7 +377,7 @@ SELECT pg_advisory_xact_lock(hashtextextended(${`agent-registry:${organizationId
       orderBy: { sequence: "asc" },
       take: limit,
     });
-    return rows.map(eventOf);
+    return eventPageOf({ rows, limit });
   }
 
   async findUndeliveredEvents({
@@ -341,58 +387,26 @@ SELECT pg_advisory_xact_lock(hashtextextended(${`agent-registry:${organizationId
     organizationId: string;
     limit: number;
   }): Promise<AgentRegistryEvent[]> {
-    const rows = await this.prisma.agentRegistryEvent.findMany({
-      where: { organizationId, deliveryRecordedAt: null },
-      orderBy: { sequence: "asc" },
-      take: limit,
-    });
-    return rows.map(eventOf);
-  }
-
-  async appendStopEvent({
-    organizationId,
-    event,
-  }: {
-    organizationId: string;
-    event: {
-      id: string;
-      type: AgentStopWebhookEventType;
-      entryId: string;
-      occurredAt: Instant;
-      stop: AgentStopView;
-    };
-  }): Promise<AgentRegistryEvent> {
-    return this.prisma.$transaction(async (transaction) => {
-      // The lock `applyChanges` takes: a feed reader never passes a sequence still uncommitted.
-      await transaction.$executeRaw` ${skipTenantCheck({
-        // Advisory-lock helper, the key names one organisation's registry.
-        SKIP_TENANT_CHECK: true,
-      })}
-SELECT pg_advisory_xact_lock(hashtextextended(${`agent-registry:${organizationId}`}, 0))`;
-      const held = await transaction.agentRegistryEvent.findFirst({
-        where: { organizationId, id: event.id },
-      });
-      if (held) return eventOf(held);
-      const entry = await transaction.agentRegistryEntry.findFirst({
-        where: { organizationId, id: event.entryId },
-        select: { entry: true },
-      });
-      if (!entry) throw new AgentRegistryEntryNotFoundError(event.entryId);
-      const row = await transaction.agentRegistryEvent.create({
-        data: {
-          id: event.id,
+    // A type, or a payload, only a newer release reads stays undelivered for it; the read pages past.
+    const events: AgentRegistryEvent[] = [];
+    let after: bigint | undefined;
+    let more = true;
+    while (more && events.length < limit) {
+      const rows = await this.prisma.agentRegistryEvent.findMany({
+        where: {
           organizationId,
-          type: event.type,
-          entryId: event.entryId,
-          fromVersion: null,
-          toVersion: null,
-          payload: jsonOf({ tool: null, agent: entryOf(entry.entry), stop: event.stop }),
-          occurredAt: toDate(event.occurredAt),
           deliveryRecordedAt: null,
+          type: { in: [...AGENT_REGISTRY_EVENT_TYPES] },
+          ...(after === undefined ? {} : { sequence: { gt: after } }),
         },
+        orderBy: { sequence: "asc" },
+        take: limit,
       });
-      return eventOf(row);
-    });
+      events.push(...readableEventsOf(rows));
+      after = rows.at(-1)?.sequence;
+      more = rows.length === limit && after !== undefined;
+    }
+    return events.slice(0, limit);
   }
 
   async findSourceKeys({

@@ -5,7 +5,7 @@ import { useState } from "react";
 import {
   isRestorableStop,
   retryStopLabelOf,
-  sharedKeyHoldersOf,
+  sharedTargetHoldersOf,
 } from "../../model/kill-switch-copy.ts";
 import {
   type KillSwitchAction,
@@ -75,7 +75,7 @@ export function AgentKillSwitchMenu({
       {dialog?.action === "restore" && dialog.stopId !== null && openStop?.id === dialog.stopId && (
         <RestoreAgentDialog
           stopId={dialog.stopId}
-          sharedKeyHolders={sharedKeyHoldersOf({ stop: openStop, summaries })}
+          sharedTargets={sharedTargetHoldersOf({ stop: openStop, summaries })}
           {...dialogProps}
         />
       )}

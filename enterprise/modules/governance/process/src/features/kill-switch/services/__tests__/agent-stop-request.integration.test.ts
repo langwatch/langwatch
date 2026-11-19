@@ -138,6 +138,38 @@ describe("AgentStopService", () => {
       await harness.eventing.close();
     });
 
+    /** @scenario "A decision on a stop that is no longer pending is refused" */
+    it.each([
+      ["an approval", "approveStop", "governance.agent.stop_approved"],
+      ["a denial", "denyStop", "governance.agent.stop_denied"],
+    ] as const)(
+      "refuses an %s read before a plan edit closed the stop",
+      async (_, method, action) => {
+        const { harness, stopId } = await pending();
+        const reads = harness.repositories.agentStops;
+        const getStop = reads.getStop.bind(reads);
+        // The decision reads the stop as pending, then a plan edit closes it before it is sent.
+        vi.spyOn(reads, "getStop").mockImplementationOnce(async (input) => {
+          const stale = await getStop(input);
+          await harness.stops.setPlan({
+            organizationId: ORG,
+            agentId: AGENT_ID,
+            targets: [],
+            caller: PERSON,
+          });
+          return stale;
+        });
+
+        const decided = harness.stops[method]({ organizationId: ORG, stopId, caller: PERSON });
+
+        expect(await codeOf(decided)).toBe("agent_stop_not_pending");
+        expect((await harness.stopOf(stopId)).status).toBe("restored");
+        const rows = harness.audit.filter((row) => row.action === action);
+        expect(rows.map((row) => row.error)).toEqual(["agent_stop_not_pending"]);
+        await harness.eventing.close();
+      },
+    );
+
     /** @scenario "The credential that requested a stop cannot approve it" */
     it("refuses the approval of the API key that requested it", async () => {
       const { harness, stopId } = await pending();
@@ -188,6 +220,7 @@ describe("AgentStopService", () => {
         organizationId: ORG,
         agentId: AGENT_ID,
         targets: harness.fullPlan.slice(0, -1),
+        caller: PERSON,
       });
       await vi.waitFor(
         async () => expect((await harness.stopOf(stopId)).targets).toHaveLength(read.length - 1),
@@ -229,9 +262,37 @@ describe("AgentStopService", () => {
           userId: MACHINE.userId,
           organizationId: ORG,
           error: "agent_stop_self_approval",
-          metadata: expect.objectContaining({ stopId, apiKeyId: MACHINE.apiKeyId }),
+          targetKind: "governance_agent",
+          targetId: AGENT_ID,
+          metadata: expect.objectContaining({
+            stopId,
+            apiKeyId: MACHINE.apiKeyId,
+            targetName: "support-bot",
+          }),
         }),
       ]);
+      await harness.eventing.close();
+    });
+
+    /** @scenario "A refused kill switch write is still audited" */
+    it("names the agent on a refused restore, and only the asked id when nothing is known", async () => {
+      const { harness, stopId } = await pending();
+
+      await codeOf(harness.stops.restore({ organizationId: ORG, stopId, caller: PERSON }));
+      await codeOf(
+        harness.stops.restore({ organizationId: ORG, stopId: "agentstop_unknown", caller: PERSON }),
+      );
+
+      const rows = harness.audit.filter(
+        (row) => row.action === "governance.agent.restore_requested",
+      );
+      expect(rows[0]).toMatchObject({
+        error: "agent_stop_not_restorable",
+        targetId: AGENT_ID,
+        metadata: expect.objectContaining({ stopId, targetName: "support-bot" }),
+      });
+      expect(rows[1]).toMatchObject({ error: "agent_stop_not_found" });
+      expect(rows[1]?.targetId).toBeUndefined();
       await harness.eventing.close();
     });
 

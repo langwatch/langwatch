@@ -2,11 +2,10 @@
 
 import {
   AgentRegistryEntryNotFoundError,
+  agentRegistryEventSchema,
   type AgentRegistryEntry,
   type AgentRegistryEvent,
   type AgentRegistryStatus,
-  type AgentStopView,
-  type AgentStopWebhookEventType,
 } from "@langwatch/enterprise-governance-contract";
 import { Temporal, type Instant } from "@langwatch/time";
 
@@ -20,10 +19,36 @@ import {
   AgentRegistryRepository,
   type RegistryEntryPage,
   type RegistryEntryPosition,
+  type RegistryEventPage,
 } from "../agent-registry.repository.ts";
 
 type MemoryRow = StoredRegistryEntry & { organizationId: string };
-type MemoryEvent = { event: AgentRegistryEvent; deliveryRecordedAt: Instant | null };
+/** A stored row's `type` is a string, as in Postgres: another release may have written it. */
+type StoredEvent = Omit<AgentRegistryEvent, "type"> & { type: string };
+type MemoryEvent = { event: StoredEvent; deliveryRecordedAt: Instant | null };
+
+/** As the Prisma repository: a full page passes on its last row, readable or not. */
+function eventPageOf({
+  held,
+  limit,
+}: {
+  held: readonly MemoryEvent[];
+  limit: number;
+}): RegistryEventPage {
+  const page = held.slice(0, limit);
+  const last = page.at(-1);
+  return {
+    events: readableEventsOf(page),
+    next: page.length === limit && last ? BigInt(last.event.sequence) : null,
+  };
+}
+
+function readableEventsOf(held: readonly MemoryEvent[]): AgentRegistryEvent[] {
+  return held.flatMap(({ event }) => {
+    const parsed = agentRegistryEventSchema.safeParse(event);
+    return parsed.success ? [structuredClone(parsed.data)] : [];
+  });
+}
 
 function epochMsOf(iso: string): number {
   return Temporal.Instant.from(iso).epochMilliseconds;
@@ -154,7 +179,7 @@ export class MemoryAgentRegistryRepository extends AgentRegistryRepository {
     return found;
   }
 
-  async findEventsAfter({
+  async listEventsAfter({
     organizationId,
     after,
     limit,
@@ -162,14 +187,16 @@ export class MemoryAgentRegistryRepository extends AgentRegistryRepository {
     organizationId: string;
     after?: bigint;
     limit: number;
-  }): Promise<AgentRegistryEvent[]> {
-    return this.eventsOf(organizationId)
-      .filter(({ event }) => after === undefined || BigInt(event.sequence) > after)
-      .slice(0, limit)
-      .map(({ event }) => structuredClone(event));
+  }): Promise<RegistryEventPage> {
+    return eventPageOf({
+      held: this.eventsOf(organizationId).filter(
+        ({ event }) => after === undefined || BigInt(event.sequence) > after,
+      ),
+      limit,
+    });
   }
 
-  async findEventsOfEntry({
+  async listEventsOfEntry({
     organizationId,
     entryId,
     after,
@@ -179,12 +206,13 @@ export class MemoryAgentRegistryRepository extends AgentRegistryRepository {
     entryId: string;
     after?: bigint;
     limit: number;
-  }): Promise<AgentRegistryEvent[]> {
-    return this.eventsOf(organizationId)
-      .filter(({ event }) => event.agent_id === entryId)
-      .filter(({ event }) => after === undefined || BigInt(event.sequence) > after)
-      .slice(0, limit)
-      .map(({ event }) => structuredClone(event));
+  }): Promise<RegistryEventPage> {
+    return eventPageOf({
+      held: this.eventsOf(organizationId)
+        .filter(({ event }) => event.agent_id === entryId)
+        .filter(({ event }) => after === undefined || BigInt(event.sequence) > after),
+      limit,
+    });
   }
 
   async findUndeliveredEvents({
@@ -194,10 +222,9 @@ export class MemoryAgentRegistryRepository extends AgentRegistryRepository {
     organizationId: string;
     limit: number;
   }): Promise<AgentRegistryEvent[]> {
-    return this.eventsOf(organizationId)
-      .filter(({ deliveryRecordedAt }) => deliveryRecordedAt === null)
-      .slice(0, limit)
-      .map(({ event }) => structuredClone(event));
+    return readableEventsOf(
+      this.eventsOf(organizationId).filter(({ deliveryRecordedAt }) => deliveryRecordedAt === null),
+    ).slice(0, limit);
   }
 
   async markDeliveryRecorded({
@@ -213,49 +240,6 @@ export class MemoryAgentRegistryRepository extends AgentRegistryRepository {
     for (const held of this.eventsOf(organizationId)) {
       if (ids.has(held.event.id)) held.deliveryRecordedAt = at;
     }
-  }
-
-  async appendStopEvent({
-    organizationId,
-    event,
-  }: {
-    organizationId: string;
-    event: {
-      id: string;
-      type: AgentStopWebhookEventType;
-      entryId: string;
-      occurredAt: Instant;
-      stop: AgentStopView;
-    };
-  }): Promise<AgentRegistryEvent> {
-    const heldEvent = () =>
-      this.eventsOf(organizationId).find((candidate) => candidate.event.id === event.id);
-    const held = heldEvent();
-    if (held) return structuredClone(held.event);
-    const entry = await this.getEntry({ organizationId, id: event.entryId });
-    // Checked again after the await: an overlapping call with the same id may have appended.
-    const appendedMeanwhile = heldEvent();
-    if (appendedMeanwhile) return structuredClone(appendedMeanwhile.event);
-    this.sequence += 1n;
-    const appended: AgentRegistryEvent = {
-      ...registryEventOf({
-        organizationId,
-        sequence: this.sequence,
-        draft: {
-          id: event.id,
-          type: event.type,
-          entryId: event.entryId,
-          fromVersion: null,
-          toVersion: null,
-          tool: null,
-          agent: entry,
-          occurredAt: registryTimestamp(event.occurredAt),
-        },
-      }),
-      stop: structuredClone(event.stop),
-    };
-    this.events.push({ event: appended, deliveryRecordedAt: null });
-    return structuredClone(appended);
   }
 
   async findSourceKeys({

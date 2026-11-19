@@ -225,6 +225,7 @@ export async function killSwitchHarness({
   const announced: {
     milestone: AgentStopWebhookEventType;
     eventId: string;
+    occurredAt: number;
     stop: AgentStopView;
   }[] = [];
 

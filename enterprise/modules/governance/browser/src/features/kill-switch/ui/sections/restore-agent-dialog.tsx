@@ -8,22 +8,26 @@ import {
   useShowErrorToast,
 } from "../../../../behavior/governance-feedback.ts";
 import { useKillSwitchRefresh } from "../../behavior/use-kill-switch.ts";
-import { sharedKeyNoteOf } from "../../model/kill-switch-copy.ts";
+import {
+  type SharedTargetHolders,
+  sharedTargetNoteOf,
+  sharedTargetToastOf,
+} from "../../model/kill-switch-copy.ts";
 
 /** Restoring a stopped agent: only the targets the stop applied are turned back on. */
 export function RestoreAgentDialog({
   organizationId,
   stopId,
   agentName,
-  sharedKeyHolders = [],
+  sharedTargets = [],
   open,
   onClose,
 }: {
   organizationId: string;
   stopId: string;
   agentName: string;
-  /** Other stopped agents sharing one of this stop's virtual keys. */
-  sharedKeyHolders?: readonly string[];
+  /** Other stopped agents sharing one of this stop's targets, per target kind. */
+  sharedTargets?: readonly SharedTargetHolders[];
   open: boolean;
   onClose: () => void;
 }) {
@@ -35,11 +39,10 @@ export function RestoreAgentDialog({
   const confirm = async () => {
     try {
       await restore.mutateAsync({ organizationId, stopId });
+      const description = sharedTargetToastOf({ shared: sharedTargets });
       toaster.create({
         title: `Restoring ${agentName}`,
-        ...(sharedKeyHolders.length > 0
-          ? { description: "The shared virtual key stays disabled." }
-          : {}),
+        ...(description ? { description } : {}),
         type: "success",
       });
       await refresh.afterStopChange();
@@ -71,11 +74,16 @@ export function RestoreAgentDialog({
       <Text textStyle="sm" color="fg.muted">
         This turns back on what the stop turned off, so the agent takes traffic again.
       </Text>
-      {sharedKeyHolders.length > 0 ? (
-        <Text textStyle="sm" color="fg.muted" data-testid="restore-shared-key-note">
-          {sharedKeyNoteOf({ holders: sharedKeyHolders })}
+      {sharedTargets.map((shared) => (
+        <Text
+          key={shared.kind}
+          textStyle="sm"
+          color="fg.muted"
+          data-testid="restore-shared-target-note"
+        >
+          {sharedTargetNoteOf(shared)}
         </Text>
-      ) : null}
+      ))}
     </Dialog>
   );
 }

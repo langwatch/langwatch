@@ -180,7 +180,7 @@ describe("targetsDroppedStop", () => {
 
   describe("given a stop waiting for an approval", () => {
     /** @scenario "A stop whose plan lost every target closes as restored" */
-    it("drops its pending targets at once, and its approval closes it as restored", () => {
+    it("closes as restored at once when the plan drops every pending target", () => {
       const pending = requested({ targets: [KEY], approval: "required" });
 
       const dropped = drop(pending, [KEY.id]);
@@ -196,9 +196,19 @@ describe("targetsDroppedStop", () => {
         at: 4_000,
       });
 
-      expect(dropped).toMatchObject({ status: "pending_approval", targets: [] });
-      expect(approved.status).toBe("restored");
-      expect(approved.quarantinedAt).toBeNull();
+      expect(dropped).toMatchObject({ status: "restored", targets: [] });
+      expect(dropped.restoredAt).not.toBeNull();
+      expect(dropped.quarantinedAt).toBeNull();
+      expect(approved).toBe(dropped);
+    });
+
+    it("keeps waiting for its approval while the plan still holds a target", () => {
+      const pending = requested({ targets: [KEY, ALIAS], approval: "required" });
+
+      const dropped = drop(pending, [KEY.id]);
+
+      expect(dropped.status).toBe("pending_approval");
+      expect(dropped.targets.map((target) => target.id)).toEqual([ALIAS.id]);
     });
   });
 

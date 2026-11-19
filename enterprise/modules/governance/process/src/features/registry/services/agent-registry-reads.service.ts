@@ -100,16 +100,13 @@ export class AgentRegistryReadsService {
     limit: number;
   }): Promise<AgentRegistryEventPage> {
     await this.deps.registry.getEntry({ organizationId, id });
-    const events = await this.deps.registry.findEventsOfEntry({
+    const { events, next } = await this.deps.registry.listEventsOfEntry({
       organizationId,
       entryId: id,
       ...(cursor ? { after: BigInt(cursor) } : {}),
       limit,
     });
-    return {
-      data: events,
-      next_cursor: events.length === limit ? (events.at(-1)?.sequence ?? null) : null,
-    };
+    return { data: events, next_cursor: next === null ? null : next.toString() };
   }
 
   async listEvents({
@@ -121,15 +118,12 @@ export class AgentRegistryReadsService {
     cursor?: string;
     limit: number;
   }): Promise<AgentRegistryEventPage> {
-    const events = await this.deps.registry.findEventsAfter({
+    const { events, next } = await this.deps.registry.listEventsAfter({
       organizationId,
       ...(cursor ? { after: BigInt(cursor) } : {}),
       limit,
     });
-    return {
-      data: events,
-      next_cursor: events.length === limit ? (events.at(-1)?.sequence ?? null) : null,
-    };
+    return { data: events, next_cursor: next === null ? null : next.toString() };
   }
 
   async ardManifest({ organizationId }: { organizationId: string }): Promise<ArdManifest> {

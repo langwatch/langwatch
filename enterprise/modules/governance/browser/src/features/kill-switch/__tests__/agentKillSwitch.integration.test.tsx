@@ -340,6 +340,68 @@ describe("the Agents page when a kill switch read fails", () => {
   });
 });
 
+describe("the Agents page of an organisation without the kill switch", () => {
+  const killSwitchReads = () =>
+    trpcDouble.reads.filter((read) => read.startsWith("governanceKillSwitch."));
+
+  /** @scenario "An organisation below the Enterprise plan sees its agents with no kill switch" */
+  it("asks no stop read, shows no error and offers no kill switch action below Enterprise", async () => {
+    answerAgentsPage({ pendingApprovals: [PENDING] });
+    renderAgentsPage({ permissions: MANAGER, plan: { isEnterprise: false, isLoading: false } });
+
+    await screen.findAllByTestId("governance-agent-row");
+    expect(killSwitchReads()).toEqual([]);
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Actions for support-bot" })).toBeNull();
+    expect(screen.queryByTestId("stop-approvals-card")).toBeNull();
+  });
+
+  /** @scenario "An organisation below the Enterprise plan sees its agents with no kill switch" */
+  it("waits for the plan before it asks a stop read", async () => {
+    answerAgentsPage();
+    renderAgentsPage({ permissions: MANAGER, plan: { isEnterprise: false, isLoading: true } });
+
+    await screen.findAllByTestId("governance-agent-row");
+    expect(killSwitchReads()).toEqual([]);
+  });
+
+  /** @scenario "An organisation below the Enterprise plan sees its agents with no kill switch" */
+  it("reads a plan refusal of the stop reads as no kill switch, even with no agent yet", async () => {
+    const planRefusal = () => {
+      throw handledError({ code: "enterprise_plan_required", httpStatus: 403 });
+    };
+    answerAgentsPage();
+    answerQuery("governanceAgents.list", () => []);
+    answerQuery("governanceKillSwitch.summaries", planRefusal);
+    answerQuery("governanceKillSwitch.pendingApprovals", planRefusal);
+    renderAgentsPage({ permissions: MANAGER });
+
+    expect(await screen.findByTestId("agents-empty")).toBeInTheDocument();
+    await waitFor(() => expect(killSwitchReads()).toHaveLength(2));
+    await act(async () => undefined);
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(screen.queryByText("Couldn't load the agents' stop state")).toBeNull();
+    expect(screen.queryByText("Couldn't load the stops waiting for approval")).toBeNull();
+  });
+
+  /** @scenario "An organisation below the Enterprise plan sees its agents with no kill switch" */
+  it("offers no kill switch action on a row when the stop reads are refused for the plan", async () => {
+    const planRefusal = () => {
+      throw handledError({ code: "enterprise_plan_required", httpStatus: 402 });
+    };
+    answerAgentsPage();
+    answerQuery("governanceKillSwitch.summaries", planRefusal);
+    answerQuery("governanceKillSwitch.pendingApprovals", planRefusal);
+    renderAgentsPage({ permissions: MANAGER });
+
+    await screen.findAllByTestId("governance-agent-row");
+    await waitFor(() => expect(killSwitchReads()).toHaveLength(2));
+    await act(async () => undefined);
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Actions for support-bot" })).toBeNull();
+  });
+});
+
 describe("the Agents page when a stop read answers a server error", () => {
   const serverError = () => {
     throw retryingFailure(new Error("INTERNAL_SERVER_ERROR"));
@@ -613,7 +675,7 @@ describe("the Restore and Retry dialogs while their call runs", () => {
 });
 
 describe("the Restore dialog of an agent sharing a key with an agent no row backs", () => {
-  /** @scenario "The restore dialog names the stopped agents that keep a shared key disabled" */
+  /** @scenario "The restore dialog names the stopped agents that keep a shared target off" */
   it("names the other stopped agent", async () => {
     const shared = (id: string) =>
       outcomeOf({ id, label: "Shared key", virtualKeyId: "vk-1", state: "applied" });
@@ -634,7 +696,7 @@ describe("the Restore dialog of an agent sharing a key with an agent no row back
     await userEvent.click(await screen.findByRole("menuitem", { name: /Restore/ }));
     const dialog = await screen.findByRole("alertdialog", { name: "Restore support-bot?" });
 
-    expect(within(dialog).getByTestId("restore-shared-key-note")).toHaveTextContent(
+    expect(within(dialog).getByTestId("restore-shared-target-note")).toHaveTextContent(
       "The virtual key stays disabled while billing-bot is still stopped.",
     );
   });

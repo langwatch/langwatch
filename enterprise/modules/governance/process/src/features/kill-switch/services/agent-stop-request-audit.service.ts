@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import type { AgentStopCaller } from "@langwatch/enterprise-governance-contract";
+import type { AgentStopCaller, AgentStopPlan } from "@langwatch/enterprise-governance-contract";
 import { HandledError } from "@langwatch/handled-error";
 
 import type { AgentStopRecord } from "../rules/agent-stop.rules.ts";
@@ -8,6 +8,11 @@ import type { KillSwitchAuditService } from "./kill-switch-audit.service.ts";
 
 /** The audit rows' target kind: the stop is about the registry agent. */
 export const AGENT_STOP_AUDIT_TARGET_KIND = "governance_agent";
+/** The one row a plan save writes, from the governance UI or over REST. */
+export const AGENT_STOP_PLAN_SET_ACTION = "governance.agent.stop_plan_set";
+
+/** The agent a row names: its registry id and the name people read. */
+export type AgentStopAuditAgent = { agentId: string; agentName: string };
 
 /**
  * Who a row names: the person, else the key, as the door's own rows do. An impersonated person's
@@ -65,16 +70,46 @@ export class AgentStopRequestAuditService {
     });
   }
 
+  /** One row for a saved plan, naming the agent and what the plan now holds. */
+  async recordPlanSet({
+    organizationId,
+    agent,
+    caller,
+    plan,
+  }: {
+    organizationId: string;
+    agent: AgentStopAuditAgent;
+    caller: AgentStopCaller;
+    plan: AgentStopPlan;
+  }): Promise<void> {
+    await this.deps.audit.record({
+      ...auditActorOf(caller),
+      organizationId,
+      action: AGENT_STOP_PLAN_SET_ACTION,
+      targetKind: AGENT_STOP_AUDIT_TARGET_KIND,
+      targetId: agent.agentId,
+      metadata: {
+        targetName: agent.agentName,
+        agentName: agent.agentName,
+        version: plan.version,
+        targets: plan.targets.map((target) => target.label),
+        apiKeyId: caller.apiKeyId,
+        ...(caller.impersonatorId ? { impersonatorId: caller.impersonatorId } : {}),
+      },
+    });
+  }
+
   /**
-   * Runs one request and records a refused attempt under the action it asked for. The transports
-   * leave these calls out of the generic trail, so this row is the only one a blocked
-   * self-approval or a stale plan leaves.
+   * Runs one request and records a refused attempt under the action it asked for, naming the
+   * agent when `agentOf` finds it. The transports leave these calls out of the generic trail, so
+   * this row is the only one a blocked self-approval or a stale plan leaves.
    */
   async recordingRefusal<T>({
     action,
     organizationId,
     caller,
     agentId,
+    agentOf,
     stopId,
     run,
   }: {
@@ -82,6 +117,7 @@ export class AgentStopRequestAuditService {
     organizationId: string;
     caller: AgentStopCaller;
     agentId?: string;
+    agentOf?: () => Promise<AgentStopAuditAgent>;
     stopId?: string;
     run: () => Promise<T>;
   }): Promise<T> {
@@ -89,13 +125,16 @@ export class AgentStopRequestAuditService {
       return await run();
     } catch (error) {
       if (!HandledError.isHandled(error)) throw error;
+      const agent = await agentOf?.().catch(() => undefined);
+      const targetId = agent?.agentId ?? agentId;
       await this.deps.audit.record({
         ...auditActorOf(caller),
         organizationId,
         action,
         error: error.code,
-        ...(agentId ? { targetKind: AGENT_STOP_AUDIT_TARGET_KIND, targetId: agentId } : {}),
+        ...(targetId ? { targetKind: AGENT_STOP_AUDIT_TARGET_KIND, targetId } : {}),
         metadata: {
+          ...(agent ? { targetName: agent.agentName, agentName: agent.agentName } : {}),
           ...(stopId ? { stopId } : {}),
           apiKeyId: caller.apiKeyId,
           ...(caller.impersonatorId ? { impersonatorId: caller.impersonatorId } : {}),

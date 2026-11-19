@@ -49,9 +49,13 @@ export function foldAgentStop({
   if (!stop) return stop;
   switch (type) {
     case AGENT_STOP_EVENT_TYPES.APPROVED:
-      return approvedStop({ stop, data: agentStopDecidedEventDataSchema.parse(data), at });
-    case AGENT_STOP_EVENT_TYPES.DENIED:
-      return deniedStop({ stop, data: agentStopDecidedEventDataSchema.parse(data), at });
+    case AGENT_STOP_EVENT_TYPES.DENIED: {
+      const decision = agentStopDecidedEventDataSchema.parse(data);
+      const decide = type === AGENT_STOP_EVENT_TYPES.APPROVED ? approvedStop : deniedStop;
+      const fold = (held: AgentStopRecord) => decide({ stop: held, data: decision, at });
+      if (decision.requestId === undefined) return fold(stop);
+      return foldRequestOnce({ stop, requestId: decision.requestId, fold });
+    }
     case AGENT_STOP_EVENT_TYPES.TARGET_APPLIED:
       return targetAppliedStop({
         stop,

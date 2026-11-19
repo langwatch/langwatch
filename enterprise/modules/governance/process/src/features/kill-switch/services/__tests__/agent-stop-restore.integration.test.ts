@@ -2,9 +2,11 @@
  * Restoring a stop and the audit trail of a stop's whole life, over memory.
  * Spec: enterprise/modules/governance/specs/agent-kill-switch.feature
  */
+import type { AgentStopTarget } from "@langwatch/enterprise-governance-contract";
+import { parse } from "@langwatch/ksuid";
 import { describe, expect, it, vi } from "vitest";
 
-import { codeOf, request, settled } from "./kill-switch-steps.fixtures.ts";
+import { codeOf, type Harness, request, settled } from "./kill-switch-steps.fixtures.ts";
 import {
   AGENT_ID,
   killSwitchHarness,
@@ -12,6 +14,8 @@ import {
   ORG,
   PERSON,
   VIRTUAL_KEY_ID,
+  WORKSPACE,
+  WORKSPACE_TOKEN,
 } from "./kill-switch.fixtures.ts";
 
 describe("AgentStopService restore", () => {
@@ -78,6 +82,32 @@ describe("AgentStopService restore", () => {
           "governance.agent.restore_failed",
         ),
       );
+      await harness.eventing.close();
+    });
+
+    /** @scenario "A milestone audit row is stamped with the moment its milestone was reached" */
+    it("stamps the restore_failed row with the moment its announcement says it failed", async () => {
+      const { harness, stopId } = await partlyStopped({ refuseStart: true });
+      const announce = vi.spyOn(harness.targets, "announce");
+
+      await harness.stops.restore({ organizationId: ORG, stopId, caller: PERSON });
+      const stop = await settled(harness, stopId, "restore_failed");
+      await vi.waitFor(() =>
+        expect(harness.audit.map((row) => row.action)).toContain("governance.agent.restore_failed"),
+      );
+
+      const intent = announce.mock.calls
+        .map(([call]) => call)
+        .find((call) => call.milestone === "governance.agent.restore_failed");
+      const row = harness.audit.find((entry) => entry.action === "governance.agent.restore_failed");
+      const failedAt = intent?.occurredAt ?? Number.NaN;
+      const failedSecond = Math.floor(failedAt / 1000) * 1000;
+      expect(failedAt).toBeGreaterThanOrEqual(Date.parse(stop.restoreRequestedAt ?? ""));
+      expect(parse(row?.idempotencyKey ?? "").date.getTime()).toBe(failedSecond);
+      const pushed = harness.announced.find(
+        (event) => event.milestone === "governance.agent.restore_failed",
+      );
+      expect(pushed?.occurredAt).toBe(failedSecond);
       await harness.eventing.close();
     });
 
@@ -202,6 +232,79 @@ describe("AgentStopService restore", () => {
     });
   });
 
+  describe("given two agents whose plans share one serving endpoint and one Bedrock alias", () => {
+    /** @scenario "Restoring one agent keeps a serving endpoint and a Bedrock alias another stopped agent shares stopped" */
+    it("keeps both stopped until the last agent holding them is restored", async () => {
+      const other = "agent-sales-bot";
+      const harness = await killSwitchHarness({ otherAgents: ["sales-bot"] });
+      const twin = await harness.repositories.ingestionSources.create({
+        organizationId: ORG,
+        teamId: null,
+        traceProjectId: null,
+        sourceType: "databricks_genie",
+        name: "Databricks (finance)",
+        description: null,
+        ingestSecretHash: "unused",
+        parserConfig: {
+          adapter: "databricks_genie",
+          workspaceUrl: `${WORKSPACE}/`,
+          credentials: { token: WORKSPACE_TOKEN },
+        },
+        pullSchedule: null,
+        status: "awaiting_first_event",
+        createdById: "user-ops",
+        providerAccountId: null,
+      });
+      const [endpoint, alias] = harness.fullPlan.filter(
+        (target) => target.kind !== "gateway_virtual_key",
+      );
+      if (endpoint?.kind !== "databricks_serving_endpoint" || !alias) throw new Error("no plan");
+      const plans = {
+        [AGENT_ID]: [endpoint, alias],
+        [other]: [{ ...endpoint, ingestionSourceId: twin.id }, alias],
+      };
+      const stopIds: string[] = [];
+      for (const [agentId, targets] of Object.entries(plans)) {
+        await harness.plans.setPlan({ organizationId: ORG, agentId, targets });
+        const view = await harness.stops.requestStop({
+          organizationId: ORG,
+          agentId,
+          reason: "prompt injection in production",
+          severity: "high",
+          caller: PERSON,
+        });
+        stopIds.push(view.id);
+        const stopped = await settled(harness, view.id, "quarantined");
+        expect(stopped.targets.map((target) => target.alreadyStopped)).toEqual([
+          undefined,
+          undefined,
+        ]);
+      }
+      const [first = "", second = ""] = stopIds;
+      const startPath = "/api/2.0/serving-endpoints/support-bot-prod/config:start";
+      const starts = () =>
+        harness.servingEndpoints.calls.filter((call) => call.path === startPath).length;
+      const aliasState = () =>
+        harness.bedrock.getAlias({ agentId: "AGENT00001", agentAliasId: "ALIAS00001" })
+          .aliasInvocationState;
+
+      await harness.stops.restore({ organizationId: ORG, stopId: first, caller: PERSON });
+      const kept = await settled(harness, first, "restored");
+
+      expect(kept.targets.map((target) => target.keptDisabled)).toEqual([true, true]);
+      expect(starts()).toBe(0);
+      expect(aliasState()).toBe("REJECT_INVOCATIONS");
+
+      await harness.stops.restore({ organizationId: ORG, stopId: second, caller: PERSON });
+      const last = await settled(harness, second, "restored");
+
+      expect(last.targets.map((target) => target.keptDisabled)).toEqual([undefined, undefined]);
+      expect(starts()).toBe(1);
+      expect(aliasState()).toBe("ACCEPT_INVOCATIONS");
+      await harness.eventing.close();
+    });
+  });
+
   describe("given a shared virtual key and the other agent's stop waiting for approval", () => {
     async function sharedWithPendingStop() {
       const other = "agent-sales-bot";
@@ -291,7 +394,12 @@ describe("AgentStopService restore", () => {
       await harness.stops.restore({ organizationId: ORG, stopId: first, caller: PERSON });
       const kept = await settled(harness, first, "restored");
       expect(kept.targets[0]?.keptDisabled).toBe(true);
-      await harness.stops.setPlan({ organizationId: ORG, agentId: other, targets: [] });
+      await harness.stops.setPlan({
+        organizationId: ORG,
+        agentId: other,
+        targets: [],
+        caller: PERSON,
+      });
       await vi.waitFor(async () => expect((await harness.stopOf(second)).targets).toEqual([]));
 
       const again = await harness.stops.requestStop({
@@ -306,6 +414,73 @@ describe("AgentStopService restore", () => {
       await harness.stops.restore({ organizationId: ORG, stopId: again.id, caller: PERSON });
       await settled(harness, again.id, "restored");
 
+      expect(harness.keyStatuses.get(VIRTUAL_KEY_ID)).toBe("ACTIVE");
+      await harness.eventing.close();
+    });
+  });
+
+  describe("given a shared target off while another stop's restore of it failed", () => {
+    const reason = "prompt injection in production";
+    async function stopAgent(harness: Harness, agentId: string, targets: AgentStopTarget[]) {
+      await harness.plans.setPlan({ organizationId: ORG, agentId, targets });
+      const view = await harness.stops.requestStop({
+        organizationId: ORG,
+        agentId,
+        reason,
+        severity: "high",
+        caller: PERSON,
+      });
+      return settled(harness, view.id, "quarantined");
+    }
+
+    /** @scenario "A stop that finds a shared target off while another stop is letting it go owns it" */
+    it("records a Bedrock alias as the new stop's own, so the failed stop's next restore keeps it off", async () => {
+      const harness = await killSwitchHarness({ otherAgents: ["sales-bot", "ops-bot"] });
+      const alias = harness.fullPlan.filter((target) => target.kind === "bedrock_agent_alias");
+      const aliasState = () =>
+        harness.bedrock.getAlias({ agentId: "AGENT00001", agentAliasId: "ALIAS00001" })
+          .aliasInvocationState;
+      const first = await stopAgent(harness, AGENT_ID, alias);
+      const second = await stopAgent(harness, "agent-sales-bot", alias);
+      await harness.stops.restore({ organizationId: ORG, stopId: first.id, caller: PERSON });
+      expect((await settled(harness, first.id, "restored")).targets[0]?.keptDisabled).toBe(true);
+      harness.bedrock.refuseWith("ThrottlingException");
+      await harness.stops.restore({ organizationId: ORG, stopId: second.id, caller: PERSON });
+      await settled(harness, second.id, "restore_failed");
+      harness.bedrock.refuseWith(null);
+
+      const third = await stopAgent(harness, "agent-ops-bot", alias);
+      expect(third.targets[0]?.alreadyStopped).toBeUndefined();
+      await harness.stops.restore({ organizationId: ORG, stopId: second.id, caller: PERSON });
+      const released = await settled(harness, second.id, "restored");
+
+      expect(released.targets[0]?.keptDisabled).toBe(true);
+      expect(aliasState()).toBe("REJECT_INVOCATIONS");
+      await harness.stops.restore({ organizationId: ORG, stopId: third.id, caller: PERSON });
+      await settled(harness, third.id, "restored");
+      expect(aliasState()).toBe("ACCEPT_INVOCATIONS");
+      await harness.eventing.close();
+    });
+
+    /** @scenario "A stop that finds a shared target off while another stop is letting it go owns it" */
+    it("records a virtual key as the new stop's own when its only holder's restore failed", async () => {
+      const harness = await killSwitchHarness({ otherAgents: ["sales-bot"] });
+      const key = [{ kind: "gateway_virtual_key" as const, virtualKeyId: VIRTUAL_KEY_ID }];
+      const first = await stopAgent(harness, AGENT_ID, key);
+      harness.keyRefusals.set("enable", "gateway_unavailable");
+      await harness.stops.restore({ organizationId: ORG, stopId: first.id, caller: PERSON });
+      await settled(harness, first.id, "restore_failed");
+      harness.keyRefusals.delete("enable");
+
+      const second = await stopAgent(harness, "agent-sales-bot", key);
+      expect(second.targets[0]?.alreadyStopped).toBeUndefined();
+      await harness.stops.restore({ organizationId: ORG, stopId: first.id, caller: PERSON });
+      const released = await settled(harness, first.id, "restored");
+
+      expect(released.targets[0]?.keptDisabled).toBe(true);
+      expect(harness.keyStatuses.get(VIRTUAL_KEY_ID)).toBe("DISABLED");
+      await harness.stops.restore({ organizationId: ORG, stopId: second.id, caller: PERSON });
+      await settled(harness, second.id, "restored");
       expect(harness.keyStatuses.get(VIRTUAL_KEY_ID)).toBe("ACTIVE");
       await harness.eventing.close();
     });
@@ -378,6 +553,7 @@ describe("AgentStopService restore", () => {
         milestone: announced.milestone,
         restoreRound: 0,
         retryRound: 0,
+        occurredAt: announced.occurredAt,
         stop: announced.stop,
       });
 

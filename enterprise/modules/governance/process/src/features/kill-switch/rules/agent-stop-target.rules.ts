@@ -23,6 +23,31 @@ export function targetKeyOf(target: AgentStopTarget): string {
   }
 }
 
+/** A Databricks workspace as two sources naming it compare: its origin, in lower case. */
+export function workspaceKeyOf(workspaceUrl: string): string {
+  try {
+    return new URL(workspaceUrl).origin.toLowerCase();
+  } catch {
+    return workspaceUrl.trim().replace(/\/+$/, "").toLowerCase();
+  }
+}
+
+/** Whether `other` names the Bedrock alias `target` names, whichever AWS connection reaches it. */
+export function isSameBedrockAlias({
+  target,
+  other,
+}: {
+  target: Extract<AgentStopTarget, { kind: "bedrock_agent_alias" }>;
+  other: AgentStopTarget;
+}): boolean {
+  return (
+    other.kind === "bedrock_agent_alias" &&
+    other.region === target.region &&
+    other.agentId === target.agentId &&
+    other.agentAliasId === target.agentAliasId
+  );
+}
+
 /** The endpoint's stop or start path, or the endpoint itself without an action. */
 export function servingEndpointPath({
   endpointName,

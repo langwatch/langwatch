@@ -774,10 +774,10 @@ getAgentStopPlan(input: { organizationId: string; agentId: string }): Promise<Ag
 
 #### `setAgentStopPlan`
 
-Throws `agent_stop_target_invalid` for a target the organisation does not hold, and `agent_stop_plan_conflict` when `expectedVersion` is given and the plan was saved since.
+Throws `agent_stop_target_invalid` for a target the organisation does not hold, and `agent_stop_plan_conflict` when `expectedVersion` is given and the plan was saved since. Writes one audit row naming the agent and `caller`, refused saves included.
 
 ```typescript
-setAgentStopPlan(input: { organizationId: string; agentId: string; targets: readonly AgentStopTarget[]; expectedVersion?: number; }): Promise<AgentStopPlan>;
+setAgentStopPlan(input: { organizationId: string; agentId: string; targets: readonly AgentStopTarget[]; expectedVersion?: number; caller: AgentStopCaller; }): Promise<AgentStopPlan>;
 ```
 
 #### `findAwsConnections`
@@ -888,7 +888,7 @@ ingestOcsfEvents(input: OcsfIngestRequest & { organizationId: string }): Promise
 
 |             |                                              |
 | ----------- | -------------------------------------------- |
-| Declared at | `src/transport/agent-kill-switch.rest.ts:47` |
+| Declared at | `src/transport/agent-kill-switch.rest.ts:50` |
 | Base URL    | none: each route's path is its address       |
 | Addressing  | literal                                      |
 | Credential  | organization                                 |
@@ -897,7 +897,7 @@ ingestOcsfEvents(input: OcsfIngestRequest & { organizationId: string }): Promise
 
 Get an agent's stop plan
 
-Permission `governance:view`. Entitlement `enterprise` (feature `AGENT_REGISTRY`). Declared at `src/transport/agent-kill-switch.rest.ts:54`.
+Permission `governance:view`. Entitlement `enterprise` (feature `AGENT_REGISTRY`). Declared at `src/transport/agent-kill-switch.rest.ts:57`.
 
 Answers at `/api/governance/agents/:agentId/stop-plan`, `/api/v1/governance/agents/:agentId/stop-plan`.
 
@@ -913,7 +913,7 @@ type Response = z.infer<typeof agentStopPlanResponseSchema>; // ../contract/src/
 
 Replace an agent's stop plan
 
-Permission `governance:manage`. Entitlement `enterprise` (feature `AGENT_REGISTRY`). Declared at `src/transport/agent-kill-switch.rest.ts:75`.
+Permission `governance:manage`. Entitlement `enterprise` (feature `AGENT_REGISTRY`). Credential `organization`. Declared at `src/transport/agent-kill-switch.rest.ts:78`.
 
 Answers at `/api/governance/agents/:agentId/stop-plan`, `/api/v1/governance/agents/:agentId/stop-plan`.
 
@@ -927,7 +927,7 @@ type Response = z.infer<typeof agentStopPlanResponseSchema>; // ../contract/src/
 
 Stop an agent
 
-Permission `governance:manage`. Entitlement `enterprise` (feature `AGENT_REGISTRY`). Credential `organization`. Declared at `src/transport/agent-kill-switch.rest.ts:105`.
+Permission `governance:manage`. Entitlement `enterprise` (feature `AGENT_REGISTRY`). Credential `organization`. Declared at `src/transport/agent-kill-switch.rest.ts:110`.
 
 Answers at `/api/governance/agents/:agentId/stop`, `/api/v1/governance/agents/:agentId/stop`.
 
@@ -946,7 +946,7 @@ type Response = z.infer<typeof agentStopResponseSchema>; // ../contract/src/feat
 
 Get an agent's latest stop
 
-Permission `governance:view`. Entitlement `enterprise` (feature `AGENT_REGISTRY`). Declared at `src/transport/agent-kill-switch.rest.ts:139`.
+Permission `governance:view`. Entitlement `enterprise` (feature `AGENT_REGISTRY`). Declared at `src/transport/agent-kill-switch.rest.ts:144`.
 
 Answers at `/api/governance/agents/:agentId/stop`, `/api/v1/governance/agents/:agentId/stop`.
 
@@ -959,7 +959,7 @@ type Response = z.infer<typeof agentStopResponseSchema>; // ../contract/src/feat
 
 List the organisation's agent stops
 
-Permission `governance:view`. Entitlement `enterprise` (feature `AGENT_REGISTRY`). Declared at `src/transport/agent-kill-switch.rest.ts:160`.
+Permission `governance:view`. Entitlement `enterprise` (feature `AGENT_REGISTRY`). Declared at `src/transport/agent-kill-switch.rest.ts:165`.
 
 Answers at `/api/governance/agent-stops`, `/api/v1/governance/agent-stops`.
 
@@ -972,7 +972,7 @@ type Response = z.infer<typeof agentStopListResponseSchema>; // ../contract/src/
 
 Approve a pending stop
 
-Permission `governance:manage`. Entitlement `enterprise` (feature `AGENT_REGISTRY`). Credential `organization`. Declared at `src/transport/agent-kill-switch.rest.ts:182`.
+Permission `governance:manage`. Entitlement `enterprise` (feature `AGENT_REGISTRY`). Credential `organization`. Declared at `src/transport/agent-kill-switch.rest.ts:187`.
 
 Answers at `/api/governance/agent-stops/:stopId/approve`, `/api/v1/governance/agent-stops/:stopId/approve`.
 
@@ -993,7 +993,7 @@ type Response = z.infer<typeof agentStopResponseSchema>; // ../contract/src/feat
 
 Deny a pending stop
 
-Permission `governance:manage`. Entitlement `enterprise` (feature `AGENT_REGISTRY`). Credential `organization`. Declared at `src/transport/agent-kill-switch.rest.ts:214`.
+Permission `governance:manage`. Entitlement `enterprise` (feature `AGENT_REGISTRY`). Credential `organization`. Declared at `src/transport/agent-kill-switch.rest.ts:219`.
 
 Answers at `/api/governance/agent-stops/:stopId/deny`, `/api/v1/governance/agent-stops/:stopId/deny`.
 
@@ -1010,7 +1010,7 @@ type Response = z.infer<typeof agentStopResponseSchema>; // ../contract/src/feat
 
 Restore a stopped agent
 
-Permission `governance:manage`. Entitlement `enterprise` (feature `AGENT_REGISTRY`). Credential `organization`. Declared at `src/transport/agent-kill-switch.rest.ts:245`.
+Permission `governance:manage`. Entitlement `enterprise` (feature `AGENT_REGISTRY`). Credential `organization`. Declared at `src/transport/agent-kill-switch.rest.ts:250`.
 
 Answers at `/api/governance/agent-stops/:stopId/restore`, `/api/v1/governance/agent-stops/:stopId/restore`.
 
@@ -1025,7 +1025,7 @@ type Response = z.infer<typeof agentStopResponseSchema>; // ../contract/src/feat
 
 Retry a stop
 
-Permission `governance:manage`. Entitlement `enterprise` (feature `AGENT_REGISTRY`). Credential `organization`. Declared at `src/transport/agent-kill-switch.rest.ts:276`.
+Permission `governance:manage`. Entitlement `enterprise` (feature `AGENT_REGISTRY`). Credential `organization`. Declared at `src/transport/agent-kill-switch.rest.ts:281`.
 
 Answers at `/api/governance/agent-stops/:stopId/retry`, `/api/v1/governance/agent-stops/:stopId/retry`.
 
@@ -1054,14 +1054,14 @@ Permission `governance:view`. Entitlement `enterprise` (feature `AGENT_REGISTRY`
 Answers at `/api/governance/registry/agents`, `/api/v1/governance/registry/agents`.
 
 ```typescript
-// Query: agentRegistryListQuerySchema, ../contract/src/features/registry/agent-registry.ts:156
+// Query: agentRegistryListQuerySchema, ../contract/src/features/registry/agent-registry.ts:173
 interface Query {
   limit?: number;
   cursor?: string;
   updated_since?: string;
   status?: "active" | "removed";
 }
-type Response = z.infer<typeof agentRegistryListResponseSchema>; // ../contract/src/features/registry/agent-registry.ts:166
+type Response = z.infer<typeof agentRegistryListResponseSchema>; // ../contract/src/features/registry/agent-registry.ts:183
 ```
 
 #### `GET /api/governance/registry/agents/:agentId` · `getRegistryAgent`
@@ -1073,11 +1073,11 @@ Permission `governance:view`. Entitlement `enterprise` (feature `AGENT_REGISTRY`
 Answers at `/api/governance/registry/agents/:agentId`, `/api/v1/governance/registry/agents/:agentId`.
 
 ```typescript
-// Params: agentRegistryParamsSchema, ../contract/src/features/registry/agent-registry.ts:174
+// Params: agentRegistryParamsSchema, ../contract/src/features/registry/agent-registry.ts:191
 interface Params {
   agentId: string;
 }
-type Response = z.infer<typeof agentRegistryDetailResponseSchema>; // ../contract/src/features/registry/agent-registry.ts:181
+type Response = z.infer<typeof agentRegistryDetailResponseSchema>; // ../contract/src/features/registry/agent-registry.ts:198
 ```
 
 #### `GET /api/governance/registry/agents/:agentId/versions` · `listRegistryAgentVersions`
@@ -1089,13 +1089,13 @@ Permission `governance:view`. Entitlement `enterprise` (feature `AGENT_REGISTRY`
 Answers at `/api/governance/registry/agents/:agentId/versions`, `/api/v1/governance/registry/agents/:agentId/versions`.
 
 ```typescript
-type Params = z.infer<typeof agentRegistryParamsSchema>; // ../contract/src/features/registry/agent-registry.ts:174
-// Query: agentRegistryEventsQuerySchema, ../contract/src/features/registry/agent-registry.ts:201
+type Params = z.infer<typeof agentRegistryParamsSchema>; // ../contract/src/features/registry/agent-registry.ts:191
+// Query: agentRegistryEventsQuerySchema, ../contract/src/features/registry/agent-registry.ts:218
 interface Query {
   limit?: number;
   cursor?: string;
 }
-type Response = z.infer<typeof agentRegistryEventsResponseSchema>; // ../contract/src/features/registry/agent-registry.ts:212
+type Response = z.infer<typeof agentRegistryEventsResponseSchema>; // ../contract/src/features/registry/agent-registry.ts:229
 ```
 
 #### `GET /api/governance/registry/events` · `listRegistryEvents`
@@ -1107,8 +1107,8 @@ Permission `governance:view`. Entitlement `enterprise` (feature `AGENT_REGISTRY`
 Answers at `/api/governance/registry/events`, `/api/v1/governance/registry/events`.
 
 ```typescript
-type Query = z.infer<typeof agentRegistryEventsQuerySchema>; // ../contract/src/features/registry/agent-registry.ts:201
-type Response = z.infer<typeof agentRegistryEventsResponseSchema>; // ../contract/src/features/registry/agent-registry.ts:212
+type Query = z.infer<typeof agentRegistryEventsQuerySchema>; // ../contract/src/features/registry/agent-registry.ts:218
+type Response = z.infer<typeof agentRegistryEventsResponseSchema>; // ../contract/src/features/registry/agent-registry.ts:229
 ```
 
 #### `GET /api/governance/registry/schema` · `getRegistrySchema`
@@ -1120,7 +1120,7 @@ Permission `governance:view`. Entitlement `enterprise` (feature `AGENT_REGISTRY`
 Answers at `/api/governance/registry/schema`, `/api/v1/governance/registry/schema`.
 
 ```typescript
-// Response: agentRegistrySchemaResponseSchema, ../contract/src/features/registry/agent-registry.ts:224
+// Response: agentRegistrySchemaResponseSchema, ../contract/src/features/registry/agent-registry.ts:241
 interface Response {
   entry: Record<string, unknown>;
   event: Record<string, unknown>;

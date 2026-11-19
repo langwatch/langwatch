@@ -209,7 +209,7 @@ const agentStopTargetOutcomeSchemaDefinition = z.object({
   alreadyStopped: z.boolean().optional(),
   /** True when the cloud resource no longer exists: it counts as stopped, and as restored. */
   gone: z.boolean().optional(),
-  /** On restore: a virtual key another agent's open stop still holds, so it stayed disabled. */
+  /** On restore: a key, endpoint or alias another agent's open stop still holds, so it stayed off. */
   keptDisabled: z.boolean().optional(),
   /** Taken out of the plan: what the stop changed on it is reverted, then the target leaves the stop. */
   dropped: z.boolean().optional(),
@@ -403,6 +403,8 @@ const agentStopDecidedEventDataSchemaDefinition = z.object({
   decidedByUserId: z.string().nullable(),
   decidedByApiKeyId: z.string().nullable(),
   note: z.string().nullable(),
+  /** The decision the API advanced the row by; absent on decisions sent before it did. */
+  requestId: z.string().optional(),
 });
 export interface AgentStopDecidedEventDataSchema extends Named<
   typeof agentStopDecidedEventDataSchemaDefinition
@@ -419,7 +421,7 @@ const agentStopTargetSettledEventDataSchemaDefinition = z.object({
   alreadyStopped: z.boolean().optional(),
   /** The cloud resource no longer exists, so there was nothing to stop or restore. */
   gone: z.boolean().optional(),
-  /** On a revert outcome: the key stayed disabled for another agent's open stop. */
+  /** On a revert outcome: the target stayed off for another agent's open stop. */
   keptDisabled: z.boolean().optional(),
   /** On a revert outcome: the restore it answers, so a second restore records its own outcome. */
   restoreRound: z.number().int().positive().optional(),
@@ -530,7 +532,7 @@ export const agentStopTargetsDroppedEventSchema = event.safeExtend({
   data: agentStopTargetsDroppedEventDataSchema,
 });
 
-/** The webhook and audit names of a stop's milestones, pushed through the registry's feed. */
+/** The webhook and audit names of a stop's milestones, pushed to webhooks by the registry. */
 export const AGENT_STOP_WEBHOOK_EVENT_TYPES = [
   "governance.agent.stop_requested",
   "governance.agent.quarantined",

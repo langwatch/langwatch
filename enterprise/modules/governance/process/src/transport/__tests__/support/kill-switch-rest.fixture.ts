@@ -9,7 +9,7 @@ import {
   createRestRuntime,
   recordOrganizationCredential,
 } from "@langwatch/api/rest";
-import type { AuditLogApi } from "@langwatch/audit-log-contract";
+import type { AuditLogApi, RecordAuditLogCommand } from "@langwatch/audit-log-contract";
 import type { AuthApi } from "@langwatch/auth-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
@@ -102,7 +102,7 @@ function planOfType(type: string): Plan {
   };
 }
 
-/** The governance application over memory, with a gateway double that records each disable. */
+/** The governance application over memory; its doubles record each disable and audit row. */
 async function governanceAppOf({
   repositories,
   planType,
@@ -111,6 +111,7 @@ async function governanceAppOf({
   planType: string;
 }) {
   const disabled: GatewayVirtualKeyDisableCommand[] = [];
+  const audited: RecordAuditLogCommand[] = [];
   const app = await GovernanceModule.create({
     config: void 0,
     repositories,
@@ -140,7 +141,10 @@ async function governanceAppOf({
       modelProviders: createApiFixture<ModelProviderApi>(),
       users: createApiFixture<UserApi>(),
       auditLog: createApiFixture<AuditLogApi>({
-        record: async () => ({ id: "audit", occurredAt: 0 }),
+        record: async (command) => {
+          audited.push(command);
+          return { id: "audit", occurredAt: 0 };
+        },
       }),
       logs: createApiFixture<LogApi>(),
       metrics: createApiFixture<MetricApi>(),
@@ -149,7 +153,7 @@ async function governanceAppOf({
     resources: new ResourceScope(),
     secrets: new ScopedSecrets(async (_handle, build) => build(undefined)),
   });
-  return { app, disabled };
+  return { app, disabled, audited };
 }
 
 /** The registry agent "support-bot" with a one-key stop plan. */
@@ -185,13 +189,15 @@ function mountKillSwitchRest({
   app,
   grants,
   planType,
+  doorRows,
 }: {
   app: Awaited<ReturnType<typeof governanceAppOf>>["app"];
   grants: string[];
   planType: string;
+  doorRows: unknown[];
 }) {
   const runtime = createRestRuntime({
-    audit: { record: () => {} },
+    audit: { record: (row) => void doorRows.push(row) },
     authorization: restTestAuthorization(),
     entitlements: { holds: async () => planType === "ENTERPRISE" },
     identity: {
@@ -241,7 +247,7 @@ export async function buildKillSwitchRest({
   planType = "ENTERPRISE",
 }: { grants?: string[]; planType?: string } = {}) {
   const repositories = MemoryGovernanceRepositories.create();
-  const { app, disabled } = await governanceAppOf({ repositories, planType });
+  const { app, disabled, audited } = await governanceAppOf({ repositories, planType });
   await seedAgent(repositories);
   const processStore = InMemoryProcessStore.createForTesting();
   const eventing = new EventSourcing({
@@ -250,6 +256,7 @@ export async function buildKillSwitchRest({
   });
   const pipeline = eventing.register(app.agentStopPipeline({ processStore }));
   app.connectAgentStop(pipeline.commands);
-  const call = mountKillSwitchRest({ app, grants, planType });
-  return { app, repositories, eventing, disabled, call };
+  const doorRows: unknown[] = [];
+  const call = mountKillSwitchRest({ app, grants, planType, doorRows });
+  return { app, repositories, eventing, disabled, audited, doorRows, call };
 }

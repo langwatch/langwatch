@@ -2,6 +2,7 @@
  * The stop plan's refusals and a redelivered apply intent, through the real `agent_stop` pipeline.
  * Spec: enterprise/modules/governance/specs/agent-kill-switch.feature
  */
+import { AgentRegistryEntryNotFoundError } from "@langwatch/enterprise-governance-contract";
 import { createTenantId } from "@langwatch/eventing";
 import { describe, expect, it, vi } from "vitest";
 
@@ -184,6 +185,7 @@ describe("AgentStopPlanService", () => {
         organizationId: ORG,
         agentId: AGENT_ID,
         targets: harness.fullPlan,
+        caller: PERSON,
       });
       await platformAsked;
       const stop = await Promise.race([
@@ -215,6 +217,79 @@ describe("AgentStopPlanService", () => {
       );
 
       expect(refusal?.code).toBe("agent_registry_entry_not_found");
+      await harness.eventing.close();
+    });
+  });
+
+  describe("when a person saves the plan", () => {
+    /** @scenario "Saving a stop plan writes one audit row naming the agent" */
+    it("writes one stop_plan_set row naming the agent and who saved it, refused saves included", async () => {
+      const harness = await killSwitchHarness();
+      const keyOnly = [{ kind: "gateway_virtual_key" as const, virtualKeyId: VIRTUAL_KEY_ID }];
+
+      await harness.stops.setPlan({
+        organizationId: ORG,
+        agentId: AGENT_ID,
+        targets: keyOnly,
+        caller: PERSON,
+      });
+      const refusal = await refusalOf(
+        harness.stops.setPlan({
+          organizationId: ORG,
+          agentId: AGENT_ID,
+          targets: keyOnly,
+          expectedVersion: 0,
+          caller: PERSON,
+        }),
+      );
+
+      expect(refusal?.code).toBe("agent_stop_plan_conflict");
+      expect(harness.audit).toEqual([
+        expect.objectContaining({
+          action: "governance.agent.stop_plan_set",
+          userId: PERSON.userId,
+          targetKind: "governance_agent",
+          targetId: AGENT_ID,
+          metadata: expect.objectContaining({
+            targetName: "support-bot",
+            version: 1,
+            targets: [`Virtual key ${VIRTUAL_KEY_ID}`],
+          }),
+        }),
+        expect.objectContaining({
+          action: "governance.agent.stop_plan_set",
+          error: "agent_stop_plan_conflict",
+          targetId: AGENT_ID,
+          metadata: expect.objectContaining({ targetName: "support-bot" }),
+        }),
+      ]);
+      expect(harness.audit[0]?.error).toBeUndefined();
+      await harness.eventing.close();
+    });
+
+    /** @scenario "Saving a stop plan writes one audit row naming the agent" */
+    it("never audits a saved plan as refused when a read after the save fails", async () => {
+      const harness = await killSwitchHarness();
+      const keyOnly = [{ kind: "gateway_virtual_key" as const, virtualKeyId: VIRTUAL_KEY_ID }];
+      const registry = harness.repositories.agentRegistry;
+      const getEntry = registry.getEntry.bind(registry);
+      vi.spyOn(registry, "getEntry").mockImplementation(async (input) => {
+        const saved = await harness.plans.findTargets({ organizationId: ORG, agentId: AGENT_ID });
+        if (saved.length > 0) throw new AgentRegistryEntryNotFoundError(input.id);
+        return getEntry(input);
+      });
+
+      const plan = await harness.stops.setPlan({
+        organizationId: ORG,
+        agentId: AGENT_ID,
+        targets: keyOnly,
+        caller: PERSON,
+      });
+
+      expect(plan.targets).toHaveLength(1);
+      expect(harness.audit.map((row) => [row.action, row.error])).toEqual([
+        ["governance.agent.stop_plan_set", undefined],
+      ]);
       await harness.eventing.close();
     });
   });

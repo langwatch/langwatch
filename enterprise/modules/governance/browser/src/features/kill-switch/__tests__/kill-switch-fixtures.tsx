@@ -15,6 +15,7 @@ import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
 
+import type { GovernancePlan } from "../../../model/governance-host.ts";
 import { fakeGovernanceHost, renderWithGovernanceHost } from "../../../testing.tsx";
 import AgentsPage from "../../../ui/sections/governance/agents.tsx";
 import { answerQuery } from "./kill-switch-api-double.tsx";
@@ -116,8 +117,14 @@ export function answerAgentsPage({
   answerQuery("governanceKillSwitch.awsConnections", () => []);
 }
 
-export function renderAgentsPage({ permissions }: { permissions: readonly string[] }) {
-  const host = fakeGovernanceHost({ permissions });
+export function renderAgentsPage({
+  permissions,
+  plan,
+}: {
+  permissions: readonly string[];
+  plan?: GovernancePlan;
+}) {
+  const host = fakeGovernanceHost({ permissions, ...(plan ? { plan } : {}) });
   renderWithGovernanceHost(
     <MemoryRouter initialEntries={["/governance/agents"]}>
       <AgentsPage />

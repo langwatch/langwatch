@@ -4,8 +4,6 @@ import type {
   AgentRegistryEntry,
   AgentRegistryEvent,
   AgentRegistryStatus,
-  AgentStopView,
-  AgentStopWebhookEventType,
 } from "@langwatch/enterprise-governance-contract";
 import type { Instant } from "@langwatch/time";
 
@@ -26,6 +24,12 @@ export type RegistryEntryPage = {
   hasMore: boolean;
   last?: RegistryEntryPosition;
 };
+
+/**
+ * A page of the change feed. A row another release wrote with a type or payload this release
+ * cannot read is left out, and `next` (the last row's sequence, or null at the end) passes it.
+ */
+export type RegistryEventPage = { events: AgentRegistryEvent[]; next: bigint | null };
 
 /** The agent registry and its append-only change feed (specs/agent-registry.feature). */
 export abstract class AgentRegistryRepository {
@@ -57,18 +61,21 @@ export abstract class AgentRegistryRepository {
   }): Promise<RegistryEntryPage>;
   /** Throws `agent_registry_entry_not_found` when the organisation holds no such entry. */
   abstract getEntry(input: { organizationId: string; id: string }): Promise<AgentRegistryEntry>;
-  abstract findEventsAfter(input: {
+  abstract listEventsAfter(input: {
     organizationId: string;
     after?: bigint;
     limit: number;
-  }): Promise<AgentRegistryEvent[]>;
-  abstract findEventsOfEntry(input: {
+  }): Promise<RegistryEventPage>;
+  abstract listEventsOfEntry(input: {
     organizationId: string;
     entryId: string;
     after?: bigint;
     limit: number;
-  }): Promise<AgentRegistryEvent[]>;
-  /** Events whose webhook fan-out is not yet recorded, oldest first. */
+  }): Promise<RegistryEventPage>;
+  /**
+   * Events this release can read whose webhook fan-out is not yet recorded, oldest first. Rows it
+   * cannot read are paged past and left undelivered, so they never hold back the rows after them.
+   */
   abstract findUndeliveredEvents(input: {
     organizationId: string;
     limit: number;
@@ -78,21 +85,6 @@ export abstract class AgentRegistryRepository {
     eventIds: readonly string[];
     at: Instant;
   }): Promise<void>;
-  /**
-   * Appends one kill switch milestone for an entry, carrying the entry as it stands and the stop.
-   * An event id already in the feed answers the stored event, so a redelivery appends once.
-   * Throws `agent_registry_entry_not_found` when the organisation holds no such entry.
-   */
-  abstract appendStopEvent(input: {
-    organizationId: string;
-    event: {
-      id: string;
-      type: AgentStopWebhookEventType;
-      entryId: string;
-      occurredAt: Instant;
-      stop: AgentStopView;
-    };
-  }): Promise<AgentRegistryEvent>;
   /** Each entry's source key, for the entries of the organisation among `ids`. */
   abstract findSourceKeys(input: {
     organizationId: string;

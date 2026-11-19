@@ -19725,187 +19725,11 @@ func (e GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataAgentTo
 	}
 }
 
-// Defines values for GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopApproval.
-const (
-	GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopApprovalImmediate GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopApproval = "immediate"
-	GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopApprovalRequired  GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopApproval = "required"
-)
-
-// Valid indicates whether the value is a known member of the GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopApproval enum.
-func (e GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopApproval) Valid() bool {
-	switch e {
-	case GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopApprovalImmediate:
-		return true
-	case GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopApprovalRequired:
-		return true
-	default:
-		return false
-	}
-}
-
-// Defines values for GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopSeverity.
-const (
-	GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopSeverityCritical GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopSeverity = "critical"
-	GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopSeverityHigh     GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopSeverity = "high"
-	GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopSeverityLow      GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopSeverity = "low"
-	GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopSeverityMedium   GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopSeverity = "medium"
-)
-
-// Valid indicates whether the value is a known member of the GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopSeverity enum.
-func (e GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopSeverity) Valid() bool {
-	switch e {
-	case GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopSeverityCritical:
-		return true
-	case GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopSeverityHigh:
-		return true
-	case GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopSeverityLow:
-		return true
-	case GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopSeverityMedium:
-		return true
-	default:
-		return false
-	}
-}
-
-// Defines values for GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopStatus.
-const (
-	GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopStatusDenied          GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopStatus = "denied"
-	GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopStatusPendingApproval GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopStatus = "pending_approval"
-	GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopStatusQuarantined     GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopStatus = "quarantined"
-	GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopStatusRestoreFailed   GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopStatus = "restore_failed"
-	GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopStatusRestored        GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopStatus = "restored"
-	GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopStatusRestoring       GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopStatus = "restoring"
-	GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopStatusStopFailed      GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopStatus = "stop_failed"
-	GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopStatusStopping        GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopStatus = "stopping"
-)
-
-// Valid indicates whether the value is a known member of the GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopStatus enum.
-func (e GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopStatus) Valid() bool {
-	switch e {
-	case GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopStatusDenied:
-		return true
-	case GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopStatusPendingApproval:
-		return true
-	case GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopStatusQuarantined:
-		return true
-	case GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopStatusRestoreFailed:
-		return true
-	case GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopStatusRestored:
-		return true
-	case GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopStatusRestoring:
-		return true
-	case GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopStatusStopFailed:
-		return true
-	case GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopStatusStopping:
-		return true
-	default:
-		return false
-	}
-}
-
-// Defines values for GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopTargetsState.
-const (
-	GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopTargetsStateApplied      GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopTargetsState = "applied"
-	GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopTargetsStateFailed       GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopTargetsState = "failed"
-	GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopTargetsStatePending      GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopTargetsState = "pending"
-	GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopTargetsStateRevertFailed GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopTargetsState = "revert_failed"
-	GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopTargetsStateReverted     GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopTargetsState = "reverted"
-	GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopTargetsStateReverting    GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopTargetsState = "reverting"
-)
-
-// Valid indicates whether the value is a known member of the GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopTargetsState enum.
-func (e GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopTargetsState) Valid() bool {
-	switch e {
-	case GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopTargetsStateApplied:
-		return true
-	case GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopTargetsStateFailed:
-		return true
-	case GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopTargetsStatePending:
-		return true
-	case GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopTargetsStateRevertFailed:
-		return true
-	case GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopTargetsStateReverted:
-		return true
-	case GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopTargetsStateReverting:
-		return true
-	default:
-		return false
-	}
-}
-
-// Defines values for GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopTargetsTarget0Kind.
-const (
-	GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopTargetsTarget0KindDatabricksServingEndpoint GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopTargetsTarget0Kind = "databricks_serving_endpoint"
-)
-
-// Valid indicates whether the value is a known member of the GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopTargetsTarget0Kind enum.
-func (e GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopTargetsTarget0Kind) Valid() bool {
-	switch e {
-	case GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopTargetsTarget0KindDatabricksServingEndpoint:
-		return true
-	default:
-		return false
-	}
-}
-
-// Defines values for GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopTargetsTarget1Kind.
-const (
-	GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopTargetsTarget1KindBedrockAgentAlias GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopTargetsTarget1Kind = "bedrock_agent_alias"
-)
-
-// Valid indicates whether the value is a known member of the GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopTargetsTarget1Kind enum.
-func (e GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopTargetsTarget1Kind) Valid() bool {
-	switch e {
-	case GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopTargetsTarget1KindBedrockAgentAlias:
-		return true
-	default:
-		return false
-	}
-}
-
-// Defines values for GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopTargetsTarget2Kind.
-const (
-	GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopTargetsTarget2KindGatewayVirtualKey GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopTargetsTarget2Kind = "gateway_virtual_key"
-)
-
-// Valid indicates whether the value is a known member of the GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopTargetsTarget2Kind enum.
-func (e GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopTargetsTarget2Kind) Valid() bool {
-	switch e {
-	case GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopTargetsTarget2KindGatewayVirtualKey:
-		return true
-	default:
-		return false
-	}
-}
-
-// Defines values for GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopTrigger.
-const (
-	GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopTriggerApiKey GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopTrigger = "api_key"
-	GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopTriggerUser   GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopTrigger = "user"
-)
-
-// Valid indicates whether the value is a known member of the GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopTrigger enum.
-func (e GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopTrigger) Valid() bool {
-	switch e {
-	case GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopTriggerApiKey:
-		return true
-	case GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopTriggerUser:
-		return true
-	default:
-		return false
-	}
-}
-
 // Defines values for GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataType.
 const (
 	GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataTypeGovernanceAgentFlaggedShadow  GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataType = "governance.agent.flagged_shadow"
-	GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataTypeGovernanceAgentQuarantined    GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataType = "governance.agent.quarantined"
 	GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataTypeGovernanceAgentRegistered     GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataType = "governance.agent.registered"
 	GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataTypeGovernanceAgentRemoved        GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataType = "governance.agent.removed"
-	GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataTypeGovernanceAgentRestoreFailed  GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataType = "governance.agent.restore_failed"
-	GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataTypeGovernanceAgentRestored       GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataType = "governance.agent.restored"
-	GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataTypeGovernanceAgentStopFailed     GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataType = "governance.agent.stop_failed"
-	GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataTypeGovernanceAgentStopRequested  GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataType = "governance.agent.stop_requested"
 	GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataTypeGovernanceAgentToolDeprecated GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataType = "governance.agent.tool_deprecated"
 	GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataTypeGovernanceAgentVersioned      GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataType = "governance.agent.versioned"
 )
@@ -19915,19 +19739,9 @@ func (e GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataType) V
 	switch e {
 	case GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataTypeGovernanceAgentFlaggedShadow:
 		return true
-	case GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataTypeGovernanceAgentQuarantined:
-		return true
 	case GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataTypeGovernanceAgentRegistered:
 		return true
 	case GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataTypeGovernanceAgentRemoved:
-		return true
-	case GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataTypeGovernanceAgentRestoreFailed:
-		return true
-	case GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataTypeGovernanceAgentRestored:
-		return true
-	case GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataTypeGovernanceAgentStopFailed:
-		return true
-	case GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataTypeGovernanceAgentStopRequested:
 		return true
 	case GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataTypeGovernanceAgentToolDeprecated:
 		return true
@@ -20700,187 +20514,11 @@ func (e GetApiGovernanceRegistryEvents200JSONResponseBodyDataAgentToolsStatus) V
 	}
 }
 
-// Defines values for GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopApproval.
-const (
-	GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopApprovalImmediate GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopApproval = "immediate"
-	GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopApprovalRequired  GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopApproval = "required"
-)
-
-// Valid indicates whether the value is a known member of the GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopApproval enum.
-func (e GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopApproval) Valid() bool {
-	switch e {
-	case GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopApprovalImmediate:
-		return true
-	case GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopApprovalRequired:
-		return true
-	default:
-		return false
-	}
-}
-
-// Defines values for GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopSeverity.
-const (
-	GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopSeverityCritical GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopSeverity = "critical"
-	GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopSeverityHigh     GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopSeverity = "high"
-	GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopSeverityLow      GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopSeverity = "low"
-	GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopSeverityMedium   GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopSeverity = "medium"
-)
-
-// Valid indicates whether the value is a known member of the GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopSeverity enum.
-func (e GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopSeverity) Valid() bool {
-	switch e {
-	case GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopSeverityCritical:
-		return true
-	case GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopSeverityHigh:
-		return true
-	case GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopSeverityLow:
-		return true
-	case GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopSeverityMedium:
-		return true
-	default:
-		return false
-	}
-}
-
-// Defines values for GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopStatus.
-const (
-	GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopStatusDenied          GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopStatus = "denied"
-	GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopStatusPendingApproval GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopStatus = "pending_approval"
-	GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopStatusQuarantined     GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopStatus = "quarantined"
-	GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopStatusRestoreFailed   GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopStatus = "restore_failed"
-	GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopStatusRestored        GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopStatus = "restored"
-	GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopStatusRestoring       GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopStatus = "restoring"
-	GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopStatusStopFailed      GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopStatus = "stop_failed"
-	GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopStatusStopping        GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopStatus = "stopping"
-)
-
-// Valid indicates whether the value is a known member of the GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopStatus enum.
-func (e GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopStatus) Valid() bool {
-	switch e {
-	case GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopStatusDenied:
-		return true
-	case GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopStatusPendingApproval:
-		return true
-	case GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopStatusQuarantined:
-		return true
-	case GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopStatusRestoreFailed:
-		return true
-	case GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopStatusRestored:
-		return true
-	case GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopStatusRestoring:
-		return true
-	case GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopStatusStopFailed:
-		return true
-	case GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopStatusStopping:
-		return true
-	default:
-		return false
-	}
-}
-
-// Defines values for GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopTargetsState.
-const (
-	GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopTargetsStateApplied      GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopTargetsState = "applied"
-	GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopTargetsStateFailed       GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopTargetsState = "failed"
-	GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopTargetsStatePending      GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopTargetsState = "pending"
-	GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopTargetsStateRevertFailed GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopTargetsState = "revert_failed"
-	GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopTargetsStateReverted     GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopTargetsState = "reverted"
-	GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopTargetsStateReverting    GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopTargetsState = "reverting"
-)
-
-// Valid indicates whether the value is a known member of the GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopTargetsState enum.
-func (e GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopTargetsState) Valid() bool {
-	switch e {
-	case GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopTargetsStateApplied:
-		return true
-	case GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopTargetsStateFailed:
-		return true
-	case GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopTargetsStatePending:
-		return true
-	case GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopTargetsStateRevertFailed:
-		return true
-	case GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopTargetsStateReverted:
-		return true
-	case GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopTargetsStateReverting:
-		return true
-	default:
-		return false
-	}
-}
-
-// Defines values for GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopTargetsTarget0Kind.
-const (
-	GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopTargetsTarget0KindDatabricksServingEndpoint GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopTargetsTarget0Kind = "databricks_serving_endpoint"
-)
-
-// Valid indicates whether the value is a known member of the GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopTargetsTarget0Kind enum.
-func (e GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopTargetsTarget0Kind) Valid() bool {
-	switch e {
-	case GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopTargetsTarget0KindDatabricksServingEndpoint:
-		return true
-	default:
-		return false
-	}
-}
-
-// Defines values for GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopTargetsTarget1Kind.
-const (
-	GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopTargetsTarget1KindBedrockAgentAlias GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopTargetsTarget1Kind = "bedrock_agent_alias"
-)
-
-// Valid indicates whether the value is a known member of the GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopTargetsTarget1Kind enum.
-func (e GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopTargetsTarget1Kind) Valid() bool {
-	switch e {
-	case GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopTargetsTarget1KindBedrockAgentAlias:
-		return true
-	default:
-		return false
-	}
-}
-
-// Defines values for GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopTargetsTarget2Kind.
-const (
-	GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopTargetsTarget2KindGatewayVirtualKey GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopTargetsTarget2Kind = "gateway_virtual_key"
-)
-
-// Valid indicates whether the value is a known member of the GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopTargetsTarget2Kind enum.
-func (e GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopTargetsTarget2Kind) Valid() bool {
-	switch e {
-	case GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopTargetsTarget2KindGatewayVirtualKey:
-		return true
-	default:
-		return false
-	}
-}
-
-// Defines values for GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopTrigger.
-const (
-	GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopTriggerApiKey GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopTrigger = "api_key"
-	GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopTriggerUser   GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopTrigger = "user"
-)
-
-// Valid indicates whether the value is a known member of the GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopTrigger enum.
-func (e GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopTrigger) Valid() bool {
-	switch e {
-	case GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopTriggerApiKey:
-		return true
-	case GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopTriggerUser:
-		return true
-	default:
-		return false
-	}
-}
-
 // Defines values for GetApiGovernanceRegistryEvents200JSONResponseBodyDataType.
 const (
 	GetApiGovernanceRegistryEvents200JSONResponseBodyDataTypeGovernanceAgentFlaggedShadow  GetApiGovernanceRegistryEvents200JSONResponseBodyDataType = "governance.agent.flagged_shadow"
-	GetApiGovernanceRegistryEvents200JSONResponseBodyDataTypeGovernanceAgentQuarantined    GetApiGovernanceRegistryEvents200JSONResponseBodyDataType = "governance.agent.quarantined"
 	GetApiGovernanceRegistryEvents200JSONResponseBodyDataTypeGovernanceAgentRegistered     GetApiGovernanceRegistryEvents200JSONResponseBodyDataType = "governance.agent.registered"
 	GetApiGovernanceRegistryEvents200JSONResponseBodyDataTypeGovernanceAgentRemoved        GetApiGovernanceRegistryEvents200JSONResponseBodyDataType = "governance.agent.removed"
-	GetApiGovernanceRegistryEvents200JSONResponseBodyDataTypeGovernanceAgentRestoreFailed  GetApiGovernanceRegistryEvents200JSONResponseBodyDataType = "governance.agent.restore_failed"
-	GetApiGovernanceRegistryEvents200JSONResponseBodyDataTypeGovernanceAgentRestored       GetApiGovernanceRegistryEvents200JSONResponseBodyDataType = "governance.agent.restored"
-	GetApiGovernanceRegistryEvents200JSONResponseBodyDataTypeGovernanceAgentStopFailed     GetApiGovernanceRegistryEvents200JSONResponseBodyDataType = "governance.agent.stop_failed"
-	GetApiGovernanceRegistryEvents200JSONResponseBodyDataTypeGovernanceAgentStopRequested  GetApiGovernanceRegistryEvents200JSONResponseBodyDataType = "governance.agent.stop_requested"
 	GetApiGovernanceRegistryEvents200JSONResponseBodyDataTypeGovernanceAgentToolDeprecated GetApiGovernanceRegistryEvents200JSONResponseBodyDataType = "governance.agent.tool_deprecated"
 	GetApiGovernanceRegistryEvents200JSONResponseBodyDataTypeGovernanceAgentVersioned      GetApiGovernanceRegistryEvents200JSONResponseBodyDataType = "governance.agent.versioned"
 )
@@ -20890,19 +20528,9 @@ func (e GetApiGovernanceRegistryEvents200JSONResponseBodyDataType) Valid() bool 
 	switch e {
 	case GetApiGovernanceRegistryEvents200JSONResponseBodyDataTypeGovernanceAgentFlaggedShadow:
 		return true
-	case GetApiGovernanceRegistryEvents200JSONResponseBodyDataTypeGovernanceAgentQuarantined:
-		return true
 	case GetApiGovernanceRegistryEvents200JSONResponseBodyDataTypeGovernanceAgentRegistered:
 		return true
 	case GetApiGovernanceRegistryEvents200JSONResponseBodyDataTypeGovernanceAgentRemoved:
-		return true
-	case GetApiGovernanceRegistryEvents200JSONResponseBodyDataTypeGovernanceAgentRestoreFailed:
-		return true
-	case GetApiGovernanceRegistryEvents200JSONResponseBodyDataTypeGovernanceAgentRestored:
-		return true
-	case GetApiGovernanceRegistryEvents200JSONResponseBodyDataTypeGovernanceAgentStopFailed:
-		return true
-	case GetApiGovernanceRegistryEvents200JSONResponseBodyDataTypeGovernanceAgentStopRequested:
 		return true
 	case GetApiGovernanceRegistryEvents200JSONResponseBodyDataTypeGovernanceAgentToolDeprecated:
 		return true
@@ -53651,57 +53279,6 @@ type GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataAgentStatu
 // GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataAgentToolsStatus defines parameters for GetApiGovernanceRegistryAgentsByIdVersions.
 type GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataAgentToolsStatus string
 
-// GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopApproval defines parameters for GetApiGovernanceRegistryAgentsByIdVersions.
-type GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopApproval string
-
-// GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopSeverity defines parameters for GetApiGovernanceRegistryAgentsByIdVersions.
-type GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopSeverity string
-
-// GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopStatus defines parameters for GetApiGovernanceRegistryAgentsByIdVersions.
-type GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopStatus string
-
-// GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopTargetsState defines parameters for GetApiGovernanceRegistryAgentsByIdVersions.
-type GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopTargetsState string
-
-// GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopTargetsTarget0 defines parameters for GetApiGovernanceRegistryAgentsByIdVersions.
-type GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopTargetsTarget0 struct {
-	EndpointName      string                                                                                  `json:"endpointName"`
-	IngestionSourceId string                                                                                  `json:"ingestionSourceId"`
-	Kind              GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopTargetsTarget0Kind `json:"kind"`
-}
-
-// GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopTargetsTarget0Kind defines parameters for GetApiGovernanceRegistryAgentsByIdVersions.
-type GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopTargetsTarget0Kind string
-
-// GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopTargetsTarget1 defines parameters for GetApiGovernanceRegistryAgentsByIdVersions.
-type GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopTargetsTarget1 struct {
-	AgentAliasId    string                                                                                  `json:"agentAliasId"`
-	AgentId         string                                                                                  `json:"agentId"`
-	AwsConnectionId string                                                                                  `json:"awsConnectionId"`
-	Kind            GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopTargetsTarget1Kind `json:"kind"`
-	Region          string                                                                                  `json:"region"`
-}
-
-// GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopTargetsTarget1Kind defines parameters for GetApiGovernanceRegistryAgentsByIdVersions.
-type GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopTargetsTarget1Kind string
-
-// GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopTargetsTarget2 defines parameters for GetApiGovernanceRegistryAgentsByIdVersions.
-type GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopTargetsTarget2 struct {
-	Kind         GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopTargetsTarget2Kind `json:"kind"`
-	VirtualKeyId string                                                                                  `json:"virtualKeyId"`
-}
-
-// GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopTargetsTarget2Kind defines parameters for GetApiGovernanceRegistryAgentsByIdVersions.
-type GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopTargetsTarget2Kind string
-
-// GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBody_Data_Stop_Targets_Target defines parameters for GetApiGovernanceRegistryAgentsByIdVersions.
-type GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBody_Data_Stop_Targets_Target struct {
-	union json.RawMessage
-}
-
-// GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopTrigger defines parameters for GetApiGovernanceRegistryAgentsByIdVersions.
-type GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopTrigger string
-
 // GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataType defines parameters for GetApiGovernanceRegistryAgentsByIdVersions.
 type GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataType string
 
@@ -53882,57 +53459,6 @@ type GetApiGovernanceRegistryEvents200JSONResponseBodyDataAgentStatus string
 
 // GetApiGovernanceRegistryEvents200JSONResponseBodyDataAgentToolsStatus defines parameters for GetApiGovernanceRegistryEvents.
 type GetApiGovernanceRegistryEvents200JSONResponseBodyDataAgentToolsStatus string
-
-// GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopApproval defines parameters for GetApiGovernanceRegistryEvents.
-type GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopApproval string
-
-// GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopSeverity defines parameters for GetApiGovernanceRegistryEvents.
-type GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopSeverity string
-
-// GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopStatus defines parameters for GetApiGovernanceRegistryEvents.
-type GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopStatus string
-
-// GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopTargetsState defines parameters for GetApiGovernanceRegistryEvents.
-type GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopTargetsState string
-
-// GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopTargetsTarget0 defines parameters for GetApiGovernanceRegistryEvents.
-type GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopTargetsTarget0 struct {
-	EndpointName      string                                                                      `json:"endpointName"`
-	IngestionSourceId string                                                                      `json:"ingestionSourceId"`
-	Kind              GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopTargetsTarget0Kind `json:"kind"`
-}
-
-// GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopTargetsTarget0Kind defines parameters for GetApiGovernanceRegistryEvents.
-type GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopTargetsTarget0Kind string
-
-// GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopTargetsTarget1 defines parameters for GetApiGovernanceRegistryEvents.
-type GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopTargetsTarget1 struct {
-	AgentAliasId    string                                                                      `json:"agentAliasId"`
-	AgentId         string                                                                      `json:"agentId"`
-	AwsConnectionId string                                                                      `json:"awsConnectionId"`
-	Kind            GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopTargetsTarget1Kind `json:"kind"`
-	Region          string                                                                      `json:"region"`
-}
-
-// GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopTargetsTarget1Kind defines parameters for GetApiGovernanceRegistryEvents.
-type GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopTargetsTarget1Kind string
-
-// GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopTargetsTarget2 defines parameters for GetApiGovernanceRegistryEvents.
-type GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopTargetsTarget2 struct {
-	Kind         GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopTargetsTarget2Kind `json:"kind"`
-	VirtualKeyId string                                                                      `json:"virtualKeyId"`
-}
-
-// GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopTargetsTarget2Kind defines parameters for GetApiGovernanceRegistryEvents.
-type GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopTargetsTarget2Kind string
-
-// GetApiGovernanceRegistryEvents200JSONResponseBody_Data_Stop_Targets_Target defines parameters for GetApiGovernanceRegistryEvents.
-type GetApiGovernanceRegistryEvents200JSONResponseBody_Data_Stop_Targets_Target struct {
-	union json.RawMessage
-}
-
-// GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopTrigger defines parameters for GetApiGovernanceRegistryEvents.
-type GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopTrigger string
 
 // GetApiGovernanceRegistryEvents200JSONResponseBodyDataType defines parameters for GetApiGovernanceRegistryEvents.
 type GetApiGovernanceRegistryEvents200JSONResponseBodyDataType string
@@ -110913,94 +110439,6 @@ func (t *GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBody_Data_Agen
 	return err
 }
 
-// AsGetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopTargetsTarget0 returns the union data inside the GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBody_Data_Stop_Targets_Target as a GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopTargetsTarget0
-func (t GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBody_Data_Stop_Targets_Target) AsGetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopTargetsTarget0() (GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopTargetsTarget0, error) {
-	var body GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopTargetsTarget0
-	err := json.Unmarshal(t.union, &body)
-	return body, err
-}
-
-// FromGetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopTargetsTarget0 overwrites any union data inside the GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBody_Data_Stop_Targets_Target as the provided GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopTargetsTarget0
-func (t *GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBody_Data_Stop_Targets_Target) FromGetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopTargetsTarget0(v GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopTargetsTarget0) error {
-	b, err := json.Marshal(v)
-	t.union = b
-	return err
-}
-
-// MergeGetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopTargetsTarget0 performs a merge with any union data inside the GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBody_Data_Stop_Targets_Target, using the provided GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopTargetsTarget0
-func (t *GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBody_Data_Stop_Targets_Target) MergeGetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopTargetsTarget0(v GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopTargetsTarget0) error {
-	b, err := json.Marshal(v)
-	if err != nil {
-		return err
-	}
-
-	merged, err := runtime.JSONMerge(t.union, b)
-	t.union = merged
-	return err
-}
-
-// AsGetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopTargetsTarget1 returns the union data inside the GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBody_Data_Stop_Targets_Target as a GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopTargetsTarget1
-func (t GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBody_Data_Stop_Targets_Target) AsGetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopTargetsTarget1() (GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopTargetsTarget1, error) {
-	var body GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopTargetsTarget1
-	err := json.Unmarshal(t.union, &body)
-	return body, err
-}
-
-// FromGetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopTargetsTarget1 overwrites any union data inside the GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBody_Data_Stop_Targets_Target as the provided GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopTargetsTarget1
-func (t *GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBody_Data_Stop_Targets_Target) FromGetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopTargetsTarget1(v GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopTargetsTarget1) error {
-	b, err := json.Marshal(v)
-	t.union = b
-	return err
-}
-
-// MergeGetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopTargetsTarget1 performs a merge with any union data inside the GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBody_Data_Stop_Targets_Target, using the provided GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopTargetsTarget1
-func (t *GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBody_Data_Stop_Targets_Target) MergeGetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopTargetsTarget1(v GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopTargetsTarget1) error {
-	b, err := json.Marshal(v)
-	if err != nil {
-		return err
-	}
-
-	merged, err := runtime.JSONMerge(t.union, b)
-	t.union = merged
-	return err
-}
-
-// AsGetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopTargetsTarget2 returns the union data inside the GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBody_Data_Stop_Targets_Target as a GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopTargetsTarget2
-func (t GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBody_Data_Stop_Targets_Target) AsGetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopTargetsTarget2() (GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopTargetsTarget2, error) {
-	var body GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopTargetsTarget2
-	err := json.Unmarshal(t.union, &body)
-	return body, err
-}
-
-// FromGetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopTargetsTarget2 overwrites any union data inside the GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBody_Data_Stop_Targets_Target as the provided GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopTargetsTarget2
-func (t *GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBody_Data_Stop_Targets_Target) FromGetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopTargetsTarget2(v GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopTargetsTarget2) error {
-	b, err := json.Marshal(v)
-	t.union = b
-	return err
-}
-
-// MergeGetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopTargetsTarget2 performs a merge with any union data inside the GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBody_Data_Stop_Targets_Target, using the provided GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopTargetsTarget2
-func (t *GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBody_Data_Stop_Targets_Target) MergeGetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopTargetsTarget2(v GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopTargetsTarget2) error {
-	b, err := json.Marshal(v)
-	if err != nil {
-		return err
-	}
-
-	merged, err := runtime.JSONMerge(t.union, b)
-	t.union = merged
-	return err
-}
-
-func (t GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBody_Data_Stop_Targets_Target) MarshalJSON() ([]byte, error) {
-	b, err := t.union.MarshalJSON()
-	return b, err
-}
-
-func (t *GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBody_Data_Stop_Targets_Target) UnmarshalJSON(b []byte) error {
-	err := t.union.UnmarshalJSON(b)
-	return err
-}
-
 // AsGetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesDataModelParameters0 returns the union data inside the GetApiGovernanceRegistryArdManifest200JSONResponseBody_Entries_Data_Model_Parameters_AdditionalProperties as a GetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesDataModelParameters0
 func (t GetApiGovernanceRegistryArdManifest200JSONResponseBody_Entries_Data_Model_Parameters_AdditionalProperties) AsGetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesDataModelParameters0() (GetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesDataModelParameters0, error) {
 	var body GetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesDataModelParameters0
@@ -111323,94 +110761,6 @@ func (t GetApiGovernanceRegistryEvents200JSONResponseBody_Data_Agent_Model_Param
 }
 
 func (t *GetApiGovernanceRegistryEvents200JSONResponseBody_Data_Agent_Model_Parameters_AdditionalProperties) UnmarshalJSON(b []byte) error {
-	err := t.union.UnmarshalJSON(b)
-	return err
-}
-
-// AsGetApiGovernanceRegistryEvents200JSONResponseBodyDataStopTargetsTarget0 returns the union data inside the GetApiGovernanceRegistryEvents200JSONResponseBody_Data_Stop_Targets_Target as a GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopTargetsTarget0
-func (t GetApiGovernanceRegistryEvents200JSONResponseBody_Data_Stop_Targets_Target) AsGetApiGovernanceRegistryEvents200JSONResponseBodyDataStopTargetsTarget0() (GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopTargetsTarget0, error) {
-	var body GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopTargetsTarget0
-	err := json.Unmarshal(t.union, &body)
-	return body, err
-}
-
-// FromGetApiGovernanceRegistryEvents200JSONResponseBodyDataStopTargetsTarget0 overwrites any union data inside the GetApiGovernanceRegistryEvents200JSONResponseBody_Data_Stop_Targets_Target as the provided GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopTargetsTarget0
-func (t *GetApiGovernanceRegistryEvents200JSONResponseBody_Data_Stop_Targets_Target) FromGetApiGovernanceRegistryEvents200JSONResponseBodyDataStopTargetsTarget0(v GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopTargetsTarget0) error {
-	b, err := json.Marshal(v)
-	t.union = b
-	return err
-}
-
-// MergeGetApiGovernanceRegistryEvents200JSONResponseBodyDataStopTargetsTarget0 performs a merge with any union data inside the GetApiGovernanceRegistryEvents200JSONResponseBody_Data_Stop_Targets_Target, using the provided GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopTargetsTarget0
-func (t *GetApiGovernanceRegistryEvents200JSONResponseBody_Data_Stop_Targets_Target) MergeGetApiGovernanceRegistryEvents200JSONResponseBodyDataStopTargetsTarget0(v GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopTargetsTarget0) error {
-	b, err := json.Marshal(v)
-	if err != nil {
-		return err
-	}
-
-	merged, err := runtime.JSONMerge(t.union, b)
-	t.union = merged
-	return err
-}
-
-// AsGetApiGovernanceRegistryEvents200JSONResponseBodyDataStopTargetsTarget1 returns the union data inside the GetApiGovernanceRegistryEvents200JSONResponseBody_Data_Stop_Targets_Target as a GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopTargetsTarget1
-func (t GetApiGovernanceRegistryEvents200JSONResponseBody_Data_Stop_Targets_Target) AsGetApiGovernanceRegistryEvents200JSONResponseBodyDataStopTargetsTarget1() (GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopTargetsTarget1, error) {
-	var body GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopTargetsTarget1
-	err := json.Unmarshal(t.union, &body)
-	return body, err
-}
-
-// FromGetApiGovernanceRegistryEvents200JSONResponseBodyDataStopTargetsTarget1 overwrites any union data inside the GetApiGovernanceRegistryEvents200JSONResponseBody_Data_Stop_Targets_Target as the provided GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopTargetsTarget1
-func (t *GetApiGovernanceRegistryEvents200JSONResponseBody_Data_Stop_Targets_Target) FromGetApiGovernanceRegistryEvents200JSONResponseBodyDataStopTargetsTarget1(v GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopTargetsTarget1) error {
-	b, err := json.Marshal(v)
-	t.union = b
-	return err
-}
-
-// MergeGetApiGovernanceRegistryEvents200JSONResponseBodyDataStopTargetsTarget1 performs a merge with any union data inside the GetApiGovernanceRegistryEvents200JSONResponseBody_Data_Stop_Targets_Target, using the provided GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopTargetsTarget1
-func (t *GetApiGovernanceRegistryEvents200JSONResponseBody_Data_Stop_Targets_Target) MergeGetApiGovernanceRegistryEvents200JSONResponseBodyDataStopTargetsTarget1(v GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopTargetsTarget1) error {
-	b, err := json.Marshal(v)
-	if err != nil {
-		return err
-	}
-
-	merged, err := runtime.JSONMerge(t.union, b)
-	t.union = merged
-	return err
-}
-
-// AsGetApiGovernanceRegistryEvents200JSONResponseBodyDataStopTargetsTarget2 returns the union data inside the GetApiGovernanceRegistryEvents200JSONResponseBody_Data_Stop_Targets_Target as a GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopTargetsTarget2
-func (t GetApiGovernanceRegistryEvents200JSONResponseBody_Data_Stop_Targets_Target) AsGetApiGovernanceRegistryEvents200JSONResponseBodyDataStopTargetsTarget2() (GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopTargetsTarget2, error) {
-	var body GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopTargetsTarget2
-	err := json.Unmarshal(t.union, &body)
-	return body, err
-}
-
-// FromGetApiGovernanceRegistryEvents200JSONResponseBodyDataStopTargetsTarget2 overwrites any union data inside the GetApiGovernanceRegistryEvents200JSONResponseBody_Data_Stop_Targets_Target as the provided GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopTargetsTarget2
-func (t *GetApiGovernanceRegistryEvents200JSONResponseBody_Data_Stop_Targets_Target) FromGetApiGovernanceRegistryEvents200JSONResponseBodyDataStopTargetsTarget2(v GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopTargetsTarget2) error {
-	b, err := json.Marshal(v)
-	t.union = b
-	return err
-}
-
-// MergeGetApiGovernanceRegistryEvents200JSONResponseBodyDataStopTargetsTarget2 performs a merge with any union data inside the GetApiGovernanceRegistryEvents200JSONResponseBody_Data_Stop_Targets_Target, using the provided GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopTargetsTarget2
-func (t *GetApiGovernanceRegistryEvents200JSONResponseBody_Data_Stop_Targets_Target) MergeGetApiGovernanceRegistryEvents200JSONResponseBodyDataStopTargetsTarget2(v GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopTargetsTarget2) error {
-	b, err := json.Marshal(v)
-	if err != nil {
-		return err
-	}
-
-	merged, err := runtime.JSONMerge(t.union, b)
-	t.union = merged
-	return err
-}
-
-func (t GetApiGovernanceRegistryEvents200JSONResponseBody_Data_Stop_Targets_Target) MarshalJSON() ([]byte, error) {
-	b, err := t.union.MarshalJSON()
-	return b, err
-}
-
-func (t *GetApiGovernanceRegistryEvents200JSONResponseBody_Data_Stop_Targets_Target) UnmarshalJSON(b []byte) error {
 	err := t.union.UnmarshalJSON(b)
 	return err
 }
@@ -182703,51 +182053,15 @@ type GetApiGovernanceRegistryAgentsByIdVersionsResponse struct {
 				UpdatedAt string `json:"updated_at"`
 				Version   int    `json:"version"`
 			} `json:"agent"`
-			AgentId        string `json:"agent_id"`
-			FromVersion    *int   `json:"from_version"`
-			Id             string `json:"id"`
-			OccurredAt     string `json:"occurred_at"`
-			OrganizationId string `json:"organization_id"`
-			Sequence       string `json:"sequence"`
-			Stop           *struct {
-				AgentId         string                                                                        `json:"agentId"`
-				AgentName       string                                                                        `json:"agentName"`
-				Approval        GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopApproval `json:"approval"`
-				DecidedAt       *string                                                                       `json:"decidedAt"`
-				DecidedByUserId *string                                                                       `json:"decidedByUserId"`
-				Id              string                                                                        `json:"id"`
-				LastRequestId   *string                                                                       `json:"lastRequestId,omitempty"`
-				QuarantinedAt   *string                                                                       `json:"quarantinedAt"`
-				Reason          string                                                                        `json:"reason"`
-				RequestedAt     string                                                                        `json:"requestedAt"`
-				RequestedBy     struct {
-					ApiKeyId *string `json:"apiKeyId"`
-					UserId   *string `json:"userId"`
-				} `json:"requestedBy"`
-				RestoreRequestedAt *string                                                                       `json:"restoreRequestedAt"`
-				RestoredAt         *string                                                                       `json:"restoredAt"`
-				RestoredByUserId   *string                                                                       `json:"restoredByUserId"`
-				Severity           GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopSeverity `json:"severity"`
-				Status             GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopStatus   `json:"status"`
-				Targets            []struct {
-					AlreadyStopped *bool                                                                                  `json:"alreadyStopped,omitempty"`
-					AppliedAt      *string                                                                                `json:"appliedAt"`
-					DropId         *string                                                                                `json:"dropId,omitempty"`
-					Dropped        *bool                                                                                  `json:"dropped,omitempty"`
-					ErrorCode      *string                                                                                `json:"errorCode"`
-					Gone           *bool                                                                                  `json:"gone,omitempty"`
-					Id             string                                                                                 `json:"id"`
-					KeptDisabled   *bool                                                                                  `json:"keptDisabled,omitempty"`
-					Label          string                                                                                 `json:"label"`
-					RevertedAt     *string                                                                                `json:"revertedAt"`
-					State          GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopTargetsState      `json:"state"`
-					Target         GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBody_Data_Stop_Targets_Target `json:"target"`
-				} `json:"targets"`
-				Trigger GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopTrigger `json:"trigger"`
-			} `json:"stop,omitempty"`
-			ToVersion *int                                                                  `json:"to_version"`
-			Tool      *string                                                               `json:"tool"`
-			Type      GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataType `json:"type"`
+			AgentId        string                                                                `json:"agent_id"`
+			FromVersion    *int                                                                  `json:"from_version"`
+			Id             string                                                                `json:"id"`
+			OccurredAt     string                                                                `json:"occurred_at"`
+			OrganizationId string                                                                `json:"organization_id"`
+			Sequence       string                                                                `json:"sequence"`
+			ToVersion      *int                                                                  `json:"to_version"`
+			Tool           *string                                                               `json:"tool"`
+			Type           GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataType `json:"type"`
 		} `json:"data"`
 		NextCursor *string `json:"next_cursor"`
 	}
@@ -183288,51 +182602,15 @@ type GetApiGovernanceRegistryEventsResponse struct {
 				UpdatedAt string `json:"updated_at"`
 				Version   int    `json:"version"`
 			} `json:"agent"`
-			AgentId        string `json:"agent_id"`
-			FromVersion    *int   `json:"from_version"`
-			Id             string `json:"id"`
-			OccurredAt     string `json:"occurred_at"`
-			OrganizationId string `json:"organization_id"`
-			Sequence       string `json:"sequence"`
-			Stop           *struct {
-				AgentId         string                                                            `json:"agentId"`
-				AgentName       string                                                            `json:"agentName"`
-				Approval        GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopApproval `json:"approval"`
-				DecidedAt       *string                                                           `json:"decidedAt"`
-				DecidedByUserId *string                                                           `json:"decidedByUserId"`
-				Id              string                                                            `json:"id"`
-				LastRequestId   *string                                                           `json:"lastRequestId,omitempty"`
-				QuarantinedAt   *string                                                           `json:"quarantinedAt"`
-				Reason          string                                                            `json:"reason"`
-				RequestedAt     string                                                            `json:"requestedAt"`
-				RequestedBy     struct {
-					ApiKeyId *string `json:"apiKeyId"`
-					UserId   *string `json:"userId"`
-				} `json:"requestedBy"`
-				RestoreRequestedAt *string                                                           `json:"restoreRequestedAt"`
-				RestoredAt         *string                                                           `json:"restoredAt"`
-				RestoredByUserId   *string                                                           `json:"restoredByUserId"`
-				Severity           GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopSeverity `json:"severity"`
-				Status             GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopStatus   `json:"status"`
-				Targets            []struct {
-					AlreadyStopped *bool                                                                      `json:"alreadyStopped,omitempty"`
-					AppliedAt      *string                                                                    `json:"appliedAt"`
-					DropId         *string                                                                    `json:"dropId,omitempty"`
-					Dropped        *bool                                                                      `json:"dropped,omitempty"`
-					ErrorCode      *string                                                                    `json:"errorCode"`
-					Gone           *bool                                                                      `json:"gone,omitempty"`
-					Id             string                                                                     `json:"id"`
-					KeptDisabled   *bool                                                                      `json:"keptDisabled,omitempty"`
-					Label          string                                                                     `json:"label"`
-					RevertedAt     *string                                                                    `json:"revertedAt"`
-					State          GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopTargetsState      `json:"state"`
-					Target         GetApiGovernanceRegistryEvents200JSONResponseBody_Data_Stop_Targets_Target `json:"target"`
-				} `json:"targets"`
-				Trigger GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopTrigger `json:"trigger"`
-			} `json:"stop,omitempty"`
-			ToVersion *int                                                      `json:"to_version"`
-			Tool      *string                                                   `json:"tool"`
-			Type      GetApiGovernanceRegistryEvents200JSONResponseBodyDataType `json:"type"`
+			AgentId        string                                                    `json:"agent_id"`
+			FromVersion    *int                                                      `json:"from_version"`
+			Id             string                                                    `json:"id"`
+			OccurredAt     string                                                    `json:"occurred_at"`
+			OrganizationId string                                                    `json:"organization_id"`
+			Sequence       string                                                    `json:"sequence"`
+			ToVersion      *int                                                      `json:"to_version"`
+			Tool           *string                                                   `json:"tool"`
+			Type           GetApiGovernanceRegistryEvents200JSONResponseBodyDataType `json:"type"`
 		} `json:"data"`
 		NextCursor *string `json:"next_cursor"`
 	}
@@ -220292,51 +219570,15 @@ func ParseGetApiGovernanceRegistryAgentsByIdVersionsResponse(rsp *http.Response)
 					UpdatedAt string `json:"updated_at"`
 					Version   int    `json:"version"`
 				} `json:"agent"`
-				AgentId        string `json:"agent_id"`
-				FromVersion    *int   `json:"from_version"`
-				Id             string `json:"id"`
-				OccurredAt     string `json:"occurred_at"`
-				OrganizationId string `json:"organization_id"`
-				Sequence       string `json:"sequence"`
-				Stop           *struct {
-					AgentId         string                                                                        `json:"agentId"`
-					AgentName       string                                                                        `json:"agentName"`
-					Approval        GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopApproval `json:"approval"`
-					DecidedAt       *string                                                                       `json:"decidedAt"`
-					DecidedByUserId *string                                                                       `json:"decidedByUserId"`
-					Id              string                                                                        `json:"id"`
-					LastRequestId   *string                                                                       `json:"lastRequestId,omitempty"`
-					QuarantinedAt   *string                                                                       `json:"quarantinedAt"`
-					Reason          string                                                                        `json:"reason"`
-					RequestedAt     string                                                                        `json:"requestedAt"`
-					RequestedBy     struct {
-						ApiKeyId *string `json:"apiKeyId"`
-						UserId   *string `json:"userId"`
-					} `json:"requestedBy"`
-					RestoreRequestedAt *string                                                                       `json:"restoreRequestedAt"`
-					RestoredAt         *string                                                                       `json:"restoredAt"`
-					RestoredByUserId   *string                                                                       `json:"restoredByUserId"`
-					Severity           GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopSeverity `json:"severity"`
-					Status             GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopStatus   `json:"status"`
-					Targets            []struct {
-						AlreadyStopped *bool                                                                                  `json:"alreadyStopped,omitempty"`
-						AppliedAt      *string                                                                                `json:"appliedAt"`
-						DropId         *string                                                                                `json:"dropId,omitempty"`
-						Dropped        *bool                                                                                  `json:"dropped,omitempty"`
-						ErrorCode      *string                                                                                `json:"errorCode"`
-						Gone           *bool                                                                                  `json:"gone,omitempty"`
-						Id             string                                                                                 `json:"id"`
-						KeptDisabled   *bool                                                                                  `json:"keptDisabled,omitempty"`
-						Label          string                                                                                 `json:"label"`
-						RevertedAt     *string                                                                                `json:"revertedAt"`
-						State          GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopTargetsState      `json:"state"`
-						Target         GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBody_Data_Stop_Targets_Target `json:"target"`
-					} `json:"targets"`
-					Trigger GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopTrigger `json:"trigger"`
-				} `json:"stop,omitempty"`
-				ToVersion *int                                                                  `json:"to_version"`
-				Tool      *string                                                               `json:"tool"`
-				Type      GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataType `json:"type"`
+				AgentId        string                                                                `json:"agent_id"`
+				FromVersion    *int                                                                  `json:"from_version"`
+				Id             string                                                                `json:"id"`
+				OccurredAt     string                                                                `json:"occurred_at"`
+				OrganizationId string                                                                `json:"organization_id"`
+				Sequence       string                                                                `json:"sequence"`
+				ToVersion      *int                                                                  `json:"to_version"`
+				Tool           *string                                                               `json:"tool"`
+				Type           GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataType `json:"type"`
 			} `json:"data"`
 			NextCursor *string `json:"next_cursor"`
 		}
@@ -220955,51 +220197,15 @@ func ParseGetApiGovernanceRegistryEventsResponse(rsp *http.Response) (*GetApiGov
 					UpdatedAt string `json:"updated_at"`
 					Version   int    `json:"version"`
 				} `json:"agent"`
-				AgentId        string `json:"agent_id"`
-				FromVersion    *int   `json:"from_version"`
-				Id             string `json:"id"`
-				OccurredAt     string `json:"occurred_at"`
-				OrganizationId string `json:"organization_id"`
-				Sequence       string `json:"sequence"`
-				Stop           *struct {
-					AgentId         string                                                            `json:"agentId"`
-					AgentName       string                                                            `json:"agentName"`
-					Approval        GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopApproval `json:"approval"`
-					DecidedAt       *string                                                           `json:"decidedAt"`
-					DecidedByUserId *string                                                           `json:"decidedByUserId"`
-					Id              string                                                            `json:"id"`
-					LastRequestId   *string                                                           `json:"lastRequestId,omitempty"`
-					QuarantinedAt   *string                                                           `json:"quarantinedAt"`
-					Reason          string                                                            `json:"reason"`
-					RequestedAt     string                                                            `json:"requestedAt"`
-					RequestedBy     struct {
-						ApiKeyId *string `json:"apiKeyId"`
-						UserId   *string `json:"userId"`
-					} `json:"requestedBy"`
-					RestoreRequestedAt *string                                                           `json:"restoreRequestedAt"`
-					RestoredAt         *string                                                           `json:"restoredAt"`
-					RestoredByUserId   *string                                                           `json:"restoredByUserId"`
-					Severity           GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopSeverity `json:"severity"`
-					Status             GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopStatus   `json:"status"`
-					Targets            []struct {
-						AlreadyStopped *bool                                                                      `json:"alreadyStopped,omitempty"`
-						AppliedAt      *string                                                                    `json:"appliedAt"`
-						DropId         *string                                                                    `json:"dropId,omitempty"`
-						Dropped        *bool                                                                      `json:"dropped,omitempty"`
-						ErrorCode      *string                                                                    `json:"errorCode"`
-						Gone           *bool                                                                      `json:"gone,omitempty"`
-						Id             string                                                                     `json:"id"`
-						KeptDisabled   *bool                                                                      `json:"keptDisabled,omitempty"`
-						Label          string                                                                     `json:"label"`
-						RevertedAt     *string                                                                    `json:"revertedAt"`
-						State          GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopTargetsState      `json:"state"`
-						Target         GetApiGovernanceRegistryEvents200JSONResponseBody_Data_Stop_Targets_Target `json:"target"`
-					} `json:"targets"`
-					Trigger GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopTrigger `json:"trigger"`
-				} `json:"stop,omitempty"`
-				ToVersion *int                                                      `json:"to_version"`
-				Tool      *string                                                   `json:"tool"`
-				Type      GetApiGovernanceRegistryEvents200JSONResponseBodyDataType `json:"type"`
+				AgentId        string                                                    `json:"agent_id"`
+				FromVersion    *int                                                      `json:"from_version"`
+				Id             string                                                    `json:"id"`
+				OccurredAt     string                                                    `json:"occurred_at"`
+				OrganizationId string                                                    `json:"organization_id"`
+				Sequence       string                                                    `json:"sequence"`
+				ToVersion      *int                                                      `json:"to_version"`
+				Tool           *string                                                   `json:"tool"`
+				Type           GetApiGovernanceRegistryEvents200JSONResponseBodyDataType `json:"type"`
 			} `json:"data"`
 			NextCursor *string `json:"next_cursor"`
 		}

@@ -27,6 +27,10 @@ function mount({
       requests.push(input);
       return { id: "agentstop_1" } as AgentStopView;
     },
+    setAgentStopPlan: async (input) => {
+      requests.push(input);
+      return { agentId: input.agentId, targets: [], updatedAt: null, version: 1 };
+    },
     createAwsConnection: async (input) => {
       requests.push(input);
       return {
@@ -126,6 +130,25 @@ describe("the governanceKillSwitch tRPC namespace", () => {
           caller: { userId: "user_1", apiKeyId: null, impersonatorId: "operator_1" },
         }),
         expect.objectContaining({ userId: "user_1", impersonatorId: "operator_1" }),
+      ]);
+      expect(genericRows).toEqual([]);
+    });
+  });
+
+  describe("when a person saves a stop plan from the governance UI", () => {
+    /** @scenario "Saving a stop plan writes one audit row naming the agent" */
+    it("hands the service the person who saved it, and writes no generic row", async () => {
+      const { caller, requests, genericRows } = mount({ holdsRegistry: true });
+
+      await caller.setPlan({ organizationId: "org_1", agentId: "agent_1", targets: [] });
+
+      expect(requests).toEqual([
+        {
+          organizationId: "org_1",
+          agentId: "agent_1",
+          targets: [],
+          caller: { userId: "user_1", apiKeyId: null },
+        },
       ]);
       expect(genericRows).toEqual([]);
     });

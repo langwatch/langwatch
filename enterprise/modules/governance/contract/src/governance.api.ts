@@ -532,12 +532,14 @@ export interface GovernanceRestApi {
   /**
    * Throws `agent_stop_target_invalid` for a target the organisation does not hold, and
    * `agent_stop_plan_conflict` when `expectedVersion` is given and the plan was saved since.
+   * Writes one audit row naming the agent and `caller`, refused saves included.
    */
   setAgentStopPlan(input: {
     organizationId: string;
     agentId: string;
     targets: readonly AgentStopTarget[];
     expectedVersion?: number;
+    caller: AgentStopCaller;
   }): Promise<AgentStopPlan>;
   findAwsConnections(input: { organizationId: string }): Promise<AwsConnectionView[]>;
   /** Writes an audit row naming `userId`, the person who added it. */

@@ -140,6 +140,8 @@ Feature: Agent kill switch: stop a misbehaving agent where it runs, with approva
     Given a stop of "support-bot" that was approved
     When it is approved or denied again
     Then the decision is refused with code "agent_stop_not_pending"
+    And a decision that read the stop as pending before a plan edit closed it is refused the same way
+    And the audit log records it only as a refused attempt
 
   @integration
   Scenario: The credential that requested a stop cannot approve it
@@ -228,19 +230,21 @@ Feature: Agent kill switch: stop a misbehaving agent where it runs, with approva
     When another decision arrives long after the first would count as abandoned
     Then it is refused with code "agent_stop_not_pending"
 
-  @integration
-  Scenario: A kill switch milestone is appended to the registry feed once however often it is announced
-    Given a registry agent "alpha"
-    When its stop_requested milestone is announced twice at once with one event id
-    Then the registry feed holds one stop_requested event carrying the stop
-    And it comes after every event already in the feed
+  @unit @integration
+  Scenario: A kill switch milestone is pushed to each subscribed webhook and written to no registry feed
+    Given webhook endpoints subscribed to "governance.agent.*", to "governance.agent.quarantined" and to "gateway.*"
+    When a stop's stop_requested, quarantined and restored milestones are announced
+    Then each milestone records one delivery for each endpoint subscribed to it, carrying the registry entry and the stop
+    And the registry feed, the agent's versions and its undelivered events hold no milestone
+    # Released readers refuse an event type they do not know; milestones join the feed once tolerant readers have shipped.
 
-  @integration
-  Scenario: Each kill switch milestone reaches the registry feed and each subscribed webhook once
+  @unit
+  Scenario: A redelivered kill switch milestone is pushed once
     Given a webhook endpoint subscribed to "governance.agent.*"
-    When a stop's stop_requested, quarantined and restored milestones are each announced twice
-    Then the registry feed holds each milestone once, in order
-    And the endpoint gets one delivery per milestone
+    When one milestone is announced twice at once with one event id, then once more
+    Then the registry's outbox holds one delivery for that milestone and endpoint
+    And every announcement carries the moment the milestone was reached as occurred_at, not when it ran
+    And an announcement where no outbox runs is refused, so its intent is retried rather than lost
 
   @integration
   Scenario: The stop listing pages through every stop with a cursor
@@ -368,6 +372,17 @@ Feature: Agent kill switch: stop a misbehaving agent where it runs, with approva
     Then the key is enabled again
 
   @integration
+  Scenario: Restoring one agent keeps a serving endpoint and a Bedrock alias another stopped agent shares stopped
+    Given "support-bot" and "sales-bot" share one serving endpoint and one Bedrock alias
+    And "sales-bot" names the endpoint through another Databricks source of the same workspace
+    When both are stopped
+    Then each stop records the endpoint and the alias as its own change, never as already stopped
+    When "support-bot" is restored
+    Then the endpoint is not started, the alias still rejects invocations, and both targets are recorded as kept disabled
+    When "sales-bot" is restored
+    Then the endpoint is started and the alias accepts invocations again
+
+  @integration
   Scenario: A stop waiting for approval does not keep a shared virtual key disabled
     Given "support-bot" is quarantined and a machine credential's stop of "sales-bot" waits for approval
     And their plans share one virtual key
@@ -383,6 +398,15 @@ Feature: Agent kill switch: stop a misbehaving agent where it runs, with approva
     Then the stop records the key as its own change, not as already stopped
     And restoring it enables the key
 
+  @integration
+  Scenario: A stop that finds a shared target off while another stop is letting it go owns it
+    Given "support-bot" and "sales-bot" share one Bedrock alias, and restoring "support-bot" kept it off for "sales-bot"
+    And restoring "sales-bot" then failed on the alias
+    When "ops-bot", whose plan names the alias too, is stopped
+    Then the stop records the alias as its own change, not as already stopped
+    And restoring "sales-bot" again keeps the alias off until "ops-bot" is restored
+    And a virtual key whose only holder's restore failed is taken over the same way
+
   @unit @integration
   Scenario: A restore that races a retry is refused by the stop and the next restore reverts
     Given a stop in "stop_failed"
@@ -391,11 +415,16 @@ Feature: Agent kill switch: stop a misbehaving agent where it runs, with approva
     And a later restore reverts the targets, and a rebuilt stop matches the live one
 
   @unit @integration
-  Scenario: The restore dialog names the stopped agents that keep a shared key disabled
+  Scenario: The restore dialog names the stopped agents that keep a shared target off
     Given "Finance close" and "Sales pipeline" are stopped and share one virtual key
     When Restore is opened for "Finance close"
     Then the dialog says the virtual key stays disabled while "Sales pipeline" is still stopped
     And it names "Sales pipeline" even when no Agents page row backs that agent
+    When they share a serving endpoint of one Databricks source instead
+    Then the dialog says the serving endpoint stays stopped while "Sales pipeline" is still stopped
+    When they share a Bedrock alias, whichever AWS connection each names it through
+    Then the dialog says the Bedrock alias stays off while "Sales pipeline" is still stopped
+    And a target that is already reverted, or a different one, names no one
 
   @integration
   Scenario: A target whose cloud resource was deleted after the stop counts as restored
@@ -451,6 +480,14 @@ Feature: Agent kill switch: stop a misbehaving agent where it runs, with approva
     Given a quarantined stop whose milestone was announced and audited
     When the same milestone announcement is delivered again
     Then the audit log holds one "governance.agent.quarantined" row
+
+  @unit @integration
+  Scenario: A milestone audit row is stamped with the moment its milestone was reached
+    Given a stop whose restore was asked at one moment and failed later
+    When its "governance.agent.restore_failed" milestone is audited
+    Then the row is stamped with the moment the restore failed, not the latest moment the stop recorded
+    And the webhook's occurred_at carries that same moment, both in whole seconds
+    And a redelivered announcement of it names the same row
 
   @integration
   Scenario: Restoring a stop that is not quarantined is refused
@@ -558,6 +595,7 @@ Feature: Agent kill switch: stop a misbehaving agent where it runs, with approva
     Given a quarantined stop, or a stop waiting for approval
     When the plan drops every target and what the stop changed is reverted
     Then the stop is "restored", never "quarantined" with nothing stopped
+    And it announces and audits "governance.agent.restored", and a new stop of the agent is accepted
 
   @integration
   Scenario: An apply for a target the plan no longer holds is recorded failed
@@ -622,6 +660,13 @@ Feature: Agent kill switch: stop a misbehaving agent where it runs, with approva
     Given the kill switch calls leave the generic audit trail out, because the service writes their rows
     When a request, a decision, a restore, a retry or an AWS connection delete is refused, such as a self-approval
     Then the audit log records the action that was asked with the refusal's code as its error, and who asked
+    And the row names the agent as its target whenever the agent or its stop is known
+
+  @integration
+  Scenario: Saving a stop plan writes one audit row naming the agent
+    When a stop plan of "support-bot" is saved from the governance UI or over REST
+    Then the audit log records one "governance.agent.stop_plan_set" row with "support-bot" as its target and who saved it
+    And no generic row is written beside it, and a refused save records that row with the refusal's code
 
   @integration
   Scenario: An impersonated kill switch write names the operator in its audit row
@@ -698,6 +743,14 @@ Feature: Agent kill switch: stop a misbehaving agent where it runs, with approva
     And no agent row shows a stop status or offers Stop, Restore or Retry
     And no approval card offers Approve or Deny
     And a stop read that fails after it answered drops the stop state it showed
+
+  @integration
+  Scenario: An organisation below the Enterprise plan sees its agents with no kill switch
+    Given an organisation whose plan is not Enterprise, with or without agents
+    When a person with governance:manage opens the Agents page
+    Then the page asks no stop read, before or after its plan is known
+    And it shows no error banner, no approval card and no kill switch action on any row
+    And a stop read refused with "enterprise_plan_required" reads the same way, never as an error
 
   @integration
   Scenario: Every agent of the Agents page gets its kill switch summary, however many there are

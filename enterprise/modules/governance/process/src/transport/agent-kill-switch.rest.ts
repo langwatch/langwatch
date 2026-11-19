@@ -39,7 +39,10 @@ const conflictResponses = {
   },
 };
 
-/** An API key acts as itself, owner kept for the trail; a person's CLI token acts as that person. */
+/**
+ * The organisation API key the door resolved acts as itself, its owner kept for the trail and the
+ * self-approval check. This door resolves no personal CLI token, so none reaches a handler here.
+ */
 function agentStopCallerOfKey(key: RestKeyCredential): AgentStopCaller {
   return { userId: key.ownerUserId, apiKeyId: key.apiKeyId };
 }
@@ -73,8 +76,9 @@ export const agentKillSwitchRest = defineRestRouter(GovernanceRestApi)
   }))
 
   .put("/api/governance/agents/:agentId/stop-plan", "setAgentStopPlan")
-  .withAudit("governance.agent.stop_plan_set")
+  .withoutAudit("the kill switch service records this row itself, naming the agent and its caller")
   .withoutConfirmation("asked at the organization, where a Langy key holds no grant")
+  .withCredential("organization", { key: true })
   .withParams(agentStopAgentParamsSchema)
   .withInput(setAgentStopPlanInputSchema)
   .withPermission("governance:manage")
@@ -93,12 +97,13 @@ export const agentKillSwitchRest = defineRestRouter(GovernanceRestApi)
       ...conflictResponses,
     },
   })
-  .handle(async ({ app, input, scope }) => ({
+  .handle(async ({ app, input, scope, key }) => ({
     data: await app.setAgentStopPlan({
       organizationId: scope.id,
       agentId: input.agentId,
       targets: input.targets,
       ...(input.expectedVersion === undefined ? {} : { expectedVersion: input.expectedVersion }),
+      caller: agentStopCallerOfKey(key),
     }),
   }))
 

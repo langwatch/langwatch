@@ -141,7 +141,7 @@ Every event has the same shape:
 
 ### Reading the feed by cursor
 
-`GET /api/governance/registry/events` returns events in `sequence` order. Pass the last `sequence` you processed as `cursor` to read what came after it; `next_cursor` is null when you have caught up. `limit` is 1 to 200, default 100; `/versions` takes the same `limit` and `cursor`. Sequences only grow, so a consumer that stores its cursor never misses or repeats an event.
+`GET /api/governance/registry/events` returns events in `sequence` order. Pass the page's `next_cursor` as `cursor` to read the next page, and store it as your position; `next_cursor` is null when you have caught up. A page can hold an empty `data` with a non-null `next_cursor` when every event on it was one this release skips: keep paging. Later releases add event types: skip a `type` your consumer does not know rather than failing on it, as LangWatch itself does. `limit` is 1 to 200, default 100; `/versions` takes the same `limit` and `cursor`. Sequences only grow, so a consumer that stores its cursor never misses or repeats an event.
 
 ```bash
 curl -s "$LANGWATCH_ENDPOINT/api/governance/registry/events?cursor=1041" \
@@ -159,7 +159,7 @@ curl -s "$LANGWATCH_ENDPOINT/api/webhooks/v1/endpoints" \
   -d '{"url": "https://governance.acme.com/hooks/langwatch", "enabled_events": ["governance.agent.*"]}'
 ```
 
-Each event is delivered in the standard webhook envelope, with the event above as `data`. Deliveries are signed with `X-LangWatch-Signature: t=<unix seconds>,v1=<hmac-sha256>`, retried with backoff for about a day, and logged per endpoint; see [verifying signatures](/features/webhooks#verifying-signatures). Deduplicate on `data.id`: it is the same in the webhook, in the feed and in `/versions`.
+Each event is delivered in the standard webhook envelope, with the event above as `data`. Deliveries are signed with `X-LangWatch-Signature: t=<unix seconds>,v1=<hmac-sha256>`, retried with backoff for about a day, and logged per endpoint; see [verifying signatures](/features/webhooks#verifying-signatures). Deduplicate on `data.id`: it is the same in the webhook, in the feed and in `/versions`. [Kill switch](/governance/kill-switch#audit-log-and-webhooks) milestones also arrive under `governance.agent.*`, as webhooks only.
 
 ## ARD v0.91
 

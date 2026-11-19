@@ -2028,6 +2028,7 @@ export class GovernanceModule implements GovernanceRestApi {
     agentId: string;
     targets: readonly AgentStopTarget[];
     expectedVersion?: number;
+    caller: AgentStopCaller;
   }): Promise<AgentStopPlan> {
     return this.agentStops.setPlan(input);
   }

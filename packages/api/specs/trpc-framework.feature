@@ -255,6 +255,15 @@ Feature: tRPC framework boundary
     And withoutAudit with an empty reason, on a query, twice or beside withAudit is refused when the router is declared
 
   @unit
+  Scenario: A mutation that audits itself is recorded once, refused or answered
+    Given a mutation declared withoutAudit because its service records its own rows, refusals included
+    When its service refuses the call
+    Then no generic failed-call row is written beside the service's row
+    And a refusal at the door, before the service runs, still writes the one generic row
+    And a mutation declared withoutAudit with refusals "generic", whose service records only what it changed, still gets the generic row for a refusal
+    And a mutation that writes the generic row records a refusal by its handler once, not twice
+
+  @unit
   Scenario: A procedure chooses its permission from its parsed input
     Given a procedure whose permission depends on a value its input carries, such as the tier a scope names
     When it declares a map from each value of that field to the permission it asks, and the tier and input field of the scope it is asked at (Alex, 2026-10-05, E3)

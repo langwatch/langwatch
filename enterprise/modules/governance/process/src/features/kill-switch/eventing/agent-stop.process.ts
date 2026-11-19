@@ -77,6 +77,8 @@ const agentStopAnnounceIntentSchema = z.object({
   restoreRound: z.number().int().nonnegative(),
   /** The retry the milestone belongs to (0 before any), so each retry announces once. */
   retryRound: z.number().int().nonnegative().default(0),
+  /** When the event that reached the milestone happened; absent on intents queued before it was kept. */
+  occurredAt: z.number().int().nonnegative().optional(),
   stop: agentStopViewSchema,
 });
 export type AgentStopApplyIntent = z.infer<typeof agentStopApplyIntentSchema>;
@@ -186,7 +188,7 @@ function intentsOfTransition({
 }: {
   before: AgentStopRecord | null;
   after: AgentStopRecord;
-  context: Pick<Context, "intent">;
+  context: Pick<Context, "intent" | "at">;
 }): ProcessIntent[] {
   const intents: ProcessIntent[] = [];
   if (after.status === "stopping" && before?.status !== "stopping") {
@@ -236,6 +238,7 @@ function intentsOfTransition({
           milestone,
           restoreRound: after.restoreRound,
           retryRound: after.retryRound,
+          occurredAt: context.at,
           stop: viewOfStop(after),
         },
       ),

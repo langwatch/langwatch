@@ -4,6 +4,7 @@
  */
 
 import type { PermissionDecision } from "@langwatch/authorization";
+import { HandledError } from "@langwatch/handled-error";
 import { defineTrpcContract, moduleApi } from "@langwatch/module";
 import { fetchRequestHandler } from "@trpc/server/adapters/fetch";
 import { describe, expect, it, vi } from "vitest";
@@ -180,6 +181,10 @@ const selfAudited = defineTrpcContract("joinRequests")
   .withInput(z.object({ organizationId: z.string(), projectId: z.string() }))
   .withOutput(z.object({ changed: z.boolean() }))
 
+  .mutation("renameDomain")
+  .withInput(z.object({ organizationId: z.string(), projectId: z.string() }))
+  .withOutput(z.object({ changed: z.boolean() }))
+
   .query("joining")
   .withInput(z.object({ organizationId: z.string(), projectId: z.string() }))
   .withOutput(z.object({ changed: z.boolean() }))
@@ -187,19 +192,35 @@ const selfAudited = defineTrpcContract("joinRequests")
 
 const JoinApi = moduleApi<Record<string, never>>()("identity");
 
+class JoiningRefusedError extends HandledError {
+  constructor() {
+    super("joining_refused", "The joining setting was refused", { httpStatus: 409 });
+    this.name = "JoiningRefusedError";
+  }
+}
+
 function selfAuditedRouter() {
   return defineTrpcRouter(JoinApi, selfAudited).procedure("setJoining");
 }
 
-/** Posts one mutation of the self-audited router through a host whose sink keeps the rows. */
-async function callSelfAudited(procedure: "setJoining" | "dismissOffer") {
+/**
+ * Posts one mutation of the self-audited router through a host whose sink keeps the rows. The
+ * handler refuses with a handled error under `refuse: "handler"`; the door under `"door"`.
+ */
+async function callSelfAudited(
+  procedure: "setJoining" | "dismissOffer" | "renameDomain",
+  { refuse }: { refuse?: "handler" | "door" } = {},
+) {
   const rows: Recorded[] = [];
-  const answer = async () => ({ changed: true });
+  const answer = async () => {
+    if (refuse === "handler") throw new JoiningRefusedError();
+    return { changed: true };
+  };
   const trpc = TrpcHost.create({
     sessions: SessionReader.create({ verify: async () => ({ userId: "sam" }) }),
     authz: createApiDouble<Authorize>({
       getDecision: async (): Promise<PermissionDecision> => ({
-        permitted: true,
+        permitted: refuse !== "door",
         organizationRole: "ADMIN",
       }),
       checkScopeLineage: async () => ({ kind: "consistent" }),
@@ -213,6 +234,10 @@ async function callSelfAudited(procedure: "setJoining" | "dismissOffer") {
     .withPermission("project:update", { via: "projectId" })
     .handle(answer)
     .procedure("dismissOffer")
+    .withPermission("project:update", { via: "projectId" })
+    .handle(answer)
+    .procedure("renameDomain")
+    .withoutAudit("the service records only what it changed", { refusals: "generic" })
     .withPermission("project:update", { via: "projectId" })
     .handle(answer)
     .procedure("joining")
@@ -246,6 +271,49 @@ describe("given a mutation declared withoutAudit because its service writes its 
     it("still records every other mutation of the same router", async () => {
       expect(await callSelfAudited("dismissOffer")).toEqual([
         expect.objectContaining({ userId: "sam", action: "joinRequests.dismissOffer" }),
+      ]);
+    });
+  });
+
+  describe("when its service refuses the call", () => {
+    /** @scenario "A mutation that audits itself is recorded once, refused or answered" */
+    it("leaves the generic row out, since the service recorded the refusal", async () => {
+      expect(await callSelfAudited("setJoining", { refuse: "handler" })).toEqual([]);
+    });
+
+    /** @scenario "A mutation that audits itself is recorded once, refused or answered" */
+    it("still writes the generic row for a service that records only what it changed", async () => {
+      expect(await callSelfAudited("renameDomain", { refuse: "handler" })).toEqual([
+        expect.objectContaining({
+          userId: "sam",
+          action: "joinRequests.renameDomain",
+          error: expect.any(Error),
+        }),
+      ]);
+    });
+  });
+
+  describe("when the door refuses the call before its service runs", () => {
+    /** @scenario "A mutation that audits itself is recorded once, refused or answered" */
+    it("writes the one generic row, since the service never saw the call", async () => {
+      expect(await callSelfAudited("setJoining", { refuse: "door" })).toEqual([
+        expect.objectContaining({
+          userId: "sam",
+          action: "joinRequests.setJoining",
+          error: expect.any(Error),
+        }),
+      ]);
+    });
+  });
+
+  describe("when a mutation that writes the generic row is refused by its handler", () => {
+    /** @scenario "A mutation that audits itself is recorded once, refused or answered" */
+    it("records the refusal once, not a second failed-call row beside it", async () => {
+      expect(await callSelfAudited("dismissOffer", { refuse: "handler" })).toEqual([
+        expect.objectContaining({
+          action: "joinRequests.dismissOffer",
+          error: expect.any(Error),
+        }),
       ]);
     });
   });

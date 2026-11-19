@@ -268,6 +268,7 @@ describe("AgentStopService lifecycle requests", () => {
         organizationId: ORG,
         agentId: AGENT_ID,
         targets: harness.fullPlan.filter((target) => target.kind !== "gateway_virtual_key"),
+        caller: PERSON,
       });
       await vi.waitFor(async () => expect((await harness.stopOf(view.id)).targets).toHaveLength(2));
 
@@ -289,6 +290,7 @@ describe("AgentStopService lifecycle requests", () => {
         organizationId: ORG,
         agentId: AGENT_ID,
         targets: harness.fullPlan.filter((target) => target.kind !== "gateway_virtual_key"),
+        caller: PERSON,
       });
       await vi.waitFor(() => expect(harness.virtualKeyCalls).toHaveLength(2));
       await harness.stops.restore({ organizationId: ORG, stopId: view.id, caller: PERSON });
@@ -304,13 +306,55 @@ describe("AgentStopService lifecycle requests", () => {
 
     /** @scenario "A stop whose plan lost every target closes as restored" */
     it("restores the stop once every target was dropped and reverted", async () => {
-      await harness.stops.setPlan({ organizationId: ORG, agentId: AGENT_ID, targets: [] });
+      await harness.stops.setPlan({
+        organizationId: ORG,
+        agentId: AGENT_ID,
+        targets: [],
+        caller: PERSON,
+      });
       const restored = await settled(harness, view.id, "restored");
 
       expect(restored.targets).toEqual([]);
       expect(restored.quarantinedAt).not.toBeNull();
       expect(harness.keyStatuses.get(VIRTUAL_KEY_ID)).toBe("ACTIVE");
       expect(harness.bedrock.updates.at(-1)?.aliasInvocationState).toBe("ACCEPT_INVOCATIONS");
+    });
+  });
+
+  describe("given a stop waiting for approval whose plan loses every target", () => {
+    /** @scenario "A stop whose plan lost every target closes as restored" */
+    it("closes it as restored, announces and audits that, and accepts a new stop", async () => {
+      const harness = await killSwitchHarness();
+      const keyOnly = harness.fullPlan.filter((target) => target.kind === "gateway_virtual_key");
+      await harness.plans.setPlan({ organizationId: ORG, agentId: AGENT_ID, targets: keyOnly });
+      const view = await request(harness, MACHINE, "high");
+      await settled(harness, view.id, "pending_approval");
+
+      await harness.stops.setPlan({
+        organizationId: ORG,
+        agentId: AGENT_ID,
+        targets: [],
+        caller: PERSON,
+      });
+      const closed = await settled(harness, view.id, "restored");
+      expect(harness.virtualKeyCalls).toEqual([]);
+      await harness.plans.setPlan({ organizationId: ORG, agentId: AGENT_ID, targets: keyOnly });
+      const next = await request(harness);
+
+      expect(closed).toMatchObject({ targets: [], quarantinedAt: null });
+      await vi.waitFor(() =>
+        expect(harness.announced.map((event) => event.milestone)).toContain(
+          "governance.agent.restored",
+        ),
+      );
+      await vi.waitFor(() =>
+        expect(
+          harness.audit.filter((row) => row.action === "governance.agent.restored"),
+        ).toHaveLength(1),
+      );
+      expect(next.id).not.toBe(view.id);
+      await settled(harness, next.id, "quarantined");
+      await harness.eventing.close();
     });
   });
 
