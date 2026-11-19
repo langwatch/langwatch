@@ -65,10 +65,11 @@ jobs:
           cd "$(mktemp -d)"
           uv venv --quiet venv
           for attempt in 1 2 3 4 5; do
-            if uv pip install --python venv/bin/python --no-config --default-index https://pypi.org/simple --dry-run "$wheel" > resolve.log 2>&1; then
+            if uv pip install --python venv/bin/python --no-config --default-index https://pypi.org/simple --refresh --dry-run "$wheel" > resolve.log 2>&1; then
               cat resolve.log
               exit 0
             fi
+            [ "$attempt" -lt 5 ] || break
             echo "Attempt $attempt/5 failed; retrying in 60s"
             sleep 60
           done
@@ -105,6 +106,7 @@ jobs:
           password: ${{ secrets.PYPI_API_TOKEN }}
 
       - name: Notify Slack
+        continue-on-error: true
         env:
           SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL: ${{ secrets.SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL }}
         run: |
@@ -132,6 +134,7 @@ jobs:
               "$RUNNER_TEMP/venv/bin/python" -c "import langwatch"
               exit 0
             fi
+            [ "$attempt" -lt 10 ] || break
             echo "Attempt $attempt/10 failed; retrying in 60s"
             sleep 60
           done
