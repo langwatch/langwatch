@@ -21,8 +21,12 @@ const WIRE_JSON =
  * seed 0x01..0x20, acme-prod, signed at 1800000000 for 900 seconds. Ed25519 is deterministic, so
  * the value is exact. The seed is built, not written out, so the source carries no key material.
  */
-const { btoa } = globalThis as unknown as { btoa: (data: string) => string };
-const SHARED_SEED = btoa(String.fromCharCode(...Array.from({ length: 32 }, (_, i) => i + 1)));
+const BASE64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+const SEED_BYTES = Array.from({ length: 32 }, (_, i) => i + 1);
+const SEED_BITS = SEED_BYTES.map((byte) => byte.toString(2).padStart(8, "0")).join("");
+const SHARED_SEED = (SEED_BITS.match(/.{1,6}/g) ?? [])
+  .map((sextet) => BASE64[parseInt(sextet.padEnd(6, "0"), 2)])
+  .join("");
 const SHARED_HEADER =
   "eyJ2IjoxLCJvcmdhbml6YXRpb25JZCI6Im9yZ19hY21lIiwicHJvamVjdElkIjoiYWNtZS1wcm9kIiwiYmluZGluZ3MiOlt7Imhvc3RuYW1lIjoibGxtLmludGVybmFsLmFjbWUudGVzdCIsImFkZHJlc3NlcyI6WyIxMC4yMC4xLjIxIiwiMTAuMjAuMi4zNCJdLCJwb3J0Ijo0NDN9XSwiZXhwaXJlc0F0IjoxODAwMDAwOTAwfQ.oyQyB4gk0jXh3oyefY_wDJ4rK1h1zu6ZKDwOTXbtNi3KFSIRCAJpo5WqzvoY79_eppAlLxm4e1dD7iaGwKB4CQ";
 
