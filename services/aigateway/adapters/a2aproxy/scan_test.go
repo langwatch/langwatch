@@ -35,6 +35,9 @@ func TestRequestScanCoversEveryPart(t *testing.T) {
 		"params metadata":    `{"message":{"messageId":"m1","parts":[{"text":"hi"}]},"metadata":{"x":"wire the money"}}`,
 		"case variant keys":  `{"message":{"messageId":"m1","Parts":[{"Text":"wire the money"}]}}`,
 		"artifact like name": `{"message":{"messageId":"m1","parts":[{"text":"hi","filename":"wire the money.txt"}]}}`,
+		"task id":            `{"message":{"messageId":"m1","taskId":"wire the money","parts":[{"text":"hi"}]}}`,
+		"role":               `{"message":{"messageId":"m1","role":"wire the money","parts":[{"text":"hi"}]}}`,
+		"message id":         `{"message":{"messageId":"wire the money","parts":[{"text":"hi"}]}}`,
 	} {
 		t.Run(name, func(t *testing.T) {
 			f := newFixture(t)
@@ -56,6 +59,8 @@ func TestReplyScanCoversErrorsAndDataParts(t *testing.T) {
 		"error data":    `{"jsonrpc":"2.0","id":7,"error":{"code":-1,"message":"x","data":{"hint":"card number 4111"}}}`,
 		"data part":     `{"jsonrpc":"2.0","id":7,"result":{"message":{"parts":[{"data":{"v":"card number 4111"}}]}}}`,
 		"artifact name": `{"jsonrpc":"2.0","id":7,"result":{"task":{"id":"t1","artifacts":[{"name":"card number 4111","parts":[]}]}}}`,
+		"task state":    `{"jsonrpc":"2.0","id":7,"result":{"task":{"id":"t1","status":{"state":"card number 4111"}}}}`,
+		"context id":    `{"jsonrpc":"2.0","id":7,"result":{"task":{"id":"t1","contextId":"card number 4111"}}}`,
 	} {
 		t.Run(name, func(t *testing.T) {
 			f := newFixture(t)
@@ -74,10 +79,10 @@ func TestReplyScanCoversErrorsAndDataParts(t *testing.T) {
 	}
 }
 
-func TestCollectTextsSkipsProtocolValues(t *testing.T) {
+func TestCollectTextsReadsProtocolValuesButNotProtocolKeys(t *testing.T) {
 	p := collectTexts([]byte(sendMessage("SendMessage", "hello")))
 	require.True(t, p.parsed)
-	assert.Equal(t, []string{"hello"}, p.texts)
+	assert.Equal(t, []string{"2.0", "SendMessage", "m1", "c1", "ROLE_USER", "hello"}, p.texts)
 	assert.False(t, collectTexts([]byte(`{"a":1} {"b":2}`)).parsed)
 	assert.False(t, collectTexts([]byte(strings.Repeat("[", maxJSONDepth+1))).parsed)
 }
@@ -177,7 +182,7 @@ func TestContentUnderProtocolNamedKeysIsScanned(t *testing.T) {
 		})
 	}
 	p := collectTexts([]byte(rpcBody(`{"message":{"messageId":"m1","role":"user","parts":[{"kind":"data","data":{"id":"x1"}}]}}`)))
-	assert.Equal(t, []string{"id", "x1"}, p.texts)
+	assert.Equal(t, []string{"2.0", "SendMessage", "m1", "user", "data", "id", "x1"}, p.texts)
 }
 
 // ghToken is a made-up GitHub token shape the guardrail fake denies; it is

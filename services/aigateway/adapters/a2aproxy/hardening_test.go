@@ -380,3 +380,14 @@ func TestUnsafePathSaysThePathIsRefused(t *testing.T) {
 	rec := f.do(http.MethodPost, "/a2a/billing/a%2Fb/message:send", `{}`)
 	assert.Contains(t, rec.Body.String(), `"message":"the A2A path is not allowed"`)
 }
+
+func TestCardAndRefusalRepliesForbidSniffing(t *testing.T) {
+	f := newFixture(t)
+	card := f.do(http.MethodGet, "/a2a/billing/.well-known/agent-card.json", "")
+	require.Equal(t, http.StatusOK, card.Code)
+	assert.Equal(t, "nosniff", card.Header().Get("X-Content-Type-Options"))
+
+	refused := f.do(http.MethodPost, "/a2a/unknown", sendMessage("SendMessage", "hello"))
+	assert.Equal(t, "nosniff", refused.Header().Get("X-Content-Type-Options"))
+	assert.Equal(t, "no-store", refused.Header().Get("Cache-Control"))
+}

@@ -39,6 +39,14 @@ func setNoStore(h http.Header) {
 	h.Set("Cache-Control", "no-store")
 }
 
+// setJSONReply marks a reply the gateway writes itself: JSON, never sniffed,
+// never cached.
+func setJSONReply(h http.Header) {
+	h.Set("Content-Type", "application/json")
+	h.Set("X-Content-Type-Options", "nosniff")
+	setNoStore(h)
+}
+
 // isEventStream reports whether a Content-Type names an SSE stream, in any case.
 func isEventStream(v string) bool {
 	media, _, err := mime.ParseMediaType(v)
