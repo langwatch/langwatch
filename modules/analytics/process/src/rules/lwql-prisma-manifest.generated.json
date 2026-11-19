@@ -21508,6 +21508,24 @@
           "isList": false,
           "isOptional": false,
           "documentation": ""
+        },
+        {
+          "name": "appliedEventIds",
+          "columnName": "appliedEventIds",
+          "type": "String",
+          "kind": "scalar",
+          "isList": true,
+          "isOptional": false,
+          "documentation": "The event ids folded in, so a redelivery folds once."
+        },
+        {
+          "name": "winnerEventId",
+          "columnName": "winnerEventId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "The fact that last changed the row; only it may tell Customer.io."
         }
       ]
     },
@@ -21792,6 +21810,15 @@
           "documentation": ""
         },
         {
+          "name": "adminAt",
+          "columnName": "adminAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
           "name": "updatedAt",
           "columnName": "updatedAt",
           "type": "DateTime",
@@ -21827,7 +21854,7 @@
           "kind": "scalar",
           "isList": false,
           "isOptional": false,
-          "documentation": "The owner pipeline whose peer fold wrote the row (prompt, evaluator, scenario, simulation),\nor `evaluation`: the project's evaluation days, written by a subscriber, at most once a day."
+          "documentation": "The owner pipeline whose peer fold wrote the row (prompt, evaluator, scenario, simulation).\nEvaluation days are not kept here: the evaluation-days map and its replay write them to\nNurturingProjectEvaluationDay."
         },
         {
           "name": "folded",
@@ -21929,6 +21956,35 @@
           "isList": false,
           "isOptional": true,
           "documentation": "Append time of the newest trace_failed."
+        }
+      ]
+    },
+    {
+      "name": "NurturingProjectEvaluationDay",
+      "tableName": "NurturingProjectEvaluationDay",
+      "documentation": "Each project and UTC day with a completed evaluation, from evaluation's lifecycle_completed,\nwritten insert-ignore. Replaces the `evaluation` rows of NurturingProjectUsageView.",
+      "primaryKey": [
+        "projectId",
+        "day"
+      ],
+      "fields": [
+        {
+          "name": "projectId",
+          "columnName": "projectId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "day",
+          "columnName": "day",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "UTC `YYYY-MM-DD`."
         }
       ]
     },

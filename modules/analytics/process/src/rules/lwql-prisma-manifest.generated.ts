@@ -2029,6 +2029,8 @@ export interface LwqlPrismaRows {
     readonly plan: "String?";
     readonly occurredAt: "DateTime";
     readonly fromCatchUp: "Boolean";
+    readonly appliedEventIds: "String[]";
+    readonly winnerEventId: "String?";
   };
   readonly NurturingVirtualKey: {
     readonly virtualKeyId: "String";
@@ -2063,6 +2065,7 @@ export interface LwqlPrismaRows {
     readonly codingRepositoryKeys: "String[]";
     readonly codingFirstDays: "Int[]";
     readonly lastTraceAt: "DateTime?";
+    readonly adminAt: "DateTime?";
     readonly updatedAt: "DateTime";
   };
   readonly NurturingProjectUsageView: {
@@ -2080,6 +2083,10 @@ export interface LwqlPrismaRows {
     readonly errorCount: "Int";
     readonly lastTraceAt: "DateTime?";
     readonly lastFailedTraceAt: "DateTime?";
+  };
+  readonly NurturingProjectEvaluationDay: {
+    readonly projectId: "String";
+    readonly day: "String";
   };
   readonly NurturingPersonalProject: {
     readonly projectId: "String";
