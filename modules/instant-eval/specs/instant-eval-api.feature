@@ -218,6 +218,19 @@ Feature: The Instant Eval run over REST, one LWQL statement, judged as a job
     Then every judgement belongs to that question and passed
 
   @integration
+  Scenario: Results narrowed to non-matches keep the skipped and failed judgements
+    Given a run with passed, not passed, skipped and failed judgements on a yes or no and a score question
+    When the results are read with matches excluded
+    Then the yes or no judgements that did not pass are returned with every skipped and failed judgement
+    And matches and non-matches together are every judgement, each once
+
+  @integration
+  Scenario: Non-matches narrowed to skipped or failed return those judgements
+    Given a run with passed, not passed, skipped and failed judgements on a yes or no and a score question
+    When the results are read with matches excluded and the status skipped, then failed
+    Then each read returns every judgement with that status
+
+  @integration
   Scenario: A sample re-reads the text that was judged without judging it again
     Given a finished run
     When a sample of five rows is requested
