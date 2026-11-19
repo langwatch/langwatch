@@ -49,15 +49,17 @@ import {
   buildNurturingProjectUsagePipeline,
   NURTURING_PROJECT_USAGE_PIPELINE_NAME,
 } from "../nurturing-project-usage.pipeline.ts";
-import { nurturingReplaySteps } from "../../migrations/replay.nurturing.migration.ts";
 import { lifecycleFact, ORGANIZATION_ID } from "./nurturing-gateway-facts.test-helpers.ts";
+import {
+  IDENTITY_MARKS_STEP,
+  KEYS_STEP,
+  nurturingReplayStepsOver,
+  USER_MARKS_STEP,
+} from "./nurturing-replay-steps.test-helpers.ts";
 import { NurturingSeededLog } from "./nurturing-seeded-log.test-helpers.ts";
 
 const BASE_MS = 1_700_000_000_000;
 const KEYS_LANE = `${NURTURING_PROJECT_USAGE_PIPELINE_NAME}.virtualKeys`;
-const USER_MARKS_STEP = "nurturing:replay-user-erasure-marks";
-const IDENTITY_MARKS_STEP = "nurturing:replay-identity-erasure-marks";
-const KEYS_STEP = "nurturing:replay-virtual-keys";
 
 const keyId = (n: number) => `vk_${n}`;
 
@@ -171,7 +173,7 @@ function deploy({
     }),
     projections,
   });
-  const steps = nurturingReplaySteps(replayer);
+  const steps = nurturingReplayStepsOver(replayer);
   const step = (id: string): MigrationStep => {
     const found = steps.find((each) => each.id === id);
     if (!found || !isMigrationStep(found)) throw new Error(`no step ${id}`);

@@ -589,7 +589,7 @@ function nurturingProjectUsageHost({
       }),
     )
     // Registered whether or not a channel syncs. The marks lane is the key lane's replay
-    // prerequisite (migrations/replay.nurturing.migration.ts).
+    // prerequisite (the withMigrations steps in nurturing.module.ts).
     .withPeerMapProjection(nurturingUserErasureMarksMap(virtualKeys))
     .withPeerMapProjection(nurturingIdentityErasureMarksMap(virtualKeys))
     .withPeerMapProjection(nurturingVirtualKeysMap(virtualKeys));
@@ -714,7 +714,7 @@ export function nurturingFounderMembershipSubscriber(
   };
 }
 
-/** Lane names under `<host pipeline>.`, which migrations/replay.nurturing.migration.ts names. */
+/** Lane names under `<host pipeline>.`, which the withMigrations steps in nurturing.module.ts name. */
 export const NURTURING_USER_ERASURE_MARKS_PROJECTION_NAME = "userErasureMarks" as const;
 export const NURTURING_IDENTITY_ERASURE_MARKS_PROJECTION_NAME = "identityErasureMarks" as const;
 export const NURTURING_VIRTUAL_KEYS_PROJECTION_NAME = "virtualKeys" as const;

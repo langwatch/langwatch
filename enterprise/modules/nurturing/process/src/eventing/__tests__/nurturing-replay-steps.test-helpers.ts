@@ -10,19 +10,24 @@ import {
   NURTURING_PROJECT_USAGE_PIPELINE_NAME,
   NURTURING_USER_ERASURE_MARKS_PROJECTION_NAME,
   NURTURING_VIRTUAL_KEYS_PROJECTION_NAME,
-} from "../eventing/nurturing-project-usage.pipeline.ts";
+} from "../nurturing-project-usage.pipeline.ts";
+
+export const USER_MARKS_STEP = "nurturing:replay-user-erasure-marks";
+export const IDENTITY_MARKS_STEP = "nurturing:replay-identity-erasure-marks";
+export const KEYS_STEP = "nurturing:replay-virtual-keys";
 
 const laneOf = (projection: string) => `${NURTURING_PROJECT_USAGE_PIPELINE_NAME}.${projection}`;
 
 /**
- * Nurturing's deploy-time fills from its owners' logs: the erasure marks of both erasure sources,
- * then the key copy, which runs `after` them so a key copied from old facts finds every erased
- * person marked. Spec: enterprise/modules/nurturing/specs/gateway-facts.feature.
+ * The three replay steps as nurturing.module.ts declares them, rebuilt over a test's own replayer
+ * from the same pinned ids and lane constants. The module's declaration test compares the module
+ * against this, so a lane or ordering change in one place fails there rather than diverging.
+ * Spec: enterprise/modules/nurturing/specs/gateway-facts.feature
  */
-export function nurturingReplaySteps(replayer: LaneReplayer): MigrationStep[] {
+export function nurturingReplayStepsOver(replayer: LaneReplayer): MigrationStep[] {
   const marks = [
     defineProjectionReplayStep({
-      id: "nurturing:replay-user-erasure-marks",
+      id: USER_MARKS_STEP,
       description: "Marks every person erased in user's log, before the keys copy.",
       lane: laneOf(NURTURING_USER_ERASURE_MARKS_PROJECTION_NAME),
       needsOldWritersGone: true,
@@ -30,7 +35,7 @@ export function nurturingReplaySteps(replayer: LaneReplayer): MigrationStep[] {
       replayer,
     }),
     defineProjectionReplayStep({
-      id: "nurturing:replay-identity-erasure-marks",
+      id: IDENTITY_MARKS_STEP,
       description: "Marks every person erased in identity's log, before the keys copy.",
       lane: laneOf(NURTURING_IDENTITY_ERASURE_MARKS_PROJECTION_NAME),
       needsOldWritersGone: true,
@@ -41,7 +46,7 @@ export function nurturingReplaySteps(replayer: LaneReplayer): MigrationStep[] {
   return [
     ...marks,
     defineProjectionReplayStep({
-      id: "nurturing:replay-virtual-keys",
+      id: KEYS_STEP,
       description: "Fills nurturing's key copy from gateway's key lifecycle log at deploy.",
       lane: laneOf(NURTURING_VIRTUAL_KEYS_PROJECTION_NAME),
       needsOldWritersGone: true,

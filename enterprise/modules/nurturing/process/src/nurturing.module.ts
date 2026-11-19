@@ -1,11 +1,17 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import type { NurturingApi, NurturingServerConfig } from "@langwatch/enterprise-nurturing-contract";
 import { defineProcessModule, type PublishedProcessModule } from "@langwatch/process";
+import { defineProjectionReplayStep } from "@langwatch/upgrade/step";
 
 import { NurturingModule } from "./app/nurturing.app.ts";
 import { nurturingChannels } from "./channels/nurturing-channels.registry.ts";
-import { nurturingProjectUsageEventing } from "./eventing/nurturing-project-usage.pipeline.ts";
-import { nurturingReplaySteps } from "./migrations/replay.nurturing.migration.ts";
+import {
+  NURTURING_IDENTITY_ERASURE_MARKS_PROJECTION_NAME,
+  NURTURING_PROJECT_USAGE_PIPELINE_NAME,
+  NURTURING_USER_ERASURE_MARKS_PROJECTION_NAME,
+  NURTURING_VIRTUAL_KEYS_PROJECTION_NAME,
+  nurturingProjectUsageEventing,
+} from "./eventing/nurturing-project-usage.pipeline.ts";
 import { nurturingTraceWindowEndEventing } from "./eventing/nurturing-trace-window-end.pipeline.ts";
 import { nurturingEventing } from "./eventing/nurturing.pipeline.ts";
 import { nurturingRepositories } from "./repositories/nurturing-repositories.registry.ts";
@@ -28,4 +34,33 @@ export const nurturingProcessModule: PublishedProcessModule<
       peers: { source: repositories.memberSource, members: repositories.members },
     }),
   ])
-  .withMigrations(({ replayer }) => nurturingReplaySteps(replayer));
+  // Deploy-time fills from its owners' logs: the erasure marks of both erasure sources, then the
+  // key copy, which runs `after` them so a key copied from old facts finds every erased person
+  // marked. Spec: enterprise/modules/nurturing/specs/gateway-facts.feature
+  .withMigrations(({ replayer }) => [
+    defineProjectionReplayStep({
+      id: "nurturing:replay-user-erasure-marks",
+      description: "Marks every person erased in user's log, before the keys copy.",
+      lane: `${NURTURING_PROJECT_USAGE_PIPELINE_NAME}.${NURTURING_USER_ERASURE_MARKS_PROJECTION_NAME}`,
+      needsOldWritersGone: true,
+      trailingPass: true,
+      replayer,
+    }),
+    defineProjectionReplayStep({
+      id: "nurturing:replay-identity-erasure-marks",
+      description: "Marks every person erased in identity's log, before the keys copy.",
+      lane: `${NURTURING_PROJECT_USAGE_PIPELINE_NAME}.${NURTURING_IDENTITY_ERASURE_MARKS_PROJECTION_NAME}`,
+      needsOldWritersGone: true,
+      trailingPass: true,
+      replayer,
+    }),
+    defineProjectionReplayStep({
+      id: "nurturing:replay-virtual-keys",
+      description: "Fills nurturing's key copy from gateway's key lifecycle log at deploy.",
+      lane: `${NURTURING_PROJECT_USAGE_PIPELINE_NAME}.${NURTURING_VIRTUAL_KEYS_PROJECTION_NAME}`,
+      needsOldWritersGone: true,
+      trailingPass: true,
+      after: ["nurturing:replay-user-erasure-marks", "nurturing:replay-identity-erasure-marks"],
+      replayer,
+    }),
+  ]);
