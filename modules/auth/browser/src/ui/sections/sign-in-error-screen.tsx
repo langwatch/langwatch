@@ -251,7 +251,7 @@ function SignInErrorDescription({
           that has your LangWatch address as a verified email, or add that address to it first.
         </Text>
         <Button {...FRONT_DOOR_PRIMARY_STYLE} asChild>
-          <Link href="/settings/security">Back to Security</Link>
+          <Link href="/settings/security">Back to Settings</Link>
         </Button>
       </VStack>
     );

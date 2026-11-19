@@ -1044,7 +1044,7 @@ Feature: The first-party sign-in and sign-up screens - the auth screen is ours
     Given I started linking a sign-in method from Settings > Security
     When the account I picked uses a different email from my LangWatch address
     Then the screen tells me to link an account that has my LangWatch address as a verified email, or to add that address to it first
-    And the way back goes to Security, not to the organization's sign-in policy
+    And the button reads "Back to Settings" and opens Settings > Security, not the organization's sign-in policy
 
   @integration
   Scenario: The invitation and join screens stand on the same ground

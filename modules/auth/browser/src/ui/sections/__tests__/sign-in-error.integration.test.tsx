@@ -123,9 +123,9 @@ describe("<SignInError/>", () => {
           "The account you picked uses a different email from your LangWatch address. Link an account that has your LangWatch address as a verified email, or add that address to it first.",
         ),
       ).toBeTruthy();
-      const back = screen.getByRole("link", { name: "Back to Security" });
+      const back = screen.getByRole("link", { name: "Back to Settings" });
       expect(back.getAttribute("href")).toBe("/settings/security");
-      expect(screen.queryByRole("link", { name: /back to settings/i })).toBeNull();
+      expect(screen.queryByRole("link", { name: /back to sign in/i })).toBeNull();
     });
   });
 });
