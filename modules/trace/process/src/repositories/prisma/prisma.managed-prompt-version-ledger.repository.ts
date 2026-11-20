@@ -2,7 +2,7 @@ import { skipTenantCheck } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { findLedgerStepRecords, type LedgerStepRecord } from "@langwatch/upgrade/reader";
 
-import { MANAGED_PROMPT_VERSION_REPLAY_STEP_ID } from "../../rules/trace-widget-columns.rules.ts";
+import { MANAGED_PROMPT_VERSION_REPLAY_STEP_ID } from "../../rules/managed-prompt-version-replay.rules.ts";
 import { ManagedPromptVersionLedgerRepository } from "../managed-prompt-version-ledger.repository.ts";
 
 // The upgrade ledger describes the installation, not a tenant.

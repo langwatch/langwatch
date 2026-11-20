@@ -25,12 +25,14 @@ import { traceIngestSourceBillingEventing } from "./features/ingestion/eventing/
 import { TRACE_ID_INDEXES } from "./repositories/clickhouse/clickhouse.trace-id-indexes.database.ts";
 import { traceRepositories } from "./repositories/trace-repositories.registry.ts";
 import {
+  MANAGED_PROMPT_VERSION_REPLAY_STEP_ID,
+  MANAGED_VERSION_REPLAY_HOURS,
+} from "./rules/managed-prompt-version-replay.rules.ts";
+import {
   RECORD_EVALUATION_OUTCOMES_STEP_ID,
   TRACE_EVALUATION_ANALYTICS_REPLAY_STEP_ID,
 } from "./rules/trace-evaluation-analytics.rules.ts";
 import {
-  MANAGED_PROMPT_VERSION_REPLAY_STEP_ID,
-  MANAGED_VERSION_REPLAY_HOURS,
   SPAN_ANALYTICS_REPLAY_STEP_ID,
   TRACE_ANALYTICS_REPLAY_STEP_ID,
   WIDGET_COLUMNS_REPLAY_HOURS,
