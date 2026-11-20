@@ -33,8 +33,8 @@ var (
 	releaseQuoted      = regexp.MustCompile(`"([^"]+)"`)
 )
 
-// ReleaseLockFiles holds the repository file contents checked against each other.
-type ReleaseLockFiles struct {
+// releaseLockFiles holds the repository file contents checked against each other.
+type releaseLockFiles struct {
 	Config, Manifest, RootPyproject, Lock string
 	Pyprojects                            map[string]string // by ReleasePackage.Path
 }
@@ -61,7 +61,7 @@ func ReleaseLock(root string) ([]string, error) {
 		}
 		contents[rel] = string(raw)
 	}
-	files := ReleaseLockFiles{
+	files := releaseLockFiles{
 		Config:        contents[".github/release-please-config.json"],
 		Manifest:      contents[".github/.release-please-manifest.json"],
 		RootPyproject: contents["pyproject.toml"],
@@ -72,22 +72,22 @@ func ReleaseLock(root string) ([]string, error) {
 		files.Pyprojects[pkg.Path] = contents[pkg.Path+"/pyproject.toml"]
 	}
 
-	return ReleaseLockProblems(files)
+	return releaseLockProblems(files)
 }
 
-// ReleaseLockProblems checks the file contents against each other, for every package.
-func ReleaseLockProblems(files ReleaseLockFiles) ([]string, error) {
+// releaseLockProblems checks the file contents against each other, for every package.
+func releaseLockProblems(files releaseLockFiles) ([]string, error) {
 	var manifestVersions map[string]string
 	if err := json.Unmarshal([]byte(files.Manifest), &manifestVersions); err != nil {
 		return nil, fmt.Errorf("release-please manifest: %w", err)
 	}
-	var config ReleaseConfig
+	var config releaseConfig
 	if err := json.Unmarshal([]byte(files.Config), &config); err != nil {
 		return nil, fmt.Errorf("release-please config: %w", err)
 	}
 	problems := workspaceProblems(files.RootPyproject)
 	for _, pkg := range ReleasePackages {
-		problems = append(problems, ReleaseExtraFilesProblems(config, pkg)...)
+		problems = append(problems, releaseExtraFilesProblems(config, pkg)...)
 		problems = append(problems, lockProblems(pkg, lockInputs{Lock: files.Lock, Pyproject: files.Pyprojects[pkg.Path], ManifestVersion: manifestVersions[pkg.Path]})...)
 	}
 
@@ -116,15 +116,15 @@ func workspaceProblems(rootPyproject string) []string {
 	return nil
 }
 
-// ReleaseConfig is the part of the release-please config the guard reads.
-type ReleaseConfig struct {
+// releaseConfig is the part of the release-please config the guard reads.
+type releaseConfig struct {
 	Packages map[string]struct {
 		ExtraFiles []json.RawMessage `json:"extra-files"`
 	} `json:"packages"`
 }
 
-// ReleaseExtraFilesProblems requires the toml uv.lock entry on the package.
-func ReleaseExtraFilesProblems(config ReleaseConfig, pkg ReleasePackage) []string {
+// releaseExtraFilesProblems requires the toml uv.lock entry on the package.
+func releaseExtraFilesProblems(config releaseConfig, pkg ReleasePackage) []string {
 	matches := 0
 	for _, raw := range config.Packages[pkg.Path].ExtraFiles {
 		if isReleaseLockEntry(raw, pkg) {

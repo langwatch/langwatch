@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
 
@@ -14,60 +15,58 @@ import (
 	"github.com/langwatch/langwatch/tools/ciguard"
 )
 
-var sdk = ciguard.ReleasePackages[0]
+var releaseLockSDK = ciguard.ReleasePackages[0]
 
-func entry(lockName string) string {
+func releaseLockEntry(lockName string) string {
 	return `{"type":"toml","path":"/uv.lock","jsonpath":"$.package[?(@.name.value=='` + lockName + `')].version"}`
 }
 
-func config(extraSDK, extraKsuid string) string {
+func releaseLockConfig(extraSDK, extraKsuid string) string {
 	return `{"packages":{"sdks/python":{"extra-files":[` + extraSDK + `]},"packages/ksuid-python":{"extra-files":[` + extraKsuid + `]}}}`
 }
 
-func lockBlock(name, version, path string) string {
+func releaseLockBlock(name, version, path string) string {
 	return "name = \"" + name + "\"\nversion = \"" + version + "\"\nsource = { editable = \"" + path + "\" }\n"
 }
 
-func lock(blocks ...string) string {
+func releaseLockLock(blocks ...string) string {
 	return "version = 1\n\n[[package]]\n" + strings.Join(blocks, "\n[[package]]\n")
 }
 
-func pyproject(version string) string {
+func releaseLockPyproject(version string) string {
 	return "[project]\nname = \"x\"\nversion = \"" + version + "\" # note\n"
 }
 
-const rootPyproject = "[tool.uv.workspace]\nmembers = [\"sdks/python\", \"packages/ksuid-python\"]\n"
+const releaseLockRootPyproject = "[tool.uv.workspace]\nmembers = [\"sdks/python\", \"packages/ksuid-python\"]\n"
 
-func manifest(sdkVersion, ksuidVersion string) string {
+func releaseLockManifest(sdkVersion, ksuidVersion string) string {
 	return `{"sdks/python":"` + sdkVersion + `","packages/ksuid-python":"` + ksuidVersion + `"}`
 }
 
-func inStep() ciguard.ReleaseLockFiles {
+func releaseLockInStep() ciguard.ReleaseLockFiles {
 	return ciguard.ReleaseLockFiles{
-		Config:        config(entry("langwatch"), entry("langwatch-ksuid")),
-		Manifest:      manifest("1.4.0", "1.0.1"),
-		RootPyproject: rootPyproject,
-		Lock: lock(
-			lockBlock("langwatch", "1.4.0", "sdks/python"),
-			lockBlock("langwatch-ksuid", "1.0.1", "packages/ksuid-python"),
+		Config:        releaseLockConfig(releaseLockEntry("langwatch"), releaseLockEntry("langwatch-ksuid")),
+		Manifest:      releaseLockManifest("1.4.0", "1.0.1"),
+		RootPyproject: releaseLockRootPyproject,
+		Lock: releaseLockLock(
+			releaseLockBlock("langwatch", "1.4.0", "sdks/python"),
+			releaseLockBlock("langwatch-ksuid", "1.0.1", "packages/ksuid-python"),
 		),
-		Pyprojects: map[string]string{"sdks/python": pyproject("1.4.0"), "packages/ksuid-python": pyproject("1.0.1")},
+		Pyprojects: map[string]string{"sdks/python": releaseLockPyproject("1.4.0"), "packages/ksuid-python": releaseLockPyproject("1.0.1")},
 	}
 }
 
-func problemsOf(t *testing.T, files ciguard.ReleaseLockFiles) string {
+func releaseLockProblemsOf(t *testing.T, files ciguard.ReleaseLockFiles) string {
 	t.Helper()
 	got, err := ciguard.ReleaseLockProblems(files)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	return strings.Join(got, "\n")
 }
 
 // @scenario "The release config bumps uv.lock"
 func TestExtraFilesProblems(t *testing.T) {
-	good := entry("langwatch")
+	good := releaseLockEntry("langwatch")
 	cases := map[string]struct {
 		extra  string
 		want   int
@@ -75,17 +74,19 @@ func TestExtraFilesProblems(t *testing.T) {
 	}{
 		"entry present":   {`"src/__version__.py",` + good, 0, ""},
 		"entry missing":   {`"src/__version__.py"`, 1, "add the toml"},
-		"other package":   {entry("langwatch-ksuid"), 1, "add the toml"},
+		"other package":   {releaseLockEntry("langwatch-ksuid"), 1, "add the toml"},
 		"entry duplicate": {good + "," + good, 1, "remove the extras"},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
 			var cfg ciguard.ReleaseConfig
-			if err := json.Unmarshal([]byte(config(tc.extra, "")), &cfg); err != nil {
-				t.Fatal(err)
-			}
-			if got := ciguard.ReleaseExtraFilesProblems(cfg, sdk); len(got) != tc.want || (tc.want > 0 && !strings.Contains(got[0], tc.advice)) {
-				t.Fatalf("got %v; want %d problems advising %q", got, tc.want, tc.advice)
+			require.NoError(t, json.Unmarshal([]byte(releaseLockConfig(tc.extra, "")), &cfg))
+
+			got := ciguard.ReleaseExtraFilesProblems(cfg, releaseLockSDK)
+
+			require.Len(t, got, tc.want)
+			if tc.want > 0 {
+				assert.Contains(t, got[0], tc.advice)
 			}
 		})
 	}
@@ -94,96 +95,89 @@ func TestExtraFilesProblems(t *testing.T) {
 // @scenario "A lock behind the release version fails the check"
 func TestLockBehindReleaseFails(t *testing.T) {
 	t.Run("pyproject ahead of the lock", func(t *testing.T) {
-		files := inStep()
-		files.Pyprojects["sdks/python"] = pyproject("1.5.0")
-		files.Manifest = manifest("1.5.0", "1.0.1")
-		got := problemsOf(t, files)
+		files := releaseLockInStep()
+		files.Pyprojects["sdks/python"] = releaseLockPyproject("1.5.0")
+		files.Manifest = releaseLockManifest("1.5.0", "1.0.1")
+
+		got := releaseLockProblemsOf(t, files)
+
 		for _, want := range []string{`lock "1.4.0"`, `pyproject "1.5.0"`, "uv lock"} {
-			if !strings.Contains(got, want) {
-				t.Fatalf("got %q, want it to contain %q", got, want)
-			}
+			assert.Contains(t, got, want)
 		}
 	})
 	t.Run("manifest ahead of pyproject and lock", func(t *testing.T) {
-		files := inStep()
-		files.Manifest = manifest("1.5.0", "1.0.1")
-		got := problemsOf(t, files)
+		files := releaseLockInStep()
+		files.Manifest = releaseLockManifest("1.5.0", "1.0.1")
+
+		got := releaseLockProblemsOf(t, files)
+
 		for _, want := range []string{`"1.4.0"`, `"1.5.0"`, "cannot fix"} {
-			if !strings.Contains(got, want) {
-				t.Fatalf("got %q, want it to contain %q", got, want)
-			}
+			assert.Contains(t, got, want)
 		}
-		if strings.Contains(got, "out of step") {
-			t.Fatalf("drift must not be reported as a lock problem: %q", got)
-		}
+		assert.NotContains(t, got, "out of step", "drift must not be reported as a lock problem")
 	})
 	t.Run("lock ahead of pyproject with the manifest disagreeing", func(t *testing.T) {
-		files := inStep()
-		files.Lock = lock(lockBlock("langwatch", "1.6.0", "sdks/python"), lockBlock("langwatch-ksuid", "1.0.1", "packages/ksuid-python"))
-		files.Manifest = manifest("1.5.0", "1.0.1")
-		got := problemsOf(t, files)
-		if !strings.Contains(got, `"1.5.0"`) || strings.Contains(got, "run `uv lock`") {
-			t.Fatalf("got %q, want the drift only, with no uv lock advice", got)
-		}
+		files := releaseLockInStep()
+		files.Lock = releaseLockLock(releaseLockBlock("langwatch", "1.6.0", "sdks/python"), releaseLockBlock("langwatch-ksuid", "1.0.1", "packages/ksuid-python"))
+		files.Manifest = releaseLockManifest("1.5.0", "1.0.1")
+
+		got := releaseLockProblemsOf(t, files)
+
+		assert.Contains(t, got, `"1.5.0"`)
+		assert.NotContains(t, got, "run `uv lock`")
 	})
 }
 
 // @scenario "A lock in step passes"
 func TestLockInStepPasses(t *testing.T) {
-	if got := problemsOf(t, inStep()); got != "" {
-		t.Fatalf("got %q, want no problems", got)
-	}
+	assert.Empty(t, releaseLockProblemsOf(t, releaseLockInStep()))
 }
 
 // @scenario "A pyproject without a static project version fails the check"
 func TestDynamicProjectVersionFails(t *testing.T) {
-	files := inStep()
+	files := releaseLockInStep()
 	files.Pyprojects["sdks/python"] = "[project]\nname = \"langwatch\"\ndynamic = [\"version\"]\n"
-	if got := problemsOf(t, files); !strings.Contains(got, "no static [project] version") {
-		t.Fatalf("got %q, want the no-static-version problem", got)
-	}
+
+	assert.Contains(t, releaseLockProblemsOf(t, files), "no static [project] version")
 }
 
 // @scenario "A ksuid-python release that leaves the lock behind fails the check"
 func TestKsuidDriftFails(t *testing.T) {
-	files := inStep()
-	files.Pyprojects["packages/ksuid-python"] = pyproject("1.0.2")
-	files.Manifest = manifest("1.4.0", "1.0.2")
-	got := problemsOf(t, files)
-	if !strings.Contains(got, "uv.lock is out of step with packages/ksuid-python/pyproject.toml") || strings.Contains(got, "sdks/python") {
-		t.Fatalf("got %q, want only the ksuid-python lock problem", got)
-	}
+	files := releaseLockInStep()
+	files.Pyprojects["packages/ksuid-python"] = releaseLockPyproject("1.0.2")
+	files.Manifest = releaseLockManifest("1.4.0", "1.0.2")
+
+	got := releaseLockProblemsOf(t, files)
+
+	assert.Contains(t, got, "uv.lock is out of step with packages/ksuid-python/pyproject.toml")
+	assert.NotContains(t, got, "sdks/python")
 }
 
 // @scenario "A uv workspace member the guard does not check fails the check"
 func TestUnlistedWorkspaceMemberFails(t *testing.T) {
-	files := inStep()
+	files := releaseLockInStep()
 	files.RootPyproject = "[tool.uv.workspace]\nmembers = [\"sdks/python\", \"packages/ksuid-python\", \"packages/new\"]\n"
-	if got := problemsOf(t, files); !strings.Contains(got, "packages/new") {
-		t.Fatalf("got %q, want the unchecked member named", got)
-	}
+
+	assert.Contains(t, releaseLockProblemsOf(t, files), "packages/new")
 }
 
 func TestProblemsRejectsBadJSON(t *testing.T) {
-	files := inStep()
+	files := releaseLockInStep()
 	files.Config = "{"
-	if _, err := ciguard.ReleaseLockProblems(files); err == nil {
-		t.Fatal("want an error for malformed config")
-	}
+
+	_, err := ciguard.ReleaseLockProblems(files)
+
+	require.Error(t, err)
 }
 
 // @scenario "The guard reads the repository files"
 func TestCheckReadsRepositoryFiles(t *testing.T) {
 	root := t.TempDir()
-	files := inStep()
+	files := releaseLockInStep()
 	write := func(rel, content string) {
 		path := filepath.Join(root, rel)
-		if err := os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
-			t.Fatal(err)
-		}
-		if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, os.MkdirAll(filepath.Dir(path), 0o750))
+		require.NoError(t, os.WriteFile(path, []byte(content), 0o600))
 	}
 	write(".github/release-please-config.json", files.Config)
 	write(".github/.release-please-manifest.json", files.Manifest)
@@ -192,72 +186,90 @@ func TestCheckReadsRepositoryFiles(t *testing.T) {
 	for path, content := range files.Pyprojects {
 		write(path+"/pyproject.toml", content)
 	}
-	if got, err := ciguard.ReleaseLock(root); err != nil || len(got) != 0 {
-		t.Fatalf("got %v, %v; want no problems", got, err)
-	}
-	write("uv.lock", lock(lockBlock("langwatch", "1.3.0", "sdks/python"), lockBlock("langwatch-ksuid", "1.0.1", "packages/ksuid-python")))
-	if got, err := ciguard.ReleaseLock(root); err != nil || len(got) != 1 {
-		t.Fatalf("got %v, %v; want one problem", got, err)
-	}
+
+	got, err := ciguard.ReleaseLock(root)
+	require.NoError(t, err)
+	assert.Empty(t, got)
+
+	write("uv.lock", releaseLockLock(releaseLockBlock("langwatch", "1.3.0", "sdks/python"), releaseLockBlock("langwatch-ksuid", "1.0.1", "packages/ksuid-python")))
+	got, err = ciguard.ReleaseLock(root)
+	require.NoError(t, err)
+	assert.Len(t, got, 1)
+}
+
+func TestReleaseLockPassesOnThisRepository(t *testing.T) {
+	root, err := ciscan.RepoRoot(".")
+	require.NoError(t, err)
+
+	problems, err := ciguard.ReleaseLock(root)
+
+	require.NoError(t, err)
+	assert.Empty(t, problems)
 }
 
 // @scenario "Manifest drift is reported without lock advice"
 func TestManifestDriftHasNoLockAdvice(t *testing.T) {
-	files := inStep()
-	files.Pyprojects["sdks/python"] = pyproject("1.5.0")
-	got := problemsOf(t, files)
-	if !strings.Contains(got, `"1.5.0"`) || !strings.Contains(got, `"1.4.0"`) || strings.Contains(got, "run `uv lock`") || strings.Contains(got, "out of step") {
-		t.Fatalf("got %q, want the drift only", got)
-	}
+	files := releaseLockInStep()
+	files.Pyprojects["sdks/python"] = releaseLockPyproject("1.5.0")
+
+	got := releaseLockProblemsOf(t, files)
+
+	assert.Contains(t, got, `"1.5.0"`)
+	assert.Contains(t, got, `"1.4.0"`)
+	assert.NotContains(t, got, "run `uv lock`")
+	assert.NotContains(t, got, "out of step")
 }
 
 // @scenario "A package missing from the release manifest fails the check"
 func TestMissingManifestKeyFails(t *testing.T) {
-	files := inStep()
+	files := releaseLockInStep()
 	files.Manifest = `{"packages/ksuid-python":"1.0.1"}`
-	got := problemsOf(t, files)
-	if !strings.Contains(got, "no \"sdks/python\" key") || strings.Contains(got, "cannot fix") {
-		t.Fatalf("got %q, want the missing-key problem", got)
-	}
+
+	got := releaseLockProblemsOf(t, files)
+
+	assert.Contains(t, got, "no \"sdks/python\" key")
+	assert.NotContains(t, got, "cannot fix")
 }
 
 // @scenario "A missing uv.lock entry fails with uv lock advice"
 func TestMissingLockEntryAdvisesUvLock(t *testing.T) {
-	files := inStep()
-	files.Lock = lock(lockBlock("langwatch-ksuid", "1.0.1", "packages/ksuid-python"))
-	got := problemsOf(t, files)
-	if !strings.Contains(got, "no entry named langwatch") || !strings.Contains(got, "run `uv lock`") {
-		t.Fatalf("got %q, want the missing-entry problem with uv lock advice", got)
-	}
+	files := releaseLockInStep()
+	files.Lock = releaseLockLock(releaseLockBlock("langwatch-ksuid", "1.0.1", "packages/ksuid-python"))
+
+	got := releaseLockProblemsOf(t, files)
+
+	assert.Contains(t, got, "no entry named langwatch")
+	assert.Contains(t, got, "run `uv lock`")
 }
 
 // @scenario "A duplicate uv.lock entry fails without uv lock advice"
 func TestDuplicateLockEntryOmitsUvLockAdvice(t *testing.T) {
-	files := inStep()
-	files.Lock = lock(lockBlock("langwatch", "1.4.0", "sdks/python"), lockBlock("langwatch", "1.4.0", "sdks/python"), lockBlock("langwatch-ksuid", "1.0.1", "packages/ksuid-python"))
-	got := problemsOf(t, files)
-	if !strings.Contains(got, "packages named langwatch") || strings.Contains(got, "run `uv lock`") {
-		t.Fatalf("got %q, want the count problem without uv lock advice", got)
-	}
+	files := releaseLockInStep()
+	files.Lock = releaseLockLock(releaseLockBlock("langwatch", "1.4.0", "sdks/python"), releaseLockBlock("langwatch", "1.4.0", "sdks/python"), releaseLockBlock("langwatch-ksuid", "1.0.1", "packages/ksuid-python"))
+
+	got := releaseLockProblemsOf(t, files)
+
+	assert.Contains(t, got, "packages named langwatch")
+	assert.NotContains(t, got, "run `uv lock`")
 }
 
 // @scenario "A non-editable uv.lock entry fails the check"
 func TestNonEditableLockEntryFails(t *testing.T) {
-	files := inStep()
-	files.Lock = lock(lockBlock("langwatch", "1.4.0", "elsewhere"), lockBlock("langwatch-ksuid", "1.0.1", "packages/ksuid-python"))
-	got := problemsOf(t, files)
-	if !strings.Contains(got, "not the editable sdks/python package") || strings.Contains(got, "run `uv lock`") {
-		t.Fatalf("got %q, want the non-editable problem without uv lock advice", got)
-	}
+	files := releaseLockInStep()
+	files.Lock = releaseLockLock(releaseLockBlock("langwatch", "1.4.0", "elsewhere"), releaseLockBlock("langwatch-ksuid", "1.0.1", "packages/ksuid-python"))
+
+	got := releaseLockProblemsOf(t, files)
+
+	assert.Contains(t, got, "not the editable sdks/python package")
+	assert.NotContains(t, got, "run `uv lock`")
 }
 
 // @scenario "A multi-line workspace members list fails the check"
 func TestMultiLineMembersFails(t *testing.T) {
-	files := inStep()
+	files := releaseLockInStep()
 	files.RootPyproject = "[tool.uv.workspace]\nmembers = [\n  \"sdks/python\",\n  \"packages/ksuid-python\",\n]\n"
-	if got := problemsOf(t, files); !strings.Contains(got, "no one-line") {
-		t.Fatalf("got %q, want the members-list problem", got)
-	}
+
+	assert.Contains(t, releaseLockProblemsOf(t, files), "no one-line")
 }
 
 // @scenario "A change to any file the release-lock guard reads runs the guard"

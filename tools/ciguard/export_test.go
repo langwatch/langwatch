@@ -8,3 +8,15 @@ var IsStoredAWSKeyLine = isStoredAWSKeyLine
 
 // ReleaseLockInputPaths exposes the files the release-lock guard reads to the external tests.
 var ReleaseLockInputPaths = releaseLockInputPaths
+
+// ReleaseLockFiles exposes the release-lock guard's file contents to the external tests.
+type ReleaseLockFiles = releaseLockFiles
+
+// ReleaseLockProblems exposes the release-lock content check to the external tests.
+var ReleaseLockProblems = releaseLockProblems
+
+// ReleaseConfig exposes the release-please config shape to the external tests.
+type ReleaseConfig = releaseConfig
+
+// ReleaseExtraFilesProblems exposes the extra-files check to the external tests.
+var ReleaseExtraFilesProblems = releaseExtraFilesProblems
