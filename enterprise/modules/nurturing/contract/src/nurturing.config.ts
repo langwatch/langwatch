@@ -1,11 +1,17 @@
-import { Config, posthogHost, posthogKey, type ConfigOf } from "@langwatch/config";
+import {
+  Config,
+  customerIoRegion,
+  posthogHost,
+  posthogKey,
+  type ConfigOf,
+} from "@langwatch/config";
 import { Secret } from "@langwatch/secrets/secret";
 import { z } from "zod";
 
 /** The PostHog target is shared deployment config: the same leaves ops reads. */
 export const nurturingConfig = Config.define((c) => ({
-  /** Customer.io's data centre; the channel sends to the EU one unless this names "us". */
-  customerIoRegion: c.env("CUSTOMER_IO_REGION", z.enum(["us", "eu"]).optional()),
+  /** Customer.io's data centre (the shared leaf: notification's Cloud mail reads it too). */
+  customerIoRegion,
   /** Replaces the regional CDP endpoint, e.g. a local analyticssim; absent, the vendor's. */
   customerIoBaseUrl: c.env("CUSTOMER_IO_BASE_URL", z.string().min(1).optional()),
   posthogKey,

@@ -36,3 +36,22 @@ None: notification declares no peers.
 [auth](../auth/README.md), [automation](../automation/README.md), [billing](../../enterprise/modules/billing/README.md), [identity](../identity/README.md), [langy](../langy/README.md), [monitor](../monitor/README.md), [ops](../ops/README.md), [organization](../organization/README.md), [user](../user/README.md) (as a peer).
 
 <!-- readme:generated:end -->
+
+## Customer.io on LangWatch Cloud
+
+On a deployment with `IS_SAAS` set and `CUSTOMER_IO_APP_API_KEY` present, a fixed list of
+templates goes through Customer.io's transactional API (`POST /v1/send/email`, EU unless
+`CUSTOMER_IO_REGION=us`): the list is `CUSTOMER_IO_ROUTES` in
+`process/src/rules/customer-io-routing.rules.ts`, and security mail is never on it. Behaviour:
+[customer-io-transactional.feature](specs/customer-io-transactional.feature).
+
+- **One request per recipient**, with our own subject and HTML, link tracking off, the person
+  identified by address. A replyless send keeps the real recipient and answers to the no-reply
+  address.
+- **Any failure falls back.** A non-2xx reply, a timeout (10 s), a network error or an unreadable
+  reply sends that recipient through the install's own mailer, once, with a warning naming the
+  template. Both failing raises the own mailer's error.
+- **Self-hosted never sees it.** The key is not in the Helm chart, and without `IS_SAAS` or the
+  key every send takes the own mailer, unchanged. Messages with attachments always do.
+- **Before turning it on,** each template id on the list must exist in Customer.io as a
+  transactional message whose trigger name is that id.
