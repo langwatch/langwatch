@@ -84,6 +84,13 @@ func TestExtraFilesProblems(t *testing.T) {
 			notAdvice: "add the",
 			found:     "$.package[0].version",
 		},
+		"stray entry beside the right one": {
+			extra:     good + `,{"type":"toml","path":"/uv.lock","jsonpath":"$.package[0].version"}`,
+			want:      1,
+			advice:    "wrong jsonpath",
+			notAdvice: "add the",
+			found:     "$.package[0].version",
+		},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -186,26 +193,23 @@ func TestProblemsRejectsBadJSON(t *testing.T) {
 
 // @scenario "The guard reads the repository files"
 func TestCheckReadsRepositoryFiles(t *testing.T) {
-	root := t.TempDir()
 	files := releaseLockInStep()
-	write := func(rel, content string) {
-		path := filepath.Join(root, rel)
-		require.NoError(t, os.MkdirAll(filepath.Dir(path), 0o750))
-		require.NoError(t, os.WriteFile(path, []byte(content), 0o600))
+	repo := map[string]string{
+		".github/release-please-config.json":    files.Config,
+		".github/.release-please-manifest.json": files.Manifest,
+		"pyproject.toml":                        files.RootPyproject,
+		"uv.lock":                               files.Lock,
 	}
-	write(".github/release-please-config.json", files.Config)
-	write(".github/.release-please-manifest.json", files.Manifest)
-	write("pyproject.toml", files.RootPyproject)
-	write("uv.lock", files.Lock)
 	for path, content := range files.Pyprojects {
-		write(path+"/pyproject.toml", content)
+		repo[path+"/pyproject.toml"] = content
 	}
+	root := writeRepo(t, repo)
 
 	got, err := ciguard.ReleaseLock(root)
 	require.NoError(t, err)
 	assert.Empty(t, got)
 
-	write("uv.lock", releaseLockLock(releaseLockBlock("langwatch", "1.3.0", "sdks/python"), releaseLockBlock("langwatch-ksuid", "1.0.1", "packages/ksuid-python")))
+	require.NoError(t, os.WriteFile(filepath.Join(root, "uv.lock"), []byte(releaseLockLock(releaseLockBlock("langwatch", "1.3.0", "sdks/python"), releaseLockBlock("langwatch-ksuid", "1.0.1", "packages/ksuid-python"))), 0o600))
 	got, err = ciguard.ReleaseLock(root)
 	require.NoError(t, err)
 	assert.Len(t, got, 1)

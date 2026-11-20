@@ -149,16 +149,19 @@ func releaseExtraFilesProblems(config releaseConfig, pkg releasePackage) []strin
 		}
 		wrongJSONPaths = append(wrongJSONPaths, entry.JSONPath)
 	}
-	switch {
-	case matches == 0 && len(wrongJSONPaths) > 0:
-		return []string{fmt.Sprintf("the %s extra-files has a toml /uv.lock entry with the wrong jsonpath: expected %q, found %q", pkg.Path, want, wrongJSONPaths)}
-	case matches == 0:
-		return []string{fmt.Sprintf("release-please would leave uv.lock stale: add the toml /uv.lock entry to the %s extra-files", pkg.Path)}
-	case matches > 1:
-		return []string{fmt.Sprintf("the %s extra-files has %d /uv.lock entries for this package: remove the extras", pkg.Path, matches)}
+
+	var problems []string
+	if len(wrongJSONPaths) > 0 {
+		problems = append(problems, fmt.Sprintf("the %s extra-files has a toml /uv.lock entry with the wrong jsonpath: expected %q, found %q", pkg.Path, want, wrongJSONPaths))
+	}
+	if matches == 0 && len(wrongJSONPaths) == 0 {
+		problems = append(problems, fmt.Sprintf("release-please would leave uv.lock stale: add the toml /uv.lock entry to the %s extra-files", pkg.Path))
+	}
+	if matches > 1 {
+		problems = append(problems, fmt.Sprintf("the %s extra-files has %d /uv.lock entries for this package: remove the extras", pkg.Path, matches))
 	}
 
-	return nil
+	return problems
 }
 
 // releaseLockJSONPath is the jsonpath that selects the package's version in uv.lock.
