@@ -222,6 +222,7 @@ describe("the Instant Evals section of the trace summary", () => {
         expect(within(section).getByText("Did the model answer the question?")).toBeInTheDocument();
       });
 
+      /** @scenario "The Instant Evals section comes straight after Evals" */
       it("orders the section straight after Evals", () => {
         const { container } = renderWithDesignSystem(
           <TraceSummaryAccordions trace={header()} spans={SPANS} />,
@@ -232,6 +233,7 @@ describe("the Instant Evals section of the trace summary", () => {
         expect(order.indexOf("instantEvals")).toBe(order.indexOf("evals") + 1);
       });
 
+      /** @scenario "A result read from a span opens that span" */
       it("names the span a result was read from, and opens it when clicked", () => {
         const onSelectSpan = vi.fn();
         const { container } = renderWithDesignSystem(

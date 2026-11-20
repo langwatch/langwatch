@@ -69,16 +69,46 @@ describe("EvalResultsTraceService", () => {
     });
   });
 
-  describe("given a released project with a result kept on a span of its trace", () => {
+  describe("given a released project with several results kept on a span of its trace", () => {
     describe("when the trace's results are read", () => {
       /** @scenario "A trace's results are the latest per span, question and judged column" */
-      it("answers the result with its source, judge and judged time, as the wire carries it", async () => {
+      it("answers each cell's latest judged row, else its failed one, newest first", async () => {
+        const judgedAt = TRACE_END + 60_000;
         const results = MemoryEvalResultsRepository.create();
         await results.insert([
+          record({ SpanId: "span-1", SourceId: "widget-1", JudgedAt: judgedAt - 30_000 }),
           record({
             SpanId: "span-1",
+            SourceId: "widget-2",
+            JudgedAt: judgedAt,
+            Probability: 0.7,
             // A span statement keys a row by the span's time, which may sit outside the trace's.
             OccurredAt: TRACE_START - EVAL_RESULTS_RECALL_WINDOW_PADDING_MS,
+          }),
+          record({
+            SpanId: "span-1",
+            JudgedColumn: "output",
+            SourceId: "widget-1",
+            JudgedAt: judgedAt - 10_000,
+            Probability: 0.4,
+          }),
+          record({
+            SpanId: "span-1",
+            JudgedColumn: "output",
+            SourceId: "widget-3",
+            JudgedAt: judgedAt + 10_000,
+            Status: "failed",
+            Probability: null,
+            Error: "classifier_failed",
+          }),
+          record({
+            SpanId: "span-1",
+            JudgedColumn: "input",
+            SourceId: "widget-4",
+            JudgedAt: judgedAt - 20_000,
+            Status: "failed",
+            Probability: null,
+            Error: "classifier_failed",
           }),
         ]);
         const service = EvalResultsTraceService.create({
@@ -86,20 +116,39 @@ describe("EvalResultsTraceService", () => {
           peers: { isReleased: async () => true },
         });
 
+        const kept = {
+          spanId: "span-1",
+          question: "Is the customer annoyed?",
+          kind: "boolean",
+          score: null,
+          label: null,
+          judgeModel: "langwatch/instant-evals",
+          source: "dashboard",
+        };
         await expect(service.findResultsByTrace(TRACE)).resolves.toEqual([
           {
-            spanId: "span-1",
+            ...kept,
             judgedColumn: "llm_readable_trace",
-            question: "Is the customer annoyed?",
-            kind: "boolean",
             status: "judged",
-            probability: 0.9,
-            score: null,
-            label: null,
-            judgeModel: "langwatch/instant-evals",
-            judgedAt: TRACE_END + 60_000,
-            source: "dashboard",
+            probability: 0.7,
+            judgedAt,
+            sourceId: "widget-2",
+          },
+          {
+            ...kept,
+            judgedColumn: "output",
+            status: "judged",
+            probability: 0.4,
+            judgedAt: judgedAt - 10_000,
             sourceId: "widget-1",
+          },
+          {
+            ...kept,
+            judgedColumn: "input",
+            status: "failed",
+            probability: null,
+            judgedAt: judgedAt - 20_000,
+            sourceId: "widget-4",
           },
         ]);
       });

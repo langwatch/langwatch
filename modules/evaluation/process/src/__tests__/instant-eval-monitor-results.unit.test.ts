@@ -215,26 +215,24 @@ describe("Instant Evals judge on a monitor, with kept results", () => {
   });
 
   describe("given a thread-level monitor", () => {
-    describe("when its judge call is recalled", () => {
+    describe("when it evaluates a trace's thread with release_instant_eval_results on", () => {
       /** @scenario "A thread-level monitor's judge call never reads or writes eval_results" */
-      it("is not kept, and asks neither the flag nor instant-eval", async () => {
+      it("judges the thread as today and neither recalls nor keeps a result", async () => {
         const results = MemoryEvaluationInstantEvalResultsChannel.create();
         const { judgments, flagReads } = monitorJudgmentsWith({ results });
-
-        const recall = await judgments.recall({
-          projectId: "project-evaluation-test",
-          organizationOf: async () => "organization-1",
-          monitor: { id: "monitor-test", isGuardrail: false, isThreadLevel: true },
-          traceId: "trace-evaluation-test",
-          occurredAt: 0,
-          question: { id: "judge", kind: "boolean", instructions: "Is the reply polite?" },
-          inputs: { input: "where is my order?", output: "it ships tomorrow" },
-          judgeModel: { kind: "langwatch" },
+        const { handler, calls } = buildInstantEvalMonitor({
+          judge: politeJudge,
+          monitorJudgments: judgments,
+          level: "thread",
         });
 
-        expect(recall).toEqual({ kind: "not_kept" });
+        const events = await handler.handle(monitorCommand({ evaluationId: "eval-1" }));
+
+        expect(calls).toHaveLength(1);
+        expect(reportedOf(events)).toMatchObject({ status: "processed", passed: true });
+        expect(results.calls.filter((call) => call.operation === "find")).toEqual([]);
+        expect(results.calls.filter((call) => call.operation === "keep")).toEqual([]);
         expect(flagReads).toEqual([]);
-        expect(results.calls).toEqual([]);
       });
     });
   });

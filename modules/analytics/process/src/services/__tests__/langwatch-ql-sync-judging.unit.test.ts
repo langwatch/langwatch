@@ -417,6 +417,7 @@ describe("LangWatchQLService with an eval function", () => {
       for (const row of result.rows) expect(row).not.toHaveProperty("OccurredAt");
     });
 
+    /** @scenario "A query that projects TraceId but not OccurredAt keeps its trace-level result" */
     it("keeps a time the statement projected itself, in the judged row and the answer", async () => {
       const projected = "2026-11-01 08:00:00.000";
       const { service, asked } = serviceOver({

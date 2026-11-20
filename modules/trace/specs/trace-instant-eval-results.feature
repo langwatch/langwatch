@@ -47,3 +47,16 @@ Feature: The trace drawer shows the Instant Evals results kept on its trace
     When the drawer asks for its Instant Evals results
     Then the read is refused as withheld over plan
     And instant-eval is never asked
+
+  @integration
+  Scenario: The Instant Evals section comes straight after Evals
+    Given release_instant_eval_results is on and the trace holds kept results
+    When the trace summary renders
+    Then the Instant Evals section is the one straight after Evals
+
+  @integration
+  Scenario: A result read from a span opens that span
+    Given a kept result read from one of the trace's spans
+    When the drawer lists it
+    Then it names that span
+    And clicking the span's name opens that span

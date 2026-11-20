@@ -1,6 +1,6 @@
 # trace
 
-Traces: ingestion and canonicalisation of spans, the projections built from them, and the reads, renderings and exports other modules ask for.
+Traces: ingestion and canonicalisation of spans, the projections built from them, and the reads, renderings and exports other modules ask for, including the trace drawer's view of a trace's kept Instant Evals results, read from [instant-eval](../instant-eval/README.md).
 
 <!-- readme:generated:start (tools/readmegen; edit the code, then `pnpm generate:readmes`) -->
 

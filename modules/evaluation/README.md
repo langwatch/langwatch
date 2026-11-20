@@ -1,6 +1,6 @@
 # evaluation
 
-Evaluations: running evaluators against traces, the evaluation runs that record their results, and the evaluator lists peers read.
+Evaluations: running evaluators against traces, the evaluation runs that record their results, and the evaluator lists peers read. With `release_instant_eval_results` on, monitor judgments are also kept in, and recalled from, [instant-eval](../instant-eval/README.md)'s `eval_results`.
 
 <!-- readme:generated:start (tools/readmegen; edit the code, then `pnpm generate:readmes`) -->
 

@@ -1,6 +1,6 @@
 # @langwatch/instant-eval-process
 
-The server half of [instant-eval](../README.md). Instant evaluations: the opt-in, the estimate, and running or cancelling an instant evaluation over sampled data.
+The server half of [instant-eval](../README.md). Instant evaluations: the opt-in, the estimate, and running or cancelling an instant evaluation over sampled data. With `release_instant_eval_results` on, it keeps each trace-linked Instant Evals result (judged, failed or skipped) in ClickHouse `eval_results` and recalls a judged verdict before judging the same text again; that covers results from asks, runs, dashboards and monitors (the monitor write comes from [evaluation](../../evaluation/README.md)), and the trace drawer reads them ([ADR-189](../../../dev/docs/adr/189-instant-eval-result-storage.md)).
 
 <!-- readme:generated:start (tools/readmegen; edit the code, then `pnpm generate:readmes`) -->
 
@@ -158,7 +158,7 @@ findResultsByTrace(input: { projectId: string; traceId: string; /** The trace's 
 
 #### `countUsage`
 
-The usage report's figures (ADR-156, section 10).
+The usage report's figures (ADR-156, section 10), with the judge-call count read from `eval_results` (ADR-189).
 
 ```typescript
 countUsage(input: { projectIds: readonly string[]; since?: number; }): Promise<InstantEvalUsageCount>;

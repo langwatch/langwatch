@@ -3921,6 +3921,7 @@ export class TraceModule implements TraceApi, CollectorApp {
       authorization,
       traceId: input.traceId,
       tenantId,
+      occurredAtMs: input.occurredFrom,
       protections,
     });
     return results.findResultsByTrace({

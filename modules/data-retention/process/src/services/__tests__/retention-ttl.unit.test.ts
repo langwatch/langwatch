@@ -76,6 +76,14 @@ describe("buildRetentionTTLExpression", () => {
         "IF(_retention_days > 0, toDateTime(OccurredAt) + toIntervalDay(_retention_days), toDateTime('2106-01-01')) DELETE",
       );
     });
+
+    it("Instant Evals results anchor retention on their trace's time", () => {
+      const config = TABLE_TTL_CONFIG.find((entry) => entry.table === "eval_results")!;
+      expect(config.retentionTTLColumn).toBe("OccurredAt");
+      expect(buildRetentionTTLExpression(config)).toBe(
+        "IF(_retention_days > 0, toDateTime(OccurredAt) + toIntervalDay(_retention_days), toDateTime('2106-01-01')) DELETE",
+      );
+    });
   });
 
   describe("when retentionTTLColumn is not set", () => {

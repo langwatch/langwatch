@@ -388,6 +388,67 @@ describe("given a failed row and a skipped row for the same key", () => {
   });
 });
 
+describe("given several judged rows of one key", () => {
+  /** Recalls trace-1's "hi" through a query, answering the verdict the query reads. */
+  async function recalledFrom(records: readonly EvalResultRecord[]): Promise<unknown> {
+    const results = new CountingResults();
+    await results.store.insert(records);
+    const { rows } = harness({ results });
+    const judged = await rows.judgeRows({
+      projectId: PROJECT_ID,
+      rows: rowsOf({ "trace-1": "hi" }),
+      questions: [ANNOYED],
+      signal: null,
+      source: ASK,
+    });
+    return judged.rows[0]?.annoyed;
+  }
+
+  describe("when one was judged later and another updated later", () => {
+    it("answers the later judged time over a later update or a greater source id", async () => {
+      const recalled = await recalledFrom([
+        {
+          ...kept({
+            traceId: "trace-1",
+            text: "hi",
+            outcome: { verdict: verdict(0.1) },
+            sourceId: "z",
+          }),
+          UpdatedAt: AT,
+        },
+        kept({
+          traceId: "trace-1",
+          text: "hi",
+          outcome: { verdict: verdict(0.2) },
+          sourceId: "a",
+          judgedAt: AT - 30_000,
+        }),
+      ]);
+
+      expect(recalled).toBe(0.2);
+    });
+  });
+
+  describe("when two were judged in the same millisecond and updated apart", () => {
+    it("answers the later update over a greater source id", async () => {
+      const recalled = await recalledFrom([
+        kept({ traceId: "trace-1", text: "hi", outcome: { verdict: verdict(0.1) }, sourceId: "z" }),
+        {
+          ...kept({
+            traceId: "trace-1",
+            text: "hi",
+            outcome: { verdict: verdict(0.2) },
+            sourceId: "a",
+          }),
+          UpdatedAt: AT - 30_000,
+        },
+      ]);
+
+      expect(recalled).toBe(0.2);
+    });
+  });
+});
+
 describe("given two judged rows of one key judged in the same millisecond", () => {
   describe("when the key is recalled", () => {
     it("answers the row with the greatest source id, whichever was written first", async () => {

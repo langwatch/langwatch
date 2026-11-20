@@ -25,6 +25,7 @@ const tag = randomUUID();
 const tenant = `${tag}-tenant`;
 const other = `${tag}-other`;
 const drawer = `${tag}-drawer`;
+const tied = `${tag}-tied`;
 const now = Date.now();
 const occurredAt = now - 2 * DAY_MS;
 const JUDGE = "langwatch/instant-evals";
@@ -92,13 +93,23 @@ describe.skipIf(!clickHouseUrl)("eval_results (real ClickHouse)", () => {
       row({ TenantId: drawer, Source: "monitor", SourceId: "monitor-1", JudgedColumn: "monitor" }),
       row({ TenantId: drawer, SpanId: "span-x", KeyVersion: EVAL_RESULTS_KEY_VERSION + 1 }),
     ]);
+    await results.insert([
+      row({
+        TenantId: tied,
+        SourceId: "run-x",
+        JudgedAt: now - 2 * DAY_MS,
+        UpdatedAt: now + DAY_MS,
+      }),
+      row({ TenantId: tied, SourceId: "run-y", JudgedAt: now - DAY_MS, UpdatedAt: now }),
+      row({ TenantId: tied, SourceId: "run-z", JudgedAt: now - DAY_MS, UpdatedAt: now - DAY_MS }),
+    ]);
   }, 120_000);
 
   afterAll(async () => {
     if (!ch) return;
     await ch.exec({
       query: "ALTER TABLE eval_results DELETE WHERE TenantId IN ({tenants:Array(String)})",
-      query_params: { tenants: [tenant, other, drawer] },
+      query_params: { tenants: [tenant, other, drawer, tied] },
     });
     await ch.close();
   });
@@ -132,6 +143,24 @@ describe.skipIf(!clickHouseUrl)("eval_results (real ClickHouse)", () => {
         await expect(
           results.countJudged({ projectIds: [tenant], since: now - 2 * DAY_MS }),
         ).resolves.toBe(3);
+      });
+    });
+
+    describe("when two judged rows of the key share a JudgedAt", () => {
+      /** @scenario "Kept results are recalled from ClickHouse by their key" */
+      it("picks the later UpdatedAt where JudgedAt ties, before the greater SourceId", async () => {
+        const recalled = await results.findLatestJudged({
+          tenantId: tied,
+          judgeModel: JUDGE,
+          keyVersion: EVAL_RESULTS_KEY_VERSION,
+          keys: [KEY],
+          occurredFrom: occurredAt - DAY_MS,
+          occurredUntil: occurredAt + DAY_MS,
+        });
+
+        expect(recalled).toEqual([
+          expect.objectContaining({ sourceId: "run-y", judgedAt: now - DAY_MS, updatedAt: now }),
+        ]);
       });
     });
 

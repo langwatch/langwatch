@@ -267,7 +267,10 @@ export interface InstantEvalApi {
     occurredUntil: number;
   }): Promise<InstantEvalTraceResultWire[]>;
 
-  /** The usage report's figures (ADR-156, section 10). */
+  /**
+   * The usage report's figures (ADR-156, section 10), with the judge-call count read from
+   * `eval_results` (ADR-189).
+   */
   countUsage(input: {
     projectIds: readonly string[];
     since?: number;

@@ -35,11 +35,19 @@ const NOT_KEPT: Pick<EvaluationMonitorJudgmentsService, "recall" | "keep"> = {
   keep: async () => undefined,
 };
 
-function traceOf({ projectId, traceId }: { projectId: string; traceId: string }): Trace {
+function traceOf({
+  projectId,
+  traceId,
+  threadId,
+}: {
+  projectId: string;
+  traceId: string;
+  threadId?: string;
+}): Trace {
   return {
     trace_id: traceId,
     project_id: projectId,
-    metadata: {},
+    metadata: threadId === undefined ? {} : { thread_id: threadId },
     input: { value: "where is my order?" },
     output: { value: "it ships tomorrow" },
     timestamps: { started_at: 0, inserted_at: 0, updated_at: 0 },
@@ -54,14 +62,23 @@ export function buildInstantEvalMonitor({
   judgeRouting = { isRouted: async () => false, isHostedOff: async () => false },
   projects = createApiFixture<ProjectApi>({ findOrganizationId: async () => "organization-1" }),
   traceId = "trace-evaluation-test",
+  level = "trace",
 }: {
   judge: Judge;
   monitorJudgments?: Pick<EvaluationMonitorJudgmentsService, "recall" | "keep">;
   judgeRouting?: EvaluationJudgeRouting;
   projects?: Pick<ProjectApi, "findOrganizationId">;
   traceId?: string;
+  /** A thread-level monitor reads its trace's thread, rendered as one conversation. */
+  level?: "trace" | "thread";
 }) {
   const calls: InstantEvalJudgeCall[] = [];
+  const traceRead = () =>
+    traceOf({
+      projectId: INSTANT_EVAL_MONITOR_PROJECT_ID,
+      traceId,
+      ...(level === "thread" ? { threadId: "thread-evaluation-test" } : {}),
+    });
   const execution = EvaluationExecutionService.create({
     runs: { findTraceEvaluations: async () => [] },
     authz: {
@@ -70,12 +87,13 @@ export function buildInstantEvalMonitor({
       },
     },
     traces: {
-      readTracesWithSpans: vi.fn(async () => [
-        traceOf({ projectId: INSTANT_EVAL_MONITOR_PROJECT_ID, traceId }),
-      ]),
-      readThreadsTraces: vi.fn(async () => []),
+      readTracesWithSpans: vi.fn(async () => [traceRead()]),
+      readThreadsTraces: vi.fn(async () => [traceRead()]),
     },
-    spanDigest: { format: vi.fn(async () => ""), formatThread: vi.fn(async () => "") },
+    spanDigest: {
+      format: vi.fn(async () => ""),
+      formatThread: vi.fn(async () => "user: where is my order?\nassistant: it ships tomorrow"),
+    },
     modelEnvResolver: {
       resolveForEvaluator: () => {
         throw new Error("a judge on Instant Evals looks up no model provider");
@@ -109,6 +127,7 @@ export function buildInstantEvalMonitor({
     monitor: buildMonitor({
       checkType: "langevals/llm_boolean",
       parameters: { model: INSTANT_EVAL_JUDGE_MODEL_ID, prompt: "is the reply polite?" },
+      level,
     }),
   });
   const handler = EvaluationExecutionIntentService.create({
