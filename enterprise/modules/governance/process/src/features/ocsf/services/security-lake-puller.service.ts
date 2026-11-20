@@ -63,10 +63,21 @@ export function securityLakeCredentialsOf(
   };
 }
 
+/** AWS throttling codes; some (SQS's RequestThrottled) come back as a 400, yet they pass. */
+const AWS_THROTTLING_ERRORS: ReadonlySet<string> = new Set([
+  "RequestThrottled",
+  "Throttling",
+  "ThrottlingException",
+  "ThrottledException",
+  "TooManyRequestsException",
+  "RequestLimitExceeded",
+  "SlowDown",
+]);
+
 /**
  * A failed run as the pull runner reads it: a 4xx from AWS or a missing key is the customer's to
- * fix, so it is refused rather than retried. The message keeps only the error code, since AWS's
- * own text can name our principals; the original error stays as the cause.
+ * fix, so it is refused rather than retried, throttling aside. The message keeps only the error
+ * code, since AWS's own text can name our principals; the original error stays as the cause.
  */
 function securityLakeRunFailure(error: unknown): DispatchError {
   const customerMessage = describeAwsFailure(error);
@@ -74,7 +85,9 @@ function securityLakeRunFailure(error: unknown): DispatchError {
   const setupMissing =
     error instanceof MissingStaticAwsCredentialsError ||
     error instanceof MissingSecurityLakeExternalIdError;
-  const retryable = !setupMissing && (status === undefined || isRetryableHttpStatus(status));
+  const throttled = error instanceof Error && AWS_THROTTLING_ERRORS.has(error.name);
+  const retryable =
+    !setupMissing && (throttled || status === undefined || isRetryableHttpStatus(status));
   return new DispatchError({
     message: customerMessage,
     retryable,
