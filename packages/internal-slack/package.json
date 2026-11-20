@@ -23,7 +23,7 @@
   },
   "dependencies": {
     "@langwatch/time": "workspace:*",
-    "@slack/types": "^2.21.1",
+    "@slack/types": "^3.2.0",
     "zod": "catalog:"
   },
   "devDependencies": {
