@@ -210,6 +210,9 @@ const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
   SigningKey: {},
   // ADR-201 §2: an organization's braid setting, one row keyed by organizationId.
   AuthzOrganizationPolicy: {},
+  // ADR-201 §1: the braid writes the authz service sent; every read and write names its
+  // organization.
+  AuthzBraidWrite: {},
   // A request to join one organization (D12), read by organization or row id,
   // plus one READ bounded by subject: "what am I waiting on" spans every
   // organization one named user asked. Writes keyed on userId stay refused.
@@ -263,6 +266,13 @@ const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
   AgentRegistryEntry: {},
   AgentRegistryEvent: {},
   AgentRegistryBaseline: {},
+  // The kill switch: stop plans, AWS connections and stops, each read and written per organization.
+  AgentStopPlanTarget: {},
+  AgentStopPlan: {},
+  GovernanceAwsConnection: {},
+  AgentStop: {},
+  AgentStopClaim: {},
+  AgentStopTargetPriorState: {},
   IdentityMatch: {},
   // Candidate matches the suggestion job computed (ADR-128 §12). The job
   // rewrites one organization's rows per pass and the review surface reads one

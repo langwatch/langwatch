@@ -369,6 +369,7 @@ export class AuthzModule implements AuthzApi {
       reads: repositories.ledgerReads,
       lineage: repositories.read,
       locks: repositories.braidLocks,
+      writes: repositories.braidWrites,
       epoch,
       permissions,
     });
@@ -394,6 +395,7 @@ export class AuthzModule implements AuthzApi {
     const braidRelease = AuthzBraidReleaseService.create({
       flags: channels.flags,
       lineage: repositories.read,
+      policies: repositories.organizationPolicies,
     });
     const sessionVersions = AuthzSessionVersionService.create({
       versions: repositories.sessionVersions,
@@ -712,14 +714,10 @@ export class AuthzModule implements AuthzApi {
     return this.#memberships;
   }
 
-  // Braid management asks `release_braids` first. General reads peers ask (trace reads list
-  // braids) do not, and nor does removing a braid, which only narrows access; the screen's
-  // routes call the `*ForScreen` twins. modules/authz/specs/braids-release-flag.feature
+  // Braid management asks `release_braids`, then the organisation's Braids setting. Listing and
+  // removing ask neither, so an admin can find and end a braid (Alex, 2026-11-18); the screen's
+  // other reads call the `*ForScreen` twins. modules/authz/specs/braids-release-flag.feature
   listBraids: AuthzApi["listBraids"] = (a) => this.braids().listBraids(a);
-  listBraidsForScreen: AuthzApi["listBraidsForScreen"] = async (a) => {
-    await this.braidRelease().assertEnabledForProject(a);
-    return this.braids().listBraids(a);
-  };
   createBraid: AuthzApi["createBraid"] = async (a) => {
     await this.braidRelease().assertEnabledForProject(a);
     return this.braids().createBraid(a);
@@ -733,10 +731,8 @@ export class AuthzModule implements AuthzApi {
   recordBraidedSpansView: AuthzApi["recordBraidedSpansView"] = (a) =>
     this.braidedReads().recordBraidedSpansView(a);
 
-  listOrganizationBraids: AuthzApi["listOrganizationBraids"] = async (a) => {
-    await this.braidRelease().assertEnabledForOrganization(a);
-    return this.braids().listOrganizationBraids(a);
-  };
+  listOrganizationBraids: AuthzApi["listOrganizationBraids"] = (a) =>
+    this.braids().listOrganizationBraids(a);
   countProjectMembersHolding: AuthzApi["countProjectMembersHolding"] = (a) =>
     this.projectMembers().countProjectMembersHolding(a);
   /** The braid dialog's "<n> people will see these spans". */
@@ -746,20 +742,26 @@ export class AuthzModule implements AuthzApi {
     await this.braidRelease().assertEnabledForProject(a);
     return this.projectMembers().countProjectMembersHolding(a);
   };
+  /** The braid dialog's reads another module answers ask this first (`traces.braidPreview`). */
+  assertBraidsReleased: AuthzApi["assertBraidsReleased"] = (a) =>
+    this.braidRelease().assertEnabledForProject(a);
   listBraidTargets: AuthzApi["listBraidTargets"] = async (a) => {
     await this.braidRelease().assertEnabledForProject(a);
     return this.braidTargets().listBraidTargets(a);
   };
   getOrganizationPolicy: AuthzApi["getOrganizationPolicy"] = (a) =>
     this.organizationPolicies().getOrganizationPolicy(a);
-  /** The Braids screen's "who may braid" setting. */
-  getOrganizationPolicyForScreen: AuthzApi["getOrganizationPolicyForScreen"] = async (a) => {
-    await this.braidRelease().assertEnabledForOrganization(a);
-    return this.organizationPolicies().getOrganizationPolicy(a);
-  };
+  /** The Braids screen's settings, read while the release is off so Braids can be turned off. */
+  getOrganizationPolicyForScreen: AuthzApi["getOrganizationPolicyForScreen"] = (a) =>
+    this.organizationPolicies().getOrganizationPolicy(a);
   setBraidsPolicy: AuthzApi["setBraidsPolicy"] = async (a) => {
-    await this.braidRelease().assertEnabledForOrganization(a);
+    await this.braidRelease().assertReleasedForOrganization(a);
     return this.organizationPolicies().setBraidsPolicy(a);
+  };
+  /** Turning Braids off only narrows reads, so it is answered while the release is off too. */
+  setBraidsEnabled: AuthzApi["setBraidsEnabled"] = async (a) => {
+    if (a.braidsEnabled) await this.braidRelease().assertReleasedForOrganization(a);
+    return this.organizationPolicies().setBraidsEnabled(a);
   };
 
   private braidRelease(): AuthzBraidReleaseService {

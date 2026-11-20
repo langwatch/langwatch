@@ -155,21 +155,21 @@ images:
   ## @param images.app.pullPolicy [string] App image pull policy.
   app:
     repository: langwatch/langwatch
-    tag: 3.23.0 # x-release-please-version
+    tag: 3.25.0 # x-release-please-version
     pullPolicy: IfNotPresent
   ## @param images.langwatch_nlp.repository [string] NLP image repository (Go nlpgo binary, published as langwatch_nlp).
   ## @param images.langwatch_nlp.tag [string] NLP image tag.
   ## @param images.langwatch_nlp.pullPolicy [string] NLP image pull policy.
   langwatch_nlp:
     repository: langwatch/langwatch_nlp
-    tag: 3.23.0 # x-release-please-version
+    tag: 3.25.0 # x-release-please-version
     pullPolicy: IfNotPresent
   ## @param images.langevals.repository [string] Langevals image repository.
   ## @param images.langevals.tag [string] Langevals image tag.
   ## @param images.langevals.pullPolicy [string] Langevals image pull policy.
   langevals:
     repository: langwatch/langevals
-    tag: 3.23.0 # x-release-please-version
+    tag: 3.25.0 # x-release-please-version
     pullPolicy: IfNotPresent
 
 # =============================================================================
@@ -369,6 +369,7 @@ app:
   ## @param app.dataplane.enabled [default: false] Enable dataset object storage.
   ## @param app.dataplane.provider [string, default: awsS3] Object storage provider. Options: awsS3, azureBlob.
   ## @param app.dataplane.bucket [string, default: langwatch-dataset] Bucket name for datasets (awsS3 provider).
+  ## @param app.dataplane.uploads [string, default: ""] Where browsers and SDKs send upload bytes, rendered as STORED_OBJECTS_UPLOADS: direct (the bucket's endpoint, the default when empty) or through-langwatch (LangWatch's signed upload route, for a bucket only reachable inside the cluster).
   dataplane:
     enabled: false
     # Storage provider to use. Options: awsS3 (default), azureBlob.
@@ -378,6 +379,13 @@ app:
     # by providers.azureBlob.authMode; mirrors the awsS3 shape.
     provider: awsS3
     bucket: "langwatch-dataset" # Bucket name for dataset storage
+    # Where clients send upload bytes. Empty or `direct`: browsers and SDKs PUT
+    # straight to the bucket's endpoint, so that endpoint must be reachable from
+    # them, with a CORS rule for the app's origin. `through-langwatch`: they PUT
+    # to LangWatch, which streams the bytes into the bucket; use it when the
+    # bucket is only reachable inside the cluster. With ingress.className nginx
+    # the chart routes that path through its own Ingress (see ingress.uploads).
+    uploads: ""
 
     # Provider-specific configurations
     providers:
@@ -1755,6 +1763,21 @@ ingress:
     ## @param ingress.gateway.annotations [object] Annotations for the gateway Ingress only, applied over ingress.annotations and the nginx defaults.
     annotations: {}
 
+  # Upload route on the app hosts. The chart renders a second Ingress,
+  # `<release>-uploads-ingress`, routing /api/stored-objects/uploads (Prefix)
+  # on every ingress.hosts host to the app Service, with ingress.annotations
+  # (minus rewrites and the host-scoped server-snippet). A host whose own
+  # paths already route exactly /api/stored-objects/uploads is left out. When className
+  # contains "nginx" it adds request buffering off, a 5121m body limit (the
+  # 5 GiB upload limit and headroom) and 3600s read/send timeouts: nginx's 1m
+  # default on the app Ingress would refuse almost every file. Other classes
+  # get only ingress.uploads.annotations on top.
+  uploads:
+    ## @param ingress.uploads.enabled [nullable] Render the uploads Ingress. Unset: on when ingress.className is nginx. true: on for any class (an empty default class, nginx-internal). false: off.
+    enabled: null
+    ## @param ingress.uploads.annotations [object] Annotations for the uploads Ingress only, applied over ingress.annotations and the nginx upload defaults.
+    annotations: {}
+
 # =============================================================================
 # System Dependencies Configuration
 # =============================================================================
@@ -2178,7 +2201,7 @@ clickhouse:
   # ClickHouse; rotate a live secret with `kubectl rollout restart statefulset`.
   ## @param clickhouse.podAnnotations [object] Annotations on the ClickHouse pod template (carries the LWQL catalog version so upgrades re-mount the access Secret).
   podAnnotations:
-    langwatch.com/lwql-access-catalog: "3.23.0" # x-release-please-version
+    langwatch.com/lwql-access-catalog: "3.25.0" # x-release-please-version
 
 # =============================================================================
 # LangWatchQL (LWQL) Configuration

@@ -62,6 +62,13 @@ Rule: The page lists my sessions with their context economics
     Then each session is one row
     And the row shows its peak context, compactions, cache rebuilds and waiting time
 
+  @integration
+  Scenario: Active and waiting time, and compactions and cache rebuilds, share one text size
+    Given a session that both worked and waited, and both compacted and rebuilt its cache
+    When the user opens their Sessions page
+    Then its active and waiting time read at the same text size
+    And its compactions and cache rebuilds read at the same text size
+
   @unit
   Scenario: A viewer who may not price the project reads its sessions without their cost
     Given a viewer without permission to price the project
@@ -208,6 +215,43 @@ Rule: The session's own name outranks every derived title
     When a later context record carries a whitespace name
     Then the row keeps the name it already had
 
+  # A launcher that runs the agent itself (a hosted agent platform, a CI job)
+  # may not run a LangWatch capture hook at all. It names its sessions the
+  # OpenTelemetry way instead: OTEL_RESOURCE_ATTRIBUTES carries
+  # langwatch.session.name, and every record the agent exports carries it too.
+
+  @unit
+  Scenario: A launcher names its sessions through the resource attributes
+    Given an agent launched with langwatch.session.name "Scout" in OTEL_RESOURCE_ATTRIBUTES
+    When one of its prompt events arrives
+    Then the record contributes the name "Scout"
+
+  @unit
+  Scenario: A name on the record itself outranks the resource's name
+    Given an agent launched with langwatch.session.name "Scout" in OTEL_RESOURCE_ATTRIBUTES
+    When a record arrives that carries the name "pr-reviewer" itself
+    Then the record contributes the name "pr-reviewer"
+
+  @unit
+  Scenario: A blank resource name names nothing
+    Given an agent launched with a whitespace langwatch.session.name
+    When one of its prompt events arrives
+    Then the record contributes no name
+
+  @unit
+  Scenario: Any record that carries a name names the session
+    Given a session with no context record
+    When a prompt event arrives carrying the name "Scout" and the first line "## Your skills"
+    Then the row wears the name "Scout"
+    And a later generated title does not replace it
+
+  @unit
+  Scenario: A launcher's name does not undo a harness rename
+    Given a session named "Scout" by its launcher
+    When a context record renames it "pr-reviewer"
+    And a later prompt event still carries the launcher's name "Scout"
+    Then the row keeps the name "pr-reviewer"
+
   @unit
   Scenario: The session's own name is the title the list shows
     Given a stored session row named by its harness
@@ -299,6 +343,20 @@ Rule: Clicking a session replays it in the terminal
     Then the session's terminal replay opens
 
   @integration
+  Scenario: A session whose traces are filed under its launcher's thread still replays
+    Given a session launched by a tool that names each trace's conversation after its own thread
+    When the user chooses its row
+    Then the session's latest stored trace opens in the terminal replay
+    And the reader is not told that nothing was stored
+
+  @unit
+  Scenario: The session's latest stored trace is found through its own trace map
+    Given a session whose traces were mapped to it as they arrived
+    When the latest turn of the session is asked for
+    Then the newest mapped trace is answered with the time it occurred
+    And a session with no mapped trace answers nothing
+
+  @integration
   Scenario: Leaving the replay returns to the table as it was
     Given an open terminal replay reached from the table
     When the user closes it
@@ -349,6 +407,41 @@ Rule: A session can be replayed from wherever it is listed
     When the user chooses it
     Then they are told the session stored none of its turns
     And no replay opens
+
+Rule: A link can open a session's replay on the Sessions page
+
+  Another tool (Laze's Investigate button) links straight to one session. The
+  link adds `session=<id>`, or `sessionName=<name>` for the newest session with
+  that name, to `/<project>/sessions`. It combines with `langy=open` and
+  `langyPrompt=<text>` to have Langy ready with a question about the session.
+
+  @integration
+  Scenario: A session link opens that session's terminal replay
+    Given a listed session "session-1"
+    When the user opens the Sessions page with "session=session-1"
+    Then the session's terminal replay opens
+    And the address no longer has "session"
+
+  @integration
+  Scenario: A session name link opens the newest session with that name
+    Given two listed sessions named "Scout", the newer one updated last
+    When the user opens the Sessions page with "sessionName=Scout"
+    Then the newer session's terminal replay opens
+
+  @integration
+  Scenario: A link to a session that is not listed says so
+    Given no listed session is named "Ghost"
+    When the user opens the Sessions page with "sessionName=Ghost"
+    Then they are told the session is not listed here
+    And no replay opens
+    And the address no longer has "sessionName"
+
+  @unit
+  Scenario: A session link keeps the Langy question beside it
+    Given a link with "session=session-1", "langy=open" and "langyPrompt=Why so many tokens?"
+    When the session link is applied
+    Then only "session" is removed from the address
+    And "langy" and "langyPrompt" stay for Langy to apply
 
 Rule: A helper thread the agent ran for itself is not a session
 

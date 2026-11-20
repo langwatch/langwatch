@@ -65,6 +65,12 @@ export const codingAgentTrpcTransport: TrpcRouterDeclaration<
     app.findSessionForTrace({ projectId: input.projectId, traceId: input.traceId }),
   )
 
+  .procedure("lastTurn")
+  .withPermission(CODING_AGENT_PERMISSION)
+  .handle(({ app, input }) =>
+    app.findLastTurnOfSession({ projectId: input.projectId, sessionId: input.sessionId }),
+  )
+
   .procedure("transcript")
   .withPermission(CODING_AGENT_PERMISSION)
   .handle(({ app, input, actor, authorization }) =>

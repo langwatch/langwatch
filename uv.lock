@@ -2982,7 +2982,7 @@ wheels = [
 
 [[package]]
 name = "langwatch"
-version = "1.4.0"
+version = "2.0.1"
 source = { editable = "sdks/python" }
 dependencies = [
     { name = "attrs" },

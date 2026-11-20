@@ -97,6 +97,10 @@ export type NavigationApiMap = ContractApiMap<typeof identityTrpc> & {
             type?: string;
             free: boolean;
             maxMessagesPerMonth: number;
+            /** A failed payment's banner outranks the seat banner while this is true. */
+            paymentFailed?: boolean;
+            /** Set while the organization is over its plan and new traces are withheld. */
+            overPlan?: { sinceMs: number; members: number; maxMembers: number } | null;
           };
           currentMonthMessagesCount: number | null;
           currentMonthCost: number;

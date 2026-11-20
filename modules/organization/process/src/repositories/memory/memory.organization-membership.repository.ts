@@ -19,6 +19,7 @@ import {
   type User,
   type OrganizationAdmission,
   auditImpersonationMetadataSchema,
+  auditTargetNameMetadataSchema,
   ORGANIZATION_KIND,
   PricingModel,
 } from "@langwatch/organization-contract";
@@ -1028,6 +1029,7 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
       source: isGateway ? "gateway" : "platform",
       targetKind: row.targetKind,
       targetId: row.targetId,
+      targetName: auditTargetNameMetadataSchema.safeParse(row.metadata).data?.targetName ?? null,
       before: row.before,
       after: row.after,
       actorUserId,

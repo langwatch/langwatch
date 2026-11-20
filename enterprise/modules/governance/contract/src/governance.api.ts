@@ -107,6 +107,23 @@ import type {
   QuarantineFillInput,
   QuarantineFillStats,
 } from "./features/ingestion/quarantine-fill.ts";
+import type {
+  AgentKillSwitchSummary,
+  AgentStopCaller,
+  AgentStopPage,
+  AgentStopPlan,
+  AgentStopSeverity,
+  AgentStopStatus,
+  AgentStopTarget,
+  AgentStopView,
+  AwsConnectionInput,
+  AwsConnectionView,
+} from "./features/kill-switch/agent-kill-switch.ts";
+import type {
+  OcsfEventsPage,
+  OcsfIngestRequest,
+  OcsfIngestResponse,
+} from "./features/ocsf/ocsf-siem.ts";
 import type { PersonaResolution } from "./features/personal/persona-home.ts";
 import type { GovernanceBudgetOverviewForUser } from "./features/personal/personal-budget-overview.ts";
 import type {
@@ -504,6 +521,113 @@ export interface GovernanceRestApi {
     organizationId: string;
     request: ArdSearchRequest;
   }): Promise<ArdSearchResponse>;
+
+  // The agent kill switch (specs/agent-kill-switch.feature).
+  findAgentKillSwitchSummaries(input: {
+    organizationId: string;
+  }): Promise<AgentKillSwitchSummary[]>;
+  findPendingAgentStops(input: { organizationId: string }): Promise<AgentStopView[]>;
+  /** Throws `agent_registry_entry_not_found` for an agent outside the organisation. */
+  getAgentStopPlan(input: { organizationId: string; agentId: string }): Promise<AgentStopPlan>;
+  /**
+   * Throws `agent_stop_target_invalid` for a target the organisation does not hold, and
+   * `agent_stop_plan_conflict` when `expectedVersion` is given and the plan was saved since.
+   * Writes one audit row naming the agent and `caller`, refused saves included.
+   */
+  setAgentStopPlan(input: {
+    organizationId: string;
+    agentId: string;
+    targets: readonly AgentStopTarget[];
+    expectedVersion?: number;
+    caller: AgentStopCaller;
+  }): Promise<AgentStopPlan>;
+  findAwsConnections(input: { organizationId: string }): Promise<AwsConnectionView[]>;
+  /** Writes an audit row naming `userId`, the person who added it. */
+  createAwsConnection(input: {
+    organizationId: string;
+    connection: AwsConnectionInput;
+    userId: string | null;
+    /** The operator behind an impersonated person, recorded beside `userId`. */
+    impersonatorId?: string;
+  }): Promise<AwsConnectionView>;
+  /**
+   * Throws `governance_aws_connection_in_use` while a plan target or unrestored stop uses it; a
+   * delete that removed a connection writes an audit row naming `userId`.
+   */
+  deleteAwsConnection(input: {
+    organizationId: string;
+    connectionId: string;
+    userId: string | null;
+    /** The operator behind an impersonated person, recorded beside `userId`. */
+    impersonatorId?: string;
+  }): Promise<{ deleted: boolean }>;
+  requestAgentStop(input: {
+    organizationId: string;
+    agentId: string;
+    reason: string;
+    severity: AgentStopSeverity;
+    /** Throws `agent_stop_plan_changed` when given and the plan no longer holds exactly these. */
+    expectedTargetIds?: readonly string[];
+    caller: AgentStopCaller;
+  }): Promise<AgentStopView>;
+  approveAgentStop(input: {
+    organizationId: string;
+    stopId: string;
+    note?: string;
+    /** Throws `agent_stop_plan_changed` when given and the stop no longer holds exactly these. */
+    expectedTargetIds?: readonly string[];
+    caller: AgentStopCaller;
+  }): Promise<AgentStopView>;
+  denyAgentStop(input: {
+    organizationId: string;
+    stopId: string;
+    note?: string;
+    caller: AgentStopCaller;
+  }): Promise<AgentStopView>;
+  restoreAgentStop(input: {
+    organizationId: string;
+    stopId: string;
+    caller: AgentStopCaller;
+  }): Promise<AgentStopView>;
+  /**
+   * Applies again every target the stop has not stopped, plus plan targets added since; throws
+   * `agent_stop_not_retryable` unless the stop is quarantined, stop_failed or restore_failed.
+   */
+  retryAgentStop(input: {
+    organizationId: string;
+    stopId: string;
+    caller: AgentStopCaller;
+  }): Promise<AgentStopView>;
+  /** The agent's latest stop; throws `agent_stop_not_found` when it was never stopped. */
+  getLatestAgentStop(input: { organizationId: string; agentId: string }): Promise<AgentStopView>;
+  /** Latest request first, `limit` at a time; a cursor it never returned is a validation error. */
+  listAgentStops(input: {
+    organizationId: string;
+    statuses?: readonly AgentStopStatus[];
+    limit: number;
+    cursor?: string;
+  }): Promise<AgentStopPage>;
+  /** The organisation's governance events as OCSF 1.9.0, after the cursor. */
+  listOcsfEvents(
+    input: OcsfExportWindow & { sourceType?: string; sourceId?: string },
+  ): Promise<OcsfEventsPage>;
+  /** The organisation's project traces as OCSF 1.9.0, one event per trace. */
+  listOcsfProjectTraces(input: OcsfExportWindow & { projectId?: string }): Promise<OcsfEventsPage>;
+  /** The organisation's audit log as OCSF 1.9.0, oldest first. */
+  listOcsfAudit(input: OcsfExportWindow): Promise<OcsfEventsPage>;
+  /** Stores OCSF events another source sent; one row per (source, metadata.uid). */
+  ingestOcsfEvents(
+    input: OcsfIngestRequest & { organizationId: string },
+  ): Promise<OcsfIngestResponse>;
 }
+
+/** The window and cursor every OCSF export stream takes. */
+export type OcsfExportWindow = {
+  organizationId: string;
+  limit: number;
+  since?: string;
+  until?: string;
+  cursor?: string;
+};
 
 export const GovernanceRestApi = moduleApi<GovernanceRestApi>()("governance");

@@ -62,6 +62,7 @@ const JUDGE_LIMITS: ReturnType<InstantEvalApi["getJudgeLimits"]> = {
   fitBytesPerInputToken: 2,
   transcriptFitBytesPerInputToken: 2.4,
   retryBytesPerInputToken: 1.5,
+  requestOverheadTokens: 50,
 };
 
 /** The fit the annoyed question leaves under {@link JUDGE_LIMITS}. */

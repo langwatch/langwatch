@@ -252,6 +252,14 @@ What the PROJECT itself may see, with nobody asking — what a job judging that 
 resolveApiKeyRunCaller(input: Readonly<{ projectId: string }>): Promise<LangWatchQLCaller>;
 ```
 
+#### `ensureLwqlKeyMapRow`
+
+Whether the project's LangWatchQL key-map row is there, written first when missing. False when it cannot be, so a caller refuses instead of reading zero rows; never throws.
+
+```typescript
+ensureLwqlKeyMapRow(input: Readonly<{ projectId: string }>): Promise<boolean>;
+```
+
 ## REST transport
 
 ### `analyticsLegacyRest`

@@ -28,6 +28,7 @@ import type { MediaProbeResult } from "@langwatch/scenario-contract";
 import type { ShareLink, ShareResourceType, ShareVisibility } from "@langwatch/share-contract";
 import { type TimeInput } from "@langwatch/time";
 import type {
+  AgentCallGraph,
   AiActionResult,
   ChangeTraceNameCommand,
   ChangeTraceNameResult,
@@ -238,6 +239,7 @@ export type TraceApiMap = {
 
     /** Every span in the trace, in full. */
     spansFull: { query: { input: TraceScope & SpanReadHint; output: SpanDetail[] } };
+    agentCallGraph: { query: { input: TraceScope & SpanReadHint; output: AgentCallGraph } };
 
     /** One span, in full. */
     spanDetail: {
