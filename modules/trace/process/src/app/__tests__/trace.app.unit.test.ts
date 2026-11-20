@@ -499,6 +499,56 @@ describe("TraceModule", () => {
           app.readInstantEvalResults({ ...read, authorization: aggregate() }),
         ).resolves.toEqual([]);
       });
+
+      describe("given a plan that withholds the trace", () => {
+        const withheldFrom = (withheldFromMs: number | null) => ({
+          ...VISIBLE,
+          withheldFromMs,
+          overPlan: { members: 5, maxMembers: 2 },
+        });
+
+        async function withholdingHarness({ withheldFromMs }: { withheldFromMs: number | null }) {
+          const instantEvalResults = MemoryTraceInstantEvalResultsChannel.create();
+          instantEvalResults.results.push(keptResult(SELLER));
+          const findResultsByTrace = vi.spyOn(instantEvalResults, "findResultsByTrace");
+          const repository = MemoryTraceSummaryRepository.create();
+          await repository.upsert(
+            { ...summaryRow(false), traceId: "trace-1", occurredAt: 1_500 },
+            SELLER,
+          );
+          const { app } = harness({
+            summary: TraceSummaryService.create({ repository }),
+            instantEvalResults,
+          });
+          vi.spyOn(app, "resolveViewerProtections").mockResolvedValue(
+            withheldFrom(withheldFromMs),
+          );
+          return { app, findResultsByTrace };
+        }
+
+        /** @scenario "A trace the viewer's plan withholds shows no Instant Evals results" */
+        it("refuses the read and never asks instant-eval", async () => {
+          const { app, findResultsByTrace } = await withholdingHarness({ withheldFromMs: 1_000 });
+
+          await expect(
+            app.readInstantEvalResults({ ...read, tenantId: SELLER, authorization: aggregate() }),
+          ).rejects.toMatchObject({ code: "trace_withheld_over_plan" });
+          expect(findResultsByTrace).not.toHaveBeenCalled();
+        });
+
+        /** @scenario "A trace the viewer's plan withholds shows no Instant Evals results" */
+        it("still answers the results of a trace the plan does not withhold", async () => {
+          const { app } = await withholdingHarness({ withheldFromMs: null });
+
+          const results = await app.readInstantEvalResults({
+            ...read,
+            tenantId: SELLER,
+            authorization: aggregate(),
+          });
+
+          expect(results.map((result) => result.sourceId)).toEqual([`widget-${SELLER}`]);
+        });
+      });
     });
 
     describe("given protections that hide captured content", () => {

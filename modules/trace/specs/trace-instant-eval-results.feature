@@ -40,3 +40,10 @@ Feature: The trace drawer shows the Instant Evals results kept on its trace
     When the drawer lists them
     Then a boolean reads as its likelihood, a score as its number and a category as its name
     And a failed result reads as could not judge and a skipped one as skipped
+
+  @unit
+  Scenario: A trace the viewer's plan withholds shows no Instant Evals results
+    Given a trace the viewer's plan withholds
+    When the drawer asks for its Instant Evals results
+    Then the read is refused as withheld over plan
+    And instant-eval is never asked

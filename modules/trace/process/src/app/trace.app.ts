@@ -3915,8 +3915,14 @@ export class TraceModule implements TraceApi, CollectorApp {
     if (!results) {
       throw new TraceCapabilityUnavailableError("this process", "the Instant Evals results read");
     }
-    const { tenantId } = await this.#readTraceMember(input);
+    const { tenantId, protections, authorization } = await this.#readTraceMember(input);
     if (tenantId === undefined) return [];
+    await this.assertTraceNotWithheld({
+      authorization,
+      traceId: input.traceId,
+      tenantId,
+      protections,
+    });
     return results.findResultsByTrace({
       projectId: tenantId,
       traceId: input.traceId,
