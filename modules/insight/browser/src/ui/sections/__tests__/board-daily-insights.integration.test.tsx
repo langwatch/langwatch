@@ -1089,6 +1089,30 @@ describe("given a member turned a board's daily run on, and may ask Langy", () =
       expect(board.host.notices).toEqual([]);
     });
 
+    /** @scenario "A read that lands a run's lifetime after the deadline gives no verdict" */
+    it("says nothing and opens nothing when a read that lands that late shows a run", async () => {
+      let read: InsightDailyRunSetting | Promise<InsightDailyRunSetting> = ON;
+      const board = openBoard({
+        setting: () => read,
+        host: ASKER,
+        write: () => runNowAnswer(),
+      });
+      await aMinuteBeforeTheDeadline(board);
+
+      read = new Promise<InsightDailyRunSetting>(() => void 0);
+      await vi.advanceTimersByTimeAsync(60_000);
+      await waitFor(() => expect(board.reads()).toHaveLength(READS_BEFORE_DEADLINE + 1));
+      await vi.advanceTimersByTimeAsync(INSIGHT_DAILY_RUN_EXPIRY_MS + 1_000);
+
+      read = RUNNING;
+      await board.readHint();
+      await vi.advanceTimersByTimeAsync(1_000);
+
+      expect(board.host.queries).toEqual([]);
+      expect(board.host.failures).toEqual([]);
+      expect(board.host.notices).toEqual([]);
+    });
+
     /** @scenario "A run that started after the deadline gives no verdict" */
     it("says nothing and opens nothing when a hint's read shows a scheduled run that started after the deadline", async () => {
       let read: InsightDailyRunSetting | Promise<InsightDailyRunSetting> = ON;

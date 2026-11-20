@@ -63,9 +63,24 @@ function ownLastRunOf(
 ): InsightDailyRunSetting["lastRun"] {
   const { runId, lastRun } = newestLastRunOf(state, started);
   if (lastRun === null || runId === null) return null;
-  const { startedAt } = started;
-  const ownStart = started.runId === runId && startedAt !== null;
-  return { ...lastRun, runId, ...(ownStart ? { startedAt } : {}) };
+  const startedAt =
+    started.runId === runId ? started.startedAt : pickSettledStart({ started, runId });
+  return { ...lastRun, runId, ...(startedAt == null ? {} : { startedAt }) };
+}
+
+/**
+ * The start an outcome carried, for a run that settled after a newer one started and so is no
+ * longer the row's run in flight; undefined when the row's last settled run is another.
+ */
+function pickSettledStart({
+  started,
+  runId,
+}: {
+  started: InsightRunInFlightState;
+  runId: string;
+}): number | undefined {
+  if (started.lastSettledRunId !== runId) return undefined;
+  return started.lastSettledRunSince ?? undefined;
 }
 
 /**

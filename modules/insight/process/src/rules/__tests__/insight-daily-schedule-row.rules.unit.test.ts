@@ -115,6 +115,21 @@ describe("given a run in flight row that kept its settled run's start", () => {
   });
 });
 
+describe("given a run in flight row that took a run's outcome after a newer run started", () => {
+  /** @scenario "A settled run keeps when it started on the board's row" */
+  it("reads the settled run's start from its outcome, not the newer run's", () => {
+    const setting = settingBeside({
+      runId: "run-2",
+      conversationId: "conversation-2",
+      startedAt: SETTLED_AT + 1_000,
+      ...outcomeOf({ runId: "run-1", filed: 1 }),
+      lastSettledRunSince: STARTED_AT,
+    });
+
+    expect(setting.lastRun).toMatchObject({ runId: "run-1", startedAt: STARTED_AT });
+  });
+});
+
 describe("given a run in flight row whose last started run has not settled", () => {
   it("names that run in flight, and takes none of its start for the last run", () => {
     const setting = settingBeside({
