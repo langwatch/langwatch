@@ -4,9 +4,10 @@
  * @see enterprise/modules/nurturing/specs/coding-agent-signals.feature
  */
 import type { CioBatchCall, NurturingSignalOf } from "@langwatch/enterprise-nurturing-contract";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { CustomerIoChannel } from "../../channels/customer-io.channel.ts";
+import { HttpCustomerIoChannel } from "../../channels/http/http.customer-io.channel.ts";
 import { MemoryNurturingClaimRepository } from "../../repositories/memory/memory.nurturing.repositories.ts";
 import { NurturingOwnCodingDeliveryService } from "../nurturing-own-coding-delivery.service.ts";
 import { NurturingService } from "../nurturing.service.ts";
@@ -70,6 +71,26 @@ describe("NurturingOwnCodingDeliveryService", () => {
         userId: "owner-1",
         traits: { own_coding_first_session_at: Math.floor(T0 / 1000) },
       });
+    });
+  });
+
+  describe("when the real HTTP channel gets a 500 on batchOrThrow", () => {
+    it("still gives the first-session claim back and does not throw", async () => {
+      const claims = MemoryNurturingClaimRepository.create();
+      const fetchFn = vi.fn().mockResolvedValue({ ok: false, status: 500 });
+      const delivery = NurturingOwnCodingDeliveryService.create({
+        claims,
+        customerIo: NurturingService.create({
+          channel: HttpCustomerIoChannel.create({
+            config: { customerIoApiKey: "key" },
+            fetchFn,
+          }),
+        }),
+      });
+
+      await expect(delivery.deliver(ownSession)).resolves.toBeUndefined();
+
+      expect(await claims.claim(FIRST_CLAIM, 60)).toBe(true);
     });
   });
 
