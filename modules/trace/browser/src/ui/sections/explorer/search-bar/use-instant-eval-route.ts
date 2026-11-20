@@ -21,6 +21,7 @@ import { type RefObject, useCallback, useRef, useState } from "react";
 
 import { useFilterStore, useViewStore } from "../../../../behavior/explorer.store.ts";
 import { api } from "../../../../behavior/trace-api.ts";
+import { useInstantEvalRunStore } from "../../../../features/instant-eval/behavior/instant-eval-run.store.ts";
 import type { InstantEvalRoutePayload } from "../../../../model/instant-eval-route.ts";
 import { explainAnyError } from "../../errors/index.ts";
 import type { InstantEvalConfirmation } from "../instant-eval-confirm-dialog.tsx";
@@ -225,7 +226,13 @@ function useInstantEvalOutcome(): {
     pendingRef.current = null;
     setConfirmation(null);
     setRefusal(null);
-    if (pending) applyQueryText(pending.payload.fallbackQuery);
+    if (!pending) return;
+    // Declined or closed, as Skip: a saved bare chip on the question keeps its older meaning.
+    useInstantEvalRunStore.getState().unmarkTyped({
+      projectId: useFilterStore.getState().projectId ?? "",
+      question: pending.payload.question.instructions,
+    });
+    applyQueryText(pending.payload.fallbackQuery);
   }, [applyQueryText]);
 
   const refuse = useCallback(

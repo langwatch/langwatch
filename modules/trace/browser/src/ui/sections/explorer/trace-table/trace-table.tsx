@@ -136,7 +136,7 @@ export const TraceTable: React.FC = () => {
   // A pending NOT chip negates nothing judged: its rows are not results yet.
   const hasPendingNegatedEval = useHasPendingNegatedEval();
 
-  if (!activeLens || hasPendingNegatedEval) return <EmptyFilterState />;
+  if (!activeLens) return <EmptyFilterState />;
 
   const rowKind = rowKindForGrouping(activeLens.grouping);
   const shell =
@@ -153,6 +153,8 @@ export const TraceTable: React.FC = () => {
           error,
         });
 
+  // A failed read says so first, as `filter_too_complex` has its own way out.
+  if (hasPendingNegatedEval && !shell.isError) return <EmptyFilterState />;
   const placeholder = shellPlaceholder(shell);
   if (placeholder) return placeholder;
 

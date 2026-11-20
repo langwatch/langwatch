@@ -3,7 +3,6 @@ import type { ExplorerSearchClassification } from "@langwatch/instant-eval-contr
 import {
   combineQueries,
   hasInstantEvalChipUnderOr,
-  hasNegatedInstantEvalChipUnderOr,
   isRouteKind,
   type ModelTrouble,
   queryWithoutInstantEvalChip,
@@ -20,6 +19,7 @@ import { type SearchNotice } from "../../../../behavior/query.slice.ts";
 import { api } from "../../../../behavior/trace-api.ts";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 import { useInstantEvalRunStore } from "../../../../features/instant-eval/behavior/instant-eval-run.store.ts";
+import { isSurelyInstantEvalChip } from "../../../../features/instant-eval/behavior/use-instant-eval-runs.ts";
 import type { InstantEvalRoutePayload } from "../../../../model/instant-eval-route.ts";
 import { explainAnyError } from "../../errors/index.ts";
 
@@ -159,10 +159,17 @@ function useApplyRoute({
   );
 }
 
+/** What a submit's eval chips ask for, before the submit path is chosen. */
+interface TypedEvalRun {
+  run: InstantEvalRoutePayload | "unjudgeable" | null;
+  /** The questions the submit records as Instant Evals, on a path that judges or refuses them. */
+  typedQuestions: string[];
+}
+
 /**
- * The run a typed eval chip asks for, or null when every chip already has one. The question is
- * judged as written, and the fallback is the query as typed so a refusal leaves it be. A chip a
- * `NOT` reaches from above an `OR` or a group is unjudgeable.
+ * The run a typed eval chip asks for, or null when every chip has one; the question is judged as
+ * written. An Instant Eval chip a `NOT` reaches from above an `OR` or a group is unjudgeable; a
+ * bare one never run or submitted here is left out instead, as it may be an evaluator name.
  */
 function typedEvalRunOf({
   queryText,
@@ -170,7 +177,7 @@ function typedEvalRunOf({
 }: {
   queryText: string;
   projectId: string;
-}): InstantEvalRoutePayload | "unjudgeable" | null {
+}): TypedEvalRun {
   // Read from the store at submit time, not from the debounced copy: the chip
   // just typed is matched against the window and lens the search will run in.
   const {
@@ -179,6 +186,7 @@ function typedEvalRunOf({
     evalRuns,
     projectId: shownProjectId,
   } = useFilterStore.getState();
+  const runsByKey = evalRuns ?? {};
   const { chips } = resolveInstantEvalChips({
     queryText,
     lensId: activeLensId,
@@ -187,35 +195,48 @@ function typedEvalRunOf({
       to: timeRange.to,
       ...(timeRange.presetId ? { presetId: timeRange.presetId } : {}),
     },
-    runsByKey: evalRuns ?? {},
+    runsByKey,
   });
-  // Every chip, not only a pending one: a run already under its key cannot answer it either.
-  const isUnjudgeable = chips.some((chip) =>
-    hasNegatedInstantEvalChipUnderOr({ queryText, field: chip.field, question: chip.question }),
+  const { typedQuestions } = useInstantEvalRunStore.getState();
+  const isUnjudgeable = chips.some(
+    (chip) =>
+      chip.isUnjudgeable &&
+      isSurelyInstantEvalChip({ chip, projectId: shownProjectId ?? "", typedQuestions, runsByKey }),
   );
-  if (isUnjudgeable) return "unjudgeable";
-  // Every chip's rows read as not judged while no run answers it, rather than as an evaluator name.
-  // Keyed by the project the explorer shows, as the table reads the mark back.
-  const { markTyped } = useInstantEvalRunStore.getState();
-  for (const typed of chips)
-    markTyped({ projectId: shownProjectId ?? "", question: typed.question });
-  const pending = chips.find((chip) => chip.runId === null);
-  if (!pending) return null;
+  if (isUnjudgeable) return { run: "unjudgeable", typedQuestions: [] };
+  const judgeable = chips.filter((chip) => !chip.isUnjudgeable);
+  const typed = judgeable.map((chip) => chip.question);
+  const pending = judgeable.find((chip) => chip.runId === null);
+  if (!pending) return { run: null, typedQuestions: typed };
   const chip = { queryText, field: pending.field, question: pending.question };
   return {
-    projectId,
-    sentence: pending.question,
-    question: { instructions: pending.question },
-    target: pending.target,
-    otherQuery: queryWithoutInstantEvalChip({
-      queryText,
-      field: pending.field,
-      question: pending.question,
-    }),
-    fallbackQuery: queryText,
-    ...(hasInstantEvalChipUnderOr(chip) ? {} : { typedQuery: queryText }),
-    timeRange: { from: timeRange.from, to: timeRange.to },
+    run: {
+      projectId,
+      sentence: pending.question,
+      question: { instructions: pending.question },
+      target: pending.target,
+      otherQuery: queryWithoutInstantEvalChip({
+        queryText,
+        field: pending.field,
+        question: pending.question,
+      }),
+      fallbackQuery: queryText,
+      ...(hasInstantEvalChipUnderOr(chip) ? {} : { typedQuery: queryText }),
+      timeRange: { from: timeRange.from, to: timeRange.to },
+    },
+    typedQuestions: typed,
   };
+}
+
+/**
+ * Records a submit's chips as Instant Evals, so their rows read as not judged while no run answers
+ * them, rather than as an evaluator name. Keyed by the project the explorer shows, as the table
+ * reads it.
+ */
+function markTypedQuestions(questions: readonly string[]): void {
+  const projectId = useFilterStore.getState().projectId ?? "";
+  const { markTyped } = useInstantEvalRunStore.getState();
+  for (const question of questions) markTyped({ projectId, question });
 }
 
 /**
@@ -417,11 +438,11 @@ export function useSubmitSearch({
       }
       // The sample preview has no project to search or judge in.
       const projectId = isSamplePreview ? null : (project?.id ?? null);
-      const run = projectId ? typedEvalRunOf({ queryText: trimmed, projectId }) : null;
+      const typed = projectId ? typedEvalRunOf({ queryText: trimmed, projectId }) : null;
       const path = submitPathOf({
         trimmed,
         projectId,
-        run,
+        run: typed?.run ?? null,
         isInstantEvalAvailable,
       });
       switch (path.kind) {
@@ -432,9 +453,11 @@ export function useSubmitSearch({
         case "refuse":
           // Nothing is searched: the typed chip stays in the bar under the
           // popover that says why the run did not start.
+          markTypedQuestions(typed?.typedQuestions ?? []);
           onInstantEval(path.run);
           return;
         case "filter":
+          markTypedQuestions(typed?.typedQuestions ?? []);
           applyFilter({ queryText: trimmed, run: path.run });
           return;
         case "requote":

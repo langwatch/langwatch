@@ -41,9 +41,9 @@ export function wrapMembership(membership: string, negated: boolean): string {
 }
 
 /**
- * Match the rows an Instant Eval run judged as passed. Dedup is eventual, so
- * the verdict is `argMax(Passed, UpdatedAt)` per key; the partition key is
- * bounded to when the run wrote its judgements, not to the trace window.
+ * Match the rows an Instant Eval run judged as passed, or, with `verdict: "not_passed"`, judged and
+ * not passed. Dedup is eventual, so each reads the latest verdict per key by `UpdatedAt`; the
+ * partition key is bounded to when the run wrote its judgements, not to the trace window.
  */
 export function instantEvalJudgmentsSubquery({
   by,

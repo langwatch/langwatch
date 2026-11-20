@@ -50,12 +50,16 @@ Feature: Instant Evals inside the Trace Explorer
 
     @integration
     Scenario: A NOT the run of a typed chip cannot answer is refused
-      Given the reader types `NOT eval:"the user is annoyed" OR status:error` or `NOT (eval:"the user is annoyed" AND status:error)`
+      Given the reader types `NOT eval.trace:"the user is annoyed" OR status:error` or `NOT (eval:"the user is annoyed" AND status:error)`
+      And the chip is spelled with a target, was submitted on this page, or has a run registered under its key
       When Enter is pressed
       Then a warning says a NOT on an eval chip must sit beside the other terms with AND
       And nothing is searched and no run is estimated or started, whether Instant Evals are on or off
       And the same holds when a run is already registered under the chip's key
       And the reads send no run for such a chip, so a loaded link shows its rows as not judged
+      And the empty table says the NOT must be rewritten beside the other terms, with no action to judge it
+      And a sibling chip with the same question that no NOT reaches keeps its run
+      But a bare chip never submitted here, like `NOT eval:my_evaluator OR status:error`, is searched as an evaluator name
 
     @unit
     Scenario: A space belongs to the question being typed
@@ -147,7 +151,9 @@ Feature: Instant Evals inside the Trace Explorer
       And the counts read zero, with no progress of another chip's run, as no row was judged
       And a chip submitted here stays so for its project after the time range changes
       But a bare chip never submitted here, like `NOT eval:my_evaluator`, keeps its evaluator-name rows
-      And so does one whose refused judgement the reader skipped, or one submitted in another project
+      And so does one whose refused judgement the reader skipped, declined or closed, or one submitted in another project
+      And a chip whose run a link restored stays pending after the time range changes, as a submitted one does
+      And a failed read shows its error, not the not-judged state
 
   Rule: tRPC wraps the run service for the Explorer
 

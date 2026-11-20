@@ -8,6 +8,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
  * @see specs/traces-v2/instant-eval-search.feature ("A refusal is a popover, never an error state")
  */
 import { useFilterStore, useViewStore } from "../../../../../behavior/explorer.store.ts";
+import { useInstantEvalRunStore } from "../../../../../features/instant-eval/behavior/instant-eval-run.store.ts";
 import type { InstantEvalRoutePayload } from "../../../../../model/instant-eval-route.ts";
 import { useInstantEvalRoute } from "../use-instant-eval-route.ts";
 
@@ -289,6 +290,24 @@ describe("given a chip typed by hand under NOT", () => {
     );
 
     expect(result.current.refusal).toEqual({ kind: "model" });
+    expect(useFilterStore.getState().queryText).toBe('NOT eval:"the user is annoyed"');
+  });
+
+  /** @scenario "A pending chip under NOT is not judged yet" */
+  it("drops the typed mark when the reader declines or closes the cost dialog", () => {
+    useFilterStore.setState({ projectId: "project-1" });
+    const mark = { projectId: "project-1", question: "the user is annoyed" };
+    useInstantEvalRunStore.setState({ typedQuestions: {} });
+    useInstantEvalRunStore.getState().markTyped(mark);
+    const { result } = renderHook(() => useInstantEvalRoute({ isInstantEvalAvailable: true }));
+    act(() => result.current.onInstantEvalRoute(typed));
+    act(() =>
+      estimateCallbacks().onSuccess?.({ rows: 90_000, isRowsCapped: false, priceUsd: 0.5 }),
+    );
+    // The dialog's Search-words button and its close both land on this one handler.
+    act(() => result.current.searchWordsInstead());
+
+    expect(useInstantEvalRunStore.getState().typedQuestions).toEqual({});
     expect(useFilterStore.getState().queryText).toBe('NOT eval:"the user is annoyed"');
   });
 

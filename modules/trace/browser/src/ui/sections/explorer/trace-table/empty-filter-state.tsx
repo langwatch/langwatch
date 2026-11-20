@@ -18,7 +18,10 @@ import { useOrganizationTeamProject } from "../../../../behavior/use-organizatio
 import { useSearchSubmitRequestStore } from "../../../../features/explorer/behavior/search-submit-request.store.ts";
 import { useExplorerCounts } from "../../../../features/explorer/behavior/use-explorer-counts.ts";
 import { useInstantEvalRunStore } from "../../../../features/instant-eval/behavior/instant-eval-run.store.ts";
-import { useInstantEvalRuns } from "../../../../features/instant-eval/behavior/use-instant-eval-runs.ts";
+import {
+  useHasUnjudgeableEval,
+  useInstantEvalRuns,
+} from "../../../../features/instant-eval/behavior/use-instant-eval-runs.ts";
 import { useRetryInstantEval } from "../../../../features/instant-eval/behavior/use-retry-instant-eval.ts";
 import {
   failedInstantEvalChip,
@@ -66,14 +69,23 @@ export const AGGREGATE_HISTORY_NOTE =
 function instantEvalEmptyContent({
   isJudging,
   hasUnjudgedEval,
+  hasUnjudgeableEval,
   failedEvalMessage,
 }: {
   isJudging: boolean;
   hasUnjudgedEval: boolean;
+  hasUnjudgeableEval: boolean;
   failedEvalMessage: string | null;
 }): EmptyContent | null {
   if (failedEvalMessage) {
     return { title: "The Instant Eval did not finish", description: failedEvalMessage };
+  }
+  if (hasUnjudgeableEval) {
+    return {
+      title: "This NOT cannot be judged as typed",
+      description:
+        'An Instant Eval judges only the rows the other terms keep. Rewrite the NOT beside them with AND, as in status:error AND NOT eval:"...".',
+    };
   }
   if (hasUnjudgedEval) {
     return {
@@ -117,6 +129,7 @@ export function emptyContent({
   rangeHours,
   isJudging,
   hasUnjudgedEval = false,
+  hasUnjudgeableEval = false,
   failedEvalMessage = null,
   isAggregate = false,
 }: {
@@ -127,12 +140,19 @@ export function emptyContent({
   isJudging: boolean;
   /** An eval chip has no run for this window, lens and filter. */
   hasUnjudgedEval?: boolean;
+  /** An eval chip has a NOT no run can answer as typed. */
+  hasUnjudgeableEval?: boolean;
   /** Why an eval chip's run failed, when one did. */
   failedEvalMessage?: string | null;
   /** The open project is an aggregate, which reads its members' traces. */
   isAggregate?: boolean;
 }): EmptyContent {
-  const judging = instantEvalEmptyContent({ isJudging, hasUnjudgedEval, failedEvalMessage });
+  const judging = instantEvalEmptyContent({
+    isJudging,
+    hasUnjudgedEval,
+    hasUnjudgeableEval,
+    failedEvalMessage,
+  });
   // A run still judging, or not started, explains the empty table on its own.
   if (judging) return judging;
   const content = lensEmptyContent({ activeLensId, hasFilters, rangeHours });
@@ -306,7 +326,11 @@ export const EmptyFilterState: React.FC = () => {
   const { instantEval } = useExplorerCounts();
   const isJudging = instantEval !== null;
   const { chips: evalChips } = useInstantEvalRuns();
-  const unjudgedChip = evalChips.find((chip) => chip.runId === null);
+  // Judging a NOT no run can answer only ends in the refusal, so the action is withheld.
+  const hasUnjudgeableEval = useHasUnjudgeableEval();
+  const unjudgedChip = hasUnjudgeableEval
+    ? undefined
+    : evalChips.find((chip) => chip.runId === null);
   const requestSubmit = useSearchSubmitRequestStore((s) => s.requestSubmit);
   const runs = useInstantEvalRunStore((s) => s.runs);
   const retry = useRetryInstantEval();
@@ -320,6 +344,7 @@ export const EmptyFilterState: React.FC = () => {
     rangeHours,
     isJudging,
     hasUnjudgedEval: Boolean(unjudgedChip),
+    hasUnjudgeableEval,
     failedEvalMessage: failed ? instantEvalFailureMessage({ run: failed.run }) : null,
     isAggregate: isAggregateProjectKind(project?.kind),
   });

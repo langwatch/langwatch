@@ -449,16 +449,52 @@ describe("given the text is an eval chip typed by hand", () => {
       ['NOT eval:"the user is annoyed" OR status:error', false],
       ['NOT (eval:"the user is annoyed" AND status:error)', true],
       ['NOT (eval:"the user is annoyed" AND status:error)', false],
-    ])("refuses %s with a warning rather than rebuilding it (on: %s)", (queryText, isOn) => {
-      useFilterStore.getState().applyQueryText("model:gpt-5-mini");
-      const { result } = renderSubmit({ isInstantEvalAvailable: isOn });
-      act(() => result.current.submitSearch(queryText));
-      expect(handlers.onInstantEval).not.toHaveBeenCalled();
-      expect(mutation.mutate).not.toHaveBeenCalled();
-      expect(useFilterStore.getState().queryText).toBe("model:gpt-5-mini");
-      expect(toast).toHaveBeenCalledWith(
-        expect.objectContaining({ title: "This NOT cannot be judged as typed", type: "warning" }),
+    ])(
+      "refuses %s submitted here before with a warning, not a rebuild (on: %s)",
+      (queryText, isOn) => {
+        useInstantEvalRunStore
+          .getState()
+          .markTyped({ projectId: "project-1", question: "the user is annoyed" });
+        useFilterStore.getState().applyQueryText("model:gpt-5-mini");
+        const { result } = renderSubmit({ isInstantEvalAvailable: isOn });
+        act(() => result.current.submitSearch(queryText));
+        expect(handlers.onInstantEval).not.toHaveBeenCalled();
+        expect(mutation.mutate).not.toHaveBeenCalled();
+        expect(useFilterStore.getState().queryText).toBe("model:gpt-5-mini");
+        expect(toast).toHaveBeenCalledWith(
+          expect.objectContaining({ title: "This NOT cannot be judged as typed", type: "warning" }),
+        );
+      },
+    );
+
+    /** @scenario "A NOT the run of a typed chip cannot answer is refused" */
+    it("refuses a chip whose spelling forces a target, never submitted here", () => {
+      const { result } = renderSubmit();
+      act(() =>
+        result.current.submitSearch('NOT eval.trace:"the user is annoyed" OR status:error'),
       );
+      expect(handlers.onInstantEval).not.toHaveBeenCalled();
+      expect(toast).toHaveBeenCalledWith(
+        expect.objectContaining({ title: "This NOT cannot be judged as typed" }),
+      );
+    });
+
+    /** @scenario "A NOT the run of a typed chip cannot answer is refused" */
+    it("searches a bare chip never submitted here as an evaluator name, with no run or mark", () => {
+      const { result } = renderSubmit({ isInstantEvalAvailable: false });
+      act(() => result.current.submitSearch("NOT eval:my_evaluator OR status:error"));
+      expect(toast).not.toHaveBeenCalled();
+      expect(handlers.onInstantEval).not.toHaveBeenCalled();
+      expect(useFilterStore.getState().queryText).toBe("NOT eval:my_evaluator OR status:error");
+      expect(useInstantEvalRunStore.getState().typedQuestions).toEqual({});
+    });
+
+    /** @scenario "A pending chip under NOT is not judged yet" */
+    it("marks nothing on a submit that routes its words rather than judging the chip", () => {
+      const { result } = renderSubmit();
+      act(() => result.current.submitSearch('eval:"the user is annoyed" AND frustrated users'));
+      expect(mutation.mutate).toHaveBeenCalled();
+      expect(useInstantEvalRunStore.getState().typedQuestions).toEqual({});
     });
 
     /** @scenario "A chip typed by hand starts its run on Enter" */

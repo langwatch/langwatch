@@ -54,6 +54,8 @@ interface InstantEvalChip {
   field: string;
   /** The unit judged, resolved from the field or the lens. */
   target: InstantEvalTarget;
+  /** This occurrence has a `NOT` reaching it across an `OR` or a group: no run answers it. */
+  isUnjudgeable: boolean;
 }
 
 /** Every eval chip of the query, with its target resolved against the lens. */
@@ -73,6 +75,7 @@ export function instantEvalChipsOf({
     return [];
   }
   const chips: InstantEvalChip[] = [];
+  const unjudgeable = unjudgeableInstantEvalTags(ast);
   walkAST(ast, (node) => {
     if (node.type !== "Tag" || node.field.type === "ImplicitField") return;
     const field = node.field.name;
@@ -80,7 +83,12 @@ export function instantEvalChipsOf({
     if (node.expression.type !== "LiteralExpression") return;
     const question = String(node.expression.value).trim();
     if (question.length === 0) return;
-    chips.push({ question, field, target: instantEvalTargetOf({ fieldName: field, lensId }) });
+    chips.push({
+      question,
+      field,
+      target: instantEvalTargetOf({ fieldName: field, lensId }),
+      isUnjudgeable: unjudgeable.has(node),
+    });
   });
   return chips;
 }
@@ -291,6 +299,15 @@ export function hasInstantEvalChipUnderOr({
 }
 
 /**
+ * The tags of `ast` tangled as above with a `NOT` reaching them too, by node, so each occurrence
+ * is judged on its own: a refused `NOT eval:"q"` leaves a positive `eval:"q"` sibling its run.
+ */
+export function unjudgeableInstantEvalTags(ast: LiqeQuery): ReadonlySet<LiqeQuery> {
+  const negated = tagsUnderNot(ast);
+  return new Set([...tangledTags(ast)].filter((node) => negated.has(node)));
+}
+
+/**
  * Whether the chip is tangled as above and a `NOT` reaches it too. No rebuild
  * beside the other terms keeps that meaning, so such a chip is refused.
  */
@@ -304,10 +321,7 @@ export function hasNegatedInstantEvalChipUnderOr({
   question: string;
 }): boolean {
   const ast = parseOrNull(queryText);
-  if (ast === null) return false;
-  const negated = tagsUnderNot(ast);
-  const nodes = [...tangledTags(ast)].filter((node) => negated.has(node));
-  return holdsChip({ nodes, field, question });
+  return ast !== null && holdsChip({ nodes: unjudgeableInstantEvalTags(ast), field, question });
 }
 
 /**
@@ -406,7 +420,7 @@ interface ResolvedInstantEvalChip extends InstantEvalChip {
 /**
  * The chips of a query matched to the runs the store holds, and the wire map the reads send. A
  * chip without a run is pending: it is sent to no read and compiles to no rows, so the table stays
- * truthful while the run starts. A chip no run can answer (`hasNegatedInstantEvalChipUnderOr`) too.
+ * truthful while the run starts. A chip occurrence no run can answer (`isUnjudgeable`) too.
  */
 export function resolveInstantEvalChips({
   queryText,
@@ -433,13 +447,8 @@ export function resolveInstantEvalChips({
       otherQuery,
       window,
     });
-    // A run cannot answer a chip a NOT reaches across an OR, so no read applies it.
-    const isUnjudgeable = hasNegatedInstantEvalChipUnderOr({
-      queryText,
-      field: chip.field,
-      question: chip.question,
-    });
-    const runId = isUnjudgeable ? null : (runsByKey[key] ?? null);
+    // A run cannot answer a chip a NOT reaches across an OR, so no read applies it there.
+    const runId = chip.isUnjudgeable ? null : (runsByKey[key] ?? null);
     if (runId) {
       evalRuns[key] = { question: chip.question, target: chip.target, runId };
     }

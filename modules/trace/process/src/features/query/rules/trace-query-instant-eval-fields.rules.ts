@@ -8,9 +8,9 @@
 import type { InstantEvalTarget } from "@langwatch/instant-eval-contract";
 import {
   type FieldDef,
-  hasNegatedInstantEvalChipUnderOr,
   INSTANT_EVAL_TARGET_FIELDS,
   type ResolvedInstantEvalRun,
+  type TagToken,
   type TranslationContext,
   UNSUPPORTED,
 } from "@langwatch/trace-contract";
@@ -29,26 +29,21 @@ function normalise(question: string): string {
 }
 
 /**
- * The runs a chip names; empty when the client registered none for it, or when a NOT reaches the
- * chip across an OR: no run answers that, even one sent for a sibling with the same question.
+ * The runs a chip names; empty when the client registered none for it, or when a NOT reaches
+ * this occurrence across an OR: no run answers that one, while a same-question sibling keeps it.
  */
 function findRuns({
   ctx,
-  field,
+  tag,
   question,
   target,
 }: {
   ctx: TranslationContext;
-  field: string;
+  tag: TagToken;
   question: string;
   target: InstantEvalTarget | undefined;
 }): ResolvedInstantEvalRun[] {
-  if (
-    ctx.queryText !== undefined &&
-    hasNegatedInstantEvalChipUnderOr({ queryText: ctx.queryText, field, question })
-  ) {
-    return [];
-  }
+  if (ctx.unjudgeableEvalTags?.has(tag)) return [];
   const wanted = normalise(question);
 
   return (
@@ -102,7 +97,7 @@ function fieldDef(fieldName: string): FieldDef {
     toClickHouse: (tag, negated, ctx) => {
       const question = extractStringValue(tag);
       validateValueLength(question);
-      const [run] = findRuns({ ctx, field: fieldName, question, target: forced });
+      const [run] = findRuns({ ctx, tag, question, target: forced });
       if (run) return compileRun({ ctx, run, negated });
       // A forcing spelling can only mean an Instant Eval, so with no run it
       // matches nothing; the bare field falls back to the evaluator lookup.

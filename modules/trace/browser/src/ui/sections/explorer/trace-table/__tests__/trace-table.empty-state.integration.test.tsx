@@ -348,6 +348,22 @@ describe("<TraceTable /> pending NOT eval chip", () => {
 
 describe("<TraceTable /> failed-read gating", () => {
   describe("given the server refused the query as too complex", () => {
+    /** @scenario "A pending chip under NOT is not judged yet" */
+    it("shows the failure and its fix, not the not-judged state, under a pending NOT chip", () => {
+      mockFilterState.queryText = 'NOT eval.trace:"the user is annoyed" AND one two three';
+      mockFilterState.debouncedQueryText = mockFilterState.queryText;
+      mockTraceListResult = {
+        ...mockTraceListResult,
+        isError: true,
+        error: { data: { error: { code: "filter_too_complex", httpStatus: 422 } } },
+      };
+
+      renderTable();
+
+      expect(screen.queryByTestId("empty-filter-state")).not.toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Search it as one phrase" })).toBeInTheDocument();
+    });
+
     /** @scenario "A sentence past the term ceiling offers to search it as one phrase" */
     it("offers a one-click fix that requotes the bare words and searches again", () => {
       mockFilterState.queryText =

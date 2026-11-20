@@ -91,8 +91,8 @@ describe("instantEvalChipsOf", () => {
     });
 
     expect(chips).toEqual([
-      { question: "is it rude", field: "eval", target: "threads" },
-      { question: "is it wrong", field: "eval.llm", target: "llm_spans" },
+      { question: "is it rude", field: "eval", target: "threads", isUnjudgeable: false },
+      { question: "is it wrong", field: "eval.llm", target: "llm_spans", isUnjudgeable: false },
     ]);
   });
 
@@ -243,7 +243,14 @@ describe("resolveInstantEvalChips", () => {
     });
     expect(pending.evalRuns).toBeUndefined();
     expect(pending.chips).toEqual([
-      { question: "is it rude", field: "eval", target: "traces", key, runId: null },
+      {
+        question: "is it rude",
+        field: "eval",
+        target: "traces",
+        isUnjudgeable: false,
+        key,
+        runId: null,
+      },
     ]);
 
     const registered = resolveInstantEvalChips({
@@ -272,7 +279,36 @@ describe("resolveInstantEvalChips", () => {
 
     expect(resolved.evalRuns).toBeUndefined();
     expect(resolved.chips).toEqual([
-      { question: "is it rude", field: "eval", target: "traces", key, runId: null },
+      {
+        question: "is it rude",
+        field: "eval",
+        target: "traces",
+        isUnjudgeable: true,
+        key,
+        runId: null,
+      },
     ]);
+  });
+
+  /** @scenario "A NOT the run of a typed chip cannot answer is refused" */
+  it("keeps the run for a sibling with the same question that no NOT reaches", () => {
+    const queryText = '(NOT eval:"is it rude" OR status:error) AND eval:"is it rude"';
+    const otherQuery = queryWithoutInstantEvalChips(queryText);
+    const key = instantEvalRunKey({ question: "is it rude", target: "traces", otherQuery, window });
+
+    const resolved = resolveInstantEvalChips({
+      queryText,
+      lensId: undefined,
+      window,
+      runsByKey: { [key]: "run-1" },
+    });
+
+    expect(resolved.chips.map((chip) => [chip.isUnjudgeable, chip.runId])).toEqual([
+      [true, null],
+      [false, "run-1"],
+    ]);
+    expect(resolved.evalRuns).toEqual({
+      [key]: { question: "is it rude", target: "traces", runId: "run-1" },
+    });
   });
 });

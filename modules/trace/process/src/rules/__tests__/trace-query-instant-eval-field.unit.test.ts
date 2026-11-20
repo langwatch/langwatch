@@ -140,6 +140,18 @@ describe("given an eval chip and no run that fits it", () => {
       expect(runParams).toHaveLength(1);
       expect(result?.sql).toContain(refusedSql);
     });
+
+    /** @scenario "A NOT the run of a typed chip cannot answer is refused" */
+    it("applies the run to a positive sibling spelled the same way, as it applies none to the NOT", () => {
+      const result = compile(
+        '(NOT eval:"the user is annoyed" OR status:error) AND eval:"the user is annoyed"',
+        [run()],
+      );
+      const runParams = Object.values(result?.params ?? {}).filter((value) => value === "run-1");
+      expect(runParams).toHaveLength(1);
+      expect(result?.sql).toContain("HAVING argMax(Passed, UpdatedAt) = 1");
+      expect(result?.sql).toContain("FROM evaluation_runs");
+    });
   });
 });
 

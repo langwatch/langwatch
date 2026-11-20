@@ -10,7 +10,11 @@ import { beforeEach, describe, expect, it } from "vitest";
  */
 import { useFilterStore, useViewStore } from "../../../../behavior/explorer.store.ts";
 import { useInstantEvalRunStore } from "../instant-eval-run.store.ts";
-import { useHasPendingNegatedEval, useInstantEvalRuns } from "../use-instant-eval-runs.ts";
+import {
+  useHasPendingNegatedEval,
+  useInstantEvalRuns,
+  useMarkRegisteredChipsTyped,
+} from "../use-instant-eval-runs.ts";
 
 const WINDOW = { from: 1_000, to: 2_000 };
 const QUESTION = "the user is annoyed";
@@ -104,6 +108,29 @@ describe("given a NOT eval chip submitted on this page with no run behind it", (
       useViewStore.setState({ projectId: "project-2" });
       const { result } = renderHook(() => useHasPendingNegatedEval());
       expect(result.current).toBe(false);
+    });
+  });
+});
+
+describe("given a link that restored a run for a bare NOT eval chip", () => {
+  const NEGATED = `NOT eval:"${QUESTION}"`;
+
+  beforeEach(() => {
+    useViewStore.setState({ projectId: "project-1" });
+    useInstantEvalRunStore.setState({ typedQuestions: {} });
+    useFilterStore.setState({
+      debouncedQueryText: NEGATED,
+      evalRuns: { [keyFor("traces")]: "run-1" },
+    });
+  });
+
+  describe("when the time window changes, so no run answers the new key", () => {
+    /** @scenario "A pending chip under NOT is not judged yet" */
+    it("stays pending rather than falling back to the evaluator-name rows", () => {
+      renderHook(() => useMarkRegisteredChipsTyped());
+      useFilterStore.setState({ debouncedTimeRange: { from: 5_000, to: 9_000 } });
+      const { result } = renderHook(() => useHasPendingNegatedEval());
+      expect(result.current).toBe(true);
     });
   });
 });
