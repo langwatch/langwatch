@@ -87,7 +87,7 @@ describe("given the derived Postgres catalog", () => {
       const view = byName.get("virtual_keys")!;
       expect(view.postgres!.tenantPath).toEqual(organizationTenantPath());
       expect(view.dedup.keyColumns[0]).toBe("TenantId");
-      expect(view.grain).toContain("once per project");
+      expect(view.grain).toContain("counted once across the projects read");
       // The helper is shared: every organization-scoped view carries the same path.
       for (const orgView of ["virtual_keys", "model_providers", "departments"]) {
         expect(byName.get(orgView)!.postgres!.tenantPath).toEqual(organizationTenantPath());
@@ -101,7 +101,7 @@ describe("given the derived Postgres catalog", () => {
       const view = byName.get("ingestion_sources")!;
       expect(view.postgres!.tenantPath).toEqual(teamTenantPath());
       expect(view.dedup.keyColumns[0]).toBe("TenantId");
-      expect(view.grain).toContain("once per project");
+      expect(view.grain).toContain("counted once across the projects read");
     });
   });
 
