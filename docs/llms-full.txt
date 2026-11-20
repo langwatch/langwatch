@@ -5944,7 +5944,7 @@ A leaked provider credential is a different problem. Rotate that one in the prov
 | Revoke    | Every request answers `403 virtual_key_revoked`. The key is dead and cannot come back                          | The secret is publicly exposed                                                                      |
 | Rotate    | Keeps working for 24 hours, then fails                                                                         | The secret left a trusted boundary but is not exposed, and callers need time to pick up the new one |
 
-Disable and revoke contain the leak as soon as the change reaches every gateway pod. The control plane writes a change event, and a pod that receives it stops serving the key on the next request, in about 10 seconds.
+Disable and revoke contain the leak as soon as the change reaches every gateway pod. The control plane writes a change event, and a pod that receives it stops serving the key on the next request, usually within a second or two.
 
 A pod that received the event keeps refusing the key even if the control plane goes down afterwards. A pod that missed the event and cannot reach the control plane serves the cached key up to the hard cap set by `LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS`, six hours by default, unless `LW_GATEWAY_AUTH_CACHE_FAIL_CLOSED_AFTER_SECONDS` is set. Read [Step 3](#step-3-stop-the-traffic) for the paths and their timings.
 
@@ -6817,7 +6817,7 @@ curl -sS -X POST "$LW/api/gateway/v1/virtual-keys/$VK_ID/disable" \
   -d '{"reason": "payment overdue"}'
 ```
 
-Requests on the key are rejected with `403 virtual_key_disabled` until you call `/enable`. Budgets, scopes, key material and any running rotation grace stay intact. The gateway picks the change up on its next change-feed poll, a long poll of about 10 seconds. Both transitions emit `gateway.virtual_key.disabled` and `gateway.virtual_key.enabled` events.
+Requests on the key are rejected with `403 virtual_key_disabled` until you call `/enable`. Budgets, scopes, key material and any running rotation grace stay intact. The gateway picks the change up from its change feed, usually within a second or two. Both transitions emit `gateway.virtual_key.disabled` and `gateway.virtual_key.enabled` events.
 
 **The customer resets their API key in your UI.** `POST /api/gateway/v1/virtual-keys/{id}/rotate` returns a new secret; send it to the customer once. The old secret keeps authenticating for 24 hours, so a client you have not reached yet does not fail mid-rollout. The event is `gateway.virtual_key.rotated`.
 
@@ -11485,7 +11485,9 @@ Revoking or disabling a key reaches every gateway replica through the change fee
 
 Each replica records the key in a revocation list kept apart from the key cache. The stale-serve window does not expire the list, so a revoked key is refused even if the control plane goes down right after. Re-enabling the key, or a later successful check with the control plane, clears it.
 
-A replica that starts, or reconnects after an outage, first reads the change history it missed, in pages. A disable found there removes the key from the cache, and the replica checks the key with the control plane until it reaches the newest change. A key disabled and later re-enabled therefore keeps working through a restart. Once the replica has caught up, the revocation list refuses every key the history left revoked or disabled.
+A replica that starts, or reconnects after an outage, first reads the change history it missed, in pages. A disable found there removes the key from the cache, and the replica checks the key with the control plane until it reaches the newest change. A key disabled and later re-enabled therefore keeps working through a restart, as long as the control plane answers; if it can't, the request gets the retryable `503 auth_upstream_unavailable`.
+
+Once the replica has caught up, the revocation list refuses the keys the history left revoked or disabled with `403`. The list is bounded: a key pushed out of it is still refused, because its cached copies are gone, but the caller gets `503 auth_upstream_unavailable` during an outage.
 
 Rotating a key is not a revocation. The old secret keeps working through its grace period, and the gateway asks the control plane about it.
 
@@ -12859,11 +12861,11 @@ You changed a limit, an allowlist or a credential, and requests still behave the
 
 | Path                                                       | Timing                                                 |
 | ---------------------------------------------------------- | ------------------------------------------------------ |
-| The change feed, a long poll against the control plane     | About 10 seconds                                       |
+| The change feed, a long poll against the control plane     | Usually a second or two                                |
 | The configuration re-fetch, for changes that emit no event | `LW_GATEWAY_AUTH_CACHE_CONFIG_TTL_SECONDS`, default 60 |
 | The key's own token expiring                               | 15 minutes                                             |
 
-Rotations, revocations, budget edits, routing changes and cache-rule edits all travel on the change feed, so 10 seconds is the normal case.
+Rotations, revocations, budget edits, routing changes and cache-rule edits all travel on the change feed, so a second or two is the normal case. An idle poll is held open about 10 seconds and answers as soon as a change lands.
 
 **Confirm the feed is running:** the pod log carries an `auth_cache_change_evict` line with the change kind and the key id when a change lands. A `change_feed_poll_failed` line instead means the pod cannot reach the control plane, and every cached key stays as it is until the poll recovers.
 

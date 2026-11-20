@@ -8,6 +8,9 @@ import (
 	"testing"
 	"time"
 
+	"go.uber.org/zap"
+	"go.uber.org/zap/zaptest/observer"
+
 	"github.com/langwatch/langwatch/pkg/herr"
 	"github.com/langwatch/langwatch/services/aigateway/domain"
 )
@@ -224,6 +227,33 @@ func TestBacklog_DisableAtTheHeadIsRefusedOnceTheReplayEnds(t *testing.T) {
 	if n := res.callsFor(key.Token) - before; n != 0 {
 		t.Fatalf("the key must be refused locally once the replay ends; got %d control-plane calls", n)
 	}
+}
+
+// @scenario "a disable and an enable on the page that ends a replay never refuse the key between them"
+func TestBacklog_DisableAndEnableOnTheLastPageNeverRefuseBetweenThem(t *testing.T) {
+	res := newKeyedResolver()
+	poller := &pagedPoller{}
+	core, logs := observer.New(zap.InfoLevel)
+	svc, _ := newService(t, Options{Resolver: res, ConfigFetcher: res, ChangePoller: poller, Logger: zap.New(core)})
+	key := domain.PresentedKey{Token: "vk-lw-blip"}
+	res.set(key.Token, resolverReturn{bundle: orgBundle("vk_blip", time.Now().Add(time.Hour))})
+	mustServe(t, svc, key, "the first request caches the key")
+	cursor := feedCursor(t, svc, "org_1")
+
+	poller.queue(lastPage(disabledEvent("vk_blip"), enabledEvent("vk_blip")))
+	pollOnce(t, svc, cursor)
+	denials := logs.FilterMessage("auth_cache_key_denied").All()
+	if len(denials) == 0 {
+		t.Fatal("the disable must be recorded")
+	}
+	for _, e := range denials {
+		if e.ContextMap()["pending"] != true {
+			t.Fatal("a disable the same page re-enables must stay pending while the page is applied")
+		}
+	}
+	mustServe(t, svc, key, "the re-enabled key serves")
+	res.setDown()
+	mustServe(t, svc, key, "an outage after the page must not refuse the re-enabled key")
 }
 
 // @scenario "a key cached before a reconnect is refused by a disable in the backlog it missed"

@@ -611,6 +611,13 @@ Feature: Gateway auth cache — hot path is zero RTT after first hit
       Then the key gets virtual_key_disabled, not a retryable error
 
     @unit
+    Scenario: a disable and an enable on the page that ends a replay never refuse the key between them
+      Given a gateway that cached an active key
+      When the change feed returns a short page that disables the key and then re-enables it
+      Then the disable stays pending while the page is applied
+      And the key serves, and the control plane going down afterwards does not refuse it
+
+    @unit
     Scenario: a key cached before a reconnect is refused by a disable in the backlog it missed
       Given two cached keys and a change feed whose poll failed during an outage
       When the feed reconnects to a backlog of full pages

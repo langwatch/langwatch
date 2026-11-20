@@ -60,7 +60,9 @@ Revoking or disabling a key reaches every gateway replica through the change fee
 
 Each replica records the key in a revocation list kept apart from the key cache. The stale-serve window does not expire the list, so a revoked key is refused even if the control plane goes down right after. Re-enabling the key, or a later successful check with the control plane, clears it.
 
-A replica that starts, or reconnects after an outage, first reads the change history it missed, in pages. A disable found there removes the key from the cache, and the replica checks the key with the control plane until it reaches the newest change. A key disabled and later re-enabled therefore keeps working through a restart. Once the replica has caught up, the revocation list refuses every key the history left revoked or disabled.
+A replica that starts, or reconnects after an outage, first reads the change history it missed, in pages. A disable found there removes the key from the cache, and the replica checks the key with the control plane until it reaches the newest change. A key disabled and later re-enabled therefore keeps working through a restart, as long as the control plane answers; if it can't, the request gets the retryable `503 auth_upstream_unavailable`.
+
+Once the replica has caught up, the revocation list refuses the keys the history left revoked or disabled with `403`. The list is bounded: a key pushed out of it is still refused, because its cached copies are gone, but the caller gets `503 auth_upstream_unavailable` during an outage.
 
 Rotating a key is not a revocation. The old secret keeps working through its grace period, and the gateway asks the control plane about it.
 

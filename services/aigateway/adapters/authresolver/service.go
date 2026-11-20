@@ -195,7 +195,7 @@ type orgCursor struct {
 	// answered (zero until the first one); the fail-closed rule reads it from
 	// request goroutines.
 	polledAt atomic.Int64
-	// pending lists the keys denied from full pages since the backlog began;
+	// pending lists the keys denied from pages since the backlog began;
 	// the page that ends it promotes them (revocation.go, promotePending).
 	pending map[string]struct{}
 }
@@ -1354,9 +1354,10 @@ func (s *Service) orgChangeFeedLoop(ctx context.Context, orgID string, cursor *o
 	}
 }
 
-// pollOrgChanges runs one long poll for an org and applies what it returns. A
-// full page is a backlog (a replay from revision 0, or a reconnect): its
-// denials stay pending until a shorter page or an empty poll ends it.
+// pollOrgChanges runs one long poll for an org and applies what it returns.
+// A page's denials stay pending while it is applied, and past it while it is
+// full (a replay or a reconnect), until a shorter page or an empty poll ends
+// the backlog: a later event may still re-enable the key.
 func (s *Service) pollOrgChanges(ctx context.Context, orgID string, cursor *orgCursor) error {
 	changes, nextRev, err := s.changePoller.PollChanges(ctx, orgID, cursor.since)
 	if err != nil {
@@ -1364,10 +1365,10 @@ func (s *Service) pollOrgChanges(ctx context.Context, orgID string, cursor *orgC
 	}
 	backlog := len(changes) >= changeFeedPageSize
 	for _, ch := range changes {
-		if backlog && deniesKey(ch.Kind) && ch.VirtualKeyID != "" {
+		if deniesKey(ch.Kind) && ch.VirtualKeyID != "" {
 			cursor.notePending(ch.VirtualKeyID)
 		}
-		s.applyFeedChange(orgID, ch, backlog)
+		s.applyFeedChange(orgID, ch, true)
 	}
 	if !backlog && len(cursor.pending) > 0 {
 		s.promotePending(cursor.pending)
@@ -1380,7 +1381,7 @@ func (s *Service) pollOrgChanges(ctx context.Context, orgID string, cursor *orgC
 	return nil
 }
 
-// notePending records a key denied from a backlog page.
+// notePending records a key denied from a change-feed page.
 func (c *orgCursor) notePending(vkID string) {
 	if c.pending == nil {
 		c.pending = map[string]struct{}{}
@@ -1425,13 +1426,13 @@ func (s *Service) applyChange(organizationID string, ch CacheChange) {
 	s.applyFeedChange(organizationID, ch, false)
 }
 
-// applyFeedChange is applyChange for an event read from a backlog page when
-// backlog is set: its denial is pending (revocation.go, denyPending).
-func (s *Service) applyFeedChange(organizationID string, ch CacheChange, backlog bool) {
+// applyFeedChange is applyChange for an event read from a change-feed page
+// when pending is set: its denial is pending (revocation.go, denyPending).
+func (s *Service) applyFeedChange(organizationID string, ch CacheChange, pending bool) {
 	keepLastKnown := !revokesKey(ch.Kind)
 	// Deny before evicting: a refresh racing this event either finds the
 	// denial when its answer is gated, or is evicted below.
-	s.applyDenial(ch, backlog)
+	s.applyDenial(ch, pending)
 	switch ch.Kind {
 	case ChangeKindProviderBindingUpdated:
 		s.evictForProvider(organizationID, ch, keepLastKnown)
@@ -1516,12 +1517,12 @@ func (s *Service) evictForProvider(organizationID string, ch CacheChange, keepLa
 }
 
 // applyDenial records or lifts the denial a key event carries.
-func (s *Service) applyDenial(ch CacheChange, backlog bool) {
+func (s *Service) applyDenial(ch CacheChange, pending bool) {
 	switch {
 	case ch.VirtualKeyID == "":
 	case ch.Kind == ChangeKindVirtualKeyEnabled:
 		s.clearDenial(ch.VirtualKeyID, "re_enable")
-	case deniesKey(ch.Kind) && backlog:
+	case deniesKey(ch.Kind) && pending:
 		s.denyPending(ch.VirtualKeyID, ch.Kind)
 	case deniesKey(ch.Kind):
 		s.deny(ch.VirtualKeyID, ch.Kind)
