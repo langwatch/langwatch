@@ -66,12 +66,29 @@ func FfmpegCacheProblems(root string) ([]string, error) {
 	if !okKey || !okRestore || !okInstall {
 		return []string{docsEncodersAction + ": missing the ffmpeg key, restore or install step"}, nil
 	}
+	problems = append(problems, ffmpegKeyProblems(&key)...)
+	problems = append(problems, ffmpegRestoreProblems(&restore)...)
+	problems = append(problems, ffmpegInstallProblems(&install)...)
+	for _, step := range []*ciscan.Step{&key, &restore, &install} {
+		problems = append(problems, mediaGateProblems(step)...)
+	}
+	return append(problems, ffmpegSaveProblems(steps)...), nil
+}
+
+// ffmpegKeyProblems reports the runner-image parts the cache key script fails to name.
+func ffmpegKeyProblems(key *ciscan.Step) []string {
+	var problems []string
 	for _, part := range ffmpegKeyParts {
 		if !strings.Contains(key.Run, part) {
 			problems = append(problems, fmt.Sprintf("ffmpeg key does not name %s, so a new runner image would restore stale packages", part))
 		}
 	}
-	problems = append(problems, ffmpegRestoreProblems(&restore)...)
+	return problems
+}
+
+// ffmpegInstallProblems reports install-step settings that break the cached download or let it stall.
+func ffmpegInstallProblems(install *ciscan.Step) []string {
+	var problems []string
 	if !ffmpegArchivesOption.MatchString(install.Run) {
 		problems = append(problems, "ffmpeg install does not download into the cached directory (-o Dir::Cache::Archives=$debs)")
 	}
@@ -84,10 +101,7 @@ func FfmpegCacheProblems(root string) ([]string, error) {
 	if install.ContinueOnError != nil {
 		problems = append(problems, "ffmpeg install sets continue-on-error, so a failed install would not stop the job")
 	}
-	for _, step := range []*ciscan.Step{&key, &restore, &install} {
-		problems = append(problems, mediaGateProblems(step)...)
-	}
-	return append(problems, ffmpegSaveProblems(steps)...), nil
+	return problems
 }
 
 func ffmpegRestoreProblems(restore *ciscan.Step) []string {
