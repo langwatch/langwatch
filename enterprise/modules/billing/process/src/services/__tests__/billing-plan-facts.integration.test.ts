@@ -223,7 +223,7 @@ describe("billing's subscription_changed fact, as nurturing's linked tests deliv
 
   describe("given an organization whose only non-cancelled subscription is pending payment", () => {
     /** @scenario "A pending checkout does not make the plan paid" */
-    it("records plan FREE, though the pending checkout still counts as a subscription", async () => {
+    it("records plan FREE and no subscription, since a pending checkout is not one", async () => {
       const { lifecycle, changed } = billingOver([
         { id: "sub-1", status: "ACTIVE", plan: "LAUNCH", ageHours: 48 },
         { id: "sub-pending", status: "PENDING", plan: "GROWTH_SEAT_EUR_MONTHLY", ageHours: 1 },

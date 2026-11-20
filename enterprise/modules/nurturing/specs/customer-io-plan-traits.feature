@@ -51,7 +51,7 @@ Feature: Customer.io knows each team's real plan
   Scenario: A pending checkout does not make the plan paid
     Given an organization whose only non-cancelled subscription is pending payment
     When its subscription_changed fact is delivered
-    Then the plan sent is free
+    Then the plan sent is free and has_subscription is false
 
   @integration
   Scenario: A renewal or a seat change tells Customer.io nothing
