@@ -174,11 +174,10 @@ function result(overrides: Partial<InstantEvalTraceResultWire>): InstantEvalTrac
 // The summary's input and output panels read and write annotations over tRPC.
 // This suite is about the Instant Evals section, so every such call stays pending.
 function pendingLink(): TRPCLink<never> {
-  return () =>
-    () =>
-      observable((_observer) => {
-        return () => void 0;
-      });
+  return () => () =>
+    observable((_observer) => {
+      return () => void 0;
+    });
 }
 
 function renderSummary({ onSelectSpan }: { onSelectSpan?: (spanId: string) => void } = {}) {
