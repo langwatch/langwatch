@@ -12,7 +12,9 @@ import {
   type ExplorerInstantEvalOptInAccess,
   combineQueries,
   instantEvalChipText,
+  instantEvalChipsOf,
   instantEvalRunKey,
+  queryWithInstantEvalChipRetargeted,
   queryWithoutInstantEvalChips,
 } from "@langwatch/trace-contract";
 import { type RefObject, useCallback, useRef, useState } from "react";
@@ -122,8 +124,38 @@ function routeRunKey({
   });
 }
 
+/**
+ * The typed text, its chip re-spelled for the run's target when a lens switch
+ * since Enter would read it as another one; undefined when no chip reads so.
+ */
+function typedQueryForLens({
+  payload,
+  lensId,
+}: {
+  payload: InstantEvalRoutePayload;
+  lensId: string | undefined;
+}): string | undefined {
+  const { typedQuery, target } = payload;
+  if (typedQuery === undefined) return undefined;
+  const question = payload.question.instructions;
+  const wanted = question.replace(/\s+/g, " ").trim();
+  const readsAsTarget = (queryText: string) =>
+    instantEvalChipsOf({ queryText, lensId }).some(
+      (chip) => chip.target === target && chip.question.replace(/\s+/g, " ").trim() === wanted,
+    );
+  if (readsAsTarget(typedQuery)) return typedQuery;
+  const respelled = queryWithInstantEvalChipRetargeted({
+    queryText: typedQuery,
+    question,
+    target,
+    lensId,
+  });
+  return readsAsTarget(respelled) ? respelled : undefined;
+}
+
 /** The bar's query with the route's eval chip in it: what a refusal leaves for the reader. */
 function pendingChipQuery(payload: InstantEvalRoutePayload): string {
+  if (payload.typedQuery !== undefined) return payload.typedQuery;
   return combineQueries({
     base: payload.otherQuery,
     addition: instantEvalChipText({
@@ -254,15 +286,17 @@ function useInstantEvalStarter({
     ({ payload, key, runId }: PendingRoute & { runId: string }) => {
       const lensId = useViewStore.getState().activeLensId;
       registerEvalRun({ key, runId });
+      // A chip typed by hand goes back as typed, so a `NOT` in front of it stays.
       applyQueryText(
-        combineQueries({
-          base: payload.otherQuery,
-          addition: instantEvalChipText({
-            question: payload.question.instructions,
-            target: payload.target,
-            lensId,
+        typedQueryForLens({ payload, lensId }) ??
+          combineQueries({
+            base: payload.otherQuery,
+            addition: instantEvalChipText({
+              question: payload.question.instructions,
+              target: payload.target,
+              lensId,
+            }),
           }),
-        }),
       );
       if (!payload.modelTrouble) return;
       // Against the text the store settled on: the strip shows while the bar holds it.

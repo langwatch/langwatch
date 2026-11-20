@@ -1036,6 +1036,16 @@ Feature: The first-party sign-in and sign-up screens - the auth screen is ours
     And the words and the recovery action are the ones it always offered
     And the error code from the query string is never shown to me
 
+  # Linking GitHub from Settings > Security with an account whose email
+  # differs ends here. The server rule stays; the screen sends the person
+  # back to where they started and says what to do.
+  @integration
+  Scenario: Linking an account with a different email sends me back to Security and says what to do
+    Given I started linking a sign-in method from Settings > Security
+    When the account I picked uses a different email from my LangWatch address
+    Then the screen tells me to link an account that has my LangWatch address as a verified email, or to add that address to it first
+    And the button reads "Back to Settings" and opens Settings > Security, not the organization's sign-in policy
+
   @integration
   Scenario: The invitation and join screens stand on the same ground
     When I open an invitation link or reach the join-before-create step

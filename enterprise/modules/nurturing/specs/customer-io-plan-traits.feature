@@ -224,7 +224,7 @@ Feature: Customer.io knows each team's real plan
   # AC 12: "refused organization retries, others unaffected"            -> Scenario: A refused organization retries on its own
   #        -> Scenario: The plan copy keeps the newest fact, and a real fact wins a tie
   # AC 13: "no channel does not finish as done"                         -> Scenario: A catch-up fact with no Customer.io channel fails visibly
-  # AC 14: "no-member skip; abort stops; resume after last page"        -> Scenario: A resync skips organizations with no members and stops on abort
+  # AC 14: "no-member skip; abort stops; no resume (amended: hand-run task, a re-run starts from the start)" -> Scenario: A resync skips organizations with no members and stops on abort
   # AC 15: "at most 100 members per request"                            -> Scenario: No request carries more than a hundred members
   # AC 16: "PostHog subscription_started unchanged"                     -> Scenario: PostHog's subscription_started is unchanged
   # AC 17: "no running campaign or segment filters on plan before deploy" -> before-merge checklist item, not a scenario (process proof, like AC 18)

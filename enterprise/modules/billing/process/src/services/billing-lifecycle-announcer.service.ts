@@ -36,7 +36,7 @@ type BillingLifecycleAnnouncerDeps = Readonly<{
     findLastNonCancelled(organizationId: string): Promise<unknown>;
     findActive(organizationId: string): Promise<{ plan: string } | null>;
   };
-  /** The organization's name and its active members' ids, through the shares (C2 B). */
+  /** The organization's active members' ids, through the shares (C2 B). */
   organizations: Pick<BillingAccountFactsRepository, "findActiveMemberIds">;
   /** The ops alert a peer's seat-limit event ends in, subscribed on the lifecycle pipeline. */
   resourceLimitAlerts: BuildBillingLifecyclePipelineInput["alerts"];
