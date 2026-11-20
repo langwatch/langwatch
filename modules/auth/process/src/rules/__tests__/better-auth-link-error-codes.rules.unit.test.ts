@@ -32,6 +32,12 @@ const CLASSIFIED: Record<string, string> = {
   // The sign-in path's refusal for an existing account under another method; the callback
   // swaps the spaces of "account not linked" for underscores before it redirects.
   account_not_linked: NOT_LINKED,
+  "account not linked": NOT_LINKED,
+  "unable to link account": "not a link refusal",
+  "unable to update account": "not a link refusal",
+  "unable to create user": "not a link refusal",
+  "unable to create session": "not a link refusal",
+  "signup disabled": "not a link refusal",
   unable_to_update_account: "not a link refusal",
   unable_to_create_user: "not a link refusal",
   unable_to_create_session: "not a link refusal",
@@ -43,6 +49,7 @@ const BEFORE_PRUNING: Record<string, string> = {
   email_does_not_match: DIFFERENT_EMAIL,
   account_already_linked_to_different_user: NOT_LINKED,
   account_not_linked: NOT_LINKED,
+  "account not linked": NOT_LINKED,
 };
 
 const libraryDir = path.dirname(createRequire(import.meta.url).resolve("better-auth/oauth2"));
@@ -56,10 +63,13 @@ function callbackCodes(): string[] {
   return codes;
 }
 
-/** The sign-in path's `result.error` strings, as the callback redirects with them. */
+/**
+ * The sign-in path's `result.error` strings, as the OAuth callback redirects with them
+ * (underscored) and as the SSO plugin's OIDC callback does (raw).
+ */
 function signInResultCodes(): string[] {
-  return [...libraryFile("link-account.mjs").matchAll(/\berror:\s*"([a-z][a-z ]+)"/g)].map(
-    (match) => (match[1] ?? "").split(" ").join("_"),
+  return [...libraryFile("link-account.mjs").matchAll(/\berror:\s*"([a-z][a-z ]+)"/g)].flatMap(
+    (match) => [match[1] ?? "", (match[1] ?? "").split(" ").join("_")],
   );
 }
 

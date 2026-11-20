@@ -346,9 +346,9 @@ verified.
 Plus a `normalizeErrorCode` helper maps BetterAuth's redirect codes to
 the legacy UI codes (`DIFFERENT_EMAIL_NOT_ALLOWED`). At the time of this PR
 (v1.6.2) the library redirected with `email_doesn't_match`; v1.7.x redirects
-with `email_does_not_match`. `LINKING_DIFFERENT_EMAILS_NOT_ALLOWED` is only an
-API error body code of `/link-social`, never a redirect code, and was dropped
-in #9752. The current codes are pinned by a test against the installed library.
+with `email_does_not_match`. `LINKING_DIFFERENT_EMAILS_NOT_ALLOWED`is only an
+API error body code of`/link-social`, never a redirect code, and was dropped
+   in #9752. The current codes are pinned by a test against the installed library.
 
 8. **OAuth callback path mismatch breaks Auth0/Okta** — BetterAuth's
    genericOAuth plugin uses `/api/auth/oauth2/callback/{provider}`, but
