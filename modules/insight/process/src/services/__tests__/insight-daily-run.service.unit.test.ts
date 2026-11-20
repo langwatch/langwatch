@@ -6,7 +6,7 @@
  */
 
 import type { AnalyticsApi } from "@langwatch/analytics-contract";
-import { InMemoryProcessStore, type ProcessRef, type ProcessStore } from "@langwatch/eventing";
+import { InMemoryProcessStore, type ProcessStore } from "@langwatch/eventing";
 import {
   INSIGHT_RUN_FINDINGS_FENCE_TAG,
   type InsightRunSettledEventData,
@@ -15,7 +15,10 @@ import type { LangyApi } from "@langwatch/langy-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
-import { INITIAL_INSIGHT_DAILY_RUN_STATE } from "../../eventing/insight-daily-run.process.ts";
+import {
+  INITIAL_INSIGHT_DAILY_RUN_STATE,
+  INSIGHT_DAILY_RUN_PROCESS_NAME,
+} from "../../eventing/insight-daily-run.process.ts";
 import type { InsightRepository } from "../../repositories/insight.repository.ts";
 import type { InsightCommandsService } from "../insight-commands.service.ts";
 import type { InsightDailyRunCommandsService } from "../insight-daily-run-commands.service.ts";
@@ -44,18 +47,50 @@ const neverSettles: Langy["awaitTurnSettlement"] = ({ signal }) =>
     signal.addEventListener("abort", () => resolve({ kind: "stopped" }), { once: true });
   });
 
-/** The run the schedule's process waits on, read by read; the last answer stands. */
-function processWaitingOn(pendingRunIds: readonly string[]): Pick<ProcessStore, "findByRef"> {
-  const answers = [...pendingRunIds];
-  // Assigned over a store, as `findByRef` is generic in the state it answers.
-  return Object.assign(InMemoryProcessStore.createForTesting(), {
-    findByRef: async ({ ref }: { ref: ProcessRef }) => {
-      const runId = answers.length > 1 ? answers.shift()! : answers[0]!;
-      const pendingRun = { runId, since: RUN.slot, slot: RUN.slot };
-      const state = { ...INITIAL_INSIGHT_DAILY_RUN_STATE, pendingRun };
-      return { ref, tenantId: ref.projectId, state, revision: 1, nextWakeAt: null, updatedAt: 0 };
+const SCHEDULE_REF = {
+  processName: INSIGHT_DAILY_RUN_PROCESS_NAME,
+  projectId: RUN.projectId,
+  processKey: RUN.scheduleId,
+};
+
+/** Leaves the schedule's process instance as its handlers would, waiting on the given run. */
+async function waitOn({ store, runId }: { store: ProcessStore; runId: string }): Promise<void> {
+  await commitState({
+    store,
+    state: {
+      ...INITIAL_INSIGHT_DAILY_RUN_STATE,
+      pendingRun: { runId, since: RUN.slot, slot: RUN.slot },
     },
   });
+}
+
+async function commitState({ store, state }: { store: ProcessStore; state: unknown }) {
+  const existing = await store.findByRef({ ref: SCHEDULE_REF });
+  const expectedRevision = existing?.revision ?? 0;
+  await store.commit({
+    ref: SCHEDULE_REF,
+    tenantId: RUN.projectId,
+    sourceEventId: `event-${expectedRevision}`,
+    expectedRevision,
+    state,
+    nextWakeAt: null,
+    messages: [],
+    now: RUN.slot,
+  });
+}
+
+/** A turn during which a newer run takes the schedule over, then ends at the deadline. */
+function takenOverDuring({
+  store,
+  settle = neverSettles,
+}: {
+  store: ProcessStore;
+  settle?: Langy["awaitTurnSettlement"];
+}): Langy["awaitTurnSettlement"] {
+  return async (input) => {
+    await waitOn({ store, runId: "run-2" });
+    return settle(input);
+  };
 }
 
 /** A turn that answers one finding at once, in the fenced block a run reads. */
@@ -195,7 +230,9 @@ describe("given a newer run took the run over before it started its turn", () =>
   /** @scenario "A run handed on to a newer run before its turn records no start" */
   it("records neither its start nor its outcome, and stops its turn", async () => {
     const { service, started, settled, stopped } = harness();
-    service.connect(processWaitingOn(["run-2"]));
+    const store = InMemoryProcessStore.createForTesting();
+    await waitOn({ store, runId: "run-2" });
+    service.connect(store);
 
     await service.run(RUN);
 
@@ -208,8 +245,12 @@ describe("given a newer run took the run over before it started its turn", () =>
 describe("given a newer run took the run over while its turn ran", () => {
   /** @scenario "A run handed on to a newer run before its outcome records no outcome" */
   it("records its start, and no outcome", async () => {
-    const { service, started, settled } = harness();
-    service.connect(processWaitingOn(["run-1", "run-2"]));
+    const store = InMemoryProcessStore.createForTesting();
+    await waitOn({ store, runId: "run-1" });
+    const { service, started, settled } = harness({
+      awaitTurnSettlement: takenOverDuring({ store }),
+    });
+    service.connect(store);
 
     await service.run(RUN);
 
@@ -222,7 +263,9 @@ describe("given the schedule's process still waits on the run", () => {
   /** @scenario "A run the schedule still waits on records its start and its outcome" */
   it("records its start and its outcome", async () => {
     const { service, started, settled } = harness();
-    service.connect(processWaitingOn(["run-1"]));
+    const store = InMemoryProcessStore.createForTesting();
+    await waitOn({ store, runId: "run-1" });
+    service.connect(store);
 
     await service.run(RUN);
 
@@ -234,13 +277,10 @@ describe("given the schedule's process still waits on the run", () => {
 describe("given the process store cannot be read when the run ends", () => {
   /** @scenario "A run whose schedule cannot be read still records its outcome" */
   it("still records the run's outcome as failed with the reason timeout", async () => {
-    const unreadable = Object.assign(InMemoryProcessStore.createForTesting(), {
-      findByRef: async () => {
-        throw new Error("process store unavailable");
-      },
-    });
+    const store = InMemoryProcessStore.createForTesting();
+    await commitState({ store, state: { pendingRun: "not a run" } });
     const { service, settled } = harness();
-    service.connect(unreadable);
+    service.connect(store);
 
     await service.run(RUN);
 
@@ -251,10 +291,12 @@ describe("given the process store cannot be read when the run ends", () => {
 describe("given a newer run took the run over before its answer was filed", () => {
   /** @scenario "A run handed on to a newer run during its turn files nothing" */
   it("files nothing and records no outcome", async () => {
+    const store = InMemoryProcessStore.createForTesting();
+    await waitOn({ store, runId: "run-1" });
     const { service, started, settled, filed } = harness({
-      awaitTurnSettlement: answersOneFinding,
+      awaitTurnSettlement: takenOverDuring({ store, settle: answersOneFinding }),
     });
-    service.connect(processWaitingOn(["run-1", "run-2"]));
+    service.connect(store);
 
     await service.run(RUN);
 
@@ -269,7 +311,9 @@ describe("given a run that replaces a lost one", () => {
 
   it("records the lost run as timed out while the process waits on this run", async () => {
     const { service, settled } = harness();
-    service.connect(processWaitingOn(["run-1"]));
+    const store = InMemoryProcessStore.createForTesting();
+    await waitOn({ store, runId: "run-1" });
+    service.connect(store);
 
     await service.run(SUPERSEDING);
 
@@ -278,7 +322,9 @@ describe("given a run that replaces a lost one", () => {
 
   it("records the lost run and this run each with its own start", async () => {
     const { service, started, settled } = harness();
-    service.connect(processWaitingOn(["run-1"]));
+    const store = InMemoryProcessStore.createForTesting();
+    await waitOn({ store, runId: "run-1" });
+    service.connect(store);
     const supersedes = { ...SUPERSEDING.supersedes, since: 1_000 };
 
     await service.run({ ...SUPERSEDING, since: 2_000, supersedes });
@@ -293,7 +339,9 @@ describe("given a run that replaces a lost one", () => {
   /** @scenario "A replacement handed on records nothing for the run it replaced" */
   it("records nothing for the lost run once the process waits on another run", async () => {
     const { service, settled } = harness();
-    service.connect(processWaitingOn(["run-2"]));
+    const store = InMemoryProcessStore.createForTesting();
+    await waitOn({ store, runId: "run-2" });
+    service.connect(store);
 
     await service.run(SUPERSEDING);
 
