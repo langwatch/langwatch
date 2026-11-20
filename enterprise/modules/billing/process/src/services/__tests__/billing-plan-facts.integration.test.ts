@@ -284,7 +284,6 @@ describe("billing's subscription_changed fact, as nurturing's linked tests deliv
       });
       const run = () =>
         resync.resync({
-          after: undefined,
           dryRun: false,
           signal: new AbortController().signal,
           onPage: async () => {},
@@ -317,7 +316,6 @@ describe("billing's subscription_changed fact, as nurturing's linked tests deliv
       });
 
       const report = await resync.resync({
-        after: undefined,
         dryRun: true,
         signal: new AbortController().signal,
         onPage: async (page) => void saves.push(page),
