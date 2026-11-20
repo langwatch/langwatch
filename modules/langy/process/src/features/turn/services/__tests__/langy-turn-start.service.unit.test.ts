@@ -154,6 +154,29 @@ describe("LangyTurnStartService", () => {
     });
   });
 
+  describe("given a copy of the send is still being prepared", () => {
+    /** @scenario A send that clashes with a copy still being prepared is refused as Langy unavailable */
+    it("refuses before minting, accepting or dispatching", async () => {
+      const fixture = makeFixture({
+        admission: {
+          claim: vi.fn(async () => ({ kind: "pending" as const })),
+          commit: vi.fn(async () => undefined),
+          confirmAccepted: vi.fn(async () => undefined),
+          abort: vi.fn(async () => undefined),
+          release: vi.fn(async () => undefined),
+        },
+      });
+
+      await expect(
+        LangyTurnService.create(fixture.deps).startConversationTurn(input()),
+      ).rejects.toMatchObject({ code: "langy_agent_unavailable" });
+
+      expect(fixture.mint).not.toHaveBeenCalled();
+      expect(fixture.acceptTurn).not.toHaveBeenCalled();
+      expect(fixture.dispatch).not.toHaveBeenCalled();
+    });
+  });
+
   describe("given no default model is configured", () => {
     it("fails before admission when no default model is configured", async () => {
       const fixture = makeFixture({
