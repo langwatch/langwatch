@@ -68,4 +68,11 @@ describe("a Claude Code span's conversation", () => {
     expect(attributes["gen_ai.conversation.id"]).toBe("agent_scout");
     expect(attributes).not.toHaveProperty("resourceAttributes");
   });
+
+  /** @scenario a launcher's declared session groups every harness session it runs */
+  it("reads a numeric declared session the way the session aggregate does", () => {
+    const attributes = canonicalise({ "session.id": "cc-run-4" }, { "langwatch.session.id": 42 });
+
+    expect(attributes["gen_ai.conversation.id"]).toBe("42");
+  });
 });

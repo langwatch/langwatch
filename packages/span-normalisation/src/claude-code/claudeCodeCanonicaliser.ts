@@ -24,6 +24,10 @@ const DECLARED_SESSION_ID = "langwatch.session.id";
 const asString = (raw: unknown): string | null =>
   typeof raw === "string" && raw.length > 0 ? raw : null;
 
+/** A session key as the coding-agent aggregate reads it: a string, or a finite number as text. */
+const asSessionKey = (raw: unknown): string | null =>
+  typeof raw === "number" && Number.isFinite(raw) ? String(raw) : asString(raw);
+
 export class ClaudeCodeCanonicaliserService implements AttributeCanonicaliser {
   static create(): ClaudeCodeCanonicaliserService {
     return new ClaudeCodeCanonicaliserService();
@@ -177,9 +181,9 @@ export class ClaudeCodeCanonicaliserService implements AttributeCanonicaliser {
    */
   private keySession(ctx: ExtractorContext): void {
     const session =
-      asString(ctx.bag.attrs.get(DECLARED_SESSION_ID)) ??
-      asString(ctx.span.resourceAttributes?.[DECLARED_SESSION_ID]) ??
-      asString(ctx.bag.attrs.get("session.id"));
+      asSessionKey(ctx.bag.attrs.get(DECLARED_SESSION_ID)) ??
+      asSessionKey(ctx.span.resourceAttributes?.[DECLARED_SESSION_ID]) ??
+      asSessionKey(ctx.bag.attrs.get("session.id"));
     const conversation = asString(ctx.out[ATTR_KEYS.GEN_AI_CONVERSATION_ID]);
     if (session === null || session === conversation) return;
     if (conversation !== null) ctx.setAttrIfAbsent(ATTR_KEYS.LANGWATCH_THREAD_ID, conversation);
