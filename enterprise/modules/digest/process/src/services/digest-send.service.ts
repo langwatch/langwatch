@@ -32,8 +32,6 @@ import {
   type DigestTemplateProps,
   type OrganizationWeek,
   pickFocusProject,
-  pickHomeOrganization,
-  weekActivity,
   weekVisibleTo,
 } from "../rules/digest-email.rules.ts";
 import { DIGEST_UNSUBSCRIBE_PATH, renderDigestMail } from "../rules/digest-mail.rules.ts";
@@ -42,13 +40,11 @@ import {
   eligibleDigestTemplates,
 } from "../rules/digest-template.rules.ts";
 import { oldestKeptWeek, plannableWeek, sendableWeek } from "../rules/digest-week.rules.ts";
+import { DigestHomeOrganization, type Membership } from "./digest-home-organization.ts";
 import type { DigestUnsubscribeService } from "./digest-unsubscribe.service.ts";
 import type { DigestWeekService } from "./digest-week.service.ts";
 
 type Member = Readonly<{ userId: string; admin: boolean }>;
-
-/** A member's standing when their email is sent, which may differ from the plan's. */
-type Membership = Readonly<{ kind: "active"; admin: boolean }> | Readonly<{ kind: "gone" }>;
 
 const logger = createLogger("langwatch:digest");
 
@@ -149,7 +145,15 @@ export class DigestSendService {
     return new DigestSendService(deps);
   }
 
-  private constructor(private readonly deps: Deps) {}
+  readonly #home: DigestHomeOrganization;
+
+  private constructor(private readonly deps: Deps) {
+    this.#home = DigestHomeOrganization.create({
+      weeks: deps.weeks,
+      membership: (input) => this.#membership(input),
+      visibleWeek: (input) => this.#visibleWeek(input),
+    });
+  }
 
   /**
    * The hourly wake's work: sweep old folds, then, for the week the slot may send, armed and not
@@ -199,7 +203,7 @@ export class DigestSendService {
       rosters,
       organizationsOf,
       attempt,
-      rankHome: (query) => this.#rankHome(query),
+      rankHome: (query) => this.#home.rankHome(query),
       requestSend: this.deps.requestSend,
       isoWeek,
       at,
@@ -242,7 +246,7 @@ export class DigestSendService {
     if (!user?.email) return skip("member has no email address");
     if (user.deactivatedAt !== null) return skip("member is deactivated");
     const choice = { organizationId, userId, isoWeek, enrolled, homeOrganizationId };
-    if (!(await this.#isHomeOrganization(choice))) return skip("another organization is home");
+    if (!(await this.#home.isHomeOrganization(choice))) return skip("another organization is home");
     const week = await this.#visibleWeek({
       week: await this.deps.weeks.organizationWeek({ organizationId, isoWeek }),
       userId,
@@ -343,70 +347,6 @@ export class DigestSendService {
       total = page.members.length < MEMBER_PAGE ? offset : page.totalCount;
     }
     return members;
-  }
-
-  /**
-   * A person in several enrolled organizations is sent one email a week, from the home the plan
-   * stored on the request. With none stored (a request asked before it was), or a stored home
-   * that can no longer send (unenrolled, or the person left it), the send ranks the
-   * organizations they are still in now.
-   */
-  async #isHomeOrganization({
-    organizationId,
-    userId,
-    isoWeek,
-    enrolled,
-    homeOrganizationId,
-  }: {
-    organizationId: string;
-    userId: string;
-    isoWeek: string;
-    enrolled: readonly string[];
-    homeOrganizationId: string | null;
-  }): Promise<boolean> {
-    if (homeOrganizationId === organizationId) return true;
-    if (
-      homeOrganizationId !== null &&
-      enrolled.includes(homeOrganizationId) &&
-      (await this.#membership({ organizationId: homeOrganizationId, userId })).kind === "active"
-    ) {
-      return false;
-    }
-    const candidates = [organizationId];
-    for (const other of enrolled.filter((id) => id !== organizationId)) {
-      const standing = await this.#membership({ organizationId: other, userId });
-      if (standing.kind === "active") candidates.push(other);
-    }
-    return (await this.#rankHome({ userId, isoWeek, candidates })) === organizationId;
-  }
-
-  /**
-   * Of the organizations a person is in, the one where their week had the most activity (lowest
-   * id on a tie); none when there are no candidates.
-   */
-  async #rankHome({
-    userId,
-    isoWeek,
-    candidates,
-  }: {
-    userId: string;
-    isoWeek: string;
-    candidates: readonly string[];
-  }): Promise<string | undefined> {
-    if (candidates.length <= 1) return candidates[0];
-    const ranked = await Promise.all(
-      candidates.map(async (candidate) => ({
-        organizationId: candidate,
-        activity: weekActivity({
-          week: await this.#visibleWeek({
-            week: await this.deps.weeks.organizationWeek({ organizationId: candidate, isoWeek }),
-            userId,
-          }),
-          userId,
-        }),
-      })),
-    );
-    return pickHomeOrganization(ranked);
   }
 
   /** The member's standing now; a member removed since the plan answers not-found. */

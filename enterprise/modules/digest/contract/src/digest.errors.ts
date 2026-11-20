@@ -112,11 +112,11 @@ export class DigestUnsubscribeRateLimitedError extends HandledError {
   declare readonly code: "digest_unsubscribe_rate_limited";
 
   constructor() {
-    super(
-      "digest_unsubscribe_rate_limited",
-      "Too many attempts. Wait a minute and try again.",
-      { httpStatus: 429, retryable: true, fault: "customer" },
-    );
+    super("digest_unsubscribe_rate_limited", "Too many attempts. Wait a minute and try again.", {
+      httpStatus: 429,
+      retryable: true,
+      fault: "customer",
+    });
     this.name = "DigestUnsubscribeRateLimitedError";
   }
 }
