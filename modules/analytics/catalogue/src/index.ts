@@ -20,7 +20,6 @@ export {
 export {
   CURATED_BOARD_DEFINITIONS,
   CURATED_BOARD_SEGMENT,
-  CURATED_TEMPLATE_IDS,
   type CuratedBoardDefinition,
   curatedBoardDefinitionById,
   curatedBoardPointerId,

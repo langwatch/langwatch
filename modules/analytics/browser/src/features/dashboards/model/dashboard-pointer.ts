@@ -96,10 +96,10 @@ function curatedPointer({
   projectSlug: string;
 }): ResolvedPointer {
   const board = curated.find((each) => each.templateId === templateId);
-  if (!board || templateId === void 0) {
+  if (!board) {
     return { board: gone(pointer.boardName), ...keptWidget(pointer) };
   }
-  const href = curatedBoardPath({ projectSlug, templateId });
+  const href = curatedBoardPath({ projectSlug, templateId: board.templateId });
   if (!pointer.widget) return { board: { name: board.name, href, deleted: false } };
   const widgetKey = pointer.widget.id;
   return {
