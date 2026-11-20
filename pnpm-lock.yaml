@@ -693,8 +693,8 @@ catalogs:
       specifier: ^2.3.0
       version: 2.3.0
     zustand:
-      specifier: ^4.5.7
-      version: 4.5.7
+      specifier: ^5.0.15
+      version: 5.0.15
   sdk-toolchain:
     typescript:
       specifier: ^6.0.3
@@ -2149,7 +2149,7 @@ importers:
         version: 4.6.7
       zustand:
         specifier: 'catalog:'
-        version: 4.5.7(@types/react@19.2.18)(immer@11.1.8)(react@19.2.8)
+        version: 5.0.15(@types/react@19.2.18)(immer@11.1.8)(react@19.2.8)(use-sync-external-store@1.6.0(react@19.2.8))
     devDependencies:
       '@ai-sdk/openai':
         specifier: 'catalog:'
@@ -6649,7 +6649,7 @@ importers:
         version: 4.6.7
       zustand:
         specifier: 'catalog:'
-        version: 4.5.7(@types/react@19.2.18)(immer@11.1.8)(react@19.2.8)
+        version: 5.0.15(@types/react@19.2.18)(immer@11.1.8)(react@19.2.8)(use-sync-external-store@1.6.0(react@19.2.8))
     devDependencies:
       '@chakra-ui/react':
         specifier: 'catalog:'
@@ -7729,7 +7729,7 @@ importers:
         version: 4.6.7
       zustand:
         specifier: 'catalog:'
-        version: 4.5.7(@types/react@19.2.18)(immer@11.1.8)(react@19.2.8)
+        version: 5.0.15(@types/react@19.2.18)(immer@11.1.8)(react@19.2.8)(use-sync-external-store@1.6.0(react@19.2.8))
     devDependencies:
       '@langwatch/vitest-config':
         specifier: workspace:*
@@ -8746,10 +8746,10 @@ importers:
         version: 4.6.7
       zundo:
         specifier: 'catalog:'
-        version: 2.3.0(zustand@4.5.7(@types/react@19.2.18)(immer@11.1.8)(react@19.2.8))
+        version: 2.3.0(zustand@5.0.15(@types/react@19.2.18)(immer@11.1.8)(react@19.2.8))
       zustand:
         specifier: 'catalog:'
-        version: 4.5.7(@types/react@19.2.18)(immer@11.1.8)(react@19.2.8)
+        version: 5.0.15(@types/react@19.2.18)(immer@11.1.8)(react@19.2.8)(use-sync-external-store@1.6.0(react@19.2.8))
     devDependencies:
       '@langwatch/vitest-config':
         specifier: workspace:*
@@ -10658,7 +10658,7 @@ importers:
         version: 4.6.7
       zustand:
         specifier: 'catalog:'
-        version: 4.5.7(@types/react@19.2.18)(immer@11.1.8)(react@19.2.8)
+        version: 5.0.15(@types/react@19.2.18)(immer@11.1.8)(react@19.2.8)(use-sync-external-store@1.6.0(react@19.2.8))
     devDependencies:
       '@langwatch/skills':
         specifier: workspace:*
@@ -11209,7 +11209,7 @@ importers:
         version: 5.0.0(zod@4.6.7)
       zustand:
         specifier: 'catalog:'
-        version: 4.5.7(@types/react@19.2.18)(immer@11.1.8)(react@19.2.8)
+        version: 5.0.15(@types/react@19.2.18)(immer@11.1.8)(react@19.2.8)(use-sync-external-store@1.6.0(react@19.2.8))
     devDependencies:
       '@chakra-ui/react':
         specifier: 'catalog:'
@@ -12084,7 +12084,7 @@ importers:
         version: 4.6.7
       zustand:
         specifier: 'catalog:'
-        version: 4.5.7(@types/react@19.2.18)(immer@11.1.8)(react@19.2.8)
+        version: 5.0.15(@types/react@19.2.18)(immer@11.1.8)(react@19.2.8)(use-sync-external-store@1.6.0(react@19.2.8))
     devDependencies:
       '@chakra-ui/react':
         specifier: 'catalog:'
@@ -12373,7 +12373,7 @@ importers:
         version: 10.1.1(react@19.2.8)
       zustand:
         specifier: 'catalog:'
-        version: 4.5.7(@types/react@19.2.18)(immer@11.1.8)(react@19.2.8)
+        version: 5.0.15(@types/react@19.2.18)(immer@11.1.8)(react@19.2.8)(use-sync-external-store@1.6.0(react@19.2.8))
     devDependencies:
       '@langwatch/vitest-config':
         specifier: workspace:*
@@ -13379,7 +13379,7 @@ importers:
         version: 4.6.7
       zustand:
         specifier: 'catalog:'
-        version: 4.5.7(@types/react@19.2.18)(immer@11.1.8)(react@19.2.8)
+        version: 5.0.15(@types/react@19.2.18)(immer@11.1.8)(react@19.2.8)(use-sync-external-store@1.6.0(react@19.2.8))
     devDependencies:
       '@chakra-ui/react':
         specifier: 'catalog:'
@@ -13719,7 +13719,7 @@ importers:
         version: 5.0.0(zod@4.6.7)
       zustand:
         specifier: 'catalog:'
-        version: 4.5.7(@types/react@19.2.18)(immer@11.1.8)(react@19.2.8)
+        version: 5.0.15(@types/react@19.2.18)(immer@11.1.8)(react@19.2.8)(use-sync-external-store@1.6.0(react@19.2.8))
     devDependencies:
       '@langwatch/vitest-config':
         specifier: workspace:*
@@ -14311,7 +14311,7 @@ importers:
         version: 4.6.7
       zustand:
         specifier: 'catalog:'
-        version: 4.5.7(@types/react@19.2.18)(immer@11.1.8)(react@19.2.8)
+        version: 5.0.15(@types/react@19.2.18)(immer@11.1.8)(react@19.2.8)(use-sync-external-store@1.6.0(react@19.2.8))
     devDependencies:
       '@langwatch/vitest-config':
         specifier: workspace:*
@@ -15286,7 +15286,7 @@ importers:
         version: 4.6.7
       zustand:
         specifier: 'catalog:'
-        version: 4.5.7(@types/react@19.2.18)(immer@11.1.8)(react@19.2.8)
+        version: 5.0.15(@types/react@19.2.18)(immer@11.1.8)(react@19.2.8)(use-sync-external-store@1.6.0(react@19.2.8))
     devDependencies:
       '@testing-library/jest-dom':
         specifier: 'catalog:'
@@ -15838,7 +15838,7 @@ importers:
         version: 4.6.7
       zustand:
         specifier: 'catalog:'
-        version: 4.5.7(@types/react@19.2.18)(immer@11.1.8)(react@19.2.8)
+        version: 5.0.15(@types/react@19.2.18)(immer@11.1.8)(react@19.2.8)(use-sync-external-store@1.6.0(react@19.2.8))
     devDependencies:
       '@langwatch/span-normalisation':
         specifier: workspace:*
@@ -16820,10 +16820,10 @@ importers:
         version: 4.6.7
       zundo:
         specifier: 'catalog:'
-        version: 2.3.0(zustand@4.5.7(@types/react@19.2.18)(immer@11.1.8)(react@19.2.8))
+        version: 2.3.0(zustand@5.0.15(@types/react@19.2.18)(immer@11.1.8)(react@19.2.8))
       zustand:
         specifier: 'catalog:'
-        version: 4.5.7(@types/react@19.2.18)(immer@11.1.8)(react@19.2.8)
+        version: 5.0.15(@types/react@19.2.18)(immer@11.1.8)(react@19.2.8)(use-sync-external-store@1.6.0(react@19.2.8))
     devDependencies:
       '@langwatch/vitest-config':
         specifier: workspace:*
@@ -17378,7 +17378,7 @@ importers:
         version: 4.0.1(supports-color@10.2.2)
       zustand:
         specifier: 'catalog:'
-        version: 4.5.7(@types/react@19.2.18)(immer@11.1.8)(react@19.2.8)
+        version: 5.0.15(@types/react@19.2.18)(immer@11.1.8)(react@19.2.8)(use-sync-external-store@1.6.0(react@19.2.8))
     devDependencies:
       '@emotion/react':
         specifier: 'catalog:'
@@ -30614,6 +30614,24 @@ packages:
       immer:
         optional: true
       react:
+        optional: true
+
+  zustand@5.0.15:
+    resolution: {integrity: sha512-MpSEjRiBkA9crSYeOUH32rJC7SVqAbm0Fqcqge/bUi2PPoLcBWKOsG+C8mevmpr8TwXHBVkChbbJiyvkE+i/3A==}
+    engines: {node: '>=12.20.0'}
+    peerDependencies:
+      '@types/react': '>=18.0.0'
+      immer: '>=9.0.6'
+      react: ^19.2.7
+      use-sync-external-store: '>=1.2.0'
+    peerDependenciesMeta:
+      '@types/react':
+        optional: true
+      immer:
+        optional: true
+      react:
+        optional: true
+      use-sync-external-store:
         optional: true
 
   zwitch@2.0.4:
@@ -43944,9 +43962,9 @@ snapshots:
 
   zone.js@0.15.1: {}
 
-  zundo@2.3.0(zustand@4.5.7(@types/react@19.2.18)(immer@11.1.8)(react@19.2.8)):
+  zundo@2.3.0(zustand@5.0.15(@types/react@19.2.18)(immer@11.1.8)(react@19.2.8)):
     dependencies:
-      zustand: 4.5.7(@types/react@19.2.18)(immer@11.1.8)(react@19.2.8)
+      zustand: 5.0.15(@types/react@19.2.18)(immer@11.1.8)(react@19.2.8)(use-sync-external-store@1.6.0(react@19.2.8))
 
   zustand@4.5.7(@types/react@19.2.18)(immer@11.1.8)(react@19.2.8):
     dependencies:
@@ -43955,5 +43973,12 @@ snapshots:
       '@types/react': 19.2.18
       immer: 11.1.8
       react: 19.2.8
+
+  zustand@5.0.15(@types/react@19.2.18)(immer@11.1.8)(react@19.2.8)(use-sync-external-store@1.6.0(react@19.2.8)):
+    optionalDependencies:
+      '@types/react': 19.2.18
+      immer: 11.1.8
+      react: 19.2.8
+      use-sync-external-store: 1.6.0(react@19.2.8)
 
   zwitch@2.0.4: {}
