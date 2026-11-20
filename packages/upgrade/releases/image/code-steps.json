@@ -307,6 +307,30 @@
     "needsOldWritersGone": true
   },
   {
+    "id": "nurturing:replay-user-erasure-marks",
+    "kind": "data",
+    "mode": "background",
+    "owner": "nurturing",
+    "description": "Marks every person erased in user's log, before the keys copy.",
+    "needsOldWritersGone": true
+  },
+  {
+    "id": "nurturing:replay-identity-erasure-marks",
+    "kind": "data",
+    "mode": "background",
+    "owner": "nurturing",
+    "description": "Marks every person erased in identity's log, before the keys copy.",
+    "needsOldWritersGone": true
+  },
+  {
+    "id": "nurturing:replay-virtual-keys",
+    "kind": "data",
+    "mode": "background",
+    "owner": "nurturing",
+    "description": "Fills nurturing's key copy from gateway's key lifecycle log at deploy.",
+    "needsOldWritersGone": true
+  },
+  {
     "id": "ops:copy-automation-migration-state",
     "kind": "data",
     "mode": "blocking",

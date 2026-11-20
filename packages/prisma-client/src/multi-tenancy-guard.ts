@@ -129,6 +129,9 @@ const GLOBAL_MODELS = [
   // Identity's sign-in switch (sign-in-switch.feature): keyed by userId alone, read on the
   // sign-in path before any tenant is known, like AccountCredential; written in raw SQL only.
   "IdentitySignInSwitch",
+  // Nurturing's erased accounts, by a hash of the id alone: an erasure spans every organization,
+  // like AuthzUserStanding; written in raw SQL only.
+  "NurturingErasedUser",
 ] as const;
 
 /**

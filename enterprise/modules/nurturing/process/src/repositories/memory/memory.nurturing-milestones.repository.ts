@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+import type { NurturingErasedUserRepository } from "../nurturing-erased-user.repository.ts";
 import {
   MAX_CODING_REPOSITORY_KEYS,
   type NurturingCodingMilestonesRepository,
@@ -8,6 +9,7 @@ import {
   type NurturingOrganizationRow,
   type NurturingTraceMilestonesRepository,
 } from "../nurturing-milestones.repository.ts";
+import { MemoryNurturingErasedUserRepository } from "./memory.nurturing-erased-user.repository.ts";
 
 /** A row plus the columns only their own writes read, as the Postgres table holds them. */
 type MemoryOrganization = NurturingOrganizationRow &
@@ -28,8 +30,19 @@ export class MemoryNurturingMilestonesRepository
   readonly #organizations = new Map<string, MemoryOrganization>();
   readonly #lastTraceAt = new Map<string, number>();
 
-  static create(): MemoryNurturingMilestonesRepository {
-    return new MemoryNurturingMilestonesRepository();
+  /** `erasedUsers` is the marks every memory copy of one composition shares. */
+  static create({
+    erasedUsers = MemoryNurturingErasedUserRepository.create(),
+  }: Readonly<{
+    erasedUsers?: NurturingErasedUserRepository;
+  }> = {}): MemoryNurturingMilestonesRepository {
+    return new MemoryNurturingMilestonesRepository(erasedUsers);
+  }
+
+  readonly #erasedUsers: NurturingErasedUserRepository;
+
+  private constructor(erasedUsers: NurturingErasedUserRepository) {
+    this.#erasedUsers = erasedUsers;
   }
 
   async recordLastTrace({
@@ -77,6 +90,7 @@ export class MemoryNurturingMilestonesRepository
   }
 
   async forgetAdmin({ adminUserId }: Readonly<{ adminUserId: string }>): Promise<void> {
+    await this.#erasedUsers.markErased({ userId: adminUserId });
     for (const [organizationId, organization] of this.#organizations) {
       if (organization.adminUserId === adminUserId) {
         this.#organizations.set(organizationId, { ...organization, adminUserId: null });
@@ -92,7 +106,7 @@ export class MemoryNurturingMilestonesRepository
     if (!organization) return [];
     const counted = { ...organization, evaluationCount: organization.evaluationCount + by };
     this.#organizations.set(organizationId, counted);
-    return [counted];
+    return [await this.#unlessErased(counted)];
   }
 
   async countSimulationRun({
@@ -103,14 +117,22 @@ export class MemoryNurturingMilestonesRepository
     if (!organization) return [];
     const counted = { ...organization, simulationRunCount: organization.simulationRunCount + by };
     this.#organizations.set(organizationId, counted);
-    return [counted];
+    return [await this.#unlessErased(counted)];
   }
 
   async findOrganization({
     organizationId,
   }: Readonly<{ organizationId: string }>): Promise<NurturingOrganizationRow[]> {
     const organization = this.#organizations.get(organizationId);
-    return organization ? [organization] : [];
+    return organization ? [await this.#unlessErased(organization)] : [];
+  }
+
+  /** As the Postgres twin: a marked admin reads as none. */
+  async #unlessErased<Row extends NurturingOrganizationCounts>(organization: Row): Promise<Row> {
+    const { adminUserId } = organization;
+    if (adminUserId === null) return organization;
+    const [erased] = await this.#erasedUsers.findErased({ userIds: [adminUserId] });
+    return erased ? { ...organization, adminUserId: null } : organization;
   }
 
   async recordCodingFirstSession({

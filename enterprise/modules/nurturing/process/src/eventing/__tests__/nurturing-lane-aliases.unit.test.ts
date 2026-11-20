@@ -30,6 +30,8 @@ function laneAliases() {
     recordPersonalOwner: async () => undefined,
     recordTracedProject: async () => undefined,
     forgetErasedUser: async () => undefined,
+    virtualKeyCreated: async () => undefined,
+    keyBudgetCrossed: async () => undefined,
   }).laneAliases;
 }
 

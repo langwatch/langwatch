@@ -7,12 +7,17 @@ Feature: Nurturing keeps its own copy of personal owners and traced projects, fr
   traits a person is sent are still read where they were. Writing a copy calls no sink, so no
   Customer.io or PostHog request comes from these facts.
 
-  When user records an account erased, nurturing deletes every owner row naming it, in every
-  organization, and clears it wherever its own organization rows name it admin. It reads no
-  other module's table and calls no sink. Accepted residue: a personal-owner fact delivered
-  after the erasure (a delayed listing or a redelivered workspace fact) writes the owner row
-  again, and a late project-created fact naming the account as admin names it again, as
-  nurturing keeps no record of who was erased.
+  When user records an account erased, nurturing marks it erased (NurturingErasedUser, a hash of
+  its id), deletes every owner row naming it, in every organization, and clears it wherever its
+  own organization rows name it admin. It reads no other module's table and calls no sink. No
+  signal delivered after the mark reaches the account, and no read names it admin again: a late
+  project-created fact naming it admin stores it, but the mark reads it as no admin. The mark
+  is written when nurturing handles lw.user.erased, after user has committed the erasure: a
+  signal about the account delivered in between, however long that handling lags or retries,
+  still sends, and an identify then can recreate its Customer.io person, which nurturing never
+  deletes. Accepted
+  residue: a personal-owner fact delivered after the erasure (a delayed listing or a redelivered
+  workspace fact) writes the owner row again, as the owner copy does not read the marks.
 
   @unit @integration
   Scenario: A new personal workspace leaves one owner row naming its member
@@ -62,6 +67,26 @@ Feature: Nurturing keeps its own copy of personal owners and traced projects, fr
     Then no owner row names user-1, and user-2's row stays
     And no organization row names user-1 admin, and user-2 stays admin of its organization
     And neither Customer.io nor PostHog receives a request
+
+  @unit @integration
+  Scenario: An erased admin a late fact names again reads as no admin
+    Given user-1, admin of an organization, was erased
+    When a late project-created fact names user-1 admin of it again
+    Then nurturing reads the organization as having no admin
+    And so no plan, usage or gateway key send names user-1 its admin
+
+  @unit
+  Scenario: A signal about an erased account, delivered late, sends them nothing
+    Given user-1 was erased
+    When a signal about user-1, such as a scenario they created, is delivered afterwards
+    Then neither Customer.io nor PostHog receives a request
+
+  @unit
+  Scenario: A signal whose erasure marks cannot be read fails before any claim or send
+    Given nurturing cannot read its erasure marks
+    When a signal is delivered
+    Then the delivery fails, so the fact is retried
+    And no delivery claim is taken, and neither Customer.io nor PostHog receives a request
 
   @unit @integration
   Scenario: An erasure of an account nurturing holds no row for changes nothing

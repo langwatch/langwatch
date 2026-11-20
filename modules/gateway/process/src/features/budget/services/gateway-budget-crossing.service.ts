@@ -10,7 +10,10 @@ import type {
   BudgetSpendTarget,
   GatewayBudgetSpendRepository,
 } from "../../../repositories/gateway-budget-spend.repository.ts";
-import { budgetCrossingKind } from "../../../rules/gateway-budget-crossing.rules.ts";
+import {
+  budgetCrossingKind,
+  computePeriodEndsAtMs,
+} from "../../../rules/gateway-budget-crossing.rules.ts";
 import type { GatewayGovernanceEventsService } from "../../../services/gateway-governance-events.service.ts";
 import type { GatewayService } from "../../../services/gateway.service.ts";
 
@@ -127,6 +130,7 @@ export class GatewayBudgetCrossingService {
       window: budget.window,
       period_started_at_ms:
         periodFloorMs ?? currentPeriodStart(budget.window, now).epochMilliseconds,
+      period_ends_at_ms: computePeriodEndsAtMs({ budget, now }),
       limit_usd: limit.toFixed(6),
       spent_usd: spent.toFixed(6),
       on_breach: budget.onBreach === "BLOCK" ? "block" : "warn",

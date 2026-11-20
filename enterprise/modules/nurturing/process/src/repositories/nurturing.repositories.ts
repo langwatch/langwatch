@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import type { NurturingClaimRepository } from "./nurturing-claim.repository.ts";
+import type { NurturingErasedUserRepository } from "./nurturing-erased-user.repository.ts";
+import type { NurturingVirtualKeyRepository } from "./nurturing-gateway-key.repository.ts";
 import type { NurturingMemberSourceRepository } from "./nurturing-member-source.repository.ts";
 import type {
   NurturingCodingMilestonesRepository,
@@ -27,6 +29,8 @@ export interface NurturingRepositories {
   readonly projects: NurturingProjectDirectoryRepository;
   /** The owners' organizations and active members, read only by the member backfill task. */
   readonly memberSource: NurturingMemberSourceRepository;
+  /** Nurturing's erasure marks, read by the member, organization and key copies and every send. */
+  readonly erasedUsers: NurturingErasedUserRepository;
   /** Nurturing's own copy of each project's organization, from project's created event. */
   readonly placements: NurturingProjectPlacementRepository;
   /** Nurturing's own copy of each organization's creation, from organization's created event. */
@@ -35,6 +39,8 @@ export interface NurturingRepositories {
   readonly members: NurturingOrganizationMemberRepository;
   /** Nurturing's own copy of each organization's plan, folded from billing's subscription facts. */
   readonly plans: NurturingOrganizationPlanRepository;
+  /** Nurturing's own copy of each gateway key, folded from gateway's lifecycle facts. */
+  readonly virtualKeys: NurturingVirtualKeyRepository;
   /** Nurturing's own per-project usage: the peer folds' rows. */
   readonly projectUsage: NurturingProjectUsageRepository;
   /** Nurturing's own trace counts per project and day: the trace-day fold's rows. */

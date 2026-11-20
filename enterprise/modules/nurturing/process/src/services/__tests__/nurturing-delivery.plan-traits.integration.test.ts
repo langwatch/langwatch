@@ -19,6 +19,7 @@ import type { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { HttpCustomerIoChannel } from "../../channels/http/http.customer-io.channel.ts";
+import { MemoryNurturingErasedUserRepository } from "../../repositories/memory/memory.nurturing-erased-user.repository.ts";
 import { MemoryNurturingMilestonesRepository } from "../../repositories/memory/memory.nurturing-milestones.repository.ts";
 import type { MemoryNurturingOrganizationMemberRepository } from "../../repositories/memory/memory.nurturing-organization-member.repository.ts";
 import { MemoryNurturingOrganizationPlanRepository } from "../../repositories/memory/memory.nurturing-organization-plan.repository.ts";
@@ -77,11 +78,13 @@ async function deliveryOver({
   customerIo,
   claims = MemoryNurturingClaimRepository.create(),
   members,
+  erasedUsers = MemoryNurturingErasedUserRepository.create(),
   plans = MemoryNurturingOrganizationPlanRepository.create(),
 }: {
   customerIo: NurturingService | undefined;
   claims?: MemoryNurturingClaimRepository;
   members?: MemoryNurturingOrganizationMemberRepository;
+  erasedUsers?: MemoryNurturingErasedUserRepository;
   plans?: MemoryNurturingOrganizationPlanRepository;
 }) {
   const milestones = MemoryNurturingMilestonesRepository.create();
@@ -91,6 +94,7 @@ async function deliveryOver({
     seeded: false,
   });
   return NurturingDeliveryService.create({
+    erasedUsers,
     claims,
     customerIo,
     posthog: undefined,
@@ -121,9 +125,10 @@ async function settle(): Promise<void> {
 async function liveRequestsOf(
   fact: SubscriptionChangedEventData,
   members?: MemoryNurturingOrganizationMemberRepository,
+  erasedUsers?: MemoryNurturingErasedUserRepository,
 ) {
   const cio = recordingCustomerIo();
-  await deliverFact(await deliveryOver({ customerIo: cio.service, members }), fact);
+  await deliverFact(await deliveryOver({ customerIo: cio.service, members, erasedUsers }), fact);
   await settle();
   return cio;
 }
@@ -172,6 +177,26 @@ describe("NurturingDeliveryService, delivering billing's subscription_changed fa
       });
 
       const { sent } = await liveRequestsOf(subscriptionChangedFactFixture(), members);
+
+      const traits = { has_subscription: true, plan: "launch" };
+      expect(sent).toEqual([
+        [{ type: "group", userId: "admin-1", groupId: "org-1", traits: { plan: "launch" } }],
+        [{ type: "identify", userId: "user-1", traits }],
+      ]);
+    });
+  });
+
+  describe("when billing's fact names a member who was erased", () => {
+    /** @scenario "A subscription fact naming an erased member tells them nothing" */
+    it("groups the admin and identifies only the other member, whose row still stands", async () => {
+      const erasedUsers = MemoryNurturingErasedUserRepository.create();
+      await erasedUsers.markErased({ userId: "user-2" });
+
+      const { sent } = await liveRequestsOf(
+        subscriptionChangedFactFixture(),
+        await fixtureMemberCopy(),
+        erasedUsers,
+      );
 
       const traits = { has_subscription: true, plan: "launch" };
       expect(sent).toEqual([

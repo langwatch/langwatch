@@ -24,6 +24,7 @@ import type { NurturingCountedTrace } from "../rules/nurturing-trace-day.rules.t
 import { NurturingCodingMilestonesService } from "../services/nurturing-coding-milestones.service.ts";
 import { NurturingCopiedProjectsService } from "../services/nurturing-copied-projects.service.ts";
 import { NurturingDeliveryService } from "../services/nurturing-delivery.service.ts";
+import { NurturingGatewayFactsService } from "../services/nurturing-gateway-facts.service.ts";
 import { NurturingMemberFactsService } from "../services/nurturing-member-facts.service.ts";
 import { NurturingMilestonesService } from "../services/nurturing-milestones.service.ts";
 import { NurturingOrganizationCreatedService } from "../services/nurturing-organization-created.service.ts";
@@ -90,19 +91,28 @@ export class NurturingModule implements NurturingApi {
     const { posthog } = channels;
     if (posthog) resources.own("Nurturing PostHog client", () => posthog.close());
 
+    const memberFacts = NurturingMemberFactsService.create({
+      claims: repositories.claims,
+      milestones: repositories.milestones,
+      projects: repositories.projects,
+      organizations: dependencies.organizations,
+    });
     const delivery = NurturingDeliveryService.create({
       claims: repositories.claims,
       customerIo,
       posthog,
       users: dependencies.users,
-      memberFacts: NurturingMemberFactsService.create({
-        claims: repositories.claims,
-        milestones: repositories.milestones,
-        projects: repositories.projects,
-        organizations: dependencies.organizations,
-      }),
+      memberFacts,
       members: repositories.members,
+      erasedUsers: repositories.erasedUsers,
       plans: repositories.plans,
+    });
+    const gatewayFacts = NurturingGatewayFactsService.create({
+      keys: repositories.virtualKeys,
+      erasedUsers: repositories.erasedUsers,
+      members: repositories.members,
+      admins: memberFacts,
+      logger: createLogger("langwatch:nurturing:gateway-facts"),
     });
     const milestones = NurturingMilestonesService.create({
       milestones: repositories.milestones,
@@ -134,6 +144,7 @@ export class NurturingModule implements NurturingApi {
           organizationsCreated: repositories.organizationsCreated,
           milestones: repositories.milestones,
           members: repositories.members,
+          erasedUsers: repositories.erasedUsers,
           sendBatch: (calls) => customerIo.batchOrThrow(calls),
           clock: { nowMs: () => nowInstant().epochMilliseconds },
           logger,
@@ -145,6 +156,7 @@ export class NurturingModule implements NurturingApi {
       : void 0;
     const organizationCreated = customerIo
       ? NurturingOrganizationCreatedService.create({
+          erasedUsers: repositories.erasedUsers,
           sendBatch: (calls) => customerIo.batchOrThrow(calls),
           logger,
         })
@@ -158,6 +170,7 @@ export class NurturingModule implements NurturingApi {
       personalProjects: repositories.personalProjects,
       organizations: repositories.milestones,
       members: repositories.members,
+      virtualKeys: repositories.virtualKeys,
     });
     const uncopiedProjects = NurturingUncopiedProjectsService.create({
       uncopiedProjects: repositories.uncopiedProjects,
@@ -180,6 +193,8 @@ export class NurturingModule implements NurturingApi {
         recordPersonalOwner: (input) => projectFacts.recordPersonalOwner(input),
         recordTracedProject: (input) => projectFacts.recordTracedProject(input),
         forgetErasedUser: (input) => userErasure.forgetUser(input),
+        virtualKeyCreated: (input) => gatewayFacts.virtualKeyCreated(input),
+        keyBudgetCrossed: (input) => gatewayFacts.keyBudgetCrossed(input),
       }),
       organizationUsage,
       organizationCreated,

@@ -11,6 +11,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 
 import { HttpCustomerIoChannel } from "../../channels/http/http.customer-io.channel.ts";
 import { MemoryPostHogChannel } from "../../channels/memory/memory.posthog.channel.ts";
+import { MemoryNurturingErasedUserRepository } from "../../repositories/memory/memory.nurturing-erased-user.repository.ts";
 import { MemoryNurturingOrganizationMemberRepository } from "../../repositories/memory/memory.nurturing-organization-member.repository.ts";
 import { MemoryNurturingOrganizationPlanRepository } from "../../repositories/memory/memory.nurturing-organization-plan.repository.ts";
 import { MemoryNurturingClaimRepository } from "../../repositories/memory/memory.nurturing.repositories.ts";
@@ -67,6 +68,7 @@ class ClockedClaims implements NurturingClaimRepository {
 function deliveryOver(claims: NurturingClaimRepository, cio = customerIo()) {
   const posthog = MemoryPostHogChannel.create();
   const delivery = NurturingDeliveryService.create({
+    erasedUsers: MemoryNurturingErasedUserRepository.create(),
     claims,
     users: createApiFixture<UserApi>({}),
     memberFacts: unplacedMemberFacts(),

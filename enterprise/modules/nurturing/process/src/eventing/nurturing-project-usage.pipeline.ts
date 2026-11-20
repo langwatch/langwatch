@@ -33,11 +33,20 @@ import {
   type PeerBatchSubscriberDefinition,
   type PeerFoldProjectionDeclaration,
   type PeerFoldSubscriberSpec,
+  type PeerMapProjectionDeclaration,
   type PeerSubscriberContext,
   type PeerSubscriberDefinition,
   type ParsingSchema,
   throttledWindow,
 } from "@langwatch/eventing";
+import {
+  GATEWAY_VK_LIFECYCLE_EVENT_TYPE,
+  recordVkLifecycleCommandDataSchema,
+} from "@langwatch/gateway-contract";
+import {
+  USER_ERASED_EVENT_TYPE as IDENTITY_USER_ERASED_EVENT_TYPE,
+  userErasedPayloadSchema as identityUserErasedPayloadSchema,
+} from "@langwatch/identity-contract";
 import {
   INVITE_ACCEPTED_EVENT_TYPE,
   inviteAcceptedEventDataSchema,
@@ -85,9 +94,11 @@ import {
   traceFailedEventDataSchema,
   traceReceivedEventDataSchema,
 } from "@langwatch/trace-contract";
+import { USER_ERASED_EVENT_TYPE, userErasedEventDataSchema } from "@langwatch/user-contract";
 import { z } from "zod";
 
 import type { NurturingModule } from "../app/nurturing.app.ts";
+import type { NurturingVirtualKeyRepository } from "../repositories/nurturing-gateway-key.repository.ts";
 import type { NurturingOrganizationCreatedRepository } from "../repositories/nurturing-organization-created.repository.ts";
 import type { NurturingOrganizationMemberRepository } from "../repositories/nurturing-organization-member.repository.ts";
 import type { NurturingProjectPlacementRepository } from "../repositories/nurturing-project-placement.repository.ts";
@@ -106,6 +117,10 @@ import {
 } from "../rules/nurturing-project-usage.rules.ts";
 import { utcDayOf } from "../rules/nurturing-time.rules.ts";
 import type { NurturingCountedTrace } from "../rules/nurturing-trace-day.rules.ts";
+import {
+  type NurturingVirtualKeyFact,
+  virtualKeyFactOf,
+} from "../rules/nurturing-virtual-key.rules.ts";
 
 /** Hosts nurturing's peer folds and subscribers over the owners' facts; no event of its own. */
 export const NURTURING_PROJECT_USAGE_PIPELINE_NAME = "nurturing_project_usage" as const;
@@ -483,6 +498,7 @@ export type NurturingUsageCopies = Readonly<{
   copyLanded: (input: Readonly<{ projectId: string }>) => Promise<void>;
   organizationsCreated: NurturingOrganizationCreatedRepository;
   members: NurturingOrganizationMemberRepository;
+  virtualKeys: NurturingVirtualKeyRepository;
 }>;
 
 /** What the usage sync needs; absent without a Customer.io channel, when nothing syncs. */
@@ -504,9 +520,9 @@ function nurturingProjectUsageHost({
   copies: NurturingUsageCopies;
   sync: NurturingUsageSync | undefined;
 }>) {
-  const { organizationsCreated, members } = copies;
+  const { organizationsCreated, members, virtualKeys } = copies;
   // The copies always register, as nurturing's other copies do: a channel configured later
-  // then finds the projects, organizations and members created before it.
+  // then finds the projects, organizations, members and gateway keys created before it.
   const copied = definePipeline({
     name: NURTURING_PROJECT_USAGE_PIPELINE_NAME,
     aggregate: defineAggregate({ type: "nurturing_project_usage_view" }),
@@ -571,7 +587,12 @@ function nurturingProjectUsageHost({
         change: "returned",
         members,
       }),
-    );
+    )
+    // Registered whether or not a channel syncs. The marks lane is the key lane's replay
+    // prerequisite (the withMigrations steps in nurturing.module.ts).
+    .withPeerMapProjection(nurturingUserErasureMarksMap(virtualKeys))
+    .withPeerMapProjection(nurturingIdentityErasureMarksMap(virtualKeys))
+    .withPeerMapProjection(nurturingVirtualKeysMap(virtualKeys));
   // Without a channel no sync reads the usage rows, and none prunes the trace days, so none is kept.
   if (!sync) return copied;
   const { usageChanged, tracesChanged, organizationCreated } = sync;
@@ -693,6 +714,88 @@ export function nurturingFounderMembershipSubscriber(
   };
 }
 
+/** Lane names under `<host pipeline>.`, which the withMigrations steps in nurturing.module.ts name. */
+export const NURTURING_USER_ERASURE_MARKS_PROJECTION_NAME = "userErasureMarks" as const;
+export const NURTURING_IDENTITY_ERASURE_MARKS_PROJECTION_NAME = "identityErasureMarks" as const;
+export const NURTURING_VIRTUAL_KEYS_PROJECTION_NAME = "virtualKeys" as const;
+
+type ErasureMark = Readonly<{ userId: string }>;
+
+const USER_ERASURE_EVENTS = [
+  { type: USER_ERASED_EVENT_TYPE, data: userErasedEventDataSchema },
+] as const;
+const IDENTITY_ERASURE_EVENTS = [
+  { type: IDENTITY_USER_ERASED_EVENT_TYPE, data: identityUserErasedPayloadSchema },
+] as const;
+
+/**
+ * Marks the account and clears it from the key copies, nothing more: a marks step run after the
+ * key step still leaves no erased person on a key. The other copies' clearing stays on the live
+ * "userErased" lane.
+ */
+const markStore = (virtualKeys: Pick<NurturingVirtualKeyRepository, "forgetUser">) => ({
+  append: ({ userId }: ErasureMark) => virtualKeys.forgetUser({ userId }),
+});
+
+/**
+ * Nurturing's erasure marks from user's erasure facts (§9). One lane a source: a peer projection
+ * takes the events of one owner pipeline. Its replay step runs before the key copy's, so a key
+ * copied from old facts never stores a person erased before nurturing kept marks.
+ */
+export function nurturingUserErasureMarksMap(
+  virtualKeys: Pick<NurturingVirtualKeyRepository, "forgetUser">,
+): PeerMapProjectionDeclaration<ErasureMark, typeof USER_ERASURE_EVENTS> {
+  return {
+    events: USER_ERASURE_EVENTS,
+    map: {
+      name: NURTURING_USER_ERASURE_MARKS_PROJECTION_NAME,
+      eventTypes: [USER_ERASED_EVENT_TYPE],
+      map: ({ data: { userId } }) => ({ userId }),
+      store: markStore(virtualKeys),
+    },
+  };
+}
+
+/** The same marks from identity's erasure fact, which names the same account (see above). */
+export function nurturingIdentityErasureMarksMap(
+  virtualKeys: Pick<NurturingVirtualKeyRepository, "forgetUser">,
+): PeerMapProjectionDeclaration<ErasureMark, typeof IDENTITY_ERASURE_EVENTS> {
+  return {
+    events: IDENTITY_ERASURE_EVENTS,
+    map: {
+      name: NURTURING_IDENTITY_ERASURE_MARKS_PROJECTION_NAME,
+      eventTypes: [IDENTITY_USER_ERASED_EVENT_TYPE],
+      map: ({ data: { userId } }) => ({ userId }),
+      store: markStore(virtualKeys),
+    },
+  };
+}
+
+const VIRTUAL_KEY_EVENTS = [
+  { type: GATEWAY_VK_LIFECYCLE_EVENT_TYPE, data: recordVkLifecycleCommandDataSchema },
+] as const;
+
+/**
+ * Nurturing's own copy of a gateway key, from each of gateway's lifecycle facts (§9): its
+ * organization, name, creator, holder, purpose and state. One statement a fact, never a batch
+ * (no `bulkAppend`): the copy's equal-stamp tie-break and erasure check read the row each fact
+ * meets, so live and replay fold alike. Every column folds order-free, so a redelivered or late
+ * fact changes nothing.
+ */
+export function nurturingVirtualKeysMap(
+  virtualKeys: Pick<NurturingVirtualKeyRepository, "recordKeyFact">,
+): PeerMapProjectionDeclaration<NurturingVirtualKeyFact, typeof VIRTUAL_KEY_EVENTS> {
+  return {
+    events: VIRTUAL_KEY_EVENTS,
+    map: {
+      name: NURTURING_VIRTUAL_KEYS_PROJECTION_NAME,
+      eventTypes: [GATEWAY_VK_LIFECYCLE_EVENT_TYPE],
+      map: ({ data }) => virtualKeyFactOf(data),
+      store: { append: (fact) => virtualKeys.recordKeyFact({ fact }) },
+    },
+  };
+}
+
 /** The host pipeline as a TYPE, derived from the builder above. */
 export type NurturingProjectUsagePipeline = ReturnType<
   ReturnType<typeof nurturingProjectUsageHost>["build"]
@@ -714,6 +817,7 @@ export const nurturingProjectUsageEventing = defineEventingModule({
         copyLanded: (input) => app.uncopiedProjectCopied(input),
         organizationsCreated: repositories.organizationsCreated,
         members: repositories.members,
+        virtualKeys: repositories.virtualKeys,
       },
       sync: app.syncsOrganizationUsage()
         ? {

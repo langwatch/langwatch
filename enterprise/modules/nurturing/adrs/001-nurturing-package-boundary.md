@@ -1,6 +1,6 @@
 # ADR-001: Nurturing learns from events and keeps its own copies
 
-**Status:** Accepted (2026-09-29; amended 2026-11-11 and 2026-11-17)
+**Status:** Accepted (2026-09-29; amended 2026-11-11 and 2026-11-17, twice)
 
 **Behavioural contract:** [Nurturing](../specs/nurturing.feature)
 
@@ -63,7 +63,12 @@ The contract holds the signal union, the Customer.io vocabulary, the Api token,
 the config (`CUSTOMER_IO_REGION`, the shared `POSTHOG_KEY`/`POSTHOG_HOST`
 leaves) and the `CUSTOMER_IO_API_KEY` secret. The process imports the event
 schemas of the owners it listens to, and the `UserApi` and `OrganizationApi`
-contracts only for the exceptions above. No feature module depends on
+contracts only for the exceptions above. Gateway's contract
+(`@langwatch/gateway-contract`) is one of those owners: its
+`lw.governance.vk_lifecycle` and `lw.governance.budget_crossing` facts carry who
+created a key, who it acts for, its purpose and a crossing's period end, so
+nurturing never reads gateway's tables
+(https://github.com/langwatch/tasks/issues/1200). No feature module depends on
 nurturing's process, so no peer cycle can pass through it.
 
 ## Persistence
@@ -72,15 +77,65 @@ Nurturing owns its copies of the owners' facts: `NurturingProject` (a project's
 organization), `NurturingOrganizationCreated` (an organization's creation),
 `NurturingOrganizationMember` (memberships), `NurturingOrganizationPlan` (an
 organization's plan, folded from billing's `subscription_changed` facts),
+`NurturingVirtualKey` (a gateway key's organization, name, creator, holder,
+purpose and state, folded order-free from gateway's `vk_lifecycle` facts by a
+peer map, one statement a fact, which a deploy-time replay fills from gateway's
+log),
 `NurturingPersonalProject` (a personal project's owner) and `NurturingTracedProject`
 (a project that traced).
 It also owns `NurturingOrganization` (admin, milestone counts, coding signals,
 last trace), `NurturingProjectUsageView` (one peer fold row per project and
-owner), `NurturingProjectTraceDay` (trace counts per project and UTC day, kept 30
-days). A redelivered batch can count a trace twice, and so can a root span stored
-more than once; accepted (owner decision, issue 9378). Signals are events on the
-`nurturing` pipeline. A delivered signal is claimed in Redis for seven days under the process-wide idempotency key prefix,
-so a redelivered event sends nothing. Billing's catch-up `subscription_changed` fact, recorded by
+owner), `NurturingProjectTraceDay` (trace counts per project and UTC day, kept
+30 days) and `NurturingErasedUser` (a SHA-256 of each erased account's id, never
+the id, so no member fact or gateway key fact folded after the erasure stores
+them again, whatever its stamp; https://github.com/langwatch/tasks/issues/1204).
+User ids are nanoids (~126 random bits), so a keyed hash (as governance uses for
+guessable emails) isn't needed; the hashed `nurturing-erased-user:` prefix stops
+joins with the bare SHA-256 a delivery claim key carries. The marks have one
+repository, `NurturingErasedUserRepository`, whose memory twin every memory copy
+of one composition shares. The member copy, the organization copy and the key
+copy each write the mark through it before clearing their rows. A member or key
+write re-checks the mark after it, so a fact whose write read no mark of an
+erasure still committing leaves the person on no row; a worker stopping between
+a write and its re-check leaves them until the fact is redelivered. The
+re-checks give that guarantee; the mark checks inside the writes only shorten
+how long such a row is briefly visible. The usage mirror drops a marked member
+too, so such a row, or one from before the marks, gets no identify. An
+organization row a late fact names a marked admin on keeps the id, but every
+read of it names no admin, so no plan, usage or key send reaches them. Every
+delivered signal drops a marked person before any send: one about them sends
+nothing, and an organization's fact still reaches its other members; a guided
+turn's failure and an organization's creation read the marks too. A member list
+read from the owner (`getAllMembers`) does not read the marks: it relies on the
+owner deleting the person's `OrganizationUser` and `User` rows in the same
+transaction as the fact that records the erasure. Erasures from before nurturing
+kept marks are marked at deploy by two replay steps, over user's `lw.user.erased`
+and identity's `lw.identity.user_erased`, which run before the key copy's replay
+so a replayed key names none of them. The mark is written by
+nurturing's `userErased` subscriber, after the owner has committed the erasure:
+until it runs, however long it lags or retries, a signal about the person still
+sends, and an identify can recreate their Customer.io person, which nurturing
+never deletes. After it, the marks are read before the send, not with it: a mark
+written between that read and the send lets that one send out. Neither gap
+closes outright, because an HTTP call cannot join the erasure's transaction. The
+first can be shortened; this change does not shorten it. A key fact naming a
+marked holder folds in as no holder at the fact's own stamp, clearing a holder
+keeps their stamp, and a holder fact at a cleared holder's own stamp fills it,
+so a key's holder is the person its latest-stamped holder fact names, or no one
+if they are erased, whatever order the facts and the erasure arrive in, but for
+one case: two holder facts at one stamp naming two people keep the one folded
+first while neither is marked; if that one is erased later, the key has no
+holder until the other person's fact at that stamp is redelivered. Erasure no
+longer moves a cleared holder's stamp to now. A hand-over stamped between the
+holder's stamp and the erasure, which was dropped, now lands. The race the moved
+stamp closed is now closed by the re-check. A redelivered batch can count a
+trace twice, and so can a root span stored more than once; accepted (owner
+decision, issue 9378).
+Signals are events on the `nurturing` pipeline.
+A delivered signal is claimed in Redis for seven days under the process-wide idempotency key prefix,
+so a redelivered event sends nothing. A gateway key's creation and its budget's crossings
+are claimed per call, the identify apart from the track, so a retry after a refused call
+sends only that call. Billing's catch-up `subscription_changed` fact, recorded by
 the `customer-io-plan-resync` task, is never claimed. Every `subscription_changed` fact folds into
 `NurturingOrganizationPlan` as ADR-174 decision 17 folds billing's facts: the newest billing fact
 wins, and a real fact wins a tie. Customer.io hears a fact only when it changes that row, and the row is
@@ -91,8 +146,8 @@ beats it landed first.
 
 The Customer.io service and the PostHog client are built in `NurturingModule.create`
 only when their key is set; the PostHog client is closed with the process. The
-copies' subscribers always register. The per-project usage folds, the trace
-counting, the usage sync and the founder's group call on an organization's
+copies' subscribers and the key copy's map always register. The per-project
+usage folds, the trace counting, the usage sync and the founder's group call on an organization's
 creation register only with a Customer.io channel. Owners
 send the command in any role; the subscribers run in the worker. The founder's
 call carries the name and creation time but no plan, so a replay or retry never
@@ -112,7 +167,9 @@ A failed claim throws, and the subscriber is retried. A `subscription_changed`
 fact is not swallowed either. A refused live one gives its claim back and fails
 its job, so it is retried. A catch-up one fails its job on a refused call or on
 no Customer.io channel (`no_customer_io_channel`), so it is retried or replayed
-(https://github.com/langwatch/tasks/issues/1196).
+(https://github.com/langwatch/tasks/issues/1196). So does a gateway key's call
+Customer.io refuses: its claim and the signal's are given back first
+(https://github.com/langwatch/tasks/issues/1200).
 
 ## Contracts and validation
 

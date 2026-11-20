@@ -70,6 +70,19 @@ Feature: Customer.io knows each team's real plan
     And no signed_up track is sent
 
   @unit
+  Scenario: An organization's creation landing after its founder's erasure sends nothing
+    Given organization's creation fact names a founder who was erased
+    When the fact lands late or is replayed
+    Then Customer.io receives no call
+    And one line with a count and no ids is logged
+
+  @integration
+  Scenario: A subscription fact naming an erased member tells them nothing
+    Given billing's subscription fact names two members, one of them erased
+    When it is delivered
+    Then the admin gets the group call and only the other member is identified
+
+  @unit
   Scenario: A provisioned organization with no founder sends nothing
     Given organization records a creation naming no founder
     When the created fact is delivered

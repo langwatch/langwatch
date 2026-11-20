@@ -43,8 +43,12 @@ Feature: Per-email usage reaches Customer.io from nurturing's own project rows
   lw.organization.member_removed or member_disabled, a return by member_enabled. Each keeps its
   latest time, so a redelivery or a late fact changes nothing; "joined last" is the latest join
   time in the copy. A member who joined before the copy existed is not in it. User's
-  lw.user.erased deletes every membership of the account (with the other rows naming it,
-  project-facts-copies.feature); a member fact delivered after the erasure writes a row again.
+  lw.user.erased marks the account erased (NurturingErasedUser, a hash of its id), then deletes
+  every membership of it (with the other rows naming it, project-facts-copies.feature); a member
+  fact delivered after the erasure, or while it commits, leaves no row for it, unless its worker
+  stops between the write and its re-check, which leaves the row until the fact is redelivered.
+  The usage mirror reads the marks too, so such a row, or one from before the marks, gets no
+  identify.
   On a usage sync a failed identify is reported and swallowed, as the
   other sinks' failures are; the group call stands. At a window's end it fails the sweep, which retries. A project's first trace syncs as later ones do. The
   signup day comes from its own copy of
@@ -333,6 +337,32 @@ Feature: Per-email usage reaches Customer.io from nurturing's own project rows
     When user records user-1 erased, delivered twice
     Then no membership names user-1, and user-2's stays
     And neither Customer.io nor PostHog receives a request
+
+  @integration
+  Scenario: A member fact landing after an erasure writes no member row in Postgres
+    Given nurturing's member copy in Postgres holds user-1, who is then erased
+    When a member fact joining user-1 to the organization lands
+    Then no membership names user-1
+
+  @integration
+  Scenario: A member fact landing while an erasure commits leaves no member row in Postgres
+    Given nurturing's member copy in Postgres holds user-1
+    And user-1's erasure mark has committed but its deletion of their memberships has not run
+    When a member fact joining user-1 to the organization lands
+    Then no membership names user-1
+
+  @integration
+  Scenario: A member fact for a marked account writes no row even if its re-check never runs
+    Given user-1's erasure mark is in Postgres
+    When a member fact joining user-1 is written and its worker stops before the re-check
+    Then the write fails, and no membership names user-1
+
+  @integration
+  Scenario: A member row left naming an erased person gets no usage identify
+    Given nurturing's member copy in Postgres holds user-1 and user-2, both of whom joined it last
+    And user-2's erasure mark is in Postgres while their member row still stands
+    When a project of the organization changes its usage
+    Then user-1 is identified with the organization's traits, and user-2 is not
 
   @unit
   Scenario: Each member of the organization gets its traits as person attributes

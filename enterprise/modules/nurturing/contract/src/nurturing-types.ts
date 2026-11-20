@@ -114,6 +114,8 @@ export interface CioPersonTraits extends CioOrganizationUsageTraits {
   usage_page_viewed_at?: number;
   // The person got an answer from Langy in a conversation they own; only ever set true
   saw_langy_first_message?: boolean;
+  // A gateway key was created for or by the person; only ever set true, so a revoke keeps it
+  has_virtual_key?: boolean;
 
   // Evaluation milestones
   has_evaluations: boolean;
@@ -223,7 +225,10 @@ export type CioEventName =
   | "self_hosted_licensed_feature_without_license"
   | "self_hosted_license_expiring"
   | "self_hosted_domain_has_cloud_account"
-  | "self_hosted_license_sync_stale";
+  | "self_hosted_license_sync_stale"
+  | "virtual_key_created"
+  /** A key's budget crossed its warn line or its limit; `budget_reached` tells them apart. */
+  | "key_budget_threshold";
 
 // ---------------------------------------------------------------------------
 // Batch call discriminated union

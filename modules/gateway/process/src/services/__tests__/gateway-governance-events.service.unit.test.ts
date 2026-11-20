@@ -37,8 +37,11 @@ const signal = (traceProjectId: string | null): GatewayVirtualKeyLifecycleSignal
     name: "Production key",
     displayPrefix: "lw_vk_",
     traceProjectId,
+    principalUserId: "user-holder",
+    purpose: "USER",
   },
   action: "disabled",
+  actorUserId: "user-admin",
   reason: "billing hold",
 });
 
@@ -63,6 +66,9 @@ describe("GatewayGovernanceEventsService", () => {
           name: "Production key",
           display_prefix: "lw_vk_",
           reason: "billing hold",
+          actor_user_id: "user-admin",
+          principal_user_id: "user-holder",
+          purpose: "USER",
           occurred_at: NOW.epochMilliseconds,
         },
       ]);
@@ -112,6 +118,7 @@ describe("GatewayGovernanceEventsService", () => {
           anchor_project_id: "project-1",
           window: "MONTH",
           period_started_at_ms: 0,
+          period_ends_at_ms: null,
           limit_usd: "1.000000",
           spent_usd: "2.000000",
           on_breach: "block",

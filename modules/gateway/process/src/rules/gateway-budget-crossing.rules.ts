@@ -1,4 +1,9 @@
-import type { BudgetCrossingKind } from "@langwatch/gateway-contract";
+import {
+  type BudgetCrossingKind,
+  type GatewayBudgetWindow,
+  GatewayWindow,
+} from "@langwatch/gateway-contract";
+import type { Instant } from "@langwatch/time";
 
 /** How much of a budget is spent before it warns; the data plane's `SoftWarnPercent`. */
 const BUDGET_SOFT_WARN_PERCENT = 80;
@@ -19,4 +24,19 @@ export function budgetCrossingKind({
   if (percent >= 100) return "breached";
   if (percent >= BUDGET_SOFT_WARN_PERCENT) return "threshold_crossed";
   return "not_crossed";
+}
+
+/**
+ * When the period containing `now` gives way to the next, by the budget's own phase, unix ms.
+ * Null for TOTAL and MANUAL: neither rolls, and their far-future sentinel is no period end.
+ */
+export function computePeriodEndsAtMs({
+  budget,
+  now,
+}: {
+  budget: { window: GatewayBudgetWindow; cycleAnchorAt: Instant | null };
+  now: Instant;
+}): number | null {
+  if (!GatewayWindow.isCyclicWindow(budget.window)) return null;
+  return GatewayWindow.nextBoundaryFor({ budget, now }).epochMilliseconds;
 }
