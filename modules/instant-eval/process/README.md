@@ -367,11 +367,11 @@ type Output = z.infer<typeof explorerInstantEvalProgressSchema>; // ../contract/
 interface Input {
   projectId: string;
 }
-type Output = z.infer<typeof instantEvalOptInAccessSchema>; // ../contract/src/instant-eval.schemas.ts:615
+type Output = z.infer<typeof instantEvalOptInAccessSchema>; // ../contract/src/instant-eval.schemas.ts:619
 
 // instantEval.enable
 type Input = z.infer<typeof explorerInstantEvalProjectSchema>; // ../contract/src/instant-eval-explorer.schemas.ts:49
-type Output = z.infer<typeof instantEvalOptInAccessSchema>; // ../contract/src/instant-eval.schemas.ts:615
+type Output = z.infer<typeof instantEvalOptInAccessSchema>; // ../contract/src/instant-eval.schemas.ts:619
 
 // instantEval.classifySearch
 // Input: explorerSearchClassificationInputSchema, ../contract/src/instant-eval-explorer.schemas.ts:107

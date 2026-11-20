@@ -6,7 +6,7 @@
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import type { InstantEvalTraceResultWire } from "@langwatch/instant-eval-contract";
 import type { SpanTreeNode, TraceHeader } from "@langwatch/trace-contract";
-import { cleanup, fireEvent, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, within } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
