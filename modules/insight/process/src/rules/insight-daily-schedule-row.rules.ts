@@ -70,7 +70,8 @@ function ownLastRunOf(
 
 /**
  * The start an outcome carried, for a run that settled after a newer one started and so is no
- * longer the row's run in flight; undefined when the row's last settled run is another.
+ * longer the row's run in flight; undefined when the row's last settled run is another, or was
+ * skipped: a skip never began a turn, so it has no start.
  */
 function pickSettledStart({
   started,
@@ -79,7 +80,7 @@ function pickSettledStart({
   started: InsightRunInFlightState;
   runId: string;
 }): number | undefined {
-  if (started.lastSettledRunId !== runId) return undefined;
+  if (started.lastSettledRunId !== runId || started.lastRunOutcome === "skipped") return undefined;
   return started.lastSettledRunSince ?? undefined;
 }
 

@@ -187,7 +187,7 @@ describe("given a run was requested for a board", () => {
       expect(row).toMatchObject({ lastSettledRunId: "run-1", newestRunId: "run-2" });
       expect(setting.runInFlight?.runId).toBe("run-2");
       expect(setting.lastRun).toMatchObject({ runId: "run-1", outcome: "filed" });
-      expect(setting.lastRun).not.toHaveProperty("startedAt");
+      expect(setting.lastRun).toMatchObject({ startedAt: T0 });
     });
   });
 
