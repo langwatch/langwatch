@@ -46,6 +46,17 @@ describe("a Claude Code span's conversation", () => {
     expect(attributes["langwatch.thread.id"]).toBe("channel_support");
   });
 
+  /** @scenario a session with no declared session is keyed by the agent's own session id */
+  it("keeps a launcher's thread that names the same session as the conversation", () => {
+    const attributes = canonicalise({
+      "session.id": "cc-run-1",
+      "langwatch.thread.id": "cc-run-1",
+    });
+
+    expect(attributes["gen_ai.conversation.id"]).toBe("cc-run-1");
+    expect(attributes).not.toHaveProperty("langwatch.thread.id");
+  });
+
   /** @scenario a launcher's declared session groups every harness session it runs */
   it("is the launcher's declared session over Claude Code's own", () => {
     const attributes = canonicalise({

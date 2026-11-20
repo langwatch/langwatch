@@ -175,7 +175,8 @@ export class ClaudeCodeCanonicaliserService implements AttributeCanonicaliser {
 
   /**
    * The conversation is the agent's session: a launcher's `langwatch.session.id` (span, then
-   * resource), else Claude Code's own `session.id`. A declared thread stays `langwatch.thread.id`.
+   * resource), else Claude Code's own `session.id`. A conversation it displaces, such as a
+   * launcher's thread, moves to `langwatch.thread.id`; one equal to the session is already kept.
    */
   private keySession(ctx: ExtractorContext): void {
     const session =
