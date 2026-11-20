@@ -413,6 +413,15 @@ describe("given the text is an eval chip typed by hand", () => {
       });
     });
 
+    /** @scenario "A pending chip under NOT is not judged yet" */
+    it("drops the mark when the reader skips the refused judgement, so the words were no eval", () => {
+      const { result } = renderSubmit({ isInstantEvalAvailable: false });
+      act(() => result.current.submitSearch('eval:"faithfulness"'));
+      const refused = handlers.onInstantEval.mock.calls.at(-1)?.[0];
+      act(() => result.current.submitWithoutInstantEval(refused));
+      expect(useInstantEvalRunStore.getState().typedQuestions).toEqual({});
+    });
+
     /** @scenario "A chip typed by hand starts its run on Enter" */
     it("hands over the text as typed, so a NOT in front of the chip is not lost", () => {
       const { result } = renderSubmit();

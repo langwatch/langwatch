@@ -62,6 +62,8 @@ interface InstantEvalRunState {
    */
   typedQuestions: Record<string, true>;
   markTyped: (typed: { projectId: string; question: string }) => void;
+  /** Skip on a refused judgement: the reader said the words were no Instant Eval. */
+  unmarkTyped: (typed: { projectId: string; question: string }) => void;
   setRun: (run: ExplorerInstantEvalProgress, now?: number) => void;
   markStopped: (runId: string) => void;
   markSettled: (runId: string) => void;
@@ -141,6 +143,13 @@ export const useInstantEvalRunStore = defineSlice<InstantEvalRunState>({
         return state.typedQuestions[key]
           ? state
           : { typedQuestions: { ...state.typedQuestions, [key]: true } };
+      }),
+    unmarkTyped: (typed) =>
+      set((state) => {
+        const key = typedQuestionKey(typed);
+        if (!state.typedQuestions[key]) return state;
+        const { [key]: _dropped, ...typedQuestions } = state.typedQuestions;
+        return { typedQuestions };
       }),
     setRun: (run, now = nowInstant().epochMilliseconds) =>
       set((state) => withRead({ state, run, now })),

@@ -144,8 +144,10 @@ Feature: Instant Evals inside the Trace Explorer
       And the chip is spelled with a target, or was submitted on this page
       When the table and the counts read the results
       Then the table shows "These results are not judged yet" rather than every row as a non-match
-      And the counts read zero, as no row was judged
+      And the counts read zero, with no progress of another chip's run, as no row was judged
+      And a chip submitted here stays so for its project after the time range changes
       But a bare chip never submitted here, like `NOT eval:my_evaluator`, keeps its evaluator-name rows
+      And so does one whose refused judgement the reader skipped, or one submitted in another project
 
   Rule: tRPC wraps the run service for the Explorer
 

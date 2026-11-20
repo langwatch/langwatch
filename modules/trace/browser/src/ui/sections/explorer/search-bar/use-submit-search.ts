@@ -461,6 +461,11 @@ export function useSubmitSearch({
     (payload: InstantEvalRoutePayload) => {
       const seq = ++submitSeqRef.current;
       onSupersede();
+      // The reader said the words were no Instant Eval: a saved bare chip keeps its older meaning.
+      useInstantEvalRunStore.getState().unmarkTyped({
+        projectId: useFilterStore.getState().projectId ?? "",
+        question: payload.question.instructions,
+      });
       const text = combineQueries({ base: payload.otherQuery, addition: payload.sentence });
       if (!splitBareWords(text).sentence || isSamplePreview) {
         applyQueryText(requoteBareTerms(text));
