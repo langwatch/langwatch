@@ -555,3 +555,40 @@ def test_the_score_counts_distinct_names():
     assert result.score == 1, f"one name, so score 1, got {result.score}"
     assert result.details is not None
     assert result.details.count("PERSON") == 1, result.details
+
+
+# ---------------------------------------------------------------------------
+# A surname written first: SURNAME, Forename
+# ---------------------------------------------------------------------------
+
+
+# @scenario "A capitalised surname before a comma and a forename is harvested"
+@pytest.mark.parametrize(
+    "text, surname",
+    [
+        ("Ticket from GONZALEZ, Maria about the late refund.", "GONZALEZ"),
+        ("Ticket from WHITFIELD, Marcus about the late refund.", "WHITFIELD"),
+        ("OKONKWO, Tobias; LEE, Amy.", "OKONKWO"),
+    ],
+)
+def test_capitalised_surname_before_a_comma_and_a_person_is_reported(
+    text: str, surname: str
+):
+    covered = [covered for _, covered in names_and_places(text)]
+
+    assert surname in covered
+
+
+# @scenario "A capitalised surname before a comma and a forename is harvested"
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Moved the ERP, then the CFO signed off.",
+        "Rolled out the ERP, then Maria signed off.",
+        "Migrated to the CRM, Maria approved it.",
+    ],
+)
+def test_lone_capitalised_word_before_a_comma_is_not_a_surname(text: str):
+    covered = [covered for _, covered in names_and_places(text)]
+
+    assert not {"ERP", "CFO", "CRM"} & set(covered)
