@@ -22,6 +22,21 @@ Feature: A release publishes the PII redaction model image
     Then cmd/newestimage fails and names the tag, because self-hosters run amd64 and arm64
 
   @unit
+  Scenario: An index without both chip types is refused
+    Given the newest http-git-<sha> is an index
+    But it holds no linux/amd64 image, or no linux/arm64 image
+    Then cmd/newestimage -platforms fails and names the chip type that is missing
+    And the attestation entries of an index (unknown/unknown) do not count as a chip type
+
+  @unit
+  Scenario: A re-run keeps the image the release already published
+    Given langwatch/pii-redaction-model:<version> is already on Docker Hub
+    When the release job runs again, after main has pushed a newer http-git-<sha>
+    Then it reuses the digest the version tag already holds and picks nothing from ECR
+    And it does not copy over the version tag, so the version keeps its signed image
+    And it fails when it cannot tell whether the version tag exists
+
+  @unit
   Scenario: No plain model image fails the release
     Given the artifacts ECR holds no http-git-<sha> image
     Then cmd/newestimage fails, so the chart release does not run for this release
