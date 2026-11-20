@@ -1,4 +1,5 @@
 import {
+  CHART_GRID_DEFAULT_COL_SPAN,
   chartGridPlacementSchema,
   fitsChartGridWidth,
 } from "@langwatch/analytics-contract/chart-grid";
@@ -86,13 +87,22 @@ const graphRestParamsSchemaDefinition = z.object({ id: z.string().min(1) });
 export interface GraphRestParamsSchema extends Named<typeof graphRestParamsSchemaDefinition> {}
 export const graphRestParamsSchema: GraphRestParamsSchema = graphRestParamsSchemaDefinition;
 
-const graphRestCreateSchemaDefinition = z.object({
-  name: z.string().min(1, "name is required"),
-  graph: z.record(z.string(), z.unknown()),
-  dashboardId: z.string().optional(),
-  filters: z.record(z.string(), z.unknown()).optional(),
-  ...chartGridPlacementSchema.partial().shape,
-});
+const graphRestCreateSchemaDefinition = z
+  .object({
+    name: z.string().min(1, "name is required"),
+    graph: z.record(z.string(), z.unknown()),
+    dashboardId: z.string().optional(),
+    filters: z.record(z.string(), z.unknown()).optional(),
+    ...chartGridPlacementSchema.partial().shape,
+  })
+  .refine(
+    ({ gridColumn = 0, colSpan = CHART_GRID_DEFAULT_COL_SPAN }) =>
+      fitsChartGridWidth({ gridColumn, colSpan }),
+    {
+      message: "gridColumn + colSpan must not exceed the grid's columns",
+      path: ["colSpan"],
+    },
+  );
 export interface GraphRestCreateSchema extends Named<typeof graphRestCreateSchemaDefinition> {}
 export const graphRestCreateSchema: GraphRestCreateSchema = graphRestCreateSchemaDefinition;
 

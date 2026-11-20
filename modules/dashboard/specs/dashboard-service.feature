@@ -54,6 +54,12 @@ Feature: Shared Dashboard service
     Then the graph is created at that size
     And a graph spanning all eight columns and twenty rows is accepted too
 
+  @unit
+  Scenario: A graph posted over REST with a size outside the grid is refused
+    When a client posts a graph to /api/graphs with a fractional colSpan, a gridRow above 2000000000, or a gridColumn and colSpan that run past the grid's eight columns
+    Then the request is refused as a validation error
+    And no graph is stored
+
   @integration
   Scenario: A dashboard widget created without a size lands four columns by five board rows
     When a client posts a dashboard widget over the API without a size

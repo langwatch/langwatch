@@ -12,8 +12,10 @@ import {
   CATALOGUE_TEMPLATES,
   CATALOGUE_WIDGETS,
   focusTemplateId,
+  implementedWidget,
   TRUNKS,
 } from "../catalogue/index.ts";
+import { BOARD_WIDGET_DEFAULT_ROW_SPAN } from "../model/board-grid.ts";
 import {
   type CatalogueFilters,
   filterCatalogue,
@@ -182,6 +184,7 @@ describe("the templates finder", () => {
 
     /** @scenario "AC107d Templates library: a card previews the template's real board" */
     it("sketches every other template's widgets by title, inside the board's columns", () => {
+      let unbuiltChecked = 0;
       for (const { board, preview } of TEMPLATE_LIBRARY) {
         if (TEMPLATE_PREVIEW_IDS.has(board.id)) continue;
         expect(preview.kind, board.id).toBe("layout");
@@ -193,8 +196,13 @@ describe("the templates finder", () => {
         ).toEqual(widgetIds.map((id) => titles.get(id)));
         for (const { key, layout } of preview.widgets) {
           expect(layout.gridColumn + layout.colSpan, key).toBeLessThanOrEqual(CHART_GRID_COLUMNS);
+          if (implementedWidget(key) === undefined) {
+            expect(layout.rowSpan, key).toBe(BOARD_WIDGET_DEFAULT_ROW_SPAN);
+            unbuiltChecked += 1;
+          }
         }
       }
+      expect(unbuiltChecked).toBeGreaterThan(0);
     });
   });
 });

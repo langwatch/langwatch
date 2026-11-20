@@ -89,7 +89,9 @@ describe("the graphs REST family", () => {
 
       expect(sizeOf(created.json)).toEqual({ colSpan: 2, rowSpan: 2 });
     });
+  });
 
+  describe("when a graph is posted with a size at the grid's bounds", () => {
     /** @scenario "A graph created over REST accepts the size it would default to" */
     it("accepts the default size and the grid's full bounds as input", async () => {
       const graphs = mountedGraphs();
@@ -104,6 +106,27 @@ describe("the graphs REST family", () => {
       expect({ status: fullWidth.status, size: sizeOf(fullWidth.json) }).toEqual({
         status: 201,
         size: { colSpan: 8, rowSpan: 20 },
+      });
+    });
+  });
+
+  describe("when a graph is posted with a size outside the grid", () => {
+    /** @scenario "A graph posted over REST with a size outside the grid is refused" */
+    it.each([
+      ["a fractional colSpan", { colSpan: 2.5 }],
+      ["a gridRow above the grid's last row", { gridRow: 2_000_000_001 }],
+      ["a span past the grid's right edge", { gridColumn: 6, colSpan: 4 }],
+      ["a column the default width runs past the edge from", { gridColumn: 7 }],
+    ])("refuses %s and stores nothing", async (_case, size) => {
+      const graphs = mountedGraphs();
+
+      const created = await graphs.create({ ...GRAPH, ...size });
+      const listed = await graphs.list();
+
+      expect({ status: created.status, code: created.json.code, listed: listed.json }).toEqual({
+        status: 422,
+        code: "validation_error",
+        listed: [],
       });
     });
   });
