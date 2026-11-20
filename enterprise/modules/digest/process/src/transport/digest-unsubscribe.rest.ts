@@ -39,7 +39,7 @@ const TOKEN_IS_THE_AUTHORIZATION =
 
 const TOKEN_ERRORS = [
   { status: 400, description: "The token is missing, invalid, expired or tampered with" },
-  { status: 429, description: "Too many attempts from this caller; wait a few minutes" },
+  { status: 429, description: "Too many attempts from this caller; wait a minute" },
   { status: 503, description: "No signing secret is configured, so no link can be checked" },
 ];
 

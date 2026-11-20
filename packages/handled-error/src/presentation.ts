@@ -4725,7 +4725,7 @@ const presentations = {
   digest_unsubscribe_rate_limited: {
     // Read on the digest's unsubscribe page, by someone with no session and nothing to fix.
     title: "Too many attempts just now",
-    describe: () => "Wait a few minutes, then open the link again.",
+    describe: () => "Wait a minute, then open the link again.",
   },
 
   // ---- automations & notifications ----
