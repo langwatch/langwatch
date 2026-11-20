@@ -1,7 +1,7 @@
 /**
  * What the address bar says about the scope, read directly from `react-router`: personal
- * workspace is "no `:project` segment matched and the first path segment is `coding-agents`" —
- * so `/coding-agents/traces` stays a project.
+ * workspace is "no `:project` segment matched and the first path segment is `coding-agents`,
+ * or the retired `me`", so `/coding-agents/traces` stays a project.
  */
 
 import type { UiScopeRoute } from "@langwatch/organization-contract";
@@ -24,8 +24,12 @@ export const UI_PUBLIC_ROUTES: readonly string[] = [
   "/unsubscribe",
 ];
 
-/** The personal workspace's own top-level segment. */
-const PERSONAL_SCOPE_SEGMENT = "coding-agents";
+/**
+ * The personal workspace's top-level segments: its own, and the retired `me`, which
+ * still renders once while its redirect to `/coding-agents` runs. Reading that render as
+ * personal keeps the shared team from being picked and remembered for it.
+ */
+const PERSONAL_SCOPE_SEGMENTS: ReadonlySet<string> = new Set(["coding-agents", "me"]);
 
 /** The query parameter that names an organization to switch to, once. */
 export const UI_ORG_QUERY_PARAM = "org";
@@ -69,7 +73,8 @@ export function useUiRouteReading(): UiRouteReading {
       // A page under a matched `:project` is about that project whatever its
       // slug spells; only a page the router matched WITHOUT one can be the
       // personal workspace.
-      isPersonalScopeRoute: projectParam === void 0 && firstSegment === PERSONAL_SCOPE_SEGMENT,
+      isPersonalScopeRoute:
+        projectParam === void 0 && PERSONAL_SCOPE_SEGMENTS.has(firstSegment ?? ""),
       orgParam,
       pathname,
       shareToken,

@@ -14,6 +14,9 @@ const ROUTE_PATHS = [
   "/settings/api-keys",
   "/coding-agents",
   "/coding-agents/sessions",
+  // The retired address's redirect rows, as the application mounts them.
+  "/me",
+  "/me/*",
   "/mentions",
   "/share/:id",
   "/auth/signin",
@@ -91,6 +94,14 @@ describe("given an address the router matched", () => {
     it("says so for every personal sub-route", () => {
       expect(readAt("/coding-agents/sessions").isPersonalScopeRoute).toBe(true);
     });
+
+    it("says so for the retired /me address while its redirect renders", () => {
+      expect(readAt("/me").isPersonalScopeRoute).toBe(true);
+    });
+
+    it("says so for a retired /me sub-route while its redirect renders", () => {
+      expect(readAt("/me/sessions").isPersonalScopeRoute).toBe(true);
+    });
   });
 
   describe("when it only looks like the personal workspace's own", () => {
@@ -103,10 +114,6 @@ describe("given an address the router matched", () => {
 
     it("reads an unrelated address that starts with the same letters as no personal page", () => {
       expect(readAt("/mentions").isPersonalScopeRoute).toBe(false);
-    });
-
-    it("reads the retired /me address as no personal page", () => {
-      expect(readAt("/me").isPersonalScopeRoute).toBe(false);
     });
 
     it("reads an organization-scoped page as no personal page", () => {

@@ -11,7 +11,7 @@ import { createMemoryRouter, Outlet, type RouteObject, RouterProvider } from "re
 import { describe, expect, it } from "vitest";
 
 import { uiRoutePatterns } from "../route-patterns";
-import { uiCodingAgentsRedirectRoutes, uiRouterTable } from "../ui-route-table";
+import { uiCodingAgentsRedirectRoutes, uiMountedRouteTable } from "../ui-route-table";
 
 /** The redirect descriptors the application mounts, materialised the same way. */
 const legacyRedirectRoutes = createUiRouteObjects({
@@ -22,7 +22,7 @@ const legacyRedirectRoutes = createUiRouteObjects({
 const passThrough = async () => ({ default: () => <Outlet /> });
 
 const stubbedPages: UiPageLoaderRegistry = Object.fromEntries(
-  uiRoutePageKeys(uiRouterTable).map((key) => [key, passThrough]),
+  uiRoutePageKeys(uiMountedRouteTable).map((key) => [key, passThrough]),
 );
 
 /**
@@ -30,7 +30,7 @@ const stubbedPages: UiPageLoaderRegistry = Object.fromEntries(
  * page back then, so a redirect mounted beneath it never runs.
  */
 const waitingChromeRoutes = createUiRouteObjects({
-  table: uiRouterTable,
+  table: uiMountedRouteTable,
   loaders: stubbedPages,
   shellLayouts: {
     auth: passThrough,

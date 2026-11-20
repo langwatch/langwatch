@@ -39,7 +39,10 @@ export type UiPageRouteDescriptor = {
   readonly page: string;
   /** The explicit native route mount point for a pre-router web installation. */
   readonly webRouteParent?: "project";
-  /** An account page (Settings > Profile and Security): the shell draws its title large. */
+  /**
+   * An account page (`/coding-agents`, Settings > Profile and Security): the
+   * shell draws its title large.
+   */
   readonly heading?: "account";
   readonly children?: readonly UiRouteDescriptor[];
 };
@@ -191,7 +194,7 @@ export const uiLegacyRedirectRoutes: readonly UiRedirectRouteDescriptor[] = [
 
 /**
  * The table as data, one literal so the README extractor can read it. The router mounts
- * `uiRouterTable`, which adds the /me redirect rows derived from this table.
+ * `uiMountedRouteTable`, which adds the /me redirect rows derived from this table.
  */
 export const uiRouteTable: readonly UiRouteDescriptor[] = [
   // Auth (public), under the host every front-door screen reads its
@@ -1101,4 +1104,5 @@ function withCodingAgentsRedirects(table: readonly UiRouteDescriptor[]): UiRoute
 }
 
 /** What the router mounts: `uiRouteTable` plus the /me redirect rows derived from it. */
-export const uiRouterTable: readonly UiRouteDescriptor[] = withCodingAgentsRedirects(uiRouteTable);
+export const uiMountedRouteTable: readonly UiRouteDescriptor[] =
+  withCodingAgentsRedirects(uiRouteTable);

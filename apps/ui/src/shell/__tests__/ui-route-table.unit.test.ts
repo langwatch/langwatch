@@ -8,7 +8,7 @@ import {
   uiCodingAgentsRedirectRoutes,
   uiLegacyRedirectRoutes,
   uiRouteDescriptors,
-  uiRouterTable,
+  uiMountedRouteTable,
   uiRouteTable,
   type UiRedirectRouteDescriptor,
   type UiRouteDescriptor,
@@ -53,7 +53,7 @@ function transcribe(table: readonly UiRouteDescriptor[], depth = 0): string[] {
 describe("given the packaged route table", () => {
   describe("when its URL surface is transcribed", () => {
     it("matches the expectation derived from the legacy route table", () => {
-      expect(transcribe(uiRouterTable)).toEqual([...expectedUiRouteTranscript]);
+      expect(transcribe(uiMountedRouteTable)).toEqual([...expectedUiRouteTranscript]);
     });
   });
 
@@ -86,12 +86,12 @@ describe("given the packaged route table", () => {
 
 describe("given the table the router mounts", () => {
   const redirects = new Set<UiRouteDescriptor>(uiCodingAgentsRedirectRoutes);
-  const positions = uiCodingAgentsRedirectRoutes.map((row) => uiRouterTable.indexOf(row));
+  const positions = uiCodingAgentsRedirectRoutes.map((row) => uiMountedRouteTable.indexOf(row));
   const indices = (count: number) => Array.from({ length: count }, (_, index) => index);
 
   describe("when its rows are set beside the data table's", () => {
     it("holds every data row, the same objects in the same order", () => {
-      const dataRows = uiRouterTable.filter((row) => !redirects.has(row));
+      const dataRows = uiMountedRouteTable.filter((row) => !redirects.has(row));
 
       expect(dataRows.map((row) => uiRouteTable.indexOf(row))).toEqual(
         indices(uiRouteTable.length),
@@ -99,15 +99,19 @@ describe("given the table the router mounts", () => {
     });
 
     it("adds exactly the /me redirect rows, side by side and in their own order", () => {
-      const start = uiRouterTable.findIndex((row) => redirects.has(row));
+      const start = uiMountedRouteTable.findIndex((row) => redirects.has(row));
 
       expect(start).toBeGreaterThan(-1);
       expect(positions).toEqual(indices(positions.length).map((offset) => start + offset));
-      expect(uiRouterTable).toHaveLength(uiRouteTable.length + uiCodingAgentsRedirectRoutes.length);
+      expect(uiMountedRouteTable).toHaveLength(
+        uiRouteTable.length + uiCodingAgentsRedirectRoutes.length,
+      );
     });
 
     it("mounts them above the chrome, before its layout row", () => {
-      const chrome = uiRouterTable.findIndex((row) => "layout" in row && row.layout === "chrome");
+      const chrome = uiMountedRouteTable.findIndex(
+        (row) => "layout" in row && row.layout === "chrome",
+      );
 
       expect(chrome).toBeGreaterThan(-1);
       expect(Math.min(...positions)).toBeGreaterThan(-1);
@@ -128,13 +132,13 @@ const CATCH_ALL = "*";
  */
 function declaredPaths(): string[] {
   return [
-    ...uiRouteDescriptors(uiRouterTable).map((descriptor) => descriptor.path),
+    ...uiRouteDescriptors(uiMountedRouteTable).map((descriptor) => descriptor.path),
     ...installedModuleScreens(browserModules).routes.project.map((route) => route.path),
   ].filter((path): path is string => typeof path === "string");
 }
 
 function redirectDescriptors(): UiRedirectRouteDescriptor[] {
-  return uiRouteDescriptors(uiRouterTable).filter(
+  return uiRouteDescriptors(uiMountedRouteTable).filter(
     (descriptor): descriptor is UiRedirectRouteDescriptor => "redirect" in descriptor,
   );
 }
