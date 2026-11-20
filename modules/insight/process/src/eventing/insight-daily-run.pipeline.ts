@@ -30,6 +30,7 @@ import {
 
 import type { InsightModule } from "../app/insight.app.ts";
 import type { InsightRepositories } from "../repositories/insight.repositories.ts";
+import type { InsightRunInFlightState } from "../rules/insight-run-in-flight.rules.ts";
 import type { InsightDailyRunAuditService } from "../services/insight-daily-run-audit.service.ts";
 import type { InsightDailyScheduleCleanupService } from "../services/insight-daily-schedule-cleanup.service.ts";
 import {
@@ -84,10 +85,7 @@ import {
   createInsightDailyScheduleProjection,
   type InsightDailyScheduleState,
 } from "./insight-daily-schedule.projection.ts";
-import {
-  createInsightRunInFlightProjection,
-  type InsightRunInFlightState,
-} from "./insight-run-in-flight.projection.ts";
+import { createInsightRunInFlightProjection } from "./insight-run-in-flight.projection.ts";
 
 interface InsightDailyRunPipelineDeps {
   scheduleStore: StateProjectionStore<InsightDailyScheduleState>;

@@ -12,7 +12,7 @@ import type {
 } from "@langwatch/insight-contract";
 
 import type { InsightDailyScheduleState } from "../eventing/insight-daily-schedule.projection.ts";
-import type { InsightRunInFlightState } from "../eventing/insight-run-in-flight.projection.ts";
+import type { InsightRunInFlightState } from "./insight-run-in-flight.rules.ts";
 
 /** How a last run ended, as the run's row and the run in flight row both keep it. */
 type LastRunColumns = Pick<

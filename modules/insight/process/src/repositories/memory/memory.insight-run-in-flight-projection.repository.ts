@@ -5,7 +5,7 @@ import type {
   StoredProjectionRead,
 } from "@langwatch/eventing";
 
-import type { InsightRunInFlightState } from "../../eventing/insight-run-in-flight.projection.ts";
+import type { InsightRunInFlightState } from "../../rules/insight-run-in-flight.rules.ts";
 import { InsightMemoryStore } from "./insight-memory.store.ts";
 
 /** The memory twin of `PrismaInsightRunInFlightProjectionRepository`. */

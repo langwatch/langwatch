@@ -18,8 +18,6 @@ import {
 } from "../rules/insight-run-in-flight.rules.ts";
 import type { InsightDailyRunEvent } from "./insight-daily-run.events.ts";
 
-export { NO_RUN_STARTED, type InsightRunInFlightState };
-
 /** Whether the run is older than the newest the row took; false until it took one. */
 function isOlderThanNewest(state: InsightRunInFlightState, run: RunOrder): boolean {
   const { newestRunId: runId, newestRunSlot: slot, newestRunSince: since } = state;

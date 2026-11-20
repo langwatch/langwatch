@@ -1,7 +1,7 @@
 import { insightRunOutcomeSchema, insightRunReasonSchema } from "@langwatch/insight-contract";
 import type { Prisma } from "@langwatch/prisma-client/generated";
 
-import type { InsightRunInFlightState } from "../../eventing/insight-run-in-flight.projection.ts";
+import type { InsightRunInFlightState } from "../../rules/insight-run-in-flight.rules.ts";
 
 export type InsightRunInFlightRow = Prisma.InsightRunInFlightProjectionGetPayload<object>;
 

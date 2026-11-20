@@ -19,11 +19,11 @@ import { cleanupTestRows } from "@langwatch/test-harness/prisma";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 
 import type { InsightDailyScheduleState } from "../../eventing/insight-daily-schedule.projection.ts";
+import { dailyScheduleId } from "../../rules/insight-daily-run.rules.ts";
 import {
   type InsightRunInFlightState,
   NO_RUN_STARTED,
-} from "../../eventing/insight-run-in-flight.projection.ts";
-import { dailyScheduleId } from "../../rules/insight-daily-run.rules.ts";
+} from "../../rules/insight-run-in-flight.rules.ts";
 import type { InsightRepositories } from "../insight.repositories.ts";
 import { MemoryInsightRepositories } from "../memory/memory.insight.repositories.ts";
 import { PostgresInsightRepositories } from "../prisma/prisma.insight.repositories.ts";

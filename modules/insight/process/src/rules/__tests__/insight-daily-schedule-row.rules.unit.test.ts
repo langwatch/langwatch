@@ -9,14 +9,11 @@ import { describe, expect, it } from "vitest";
 
 import type { InsightDailyScheduleState } from "../../eventing/insight-daily-schedule.projection.ts";
 import {
-  type InsightRunInFlightState,
-  NO_RUN_STARTED,
-} from "../../eventing/insight-run-in-flight.projection.ts";
-import {
   dailyRunFromState,
   dailyRunSettingFromState,
   decidedScheduleFromState,
 } from "../insight-daily-schedule-row.rules.ts";
+import { type InsightRunInFlightState, NO_RUN_STARTED } from "../insight-run-in-flight.rules.ts";
 
 const STARTED_AT = Date.UTC(2026, 10, 19, 9, 0);
 const SETTLED_AT = STARTED_AT + 60_000;

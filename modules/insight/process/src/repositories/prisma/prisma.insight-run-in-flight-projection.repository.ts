@@ -6,7 +6,7 @@ import type {
 } from "@langwatch/eventing";
 import { PrismaRepository } from "@langwatch/prisma-client";
 
-import type { InsightRunInFlightState } from "../../eventing/insight-run-in-flight.projection.ts";
+import type { InsightRunInFlightState } from "../../rules/insight-run-in-flight.rules.ts";
 import { runInFlightStateFromRow } from "./prisma.insight-run-in-flight.mapper.ts";
 
 /** Postgres row I/O for a schedule's run in flight row; the row id is the schedule id. */
