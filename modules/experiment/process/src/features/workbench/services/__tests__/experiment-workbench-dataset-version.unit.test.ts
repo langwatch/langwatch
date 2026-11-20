@@ -20,8 +20,10 @@ import type { PromptApi } from "@langwatch/prompt-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
+import { MemoryExperimentRunActivityRepository } from "../../../../repositories/memory/memory.experiment-run-activity.repository.ts";
 import type { ExperimentWorkflowDsl } from "../../../../services/experiment-execution-data.service.ts";
 import type { ExperimentService } from "../../../../services/experiment.service.ts";
+import { ExperimentRunConcurrencyService } from "../../../run/services/experiment-run-concurrency.service.ts";
 import { ExperimentSavedRunPreparationService } from "../experiment-saved-run-preparation.service.ts";
 import type { ExperimentWorkbenchObserver } from "../experiment-workbench-observer.service.ts";
 import type { WorkbenchRunPipeline } from "../experiment-workbench-pipeline-run.service.ts";
@@ -225,8 +227,11 @@ function harness({
   datasetVersion,
   results,
   inline,
+  startFails,
 }: {
   dataset: VersionedDataset;
+  /** The run's start command fails to send, after its concurrency was claimed. */
+  startFails?: boolean;
   datasetVersion?: number;
   /** The active dataset tab is inline rows rather than a saved dataset. */
   inline?: boolean;
@@ -234,10 +239,12 @@ function harness({
   results?: SavedResults;
 }) {
   const started: { runId: string; total: number }[] = [];
+  const activity = MemoryExperimentRunActivityRepository.create();
   const plans: ExperimentRunPlan[] = [];
   const runs: WorkbenchRunPipeline = {
     commands: createApiFixture<WorkbenchRunPipeline["commands"]>({
       startExperimentRun: async (start) => {
+        if (startFails) throw new Error("dispatch failed");
         started.push({ runId: start.runId, total: start.total });
         if ("plan" in start && start.plan) plans.push(start.plan);
       },
@@ -257,7 +264,10 @@ function harness({
       projects: { getOrganizationId: async () => "organization-1" },
     },
     ownership: { assertConnectedAgentsRunnable: async () => {} },
-    concurrency: 4,
+    concurrency: ExperimentRunConcurrencyService.create({
+      activity,
+      config: { runConcurrency: 4, projectCellBudget: 20 },
+    }),
     refusals: {},
   };
   const experiments = createApiFixture<ExperimentService>({
@@ -320,7 +330,7 @@ function harness({
       { id: "user-1" },
     );
 
-  return { run, started, plans, executeOnPage, prepare };
+  return { run, started, plans, executeOnPage, prepare, activity };
 }
 
 const questions = (...names: string[]): Row[] => names.map((question) => ({ question }));
@@ -449,6 +459,24 @@ describe("given a saved experiment over a saved dataset", () => {
       await run({ body: JSON.stringify({ dataset_id: DATASET_ID, dataset_version: 1 }) });
 
       expect(dataset.read).toEqual([1]);
+    });
+  });
+
+  describe("when the run's start fails to send after its concurrency was claimed", () => {
+    it("gives the claim back, so later runs do not count it", async () => {
+      const { run, activity } = harness({
+        dataset: new VersionedDataset(questions("a")),
+        startFails: true,
+      });
+
+      await expect(run()).rejects.toThrow("dispatch failed");
+      const now = Date.now();
+      expect(
+        await activity.claim({ projectId: PROJECT_ID, runId: "probe", now, expiresAt: now + 1 }),
+      ).toEqual({
+        project: 0,
+        global: 0,
+      });
     });
   });
 

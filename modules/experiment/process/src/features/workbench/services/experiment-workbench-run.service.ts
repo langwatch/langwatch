@@ -85,11 +85,16 @@ export class ExperimentWorkbenchRunService {
     // The refusal a process without Redis or a public address owes, as before the pipeline.
     const runs = this.#startable();
     const runId = generateHumanReadableId();
+    const concurrency = await runs.concurrency.resolve({
+      projectId,
+      runId,
+      requested: saved.runInputs.concurrency,
+    });
     const savedRun = (options: { persistResults: boolean; runUrl?: string }): PipelineRunStart => {
       const plan = ExperimentRunPlanService.create().buildPlan({
         request: { state: saved.state, scope: saved.scope },
         data: saved.data,
-        concurrency: saved.runInputs.concurrency ?? runs.concurrency,
+        concurrency,
         origin: "saved",
         actor: workbenchActorFrom({ credential: input.credential }),
         experimentSlug: slug,
@@ -117,15 +122,18 @@ export class ExperimentWorkbenchRunService {
       };
     };
 
+    const built = (options: { persistResults: boolean; runUrl?: string }) =>
+      this.#builtOrReleased({ build: () => savedRun(options), projectId, runId });
+
     // A stream never wrote the board; a polled run of the saved dataset fills the cells it shows.
     if (input.acceptsEvents) {
       return {
         kind: "streaming",
-        events: this.#runsOn().streamRun(savedRun({ persistResults: false })),
+        events: this.#runsOn().streamRun(await built({ persistResults: false })),
       };
     }
     const runUrl = this.#runUrl({ projectSlug: input.projectSlug, slug, runId });
-    const run = savedRun({ persistResults: runsSavedDataset(saved.runInputs), runUrl });
+    const run = await built({ persistResults: runsSavedDataset(saved.runInputs), runUrl });
     await this.#runsOn().startRun(run);
 
     return {
@@ -136,6 +144,26 @@ export class ExperimentWorkbenchRunService {
       ...(run.start.plan ? { concurrency: run.start.plan.concurrency } : {}),
       runUrl,
     };
+  }
+
+  /**
+   * A run that cannot even be built gives its claim back; once built, `startRun` and `streamRun`
+   * release it themselves if the start command is never sent.
+   */
+  async #builtOrReleased(input: {
+    build: () => PipelineRunStart;
+    projectId: string;
+    runId: string;
+  }): Promise<PipelineRunStart> {
+    try {
+      return input.build();
+    } catch (error) {
+      await this.#startable().concurrency.release({
+        projectId: input.projectId,
+        runId: input.runId,
+      });
+      throw error;
+    }
   }
 
   /** `POST /execute`: the browser's run, planned here and executed by the worker's run pipeline. */
@@ -167,51 +195,58 @@ export class ExperimentWorkbenchRunService {
     const state = workbenchRunState(input);
 
     const experimentId = input.experimentId ?? "";
-    const plan = ExperimentRunPlanService.create().buildPlan({
-      request: {
-        state,
-        scope: input.scope,
-        ...(input.seedTargetOutputs ? { seedTargetOutputs: input.seedTargetOutputs } : {}),
-      },
-      data: dataResult,
-      concurrency: input.concurrency ?? runs.concurrency,
-      origin: "workbench",
-      // The page saves these cells too; the server writes them so the board outlives the tab.
-      persistResults:
-        experimentId !== "" &&
-        runsSavedDataset({
-          ...(input.data !== undefined ? { data: input.data } : {}),
-          ...(input.dataset_id !== undefined ? { dataset_id: input.dataset_id } : {}),
-          ...(input.parameters !== undefined ? { parameters: input.parameters } : {}),
-        }),
-      actor: { userId: by.id, label: "user" },
-      ...(input.experimentSlug !== undefined ? { experimentSlug: input.experimentSlug } : {}),
-    });
-
-    return {
-      kind: "streaming",
-      events: this.#runsOn().streamRun({
-        start: this.#runsOn().startOf({
-          projectId,
-          runId: generateHumanReadableId(),
-          experimentId,
-          plan,
-          state,
+    const runId = generateHumanReadableId();
+    const { concurrency: requested } = input;
+    const concurrency = await runs.concurrency.resolve({ projectId, runId, requested });
+    const run = await this.#builtOrReleased({
+      projectId,
+      runId,
+      build: () => {
+        const plan = ExperimentRunPlanService.create().buildPlan({
+          request: {
+            state,
+            scope: input.scope,
+            ...(input.seedTargetOutputs ? { seedTargetOutputs: input.seedTargetOutputs } : {}),
+          },
           data: dataResult,
-        }),
-        actor: { id: by.id, label: "user" },
-        data: dataResult,
-        state,
-        carriedOverCells: input.carriedOverCells ?? [],
-        reportContext: { projectId },
-        ran: {
-          userId: by.id,
-          projectId,
-          experimentId: input.experimentId,
-          isFullRun: input.scope.type === "full",
-        },
-      }),
-    };
+          concurrency,
+          origin: "workbench",
+          // The page saves these cells too; the server writes them so the board outlives the tab.
+          persistResults:
+            experimentId !== "" &&
+            runsSavedDataset({
+              ...(input.data !== undefined ? { data: input.data } : {}),
+              ...(input.dataset_id !== undefined ? { dataset_id: input.dataset_id } : {}),
+              ...(input.parameters !== undefined ? { parameters: input.parameters } : {}),
+            }),
+          actor: { userId: by.id, label: "user" },
+          ...(input.experimentSlug !== undefined ? { experimentSlug: input.experimentSlug } : {}),
+        });
+
+        return {
+          start: this.#runsOn().startOf({
+            projectId,
+            runId,
+            experimentId,
+            plan,
+            state,
+            data: dataResult,
+          }),
+          actor: { id: by.id, label: "user" },
+          data: dataResult,
+          state,
+          carriedOverCells: input.carriedOverCells ?? [],
+          reportContext: { projectId },
+          ran: {
+            userId: by.id,
+            projectId,
+            experimentId: input.experimentId,
+            isFullRun: input.scope.type === "full",
+          },
+        };
+      },
+    });
+    return { kind: "streaming", events: this.#runsOn().streamRun(run) };
   }
 
   /** `GET /runs`: one page of an experiment's runs, newest first. */
