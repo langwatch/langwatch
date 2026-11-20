@@ -1039,7 +1039,8 @@ jobs:
           pnpm format || true
           git --no-pager diff --stat || true
           git --no-pager diff | head -n 2000 || true
-          git checkout -- . || true
+          git checkout -- .
+          test -z "$(git status --porcelain)" || { git status --porcelain; echo "::error::could not restore the worktree after pnpm format"; exit 1; }
           echo "::error::oxfmt found unformatted files; the diff above is the fix (cut at 2000 lines)"
           exit 1
 
