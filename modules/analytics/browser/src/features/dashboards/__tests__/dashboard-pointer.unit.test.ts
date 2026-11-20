@@ -163,7 +163,7 @@ describe("given a pointer to a From LangWatch board", () => {
 
 describe("given a pointer an insight run files on a From LangWatch board", () => {
   describe.each(CURATED_BOARDS)("when it names the $templateId board", (board) => {
-    /** @scenario "A From LangWatch board is read from the catalogue" */
+    /** @scenario "An insight a daily run filed on a From LangWatch board links to its live widget" */
     it.each(board.widgets.map(({ key }) => key))("links widget %s", (key) => {
       const resolved = resolve({
         pointer: {

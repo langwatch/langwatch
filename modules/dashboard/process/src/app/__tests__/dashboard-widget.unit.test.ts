@@ -56,7 +56,7 @@ describe("DashboardModule dashboard widgets", () => {
     await expect(dashboard.listDashboardWidgets({ projectId: "project-1" })).resolves.toEqual([]);
   });
 
-  /** @scenario "A From LangWatch widget is read over the API by its template widget id" */
+  /** @scenario "The app finds no deletable widget under a template widget id" */
   it("finds no deletable widget under a From LangWatch widget id", async () => {
     const dashboard = createDashboardTestApp({
       repositories: await createDashboardTestRepositoriesWithBoard(),

@@ -63,6 +63,14 @@ Feature: Editing a dashboard widget from an agent, and where each widget came fr
     Then it answers the widget's name and stored queries from the catalogue
     And changing or deleting it is refused as not found
 
+  @unit
+  Scenario: The app finds no deletable widget under a template widget id
+    Given a From LangWatch widget id "template:<templateId>:<key>"
+    When the app reads that widget
+    Then it answers the widget
+    When the app looks for a deletable widget under that id
+    Then it is refused as not found
+
   @integration
   Scenario: A From LangWatch widget is read under its own board's path only
     Given a project key with analytics:view
