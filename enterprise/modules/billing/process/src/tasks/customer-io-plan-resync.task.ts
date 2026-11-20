@@ -47,7 +47,6 @@ export async function runCustomerIoPlanResync({
   const run = async (dryRun: boolean): Promise<CustomerIoPlanResyncReport> => {
     const totals = await resync.resync({
       // No resume: a re-run records every organization again; each catch-up is stamped fresh, so a re-run re-sends every organization (same values: safe, not free).
-      after: undefined,
       dryRun,
       signal,
       onPage: async ({ afterOrganizationId }) =>

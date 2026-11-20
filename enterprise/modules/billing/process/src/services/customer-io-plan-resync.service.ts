@@ -39,16 +39,14 @@ export class CustomerIoPlanResyncService {
   }
 
   /**
-   * Each organization after `after`, a page at a time; `onPage` hears the last organization of
+   * Each organization from the start, a page at a time; `onPage` hears the last organization of
    * each completed page, never on a dry run. Stops between organizations on abort.
    */
   async resync({
-    after,
     dryRun,
     signal,
     onPage,
   }: {
-    after: string | undefined;
     dryRun: boolean;
     signal: AbortSignal;
     onPage: (page: { afterOrganizationId: string }) => Promise<void>;
@@ -62,7 +60,7 @@ export class CustomerIoPlanResyncService {
       skipped: { no_active_members: 0 },
     };
     const { afterOrganizationId } = await this.pages.walk({
-      after,
+      after: undefined,
       dryRun,
       signal,
       onPage,

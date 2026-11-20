@@ -37,9 +37,8 @@ function resyncOver({ abortAfter }: { abortAfter?: string } = {}) {
       },
     },
   });
-  const run = ({ after, dryRun = false }: { after?: string; dryRun?: boolean } = {}) =>
+  const run = ({ dryRun = false }: { dryRun?: boolean } = {}) =>
     service.resync({
-      after,
       dryRun,
       signal: controller.signal,
       onPage: async (page) => void saves.push(page),
@@ -90,7 +89,7 @@ describe("CustomerIoPlanResyncService", () => {
 
   describe("given an organization with no active members and an abort after the first page", () => {
     /** @scenario "A resync skips organizations with no members and stops on abort" */
-    it("counts the empty one skipped, stops between organizations, and resumes after the saved page", async () => {
+    it("counts the empty one skipped, and stops between organizations", async () => {
       const aborted = resyncOver({ abortAfter: "org_b" });
 
       const report = await aborted.run();
@@ -101,11 +100,6 @@ describe("CustomerIoPlanResyncService", () => {
         "org_b",
       ]);
       expect(aborted.saves).toEqual([{ afterOrganizationId: "org_b" }]);
-
-      const resumed = resyncOver();
-      await resumed.run({ after: report.afterOrganizationId ?? undefined });
-
-      expect(resumed.caughtUp.map(({ organizationId }) => organizationId)).toEqual(["org_c"]);
     });
 
     it("saves no page it stopped part way through", async () => {
@@ -134,7 +128,6 @@ describe("CustomerIoPlanResyncService", () => {
     });
 
     await service.resync({
-      after: undefined,
       dryRun: true,
       signal: new AbortController().signal,
       onPage: async () => {},
