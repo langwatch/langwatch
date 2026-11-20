@@ -43,10 +43,33 @@ Feature: The package-suites weights are refreshed by a command
       Then it keeps the committed weight rather than the replay's seconds
 
     @unit
-    Scenario: A package's weight is the median of its runs, summed over its scripts
+    Scenario: A script no run measured keeps its committed weight
+      Given the committed weights file names a script of a package that some run measured
+      And no sampled run measured that script
+      When the weights are computed
+      Then the script keeps its committed weight
+      And a package no run measured is dropped
+
+    @unit
+    Scenario: A committed script its package no longer defines is dropped
+      Given the committed weights file names a script of a package that some run measured
+      And that package's package.json no longer defines the script
+      When the weights are computed
+      Then the script is dropped rather than carried forward
+
+    @unit
+    Scenario: A measured script its package no longer defines is dropped
+      Given a sampled run measured a script
+      And that package's package.json no longer defines the script
+      When the weights are computed
+      Then the script is dropped, so the written file names only scripts the gate runs
+
+    @unit
+    Scenario: A package's weight is the median of its runs, kept per script
       Given a package whose unit and integration scripts were measured in three runs
       When the weights are computed
-      Then its weight is the median of each script plus the median of the other
+      Then each script has its own weight, the median of its runs
+      And the scheduler weighs the package as the sum of the scripts a leg keeps
 
   Rule: only complete, green runs are measured
 
@@ -55,6 +78,13 @@ Feature: The package-suites weights are refreshed by a command
       Given a main run where one package-suites shard failed
       When runs are collected
       Then that run is not measured and the next green one is
+
+    @unit
+    Scenario: The browser job is measured when present and must be green
+      Given a main run whose shards are green
+      When the package-suites browser job is also green
+      Then its log is measured with the shards
+      And when the browser job failed the run is skipped
 
     @unit
     Scenario: Too few green runs is an error rather than a thin file
@@ -77,9 +107,32 @@ Feature: The package-suites weights are refreshed by a command
   Rule: the file says where its numbers came from
 
     @unit
+    Scenario: The file lists each script with its own seconds
+      Given a weights file with lines "<package>  <script>  <seconds>"
+      When it is read
+      Then each line is the weight of that script of that package
+      And a line of any other shape is skipped
+
+    @unit
     Scenario: The file is written heaviest first and names its runs
-      Given weights for several packages
+      Given weights for several package scripts
       When the file is rendered
-      Then the packages are listed heaviest first, ties by name
-      And packages under the listing threshold are left to the default
+      Then the scripts are listed heaviest first, ties by package then script
+      And scripts under the listing threshold are left to the default
       And the header names the runs the numbers came from
+
+  Rule: a weight counts only while the gate still runs that script
+
+    @unit
+    Scenario: Workspace globs decide which packages define scripts
+      Given a workspace whose globs match packages at several depths
+      When the defined scripts are read
+      Then every matched package's scripts are defined
+      And a package under a negated glob defines nothing
+
+    @unit
+    Scenario: Only the scripts the gate runs are defined
+      Given a package with test, test:unit, test:integration, test:browser and build
+      When its defined scripts are chosen
+      Then test:unit wins over test, and integration and browser are kept
+      And build is not defined

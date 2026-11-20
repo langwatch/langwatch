@@ -28,29 +28,36 @@ type Source interface {
 
 var shardName = regexp.MustCompile(`^package-suites \((\d+)/(\d+)\)$`)
 
+const browserJobName = "package-suites (browser)"
+
 // suiteJobs returns the run's package-suites jobs when every shard ran and
 // passed. A failed or cancelled shard stops early or reruns nothing, so its
 // times are not what the suites cost, and a run missing a shard did not
-// measure every package.
+// measure every package. The browser job is optional (older runs lack it) but
+// must be green when present.
 func suiteJobs(jobs []Job) ([]Job, bool) {
 	var found []Job
-	total := 0
+	total, shards := 0, 0
 	for _, job := range jobs {
 		match := shardName.FindStringSubmatch(job.Name)
-		if match == nil {
+		if match == nil && job.Name != browserJobName {
 			continue
 		}
-		total, _ = strconv.Atoi(match[2])
 		if job.Conclusion != "success" {
 			return nil, false
 		}
+		if match != nil {
+			total, _ = strconv.Atoi(match[2])
+			shards++
+		}
 		found = append(found, job)
 	}
-	return found, total > 0 && len(found) == total
+	return found, total > 0 && shards == total
 }
 
 // Collect measures the newest `want` runs on main whose package-suites shards
-// all passed, and returns their ids with every measurement of each.
+// and, when the run has one, package-suites (browser) job all passed, and
+// returns their ids with every measurement of each.
 func Collect(src Source, want int) ([]int64, [][]Measurement, error) {
 	if want < 1 {
 		return nil, nil, fmt.Errorf("asked for %d runs; take the median over at least one", want)
@@ -75,7 +82,7 @@ func Collect(src Source, want int) ([]int64, [][]Measurement, error) {
 		}
 	}
 	if len(ids) < want {
-		return nil, nil, fmt.Errorf("found %d main runs with every package-suites shard green, wanted %d", len(ids), want)
+		return nil, nil, fmt.Errorf("found %d main runs with every package-suites shard and browser job green, wanted %d", len(ids), want)
 	}
 	return ids, measured, nil
 }
