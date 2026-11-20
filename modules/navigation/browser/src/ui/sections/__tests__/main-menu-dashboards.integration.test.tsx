@@ -87,9 +87,7 @@ function renderSidebar({
         pathname,
         permissions,
         isLoading: organizationLoading,
-        flags: {
-          release_dashboards: { enabled: dashboardsFlag, isLoading: dashboardsLoading },
-        },
+        flags: { release_dashboards: { enabled: dashboardsFlag, isLoading: dashboardsLoading } },
         commandBar: { shortcut: "⌘K", open: vi.fn(), trigger: null },
       }}
     >
