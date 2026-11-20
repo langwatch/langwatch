@@ -705,7 +705,6 @@ jobs:
       # Vitest's transform cache is one per user (ADR-196); keep it where the job restores it.
       VITEST_FS_MODULE_CACHE_DIR: ${{ github.workspace }}/node_modules/.vitest-cache
       CI: "true"
-      LWQL_ATTRIBUTION_MEMORY_SWEEP: ${{ contains(github.event.pull_request.labels.*.name, 'ci:lwql-memory-sweep') && '1' || '' }}
     runs-on: ubuntu-latest
     # Read the checkout; write only to prune this pull request's older suite results.
     permissions:
