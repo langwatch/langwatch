@@ -7,7 +7,7 @@ import {
 } from "../canonicalAttributes.ts";
 import { markInputAsFresh } from "../canonicalExtraction.ts";
 import { asNumber } from "../canonicalGuard.ts";
-import { asSessionKey, readDeclaredSessionKey } from "../langwatch/declaredSession.ts";
+import { asSessionKey, readDeclaredSessionKey } from "../langwatch/langwatchIdentity.ts";
 import { ClaudeCodeResponseService } from "./claudeCodeResponse.ts";
 
 const claudeCodeResponseService = ClaudeCodeResponseService.create();

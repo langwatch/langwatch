@@ -3,7 +3,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { readDeclaredSessionKey } from "../langwatch/declaredSession.ts";
+import { readDeclaredSessionKey } from "../langwatch/langwatchIdentity.ts";
 
 describe("readDeclaredSessionKey()", () => {
   /** @scenario a launcher's declared session groups every harness session it runs */
