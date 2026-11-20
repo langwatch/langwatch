@@ -3,9 +3,6 @@ import { RUN_KEY_LIFETIME_MS } from "@langwatch/api-key-contract";
 /** A held run key is handed out only while at least this much of its life remains. */
 export const RUN_KEY_REUSE_MARGIN_MS = 5 * 60 * 1000;
 
-/** A held key handed out must still cover a 20-minute run lease, plus the reuse margin. */
-export const HELD_KEY_MIN_REMAINING_MS = 20 * 60_000 + RUN_KEY_REUSE_MARGIN_MS;
-
 /** The life a handed-out key must still have: the caller's bound, never under the margin. */
 function runKeyFloorMs(minRemainingMs: number | undefined): number {
   return Math.max(RUN_KEY_REUSE_MARGIN_MS, minRemainingMs ?? 0);

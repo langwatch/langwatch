@@ -63,7 +63,10 @@ export class LangyTurnPreparationService {
     turnContext: object;
     /** Keeps the unattended ceiling: an allowlisted key, no GitHub token, no UI action. */
     readOnly: boolean;
-    unattended?: Pick<NonNullable<StartConversationTurnInput["unattended"]>, "title">;
+    unattended?: Pick<
+      NonNullable<StartConversationTurnInput["unattended"]>,
+      "title" | "heldKeyMinRemainingMs"
+    >;
     holdKey?: string;
     worker: NonNullable<LangyTurnServiceDependencies["worker"]>;
     accessStore: LangyTurnServiceDependencies["accessStore"];
@@ -262,6 +265,9 @@ export class LangyTurnPreparationService {
       organizationId: args.credentials.organizationId,
       ...(args.readOnly ? { ceiling: "unattended" as const } : {}),
       ...(args.holdKey ? { holdKey: args.holdKey } : {}),
+      ...(args.unattended?.heldKeyMinRemainingMs
+        ? { heldKeyMinRemainingMs: args.unattended.heldKeyMinRemainingMs }
+        : {}),
       conversation: { id: args.conversation.id, turnId: args.turnId },
     });
     args.credentials.langwatchApiKey = minted.token;

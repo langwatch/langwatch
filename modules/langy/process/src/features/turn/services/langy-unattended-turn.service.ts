@@ -80,6 +80,9 @@ export class LangyUnattendedTurnService {
         title: input.title,
         // Counted by the turn once it is claimed, so a replay of the same turn counts nothing.
         countTurn: () => bounds.assertUnattendedTurnWithinBounds({ projectId: project.id }),
+        ...(input.heldKeyMinRemainingMs
+          ? { heldKeyMinRemainingMs: input.heldKeyMinRemainingMs }
+          : {}),
       },
     });
   }

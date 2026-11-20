@@ -394,7 +394,7 @@ Feature: API key lifecycle
 
   @unit
   Scenario: A held key that was revoked or has lapsed is minted over
-    Given a key held under a name was revoked, or has less than a minute of life left
+    Given a key held under a name was revoked, or has less life left than its caller needs
     When the key is asked for under the same name
     Then a new key is written and returned
 

@@ -192,6 +192,8 @@ export type LangyStartUnattendedTurnInput = Readonly<{
   idempotencyKey: string;
   text: string;
   title: string;
+  /** The life the run's held key must still have when handed out, to outlast the run's lease. */
+  heldKeyMinRemainingMs?: number;
 }>;
 
 /** One turn a caller holds for; `signal` is the caller's deadline and disconnect. */

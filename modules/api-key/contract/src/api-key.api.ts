@@ -126,6 +126,8 @@ export type CliSessionKeyRevocation = Readonly<{
 /** A key for `createHeld`: the create input, named by what holds it, always with an expiry. */
 export type CreateHeldApiKeyInput = {
   holdKey: string;
+  /** The life a held key must still have to be handed out, as `mintRunKey` reads it. */
+  minRemainingMs?: number;
   key: CreateApiKeyInput & { expiresAt: NonNullable<CreateApiKeyInput["expiresAt"]> };
 };
 

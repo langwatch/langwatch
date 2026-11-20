@@ -22,7 +22,10 @@ import {
 import { nowInstant, Temporal } from "@langwatch/time";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { INSIGHT_DAILY_RUN_MAX_ATTEMPTS } from "../../eventing/insight-daily-run.intent.ts";
+import {
+  INSIGHT_DAILY_RUN_LEASE_MS,
+  INSIGHT_DAILY_RUN_MAX_ATTEMPTS,
+} from "../../eventing/insight-daily-run.intent.ts";
 import { dailyRunWindows } from "../../rules/insight-daily-run.rules.ts";
 import {
   answerWith,
@@ -138,6 +141,8 @@ describe("given a member with analytics:view and a board with widgets", () => {
           idempotencyKey: `insight-daily-run:${installed.scheduleIdOf()}:${runId}`,
           text: expect.stringContaining('Dashboard: "Costs" (id "dashboard-1")'),
           title: expect.stringMatching(/^Daily insights - Costs - \d{4}-\d{2}-\d{2}$/),
+          // The held key outlives the run's lease, with five minutes to settle.
+          heldKeyMinRemainingMs: INSIGHT_DAILY_RUN_LEASE_MS + 5 * 60_000,
         },
       ]);
       expect(installed.langy.waits).toEqual([

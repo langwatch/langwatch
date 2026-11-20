@@ -97,7 +97,7 @@ async function mintShared(input: {
   /** Whether the key's row is still live: a key retired elsewhere is minted over. */
   isLive?: (apiKeyId: string) => Promise<boolean>;
   /** Whether a pending key is still only disabled; one revoked since is minted over. */
-  isPending?: (apiKeyId: string) => Promise<boolean>;
+  isPending: (apiKeyId: string) => Promise<boolean>;
   /** Told to a caller whose grant has not landed, so its retry waits for the fold. */
   retryAfterMs?: number;
 }): Promise<{ token: string; apiKeyId: string; expiresAtMs: number; written: boolean }> {
@@ -162,7 +162,7 @@ async function firstPending({
   isPending: Mint["isPending"];
 }): Promise<{ kind: "pending"; shared: SharedKey } | { kind: "none" }> {
   for (const candidate of candidates) {
-    if (!isPending || (await isPending(candidate.apiKeyId))) {
+    if (await isPending(candidate.apiKeyId)) {
       return { kind: "pending", shared: candidate };
     }
   }

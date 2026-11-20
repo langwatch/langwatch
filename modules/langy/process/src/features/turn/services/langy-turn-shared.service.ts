@@ -93,7 +93,11 @@ export interface StartConversationTurnInput {
    * conversation under this title. `countTurn` counts it against its window, or refuses; it is
    * asked once the turn is claimed, so a replay counts nothing.
    */
-  unattended?: { title: string; countTurn: () => Promise<void> };
+  unattended?: {
+    title: string;
+    countTurn: () => Promise<void>;
+    heldKeyMinRemainingMs?: number;
+  };
 }
 
 export interface LangyTurnServiceDeps {

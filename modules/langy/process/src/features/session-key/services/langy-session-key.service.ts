@@ -47,6 +47,8 @@ type LangySessionKeyMintInput = {
    * the same `holdKey` to `revoke`; a revoke elsewhere is caught by the liveness check.
    */
   holdKey?: string;
+  /** The life a held key must still have to be handed out again, to outlast its run's lease. */
+  heldKeyMinRemainingMs?: number;
 };
 
 /** Where a minted key's conversation is written, so a delete it asks for can show its card. */
@@ -169,7 +171,11 @@ export class LangySessionKeyService extends LangySessionKey {
       expiresAt: toDate(nowInstant().add({ milliseconds: sessionKeyLifetimeMs })),
     } satisfies CreateApiKeyInput;
     const { created, ...result } = input.holdKey
-      ? await this.apiKeys.createHeld({ holdKey: input.holdKey, key })
+      ? await this.apiKeys.createHeld({
+          holdKey: input.holdKey,
+          key,
+          ...(input.heldKeyMinRemainingMs ? { minRemainingMs: input.heldKeyMinRemainingMs } : {}),
+        })
       : await this.apiKeys
           .create(key)
           .then(({ token, apiKey }) => ({ token, apiKeyId: apiKey.id, created: true }));

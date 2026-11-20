@@ -12,7 +12,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 ## Module API (`ApiKeyApi`)
 
-Peers call these through the token, declared at `../contract/src/api-key.api.ts:132`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/api-key.api.ts:134`; nothing else in this package is public.
 
 #### `create`
 

@@ -178,12 +178,14 @@ describe("HeldKeyMintService", () => {
     expect(rows()).toHaveLength(2);
   });
 
-  it("mints a fresh key when the held one has too little life left to serve the caller", async () => {
+  /** @scenario "A held key that was revoked or has lapsed is minted over" */
+  it("mints a fresh key when the held one has less life left than the caller needs", async () => {
     const { service } = createFixture({ landsAtMs: 0 });
-    const soon = { ...keyInput(), expiresAt: new Date(Date.now() + 30_000) };
-    const first = await service.createHeld({ holdKey: "run-1", key: soon });
+    const minRemainingMs = 25 * 60_000;
+    const soon = { ...keyInput(), expiresAt: new Date(Date.now() + 20 * 60_000) };
+    const first = await service.createHeld({ holdKey: "run-1", key: soon, minRemainingMs });
 
-    const next = await service.createHeld({ holdKey: "run-1", key: keyInput() });
+    const next = await service.createHeld({ holdKey: "run-1", key: keyInput(), minRemainingMs });
 
     expect(next.apiKeyId).not.toBe(first.apiKeyId);
   });

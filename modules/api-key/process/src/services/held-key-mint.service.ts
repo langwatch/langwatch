@@ -6,7 +6,7 @@ import { Temporal, nowInstant } from "@langwatch/time";
 
 import type { ApiKeyRepository } from "../repositories/api-key.repository.ts";
 import { scopeOf } from "../rules/api-key-own-grant-ids.rules.ts";
-import { HELD_KEY_MIN_REMAINING_MS } from "../rules/run-key.rules.ts";
+import { isRunKeyReusable } from "../rules/run-key.rules.ts";
 import type { SharedKeyMintService } from "./shared-key-mint.service.ts";
 
 /**
@@ -40,11 +40,13 @@ export class HeldKeyMintService {
 
   /**
    * The one live key for `holdKey`: minted by the first caller, `created` for that one only. A
-   * held key retired since, or held for another identity, is minted over.
+   * held key retired since, held for another identity, or with under `minRemainingMs` of life
+   * left (never under the reuse margin), is minted over.
    */
   async createHeld({
     holdKey,
     key,
+    minRemainingMs,
   }: CreateHeldApiKeyInput): Promise<{ token: string; apiKeyId: string; created: boolean }> {
     const { sharedKeys, keys, held } = this.options;
     const shared = await sharedKeys.mint({
@@ -54,7 +56,7 @@ export class HeldKeyMintService {
       newExpiresAt: () => Temporal.Instant.fromEpochMilliseconds(key.expiresAt.getTime()),
       keyFor: () => key,
       reusable: ({ expiresAtMs }) =>
-        expiresAtMs - nowInstant().epochMilliseconds >= HELD_KEY_MIN_REMAINING_MS,
+        isRunKeyReusable({ expiresAtMs, nowMs: nowInstant().epochMilliseconds, minRemainingMs }),
       isLive: async (apiKeyId) => {
         const row = await keys.findLivenessById({ id: apiKeyId });
         return (

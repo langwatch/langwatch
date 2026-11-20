@@ -4,7 +4,7 @@ import { type Instant, nowInstant } from "@langwatch/time";
 
 const logger = createLogger("langwatch:authz:revocation");
 
-export type AuthzRevocationReason = "revocation" | "offboard";
+export type AuthzRevocationReason = "revocation" | "offboard" | "api_key_role_deletion";
 
 /** Writes that bypassed the group queue, labelled by cause; the name is an external interface. */
 export const authzDirectProjectionWriteTotal = counter({
@@ -60,9 +60,14 @@ export abstract class AuthzRevocationRepository {
    * guards: a define's hold then never confirms on a role about to go. Other roles are untouched.
    */
   async enforceApiKeyRoleDeletion(mark: AuthzRoleDeletionMark): Promise<void> {
-    if ((await this.markRoleDeleted(mark)) > 0) {
-      authzDirectProjectionWriteTotal.inc({ reason: "revocation" });
-    }
+    if ((await this.markRoleDeleted(mark)) === 0) return;
+
+    const reason: AuthzRevocationReason = "api_key_role_deletion";
+    authzDirectProjectionWriteTotal.inc({ reason });
+    logger.info(
+      { organizationId: mark.organizationId, reason, roleId: mark.roleId },
+      "authz read model written directly, bypassing the queue",
+    );
   }
 
   protected abstract markRevoked(mark: AuthzRevocationMark): Promise<void>;

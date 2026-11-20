@@ -340,7 +340,7 @@ export type AuthzGrantIdInput = {
 export const AuthzApi = moduleApi<AuthzApi>()("authz");
 
 // A binding's id is caller-minted, in the persisted format shared across processes.
-export const GRANT_KSUID_RESOURCE = "rolebinding";
+const GRANT_KSUID_RESOURCE = "rolebinding";
 
 /**
  * Begins the stable command id an API key's create writes its own role and grants under, so the

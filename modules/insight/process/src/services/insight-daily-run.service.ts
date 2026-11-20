@@ -21,9 +21,10 @@ import { createLogger } from "@langwatch/observability";
 import { nowInstant, Temporal } from "@langwatch/time";
 import { LANGY_TRACE_ORIGIN } from "@langwatch/trace-contract";
 
-import type {
-  InsightDailyRunExecutor,
-  RunBoardIntent,
+import {
+  INSIGHT_DAILY_RUN_LEASE_MS,
+  type InsightDailyRunExecutor,
+  type RunBoardIntent,
 } from "../eventing/insight-daily-run.intent.ts";
 import type { InsightRepository } from "../repositories/insight.repository.ts";
 import { type CheckedFinding, checkRunAnswer } from "../rules/insight-daily-run-answer.rules.ts";
@@ -52,6 +53,9 @@ const RUN_TIMEZONE = "UTC";
 
 /** How long a run waits for Langy; shorter than the outbox lease, so the run ends first. */
 const TURN_DEADLINE_MS = 10 * 60_000;
+
+/** A run's held Langy key must outlive the run's lease, with five minutes to settle. */
+const HELD_KEY_MIN_REMAINING_MS = INSIGHT_DAILY_RUN_LEASE_MS + 5 * 60_000;
 
 /** As many of the person's newest insights as their inbox reads. */
 const OPEN_INSIGHTS_READ_LIMIT = 500;
@@ -233,6 +237,7 @@ export class InsightDailyRunService implements InsightDailyRunExecutor {
         userId,
         // The run is the key: a repeat with the same brief is answered with the same turn.
         idempotencyKey: `insight-daily-run:${scheduleId}:${runId}`,
+        heldKeyMinRemainingMs: HELD_KEY_MIN_REMAINING_MS,
         text: buildDailyRunBrief({
           projectId,
           board: gate.board,
