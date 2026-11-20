@@ -4,8 +4,8 @@ import type { CreateHeldApiKeyInput } from "@langwatch/api-key-contract";
 import type { SharedCredentialStore } from "@langwatch/secrets/shared-credential";
 import { Temporal, nowInstant } from "@langwatch/time";
 
-import { scopeOf } from "../rules/api-key-own-grant-ids.rules.ts";
 import type { ApiKeyRepository } from "../repositories/api-key.repository.ts";
+import { scopeOf } from "../rules/api-key-own-grant-ids.rules.ts";
 import type { SharedKeyMintService } from "./shared-key-mint.service.ts";
 
 /**
