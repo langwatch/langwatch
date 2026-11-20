@@ -148,6 +148,7 @@ describe("useFilteredTraceFacets", () => {
         isPlaceholderData: false,
         isFetching: false,
         isError: false,
+        matchesNothing: true,
       });
     });
   });
@@ -173,6 +174,7 @@ describe("useFilteredTraceFacets", () => {
       isPlaceholderData: true,
       isFetching: true,
       isError: false,
+      matchesNothing: false,
     });
   });
 });

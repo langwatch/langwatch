@@ -16,6 +16,8 @@ interface FilteredTraceFacetsResult {
   isPlaceholderData: boolean;
   isFetching: boolean;
   isError: boolean;
+  /** The query matches no trace yet (a pending NOT eval chip): every count is zero. */
+  matchesNothing: boolean;
 }
 
 /**
@@ -50,14 +52,21 @@ export function useFilteredTraceFacets(): FilteredTraceFacetsResult {
     },
   );
 
-  // A settled empty answer, so the rail shows no counts rather than a pending read.
+  // Settled, as a read matching no trace: the rail shows no counts, not a pending read.
   if (hasPendingNegatedEval) {
-    return { data: [], isPlaceholderData: false, isFetching: false, isError: false };
+    return {
+      data: [],
+      isPlaceholderData: false,
+      isFetching: false,
+      isError: false,
+      matchesNothing: true,
+    };
   }
   return {
     data: query.data?.facets,
     isPlaceholderData: query.isPlaceholderData,
     isFetching: query.isFetching,
     isError: query.isError,
+    matchesNothing: false,
   };
 }
