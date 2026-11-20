@@ -73,8 +73,9 @@ describe("the managed prompt version replay step", () => {
       });
 
       const registered = steps.find(({ id }) => id === MANAGED_PROMPT_VERSION_REPLAY_STEP_ID);
+      const after = registered && "after" in registered ? registered.after : undefined;
 
-      expect(registered?.after).toEqual(
+      expect(after).toEqual(
         expect.arrayContaining([
           "trace:replay-trace-analytics-widget-columns",
           "trace:replay-trace-evaluation-analytics",
