@@ -3,7 +3,7 @@
  * Test connection through the real SQS channel and AWS SDK: the subscriber role is assumed with
  * the external id LangWatch generated before the queue is read. Requests to AWS hosts are sent to
  * a local server, so the AssumeRole body and the SQS signature are read as sent.
- * Spec: specs/security-lake-ingest.feature
+ * Spec: enterprise/modules/governance/specs/security-lake-ingest.feature
  */
 import http, { createServer, type IncomingHttpHeaders, type Server } from "node:http";
 import https from "node:https";

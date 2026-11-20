@@ -2,7 +2,7 @@
 /**
  * @vitest-environment node
  * Adding a Security Lake source over REST with an organisation key: no user created it, so the
- * source names no creator. Spec: specs/security-lake-ingest.feature
+ * source names no creator. Spec: enterprise/modules/governance/specs/security-lake-ingest.feature
  */
 import { describe, expect, it } from "vitest";
 

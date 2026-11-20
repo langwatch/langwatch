@@ -7,11 +7,10 @@ import {
   ReceiveMessageCommand,
   SQSClient,
 } from "@aws-sdk/client-sqs";
-import { AwsClientConfiguration } from "@langwatch/aws-client";
+import { AwsClientConfiguration, pinnedHostsConfig } from "@langwatch/aws-client";
 import { createSsrfUrlValidator, type SsrfUrlValidator } from "@langwatch/egress";
 
 import type { GovernanceEgressPolicy } from "../http/http.governance-http.channel.ts";
-import { pinnedHostsConfig } from "../s3/s3.object-store.channel.ts";
 import type {
   SecurityLakeQueue,
   SecurityLakeQueueMessage,

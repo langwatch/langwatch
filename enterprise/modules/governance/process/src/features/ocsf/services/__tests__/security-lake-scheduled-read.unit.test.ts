@@ -2,7 +2,7 @@
 /**
  * A Security Lake source rides the ingestion pull lifecycle: its schedule becomes the pull's cron,
  * and each scheduled run of the pull worker reads its subscriber queue once through the Security
- * Lake puller. Spec: specs/security-lake-ingest.feature
+ * Lake puller. Spec: enterprise/modules/governance/specs/security-lake-ingest.feature
  */
 import {
   type GovernanceIngestionSource,

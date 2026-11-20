@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-/** Spec: specs/security-lake-ingest.feature */
+/** Spec: enterprise/modules/governance/specs/security-lake-ingest.feature */
 
 import { createServer, type IncomingHttpHeaders, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
@@ -103,15 +103,19 @@ function signedKeys(): string[] {
   return captured.map((request) => String(request.headers.authorization ?? ""));
 }
 
+/** A run refused for missing keys: not retried, and the customer told which keys to add. */
+const KEYS_MISSING = {
+  retryable: false,
+  customerMessage: expect.stringMatching(/add the access key ID and secret access key/),
+};
+
 describe("Security Lake pull and the worker's own AWS identity", () => {
   describe("given a source saved with no key pair", () => {
     /** @scenario "A source without its own key pair never uses the worker's AWS identity" */
     it("refuses before any AWS client signs a request", async () => {
       const send = vi.spyOn(SQSClient.prototype, "send");
 
-      await expect(pull({ credentials: undefined })).rejects.toThrow(
-        /access key ID and secret access key are required/,
-      );
+      await expect(pull({ credentials: undefined })).rejects.toMatchObject(KEYS_MISSING);
 
       expect(send).not.toHaveBeenCalled();
     });
@@ -136,9 +140,7 @@ describe("Security Lake pull and the worker's own AWS identity", () => {
       ).toHaveLength(1);
       const send = vi.spyOn(SQSClient.prototype, "send");
 
-      await expect(pull({ credentials: blank })).rejects.toThrow(
-        /access key ID and secret access key are required/,
-      );
+      await expect(pull({ credentials: blank })).rejects.toMatchObject(KEYS_MISSING);
 
       expect(send).not.toHaveBeenCalled();
     });
@@ -152,7 +154,7 @@ describe("Security Lake pull and the worker's own AWS identity", () => {
           credentials: undefined,
           overrides: { sqsEndpoint: endpoint, s3Endpoint: endpoint, queueUrl: `${endpoint}/q` },
         }),
-      ).rejects.toThrow(/access key ID and secret access key are required/);
+      ).rejects.toMatchObject(KEYS_MISSING);
 
       expect(captured).toHaveLength(0);
     });

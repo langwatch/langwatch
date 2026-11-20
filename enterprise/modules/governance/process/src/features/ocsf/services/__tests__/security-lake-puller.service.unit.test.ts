@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import { securityLakePullConfigSchema } from "@langwatch/enterprise-governance-contract";
+import { DispatchError } from "@langwatch/eventing";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
@@ -19,13 +20,17 @@ const ROLE = "arn:aws:iam::123456789012:role/AmazonSecurityLake-subscriber";
 
 function run(
   overrides: Record<string, unknown> = {},
-  { externalId = "acme-external-id" }: { externalId?: string | null } = {},
+  {
+    externalId = "acme-external-id",
+    receiveFailure,
+  }: { externalId?: string | null; receiveFailure?: unknown } = {},
 ) {
   const memory = MemorySecurityLakeQueueChannel.create();
   const seen: GovernanceObjectStorageCredentials[] = [];
   const queue: SecurityLakeQueue = {
     receive: async (input) => {
       seen.push(input.credentials);
+      if (receiveFailure !== undefined) throw receiveFailure;
       return memory.receive(input);
     },
     delete: (input) => memory.delete(input),
@@ -82,7 +87,10 @@ describe("SecurityLakePullerService", () => {
   describe("given a source on AWS with no generated external id", () => {
     /** @scenario The reader refuses to assume the role without the generated external id */
     it("refuses before reading, so the role is never assumed without one", async () => {
-      await expect(run({}, { externalId: null })).rejects.toThrow(/no external id/);
+      await expect(run({}, { externalId: null })).rejects.toMatchObject({
+        retryable: false,
+        customerMessage: expect.stringMatching(/no external id/),
+      });
     });
   });
 
@@ -109,6 +117,40 @@ describe("SecurityLakePullerService", () => {
       });
 
       expect(seen[0]?.assumeRole).toEqual({ roleArn: ROLE, externalId: "acme-external-id" });
+    });
+  });
+
+  describe("when AWS refuses the source's own setup", () => {
+    it("fails the run as a refusal the customer fixes, not one to retry", async () => {
+      const denied = Object.assign(new Error("User arn:aws:iam::1:user/x is not authorized"), {
+        name: "AccessDenied",
+        $metadata: { httpStatusCode: 403 },
+      });
+
+      const failure = await run({}, { receiveFailure: denied }).catch((error: unknown) => error);
+
+      expect(failure).toBeInstanceOf(DispatchError);
+      expect(failure).toMatchObject({
+        retryable: false,
+        customerMessage: "The AWS request failed with AccessDenied.",
+        cause: denied,
+      });
+    });
+  });
+
+  describe("when AWS is briefly unavailable", () => {
+    it("fails the run as retryable, with only the error code in its message", async () => {
+      const unavailable = Object.assign(new Error("internal detail"), {
+        name: "ServiceUnavailable",
+        $metadata: { httpStatusCode: 503 },
+      });
+
+      const failure = await run({}, { receiveFailure: unavailable }).catch((e: unknown) => e);
+
+      expect(failure).toMatchObject({
+        retryable: true,
+        message: "The AWS request failed with ServiceUnavailable.",
+      });
     });
   });
 });

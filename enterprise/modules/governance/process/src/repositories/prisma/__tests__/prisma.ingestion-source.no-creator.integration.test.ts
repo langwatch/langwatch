@@ -1,6 +1,6 @@
 /**
  * @vitest-environment node
- * @see specs/security-lake-ingest.feature
+ * @see enterprise/modules/governance/specs/security-lake-ingest.feature
  *
  * A source a service key adds has no user behind it: the real table takes it with no creator.
  */

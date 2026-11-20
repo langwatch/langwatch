@@ -436,7 +436,7 @@ export class SecurityLakeReaderService {
       dropped: 0,
       invalid: 0,
     };
-    const latest = nowInstant().epochMilliseconds + OCSF_INGEST_MAX_FUTURE_MS;
+    const latest = this.deps.now() + OCSF_INGEST_MAX_FUTURE_MS;
     try {
       const bytes = await this.deps.objects.readBytes({
         bucket: object.bucket,

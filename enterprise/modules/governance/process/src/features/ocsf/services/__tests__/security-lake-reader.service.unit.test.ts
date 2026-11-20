@@ -1,5 +1,6 @@
 /** Spec: enterprise/modules/governance/specs/security-lake-ingest.feature */
 import {
+  OCSF_INGEST_MAX_FUTURE_MS,
   type SecurityLakePullConfig,
   securityLakePullConfigSchema,
 } from "@langwatch/enterprise-governance-contract";
@@ -347,6 +348,20 @@ describe("SecurityLakeReaderService", () => {
 
       expect(result).toMatchObject({ rows: 3, written: 1, invalid: 2, deleted: 1 });
       expect((await stored()).map((row) => row.eventId)).toEqual([`security_lake:${SOURCE}:ok`]);
+    });
+  });
+
+  describe("given rows dated further ahead of the reader's clock than OCSF allows", () => {
+    it("counts them invalid and stores none", async () => {
+      const { queue, objects, read, stored, clock } = setup();
+      objects.seedBytes({ bucket: BUCKET, key: MGMT_KEY, bytes: cloudTrailParquet(MIXED_CALLS) });
+      queue.send({ body: notification(MGMT_KEY) });
+      clock.ms = NOW_MS - OCSF_INGEST_MAX_FUTURE_MS - 10 * 60_000;
+
+      const result = await read();
+
+      expect(result).toMatchObject({ rows: 3, written: 0, invalid: 3 });
+      expect(await stored()).toEqual([]);
     });
   });
 

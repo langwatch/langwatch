@@ -2,7 +2,8 @@
 /**
  * @vitest-environment node
  * The Security Lake procedures of `ingestionSources.*` ask for the Enterprise plan before the
- * handler runs, as the REST routes do. Spec: specs/security-lake-ingest.feature
+ * handler runs, as the REST routes do.
+ * Spec: enterprise/modules/governance/specs/security-lake-ingest.feature
  */
 import type { GovernanceRestApi } from "@langwatch/enterprise-governance-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
