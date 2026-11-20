@@ -334,3 +334,33 @@ Feature: Token Created modal command snippets
   Scenario: Reopening starts from the new key alone
     Given a second key is minted after the first dialog closed
     Then no earlier token, selection, reveal or copy tick is shown
+
+  @integration @regression
+  Scenario: An inline copy button that unmounts does not reset after it is gone
+    Given a copy button that has just copied successfully
+    When it is closed and 2 seconds pass
+    Then nothing is left waiting to reset the tick and nothing breaks
+
+  @integration
+  Scenario: An inline copy button returns to its copy icon after 2 seconds
+    Given a copy button that has just copied successfully
+    When 2 seconds pass while it stays mounted
+    Then its check icon goes back to the copy icon
+
+  @integration @regression
+  Scenario: An inline copy button that unmounts mid-copy starts no reset timer when the copy lands
+    Given a copy button whose copy has not resolved yet
+    When it is closed and then the copy succeeds
+    Then nothing is left waiting to reset the tick and nothing breaks
+
+  @integration @regression
+  Scenario: The Copy API key button that closes with the dialog does not reset after it is gone
+    Given the dialog's Copy API key button has just copied successfully
+    When the dialog closes and 2 seconds pass
+    Then nothing is left waiting to reset the tick and nothing breaks
+
+  @integration @regression
+  Scenario: The Copy API key button that closes mid-copy starts no reset timer when the copy lands
+    Given the dialog's Copy API key button was clicked and its copy has not resolved yet
+    When the dialog is closed and then the copy succeeds
+    Then nothing is left waiting to reset the tick and nothing breaks
