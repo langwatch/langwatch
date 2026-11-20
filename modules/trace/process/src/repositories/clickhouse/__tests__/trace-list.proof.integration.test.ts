@@ -504,14 +504,14 @@ describe.skipIf(!clickHouseConfigured)("TraceListClickHouseRepository through th
           return page.rows.length;
         };
 
-        for (const field of [
-          "scenarioVerdict:success",
-          "evaluator:nobody",
-          'eval:"is it twinned"',
-          'eval.conversation:"is the thread twinned"',
-        ]) {
+        for (const field of ["scenarioVerdict:success", "evaluator:nobody"]) {
           expect(await twinIds(field)).toBe(0);
           expect(await twinIds(`NOT ${field}`)).toBe(4);
+        }
+        // An eval chip's NOT keeps only rows the run judged "no"; this run judged none.
+        for (const field of ['eval:"is it twinned"', 'eval.conversation:"is the thread twinned"']) {
+          expect(await twinIds(field)).toBe(0);
+          expect(await twinIds(`NOT ${field}`)).toBe(0);
         }
       });
     });
