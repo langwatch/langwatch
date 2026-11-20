@@ -25,10 +25,12 @@ const denySetSize = 1 << 16
 const maxDeniedCredentialsPerKey = 8
 
 // denial records that every confirmation of a virtual key started before at is
-// void. kind is the change-feed event that caused it.
+// void. kind is the change-feed event that caused it. A pending denial came
+// from a change-feed backlog and refuses no credential locally (denyPending).
 type denial struct {
-	at   time.Time
-	kind string
+	at      time.Time
+	kind    string
+	pending bool
 }
 
 // DefaultDenialRecheckInterval is how often a denied key may be re-checked
@@ -133,10 +135,29 @@ func (e *entry) authStart() time.Time {
 // deny voids every confirmation of vkID that started before now, and remembers
 // which cached credentials carried it so an outage still answers them with the
 // key's own error rather than a retryable one.
-func (s *Service) deny(vkID, kind string) {
+func (s *Service) deny(vkID, kind string) { s.recordDenial(vkID, kind, false) }
+
+// denyPending is deny for an event read from a change-feed backlog, where a
+// later page may re-enable the key: it voids confirmations the same way but
+// refuses no credential locally until promotePending, so the next request asks
+// the control plane. See specs/ai-gateway/auth-cache.feature, issue #9754.
+func (s *Service) denyPending(vkID, kind string) { s.recordDenial(vkID, kind, true) }
+
+// recordDenial puts vkID on the revocation list. A pending denial never
+// replaces one that already refuses locally.
+func (s *Service) recordDenial(vkID, kind string, pending bool) {
 	s.denyMu.Lock()
-	s.denied.Add(vkID, denial{at: time.Now(), kind: kind})
+	if old, ok := s.denied.Peek(vkID); ok && !old.pending {
+		pending = false
+	}
+	s.denied.Add(vkID, denial{at: time.Now(), kind: kind, pending: pending})
 	s.denyMu.Unlock()
+	s.rememberDenied(vkID, s.carriersOf(vkID)...)
+	s.logger.Info("auth_cache_key_denied", zap.String("vk_id", vkID), zap.String("reason", evictReason(kind)), zap.Bool("pending", pending))
+}
+
+// carriersOf lists the cached credentials, live or last known, of vkID.
+func (s *Service) carriersOf(vkID string) [][64]byte {
 	var carried [][64]byte
 	for _, h := range s.l1.Keys() {
 		if e, ok := s.l1.Peek(h); ok && e.bundle.VirtualKeyID == vkID {
@@ -148,8 +169,25 @@ func (s *Service) deny(vkID, kind string) {
 			carried = append(carried, h)
 		}
 	}
-	s.rememberDenied(vkID, carried...)
-	s.logger.Info("auth_cache_key_denied", zap.String("vk_id", vkID), zap.String("reason", evictReason(kind)))
+	return carried
+}
+
+// promotePending makes the pending denials of vkIDs that are still on the list
+// refuse their credentials locally. The change feed calls it once the backlog
+// that recorded them is read to its end, so each key is refused only for the
+// state the backlog left it in.
+func (s *Service) promotePending(vkIDs map[string]struct{}) {
+	s.denyMu.Lock()
+	defer s.denyMu.Unlock()
+	for vkID := range vkIDs {
+		d, ok := s.denied.Peek(vkID)
+		if !ok || !d.pending {
+			continue
+		}
+		d.pending = false
+		s.denied.Add(vkID, d)
+		s.indexDeniedLocked(vkID)
+	}
 }
 
 // clearDenial lifts vkID's denial and forgets the credentials that carried
@@ -194,8 +232,9 @@ func (s *Service) liftDenialBefore(vkID string, start time.Time, source string) 
 }
 
 // rememberDenied maps credentials to the denied key they carried, each once and
-// at most maxDeniedCredentialsPerKey per key. The index drops keys that left
-// the revocation list once it outgrows the list.
+// at most maxDeniedCredentialsPerKey per key; only a denial that is not
+// pending refuses them locally. The index drops keys that left the revocation
+// list once it outgrows the list.
 func (s *Service) rememberDenied(vkID string, hashes ...[64]byte) {
 	s.denyMu.Lock()
 	defer s.denyMu.Unlock()
@@ -209,9 +248,19 @@ func (s *Service) rememberDenied(vkID string, hashes ...[64]byte) {
 			continue
 		}
 		set[h] = struct{}{}
-		s.deniedKeys.Add(h, vkID)
+	}
+	if d, ok := s.denied.Peek(vkID); ok && !d.pending {
+		s.indexDeniedLocked(vkID)
 	}
 	s.pruneDeniedIndexLocked()
+}
+
+// indexDeniedLocked lets refusalIfDenied find every credential vkID carried.
+// The caller holds denyMu.
+func (s *Service) indexDeniedLocked(vkID string) {
+	for h := range s.deniedByVK[vkID] {
+		s.deniedKeys.Add(h, vkID)
+	}
 }
 
 // pruneDeniedIndexLocked drops keys that left the revocation list once the
