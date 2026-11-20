@@ -172,6 +172,17 @@ The rule: every Instant Evals judgment is a row in `eval_results`, whoever asked
 - **Where recall sits (step 4).** After the decision model resolves and the hosted-off check, so only a call that would have reached the judge is recalled, and the key carries the judge model it would have used. A recalled verdict carries no cost, so no cost row is written; its details read as a fresh one's.
 - **The canonical JSON (step 4).** `InputHash` for a monitor is sha256 of `{"contexts": [...], "input": ..., "output": ...}` in that key order, an absent input or output as `null` and absent contexts as `[]`. A thread-level monitor is not kept: it judges a thread's text, which section 2 leaves unstored, so it is judged as today and never reads or writes `eval_results`.
 
+### 6. Old judgments are not copied (step 5)
+
+No row of `instant_eval_judgments` is copied into `eval_results`. Two recall key columns cannot be rebuilt from what an old row and its run store:
+
+- **`InputHash`** is sha256 of the judged column name and its text (`eval-results-key.rules.ts:70-78`). Neither table stores the text or a hash of it: 00097 keeps no judged text (lines 29-34), and `instant_eval_runs` keeps the statement and its questions (00098 lines 55-63). Reading the trace's text again does not count: the text can change after it was judged (open question 2) and retention can drop it, so the hash would name text that was never judged.
+- **`JudgeModel`** is the project's decision model at judge time (`instant-eval.app.ts:504-505`). No run or judgment column records it, and the project may have changed its decision model since.
+
+A guessed key would let recall serve a verdict on text, or from a judge, that never produced it, which is what the key exists to prevent. A run whose `Questions` carry no `judgedText` (`instant-eval-run-questions.rules.ts:38-39`) has no `JudgedColumn` either.
+
+What this means: old verdicts stay on their run pages, the Explorer chip and the LWQL view, all read from `instant_eval_judgments`, which does not change. Recall and the trace drawer start empty and fill as new judgments land, so the first judgment of a trace after the flag is on is a judge call.
+
 ## Alternatives considered
 
 ### Split by use (the first draft's Option D)
@@ -224,7 +235,7 @@ Two more were asked as pictures in the Laze deck. On 2026-11-10, @lw-instant-eva
 - **The chip and the view see runs only.** Results from asks, dashboards and monitors show in the trace drawer, not in the `eval:"q"` chip or `analytics.judgments`, unless they move, which section 3 leaves open.
 - **A key version bump starts recall over.** After a bump, every recall misses: dashboard widgets, asks, runs and monitors pay to judge again, and the drawer shows no Instant Evals result on a trace until something judges it (monitor results still show from `evaluation_runs`). A bump is only for a key bug, when the old rows cannot be trusted, so this is accepted.
 - **The drawer can lag the text.** After a trace's text changes, the drawer shows the last verdict with its time until something judges the new text; an ask on the new text misses, judges, and the drawer then shows that.
-- **Old judgments.** `instant_eval_judgments` keeps its rows with no expiry, and runs keep writing it. A copy into `eval_results` is its own plan: an old row has no question text, `QuestionHash`, `JudgeModel` or `InputHash`, so the copy must rebuild them losslessly from `instant_eval_runs.Questions` and the run's judge before it may run. Rows it cannot rebuild are not copied and recall does not serve them. The old table is not dropped while the run page, the Explorer chip or the LWQL view read it; any drop is an operator step, never a goose file.
+- **Old judgments.** `instant_eval_judgments` keeps its rows with no expiry, and runs keep writing it. None of its rows is copied into `eval_results` (section 6): their `InputHash` and `JudgeModel` cannot be rebuilt, so recall and the drawer serve no verdict from before the flag. The old table is not dropped while the run page, the Explorer chip or the LWQL view read it; any drop is an operator step, never a goose file.
 
 ## Consequences
 
@@ -235,6 +246,7 @@ Two more were asked as pictures in the Laze deck. On 2026-11-10, @lw-instant-eva
 - Instant eval results follow the trace's retention, not "never expire".
 - Monitors keep writing `evaluation_runs`. A monitor on the Instant Evals judge also writes `eval_results` and gets recall.
 - A trace or span run writes two tables: `instant_eval_judgments` for its run page, chip and view, and `eval_results` for recall.
+- No old run verdict is copied into `eval_results` (section 6). Old verdicts stay on their run pages; recall and the trace drawer start empty and fill as new judgments land.
 - A run writes every verdict it delivers to `instant_eval_judgments`, recalled or judged, so its run page stays complete. The usage report (`usage-report.ts:394-396`) counts those rows, so once recall is on it counts delivered run verdicts, recalled ones included, not judge calls. Asks, dashboards and monitors are not counted, as today. Judge calls are counted from `eval_results` as `instant_eval_judge_calls` (with its `_7d` and `_28d` windows): its rows with `Status = judged`, which a recall never adds, through `InstantEvalApi.countUsage`, for the organizations with `release_instant_eval_results` on; for an install with none, the field is left out.
 
 ## References
