@@ -38,6 +38,7 @@ import type { IngestionTemplateRepository } from "./ingestion-template.repositor
 import type { KillSwitchLockRepository } from "./kill-switch-lock.repository.ts";
 import type { OrganizationSupportContactRepository } from "./organization-support-contact.repository.ts";
 import type { RollupErasureRepository } from "./rollup-erasure.repository.ts";
+import type { SecurityLakeCallerRepository } from "./security-lake-caller.repository.ts";
 import type { SpendSpikeAnomalyRepository } from "./spend-spike-anomaly.repository.ts";
 import type { SuppressionSnapshotRepository } from "./suppression-snapshot.repository.ts";
 
@@ -201,7 +202,8 @@ export interface GovernanceClickHouseRepositories {
     GovernanceOcsfEventWriter &
     OcsfEventBatchWriter &
     OcsfSeatReportReader &
-    OcsfIngestOrderedReader;
+    OcsfIngestOrderedReader &
+    SecurityLakeCallerRepository;
 }
 
 /**

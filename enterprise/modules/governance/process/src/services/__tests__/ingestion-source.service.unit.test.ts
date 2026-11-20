@@ -1035,3 +1035,69 @@ describe("IngestionSourceService", () => {
     });
   });
 });
+
+describe("the generic ingestion source routes and the Security Lake adapter", () => {
+  const securityLakeConfig = {
+    adapter: "aws_security_lake",
+    region: "eu-west-1",
+    subscriberRoleArn: "arn:aws:iam::123456789012:role/attacker-chosen",
+    queueUrl: "https://sqs.eu-west-1.amazonaws.com/123456789012/lake",
+    credentials: { external_id: "attacker-chosen", aws_access_key_id: "AKIA1" },
+  };
+
+  describe("given an organisation with or without the Enterprise plan", () => {
+    describe.each([
+      ["parserConfig", { parserConfig: securityLakeConfig }],
+      ["pullConfig", { pullConfig: securityLakeConfig }],
+    ])("when the generic create names the adapter in its %s", (_where, config) => {
+      /** @scenario The generic source create refuses the Security Lake adapter under another source type */
+      it("refuses it as an unsupported source type and stores nothing", async () => {
+        const { service, repository, entitlements } = harness();
+        entitlements.enterprise = false;
+
+        await expect(
+          service.assertGenericallyManaged({
+            organizationId: "org-1",
+            sourceType: "otel_generic",
+            ...config,
+          }),
+        ).rejects.toThrow(/Unsupported sourceType "security_lake"/);
+        expect(repository.create).not.toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe("given a push source with no stored pull adapter", () => {
+    describe("when the generic edit sets the adapter to aws_security_lake", () => {
+      /** @scenario The generic source edit refuses to give a source the Security Lake adapter */
+      it("refuses it as an unsupported source type and changes nothing", async () => {
+        const { service, repository } = harness();
+        repository.row = source({ sourceType: "otel_generic", parserConfig: {} });
+
+        await expect(
+          service.assertGenericallyManaged({
+            id: "source-1",
+            organizationId: "org-1",
+            parserConfig: securityLakeConfig,
+          }),
+        ).rejects.toThrow(/Unsupported sourceType "security_lake"/);
+        expect(repository.update).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when the generic edit leaves the adapter alone", () => {
+      it("lets the edit through", async () => {
+        const { service, repository } = harness();
+        repository.row = source({ sourceType: "otel_generic", parserConfig: {} });
+
+        await expect(
+          service.assertGenericallyManaged({
+            id: "source-1",
+            organizationId: "org-1",
+            parserConfig: { ottlStatements: [] },
+          }),
+        ).resolves.toBeUndefined();
+      });
+    });
+  });
+});

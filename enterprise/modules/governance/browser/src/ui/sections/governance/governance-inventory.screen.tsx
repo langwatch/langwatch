@@ -3,6 +3,7 @@
 import { ContentTabs } from "@langwatch/design-system/content-tabs";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import { Badge, HStack, Spacer, VStack } from "@langwatch/design-system/primitives";
+import { SECURITY_LAKE_SOURCE_TYPE } from "@langwatch/enterprise-governance-contract";
 import { Plus } from "lucide-react";
 import type { ReactNode } from "react";
 
@@ -38,6 +39,7 @@ import {
   useIngestionSourcesPage,
   useInventoryTab,
 } from "./inventory/use-inventory-page.ts";
+import { SecurityLakeSection } from "./security-lake/security-lake-section.tsx";
 
 /**
  * The Inventory page: header actions, summary strip, the Catalog, Environments and
@@ -134,8 +136,19 @@ function InventoryTabs({
  * about a read that failed underneath them is then noise about data they are
  * not looking at, and the banner above already says the screen is a mock-up.
  */
+/** Security Lake sources have their own section; the generic edit would overwrite their config. */
+function genericallyManagedSources<T extends { sourceType: string }>(
+  sources: readonly T[] | undefined,
+): T[] | undefined {
+  return sources?.filter((source) => source.sourceType !== SECURITY_LAKE_SOURCE_TYPE);
+}
+
 function InventorySourcesPane({ page }: { page: ReturnType<typeof useIngestionSourcesPage> }) {
   const { orgId, sourcesQuery, mutations } = page;
+  const generic = genericallyManagedSources(sourcesQuery.data);
+  const onlySecurityLake =
+    !page.sample.active && generic?.length === 0 && (sourcesQuery.data?.length ?? 0) > 0;
+  if (onlySecurityLake) return null;
   return (
     <IngestionSourceList
       canRead={page.canRead}
@@ -143,7 +156,7 @@ function InventorySourcesPane({ page }: { page: ReturnType<typeof useIngestionSo
       canManage={page.canManage && !page.sample.active}
       isLoading={!page.sample.active && sourcesQuery.isLoading}
       error={page.sample.active ? null : sourcesQuery.error}
-      sources={page.sample.active ? SAMPLE_INGESTION_SOURCES : sourcesQuery.data}
+      sources={page.sample.active ? SAMPLE_INGESTION_SOURCES : generic}
       rotatingId={pendingId(mutations.rotate)}
       archivingId={pendingId(mutations.archive)}
       onEdit={page.editSource}
@@ -158,6 +171,18 @@ function InventorySourcesPane({ page }: { page: ReturnType<typeof useIngestionSo
           />
         ) : undefined
       }
+    />
+  );
+}
+
+function InventorySecurityLakePane({ page }: { page: ReturnType<typeof useIngestionSourcesPage> }) {
+  if (page.sample.active || !page.canRead) return null;
+  return (
+    <SecurityLakeSection
+      organizationId={page.orgId}
+      canManage={page.canManage}
+      sources={page.sourcesQuery.data}
+      onChanged={() => page.sourcesQuery.refetch()}
     />
   );
 }
@@ -365,7 +390,12 @@ function InventoryPage() {
                 }
               />
             }
-            sources={<InventorySourcesPane page={page} />}
+            sources={
+              <>
+                <InventorySourcesPane page={page} />
+                <InventorySecurityLakePane page={page} />
+              </>
+            }
           />
         </VStack>
       </PageLayout.Container>
