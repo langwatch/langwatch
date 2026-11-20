@@ -36,6 +36,7 @@ runs:
         key: docs-media-${{ runner.os }}-${{ hashFiles('docs/images/**', 'docs/media/**', 'apps/docs/src/site/image-variants.ts', 'apps/docs/src/site/video-variants.ts') }}
         restore-keys: |
           docs-media-${{ runner.os }}-
+    # Spec: specs/ci/docs-ffmpeg-cache.feature
     # ffmpeg is installed only on a media-cache miss. Its .deb files are cached per runner image
     # because a slow Ubuntu mirror can trickle one package for minutes, which no apt timeout
     # catches (tasks#1215). Saved only after a good install, so a half download is never cached;
@@ -70,7 +71,7 @@ runs:
         rm -rf "$debs/partial" "$debs/lock"
         ffmpeg -hide_banner -encoders | grep -E 'libsvtav1|libaom-av1|libx264'
     - name: Save the ffmpeg packages
-      if: steps.media-cache.outputs.cache-hit != 'true' && steps.media-restore.outputs.cache-hit != 'true' && steps.ffmpeg-debs.outputs.cache-hit != 'true' && steps.ffmpeg-install.outcome == 'success'
+      if: steps.media-cache.outputs.cache-hit != 'true' && steps.media-restore.outputs.cache-hit != 'true' && steps.ffmpeg-debs.outputs.cache-hit != 'true'
       uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: ~/.cache/ffmpeg-debs
