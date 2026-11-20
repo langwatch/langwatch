@@ -6,7 +6,6 @@
 
 import {
   CHART_GRID_DEFAULT_COL_SPAN,
-  CHART_GRID_DEFAULT_ROW_SPAN,
   chartGridBottomRow,
   type ChartGridPlacement,
 } from "../../../model/chart-grid.ts";
@@ -15,6 +14,7 @@ import {
   STARTER_WIDGET_CODE,
   STARTER_WIDGET_QUERIES,
 } from "../../../model/dashboard-widget/presets.ts";
+import { BOARD_WIDGET_DEFAULT_ROW_SPAN } from "./board-grid.ts";
 
 /** What the editor starts a new widget from. */
 export const BLANK_WIDGET: DashboardWidgetDraft = {
@@ -31,6 +31,6 @@ export function blankWidgetSlot(
     gridColumn: 0,
     gridRow: chartGridBottomRow(placements),
     colSpan: CHART_GRID_DEFAULT_COL_SPAN,
-    rowSpan: CHART_GRID_DEFAULT_ROW_SPAN,
+    rowSpan: BOARD_WIDGET_DEFAULT_ROW_SPAN,
   };
 }

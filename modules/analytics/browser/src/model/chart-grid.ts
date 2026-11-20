@@ -22,8 +22,7 @@ export const CHART_GRID_MARGIN_PX = 16;
  */
 export const CHART_GRID_MAX_ROW_SPAN = 20;
 
-// The default footprint (half wide, five rows tall) lives in the contract,
-// so server and browser cannot drift.
+// The default footprint lives in the contract, so server and browser cannot drift.
 export {
   CHART_GRID_DEFAULT_COL_SPAN,
   CHART_GRID_DEFAULT_ROW_SPAN,

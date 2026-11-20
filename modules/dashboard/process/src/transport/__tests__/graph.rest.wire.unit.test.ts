@@ -61,7 +61,7 @@ function mountedGraphs() {
 
 const GRAPH = { name: "Latency", graph: { graphType: "line" } };
 // Literal on purpose: a constant-derived expectation would follow a regression.
-const SIZE = { colSpan: 4, rowSpan: 5 };
+const SIZE = { colSpan: 4, rowSpan: 3 };
 const sizeOf = (graph: { colSpan: number; rowSpan: number }) => ({
   colSpan: graph.colSpan,
   rowSpan: graph.rowSpan,
@@ -69,8 +69,8 @@ const sizeOf = (graph: { colSpan: number; rowSpan: number }) => ({
 
 describe("the graphs REST family", () => {
   describe("when a graph is posted without a size", () => {
-    /** @scenario "A graph created over REST without a size lands at the grid's default of four by five" */
-    it("is four columns by five rows", async () => {
+    /** @scenario "A graph created over REST without a size lands at the grid's default of four by three" */
+    it("is four columns by three rows", async () => {
       const graphs = mountedGraphs();
 
       const created = await graphs.create(GRAPH);
@@ -81,7 +81,7 @@ describe("the graphs REST family", () => {
       });
     });
 
-    /** @scenario "A graph created over REST without a size lands at the grid's default of four by five" */
+    /** @scenario "A graph created over REST without a size lands at the grid's default of four by three" */
     it("keeps a size the caller sent", async () => {
       const graphs = mountedGraphs();
 
@@ -89,11 +89,28 @@ describe("the graphs REST family", () => {
 
       expect(sizeOf(created.json)).toEqual({ colSpan: 2, rowSpan: 2 });
     });
+
+    /** @scenario "A graph created over REST accepts the size it would default to" */
+    it("accepts the default size and the grid's full bounds as input", async () => {
+      const graphs = mountedGraphs();
+
+      const atDefault = await graphs.create({ ...GRAPH, gridColumn: 4, ...SIZE });
+      const fullWidth = await graphs.create({ ...GRAPH, gridColumn: 0, colSpan: 8, rowSpan: 20 });
+
+      expect({ status: atDefault.status, size: sizeOf(atDefault.json) }).toEqual({
+        status: 201,
+        size: SIZE,
+      });
+      expect({ status: fullWidth.status, size: sizeOf(fullWidth.json) }).toEqual({
+        status: 201,
+        size: { colSpan: 8, rowSpan: 20 },
+      });
+    });
   });
 
   describe("when a graph posted without a size is read, listed and renamed", () => {
-    /** @scenario "A graph created over REST without a size reads back, lists and renames at four by five" */
-    it("answers four columns by five rows each time", async () => {
+    /** @scenario "A graph created over REST without a size reads back, lists and renames at four by three" */
+    it("answers four columns by three rows each time", async () => {
       const graphs = mountedGraphs();
       const created = await graphs.create(GRAPH);
 

@@ -43628,23 +43628,24 @@
                     "additionalProperties": {}
                   },
                   "gridColumn": {
-                    "type": "number",
+                    "type": "integer",
                     "minimum": 0,
-                    "maximum": 1
+                    "maximum": 7
                   },
                   "gridRow": {
-                    "type": "number",
-                    "minimum": 0
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 2000000000
                   },
                   "colSpan": {
-                    "type": "number",
+                    "type": "integer",
                     "minimum": 1,
-                    "maximum": 2
+                    "maximum": 8
                   },
                   "rowSpan": {
-                    "type": "number",
+                    "type": "integer",
                     "minimum": 1,
-                    "maximum": 2
+                    "maximum": 20
                   }
                 },
                 "required": [

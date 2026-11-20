@@ -26,11 +26,17 @@ export const CHART_GRID_MAX_ROW_SPAN = 20;
 
 /**
  * The size a chart lands at when nothing chose one: half the row wide and
- * five rows tall, so a chart keeps room beside its KPI and legend. Only new
- * widgets take it; saved placements keep their stored size.
+ * three rows tall, the same footprint the old grid's single default cell had.
  */
 export const CHART_GRID_DEFAULT_COL_SPAN = 4;
-export const CHART_GRID_DEFAULT_ROW_SPAN = 5;
+export const CHART_GRID_DEFAULT_ROW_SPAN = 3;
+
+/**
+ * A board widget's default height. Boards render 44px rows, not 100px, so five
+ * rows (284px) keep a chart room beside its KPI and legend. Only new widgets
+ * take it; saved placements keep their stored size.
+ */
+export const BOARD_WIDGET_DEFAULT_ROW_SPAN = 5;
 
 /**
  * The ceiling a grid row may carry. Far beyond any real dashboard, but within

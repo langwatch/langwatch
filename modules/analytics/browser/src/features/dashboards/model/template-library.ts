@@ -5,10 +5,7 @@
  * @see modules/dashboard/specs/dashboards-finder.feature
  */
 
-import {
-  CHART_GRID_DEFAULT_COL_SPAN,
-  CHART_GRID_DEFAULT_ROW_SPAN,
-} from "../../../model/chart-grid.ts";
+import { CHART_GRID_DEFAULT_COL_SPAN } from "../../../model/chart-grid.ts";
 import {
   AGENT_KINDS,
   type AgentKind,
@@ -26,6 +23,7 @@ import {
   type BoardTemplate,
   type BoardTemplateWidget,
 } from "../templates/index.ts";
+import { BOARD_WIDGET_DEFAULT_ROW_SPAN } from "./board-grid.ts";
 import {
   type CatalogueFilters,
   type CatalogueItem,
@@ -133,7 +131,7 @@ const UNBUILT_LAYOUT = {
   gridColumn: 0,
   gridRow: 0,
   colSpan: CHART_GRID_DEFAULT_COL_SPAN,
-  rowSpan: CHART_GRID_DEFAULT_ROW_SPAN,
+  rowSpan: BOARD_WIDGET_DEFAULT_ROW_SPAN,
 };
 
 function previewOf(template: CatalogueTemplate): TemplatePreview {

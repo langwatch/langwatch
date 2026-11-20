@@ -91,10 +91,7 @@ const graphRestCreateSchemaDefinition = z.object({
   graph: z.record(z.string(), z.unknown()),
   dashboardId: z.string().optional(),
   filters: z.record(z.string(), z.unknown()).optional(),
-  gridColumn: z.number().min(0).max(1).optional(),
-  gridRow: z.number().min(0).optional(),
-  colSpan: z.number().min(1).max(2).optional(),
-  rowSpan: z.number().min(1).max(2).optional(),
+  ...chartGridPlacementSchema.partial().shape,
 });
 export interface GraphRestCreateSchema extends Named<typeof graphRestCreateSchemaDefinition> {}
 export const graphRestCreateSchema: GraphRestCreateSchema = graphRestCreateSchemaDefinition;
