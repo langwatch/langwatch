@@ -8,6 +8,8 @@ import {
   databricksGeniePullConfigSchema,
   OPENAI_ADMIN_ADAPTER_ID,
   openaiAdminPullConfigSchema,
+  SECURITY_LAKE_ADAPTER_ID,
+  securityLakePullConfigSchema,
 } from "@langwatch/enterprise-governance-contract";
 import type { z } from "zod";
 
@@ -22,21 +24,41 @@ const PULL_CONFIG_SCHEMAS: ReadonlyMap<string, z.ZodType> = new Map<string, z.Zo
   [DATABRICKS_GENIE_ADAPTER_ID, databricksGeniePullConfigSchema],
   [ANTHROPIC_ADMIN_ADAPTER_ID, anthropicAdminPullConfigSchema],
   [OPENAI_ADMIN_ADAPTER_ID, openaiAdminPullConfigSchema],
+  [SECURITY_LAKE_ADAPTER_ID, securityLakePullConfigSchema],
 ]);
+
+/** A bucket or queue read as the source, never with the worker's own AWS identity. */
+const S3_POLLING_ADAPTER_ID = "s3_polling";
+type RequiredCredentials = { group: string; fields: readonly (readonly [string, string])[] };
+const AWS_KEY_PAIR: RequiredCredentials = {
+  group: "Access keys: enter the access key ID and secret access key together",
+  fields: [
+    ["aws_access_key_id", "access key ID"],
+    ["aws_secret_access_key", "secret access key"],
+  ],
+};
 
 /**
  * The credentials an adapter cannot sign in without, by the form's name for each. The config
  * schemas leave `credentials` out because the stored form is sealed, so this is checked apart.
  */
-const REQUIRED_CREDENTIALS: ReadonlyMap<string, readonly (readonly [string, string])[]> = new Map([
+const REQUIRED_CREDENTIALS: ReadonlyMap<string, RequiredCredentials> = new Map<
+  string,
+  RequiredCredentials
+>([
   [
     COPILOT_STUDIO_DATAVERSE_ADAPTER_ID,
-    [
-      ["tenantId", "tenant ID"],
-      ["clientId", "client ID"],
-      ["clientSecret", "client secret"],
-    ],
+    {
+      group: "App registration: enter the tenant ID, client ID and client secret together",
+      fields: [
+        ["tenantId", "tenant ID"],
+        ["clientId", "client ID"],
+        ["clientSecret", "client secret"],
+      ],
+    },
   ],
+  [SECURITY_LAKE_ADAPTER_ID, AWS_KEY_PAIR],
+  [S3_POLLING_ADAPTER_ID, AWS_KEY_PAIR],
 ]);
 
 /** The form's names for the fields an adapter can refuse, so a refusal points at what to fix. */
@@ -51,6 +73,11 @@ const FIELD_LABELS: Readonly<Record<string, string>> = {
   bucketWidth: "Bucket width",
   startingAt: "Read history from",
   schedule: "Pull schedule",
+  region: "Region",
+  subscriberRoleArn: "Subscriber role ARN",
+  externalId: "External ID",
+  queueUrl: "SQS queue URL",
+  sources: "Sources",
 };
 
 /**
@@ -78,10 +105,12 @@ export function findPullConfigComplaints(
 /**
  * What is missing from the credentials a save sends, for an adapter that cannot sign in without
  * them. Read only where the save sends credentials of its own (a create, or an edit replacing
- * them), since an edit that sends none keeps the stored ones.
+ * them), since an edit that sends none keeps the stored ones. With `deploymentAwsIdentity` an S3
+ * polling source that sends no key at all reads as the deployment, so only a half pair is refused.
  */
 export function findPullCredentialComplaints(
   parserConfig: Record<string, unknown> | null | undefined,
+  { deploymentAwsIdentity = false }: { deploymentAwsIdentity?: boolean } = {},
 ): string[] {
   const adapter = parserConfig?.adapter;
   if (typeof adapter !== "string") return [];
@@ -92,17 +121,17 @@ export function findPullCredentialComplaints(
   const sent = new Map<string, unknown>(
     credentials !== null && typeof credentials === "object" ? Object.entries(credentials) : [],
   );
-  const missing = required
+  const missing = required.fields
     .filter(([key]) => {
       const value = sent.get(key);
       return typeof value !== "string" || value.trim().length === 0;
     })
     .map(([, label]) => label);
   if (missing.length === 0) return [];
+  const sentNone = missing.length === required.fields.length;
+  if (deploymentAwsIdentity && adapter === S3_POLLING_ADAPTER_ID && sentNone) return [];
 
-  return [
-    `App registration: enter the tenant ID, client ID and client secret together; missing ${joinLabels(missing)}.`,
-  ];
+  return [`${required.group}; missing ${joinLabels(missing)}.`];
 }
 
 function joinLabels(labels: readonly string[]): string {

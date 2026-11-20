@@ -121,6 +121,17 @@ regexes = ['''^(0123456789abcdef){4}$''']
 description = "AWS-shaped fixture credentials planted by the secrets-gate scoping tests"
 regexes = ['''AKIAQYLPMN5HHHFPZAM2''', '''A1B2C3D4E5F6G7H8I9J0K1L2M3N4O5P6Q7R8S9T0''']
 
+# The temporary key a fake STS client returns in the Security Lake assume-role
+# unit test. The value spells a word, names no AWS account, and is gone from the
+# tip, but gitleaks scans the whole commit range. Scoped by value AND path.
+[[allowlists]]
+description = "Fake STS temporary key in the Security Lake assume-role unit test"
+condition = "AND"
+paths = [
+  '''enterprise/modules/governance/process/src/features/ocsf/services/__tests__/security-lake-assume-role\.unit\.test\.ts''',
+]
+regexes = ['''^ASIATEMPORARYROLEKEY$''']
+
 # The synthetic credentials the secrets-redaction suite feeds to the redactor.
 # This suite's whole job is to hand credential-shaped strings to `redact()` and
 # assert they come back as `[SECRET]`, so a fixture no scanner recognises would
