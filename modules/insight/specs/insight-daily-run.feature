@@ -1517,6 +1517,13 @@ Feature: The daily insights run
       And a later run that never reached Langy names no start and no run in flight
       And a schedule with no run in flight row names no start, read by its settle time
 
+    @unit
+    Scenario: A run that settles after a newer run started keeps its own start
+      Given a run whose turn started, and a newer run whose turn started before it settled
+      When the older run then settles
+      Then the last run's start is when the older run's own turn started
+      And not when the process started that run, nor when the newer run's turn started
+
     @integration
     Scenario: Run now asks for analytics:view and langy:create
       Given a member without analytics:view or without langy:create

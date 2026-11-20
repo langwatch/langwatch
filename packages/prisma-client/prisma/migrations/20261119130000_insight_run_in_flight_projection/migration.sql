@@ -1,7 +1,8 @@
 -- A daily insights schedule's last run that started (modules/insight, ADR-004): its run id, its
 -- Langy conversation and when it started, beside the last run that settled and how it ended, and
 -- the newest run's id, and its and the last settled run's slot and start, which order runs so an
--- older run's late start or outcome leaves it.
+-- older run's late start or outcome leaves it. The last settled run's turn start, and the run a
+-- newer start took the place of with its turn start, keep a run's own start once overtaken.
 -- Run now reads it as the run in flight until that run settles, and as the last run once it has.
 -- A read model folded from the `insight_daily_schedule` aggregate's run events, one row per
 -- schedule. Until a schedule's row here took an outcome, its last run is read from its run row.
@@ -26,6 +27,9 @@ CREATE TABLE IF NOT EXISTS "InsightRunInFlightProjection" (
   "newestRunSince" DOUBLE PRECISION,
   "lastSettledRunSlot" DOUBLE PRECISION,
   "lastSettledRunSince" DOUBLE PRECISION,
+  "lastSettledRunStartedAt" DOUBLE PRECISION,
+  "overtakenRunId" TEXT,
+  "overtakenRunStartedAt" DOUBLE PRECISION,
   "createdAt" DOUBLE PRECISION NOT NULL,
   "updatedAt" DOUBLE PRECISION NOT NULL,
   "occurredAt" DOUBLE PRECISION NOT NULL,

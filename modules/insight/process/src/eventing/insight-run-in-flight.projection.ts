@@ -43,6 +43,25 @@ function newestFrom({ runId, slot, since }: RunOrder): Partial<InsightRunInFligh
   return { newestRunId: runId, newestRunSlot: slot, newestRunSince: since ?? null };
 }
 
+/** A run in flight that a newer start takes the place of, kept so its outcome reads its start. */
+function overtakenBy(state: InsightRunInFlightState): Partial<InsightRunInFlightState> {
+  const { runId, startedAt, lastSettledRunId } = state;
+  if (runId === null || runId === lastSettledRunId) return {};
+  return { overtakenRunId: runId, overtakenRunStartedAt: startedAt };
+}
+
+/** When the settling run's turn started: the row's run in flight, or the one it overtook. */
+function startOf({
+  state,
+  runId,
+}: {
+  state: InsightRunInFlightState;
+  runId: string;
+}): number | null {
+  if (state.runId === runId) return state.startedAt;
+  return state.overtakenRunId === runId ? state.overtakenRunStartedAt : null;
+}
+
 /** Whether the event leaves the row as it is. */
 function leavesRow(state: InsightRunInFlightState, event: InsightDailyRunEvent): boolean {
   switch (event.type) {
@@ -71,7 +90,13 @@ function changeOf(
   switch (event.type) {
     case INSIGHT_DAILY_RUN_EVENT_TYPES.RUN_STARTED: {
       const { runId, conversationId } = event.data;
-      return { runId, conversationId, startedAt: event.occurredAt, ...newestFrom(event.data) };
+      return {
+        ...overtakenBy(state),
+        runId,
+        conversationId,
+        startedAt: event.occurredAt,
+        ...newestFrom(event.data),
+      };
     }
     case INSIGHT_DAILY_RUN_EVENT_TYPES.RUN_SETTLED: {
       const { data } = event;
@@ -80,6 +105,7 @@ function changeOf(
         lastSettledRunId: data.runId,
         lastSettledRunSlot: run.slot,
         lastSettledRunSince: run.since ?? null,
+        lastSettledRunStartedAt: startOf({ state, runId: data.runId }),
         lastRunAt: event.occurredAt,
         lastRunOutcome: data.outcome,
         lastRunReason: data.reason,

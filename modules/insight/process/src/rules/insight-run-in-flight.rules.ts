@@ -25,6 +25,14 @@ export interface InsightRunInFlightState {
   /** The last settled run's slot and start, in the run order; an older run's outcome leaves it. */
   readonly lastSettledRunSlot: number | null;
   readonly lastSettledRunSince: number | null;
+  /** When the last settled run's turn started; null on a run that never started. Epoch ms. */
+  readonly lastSettledRunStartedAt: number | null;
+  /**
+   * The run a newer run's start took the place of before it settled, and when its turn started,
+   * so its own outcome still reads its start; null until a start took one's place.
+   */
+  readonly overtakenRunId: string | null;
+  readonly overtakenRunStartedAt: number | null;
 }
 
 /** What a schedule with no row reads: no run started, none settled. */
@@ -44,4 +52,7 @@ export const NO_RUN_STARTED: InsightRunInFlightState = {
   newestRunSince: null,
   lastSettledRunSlot: null,
   lastSettledRunSince: null,
+  lastSettledRunStartedAt: null,
+  overtakenRunId: null,
+  overtakenRunStartedAt: null,
 };

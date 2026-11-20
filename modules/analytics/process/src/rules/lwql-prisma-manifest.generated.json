@@ -10466,6 +10466,33 @@
           "documentation": ""
         },
         {
+          "name": "lastSettledRunStartedAt",
+          "columnName": "lastSettledRunStartedAt",
+          "type": "Float",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "When the last settled run's turn started. NULL on a run that never started."
+        },
+        {
+          "name": "overtakenRunId",
+          "columnName": "overtakenRunId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "The run a newer run's start took the place of before it settled, and when its turn\nstarted, so its own outcome still reads its start. NULL until a start took one's place."
+        },
+        {
+          "name": "overtakenRunStartedAt",
+          "columnName": "overtakenRunStartedAt",
+          "type": "Float",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
           "name": "createdAt",
           "columnName": "createdAt",
           "type": "Float",

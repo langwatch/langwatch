@@ -69,9 +69,9 @@ function ownLastRunOf(
 }
 
 /**
- * The start an outcome carried, for a run that settled after a newer one started and so is no
- * longer the row's run in flight; undefined when the row's last settled run is another, or was
- * skipped: a skip never began a turn, so it has no start.
+ * The start of a run that settled after a newer one started, so is no longer the row's run in
+ * flight: its own turn's, as the row kept it. Undefined when the row's last settled run is
+ * another, or was skipped: a skip never began a turn, so it has no start.
  */
 function pickSettledStart({
   started,
@@ -81,7 +81,7 @@ function pickSettledStart({
   runId: string;
 }): number | undefined {
   if (started.lastSettledRunId !== runId || started.lastRunOutcome === "skipped") return undefined;
-  return started.lastSettledRunSince ?? undefined;
+  return started.lastSettledRunStartedAt ?? undefined;
 }
 
 /**

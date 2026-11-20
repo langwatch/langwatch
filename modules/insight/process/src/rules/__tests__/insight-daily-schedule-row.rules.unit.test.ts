@@ -113,14 +113,15 @@ describe("given a run in flight row that kept its settled run's start", () => {
 });
 
 describe("given a run in flight row that took a run's outcome after a newer run started", () => {
-  /** @scenario "A settled run keeps when it started on the board's row" */
-  it("reads the settled run's start from its outcome, not the newer run's", () => {
+  /** @scenario "A run that settles after a newer run started keeps its own start" */
+  it("reads the settled run's own start, not its process's start nor the newer run's", () => {
     const setting = settingBeside({
       runId: "run-2",
       conversationId: "conversation-2",
       startedAt: SETTLED_AT + 1_000,
       ...outcomeOf({ runId: "run-1", filed: 1 }),
-      lastSettledRunSince: STARTED_AT,
+      lastSettledRunSince: STARTED_AT - 1_000,
+      lastSettledRunStartedAt: STARTED_AT,
     });
 
     expect(setting.lastRun).toMatchObject({ runId: "run-1", startedAt: STARTED_AT });

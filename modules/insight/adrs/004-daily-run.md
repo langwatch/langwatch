@@ -267,8 +267,12 @@ beside the schedule's row and not on it: the schedule's projection table is neve
 `runId`, `conversationId` and `startedAt`: the last run that started, not only one in
 flight. Its `run_settled` keeps them, so they carry the settled run's start, and writes
 `lastSettledRunId`; the `run_settled` of a later run clears a start kept for the run
-settled before, so a run that never started is not read as the earlier one. A second
-`run_started` of the run it names, or of a run already settled, leaves the row. Runs are
+settled before, so a run that never started is not read as the earlier one. A
+`run_started` that takes the place of a run still in flight keeps that run's id and start
+(`overtakenRunId`, `overtakenRunStartedAt`), and `run_settled` writes the settled run's own
+start (`lastSettledRunStartedAt`): a run that settles after a newer one started reads its own
+turn's start, not its `since` nor the newer run's. A second `run_started` of the run it
+names, or of a run already settled, leaves the row. Runs are
 ordered by `since`, the instant the schedule's process started the run: `startRun` takes
 the later of the event's instant and the worker's clock and stores it in
 `pendingRun.since`, a field the process state has held since before Run now, so a worker

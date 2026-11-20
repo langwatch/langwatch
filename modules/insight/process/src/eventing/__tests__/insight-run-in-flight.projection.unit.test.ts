@@ -143,6 +143,9 @@ describe("given a run was requested for a board", () => {
         newestRunSince: null,
         lastSettledRunSlot: T0,
         lastSettledRunSince: null,
+        lastSettledRunStartedAt: T0 + 1_000,
+        overtakenRunId: null,
+        overtakenRunStartedAt: null,
       });
       expect(setting.lastRun?.startedAt).toBe(T0 + 1_000);
     });
@@ -172,7 +175,8 @@ describe("given a run was requested for a board", () => {
   });
 
   describe("when a lost run's own outcome lands after a newer run started", () => {
-    it("reads the lost run's outcome as the last run, and keeps the newer run in flight", () => {
+    /** @scenario "A run that settles after a newer run started keeps its own start" */
+    it("keeps the lost run's own start on its outcome, and the newer run in flight", () => {
       const prior = { runId: "run-0", slot: T0 - DAY, since: T0 - DAY };
       const lost = { runId: "run-1", slot: T0, since: T0 };
       const newer = { runId: "run-2", slot: T0 + 2 * HOUR, since: T0 + 2 * HOUR };
@@ -187,7 +191,8 @@ describe("given a run was requested for a board", () => {
       expect(row).toMatchObject({ lastSettledRunId: "run-1", newestRunId: "run-2" });
       expect(setting.runInFlight?.runId).toBe("run-2");
       expect(setting.lastRun).toMatchObject({ runId: "run-1", outcome: "filed" });
-      expect(setting.lastRun).toMatchObject({ startedAt: T0 });
+      // Its turn's start: not the process's start (`since`), nor the newer run's turn's.
+      expect(setting.lastRun?.startedAt).toBe(T0 + 1_000);
     });
   });
 

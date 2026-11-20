@@ -2706,37 +2706,43 @@ model InsightDailyScheduleProjection {
 /// ADR-004): in flight until it settles, then the last run: its start and how it ended.
 model InsightRunInFlightProjection {
   /// The schedule id, which is also its aggregate id.
-  id                    String  @id
-  projectId             String
+  id                      String  @id
+  projectId               String
   /// The last run that started, its Langy conversation and when. NULL until one started.
-  runId                 String?
-  conversationId        String?
-  startedAt             Float?
+  runId                   String?
+  conversationId          String?
+  startedAt               Float?
   /// The last run that settled, started or not, and how it ended. NULL until one did.
-  lastSettledRunId      String?
-  lastRunAt             Float?
+  lastSettledRunId        String?
+  lastRunAt               Float?
   /// filed | nothing | failed | skipped
-  lastRunOutcome        String?
-  lastRunReason         String?
-  lastRunFiled          Int?
+  lastRunOutcome          String?
+  lastRunReason           String?
+  lastRunFiled            Int?
   /// How many insights the run found still true and renewed.
-  lastRunRenewed        Int?
-  lastRunConversationId String?
+  lastRunRenewed          Int?
+  lastRunConversationId   String?
   /// The newest run the row took, started or settled: its id, its slot and when it started
   /// (NULL on a run that did not carry it). An older run's event leaves the row. NULL until one.
-  newestRunId           String?
-  newestRunSlot         Float?
-  newestRunSince        Float?
+  newestRunId             String?
+  newestRunSlot           Float?
+  newestRunSince          Float?
   /// The last settled run's slot and when it started (NULL on a run that did not carry it). An
   /// outcome of a run older than it leaves the row. NULL until one settled.
-  lastSettledRunSlot    Float?
-  lastSettledRunSince   Float?
-  createdAt             Float
-  updatedAt             Float
-  occurredAt            Float
-  acceptedAt            Float
-  lastEventId           String
-  projectionVersion     String
+  lastSettledRunSlot      Float?
+  lastSettledRunSince     Float?
+  /// When the last settled run's turn started. NULL on a run that never started.
+  lastSettledRunStartedAt Float?
+  /// The run a newer run's start took the place of before it settled, and when its turn
+  /// started, so its own outcome still reads its start. NULL until a start took one's place.
+  overtakenRunId          String?
+  overtakenRunStartedAt   Float?
+  createdAt               Float
+  updatedAt               Float
+  occurredAt              Float
+  acceptedAt              Float
+  lastEventId             String
+  projectionVersion       String
 }
 
 model SavedView {

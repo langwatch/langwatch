@@ -985,6 +985,9 @@ export interface LwqlPrismaRows {
     readonly newestRunSince: "Float?";
     readonly lastSettledRunSlot: "Float?";
     readonly lastSettledRunSince: "Float?";
+    readonly lastSettledRunStartedAt: "Float?";
+    readonly overtakenRunId: "String?";
+    readonly overtakenRunStartedAt: "Float?";
     readonly createdAt: "Float";
     readonly updatedAt: "Float";
     readonly occurredAt: "Float";

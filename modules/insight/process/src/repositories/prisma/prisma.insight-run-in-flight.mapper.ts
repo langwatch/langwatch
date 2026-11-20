@@ -25,5 +25,8 @@ export function runInFlightStateFromRow(row: InsightRunInFlightRow): InsightRunI
     newestRunSince: row.newestRunSince,
     lastSettledRunSlot: row.lastSettledRunSlot,
     lastSettledRunSince: row.lastSettledRunSince,
+    lastSettledRunStartedAt: row.lastSettledRunStartedAt,
+    overtakenRunId: row.overtakenRunId,
+    overtakenRunStartedAt: row.overtakenRunStartedAt,
   };
 }
