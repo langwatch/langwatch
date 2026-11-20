@@ -1,18 +1,26 @@
 /**
- * The "Dashboards" section in the LLM Ops sidebar, lent through `StarredDashboardsToken`
- * (§10.1): the dashboards the member pinned to the project (their stars there), the first 7
- * then "All pinned (N)", and a "+" that makes a pinned dashboard and opens "Add a widget".
+ * The sidebar's "Dashboards" section, lent through `StarredDashboardsToken` (§10.1): the
+ * dashboards the member pinned to the project (their stars there), the first 7 then
+ * "All pinned (N)", and a "+" that makes a pinned dashboard and opens "Add a widget".
  * @see modules/navigation/specs/product-sidebars.feature
  */
 
-import type { StarredDashboardsProps } from "@langwatch/analytics-client";
+import type { StarredDashboardsProject, StarredDashboardsProps } from "@langwatch/analytics-client";
+import {
+  UiHostServicesContextProvider,
+  useOptionalUiHostServices,
+} from "@langwatch/browser-host/capabilities";
 import { SidebarSectionLabel } from "@langwatch/design-system/app-shell";
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
 import { Box, Link as ChakraLink, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { LayoutDashboard, Plus } from "lucide-react";
-import { type ReactNode, useState } from "react";
+import { type ReactNode, useMemo, useState } from "react";
 
-import { useAnalyticsHost } from "../../../../model/analytics-host.ts";
+import { AnalyticsHostProvider, useAnalyticsHost } from "../../../../model/analytics-host.ts";
+import {
+  analyticsHostInProject,
+  uiAnalyticsInProject,
+} from "../../../../model/analytics-host-in-project.ts";
 import { opensElsewhere } from "../../../../ui/elements/analytics-link.tsx";
 import { useBoardAccess, useBoardReader } from "../../behavior/use-board-access.ts";
 import { useBoardFromTemplate } from "../../behavior/use-board-from-template.ts";
@@ -30,7 +38,53 @@ const PINNED_SHOWN_MAX = 7;
 /** What the create path offers: the "+" and the empty-state item both run `onAdd`. */
 type CreateControls = { isCreating: boolean; onAdd: () => void };
 
-export function StarredDashboardsSection(_props: StarredDashboardsProps) {
+export function StarredDashboardsSection({ project }: StarredDashboardsProps) {
+  if (!project) return <PinnedDashboards />;
+  return (
+    <InProject project={project}>
+      <PinnedDashboards projectName={project.name} />
+    </InProject>
+  );
+}
+
+/** Scopes every read, write, grant and product event below to the project navigation named. */
+function InProject({
+  project: { id, slug, name },
+  children,
+}: {
+  project: StarredDashboardsProject;
+  children: ReactNode;
+}) {
+  const host = useAnalyticsHost();
+  const pageProjectId = host.project()?.id;
+  const services = useOptionalUiHostServices();
+  const scoped = useMemo(
+    () => analyticsHostInProject({ host, project: { id, slug, name } }),
+    [host, id, slug, name],
+  );
+  const scopedServices = useMemo(
+    () =>
+      services?.analytics
+        ? {
+            ...services,
+            analytics: uiAnalyticsInProject({
+              analytics: services.analytics,
+              projectId: id,
+              pageProjectId,
+            }),
+          }
+        : void 0,
+    [services, id, pageProjectId],
+  );
+  const section = <AnalyticsHostProvider value={scoped}>{children}</AnalyticsHostProvider>;
+  if (!scopedServices) return section;
+  return (
+    <UiHostServicesContextProvider value={scopedServices}>{section}</UiHostServicesContextProvider>
+  );
+}
+
+/** The section over the project in scope; a `projectName` is said in its title. */
+function PinnedDashboards({ projectName }: { projectName?: string }) {
   const host = useAnalyticsHost();
   const favourites = useFavourites();
   const { mayCreate } = useBoardReader();
@@ -43,7 +97,13 @@ export function StarredDashboardsSection(_props: StarredDashboardsProps) {
   // A member who may not add one sees the section only for what it lists.
   if (!mayCreate && links.length === 0) return null;
   const frame = (create?: CreateControls) => (
-    <SectionFrame links={links} isLoaded={isLoaded} projectSlug={projectSlug} create={create} />
+    <SectionFrame
+      projectName={projectName}
+      links={links}
+      isLoaded={isLoaded}
+      projectSlug={projectSlug}
+      create={create}
+    />
   );
   // The create path reads the board list to name the new one; only members who may create mount it.
   return mayCreate ? <WithCreate>{frame}</WithCreate> : frame();
@@ -59,23 +119,29 @@ function WithCreate({ children }: { children: (create: CreateControls) => ReactN
 }
 
 function SectionFrame({
+  projectName,
   links,
   isLoaded,
   projectSlug,
   create,
 }: {
+  projectName: string | undefined;
   links: StarredLink[];
   isLoaded: boolean;
   projectSlug: string;
   create?: CreateControls;
 }) {
   const shown = links.slice(0, PINNED_SHOWN_MAX);
+  const label = projectName ? `Dashboards · ${projectName}` : "Dashboards";
 
   return (
-    <VStack as="section" aria-label="Dashboards" align="stretch" gap={0.5} width="full">
+    <VStack as="section" aria-label={label} align="stretch" gap={0.5} width="full">
       {/* The same frame and label as navigation's own groups, so it reads like "Build". */}
       <HStack minHeight="28px" paddingX={2} paddingTop={2.5} paddingBottom={0.5} gap={1}>
-        <SidebarSectionLabel label="Dashboards" />
+        {/* A long project name is clipped, never pushing the "+" out of the column. */}
+        <Box minWidth={0} overflow="hidden" title={projectName}>
+          <SidebarSectionLabel label={label} />
+        </Box>
         {create && <NewDashboardButton isCreating={create.isCreating} onCreate={create.onAdd} />}
       </HStack>
       <VStack as="ul" align="stretch" gap={0.5} margin={0} padding={0}>

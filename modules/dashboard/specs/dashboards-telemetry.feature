@@ -7,6 +7,7 @@ Feature: Dashboards telemetry: product events and query telemetry
   # Sources: langwatch/tasks#1003 (product events) and langwatch/tasks#1005 (query telemetry).
   # Every product event goes through useUiAnalytics() with the boundary "dashboards", so its
   # name reads "dashboards.<action>.<name>". Attributes never carry a raw id or any SQL.
+  # Except projectId as the event's project context, the same id the shell attaches to every event.
 
   # ---------------------------------------------------------------------------
   # Product events (#1003)
@@ -99,6 +100,14 @@ Feature: Dashboards telemetry: product events and query telemetry
     Given analytics kept projectId from an earlier page load
     When the app loads with no project in scope
     Then analytics unregisters projectId straight away
+
+  @integration
+  Scenario: Telemetry: a board made or unpinned from Gateway or Coding agents names its project
+    Given the Dashboards section in Gateway or Coding agents works in the project "Shop"
+    When I make a dashboard from it, or pin or unpin one there
+    Then "dashboards.created.dashboard" and "dashboards.favourited.dashboard" go out
+    And each goes out with the registered projectId set to "Shop", not the page's project
+    And the page's projectId is registered again straight after
 
   # ---------------------------------------------------------------------------
   # Engagement events: what a member does on a board after opening it

@@ -5,8 +5,10 @@
  */
 
 import {
+  useUiCopyTargets,
   useUiHostServices,
   useUiScope,
+  type UiCopyTargets,
   type UiFeedback,
   type UiNavigation,
   type UiRoute,
@@ -44,6 +46,7 @@ class CapabilityAnalyticsHost extends AnalyticsHostApi {
   private readonly navigationCapability: UiNavigation;
   private readonly feedback: UiFeedback;
   private readonly langy: (() => Promise<LangyAsk>) | undefined;
+  private readonly copyTargets: UiCopyTargets;
 
   constructor({
     project_,
@@ -55,6 +58,7 @@ class CapabilityAnalyticsHost extends AnalyticsHostApi {
     navigationCapability,
     feedback,
     langy,
+    copyTargets,
   }: {
     project_: AnalyticsHostProject | undefined;
     organizationId_: string | undefined;
@@ -65,6 +69,7 @@ class CapabilityAnalyticsHost extends AnalyticsHostApi {
     navigationCapability: UiNavigation;
     feedback: UiFeedback;
     langy: (() => Promise<LangyAsk>) | undefined;
+    copyTargets: UiCopyTargets;
   }) {
     super();
     this.project_ = project_;
@@ -76,6 +81,7 @@ class CapabilityAnalyticsHost extends AnalyticsHostApi {
     this.navigationCapability = navigationCapability;
     this.feedback = feedback;
     this.langy = langy;
+    this.copyTargets = copyTargets;
   }
 
   project(): AnalyticsHostProject | undefined {
@@ -96,6 +102,14 @@ class CapabilityAnalyticsHost extends AnalyticsHostApi {
 
   hasPermission(permission: string): boolean {
     return this.session.hasPermission(permission);
+  }
+
+  /** Organization's lent copy targets grade each project by its own grants, manage included. */
+  hasPermissionIn({ projectId, permission }: { projectId: string; permission: string }): boolean {
+    const target = this.copyTargets
+      .targets(permission)
+      ?.find((candidate) => candidate.projectId === projectId);
+    return target?.mayCreate ?? false;
   }
 
   isSettled(): boolean {
@@ -156,6 +170,7 @@ class CapabilityAnalyticsHost extends AnalyticsHostApi {
 export default function AnalyticsHostMount({ children }: { children?: ReactNode }) {
   const { session, navigation, route, feedback } = useUiHostServices();
   const langy = useLentOperations(LangyAskToken);
+  const copyTargets = useUiCopyTargets();
   // Read as primitives: the flags service hands a new object on every render.
   const uiFlags = useUiFlags();
   const dashboardsFlag = uiFlags.flag(FrontendFlags.release_dashboards);
@@ -204,6 +219,7 @@ export default function AnalyticsHostMount({ children }: { children?: ReactNode 
         navigationCapability: navigation,
         feedback,
         langy,
+        copyTargets,
       }),
     [
       scopeProjectId,
@@ -222,6 +238,7 @@ export default function AnalyticsHostMount({ children }: { children?: ReactNode 
       navigation,
       feedback,
       langy,
+      copyTargets,
     ],
   );
   return <AnalyticsHostProvider value={host}>{children}</AnalyticsHostProvider>;

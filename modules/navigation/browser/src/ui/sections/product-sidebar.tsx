@@ -1,6 +1,7 @@
 /** Sidebar column: product pages and utilities. Host and search palette integration. */
 
 import { RawKbd as Kbd } from "@langwatch/design-system/kbd";
+import { FrontendFlags } from "@langwatch/feature-flag-contract";
 import { Box, VStack } from "@langwatch/design-system/primitives";
 import { ScrollEdgeFade, useScrollEdges } from "@langwatch/design-system/scroll-fade";
 import { ArrowLeft, ArrowUpRight, Search } from "lucide-react";
@@ -8,7 +9,7 @@ import { useRef, useState } from "react";
 
 import { SavedDashboards, StarredDashboards } from "../../behavior/lent-saved-dashboards.tsx";
 import { useAdminMenu } from "../../behavior/use-admin-menu.ts";
-import { useLlmOpsProjectSlug } from "../../behavior/use-llm-ops-project-slug.ts";
+import { useLlmOpsProject, useLlmOpsProjectSlug } from "../../behavior/use-llm-ops-project-slug.ts";
 import { useMenuScrollPosition } from "../../behavior/use-menu-scroll-position.ts";
 import { useOpsAttentionCount } from "../../behavior/use-ops-attention-count.ts";
 import { useReachableProducts } from "../../behavior/use-reachable-products.ts";
@@ -328,9 +329,12 @@ function DashboardsSidebarBody({ showExpanded }: { showExpanded: boolean }) {
   return <SavedDashboards openPath={dashboardsAreaAt(pattern)?.openPath} />;
 }
 
+/** The sidebars that may show the Dashboards section only with every product's flag on. */
+const DASHBOARDS_SECTION_FLAGGED_SURFACES: ReadonlySet<SidebarSurface> = new Set(["gateway", "me"]);
+
 /**
- * The Dashboards section analytics lends, in the LLM Ops sidebar only and for a member who can
- * reach Dashboards: the owner wants it in the project's sidebar, not everywhere.
+ * The Dashboards section analytics lends, for a member who can reach Dashboards: in LLM Ops,
+ * and with `release_dashboards_in_every_product` in Gateway and Coding agents too.
  */
 function StarredDashboardsGroup({
   surface,
@@ -339,10 +343,17 @@ function StarredDashboardsGroup({
   surface: SidebarSurface;
   showExpanded: boolean;
 }) {
+  const host = useNavigationHost();
   const { reachableProducts } = useReachableProducts();
-  if (!showExpanded || surface !== "llm-ops") return null;
-  if (!reachableProducts.includes("dashboards")) return null;
-  return <StarredDashboards />;
+  const llmOpsProject = useLlmOpsProject();
+  const everyProduct = host.featureFlag(FrontendFlags.release_dashboards_in_every_product);
+  if (!showExpanded || !reachableProducts.includes("dashboards")) return null;
+  if (surface === "llm-ops") return <StarredDashboards />;
+  if (!everyProduct.enabled || !DASHBOARDS_SECTION_FLAGGED_SURFACES.has(surface)) return null;
+  // These pages are about no project: the section works in the one LLM Ops would open.
+  if (!llmOpsProject) return null;
+  const { id, slug, name } = llmOpsProject;
+  return <StarredDashboards project={{ id, slug, name }} />;
 }
 
 function ProductSidebarBody({
