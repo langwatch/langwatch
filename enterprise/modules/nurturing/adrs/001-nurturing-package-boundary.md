@@ -1,6 +1,6 @@
 # ADR-001: Nurturing learns from events and keeps its own copies
 
-**Status:** Accepted (2026-09-29; amended 2026-11-11)
+**Status:** Accepted (2026-09-29; amended 2026-11-11 and 2026-11-20)
 
 **Behavioural contract:** [Nurturing](../specs/nurturing.feature)
 
@@ -51,16 +51,22 @@ https://github.com/langwatch/tasks/issues/1131:
 ## Public surfaces and transports
 
 Each package has one root export. Nurturing serves no route: the contract's
-`NurturingApi` carries only `recordSignal`.
+`NurturingApi` carries `recordSignal` and `sendTransactionalEmail`. The second
+sends one transactional email for another module through Customer.io and
+answers `queued`, `refused` or `off`; it never throws on a Customer.io refusal,
+so the caller can send the email another way.
 
 ## Dependencies
 
 The contract holds the signal union, the Customer.io vocabulary, the Api token,
 the config (`CUSTOMER_IO_REGION`, the shared `POSTHOG_KEY`/`POSTHOG_HOST`
-leaves) and the `CUSTOMER_IO_API_KEY` secret. The process imports the event
+leaves) and the `CUSTOMER_IO_API_KEY` and `CUSTOMER_IO_APP_API_KEY` secrets.
+The process imports the event
 schemas of the owners it listens to, and the `UserApi` and `OrganizationApi`
-contracts only for the exceptions above. No feature module depends on
-nurturing's process, so no peer cycle can pass through it.
+contracts only for the exceptions above. The notification module reaches
+nurturing only through a channel bound to the `NurturingApi` token, so no
+feature module depends on nurturing's process and no peer cycle passes through
+it.
 
 ## Persistence
 
@@ -78,15 +84,16 @@ so a redelivered event sends nothing.
 
 ## Runtime and registration
 
-The Customer.io service and the PostHog client are built in `NurturingModule.create`
-only when their key is set; the PostHog client is closed with the process. The
+The Customer.io service, the Customer.io transactional client (built only when
+`CUSTOMER_IO_APP_API_KEY` is set) and the PostHog client are built in
+`NurturingModule.create` only when their key is set; the PostHog client is closed with the process. The
 copies' subscribers always register. The per-project usage folds, the trace
 counting and the usage sync register only with a Customer.io channel. Owners
 send the command in any role; the subscribers run in the worker.
 
 ## Environment and configuration
 
-Nurturing reads no ambient environment: its config and secret are declared in
+Nurturing reads no ambient environment: its config and secrets are declared in
 the contract and composed by the apps.
 
 ## Errors
@@ -106,3 +113,10 @@ fact costs a peer subscriber or fold and, when it must be kept, a column or
 table of nurturing's own. Nurturing's copies are only as complete as the events
 it has seen: a project, organization or member that existed before its copy
 began is absent until an owner event names it.
+
+## Amendments
+
+- 2026-11-20: `NurturingApi` gains `sendTransactionalEmail` so non-security app
+  emails can go through Customer.io on Cloud, from the owner's ask of 19 Nov
+  2026 ("all emails from the app on Customer.io"). Nurturing stays the only
+  Customer.io client.
