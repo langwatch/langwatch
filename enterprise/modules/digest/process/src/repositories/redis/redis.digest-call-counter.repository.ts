@@ -31,9 +31,14 @@ export class RedisDigestCallCounterRepository implements DigestCallCounterReposi
   ): Promise<Readonly<{ allowed: boolean; resetAt: number }>> {
     const redisKey = `${KEY_PREFIX}${input.key}`;
     const count = await this.#redis.incr(redisKey);
-    // Only the first call opens the window, so later calls cannot push its end out.
-    if (count === 1) await this.#redis.expire(redisKey, input.windowSeconds);
-    const ttl = await this.#redis.ttl(redisKey);
+    let ttl = await this.#redis.ttl(redisKey);
+    // Only the first call opens the window, so later calls cannot push its end out. A TTL of -1
+    // is a key orphaned by a crash between incr and expire: without re-arming it the caller
+    // would stay rate-limited forever, and unsubscribe must always work.
+    if (count === 1 || ttl === -1) {
+      await this.#redis.expire(redisKey, input.windowSeconds);
+      ttl = input.windowSeconds;
+    }
     return {
       allowed: count <= input.max,
       resetAt: nowInstant().epochMilliseconds + (ttl > 0 ? ttl : input.windowSeconds) * 1000,
