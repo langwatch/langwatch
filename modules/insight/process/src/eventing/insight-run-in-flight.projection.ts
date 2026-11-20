@@ -50,6 +50,15 @@ function overtakenBy(state: InsightRunInFlightState): Partial<InsightRunInFlight
   return { overtakenRunId: runId, overtakenRunStartedAt: startedAt };
 }
 
+/** The settling run's start: unknown when a third overlapping run means the row never held it. */
+type SettlingRunStart =
+  | Readonly<{ kind: "known"; startedAt: number }>
+  | Readonly<{ kind: "unknown" }>;
+
+function knownStart(startedAt: number | null): SettlingRunStart {
+  return startedAt === null ? { kind: "unknown" } : { kind: "known", startedAt };
+}
+
 /** When the settling run's turn started: the row's run in flight, or the one it overtook. */
 function startOf({
   state,
@@ -57,9 +66,11 @@ function startOf({
 }: {
   state: InsightRunInFlightState;
   runId: string;
-}): number | null {
-  if (state.runId === runId) return state.startedAt;
-  return state.overtakenRunId === runId ? state.overtakenRunStartedAt : null;
+}): SettlingRunStart {
+  if (state.runId === runId) return knownStart(state.startedAt);
+  return state.overtakenRunId === runId
+    ? knownStart(state.overtakenRunStartedAt)
+    : { kind: "unknown" };
 }
 
 /** Whether the event leaves the row as it is. */
@@ -101,11 +112,12 @@ function changeOf(
     case INSIGHT_DAILY_RUN_EVENT_TYPES.RUN_SETTLED: {
       const { data } = event;
       const run = runOf(state, data);
+      const start = startOf({ state, runId: data.runId });
       return {
         lastSettledRunId: data.runId,
         lastSettledRunSlot: run.slot,
         lastSettledRunSince: run.since ?? null,
-        lastSettledRunStartedAt: startOf({ state, runId: data.runId }),
+        lastSettledRunStartedAt: start.kind === "known" ? start.startedAt : null,
         lastRunAt: event.occurredAt,
         lastRunOutcome: data.outcome,
         lastRunReason: data.reason,
