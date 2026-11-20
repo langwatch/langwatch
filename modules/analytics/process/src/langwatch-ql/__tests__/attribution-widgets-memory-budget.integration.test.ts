@@ -1,7 +1,7 @@
 /**
  * @vitest-environment node
- * att-change/change on a 60-day board reads 120 days. Sent as the service sends it, under the
- * widget cap at compatibility 25.10, its peak no longer grows with the project's older history.
+ * att-change/change on a 60-day board reads 120 days. Sent as the service sends it, under the cap C
+ * at 25.10, its peak no longer grows with older history; the sweep shows main's refused (code 241).
  * @see specs/lwql/stock-widgets-on-trace-metrics.feature
  */
 import {
@@ -13,20 +13,23 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { ClickHouseLangWatchQLExecutorRepository } from "../../repositories/clickhouse/clickhouse.langwatch-ql-executor.repository.ts";
 import { floorLangWatchQLDedup } from "../../rules/lwql-dedup-floor.rules.ts";
 import {
-  ATT_CHANGE_LABELS,
   createMeasurer,
   described,
   expectAnswered,
   type Form,
   median,
   mib,
-  QUERY_LABELS,
   type QueryLabel,
+  type Run,
   sqlOf,
 } from "./attribution-widgets-measurement.ts";
 import {
+  PERMANENT_TENANTS,
+  provisionAttributionViews,
   SEED_BUDGET_SECONDS,
   seedAttributionTenants,
+  SWEEP_ONLY_TENANTS,
+  SWEEP_TENANTS,
   type TenantName,
   type TenantSeed,
   TENANTS,
@@ -37,22 +40,79 @@ import {
   startLangWatchQLClickHouse,
 } from "./lwql-clickhouse-harness.ts";
 
-/** Production's widget cap; every query here must answer under it. */
-const ATTRIBUTION_MEMORY_CAP_BYTES = DEFAULT_LWQL_RESOURCE_LIMITS.maxMemoryUsageBytes;
-/** How far LARGE's peak may sit from BARE's once older history no longer counts. */
+/**
+ * C, below the shipped 1 GB: CI cannot seed production-size history in time. New ~114 MiB flat
+ * (0.59 C); main 62.7 MiB bare, +37 MiB per 375k history traces, so ~457 MiB at 4M. Retune here.
+ */
+const ATTRIBUTION_MEMORY_CAP_BYTES = 192 * 2 ** 20;
+/** How far a peak may sit from the no-history tenant's once older history no longer counts. */
 const HISTORY_TOLERANCE = 0.1;
 /** Runs of each new query per tenant; the comparisons read their median. */
 const RUNS = 3;
 /** Up to nine runs a case, each allowed the profile's 60 s. */
 const CASE_TIMEOUT_MS = 600_000;
 
-/** Production's ceilings, on four threads. */
-const LIMITS: LangWatchQLResourceLimits = { ...DEFAULT_LWQL_RESOURCE_LIMITS, maxThreads: 4 };
+/** The one-off sweep to 4M traces of history; too slow to seed on every pull request. */
+const SWEEP = process.env.LWQL_ATTRIBUTION_MEMORY_SWEEP === "1";
+/** Main's form runs once a tenant, or as often as the new one when the sweep compares them. */
+const MAIN_RUNS = SWEEP ? RUNS : 1;
+const SWEEP_SEED_BUDGET_SECONDS = 900;
+/** Up to twelve runs a sweep case. */
+const SWEEP_CASE_TIMEOUT_MS = 900_000;
+const MEMORY_LIMIT_EXCEEDED = 241;
+
+const SHIPPED = DEFAULT_LWQL_RESOURCE_LIMITS;
+/** A shipped byte budget, kept in its shipped proportion to the memory cap. */
+const scaledToCap = (bytes: number) =>
+  Math.floor((bytes * ATTRIBUTION_MEMORY_CAP_BYTES) / SHIPPED.maxMemoryUsageBytes);
+
+/** Production's ceilings at C on four threads, its spill and join budgets scaled with it. */
+const LIMITS: LangWatchQLResourceLimits = {
+  ...SHIPPED,
+  maxMemoryUsageBytes: ATTRIBUTION_MEMORY_CAP_BYTES,
+  maxThreads: 4,
+  maxBytesBeforeExternalGroupBy: scaledToCap(SHIPPED.maxBytesBeforeExternalGroupBy),
+  maxBytesBeforeExternalSort: scaledToCap(SHIPPED.maxBytesBeforeExternalSort),
+  maxBytesInJoin: scaledToCap(SHIPPED.maxBytesInJoin),
+};
+
+type SweepCase = { label: QueryLabel; form: Form; tenant: TenantSeed };
+type SweepRow = SweepCase & { runs: readonly Run[] };
+
+const distinct = (values: readonly (string | number)[]) => [...new Set(values)].join(", ");
+
+/** The sweep's peaks as a markdown table, one row a query, form and history size. */
+function sweepTable(rows: readonly SweepRow[]): string {
+  const sorted = rows.toSorted(
+    (a, b) =>
+      a.label.localeCompare(b.label) ||
+      a.tenant.historyTraces - b.tenant.historyTraces ||
+      a.form.localeCompare(b.form),
+  );
+  const lines = [
+    "| Query | Form | Older history (traces) | Peak MiB per run | Exit code | Type | Refusal |",
+    "|---|---|---:|---|---|---|---|",
+  ];
+  for (const { label, form, tenant, runs } of sorted) {
+    const cells = [
+      label,
+      form === "main" ? "main" : "new",
+      tenant.historyTraces.toLocaleString("en-GB"),
+      runs.map((run) => mib(run.peakBytes)).join(" / "),
+      distinct(runs.map((run) => run.exceptionCode)),
+      distinct(runs.map((run) => run.type)),
+      distinct(runs.map((run) => run.refusal ?? "-")),
+    ];
+    lines.push(`| ${cells.join(" | ")} |`);
+  }
+  return lines.join("\n");
+}
 
 describe("given three tenants' attribution traces, read over a 60-day period and the window before it", () => {
   const fileStartedAt = performance.now();
   let harness: LangWatchQLClickHouseHarness;
   let executor: ClickHouseLangWatchQLExecutorRepository;
+  let managedColumn = false;
   let seedSeconds = Number.NaN;
   const measurer = createMeasurer({ harness: () => harness, executor: () => executor });
   const { measurements } = measurer;
@@ -65,18 +125,20 @@ describe("given three tenants' attribution traces, read over a 60-day period and
     form: Form;
     label: QueryLabel;
     tenant: TenantSeed;
-  }) => measurer.measured({ form, label, tenant, runs: form === "main" ? 1 : RUNS });
+  }) => measurer.measured({ form, label, tenant, runs: form === "main" ? MAIN_RUNS : RUNS });
 
   beforeAll(async () => {
     harness = await startLangWatchQLClickHouse({
       suite: "attribution-widgets-memory",
       facts: "migrated",
     });
-    const seeded = await seedAttributionTenants({ harness, limits: LIMITS });
-    seedSeconds = seeded.seedSeconds;
-    console.table({
-      seed: { seconds: Number(seedSeconds.toFixed(1)), managedColumn: seeded.managedColumn },
+    ({ managedColumn } = await provisionAttributionViews({ harness, limits: LIMITS }));
+    seedSeconds = await seedAttributionTenants({
+      harness,
+      tenants: PERMANENT_TENANTS,
+      managedColumn,
     });
+    console.table({ seed: { seconds: Number(seedSeconds.toFixed(1)), managedColumn } });
 
     executor = ClickHouseLangWatchQLExecutorRepository.create({
       connection: {
@@ -130,33 +192,17 @@ describe("given three tenants' attribution traces, read over a 60-day period and
     ]);
   });
 
-  it("seeds the three tenants within 300 seconds", () => {
+  it(`seeds the three tenants within ${SEED_BUDGET_SECONDS} seconds`, () => {
     expect(seedSeconds).toBeLessThanOrEqual(SEED_BUDGET_SECONDS);
   });
 
-  describe("when main's SQL runs on the large tenant with 300 days of older history", () => {
-    it.each(QUERY_LABELS)(
-      "answers main's %s within the cap",
-      async (label) => {
-        const runs = await measured({ form: "main", label, tenant: TENANTS.LARGE });
-        expectAnswered({ runs, context: `main's ${label} on LARGE` });
-        for (const run of runs) {
-          expect(run.peakBytes).toBeLessThanOrEqual(ATTRIBUTION_MEMORY_CAP_BYTES);
-        }
-      },
-      CASE_TIMEOUT_MS,
-    );
-  });
-
-  describe("when main's att-change runs on the large tenant with no older history", () => {
-    it.each(ATT_CHANGE_LABELS)(
-      "answers main's %s within the cap",
-      async (label) => {
-        const runs = await measured({ form: "main", label, tenant: TENANTS.BARE });
-        expectAnswered({ runs, context: `main's ${label} on BARE` });
-        for (const run of runs) {
-          expect(run.peakBytes).toBeLessThanOrEqual(ATTRIBUTION_MEMORY_CAP_BYTES);
-        }
+  describe("when main's att-change/change runs with and without 300 days of older history", () => {
+    it.each([TENANTS.LARGE, TENANTS.BARE])(
+      "answers on $name within the cap",
+      async (tenant) => {
+        const label = "att-change/change";
+        const runs = await measured({ form: "main", label, tenant });
+        expectAnswered({ runs, context: `main's ${label} on ${tenant.name}` });
       },
       CASE_TIMEOUT_MS,
     );
@@ -166,7 +212,7 @@ describe("given three tenants' attribution traces, read over a 60-day period and
     const label = "att-change/change";
 
     it(
-      "answers on every tenant, its peaks printed beside main's",
+      "answers on every tenant within the cap, its peaks printed beside main's",
       async () => {
         for (const tenant of [TENANTS.LARGE, TENANTS.SMALL, TENANTS.BARE]) {
           const runs = await measured({ form: "catalogue", label, tenant });
@@ -190,6 +236,98 @@ describe("given three tenants' attribution traces, read over a 60-day period and
         );
       },
       CASE_TIMEOUT_MS,
+    );
+  });
+
+  describe.skipIf(!SWEEP)("when older history grows to 4M traces, the window fixed", () => {
+    const label = "att-change/change";
+    const swept: (SweepCase & { pending: Promise<Run[]> })[] = [];
+    let sweepSeedSeconds = Number.NaN;
+
+    /** att-change/change as the file measures it, the others once; each kept for the table. */
+    const sweepMeasured = (row: SweepCase) => {
+      const pending = row.label === label ? measured(row) : measurer.measured({ ...row, runs: 1 });
+      if (!swept.some((known) => known.pending === pending)) swept.push({ ...row, pending });
+      return pending;
+    };
+
+    beforeAll(async () => {
+      sweepSeedSeconds = await seedAttributionTenants({
+        harness,
+        tenants: SWEEP_ONLY_TENANTS,
+        managedColumn,
+      });
+    }, 2 * SWEEP_SEED_BUDGET_SECONDS * 1000);
+
+    afterAll(async () => {
+      const rows: SweepRow[] = [];
+      for (const { pending, ...row } of swept) {
+        rows.push({ ...row, runs: await pending.catch(() => []) });
+      }
+      const seconds = Number(sweepSeedSeconds.toFixed(1));
+      console.log(
+        `\nAttribution memory sweep: cap ${mib(ATTRIBUTION_MEMORY_CAP_BYTES)} MiB, ` +
+          `window 250,000 traces, sweep seed ${seconds} s\n\n${sweepTable(rows)}\n`,
+      );
+    }, 120_000);
+
+    it(`seeds the two larger histories within ${SWEEP_SEED_BUDGET_SECONDS} seconds`, () => {
+      expect(sweepSeedSeconds).toBeLessThanOrEqual(SWEEP_SEED_BUDGET_SECONDS);
+    });
+
+    it(
+      "refuses main's form with code 241 at the largest history",
+      async () => {
+        for (const tenant of SWEEP_TENANTS) {
+          await sweepMeasured({ form: "main", label, tenant });
+        }
+        const runs = await sweepMeasured({ form: "main", label, tenant: TENANTS.HISTORY_4000K });
+        for (const run of runs) {
+          expect(run.exceptionCode, described(runs)).toBe(MEMORY_LIMIT_EXCEEDED);
+        }
+      },
+      SWEEP_CASE_TIMEOUT_MS,
+    );
+
+    it(
+      "answers the new form at every history size",
+      async () => {
+        for (const tenant of SWEEP_TENANTS) {
+          const runs = await sweepMeasured({ form: "catalogue", label, tenant });
+          expectAnswered({ runs, context: `${label} on ${tenant.name}` });
+        }
+      },
+      SWEEP_CASE_TIMEOUT_MS,
+    );
+
+    it(
+      "keeps the new form within a tenth of no older history at every size, median of three",
+      async () => {
+        const bare = await sweepMeasured({ form: "catalogue", label, tenant: TENANTS.BARE });
+        for (const tenant of SWEEP_TENANTS) {
+          const runs = await sweepMeasured({ form: "catalogue", label, tenant });
+          const drift = Math.abs(median(runs) - median(bare)) / median(bare);
+          const context = `${tenant.name}: ${described(runs)} against ${described(bare)}`;
+          expect(drift, context).toBeLessThanOrEqual(HISTORY_TOLERANCE);
+        }
+      },
+      SWEEP_CASE_TIMEOUT_MS,
+    );
+
+    it(
+      "records att-table/passRates main against new, and main's att-change/units, on LARGE",
+      async () => {
+        const cases = [
+          { label: "att-table/passRates", form: "main" },
+          { label: "att-table/passRates", form: "catalogue" },
+          { label: "att-change/units", form: "main" },
+        ] as const;
+        for (const row of cases) {
+          const runs = await sweepMeasured({ ...row, tenant: TENANTS.LARGE });
+          expect(runs, `${row.form}'s ${row.label}`).toHaveLength(1);
+        }
+      },
+      SWEEP_CASE_TIMEOUT_MS,
     );
   });
 });

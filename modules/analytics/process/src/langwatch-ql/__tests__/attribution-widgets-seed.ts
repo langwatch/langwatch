@@ -46,7 +46,7 @@ const EVALUATORS = 5;
 /** With CustomerId and Labels, the 8 keys att-change and att-table pick their unit from. */
 const UNIT_METADATA_KEYS = ["document_type", "language", "team", "flow", "segment", "topic"];
 
-export type TenantName = "SMALL" | "LARGE" | "BARE";
+export type TenantName = "SMALL" | "LARGE" | "BARE" | "HISTORY_1500K" | "HISTORY_4000K";
 export type TenantSeed = {
   name: TenantName;
   tenantId: string;
@@ -55,23 +55,54 @@ export type TenantSeed = {
   windowTraces: number;
   /** Traces in the 300 days before them. */
   historyTraces: number;
+  /** Whether its traces carry evaluations, which att-change never reads. */
+  evaluations: boolean;
+};
+
+type TenantSize = Pick<TenantSeed, "name" | "windowTraces" | "historyTraces"> & {
+  evaluations?: boolean;
 };
 
 function tenantSeed({
   name,
   windowTraces,
   historyTraces,
-}: Omit<TenantSeed, "tenantId" | "keyHash">): TenantSeed {
+  evaluations = true,
+}: TenantSize): TenantSeed {
   const tenantId = `attribution-${name.toLowerCase()}`;
   const keyHash = capabilities.tenantCapability({ secret: `raw-lwql-key-${tenantId}-DO-NOT-LOG` });
-  return { name, tenantId, keyHash, windowTraces, historyTraces };
+  return { name, tenantId, keyHash, windowTraces, historyTraces, evaluations };
 }
 
 export const TENANTS: Record<TenantName, TenantSeed> = {
   SMALL: tenantSeed({ name: "SMALL", windowTraces: 125_000, historyTraces: 190_000 }),
   LARGE: tenantSeed({ name: "LARGE", windowTraces: 250_000, historyTraces: 375_000 }),
   BARE: tenantSeed({ name: "BARE", windowTraces: 250_000, historyTraces: 0 }),
+  HISTORY_1500K: tenantSeed({
+    name: "HISTORY_1500K",
+    windowTraces: 250_000,
+    historyTraces: 1_500_000,
+    evaluations: false,
+  }),
+  HISTORY_4000K: tenantSeed({
+    name: "HISTORY_4000K",
+    windowTraces: 250_000,
+    historyTraces: 4_000_000,
+    evaluations: false,
+  }),
 };
+
+/** Seeded on every run. */
+export const PERMANENT_TENANTS = [TENANTS.SMALL, TENANTS.LARGE, TENANTS.BARE];
+/** The sweep's history sizes, smallest first, its window fixed at 250k traces. */
+export const SWEEP_TENANTS = [
+  TENANTS.BARE,
+  TENANTS.LARGE,
+  TENANTS.HISTORY_1500K,
+  TENANTS.HISTORY_4000K,
+];
+/** What the sweep seeds on top of the permanent tenants. */
+export const SWEEP_ONLY_TENANTS = [TENANTS.HISTORY_1500K, TENANTS.HISTORY_4000K];
 
 /**
  * The seed writes whole blocks: merges stay stopped on these tables, so each block is a part per
@@ -176,14 +207,17 @@ function traceEvaluationInsert({
   `;
 }
 
-/** Provisions the views and access model, seeds the three tenants and checks the row counts. */
-export async function seedAttributionTenants({
+/**
+ * Provisions the views and the access model with `limits`, and maps every tenant's key. Returns
+ * whether `trace_analytics` has the managed version column the seed then writes.
+ */
+export async function provisionAttributionViews({
   harness,
   limits,
 }: {
   harness: LangWatchQLClickHouseHarness;
   limits: LangWatchQLResourceLimits;
-}): Promise<{ seedSeconds: number; managedColumn: boolean }> {
+}): Promise<{ managedColumn: boolean }> {
   const { names, factDatabase: facts } = harness;
   await harness.applyAsAdmin(
     viewProvisioning.setupStatements({
@@ -213,8 +247,40 @@ export async function seedAttributionTenants({
       `WHERE database = '${facts}' AND table = 'trace_analytics' ` +
       `AND name = 'LastUsedPromptVersionId'`,
   );
-  const managedColumn = Number(column?.n) > 0;
+  return { managedColumn: Number(column?.n) > 0 };
+}
 
+/** The statements that write one tenant's traces, its evaluations only when it carries them. */
+function tenantStatements({
+  facts,
+  tenant,
+  managedColumn,
+}: {
+  facts: string;
+  tenant: TenantSeed;
+  managedColumn: boolean;
+}): string[] {
+  const evaluations = tenant.evaluations
+    ? EVALUATION_WRITES.map((write) => traceEvaluationInsert({ facts, tenant, write }))
+    : [];
+  return [
+    traceAnalyticsInsert({ facts, tenant, managedColumn }),
+    traceSummariesInsert({ facts, tenant }),
+    ...evaluations,
+  ];
+}
+
+/** Seeds `tenants` once the views are provisioned, checks their row counts, returns the seconds. */
+export async function seedAttributionTenants({
+  harness,
+  tenants,
+  managedColumn,
+}: {
+  harness: LangWatchQLClickHouseHarness;
+  tenants: readonly TenantSeed[];
+  managedColumn: boolean;
+}): Promise<number> {
+  const facts = harness.factDatabase;
   // One INSERT ... SELECT can outlast the driver's default 30 s on a slow runner.
   const seeder = createClient({
     url: harness.container.getHttpUrl(),
@@ -223,13 +289,8 @@ export async function seedAttributionTenants({
     request_timeout: SEED_BUDGET_SECONDS * 1000,
   });
   const seedStartedAt = performance.now();
-  for (const tenant of Object.values(TENANTS)) {
-    const statements = [
-      traceAnalyticsInsert({ facts, tenant, managedColumn }),
-      traceSummariesInsert({ facts, tenant }),
-      ...EVALUATION_WRITES.map((write) => traceEvaluationInsert({ facts, tenant, write })),
-    ];
-    for (const query of statements) {
+  for (const tenant of tenants) {
+    for (const query of tenantStatements({ facts, tenant, managedColumn })) {
       await seeder.command({
         query,
         query_params: {
@@ -249,11 +310,11 @@ export async function seedAttributionTenants({
     `SELECT TenantId, count() AS n FROM ${facts}.trace_analytics ` +
       `WHERE TenantId LIKE 'attribution-%' GROUP BY TenantId`,
   );
-  for (const tenant of Object.values(TENANTS)) {
+  for (const tenant of tenants) {
     const n = Number(seeded.find((row) => row.TenantId === tenant.tenantId)?.n);
     if (n !== tenant.windowTraces + tenant.historyTraces) {
       throw new Error(`seed wrote ${n} trace_analytics rows for ${tenant.name}`);
     }
   }
-  return { seedSeconds, managedColumn };
+  return seedSeconds;
 }

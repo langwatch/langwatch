@@ -26,12 +26,11 @@ function fixture(name: string): readonly StockQuery[] {
   );
 }
 
-export const QUERY_LABELS = [
+const QUERY_LABELS = [
   "att-change/change",
   "att-change/units",
   "att-table/passRates",
 ] as const;
-export const ATT_CHANGE_LABELS = ["att-change/change", "att-change/units"] as const;
 export type QueryLabel = (typeof QUERY_LABELS)[number];
 
 /** Main's SQL for the three, frozen as the catalogue held it before the fix. */
@@ -137,7 +136,7 @@ export function createMeasurer({
     return refusal === undefined ? run : { ...run, refusal };
   }
 
-  /** Main's form runs once per tenant; the catalogue's three times, shared by every comparison. */
+  /** Each form, query and tenant runs `runs` times a file run, shared by every comparison. */
   function measured({
     form,
     label,
