@@ -140,7 +140,6 @@ describe("evalResultsJudgeModelOf", () => {
         evalResultsJudgeModelOf({
           kind: "own_unavailable",
           model: "azure/decisions:gpt-6-luna",
-          reason: "key_missing",
         }),
       ).toBe("azure/decisions:gpt-6-luna");
     });
