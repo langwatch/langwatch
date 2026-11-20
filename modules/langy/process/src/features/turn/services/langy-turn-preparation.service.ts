@@ -21,6 +21,7 @@ import {
   placeholderTitleOf,
   startsWithGuidedKickoff,
 } from "../../../rules/langy-conversation-title.rules.ts";
+import { dispatchIntentOf } from "../../../rules/langy-dispatch-intent.rules.ts";
 import { mintRunToken } from "../../../rules/langy-frame-auth.rules.ts";
 import type { LangyTurnAttemptService } from "./langy-turn-attempt.service.ts";
 import { LangyTurnOverrideService } from "./langy-turn-override.service.ts";
@@ -491,15 +492,4 @@ export class LangyTurnPreparationService {
         );
       });
   }
-}
-
-function dispatchIntentOf({
-  resumable,
-  hasApiKey,
-}: {
-  resumable: boolean;
-  hasApiKey: boolean;
-}): "create" | "revive" | "continue" {
-  if (resumable) return "revive";
-  return hasApiKey ? "create" : "continue";
 }
