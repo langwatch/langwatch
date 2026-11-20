@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 
 import type { CreateHeldApiKeyInput } from "@langwatch/api-key-contract";
 import type { SharedCredentialStore } from "@langwatch/secrets/shared-credential";
-import { Temporal, nowInstant } from "@langwatch/time";
+import { Temporal, nowInstant, toDate } from "@langwatch/time";
 
 import type { ApiKeyRepository } from "../repositories/api-key.repository.ts";
 import { isKeyLive } from "../rules/api-key-held-answer.rules.ts";
@@ -55,7 +55,7 @@ export class HeldKeyMintService {
       address: { tenantId: key.organizationId, contentKey: holdKey },
       identity: identityOf(key),
       newExpiresAt: () => Temporal.Instant.fromEpochMilliseconds(key.expiresAt.getTime()),
-      keyFor: (expiresAt) => ({ ...key, expiresAt: new Date(expiresAt.epochMilliseconds) }),
+      keyFor: (expiresAt) => ({ ...key, expiresAt: toDate(expiresAt) }),
       reusable: ({ expiresAtMs }) =>
         isRunKeyReusable({ expiresAtMs, nowMs: nowInstant().epochMilliseconds, minRemainingMs }),
       isLive: async (apiKeyId) => {
