@@ -171,7 +171,9 @@ describe("HeldKeyMintService", () => {
     await attempts(() => service.createHeld({ holdKey: "run-1", key: later }));
 
     expect(rows()[0]?.expiresAt?.getTime()).toBe(written.expiresAt.getTime());
+    // Grant tries end at 10 s (write), 20 s (retry 1), 70 s (retry 2, past 45 s): two reopens.
     expect(reopened.map(({ expiresAt }) => expiresAt.getTime())).toEqual([
+      written.expiresAt.getTime(),
       written.expiresAt.getTime(),
     ]);
   });
