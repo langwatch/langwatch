@@ -167,11 +167,14 @@ export class HttpInstantEvalClassifierChannel implements InstantEvalClassifierCh
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
       const gate = this.breakerAllowsSend();
       if (!gate.isAllowed) {
-        // Held back, not sent: the attempt fails as a 500 would, with the same wait.
-        const held: Attempt = { kind: "retry", waitMs: backoffMs(attempt), isRateLimited: false };
-        const settled = settle({ outcome: held, state, isLastAttempt: attempt === MAX_ATTEMPTS });
-        if (settled.kind === "settled") return { ...settled.judgement, limiterWaitMs };
-        await this.sleep(held.waitMs, signal);
+        const held = await this.holdBack({
+          isAwaitingProbe: gate.isAwaitingProbe,
+          attempt,
+          state,
+          signal,
+        });
+        if (held.judgement) return { ...held.judgement, limiterWaitMs };
+        attempt -= 1 - held.attemptsSpent;
         continue;
       }
       let outcome: Attempt;
@@ -207,10 +210,43 @@ export class HttpInstantEvalClassifierChannel implements InstantEvalClassifierCh
     return { ...instantEvalSkipped("classifier_rate_limited"), limiterWaitMs };
   }
 
-  private breakerAllowsSend(): { isAllowed: boolean; probe: number | null } {
-    const decision = classifierBreakerAllowsSend({ state: this.breaker, now: this.now() });
-    this.breaker = decision.state;
-    return { isAllowed: decision.isAllowed, probe: decision.probe };
+  /**
+   * One held-back turn, not sent. Behind an unanswered probe it is free until the probe is
+   * overdue, and an answer lets the text use every attempt it has left.
+   * Otherwise it fails as a 500 would, with the same wait.
+   */
+  private async holdBack({
+    isAwaitingProbe,
+    attempt,
+    state,
+    signal,
+  }: {
+    isAwaitingProbe: boolean;
+    attempt: number;
+    state: AttemptState;
+    signal: AbortSignal | undefined;
+  }): Promise<{ judgement?: InstantEvalJudgement; attemptsSpent: 0 | 1 }> {
+    const waitMs = backoffMs(attempt);
+    if (!isAwaitingProbe) {
+      const held: Attempt = { kind: "retry", waitMs, isRateLimited: false };
+      const settled = settle({ outcome: held, state, isLastAttempt: attempt === MAX_ATTEMPTS });
+      if (settled.kind === "settled") return { judgement: settled.judgement, attemptsSpent: 1 };
+    }
+    await this.sleep(waitMs, signal);
+    return { attemptsSpent: isAwaitingProbe ? 0 : 1 };
+  }
+
+  private breakerAllowsSend(): {
+    isAllowed: boolean;
+    probe: number | null;
+    isAwaitingProbe: boolean;
+  } {
+    const { state, ...decision } = classifierBreakerAllowsSend({
+      state: this.breaker,
+      now: this.now(),
+    });
+    this.breaker = state;
+    return decision;
   }
 
   private recordSend(health: ClassifierSendHealth, probe: number | null): void {

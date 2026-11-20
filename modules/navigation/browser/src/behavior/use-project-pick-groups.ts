@@ -1,11 +1,10 @@
 /** Projects switcher offers; one answer for both; "New Project" for project:create access */
 
+import type { ProjectPickerGroup } from "@langwatch/design-system/project-picker";
 import { isAggregateProjectKind } from "@langwatch/project-contract";
-import { useMemo } from "react";
 
 import { useOptionalNavigationHost } from "../model/navigation-host.ts";
 import { isListedInSwitcher } from "../model/personal-team.ts";
-import type { ProjectPickGroup } from "../model/project-pick-items.ts";
 
 /** Project pick destination: swap project segment, drop trailing dynamic segments */
 export function projectSwitchHref({
@@ -48,7 +47,7 @@ function dropExtraDynamicSegment({
 }
 
 /** Teams reader may open with projects; host is optional since switcher handed across seam */
-export function useProjectPickGroups(): ProjectPickGroup[] {
+export function useProjectPickGroups(): ProjectPickerGroup[] {
   const host = useOptionalNavigationHost();
   const organization = host?.organization();
   const project = host?.project();
@@ -58,31 +57,29 @@ export function useProjectPickGroups(): ProjectPickGroup[] {
 
   const canCreateProject = host?.hasPermission("project:create") ?? false;
 
-  return useMemo(() => {
-    if (!host || !organization) return [];
-    return host
-      .openableTeams()
-      .filter((team) => isListedInSwitcher(team, userId))
-      .filter((team) => team.projects.length > 0 || canCreateProject)
-      .map((team) => ({
-        team: {
-          teamId: team.id,
-          orgId: organization.id,
-          label: team.name,
-          // A personal workspace holds its owner's one project; main offered no create there.
-          canCreateProject: canCreateProject && !team.isPersonal,
-        },
-        projects: team.projects.map((candidate) => ({
-          projectId: candidate.id,
-          label: candidate.name,
-          isAggregate: isAggregateProjectKind(candidate.kind),
-          href: projectSwitchHref({
-            pathname,
-            routePattern,
-            currentSlug: project?.slug,
-            nextSlug: candidate.slug,
-          }),
-        })),
-      }));
-  }, [host, organization, pathname, routePattern, project?.slug, canCreateProject, userId]);
+  if (!host || !organization) return [];
+  return host
+    .openableTeams()
+    .filter((team) => isListedInSwitcher(team, userId))
+    .filter((team) => team.projects.length > 0 || canCreateProject)
+    .map((team) => ({
+      team: {
+        teamId: team.id,
+        orgId: organization.id,
+        label: team.name,
+        // A personal workspace holds its owner's one project; main offered no create there.
+        canCreateProject: canCreateProject && !team.isPersonal,
+      },
+      projects: team.projects.map((candidate) => ({
+        projectId: candidate.id,
+        label: candidate.name,
+        isAggregate: isAggregateProjectKind(candidate.kind),
+        href: projectSwitchHref({
+          pathname,
+          routePattern,
+          currentSlug: project?.slug,
+          nextSlug: candidate.slug,
+        }),
+      })),
+    }));
 }

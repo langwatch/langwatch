@@ -57,6 +57,13 @@ Feature: Redacting personal data out of a span at ingestion
     And a selection the native engine covers entirely makes no external call
 
   @unit
+  Scenario: The analysis request turns off every identifier the call did not ask for
+    Given a custom selection whose only analysis-service identifier is person names
+    When the batch is sent to the analysis service
+    Then the request asks for person names
+    And it turns off credit card numbers, email addresses and every other identifier by name
+
+  @unit
   Scenario: An explicit policy level beats the level the ingestion call asked for
     Given a scope whose resolved policy names a level other than the platform default
     When a process redacts a span whose ingestion call asked for a different level

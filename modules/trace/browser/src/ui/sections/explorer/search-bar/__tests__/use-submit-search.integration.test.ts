@@ -379,8 +379,40 @@ describe("given the text is an eval chip typed by hand", () => {
         target: "traces",
         otherQuery: "status:error",
         fallbackQuery: 'status:error AND eval:"the user is annoyed"',
+        typedQuery: 'status:error AND eval:"the user is annoyed"',
         timeRange: { from: 1000, to: 2000 },
       });
+    });
+
+    /** @scenario "A chip typed by hand starts its run on Enter" */
+    it("hands over the text as typed, so a NOT in front of the chip is not lost", () => {
+      const { result } = renderSubmit();
+      act(() => result.current.submitSearch('NOT eval:"the user is annoyed"'));
+      expect(handlers.onInstantEval).toHaveBeenCalledWith(
+        expect.objectContaining({
+          otherQuery: "",
+          typedQuery: 'NOT eval:"the user is annoyed"',
+        }),
+      );
+    });
+
+    /** @scenario "A chip typed by hand starts its run on Enter" */
+    it("leaves a chip under an OR to be rebuilt, since its run judges only the other terms", () => {
+      const { result } = renderSubmit();
+      act(() => result.current.submitSearch('status:error OR eval:"the user is annoyed"'));
+      const run = handlers.onInstantEval.mock.calls.at(-1)?.[0];
+      expect(run).toMatchObject({ otherQuery: "status:error" });
+      expect(run).not.toHaveProperty("typedQuery");
+    });
+
+    /** @scenario "A chip typed by hand starts its run on Enter" */
+    it("keeps the typed text when only another chip is under an OR", () => {
+      const { result } = renderSubmit();
+      const queryText = 'NOT eval:"b" AND (status:error OR eval:"a")';
+      act(() => result.current.submitSearch(queryText));
+      expect(handlers.onInstantEval).toHaveBeenCalledWith(
+        expect.objectContaining({ question: { instructions: "b" }, typedQuery: queryText }),
+      );
     });
 
     /** @scenario "A chip typed by hand starts its run on Enter" */
