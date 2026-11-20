@@ -2,6 +2,7 @@
 import { suiteTemplateSchema } from "@langwatch/suite-contract";
 import { describe, expect, it } from "vitest";
 
+import { agenticRagTemplate } from "../agentic-rag.rules.ts";
 import { owaspAgenticTop10Template } from "../owasp-agentic-top-10.rules.ts";
 import { owaspLlmTop10Template } from "../owasp-llm-top-10-2025.rules.ts";
 import { piiSensitiveDataTemplate } from "../pii-sensitive-data.rules.ts";
@@ -9,6 +10,7 @@ import { promptInjectionTemplate } from "../prompt-injection.rules.ts";
 import { retailSupportAgentTemplate } from "../retail-support-agent.rules.ts";
 import { fillTemplateScenario, SUITE_TEMPLATES } from "../suite-template-fill.rules.ts";
 import { supportAgentTemplate } from "../support-agent.rules.ts";
+import { technicianCopilotTemplate } from "../technician-copilot.rules.ts";
 import { voiceSupportAgentTemplate } from "../voice-support-agent.rules.ts";
 
 const OFFICIAL_NAMES = [
@@ -83,18 +85,20 @@ describe("shipped suite templates", () => {
 
     /** @scenario "The archetypes cover the everyday agent kinds" */
     it("ships one archetype per everyday agent kind", () => {
-      expect(archetypes.map((template) => template.id).toSorted()).toEqual([
+      expect(archetypes.map((template) => template.id)).toEqual([
         "analytics-copilot",
         "banking-assistant",
-        "claims-intake-agent",
+        "voice-support-agent",
+        "support-agent",
         "it-helpdesk-agent",
         "knowledge-assistant",
+        "agentic-rag",
+        "technician-copilot",
         "kyc-onboarding-agent",
         "legal-ops-assistant",
         "payments-agent",
         "retail-support-agent",
-        "support-agent",
-        "voice-support-agent",
+        "claims-intake-agent",
       ]);
     });
 
@@ -119,6 +123,28 @@ describe("shipped suite templates", () => {
         "read-back",
         "book-and-callback",
         "noisy-line",
+      ]);
+    });
+
+    /** @scenario "The archetypes cover the everyday agent kinds" */
+    it("tests the technician copilot on manuals, bulletins and part numbers", () => {
+      expect(technicianCopilotTemplate.scenarios.map((scenario) => scenario.key)).toEqual([
+        "fault-code",
+        "safety-step",
+        "part-number",
+        "superseded-bulletin",
+        "not-in-manuals",
+      ]);
+    });
+
+    /** @scenario "The archetypes cover the everyday agent kinds" */
+    it("tests agentic RAG on tender verification across several documents", () => {
+      expect(agenticRagTemplate.scenarios.map((scenario) => scenario.key)).toEqual([
+        "bid-against-requirements",
+        "missing-mandatory-document",
+        "multi-step-requirement",
+        "conflicting-statements",
+        "not-in-documents",
       ]);
     });
   });

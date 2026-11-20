@@ -16,9 +16,11 @@ Feature: Suite templates
   @unit
   Scenario: The archetypes cover the everyday agent kinds
     When the shipped templates are read
-    Then the archetypes are the customer support, retail support, payments, IT helpdesk, banking, KYC onboarding, legal ops, claims intake, analytics, knowledge and voice support agents
+    Then the archetypes are, in this order, the analytics copilot, banking assistant, voice support agent, customer support agent, IT helpdesk agent, knowledge assistant, agentic RAG, technician copilot, KYC onboarding agent, legal ops assistant, payments agent, retail support agent and claims intake agent
     And each archetype holds four to six scenarios, each with a situation and two criteria and no attack
     And the voice support agent tests a language switch, an interruption, a read-back of dates and numbers, a booking with a callback and a noisy line
+    And the technician copilot tests a fault code, a procedure with a safety step, a part number, a superseded service bulletin and a question the manuals do not cover
+    And agentic RAG tests tender verification: a bid against the requirements, a missing mandatory document, a requirement across several documents, conflicting documents and a question the documents do not answer
 
   @unit
   Scenario: The PII and prompt injection packs are listed as red team packs
@@ -30,7 +32,7 @@ Feature: Suite templates
   @unit
   Scenario: Listing templates answers every template sorted with full preview data
     When the caller lists templates
-    Then every shipped template is returned sorted by kind then title
+    Then every shipped template is returned in gallery order, archetypes first and then red team packs
     And each carries its scenarios, attack goals and OWASP ids
 
   @unit

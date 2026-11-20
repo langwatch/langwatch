@@ -5,6 +5,7 @@ import type {
   SuiteTemplateScenario,
 } from "@langwatch/suite-contract";
 
+import { agenticRagTemplate } from "./agentic-rag.rules.ts";
 import { analyticsCopilotTemplate } from "./analytics-copilot.rules.ts";
 import { bankingAssistantTemplate } from "./banking-assistant.rules.ts";
 import { claimsIntakeAgentTemplate } from "./claims-intake-agent.rules.ts";
@@ -19,28 +20,29 @@ import { piiSensitiveDataTemplate } from "./pii-sensitive-data.rules.ts";
 import { promptInjectionTemplate } from "./prompt-injection.rules.ts";
 import { retailSupportAgentTemplate } from "./retail-support-agent.rules.ts";
 import { supportAgentTemplate } from "./support-agent.rules.ts";
+import { technicianCopilotTemplate } from "./technician-copilot.rules.ts";
 import { voiceSupportAgentTemplate } from "./voice-support-agent.rules.ts";
 
-/** Every shipped suite template, sorted by kind then title. */
+/** Every shipped suite template in gallery order: archetypes first, then red team packs. */
 export const SUITE_TEMPLATES: readonly SuiteTemplate[] = [
-  owaspLlmTop10Template,
-  owaspAgenticTop10Template,
-  piiSensitiveDataTemplate,
-  promptInjectionTemplate,
-  supportAgentTemplate,
-  paymentsAgentTemplate,
   analyticsCopilotTemplate,
   bankingAssistantTemplate,
-  claimsIntakeAgentTemplate,
+  voiceSupportAgentTemplate,
+  supportAgentTemplate,
   itHelpdeskAgentTemplate,
   knowledgeAssistantTemplate,
+  agenticRagTemplate,
+  technicianCopilotTemplate,
   kycOnboardingAgentTemplate,
   legalOpsAssistantTemplate,
+  paymentsAgentTemplate,
   retailSupportAgentTemplate,
-  voiceSupportAgentTemplate,
-].toSorted(
-  (left, right) => left.kind.localeCompare(right.kind) || left.title.localeCompare(right.title),
-);
+  claimsIntakeAgentTemplate,
+  owaspAgenticTop10Template,
+  owaspLlmTop10Template,
+  piiSensitiveDataTemplate,
+  promptInjectionTemplate,
+];
 
 /** One scenario a template creates, filled from the fit and ready to send to ScenarioApi. */
 export type FilledTemplateScenario = {

@@ -3,6 +3,7 @@ import {
   BookOpen,
   ChartColumn,
   CreditCard,
+  FileSearch,
   FileText,
   Fingerprint,
   Headset,
@@ -16,6 +17,7 @@ import {
   ShieldAlert,
   ShoppingBag,
   Syringe,
+  Wrench,
 } from "lucide-react";
 
 /** The icon each shipped template shows on its card; an unlisted one falls back by kind. */
@@ -31,6 +33,8 @@ const TEMPLATE_ICONS: Record<string, LucideIcon> = {
   "analytics-copilot": ChartColumn,
   "knowledge-assistant": BookOpen,
   "voice-support-agent": Mic,
+  "technician-copilot": Wrench,
+  "agentic-rag": FileSearch,
   "pii-sensitive-data": Fingerprint,
   "prompt-injection": Syringe,
 };

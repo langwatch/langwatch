@@ -32,9 +32,11 @@ Feature: Create a test suite from a template
 
   @integration
   Scenario: Each template card shows an icon for the kind of agent it tests
-    Given the project lists a voice support agent archetype and an unknown archetype
+    Given the project lists the voice support agent, technician copilot and agentic RAG archetypes and an unknown archetype
     When the reader opens the Archetypes tab
     Then the voice support agent card shows a microphone icon
+    And the technician copilot card shows a wrench icon
+    And the agentic RAG card shows a document search icon
     And the unknown archetype shows the generic template icon
 
   @integration
