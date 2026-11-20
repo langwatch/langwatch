@@ -3,6 +3,7 @@ import type {
   InstantEvalClassifierLimits,
   InstantEvalJudgement,
   InstantEvalQuestion,
+  InstantEvalVerdict,
 } from "@langwatch/instant-eval-judge-contract";
 import { moduleApi } from "@langwatch/module";
 import type { Instant } from "@langwatch/time";
@@ -100,6 +101,32 @@ export interface InstantEvalUsageCount {
    */
   readonly judgeCalls?: number;
 }
+
+/** The decision model judging a monitor's texts: LangWatch's judge, or an own model by its id. */
+export type InstantEvalMonitorJudgeModel =
+  | Readonly<{ kind: "langwatch" }>
+  | Readonly<{ kind: "own"; model: string }>;
+
+/**
+ * One monitor's Instant Evals judgment of one trace, as it is recalled and kept (ADR-189 section
+ * 5). The mapped texts are hashed into the key and never stored.
+ */
+export interface InstantEvalMonitorJudgment {
+  readonly projectId: string;
+  readonly monitorId: string;
+  readonly traceId: string;
+  /** The trace's start, epoch milliseconds: the row's partition and retention anchor. */
+  readonly occurredAt: number;
+  readonly question: InstantEvalQuestion;
+  readonly inputs: Readonly<{ input?: string; output?: string; contexts?: readonly string[] }>;
+  readonly judgeModel: InstantEvalMonitorJudgeModel;
+}
+
+/** What the judge answered a monitor's judgment, as it is kept. */
+export type InstantEvalMonitorJudgementAnswer = Pick<
+  InstantEvalJudgement,
+  "verdicts" | "skippedReason"
+>;
 
 export interface InstantEvalApi {
   /** Whether this project may run Instant Evals at all. */
@@ -245,6 +272,21 @@ export interface InstantEvalApi {
     projectIds: readonly string[];
     since?: number;
   }): Promise<InstantEvalUsageCount>;
+
+  /**
+   * A monitor's kept verdict for this trace, question, judge model and mapped texts (ADR-189
+   * section 5), filed under the question asked: at most one. Empty on a miss, and without
+   * reading where `release_instant_eval_results` is off.
+   */
+  findMonitorJudgments(input: InstantEvalMonitorJudgment): Promise<InstantEvalVerdict[]>;
+
+  /**
+   * Keeps what the judge answered a monitor, as `Source = monitor` and its id (ADR-189 section 5);
+   * writes nothing where `release_instant_eval_results` is off.
+   */
+  keepMonitorJudgment(
+    input: InstantEvalMonitorJudgment & { judgement: InstantEvalMonitorJudgementAnswer },
+  ): Promise<void>;
 }
 
 export const InstantEvalApi = moduleApi<InstantEvalApi>()("instant-eval");

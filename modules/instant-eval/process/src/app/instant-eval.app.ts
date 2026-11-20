@@ -17,6 +17,8 @@ import {
   type InstantEvalRunInput,
   type InstantEvalJudgmentStatus,
   type InstantEvalEstimateWire,
+  type InstantEvalMonitorJudgementAnswer,
+  type InstantEvalMonitorJudgment,
   type InstantEvalOptInAccess,
   type InstantEvalQueryJudging,
   type InstantEvalQueryJudgingInput,
@@ -36,6 +38,7 @@ import {
   type InstantEvalClassifierLimits,
   type InstantEvalJudgement,
   type InstantEvalQuestion,
+  type InstantEvalVerdict,
   isLangWatchJudgeHost,
 } from "@langwatch/instant-eval-judge-contract";
 import { ModelProviderApi } from "@langwatch/model-provider-contract";
@@ -76,6 +79,7 @@ import {
   toInstantEvalJudgmentWire,
   toInstantEvalRunWire,
 } from "../rules/instant-eval-wire.rules.ts";
+import { EvalResultsMonitorService } from "../services/eval-results-monitor.service.ts";
 import { EvalResultsRecallService } from "../services/eval-results-recall.service.ts";
 import { EvalResultsTraceService } from "../services/eval-results-trace.service.ts";
 import { EvalResultsUsageService } from "../services/eval-results-usage.service.ts";
@@ -190,6 +194,7 @@ export class InstantEvalModule implements InstantEvalApiContract, InstantEvalBro
   private readonly queries: InstantEvalQueryJudgingService;
   private readonly spendCatchUp: InstantEvalJudgeSpendCatchUpService;
   private readonly traceResults: EvalResultsTraceService;
+  private readonly monitorResults: EvalResultsMonitorService;
 
   private constructor(options: {
     access: InstantEvalAccessService;
@@ -204,6 +209,7 @@ export class InstantEvalModule implements InstantEvalApiContract, InstantEvalBro
     queries: InstantEvalQueryJudgingService;
     spendCatchUp: InstantEvalJudgeSpendCatchUpService;
     traceResults: EvalResultsTraceService;
+    monitorResults: EvalResultsMonitorService;
   }) {
     this.access = options.access;
     this.optIns = options.optIns;
@@ -217,6 +223,7 @@ export class InstantEvalModule implements InstantEvalApiContract, InstantEvalBro
     this.queries = options.queries;
     this.spendCatchUp = options.spendCatchUp;
     this.traceResults = options.traceResults;
+    this.monitorResults = options.monitorResults;
   }
 
   static async create(setup: InstantEvalSetup): Promise<InstantEvalModule> {
@@ -367,6 +374,13 @@ export class InstantEvalModule implements InstantEvalApiContract, InstantEvalBro
         results: repositories.evalResults,
         peers: { isReleased: InstantEvalModule.isResultsReleasedOf(setup) },
       }),
+      monitorResults: EvalResultsMonitorService.create({
+        results: repositories.evalResults,
+        peers: {
+          isReleased: InstantEvalModule.isResultsReleasedOf(setup),
+          retentionDaysOf: InstantEvalModule.retentionDaysOf(setup),
+        },
+      }),
       spendCatchUp: InstantEvalJudgeSpendCatchUpService.create({
         peers: {
           listProjectIds: ({ organizationId }) =>
@@ -482,20 +496,28 @@ export class InstantEvalModule implements InstantEvalApiContract, InstantEvalBro
 
   /** Recall before judging and keep what was judged, behind `release_instant_eval_results`. */
   private static resultsOf(setup: InstantEvalSetup): EvalResultsRecallService {
-    const { modelProviders, retention } = setup.dependencies;
+    const { modelProviders } = setup.dependencies;
     return EvalResultsRecallService.create({
       results: setup.repositories.evalResults,
       peers: {
         isReleased: InstantEvalModule.isResultsReleasedOf(setup),
         judgeModelOf: async ({ projectId }) =>
           evalResultsJudgeModelOf(await modelProviders.resolveDecisionModel({ projectId })),
-        retentionDaysOf: ({ projectId }) =>
-          retention.getRetentionDays({
-            projectId,
-            category: RETENTION_TABLE_CATEGORY_MAP.eval_results,
-          }),
+        retentionDaysOf: InstantEvalModule.retentionDaysOf(setup),
       },
     });
+  }
+
+  /** The project's trace retention, which every kept result is stamped with (ADR-189 section 4). */
+  private static retentionDaysOf(
+    setup: InstantEvalSetup,
+  ): (input: { projectId: string }) => Promise<number> {
+    const { retention } = setup.dependencies;
+    return ({ projectId }) =>
+      retention.getRetentionDays({
+        projectId,
+        category: RETENTION_TABLE_CATEGORY_MAP.eval_results,
+      });
   }
 
   /** LangWatch's own switch for its hosted model, read for the project within its organization. */
@@ -844,6 +866,18 @@ export class InstantEvalModule implements InstantEvalApiContract, InstantEvalBro
     occurredUntil: number;
   }): Promise<InstantEvalTraceResultWire[]> {
     return this.traceResults.findResultsByTrace(input);
+  }
+
+  /** A monitor's kept verdict for its judgment (ADR-189 section 5); empty with the flag off. */
+  findMonitorJudgments(input: InstantEvalMonitorJudgment): Promise<InstantEvalVerdict[]> {
+    return this.monitorResults.findJudgments(input);
+  }
+
+  /** Keeps what the judge answered a monitor (ADR-189 section 5); nothing with the flag off. */
+  keepMonitorJudgment(
+    input: InstantEvalMonitorJudgment & { judgement: InstantEvalMonitorJudgementAnswer },
+  ): Promise<void> {
+    return this.monitorResults.keep(input);
   }
 
   async findRunProgress(input: {

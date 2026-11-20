@@ -1,7 +1,7 @@
 /**
- * Answers one LLM judge whose model is Instant Evals through the judge leaf, before any provider
- * lookup (ADR-174 d1, 7, 9, 16). A stream chunk is skipped before the call, a refusal is an error
- * result, never thrown. LangWatch's model is routed under the judge router flag (ADR-190).
+ * Answers one LLM judge on Instant Evals through the judge leaf, before any provider lookup
+ * (ADR-174 d1, 7, 9, 16); a refusal is an error result, never thrown. LangWatch's model is routed
+ * under ADR-190's flag; a monitor's verdict is recalled from and kept in eval_results (ADR-189).
  * @see modules/instant-eval/specs/instant-eval-judge-model.feature
  */
 import type { GuardrailCheckDirection } from "@langwatch/evaluation-contract";
@@ -13,6 +13,7 @@ import {
   type InstantEvalJudgeRouteRequest,
 } from "@langwatch/instant-eval-judge-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
+import type { Trace } from "@langwatch/trace-contract";
 
 import { instantEvalGuardrailSkipOf } from "../../../rules/instant-eval-guardrail-skip.rules.ts";
 import { instantEvalJudgeInputsOf } from "../../../rules/instant-eval-judge-dispatch.rules.ts";
@@ -22,9 +23,14 @@ import {
 } from "../../../rules/instant-eval-judge-question.rules.ts";
 import {
   instantEvalJudgeResult,
+  instantEvalRecalledResultOf,
   instantEvalRefusalResultOf,
   instantEvalSkipResultOf,
 } from "../../../rules/instant-eval-judge-result.rules.ts";
+import type {
+  EvaluationMonitorJudgmentsService,
+  EvaluationMonitorRun,
+} from "./evaluation-monitor-judgments.service.ts";
 
 type EvaluationJudgingDeps = Readonly<{
   judges: Pick<InstantEvalJudgeApi, "judge">;
@@ -34,6 +40,8 @@ type EvaluationJudgingDeps = Readonly<{
   evaluators: Pick<EvaluatorApi, "augmentResult">;
   /** What the project's organization's flags say about LangWatch's hosted judge. */
   judgeRouting: EvaluationJudgeRouting;
+  /** A monitor's kept verdicts, behind `release_instant_eval_results` (ADR-189 section 5). */
+  monitorJudgments: Pick<EvaluationMonitorJudgmentsService, "recall" | "keep">;
 }>;
 
 export type EvaluationJudgeRouting = Readonly<{
@@ -71,6 +79,9 @@ export class EvaluationJudgingService {
     idempotencyKey?: string | undefined;
     guardrailDirection?: GuardrailCheckDirection | undefined;
     signal?: AbortSignal | undefined;
+    /** Only a queued monitor's run carries one; with a trace, its verdict is kept (ADR-189). */
+    monitor?: EvaluationMonitorRun | undefined;
+    trace?: Pick<Trace, "trace_id" | "timestamps"> | undefined;
   }): Promise<SingleEvaluationResult> {
     const result = await this.judged({ ...call, judge, mappedData: data.data });
     return this.deps.evaluators.augmentResult({
@@ -90,6 +101,8 @@ export class EvaluationJudgingService {
     guardrailDirection,
     signal,
     decisionModel,
+    monitor,
+    trace,
   }: {
     projectId: string;
     judge: InstantEvalJudge;
@@ -98,6 +111,8 @@ export class EvaluationJudgingService {
     guardrailDirection?: GuardrailCheckDirection | undefined;
     signal?: AbortSignal | undefined;
     decisionModel?: string | undefined;
+    monitor?: EvaluationMonitorRun | undefined;
+    trace?: Pick<Trace, "trace_id" | "timestamps"> | undefined;
   }): Promise<SingleEvaluationResult> {
     const guardrailSkip = instantEvalGuardrailSkipOf({ direction: guardrailDirection });
     if (guardrailSkip.kind === "skipped") return guardrailSkip.result;
@@ -121,6 +136,19 @@ export class EvaluationJudgingService {
     ) {
       return instantEvalSkipResultOf("classifier_not_configured");
     }
+    const recall = await this.deps.monitorJudgments.recall({
+      projectId,
+      monitor,
+      traceId: trace?.trace_id,
+      occurredAt: trace?.timestamps.started_at,
+      question: request.question,
+      inputs,
+      judgeModel:
+        resolved.kind === "own" ? { kind: "own", model: resolved.model } : { kind: "langwatch" },
+    });
+    if (recall.kind === "recalled") {
+      return instantEvalRecalledResultOf({ judge, verdict: recall.verdict });
+    }
     // An own decision model is never routed, so the flag is read on LangWatch's model only.
     const isRouted =
       resolved.kind === "langwatch" && (await this.deps.judgeRouting.isRouted({ projectId }));
@@ -137,6 +165,12 @@ export class EvaluationJudgingService {
     });
     if (answer.outcome === "refused") {
       return instantEvalRefusalResultOf({ code: answer.code, message: answer.message });
+    }
+    if (recall.kind === "missed") {
+      await this.deps.monitorJudgments.keep({
+        judgment: recall.judgment,
+        judgement: answer.judgement,
+      });
     }
     return instantEvalJudgeResult({
       judge,

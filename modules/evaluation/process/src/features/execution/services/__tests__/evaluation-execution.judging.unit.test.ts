@@ -104,6 +104,7 @@ function buildService({
       resolveDecisionModel: resolveDecisionModel,
     }),
     judgeRouting: { isRouted: isRoutedSpy, isHostedOff: isHostedOffSpy },
+    monitorJudgments: { recall: async () => ({ kind: "not_kept" }), keep: async () => undefined },
     installEnvironment: {},
   });
 

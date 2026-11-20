@@ -7,11 +7,11 @@
 
 import { createHash } from "node:crypto";
 
+import type { InstantEvalMonitorJudgment } from "@langwatch/instant-eval-contract";
 import {
   INSTANT_EVAL_JUDGE_MODEL_ID,
   type InstantEvalQuestion,
 } from "@langwatch/instant-eval-judge-contract";
-import type { DecisionModelResolution } from "@langwatch/model-provider-contract";
 
 import type { EvalResultsMatchKey } from "../repositories/eval-results.repository.ts";
 
@@ -23,6 +23,9 @@ import type { InstantEvalRunQuestion } from "./instant-eval-run-questions.rules.
  * for a key bug: it retires every row written under the old one.
  */
 export const EVAL_RESULTS_KEY_VERSION = 1;
+
+/** The judged column a monitor's row names: it judges a mapping, not one extracted column. */
+export const EVAL_RESULTS_MONITOR_JUDGED_COLUMN = "monitor";
 
 /** Where one judged cell's result is kept, and when its trace happened. */
 export interface EvalResultsCellKey extends EvalResultsMatchKey {
@@ -106,10 +109,38 @@ export function findEvalResultsCellKeys({
 }
 
 /**
+ * A monitor's judgment key (ADR-189 section 5): the trace alone, and a hash of its mapped input,
+ * output and contexts as canonical JSON, so a monitor's rows and an ask's never recall each other.
+ */
+export function evalResultsMonitorCellKey(
+  judgment: Pick<InstantEvalMonitorJudgment, "traceId" | "occurredAt" | "question" | "inputs">,
+): EvalResultsCellKey {
+  const { input, output, contexts } = judgment.inputs;
+  // Fixed key order and an absent field as null, so the same mapping always hashes the same.
+  const canonical = JSON.stringify({
+    contexts: contexts ?? [],
+    input: input ?? null,
+    output: output ?? null,
+  });
+  return {
+    traceId: judgment.traceId,
+    spanId: "",
+    questionHash: evalResultsQuestionHash(judgment.question),
+    inputHash: sha256(canonical),
+    judgedColumn: EVAL_RESULTS_MONITOR_JUDGED_COLUMN,
+    occurredAt: judgment.occurredAt,
+  };
+}
+
+/**
  * The model a row records and recall keys on: the own decision model's id, or LangWatch's judge.
  * A judge that changes its weights must change this id, or recall serves its old verdicts.
  */
-export function evalResultsJudgeModelOf(resolution: DecisionModelResolution): string {
+export function evalResultsJudgeModelOf(
+  resolution:
+    | Readonly<{ kind: "langwatch" }>
+    | Readonly<{ kind: "own" | "own_unavailable"; model: string }>,
+): string {
   return resolution.kind === "langwatch" ? INSTANT_EVAL_JUDGE_MODEL_ID : resolution.model;
 }
 

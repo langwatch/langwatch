@@ -86,7 +86,7 @@ export function evalResultRecordOf({
 }: {
   tenantId: string;
   key: EvalResultsCellKey;
-  question: InstantEvalRunQuestion;
+  question: Pick<InstantEvalRunQuestion, "kind" | "question">;
   judgeModel: string;
   source: { kind: InstantEvalResultSource; id: string };
   outcome: EvalResultOutcome;

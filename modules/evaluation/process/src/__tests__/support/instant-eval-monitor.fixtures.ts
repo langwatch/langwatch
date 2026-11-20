@@ -16,6 +16,7 @@ import { vi } from "vitest";
 import { EvaluationExecutionIntentService } from "../../features/execution/services/evaluation-execution-intent.service.ts";
 import { EvaluationExecutionReceiptService } from "../../features/execution/services/evaluation-execution-receipt.service.ts";
 import { EvaluationExecutionService } from "../../features/execution/services/evaluation-execution.service.ts";
+import type { EvaluationMonitorJudgmentsService } from "../../features/execution/services/evaluation-monitor-judgments.service.ts";
 import {
   buildExecutionDeps,
   buildMonitor,
@@ -26,9 +27,15 @@ export const INSTANT_EVAL_MONITOR_PROJECT_ID = "project-evaluation-test";
 
 type Judge = InstantEvalJudgeApi["judge"];
 
-function traceOf(projectId: string): Trace {
+/** Every judge call judged as without kept results: no monitor verdict is recalled or kept. */
+const NOT_KEPT: Pick<EvaluationMonitorJudgmentsService, "recall" | "keep"> = {
+  recall: async () => ({ kind: "not_kept" }),
+  keep: async () => undefined,
+};
+
+function traceOf({ projectId, traceId }: { projectId: string; traceId: string }): Trace {
   return {
-    trace_id: "trace-evaluation-test",
+    trace_id: traceId,
     project_id: projectId,
     metadata: {},
     input: { value: "where is my order?" },
@@ -39,7 +46,15 @@ function traceOf(projectId: string): Trace {
 }
 
 /** The monitor's command handler, the judge calls it made, and the cost rows it wrote. */
-export function buildInstantEvalMonitor({ judge }: { judge: Judge }) {
+export function buildInstantEvalMonitor({
+  judge,
+  monitorJudgments = NOT_KEPT,
+  traceId = "trace-evaluation-test",
+}: {
+  judge: Judge;
+  monitorJudgments?: Pick<EvaluationMonitorJudgmentsService, "recall" | "keep">;
+  traceId?: string;
+}) {
   const calls: InstantEvalJudgeCall[] = [];
   const execution = EvaluationExecutionService.create({
     runs: { findTraceEvaluations: async () => [] },
@@ -49,7 +64,9 @@ export function buildInstantEvalMonitor({ judge }: { judge: Judge }) {
       },
     },
     traces: {
-      readTracesWithSpans: vi.fn(async () => [traceOf(INSTANT_EVAL_MONITOR_PROJECT_ID)]),
+      readTracesWithSpans: vi.fn(async () => [
+        traceOf({ projectId: INSTANT_EVAL_MONITOR_PROJECT_ID, traceId }),
+      ]),
       readThreadsTraces: vi.fn(async () => []),
     },
     spanDigest: { format: vi.fn(async () => ""), formatThread: vi.fn(async () => "") },
@@ -77,6 +94,7 @@ export function buildInstantEvalMonitor({ judge }: { judge: Judge }) {
     },
     decisionModels: { resolveDecisionModel: async () => ({ kind: "langwatch" }) },
     judgeRouting: { isRouted: async () => false, isHostedOff: async () => false },
+    monitorJudgments,
     installEnvironment: {},
   });
   const costRecorder = new TestCostRecorder();

@@ -12,7 +12,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 ## Module API (`InstantEvalApi`)
 
-Peers call these through the token, declared at `../contract/src/instant-eval.api.ts:104`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/instant-eval.api.ts:131`; nothing else in this package is public.
 
 #### `isEnabled`
 
@@ -162,6 +162,22 @@ The usage report's figures (ADR-156, section 10).
 
 ```typescript
 countUsage(input: { projectIds: readonly string[]; since?: number; }): Promise<InstantEvalUsageCount>;
+```
+
+#### `findMonitorJudgments`
+
+A monitor's kept verdict for this trace, question, judge model and mapped texts (ADR-189 section 5), filed under the question asked: at most one. Empty on a miss, and without reading where `release_instant_eval_results` is off.
+
+```typescript
+findMonitorJudgments(input: InstantEvalMonitorJudgment): Promise<InstantEvalVerdict[]>;
+```
+
+#### `keepMonitorJudgment`
+
+Keeps what the judge answered a monitor, as `Source = monitor` and its id (ADR-189 section 5); writes nothing where `release_instant_eval_results` is off.
+
+```typescript
+keepMonitorJudgment(input: InstantEvalMonitorJudgment & { judgement: InstantEvalMonitorJudgementAnswer }): Promise<void>;
 ```
 
 ## REST transport

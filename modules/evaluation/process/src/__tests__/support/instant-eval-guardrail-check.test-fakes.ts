@@ -44,6 +44,7 @@ export function instantEvalGuardrailCheckOver({
     judges,
     decisionModels: { resolveDecisionModel: async () => ({ kind: "langwatch" }) },
     judgeRouting: { isRouted: async () => false, isHostedOff: async () => false },
+    monitorJudgments: { recall: async () => ({ kind: "not_kept" }), keep: async () => undefined },
     installEnvironment: {},
   });
   const check = EvaluationGuardrailCheckService.create({

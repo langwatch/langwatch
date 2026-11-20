@@ -1,11 +1,11 @@
-import type {
-  EvaluationExecutionResult,
-  ExecuteEvaluationCommand,
-} from "@langwatch/evaluation-contract";
+import type { EvaluationExecutionResult } from "@langwatch/evaluation-contract";
 import { createLogger } from "@langwatch/observability";
 
 import type { EvaluationCostService } from "./evaluation-cost.service.ts";
-import type { EvaluationExecutionService } from "./evaluation-execution.service.ts";
+import type {
+  EvaluationExecutionCommand,
+  EvaluationExecutionService,
+} from "./evaluation-execution.service.ts";
 
 const logger = createLogger("langwatch:evaluation:execution-receipt");
 
@@ -30,7 +30,7 @@ export class EvaluationExecutionReceiptService {
     tenantId: string;
     evaluationId: string;
     operationKey: string;
-    command: ExecuteEvaluationCommand;
+    command: EvaluationExecutionCommand;
     cost: {
       isGuardrail: boolean;
       evaluatorName: string;

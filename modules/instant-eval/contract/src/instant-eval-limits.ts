@@ -62,6 +62,12 @@ export const INSTANT_EVAL_RESULT_SOURCES = [
 
 export type InstantEvalResultSource = (typeof INSTANT_EVAL_RESULT_SOURCES)[number];
 
+/**
+ * How long a monitor waits on eval_results for one recall or one write (ADR-189 section 5); past
+ * it, the monitor judges or moves on as it would without the table.
+ */
+export const EVAL_RESULTS_MONITOR_TIMEOUT_MS = 300;
+
 /** Whether a judgement was made, declined, or attempted and lost. */
 export const INSTANT_EVAL_JUDGMENT_STATUSES = ["judged", "skipped", "failed"] as const;
 
