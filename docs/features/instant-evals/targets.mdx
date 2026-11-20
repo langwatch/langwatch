@@ -67,7 +67,7 @@ SELECT
   Attributes['gen_ai.conversation.id'] AS ThreadId,
   OccurredAt,
   eval(llm_readable_trace(TraceId, 8000), 'the customer sounds annoyed') AS q1
-FROM analytics.traces
+FROM langwatch.traces
 WHERE OccurredAt >= {start_at:DateTime}
   AND OccurredAt < {end_at:DateTime}
 ORDER BY TraceId
@@ -81,7 +81,7 @@ SELECT
   m.ConversationId AS ThreadId,
   max(m.OccurredAt) AS OccurredAt,
   eval(llm_readable_thread(m.ConversationId, 18729), 'the customer sounds annoyed') AS q1
-FROM analytics.trace_metrics AS m
+FROM langwatch.trace_metrics AS m
 WHERE m.OccurredAt >= {start_at:DateTime}
   AND m.OccurredAt < {end_at:DateTime}
   AND m.ConversationId != ''
@@ -97,14 +97,14 @@ SELECT
   SpanId,
   StartTime AS OccurredAt,
   eval(llm_messages_span(TraceId, SpanId), 'the model was asked to do two things at once') AS q1
-FROM analytics.spans
+FROM langwatch.spans
 WHERE StartTime >= {start_at:DateTime}
   AND StartTime < {end_at:DateTime}
   AND SpanAttributes['langwatch.span.type'] = 'llm'
 ORDER BY TraceId, SpanId
 ```
 
-A `--filter` on `traces` goes into that `WHERE`. On `threads` and `llm-spans` it goes into a subquery over `analytics.traces` with the same window, because the trace's attributes are not columns of the conversation or span views.
+A `--filter` on `traces` goes into that `WHERE`. On `threads` and `llm-spans` it goes into a subquery over `langwatch.traces` with the same window, because the trace's attributes are not columns of the conversation or span views.
 
 ## What is the token budget per row
 
