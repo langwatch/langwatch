@@ -90,7 +90,9 @@ async function notificationApp({ isSaas, keyed = true }: { isSaas: boolean; keye
 }
 
 const toOwnMailer = () =>
-  fetch.mock.calls.filter(([url]) => String(url).includes("resend.com")).map(([, init]) => init);
+  fetch.mock.calls
+    .filter(([url]) => new URL(String(url)).hostname === "api.resend.com")
+    .map(([, init]) => init);
 
 const message = (template?: string) => ({
   to: RECIPIENT,
