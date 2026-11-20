@@ -9,7 +9,6 @@
 
 import type { StarredDashboardsProject } from "@langwatch/analytics-client";
 import type { UiAnalyticsEvent } from "@langwatch/browser-host/analytics";
-
 import type { UiProcedureCall } from "@langwatch/browser/testing-transport";
 import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";

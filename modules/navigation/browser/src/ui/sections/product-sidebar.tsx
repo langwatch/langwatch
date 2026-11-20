@@ -1,9 +1,9 @@
 /** Sidebar column: product pages and utilities. Host and search palette integration. */
 
 import { RawKbd as Kbd } from "@langwatch/design-system/kbd";
-import { FrontendFlags } from "@langwatch/feature-flag-contract";
 import { Box, VStack } from "@langwatch/design-system/primitives";
 import { ScrollEdgeFade, useScrollEdges } from "@langwatch/design-system/scroll-fade";
+import { FrontendFlags } from "@langwatch/feature-flag-contract";
 import { ArrowLeft, ArrowUpRight, Search } from "lucide-react";
 import { useRef, useState } from "react";
 

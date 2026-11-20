@@ -16,11 +16,11 @@ import { Box, Link as ChakraLink, HStack, Text, VStack } from "@langwatch/design
 import { LayoutDashboard, Plus } from "lucide-react";
 import { type ReactNode, useMemo, useState } from "react";
 
-import { AnalyticsHostProvider, useAnalyticsHost } from "../../../../model/analytics-host.ts";
 import {
   analyticsHostInProject,
   uiAnalyticsInProject,
 } from "../../../../model/analytics-host-in-project.ts";
+import { AnalyticsHostProvider, useAnalyticsHost } from "../../../../model/analytics-host.ts";
 import { opensElsewhere } from "../../../../ui/elements/analytics-link.tsx";
 import { useBoardAccess, useBoardReader } from "../../behavior/use-board-access.ts";
 import { useBoardFromTemplate } from "../../behavior/use-board-from-template.ts";
