@@ -24,7 +24,7 @@ class GetApiGovernanceRegistryEventsResponse200DataItem:
     Attributes:
         id (str):
         sequence (str):
-        type_ (GetApiGovernanceRegistryEventsResponse200DataItemType):
+        type_ (GetApiGovernanceRegistryEventsResponse200DataItemType | str):
         organization_id (str):
         agent_id (str):
         from_version (int | None):
@@ -36,7 +36,7 @@ class GetApiGovernanceRegistryEventsResponse200DataItem:
 
     id: str
     sequence: str
-    type_: GetApiGovernanceRegistryEventsResponse200DataItemType
+    type_: GetApiGovernanceRegistryEventsResponse200DataItemType | str
     organization_id: str
     agent_id: str
     from_version: int | None
@@ -50,7 +50,11 @@ class GetApiGovernanceRegistryEventsResponse200DataItem:
 
         sequence = self.sequence
 
-        type_ = self.type_.value
+        type_: str
+        if isinstance(self.type_, GetApiGovernanceRegistryEventsResponse200DataItemType):
+            type_ = self.type_.value
+        else:
+            type_ = self.type_
 
         organization_id = self.organization_id
 
@@ -99,7 +103,18 @@ class GetApiGovernanceRegistryEventsResponse200DataItem:
 
         sequence = d.pop("sequence")
 
-        type_ = GetApiGovernanceRegistryEventsResponse200DataItemType(d.pop("type"))
+        def _parse_type_(data: object) -> GetApiGovernanceRegistryEventsResponse200DataItemType | str:
+            try:
+                if not isinstance(data, str):
+                    raise TypeError()
+                type_type = GetApiGovernanceRegistryEventsResponse200DataItemType(data)
+
+                return type_type
+            except (TypeError, ValueError, AttributeError, KeyError):
+                pass
+            return cast(GetApiGovernanceRegistryEventsResponse200DataItemType | str, data)
+
+        type_ = _parse_type_(d.pop("type"))
 
         organization_id = d.pop("organization_id")
 

@@ -75156,6 +75156,7 @@ A rollback never runs migrations and never needs a down migration. Every migrati
 - The previous version starts on the newer schema.
 - The Upgrades page shows **Rolled back** while the older version runs. Background steps that an older version can undo are reopened, and run again after you upgrade again.
 - Data the newer version wrote stays. Features the older version does not know about are unavailable until you upgrade again.
+- The agent registry's change feed and `/versions` skip an event type the running version does not know, so they keep answering after a rollback. LangWatch 3.25 and earlier refuse such an event, so a release adds a feed event type only once every version it can roll back to skips unknown types.
 
 ### Helm
 
@@ -77668,6 +77669,100 @@ openapi: "GET /api/v1/governance/registry/events"
 ---
 title: "Search the registry (ARD search)"
 openapi: "POST /api/v1/governance/registry/ard/search"
+---
+
+---
+
+# FILE: ./api-reference/governance-kill-switch/approve-a-pending-stop.mdx
+
+---
+title: "Approve a pending stop"
+openapi: "POST /api/v1/governance/agent-stops/{stopId}/approve"
+---
+
+---
+
+# FILE: ./api-reference/governance-kill-switch/deny-a-pending-stop.mdx
+
+---
+title: "Deny a pending stop"
+openapi: "POST /api/v1/governance/agent-stops/{stopId}/deny"
+---
+
+---
+
+# FILE: ./api-reference/governance-kill-switch/get-an-agent-s-latest-stop.mdx
+
+---
+title: "Get an agent's latest stop"
+openapi: "GET /api/v1/governance/agents/{agentId}/stop"
+---
+
+---
+
+# FILE: ./api-reference/governance-kill-switch/get-an-agent-s-stop-plan.mdx
+
+---
+title: "Get an agent's stop plan"
+openapi: "GET /api/v1/governance/agents/{agentId}/stop-plan"
+---
+
+---
+
+# FILE: ./api-reference/governance-kill-switch/list-the-organisation-s-agent-stops.mdx
+
+---
+title: "List the organisation's agent stops"
+openapi: "GET /api/v1/governance/agent-stops"
+---
+
+---
+
+# FILE: ./api-reference/governance-kill-switch/overview.mdx
+
+---
+title: "Overview"
+description: "Stop a registry agent on the targets of its stop plan: Databricks serving endpoints, Amazon Bedrock agent aliases and gateway virtual keys. Set each agent's stop plan, request a stop, approve or deny it, read every target's outcome, retry a failed stop and restore the agent. Needs an organization API key on an Enterprise plan with the agent registry. Reads need the governance:view permission and changes need governance:manage."
+---
+
+## Intro
+
+Stop a registry agent on the targets of its stop plan: Databricks serving endpoints, Amazon Bedrock agent aliases and gateway virtual keys. Set each agent's stop plan, request a stop, approve or deny it, read every target's outcome, retry a failed stop and restore the agent. Needs an organization API key on an Enterprise plan with the agent registry. Reads need the governance:view permission and changes need governance:manage.
+
+---
+
+# FILE: ./api-reference/governance-kill-switch/replace-an-agent-s-stop-plan.mdx
+
+---
+title: "Replace an agent's stop plan"
+openapi: "PUT /api/v1/governance/agents/{agentId}/stop-plan"
+---
+
+---
+
+# FILE: ./api-reference/governance-kill-switch/restore-a-stopped-agent.mdx
+
+---
+title: "Restore a stopped agent"
+openapi: "POST /api/v1/governance/agent-stops/{stopId}/restore"
+---
+
+---
+
+# FILE: ./api-reference/governance-kill-switch/retry-a-stop.mdx
+
+---
+title: "Retry a stop"
+openapi: "POST /api/v1/governance/agent-stops/{stopId}/retry"
+---
+
+---
+
+# FILE: ./api-reference/governance-kill-switch/stop-an-agent.mdx
+
+---
+title: "Stop an agent"
+openapi: "POST /api/v1/governance/agents/{agentId}/stop"
 ---
 
 ---
