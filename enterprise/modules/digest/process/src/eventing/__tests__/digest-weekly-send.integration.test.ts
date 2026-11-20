@@ -247,11 +247,14 @@ describe("the weekly digest send", () => {
   });
 
   describe("when a member's email cannot be rendered", () => {
-    /** @scenario "An email that cannot be rendered claims nothing and is sent on a retry" */
-    it("fails the attempt without claiming the week, so the retry mails them once", async () => {
+    beforeEach(async () => {
       await enrol();
       await arm();
       everyoneNearTheLimit();
+    });
+
+    /** @scenario "An email that cannot be rendered claims nothing and is sent on a retry" */
+    it("fails the attempt without claiming the week, so the retry mails them once", async () => {
       // No scheme: neither the template's links nor notification's unsubscribe URL accept it.
       digest.world.publicBaseUrl = "app.example.test";
 
@@ -273,9 +276,6 @@ describe("the weekly digest send", () => {
     });
 
     it("refuses by name with no public base URL, and records no send", async () => {
-      await enrol();
-      await arm();
-      everyoneNearTheLimit();
       digest.world.publicBaseUrl = "";
 
       await expect(sendFor({ userId: MEMBER, isoWeek: SENT_WEEK })).rejects.toMatchObject({

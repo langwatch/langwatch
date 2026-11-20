@@ -9,19 +9,27 @@ import type { DigestWeekService } from "./digest-week.service.ts";
 /** A member's standing when their email is sent, which may differ from the plan's. */
 export type Membership = Readonly<{ kind: "active"; admin: boolean }> | Readonly<{ kind: "gone" }>;
 
+/** No home means there was no organization to rank: an outcome of ranking, not a lookup miss. */
+export type HomeRanking =
+  | Readonly<{ kind: "home"; organizationId: string }>
+  | Readonly<{ kind: "no-home" }>;
+
 type Deps = Readonly<{
   weeks: Pick<DigestWeekService, "organizationWeek">;
   membership: (input: { organizationId: string; userId: string }) => Promise<Membership>;
   visibleWeek: (input: { week: OrganizationWeek; userId: string }) => Promise<OrganizationWeek>;
 }>;
 
+const homeRanking = (organizationId: string | undefined): HomeRanking =>
+  organizationId === undefined ? { kind: "no-home" } : { kind: "home", organizationId };
+
 /**
- * Which of a person's organizations is their home, the one that sends their weekly email.
- * Private to the send service.
+ * Which of a person's organizations is their home, the one that sends their weekly email. Used
+ * only by DigestSendService; split out so that service stays under its size ceiling.
  */
-export class DigestHomeOrganization {
-  static create(deps: Deps): DigestHomeOrganization {
-    return new DigestHomeOrganization(deps);
+export class DigestHomeOrganizationService {
+  static create(deps: Deps): DigestHomeOrganizationService {
+    return new DigestHomeOrganizationService(deps);
   }
 
   private constructor(private readonly deps: Deps) {}
@@ -46,26 +54,22 @@ export class DigestHomeOrganization {
     homeOrganizationId: string | null;
   }): Promise<boolean> {
     if (homeOrganizationId === organizationId) return true;
-    if (
-      homeOrganizationId !== null &&
-      enrolled.includes(homeOrganizationId) &&
-      (
-        await this.deps.membership({ organizationId: homeOrganizationId, userId })
-      ).kind === "active"
-    ) {
-      return false;
+    if (homeOrganizationId !== null && enrolled.includes(homeOrganizationId)) {
+      const standing = await this.deps.membership({ organizationId: homeOrganizationId, userId });
+      if (standing.kind === "active") return false;
     }
     const candidates = [organizationId];
     for (const other of enrolled.filter((id) => id !== organizationId)) {
       const standing = await this.deps.membership({ organizationId: other, userId });
       if (standing.kind === "active") candidates.push(other);
     }
-    return (await this.rankHome({ userId, isoWeek, candidates })) === organizationId;
+    const home = await this.rankHome({ userId, isoWeek, candidates });
+    return home.kind === "home" && home.organizationId === organizationId;
   }
 
   /**
    * Of the organizations a person is in, the one where their week had the most activity (lowest
-   * id on a tie); none when there are no candidates.
+   * id on a tie).
    */
   async rankHome({
     userId,
@@ -75,8 +79,8 @@ export class DigestHomeOrganization {
     userId: string;
     isoWeek: string;
     candidates: readonly string[];
-  }): Promise<string | undefined> {
-    if (candidates.length <= 1) return candidates[0];
+  }): Promise<HomeRanking> {
+    if (candidates.length <= 1) return homeRanking(candidates[0]);
     const ranked = await Promise.all(
       candidates.map(async (candidate) => ({
         organizationId: candidate,
@@ -89,6 +93,6 @@ export class DigestHomeOrganization {
         }),
       })),
     );
-    return pickHomeOrganization(ranked);
+    return homeRanking(pickHomeOrganization(ranked));
   }
 }

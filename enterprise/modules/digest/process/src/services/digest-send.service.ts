@@ -40,7 +40,11 @@ import {
   eligibleDigestTemplates,
 } from "../rules/digest-template.rules.ts";
 import { oldestKeptWeek, plannableWeek, sendableWeek } from "../rules/digest-week.rules.ts";
-import { DigestHomeOrganization, type Membership } from "./digest-home-organization.ts";
+import {
+  DigestHomeOrganizationService,
+  type HomeRanking,
+  type Membership,
+} from "./digest-home-organization.service.ts";
 import type { DigestUnsubscribeService } from "./digest-unsubscribe.service.ts";
 import type { DigestWeekService } from "./digest-week.service.ts";
 
@@ -68,7 +72,7 @@ async function requestSends({
     userId: string;
     isoWeek: string;
     candidates: readonly string[];
-  }) => Promise<string | undefined>;
+  }) => Promise<HomeRanking>;
   requestSend: (request: DigestSendRequest & { occurredAt: number }) => Promise<void>;
   isoWeek: string;
   at: number;
@@ -80,7 +84,7 @@ async function requestSends({
         if (!homes.has(member.userId)) {
           const candidates = organizationsOf.get(member.userId) ?? [organizationId];
           const home = await rankHome({ userId: member.userId, isoWeek, candidates });
-          homes.set(member.userId, home ?? null);
+          homes.set(member.userId, home.kind === "home" ? home.organizationId : null);
         }
         await requestSend({
           ...member,
@@ -145,10 +149,10 @@ export class DigestSendService {
     return new DigestSendService(deps);
   }
 
-  readonly #home: DigestHomeOrganization;
+  readonly #home: DigestHomeOrganizationService;
 
   private constructor(private readonly deps: Deps) {
-    this.#home = DigestHomeOrganization.create({
+    this.#home = DigestHomeOrganizationService.create({
       weeks: deps.weeks,
       membership: (input) => this.#membership(input),
       visibleWeek: (input) => this.#visibleWeek(input),
