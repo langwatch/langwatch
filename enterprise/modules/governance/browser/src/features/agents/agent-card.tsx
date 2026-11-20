@@ -11,6 +11,7 @@ import {
   formatAgentLastActive,
   formatAgentRequests,
 } from "./agent-figure";
+import type { AgentRowExtras } from "./agent-row-extras";
 import { AGENT_SOURCE_LABELS } from "./agent-rows";
 
 /**
@@ -21,15 +22,19 @@ import { AGENT_SOURCE_LABELS } from "./agent-rows";
 export function AgentCard({
   agent,
   sample = false,
+  extras,
 }: {
   agent: GovernanceAgentRow;
   sample?: boolean;
+  extras?: AgentRowExtras;
 }) {
+  const added = extras?.(agent);
   return (
     <Card variant="showcase" data-testid="governance-agent-card" padding="md" bodyLayout="spaced">
       <HStack gap={2} align="baseline" wrap="wrap">
         <Text fontWeight="semibold">{agent.name}</Text>
         <AgentEnvironment environment={agent.environment} />
+        {added?.status}
         <Box flex="1" />
         <Badge size="xs" variant="subtle" colorPalette="purple">
           {AGENT_SOURCE_LABELS[agent.source]}
@@ -39,6 +44,7 @@ export function AgentCard({
             sample
           </Badge>
         )}
+        {added?.actions}
       </HStack>
 
       <HStack gap={2} wrap="wrap">

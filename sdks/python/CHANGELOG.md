@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.0.1](https://github.com/langwatch/langwatch/compare/python-sdk@v2.0.0...python-sdk@v2.0.1) (2026-11-19)
+
+
+### Bug Fixes
+
+* **user:** let any key bound to a project read its identity at /api/v1/me/project ([#9703](https://github.com/langwatch/langwatch/issues/9703)) ([33de8d5](https://github.com/langwatch/langwatch/commit/33de8d55d385b30e239931c48e539b8949e3c4d4))
+
 ## [2.0.0](https://github.com/langwatch/langwatch/compare/python-sdk@v1.4.0...python-sdk@v2.0.0) (2026-11-18)
 
 

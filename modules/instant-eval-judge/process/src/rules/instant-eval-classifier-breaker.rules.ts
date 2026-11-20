@@ -10,6 +10,11 @@ export const INSTANT_EVAL_CLASSIFIER_BREAKER = {
   openAfterFailures: 16,
   /** How often one probe goes through while it is stopped. */
   probeEveryMs: 10_000,
+  /**
+   * A probe settles within the rate limiter's longest wait plus one request timeout. One still
+   * unanswered after this is presumed stuck: held-back sends spend their attempts again.
+   */
+  probeAnsweredWithinMs: 240_000,
 } as const;
 
 /**
@@ -21,7 +26,10 @@ export type ClassifierSendHealth = "down" | "up" | "neutral";
 
 export interface ClassifierBreakerState {
   readonly consecutiveFailures: number;
-  /** When it stopped sending, or last let a probe through; null while closed. */
+  /**
+   * When it stopped sending, last let a probe through, or last had a send found down while
+   * stopped (each restarts the probe interval); null while closed.
+   */
   readonly openedAt: number | null;
   /** The number of the probe still unanswered, if any. */
   readonly probeInFlight: number | null;
@@ -36,7 +44,10 @@ export const CLOSED_CLASSIFIER_BREAKER: ClassifierBreakerState = {
   probesSent: 0,
 };
 
-/** Whether this send may go out, the state once it does, and its probe number if it is one. */
+/**
+ * Whether this send may go out, the state once it does, and its probe number if it is one.
+ * `isAwaitingProbe` says a held-back send waits on a probe still unanswered and not overdue.
+ */
 export function classifierBreakerAllowsSend({
   state,
   now,
@@ -47,17 +58,23 @@ export function classifierBreakerAllowsSend({
   readonly isAllowed: boolean;
   readonly state: ClassifierBreakerState;
   readonly probe: number | null;
+  readonly isAwaitingProbe: boolean;
 } {
-  if (state.openedAt === null) return { isAllowed: true, state, probe: null };
-  const { probeEveryMs } = INSTANT_EVAL_CLASSIFIER_BREAKER;
+  if (state.openedAt === null) {
+    return { isAllowed: true, state, probe: null, isAwaitingProbe: false };
+  }
+  const { probeEveryMs, probeAnsweredWithinMs } = INSTANT_EVAL_CLASSIFIER_BREAKER;
   if (state.probeInFlight !== null || now - state.openedAt < probeEveryMs) {
-    return { isAllowed: false, state, probe: null };
+    const isAwaitingProbe =
+      state.probeInFlight !== null && now - state.openedAt < probeAnsweredWithinMs;
+    return { isAllowed: false, state, probe: null, isAwaitingProbe };
   }
   const probe = state.probesSent + 1;
   return {
     isAllowed: true,
     state: { ...state, openedAt: now, probeInFlight: probe, probesSent: probe },
     probe,
+    isAwaitingProbe: false,
   };
 }
 

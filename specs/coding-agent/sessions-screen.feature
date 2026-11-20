@@ -343,6 +343,20 @@ Rule: Clicking a session replays it in the terminal
     Then the session's terminal replay opens
 
   @integration
+  Scenario: A session whose traces are filed under its launcher's thread still replays
+    Given a session launched by a tool that names each trace's conversation after its own thread
+    When the user chooses its row
+    Then the session's latest stored trace opens in the terminal replay
+    And the reader is not told that nothing was stored
+
+  @unit
+  Scenario: The session's latest stored trace is found through its own trace map
+    Given a session whose traces were mapped to it as they arrived
+    When the latest turn of the session is asked for
+    Then the newest mapped trace is answered with the time it occurred
+    And a session with no mapped trace answers nothing
+
+  @integration
   Scenario: Leaving the replay returns to the table as it was
     Given an open terminal replay reached from the table
     When the user closes it
@@ -393,6 +407,41 @@ Rule: A session can be replayed from wherever it is listed
     When the user chooses it
     Then they are told the session stored none of its turns
     And no replay opens
+
+Rule: A link can open a session's replay on the Sessions page
+
+  Another tool (Laze's Investigate button) links straight to one session. The
+  link adds `session=<id>`, or `sessionName=<name>` for the newest session with
+  that name, to `/<project>/sessions`. It combines with `langy=open` and
+  `langyPrompt=<text>` to have Langy ready with a question about the session.
+
+  @integration
+  Scenario: A session link opens that session's terminal replay
+    Given a listed session "session-1"
+    When the user opens the Sessions page with "session=session-1"
+    Then the session's terminal replay opens
+    And the address no longer has "session"
+
+  @integration
+  Scenario: A session name link opens the newest session with that name
+    Given two listed sessions named "Scout", the newer one updated last
+    When the user opens the Sessions page with "sessionName=Scout"
+    Then the newer session's terminal replay opens
+
+  @integration
+  Scenario: A link to a session that is not listed says so
+    Given no listed session is named "Ghost"
+    When the user opens the Sessions page with "sessionName=Ghost"
+    Then they are told the session is not listed here
+    And no replay opens
+    And the address no longer has "sessionName"
+
+  @unit
+  Scenario: A session link keeps the Langy question beside it
+    Given a link with "session=session-1", "langy=open" and "langyPrompt=Why so many tokens?"
+    When the session link is applied
+    Then only "session" is removed from the address
+    And "langy" and "langyPrompt" stay for Langy to apply
 
 Rule: A helper thread the agent ran for itself is not a session
 

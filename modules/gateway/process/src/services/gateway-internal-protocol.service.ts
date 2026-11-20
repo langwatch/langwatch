@@ -25,7 +25,7 @@ import {
   type GatewayPricedSpendResult,
   type GatewayInternalSpendSubmission,
   type VirtualKeyWithScopes,
-  type GatewayVirtualKeyRecord,
+  type GatewayPresentedVirtualKey,
 } from "@langwatch/gateway-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
@@ -103,7 +103,7 @@ export class GatewayInternalProtocolService implements GatewayInternalProtocol {
     return new GatewayInternalProtocolService(members);
   }
 
-  findVirtualKeyBySecret(secret: string): Promise<GatewayVirtualKeyRecord | null> {
+  findVirtualKeyBySecret(secret: string): Promise<GatewayPresentedVirtualKey | null> {
     return this.#members.virtualKeys.findBySecretInternal(secret);
   }
 

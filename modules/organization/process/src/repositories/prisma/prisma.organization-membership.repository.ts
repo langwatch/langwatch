@@ -26,6 +26,7 @@ import {
   OrganizationSlugTakenError,
   ORGANIZATION_KIND,
   auditImpersonationMetadataSchema,
+  auditTargetNameMetadataSchema,
 } from "@langwatch/organization-contract";
 import type {
   FullyLoadedOrganization,
@@ -2573,6 +2574,7 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
         source: isGateway ? "gateway" : "platform",
         targetKind: log.targetKind,
         targetId: log.targetId,
+        targetName: auditTargetNameMetadataSchema.safeParse(log.metadata).data?.targetName ?? null,
         before: log.before,
         after: log.after,
         actorUserId: actorIds.get(log.id) ?? null,
