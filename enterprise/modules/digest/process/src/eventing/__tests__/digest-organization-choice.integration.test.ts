@@ -7,6 +7,7 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import type { RenderedDigestMail } from "../../channels/digest-mail.channel.ts";
 import {
   ADMIN,
   emailOf,
@@ -38,6 +39,10 @@ const arm = () => digest.repositories.audience.setArmed({ armed: true });
 
 const sendIn = ({ userId, organizationId }: { userId: string; organizationId: string }) =>
   digest.carryOut({ userId, organizationId, isoWeek: SENT_WEEK, admin: false, at: WAKE_AT });
+
+/** The week's trace count an email shows; only the traces-week template shows one. */
+const tracesOf = (mail: RenderedDigestMail) =>
+  mail.templateId === "digest-traces-week" ? tracesOf(mail) : undefined;
 
 /** The send intents asked so far, waited for since the plan's requests become intents async. */
 async function asked(expected: number) {
@@ -84,7 +89,7 @@ describe("a member of two enrolled organizations", () => {
 
       for (const organizationId of order) await sendIn({ userId: MEMBER, organizationId });
 
-      expect(digest.mail.map((mail) => [mail.to, mail.props.traces])).toEqual([
+      expect(digest.mail.map((mail) => [mail.to, tracesOf(mail)])).toEqual([
         [emailOf(MEMBER), 5_000],
       ]);
     });
@@ -115,7 +120,7 @@ describe("a member of two enrolled organizations", () => {
 
       await sendIn({ userId: MEMBER, organizationId: ORGANIZATION });
 
-      expect(digest.mail.map((mail) => mail.props.traces)).toEqual([1_200]);
+      expect(digest.mail.map((mail) => tracesOf(mail))).toEqual([1_200]);
     });
   });
 
@@ -148,7 +153,7 @@ describe("a member of two enrolled organizations", () => {
       });
       await digest.carryOut(first);
 
-      expect(digest.mail.map((mail) => [mail.to, mail.props.traces])).toEqual([
+      expect(digest.mail.map((mail) => [mail.to, tracesOf(mail)])).toEqual([
         [emailOf(MEMBER), 5_000],
       ]);
     });
@@ -162,7 +167,7 @@ describe("a member of two enrolled organizations", () => {
 
       await digest.carryOut(first);
 
-      expect(digest.mail.map((mail) => [mail.to, mail.props.traces])).toEqual([
+      expect(digest.mail.map((mail) => [mail.to, tracesOf(mail)])).toEqual([
         [emailOf(MEMBER), 1_200],
       ]);
     });

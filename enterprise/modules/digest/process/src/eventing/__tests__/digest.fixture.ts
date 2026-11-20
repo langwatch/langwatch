@@ -29,6 +29,7 @@ import {
   type IntentContext,
 } from "@langwatch/eventing";
 import { EventStoreMemory } from "@langwatch/eventing/testing";
+import { ReactEmailMailRenderer } from "@langwatch/mail";
 import { MemberNotFoundError } from "@langwatch/organization-contract";
 import {
   SIMULATION_EVENT_VERSIONS,
@@ -229,12 +230,12 @@ export function installDigest(
       },
     }),
     organizations: {
-      listMembers: async ({ organizationId }) => {
+      listMembers: async ({ organizationId, offset = 0, limit = Number.POSITIVE_INFINITY }) => {
         if (world.failingOrganizations.has(organizationId)) {
           throw new Error(`${organizationId} cannot be read`);
         }
         const members = membersIn(organizationId);
-        return { members, totalCount: members.length };
+        return { members: members.slice(offset, offset + limit), totalCount: members.length };
       },
       getMember: async ({ organizationId, userId }) => {
         const members = membersIn(organizationId);
@@ -264,6 +265,7 @@ export function installDigest(
     },
     users,
     mail,
+    renderer: ReactEmailMailRenderer.create(),
     unsubscribes,
     get publicBaseUrl() {
       return world.publicBaseUrl;
@@ -285,10 +287,7 @@ export function installDigest(
     }),
   );
   commands.connectActivity(fold.commands);
-  const sendDefinition = buildDigestSendPipeline({
-    runner: sends,
-    deleteDispatchedBefore: (params) => processStore.deleteDispatchedBefore(params),
-  });
+  const sendDefinition = buildDigestSendPipeline({ runner: sends });
   commands.connectSend(eventing.register(sendDefinition).commands);
   const owner = eventing.register(ownerStandIn());
 
@@ -394,6 +393,8 @@ export function installDigest(
     /** An operator's test of a member's last week, as the app asks it once ops admitted them. */
     sendTest: (input: { organizationId: string; userId: string; operatorId: string }) =>
       sends.sendTest(input),
+    /** An organization's active roster, as the plan reads it page by page. */
+    members: (input: { organizationId: string }) => sends.members(input),
     /** One fact on a project's week, through digest's own record command. */
     recordProject: (activity: ProjectActivity) => commands.recordProject(activity),
     ownerFact,

@@ -187,6 +187,23 @@ describe("the weekly digest send", () => {
     });
   });
 
+  describe("when an enrolled organization has more members than one page of its roster", () => {
+    /** @scenario "Each enrolled member gets one email a week" */
+    it("reads every page and stops after the short last one", async () => {
+      // One past the 500-member page: the second page holds a single member.
+      digest.world.members = Array.from({ length: 501 }, (_, index) => ({
+        userId: `member-${index}`,
+        role: "MEMBER",
+        disabledAt: null,
+      }));
+
+      const members = await digest.members({ organizationId: ORGANIZATION });
+
+      expect(members).toHaveLength(501);
+      expect(members.at(-1)).toEqual({ userId: "member-500", admin: false });
+    });
+  });
+
   describe("when the send is armed early on Monday, before 08:00 UTC", () => {
     beforeEach(async () => {
       await enrol();

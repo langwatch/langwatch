@@ -7,7 +7,8 @@ import {
   type DigestServerConfig,
 } from "@langwatch/enterprise-digest-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
-import type { EventingCommands, ProcessStore } from "@langwatch/eventing";
+import type { EventingCommands } from "@langwatch/eventing";
+import { ReactEmailMailRenderer } from "@langwatch/mail";
 import { OpsApi } from "@langwatch/ops-contract";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import type { FeatureSetup } from "@langwatch/process";
@@ -133,6 +134,7 @@ export class DigestModule implements DigestApiContract {
       access: dependencies.authz,
       users: dependencies.users,
       mail: channels.mail,
+      renderer: ReactEmailMailRenderer.create(),
       unsubscribes,
       publicBaseUrl: config.publicBaseUrl,
       requestSend: (request) => commands.requestSend(request),
@@ -166,12 +168,9 @@ export class DigestModule implements DigestApiContract {
     this.#commands.connectActivity(commands);
   }
 
-  /** The send pipeline `digest_send`; the hosting process lends the store its plan rows prune. */
-  sendPipeline({ processStore }: { processStore: ProcessStore }): DigestSendPipeline {
-    return buildDigestSendPipeline({
-      runner: this.#sends,
-      deleteDispatchedBefore: (params) => processStore.deleteDispatchedBefore(params),
-    });
+  /** The send pipeline `digest_send`. */
+  sendPipeline(): DigestSendPipeline {
+    return buildDigestSendPipeline({ runner: this.#sends });
   }
 
   connectSendCommands(commands: EventingCommands<DigestSendPipeline>): void {

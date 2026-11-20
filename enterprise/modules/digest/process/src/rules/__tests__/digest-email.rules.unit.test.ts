@@ -42,7 +42,7 @@ function parsedBy({
   props,
 }: {
   templateId: string;
-  props: DigestTemplateProps | undefined;
+  props: DigestTemplateProps["props"] | undefined;
 }) {
   const template = mailTemplates.find((candidate) => candidate.id === templateId);
   if (!template || !props) throw new Error(`no ${templateId} props to parse`);
@@ -61,18 +61,16 @@ function propsFor({
   const pick = pickDigestTemplate(
     digestTemplateInput({ week: organizationWeek, userId: "u", admin }),
   );
-  return {
+  const built = buildDigestTemplateProps({
     pick,
-    props: buildDigestTemplateProps({
-      pick,
-      week: organizationWeek,
-      userId: "u",
-      names,
-      baseUrl: BASE,
-      unsubscribeUrl: UNSUBSCRIBE,
-      now: NOW,
-    }),
-  };
+    week: organizationWeek,
+    userId: "u",
+    names,
+    baseUrl: BASE,
+    unsubscribeUrl: UNSUBSCRIBE,
+    now: NOW,
+  });
+  return { pick, props: built?.props };
 }
 
 function week(overrides: Partial<OrganizationWeek> = {}): OrganizationWeek {

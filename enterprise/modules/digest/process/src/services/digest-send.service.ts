@@ -34,7 +34,11 @@ import {
   pickFocusProject,
   weekVisibleTo,
 } from "../rules/digest-email.rules.ts";
-import { DIGEST_UNSUBSCRIBE_PATH, renderDigestMail } from "../rules/digest-mail.rules.ts";
+import {
+  DIGEST_UNSUBSCRIBE_PATH,
+  type DigestMailRender,
+  renderDigestMail,
+} from "../rules/digest-mail.rules.ts";
 import {
   type DigestTemplatePick,
   eligibleDigestTemplates,
@@ -125,6 +129,8 @@ type Deps = Readonly<{
   /** The address an email goes to, read when it is sent and never stored. */
   users: Pick<UserApi, "findById">;
   mail: DigestMailChannel;
+  /** The digest templates' renders, injected so react-email stays at the app's composition. */
+  renderer: DigestMailRender;
   unsubscribes: Pick<DigestUnsubscribeService, "token">;
   /** The deployment's public origin; absent, a send refuses by name, since no link could work. */
   publicBaseUrl: string | undefined;
@@ -134,8 +140,7 @@ type Deps = Readonly<{
 
 /** One email ready to hand to the mail channel. */
 type Composed = Readonly<{
-  pick: DigestTemplatePick;
-  props: DigestTemplateProps;
+  template: DigestTemplateProps;
   oneClick: string;
 }>;
 
@@ -264,12 +269,14 @@ export class DigestSendService {
     // Rendered and checked before the claim: a refusal fails this attempt and leaves the week
     // unclaimed, so the retry can still send it.
     const rendered = await renderDigestMail({
-      to: user.email,
-      templateId: composed.pick.template,
-      props: composed.props,
-      oneClickUnsubscribeUrl: composed.oneClick,
-      idempotencyKey: digestMessageId({ userId, isoWeek }),
-      test: false,
+      mail: {
+        ...composed.template,
+        to: user.email,
+        oneClickUnsubscribeUrl: composed.oneClick,
+        idempotencyKey: digestMessageId({ userId, isoWeek }),
+        test: false,
+      },
+      renderer: this.deps.renderer,
     });
     // Claimed before the mailer is called, since SMTP does not dedupe a retry: a failure past
     // the claim loses this week's email rather than risk sending it twice (ADR-001).
@@ -277,7 +284,7 @@ export class DigestSendService {
       userId,
       organizationId,
       isoWeek,
-      templateId: composed.pick.template,
+      templateId: composed.template.templateId,
       sentAt: this.deps.now(),
     });
     if (!claimed) return skip("another attempt claimed the week");
@@ -324,11 +331,13 @@ export class DigestSendService {
     if (!composed) throw new DigestNothingToSendError(userId);
     await this.deps.mail.send(
       await renderDigestMail({
-        to: operator.email,
-        templateId: composed.pick.template,
-        props: composed.props,
-        oneClickUnsubscribeUrl: composed.oneClick,
-        test: true,
+        mail: {
+          ...composed.template,
+          to: operator.email,
+          oneClickUnsubscribeUrl: composed.oneClick,
+          test: true,
+        },
+        renderer: this.deps.renderer,
       }),
     );
   }
@@ -411,7 +420,7 @@ export class DigestSendService {
     // The first eligible template whose props build: one that cannot (a name not found) must
     // not cost the member the email a lower-ranked template could send.
     for (const pick of eligibleDigestTemplates(digestTemplateInput({ week, ...member }))) {
-      const props = buildDigestTemplateProps({
+      const template = buildDigestTemplateProps({
         pick,
         week,
         userId: member.userId,
@@ -420,7 +429,7 @@ export class DigestSendService {
         unsubscribeUrl,
         now: this.deps.now(),
       });
-      if (props) return { pick, props, oneClick: unsubscribeUrl };
+      if (template) return { template, oneClick: unsubscribeUrl };
     }
     return null;
   }

@@ -9,7 +9,6 @@ import {
   definePipeline,
   type EventingSetup,
 } from "@langwatch/eventing";
-import { nowEpochMs } from "@langwatch/time";
 
 import type { DigestModule } from "../app/digest.app.ts";
 import type { DigestRepositories } from "../repositories/digest.repositories.ts";
@@ -19,7 +18,6 @@ import {
   DIGEST_SEND_PIPELINE_NAME,
   DigestSendRequestedEventSchema,
 } from "./digest-send.events.ts";
-import { runDigestPlan } from "./digest-send.intent.ts";
 import {
   DIGEST_MEMBER_SEND_INITIAL_STATE,
   DIGEST_MEMBER_SEND_PROCESS_NAME,
@@ -49,10 +47,7 @@ export interface DigestSendRunner {
   sendDigest(input: SendDigestIntent): Promise<void>;
 }
 
-function digestSend(deps: {
-  runner: DigestSendRunner;
-  deleteDispatchedBefore: (params: { processName: string; before: number }) => Promise<number>;
-}) {
+function digestSend(deps: { runner: DigestSendRunner }) {
   return definePipeline({
     name: DIGEST_SEND_PIPELINE_NAME,
     aggregate: defineAggregate({ type: DIGEST_SEND_AGGREGATE_TYPE }),
@@ -64,15 +59,8 @@ function digestSend(deps: {
         .state(digestPlanStateSchema, DIGEST_PLAN_INITIAL_STATE)
         .schedule({ everyMs: DIGEST_PLAN_INTERVAL_MS })
         .onWake(digestPlanWake)
-        .intent(
-          "planWeek",
-          planWeekIntentSchema,
-          runDigestPlan({
-            planWeek: (plan) => deps.runner.planWeek(plan),
-            deleteDispatchedBefore: deps.deleteDispatchedBefore,
-            now: nowEpochMs,
-          }),
-        )
+        // Its dispatched rows are reaped by the platform's process retention sweep.
+        .intent("planWeek", planWeekIntentSchema, (plan) => deps.runner.planWeek(plan))
         .outbox({ leaseDurationMs: PLAN_LEASE_MS, concurrency: 1, batchSize: 1, maxAttempts: 3 }),
     )
     .withProcessManager(DIGEST_MEMBER_SEND_PROCESS_NAME, (pm) =>
@@ -99,7 +87,6 @@ export function buildDigestSendPipeline(
 
 export const digestSendEventing = defineEventingModule({
   pipeline: DIGEST_SEND_PIPELINE_NAME,
-  build: ({ app, processStore }: EventingSetup<DigestRepositories, DigestModule>) =>
-    app.sendPipeline({ processStore }),
+  build: ({ app }: EventingSetup<DigestRepositories, DigestModule>) => app.sendPipeline(),
   connect: ({ app, commands }) => app.connectSendCommands(commands),
 });

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-import { mailTemplates, renderMailTemplate } from "@langwatch/mail";
+import type { MailRender } from "@langwatch/mail";
 import { sendEmailCommandSchema } from "@langwatch/notification-contract";
 
 import type { DigestMail, RenderedDigestMail } from "../channels/digest-mail.channel.ts";
@@ -10,19 +10,31 @@ import type { DigestMail, RenderedDigestMail } from "../channels/digest-mail.cha
  */
 export const DIGEST_UNSUBSCRIBE_PATH = "/api/digest/unsubscribe";
 
+/** The digest's own renders on `@langwatch/mail`'s `MailRender`, one per template that sends. */
+export type DigestMailRender = Pick<
+  MailRender,
+  | "renderDigestPlanPressure"
+  | "renderDigestScenariosTrend"
+  | "renderDigestCodingAgentWeek"
+  | "renderDigestTracesWeek"
+>;
+
 /**
- * Renders a composed digest email with its `@langwatch/mail` template and parses the command
+ * Renders a composed digest email through the injected `MailRender` and parses the command
  * notification will take. Everything that can refuse the email short of the mailer refuses it
  * here, so a send can do this before it claims the week and a refusal leaves the week unclaimed.
  *
  * @throws when the template's own schema refuses the props, or notification's command schema
  *   refuses the envelope (an unsubscribe address that is not a URL, say).
  */
-export async function renderDigestMail(mail: DigestMail): Promise<RenderedDigestMail> {
-  const template = mailTemplates.find((candidate) => candidate.id === mail.templateId);
-  if (!template) throw new Error(`@langwatch/mail holds no ${mail.templateId} template`);
-  // The rendered plain-text part is left behind: `SendEmailCommand` is strict and takes none.
-  const { subject, html } = await renderMailTemplate(template, mail.props);
+export async function renderDigestMail({
+  mail,
+  renderer,
+}: {
+  mail: DigestMail;
+  renderer: DigestMailRender;
+}): Promise<RenderedDigestMail> {
+  const { subject, html } = await renderTemplate({ mail, renderer });
   const email = sendEmailCommandSchema.parse({
     to: mail.to,
     subject: mail.test ? `[Test] ${subject}` : subject,
@@ -31,4 +43,23 @@ export async function renderDigestMail(mail: DigestMail): Promise<RenderedDigest
     ...(mail.idempotencyKey === undefined ? {} : { idempotencyKey: mail.idempotencyKey }),
   });
   return { ...mail, email };
+}
+
+function renderTemplate({
+  mail,
+  renderer,
+}: {
+  mail: DigestMail;
+  renderer: DigestMailRender;
+}): Promise<{ subject: string; html: string }> {
+  switch (mail.templateId) {
+    case "digest-plan-pressure":
+      return renderer.renderDigestPlanPressure(mail.props);
+    case "digest-scenarios-trend":
+      return renderer.renderDigestScenariosTrend(mail.props);
+    case "digest-coding-agent-week":
+      return renderer.renderDigestCodingAgentWeek(mail.props);
+    case "digest-traces-week":
+      return renderer.renderDigestTracesWeek(mail.props);
+  }
 }

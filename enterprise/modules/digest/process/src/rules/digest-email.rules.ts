@@ -1,6 +1,12 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /** What one person's weekly email says: the template input, and the picked template's props. */
 import type { UsageStats } from "@langwatch/entitlement-contract";
+import type {
+  DigestCodingAgentWeekProps,
+  DigestPlanPressureProps,
+  DigestScenariosTrendProps,
+  DigestTracesWeekProps,
+} from "@langwatch/mail";
 
 import type { DigestTemplateInput, DigestTemplatePick } from "./digest-template.rules.ts";
 import {
@@ -15,8 +21,15 @@ import {
   weeksBefore,
 } from "./digest-week.rules.ts";
 
-/** A template's props, as `@langwatch/mail`'s digest-*.tsx schema reads them. */
-export type DigestTemplateProps = Readonly<Record<string, unknown>>;
+/**
+ * A template that has something to send and its props, typed by `@langwatch/mail`'s own props
+ * type. "What's new" is absent: it never sends until its card is published.
+ */
+export type DigestTemplateProps =
+  | Readonly<{ templateId: "digest-plan-pressure"; props: DigestPlanPressureProps }>
+  | Readonly<{ templateId: "digest-scenarios-trend"; props: DigestScenariosTrendProps }>
+  | Readonly<{ templateId: "digest-coding-agent-week"; props: DigestCodingAgentWeekProps }>
+  | Readonly<{ templateId: "digest-traces-week"; props: DigestTracesWeekProps }>;
 
 /** The names an email shows, read from their owners when it is rendered and never stored. */
 export type DigestNames = Readonly<{
@@ -159,9 +172,9 @@ export function digestTemplateInput({
 }
 
 /**
- * The picked template's props (`@langwatch/mail` digest-*.tsx), links built on the deployment's
- * origin; none when the template has nothing to show, so nothing is sent. "What's new" has no
- * published card yet (the update editor is not built), so it never sends.
+ * The picked template with its props (`@langwatch/mail` digest-*.tsx), links built on the
+ * deployment's origin; none when the template has nothing to show, so nothing is sent. "What's
+ * new" has no published card yet (the update editor is not built), so it never sends.
  */
 export function buildDigestTemplateProps({
   pick,
@@ -183,14 +196,28 @@ export function buildDigestTemplateProps({
 }): DigestTemplateProps | undefined {
   const common = { weekLabel: weekLabel(week.isoWeek), unsubscribeUrl };
   switch (pick.template) {
-    case "digest-plan-pressure":
-      return buildPlanPressureProps({ week, names, baseUrl, now, common });
-    case "digest-scenarios-trend":
-      return buildScenariosTrendProps({ week, names, baseUrl, direction: pick.direction, common });
-    case "digest-coding-agent-week":
-      return buildCodingAgentWeekProps({ user: week.users.get(userId), baseUrl, common });
-    case "digest-traces-week":
-      return buildTracesWeekProps({ week, names, baseUrl, common });
+    case "digest-plan-pressure": {
+      const props = buildPlanPressureProps({ week, names, baseUrl, now, common });
+      return props && { templateId: pick.template, props };
+    }
+    case "digest-scenarios-trend": {
+      const props = buildScenariosTrendProps({
+        week,
+        names,
+        baseUrl,
+        direction: pick.direction,
+        common,
+      });
+      return props && { templateId: pick.template, props };
+    }
+    case "digest-coding-agent-week": {
+      const props = buildCodingAgentWeekProps({ user: week.users.get(userId), baseUrl, common });
+      return props && { templateId: pick.template, props };
+    }
+    case "digest-traces-week": {
+      const props = buildTracesWeekProps({ week, names, baseUrl, common });
+      return props && { templateId: pick.template, props };
+    }
     case "digest-whats-new":
       return undefined;
   }
@@ -208,7 +235,7 @@ function buildPlanPressureProps({
   baseUrl: string;
   now: number;
   common: CommonProps;
-}): DigestTemplateProps | undefined {
+}): DigestPlanPressureProps | undefined {
   const usage = week.planUsage;
   if (!usage || !names.organizationName) return undefined;
   return {
@@ -237,7 +264,7 @@ function buildScenariosTrendProps({
   baseUrl: string;
   direction: Extract<DigestTemplatePick, { template: "digest-scenarios-trend" }>["direction"];
   common: CommonProps;
-}): DigestTemplateProps | undefined {
+}): DigestScenariosTrendProps | undefined {
   const focus = pickFocusProject(week);
   const project = names.project;
   if (!focus || !project || focus.scenarios.runs === 0) return undefined;
@@ -268,7 +295,7 @@ function buildCodingAgentWeekProps({
   user: UserWeekState | undefined;
   baseUrl: string;
   common: CommonProps;
-}): DigestTemplateProps | undefined {
+}): DigestCodingAgentWeekProps | undefined {
   if (!user) return undefined;
   const totals = userWeekTotals(user);
   if (totals.sessions === 0) return undefined;
@@ -299,7 +326,7 @@ function buildTracesWeekProps({
   names: DigestNames;
   baseUrl: string;
   common: CommonProps;
-}): DigestTemplateProps | undefined {
+}): DigestTracesWeekProps | undefined {
   const focus = pickFocusProject(week);
   const project = names.project;
   if (!focus || !project || focus.traces === 0) return undefined;
@@ -317,7 +344,7 @@ function tracesWeekNumbers({
 }: {
   week: OrganizationWeek;
   focus: ProjectWeekState;
-}): DigestTemplateProps {
+}): Omit<DigestTracesWeekProps, keyof CommonProps | "whatsNew" | "projectName" | "tracesUrl"> {
   const [lastWeek] = weeksBefore({ isoWeek: week.isoWeek, count: 1 });
   const previous = week.history.find(
     (fold) => fold.projectId === focus.projectId && fold.isoWeek === lastWeek,
