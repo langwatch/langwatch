@@ -396,6 +396,13 @@ Feature: Authorization grants
     Then the write is reported as done
 
   @unit
+  Scenario: A retry is confirmed by the earlier attempt's landed append
+    Given a write that failed with "authz_grant_not_confirmed" because its fold lands after the window
+    When it is retried after, or while, the earlier attempt's append lands
+    Then the retry is confirmed by that append, without waiting for its own
+    And a skipping attach reports the earlier grant as a duplicate and only that grant stands
+
+  @unit
   Scenario: A role definition is confirmed by the canonical Role projection
     Given a canonical Role row with the requested name and permissions
     When the role definition is written

@@ -8,13 +8,10 @@ import { HandledError } from "@langwatch/handled-error";
 import { toDate } from "@langwatch/time";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import {
-  type AuthzAuditRow,
-  AuthzAuditTrailRepository,
-} from "../../repositories/authz-audit-trail.repository.ts";
 import { grantFactToRow } from "../../repositories/prisma/prisma.authz-grant.mapper.ts";
 import { DefineRoleCommand } from "../authz-grant.commands.ts";
 import { EventingAuthzAuditAdapter } from "../authz-grant.subscriber.ts";
+import { KeyedAuditTrailStore } from "./support/authz-audit-trail.stub.ts";
 import { ACTOR, binding, harness, ORG_ID } from "./support/eventing.authz-ledger-fork.harness.ts";
 
 /** A Grant row as Postgres returns it: Dates where the mapped shape holds Instants. */
@@ -399,15 +396,6 @@ describe("given a role deletion", () => {
     });
   });
 });
-
-/** An audit store that keeps the first row per id, as the Prisma insert's skipDuplicates does. */
-class KeyedAuditTrailStore extends AuthzAuditTrailRepository {
-  readonly rows = new Map<string, AuthzAuditRow>();
-
-  async insert(row: AuthzAuditRow): Promise<void> {
-    if (!this.rows.has(row.id)) this.rows.set(row.id, row);
-  }
-}
 
 describe("given an api key's own role defined again", () => {
   const apiKeyRole = {

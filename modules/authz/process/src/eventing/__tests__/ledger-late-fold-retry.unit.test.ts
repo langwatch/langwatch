@@ -156,6 +156,7 @@ describe.each(FOLD_LAGS_MS)(
   "given a fold that lands each append %i ms after the read-your-writes window",
   (lag) => {
     describe("when a role definition is retried after the first try's event landed", () => {
+      /** @scenario "A retry is confirmed by the earlier attempt's landed append" */
       it("times out on the first try, then the retry is confirmed at once by the landed role", async () => {
         const { writer, memory } = ledger(lag);
 
@@ -181,10 +182,13 @@ describe.each(FOLD_LAGS_MS)(
 
       beforeEach(async () => {
         ({ writer, memory } = ledger(lag));
-        track(writer.attachBindings(attach("rb_first")));
+        const first = track(writer.attachBindings(attach("rb_first")));
         await elapse(WINDOW_MS + 500);
+        expect(first.error).toBeInstanceOf(AuthzGrantNotConfirmedError);
+        expect(memory.grants).toHaveLength(0);
       });
 
+      /** @scenario "A retry is confirmed by the earlier attempt's landed append" */
       it("returns at once as a duplicate once the earlier append has landed", async () => {
         await elapse(lag);
         expect(memory.grants.map((row) => row.id)).toEqual(["rb_first"]);
@@ -196,6 +200,7 @@ describe.each(FOLD_LAGS_MS)(
         expect(retry.value).toEqual({ attached: [], duplicates: ["rb_first"] });
       });
 
+      /** @scenario "A retry is confirmed by the earlier attempt's landed append" */
       it("is confirmed by the earlier attempt once that one lands inside the retry's window", async () => {
         // Called 7 s before the first append lands, so that lands inside the retry's own window
         // while the retry's own append lands a full fold later.

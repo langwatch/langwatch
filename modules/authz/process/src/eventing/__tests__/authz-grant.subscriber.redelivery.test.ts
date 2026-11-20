@@ -9,24 +9,13 @@ import { createTenantId } from "@langwatch/eventing";
 import { describe, expect, it } from "vitest";
 
 import {
-  AuthzAuditTrailRepository,
-  type AuthzAuditRow,
-} from "../../repositories/authz-audit-trail.repository.ts";
-import {
   AUTHZ_GRANT_AGGREGATE_TYPE,
   type GrantAttachedEvent,
   type RoleDefinedEvent,
   type RoleDeletedEvent,
 } from "../authz-grant.events.ts";
 import { EventingAuthzAuditAdapter } from "../authz-grant.subscriber.ts";
-
-class KeyedAuditTrailStore extends AuthzAuditTrailRepository {
-  readonly rows = new Map<string, AuthzAuditRow>();
-
-  async insert(row: AuthzAuditRow): Promise<void> {
-    if (!this.rows.has(row.id)) this.rows.set(row.id, row);
-  }
-}
+import { KeyedAuditTrailStore } from "./support/authz-audit-trail.stub.ts";
 
 const roleDeleted: RoleDeletedEvent = {
   id: "evt_role_deleted",
