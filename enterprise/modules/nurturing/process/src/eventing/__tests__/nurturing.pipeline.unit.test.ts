@@ -47,6 +47,9 @@ import { describe, expect, it, vi } from "vitest";
  */
 import { HttpCustomerIoChannel } from "../../channels/http/http.customer-io.channel.ts";
 import { MemoryPostHogChannel } from "../../channels/memory/memory.posthog.channel.ts";
+import { MemoryNurturingErasedUserRepository } from "../../repositories/memory/memory.nurturing-erased-user.repository.ts";
+import { MemoryNurturingOrganizationMemberRepository } from "../../repositories/memory/memory.nurturing-organization-member.repository.ts";
+import { MemoryNurturingOrganizationPlanRepository } from "../../repositories/memory/memory.nurturing-organization-plan.repository.ts";
 import { postHogUuidFor } from "../../rules/nurturing-guided-onboarding-service.rules.ts";
 import { unplacedMemberFacts } from "../../services/__tests__/nurturing-member-facts.test-helpers.ts";
 import { NurturingDeliveryService } from "../../services/nurturing-delivery.service.ts";
@@ -96,8 +99,12 @@ function nurturingOverMemoryPostHog(users: UserApi = createApiFixture<UserApi>({
       new Response(null, { status: 200 }),
   );
   const seen = new Set<string>();
+  const erasedUsers = MemoryNurturingErasedUserRepository.create();
   const delivery = NurturingDeliveryService.create({
+    erasedUsers,
     memberFacts: unplacedMemberFacts(),
+    members: MemoryNurturingOrganizationMemberRepository.create(),
+    plans: MemoryNurturingOrganizationPlanRepository.create(),
     claims: {
       claim: async (key: string) => !seen.has(key) && Boolean(seen.add(key)),
       release: async (key: string) => void seen.delete(key),
@@ -122,6 +129,8 @@ function nurturingOverMemoryPostHog(users: UserApi = createApiFixture<UserApi>({
     recordPersonalOwner: async () => undefined,
     recordTracedProject: async () => undefined,
     forgetErasedUser: async () => undefined,
+    virtualKeyCreated: async () => undefined,
+    keyBudgetCrossed: async () => undefined,
   });
   const subscribers: EventSubscriberDefinition<Event>[] = [];
   const registry = createApiFixture<
@@ -136,7 +145,7 @@ function nurturingOverMemoryPostHog(users: UserApi = createApiFixture<UserApi>({
       await subscriber.handle(event, { tenantId: event.tenantId, aggregateId: event.aggregateId });
     }
   };
-  return { posthog, customerIoFetch, subscribers, deliverFact };
+  return { posthog, customerIoFetch, subscribers, deliverFact, erasedUsers };
 }
 
 function userFact(type: string): Event {
@@ -553,6 +562,18 @@ describe("nurturing's guidedOnboardingTurnFailed peer subscriber", () => {
       });
     });
 
+    /** @scenario "A failed guided turn of an erased user is not tracked" */
+    it("tracks nothing for a user erased before the fact lands", async () => {
+      const { posthog, customerIoFetch, deliverFact, erasedUsers } = nurturingOverMemoryPostHog();
+      await erasedUsers.markErased({ userId: "user-1" });
+
+      await deliverFact(turnFailedFact());
+      await settle();
+
+      expect(posthog.tracked).toEqual([]);
+      expect(customerIoFetch).not.toHaveBeenCalled();
+    });
+
     /** @scenario "A redelivered failed-turn fact is tracked once" */
     it("tracks one event for a fact delivered twice, under one uuid per source event", async () => {
       const { posthog, deliverFact } = nurturingOverMemoryPostHog();
@@ -629,11 +650,14 @@ describe("nurturing's usageReportReceived peer subscriber", () => {
     it("sends nothing and claims nothing", async () => {
       const claim = vi.fn(async () => true);
       const delivery = NurturingDeliveryService.create({
+        erasedUsers: MemoryNurturingErasedUserRepository.create(),
         claims: { claim, release: async () => undefined },
         customerIo: undefined,
         posthog: undefined,
         users: createApiFixture<UserApi>({}),
         memberFacts: unplacedMemberFacts(),
+        members: MemoryNurturingOrganizationMemberRepository.create(),
+        plans: MemoryNurturingOrganizationPlanRepository.create(),
       });
 
       await delivery.deliverUsageReport({

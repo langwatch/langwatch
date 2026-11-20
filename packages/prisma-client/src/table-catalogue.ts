@@ -149,6 +149,9 @@ export const prismaTableCatalogue = {
   "NurturingUncopiedProject": "NurturingUncopiedProject",
   "NurturingOrganizationMember": "NurturingOrganizationMember",
   "NurturingOrganizationCreated": "NurturingOrganizationCreated",
+  "NurturingOrganizationPlan": "NurturingOrganizationPlan",
+  "NurturingVirtualKey": "NurturingVirtualKey",
+  "NurturingErasedUser": "NurturingErasedUser",
   "NurturingOrganization": "NurturingOrganization",
   "NurturingProjectUsageView": "NurturingProjectUsageView",
   "NurturingProjectTraceDay": "NurturingProjectTraceDay",
@@ -2523,6 +2526,31 @@ export const prismaModelFieldCatalogue = {
     "organizationId",
     "createdAt"
   ],
+  "NurturingOrganizationPlan": [
+    "organizationId",
+    "plan",
+    "occurredAt",
+    "fromCatchUp"
+  ],
+  "NurturingVirtualKey": [
+    "virtualKeyId",
+    "organizationId",
+    "name",
+    "occurredAt",
+    "keyCreatedAt",
+    "creatorUserId",
+    "principalUserId",
+    "principalUserIdAt",
+    "purpose",
+    "purposeAt",
+    "disabledAt",
+    "enabledAt",
+    "revokedAt"
+  ],
+  "NurturingErasedUser": [
+    "userIdHash",
+    "erasedAt"
+  ],
   "NurturingOrganization": [
     "organizationId",
     "adminUserId",
@@ -3963,6 +3991,9 @@ export const prismaRelationCatalogue = {
   "NurturingUncopiedProject": {},
   "NurturingOrganizationMember": {},
   "NurturingOrganizationCreated": {},
+  "NurturingOrganizationPlan": {},
+  "NurturingVirtualKey": {},
+  "NurturingErasedUser": {},
   "NurturingOrganization": {},
   "NurturingProjectUsageView": {},
   "NurturingProjectTraceDay": {},

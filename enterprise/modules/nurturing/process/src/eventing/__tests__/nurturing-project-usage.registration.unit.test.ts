@@ -3,10 +3,16 @@
  * @vitest-environment node
  * @see enterprise/modules/nurturing/specs/project-usage.feature
  */
-import { createTenantId, InMemoryProcessStore } from "@langwatch/eventing";
+import {
+  createTenantId,
+  type Event,
+  type EventSubscriberDefinition,
+  InMemoryProcessStore,
+} from "@langwatch/eventing";
+import { ORGANIZATION_CREATED_EVENT_TYPE } from "@langwatch/organization-contract";
 import { PROJECT_CREATED_EVENT_TYPE } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import type { NurturingModule } from "../../app/nurturing.app.ts";
 import { MemoryNurturingOrganizationCreatedRepository } from "../../repositories/memory/memory.nurturing-organization-created.repository.ts";
@@ -33,18 +39,36 @@ const COPY_LANES = [
   "memberRemoved",
   "memberDisabled",
   "memberEnabled",
+  "virtualKeys",
+  "userErasureMarks",
+  "identityErasureMarks",
 ];
 
-function usageLanesWith(syncsOrganizationUsage: boolean): string[] {
-  const app = createApiFixture<NurturingModule>({
-    syncsOrganizationUsage: () => syncsOrganizationUsage,
-  });
-  const pipeline = nurturingProjectUsageEventing.build({
+/** The lanes only a deployment with a Customer.io channel registers: the folds and the syncs. */
+const SYNC_LANES = [
+  "promptUsage",
+  "evaluatorUsage",
+  "scenarioUsage",
+  "simulationUsage",
+  "traceDayCount",
+  "failedTraceDayCount",
+  "firstTraceUsageSync",
+  "traceUsageSync",
+  "evaluationActiveDay",
+  "organizationCreatedSync",
+];
+
+function usagePipelineWith(app: Partial<NurturingModule>) {
+  return nurturingProjectUsageEventing.build({
     participation: "consume",
     repositories: MemoryNurturingRepositories.create(),
-    app,
+    app: createApiFixture<NurturingModule>(app),
     processStore: InMemoryProcessStore.createForTesting(),
   });
+}
+
+function usageLanesWith(syncsOrganizationUsage: boolean): string[] {
+  const pipeline = usagePipelineWith({ syncsOrganizationUsage: () => syncsOrganizationUsage });
   return (pipeline.globalProjections ?? []).map(({ name }) => name);
 }
 
@@ -69,18 +93,54 @@ describe("the usage pipeline's registration", () => {
   });
 
   /** @scenario "A project's first trace syncs its organization too" */
-  it("registers the trace-day count, both trace syncs and the placement copies with a channel", () => {
+  it("registers the folds, the syncs and the placement copies with a channel, and no other lane", () => {
     const lanes = usageLanesWith(true);
 
-    expect(lanes).toEqual(
-      expect.arrayContaining([
-        lane("traceDayCount"),
-        lane("failedTraceDayCount"),
-        lane("firstTraceUsageSync"),
-        lane("traceUsageSync"),
-        ...COPY_LANES.map(lane),
-      ]),
+    expect(lanes.toSorted()).toEqual([...COPY_LANES, ...SYNC_LANES].map(lane).toSorted());
+  });
+
+  /** @scenario "A new organization gets its name and creation time on its founder" */
+  it("hands an organization's creation fact to the organization-created service", async () => {
+    const organizationCreated = vi.fn(async () => {});
+    const pipeline = usagePipelineWith({
+      syncsOrganizationUsage: () => true,
+      organizationCreated,
+    });
+    const subscribers: EventSubscriberDefinition<Event>[] = [];
+    const registry = createApiFixture<
+      Parameters<NonNullable<typeof pipeline.globalProjections>[number]["register"]>[0]
+    >({
+      registerEventSubscriber: (subscriber) => void subscribers.push(subscriber),
+      // The folds and maps register too; this test reads only the event subscribers.
+      registerPeerFoldProjection: () => {},
+      registerPeerMapProjection: () => {},
+      registerSubscriber: () => {},
+    });
+    for (const projection of pipeline.globalProjections ?? []) projection.register(registry);
+    const data = {
+      tenantId: "org-1",
+      organizationId: "org-1",
+      organizationName: "Acme",
+      occurredAt: 1_000,
+    };
+
+    const sync = subscribers.find(({ name }) => name === lane("organizationCreatedSync"));
+    await sync?.handle(
+      {
+        id: "event-1",
+        aggregateId: "org-1",
+        aggregateType: "organization",
+        tenantId: createTenantId("org-1"),
+        createdAt: 1_000,
+        occurredAt: 1_000,
+        type: ORGANIZATION_CREATED_EVENT_TYPE,
+        version: "2026-10-01",
+        data,
+      } as Event,
+      { tenantId: createTenantId("org-1"), aggregateId: "org-1" },
     );
+
+    expect(organizationCreated).toHaveBeenCalledWith(data);
   });
 });
 

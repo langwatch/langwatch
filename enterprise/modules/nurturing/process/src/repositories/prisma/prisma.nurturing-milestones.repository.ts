@@ -2,6 +2,7 @@
 import { PrismaRepository, skipTenantCheck } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
+import type { NurturingErasedUserRepository } from "../nurturing-erased-user.repository.ts";
 import {
   MAX_CODING_REPOSITORY_KEYS,
   type NurturingCodingMilestonesRepository,
@@ -11,6 +12,10 @@ import {
   type NurturingOrganizationRow,
   type NurturingTraceMilestonesRepository,
 } from "../nurturing-milestones.repository.ts";
+import {
+  type NurturingErasedUserDatabase,
+  PrismaNurturingErasedUserRepository,
+} from "./prisma.nurturing-erased-user.repository.ts";
 
 const ORGANIZATION_STATE = {
   organizationId: true,
@@ -28,9 +33,15 @@ const ORGANIZATION_ROW = {
   codingLastActiveDay: true,
 } as const;
 
-type NurturingOrganizationDatabase = Pick<PrismaClient, "nurturingOrganization" | "$executeRaw">;
+type NurturingOrganizationDatabase = Pick<PrismaClient, "nurturingOrganization" | "$executeRaw"> &
+  NurturingErasedUserDatabase;
 
-/** Nurturing's organizations, the one table it claims; the owners' rows are read elsewhere (R40). */
+type ErasedUsers = Pick<NurturingErasedUserRepository, "markErased" | "findErased">;
+
+/**
+ * Nurturing's organizations, read with no erased admin through the erasure marks; the owners'
+ * rows are read elsewhere (R40).
+ */
 export class PrismaNurturingMilestonesRepository
   extends PrismaRepository.for("NurturingOrganization")
   implements
@@ -39,17 +50,24 @@ export class PrismaNurturingMilestonesRepository
     NurturingTraceMilestonesRepository,
     NurturingOrganizationAdminRepository
 {
+  /** `erasedUsers` defaults to the marks over the same client. */
   static create({
     prisma,
-  }: Readonly<{ prisma: NurturingOrganizationDatabase }>): PrismaNurturingMilestonesRepository {
-    return new PrismaNurturingMilestonesRepository(prisma);
+    erasedUsers = PrismaNurturingErasedUserRepository.create({ prisma }),
+  }: Readonly<{
+    prisma: NurturingOrganizationDatabase;
+    erasedUsers?: ErasedUsers;
+  }>): PrismaNurturingMilestonesRepository {
+    return new PrismaNurturingMilestonesRepository(prisma, erasedUsers);
   }
 
   readonly #database: NurturingOrganizationDatabase;
+  readonly #erasedUsers: ErasedUsers;
 
-  private constructor(prisma: NurturingOrganizationDatabase) {
+  private constructor(prisma: NurturingOrganizationDatabase, erasedUsers: ErasedUsers) {
     super(prisma);
     this.#database = prisma;
+    this.#erasedUsers = erasedUsers;
   }
 
   async recordLastTrace({
@@ -93,7 +111,12 @@ export class PrismaNurturingMilestonesRepository
       });
   }
 
+  /**
+   * Marks the account erased first, so no read names them admin from then on, even where a late
+   * fact stores them again; then clears the rows naming them.
+   */
   async forgetAdmin({ adminUserId }: Readonly<{ adminUserId: string }>): Promise<void> {
+    await this.#erasedUsers.markErased({ userId: adminUserId });
     await this.#database.$executeRaw`${skipTenantCheck({
       // An erased account is admin of no organization: every row naming it is cleared by user.
       SKIP_TENANT_CHECK: true,
@@ -128,9 +151,17 @@ export class PrismaNurturingMilestonesRepository
     return [
       {
         ...organization,
+        adminUserId: await this.#unlessErased(organization.adminUserId),
         codingFirstSessionAt: organization.codingFirstSessionAt?.getTime() ?? null,
       },
     ];
+  }
+
+  /** A marked admin reads as none: a late fact can store them again after their erasure. */
+  async #unlessErased(adminUserId: string | null): Promise<string | null> {
+    if (adminUserId === null) return null;
+    const [erased] = await this.#erasedUsers.findErased({ userIds: [adminUserId] });
+    return erased ? null : adminUserId;
   }
 
   // Each coding write is one conditional UPDATE in SQL: Postgres re-checks its WHERE on the
@@ -260,7 +291,7 @@ export class PrismaNurturingMilestonesRepository
     };
   }
 
-  /** Empty when nurturing never learned the organization. */
+  /** Empty when nurturing never learned the organization; a marked admin reads as none. */
   private async count({
     organizationId,
     data,
@@ -279,6 +310,7 @@ export class PrismaNurturingMilestonesRepository
       where: { organizationId },
       select: ORGANIZATION_STATE,
     });
-    return organization ? [organization] : [];
+    if (!organization) return [];
+    return [{ ...organization, adminUserId: await this.#unlessErased(organization.adminUserId) }];
   }
 }

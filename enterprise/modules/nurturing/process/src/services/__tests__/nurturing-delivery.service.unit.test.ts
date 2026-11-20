@@ -11,9 +11,14 @@ import { describe, expect, it, vi } from "vitest";
 import { HttpCustomerIoChannel } from "../../channels/http/http.customer-io.channel.ts";
 import { MemoryPostHogChannel } from "../../channels/memory/memory.posthog.channel.ts";
 import { PostHogChannel } from "../../channels/posthog.channel.ts";
+import { MemoryNurturingErasedUserRepository } from "../../repositories/memory/memory.nurturing-erased-user.repository.ts";
+import { MemoryNurturingOrganizationMemberRepository } from "../../repositories/memory/memory.nurturing-organization-member.repository.ts";
+import { MemoryNurturingOrganizationPlanRepository } from "../../repositories/memory/memory.nurturing-organization-plan.repository.ts";
+import { MemoryNurturingClaimRepository } from "../../repositories/memory/memory.nurturing.repositories.ts";
+import type { NurturingErasedUserRepository } from "../../repositories/nurturing-erased-user.repository.ts";
 import { NurturingDeliveryService } from "../nurturing-delivery.service.ts";
 import { NurturingService } from "../nurturing.service.ts";
-import { unplacedMemberFacts } from "./nurturing-member-facts.test-helpers.ts";
+import { memberCopyOf, unplacedMemberFacts } from "./nurturing-member-facts.test-helpers.ts";
 
 const scenarioCreated: NurturingSignal = {
   kind: "scenario_created",
@@ -61,18 +66,30 @@ async function settle(): Promise<void> {
   for (let tick = 0; tick < 3; tick++) await new Promise((resolve) => setTimeout(resolve, 0));
 }
 
-/** A delivery over memory PostHog and a recording Customer.io. */
-function deliveryOverBothSinks() {
+type ErasureMarks = Pick<NurturingErasedUserRepository, "findErased">;
+
+/**
+ * A delivery over memory PostHog and a recording Customer.io; `members` is nurturing's copy and
+ * `erasedUsers` its erasure marks.
+ */
+function deliveryOverBothSinks(
+  members = MemoryNurturingOrganizationMemberRepository.create(),
+  erasedUsers: ErasureMarks = MemoryNurturingErasedUserRepository.create(),
+) {
   const posthog = MemoryPostHogChannel.create();
   const cio = customerIo();
+  const claimed = claims();
   const delivery = NurturingDeliveryService.create({
-    claims: claims(),
+    erasedUsers,
+    claims: claimed,
     users: users(),
     memberFacts: unplacedMemberFacts(),
+    members,
+    plans: MemoryNurturingOrganizationPlanRepository.create(),
     customerIo: cio.service,
     posthog,
   });
-  return { posthog, cio, delivery };
+  return { posthog, cio, delivery, claimed };
 }
 
 const source = { tenantId: "project-1", occurredAt: Date.UTC(2026, 8, 29) };
@@ -114,9 +131,12 @@ describe("NurturingDeliveryService", () => {
       const posthog = MemoryPostHogChannel.create();
       const cio = customerIo();
       const delivery = NurturingDeliveryService.create({
+        erasedUsers: MemoryNurturingErasedUserRepository.create(),
         claims: claims(),
         users: users(),
         memberFacts: unplacedMemberFacts(),
+        members: MemoryNurturingOrganizationMemberRepository.create(),
+        plans: MemoryNurturingOrganizationPlanRepository.create(),
         customerIo: cio.service,
         posthog,
       });
@@ -146,9 +166,12 @@ describe("NurturingDeliveryService", () => {
       const posthog = MemoryPostHogChannel.create();
       const cio = customerIo();
       const delivery = NurturingDeliveryService.create({
+        erasedUsers: MemoryNurturingErasedUserRepository.create(),
         claims: claims(),
         users: users(),
         memberFacts: unplacedMemberFacts(),
+        members: MemoryNurturingOrganizationMemberRepository.create(),
+        plans: MemoryNurturingOrganizationPlanRepository.create(),
         customerIo: cio.service,
         posthog,
       });
@@ -159,6 +182,39 @@ describe("NurturingDeliveryService", () => {
 
       expect(posthog.tracked).toHaveLength(1);
       expect(cio.sent).toHaveLength(1);
+    });
+  });
+
+  describe("when a signal about an erased person is delivered after their erasure", () => {
+    /** @scenario "A signal about an erased account, delivered late, sends them nothing" */
+    it("sends neither Customer.io nor PostHog anything", async () => {
+      const erasedUsers = MemoryNurturingErasedUserRepository.create();
+      await erasedUsers.markErased({ userId: "user-1" });
+      const { posthog, cio, delivery } = deliveryOverBothSinks(undefined, erasedUsers);
+
+      await delivery.deliver({ key: "scenario_created:event-1", signal: scenarioCreated });
+      await settle();
+
+      expect(cio.sent).toEqual([]);
+      expect([...posthog.tracked, ...posthog.identified]).toEqual([]);
+    });
+  });
+
+  describe("when the erasure marks cannot be read", () => {
+    /** @scenario "A signal whose erasure marks cannot be read fails before any claim or send" */
+    it("rejects, takes no claim and sends nothing, so the fact is retried", async () => {
+      const down = new Error("the database is down");
+      const unreadable: ErasureMarks = { findErased: () => Promise.reject(down) };
+      const { posthog, cio, delivery, claimed } = deliveryOverBothSinks(undefined, unreadable);
+
+      await expect(
+        delivery.deliver({ key: "scenario_created:event-1", signal: scenarioCreated }),
+      ).rejects.toBe(down);
+      await settle();
+
+      expect(claimed.claim).not.toHaveBeenCalled();
+      expect(cio.sent).toEqual([]);
+      expect([...posthog.tracked, ...posthog.identified]).toEqual([]);
     });
   });
 
@@ -449,9 +505,12 @@ describe("NurturingDeliveryService", () => {
       }
       const cio = customerIo();
       const delivery = NurturingDeliveryService.create({
+        erasedUsers: MemoryNurturingErasedUserRepository.create(),
         claims: claims(),
         users: users(),
         memberFacts: unplacedMemberFacts(),
+        members: MemoryNurturingOrganizationMemberRepository.create(),
+        plans: MemoryNurturingOrganizationPlanRepository.create(),
         customerIo: cio.service,
         posthog: new ThrowingPostHogChannel(),
       });
@@ -467,7 +526,9 @@ describe("NurturingDeliveryService", () => {
 
   describe("when a subscription change is delivered", () => {
     it("tells Customer.io every member's trait and tracks nothing in PostHog", async () => {
-      const { posthog, cio, delivery } = deliveryOverBothSinks();
+      const { posthog, cio, delivery } = deliveryOverBothSinks(
+        await memberCopyOf({ organizationId: "org-1", userIds: ["user-1", "user-2"] }),
+      );
 
       await delivery.deliver({
         key: "subscription_changed:event-21",
@@ -483,7 +544,49 @@ describe("NurturingDeliveryService", () => {
       await settle();
 
       expect(posthog.tracked).toEqual([]);
-      expect(cio.sent.map((call) => call.path)).toEqual(["/v1/identify", "/v1/identify"]);
+      expect(cio.sent).toEqual([
+        {
+          path: "/v1/batch",
+          body: {
+            batch: [
+              { type: "identify", userId: "user-1", traits: { has_subscription: true } },
+              { type: "identify", userId: "user-2", traits: { has_subscription: true } },
+            ],
+          },
+        },
+      ]);
+    });
+
+    it("fails and gives its claim back when the admin read fails, so the retry sends", async () => {
+      const cio = customerIo();
+      const memberFacts = unplacedMemberFacts();
+      vi.spyOn(memberFacts, "adminOf").mockRejectedValueOnce(new Error("milestones unavailable"));
+      const delivery = NurturingDeliveryService.create({
+        erasedUsers: MemoryNurturingErasedUserRepository.create(),
+        claims: MemoryNurturingClaimRepository.create(),
+        users: users(),
+        memberFacts,
+        members: await memberCopyOf({ organizationId: "org-1", userIds: ["user-1"] }),
+        plans: MemoryNurturingOrganizationPlanRepository.create(),
+        customerIo: cio.service,
+        posthog: undefined,
+      });
+      const signal: NurturingSignal = {
+        kind: "subscription_changed",
+        sourceEventId: "event-22",
+        ...source,
+        organizationId: "org-1",
+        memberUserIds: ["user-1"],
+        hasSubscription: true,
+      };
+
+      await expect(
+        delivery.deliver({ key: "subscription_changed:event-22", signal }),
+      ).rejects.toThrow("milestones unavailable");
+      expect(cio.sent).toEqual([]);
+      await delivery.deliver({ key: "subscription_changed:event-22", signal });
+
+      expect(cio.sent.map(({ path }) => path)).toEqual(["/v1/batch"]);
     });
   });
 
@@ -532,9 +635,12 @@ describe("NurturingDeliveryService", () => {
     it("tracks nothing and does not throw when PostHog is not configured", async () => {
       const cio = customerIo();
       const delivery = NurturingDeliveryService.create({
+        erasedUsers: MemoryNurturingErasedUserRepository.create(),
         claims: claims(),
         users: users(),
         memberFacts: unplacedMemberFacts(),
+        members: MemoryNurturingOrganizationMemberRepository.create(),
+        plans: MemoryNurturingOrganizationPlanRepository.create(),
         customerIo: cio.service,
         posthog: undefined,
       });
@@ -555,9 +661,12 @@ describe("NurturingDeliveryService", () => {
         identify(): void {}
       }
       const delivery = NurturingDeliveryService.create({
+        erasedUsers: MemoryNurturingErasedUserRepository.create(),
         claims: claims(),
         users: users(),
         memberFacts: unplacedMemberFacts(),
+        members: MemoryNurturingOrganizationMemberRepository.create(),
+        plans: MemoryNurturingOrganizationPlanRepository.create(),
         customerIo: undefined,
         posthog: new ThrowingPostHogChannel(),
       });
@@ -589,9 +698,12 @@ describe("NurturingDeliveryService", () => {
         }),
       });
       const delivery = NurturingDeliveryService.create({
+        erasedUsers: MemoryNurturingErasedUserRepository.create(),
         claims: claims(),
         users: users(),
         memberFacts: unplacedMemberFacts(),
+        members: MemoryNurturingOrganizationMemberRepository.create(),
+        plans: MemoryNurturingOrganizationPlanRepository.create(),
         customerIo: service,
         posthog: undefined,
       });
@@ -806,9 +918,12 @@ describe("NurturingDeliveryService", () => {
     it("claims nothing and sends nothing", async () => {
       const claim = claims();
       const delivery = NurturingDeliveryService.create({
+        erasedUsers: MemoryNurturingErasedUserRepository.create(),
         claims: claim,
         users: users(),
         memberFacts: unplacedMemberFacts(),
+        members: MemoryNurturingOrganizationMemberRepository.create(),
+        plans: MemoryNurturingOrganizationPlanRepository.create(),
         customerIo: undefined,
         posthog: undefined,
       });
@@ -824,9 +939,12 @@ describe("NurturingDeliveryService", () => {
     it("resolves and reports the failure", async () => {
       const cio = customerIo(500);
       const delivery = NurturingDeliveryService.create({
+        erasedUsers: MemoryNurturingErasedUserRepository.create(),
         claims: claims(),
         users: users(),
         memberFacts: unplacedMemberFacts(),
+        members: MemoryNurturingOrganizationMemberRepository.create(),
+        plans: MemoryNurturingOrganizationPlanRepository.create(),
         customerIo: cio.service,
         posthog: undefined,
       });
@@ -844,9 +962,12 @@ describe("NurturingDeliveryService", () => {
     it("sends Customer.io the update once", async () => {
       const cio = customerIo();
       const delivery = NurturingDeliveryService.create({
+        erasedUsers: MemoryNurturingErasedUserRepository.create(),
         claims: claims(),
         users: users(),
         memberFacts: unplacedMemberFacts(),
+        members: MemoryNurturingOrganizationMemberRepository.create(),
+        plans: MemoryNurturingOrganizationPlanRepository.create(),
         customerIo: cio.service,
         posthog: undefined,
       });
@@ -986,9 +1107,12 @@ describe("NurturingDeliveryService", () => {
     it("session_started: returns normally and reports the failure", async () => {
       const cio = customerIo(500);
       const delivery = NurturingDeliveryService.create({
+        erasedUsers: MemoryNurturingErasedUserRepository.create(),
         claims: claims(),
         users: users(),
         memberFacts: unplacedMemberFacts(),
+        members: MemoryNurturingOrganizationMemberRepository.create(),
+        plans: MemoryNurturingOrganizationPlanRepository.create(),
         customerIo: cio.service,
         posthog: undefined,
       });
@@ -1013,9 +1137,12 @@ describe("NurturingDeliveryService", () => {
     it("workflow_created: returns normally and reports the failure", async () => {
       const cio = customerIo(500);
       const delivery = NurturingDeliveryService.create({
+        erasedUsers: MemoryNurturingErasedUserRepository.create(),
         claims: claims(),
         users: users(),
         memberFacts: unplacedMemberFacts(),
+        members: MemoryNurturingOrganizationMemberRepository.create(),
+        plans: MemoryNurturingOrganizationPlanRepository.create(),
         customerIo: cio.service,
         posthog: undefined,
       });
@@ -1042,9 +1169,12 @@ describe("NurturingDeliveryService", () => {
     it("integration_method_chosen: returns normally and reports the failure", async () => {
       const cio = customerIo(500);
       const delivery = NurturingDeliveryService.create({
+        erasedUsers: MemoryNurturingErasedUserRepository.create(),
         claims: claims(),
         users: users(),
         memberFacts: unplacedMemberFacts(),
+        members: MemoryNurturingOrganizationMemberRepository.create(),
+        plans: MemoryNurturingOrganizationPlanRepository.create(),
         customerIo: cio.service,
         posthog: undefined,
       });
@@ -1069,9 +1199,12 @@ describe("NurturingDeliveryService", () => {
     it("prompt_created: returns normally and reports the failure", async () => {
       const cio = customerIo(500);
       const delivery = NurturingDeliveryService.create({
+        erasedUsers: MemoryNurturingErasedUserRepository.create(),
         claims: claims(),
         users: users(),
         memberFacts: unplacedMemberFacts(),
+        members: MemoryNurturingOrganizationMemberRepository.create(),
+        plans: MemoryNurturingOrganizationPlanRepository.create(),
         customerIo: cio.service,
         posthog: undefined,
       });
@@ -1097,9 +1230,12 @@ describe("NurturingDeliveryService", () => {
     it("signed_up: returns normally and reports the failure", async () => {
       const cio = customerIo(500);
       const delivery = NurturingDeliveryService.create({
+        erasedUsers: MemoryNurturingErasedUserRepository.create(),
         claims: claims(),
         users: users(),
         memberFacts: unplacedMemberFacts(),
+        members: MemoryNurturingOrganizationMemberRepository.create(),
+        plans: MemoryNurturingOrganizationPlanRepository.create(),
         customerIo: cio.service,
         posthog: undefined,
       });
@@ -1127,9 +1263,12 @@ describe("NurturingDeliveryService", () => {
     it("paths_selected: returns normally and reports the failure", async () => {
       const cio = customerIo(503);
       const delivery = NurturingDeliveryService.create({
+        erasedUsers: MemoryNurturingErasedUserRepository.create(),
         claims: claims(),
         users: users(),
         memberFacts: unplacedMemberFacts(),
+        members: MemoryNurturingOrganizationMemberRepository.create(),
+        plans: MemoryNurturingOrganizationPlanRepository.create(),
         customerIo: cio.service,
         posthog: undefined,
       });
@@ -1160,9 +1299,12 @@ describe("NurturingDeliveryService", () => {
     /** @scenario "Signup with no Customer.io key configured completes without errors" */
     it("signed_up: makes no request at all and raises nothing", async () => {
       const delivery = NurturingDeliveryService.create({
+        erasedUsers: MemoryNurturingErasedUserRepository.create(),
         claims: claims(),
         users: users(),
         memberFacts: unplacedMemberFacts(),
+        members: MemoryNurturingOrganizationMemberRepository.create(),
+        plans: MemoryNurturingOrganizationPlanRepository.create(),
         customerIo: undefined,
         posthog: MemoryPostHogChannel.create(),
       });
@@ -1186,9 +1328,12 @@ describe("NurturingDeliveryService", () => {
     it("guided onboarding: reaches PostHog only, and raises nothing", async () => {
       const posthog = MemoryPostHogChannel.create();
       const delivery = NurturingDeliveryService.create({
+        erasedUsers: MemoryNurturingErasedUserRepository.create(),
         claims: claims(),
         users: users(),
         memberFacts: unplacedMemberFacts(),
+        members: MemoryNurturingOrganizationMemberRepository.create(),
+        plans: MemoryNurturingOrganizationPlanRepository.create(),
         customerIo: undefined,
         posthog,
       });

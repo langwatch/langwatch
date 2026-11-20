@@ -364,6 +364,10 @@ const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
   NurturingOrganizationCreated: {
     extraBound: ({ clause, action }) => READ_ACTIONS.has(action) && isTraceWindowEndSweep(clause),
   },
+  // Nurturing's plan copy: one row per organization, by its id.
+  NurturingOrganizationPlan: {},
+  // Nurturing's gateway key copy: a key by its organization and id.
+  NurturingVirtualKey: {},
   // Nurturing's member copy: an organization's rows, or a READ of the named members' other rows.
   NurturingOrganizationMember: {
     extraBound: ({ clause, action }) => READ_ACTIONS.has(action) && hasUserBound(clause),

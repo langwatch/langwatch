@@ -1,0 +1,36 @@
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
+
+import type {
+  NurturingMemberSourceRepository,
+  NurturingSourceMember,
+} from "../nurturing-member-source.repository.ts";
+
+/** Only the shared delegates this reader touches; it claims no table (R40). */
+type PrismaNurturingMemberSourceDatabase = Pick<PrismaClient, "organizationUser">;
+
+/**
+ * Organization's `OrganizationUser` rows, through a share (R40). Deactivation lives on `User`,
+ * which nurturing may not read, so the backfill service filters it through the owner's API.
+ */
+export class PrismaNurturingMemberSourceRepository implements NurturingMemberSourceRepository {
+  private constructor(private readonly prisma: PrismaNurturingMemberSourceDatabase) {}
+
+  static create({
+    prisma,
+  }: Readonly<{
+    prisma: PrismaNurturingMemberSourceDatabase;
+  }>): PrismaNurturingMemberSourceRepository {
+    return new PrismaNurturingMemberSourceRepository(prisma);
+  }
+
+  async findActiveMembers({
+    organizationId,
+  }: Readonly<{ organizationId: string }>): Promise<NurturingSourceMember[]> {
+    const rows = await this.prisma.organizationUser.findMany({
+      where: { organizationId, disabledAt: null },
+      select: { userId: true, createdAt: true },
+    });
+    return rows.map(({ userId, createdAt }) => ({ userId, joinedAt: createdAt.getTime() }));
+  }
+}

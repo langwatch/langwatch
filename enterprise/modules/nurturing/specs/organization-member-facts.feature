@@ -93,6 +93,13 @@ Feature: An organization's session facts reach every active member in Customer.i
     Then Customer.io identifies the person with has_traces true
 
   @unit
+  Scenario: An organization's fact about an erased admin still reaches its other members
+    Given an organization whose admin was erased, with another active member
+    When a first trace or a coding agent's first session of the organization is delivered
+    Then the other member is told it
+    And the erased admin gets no call
+
+  @unit
   Scenario: A busy organization sends one batch per debounce window
     When traces of project-1 and project-2 are delivered inside 300 seconds
     Then each member is identified once
@@ -221,3 +228,40 @@ Feature: An organization's session facts reach every active member in Customer.i
     Given the owners hold no organization for the project
     When a trace_received signal is delivered
     Then Customer.io identifies the signal's admin alone
+
+  @unit
+  Scenario: A dry run of the member backfill writes nothing
+    Given the owners hold active members the member copy lacks
+    When a person runs pnpm task nurturing-member-backfill without --execute
+    Then no row is written
+    And the counts of organizations, memberships, rows to create and rows already present are printed
+
+  @unit
+  Scenario: The member backfill creates a row for each current member the copy lacks
+    Given the owners hold an active member of an organization with no row in the member copy
+    When a person runs pnpm task nurturing-member-backfill --execute
+    Then the copy holds a join for that member, at the time the owners' membership was created
+
+  @unit
+  Scenario: The member backfill leaves a member whose row exists, and a second run changes nothing
+    Given the member copy holds a row for an active member, however old
+    When the member backfill runs with --execute, twice
+    Then that row is unchanged and the second run creates no row
+
+  @unit
+  Scenario: The member backfill does not bring back a member who left
+    Given the member copy holds a leave for a person the owners still list
+    When the member backfill runs with --execute
+    Then the person's row still records the leave and is not current
+
+  @integration
+  Scenario: The member backfill skips disabled members
+    Given an organization with an active member and a member whose membership is disabled
+    When the owners' membership rows of that organization are read
+    Then only the active member is listed
+
+  @unit
+  Scenario: The member backfill skips a member whose account is deactivated
+    Given an organization with two active memberships, one of them a user the owners hold as deactivated
+    When the member backfill runs with --execute
+    Then only the other member gets a row in the copy

@@ -58,7 +58,10 @@ describe("fireSignup", () => {
         });
       });
 
-      /** @scenario "New signup associates user with organization via group call" */
+      /**
+       * @scenario "New signup associates user with organization via group call"
+       * @scenario "The sign-up path keeps its calls"
+       */
       it("decides to associate them with their organization by name", () => {
         const calls = fireSignup({ ...SIGNUP, signUpData: { companySize: "11-50" } });
 

@@ -3,10 +3,13 @@ import type {
   VkLifecycleAction,
   RecordBudgetCrossingCommandData,
   RecordVkLifecycleCommandData,
+  VirtualKeyPurpose,
 } from "@langwatch/gateway-contract";
 import { createLogger } from "@langwatch/observability";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { nowInstant, type Instant } from "@langwatch/time";
+
+import { toPersonActorId } from "../rules/gateway-governance-actor.rules.ts";
 
 const logger = createLogger("langwatch:gateway:governance-events");
 
@@ -67,6 +70,9 @@ export class GatewayGovernanceEventsService implements GatewayGovernanceSignals 
         name: virtualKey.name,
         display_prefix: virtualKey.displayPrefix,
         reason: signal.reason ?? null,
+        actor_user_id: toPersonActorId(signal.actorUserId),
+        principal_user_id: virtualKey.principalUserId,
+        purpose: virtualKey.purpose,
         occurred_at: this.clock().epochMilliseconds,
       };
       await sender.send(data);
@@ -102,8 +108,12 @@ export type GatewayVirtualKeyLifecycleSignal = {
     name: string;
     displayPrefix: string;
     traceProjectId: string | null;
+    principalUserId: string | null;
+    purpose: VirtualKeyPurpose;
   };
   action: VkLifecycleAction;
+  /** Who made the change, as its audit row records it: a person or a machine principal. */
+  actorUserId: string;
   reason?: string | null;
 };
 

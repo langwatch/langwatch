@@ -189,19 +189,28 @@ export function evaluationCompletedSignal({
   ];
 }
 
-/** Every member of the organization carries whether it holds a subscription. */
+/**
+ * Every member of the organization carries whether it holds a subscription and, once billing
+ * names it, the plan. A field billing left out stays out: an old fact invents no plan.
+ */
 export function subscriptionChangedSignal({
   data,
   aggregateId,
 }: OwnerEvent<SubscriptionChangedEventData>): NurturingSignal {
+  const { plan, fromCatchUp } = data;
+  const sourceEventId = fromCatchUp
+    ? `${aggregateId}:subscription:catch-up:${data.occurredAt}`
+    : `${aggregateId}:subscription:${data.hasSubscription}:${data.occurredAt}`;
   return {
     kind: "subscription_changed",
-    sourceEventId: `${aggregateId}:subscription:${data.hasSubscription}:${data.occurredAt}`,
+    sourceEventId,
     tenantId: data.tenantId,
     occurredAt: data.occurredAt,
     organizationId: data.organizationId,
     memberUserIds: data.memberUserIds,
     hasSubscription: data.hasSubscription,
+    ...(plan === undefined ? {} : { plan }),
+    ...(fromCatchUp === undefined ? {} : { fromCatchUp }),
   };
 }
 

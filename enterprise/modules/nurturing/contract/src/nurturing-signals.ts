@@ -263,6 +263,10 @@ const nurturingSignalSchemaDefinition = z.discriminatedUnion("kind", [
     /** Every member of the organization, each told the trait. */
     memberUserIds: z.array(id),
     hasSubscription: z.boolean(),
+    /** Billing's plan type; absent on a fact billing stored before it carried one. */
+    plan: id.optional(),
+    /** Billing's resync restated it: sent at once, unclaimed, and failing when not delivered. */
+    fromCatchUp: z.boolean().optional(),
   }),
   z.object({
     kind: z.literal("subscription_started"),
@@ -415,6 +419,37 @@ const nurturingSignalSchemaDefinition = z.discriminatedUnion("kind", [
     kind: z.literal("langy_first_message_seen"),
     ...signalSource,
     userId: id,
+  }),
+  z.object({
+    /** Gateway created a person's key. `sourceEventId` is the key and `created`, once per key. */
+    kind: z.literal("virtual_key_created"),
+    ...signalSource,
+    /** The key's holder, else its creator, else the organization's admin. */
+    userId: id,
+    organizationId: id,
+    virtualKeyId: id,
+    keyName: z.string(),
+    /** False for the admin told in place of the key's holder and maker: no `has_virtual_key`. */
+    recipientHoldsKey: z.boolean(),
+  }),
+  z.object({
+    /** A person's key crossed its budget's warn line or limit, once per crossing and period. */
+    kind: z.literal("key_budget_threshold"),
+    ...signalSource,
+    /** The key's holder, else its creator, else the organization's admin. */
+    userId: id,
+    organizationId: id,
+    virtualKeyId: id,
+    keyName: z.string(),
+    limitUsd: z.number(),
+    spentUsd: z.number(),
+    /** At or over the limit, not only the warn line. */
+    reached: z.boolean(),
+    onBreach: z.enum(["block", "warn"]),
+    window: id,
+    scopeType: id,
+    /** ISO-8601 UTC; null for a window that never rolls; absent when gateway named no end. */
+    periodEnd: z.string().nullish(),
   }),
 ]);
 export interface NurturingSignalSchema extends Named<typeof nurturingSignalSchemaDefinition> {}

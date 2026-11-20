@@ -2024,6 +2024,31 @@ export interface LwqlPrismaRows {
     readonly organizationId: "String";
     readonly createdAt: "DateTime";
   };
+  readonly NurturingOrganizationPlan: {
+    readonly organizationId: "String";
+    readonly plan: "String?";
+    readonly occurredAt: "DateTime";
+    readonly fromCatchUp: "Boolean";
+  };
+  readonly NurturingVirtualKey: {
+    readonly virtualKeyId: "String";
+    readonly organizationId: "String";
+    readonly name: "String";
+    readonly occurredAt: "DateTime";
+    readonly keyCreatedAt: "DateTime?";
+    readonly creatorUserId: "String?";
+    readonly principalUserId: "String?";
+    readonly principalUserIdAt: "DateTime?";
+    readonly purpose: "String?";
+    readonly purposeAt: "DateTime?";
+    readonly disabledAt: "DateTime?";
+    readonly enabledAt: "DateTime?";
+    readonly revokedAt: "DateTime?";
+  };
+  readonly NurturingErasedUser: {
+    readonly userIdHash: "String";
+    readonly erasedAt: "DateTime";
+  };
   readonly NurturingOrganization: {
     readonly organizationId: "String";
     readonly adminUserId: "String?";

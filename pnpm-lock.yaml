@@ -3998,9 +3998,15 @@ importers:
       '@langwatch/experiment-contract':
         specifier: workspace:*
         version: link:../../../../modules/experiment/contract
+      '@langwatch/gateway-contract':
+        specifier: workspace:*
+        version: link:../../../../modules/gateway/contract
       '@langwatch/group-queue':
         specifier: workspace:*
         version: link:../../../../packages/group-queue
+      '@langwatch/identity-contract':
+        specifier: workspace:*
+        version: link:../../../../modules/identity/contract
       '@langwatch/insight-contract':
         specifier: workspace:*
         version: link:../../../../modules/insight/contract
@@ -4037,12 +4043,18 @@ importers:
       '@langwatch/scenario-contract':
         specifier: workspace:*
         version: link:../../../../modules/scenario/contract
+      '@langwatch/task':
+        specifier: workspace:*
+        version: link:../../../../packages/task
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../../packages/time
       '@langwatch/trace-contract':
         specifier: workspace:*
         version: link:../../../../modules/trace/contract
+      '@langwatch/upgrade':
+        specifier: workspace:*
+        version: link:../../../../packages/upgrade
       '@langwatch/user-contract':
         specifier: workspace:*
         version: link:../../../../modules/user/contract

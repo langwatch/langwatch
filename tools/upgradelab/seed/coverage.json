@@ -196,6 +196,21 @@
       "seed": "unplanned",
       "note": "main has no headless door for a plaintext custom key: SQL row not written yet"
     },
+    "nurturing:replay-identity-erasure-marks": {
+      "status": "pending",
+      "seed": "unplanned",
+      "note": "projection replay from the owner's event log; no seed door written yet"
+    },
+    "nurturing:replay-user-erasure-marks": {
+      "status": "pending",
+      "seed": "unplanned",
+      "note": "projection replay from the owner's event log; no seed door written yet"
+    },
+    "nurturing:replay-virtual-keys": {
+      "status": "pending",
+      "seed": "unplanned",
+      "note": "projection replay from the owner's event log; no seed door written yet"
+    },
     "ops:checkup-canary-project": {
       "status": "pending",
       "seed": "unplanned",

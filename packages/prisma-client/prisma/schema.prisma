@@ -5279,6 +5279,45 @@ model NurturingOrganizationCreated {
   @@index([createdAt])
 }
 
+/// Each organization's plan, folded from billing's subscription_changed facts: nurturing's own
+/// copy. The newest fact wins, and a real fact wins a tie over a catch-up; Customer.io hears a
+/// fact only when it changes this row.
+model NurturingOrganizationPlan {
+  organizationId String   @id
+  plan           String?
+  occurredAt     DateTime
+  fromCatchUp    Boolean
+}
+
+/// Each gateway virtual key, folded from gateway's vk_lifecycle facts: nurturing's own copy. The
+/// creator comes from the created fact alone; the holder and purpose are each the latest non-null
+/// value by the fact's time (stamped beside them); the state times keep their latest.
+model NurturingVirtualKey {
+  virtualKeyId      String    @id
+  organizationId    String
+  name              String
+  occurredAt        DateTime
+  keyCreatedAt      DateTime?
+  creatorUserId     String?
+  principalUserId   String?
+  principalUserIdAt DateTime?
+  purpose           String?
+  purposeAt         DateTime?
+  disabledAt        DateTime?
+  enabledAt         DateTime?
+  revokedAt         DateTime?
+
+  @@index([creatorUserId])
+  @@index([principalUserId])
+}
+
+/// Each account nurturing erased, as a SHA-256 of its id and never the id: a gateway key fact
+/// naming it, however late it lands, stores no creator or holder. Platform-wide, like the erasure.
+model NurturingErasedUser {
+  userIdHash String   @id
+  erasedAt   DateTime @default(now())
+}
+
 /// Nurturing's read model per organization: its admin and its milestone counts.
 /// `seeded` marks an organization learned from the project backfill: its first_* already happened.
 model NurturingOrganization {

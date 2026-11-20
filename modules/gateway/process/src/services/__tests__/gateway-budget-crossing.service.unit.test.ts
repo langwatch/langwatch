@@ -5,6 +5,7 @@
 import type {
   GatewayResolvedBudget,
   GatewayBudgetScopeType,
+  GatewayBudgetWindow,
   RecordBudgetCrossingCommandData,
 } from "@langwatch/gateway-contract";
 import { type Instant, Temporal } from "@langwatch/time";
@@ -28,12 +29,14 @@ function resolved({
   scopeType = "VIRTUAL_KEY",
   bucketScopeId = `${id}-bucket`,
   cycleAnchorAt = null,
+  window = "MONTH",
 }: {
   id: string;
   limitUsd?: string;
   scopeType?: GatewayBudgetScopeType;
   bucketScopeId?: string;
   cycleAnchorAt?: Instant | null;
+  window?: GatewayBudgetWindow;
 }): GatewayResolvedBudget {
   return {
     budget: {
@@ -44,7 +47,7 @@ function resolved({
       providerKey: null,
       name: id,
       description: null,
-      window: "MONTH",
+      window,
       limitUsd: { toString: () => limitUsd, toFixed: () => limitUsd },
       onBreach: "BLOCK",
       timezone: null,
@@ -161,6 +164,7 @@ describe("GatewayBudgetCrossingService", () => {
         anchor_project_id: null,
         window: "MONTH",
         period_started_at_ms: MONTH_START,
+        period_ends_at_ms: Temporal.Instant.from("2026-10-01T00:00:00Z").epochMilliseconds,
         limit_usd: "100.000000",
         spent_usd: "120.000000",
         on_breach: "block",
@@ -255,6 +259,45 @@ describe("GatewayBudgetCrossingService", () => {
       expect(early).toBe(Temporal.Instant.from("2026-09-17T09:00:00Z").epochMilliseconds);
       expect(late).toBe(early);
       expect(afterRollover).toBe(Temporal.Instant.from("2026-10-17T09:00:00Z").epochMilliseconds);
+    });
+  });
+
+  describe("given a monthly budget anchored on the 31st", () => {
+    describe("when it crosses in the period that starts on 28 February", () => {
+      /** @scenario "A crossing carries when its period ends" */
+      it("stamps that period's start and its end on 31 March, by gateway's own window logic", async () => {
+        const anchor = Temporal.Instant.from("2027-01-31T00:00:00Z");
+        const { crossings, facts } = harness({
+          spent: { anchored: "90" },
+          now: Temporal.Instant.from("2027-03-10T12:00:00Z"),
+        });
+
+        await crossings.detect({
+          tenantId: "project-1",
+          organizationId: "org-1",
+          budgets: [resolved({ id: "anchored", cycleAnchorAt: anchor })],
+        });
+
+        expect(facts.recorded[0]).toMatchObject({
+          period_started_at_ms: Temporal.Instant.from("2027-02-28T00:00:00Z").epochMilliseconds,
+          period_ends_at_ms: Temporal.Instant.from("2027-03-31T00:00:00Z").epochMilliseconds,
+        });
+      });
+    });
+  });
+
+  describe("given a budget whose window never rolls", () => {
+    /** @scenario "A crossing carries when its period ends" */
+    it("records a TOTAL budget's crossing with no period end, never the far-future sentinel", async () => {
+      const { crossings, facts } = harness({ spent: { lifetime: "120" } });
+
+      await crossings.detect({
+        tenantId: "project-1",
+        organizationId: "org-1",
+        budgets: [resolved({ id: "lifetime", window: "TOTAL" })],
+      });
+
+      expect(facts.recorded.map((crossing) => crossing.period_ends_at_ms)).toEqual([null]);
     });
   });
 });

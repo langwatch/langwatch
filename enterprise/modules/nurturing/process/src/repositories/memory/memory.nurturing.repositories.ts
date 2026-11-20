@@ -4,9 +4,13 @@ import { nowInstant } from "@langwatch/time";
 
 import type { NurturingClaimRepository } from "../nurturing-claim.repository.ts";
 import type { NurturingRepositories } from "../nurturing.repositories.ts";
+import { MemoryNurturingErasedUserRepository } from "./memory.nurturing-erased-user.repository.ts";
+import { MemoryNurturingVirtualKeyRepository } from "./memory.nurturing-gateway-key.repository.ts";
+import { MemoryNurturingMemberSourceRepository } from "./memory.nurturing-member-source.repository.ts";
 import { MemoryNurturingMilestonesRepository } from "./memory.nurturing-milestones.repository.ts";
 import { MemoryNurturingOrganizationCreatedRepository } from "./memory.nurturing-organization-created.repository.ts";
 import { MemoryNurturingOrganizationMemberRepository } from "./memory.nurturing-organization-member.repository.ts";
+import { MemoryNurturingOrganizationPlanRepository } from "./memory.nurturing-organization-plan.repository.ts";
 import { MemoryNurturingPersonalProjectRepository } from "./memory.nurturing-personal-project.repository.ts";
 import { MemoryNurturingProjectDirectoryRepository } from "./memory.nurturing-project-directory.repository.ts";
 import { MemoryNurturingProjectPlacementRepository } from "./memory.nurturing-project-placement.repository.ts";
@@ -40,12 +44,18 @@ export class MemoryNurturingRepositories {
   static readonly requires = [] as const;
 
   static create(): NurturingRepositories {
+    // One mark set for every copy, as they share one table in Postgres.
+    const erasedUsers = MemoryNurturingErasedUserRepository.create();
     return {
-      milestones: MemoryNurturingMilestonesRepository.create(),
+      erasedUsers,
+      milestones: MemoryNurturingMilestonesRepository.create({ erasedUsers }),
       projects: MemoryNurturingProjectDirectoryRepository.create(),
+      memberSource: MemoryNurturingMemberSourceRepository.create(),
       placements: MemoryNurturingProjectPlacementRepository.create(),
       organizationsCreated: MemoryNurturingOrganizationCreatedRepository.create(),
-      members: MemoryNurturingOrganizationMemberRepository.create(),
+      members: MemoryNurturingOrganizationMemberRepository.create({ erasedUsers }),
+      plans: MemoryNurturingOrganizationPlanRepository.create(),
+      virtualKeys: MemoryNurturingVirtualKeyRepository.create({ erasedUsers }),
       projectUsage: MemoryNurturingProjectUsageRepository.create(),
       traceDays: MemoryNurturingTraceDayRepository.create(),
       personalProjects: MemoryNurturingPersonalProjectRepository.create(),

@@ -29,3 +29,23 @@ Feature: Gateway records its governance facts for webhook delivery
     When gateway announces the change
     Then main's lifecycle fact is recorded under the key's trace project
     And a failure to record it never fails the key mutation
+
+  @unit
+  Scenario: A created key's fact names the person who made it and the person it acts for
+    Given a key created by a signed-in person, an API key with no owner, a legacy project key or a Connect licence
+    When gateway announces the creation
+    Then the fact carries the key's principal and purpose
+    And it names the creator only when a person made it, never a svc_ or system: id
+
+  @unit
+  Scenario: A crossing carries when its period ends
+    Given a monthly budget anchored on the 31st, crossing in the period that starts on 28 February
+    When crossing detection runs
+    Then the crossing's period ends on 31 March
+    And a TOTAL budget's crossing names no period end
+
+  @unit
+  Scenario: Governance facts stored before the person and period fields still parse
+    Given a stored lifecycle fact with no actor, principal or purpose, and a stored crossing with no period end
+    When each is read through gateway's contract
+    Then both parse, the missing fields reading as none

@@ -6,7 +6,7 @@ The server half of [billing](../README.md). Billing: subscriptions, invoices and
 
 ## Installation
 
-`defineProcessModule("billing").withRepositories(billingRepositories).withChannels(billingChannels).withApi(BillingModule).withTransports(connectedBillingTrpcTransport, billingStripeWebhookRest, currencyTrpcTransport, subscriptionTrpcTransport).withEventing(connectedBillingEventing).withEventing(billingReportingEventing).withEventing(billingLifecycleEventing).withEventing(seatLineRepairEventing).withEventing(paymentRecoveryEventing).withMigrations(…).withTasks(…)`, `src/billing.module.ts:45`.
+`defineProcessModule("billing").withRepositories(billingRepositories).withChannels(billingChannels).withApi(BillingModule).withTransports(connectedBillingTrpcTransport, billingStripeWebhookRest, currencyTrpcTransport, subscriptionTrpcTransport).withEventing(connectedBillingEventing).withEventing(billingReportingEventing).withEventing(billingLifecycleEventing).withEventing(seatLineRepairEventing).withEventing(paymentRecoveryEventing).withMigrations(…).withTasks(…)`, `src/billing.module.ts:46`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -458,6 +458,7 @@ Run by the tasks process, before serve.
 | Task                        | Class                              | Declared at                                      |
 | --------------------------- | ---------------------------------- | ------------------------------------------------ |
 | `tiered-free-to-seat-event` | `TieredFreeToSeatEventMigrateTask` | `src/tasks/tiered-free-to-seat-event.task.ts:79` |
+| `customer-io-plan-resync`   | `CustomerIoPlanResyncTask`         | `src/tasks/customer-io-plan-resync.task.ts:78`   |
 | `stripe-prices-sync`        | `StripePricesSyncTask`             | `src/tasks/stripe-prices-sync.task.ts:469`       |
 
 ## Configuration
@@ -482,3 +483,9 @@ Run by the tasks process, before serve.
 | config | `nodeEnvironment`                   | `NODE_ENV`                                     | `../contract/src/billing.config.ts:40` |
 
 <!-- readme:generated:end -->
+
+## Hand-run tasks
+
+| Task                      | When and how                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `customer-io-plan-resync` | Run after the rollout and after `nurturing-member-backfill --execute`: if it runs first, it identifies no member without a member-copy row (the org's group call still carries the plan), so the wrong order sends nothing wrong. To repair it, after the backfill, re-run the resync; skipped members otherwise get no plan until the next live fact; dry run unless `--execute`; running it against production needs the owner's go. |
