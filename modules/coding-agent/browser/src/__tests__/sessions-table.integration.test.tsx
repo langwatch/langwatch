@@ -15,6 +15,9 @@ const { queryImpls, utils } = vi.hoisted(() => ({
     traces: {
       conversationContext: { fetch: vi.fn(), prefetch: vi.fn() },
     },
+    codingAgents: {
+      lastTurn: { fetch: vi.fn() },
+    },
   },
 }));
 
@@ -146,8 +149,8 @@ const tableElement = () => <SessionsTable projectId="proj-personal" projectSlug=
 /** The surface the table is mounted in, rebuilt per render. */
 let host: FakeCodingAgentActivityHost;
 
-function renderTable() {
-  host = fakeCodingAgentActivityHost();
+function renderTable(query: Record<string, string> = {}) {
+  host = fakeCodingAgentActivityHost({ query });
   return render(tableElement(), { wrapper: codingAgentHostWrapper(host) });
 }
 
@@ -193,6 +196,7 @@ beforeEach(() => {
   for (const key of Object.keys(queryImpls)) delete queryImpls[key];
   vi.clearAllMocks();
   pinTurns([turn({ traceId: "trace-first", timestamp: LONG_AGO }), turn()]);
+  utils.codingAgents.lastTurn.fetch.mockResolvedValue(null);
 });
 
 afterEach(() => {
@@ -647,6 +651,86 @@ describe("the personal Sessions table", () => {
         ),
       );
       expect(writtenQueries()).toEqual([]);
+    });
+
+    /** @scenario "A session whose traces are filed under its launcher's thread still replays" */
+    it("opens the session's own latest trace when its conversation is named by a launcher", async () => {
+      pinTurns([]);
+      utils.codingAgents.lastTurn.fetch.mockResolvedValue({
+        traceId: "trace-mapped",
+        occurredAtMs: LONG_AGO + 9_000,
+      });
+      const user = userEvent.setup();
+      renderTable();
+
+      await user.click(screen.getByText("Link sessions to pull requests"));
+
+      await waitFor(() =>
+        expect(writtenQueries()).toEqual([
+          {
+            "drawer.open": "traceV2Details",
+            "drawer.traceId": "trace-mapped",
+            "drawer.t": String(LONG_AGO + 9_000),
+            "drawer.mode": "terminal",
+            "drawer.projectId": "proj-personal",
+          },
+        ]),
+      );
+      expect(utils.codingAgents.lastTurn.fetch).toHaveBeenCalledWith({
+        projectId: "proj-personal",
+        sessionId: "session-1",
+      });
+      expect(host.recording.infos).toEqual([]);
+    });
+
+    /** @scenario "A session link opens that session's terminal replay" */
+    it("opens the linked session's replay and drops the link, keeping Langy's question", async () => {
+      renderTable({ session: "session-1", langy: "open", langyPrompt: "Why so many tokens?" });
+
+      await waitFor(() =>
+        expect(writtenQueries()).toEqual([
+          {
+            langy: "open",
+            langyPrompt: "Why so many tokens?",
+            "drawer.open": "traceV2Details",
+            "drawer.traceId": "trace-last",
+            "drawer.t": String(LONG_AGO + 5_000),
+            "drawer.mode": "terminal",
+            "drawer.projectId": "proj-personal",
+          },
+        ]),
+      );
+    });
+
+    /** @scenario "A session name link opens the newest session with that name" */
+    it("opens the newest session with the linked name", async () => {
+      pinSessions([
+        sessionRow({ sessionId: "older", title: "Scout", lastEventOccurredAtMs: LONG_AGO }),
+        sessionRow({
+          sessionId: "newer",
+          title: "Scout",
+          lastEventOccurredAtMs: LONG_AGO + DAY_MS,
+        }),
+      ]);
+      renderTable({ sessionName: "Scout" });
+
+      await waitFor(() => expect(writtenQueries()).toHaveLength(1));
+      expect(utils.traces.conversationContext.fetch).toHaveBeenCalledWith({
+        projectId: "proj-personal",
+        conversationId: "newer",
+      });
+    });
+
+    /** @scenario "A link to a session that is not listed says so" */
+    it("says so when the linked session is not listed, and opens nothing", async () => {
+      renderTable({ sessionName: "Ghost" });
+
+      await waitFor(() =>
+        expect(host.recording.infos).toContainEqual(
+          expect.objectContaining({ title: "That session is not listed here" }),
+        ),
+      );
+      expect(writtenQueries()).toEqual([{}]);
     });
 
     it("reports a failed lookup rather than opening an empty replay", async () => {

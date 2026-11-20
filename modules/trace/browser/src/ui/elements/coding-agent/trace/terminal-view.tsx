@@ -22,6 +22,12 @@ import {
 
 import { formatDurationSeconds } from "../../../../model/coding-agent/duration.ts";
 import {
+  codeModeResultText,
+  isCodeModePoll,
+  isCodeModeScript,
+  readCodeModeScript,
+} from "../../../../model/coding-agent/trace/terminal-code-mode.ts";
+import {
   TERMINAL_FONT_STACK,
   TERMINAL_TOKENS,
 } from "../../../../model/coding-agent/trace/terminal-palette.ts";
@@ -1238,7 +1244,7 @@ function EntryLine({ entry, toolSpans }: { entry: TranscriptEntry; toolSpans: To
     case "assistant_message":
       return <AssistantLine text={entry.text} />;
     case "tool":
-      return <ToolCall entry={entry} ran={toolSpans.get(entry.spanId) ?? null} />;
+      return <ToolEntryLine entry={entry} ran={toolSpans.get(entry.spanId) ?? null} />;
     case "tool_rejected":
       return <RejectedLine name={entry.name} outcome={entry.outcome} byUser={entry.byUser} />;
     case "note":
@@ -1396,6 +1402,91 @@ function AssistantLine({ text }: { text: string | null }) {
   );
 }
 
+type ToolEntry = Extract<TranscriptEntry, { kind: "tool" }>;
+
+function ToolEntryLine({ entry, ran }: { entry: ToolEntry; ran: TerminalToolSpan | null }) {
+  const name = ran?.toolName ?? entry.name;
+  if (isCodeModeScript(name)) return <CodeScriptCall entry={entry} ran={ran} />;
+  if (isCodeModePoll(name))
+    return <ScriptWaitLine durationMs={ran?.durationMs ?? entry.durationMs} />;
+  return <ToolCall entry={entry} ran={ran} />;
+}
+
+/**
+ * A Code Mode script, drawn as the CLI draws it: `⏺ Code(description) · N lines`, the script
+ * collapsed until opened. The calls it made follow as their own rows; the span's duration is
+ * left out because the CLI logs the call as soon as the script starts.
+ */
+function CodeScriptCall({ entry, ran }: { entry: ToolEntry; ran: TerminalToolSpan | null }) {
+  const [expanded, setExpanded] = useState(false);
+  const script = readCodeModeScript(entry.input);
+  const resultText = codeModeResultText(ran?.output ?? entry.output);
+  const isError = ran?.isError ?? entry.failed;
+  const canExpand = script.code !== null || resultText !== null;
+  const linesLabel = script.lineCount === null ? "" : ` · ${lineCountLabel(script.lineCount)}`;
+  const toggleLabel = expanded ? "(click to hide)" : "(click to show)";
+
+  const heading = (
+    <>
+      <Glyph char={GLYPH.bullet} color={isError ? TERMINAL_TOKENS.red : TERMINAL_TOKENS.faint} />
+      <Text {...CELL} color={TERMINAL_TOKENS.screenFg} flex={1} minWidth={0} textAlign="start">
+        <Text as="span" fontWeight="semibold" color={TERMINAL_TOKENS.screenFg}>
+          Code
+        </Text>
+        {script.description !== null ? `(${truncateArg(script.description)})` : ""}
+        <Text as="span" color={TERMINAL_TOKENS.faint}>
+          {linesLabel}
+          {canExpand ? ` ${toggleLabel}` : ""}
+        </Text>
+      </Text>
+    </>
+  );
+
+  return (
+    <VStack align="stretch" gap={0.5}>
+      {canExpand ? (
+        <HStack asChild align="flex-start" gap={2} cursor="pointer" width="100%">
+          {/* A real button, typed explicitly: inside a form the default `type` is submit. */}
+          <button type="button" onClick={() => setExpanded((v) => !v)} aria-expanded={expanded}>
+            {heading}
+          </button>
+        </HStack>
+      ) : (
+        <HStack align="flex-start" gap={2}>
+          {heading}
+        </HStack>
+      )}
+      {expanded && script.code !== null && (
+        <ResultLine>
+          <SyntaxHighlightedCode code={script.code} filePath="script.js" />
+        </ResultLine>
+      )}
+      {expanded && resultText !== null && (
+        <ResultLine>
+          <TerminalOutput text={resultText} isError={isError} />
+        </ResultLine>
+      )}
+    </VStack>
+  );
+}
+
+function lineCountLabel(count: number): string {
+  return count === 1 ? "1 line" : `${count} lines`;
+}
+
+/** Poll: the model waiting on a script still running. One faint line, never a status body. */
+function ScriptWaitLine({ durationMs }: { durationMs: number | null }) {
+  const waited = durationMs !== null && durationMs > 0 ? ` · ${formatDuration(durationMs)}` : "";
+  return (
+    <HStack align="flex-start" gap={2}>
+      <Glyph char={GLYPH.note} color={TERMINAL_TOKENS.faint} />
+      <Text {...CELL} color={TERMINAL_TOKENS.faint} flex={1} minWidth={0}>
+        {`Waited for the script${waited}`}
+      </Text>
+    </HStack>
+  );
+}
+
 /**
  * `⏺ Tool(arg)` with its result hanging underneath on the `⎿` elbow. The
  * bullet is the only status signal — muted ran, red failed — matching how
@@ -1405,7 +1496,7 @@ function ToolCall({
   entry,
   ran,
 }: {
-  entry: Extract<TranscriptEntry, { kind: "tool" }>;
+  entry: ToolEntry;
   /** The tool's real span, when we have it. */
   ran: TerminalToolSpan | null;
 }) {
@@ -1425,9 +1516,23 @@ function ToolCall({
   const transcriptOutput =
     ranOutput === null && entry.output !== null ? toolResultBodyToString(entry.output) : null;
 
+  // A call a Code Mode script made sits under the script's Code row, and its output was
+  // never recorded, so it draws no result line rather than a "(no output)" filler.
+  const inScript = entry.inScript === true;
+  const hasRecordedBody =
+    patch !== null ||
+    synthesizedDiff !== null ||
+    ranOutput !== null ||
+    (transcriptOutput !== null && transcriptOutput.trim() !== "");
+
   return (
     <VStack align="stretch" gap={0.5}>
       <HStack align="flex-start" gap={2}>
+        {inScript && (
+          <Text {...CELL} whiteSpace="pre" flexShrink={0} userSelect="none" aria-hidden>
+            {"  "}
+          </Text>
+        )}
         <Glyph char={GLYPH.bullet} color={isError ? TERMINAL_TOKENS.red : TERMINAL_TOKENS.faint} />
         {/* One flowing block, not nested spans with their own box — nesting
             `fontWeight="semibold"` on an inline child was giving a wrapped
@@ -1452,16 +1557,18 @@ function ToolCall({
         )}
       </HStack>
 
-      <ResultLine>
-        <ToolResultBody
-          patch={patch}
-          synthesizedDiff={synthesizedDiff}
-          ran={ran}
-          ranOutput={ranOutput}
-          transcriptOutput={transcriptOutput}
-          isError={isError}
-        />
-      </ResultLine>
+      {(!inScript || hasRecordedBody) && (
+        <ResultLine>
+          <ToolResultBody
+            patch={patch}
+            synthesizedDiff={synthesizedDiff}
+            ran={ran}
+            ranOutput={ranOutput}
+            transcriptOutput={transcriptOutput}
+            isError={isError}
+          />
+        </ResultLine>
+      )}
     </VStack>
   );
 }

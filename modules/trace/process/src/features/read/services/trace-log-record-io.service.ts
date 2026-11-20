@@ -16,7 +16,12 @@ import type {
  * the only collaborator and never varies per record, so it is held rather than threaded through
  * every call.
  */
-type TraceLogIO = { input: string | null; output: string | null };
+type TraceLogIO = {
+  input: string | null;
+  output: string | null;
+  /** The record declared its output (`langwatch.output`), so a later inferred one keeps off it. */
+  outputDeclared?: boolean;
+};
 
 const NO_IO: TraceLogIO = { input: null, output: null };
 
@@ -73,6 +78,10 @@ export class TraceLogRecordIOService {
     if (!CLAUDE_CODE_SCOPE_NAMES.has(data.scopeName)) {
       return null;
     }
+
+    // A launcher that wraps the request, or answers through a tool, declares the real text.
+    const [declared] = declaredIO(data.attributes);
+    if (declared) return declared;
 
     // Gated on `user_prompt` specifically. Any claude_code record with a
     // `prompt` attribute would otherwise win, including internal subagent calls
@@ -151,4 +160,19 @@ export class TraceLogRecordIOService {
     }
     return null;
   }
+}
+
+/**
+ * The input and output a launcher declared on the record: the request it wrapped, the reply its
+ * agent posted through a tool. One item when it declared either, none when it declared neither.
+ */
+function declaredIO(attributes: LogRecordReceivedEventData["attributes"]): TraceLogIO[] {
+  const text = (key: string): string | null => {
+    const value = attributes[key];
+    return typeof value === "string" && value.length > 0 ? value : null;
+  };
+  const input = text("langwatch.input");
+  const output = text("langwatch.output");
+  if (input === null && output === null) return [];
+  return [{ input, output, ...(output === null ? {} : { outputDeclared: true }) }];
 }

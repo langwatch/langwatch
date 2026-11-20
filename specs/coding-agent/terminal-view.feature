@@ -408,3 +408,69 @@ Rule: An injected notification reads as a note, not as the user's words
     When the Terminal view asks for the session's transcript
     Then the log read names its time window with parameters the tenant guard does not mistake for a FROM clause
     And the transcript request answers instead of failing with a tenant-scope refusal
+
+  # In Claude Code's Code Mode the model has two tools: REPL runs a JavaScript
+  # script and Poll waits for a running one. The real tools (Bash, Read, Write)
+  # run inside the script, so they export no span and no result log of their
+  # own: each leaves only an accepted decision whose tool use id starts with
+  # "repl_". The real CLI draws the script as Code(<description>) and each
+  # call inside it as its usual tool row.
+
+Rule: A Code Mode session reads like the real CLI, not like REPL and Poll
+
+  @integration
+  Scenario: A Code Mode script is shown as a Code row with its script collapsed
+    Given a Claude Code session in Code Mode whose REPL call carries its script and description
+    When the Terminal tab renders the session
+    Then the call is one Code row named after the script's description
+    And the row counts the script's lines and keeps the script collapsed until opened
+    And no status summary is shown as the call's output
+
+  @unit
+  Scenario: The calls a Code Mode script made are listed as tool calls
+    Given a Claude Code session in Code Mode whose script ran Bash commands
+    When the transcript is derived from the session's spans and logs
+    Then each call the script made is a tool call marked as running inside the script
+    And it is named after the tool and carries the command it ran
+    And it is ordered by the time it was decided, after the script that made it
+
+  @integration
+  Scenario: The calls a Code Mode script made are shown under its Code row
+    Given a Claude Code session in Code Mode whose script ran Bash commands
+    When the Terminal tab renders the session
+    Then each call is shown under the Code row as its tool name and the command it ran
+    And no "(no output)" filler is shown for a call whose output was not recorded
+
+  @integration
+  Scenario: A metadata-only Code Mode session still names the script's calls
+    Given a Claude Code session in Code Mode exported without content
+    When the Terminal tab renders the session
+    Then the script is shown as a Code row with no description
+    And the tools the script called are still listed by name
+    And no status summary is shown for the script
+
+  @integration
+  Scenario: Waiting on a running script is one quiet line with its duration
+    Given a Claude Code session in Code Mode where the model polled a running script
+    When the Terminal tab renders the session
+    Then the poll is one faint line saying it waited for the script and for how long
+    And no status summary is shown for the poll
+
+  @integration
+  Scenario: A script with no description falls back to Code
+    Given a REPL call whose input carries a script but no description
+    When the Terminal tab renders the session
+    Then the row reads Code with the script's line count
+
+  @unit
+  Scenario: A model reply that only names its tool calls adds no line of its own
+    Given a Claude Code model call whose answer is a tool call, written as "[tool_use: REPL]" and its input
+    When the transcript is derived from the session's spans and logs
+    Then the call adds no assistant line, since the tool row already shows it
+    And prose written beside the tool call is still shown
+
+  @unit
+  Scenario: Claude Code's own utility calls are not the agent talking
+    Given a Claude Code model call made to generate the session title
+    When the transcript is derived from the session's spans and logs
+    Then its answer is not shown as an assistant line

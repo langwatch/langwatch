@@ -496,6 +496,18 @@ export class TestTraceSessions extends CodingAgentTraceSessionRepository {
     this.inputs.push(input);
     return this.mapping;
   }
+
+  latestInputs: { tenantId: string; sessionId: string; fromMs: number; toMs: number }[] = [];
+
+  async findLatestBySessionId(input: {
+    tenantId: string;
+    sessionId: string;
+    fromMs: number;
+    toMs: number;
+  }): Promise<CodingAgentTraceSessionRecord | null> {
+    this.latestInputs.push(input);
+    return this.mapping;
+  }
 }
 
 export class TestMetricSeries extends SessionMetricSeriesRepository {
