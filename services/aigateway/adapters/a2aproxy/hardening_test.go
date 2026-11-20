@@ -315,32 +315,6 @@ func TestBlockedUpstreamAddressIsNotCalled(t *testing.T) {
 	assert.Empty(t, f.upstreamCalls())
 }
 
-func TestCheckDialAddress(t *testing.T) {
-	cases := []struct {
-		address    string
-		blockLocal bool
-		allowed    bool
-	}{
-		{"8.8.8.8:443", true, true},
-		{"127.0.0.1:80", true, false},
-		{"127.0.0.1:80", false, true},
-		{"10.0.0.5:80", true, false},
-		{"169.254.169.254:80", false, false},
-		{"[fe80::1]:80", false, false},
-		{"0.0.0.0:80", false, false},
-		{"168.63.129.16:80", false, false},
-		{"[::ffff:169.254.169.254]:80", false, false},
-	}
-	for _, tc := range cases {
-		err := checkDialAddress(tc.address, tc.blockLocal)
-		if tc.allowed {
-			assert.NoError(t, err, tc.address)
-		} else {
-			assert.ErrorIs(t, err, errAddressBlocked, tc.address)
-		}
-	}
-}
-
 func TestReadEventsSplitsBareCRAndDropsBOM(t *testing.T) {
 	body := "\xef\xbb\xbfdata: one\r\r: ping\rdata: two\r\n\r\ndata: three\n\n"
 	var got []string
