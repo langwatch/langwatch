@@ -12,12 +12,13 @@ import type { OrganizationApi } from "@langwatch/organization-contract";
 import { ScopedSecrets, SecretsChain, SecretsResolver } from "@langwatch/secrets";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { UserApi, UserProfile } from "@langwatch/user-contract";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { CustomerIoTransactionalChannel } from "../../channels/customer-io-transactional.channel.ts";
 import { HttpNurturingChannels } from "../../channels/http/http.nurturing.channels.ts";
 import { MemoryCustomerIoTransactionalChannel } from "../../channels/memory/memory.customer-io-transactional.channel.ts";
 import { MemoryNurturingRepositories } from "../../repositories/memory/memory.nurturing.repositories.ts";
+import { USER_LOOKUP_DEADLINE_MS } from "../../services/nurturing-transactional-email.service.ts";
 import { NurturingModule } from "../nurturing.app.ts";
 
 const config: NurturingServerConfig = {
@@ -130,6 +131,24 @@ describe("given the user lookup throws", () => {
     });
 
     await expect(app.sendTransactionalEmail(email)).resolves.toMatchObject({ outcome: "queued" });
+    expect(channel.sent).toEqual([{ ...email, identifiers: { email: "ada@acme.test" } }]);
+  });
+});
+
+describe("given the user lookup never answers", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("sends by address once the lookup deadline passes", async () => {
+    const channel = MemoryCustomerIoTransactionalChannel.create();
+    const app = await moduleWith(channel, { findByEmail: () => new Promise<null>(() => void 0) });
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+
+    const answer = app.sendTransactionalEmail(email);
+    await vi.advanceTimersByTimeAsync(USER_LOOKUP_DEADLINE_MS);
+
+    await expect(answer).resolves.toMatchObject({ outcome: "queued" });
     expect(channel.sent).toEqual([{ ...email, identifiers: { email: "ada@acme.test" } }]);
   });
 });

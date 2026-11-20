@@ -2,7 +2,7 @@
 import { mailTemplates } from "@langwatch/mail";
 import { describe, expect, it } from "vitest";
 
-import { CUSTOMER_IO_ROUTES } from "../customer-io-routing.rules.ts";
+import { CUSTOMER_IO_ROUTES, findCustomerIoRequests } from "../customer-io-routing.rules.ts";
 
 /** Written out here, not read from the table: the list is the agreed scope, not a default. */
 const AGREED = [
@@ -61,5 +61,25 @@ describe("the Customer.io routing list", () => {
   it("names only templates the app sends", () => {
     const sent = new Set(mailTemplates.map((template) => template.id));
     expect(Object.keys(CUSTOMER_IO_ROUTES).filter((id) => !sent.has(id))).toEqual([]);
+  });
+});
+
+describe("the person a routed recipient is filed under", () => {
+  const filedUnder = (to: string) =>
+    findCustomerIoRequests({
+      command: { to, subject: "s", html: "<p>h</p>", template: "usage-limit" },
+      defaultFrom: "LangWatch <contact@langwatch.test>",
+      replyTo: undefined,
+    }).map((request) => request.identifiers);
+
+  it("is the bare address, or the address of a Name <address> form", () => {
+    expect(filedUnder(" ada@acme.test ")).toEqual([{ email: "ada@acme.test" }]);
+    expect(filedUnder("Ada <ada@acme.test>")).toEqual([{ email: "ada@acme.test" }]);
+  });
+
+  it("is the address that ends the recipient, not one inside a quoted display name", () => {
+    expect(filedUnder('"Team <other@acme.test>" <ada@acme.test>')).toEqual([
+      { email: "ada@acme.test" },
+    ]);
   });
 });

@@ -36,7 +36,7 @@ const settings: MailGatewaySettings = {
   resend: {},
 };
 
-/** The install's own mailer, recorded rather than delivered; told to fail, it refuses every send. */
+/** The install's own mailer, recorded rather than delivered; told to fail, it refuses all sends. */
 class OwnMailer extends EmailDelivery {
   readonly sent: EmailContent[] = [];
   failure: Error | undefined;
@@ -156,6 +156,36 @@ describe("given a routed message to two recipients", () => {
           idempotencyKey: "usage:org-1:grace@acme.test",
         },
       ]);
+    });
+  });
+});
+
+describe("given nurturing answers off, as it does without the App API key", () => {
+  describe("when a routed message to two recipients is sent", () => {
+    /** @scenario "Without IS_SAAS or the key nothing reaches Customer.io" */
+    it("sends the original envelope once, with both recipients and the caller's key", async () => {
+      const { customerIo, ownMailer, mail } = compose();
+      customerIo.turnOff();
+
+      await mail.sendEmail({
+        to: ["ada@acme.test", "grace@acme.test"],
+        undisclosedRecipients: ["linus@acme.test"],
+        subject: "Usage limit reached",
+        html: "<p>limit</p>",
+        template: "usage-limit",
+        idempotencyKey: "usage:org-1",
+      });
+
+      expect(ownMailer.sent).toEqual([
+        {
+          to: ["ada@acme.test", "grace@acme.test"],
+          bcc: ["linus@acme.test"],
+          subject: "Usage limit reached",
+          html: "<p>limit</p>",
+          idempotencyKey: "usage:org-1",
+        },
+      ]);
+      expect(warnings()).toEqual([]);
     });
   });
 });

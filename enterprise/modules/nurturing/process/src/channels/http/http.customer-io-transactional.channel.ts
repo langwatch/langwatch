@@ -84,13 +84,24 @@ function payloadOf(email: CustomerIoTransactionalRequest) {
     identifiers: email.identifiers,
     to: email.to,
     from: email.from,
-    subject: email.subject,
-    body: email.body,
+    subject: literalUnderLiquid(email.subject),
+    body: literalUnderLiquid(email.body),
     ...(email.replyTo && { reply_to: email.replyTo }),
     ...(email.headers && { headers: email.headers }),
     send_to_unsubscribed: true,
     tracked: false,
   };
+}
+
+/**
+ * Customer.io renders Liquid in a subject and body passed with the send (its own `auto_create`
+ * example puts `{{customer.first_name}}` in one), and has no switch to turn that off. Ours are
+ * finished text that carries user-set names (an organization, a trigger), so every Liquid opener
+ * is printed as a Liquid string literal: the reader sees the text as typed, nothing is evaluated.
+ * One pass, so the `{{` each replacement adds is not itself replaced.
+ */
+function literalUnderLiquid(text: string): string {
+  return text.replace(/\{[{%]/g, (opener) => `{{ "${opener}" }}`);
 }
 
 /** `AbortSignal.timeout` rejects with a `TimeoutError`. */

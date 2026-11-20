@@ -53,6 +53,7 @@ Feature: The app's product mail goes through Customer.io on LangWatch Cloud
     When a "usage-limit" message is sent
     Then nothing reaches Customer.io
     And the own mailer sends it, with no warning
+    And a message to several recipients leaves as one envelope under the caller's key, as before
 
   @unit
   Scenario Outline: A failed usage-limit send still reaches the person

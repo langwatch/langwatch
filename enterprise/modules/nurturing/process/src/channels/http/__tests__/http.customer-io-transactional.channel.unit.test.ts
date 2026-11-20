@@ -30,10 +30,16 @@ type Posted = { url: string; init: RequestInit };
 function network(answer: () => Promise<Response>) {
   const posted: Posted[] = [];
   const fetchFn = (async (url: string | URL | Request, init?: RequestInit) => {
-    posted.push({ url: String(url), init: init ?? {} });
+    posted.push({ url: url instanceof Request ? url.url : url.toString(), init: init ?? {} });
     return answer();
   }) as typeof fetch;
   return { posted, fetchFn };
+}
+
+/** The JSON body the client posts is always a string; anything else fails the test loudly. */
+function stringBody(body: BodyInit | null | undefined): string {
+  if (typeof body !== "string") throw new Error("expected a string request body");
+  return body;
 }
 
 const accepted = () =>
@@ -62,7 +68,7 @@ describe("given the client on the default region", () => {
         Authorization: `Bearer ${API_KEY}`,
         "Content-Type": "application/json",
       });
-      expect(JSON.parse(String(posted[0]?.init.body))).toEqual({
+      expect(JSON.parse(stringBody(posted[0]?.init.body))).toEqual({
         transactional_message_id: "trigger-digest",
         identifiers: { email: "ada@acme.test" },
         to: "ada@acme.test",
@@ -99,6 +105,29 @@ describe("given the client on the US region", () => {
       await channel.send(email);
 
       expect(posted[0]?.url).toBe("https://api.customer.io/v1/send/email");
+    });
+  });
+});
+
+describe("given a subject and body holding user text that reads as Liquid", () => {
+  describe("when it is sent", () => {
+    it("prints every Liquid opener as a string literal, so Customer.io evaluates none of it", async () => {
+      const { posted, fetchFn } = network(accepted);
+      const channel = HttpCustomerIoTransactionalChannel.create({
+        apiKey: API_KEY,
+        region: undefined,
+        fetchFn,
+      });
+
+      await channel.send({
+        ...email,
+        subject: "Usage limit for {{ 7 | plus: 5 }}",
+        body: "<p>{% if true %}Acme{% endif %} {{{</p>",
+      });
+
+      const sent = JSON.parse(stringBody(posted[0]?.init.body)) as { subject: string; body: string };
+      expect(sent.subject).toBe('Usage limit for {{ "{{" }} 7 | plus: 5 }}');
+      expect(sent.body).toBe('<p>{{ "{%" }} if true %}Acme{{ "{%" }} endif %} {{ "{{" }}{</p>');
     });
   });
 });

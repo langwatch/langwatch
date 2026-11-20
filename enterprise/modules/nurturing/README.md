@@ -6,13 +6,13 @@ Product analytics and lifecycle messaging: nurturing learns from the owners' eve
 
 ## At a glance
 
-|                |                                                                                                                |
-| -------------- | -------------------------------------------------------------------------------------------------------------- |
-| Classification | enterprise (`modules/catalogue.json`)                                                                          |
-| Subjects       | nurturing, product-milestone                                                                                   |
-| Halves         | [contract](contract) · [process](process/README.md)                                                            |
-| Api token      | `NurturingApi` = `moduleApi<NurturingApi>()("nurturing")`, `contract/src/nurturing-types.ts:259` (1 operation) |
-| Installed by   | api, worker, tasks (process)                                                                                   |
+|                |                                                                                                                 |
+| -------------- | --------------------------------------------------------------------------------------------------------------- |
+| Classification | enterprise (`modules/catalogue.json`)                                                                           |
+| Subjects       | nurturing, product-milestone                                                                                    |
+| Halves         | [contract](contract) · [process](process/README.md)                                                             |
+| Api token      | `NurturingApi` = `moduleApi<NurturingApi>()("nurturing")`, `contract/src/nurturing-types.ts:269` (2 operations) |
+| Installed by   | api, worker, tasks (process)                                                                                    |
 
 ## What nurturing owns
 
@@ -29,10 +29,10 @@ Product analytics and lifecycle messaging: nurturing learns from the owners' eve
 | Postgres table                 | `NurturingUncopiedProject`                                                                                                                    | `process/src/repositories/prisma/prisma.nurturing-uncopied-project.repository.ts:12`     |
 | Postgres, accessed not claimed | `Organization`, `Project`, `Team`                                                                                                             | `process/src/repositories/prisma/prisma.nurturing-project-directory.repository.ts:12`    |
 | Stores required                |                                                                                                                                               | `process/src/channels/http/http.customer-io.channel.ts:20`                               |
-| Stores required                |                                                                                                                                               | `process/src/channels/http/http.nurturing.channels.ts:13`                                |
+| Stores required                |                                                                                                                                               | `process/src/channels/http/http.nurturing.channels.ts:14`                                |
 | Stores required                | prisma, redis                                                                                                                                 | `process/src/repositories/live/live.nurturing.repositories.ts:11`                        |
 | Stores required                | ≈ `ownedRepositories.requires`                                                                                                                | `process/src/repositories/prisma/prisma.nurturing.repositories.ts:36`                    |
-| Secrets                        | CUSTOMER_IO_API_KEY                                                                                                                           | `process/src/app/nurturing.app.ts:48`                                                    |
+| Secrets                        | CUSTOMER_IO_API_KEY                                                                                                                           | `process/src/app/nurturing.app.ts:52`                                                    |
 | Config                         | `customerIoRegion` (CUSTOMER_IO_REGION), `customerIoBaseUrl` (CUSTOMER_IO_BASE_URL), `posthogKey` (POSTHOG_KEY), `posthogHost` (POSTHOG_HOST) | `contract/src/nurturing.config.ts:8`                                                     |
 
 Anything else nurturing needs belongs to another module and is reached through its `*Api`.

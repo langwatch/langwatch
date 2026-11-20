@@ -54,6 +54,7 @@ function process(smtp: { host: string | undefined; port: string | undefined; pro
   const resolver = SecretsResolver.over(
     SecretsChain.start({ environment: { SMTP_PASSWORD: "p" } }).withEnv(),
   );
+  // The channel tier binds nurturing for Cloud mail; this process installs no nurturing.
   return createApp({
     role: "worker",
     secrets: (owner, declared) => resolver.scopeTo(owner, declared),
@@ -80,7 +81,6 @@ function process(smtp: { host: string | undefined; port: string | undefined; pro
         },
       },
     })
-    // The channel tier binds nurturing for Cloud mail; this process installs no nurturing.
     .provide({ nurturing: createApiFixture<NurturingApi>({}) });
 }
 

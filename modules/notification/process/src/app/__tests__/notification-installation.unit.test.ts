@@ -13,6 +13,7 @@ function process(
   role: "api" | "worker",
   resolver = SecretsResolver.over(SecretsChain.start({ environment: {} })),
 ) {
+  // The channel tier binds nurturing for Cloud mail; this process installs no nurturing.
   return createApp({ role, secrets: (owner, declared) => resolver.scopeTo(owner, declared) })
     .withModules([notificationProcessModule])
     .withStores(memoryStores())
@@ -36,7 +37,6 @@ function process(
         },
       },
     })
-    // The channel tier binds nurturing for Cloud mail; this process installs no nurturing.
     .provide({ nurturing: createApiFixture<NurturingApi>({}) });
 }
 

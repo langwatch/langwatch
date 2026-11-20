@@ -9,10 +9,9 @@ export type CustomerIoRoute = Readonly<{ fallback: "own-mailer" }>;
 const ownMailerFallback: CustomerIoRoute = { fallback: "own-mailer" };
 
 /**
- * The messages LangWatch Cloud sends through Customer.io, by template id. Everything else stays
- * on the own mailer. Security mail (sign-up verification, password reset, address confirmation,
- * invitations, MFA, SSO, licences, statements, operator notices) never belongs here.
- * Payment recovery waits until something on main sends it.
+ * The messages LangWatch Cloud sends through Customer.io, by template id; the rest stays on the
+ * own mailer. Security mail (verification, reset, invitations, MFA, SSO, licences, statements,
+ * operator notices) never belongs here. Payment recovery waits until main sends it.
  */
 export const CUSTOMER_IO_ROUTES: Readonly<Record<string, CustomerIoRoute>> = {
   "invite-re-request": ownMailerFallback,
@@ -32,10 +31,10 @@ export const CUSTOMER_IO_ROUTES: Readonly<Record<string, CustomerIoRoute>> = {
 
 /**
  * The Customer.io requests one send becomes, one per recipient (the visible one and every hidden
- * one), or undefined when the own mailer sends it: an untagged or unrouted template, or a message
+ * one), or none when the own mailer sends it: an untagged or unrouted template, or a message
  * with attachments, which this route does not carry.
  */
-export function customerIoRequestsFor({
+export function findCustomerIoRequests({
   command,
   defaultFrom,
   replyTo,
@@ -44,10 +43,10 @@ export function customerIoRequestsFor({
   defaultFrom: string;
   /** The no-reply address a replyless send answers to. */
   replyTo: string | undefined;
-}): TransactionalEmail[] | undefined {
+}): TransactionalEmail[] {
   const { template } = command;
-  if (template === undefined || !Object.hasOwn(CUSTOMER_IO_ROUTES, template)) return undefined;
-  if (command.attachments !== undefined && command.attachments.length > 0) return undefined;
+  if (template === undefined || !Object.hasOwn(CUSTOMER_IO_ROUTES, template)) return [];
+  if (command.attachments !== undefined && command.attachments.length > 0) return [];
 
   return recipientsOf(command).map((recipient) => ({
     transactionalMessageId: template,
@@ -68,7 +67,10 @@ function recipientsOf(command: SendEmailCommand): string[] {
   return [...[command.to].flat(), ...(command.undisclosedRecipients ?? [])];
 }
 
-/** Customer.io files a person under a plain address, never a `Name <address>` form. */
+/**
+ * Customer.io files a person under a plain address, never a `Name <address>` form. The address
+ * is the angle pair that ends the string: a quoted display name may hold an earlier one.
+ */
 function bareAddressOf(recipient: string): string {
-  return recipient.match(/<([^>]+)>/)?.[1]?.trim() ?? recipient.trim();
+  return recipient.match(/<([^<>]+)>\s*$/)?.[1]?.trim() ?? recipient.trim();
 }

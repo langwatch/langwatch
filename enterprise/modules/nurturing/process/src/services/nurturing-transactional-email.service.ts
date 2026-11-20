@@ -15,6 +15,13 @@ import {
 const logger = createLogger("langwatch:nurturing:transactional-email");
 
 /**
+ * The channel's 10 s limit starts only after the lookup, so a lookup stalled on a hung database
+ * would hold the send with no answer and the caller's own mailer would never take over. Past
+ * this, the send goes by address, as when the lookup fails.
+ */
+export const USER_LOOKUP_DEADLINE_MS = 3_000;
+
+/**
  * Customer.io's transactional email, answered rather than thrown: whoever asked keeps its own
  * mailer and decides what a refusal means. Without the App API key every send is `off`.
  *
@@ -55,7 +62,10 @@ export class NurturingTransactionalEmailService {
 
   private async identified(email: TransactionalEmail): Promise<CustomerIoTransactionalRequest> {
     try {
-      const user = await this.users.findByEmail({ email: email.identifiers.email });
+      const user = await withinDeadline(
+        this.users.findByEmail({ email: email.identifiers.email }),
+        USER_LOOKUP_DEADLINE_MS,
+      );
       return user ? { ...email, identifiers: { id: user.id } } : email;
     } catch (error) {
       // Delivery matters more than profile tidiness: a failed lookup sends by address, at worst
@@ -67,4 +77,17 @@ export class NurturingTransactionalEmailService {
       return email;
     }
   }
+}
+
+/** `work`'s result, or a `TimeoutError` rejection once `ms` pass first. */
+function withinDeadline<T>(work: Promise<T>, ms: number): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const deadline = new Promise<never>((_resolve, reject) => {
+    timer = setTimeout(() => {
+      const timeout = new Error(`no answer within ${ms} ms`);
+      timeout.name = "TimeoutError";
+      reject(timeout);
+    }, ms);
+  });
+  return Promise.race([work, deadline]).finally(() => clearTimeout(timer));
 }
