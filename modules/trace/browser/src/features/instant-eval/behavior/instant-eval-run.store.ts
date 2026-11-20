@@ -57,11 +57,11 @@ interface InstantEvalRunState {
   /** Quiet runs whose final numbers the table and the sidebar have read. */
   settled: Record<string, true>;
   /**
-   * Run keys of chips the reader submitted as Instant Evals on this page. A bare
+   * Questions the reader submitted as Instant Evals on this page, by `typedQuestionKey`. A bare
    * chip outside it may still be an evaluator name from before Instant Evals.
    */
-  typedKeys: Record<string, true>;
-  markTyped: (key: string) => void;
+  typedQuestions: Record<string, true>;
+  markTyped: (typed: { projectId: string; question: string }) => void;
   setRun: (run: ExplorerInstantEvalProgress, now?: number) => void;
   markStopped: (runId: string) => void;
   markSettled: (runId: string) => void;
@@ -113,6 +113,20 @@ function only<T>(record: Record<string, T>, keep: ReadonlySet<string>): Record<s
   return Object.fromEntries(Object.entries(record).filter(([id]) => keep.has(id)));
 }
 
+/**
+ * The mark of a question submitted as an Instant Eval: by project, so another project's bare chip
+ * keeps its older meaning, and not by window, so a new range keeps the chip pending.
+ */
+export function typedQuestionKey({
+  projectId,
+  question,
+}: {
+  projectId: string;
+  question: string;
+}): string {
+  return JSON.stringify([projectId, question.replace(/\s+/g, " ").trim()]);
+}
+
 export const useInstantEvalRunStore = defineSlice<InstantEvalRunState>({
   name: "trace:instant-eval-run",
   create: (set) => ({
@@ -120,11 +134,14 @@ export const useInstantEvalRunStore = defineSlice<InstantEvalRunState>({
     stoppedByUser: {},
     quiet: {},
     settled: {},
-    typedKeys: {},
-    markTyped: (key) =>
-      set((state) =>
-        state.typedKeys[key] ? state : { typedKeys: { ...state.typedKeys, [key]: true } },
-      ),
+    typedQuestions: {},
+    markTyped: (typed) =>
+      set((state) => {
+        const key = typedQuestionKey(typed);
+        return state.typedQuestions[key]
+          ? state
+          : { typedQuestions: { ...state.typedQuestions, [key]: true } };
+      }),
     setRun: (run, now = nowInstant().epochMilliseconds) =>
       set((state) => withRead({ state, run, now })),
     markStopped: (runId) =>

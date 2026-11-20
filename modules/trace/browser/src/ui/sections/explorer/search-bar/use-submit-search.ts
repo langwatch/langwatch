@@ -173,7 +173,12 @@ function typedEvalRunOf({
 }): InstantEvalRoutePayload | "unjudgeable" | null {
   // Read from the store at submit time, not from the debounced copy: the chip
   // just typed is matched against the window and lens the search will run in.
-  const { activeLensId, timeRange, evalRuns } = useFilterStore.getState();
+  const {
+    activeLensId,
+    timeRange,
+    evalRuns,
+    projectId: shownProjectId,
+  } = useFilterStore.getState();
   const { chips } = resolveInstantEvalChips({
     queryText,
     lensId: activeLensId,
@@ -189,11 +194,14 @@ function typedEvalRunOf({
     hasNegatedInstantEvalChipUnderOr({ queryText, field: chip.field, question: chip.question }),
   );
   if (isUnjudgeable) return "unjudgeable";
+  // Every chip's rows read as not judged while no run answers it, rather than as an evaluator name.
+  // Keyed by the project the explorer shows, as the table reads the mark back.
+  const { markTyped } = useInstantEvalRunStore.getState();
+  for (const typed of chips)
+    markTyped({ projectId: shownProjectId ?? "", question: typed.question });
   const pending = chips.find((chip) => chip.runId === null);
   if (!pending) return null;
   const chip = { queryText, field: pending.field, question: pending.question };
-  // Its rows read as not judged while no run answers it, rather than as an evaluator name.
-  useInstantEvalRunStore.getState().markTyped(pending.key);
   return {
     projectId,
     sentence: pending.question,

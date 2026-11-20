@@ -125,6 +125,22 @@ describe("given an eval chip and no run that fits it", () => {
       expect(result?.params.evaluatorName_0).toBe("faithfulness");
     });
   });
+
+  describe("when a NOT reaches the chip across an OR, beside a sibling chip with a run", () => {
+    /** @scenario "A NOT the run of a typed chip cannot answer is refused" */
+    it.each([
+      [
+        'NOT eval:"the user is annoyed" OR eval.trace:"the user is annoyed"',
+        "FROM evaluation_runs",
+      ],
+      ['NOT eval.trace:"the user is annoyed" OR eval:"the user is annoyed"', "NOT (1 = 0)"],
+    ])("applies the run to the sibling only: %s", (queryText, refusedSql) => {
+      const result = compile(queryText, [run()]);
+      const runParams = Object.values(result?.params ?? {}).filter((value) => value === "run-1");
+      expect(runParams).toHaveLength(1);
+      expect(result?.sql).toContain(refusedSql);
+    });
+  });
 });
 
 describe("given a trigger evaluating an eval chip in memory", () => {

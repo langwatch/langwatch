@@ -225,6 +225,7 @@ Feature: Instant Evals inside the Trace Explorer
       When the filter is compiled
       Then it keeps the rows whose latest verdict for the run is a judged "no", and no row that passed
       And a row the run never judged, past the cap, after a stop or newer than the run, is left out
+      And a threads run's row is a conversation, so a conversation judged "no" keeps every turn, a later one too, as a matched one does
 
     @unit
     Scenario: A target modifier only resolves a run of that target

@@ -6,7 +6,7 @@ import {
 import { useMemo } from "react";
 
 import { useFilterStore, useViewStore } from "../../../behavior/explorer.store.ts";
-import { useInstantEvalRunStore } from "./instant-eval-run.store.ts";
+import { typedQuestionKey, useInstantEvalRunStore } from "./instant-eval-run.store.ts";
 
 /**
  * The query's eval chips, each with its run or none, and the map every read
@@ -51,13 +51,14 @@ export function useInstantEvalRuns(): InstantEvalRunsResult {
 export function useHasPendingNegatedEval(): boolean {
   const queryText = useFilterStore((s) => s.debouncedQueryText) ?? "";
   const runsByKey = useFilterStore((s) => s.evalRuns);
-  const typedKeys = useInstantEvalRunStore((s) => s.typedKeys);
+  const typedQuestions = useInstantEvalRunStore((s) => s.typedQuestions);
+  const projectId = useViewStore((s) => s.projectId) ?? "";
   const { chips } = useInstantEvalRuns();
   return chips.some(
     (chip) =>
       chip.runId === null &&
       (Object.hasOwn(INSTANT_EVAL_TARGET_FIELDS, chip.field) ||
-        Boolean(typedKeys[chip.key]) ||
+        Boolean(typedQuestions[typedQuestionKey({ projectId, question: chip.question })]) ||
         Boolean(runsByKey?.[chip.key])) &&
       isInstantEvalChipNegated({ queryText, field: chip.field, question: chip.question }),
   );

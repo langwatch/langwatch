@@ -14,7 +14,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
  * failure on the way is a phrase search rather than an error state.
  */
 import { useFilterStore } from "../../../../../behavior/explorer.store.ts";
-import { useInstantEvalRunStore } from "../../../../../features/instant-eval/behavior/instant-eval-run.store.ts";
+import {
+  typedQuestionKey,
+  useInstantEvalRunStore,
+} from "../../../../../features/instant-eval/behavior/instant-eval-run.store.ts";
 import { useSubmitSearch } from "../use-submit-search.ts";
 
 type MutateOptions = {
@@ -94,7 +97,8 @@ beforeEach(() => {
   useFilterStore.getState().clearAll();
   useFilterStore.setState({ searchNotice: null });
   useFilterStore.setState({ activeLensId: "all-traces" });
-  useInstantEvalRunStore.setState({ typedKeys: {} });
+  useInstantEvalRunStore.setState({ typedQuestions: {} });
+  useFilterStore.setState({ projectId: "project-1" });
 });
 
 describe("given the text has only field:value terms", () => {
@@ -394,18 +398,19 @@ describe("given the text is an eval chip typed by hand", () => {
     it("marks the chip as typed here, so its rows read as not judged until a run answers", () => {
       const { result } = renderSubmit({ isInstantEvalAvailable: false });
       act(() => result.current.submitSearch('NOT eval:"the user is annoyed"'));
-      const { timeRange } = useFilterStore.getState();
-      const key = instantEvalRunKey({
-        question: "the user is annoyed",
-        target: "traces",
-        otherQuery: "",
-        window: {
-          from: timeRange.from,
-          to: timeRange.to,
-          ...(timeRange.presetId ? { presetId: timeRange.presetId } : {}),
-        },
+      expect(useInstantEvalRunStore.getState().typedQuestions).toEqual({
+        [typedQuestionKey({ projectId: "project-1", question: "the user is annoyed" })]: true,
       });
-      expect(useInstantEvalRunStore.getState().typedKeys).toEqual({ [key]: true });
+    });
+
+    /** @scenario "A pending chip under NOT is not judged yet" */
+    it("marks every chip of the query as typed, not only the one whose run starts", () => {
+      const { result } = renderSubmit({ isInstantEvalAvailable: false });
+      act(() => result.current.submitSearch('eval:"a" AND NOT eval:"b"'));
+      expect(useInstantEvalRunStore.getState().typedQuestions).toEqual({
+        [typedQuestionKey({ projectId: "project-1", question: "a" })]: true,
+        [typedQuestionKey({ projectId: "project-1", question: "b" })]: true,
+      });
     });
 
     /** @scenario "A chip typed by hand starts its run on Enter" */

@@ -41,7 +41,7 @@ export class TraceQueryTranslationService {
         timeTo: timeRange.to,
       },
       timeRange,
-      ...(evalRuns ? { evalRuns } : {}),
+      ...(evalRuns ? { evalRuns, queryText } : {}),
     };
 
     const sql = translateFilterAst({

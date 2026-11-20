@@ -8,6 +8,7 @@
 import type { InstantEvalTarget } from "@langwatch/instant-eval-contract";
 import {
   type FieldDef,
+  hasNegatedInstantEvalChipUnderOr,
   INSTANT_EVAL_TARGET_FIELDS,
   type ResolvedInstantEvalRun,
   type TranslationContext,
@@ -27,16 +28,27 @@ function normalise(question: string): string {
   return question.replace(/\s+/g, " ").trim();
 }
 
-/** The runs a chip names; empty when the client registered none for it. */
+/**
+ * The runs a chip names; empty when the client registered none for it, or when a NOT reaches the
+ * chip across an OR: no run answers that, even one sent for a sibling with the same question.
+ */
 function findRuns({
   ctx,
+  field,
   question,
   target,
 }: {
   ctx: TranslationContext;
+  field: string;
   question: string;
   target: InstantEvalTarget | undefined;
 }): ResolvedInstantEvalRun[] {
+  if (
+    ctx.queryText !== undefined &&
+    hasNegatedInstantEvalChipUnderOr({ queryText: ctx.queryText, field, question })
+  ) {
+    return [];
+  }
   const wanted = normalise(question);
 
   return (
@@ -73,7 +85,8 @@ function compileRun({
     });
   if (!negated) return membership("passed");
   // NOT keeps only rows the run judged and did not pass: a row past the cap, after a stop
-  // or newer than the run was never judged, so it is no non-match either.
+  // or newer than the run was never judged, so it is no non-match either. A threads run's
+  // row is a conversation: one judged "no" keeps every turn, as a matched one does.
   return `(${membership("not_passed")} AND ${wrapMembership(membership("passed"), true)})`;
 }
 
@@ -89,7 +102,7 @@ function fieldDef(fieldName: string): FieldDef {
     toClickHouse: (tag, negated, ctx) => {
       const question = extractStringValue(tag);
       validateValueLength(question);
-      const [run] = findRuns({ ctx, question, target: forced });
+      const [run] = findRuns({ ctx, field: fieldName, question, target: forced });
       if (run) return compileRun({ ctx, run, negated });
       // A forcing spelling can only mean an Instant Eval, so with no run it
       // matches nothing; the bare field falls back to the evaluator lookup.

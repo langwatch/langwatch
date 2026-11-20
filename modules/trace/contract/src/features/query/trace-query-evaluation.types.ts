@@ -23,6 +23,8 @@ export interface TranslationContext {
    * checked against the project. Absent when the query carries no such chip.
    */
   evalRuns?: readonly ResolvedInstantEvalRun[];
+  /** The query being compiled, so a chip no run can answer is given none of `evalRuns`. */
+  queryText?: string;
 }
 
 export type FieldHandler = (tag: TagToken, negated: boolean, context: TranslationContext) => string;

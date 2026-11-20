@@ -96,6 +96,7 @@ vi.mock("../../../../../behavior/explorer.store.ts", () => ({
   useViewStore: (selector: (s: unknown) => unknown) =>
     selector({
       activeLensId: "all-traces",
+      projectId: "proj-1",
       sort: { columnId: "timestamp", direction: "desc" },
     }),
   useExplorerStore: (selector: (s: unknown) => unknown) =>
@@ -172,15 +173,14 @@ import type React from "react";
 import { useInstantEvalRunStore } from "../../../../../features/instant-eval/behavior/instant-eval-run.store.ts";
 import { TraceTable } from "../trace-table.tsx";
 
-/** The run keys of the query's chips, as the table resolves them. */
-function chipKeysOf(queryText: string): string[] {
-  const { chips } = resolveInstantEvalChips({
+/** The query's chips, as the table resolves them. */
+function chipsOf(queryText: string) {
+  return resolveInstantEvalChips({
     queryText,
     lensId: "all-traces",
     window: mockFilterState.debouncedTimeRange,
     runsByKey: {},
-  });
-  return chips.map((chip) => chip.key);
+  }).chips;
 }
 
 // ─── Test lifecycle ───────────────────────────────────────────────────────────
@@ -195,7 +195,7 @@ beforeEach(() => {
   mockFilterState.queryText = "";
   mockFilterState.debouncedQueryText = "";
   mockFilterState.evalRuns = {};
-  useInstantEvalRunStore.setState({ typedKeys: {} });
+  useInstantEvalRunStore.setState({ typedQuestions: {} });
   mockTraceListResult = {
     data: [],
     totalHits: 0,
@@ -310,7 +310,9 @@ describe("<TraceTable /> pending NOT eval chip", () => {
     (queryText, typed, notJudged) => {
       mockFilterState.debouncedQueryText = queryText;
       if (typed === "typed") {
-        for (const key of chipKeysOf(queryText)) useInstantEvalRunStore.getState().markTyped(key);
+        for (const { question } of chipsOf(queryText)) {
+          useInstantEvalRunStore.getState().markTyped({ projectId: "proj-1", question });
+        }
       }
       mockTraceListResult = {
         ...mockTraceListResult,
@@ -329,7 +331,9 @@ describe("<TraceTable /> pending NOT eval chip", () => {
   it("shows a chip a NOT reaches across an OR as not judged, even with its run registered", () => {
     const queryText = 'NOT eval:"the user is annoyed" OR status:error';
     mockFilterState.debouncedQueryText = queryText;
-    mockFilterState.evalRuns = Object.fromEntries(chipKeysOf(queryText).map((k) => [k, "run-1"]));
+    mockFilterState.evalRuns = Object.fromEntries(
+      chipsOf(queryText).map((chip) => [chip.key, "run-1"]),
+    );
     mockTraceListResult = {
       ...mockTraceListResult,
       data: [{ traceId: "trace-abc-123" }] as typeof mockTraceListResult.data,
