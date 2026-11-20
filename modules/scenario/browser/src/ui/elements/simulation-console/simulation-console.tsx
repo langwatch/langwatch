@@ -54,7 +54,6 @@ export function SimulationConsole({
   durationInMs,
   titleBarActions,
   fileName = DEFAULT_CONSOLE_FILE_NAME,
-  statusLine,
 }: {
   results?: ScenarioResults | null;
   scenarioName?: string;
@@ -64,8 +63,6 @@ export function SimulationConsole({
   titleBarActions?: ReactNode;
   /** What the title bar reads. Agent Testing calls these test results. */
   fileName?: string;
-  /** Replaces the pass or fail status line, e.g. a red team run's Held or Broke. */
-  statusLine?: ReactNode;
 }) {
   const isPending =
     status === ScenarioRunStatus.IN_PROGRESS || status === ScenarioRunStatus.PENDING;
@@ -92,7 +89,7 @@ export function SimulationConsole({
           width="100%"
         >
           <VStack align="start" gap={3} width="100%">
-            {statusLine ?? <StatusDisplay status={status} verdict={results?.verdict} />}
+            <StatusDisplay status={status} verdict={results?.verdict} />
 
             {!isPending && <MetricsSummary results={results} durationInMs={durationInMs} />}
 

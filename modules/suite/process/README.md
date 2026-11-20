@@ -90,7 +90,7 @@ createTestSuite(input: ScenarioTestSuiteCreateInput): Promise<ScenarioTestSuite>
 
 #### `listTemplates`
 
-Every shipped suite template, sorted by kind then title.
+Every shipped suite template in gallery order: archetypes first, then red team packs.
 
 ```typescript
 listTemplates(input: { projectId: string }): Promise<SuiteTemplate[]>;
