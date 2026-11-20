@@ -7947,6 +7947,28 @@ The tRPC query `governance.ocsfExport` still returns the governance events in th
 
 **Also check:** [Anomaly rules](/ai-governance/anomaly-rules) for how a fired alert reaches you, and [Retention](/ai-gateway/governance/retention) for how long the source traces are kept.
 
+## Read AI events from AWS Security Lake
+
+LangWatch can subscribe to your AWS Security Lake and read the CloudTrail management and data events for Bedrock and SageMaker calls. Add a Security Lake source under Governance, Ingestion sources, with the subscriber role ARN, Region and queue URL that Security Lake gave you when you created the subscriber.
+
+LangWatch generates the source's external id when you add it. You can't choose it. Copy it from the source's edit form, or read it from the API, and set it as the `sts:ExternalId` condition in the subscriber role's trust policy. The trust policy must require it, or any LangWatch customer that knows the role ARN could ask LangWatch to assume your role.
+
+LangWatch reads each Parquet object the queue announces, keeps the model, agent and endpoint calls, and deletes the message only after the events are written. A message that keeps failing is recorded as poison once it passes its receive limit.
+
+### Minimal IAM for the subscriber role
+
+The access keys you store on the source are the base identity. That identity needs `sts:AssumeRole` on the subscriber role, and the role's trust policy must allow it only with the external id LangWatch generated as the `sts:ExternalId` condition. Before each read, LangWatch assumes the subscriber role with that external id and reads the queue and the bucket with the role's temporary credentials.
+
+The subscriber role needs only these permissions:
+
+- `s3:GetObject` on the Security Lake bucket prefix of the selected sources.
+- `sqs:ReceiveMessage`, `sqs:DeleteMessage`, `sqs:ChangeMessageVisibility` and `sqs:GetQueueAttributes` on the subscriber queue. LangWatch extends a message's visibility while it reads the file. The connection test uses `sqs:GetQueueAttributes`.
+- `kms:Decrypt` on the lake key, only when the lake uses a customer managed KMS key.
+
+### Callers without traces
+
+The source page lists the principals that called a model in the last 30 days and sent no traces. A principal counts as traced when a trace in any project of the organisation carries its ARN in the `aws.principal.arn` attribute.
+
 ---
 
 # FILE: ./ai-gateway/governance/overview.mdx
@@ -78054,6 +78076,64 @@ Pull governance events, project traces and the audit log as OCSF 1.9.0 API Activ
 ---
 title: "Push OCSF events in from another source"
 openapi: "POST /api/v1/governance/ocsf/ingest"
+---
+
+---
+
+# FILE: ./api-reference/governance-security-lake/add-an-aws-security-lake-source.mdx
+
+---
+title: "Add an AWS Security Lake source"
+openapi: "POST /api/v1/governance/security-lake/sources"
+---
+
+---
+
+# FILE: ./api-reference/governance-security-lake/edit-an-aws-security-lake-source.mdx
+
+---
+title: "Edit an AWS Security Lake source"
+openapi: "PATCH /api/v1/governance/security-lake/sources/{sourceId}"
+---
+
+---
+
+# FILE: ./api-reference/governance-security-lake/overview.mdx
+
+---
+title: "Overview"
+description: "Add an AWS Security Lake subscriber as a source, test its queue and read its health. LangWatch reads the subscriber queue on the source's schedule and stores the AI activity it finds as OCSF events."
+---
+
+## Intro
+
+Add an AWS Security Lake subscriber as a source, test its queue and read its health. LangWatch reads the subscriber queue on the source's schedule and stores the AI activity it finds as OCSF events.
+
+---
+
+# FILE: ./api-reference/governance-security-lake/read-a-security-lake-source-s-health.mdx
+
+---
+title: "Read a Security Lake source's health"
+openapi: "GET /api/v1/governance/security-lake/sources/{sourceId}/health"
+---
+
+---
+
+# FILE: ./api-reference/governance-security-lake/read-a-security-lake-source.mdx
+
+---
+title: "Read a Security Lake source"
+openapi: "GET /api/v1/governance/security-lake/sources/{sourceId}"
+---
+
+---
+
+# FILE: ./api-reference/governance-security-lake/test-a-security-lake-source-s-connection.mdx
+
+---
+title: "Test a Security Lake source's connection"
+openapi: "POST /api/v1/governance/security-lake/sources/{sourceId}/test"
 ---
 
 ---
