@@ -50105,14 +50105,14 @@ type GetApiGraphsParams struct {
 
 // PostApiGraphsJSONBody defines parameters for PostApiGraphs.
 type PostApiGraphsJSONBody struct {
-	ColSpan     *float32                `json:"colSpan,omitempty"`
+	ColSpan     *int                    `json:"colSpan,omitempty"`
 	DashboardId *string                 `json:"dashboardId,omitempty"`
 	Filters     *map[string]interface{} `json:"filters,omitempty"`
 	Graph       map[string]interface{}  `json:"graph"`
-	GridColumn  *float32                `json:"gridColumn,omitempty"`
-	GridRow     *float32                `json:"gridRow,omitempty"`
+	GridColumn  *int                    `json:"gridColumn,omitempty"`
+	GridRow     *int                    `json:"gridRow,omitempty"`
 	Name        string                  `json:"name"`
-	RowSpan     *float32                `json:"rowSpan,omitempty"`
+	RowSpan     *int                    `json:"rowSpan,omitempty"`
 }
 
 // PatchApiGraphsByIdJSONBody defines parameters for PatchApiGraphsById.
