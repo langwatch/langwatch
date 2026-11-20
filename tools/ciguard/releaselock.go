@@ -133,12 +133,12 @@ func releaseExtraFilesProblems(config releaseConfig, pkg releasePackage) []strin
 		if !ok {
 			continue
 		}
-		switch {
-		case entry.JSONPath == want:
+		if entry.JSONPath == want {
 			matches++
-		default:
-			wrongJSONPaths = append(wrongJSONPaths, entry.JSONPath)
+
+			continue
 		}
+		wrongJSONPaths = append(wrongJSONPaths, entry.JSONPath)
 	}
 	switch {
 	case matches == 0 && len(wrongJSONPaths) > 0:

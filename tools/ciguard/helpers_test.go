@@ -18,8 +18,9 @@ func goCIChangesFilters(t *testing.T) map[string][]string {
 	require.NoError(t, err)
 
 	var filters map[string][]string
-	for _, step := range workflow.Jobs["changes"].Steps {
-		if text, ok := step.StringWith("filters"); ok {
+	steps := workflow.Jobs["changes"].Steps
+	for i := range steps {
+		if text, ok := steps[i].StringWith("filters"); ok {
 			require.NoError(t, yaml.Unmarshal([]byte(text), &filters))
 		}
 	}
