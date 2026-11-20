@@ -126,6 +126,20 @@ describe("given a run in flight row that took a run's outcome after a newer run 
 
     expect(setting.lastRun).toMatchObject({ runId: "run-1", startedAt: STARTED_AT });
   });
+
+  /** @scenario "A run that settles after a newer run started keeps its own start" */
+  it("reads the start of a skipped run whose turn began before the skip", () => {
+    const setting = settingBeside({
+      runId: "run-2",
+      conversationId: "conversation-2",
+      startedAt: SETTLED_AT + 1_000,
+      ...outcomeOf({ runId: "run-1", filed: 0 }),
+      lastRunOutcome: "skipped",
+      lastSettledRunStartedAt: STARTED_AT,
+    });
+
+    expect(setting.lastRun).toMatchObject({ runId: "run-1", startedAt: STARTED_AT });
+  });
 });
 
 describe("given a run in flight row whose last started run has not settled", () => {
