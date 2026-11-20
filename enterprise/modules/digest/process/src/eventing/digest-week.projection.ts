@@ -139,8 +139,7 @@ export function applyUserActivity({
   const series = activity.series;
   const seriesFits =
     series !== null &&
-    (Object.hasOwn(state.series, series.seriesId) ||
-      Object.keys(state.series).length < MAX_SERIES);
+    (Object.hasOwn(state.series, series.seriesId) || Object.keys(state.series).length < MAX_SERIES);
   return {
     userId: activity.userId,
     organizationId: activity.organizationId,

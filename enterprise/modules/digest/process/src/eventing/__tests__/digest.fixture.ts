@@ -210,7 +210,9 @@ export function installDigest(
 
   const source = DigestSourceService.create({
     audience: repositories.audience,
-    projects: createApiFixture<Pick<ProjectApi, "listIdsByOrganization" | "findPersonalWorkspaceOwner">>(
+    projects: createApiFixture<
+      Pick<ProjectApi, "listIdsByOrganization" | "findPersonalWorkspaceOwner">
+    >(
       {
         listIdsByOrganization: async ({ organizationId }) =>
           organizationId === ORGANIZATION ? world.projects : [],

@@ -234,7 +234,7 @@ Feature: Weekly digest emails
 
   @integration
   Scenario: A member with no email address is skipped
-    Given the send is armed and a member whose profile has no email address
+    Given the send is armed and a member the user module has no record of
     When the week's emails are sent
     Then that member receives none
     And the organization's other members are each sent theirs
