@@ -52,10 +52,19 @@ Feature: Every trace-linked Instant Evals result is kept, and recalled before ju
     Then the span's key carries the span and the trace's key carries none
 
   @unit
-  Scenario: A row with no trace or no trace time is not kept
-    Given a row that projects no TraceId, and one that projects no OccurredAt
+  Scenario: A row with no trace, or a trace hydration could not find, is not kept
+    Given a row that projects no TraceId
+    And a row whose trace hydration could not find, so it carries no OccurredAt
     When the cell keys are read
     Then neither has a key
+
+  @unit
+  Scenario: A query that projects TraceId but not OccurredAt keeps its trace-level result
+    Given a query that projects TraceId and an eval over its trace, but not OccurredAt
+    When hydration reads the trace and its eval column is judged
+    Then the judged row carries the trace's start time as its OccurredAt, so its result is kept
+    And a time the query projected itself is kept as it was
+    And the answer holds only the columns the query projected
 
   @unit
   Scenario: The judge model is the own decision model or LangWatch's judge
@@ -118,6 +127,13 @@ Feature: Every trace-linked Instant Evals result is kept, and recalled before ju
     Given a recall read that fails
     When a trace's text is judged
     Then the judge is asked as if nothing were kept
+
+  @unit
+  Scenario: A recall that cannot read its flag or judge model judges as if recall were off
+    Given a release_instant_eval_results read that throws, or a judge model read that throws
+    When a trace's text is recalled
+    Then nothing is recalled and eval_results is not read
+    And the ask or run is not failed
 
   @unit
   Scenario: A batch with recalled verdicts is delivered when the judge loses the rest

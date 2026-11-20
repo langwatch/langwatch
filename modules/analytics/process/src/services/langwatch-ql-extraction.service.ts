@@ -26,6 +26,10 @@ import {
 } from "../rules/langwatch-ql-judgement-questions.rules.ts";
 import type { AcceptedLangWatchQL } from "../rules/langwatch-ql-validation-shape.rules.ts";
 
+/** The columns a judged row's kept result is keyed on, as LangWatchQL names them. */
+const LWQL_TRACE_COLUMN = "TraceId";
+const LWQL_TIME_COLUMN = "OccurredAt";
+
 type LangWatchQLExtractionDependencies = {
   readonly hydration?: Pick<LangWatchQLHydrationService, "hydrate"> | undefined;
   readonly judging?: Pick<InstantEvalApi, "judgeQuery" | "getJudgeLimits"> | undefined;
@@ -93,6 +97,7 @@ export class LangWatchQLExtractionService {
       projects,
       judgements,
       rows: hydrated.rows,
+      traceStartedAt: hydrated.traceStartedAt,
       signal,
       source,
     });
@@ -122,12 +127,14 @@ export class LangWatchQLExtractionService {
     projects,
     judgements,
     rows,
+    traceStartedAt,
     signal,
     source,
   }: {
     readonly projects: readonly LangWatchQLCaller[];
     readonly judgements: ReturnType<typeof langWatchQLJudgementCalls>;
     readonly rows: readonly Record<string, unknown>[];
+    readonly traceStartedAt: ReadonlyMap<string, number>;
     readonly signal?: AbortSignal | undefined;
     readonly source?: InstantEvalQuerySource | undefined;
   }): Promise<{
@@ -139,10 +146,11 @@ export class LangWatchQLExtractionService {
     if (!project || others.length > 0) {
       throw new Error("an eval function reached execution outside a single-project scope");
     }
+    const timed = withTraceTimes({ rows, traceStartedAt });
     const judged = await this.deps.judging.judgeQuery({
       projectId: project.id,
       judgements,
-      rows,
+      rows: timed,
       ...(signal ? { signal } : {}),
       ...(source ? { source } : {}),
     });
@@ -152,6 +160,50 @@ export class LangWatchQLExtractionService {
         : new DOMException("The query was cancelled", "AbortError");
     }
 
-    return { rows: judged.rows, skipped: judged.skipped };
+    return {
+      rows: withoutAddedTimes({ judged: judged.rows, sent: timed, projected: rows }),
+      skipped: judged.skipped,
+    };
   }
+}
+
+/**
+ * Each row naming a trace hydration read, with that trace's start as its time when the statement
+ * projected none: recall keys a kept result on it (ADR-189 section 2). A projected time wins, and
+ * a row whose trace was not found is sent as it is, so it is not kept.
+ */
+function withTraceTimes({
+  rows,
+  traceStartedAt,
+}: {
+  rows: readonly Record<string, unknown>[];
+  traceStartedAt: ReadonlyMap<string, number>;
+}): readonly Record<string, unknown>[] {
+  return rows.map((row) => {
+    const traceId = row[LWQL_TRACE_COLUMN];
+    if (LWQL_TIME_COLUMN in row || typeof traceId !== "string") return row;
+    const startedAt = traceStartedAt.get(traceId);
+
+    return startedAt === undefined ? row : { ...row, [LWQL_TIME_COLUMN]: startedAt };
+  });
+}
+
+/**
+ * The judged rows without the time only the judge was given, so the answer holds the columns the
+ * statement projected. A row sent as it was projected is the same object, and is left alone.
+ */
+function withoutAddedTimes({
+  judged,
+  sent,
+  projected,
+}: {
+  judged: readonly Record<string, unknown>[];
+  sent: readonly Record<string, unknown>[];
+  projected: readonly Record<string, unknown>[];
+}): readonly Record<string, unknown>[] {
+  return judged.map((row, at) =>
+    sent[at] === projected[at]
+      ? row
+      : Object.fromEntries(Object.entries(row).filter(([column]) => column !== LWQL_TIME_COLUMN)),
+  );
 }

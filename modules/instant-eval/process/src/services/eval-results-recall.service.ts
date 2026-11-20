@@ -113,9 +113,9 @@ export class EvalResultsRecallService {
     const keyed = keyedCellsOf({ rows, units });
     const untouched = { units, recalled: [], pending: [], judgeModel: "" };
     if (keyed.length === 0) return untouched;
-    if (!(await this.peers.isReleased({ projectId }))) return untouched;
+    const judgeModel = await this.#releasedJudgeModelOf({ projectId });
+    if (judgeModel === null) return untouched;
 
-    const judgeModel = await this.peers.judgeModelOf({ projectId });
     const hits = await this.#latestByKey({ projectId, judgeModel, keyed });
     const recalled: EvalResultsRecalledCell[] = [];
     const pending: EvalResultsPendingCell[] = [];
@@ -183,6 +183,23 @@ export class EvalResultsRecallService {
         { projectId, source: source.kind, sourceId: source.id, error },
         "Instant Evals results could not be kept; the verdicts were still delivered",
       );
+    }
+  }
+
+  /**
+   * The judge model a released project's rows key on, or null to recall nothing. A flag or model
+   * read that throws is null too: recall is a saving, so it never fails the ask or the run.
+   */
+  async #releasedJudgeModelOf({ projectId }: { projectId: string }): Promise<string | null> {
+    try {
+      if (!(await this.peers.isReleased({ projectId }))) return null;
+      return await this.peers.judgeModelOf({ projectId });
+    } catch (error) {
+      logger.warn(
+        { projectId, error },
+        "Instant Evals recall could not read its flag or judge model; judging as if it were off",
+      );
+      return null;
     }
   }
 

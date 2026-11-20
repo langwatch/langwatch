@@ -461,6 +461,39 @@ describe("given a recall read that fails", () => {
   });
 });
 
+describe("given a recall whose flag read or judge-model read throws", () => {
+  const unbroken = {
+    isReleased: async () => true,
+    judgeModelOf: async () => JUDGE,
+    retentionDaysOf: async () => 30,
+  };
+  const units = [{ rowIndex: 0, text: "hello", questions: [ANNOYED] }];
+
+  describe("when a trace's text is recalled", () => {
+    /** @scenario "A recall that cannot read its flag or judge model judges as if recall were off" */
+    it("recalls nothing for either throw, and does not throw", async () => {
+      const broken = [
+        { ...unbroken, isReleased: () => Promise.reject(new Error("the flag is unreadable")) },
+        { ...unbroken, judgeModelOf: () => Promise.reject(new Error("no judge model")) },
+      ];
+
+      for (const peers of broken) {
+        const results = new CountingResults();
+        const recall = EvalResultsRecallService.create({ results, peers, now: () => AT });
+
+        const recalled = await recall.recall({
+          projectId: PROJECT_ID,
+          rows: rowsOf({ "trace-1": "hello" }),
+          units,
+        });
+
+        expect(recalled).toEqual({ units, recalled: [], pending: [], judgeModel: "" });
+        expect(results.reads).toBe(0);
+      }
+    });
+  });
+});
+
 describe("given an insert into eval_results that fails", () => {
   describe("when a trace's text is judged", () => {
     /** @scenario "A result that could not be kept is still delivered" */

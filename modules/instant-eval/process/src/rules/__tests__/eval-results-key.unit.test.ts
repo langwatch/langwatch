@@ -113,10 +113,11 @@ describe("findEvalResultsCellKeys", () => {
     });
   });
 
-  describe("given a row with no trace, or no trace time", () => {
-    /** @scenario "A row with no trace or no trace time is not kept" */
+  describe("given a row with no trace, or a trace hydration could not find", () => {
+    /** @scenario "A row with no trace, or a trace hydration could not find, is not kept" */
     it("keys neither", () => {
       const noTrace = { OccurredAt: OCCURRED_AT };
+      // Hydration adds OccurredAt only for a trace it found, so this row's trace was not.
       const noTime = { TraceId: "trace-1" };
 
       expect(findEvalResultsCellKeys({ row: noTrace, question: question(), text: "x" })).toEqual(

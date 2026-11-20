@@ -122,6 +122,8 @@ Before judging, the service looks up the rows that match tenant, trace, span, qu
 - **Recall splits a unit.** A text is judged only for its missed questions; a unit with no misses is dropped. The budget check runs on what is left.
 - **Trace and span keys only.** A thread-keyed or text-keyed `eval()` has no single trace, so it is judged as today and not stored. A run over threads writes only `instant_eval_judgments`, as today, and gets no recall.
 - **Every read filters `TenantId` first** and carries an `OccurredAt` window, so the cold-scan detector stays quiet.
+- **The trace time comes from the row, or from hydration.** An ask or a widget whose statement projects `TraceId` but not `OccurredAt` is keyed on the start time of the trace hydration read for its extraction; analytics gives it to the judge only, so the answer keeps the columns the statement projected. A projected `OccurredAt` wins, and a row whose trace hydration did not find is not kept. A span's text is kept only when the statement also projects `SpanId`, and a row grouped by `ConversationId` names no single trace, so it is not kept.
+- **Recall never fails the caller.** A flag or judge-model read that throws recalls nothing, as if the flag were off.
 - **Flags.** Writes and recall both sit behind a new flag, `release_instant_eval_results`, on every path including monitors, as does the drawer section. With it off, nothing reads or writes `eval_results` and every judgement is made as before.
 - **A recall makes no judge call**, so it is free, and every viewer of the same widget or ask gets the same row.
 - **The table is the cache.** There is no separate cache with its own expiry.
