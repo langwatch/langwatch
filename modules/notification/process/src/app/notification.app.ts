@@ -22,15 +22,13 @@ import {
 import type { FeatureSetup } from "@langwatch/process";
 import { Secret } from "@langwatch/secrets";
 
-import type { CustomerIoTransactionalChannel } from "../channels/customer-io-transactional.channel.ts";
 import {
-  type EmailOutboundProxyConfig,
   type MailGatewaySettings,
   resolveDefaultFrom,
 } from "../channels/email-delivery.channel.ts";
 import { emailGatewayOpener } from "../channels/email-gateway-channels.registry.ts";
-import { HttpCustomerIoTransactionalChannel } from "../channels/http/http.customer-io-transactional.channel.ts";
 import { HttpWebPushGatewayChannel } from "../channels/http/http.web-push-gateway.channel.ts";
+import type { NotificationChannels } from "../channels/notification.channels.ts";
 import { emailProxyResolver } from "../channels/ses/ses.email-gateway.channel.ts";
 import {
   buildWebPushPipeline,
@@ -47,7 +45,8 @@ import { WebPushService, type WebPushQueue } from "../services/web-push.service.
 type NotificationSetup = FeatureSetup<
   typeof NotificationModule.dependencies,
   NotificationServerConfig,
-  NotificationRepositories
+  NotificationRepositories,
+  NotificationChannels
 >;
 
 export class NotificationModule implements NotificationApiContract {
@@ -61,8 +60,6 @@ export class NotificationModule implements NotificationApiContract {
     smtpUrl: Secret.load("SMTP_URL", { optional: true }),
     smtpPassword: Secret.load("SMTP_PASSWORD", { optional: true }),
     resend: Secret.load("RESEND_API_KEY", { optional: true }),
-    /** Customer.io's App API key: LangWatch Cloud only, never in the self-hosted chart. */
-    customerIoApp: Secret.load("CUSTOMER_IO_APP_API_KEY", { optional: true }),
   } as const;
 
   #notifications: NotificationService;
@@ -89,6 +86,7 @@ export class NotificationModule implements NotificationApiContract {
 
   static async create({
     repositories,
+    channels,
     config,
     secrets,
     resources,
@@ -113,12 +111,12 @@ export class NotificationModule implements NotificationApiContract {
       }),
     });
     resources.own("Notification mail gateway", () => delivery.close());
-    const customerIo = await customerIoTransactional({ config, secrets, outboundProxy });
-    if (customerIo) resources.own("Notification Customer.io client", () => customerIo.close());
     const mailDelivery = MailDeliveryService.create({
       settings: async () => settings,
       delivery,
-      customerIo,
+      // Self-hosted never asks: its mail path is the one it always had. On Cloud nurturing
+      // answers `off` until it holds the Customer.io App API key.
+      customerIo: config.isSaas ? channels.customerIoMail : undefined,
     });
     return new NotificationModule(repositories, mailDelivery, {
       settings: { publicBaseUrl: config.publicBaseUrl },
@@ -173,27 +171,6 @@ export class NotificationModule implements NotificationApiContract {
   requestWebPushDelivery(input: RequestWebPushDeliveryCommand): Promise<WebPushDeliveryRequested> {
     return this.#webPush.request(input);
   }
-}
-
-/**
- * Customer.io's client where this deployment routes mail through it, else undefined, and then
- * no send changes path. Only LangWatch Cloud holding the App API key builds one: a self-hosted
- * install has neither, so its mail goes the way it always went.
- */
-async function customerIoTransactional({
-  config,
-  secrets,
-  outboundProxy,
-}: Pick<NotificationSetup, "config" | "secrets"> & {
-  outboundProxy: EmailOutboundProxyConfig;
-}): Promise<CustomerIoTransactionalChannel | undefined> {
-  const apiKey = await secrets.into(NotificationModule.secrets.customerIoApp, (value) => value);
-  if (!config.isSaas || !apiKey) return undefined;
-  return HttpCustomerIoTransactionalChannel.create({
-    apiKey,
-    region: config.customerIoRegion,
-    outboundProxy,
-  });
 }
 
 /** This deployment's gateway settings: its config slice, and the credentials the chain resolves. */

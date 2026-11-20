@@ -372,14 +372,6 @@ export const { trustedIdpOrigins, idpSimulatorUrl } = Config.define((c) => ({
   idpSimulatorUrl: c.env("LANGWATCH_IDPSIM_URL", z.string().optional()),
 }));
 
-/**
- * Customer.io's data centre: nurturing's lifecycle signals and notification's Cloud mail both go
- * to the EU one unless this names "us".
- */
-export const { customerIoRegion } = Config.define((c) => ({
-  customerIoRegion: c.env("CUSTOMER_IO_REGION", z.enum(["us", "eu"]).optional()),
-}));
-
 /** Where server-side product analytics goes: shared config no module owns (Alex, 2026-09-29). */
 export const { posthogKey, posthogHost } = Config.define((c) => ({
   posthogKey: c.env("POSTHOG_KEY", z.string().optional()),

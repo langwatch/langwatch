@@ -12,7 +12,7 @@ const { EnvHttpProxyAgent, fetch, captured } = vi.hoisted(() => ({
   captured: { lines: [] as { level: number; msg?: string; [field: string]: unknown }[] },
 }));
 
-// The network stops at undici: Customer.io and Resend (the own mailer here) are both recorded.
+// The own mailer here is Resend, so the network stops at undici and its sends are recorded.
 vi.mock("undici", async (importOriginal) => ({
   ...(await importOriginal<object>()),
   EnvHttpProxyAgent,
@@ -26,10 +26,10 @@ vi.mock("@langwatch/observability", async (importOriginal) => {
   return { ...(await importOriginal<object>()), createLogger: () => logger };
 });
 
+import { MemoryCustomerIoMailChannel } from "../../channels/memory/memory.customer-io-mail.channel.ts";
 import { MemoryNotificationRepositories } from "../../repositories/memory/memory.notification.repositories.ts";
 import { NotificationModule } from "../notification.app.ts";
 
-const CUSTOMER_IO_KEY = "cio_app_secret_key";
 const RECIPIENT = "ada@acme.test";
 
 const ROUTED = [
@@ -42,7 +42,6 @@ const ROUTED = [
   "domain-auto-joined",
   "seat-request",
   "usage-limit",
-  "payment-recovery",
   "budget-increase-request",
   "automation-limit",
   "trigger-digest",
@@ -58,7 +57,6 @@ function config({ isSaas }: { isSaas: boolean }): NotificationServerConfig {
     publicBaseUrl: "https://app.langwatch.test",
     webPushServiceBase: undefined,
     isSaas,
-    customerIoRegion: undefined,
     outboundProxy: {
       HTTPS_PROXY: undefined,
       https_proxy: undefined,
@@ -70,34 +68,29 @@ function config({ isSaas }: { isSaas: boolean }): NotificationServerConfig {
   };
 }
 
-/** The notification app with Resend as its own mailer, on Cloud or not, holding the key or not. */
-function notificationApp({ isSaas, withKey }: { isSaas: boolean; withKey: boolean }) {
-  const environment = {
-    RESEND_API_KEY: "re_test",
-    ...(withKey ? { CUSTOMER_IO_APP_API_KEY: CUSTOMER_IO_KEY } : {}),
-  };
-  const secrets = SecretsResolver.over(SecretsChain.start({ environment }).withEnv()).scopeTo(
-    "notification",
-    Object.values(NotificationModule.secrets),
-  );
-  return NotificationModule.create({
+/**
+ * The notification app with Resend as its own mailer, on Cloud or not. `customerIo` stands in for
+ * nurturing's answer: it queues, or answers `off` as nurturing does without the App API key.
+ */
+async function notificationApp({ isSaas, keyed = true }: { isSaas: boolean; keyed?: boolean }) {
+  const customerIo = MemoryCustomerIoMailChannel.create();
+  if (!keyed) customerIo.turnOff();
+  const secrets = SecretsResolver.over(
+    SecretsChain.start({ environment: { RESEND_API_KEY: "re_test" } }).withEnv(),
+  ).scopeTo("notification", Object.values(NotificationModule.secrets));
+  const app = await NotificationModule.create({
     repositories: MemoryNotificationRepositories.create(),
     dependencies: {},
     config: config({ isSaas }),
+    channels: { customerIoMail: customerIo },
     resources: new ResourceScope(),
     secrets,
   });
+  return { app, customerIo };
 }
 
-type Sent = { url: string; headers: Record<string, string>; body: Record<string, unknown> };
-
-const sent = (): Sent[] =>
-  fetch.mock.calls.map(([url, init]) => {
-    const { headers, body } = init as { headers: Record<string, string>; body: string };
-    return { url: String(url), headers, body: JSON.parse(body) as Record<string, unknown> };
-  });
-const toCustomerIo = () => sent().filter(({ url }) => url.includes("customer.io"));
-const toOwnMailer = () => sent().filter(({ url }) => url.includes("resend.com"));
+const toOwnMailer = () =>
+  fetch.mock.calls.filter(([url]) => String(url).includes("resend.com")).map(([, init]) => init);
 
 const message = (template?: string) => ({
   to: RECIPIENT,
@@ -109,32 +102,27 @@ const message = (template?: string) => ({
 beforeEach(() => {
   vi.clearAllMocks();
   captured.lines.length = 0;
-  fetch.mockImplementation(async (url: string) =>
-    String(url).includes("customer.io")
-      ? { ok: true, status: 200, json: async () => ({ delivery_id: "dlv_1" }) }
-      : { ok: true, status: 200, json: async () => ({ id: "re_1" }) },
-  );
+  fetch.mockResolvedValue({ ok: true, status: 200, json: async () => ({ id: "re_1" }) });
 });
 
-describe("given LangWatch Cloud holding the Customer.io key", () => {
+describe("given LangWatch Cloud with nurturing holding the Customer.io key", () => {
   describe.each(ROUTED)("when a %s message is sent", (template) => {
     /** @scenario "A routed template goes through Customer.io on Cloud" */
-    it("hands exactly one request to Customer.io's EU endpoint and none to the own mailer", async () => {
-      const app = await notificationApp({ isSaas: true, withKey: true });
+    it("hands exactly one message to Customer.io and none to the own mailer", async () => {
+      const { app, customerIo } = await notificationApp({ isSaas: true });
 
       await app.sendEmail(message(template));
 
-      const [request, ...more] = toCustomerIo();
-      expect(more).toEqual([]);
-      expect(request?.url).toBe("https://api-eu.customer.io/v1/send/email");
-      expect(request?.headers.Authorization).toBe(`Bearer ${CUSTOMER_IO_KEY}`);
-      expect(request?.body).toMatchObject({
-        transactional_message_id: template,
-        to: RECIPIENT,
-        subject: "Subject line",
-        body: "<p>Rendered here</p>",
-        tracked: false,
-      });
+      expect(customerIo.sent).toEqual([
+        {
+          transactionalMessageId: template,
+          identifiers: { email: RECIPIENT },
+          to: RECIPIENT,
+          from: "LangWatch <contact@langwatch.test>",
+          subject: "Subject line",
+          body: "<p>Rendered here</p>",
+        },
+      ]);
       expect(toOwnMailer()).toEqual([]);
     });
   });
@@ -150,52 +138,47 @@ describe("given LangWatch Cloud holding the Customer.io key", () => {
   describe.each(others)("when a message of %s is sent", (_name, template) => {
     /** @scenario "Every other message stays on the own mailer on Cloud" */
     it("sends it through the own mailer and nothing to Customer.io", async () => {
-      const app = await notificationApp({ isSaas: true, withKey: true });
+      const { app, customerIo } = await notificationApp({ isSaas: true });
 
       await app.sendEmail(message(template));
 
-      expect(toCustomerIo()).toEqual([]);
+      expect(customerIo.sent).toEqual([]);
       expect(toOwnMailer()).toHaveLength(1);
     });
   });
 });
 
 describe.each([
-  ["IS_SAAS is unset", { isSaas: false, withKey: true }],
-  ["the key is missing", { isSaas: true, withKey: false }],
+  ["IS_SAAS is unset", { isSaas: false }],
+  ["nurturing holds no Customer.io key", { isSaas: true, keyed: false }],
 ])("given %s", (_name, deployment) => {
-  describe("when a payment-recovery message is sent", () => {
+  describe("when a usage-limit message is sent", () => {
     /** @scenario "Without IS_SAAS or the key nothing reaches Customer.io" */
     it("sends it through the own mailer and nothing to Customer.io", async () => {
-      const app = await notificationApp(deployment);
+      const { app, customerIo } = await notificationApp(deployment);
 
-      await app.sendEmail(message("payment-recovery"));
+      await app.sendEmail(message("usage-limit"));
 
-      expect(toCustomerIo()).toEqual([]);
+      expect(customerIo.sent).toEqual([]);
       expect(toOwnMailer()).toHaveLength(1);
+      expect(captured.lines.filter((line) => line.level >= 40)).toEqual([]);
     });
   });
 });
 
-describe("given LangWatch Cloud holding the Customer.io key", () => {
+describe("given LangWatch Cloud with nurturing holding the Customer.io key", () => {
   describe("when one routed send is accepted and one is refused and falls back", () => {
     /** @scenario "No log line carries the key or a recipient address" */
-    it("logs neither the key nor the recipient", async () => {
-      const app = await notificationApp({ isSaas: true, withKey: true });
-      await app.sendEmail(message("payment-recovery"));
-      fetch.mockImplementation(async (url: string) =>
-        String(url).includes("customer.io")
-          ? { ok: false, status: 500, body: { cancel: async () => undefined } }
-          : { ok: true, status: 200, json: async () => ({ id: "re_2" }) },
-      );
+    it("logs no recipient address", async () => {
+      const { app, customerIo } = await notificationApp({ isSaas: true });
+      await app.sendEmail(message("usage-limit"));
+      customerIo.refuse({ outcome: "refused", reason: "status", status: 500 });
 
-      await app.sendEmail(message("payment-recovery"));
+      await app.sendEmail(message("usage-limit"));
 
       expect(toOwnMailer()).toHaveLength(1);
       expect(captured.lines.length).toBeGreaterThan(0);
-      const logged = JSON.stringify(captured.lines);
-      expect(logged).not.toContain(CUSTOMER_IO_KEY);
-      expect(logged).not.toContain(RECIPIENT);
+      expect(JSON.stringify(captured.lines)).not.toContain(RECIPIENT);
     });
   });
 });

@@ -1,11 +1,4 @@
-import {
-  Config,
-  customerIoRegion,
-  isSaas,
-  outboundProxy,
-  publicBaseUrl,
-  type ConfigOf,
-} from "@langwatch/config";
+import { Config, isSaas, outboundProxy, publicBaseUrl, type ConfigOf } from "@langwatch/config";
 import { defineBrowserConfig } from "@langwatch/config/public-app-config";
 import type { Named } from "@langwatch/module";
 import { z } from "zod";
@@ -45,8 +38,6 @@ export const notificationConfig = Config.define((c) => ({
   webPushServiceBase: c.env("WEB_PUSH_SERVICE_BASE", optionalPushServiceBase),
   /** The hosted product (the shared leaf): only there may Customer.io send the app's mail. */
   isSaas,
-  /** Customer.io's data centre (the shared leaf); unset is the EU one. */
-  customerIoRegion,
 }));
 
 export type NotificationServerConfig = ConfigOf<typeof notificationConfig>;

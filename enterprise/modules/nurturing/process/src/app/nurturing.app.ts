@@ -5,6 +5,9 @@ import {
   nurturingSecrets,
   type NurturingServerConfig,
   type NurturingSignal,
+  type TransactionalEmail,
+  type TransactionalEmailOutcome,
+  transactionalEmailSchema,
 } from "@langwatch/enterprise-nurturing-contract";
 import type { EventingCommands } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
@@ -26,6 +29,7 @@ import { NurturingMilestonesService } from "../services/nurturing-milestones.ser
 import { NurturingOrganizationUsageService } from "../services/nurturing-organization-usage.service.ts";
 import { NurturingProjectFactsService } from "../services/nurturing-project-facts.service.ts";
 import { NurturingTraceCountingService } from "../services/nurturing-trace-counting.service.ts";
+import { NurturingTransactionalEmailService } from "../services/nurturing-transactional-email.service.ts";
 import { NurturingUncopiedProjectsService } from "../services/nurturing-uncopied-projects.service.ts";
 import { NurturingUserErasureService } from "../services/nurturing-user-erasure.service.ts";
 import { NurturingService } from "../services/nurturing.service.ts";
@@ -51,6 +55,7 @@ export class NurturingModule implements NurturingApi {
   readonly #organizationUsage: NurturingOrganizationUsageService | undefined;
   readonly #uncopiedProjects: NurturingUncopiedProjectsService;
   readonly #traceCounting: NurturingTraceCountingService;
+  readonly #transactionalEmail: NurturingTransactionalEmailService;
   #commands: EventingCommands<NurturingPipeline> | undefined;
 
   private constructor({
@@ -58,16 +63,19 @@ export class NurturingModule implements NurturingApi {
     organizationUsage,
     uncopiedProjects,
     traceCounting,
+    transactionalEmail,
   }: Readonly<{
     pipeline: NurturingPipeline;
     organizationUsage: NurturingOrganizationUsageService | undefined;
     uncopiedProjects: NurturingUncopiedProjectsService;
     traceCounting: NurturingTraceCountingService;
+    transactionalEmail: NurturingTransactionalEmailService;
   }>) {
     this.#pipeline = pipeline;
     this.#organizationUsage = organizationUsage;
     this.#uncopiedProjects = uncopiedProjects;
     this.#traceCounting = traceCounting;
+    this.#transactionalEmail = transactionalEmail;
   }
 
   static async create({
@@ -168,6 +176,9 @@ export class NurturingModule implements NurturingApi {
       organizationUsage,
       uncopiedProjects,
       traceCounting,
+      transactionalEmail: NurturingTransactionalEmailService.create({
+        channel: channels.customerIoTransactional,
+      }),
     });
   }
 
@@ -214,6 +225,10 @@ export class NurturingModule implements NurturingApi {
       occurredAt: signal.occurredAt,
       signal,
     });
+  }
+
+  sendTransactionalEmail(email: TransactionalEmail): Promise<TransactionalEmailOutcome> {
+    return this.#transactionalEmail.send(transactionalEmailSchema.parse(email));
   }
 
   /** The nurturing pipeline this module registers, built once by {@link create}. */

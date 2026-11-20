@@ -39,19 +39,23 @@ None: notification declares no peers.
 
 ## Customer.io on LangWatch Cloud
 
-On a deployment with `IS_SAAS` set and `CUSTOMER_IO_APP_API_KEY` present, a fixed list of
-templates goes through Customer.io's transactional API (`POST /v1/send/email`, EU unless
-`CUSTOMER_IO_REGION=us`): the list is `CUSTOMER_IO_ROUTES` in
-`process/src/rules/customer-io-routing.rules.ts`, and security mail is never on it. Behaviour:
+On a deployment with `IS_SAAS` set, a fixed list of templates goes through Customer.io's
+transactional API: the list is `CUSTOMER_IO_ROUTES` in
+`process/src/rules/customer-io-routing.rules.ts`, and security mail is never on it. Nurturing
+alone talks to Customer.io, so notification hands each message to `NurturingApi.sendTransactionalEmail`
+through its `customerIoMail` channel (a binding, not a peer) and keeps the routing and the
+fallback. Nurturing holds `CUSTOMER_IO_APP_API_KEY` and posts to `/v1/send/email` (EU unless
+`CUSTOMER_IO_REGION=us`). Behaviour:
 [customer-io-transactional.feature](specs/customer-io-transactional.feature).
 
-- **One request per recipient**, with our own subject and HTML, link tracking off, the person
+- **One message per recipient**, with our own subject and HTML, link tracking off, the person
   identified by address. A replyless send keeps the real recipient and answers to the no-reply
   address.
-- **Any failure falls back.** A non-2xx reply, a timeout (10 s), a network error or an unreadable
+- **Any refusal falls back.** A non-2xx reply, a timeout (10 s), a network error or an unreadable
   reply sends that recipient through the install's own mailer, once, with a warning naming the
   template. Both failing raises the own mailer's error.
-- **Self-hosted never sees it.** The key is not in the Helm chart, and without `IS_SAAS` or the
-  key every send takes the own mailer, unchanged. Messages with attachments always do.
+- **Self-hosted never sees it.** Without `IS_SAAS` notification never asks; without the key
+  nurturing answers `off` and the own mailer sends, with no warning. The key is not in the Helm
+  chart. Messages with attachments always take the own mailer.
 - **Before turning it on,** each template id on the list must exist in Customer.io as a
   transactional message whose trigger name is that id.

@@ -1,6 +1,10 @@
 import { moduleApi } from "@langwatch/module";
 
 import type { NurturingSignal } from "./nurturing-signals.ts";
+import type {
+  TransactionalEmail,
+  TransactionalEmailOutcome,
+} from "./nurturing-transactional-email.ts";
 /**
  * The complete data model nurturing pushes to Customer.io. Every date is Unix
  * seconds: Customer.io's timestamp conditions match nothing else.
@@ -254,6 +258,12 @@ export type CioBatchCall =
 export interface NurturingApi {
   /** Records the signal on nurturing's pipeline; its subscriber sends what main sent, once. */
   recordSignal(signal: NurturingSignal): Promise<void>;
+
+  /**
+   * Hands one rendered email to Customer.io's transactional API and says what became of it. A
+   * refusal is an answer, not a throw: the caller falls back to its own mailer.
+   */
+  sendTransactionalEmail(email: TransactionalEmail): Promise<TransactionalEmailOutcome>;
 }
 
 export const NurturingApi = moduleApi<NurturingApi>()("nurturing");

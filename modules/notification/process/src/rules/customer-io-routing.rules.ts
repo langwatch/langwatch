@@ -1,6 +1,6 @@
+import type { TransactionalEmail } from "@langwatch/enterprise-nurturing-contract";
 import type { SendEmailCommand } from "@langwatch/notification-contract";
 
-import type { CustomerIoTransactionalRequest } from "../channels/customer-io-transactional.channel.ts";
 import { oneClickUnsubscribeHeaders } from "./email-mime.rules.ts";
 
 /** What becomes of a recipient Customer.io did not accept. */
@@ -12,6 +12,7 @@ const ownMailerFallback: CustomerIoRoute = { fallback: "own-mailer" };
  * The messages LangWatch Cloud sends through Customer.io, by template id. Everything else stays
  * on the own mailer. Security mail (sign-up verification, password reset, address confirmation,
  * invitations, MFA, SSO, licences, statements, operator notices) never belongs here.
+ * Payment recovery waits until something on main sends it.
  */
 export const CUSTOMER_IO_ROUTES: Readonly<Record<string, CustomerIoRoute>> = {
   "invite-re-request": ownMailerFallback,
@@ -23,7 +24,6 @@ export const CUSTOMER_IO_ROUTES: Readonly<Record<string, CustomerIoRoute>> = {
   "domain-auto-joined": ownMailerFallback,
   "seat-request": ownMailerFallback,
   "usage-limit": ownMailerFallback,
-  "payment-recovery": ownMailerFallback,
   "budget-increase-request": ownMailerFallback,
   "automation-limit": ownMailerFallback,
   "trigger-digest": ownMailerFallback,
@@ -44,7 +44,7 @@ export function customerIoRequestsFor({
   defaultFrom: string;
   /** The no-reply address a replyless send answers to. */
   replyTo: string | undefined;
-}): CustomerIoTransactionalRequest[] | undefined {
+}): TransactionalEmail[] | undefined {
   const { template } = command;
   if (template === undefined || !Object.hasOwn(CUSTOMER_IO_ROUTES, template)) return undefined;
   if (command.attachments !== undefined && command.attachments.length > 0) return undefined;

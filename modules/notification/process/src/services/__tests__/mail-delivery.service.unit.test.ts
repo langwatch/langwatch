@@ -31,7 +31,6 @@ const config: NotificationServerConfig = {
   publicBaseUrl: undefined,
   webPushServiceBase: undefined,
   isSaas: false,
-  customerIoRegion: undefined,
   outboundProxy: {
     HTTPS_PROXY: undefined,
     https_proxy: undefined,

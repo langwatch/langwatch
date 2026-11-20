@@ -1,11 +1,11 @@
+import type {
+  TransactionalEmail,
+  TransactionalEmailOutcome,
+} from "@langwatch/enterprise-nurturing-contract";
 import type { MailDeliveryView, SendEmailCommand } from "@langwatch/notification-contract";
 import { createLogger } from "@langwatch/observability";
 
-import {
-  type CustomerIoTransactionalChannel,
-  CustomerIoTransactionalError,
-  type CustomerIoTransactionalRequest,
-} from "../channels/customer-io-transactional.channel.ts";
+import type { CustomerIoMailChannel } from "../channels/customer-io-mail.channel.ts";
 import {
   type EmailContent,
   type EmailDelivery,
@@ -29,7 +29,7 @@ export class MailDeliveryService {
   private constructor(
     private readonly settings: () => Promise<MailGatewaySettings>,
     private readonly delivery: EmailDelivery,
-    private readonly customerIo: CustomerIoTransactionalChannel | undefined,
+    private readonly customerIo: CustomerIoMailChannel | undefined,
   ) {}
 
   static create({
@@ -39,8 +39,8 @@ export class MailDeliveryService {
   }: {
     settings: () => Promise<MailGatewaySettings>;
     delivery: EmailDelivery;
-    /** Present only on LangWatch Cloud with its key; absent, every send takes the own mailer. */
-    customerIo?: CustomerIoTransactionalChannel;
+    /** Present only on LangWatch Cloud; absent, every send takes the own mailer, unchanged. */
+    customerIo?: CustomerIoMailChannel;
   }): MailDeliveryService {
     return new MailDeliveryService(settings, delivery, customerIo);
   }
@@ -85,25 +85,26 @@ export class MailDeliveryService {
     command,
     defaultFrom,
   }: {
-    customerIo: CustomerIoTransactionalChannel;
-    request: CustomerIoTransactionalRequest;
+    customerIo: CustomerIoMailChannel;
+    request: TransactionalEmail;
     command: SendEmailCommand;
     defaultFrom: string;
   }): Promise<void> {
     const template = request.transactionalMessageId;
-    try {
-      const { deliveryId } = await customerIo.send(request);
-      logger.info({ template, deliveryId }, "Email handed to Customer.io");
+    const answer = await outcomeOf(() => customerIo.send(request));
+    if (answer.outcome === "queued") {
+      logger.info({ template, deliveryId: answer.deliveryId }, "Email handed to Customer.io");
       return;
-    } catch (error) {
+    }
+    if (answer.outcome === "refused") {
       logger.warn(
-        { template, ...failureOf(error) },
+        { template, reason: answer.reason, status: answer.status },
         "Customer.io did not take an email, so the own mailer sends it",
       );
     }
     // No idempotency key reaches Customer.io, so a timeout or an unreadable reply on a send
     // Customer.io did in fact queue makes this a second copy. We prefer a duplicate to a lost
-    // email: these are messages a person acts on (a payment, a request waiting on them).
+    // email: these are messages a person acts on (a request waiting on them, a limit reached).
     await this.delivery.send(envelopeOf({ command, defaultFrom }));
   }
 
@@ -198,12 +199,23 @@ function commandForOne({
   };
 }
 
-/** What a warning may say about a failed send: never the address, the body or the key. */
-function failureOf(error: unknown): { reason: string; status?: number } {
-  if (error instanceof CustomerIoTransactionalError) {
-    return { reason: error.reason, status: error.status };
+/** Nurturing's answer, or an `unexpected` refusal when the call itself threw. */
+type CustomerIoAnswer =
+  | TransactionalEmailOutcome
+  | Readonly<{ outcome: "refused"; reason: "unexpected"; status?: undefined }>;
+
+/**
+ * Nurturing answers a refusal rather than throwing one; anything that still throws is a refusal
+ * too, so the recipient gets the own mailer. The error is not logged: it may hold the address.
+ */
+async function outcomeOf(
+  send: () => Promise<TransactionalEmailOutcome>,
+): Promise<CustomerIoAnswer> {
+  try {
+    return await send();
+  } catch {
+    return { outcome: "refused", reason: "unexpected" };
   }
-  return { reason: "unexpected" };
 }
 
 /** A bare sender address has no domain to read, so `langwatch.ai` stands in, as on main. */

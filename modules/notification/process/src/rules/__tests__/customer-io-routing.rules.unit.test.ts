@@ -15,7 +15,6 @@ const AGREED = [
   "domain-auto-joined",
   "seat-request",
   "usage-limit",
-  "payment-recovery",
   "budget-increase-request",
   "automation-limit",
   "trigger-digest",
@@ -39,8 +38,11 @@ const SECURITY = [
 
 describe("the Customer.io routing list", () => {
   /** @scenario "The routing list holds the agreed product messages and no security mail" */
-  it("holds exactly the fourteen agreed template ids, each falling back to the own mailer", () => {
+  it("holds exactly the thirteen agreed template ids, each falling back to the own mailer", () => {
+    expect(AGREED).toHaveLength(13);
     expect(Object.keys(CUSTOMER_IO_ROUTES).toSorted()).toEqual(AGREED.toSorted());
+    // Nothing on main sends it yet, so it is not routed.
+    expect(Object.hasOwn(CUSTOMER_IO_ROUTES, "payment-recovery")).toBe(false);
     for (const route of Object.values(CUSTOMER_IO_ROUTES)) {
       expect(route).toEqual({ fallback: "own-mailer" });
     }

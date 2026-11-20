@@ -11916,6 +11916,9 @@ importers:
       '@langwatch/egress':
         specifier: workspace:*
         version: link:../../../packages/egress
+      '@langwatch/enterprise-nurturing-contract':
+        specifier: workspace:*
+        version: link:../../../enterprise/modules/nurturing/contract
       '@langwatch/eventing':
         specifier: workspace:*
         version: link:../../../packages/eventing

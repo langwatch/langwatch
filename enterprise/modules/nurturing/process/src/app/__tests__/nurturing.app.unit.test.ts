@@ -29,7 +29,7 @@ function moduleWith(customerIo: CustomerIoChannel | undefined): Promise<Nurturin
     resources: { own: () => void 0, ownService: () => void 0 },
     secrets: new ScopedSecrets(async (_handle, build) => build(undefined)),
     repositories: MemoryNurturingRepositories.create(),
-    channels: { customerIo, posthog: void 0 },
+    channels: { customerIo, customerIoTransactional: void 0, posthog: void 0 },
   });
 }
 

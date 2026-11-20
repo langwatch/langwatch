@@ -3,6 +3,7 @@ import { EventStoreMemory } from "@langwatch/eventing/testing";
 import { ResourceScope } from "@langwatch/process";
 import { SecretsChain, SecretsResolver } from "@langwatch/secrets";
 
+import { MemoryCustomerIoMailChannel } from "../../channels/memory/memory.customer-io-mail.channel.ts";
 import { MemoryNotificationRepositories } from "../../repositories/memory/memory.notification.repositories.ts";
 import type { NotificationRepositories } from "../../repositories/notification.repositories.ts";
 import { NotificationModule } from "../notification.app.ts";
@@ -27,7 +28,6 @@ export function createNotificationTestApp(
       publicBaseUrl: undefined,
       webPushServiceBase: undefined,
       isSaas: false,
-      customerIoRegion: undefined,
       outboundProxy: {
         HTTPS_PROXY: undefined,
         https_proxy: undefined,
@@ -37,6 +37,7 @@ export function createNotificationTestApp(
         no_proxy: undefined,
       },
     },
+    channels: { customerIoMail: MemoryCustomerIoMailChannel.create() },
     resources: new ResourceScope(),
     secrets,
   });

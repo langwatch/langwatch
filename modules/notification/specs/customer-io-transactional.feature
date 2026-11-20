@@ -2,9 +2,13 @@ Feature: The app's product mail goes through Customer.io on LangWatch Cloud
 
   On LangWatch Cloud a fixed list of product messages leaves through Customer.io's
   transactional API instead of the install's own mailer: invitation re-requests, the
-  join-request messages, seat and budget requests, usage and automation limits, payment
-  recovery, the trigger digest and the paused online evaluation. Each message is still
-  rendered here; Customer.io only delivers it.
+  join-request messages, seat and budget requests, usage and automation limits, the
+  trigger digest and the paused online evaluation. Each message is still rendered here;
+  Customer.io only delivers it.
+
+  Nurturing alone talks to Customer.io, so notification keeps the routing list and the
+  fallback and asks nurturing to hand each message over. Nurturing holds the App API key
+  and answers "queued", "refused" or "off".
 
   Customer.io is an extra hop, never a single point of failure: any send it does not
   accept goes through the own mailer for that recipient. A self-hosted install has no
@@ -15,11 +19,9 @@ Feature: The app's product mail goes through Customer.io on LangWatch Cloud
 
   @unit
   Scenario Outline: A routed template goes through Customer.io on Cloud
-    Given IS_SAAS is set and CUSTOMER_IO_APP_API_KEY is present
+    Given IS_SAAS is set and nurturing holds CUSTOMER_IO_APP_API_KEY
     When a "<template>" message is sent to one recipient
-    Then exactly one request reaches Customer.io's EU transactional endpoint with the key as bearer
-    And it names "<template>" as the transactional message, with our subject and HTML
-    And link tracking is off
+    Then nurturing is handed exactly one message naming "<template>", with our subject and HTML
     And the own mailer sends nothing
 
     Examples:
@@ -33,7 +35,6 @@ Feature: The app's product mail goes through Customer.io on LangWatch Cloud
       | domain-auto-joined      |
       | seat-request            |
       | usage-limit             |
-      | payment-recovery        |
       | budget-increase-request |
       | automation-limit        |
       | trigger-digest          |
@@ -41,32 +42,32 @@ Feature: The app's product mail goes through Customer.io on LangWatch Cloud
 
   @unit
   Scenario: Every other message stays on the own mailer on Cloud
-    Given IS_SAAS is set and CUSTOMER_IO_APP_API_KEY is present
-    When a message of any template off the list, or with no template, is sent
+    Given IS_SAAS is set and nurturing holds CUSTOMER_IO_APP_API_KEY
+    When a message of any template off the list, or with no template, or with an attachment, is sent
     Then nothing reaches Customer.io
     And the own mailer sends it
 
   @unit
   Scenario: Without IS_SAAS or the key nothing reaches Customer.io
-    Given IS_SAAS is unset, or CUSTOMER_IO_APP_API_KEY is missing
-    When a "payment-recovery" message is sent
+    Given IS_SAAS is unset, or nurturing holds no CUSTOMER_IO_APP_API_KEY
+    When a "usage-limit" message is sent
     Then nothing reaches Customer.io
-    And the own mailer sends it
+    And the own mailer sends it, with no warning
 
   @unit
-  Scenario Outline: A failed payment-recovery send still reaches the person
-    Given Customer.io answers a "payment-recovery" send with <failure>
+  Scenario Outline: A failed usage-limit send still reaches the person
+    Given Customer.io answers a "usage-limit" send with <failure>
     When the message is sent
     Then the own mailer sends it once, with the same subject and HTML
-    And one warning names the "payment-recovery" template
+    And one warning names the "usage-limit" template
 
     Examples:
-      | failure             |
-      | a 500               |
-      | a 400               |
-      | a 429               |
-      | a timeout           |
-      | a network error     |
+      | failure         |
+      | a 500           |
+      | a 400           |
+      | a 429           |
+      | a timeout       |
+      | a network error |
 
   @unit
   Scenario: Only the recipient Customer.io refused falls back
@@ -91,7 +92,7 @@ Feature: The app's product mail goes through Customer.io on LangWatch Cloud
 
   @unit
   Scenario: The routing list holds the agreed product messages and no security mail
-    Then the routing list holds exactly the fourteen agreed template ids
+    Then the routing list holds exactly the thirteen agreed template ids
     And no security message is on it
     And every id on it is a template the app sends
 
@@ -108,7 +109,14 @@ Feature: The app's product mail goes through Customer.io on LangWatch Cloud
     And each carries the List-Unsubscribe pair and the reply-to
 
   @unit
+  Scenario: Nurturing answers whether Customer.io took the message
+    Given nurturing with, or without, CUSTOMER_IO_APP_API_KEY
+    When it is handed a message
+    Then it answers "queued" with the delivery id, "refused" with the reason and status, or "off"
+
+  @unit
   Scenario: The HTTP client sends the documented request
     When the client sends one message
-    Then it posts JSON to the regional /v1/send/email with the key as bearer
+    Then it posts JSON to the EU /v1/send/email (US when CUSTOMER_IO_REGION is "us") with the key as bearer
+    And link tracking is off and unsubscribed people still get it
     And it gives up after ten seconds

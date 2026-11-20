@@ -24,7 +24,6 @@ export {
   allowLoopbackVoiceProviders,
   blockLocalHttpCalls,
   clickhouseCluster,
-  customerIoRegion,
   foldCacheTtlSeconds,
   gatewayAddressOf,
   gatewayInternalUrl,

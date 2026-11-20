@@ -20,9 +20,9 @@ import {
   type MailGatewaySettings,
 } from "../../channels/email-delivery.channel.ts";
 import {
-  type CustomerIoScriptedFailure,
-  MemoryCustomerIoTransactionalChannel,
-} from "../../channels/memory/memory.customer-io-transactional.channel.ts";
+  type CustomerIoMailRefusal,
+  MemoryCustomerIoMailChannel,
+} from "../../channels/memory/memory.customer-io-mail.channel.ts";
 import { MailDeliveryService } from "../mail-delivery.service.ts";
 
 const WARN_LEVEL = 40;
@@ -52,7 +52,7 @@ class OwnMailer extends EmailDelivery {
 }
 
 function compose() {
-  const customerIo = MemoryCustomerIoTransactionalChannel.create();
+  const customerIo = MemoryCustomerIoMailChannel.create();
   const ownMailer = new OwnMailer();
   const mail = MailDeliveryService.create({
     settings: () => Promise.resolve(settings),
@@ -62,11 +62,11 @@ function compose() {
   return { customerIo, ownMailer, mail };
 }
 
-const paymentRecovery = (): SendEmailCommand => ({
+const usageLimit = (): SendEmailCommand => ({
   to: "ada@acme.test",
-  subject: "Your payment did not go through",
-  html: "<p>Update your card</p>",
-  template: "payment-recovery",
+  subject: "You reached your plan's usage limit",
+  html: "<p>Upgrade to keep tracing</p>",
+  template: "usage-limit",
 });
 
 const warnings = () => captured.lines.filter((line) => line.level === WARN_LEVEL);
@@ -75,37 +75,56 @@ beforeEach(() => {
   captured.lines.length = 0;
 });
 
-describe("given Customer.io refuses a payment-recovery send", () => {
-  const failures: [string, CustomerIoScriptedFailure][] = [
-    ["a 500", { kind: "status", status: 500 }],
-    ["a 400", { kind: "status", status: 400 }],
-    ["a 429", { kind: "status", status: 429 }],
-    ["a timeout", { kind: "timeout" }],
-    ["a network error", { kind: "network" }],
+describe("given Customer.io refuses a usage-limit send", () => {
+  const refusals: [string, CustomerIoMailRefusal][] = [
+    ["a 500", { outcome: "refused", reason: "status", status: 500 }],
+    ["a 400", { outcome: "refused", reason: "status", status: 400 }],
+    ["a 429", { outcome: "refused", reason: "status", status: 429 }],
+    ["a timeout", { outcome: "refused", reason: "timeout" }],
+    ["a network error", { outcome: "refused", reason: "network" }],
   ];
 
-  describe.each(failures)("when it answers with %s", (_name, failure) => {
-    /** @scenario "A failed payment-recovery send still reaches the person" */
+  describe.each(refusals)("when it answers with %s", (_name, refusal) => {
+    /** @scenario "A failed usage-limit send still reaches the person" */
     it("sends it once through the own mailer, unchanged, and warns naming the template", async () => {
       const { customerIo, ownMailer, mail } = compose();
-      customerIo.failFor(failure);
+      customerIo.refuse(refusal);
 
-      await mail.sendEmail(paymentRecovery());
+      await mail.sendEmail(usageLimit());
 
-      expect(customerIo.requests).toHaveLength(1);
+      expect(customerIo.sent).toHaveLength(1);
       expect(ownMailer.sent).toEqual([
         {
           to: "ada@acme.test",
-          subject: "Your payment did not go through",
-          html: "<p>Update your card</p>",
+          subject: "You reached your plan's usage limit",
+          html: "<p>Upgrade to keep tracing</p>",
         },
       ]);
       expect(warnings()).toHaveLength(1);
       expect(warnings()[0]).toMatchObject({
-        template: "payment-recovery",
-        reason: failure.kind,
-        ...(failure.kind === "status" ? { status: failure.status } : {}),
+        template: "usage-limit",
+        reason: refusal.reason,
+        ...(refusal.status === undefined ? {} : { status: refusal.status }),
       });
+    });
+  });
+
+  describe("when the call to nurturing itself throws", () => {
+    /** @scenario "A failed usage-limit send still reaches the person" */
+    it("still sends it once through the own mailer", async () => {
+      const { ownMailer } = compose();
+      const mail = MailDeliveryService.create({
+        settings: () => Promise.resolve(settings),
+        delivery: ownMailer,
+        customerIo: {
+          send: () => Promise.reject(new Error("nurturing is not connected yet")),
+        },
+      });
+
+      await mail.sendEmail(usageLimit());
+
+      expect(ownMailer.sent).toHaveLength(1);
+      expect(warnings()[0]).toMatchObject({ template: "usage-limit", reason: "unexpected" });
     });
   });
 });
@@ -115,7 +134,7 @@ describe("given a routed message to two recipients", () => {
     /** @scenario "Only the recipient Customer.io refused falls back" */
     it("has the own mailer send to that recipient only", async () => {
       const { customerIo, ownMailer, mail } = compose();
-      customerIo.failFor({ kind: "status", status: 503 }, "grace@acme.test");
+      customerIo.refuse({ outcome: "refused", reason: "status", status: 503 }, "grace@acme.test");
 
       await mail.sendEmail({
         to: ["ada@acme.test", "grace@acme.test"],
@@ -125,7 +144,7 @@ describe("given a routed message to two recipients", () => {
         idempotencyKey: "usage:org-1",
       });
 
-      expect(customerIo.requests.map((request) => request.to)).toEqual([
+      expect(customerIo.sent.map((email) => email.to)).toEqual([
         "ada@acme.test",
         "grace@acme.test",
       ]);
@@ -155,7 +174,7 @@ describe("given a replyless trigger-digest message", () => {
         template: "trigger-digest",
       });
 
-      expect(customerIo.requests).toEqual([
+      expect(customerIo.sent).toEqual([
         expect.objectContaining({
           identifiers: { email: "ada@acme.test" },
           to: "ada@acme.test",
@@ -172,11 +191,11 @@ describe("given Customer.io and the own mailer both refuse a routed send", () =>
     /** @scenario "When both Customer.io and the own mailer fail the send fails with the own mailer's error" */
     it("rejects with the own mailer's error", async () => {
       const { customerIo, ownMailer, mail } = compose();
-      customerIo.failFor({ kind: "status", status: 500 });
+      customerIo.refuse({ outcome: "refused", reason: "status", status: 500 });
       const refusal = new Error("SMTP relay refused the message");
       ownMailer.failure = refusal;
 
-      await expect(mail.sendEmail(paymentRecovery())).rejects.toBe(refusal);
+      await expect(mail.sendEmail(usageLimit())).rejects.toBe(refusal);
     });
   });
 });
@@ -208,7 +227,7 @@ describe("given a routed message with an unsubscribe link and a hidden recipient
           "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
         },
       };
-      expect(customerIo.requests).toEqual([
+      expect(customerIo.sent).toEqual([
         { ...shared, to: "ada@acme.test", identifiers: { email: "ada@acme.test" } },
         { ...shared, to: "grace@acme.test", identifiers: { email: "grace@acme.test" } },
       ]);
@@ -221,11 +240,11 @@ describe("given a routed message with an unsubscribe link and a hidden recipient
       const { customerIo, ownMailer, mail } = compose();
 
       await mail.sendEmail({
-        ...paymentRecovery(),
-        attachments: [{ filename: "invoice.csv", content: "a,b", contentType: "text/csv" }],
+        ...usageLimit(),
+        attachments: [{ filename: "usage.csv", content: "a,b", contentType: "text/csv" }],
       });
 
-      expect(customerIo.requests).toEqual([]);
+      expect(customerIo.sent).toEqual([]);
       expect(ownMailer.sent).toHaveLength(1);
     });
   });
@@ -236,9 +255,9 @@ describe("given a send through Customer.io that succeeds and one that falls back
     /** @scenario "No log line carries the key or a recipient address" */
     it("carries neither recipient address", async () => {
       const { customerIo, mail } = compose();
-      await mail.sendEmail(paymentRecovery());
-      customerIo.failFor({ kind: "network" });
-      await mail.sendEmail({ ...paymentRecovery(), to: "Grace <grace@acme.test>" });
+      await mail.sendEmail(usageLimit());
+      customerIo.refuse({ outcome: "refused", reason: "network" });
+      await mail.sendEmail({ ...usageLimit(), to: "Grace <grace@acme.test>" });
 
       const logged = JSON.stringify(captured.lines);
       expect(captured.lines.length).toBeGreaterThan(0);
