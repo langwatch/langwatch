@@ -184,7 +184,6 @@ describe("the templates finder", () => {
 
     /** @scenario "AC107d Templates library: a card previews the template's real board" */
     it("sketches every other template's widgets by title, inside the board's columns", () => {
-      let unbuiltChecked = 0;
       for (const { board, preview } of TEMPLATE_LIBRARY) {
         if (TEMPLATE_PREVIEW_IDS.has(board.id)) continue;
         expect(preview.kind, board.id).toBe("layout");
@@ -196,13 +195,20 @@ describe("the templates finder", () => {
         ).toEqual(widgetIds.map((id) => titles.get(id)));
         for (const { key, layout } of preview.widgets) {
           expect(layout.gridColumn + layout.colSpan, key).toBeLessThanOrEqual(CHART_GRID_COLUMNS);
-          if (implementedWidget(key) === undefined) {
-            expect(layout.rowSpan, key).toBe(BOARD_WIDGET_DEFAULT_ROW_SPAN);
-            unbuiltChecked += 1;
-          }
         }
       }
-      expect(unbuiltChecked).toBeGreaterThan(0);
+    });
+
+    /** @scenario "AC107d Templates library: a card previews the template's real board" */
+    it("sketches every unbuilt widget at the board's default height", () => {
+      const unbuilt = TEMPLATE_LIBRARY.filter(({ board }) => !TEMPLATE_PREVIEW_IDS.has(board.id))
+        .flatMap(({ preview }) => (preview.kind === "layout" ? preview.widgets : []))
+        .filter(({ key }) => implementedWidget(key) === undefined);
+
+      expect(unbuilt.length).toBeGreaterThan(0);
+      expect(unbuilt.map(({ key, layout }) => [key, layout.rowSpan])).toEqual(
+        unbuilt.map(({ key }) => [key, BOARD_WIDGET_DEFAULT_ROW_SPAN]),
+      );
     });
   });
 });
