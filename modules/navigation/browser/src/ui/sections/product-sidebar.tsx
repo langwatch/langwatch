@@ -1,5 +1,6 @@
 /** Sidebar column: product pages and utilities. Host and search palette integration. */
 
+import type { StarredDashboardsProject } from "@langwatch/analytics-client";
 import { RawKbd as Kbd } from "@langwatch/design-system/kbd";
 import { Box, VStack } from "@langwatch/design-system/primitives";
 import { ScrollEdgeFade, useScrollEdges } from "@langwatch/design-system/scroll-fade";
@@ -8,6 +9,7 @@ import { ArrowLeft, ArrowUpRight, Search } from "lucide-react";
 import { useRef, useState } from "react";
 
 import { SavedDashboards, StarredDashboards } from "../../behavior/lent-saved-dashboards.tsx";
+import { navigationApi } from "../../behavior/navigation-api.ts";
 import { useAdminMenu } from "../../behavior/use-admin-menu.ts";
 import { useLlmOpsProject, useLlmOpsProjectSlug } from "../../behavior/use-llm-ops-project-slug.ts";
 import { useMenuScrollPosition } from "../../behavior/use-menu-scroll-position.ts";
@@ -349,13 +351,25 @@ function StarredDashboardsGroup({
   const { reachableProducts } = useReachableProducts();
   const llmOpsProject = useLlmOpsProject();
   const everyProduct = host.featureFlag(FrontendFlags.release_dashboards_in_every_product);
-  if (!showExpanded || !reachableProducts.includes("dashboards")) return null;
-  if (surface === "llm-ops") return <StarredDashboards />;
+  if (!showExpanded) return null;
+  if (surface === "llm-ops") {
+    return reachableProducts.includes("dashboards") ? <StarredDashboards /> : null;
+  }
   if (!everyProduct.enabled || !DASHBOARDS_SECTION_FLAGGED_SURFACES.has(surface)) return null;
   // These pages are about no project: the section works in the one LLM Ops would open.
-  if (!llmOpsProject) return null;
+  if (!llmOpsProject || !host.hasPermission("analytics:view")) return null;
   const { id, slug, name } = llmOpsProject;
-  return <StarredDashboards project={{ id, slug, name }} />;
+  return <StarredDashboardsInProject project={{ id, slug, name }} />;
+}
+
+/** Dashboards is released per project: the section follows the one it works in, not the page's. */
+function StarredDashboardsInProject({ project }: { project: StarredDashboardsProject }) {
+  const released = navigationApi.featureFlag.isEnabled.useQuery({
+    flag: "release_dashboards",
+    projectId: project.id,
+  });
+  if (!released.data?.enabled) return null;
+  return <StarredDashboards project={project} />;
 }
 
 function ProductSidebarBody({

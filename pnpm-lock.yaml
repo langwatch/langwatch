@@ -5017,6 +5017,12 @@ importers:
       '@langwatch/api':
         specifier: workspace:*
         version: link:../../../packages/api
+      '@langwatch/authorization':
+        specifier: workspace:*
+        version: link:../../../packages/authorization
+      '@langwatch/authz-contract':
+        specifier: workspace:*
+        version: link:../../authz/contract
       '@langwatch/automation-contract':
         specifier: workspace:*
         version: link:../../automation/contract

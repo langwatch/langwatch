@@ -4,11 +4,10 @@
  * application. ARCHITECTURE.md §10.1.
  */
 
+import { permissionSatisfiedBy } from "@langwatch/authorization";
 import {
-  useUiCopyTargets,
   useUiHostServices,
   useUiScope,
-  type UiCopyTargets,
   type UiFeedback,
   type UiNavigation,
   type UiRoute,
@@ -18,7 +17,7 @@ import { useUiFlags } from "@langwatch/browser-host/feature-flag";
 import { useLentOperations } from "@langwatch/browser-host/lent";
 import { FrontendFlags } from "@langwatch/feature-flag-contract";
 import { LangyAskToken, type LangyAsk } from "@langwatch/langy-client";
-import { useMemo, type ReactNode } from "react";
+import { useCallback, useMemo, useState, type ReactNode } from "react";
 
 import {
   AnalyticsHostApi,
@@ -46,7 +45,8 @@ class CapabilityAnalyticsHost extends AnalyticsHostApi {
   private readonly navigationCapability: UiNavigation;
   private readonly feedback: UiFeedback;
   private readonly langy: (() => Promise<LangyAsk>) | undefined;
-  private readonly copyTargets: UiCopyTargets;
+  private readonly projectGrants: ReadonlyMap<string, ReadonlySet<string>>;
+  private readonly askAbout: (projectId: string) => void;
 
   constructor({
     project_,
@@ -58,7 +58,8 @@ class CapabilityAnalyticsHost extends AnalyticsHostApi {
     navigationCapability,
     feedback,
     langy,
-    copyTargets,
+    projectGrants,
+    askAbout,
   }: {
     project_: AnalyticsHostProject | undefined;
     organizationId_: string | undefined;
@@ -69,7 +70,8 @@ class CapabilityAnalyticsHost extends AnalyticsHostApi {
     navigationCapability: UiNavigation;
     feedback: UiFeedback;
     langy: (() => Promise<LangyAsk>) | undefined;
-    copyTargets: UiCopyTargets;
+    projectGrants: ReadonlyMap<string, ReadonlySet<string>>;
+    askAbout: (projectId: string) => void;
   }) {
     super();
     this.project_ = project_;
@@ -81,7 +83,8 @@ class CapabilityAnalyticsHost extends AnalyticsHostApi {
     this.navigationCapability = navigationCapability;
     this.feedback = feedback;
     this.langy = langy;
-    this.copyTargets = copyTargets;
+    this.projectGrants = projectGrants;
+    this.askAbout = askAbout;
   }
 
   project(): AnalyticsHostProject | undefined {
@@ -104,12 +107,14 @@ class CapabilityAnalyticsHost extends AnalyticsHostApi {
     return this.session.hasPermission(permission);
   }
 
-  /** Organization's lent copy targets grade each project by its own grants, manage included. */
+  /** By the reader's own standing in that project, organization admin included, manage too. */
   hasPermissionIn({ projectId, permission }: { projectId: string; permission: string }): boolean {
-    const target = this.copyTargets
-      .targets(permission)
-      ?.find((candidate) => candidate.projectId === projectId);
-    return target?.mayCreate ?? false;
+    const granted = this.projectGrants.get(projectId);
+    if (!granted) {
+      this.askAbout(projectId);
+      return false;
+    }
+    return permissionSatisfiedBy({ granted, requested: permission });
   }
 
   isSettled(): boolean {
@@ -170,7 +175,6 @@ class CapabilityAnalyticsHost extends AnalyticsHostApi {
 export default function AnalyticsHostMount({ children }: { children?: ReactNode }) {
   const { session, navigation, route, feedback } = useUiHostServices();
   const langy = useLentOperations(LangyAskToken);
-  const copyTargets = useUiCopyTargets();
   // Read as primitives: the flags service hands a new object on every render.
   const uiFlags = useUiFlags();
   const dashboardsFlag = uiFlags.flag(FrontendFlags.release_dashboards);
@@ -194,6 +198,41 @@ export default function AnalyticsHostMount({ children }: { children?: ReactNode 
     { enabled: session.currentUser() !== null && scopeProjectId !== void 0 },
   );
   const isPersonal = isPersonalProject({ graph: scopeGraph.data ?? [], projectId: scopeProjectId });
+
+  // Only the projects a section asked about are read, never every project in the organization.
+  const [askedProjectIds, setAskedProjectIds] = useState<readonly string[]>([]);
+  const askAbout = useCallback(
+    (askedProjectId: string) => {
+      if (askedProjectIds.includes(askedProjectId)) return;
+      // Deferred: a section asks while rendering, when setting this mount's state is refused.
+      queueMicrotask(() =>
+        setAskedProjectIds((asked) =>
+          asked.includes(askedProjectId) ? asked : [...asked, askedProjectId],
+        ),
+      );
+    },
+    [askedProjectIds],
+  );
+  const standings = analyticsApi.useQueries((t) =>
+    askedProjectIds.map((askedProjectId) =>
+      t.authz.effectivePermissions({ projectId: askedProjectId }),
+    ),
+  );
+  const landed = askedProjectIds.flatMap((askedProjectId, index) => {
+    const permissions = standings[index]?.data?.permissions;
+    return permissions ? [[askedProjectId, permissions] as const] : [];
+  });
+  // useQueries answers a new array every render, so the grants are keyed on what landed.
+  const landedKey = JSON.stringify(landed);
+  const projectGrants = useMemo(
+    () =>
+      new Map(
+        landed.map(
+          ([askedProjectId, permissions]) => [askedProjectId, new Set(permissions)] as const,
+        ),
+      ),
+    [landedKey],
+  );
 
   // Primitive dependencies only, so the host stays the SAME object across
   // renders that carry the same reading.
@@ -219,7 +258,8 @@ export default function AnalyticsHostMount({ children }: { children?: ReactNode 
         navigationCapability: navigation,
         feedback,
         langy,
-        copyTargets,
+        projectGrants,
+        askAbout,
       }),
     [
       scopeProjectId,
@@ -238,7 +278,8 @@ export default function AnalyticsHostMount({ children }: { children?: ReactNode 
       navigation,
       feedback,
       langy,
-      copyTargets,
+      projectGrants,
+      askAbout,
     ],
   );
   return <AnalyticsHostProvider value={host}>{children}</AnalyticsHostProvider>;

@@ -152,6 +152,13 @@ export type NavigationApiMap = ContractApiMap<typeof identityTrpc> & {
         output: { enabledByOrganizationId?: Record<string, boolean> };
       };
     };
+    /** One flag, answered for a named project: on a page about no project, the one it works in. */
+    isEnabled: {
+      query: {
+        input: { flag: string; projectId?: string | null; organizationId?: string | null };
+        output: { enabled: boolean };
+      };
+    };
   };
 
   user: {
