@@ -43,13 +43,13 @@ A run on a project with no trace since the window's start ends as `nothing` (rea
 
 **Five life steps.** Citations are at the commit this ADR lands on.
 
-| Step | What happens | Code today |
-| --- | --- | --- |
-| Found | The run files a new insight or renews an open one (same id, new numbers). | `modules/insight/process/src/services/insight-daily-run.service.ts:306-311`, rule `modules/insight/process/src/rules/insight-daily-run.rules.ts:177` |
-| Shown | The bell and the Insights entry in the menu show the count of unseen insights, behind `release_insights`. | `modules/insight/contract/src/insight-inbox.ts:77`, `modules/insight/browser/src/ui/sections/insights-bell.tsx:27`, `modules/navigation/browser/src/ui/sections/main-menu.tsx:98-112` |
-| Read | Showing an insight on the Insights page marks it seen, and the count goes down. | `modules/insight/browser/src/ui/sections/insights.screen.tsx:171`, `modules/insight/process/src/services/insight.service.ts:87` |
-| Acted on | The person marks it done, keeps it, chats with Langy about it, copies it or says it is not useful. | `modules/insight/browser/src/ui/sections/insights.screen.tsx:207-218`, `modules/insight/process/src/services/insight.service.ts:114-122` |
-| Retired | Mark done archives it. Unless kept or renewed, it goes stale after its valid days (default 7, from 1 to 90). | `modules/insight/contract/src/insight-inbox.ts:33-42`, `modules/insight/contract/src/insight.ts:15-16` |
+| Step     | What happens                                                                                                 | Code today                                                                                                                                                                            |
+| -------- | ------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Found    | The run files a new insight or renews an open one (same id, new numbers).                                    | `modules/insight/process/src/services/insight-daily-run.service.ts:306-311`, rule `modules/insight/process/src/rules/insight-daily-run.rules.ts:177`                                  |
+| Shown    | The bell and the Insights entry in the menu show the count of unseen insights, behind `release_insights`.    | `modules/insight/contract/src/insight-inbox.ts:77`, `modules/insight/browser/src/ui/sections/insights-bell.tsx:27`, `modules/navigation/browser/src/ui/sections/main-menu.tsx:98-112` |
+| Read     | Showing an insight on the Insights page marks it seen, and the count goes down.                              | `modules/insight/browser/src/ui/sections/insights.screen.tsx:171`, `modules/insight/process/src/services/insight.service.ts:87`                                                       |
+| Acted on | The person marks it done, keeps it, chats with Langy about it, copies it or says it is not useful.           | `modules/insight/browser/src/ui/sections/insights.screen.tsx:207-218`, `modules/insight/process/src/services/insight.service.ts:114-122`                                              |
+| Retired  | Mark done archives it. Unless kept or renewed, it goes stale after its valid days (default 7, from 1 to 90). | `modules/insight/contract/src/insight-inbox.ts:33-42`, `modules/insight/contract/src/insight.ts:15-16`                                                                                |
 
 The Insights page has three folders, Inbox, Stale and Archived, all derived by
 `insightFolder`. Of what a person does in Acted on, only done and kept are recorded; a chat, a
