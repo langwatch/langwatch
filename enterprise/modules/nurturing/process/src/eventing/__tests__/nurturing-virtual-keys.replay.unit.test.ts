@@ -126,7 +126,9 @@ const ownerPipeline = (name: string, aggregateType: string) =>
 /** The three owners' pipelines as stand-ins. */
 function owners() {
   const gateway = ownerPipeline("governance_events", "governance_subject")
-    .withEvents([testEventSchema(GATEWAY_VK_LIFECYCLE_EVENT_TYPE, recordVkLifecycleCommandDataSchema)])
+    .withEvents([
+      testEventSchema(GATEWAY_VK_LIFECYCLE_EVENT_TYPE, recordVkLifecycleCommandDataSchema),
+    ])
     .build();
   const user = ownerPipeline(USER_LIFECYCLE_PIPELINE_NAME, USER_AGGREGATE_TYPE)
     .withEvents([testEventSchema(USER_ERASED_EVENT_TYPE, userErasedEventDataSchema)])
@@ -181,7 +183,10 @@ function deploy({
   };
   const run = (
     id: string,
-    { dryRun = false, resumeFrom = null }: { dryRun?: boolean; resumeFrom?: MigrationStepReport | null } = {},
+    { dryRun = false, resumeFrom = null }: {
+      dryRun?: boolean;
+      resumeFrom?: MigrationStepReport | null;
+    } = {},
   ) =>
     step(id).run({
       log: { info: () => undefined, warn: () => undefined },
@@ -196,7 +201,10 @@ function deploy({
   const rows = (...ids: number[]) =>
     Promise.all(
       ids.map((id) =>
-        repositories.virtualKeys.findKey({ organizationId: ORGANIZATION_ID, virtualKeyId: keyId(id) }),
+        repositories.virtualKeys.findKey({
+          organizationId: ORGANIZATION_ID,
+          virtualKeyId: keyId(id),
+        }),
       ),
     );
   return { repositories, log, steps, step, run, runAll, rows, projections };
@@ -224,7 +232,9 @@ async function perFactRows({
 }
 
 function keysLaneOf(projections: ReturnType<typeof replayProjectionsOf>) {
-  const lane = projections.mapProjections.find(({ projectionName }) => projectionName === KEYS_LANE);
+  const lane = projections.mapProjections.find(
+    ({ projectionName }) => projectionName === KEYS_LANE,
+  );
   if (!lane) throw new Error(`no lane ${KEYS_LANE}`);
   return lane;
 }
@@ -422,7 +432,7 @@ describe("given two holder facts share a stamp and one names an erased person", 
       [{ principalUserId: "user-next", principalUserIdAt: 2_000 }],
     ]);
     // A batch write would fold a stamp's holders in memory, where the erased one can win a tie.
-    expect(keysLaneOf(worker.projections).open((lane) => 'bulkAppend' in lane.store)).toBe(false);
+    expect(keysLaneOf(worker.projections).open((lane) => "bulkAppend" in lane.store)).toBe(false);
   });
 });
 
@@ -566,8 +576,8 @@ describe("given the module's steps", () => {
       service: new ReplayService({
         eventSource: worker.log,
         redis: memoryRedisDouble({
-        script: { hdel: async () => 0, hlen: async () => 0, lpush: async () => 0 },
-      }),
+          script: { hdel: async () => 0, hlen: async () => 0, lpush: async () => 0 },
+        }),
       }),
       projections: worker.projections,
     });

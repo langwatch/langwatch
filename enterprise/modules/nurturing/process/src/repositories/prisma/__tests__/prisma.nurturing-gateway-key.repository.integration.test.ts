@@ -60,7 +60,11 @@ const writeFact = (
   keys: PrismaNurturingVirtualKeyRepository,
   next: NurturingVirtualKeyFact,
   tenant = "project-1",
-) => keyLane(keys).append(next, { tenantId: createTenantId(tenant), aggregateId: `vk:${next.virtualKeyId}` });
+) =>
+  keyLane(keys).append(next, {
+    tenantId: createTenantId(tenant),
+    aggregateId: `vk:${next.virtualKeyId}`,
+  });
 
 /** Runs the same steps on Postgres and then on the memory twin, so both hold the same facts. */
 async function onEach<Repository>(
@@ -454,9 +458,9 @@ describe.skipIf(!databaseUrl)("given nurturing's key copy in Postgres", () => {
       await writeFact(keys, naming(otherFirst, person));
 
       for (const virtualKeyId of [erasedFirst, otherFirst]) {
-        await expect(keys.findKey({ organizationId: firstOrganization, virtualKeyId })).resolves.toMatchObject([
-          { principalUserId: "user-next", principalUserIdAt: 2_000 },
-        ]);
+        await expect(
+          keys.findKey({ organizationId: firstOrganization, virtualKeyId }),
+        ).resolves.toMatchObject([{ principalUserId: "user-next", principalUserIdAt: 2_000 }]);
       }
       // A bulkAppend would fold a stamp's holders in memory, where the erased one can win the tie.
       expect(keyLane(keys).bulkAppend).toBeUndefined();
