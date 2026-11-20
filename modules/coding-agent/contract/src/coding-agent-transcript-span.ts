@@ -121,8 +121,8 @@ function collectModelCallSpan(span: SpanDetail, accumulator: SpanEntryAccumulato
   });
 }
 
-/** Claude Code's `[tool_use: Name]` lines and their input: the tool rows already show each call. */
-const TOOL_USE_TEXT = /\[tool_use: [^\]\n]+\](?:\n[^\n]*)?/g;
+/** Claude Code's own `[tool_use: Name]` lines with their JSON input: the tool rows show them. */
+const TOOL_USE_TEXT = /^\[tool_use: [^\]\n]+\][ \t]*(?:\n[ \t]*[{[].*)?$/gm;
 
 function withoutToolUseText(text: string): string {
   if (!text.includes("[tool_use: ")) return text;

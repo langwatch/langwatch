@@ -144,8 +144,8 @@ export class CodingAgentTraceSessionClickHouseRepository implements TraceSession
   }
 
   /**
-   * The session's newest mapping. The table is keyed by trace, so the read is a tenant range
-   * bounded by the session's window; the partition key keeps it to the months the window spans.
+   * The session's newest mapping, counting only each trace's current version. The table is keyed
+   * by trace, so the read is a tenant range bounded by the session's window.
    */
   async findLatestBySessionId({
     tenantId,
@@ -173,6 +173,20 @@ export class CodingAgentTraceSessionClickHouseRepository implements TraceSession
           AND SessionId = {sessionId:String}
           AND OccurredAt >= fromUnixTimestamp64Milli({fromMs:Int64})
           AND OccurredAt <= fromUnixTimestamp64Milli({toMs:Int64})
+          AND (TenantId, TraceId, UpdatedAt) IN (
+            SELECT TenantId, TraceId, max(UpdatedAt)
+            FROM ${TABLE_NAME}
+            WHERE TenantId = {tenantId:String}
+              AND TraceId IN (
+                SELECT TraceId
+                FROM ${TABLE_NAME}
+                WHERE TenantId = {tenantId:String}
+                  AND SessionId = {sessionId:String}
+                  AND OccurredAt >= fromUnixTimestamp64Milli({fromMs:Int64})
+                  AND OccurredAt <= fromUnixTimestamp64Milli({toMs:Int64})
+              )
+            GROUP BY TenantId, TraceId
+          )
         ORDER BY OccurredAt DESC, TraceId ASC
         LIMIT 1
       `,

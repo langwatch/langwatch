@@ -19,28 +19,34 @@ type Resolved =
   | Readonly<{ kind: "turn"; turn: ConversationTurn | null; tenantId: string | undefined }>;
 
 /**
- * Applies a `session=` or `sessionName=` link once: looks the session's last turn up, then opens
- * its terminal replay and drops the link in one address write made from the current address, so
- * a Langy question beside it stays. Spec: specs/coding-agent/sessions-screen.feature
+ * Applies each `session=` or `sessionName=` link once the list has loaded: looks the session's
+ * last turn up, then opens its replay and drops the link in one address write from the current
+ * address, so a Langy question beside it stays. Spec: specs/coding-agent/sessions-screen.feature
  */
 export function useSessionLink({
   projectId,
   rows,
+  isLoaded,
 }: {
   projectId: string;
   rows: readonly SessionListRow[];
+  isLoaded: boolean;
 }): void {
   const utils = codingAgentApi.useUtils();
-  const router = useCodingAgentRouter();
-  const toaster = useCodingAgentToaster();
   const showErrorToast = useShowErrorToast();
+  const router = useCodingAgentRouter();
   const link = findSessionLink(router.query);
-  const startedRef = useRef(false);
+  const linkKey = JSON.stringify(link);
+  const handledLinkRef = useRef<string | null>(null);
   const [resolved, setResolved] = useState<Resolved | null>(null);
 
   useEffect(() => {
-    if (link === null || startedRef.current) return;
-    startedRef.current = true;
+    if (link === null) {
+      handledLinkRef.current = null;
+      return;
+    }
+    if (!isLoaded || handledLinkRef.current === linkKey) return;
+    handledLinkRef.current = linkKey;
     const row = sessionOfLink({ link, rows });
     if (row === null) {
       setResolved({ kind: "unlisted" });
@@ -53,7 +59,23 @@ export function useSessionLink({
         showErrorToast({ error, fallbackTitle: "Couldn't open the terminal replay" });
         setResolved({ kind: "failed" });
       });
-  }, [link, rows, projectId, utils, showErrorToast]);
+  }, [link, linkKey, isLoaded, rows, projectId, utils, showErrorToast]);
+
+  useAppliedSessionLink({ resolved, setResolved, projectId });
+}
+
+/** Acts on a resolved link: opens the replay, or says why it could not, then drops the link. */
+function useAppliedSessionLink({
+  resolved,
+  setResolved,
+  projectId,
+}: {
+  resolved: Resolved | null;
+  setResolved: (next: null) => void;
+  projectId: string;
+}): void {
+  const router = useCodingAgentRouter();
+  const toaster = useCodingAgentToaster();
 
   useEffect(() => {
     if (resolved === null) return;
@@ -78,5 +100,5 @@ export function useSessionLink({
       sayNothingWasStored(toaster);
     }
     router.setQueryParams(withoutSessionLink(), { replace: true });
-  }, [resolved, projectId, router, toaster]);
+  }, [resolved, setResolved, projectId, router, toaster]);
 }

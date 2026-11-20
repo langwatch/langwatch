@@ -457,6 +457,12 @@ Rule: A Code Mode session reads like the real CLI, not like REPL and Poll
     And no status summary is shown for the poll
 
   @integration
+  Scenario: A poll that failed still shows its error
+    Given a Claude Code session in Code Mode where polling a running script failed
+    When the Terminal tab renders the session
+    Then the poll is shown as a failed call with the error it returned
+
+  @integration
   Scenario: A script with no description falls back to Code
     Given a REPL call whose input carries a script but no description
     When the Terminal tab renders the session

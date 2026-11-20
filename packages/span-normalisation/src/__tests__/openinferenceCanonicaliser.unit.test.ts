@@ -173,6 +173,18 @@ describe("OpenInferenceCanonicaliserService", () => {
 
       expect(ctx.bag.attrs.get(ATTR_KEYS.OPENINFERENCE_SESSION_ID)).toBe("claude-session-1");
     });
+
+    it("leaves a raw conversation id on the span in place of session.id", () => {
+      const ctx = createExtractorContext({
+        [ATTR_KEYS.OPENINFERENCE_SESSION_ID]: "claude-session-1",
+        [ATTR_KEYS.GEN_AI_CONVERSATION_ID]: "raw-thread-1",
+      });
+
+      extractor.apply(ctx);
+
+      expect(ctx.out[ATTR_KEYS.GEN_AI_CONVERSATION_ID]).toBeUndefined();
+      expect(ctx.bag.attrs.get(ATTR_KEYS.OPENINFERENCE_SESSION_ID)).toBe("claude-session-1");
+    });
   });
 
   describe("when tag.tags is a string", () => {

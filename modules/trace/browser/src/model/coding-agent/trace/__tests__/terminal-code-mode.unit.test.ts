@@ -28,6 +28,11 @@ describe("codeModeResultText", () => {
   it("keeps a JSON result that is not a status summary", () => {
     expect(codeModeResultText('{"lines":4}')).toBe('{"lines":4}');
   });
+
+  it("keeps a script's own result even when it reuses the summary's key names", () => {
+    expect(codeModeResultText('{"success":false}')).toBe('{"success":false}');
+    expect(codeModeResultText('{"status":"healthy"}')).toBe('{"status":"healthy"}');
+  });
 });
 
 describe("toolPrimaryArg", () => {

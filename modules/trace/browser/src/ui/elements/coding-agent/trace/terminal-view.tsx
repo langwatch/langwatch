@@ -1407,7 +1407,8 @@ type ToolEntry = Extract<TranscriptEntry, { kind: "tool" }>;
 function ToolEntryLine({ entry, ran }: { entry: ToolEntry; ran: TerminalToolSpan | null }) {
   const name = ran?.toolName ?? entry.name;
   if (isCodeModeScript(name)) return <CodeScriptCall entry={entry} ran={ran} />;
-  if (isCodeModePoll(name))
+  const failed = ran?.isError ?? entry.failed;
+  if (isCodeModePoll(name) && !failed)
     return <ScriptWaitLine durationMs={ran?.durationMs ?? entry.durationMs} />;
   return <ToolCall entry={entry} ran={ran} />;
 }

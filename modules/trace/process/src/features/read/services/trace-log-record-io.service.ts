@@ -79,10 +79,20 @@ export class TraceLogRecordIOService {
       return null;
     }
 
-    // A launcher that wraps the request, or answers through a tool, declares the real text.
+    // A launcher that wraps the request, or answers through a tool, declares the real text. Each
+    // declared side replaces only its own native counterpart.
+    const [native] = this.nativeClaudeCodeIO(data);
     const [declared] = declaredIO(data.attributes);
-    if (declared) return declared;
+    if (!declared) return native ?? null;
+    return {
+      input: declared.input ?? native?.input ?? null,
+      output: declared.output ?? native?.output ?? null,
+      ...(declared.outputDeclared ? { outputDeclared: true } : {}),
+    };
+  }
 
+  /** What Claude Code itself put on the record: one item, or none when it carries no text. */
+  private nativeClaudeCodeIO(data: LogRecordReceivedEventData): TraceLogIO[] {
     // Gated on `user_prompt` specifically. Any claude_code record with a
     // `prompt` attribute would otherwise win, including internal subagent calls
     // — a Bash tool subagent emitting `prompt:"env"` would put the shell
@@ -90,7 +100,7 @@ export class TraceLogRecordIOService {
     if (data.attributes["event.name"] === "user_prompt") {
       const prompt = data.attributes.prompt;
       if (typeof prompt === "string" && prompt) {
-        return { input: prompt, output: null };
+        return [{ input: prompt, output: null }];
       }
     }
 
@@ -103,18 +113,18 @@ export class TraceLogRecordIOService {
         body: data.attributes.body,
       }).assistantText;
       if (responseText !== null) {
-        return { input: null, output: responseText };
+        return [{ input: null, output: responseText }];
       }
     }
 
     if (this.isConversationalTurn(data, "assistant_response")) {
       const response = data.attributes.response;
       if (typeof response === "string" && response.length > 0) {
-        return { input: null, output: response };
+        return [{ input: null, output: response }];
       }
     }
 
-    return null;
+    return [];
   }
 
   /**

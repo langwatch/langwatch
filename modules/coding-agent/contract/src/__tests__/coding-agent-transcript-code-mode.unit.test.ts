@@ -177,6 +177,18 @@ describe("model replies in the transcript", () => {
     expect(replies([toolOnly, withProse])).toEqual(["Checking the notes first."]);
   });
 
+  /** @scenario "A model reply that only names its tool calls adds no line of its own" */
+  it("keeps prose that only mentions the marker", () => {
+    const literal = modelCall({
+      params: { query_source_safe: "repl_main_thread" },
+      output: "Use this literal marker: [tool_use: Bash]\nIt is documentation, not a tool call.",
+    });
+
+    expect(replies([literal])).toEqual([
+      "Use this literal marker: [tool_use: Bash]\nIt is documentation, not a tool call.",
+    ]);
+  });
+
   /** @scenario "Claude Code's own utility calls are not the agent talking" */
   it("leaves out the session title call and keeps a sub-agent's reply", () => {
     const title = modelCall({

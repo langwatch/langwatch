@@ -288,6 +288,20 @@ describe("the personal Sessions table", () => {
       expect(screen.queryByRole("searchbox")).not.toBeInTheDocument();
       expect(screen.queryByRole("table")).not.toBeInTheDocument();
     });
+
+    /** @scenario "A link to a session that is not listed says so" */
+    it("still says a linked session is not listed when there are none", async () => {
+      pinSessions([]);
+
+      renderTable({ session: "ghost-session" });
+
+      await waitFor(() =>
+        expect(host.recording.infos).toContainEqual(
+          expect.objectContaining({ title: "That session is not listed here" }),
+        ),
+      );
+      expect(writtenQueries()).toEqual([{}]);
+    });
   });
 
   describe("given a session whose agent never generated a title", () => {

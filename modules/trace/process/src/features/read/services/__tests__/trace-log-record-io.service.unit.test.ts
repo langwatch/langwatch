@@ -131,6 +131,25 @@ describe("TraceLogRecordIOService", () => {
           outputDeclared: true,
         });
       });
+
+      it("keeps the native side it did not declare", () => {
+        const result = service.extractIO(
+          record({
+            scopeName: CLAUDE_SCOPE,
+            attributes: {
+              "event.name": "user_prompt",
+              prompt: "Can you check the build?",
+              "langwatch.output": "The build is green.",
+            },
+          }),
+        );
+
+        expect(result).toEqual({
+          input: "Can you check the build?",
+          output: "The build is green.",
+          outputDeclared: true,
+        });
+      });
     });
 
     describe("when a subagent emits a prompt on some other event", () => {

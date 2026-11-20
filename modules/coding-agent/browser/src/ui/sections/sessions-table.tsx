@@ -60,6 +60,7 @@ export function SessionsTable({
     () => (sessionsQuery.data ?? []).map(toListRow),
     [sessionsQuery.data],
   );
+  useSessionLink({ projectId, rows, isLoaded: sessionsQuery.data !== undefined });
 
   if (sessionsQuery.isLoading) {
     return <Skeleton height="180px" borderRadius="md" />;
@@ -93,7 +94,6 @@ const ListedSessions: React.FC<{
   projectSlug: string | null;
   rows: SessionListRow[];
 }> = ({ projectId, projectSlug, rows }) => {
-  useSessionLink({ projectId, rows });
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState<number>(DEFAULT_PAGE_SIZE);
   const [search, setSearch] = useState("");

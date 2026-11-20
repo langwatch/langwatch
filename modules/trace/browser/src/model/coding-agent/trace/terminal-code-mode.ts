@@ -16,6 +16,9 @@ const OUTCOME_SUMMARY_KEYS = new Set([
   "decisionSource",
 ]);
 
+/** The statuses the outcome summary is written with. */
+const SUMMARY_STATUSES = new Set(["completed", "failed", "unknown", "rejected"]);
+
 export function isCodeModeScript(name: string): boolean {
   return name === SCRIPT_TOOL;
 }
@@ -61,8 +64,14 @@ function isToolOutcomeSummary(text: string): boolean {
   try {
     const parsed: unknown = JSON.parse(trimmed);
     if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) return false;
-    const keys = Object.keys(parsed);
-    return keys.length > 0 && keys.every((key) => OUTCOME_SUMMARY_KEYS.has(key));
+    const record = parsed as Record<string, unknown>;
+    // The span records no provenance, so the summary is told by its whole shape: a `status` the
+    // enrichment writes plus only its own keys. A script's own `{ success: false }` keeps showing.
+    return (
+      typeof record.status === "string" &&
+      SUMMARY_STATUSES.has(record.status) &&
+      Object.keys(record).every((key) => OUTCOME_SUMMARY_KEYS.has(key))
+    );
   } catch {
     return false;
   }

@@ -1526,6 +1526,24 @@ describe("TerminalView in a Claude Code Code Mode session", () => {
       expect(screen.queryByText("Poll")).not.toBeInTheDocument();
       expect(container.textContent).not.toContain('"status"');
     });
+
+    /** @scenario "A poll that failed still shows its error" */
+    it("shows a failed poll as a failed call with its error", () => {
+      const { container } = renderCodeMode([
+        toolEntry({
+          atMs: 2_000,
+          name: "Poll",
+          input: {},
+          output: "Script failed: TypeError: notes is undefined",
+          failed: true,
+          spanId: "poll-span",
+        }),
+      ]);
+
+      expect(screen.getByText("Poll")).toBeInTheDocument();
+      expect(container.textContent).toContain("Script failed: TypeError: notes is undefined");
+      expect(container.textContent).not.toContain("Waited for the script");
+    });
   });
 
   describe("when the REPL input carries a script but no description", () => {

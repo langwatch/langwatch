@@ -35,7 +35,14 @@ beforeAll(async () => {
       { tenantId, traceId: "trace-early", sessionId, occurredAtMs: baseMs },
       { tenantId, traceId: "trace-late", sessionId, occurredAtMs: baseMs + 5_000 },
       { tenantId, traceId: "trace-other", sessionId: "other", occurredAtMs: baseMs + 9_000 },
+      { tenantId, traceId: "trace-moved", sessionId, occurredAtMs: baseMs + 7_000 },
     ],
+    30,
+  );
+  // A later version files `trace-moved` under another session; the earlier row is superseded.
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  await traceSessions.ensure(
+    [{ tenantId, traceId: "trace-moved", sessionId: "other", occurredAtMs: baseMs + 7_000 }],
     30,
   );
 });
