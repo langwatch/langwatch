@@ -380,7 +380,7 @@ describe("given a failed row and a skipped row for the same key", () => {
         source: ASK,
       });
 
-      expect(results.store.list().map((row) => row.Status)).toEqual(
+      expect(results.store.findAll().map((row) => row.Status)).toEqual(
         expect.arrayContaining(["failed", "skipped", "judged"]),
       );
       expect(judge.requests).toHaveLength(1);

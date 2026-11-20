@@ -55,7 +55,7 @@ describe("EvalResultsMonitorService", () => {
 
         await service.keep({ ...JUDGMENT, judgement: POLITE });
 
-        expect(results.list()).toEqual([
+        expect(results.findAll()).toEqual([
           expect.objectContaining({
             TenantId: "project-1",
             TraceId: "trace-1",
@@ -86,7 +86,7 @@ describe("EvalResultsMonitorService", () => {
           judgement: { verdicts: [], skippedReason: "classifier_failed" },
         });
 
-        expect(results.list().map((row) => row.Status)).toEqual(["failed"]);
+        expect(results.findAll().map((row) => row.Status)).toEqual(["failed"]);
         expect(await service.findJudgments(JUDGMENT)).toEqual([]);
       });
     });
@@ -125,7 +125,7 @@ describe("EvalResultsMonitorService", () => {
       it("answers the monitor's own verdict, never the ask's", async () => {
         const { results, service } = harness();
         await service.keep({ ...JUDGMENT, judgement: POLITE });
-        const [monitorRow] = results.list();
+        const [monitorRow] = results.findAll();
         if (!monitorRow) throw new Error("the monitor row was not kept");
         await results.insert([
           {

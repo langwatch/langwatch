@@ -37,9 +37,7 @@ export class MemoryEvaluationInstantEvalResultsChannel implements EvaluationInst
     ...judgment
   }: InstantEvalMonitorJudgment & { judgement: InstantEvalMonitorJudgementAnswer }): Promise<void> {
     this.calls.push({ operation: "keep", monitorId: judgment.monitorId });
-    const verdict = judgement.verdicts.find(
-      (answer) => answer.questionId === judgment.question.id,
-    );
+    const verdict = judgement.verdicts.find((answer) => answer.questionId === judgment.question.id);
     if (verdict && !judgement.skippedReason) this.kept.set(keyOf(judgment), verdict);
   }
 }

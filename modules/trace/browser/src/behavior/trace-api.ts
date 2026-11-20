@@ -12,10 +12,7 @@ import type {
 import { createModuleApi, type ContractApiMap, type OutputsFromMap } from "@langwatch/api/web";
 import type { CodingAgentTranscript } from "@langwatch/coding-agent-contract";
 import type { DataPrivacySnapshot } from "@langwatch/data-privacy-contract";
-import type {
-  InstantEvalTraceResultWire,
-  instantEvalTrpc,
-} from "@langwatch/instant-eval-contract";
+import type { InstantEvalTraceResultWire, instantEvalTrpc } from "@langwatch/instant-eval-contract";
 import type {
   PresenceCursorEvent,
   PresenceCursorInput,

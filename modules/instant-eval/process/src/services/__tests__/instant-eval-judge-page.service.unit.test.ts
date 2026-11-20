@@ -320,7 +320,7 @@ describe("given a run page of two traces, one already kept", () => {
         { TraceId: "t1", Status: "judged", Probability: 0.9 },
         { TraceId: "t2", Status: "judged", Probability: 0.4 },
       ]);
-      expect(kept.list().map((row) => [row.TraceId, row.Source, row.SourceId])).toEqual([
+      expect(kept.findAll().map((row) => [row.TraceId, row.Source, row.SourceId])).toEqual([
         ["t1", "run", RUN_ID],
         ["t2", "run", RUN_ID],
       ]);

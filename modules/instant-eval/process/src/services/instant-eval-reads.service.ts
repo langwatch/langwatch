@@ -26,12 +26,22 @@ import { publishedInstantEvalStatus } from "../rules/instant-eval-run-status.rul
 import type { EvalResultsUsageService } from "./eval-results-usage.service.ts";
 
 export class InstantEvalReadsService {
-  private constructor(
-    private readonly runs: InstantEvalRunRepository,
-    private readonly judgments: InstantEvalJudgmentsRepository,
-    private readonly judgeCalls: Pick<EvalResultsUsageService, "countJudgeCalls"> | undefined,
-    private readonly now: () => Instant,
-  ) {}
+  private readonly runs: InstantEvalRunRepository;
+  private readonly judgments: InstantEvalJudgmentsRepository;
+  private readonly judgeCalls: Pick<EvalResultsUsageService, "countJudgeCalls"> | undefined;
+  private readonly now: () => Instant;
+
+  private constructor(options: {
+    runs: InstantEvalRunRepository;
+    judgments: InstantEvalJudgmentsRepository;
+    judgeCalls: Pick<EvalResultsUsageService, "countJudgeCalls"> | undefined;
+    now: () => Instant;
+  }) {
+    this.runs = options.runs;
+    this.judgments = options.judgments;
+    this.judgeCalls = options.judgeCalls;
+    this.now = options.now;
+  }
 
   static create({
     runs,
@@ -45,7 +55,7 @@ export class InstantEvalReadsService {
     judgeCalls?: Pick<EvalResultsUsageService, "countJudgeCalls">;
     now?: () => Instant;
   }): InstantEvalReadsService {
-    return new InstantEvalReadsService(runs, judgments, judgeCalls, now);
+    return new InstantEvalReadsService({ runs, judgments, judgeCalls, now });
   }
 
   /** The usage report's figures (ADR-156, section 10). */

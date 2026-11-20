@@ -26,7 +26,7 @@ export class MemoryEvalResultsRepository implements EvalResultsRepository {
   }
 
   /** Every row kept, latest version per sort key, for a test to read what was written. */
-  list(): readonly EvalResultRecord[] {
+  findAll(): readonly EvalResultRecord[] {
     return [...this.records.values()];
   }
 

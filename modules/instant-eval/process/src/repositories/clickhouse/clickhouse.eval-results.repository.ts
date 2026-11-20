@@ -25,6 +25,7 @@ import type { InstantEvalClickHouseResolver } from "./clickhouse.instant-eval-se
 const TABLE_NAME = "eval_results" as const;
 
 const totalRowsSchema = z.array(z.object({ Total: z.string() }));
+const traceRowsSchema = z.array(evalTraceResultRowSchema);
 
 const logger = createLogger("langwatch:instant-evals:eval-results-repository");
 
@@ -172,7 +173,7 @@ export class ClickHouseEvalResultsRepository implements EvalResultsRepository {
       format: "JSONEachRow",
     });
 
-    return z.array(evalTraceResultRowSchema).parse(await result.json()).map(toEvalTraceResult);
+    return traceRowsSchema.parse(await result.json()).map(toEvalTraceResult);
   }
 
   /** Per project, so each read routes to the tenant's server; FINAL, as the report always read. */

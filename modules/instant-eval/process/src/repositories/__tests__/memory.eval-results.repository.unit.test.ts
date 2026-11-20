@@ -106,7 +106,7 @@ describe("given kept results of one key", () => {
       await repository.insert([record()]);
       await repository.insert([record()]);
 
-      expect(repository.list()).toHaveLength(1);
+      expect(repository.findAll()).toHaveLength(1);
     });
   });
 

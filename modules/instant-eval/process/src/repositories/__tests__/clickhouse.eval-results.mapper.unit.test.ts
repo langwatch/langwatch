@@ -191,8 +191,12 @@ describe("toEvalTraceResult", () => {
   });
 
   it("refuses a row whose status or source the table does not know", () => {
-    expect(() => evalTraceResultRowSchema.parse({ ...row, LatestStatus: "maybe" })).toThrow();
-    expect(() => evalTraceResultRowSchema.parse({ ...row, LatestSource: "cron" })).toThrow();
+    expect(() => evalTraceResultRowSchema.parse({ ...row, LatestStatus: "maybe" })).toThrow(
+      /LatestStatus/,
+    );
+    expect(() => evalTraceResultRowSchema.parse({ ...row, LatestSource: "cron" })).toThrow(
+      /LatestSource/,
+    );
   });
 });
 

@@ -709,7 +709,7 @@ describe("InstantEvalQueryJudgingService.judgeQuery", () => {
         rows: traceRows,
       });
 
-      const [row] = kept.list();
+      const [row] = kept.findAll();
       expect(row?.Source).toBe("ask");
       expect(row?.SourceId).toMatch(/^query:/);
     });
@@ -726,7 +726,7 @@ describe("InstantEvalQueryJudgingService.judgeQuery", () => {
         source: { kind: "dashboard", id: "widget-1" },
       });
 
-      expect(kept.list().map((row) => [row.Source, row.SourceId])).toEqual([
+      expect(kept.findAll().map((row) => [row.Source, row.SourceId])).toEqual([
         ["dashboard", "widget-1"],
       ]);
     });

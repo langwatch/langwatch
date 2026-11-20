@@ -14,9 +14,9 @@ describe("EvaluationJudgeRoutingService", () => {
   it("reads the router flag for the project within its organization", async () => {
     const { routing, isEnabled } = buildRouting();
 
-    await expect(
-      routing.isRouted({ projectId: "proj-1", organizationId: "org-1" }),
-    ).resolves.toBe(true);
+    await expect(routing.isRouted({ projectId: "proj-1", organizationId: "org-1" })).resolves.toBe(
+      true,
+    );
     expect(isEnabled).toHaveBeenCalledWith("release_instant_evals_judge_router", {
       kind: "project",
       projectId: "proj-1",

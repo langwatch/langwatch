@@ -66,9 +66,7 @@ describe("evalResultsInputHash", () => {
     it("hashes each its own, and a changed text differently", () => {
       const trace = evalResultsInputHash({ judgedColumn: "llm_readable_trace", text: "hello" });
 
-      expect(evalResultsInputHash({ judgedColumn: "llm_messages", text: "hello" })).not.toBe(
-        trace,
-      );
+      expect(evalResultsInputHash({ judgedColumn: "llm_messages", text: "hello" })).not.toBe(trace);
       expect(evalResultsInputHash({ judgedColumn: "llm_readable_trace", text: "hello!" })).not.toBe(
         trace,
       );
@@ -124,9 +122,7 @@ describe("findEvalResultsCellKeys", () => {
       expect(findEvalResultsCellKeys({ row: noTrace, question: question(), text: "x" })).toEqual(
         [],
       );
-      expect(findEvalResultsCellKeys({ row: noTime, question: question(), text: "x" })).toEqual(
-        [],
-      );
+      expect(findEvalResultsCellKeys({ row: noTime, question: question(), text: "x" })).toEqual([]);
     });
   });
 });
