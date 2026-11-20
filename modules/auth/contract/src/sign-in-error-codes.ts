@@ -5,21 +5,21 @@
  * @see specs/identity/sso-signin-error-boundary.feature
  */
 
-/** Better Auth's granular link-account codes, folded to one spelling per failure. */
+/**
+ * Better Auth's link-failure codes, folded to the screen code that has words for them. Pinned to
+ * the installed library by `better-auth-link-error-codes.rules.unit.test.ts`.
+ */
 export const normalizeSignInErrorCode = (error: string | null | undefined): string | null => {
   if (!error) return null;
-  if (
-    error === "email_does_not_match" ||
-    error === "email_doesn't_match" ||
-    error === "LINKING_DIFFERENT_EMAILS_NOT_ALLOWED"
-  ) {
+  // `email_doesn't_match` is what the 1.6 releases redirected with; links from them may linger.
+  if (error === "email_does_not_match" || error === "email_doesn't_match") {
     return "DIFFERENT_EMAIL_NOT_ALLOWED";
   }
+  // The SSO plugin's OIDC callback redirects with the sign-in refusal's raw, spaced string.
   if (
     error === "account_already_linked_to_different_user" ||
     error === "account_not_linked" ||
-    error === "account not linked" ||
-    error === "OAuthAccountNotLinked"
+    error === "account not linked"
   ) {
     return "OAuthAccountNotLinked";
   }
