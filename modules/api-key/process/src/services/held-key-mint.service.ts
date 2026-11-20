@@ -10,9 +10,9 @@ import { isRunKeyReusable } from "../rules/run-key.rules.ts";
 import type { SharedKeyMintService } from "./shared-key-mint.service.ts";
 
 /**
- * How long a retry should wait after a held key's grant did not land. A try can wait twice (the
- * role's fold, then the binding's), each fold seen to take up to ~50 s, and a landed fold is
- * confirmed at once by the next try: two retries at this pace outlast both.
+ * Retry wait after a held key's grant did not land; a try can wait twice (role fold, then binding).
+ * Fold lag has no fixed bound. At this pace, 3 retries give at least 120 s, which covered the
+ * slowest fold a proof run saw (114 s; langwatch/langwatch#9506). A slower fold fails the run.
  */
 export const HELD_KEY_GRANT_RETRY_AFTER_MS = 40_000;
 

@@ -10,9 +10,9 @@ import { z } from "zod";
 export const INSIGHT_DAILY_RUN_INTENT = "runBoard" as const;
 
 /**
- * Four tries, not three: Langy's session key is held across them, and a try that finds its grant
- * unlanded fails with `retryAfterMs` set, which the outbox honours. Two such waits outlast two
- * ~50 s authz folds. A model call that fails for good is not worth a fifth.
+ * Four tries: the held session key spans them, and an unlanded grant fails with `retryAfterMs`,
+ * which the outbox honours. Folds have no fixed lag; three 40 s waits give at least 120 s, which
+ * covered a proof run's 114 s (langwatch/langwatch#9506). A model call failing for good: no fifth.
  */
 export const INSIGHT_DAILY_RUN_MAX_ATTEMPTS = 4;
 
