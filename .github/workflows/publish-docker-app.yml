@@ -381,30 +381,64 @@ jobs:
           aws ecr get-login-password --region "${AWS_REGION}" \
             | docker login --username AWS --password-stdin "${REGISTRY}"
 
-      - name: Pick the newest model image
-        id: pick
-        run: |
-          set -euo pipefail
-          aws ecr describe-images --repository-name langwatch-pii-redaction-model \
-            --filter tagStatus=TAGGED --output json \
-            | go run ./cmd/newestimage -prefix http-git- >> "$GITHUB_OUTPUT"
-
       - name: Log in to Docker Hub
         uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
+      # A re-run (this job fails until langwatch-saas has pushed an image) must
+      # not move the version to a newer model build: the version keeps the
+      # image it was first published and signed with. Any answer other than
+      # "not found" fails, so an outage never looks like a first run.
+      - name: Look for the image this release already published
+        id: released
+        run: |
+          set -euo pipefail
+          if digest="$(docker buildx imagetools inspect "${REPO}:${VERSION}" --format '{{.Manifest.Digest}}' 2>inspect.err)"; then
+            echo "digest=${digest}" >> "$GITHUB_OUTPUT"
+          elif grep -q ': not found' inspect.err; then
+            echo "digest=" >> "$GITHUB_OUTPUT"
+          else
+            cat inspect.err >&2
+            exit 1
+          fi
+
+      - name: Pick the newest model image, or the one already published
+        id: pick
+        env:
+          RELEASED: ${{ steps.released.outputs.digest }}
+          REGISTRY: ${{ steps.ecr.outputs.registry }}
+        run: |
+          set -euo pipefail
+          aws ecr describe-images --repository-name langwatch-pii-redaction-model \
+            --filter tagStatus=TAGGED --output json \
+            | go run ./cmd/newestimage -prefix http-git- -released "${RELEASED}" > pick.out
+          cat pick.out >> "$GITHUB_OUTPUT"
+          # Self-hosters run both chip types: look inside the index.
+          if [ -z "${RELEASED}" ]; then
+            DIGEST="$(sed -n 's/^digest=//p' pick.out)"
+            docker buildx imagetools inspect --raw "${REGISTRY}/langwatch-pii-redaction-model@${DIGEST}" \
+              | go run ./cmd/newestimage -platforms linux/amd64,linux/arm64
+          fi
+
       # By digest, so the copy is the index ECR holds, byte for byte.
       - name: Copy it to Docker Hub as the release
         env:
           SOURCE: ${{ steps.ecr.outputs.registry }}/langwatch-pii-redaction-model@${{ steps.pick.outputs.digest }}
+          DIGEST: ${{ steps.pick.outputs.digest }}
+          REUSED: ${{ steps.pick.outputs.reused }}
+          TAG: ${{ steps.pick.outputs.tag }}
         run: |
           set -euo pipefail
-          echo "Copying ${{ steps.pick.outputs.tag }} as ${REPO}:${VERSION}"
-          docker buildx imagetools create -t "${REPO}:${VERSION}" "${SOURCE}"
+          if [ "${REUSED}" != "true" ]; then
+            echo "Copying ${TAG} as ${REPO}:${VERSION}"
+            docker buildx imagetools create -t "${REPO}:${VERSION}" "${SOURCE}"
+          else
+            echo "${REPO}:${VERSION} already holds ${DIGEST}; a re-run keeps it"
+          fi
           if ! echo "${VERSION}" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+-.+'; then
-            docker buildx imagetools create -t "${REPO}:latest" "${SOURCE}"
+            docker buildx imagetools create -t "${REPO}:latest" "${REPO}@${DIGEST}"
           fi
 
       - name: Install cosign
