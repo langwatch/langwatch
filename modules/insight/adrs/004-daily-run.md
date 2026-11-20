@@ -1,6 +1,6 @@
 # ADR-004: A daily run is Langy reading one board for one person
 
-**Status:** Accepted
+**Status:** Accepted. [ADR-005](./005-life-of-an-insight.md) (Proposed) would amend it in part (one thread per board).
 
 **Behavioural contract:** [The daily insights run](../specs/insight-daily-run.feature),
 [The daily insights run before a wider rollout](../specs/insight-daily-run-hardening.feature)
