@@ -267,7 +267,7 @@ describe("a Langy key's delete card for a widget at /api/v1/dashboards/{dashboar
 });
 
 describe("a Langy key's delete card for a From LangWatch widget", () => {
-  /** @scenario "A From LangWatch widget is read over the API by its template widget id" */
+  /** @scenario "A From LangWatch widget's delete card names nothing" */
   it("names nothing, as the widget can never be deleted", async () => {
     const { app } = appWithDatabase();
     const [board] = CURATED_BOARD_DEFINITIONS;
