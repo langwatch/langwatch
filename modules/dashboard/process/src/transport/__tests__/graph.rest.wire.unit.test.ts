@@ -3,7 +3,6 @@
  * The `/api/graphs` wire: the size a graph posted without one lands at, and that
  * it reads back, lists and renames at that size. Spec: dashboard-service.feature.
  */
-import { CHART_GRID_DEFAULT_ROW_SPAN } from "@langwatch/analytics-contract/chart-grid";
 import { canonicalErrorResponse, createRestRuntime } from "@langwatch/api/rest";
 import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { describe, expect, it } from "vitest";
@@ -101,7 +100,7 @@ describe("the graphs REST family", () => {
 
       expect({ status: created.status, size: sizeOf(created.json) }).toEqual({
         status: 201,
-        size: { colSpan: 2, rowSpan: CHART_GRID_DEFAULT_ROW_SPAN },
+        size: { colSpan: 2, rowSpan: 3 },
       });
     });
   });
