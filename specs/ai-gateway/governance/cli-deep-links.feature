@@ -24,7 +24,7 @@ Feature: AI Gateway Governance — CLI ↔ Dashboard deep-links
   # ---------------------------------------------------------------------------
 
   @bdd @cli @dashboard
-  Scenario: Default dashboard opens the user's /coding-agents page
+  Scenario: Default dashboard prints the /me link that the app redirects to /coding-agents
     When jane runs "langwatch dashboard"
     Then the CLI prints "Opening http://app.langwatch.example.com/me"
     And the CLI invokes the OS default browser launcher with that URL

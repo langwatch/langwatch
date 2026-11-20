@@ -45,7 +45,7 @@ Feature: AI Gateway Governance — Ingestion Templates Catalog (personal-workspa
         (claude_code / codex / cursor / gemini / opencode are never seeded)
     And a client-side **discovery card** "raw_otlp_advanced" renders alongside the
         platform-template tiles. The card is NOT an IngestionTemplate row — it deep-
-        links to /coding-agents/settings#otlp where the user grabs the personal-project OTLP
+        links to /coding-agents/configure#otlp where the user grabs the personal-project OTLP
         token. It does NOT mint an ingestion key. Its presence in the catalog
         is for discovery parity (so the no-template fallback is visible from the
         same surface as templates), not because it shares the IngestionTemplate
@@ -95,8 +95,21 @@ Feature: AI Gateway Governance — Ingestion Templates Catalog (personal-workspa
     But when she opens the raw_otlp_advanced card
     Then the headline reads "Bring your own OTLP — raw shape"
     And the subcopy contains "Spans land as-emitted; you control the shape. Cost/tokens/model not auto-populated unless your spans already follow gen_ai.* conventions."
-    And the /coding-agents/settings "Personal OTLP Endpoint" panel headline reads "Personal OTLP Endpoint"
+    And the /coding-agents/configure "Personal OTLP Endpoint" panel headline reads "Personal OTLP Endpoint"
     And its subcopy contains "For ad-hoc / custom telemetry. Use the catalog (Trace Ingest section above) for tool-specific auto-shape."
+
+  @integration
+  Scenario: The install drawer points at the personal project's traces page
+    Given jane's personal project slug is "personal-jane"
+    When the install drawer has issued her an ingestion key for the "acme-router" template
+    Then it says traces will land at "/personal-jane/traces" filtered by source=acme-router
+
+  @integration
+  Scenario: The install drawer points at Coding agents before the personal project resolves
+    Given jane's personal project slug has not resolved yet
+    When the install drawer has issued her an ingestion key for the "acme-router" template
+    Then it says traces will land in her personal project
+    And it tells her to open Coding agents to find them
 
   # ---------------------------------------------------------------------------
   # Platform-vs-org template scope

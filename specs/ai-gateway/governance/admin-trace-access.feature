@@ -14,7 +14,7 @@ Feature: Admin trace access — bird's-eye drill-in with persistent 'viewing as'
   'Viewing <user/team> as admin' banner that is server-side-gated DOM
   (NOT a transient client flag — reload-safe + CSS-regression-tested);
   every drill-in writes an OCSF audit-log row visible to org security
-  admins AND to the impersonated user themselves on /coding-agents/settings →
+  admins AND to the impersonated user themselves on /coding-agents/configure →
   Activity tab.
 
   No admin catch-all read backdoor: the drill-in IS the only path. No
@@ -22,7 +22,7 @@ Feature: Admin trace access — bird's-eye drill-in with persistent 'viewing as'
   hatch, no SQL-direct without firing the audit hook) — load-bearing
   for SOC2 / ISO27001.
 
-  User-visible disclosure: /coding-agents/settings carries a static line "Org
+  User-visible disclosure: /coding-agents/configure carries a static line "Org
   admins can view your traces for compliance and debugging. Each
   access is logged at /settings/audit-log." Users can grep their own
   audit log entries to see who viewed their workspace and when.
@@ -172,7 +172,6 @@ Feature: Admin trace access — bird's-eye drill-in with persistent 'viewing as'
       | /governance          | org-scope admin home              |
       | /settings/*          | org-scope admin config            |
       | /coding-agents                  | personal-self                     |
-      | /coding-agents/settings         | personal-self config              |
       | /coding-agents/configure        | personal-self config              |
       | /coding-agents/sessions         | personal-self                     |
       | /ops/*               | platform-internal admin           |
@@ -231,7 +230,7 @@ Feature: Admin trace access — bird's-eye drill-in with persistent 'viewing as'
   @bdd @audit @admin-trace-access @user-visibility
   Scenario: Impersonated user can grep their own audit log to see who viewed
     Given an org admin previously drilled into ariana's workspace 3 times
-    When ariana navigates to `/coding-agents/settings → Activity` tab
+    When ariana navigates to `/coding-agents/configure → Activity` tab
     Then ariana sees the 3 audit-log rows scoped to her own
         impersonation history (actor = admin, target = ariana)
     And the rows display: actor name + email, occurredAt, drill-in
@@ -329,12 +328,12 @@ Feature: Admin trace access — bird's-eye drill-in with persistent 'viewing as'
   # ---------------------------------------------------------------------------
 
   @bdd @ui @admin-trace-access @disclosure
-  Scenario: /coding-agents/settings carries the admin-can-view disclosure
-    Given ariana navigates to `/coding-agents/settings`
+  Scenario: /coding-agents/configure carries the admin-can-view disclosure
+    Given ariana navigates to `/coding-agents/configure`
     Then a static copy line reads:
       "Org admins can view your traces for compliance and debugging.
        Each access is logged in your Activity tab."
-    And the line links to `/coding-agents/settings → Activity` tab inline
+    And the line links to `/coding-agents/configure → Activity` tab inline
     And the disclosure is NOT a dismissable banner / one-time onboarding
         — it's persistent settings copy so users discover it any time
         they wonder about admin visibility
@@ -343,7 +342,7 @@ Feature: Admin trace access — bird's-eye drill-in with persistent 'viewing as'
   Scenario: Self-audit Activity tab is discoverable from Personal Workspace surfaces
     Given ariana is on /coding-agents with the disclosure copy visible
     When ariana clicks the disclosure's inline 'Activity' link
-    Then she lands on `/coding-agents/settings → Activity` tab
+    Then she lands on `/coding-agents/configure → Activity` tab
     And the tab renders the audit-log rows scoped to her workspace
         per the @user-visibility scenario above
 

@@ -45,7 +45,7 @@ Feature: Governance visibility rides a single feature flag
     Then none of the governance surfaces are reachable from the UI:
       | surface                            | path                              |
       | My Workspace dashboard             | /coding-agents                               |
-      | My Workspace settings              | /coding-agents/settings                      |
+      | My Workspace settings              | /coding-agents/configure                     |
       | Admin Routing Policies             | /gateway/routing-policies         |
       | Governance overview                | /governance                       |
       | Governance inventory (sources)     | /governance/inventory             |

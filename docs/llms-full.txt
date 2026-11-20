@@ -14072,7 +14072,7 @@ existing routes:
 | Surface | Purpose | Audience | Where it lives |
 |---------|---------|----------|----------------|
 | `/governance` | Daily-use **org governance home**: spend, ingestion-source health, anomalies, per-user breakdown. Read-mostly. | Org admins whose org's `setupState.governanceActive` is `true` (see [Persona-based home routing](#persona-based-home-routing-the-setup-state-signal) below) | Top-level route, org-scoped. |
-| `/coding-agents`, `/coding-agents/settings` | Daily-use **personal home**: your usage, your budget, your personal VK, your IDE setup snippet. | Any user with a personal VK | Top-level route, principal-scoped. |
+| `/coding-agents`, `/coding-agents/configure` | Daily-use **personal home**: your usage, your budget, your personal VK, your IDE setup snippet. | Any user with a personal VK | Top-level route, principal-scoped. |
 | `/[project]/...` | LLMOps daily-use, traces, evals, datasets, scenarios, workflows. | Project members | Per-project routes. **Unchanged** from current LangWatch. |
 | `/governance/ingestion-sources`, `/gateway/routing-policies` | Admin-authoring (CRUD), create, rotate, archive sources, publish routing policies. | The governance pages open on `governance:view` and `/gateway/routing-policies` on `routingPolicies:view`. Each write control needs the matching `:manage` grant (`ingestionSources:manage`, `routingPolicies:manage`) and is hidden without it. | Governance sub-routes, deliberately separate from daily-use surfaces. |
 
@@ -14326,7 +14326,7 @@ cursor/gemini`, `langwatch instrument <tool>`, `langwatch whoami`,
   device approval).
 - ✅ **Routing Policies** (Org/Team/Project hierarchy, provider-cred
   validation).
-- ✅ **`/coding-agents` + `/coding-agents/settings`** dashboards (web app, gated behind the
+- ✅ **`/coding-agents` + `/coding-agents/configure`** dashboards (web app, gated behind the
   `release_ui_ai_governance_enabled` flag).
 - ✅ **`/governance`** admin oversight dashboard
   (org-admin-only via `organization:manage` permission, plus the
@@ -15590,7 +15590,7 @@ LangWatch's **Ingestion Templates** let you connect tool-specific telemetry sour
 without LangWatch ever participating in the upstream tool's authentication.
 
 You install a template, paste an **ingestion key** into your tool's OTLP exporter, and
-traces land at `/coding-agents/traces` already shaped into the canonical `gen_ai.*` form, cost,
+traces land in your personal project at `/<personal project slug>/traces` already shaped into the canonical `gen_ai.*` form, cost,
 tokens, and model populated automatically.
 
 An ingestion key is one
@@ -15652,7 +15652,7 @@ org-customizable for admins who need it.
 
 ## Worked example: connect Claude Code on Anthropic 20x
 
-By the end of this flow you have a Claude Code trace visible at `/coding-agents/traces` with
+By the end of this flow you have a Claude Code trace visible at `/<personal project slug>/traces` with
 `gen_ai.usage.*`, `gen_ai.response.model`, and `langwatch.cost.usd` populated.
 
 > **Before you start:** you need a LangWatch account. If you're brand new, start with the
@@ -15708,11 +15708,12 @@ Open a new terminal so the env vars take effect, then run Claude Code as you nor
 would. As soon as Claude Code completes its first action, OpenTelemetry exports the span
 to your LangWatch personal workspace.
 
-### Step 4: see the trace at /coding-agents/traces
+### Step 4: see the trace in your personal project
 
-Click **View traces →** on the tile, or navigate directly to `/coding-agents/traces`.
+Open **Traces** in the Coding agents sidebar, or navigate directly to
+`/<personal project slug>/traces`.
 
-![/coding-agents/traces, Claude Code traces with tokens + model populated](/images/ai-governance/post-bypass/12-traces-populated.png)
+![Personal project traces, Claude Code traces with tokens + model populated](/images/ai-governance/post-bypass/12-traces-populated.png)
 
 Open the trace. You should see:
 
@@ -15824,7 +15825,7 @@ The `protectedTemplateAttributeKeys` closed list:
 - `langwatch.origin`, receiver-stamped provenance (`coding_agent` for a CLI
   assistant, `ai_tool` for any other ingest source).
 - `langwatch.source`, receiver-stamped provenance (used for tile filtering at
-  `/coding-agents/traces`).
+  `/<personal project slug>/traces`).
 
 Notably **not** in the list:
 
@@ -15854,12 +15855,12 @@ If you have a custom telemetry pipeline, your own spans, your own normalisation,
 own cost calculations, you don't want a template's OTTL rewriting your shape. Use the
 **Raw OTLP (advanced)** card on `/coding-agents` Trace Ingest instead.
 
-The card deep-links to the **Personal OTLP Endpoint** panel at `/coding-agents/settings#otlp`,
+The card deep-links to the **Personal OTLP Endpoint** panel at `/coding-agents/configure#otlp`,
 which surfaces your personal-project's existing OTLP endpoint and API key for ad-hoc /
-custom telemetry. No template OTTL is applied; your spans land at `/coding-agents/traces` exactly
+custom telemetry. No template OTTL is applied; your spans land at `/<personal project slug>/traces` exactly
 as you emit them.
 
-![Personal OTLP Endpoint panel on /coding-agents/settings](/images/ai-governance/post-bypass/04-me-settings.png)
+![Personal OTLP Endpoint panel on /coding-agents/configure](/images/ai-governance/post-bypass/04-me-settings.png)
 
 ### When to choose Raw OTLP vs a template
 
@@ -15868,7 +15869,7 @@ as you emit them.
 | Claude Code, Cursor, Claude cowork tile | You run that tool and want LangWatch's catalog OTTL to normalise the spans for you.                                         |
 | Raw OTLP (advanced)                     | You have a custom pipeline, or your spans already follow `gen_ai.*` conventions, or you want to keep your own field shapes. |
 
-You can also surface the same endpoint + token from `/coding-agents/settings → Personal OTLP Endpoint`
+You can also surface the same endpoint + token from `/coding-agents/configure → Personal OTLP Endpoint`
 without going through the catalog tile.
 
 ---
@@ -17167,7 +17168,7 @@ The signal-based default avoids two failure modes:
 ## Overriding the default
 
 Every user can override the persona-based default in
-**`/coding-agents/settings → Default landing page`**:
+**`/coding-agents/configure → Default landing page`**:
 
 - **Auto** (default), uses the persona detection above.
 - **Always /coding-agents**: always lands on the AI Tools Portal + Trace Ingest

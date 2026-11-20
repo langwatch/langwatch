@@ -76,6 +76,23 @@ const codingAgentsSegments = new Set(
   uiRoutePatterns().flatMap((pattern) => pattern.match(/^\/coding-agents\/([^/:*]+)$/)?.[1] ?? []),
 );
 
+/**
+ * Every deep project page, table's and modules' alike, as an old /me address: each one
+ * outranks the `/me/<segment>/*` row unless it has a twin of its own.
+ */
+const deepProjectAddresses = [
+  ...new Set(
+    uiRoutePatterns()
+      .filter((pattern) => /^\/:project\/[^/]+\/./.test(pattern))
+      .map((pattern) =>
+        pattern
+          .replace(":project", "me")
+          .replace(/:[^/]+/g, "sample")
+          .replace(/\*$/, "sample"),
+      ),
+  ),
+];
+
 function addressOf(router: ReturnType<typeof renderRouterAt>): string {
   const { pathname, search, hash } = router.state.location;
   return `${pathname}${search}${hash}`;
@@ -167,7 +184,7 @@ describe("legacy /me redirects", () => {
 
   describe("when a deep old address meets the real project routes", () => {
     /** @scenario Every old address a project page also matches lands on Coding agents */
-    it.each(["/me/messages/t1/spans", "/me/evaluations/new", "/me/analytics/custom/abc"])(
+    it.each(deepProjectAddresses)(
       "moves %s to the Coding agents home, not a project page",
       async (from) => {
         const projectPages: RouteObject[] = uiRoutePatterns()

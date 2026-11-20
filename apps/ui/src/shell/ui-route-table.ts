@@ -4,6 +4,10 @@
  * entry with only the loader repointed. Turned into routes elsewhere.
  */
 
+import { installedModuleScreens } from "@langwatch/browser/module-screens";
+
+import { browserModules } from "../browser-modules.generated.ts";
+
 export type UiRedirectDescriptor = {
   /**
    * The retired address; whatever the matched path carries BEYOND this
@@ -994,24 +998,18 @@ export const uiRouteTable: readonly UiRouteDescriptor[] = [
 ];
 
 /**
- * Project pages a module declares, so the table never sees them. The /me twin test reads the
- * modules' own routes and fails when this list falls behind.
+ * Every path the router serves: the table's own, then the project pages the installed modules
+ * declare, which the table never sees.
  */
-const MODULE_PROJECT_SEGMENTS = [
-  "annotations",
-  "datasets",
-  "insights",
-  "online-evaluations",
-  "prompts",
-] as const;
+const servedPaths: readonly string[] = [
+  ...uiRouteDescriptors(uiRouteTable).flatMap((descriptor) => descriptor.path ?? []),
+  ...installedModuleScreens(browserModules).routes.project.flatMap((route) => route.path ?? []),
+];
 
-/** The first segment of every `/:project/<segment>` page: table order, then module-owned. */
-function projectSegments(table: readonly UiRouteDescriptor[]): string[] {
-  const fromTable = uiRouteDescriptors(table).flatMap((descriptor) => {
-    const segment = descriptor.path?.match(/^\/:project\/([^/:*]+)/)?.[1];
-    return segment === void 0 ? [] : [segment];
-  });
-  return [...new Set([...fromTable, ...MODULE_PROJECT_SEGMENTS])];
+/** The first segment of every `/:project/<segment>` page, in served order. */
+function projectSegments(paths: readonly string[]): string[] {
+  const segments = paths.flatMap((path) => path.match(/^\/:project\/([^/:*]+)/)?.[1] ?? []);
+  return [...new Set(segments)];
 }
 
 /**
@@ -1019,11 +1017,9 @@ function projectSegments(table: readonly UiRouteDescriptor[]): string[] {
  * outranks `:project` at any depth, where the `/me/<segment>/*` rows lose to a deeper project
  * page. One-segment pages and a bare `/*` tail are already covered by those rows.
  */
-function projectPageTwins(table: readonly UiRouteDescriptor[]): string[] {
-  const twins = uiRouteDescriptors(table).flatMap((descriptor) =>
-    descriptor.path?.match(/^\/:project\/[^/]+\/(?!\*$)/)
-      ? [descriptor.path.replace(":project", "me")]
-      : [],
+function projectPageTwins(paths: readonly string[]): string[] {
+  const twins = paths.flatMap((path) =>
+    /^\/:project\/[^/]+\/(?!\*$)/.test(path) ? [path.replace(":project", "me")] : [],
   );
   return [...new Set(twins)];
 }
@@ -1052,7 +1048,7 @@ const toCodingAgents = { from: "/me", to: "/coding-agents", mapSegment: KEPT_SEG
 /**
  * Moved /me to /coding-agents; CLIs still print /me links. Mounted above the chrome, which would
  * wait for a project and never redirect. /:project/<segment> outranks /me/*, so every project
- * page gets a /me twin derived from the table. Spec: coding-agents-url-move.feature
+ * page gets a /me twin derived from the served paths. Spec: coding-agents-url-move.feature
  */
 export const uiCodingAgentsRedirectRoutes: readonly UiRedirectRouteDescriptor[] = [
   {
@@ -1080,11 +1076,11 @@ export const uiCodingAgentsRedirectRoutes: readonly UiRedirectRouteDescriptor[] 
       path: `/me/${page}`,
       redirect: { from: "/me", to: "/coding-agents" },
     })),
-  ...projectSegments(uiRouteTable).flatMap((segment) => [
+  ...projectSegments(servedPaths).flatMap((segment) => [
     { path: `/me/${segment}`, redirect: toCodingAgents },
     { path: `/me/${segment}/*`, redirect: toCodingAgents },
   ]),
-  ...projectPageTwins(uiRouteTable).map((path) => ({ path, redirect: toCodingAgents })),
+  ...projectPageTwins(servedPaths).map((path) => ({ path, redirect: toCodingAgents })),
   { path: "/me/*", redirect: toCodingAgents },
   { path: "/me", redirect: toCodingAgents },
 ];

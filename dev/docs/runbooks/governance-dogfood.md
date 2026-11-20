@@ -98,7 +98,7 @@ gpt-5.4, claude-haiku-4-5, gemini-2-5-pro). Legacy aliases
 
 ### 4. Direct OTLP (raw_otlp_advanced fallback)
 
-Discovery card on /coding-agents → deep links to `/coding-agents/settings#otlp`. User mints raw OTLP
+Discovery card on /coding-agents → deep links to `/coding-agents/configure#otlp`. User mints raw OTLP
 token, posts to `/api/otel/v1/traces` with `Authorization: Bearer <token>`.
 No OTTL parsing — span shape is whatever client emits.
 
@@ -191,7 +191,7 @@ they're docs assets under `docs/images/ai-governance/`.
 | Install drawer returns 409 CONFLICT    | Tile already has binding                   | Drawer should auto-route to Rotate path; if not, check `hasExistingBinding` prop wiring |
 | TotalCost = NULL on trace              | Legacy model alias not in llmModels.json   | Bump payload to current-gen alias                                                       |
 | `pnpm tsx scripts/...` silently no-ops | Host `.env` DATABASE_URL points at AWS RDS | Run inside `docker exec wise-mixing-zebra-app-1`                                        |
-| /coding-agents/settings 404            | tsx watch didn't pick up route             | Hard-kill API pid, restart `pnpm dev`                                                   |
+| /coding-agents/configure 404           | tsx watch didn't pick up route             | Hard-kill API pid, restart `pnpm dev`                                                   |
 
 ## TODO (out-of-scope for this runbook drop)
 

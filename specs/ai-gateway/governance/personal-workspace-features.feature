@@ -6,7 +6,7 @@ Feature: Personal-workspace progressive feature unlock — minimal-by-default, c
   features unlock them by either:
 
     (a) flipping a single 'Enable advanced features' checkbox in
-        /coding-agents/settings → 'Workspace features' card, OR
+        /coding-agents/configure → 'Workspace features' card, OR
     (b) clicking a disabled-feature button on a trace in the Traces
         Explorer → modal asks 'Enable advanced features in your
         personal workspace?' → consent flips the bundle + the user
@@ -69,7 +69,7 @@ Feature: Personal-workspace progressive feature unlock — minimal-by-default, c
         as long as the chrome-retention invariant holds. Two valid
         shapes (Lane-B shipped the second):
       | shape                                                                    | how chrome-retention is achieved                                              |
-      | `/coding-agents/traces` thin wrapper mounting `<TracesPage projectId={...}/>`        | wrapper renders inside MyLayout; explicit prop bypasses URL-scoped project    |
+      | `/me/traces` thin wrapper mounting `<TracesPage projectId={...}/>`        | wrapper renders inside MyLayout; explicit prop bypasses URL-scoped project    |
       | `/[personalProjectSlug]/*` URLs render PersonalSidebar via layout discriminator (`isPersonal=true && ownerUserId=me`) | chrome layer consults `Project.isPersonal + ownerUserId`; TracesPage hooks unchanged (40+ useOrganizationTeamProject callsites still resolve project from URL) |
     And the user's personal project slug + id are resolvable via the
         existing `personalProject` resolver (no new tRPC needed)
@@ -105,7 +105,7 @@ Feature: Personal-workspace progressive feature unlock — minimal-by-default, c
 
   @bdd @ui @personal-workspace @storage
   Scenario: Single 'Enable advanced features' checkbox flips all four to true atomically
-    Given the user is on /coding-agents/settings → 'Workspace features' card
+    Given the user is on /coding-agents/configure → 'Workspace features' card
     When the user toggles 'Enable advanced features'
     Then `personalWorkspaceFeatures.enableAll` is called
     And `Project.personalFeatures` is updated atomically to
@@ -191,7 +191,7 @@ Feature: Personal-workspace progressive feature unlock — minimal-by-default, c
   Scenario: Disabling the bundle does NOT close tRPC routers — UI hides, data accessible
     Given the user previously had `personalFeatures.datasets = true` and authored
         Datasets / Evaluations / Annotations / Automations during the enabled window
-    When the user disables the bundle in /coding-agents/settings
+    When the user disables the bundle in /coding-agents/configure
     Then `Project.personalFeatures` flips to all-false
     And the sidebar entries for the four features hide on next render
     And the underlying tRPC routers (`datasets.*`, `evaluations.*`,
@@ -243,7 +243,7 @@ Feature: Personal-workspace progressive feature unlock — minimal-by-default, c
 
   @bdd @audit @personal-workspace
   Scenario: Bundle enable / disable writes audit-log rows
-    When the user toggles the bundle in /coding-agents/settings (either direction)
+    When the user toggles the bundle in /coding-agents/configure (either direction)
     Then exactly one audit-log row is written per toggle, shape:
       | field           | value                                                       |
       | actor.userId    | the user                                                    |
@@ -253,7 +253,7 @@ Feature: Personal-workspace progressive feature unlock — minimal-by-default, c
       | occurredAt      | server timestamp                                            |
     And the row is visible at /settings/audit-log to org admins (per
         the existing audit-log RBAC) AND to the user themselves on
-        /coding-agents/settings → 'Activity' tab (so the user can self-audit)
+        /coding-agents/configure → 'Activity' tab (so the user can self-audit)
 
   # ---------------------------------------------------------------------------
   # Self-trace visibility + cross-user isolation (covered in detail in
@@ -298,7 +298,7 @@ Feature: Personal-workspace progressive feature unlock — minimal-by-default, c
     Given user A has Personal Project `personalProjectIdA`
     And user B has Personal Project `personalProjectIdB`
     When user A direct-pastes `/[personalProjectSlugB]/traces` or
-        `/coding-agents/traces` rendered with `?projectId=personalProjectIdB`
+        `/[personalProjectSlugA]/traces` rendered with `?projectId=personalProjectIdB`
     Then the existing project-guard middleware rejects (redirect or 403)
         — user A is NOT a member of personalProjectIdB, the guard fires
         the same as for any other foreign-project access

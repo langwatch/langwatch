@@ -15,7 +15,7 @@ Feature: Persona-aware home CONTENT — what each persona sees on landing
     - Persona 3 (LLMOps majority) home content stays UNCHANGED — regression
       invariant.
     - Personas 1, 2, 4 each get their own home shape.
-    - Users can pin their default landing via `/coding-agents/settings`.
+    - Users can pin their default landing via `/coding-agents/configure`.
     - Org admins can pin a default for all members via `/settings/general`
       (Organization.defaultLandingPath — proposed for follow-up PR; this spec
       includes scenarios so the contract is locked).
@@ -73,7 +73,7 @@ Feature: Persona-aware home CONTENT — what each persona sees on landing
   @bdd @ui @persona-content @customization @user-pin @unit
   Scenario: User pin overrides auto-detected persona destination
     Given a user resolves to persona "mixed" (default destination /coding-agents)
-    And the user has set `User.lastHomePath = "/<projectSlug>/messages"` via /coding-agents/settings
+    And the user has set `User.lastHomePath = "/<projectSlug>/messages"` via /coding-agents/configure
     When the user navigates to "/"
     Then `governance.resolveHome` returns destination "/<projectSlug>/messages"
     And NOT "/coding-agents"

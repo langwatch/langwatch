@@ -142,7 +142,7 @@ Feature: Persona-aware home resolver
     When the resolver runs for the user
     Then the resolver returns "/<projectSlug>"
     And the persona-2 default is overridden by the user pin
-    And the user can re-pin via /coding-agents/settings
+    And the user can re-pin via /coding-agents/configure
 
   # ---------------------------------------------------------------------------
   # Fail-safe behaviour
