@@ -656,7 +656,7 @@ describe("given a Langy session key deleting at /api/v1/dashboards", () => {
       });
     });
 
-    /** @scenario "A From LangWatch widget cannot be changed under its own board's path" */
+    /** @scenario "A From LangWatch widget cannot be changed under another board's path" */
     it("answers a From LangWatch widget under a stored board's path as not found, with no card", async () => {
       const [curated] = CURATED_BOARD_DEFINITIONS;
       const [template] = curated?.widgets ?? [];

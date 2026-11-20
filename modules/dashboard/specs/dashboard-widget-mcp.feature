@@ -103,6 +103,14 @@ Feature: Editing a dashboard widget from an agent, and where each widget came fr
     Then the confirmation card names that widget and the widget is deleted
 
   @integration
+  Scenario: A From LangWatch widget cannot be changed under another board's path
+    Given a Langy session key with analytics:update and analytics:delete
+    When it deletes a From LangWatch widget under the path of a stored board
+    Then no confirmation card is raised and the request is refused as not found
+    When it updates the same widget under the same path
+    Then the request is refused as not found
+
+  @integration
   Scenario: A From LangWatch widget is refused without analytics:view
     Given a project key without analytics:view
     When it gets a From LangWatch widget by its template widget id
