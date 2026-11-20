@@ -212,10 +212,10 @@ describe("given a replyless routed message", () => {
 
 describe.each([
   ["trigger-digest", "its unsubscribe token and trace previews"],
-  ["join-request-arrived", "its approve and reject links"],
+  ["budget-increase-request", "the requester's own words"],
 ])("given a %s message, which carries %s", (template) => {
   describe("when it is sent", () => {
-    /** @scenario "A message carrying tokens, action links or trace text stays on the own mailer" */
+    /** @scenario "A message carrying a token or customer content stays on the own mailer" */
     it("sends it through the own mailer and nothing to Customer.io", async () => {
       const { customerIo, ownMailer, mail } = compose();
 

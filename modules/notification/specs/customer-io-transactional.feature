@@ -1,11 +1,11 @@
 Feature: The app's product mail goes through Customer.io on LangWatch Cloud
 
   On LangWatch Cloud a fixed list of product messages leaves through Customer.io's
-  transactional API instead of the install's own mailer: invitation re-requests, automatic
-  domain joins, seat requests, and usage and automation limits. Each message is still
-  rendered here; Customer.io only delivers it. A message whose HTML carries a per-recipient
-  token, a one-click action link or customer content stays on the own mailer, so none of
-  that reaches Customer.io.
+  transactional API instead of the install's own mailer, ten in all: invitation re-requests,
+  the five join-request messages, automatic domain joins, seat requests, and usage and
+  automation limits. Each message is still rendered here; Customer.io only delivers it. A
+  message whose HTML carries a per-recipient token, a one-click action link or customer
+  content stays on the own mailer, so none of that reaches Customer.io.
 
   Nurturing alone talks to Customer.io, so notification keeps the routing list and the
   fallback and asks nurturing to hand each message over. Nurturing holds the App API key
@@ -26,12 +26,17 @@ Feature: The app's product mail goes through Customer.io on LangWatch Cloud
     And the own mailer sends nothing
 
     Examples:
-      | template           |
-      | invite-re-request  |
-      | domain-auto-joined |
-      | seat-request       |
-      | usage-limit        |
-      | automation-limit   |
+      | template              |
+      | invite-re-request     |
+      | join-request-arrived  |
+      | join-request-reminder |
+      | join-request-approved |
+      | join-request-rejected |
+      | join-request-expired  |
+      | domain-auto-joined    |
+      | seat-request          |
+      | usage-limit           |
+      | automation-limit      |
 
   @unit
   Scenario: Every other message stays on the own mailer on Cloud
@@ -86,21 +91,21 @@ Feature: The app's product mail goes through Customer.io on LangWatch Cloud
 
   @unit
   Scenario: The routing list holds the agreed product messages and no security mail
-    Then the routing list holds exactly the five agreed template ids
+    Then the routing list holds exactly the ten agreed template ids
     And no security message is on it
     And every id on it is a template the app sends
 
   @unit
-  Scenario Outline: A message carrying tokens, action links or trace text stays on the own mailer
+  Scenario Outline: A message carrying a token or customer content stays on the own mailer
     Given IS_SAAS is set and nurturing holds CUSTOMER_IO_APP_API_KEY
     When a "<template>" message is sent
     Then nothing reaches Customer.io
     And the own mailer sends it
 
     Examples:
-      | template             |
-      | trigger-digest       |
-      | join-request-arrived |
+      | template                |
+      | trigger-digest          |
+      | budget-increase-request |
 
   @unit
   Scenario: No log line carries the key or a recipient address
