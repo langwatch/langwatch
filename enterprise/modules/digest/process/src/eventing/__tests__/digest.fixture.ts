@@ -4,6 +4,7 @@
  * the peers it asks scripted and the mail channel's memory tier recording every email. The
  * plan and send intents are carried out the way the outbox carries them out.
  */
+import type { AuthzApi } from "@langwatch/authz-contract";
 import {
   METRIC_FACTS_CONTRIBUTED_EVENT_TYPE,
   METRIC_FACTS_CONTRIBUTED_EVENT_VERSION_LATEST,
@@ -31,11 +32,13 @@ import {
 import { EventStoreMemory } from "@langwatch/eventing/testing";
 import { ReactEmailMailRenderer } from "@langwatch/mail";
 import { MemberNotFoundError } from "@langwatch/organization-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 import {
   SIMULATION_EVENT_VERSIONS,
   SIMULATION_RUN_EVENT_TYPES,
   simulationRunFinishedEventDataSchema,
 } from "@langwatch/scenario-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { type Instant, Temporal } from "@langwatch/time";
 import {
   recordTraceSpanEventDataSchema,
@@ -45,6 +48,7 @@ import {
 import {
   USER_ERASED_EVENT_TYPE,
   USER_LIFECYCLE_EVENT_VERSION,
+  type UserApi,
   userErasedEventDataSchema,
 } from "@langwatch/user-contract";
 import { z } from "zod";
@@ -134,6 +138,10 @@ function ownerStandIn() {
 
 /** One member as the organization module answers them. */
 type WorldMember = Readonly<{ userId: string; role: string; disabledAt: Instant | null }>;
+// The send and week services narrow OrganizationApi and EntitlementApi to the fields they read,
+// so the world's rows stay that narrow instead of padding every member and plan field.
+type SendDeps = Parameters<typeof DigestSendService.create>[0];
+type WeekDeps = Parameters<typeof DigestWeekService.create>[0];
 
 /** What the test controls: who the organization's members are, and its projects. */
 export function digestWorld() {
@@ -185,10 +193,13 @@ export function installDigest(
   const memoryMail = MemoryDigestMailChannel.create();
   const mail = new FailsAfterAcceptingMailChannel(memoryMail);
   const now = () => Date.now() + world.clockOffsetMs;
-  const users = {
-    findById: async ({ id }: { id: string }) =>
-      world.users.includes(id) ? userProfile(id, world.deactivated.has(id)) : null,
-  };
+  const users = createApiFixture<Pick<UserApi, "findById">>(
+    {
+      findById: async ({ id }) =>
+        world.users.includes(id) ? userProfile(id, world.deactivated.has(id)) : null,
+    },
+    "UserApi",
+  );
   const unsubscribes = DigestUnsubscribeService.create({
     secret,
     limits: repositories.callCounter,
@@ -199,14 +210,17 @@ export function installDigest(
 
   const source = DigestSourceService.create({
     audience: repositories.audience,
-    projects: {
-      listIdsByOrganization: async ({ organizationId }) =>
-        organizationId === ORGANIZATION ? world.projects : [],
-      findPersonalWorkspaceOwner: async ({ scopeId }) => {
-        const ownerUserId = world.personalOwners.get(scopeId);
-        return ownerUserId ? { ownerUserId } : null;
+    projects: createApiFixture<Pick<ProjectApi, "listIdsByOrganization" | "findPersonalWorkspaceOwner">>(
+      {
+        listIdsByOrganization: async ({ organizationId }) =>
+          organizationId === ORGANIZATION ? world.projects : [],
+        findPersonalWorkspaceOwner: async ({ scopeId }) => {
+          const ownerUserId = world.personalOwners.get(scopeId);
+          return ownerUserId ? { ownerUserId } : null;
+        },
       },
-    },
+      "ProjectApi",
+    ),
     recordProject: (activity) => commands.recordProject(activity),
     recordUser: (activity) => commands.recordUser(activity),
     now,
@@ -225,44 +239,54 @@ export function installDigest(
     weeks: DigestWeekService.create({
       projectWeeks: repositories.projectWeeks,
       userWeeks: repositories.userWeeks,
-      entitlement: {
-        getUsage: async () => world.usage,
-      },
+      entitlement: createApiFixture<WeekDeps["entitlement"]>(
+        { getUsage: async () => world.usage },
+        "EntitlementApi",
+      ),
     }),
-    organizations: {
-      listMembers: async ({ organizationId, offset = 0, limit = Number.POSITIVE_INFINITY }) => {
-        if (world.failingOrganizations.has(organizationId)) {
-          throw new Error(`${organizationId} cannot be read`);
-        }
-        const members = membersIn(organizationId);
-        return { members: members.slice(offset, offset + limit), totalCount: members.length };
+    organizations: createApiFixture<SendDeps["organizations"]>(
+      {
+        listMembers: async ({ organizationId, offset = 0, limit = Number.POSITIVE_INFINITY }) => {
+          if (world.failingOrganizations.has(organizationId)) {
+            throw new Error(`${organizationId} cannot be read`);
+          }
+          const members = membersIn(organizationId);
+          return { members: members.slice(offset, offset + limit), totalCount: members.length };
+        },
+        getMember: async ({ organizationId, userId }) => {
+          const members = membersIn(organizationId);
+          const member = members.find((row) => row.userId === userId);
+          if (!member) throw new MemberNotFoundError(userId);
+          return member;
+        },
+        findProvisioningSummary: async (organizationId) =>
+          !world.unnamedOrganizations.has(organizationId)
+            ? { id: ORGANIZATION, name: "Acme", slug: "acme", createdAt: Temporal.Now.instant() }
+            : null,
       },
-      getMember: async ({ organizationId, userId }) => {
-        const members = membersIn(organizationId);
-        const member = members.find((row) => row.userId === userId);
-        if (!member) throw new MemberNotFoundError(userId);
-        return member;
+      "OrganizationApi",
+    ),
+    projects: createApiFixture<Pick<ProjectApi, "findSummaryById" | "listNamesByIds">>(
+      {
+        findSummaryById: async (projectId) =>
+          knownProject(projectId) ? { name: "Support bot", slug: "support-bot" } : null,
+        listNamesByIds: async ({ projectIds }) =>
+          projectIds.filter(knownProject).map(projectIdentity),
       },
-      findProvisioningSummary: async (organizationId) =>
-        !world.unnamedOrganizations.has(organizationId)
-          ? { id: ORGANIZATION, name: "Acme", slug: "acme", createdAt: Temporal.Now.instant() }
-          : null,
-    },
-    projects: {
-      findSummaryById: async (projectId) =>
-        knownProject(projectId) ? { name: "Support bot", slug: "support-bot" } : null,
-      listNamesByIds: async ({ projectIds }) =>
-        projectIds.filter(knownProject).map(projectIdentity),
-    },
-    access: {
-      canBatchByIds: async ({ principal, projects }) => {
-        const viewer = principal.type === "user" ? principal.id : "";
-        const hidden = world.hiddenFrom.get(viewer) ?? [];
-        const decided = new Map<string, boolean>();
-        for (const { projectId } of projects) decided.set(projectId, !hidden.includes(projectId));
-        return { teams: new Map(), projects: decided, organizationRole: null };
+      "ProjectApi",
+    ),
+    access: createApiFixture<Pick<AuthzApi, "canBatchByIds">>(
+      {
+        canBatchByIds: async ({ principal, projects }) => {
+          const viewer = principal.type === "user" ? principal.id : "";
+          const hidden = world.hiddenFrom.get(viewer) ?? [];
+          const decided = new Map<string, boolean>();
+          for (const { projectId } of projects) decided.set(projectId, !hidden.includes(projectId));
+          return { teams: new Map(), projects: decided, organizationRole: null };
+        },
       },
-    },
+      "AuthzApi",
+    ),
     users,
     mail,
     renderer: ReactEmailMailRenderer.create(),

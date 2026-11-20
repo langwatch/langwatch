@@ -292,6 +292,7 @@ describe("the weekly digest send", () => {
       );
     });
 
+    /** @scenario "A send without a public base URL is refused by name" */
     it("refuses by name with no public base URL, and records no send", async () => {
       digest.world.publicBaseUrl = "";
 
@@ -408,6 +409,7 @@ describe("the weekly digest send", () => {
   });
 
   describe("when a member has no address", () => {
+    /** @scenario "A member with no email address is skipped" */
     it("mails them nothing", async () => {
       await enrol();
       await arm();
@@ -727,6 +729,7 @@ describe("an operator's test send", () => {
   });
 
   describe("when the person asked for is not a member", () => {
+    /** @scenario "A test send of someone who is not a member is refused" */
     it("is refused as not found and mails no one", async () => {
       await enrol();
       await expect(
@@ -737,6 +740,7 @@ describe("an operator's test send", () => {
   });
 
   describe("when the operator has no address to send to", () => {
+    /** @scenario "A test send to an operator with no email address is refused" */
     it("is refused as an operator without an address and mails no one", async () => {
       await enrol();
       everyoneNearTheLimit();

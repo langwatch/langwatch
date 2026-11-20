@@ -148,6 +148,13 @@ Feature: Weekly digest emails
     And once it renders, the retried send mails them exactly once
 
   @integration
+  Scenario: A send without a public base URL is refused by name
+    Given the send is armed and no public base URL is configured
+    When a member's send is handled
+    Then it is refused with digest_public_base_url_missing
+    And no email is sent and no send is recorded for them
+
+  @integration
   Scenario: An organization admin near the plan limit is sent the plan's numbers
     Given the send is armed and an enrolled organization at 90% of its monthly limit
     When the week's emails are sent
@@ -224,6 +231,13 @@ Feature: Weekly digest emails
     Given the send is armed and a member whose profile is deactivated
     When the week's emails are sent
     Then that member receives none and no send is recorded for them
+
+  @integration
+  Scenario: A member with no email address is skipped
+    Given the send is armed and a member whose profile has no email address
+    When the week's emails are sent
+    Then that member receives none
+    And the organization's other members are each sent theirs
 
   @integration
   Scenario: One unreadable organization does not stall the others' plan
@@ -355,6 +369,20 @@ Feature: Weekly digest emails
     Given an enrolled organization and a member who unsubscribed
     When an operator sends themself a test of that member's email
     Then the call is refused with digest_member_unsubscribed
+    And no email is sent
+
+  @integration
+  Scenario: A test send of someone who is not a member is refused
+    Given an enrolled organization
+    When an operator sends themself a test of a person who is not its member
+    Then the call is refused with digest_member_not_found
+    And no email is sent
+
+  @integration
+  Scenario: A test send to an operator with no email address is refused
+    Given an enrolled organization
+    When an operator whose account has no email address sends themself a test of a member's email
+    Then the call is refused with digest_operator_address_missing
     And no email is sent
 
   @integration @unimplemented
