@@ -25,6 +25,12 @@ const dashboardsRelease: {
   fallback: boolean;
 } = vi.hoisted(() => ({ byProject: {}, fallback: false }));
 
+/** The reader's own permissions as each project resolves them; `fallback` for a project not named. */
+const grants: {
+  byProject: Readonly<Record<string, readonly string[]>>;
+  fallback: readonly string[];
+} = vi.hoisted(() => ({ byProject: {}, fallback: [] }));
+
 vi.mock("@langwatch/browser-host/capabilities", async (importOriginal) => ({
   ...(await importOriginal<object>()),
   useUiDeclarations: () => declarations.current,
@@ -46,6 +52,13 @@ vi.mock("../../../behavior/navigation-api.ts", () => ({
               (dashboardsRelease.byProject[projectId ?? ""] ?? dashboardsRelease.fallback),
           },
           isLoading: false,
+        }),
+      },
+    },
+    authz: {
+      effectivePermissions: {
+        useQuery: ({ projectId }: { projectId: string }) => ({
+          data: { permissions: grants.byProject[projectId] ?? grants.fallback },
         }),
       },
     },
@@ -113,10 +126,14 @@ function renderSidebar({
   openableTeams,
   rememberedProjectSlug,
   dashboardsFlagByProject = {},
+  permissionsByProject = {},
 }: {
   surface: "llm-ops" | "dashboards" | "gateway" | "governance" | "me" | "settings";
   pathname: string;
+  /** The page's own grants, and the grants in any project not named below. */
   permissions?: string[];
+  /** The reader's own grants in a named project, by project id. */
+  permissionsByProject?: Readonly<Record<string, readonly string[]>>;
   /** `release_dashboards` for the page's own scope, and for any project not named below. */
   dashboardsFlag?: boolean;
   /** `release_dashboards` resolved for a named project, by project id. */
@@ -133,6 +150,8 @@ function renderSidebar({
   declarations.current = analyticsLends;
   dashboardsRelease.byProject = dashboardsFlagByProject;
   dashboardsRelease.fallback = dashboardsFlag;
+  grants.byProject = permissionsByProject;
+  grants.fallback = permissions;
   return renderWithDesignSystem(
     <WithStubNavigationHost
       readings={{
@@ -426,6 +445,34 @@ describe("the Dashboards section with Dashboards in every product on", () => {
           ...codingAgents,
           dashboardsFlag: false,
           dashboardsFlagByProject: { [PERSONAL.id]: false, [SHOP.id]: true },
+        });
+
+        expect(await screen.findByTestId("starred-dashboards")).toHaveTextContent(
+          "Pinned dashboards in Shop (project-shop)",
+        );
+      });
+    });
+
+    describe("when the member may view dashboards in the workspace but not in Shop", () => {
+      /** @scenario "In Gateway or Coding agents, the Dashboards section follows the named project's view grant" */
+      it("draws no section, so no '+' offers Dashboards Shop will not open", async () => {
+        renderSidebar({
+          ...codingAgents,
+          permissions: ["analytics:view"],
+          permissionsByProject: { [PERSONAL.id]: ["analytics:view"], [SHOP.id]: [] },
+        });
+
+        await expectNoSection();
+      });
+    });
+
+    describe("when the member may view dashboards in Shop but not in the workspace", () => {
+      /** @scenario "In Gateway or Coding agents, the Dashboards section follows the named project's view grant" */
+      it("hands the section Shop", async () => {
+        renderSidebar({
+          ...codingAgents,
+          permissions: [],
+          permissionsByProject: { [SHOP.id]: ["analytics:view"] },
         });
 
         expect(await screen.findByTestId("starred-dashboards")).toHaveTextContent(

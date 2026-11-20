@@ -161,6 +161,13 @@ export type NavigationApiMap = ContractApiMap<typeof identityTrpc> & {
     };
   };
 
+  authz: {
+    /** The reader's own permissions in a named project, as the server resolves them. */
+    effectivePermissions: {
+      query: { input: { projectId: string }; output: { permissions: string[] } };
+    };
+  };
+
   user: {
     /** Whether the reader still owes their organization an SSO link. */
     getSsoStatus: {

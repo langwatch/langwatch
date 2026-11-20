@@ -1,6 +1,7 @@
 /** Sidebar column: product pages and utilities. Host and search palette integration. */
 
 import type { StarredDashboardsProject } from "@langwatch/analytics-client";
+import { permissionSatisfiedBy } from "@langwatch/authorization";
 import { RawKbd as Kbd } from "@langwatch/design-system/kbd";
 import { Box, VStack } from "@langwatch/design-system/primitives";
 import { ScrollEdgeFade, useScrollEdges } from "@langwatch/design-system/scroll-fade";
@@ -357,18 +358,23 @@ function StarredDashboardsGroup({
   }
   if (!everyProduct.enabled || !DASHBOARDS_SECTION_FLAGGED_SURFACES.has(surface)) return null;
   // These pages are about no project: the section works in the one LLM Ops would open.
-  if (!llmOpsProject || !host.hasPermission("analytics:view")) return null;
+  if (!llmOpsProject) return null;
   const { id, slug, name } = llmOpsProject;
   return <StarredDashboardsInProject project={{ id, slug, name }} />;
 }
 
-/** Dashboards is released per project: the section follows the one it works in, not the page's. */
+/** Released and granted per project: the section follows the one it works in, not the page's. */
 function StarredDashboardsInProject({ project }: { project: StarredDashboardsProject }) {
   const released = navigationApi.featureFlag.isEnabled.useQuery({
     flag: "release_dashboards",
     projectId: project.id,
   });
-  if (!released.data?.enabled) return null;
+  const standing = navigationApi.authz.effectivePermissions.useQuery({ projectId: project.id });
+  const granted = standing.data?.permissions;
+  if (!released.data?.enabled || !granted) return null;
+  if (!permissionSatisfiedBy({ granted: new Set(granted), requested: "analytics:view" })) {
+    return null;
+  }
   return <StarredDashboards project={project} />;
 }
 

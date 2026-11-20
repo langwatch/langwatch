@@ -252,6 +252,16 @@ Feature: Product sidebars
     Then Coding agents shows no Dashboards section and no "+"
     And when Dashboards is released for "Shop" but not for the page's own project, the section shows
 
+  # Reaching Dashboards takes analytics:view where it works, so the section asks "Shop" for the
+  # grant, never the page's own project.
+  @integration
+  Scenario: In Gateway or Coding agents, the Dashboards section follows the named project's view grant
+    Given Dashboards in every product is on
+    And LLM Ops would open the project "Shop"
+    When I may view dashboards in the page's own project but not in "Shop"
+    Then Coding agents shows no Dashboards section and no "+"
+    And when I may view dashboards in "Shop" but not in the page's own project, the section shows
+
   @integration
   Scenario: The LLM Ops sidebar's Dashboards section names no project
     Given Dashboards in every product is on
