@@ -209,13 +209,16 @@ export class ClaudeCodeCanonicaliserService implements AttributeCanonicaliser {
     }
 
     // The record's thread is the agent's session, as a span's conversation is (keySession).
-    const session =
-      readDeclaredSessionKey({
-        attributes: ctx.bag.attrs,
-        resourceAttributes: ctx.resourceAttributes,
-      }) ?? sessionId;
-    if (session !== null) {
-      ctx.setAttrIfAbsent(ATTR_KEYS.LANGWATCH_THREAD_ID, session);
+    // A launcher's declared session wins over any thread the record named itself.
+    const declaredSession = readDeclaredSessionKey({
+      attributes: ctx.bag.attrs,
+      resourceAttributes: ctx.resourceAttributes,
+    });
+    if (declaredSession !== null) {
+      ctx.setAttr(ATTR_KEYS.LANGWATCH_THREAD_ID, declaredSession);
+      fired = true;
+    } else if (sessionId !== null) {
+      ctx.setAttrIfAbsent(ATTR_KEYS.LANGWATCH_THREAD_ID, sessionId);
       fired = true;
     }
 

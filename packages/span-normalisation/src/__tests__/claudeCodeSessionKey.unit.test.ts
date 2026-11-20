@@ -116,4 +116,22 @@ describe("a Claude Code prompt record's thread", () => {
 
     expect(attributes["langwatch.thread.id"]).toBe("agent_scout");
   });
+
+  /** @scenario a launcher's declared session groups every harness session it runs */
+  it("is the declared session over a conversation the record named itself", () => {
+    const { attributes } = canonicaliseLogRecord({
+      canonicalisers: orderedSpanCanonicalisers({ codexScopes }),
+      scopeName: "com.anthropic.claude_code.events",
+      body: "claude_code.user_prompt",
+      attributes: {
+        "event.name": "user_prompt",
+        prompt: "hi",
+        "session.id": "cc-run-6",
+        "gen_ai.conversation.id": "conversation_acme",
+        "langwatch.session.id": "agent_scout",
+      },
+    });
+
+    expect(attributes["langwatch.thread.id"]).toBe("agent_scout");
+  });
 });

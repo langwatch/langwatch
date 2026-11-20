@@ -27,6 +27,21 @@ describe("a transcript's session id", () => {
     expect(transcript.sessionId).toBe("agent_scout");
   });
 
+  /** @scenario a launcher's declared session groups every harness session it runs */
+  it("is a session declared only on the record's resource", () => {
+    const transcript = buildCodingAgentTranscript({
+      spans: [],
+      logs: [
+        {
+          ...prompt({ "session.id": "cc-run-1" }),
+          resourceAttributes: { "langwatch.session.id": "agent_scout" },
+        },
+      ],
+    });
+
+    expect(transcript.sessionId).toBe("agent_scout");
+  });
+
   /** @scenario a session with no declared session is keyed by the agent's own session id */
   it("is the run's own session when nothing is declared", () => {
     const transcript = buildCodingAgentTranscript({

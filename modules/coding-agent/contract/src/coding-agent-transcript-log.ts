@@ -37,8 +37,10 @@ export function collectLogEntries(
     if (event === null) continue;
 
     sessionId ??=
-      readDeclaredSessionKey({ attributes: log.attributes, resourceAttributes: null }) ??
-      deriveConversationKey(log.attributes);
+      readDeclaredSessionKey({
+        attributes: log.attributes,
+        resourceAttributes: log.resourceAttributes ?? null,
+      }) ?? deriveConversationKey(log.attributes);
     const entry = buildLogEntry({ event, log, claimedToolCalls, seenScriptCalls });
     if (entry !== null) entries.push(entry);
   }
