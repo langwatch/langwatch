@@ -150,6 +150,7 @@ Feature: Instant Evals inside the Trace Explorer
       When the table and the counts read the results
       Then the table shows "These results are not judged yet" rather than every row as a non-match
       And the counts read zero, with no progress of another chip's run, as no row was judged
+      And the sidebar facets show no counts and no trace is counted as new, as neither read is sent
       And a chip submitted here stays so for its project after the time range changes
       But a bare chip never submitted here, like `NOT eval:my_evaluator`, keeps its evaluator-name rows
       And so does one whose refused judgement the reader skipped, declined or closed, or one submitted in another project

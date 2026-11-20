@@ -4,6 +4,7 @@ import { useFilterStore } from "../../../behavior/explorer.store.ts";
 import { usePreviewTracesActive } from "../../../behavior/explorer/onboarding/use-preview-traces-active.ts";
 import { api, type RouterOutputs } from "../../../behavior/trace-api.ts";
 import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
+import { useHasPendingNegatedEval } from "../../instant-eval/behavior/use-has-pending-negated-eval.ts";
 import { useInstantEvalRuns } from "../../instant-eval/behavior/use-instant-eval-runs.ts";
 
 type DiscoverDescriptors = RouterOutputs["traces"]["discover"]["facets"];
@@ -29,6 +30,8 @@ export function useFilteredTraceFacets(): FilteredTraceFacetsResult {
   const queryText = useFilterStore((s) => s.debouncedQueryText);
   const isSamplePreview = usePreviewTracesActive();
   const { evalRuns } = useInstantEvalRuns();
+  // A pending NOT chip's rows are not results yet, as in the table: count none.
+  const hasPendingNegatedEval = useHasPendingNegatedEval();
 
   const query = api.traces.discover.useQuery(
     {
@@ -42,11 +45,15 @@ export function useFilteredTraceFacets(): FilteredTraceFacetsResult {
       ...(evalRuns ? { evalRuns } : {}),
     },
     {
-      enabled: !!projectId && !isSamplePreview,
+      enabled: !!projectId && !isSamplePreview && !hasPendingNegatedEval,
       placeholderData: keepPreviousData,
     },
   );
 
+  // A settled empty answer, so the rail shows no counts rather than a pending read.
+  if (hasPendingNegatedEval) {
+    return { data: [], isPlaceholderData: false, isFetching: false, isError: false };
+  }
   return {
     data: query.data?.facets,
     isPlaceholderData: query.isPlaceholderData,

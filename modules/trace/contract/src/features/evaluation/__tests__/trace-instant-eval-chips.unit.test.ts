@@ -197,10 +197,14 @@ describe("hasInstantEvalChipUnderOr", () => {
 });
 
 describe("instantEvalChipsOf isUnjudgeable", () => {
-  const refused = (queryText: string, question = "q") =>
-    instantEvalChipsOf({ queryText, lensId: undefined }).some(
-      (chip) => chip.question === question && chip.isUnjudgeable,
+  // Throws on a question the query lacks, so a `false` is never vacuous.
+  const refused = (queryText: string, question = "q") => {
+    const chips = instantEvalChipsOf({ queryText, lensId: undefined }).filter(
+      (chip) => chip.question === question,
     );
+    if (chips.length === 0) throw new Error(`no chip "${question}" in ${queryText}`);
+    return chips.some((chip) => chip.isUnjudgeable);
+  };
 
   /** @scenario "A NOT the run of a typed chip cannot answer is refused" */
   it("refuses a NOT on the chip under an OR, and a NOT over a group holding it", () => {
@@ -214,7 +218,8 @@ describe("instantEvalChipsOf isUnjudgeable", () => {
     expect(refused('status:error AND NOT eval:"q"')).toBe(false);
     expect(refused('status:error OR eval:"q"')).toBe(false);
     expect(refused('NOT eval:"b" AND (status:error OR eval:"q")')).toBe(false);
-    expect(refused('NOT eval:"b" OR status:error')).toBe(false);
+    expect(refused('(NOT eval:"b" OR status:error) AND eval:"q"')).toBe(false);
+    expect(refused('(NOT eval:"b" OR status:error) AND eval:"q"', "b")).toBe(true);
   });
 });
 
