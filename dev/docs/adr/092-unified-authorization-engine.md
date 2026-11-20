@@ -1013,12 +1013,20 @@ there, without waiting for the queue. The fold later applies the same event
 in its FIFO position; deleting an absent row is a no-op, so early
 enforcement and ordered convergence coexist. Redis never gates a
 revocation: with the queue down, the append and the enforcement still
-happen and the fold catches up when the queue returns. This is the **one
-sanctioned direct projection write** by application code — the "one writer"
-doctrine's single named exception — and it is shaped so it can only make
-_deny_ true early, never grant. Known edge, accepted: revoking a grant
-whose attach event is still queued deletes nothing (no row yet); the attach
-then the revoke apply in order and the state converges to revoked.
+happen and the fold catches up when the queue returns. This is the first of
+**two sanctioned direct projection writes** by application code (the "one
+writer" doctrine's named exceptions), and, like the second, it is shaped so
+it can only make _deny_ true early, never grant. Known edge, accepted:
+revoking a grant whose attach event is still queued deletes nothing (no row
+yet); the attach then the revoke apply in order and the state converges to
+revoked.
+
+The second is an API key's own role deleted early: `enforceApiKeyRoleDeletion`
+(`markRoleDeleted`) marks only a `system_api_key` role deleted, and only while
+its `occurredAt <= deletedAt`, so it never grants and never undoes a later
+define. Without it, a define sent right after a key's unawaited revoke would
+confirm against the role row the queued delete is about to remove (scenario
+"A define after a key role's delete not waited for is sent and not confirmed").
 
 **Doctrines** (nothing else backs these; this ADR does):
 
