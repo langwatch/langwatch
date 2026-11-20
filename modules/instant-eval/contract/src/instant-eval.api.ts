@@ -19,6 +19,7 @@ import type {
   InstantEvalRunWire,
   InstantEvalSampleWire,
   InstantEvalShorthandInput,
+  InstantEvalTraceResultWire,
 } from "./instant-eval.schemas.ts";
 
 /**
@@ -225,6 +226,19 @@ export interface InstantEvalApi {
     priceUsd: number;
     occurredAt: Instant;
   }): Promise<void>;
+
+  /**
+   * A trace's kept results for its drawer (ADR-189 section 3): per span, question and judged
+   * column the latest judged verdict, else a failed or skipped one; never a monitor's, which shows
+   * from evaluation_runs. Empty without reading where `release_instant_eval_results` is off.
+   */
+  findResultsByTrace(input: {
+    projectId: string;
+    traceId: string;
+    /** The trace's time window, epoch milliseconds: what prunes the partitions. */
+    occurredFrom: number;
+    occurredUntil: number;
+  }): Promise<InstantEvalTraceResultWire[]>;
 
   /** The usage report's figures (ADR-156, section 10). */
   countUsage(input: {

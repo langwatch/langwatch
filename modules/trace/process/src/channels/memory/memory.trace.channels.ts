@@ -1,6 +1,7 @@
 import type { TraceTokenCounter } from "../token-counter.channel.ts";
 import type { TraceChannels } from "../trace.channels.ts";
 import { MemoryTraceEvaluationRunsChannel } from "./memory.trace-evaluation-runs.channel.ts";
+import { MemoryTraceInstantEvalResultsChannel } from "./memory.trace-instant-eval-results.channel.ts";
 import { MemoryTraceLegacySpoolChannel } from "./memory.trace-legacy-spool.channel.ts";
 
 /** Token counts and v1 spool reads are answered in-process for a test to script. */
@@ -12,6 +13,7 @@ export class MemoryTraceChannels {
       tokenizer: MemoryTokenCounterChannel.create(),
       legacySpool: MemoryTraceLegacySpoolChannel.create(),
       evaluations: MemoryTraceEvaluationRunsChannel.create(),
+      instantEvalResults: MemoryTraceInstantEvalResultsChannel.create(),
     };
   }
 }

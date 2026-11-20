@@ -11,7 +11,7 @@ Instant evaluations: the opt-in, the estimate, and running or cancelling an inst
 | Classification | core (`modules/catalogue.json`)                                                                                          |
 | Subjects       | instant-eval                                                                                                             |
 | Halves         | [contract](contract) · [process](process/README.md)                                                                      |
-| Api token      | `InstantEvalApi` = `moduleApi<InstantEvalApi>()("instant-eval")`, `contract/src/instant-eval.api.ts:236` (18 operations) |
+| Api token      | `InstantEvalApi` = `moduleApi<InstantEvalApi>()("instant-eval")`, `contract/src/instant-eval.api.ts:250` (19 operations) |
 | Other token    | `InstantEvalBrowserApi`, `process/src/transport/instant-eval.trpc.ts:48`                                                 |
 | Installed by   | api, worker, tasks (process)                                                                                             |
 

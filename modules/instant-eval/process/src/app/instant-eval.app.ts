@@ -23,6 +23,7 @@ import {
   type InstantEvalResultsWire,
   type InstantEvalSampleWire,
   type InstantEvalRunProgress,
+  type InstantEvalTraceResultWire,
   type InstantEvalUsageCount,
   type InstantEvalRunWire,
   type InstantEvalServerConfig,
@@ -76,6 +77,7 @@ import {
   toInstantEvalRunWire,
 } from "../rules/instant-eval-wire.rules.ts";
 import { EvalResultsRecallService } from "../services/eval-results-recall.service.ts";
+import { EvalResultsTraceService } from "../services/eval-results-trace.service.ts";
 import { EvalResultsUsageService } from "../services/eval-results-usage.service.ts";
 import {
   InstantEvalAccessService,
@@ -186,6 +188,7 @@ export class InstantEvalModule implements InstantEvalApiContract, InstantEvalBro
   private readonly hostedSpend: InstantEvalSpendService;
   private readonly queries: InstantEvalQueryJudgingService;
   private readonly spendCatchUp: InstantEvalJudgeSpendCatchUpService;
+  private readonly traceResults: EvalResultsTraceService;
 
   private constructor(options: {
     access: InstantEvalAccessService;
@@ -199,6 +202,7 @@ export class InstantEvalModule implements InstantEvalApiContract, InstantEvalBro
     hostedSpend: InstantEvalSpendService;
     queries: InstantEvalQueryJudgingService;
     spendCatchUp: InstantEvalJudgeSpendCatchUpService;
+    traceResults: EvalResultsTraceService;
   }) {
     this.access = options.access;
     this.optIns = options.optIns;
@@ -211,6 +215,7 @@ export class InstantEvalModule implements InstantEvalApiContract, InstantEvalBro
     this.hostedSpend = options.hostedSpend;
     this.queries = options.queries;
     this.spendCatchUp = options.spendCatchUp;
+    this.traceResults = options.traceResults;
   }
 
   static async create(setup: InstantEvalSetup): Promise<InstantEvalModule> {
@@ -350,6 +355,10 @@ export class InstantEvalModule implements InstantEvalApiContract, InstantEvalBro
     return new InstantEvalModule({
       hostedSpend,
       queries,
+      traceResults: EvalResultsTraceService.create({
+        results: repositories.evalResults,
+        peers: { isReleased: InstantEvalModule.isResultsReleasedOf(setup) },
+      }),
       spendCatchUp: InstantEvalJudgeSpendCatchUpService.create({
         peers: {
           listProjectIds: ({ organizationId }) =>
@@ -443,21 +452,29 @@ export class InstantEvalModule implements InstantEvalApiContract, InstantEvalBro
       isEnterpriseTier((await plans.getActivePlan({ organizationId })).type);
   }
 
+  /** Whether a project keeps its results (`release_instant_eval_results`). */
+  private static isResultsReleasedOf(
+    setup: InstantEvalSetup,
+  ): (input: { projectId: string }) => Promise<boolean> {
+    const { featureFlags } = setup.dependencies;
+    const { projects } = setup.channels;
+    return async ({ projectId }) => {
+      const organizationId = await projects.findOrganizationId(projectId);
+      return featureFlags.isEnabled(INSTANT_EVAL_RESULTS_FLAG, {
+        kind: "project",
+        projectId,
+        ...(organizationId === undefined ? {} : { organizationId }),
+      });
+    };
+  }
+
   /** Recall before judging and keep what was judged, behind `release_instant_eval_results`. */
   private static resultsOf(setup: InstantEvalSetup): EvalResultsRecallService {
-    const { featureFlags, modelProviders, retention } = setup.dependencies;
-    const { projects } = setup.channels;
+    const { modelProviders, retention } = setup.dependencies;
     return EvalResultsRecallService.create({
       results: setup.repositories.evalResults,
       peers: {
-        isReleased: async ({ projectId }) => {
-          const organizationId = await projects.findOrganizationId(projectId);
-          return featureFlags.isEnabled(INSTANT_EVAL_RESULTS_FLAG, {
-            kind: "project",
-            projectId,
-            ...(organizationId === undefined ? {} : { organizationId }),
-          });
-        },
+        isReleased: InstantEvalModule.isResultsReleasedOf(setup),
         judgeModelOf: async ({ projectId }) =>
           evalResultsJudgeModelOf(await modelProviders.resolveDecisionModel({ projectId })),
         retentionDaysOf: ({ projectId }) =>
@@ -799,6 +816,16 @@ export class InstantEvalModule implements InstantEvalApiContract, InstantEvalBro
     since?: number;
   }): Promise<InstantEvalUsageCount> {
     return this.reads.countUsage(input);
+  }
+
+  /** A trace's kept results for its drawer (ADR-189 section 3); empty with the flag off. */
+  findResultsByTrace(input: {
+    projectId: string;
+    traceId: string;
+    occurredFrom: number;
+    occurredUntil: number;
+  }): Promise<InstantEvalTraceResultWire[]> {
+    return this.traceResults.findResultsByTrace(input);
   }
 
   async findRunProgress(input: {

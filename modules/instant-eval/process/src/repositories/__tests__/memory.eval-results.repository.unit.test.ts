@@ -1,5 +1,5 @@
 /**
- * Kept results in process: recalled by key the way the table is, latest judged row first,
+ * Kept results in process: recalled by key the way the table is, read by trace for the drawer,
  * isolated by project, deduplicated on the sort key, counted from judged rows only.
  * @see modules/instant-eval/specs/instant-eval-results.feature
  */
@@ -123,6 +123,88 @@ describe("given kept results of one key", () => {
       await expect(repository.countJudged({ projectIds: ["project-1"], since: AT })).resolves.toBe(
         1,
       );
+    });
+  });
+});
+
+describe("given kept results on one trace", () => {
+  const traceQuery = {
+    tenantId: "project-1",
+    traceId: KEY.traceId,
+    keyVersion: EVAL_RESULTS_KEY_VERSION,
+    occurredFrom: AT - 1_000,
+    occurredUntil: AT + 1_000,
+  };
+
+  describe("when the trace is read", () => {
+    /** @scenario "A trace's results are the latest per span, question and judged column" */
+    it("answers the latest judged row of each cell, newest first, whatever its judge", async () => {
+      await repository.insert([
+        record({ SourceId: "run-a", JudgedAt: AT + 1, Probability: 0.1 }),
+        record({ SourceId: "query:2", JudgedAt: AT + 5, Probability: 0.5, JudgeModel: "own/m" }),
+        record({ SourceId: "query:3", JudgedAt: AT + 2, JudgedColumn: "output", Probability: 0.2 }),
+        record({ SourceId: "query:4", JudgedAt: AT + 3, SpanId: "span-1", Probability: 0.3 }),
+      ]);
+
+      const results = await repository.findLatestByTrace(traceQuery);
+
+      expect(results.map(({ sourceId, judgeModel }) => ({ sourceId, judgeModel }))).toEqual([
+        { sourceId: "query:2", judgeModel: "own/m" },
+        { sourceId: "query:4", judgeModel: JUDGE },
+        { sourceId: "query:3", judgeModel: JUDGE },
+      ]);
+      expect(results[0]).toMatchObject({
+        spanId: "",
+        judgedColumn: "llm_readable_trace",
+        question: "Is the customer annoyed?",
+        status: "judged",
+        probability: 0.5,
+        source: "ask",
+        judgedAt: AT + 5,
+      });
+    });
+
+    /** @scenario "A failed or skipped result shows only where no judged one exists" */
+    it("answers a failed or skipped row only for a cell with no judged row", async () => {
+      await repository.insert([
+        record({ SourceId: "run-a", JudgedAt: AT + 1, Probability: 0.4 }),
+        record({ SourceId: "query:2", JudgedAt: AT + 9, Status: "failed", Probability: null }),
+        record({
+          SourceId: "query:3",
+          JudgedColumn: "output",
+          Status: "skipped",
+          Probability: null,
+        }),
+      ]);
+
+      const results = await repository.findLatestByTrace(traceQuery);
+
+      expect(results.map(({ sourceId, status }) => ({ sourceId, status }))).toEqual([
+        { sourceId: "query:3", status: "skipped" },
+        { sourceId: "run-a", status: "judged" },
+      ]);
+    });
+
+    /** @scenario "A monitor's results are left out of the trace's read" */
+    it("never answers a monitor's row", async () => {
+      await repository.insert([
+        record({ Source: "monitor", SourceId: "monitor-1", JudgedColumn: "monitor" }),
+      ]);
+
+      await expect(repository.findLatestByTrace(traceQuery)).resolves.toEqual([]);
+    });
+
+    it("answers nothing to another project, another trace, another key version or a far window", async () => {
+      await repository.insert([record()]);
+
+      for (const query of [
+        { ...traceQuery, tenantId: "project-2" },
+        { ...traceQuery, traceId: "trace-2" },
+        { ...traceQuery, keyVersion: EVAL_RESULTS_KEY_VERSION + 1 },
+        { ...traceQuery, occurredFrom: AT + 10_000, occurredUntil: AT + 20_000 },
+      ]) {
+        await expect(repository.findLatestByTrace(query)).resolves.toEqual([]);
+      }
     });
   });
 });

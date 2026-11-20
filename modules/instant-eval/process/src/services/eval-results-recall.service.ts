@@ -5,6 +5,7 @@
  * @see modules/instant-eval/specs/instant-eval-results.feature
  */
 
+import type { InstantEvalTraceResultSource } from "@langwatch/instant-eval-contract";
 import type {
   InstantEvalJudgement,
   InstantEvalVerdict,
@@ -13,7 +14,6 @@ import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 
 import type {
-  EvalResultSource,
   EvalResultsRepository,
   RecalledEvalResult,
 } from "../repositories/eval-results.repository.ts";
@@ -40,7 +40,7 @@ export const EVAL_RESULTS_RECALL_WINDOW_PADDING_MS = 24 * 60 * 60 * 1000;
 
 /** Who asked, as the kept rows name it: a query, a run or a widget, by its id. */
 export interface EvalResultsSourceReference {
-  readonly kind: Exclude<EvalResultSource, "monitor">;
+  readonly kind: InstantEvalTraceResultSource;
   readonly id: string;
 }
 

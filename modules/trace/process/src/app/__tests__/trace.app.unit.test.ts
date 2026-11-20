@@ -18,6 +18,7 @@ import type {
 import { describe, expect, it, vi } from "vitest";
 
 import { aggregateProof, ownProof } from "../../__tests__/support/authorization-proofs.fixture.ts";
+import { MemoryTraceInstantEvalResultsChannel } from "../../channels/memory/memory.trace-instant-eval-results.channel.ts";
 import { MemoryNullTraceBraidReadsRepository } from "../../features/braid/repositories/memory/memory.null-trace-braid-reads.repository.ts";
 import { TraceSummaryService } from "../../features/read/services/trace-summary-read.service.ts";
 import type { TraceSpanCostSuggestion } from "../../features/span/services/span-cost-suggestion.service.ts";
@@ -81,6 +82,7 @@ function harness(
     getByTraceId: TraceSummaryReader["getByTraceId"];
     summary: TraceSummaryReader;
     evaluationRuns: MemoryTraceEvaluationRunsRepository;
+    instantEvalResults: MemoryTraceInstantEvalResultsChannel;
   }> = {},
 ) {
   const tryGetById = vi.fn<TraceLegacyRead["findById"]>(
@@ -151,6 +153,7 @@ function harness(
       cleanupTenantEmitter: () => undefined,
     },
     evaluationRuns: reads.evaluationRuns ?? MemoryTraceEvaluationRunsRepository.create(),
+    ...(reads.instantEvalResults ? { instantEvalResults: reads.instantEvalResults } : {}),
     share: {} as ShareApi,
     projects: {
       getOrganizationId: async (projectId: string) => `organization-of-${projectId}`,
@@ -431,6 +434,70 @@ describe("TraceModule", () => {
             viewerUserId: "user-1",
           }),
         ).rejects.toThrow("Trace member narrowing is unavailable");
+      });
+    });
+
+    describe("when the drawer reads the trace's kept Instant Evals results (ADR-189)", () => {
+      const keptResult = (tenantId: string) => ({
+        tenantId,
+        traceId: "trace-1",
+        spanId: "",
+        judgedColumn: "output",
+        question: "Is the customer annoyed?",
+        kind: "boolean",
+        status: "judged" as const,
+        probability: 0.8,
+        score: null,
+        label: null,
+        judgeModel: "langwatch/instant-evals",
+        judgedAt: 1_500,
+        source: "dashboard" as const,
+        sourceId: `widget-${tenantId}`,
+      });
+
+      async function resultsHarness({ holders }: { holders: string[] }) {
+        const instantEvalResults = MemoryTraceInstantEvalResultsChannel.create();
+        instantEvalResults.results.push(keptResult(ENGINEER), keptResult(SELLER));
+        const repository = MemoryTraceSummaryRepository.create();
+        for (const tenantId of holders) {
+          await repository.upsert({ ...summaryRow(false), traceId: "trace-1" }, tenantId);
+        }
+        const { app } = harness({
+          summary: TraceSummaryService.create({ repository }),
+          instantEvalResults,
+        });
+        vi.spyOn(app, "resolveViewerProtections").mockResolvedValue(VISIBLE);
+        return app;
+      }
+
+      const read = {
+        projectId: AGGREGATE,
+        traceId: "trace-1",
+        occurredFrom: 1_000,
+        occurredUntil: 2_000,
+        viewerUserId: "user-1",
+      };
+
+      /** @scenario "The drawer asks instant-eval for the results of the trace's member" */
+      it("answers the results of the member that holds the trace, never another's", async () => {
+        const app = await resultsHarness({ holders: [SELLER] });
+
+        const results = await app.readInstantEvalResults({
+          ...read,
+          tenantId: SELLER,
+          authorization: aggregate(),
+        });
+
+        expect(results.map((result) => result.sourceId)).toEqual([`widget-${SELLER}`]);
+      });
+
+      /** @scenario "The drawer asks instant-eval for the results of the trace's member" */
+      it("answers empty where no member holds the trace", async () => {
+        const app = await resultsHarness({ holders: [] });
+
+        await expect(
+          app.readInstantEvalResults({ ...read, authorization: aggregate() }),
+        ).resolves.toEqual([]);
       });
     });
 

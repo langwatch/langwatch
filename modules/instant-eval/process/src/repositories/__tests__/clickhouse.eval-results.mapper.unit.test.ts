@@ -1,6 +1,6 @@
 /**
  * `eval_results` rows on the way in and out: the inserts a batch is split into, the recalled
- * row's shape, and the recall's bound parameters.
+ * and the trace read's row shapes, and both reads' bound parameters.
  * @see modules/instant-eval/specs/instant-eval-results.feature
  */
 
@@ -10,8 +10,11 @@ import {
   EVAL_RESULTS_MAX_WEEKS_PER_INSERT,
   evalResultsInsertBatches,
   evalResultsRecallParameters,
+  evalResultsTraceParameters,
   evalResultsWeekOf,
+  evalTraceResultRowSchema,
   toEvalResultValues,
+  toEvalTraceResult,
   toRecalledEvalResult,
 } from "../clickhouse/clickhouse.eval-results.mapper.ts";
 import type { EvalResultRecord } from "../eval-results.repository.ts";
@@ -146,6 +149,71 @@ describe("evalResultsRecallParameters", () => {
       judgeModel: "langwatch/instant-evals",
       keyVersion: 1,
       status: "judged",
+    });
+  });
+});
+
+describe("toEvalTraceResult", () => {
+  const row = {
+    SpanId: "span-1",
+    QuestionHash: "question-hash",
+    JudgedColumn: "output",
+    LatestQuestion: "Is the customer annoyed?",
+    LatestKind: "boolean",
+    LatestStatus: "judged",
+    LatestProbability: 0.8,
+    LatestScore: null,
+    LatestLabel: "",
+    LatestJudgeModel: "langwatch/instant-evals",
+    LatestSource: "dashboard",
+    LatestSourceId: "widget-1",
+    LatestJudgedAt: "1762000000000",
+    LatestUpdatedAt: 1762000000001,
+  };
+
+  it("reads quoted epoch milliseconds and an empty label as none", () => {
+    expect(toEvalTraceResult(evalTraceResultRowSchema.parse(row))).toEqual({
+      spanId: "span-1",
+      questionHash: "question-hash",
+      judgedColumn: "output",
+      question: "Is the customer annoyed?",
+      kind: "boolean",
+      status: "judged",
+      probability: 0.8,
+      score: null,
+      label: null,
+      judgeModel: "langwatch/instant-evals",
+      source: "dashboard",
+      sourceId: "widget-1",
+      judgedAt: 1762000000000,
+      updatedAt: 1762000000001,
+    });
+  });
+
+  it("refuses a row whose status or source the table does not know", () => {
+    expect(() => evalTraceResultRowSchema.parse({ ...row, LatestStatus: "maybe" })).toThrow();
+    expect(() => evalTraceResultRowSchema.parse({ ...row, LatestSource: "cron" })).toThrow();
+  });
+});
+
+describe("evalResultsTraceParameters", () => {
+  it("binds the tenant, the trace, the window and the key version, leaving monitors out", () => {
+    expect(
+      evalResultsTraceParameters({
+        tenantId: "project-1",
+        traceId: "trace-1",
+        keyVersion: 1,
+        occurredFrom: SUNDAY,
+        occurredUntil: SUNDAY + WEEK_MS,
+      }),
+    ).toEqual({
+      tenantId: "project-1",
+      traceId: "trace-1",
+      occurredFrom: new Date(SUNDAY),
+      occurredUntil: new Date(SUNDAY + WEEK_MS),
+      keyVersion: 1,
+      judged: "judged",
+      monitor: "monitor",
     });
   });
 });

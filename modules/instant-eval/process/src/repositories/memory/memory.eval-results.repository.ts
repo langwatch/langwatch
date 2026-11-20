@@ -5,11 +5,14 @@
 
 import { evalResultsMatchKeyId } from "../../rules/eval-results-key.rules.ts";
 import { pickLatestEvalResult } from "../../rules/eval-results-recall.rules.ts";
+import { latestTraceEvalResults } from "../../rules/eval-results-trace.rules.ts";
 import { parseProbabilities } from "../clickhouse/clickhouse.instant-eval-judgments.mapper.ts";
 import type {
   EvalResultRecord,
   EvalResultsRecallQuery,
   EvalResultsRepository,
+  EvalResultsTraceQuery,
+  EvalTraceResult,
   RecalledEvalResult,
 } from "../eval-results.repository.ts";
 
@@ -57,6 +60,18 @@ export class MemoryEvalResultsRepository implements EvalResultsRepository {
     return [...byKey.values()].flatMap((rows) => pickLatestEvalResult(rows));
   }
 
+  async findLatestByTrace(query: EvalResultsTraceQuery): Promise<readonly EvalTraceResult[]> {
+    const rows = [...this.records.values()].filter(
+      (record) =>
+        record.TenantId === query.tenantId &&
+        record.TraceId === query.traceId &&
+        record.KeyVersion === query.keyVersion &&
+        record.OccurredAt >= query.occurredFrom &&
+        record.OccurredAt <= query.occurredUntil,
+    );
+    return latestTraceEvalResults(rows.map(traceResultOf));
+  }
+
   async countJudged({
     projectIds,
     since,
@@ -99,6 +114,25 @@ function recalledOf(record: EvalResultRecord): RecalledEvalResult {
     label: record.Label === "" ? null : record.Label,
     probability: record.Probability,
     probabilities: parseProbabilities(record.Probabilities),
+    judgedAt: record.JudgedAt,
+    updatedAt: record.UpdatedAt,
+  };
+}
+
+function traceResultOf(record: EvalResultRecord): EvalTraceResult {
+  return {
+    spanId: record.SpanId,
+    questionHash: record.QuestionHash,
+    judgedColumn: record.JudgedColumn,
+    question: record.Question,
+    kind: record.Kind,
+    status: record.Status,
+    probability: record.Probability,
+    score: record.Score,
+    label: record.Label === "" ? null : record.Label,
+    judgeModel: record.JudgeModel,
+    source: record.Source,
+    sourceId: record.SourceId,
     judgedAt: record.JudgedAt,
     updatedAt: record.UpdatedAt,
   };

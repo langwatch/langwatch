@@ -12,7 +12,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 ## Module API (`InstantEvalApi`)
 
-Peers call these through the token, declared at `../contract/src/instant-eval.api.ts:103`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/instant-eval.api.ts:104`; nothing else in this package is public.
 
 #### `isEnabled`
 
@@ -146,6 +146,14 @@ Main's hosted-call recorder: a Connect licence's judgements, billed to the calli
 
 ```typescript
 recordSpendForHostedCalls(input: { projectId: string; virtualKeyId: string; inputTokens: number; requests: number; costUsd: number; priceUsd: number; occurredAt: Instant; }): Promise<void>;
+```
+
+#### `findResultsByTrace`
+
+A trace's kept results for its drawer (ADR-189 section 3): per span, question and judged column the latest judged verdict, else a failed or skipped one; never a monitor's, which shows from evaluation_runs. Empty without reading where `release_instant_eval_results` is off.
+
+```typescript
+findResultsByTrace(input: { projectId: string; traceId: string; /** The trace's time window, epoch milliseconds: what prunes the partitions. */ occurredFrom: number; occurredUntil: number; }): Promise<InstantEvalTraceResultWire[]>;
 ```
 
 #### `countUsage`

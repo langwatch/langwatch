@@ -1,5 +1,8 @@
 import type { Authorization, PrincipalRef } from "@langwatch/authorization";
-import type { InstantEvalRunReference } from "@langwatch/instant-eval-contract";
+import type {
+  InstantEvalRunReference,
+  InstantEvalTraceResultWire,
+} from "@langwatch/instant-eval-contract";
 import { moduleApi } from "@langwatch/module";
 
 import type { ConversationView } from "./conversation/conversation-steps.ts";
@@ -954,6 +957,19 @@ export interface TraceApi extends TraceOtlpIngestApi {
           viewerUserId: string;
         },
   ): Promise<unknown>;
+  /**
+   * The trace member's kept Instant Evals results, asked of instant-eval over the trace's time
+   * window (ADR-189 section 3); empty where its flag is off or no member holds the trace.
+   */
+  readInstantEvalResults(input: {
+    projectId: string;
+    traceId: string;
+    tenantId?: string | undefined;
+    occurredFrom: number;
+    occurredUntil: number;
+    authorization: Authorization;
+    viewerUserId: string;
+  }): Promise<InstantEvalTraceResultWire[]>;
   /** The transcript through the viewer's own protections; `codingAgents.transcript` reads it. */
   readCodingAgentTranscript(input: {
     projectId: string;

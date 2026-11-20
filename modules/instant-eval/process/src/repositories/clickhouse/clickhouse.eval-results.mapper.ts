@@ -3,11 +3,18 @@
  * recalled row's shape, and the inserts a batch is split into.
  */
 
+import {
+  INSTANT_EVAL_JUDGMENT_STATUSES,
+  INSTANT_EVAL_RESULT_SOURCES,
+} from "@langwatch/instant-eval-contract";
 import { Temporal, toDate } from "@langwatch/time";
+import { z } from "zod";
 
 import type {
   EvalResultRecord,
   EvalResultsRecallQuery,
+  EvalResultsTraceQuery,
+  EvalTraceResult,
   RecalledEvalResult,
 } from "../eval-results.repository.ts";
 import { parseProbabilities } from "./clickhouse.instant-eval-judgments.mapper.ts";
@@ -121,5 +128,60 @@ export function evalResultsRecallParameters(
     judgeModel: query.judgeModel,
     keyVersion: query.keyVersion,
     status: "judged",
+  };
+}
+
+/**
+ * One trace read row as the query answers it, checked at the boundary. The tuple's columns carry
+ * a `Latest` prefix so no alias shadows the column it is read from; times may arrive quoted.
+ */
+export const evalTraceResultRowSchema = z.object({
+  SpanId: z.string(),
+  QuestionHash: z.string(),
+  JudgedColumn: z.string(),
+  LatestQuestion: z.string(),
+  LatestKind: z.string(),
+  LatestStatus: z.enum(INSTANT_EVAL_JUDGMENT_STATUSES),
+  LatestProbability: z.number().nullable(),
+  LatestScore: z.number().nullable(),
+  LatestLabel: z.string(),
+  LatestJudgeModel: z.string(),
+  LatestSource: z.enum(INSTANT_EVAL_RESULT_SOURCES),
+  LatestSourceId: z.string(),
+  LatestJudgedAt: z.coerce.number(),
+  LatestUpdatedAt: z.coerce.number(),
+});
+
+export type EvalTraceResultRow = z.infer<typeof evalTraceResultRowSchema>;
+
+export function toEvalTraceResult(row: EvalTraceResultRow): EvalTraceResult {
+  return {
+    spanId: row.SpanId,
+    questionHash: row.QuestionHash,
+    judgedColumn: row.JudgedColumn,
+    question: row.LatestQuestion,
+    kind: row.LatestKind,
+    status: row.LatestStatus,
+    probability: row.LatestProbability,
+    score: row.LatestScore,
+    label: row.LatestLabel === "" ? null : row.LatestLabel,
+    judgeModel: row.LatestJudgeModel,
+    source: row.LatestSource,
+    sourceId: row.LatestSourceId,
+    judgedAt: row.LatestJudgedAt,
+    updatedAt: row.LatestUpdatedAt,
+  };
+}
+
+/** The trace read's bound parameters; monitor rows are left out in the query itself. */
+export function evalResultsTraceParameters(query: EvalResultsTraceQuery): Record<string, unknown> {
+  return {
+    tenantId: query.tenantId,
+    traceId: query.traceId,
+    occurredFrom: atEpoch(query.occurredFrom),
+    occurredUntil: atEpoch(query.occurredUntil),
+    keyVersion: query.keyVersion,
+    judged: "judged",
+    monitor: "monitor",
   };
 }

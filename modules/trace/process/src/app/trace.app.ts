@@ -35,7 +35,10 @@ import {
 } from "@langwatch/eventing";
 import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { ValidationError } from "@langwatch/handled-error";
-import type { InstantEvalRunReference } from "@langwatch/instant-eval-contract";
+import type {
+  InstantEvalRunReference,
+  InstantEvalTraceResultWire,
+} from "@langwatch/instant-eval-contract";
 import { generate } from "@langwatch/ksuid";
 import { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { createLogger } from "@langwatch/observability";
@@ -219,6 +222,7 @@ import {
 import type { ConversationView } from "@langwatch/trace-contract/conversation";
 import type { z } from "zod";
 
+import type { TraceInstantEvalResults } from "../channels/trace-instant-eval-results.channel.ts";
 import type { TraceChannels } from "../channels/trace.channels.ts";
 import type { TraceProcessingPipelineDefinition } from "../eventing/trace-processing-projections.pipeline.ts";
 import { TraceProcessingRuntimeAdapter } from "../eventing/trace-processing-runtime.pipeline.ts";
@@ -792,6 +796,8 @@ export interface TraceAppDependencies {
   >;
   /** Dates eval chips' runs from instant-eval's shared table; absent, chips stay pending. */
   explorerEvalRuns?: TraceInstantEvalRunService;
+  /** Instant-eval's kept results for the drawer; absent, that read refuses by name. */
+  instantEvalResults?: TraceInstantEvalResults;
   /** The AI search composer's model seam; absent, the three AI operations refuse by name. */
   models?: Pick<ModelProviderApi, "generateText" | "generateStructured">;
   presence?: PresenceApi;
@@ -1044,6 +1050,7 @@ export class TraceModule implements TraceApi, CollectorApp {
           fallbackVisibilityDays: TRACE_FALLBACK_VISIBILITY_DAYS,
         },
       }),
+      instantEvalResults: setup.channels.instantEvalResults,
     });
     app.#processingCommands = commands;
     app.#modelSpend = setup.repositories.modelSpend;
@@ -3789,6 +3796,30 @@ export class TraceModule implements TraceApi, CollectorApp {
       traceId: input.traceId,
     });
     return runs.map((evaluation) => gateEvaluationContent({ evaluation, protections }));
+  }
+
+  /** The trace member's kept Instant Evals results, asked of instant-eval (ADR-189 section 3). */
+  async readInstantEvalResults(input: {
+    projectId: string;
+    traceId: string;
+    tenantId?: string | undefined;
+    occurredFrom: number;
+    occurredUntil: number;
+    authorization: Authorization;
+    viewerUserId: string;
+  }): Promise<InstantEvalTraceResultWire[]> {
+    const results = this.#dependencies.instantEvalResults;
+    if (!results) {
+      throw new TraceCapabilityUnavailableError("this process", "the Instant Evals results read");
+    }
+    const { tenantId } = await this.#readTraceMember(input);
+    if (tenantId === undefined) return [];
+    return results.findResultsByTrace({
+      projectId: tenantId,
+      traceId: input.traceId,
+      occurredFrom: input.occurredFrom,
+      occurredUntil: input.occurredUntil,
+    });
   }
 
   /** The trace's member (none while the proof reads several), and protections through it. */

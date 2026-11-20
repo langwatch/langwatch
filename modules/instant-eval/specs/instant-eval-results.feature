@@ -4,7 +4,7 @@ Feature: Every trace-linked Instant Evals result is kept, and recalled before ju
   I want a verdict already given on that text, with that judge, to be reused
   So that a repeat ask, a rerun or a dashboard refresh pays only for what is new
 
-  ADR-189, step 2. Behind release_instant_eval_results: off, nothing reads or writes
+  ADR-189, steps 2 and 3. Behind release_instant_eval_results: off, nothing reads or writes
   eval_results and every judgement is made as today.
 
   The shape:
@@ -151,6 +151,42 @@ Feature: Every trace-linked Instant Evals result is kept, and recalled before ju
     Then only the other trace is sent to the judge
     And the run's own judgements hold both verdicts
     And the kept row of the judged trace names the run
+
+  # ============================================================================
+  # The trace's drawer (ADR-189 step 3)
+  # ============================================================================
+
+  @unit
+  Scenario: A trace's results are the latest per span, question and judged column
+    Given kept rows on one trace for two judged columns, a span, and two judge models
+    When the trace's results are read
+    Then each span, question and judged column answers its latest judged row, newest first
+    And each names its question, source, source id, judge model and judged time
+
+  @unit
+  Scenario: A failed or skipped result shows only where no judged one exists
+    Given a judged row and a newer failed row for one cell, and only a skipped row for another
+    When the trace's results are read
+    Then the first cell answers its judged row and the second its skipped row
+
+  @unit
+  Scenario: A monitor's results are left out of the trace's read
+    Given a row a monitor wrote on the trace
+    When the trace's results are read
+    Then it is not answered, because the trace shows it from evaluation_runs
+
+  @unit
+  Scenario: With release_instant_eval_results off a trace's read reads nothing
+    Given a project without the flag
+    When its trace's results are read
+    Then the answer is empty and eval_results is not read
+
+  @integration
+  Scenario: A trace's kept results are read from ClickHouse by the trace
+    Given judged, failed, skipped, monitor and retired-key rows on one trace in eval_results
+    When the trace is read
+    Then each cell answers its latest judged row, else its latest failed or skipped one
+    And no monitor row and no row of another key version is answered
 
   # ============================================================================
   # Storage

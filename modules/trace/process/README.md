@@ -12,7 +12,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 ## Module API (`TraceApi`)
 
-Peers call these through the token, declared at `../contract/src/trace.api.ts:201`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/trace.api.ts:204`; nothing else in this package is public.
 It extends `TraceOtlpIngestApi`.
 
 #### `extractInlineMediaFromEvent`
@@ -931,6 +931,14 @@ With a proof, the trace member's runs, content gated for the viewer (ADR-177 blo
 readEvaluationRuns(input: | { tenantId: string; traceId: string } | { projectId: string; traceId: string; tenantId?: string | undefined; authorization: Authorization; viewerUserId: string; }): Promise<unknown>;
 ```
 
+#### `readInstantEvalResults`
+
+The trace member's kept Instant Evals results, asked of instant-eval over the trace's time window (ADR-189 section 3); empty where its flag is off or no member holds the trace.
+
+```typescript
+readInstantEvalResults(input: { projectId: string; traceId: string; tenantId?: string | undefined; occurredFrom: number; occurredUntil: number; authorization: Authorization; viewerUserId: string; }): Promise<InstantEvalTraceResultWire[]>;
+```
+
 #### `readCodingAgentTranscript`
 
 The transcript through the viewer's own protections; `codingAgents.transcript` reads it.
@@ -1588,6 +1596,7 @@ Contract `../contract/src/traces.trpc.ts:189`, router `src/transport/traces.trpc
 | `traces.changeName`                    | mutation     | Permission `traces:update`                                            | inline                          | `tracesChangedNameSchema`          |
 | `traces.changeMetadata`                | mutation     | Permission `traces:update`                                            | inline                          | `traceMetadataResponseSchema`      |
 | `traces.evals`                         | query        | Permission `traces:view`                                              | inline                          | `tracesEvaluationRunsSchema`       |
+| `traces.instantEvalResults`            | query        | Permission `traces:view`                                              | inline                          | inline                             |
 | `traces.traceLogs`                     | query        | Permission `traces:view`                                              | inline                          | `tracesTraceLogsSchema`            |
 | `traces.spansPaginated`                | query        | Permission `traces:view`                                              | inline                          | `tracesSpansPageSchema`            |
 | `traces.spansDelta`                    | query        | Permission `traces:view`                                              | inline                          | `tracesSpansDeltaSchema`           |
@@ -1918,6 +1927,17 @@ interface Input {
   tenantId?: string;
 }
 type Output = z.infer<typeof tracesEvaluationRunsSchema>; // ../contract/src/trace.responses.ts:216
+
+// traces.instantEvalResults
+// Input: inline, ../contract/src/traces.trpc.ts:492
+interface Input {
+  projectId: string;
+  traceId: string;
+  occurredFrom: number;
+  occurredUntil: number;
+  tenantId?: string;
+}
+// Output: instantEvalTraceResultSchema.array() (inline, ../contract/src/traces.trpc.ts:501)
 
 // traces.traceLogs
 // Input: inline, ../contract/src/traces.trpc.ts:491

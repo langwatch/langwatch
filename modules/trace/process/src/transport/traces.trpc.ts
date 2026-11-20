@@ -526,6 +526,12 @@ export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesT
       ),
     )
 
+    .procedure("instantEvalResults")
+    .withPermission("traces:view")
+    .handle(({ app, input, authorization, actor }) =>
+      app.readInstantEvalResults({ ...input, authorization, viewerUserId: actor.id }),
+    )
+
     .procedure("traceLogs")
     .withPermission("traces:view")
     .handle(async ({ app, input, actor, authorization }) => {

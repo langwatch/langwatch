@@ -12,7 +12,10 @@ import type {
 import { createModuleApi, type ContractApiMap, type OutputsFromMap } from "@langwatch/api/web";
 import type { CodingAgentTranscript } from "@langwatch/coding-agent-contract";
 import type { DataPrivacySnapshot } from "@langwatch/data-privacy-contract";
-import type { instantEvalTrpc } from "@langwatch/instant-eval-contract";
+import type {
+  InstantEvalTraceResultWire,
+  instantEvalTrpc,
+} from "@langwatch/instant-eval-contract";
 import type {
   PresenceCursorEvent,
   PresenceCursorInput,
@@ -256,6 +259,14 @@ export type TraceApiMap = {
      */
     evals: {
       query: { input: ProjectScope & Record<string, unknown>; output: unknown };
+    };
+
+    /** The trace's kept Instant Evals results, over its time window (ADR-189 section 3). */
+    instantEvalResults: {
+      query: {
+        input: TraceScope & { occurredFrom: number; occurredUntil: number; tenantId?: string };
+        output: InstantEvalTraceResultWire[];
+      };
     };
 
     /** The log records emitted inside a trace. */

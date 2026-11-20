@@ -4,12 +4,10 @@
  * @see packages/clickhouse-migrations/migrations/00132_create_eval_results.sql
  */
 
-import type { InstantEvalJudgmentStatus } from "@langwatch/instant-eval-contract";
-
-/** Who asked for a judgement: a provenance label only, which recall never reads. */
-export const EVAL_RESULT_SOURCES = ["ask", "run", "dashboard", "monitor"] as const;
-
-export type EvalResultSource = (typeof EVAL_RESULT_SOURCES)[number];
+import type {
+  InstantEvalJudgmentStatus,
+  InstantEvalResultSource,
+} from "@langwatch/instant-eval-contract";
 
 /** One row of `eval_results`, in the table's own spelling. Times are epoch milliseconds. */
 export interface EvalResultRecord {
@@ -24,7 +22,7 @@ export interface EvalResultRecord {
   readonly InputHash: string;
   readonly JudgedColumn: string;
   readonly KeyVersion: number;
-  readonly Source: EvalResultSource;
+  readonly Source: InstantEvalResultSource;
   readonly SourceId: string;
   readonly Status: InstantEvalJudgmentStatus;
   readonly Score: number | null;
@@ -69,6 +67,34 @@ export interface EvalResultsRecallQuery {
   readonly occurredUntil: number;
 }
 
+/** What a trace's drawer reads: one trace, the current key version, the trace's time window. */
+export interface EvalResultsTraceQuery {
+  readonly tenantId: string;
+  readonly traceId: string;
+  readonly keyVersion: number;
+  /** Epoch milliseconds bounding the rows' trace times: what prunes the partitions. */
+  readonly occurredFrom: number;
+  readonly occurredUntil: number;
+}
+
+/** The latest result of one span, question and judged column on a trace. */
+export interface EvalTraceResult {
+  readonly spanId: string;
+  readonly questionHash: string;
+  readonly judgedColumn: string;
+  readonly question: string;
+  readonly kind: string;
+  readonly status: InstantEvalJudgmentStatus;
+  readonly probability: number | null;
+  readonly score: number | null;
+  readonly label: string | null;
+  readonly judgeModel: string;
+  readonly source: InstantEvalResultSource;
+  readonly sourceId: string;
+  readonly judgedAt: number;
+  readonly updatedAt: number;
+}
+
 export interface EvalResultsRepository {
   /** Every row in as few inserts as the partition limit allows. */
   insert(records: readonly EvalResultRecord[]): Promise<void>;
@@ -77,6 +103,12 @@ export interface EvalResultsRepository {
    * `SourceId`. Failed and skipped rows are never returned: they must not block a retry.
    */
   findLatestJudged(query: EvalResultsRecallQuery): Promise<readonly RecalledEvalResult[]>;
+  /**
+   * Per span, question and judged column of one trace, newest first: the latest judged row by
+   * `JudgedAt`, `UpdatedAt`, then `SourceId`, or the latest failed or skipped one where none was
+   * judged. Monitor rows are never returned: the trace shows them from evaluation_runs.
+   */
+  findLatestByTrace(query: EvalResultsTraceQuery): Promise<readonly EvalTraceResult[]>;
   /** Judged rows, which is judge calls made, judged since `since` (epoch ms) when given. */
   countJudged(input: { projectIds: readonly string[]; since?: number }): Promise<number>;
 }

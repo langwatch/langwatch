@@ -49,6 +49,19 @@ export const INSTANT_EVALS_FLAG = "release_instant_evals";
 /** The flag that keeps a project's Instant Evals results and recalls them (ADR-189). */
 export const INSTANT_EVAL_RESULTS_FLAG = "release_instant_eval_results";
 
+/** The sources a trace's drawer shows a kept result from; a monitor's shows from its own runs. */
+export const INSTANT_EVAL_TRACE_RESULT_SOURCES = ["ask", "run", "dashboard"] as const;
+
+export type InstantEvalTraceResultSource = (typeof INSTANT_EVAL_TRACE_RESULT_SOURCES)[number];
+
+/** Who asked for a kept judgement (ADR-189): a provenance label only, which recall never reads. */
+export const INSTANT_EVAL_RESULT_SOURCES = [
+  ...INSTANT_EVAL_TRACE_RESULT_SOURCES,
+  "monitor",
+] as const;
+
+export type InstantEvalResultSource = (typeof INSTANT_EVAL_RESULT_SOURCES)[number];
+
 /** Whether a judgement was made, declined, or attempted and lost. */
 export const INSTANT_EVAL_JUDGMENT_STATUSES = ["judged", "skipped", "failed"] as const;
 

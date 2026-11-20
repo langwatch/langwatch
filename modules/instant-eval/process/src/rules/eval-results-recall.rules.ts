@@ -4,12 +4,14 @@
  * @see modules/instant-eval/specs/instant-eval-results.feature
  */
 
-import type { InstantEvalJudgmentStatus } from "@langwatch/instant-eval-contract";
+import type {
+  InstantEvalJudgmentStatus,
+  InstantEvalResultSource,
+} from "@langwatch/instant-eval-contract";
 import type { InstantEvalVerdict } from "@langwatch/instant-eval-judge-contract";
 
 import type {
   EvalResultRecord,
-  EvalResultSource,
   RecalledEvalResult,
 } from "../repositories/eval-results.repository.ts";
 import { EVAL_RESULTS_KEY_VERSION, type EvalResultsCellKey } from "./eval-results-key.rules.ts";
@@ -86,7 +88,7 @@ export function evalResultRecordOf({
   key: EvalResultsCellKey;
   question: InstantEvalRunQuestion;
   judgeModel: string;
-  source: { kind: EvalResultSource; id: string };
+  source: { kind: InstantEvalResultSource; id: string };
   outcome: EvalResultOutcome;
   /** Epoch milliseconds; also the write clock. */
   judgedAt: number;

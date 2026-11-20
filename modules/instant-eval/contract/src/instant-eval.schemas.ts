@@ -18,6 +18,7 @@ import {
   INSTANT_EVAL_RUN_STATUSES,
   INSTANT_EVAL_SAMPLE_CEILING,
   INSTANT_EVAL_TARGETS,
+  INSTANT_EVAL_TRACE_RESULT_SOURCES,
 } from "./instant-eval-limits.ts";
 
 /** A bound parameter's value: scalars only, as the query family publishes. */
@@ -504,11 +505,40 @@ const instantEvalSampleSchemaDefinition = z.object({
 export interface InstantEvalSampleSchema extends Named<typeof instantEvalSampleSchemaDefinition> {}
 export const instantEvalSampleSchema: InstantEvalSampleSchema = instantEvalSampleSchemaDefinition;
 
+/** One kept result on a trace (ADR-189 section 3): a question's latest verdict on one text. */
+const instantEvalTraceResultSchemaDefinition = z.object({
+  spanId: z.string().describe("The span the judged text was read from; empty for the trace's own."),
+  judgedColumn: z.string().describe("The text that was judged, such as input or output."),
+  question: z.string().describe("The question as it was asked."),
+  kind: z.string().describe("What kind of question was asked."),
+  status: z
+    .enum(INSTANT_EVAL_JUDGMENT_STATUSES)
+    .describe("Judged, or failed or skipped where no judge has answered yet."),
+  probability: z
+    .number()
+    .nullable()
+    .describe("How likely the judge found a boolean question's answer to be true."),
+  score: z.number().nullable().describe("A score question's answer."),
+  label: z.string().nullable().describe("A category question's answer."),
+  judgeModel: z.string().describe("The model that judged."),
+  judgedAt: z.number().describe("When the judge answered, in epoch milliseconds."),
+  source: z
+    .enum(INSTANT_EVAL_TRACE_RESULT_SOURCES)
+    .describe("Who asked: a quick ask, a run or a dashboard widget."),
+  sourceId: z.string().describe("The id of the query, run or widget that asked."),
+});
+export interface InstantEvalTraceResultSchema extends Named<
+  typeof instantEvalTraceResultSchemaDefinition
+> {}
+export const instantEvalTraceResultSchema: InstantEvalTraceResultSchema =
+  instantEvalTraceResultSchemaDefinition;
+
 export type InstantEvalRunWire = z.infer<typeof instantEvalRunSchema>;
 export type InstantEvalJudgmentWire = z.infer<typeof instantEvalJudgmentSchema>;
 export type InstantEvalEstimateWire = z.infer<typeof instantEvalEstimateSchema>;
 export type InstantEvalResultsWire = z.infer<typeof instantEvalResultsSchema>;
 export type InstantEvalSampleWire = z.infer<typeof instantEvalSampleSchema>;
+export type InstantEvalTraceResultWire = z.infer<typeof instantEvalTraceResultSchema>;
 
 /**
  * The credential a request arrived on. A run reads its rows as the asker's own

@@ -1,3 +1,4 @@
+import { INSTANT_EVAL_RESULTS_CEILING } from "@langwatch/instant-eval-contract";
 import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
 
@@ -5,13 +6,18 @@ import type {
   EvalResultRecord,
   EvalResultsRecallQuery,
   EvalResultsRepository,
+  EvalResultsTraceQuery,
+  EvalTraceResult,
   RecalledEvalResult,
 } from "../eval-results.repository.ts";
 import {
   evalResultsInsertBatches,
   evalResultsRecallParameters,
+  evalResultsTraceParameters,
+  evalTraceResultRowSchema,
   type RecalledEvalResultRow,
   toEvalResultValues,
+  toEvalTraceResult,
   toRecalledEvalResult,
 } from "./clickhouse.eval-results.mapper.ts";
 import type { InstantEvalClickHouseResolver } from "./clickhouse.instant-eval-session.store.ts";
@@ -64,6 +70,48 @@ const RECALL_QUERY = `
     GROUP BY TraceId, SpanId, QuestionHash, InputHash
   )`;
 
+/**
+ * The drawer's read: per span, question and judged column, the row a judged one wins over any
+ * failed or skipped one, then the latest, read as one tuple as recall is. A prefix read of the
+ * sort key; a monitor's rows are left out, as the trace shows them from evaluation_runs.
+ */
+const TRACE_QUERY = `
+  SELECT
+    SpanId,
+    QuestionHash,
+    JudgedColumn,
+    Latest.1 AS LatestQuestion,
+    Latest.2 AS LatestKind,
+    Latest.3 AS LatestStatus,
+    Latest.4 AS LatestProbability,
+    Latest.5 AS LatestScore,
+    Latest.6 AS LatestLabel,
+    Latest.7 AS LatestJudgeModel,
+    Latest.8 AS LatestSource,
+    Latest.9 AS LatestSourceId,
+    toUnixTimestamp64Milli(Latest.10) AS LatestJudgedAt,
+    toUnixTimestamp64Milli(Latest.11) AS LatestUpdatedAt
+  FROM (
+    SELECT
+      SpanId,
+      QuestionHash,
+      JudgedColumn,
+      argMax(
+        (Question, Kind, Status, Probability, Score, Label, JudgeModel, Source, SourceId, JudgedAt, UpdatedAt),
+        (Status = {judged:String}, JudgedAt, UpdatedAt, SourceId)
+      ) AS Latest
+    FROM ${TABLE_NAME}
+    WHERE TenantId = {tenantId:String}
+      AND OccurredAt >= {occurredFrom:DateTime64(3)}
+      AND OccurredAt <= {occurredUntil:DateTime64(3)}
+      AND TraceId = {traceId:String}
+      AND KeyVersion = {keyVersion:UInt16}
+      AND Source != {monitor:String}
+    GROUP BY SpanId, QuestionHash, JudgedColumn
+  )
+  ORDER BY LatestJudgedAt DESC, SpanId, QuestionHash, JudgedColumn
+  LIMIT ${INSTANT_EVAL_RESULTS_CEILING}`;
+
 export class ClickHouseEvalResultsRepository implements EvalResultsRepository {
   private constructor(private readonly resolveClient: InstantEvalClickHouseResolver) {}
 
@@ -114,6 +162,17 @@ export class ClickHouseEvalResultsRepository implements EvalResultsRepository {
     });
 
     return (await result.json()).map(toRecalledEvalResult);
+  }
+
+  async findLatestByTrace(query: EvalResultsTraceQuery): Promise<readonly EvalTraceResult[]> {
+    const client = await this.resolveClient(query.tenantId);
+    const result = await client.query({
+      query: TRACE_QUERY,
+      query_params: evalResultsTraceParameters(query),
+      format: "JSONEachRow",
+    });
+
+    return z.array(evalTraceResultRowSchema).parse(await result.json()).map(toEvalTraceResult);
   }
 
   /** Per project, so each read routes to the tenant's server; FINAL, as the report always read. */
