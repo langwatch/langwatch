@@ -168,11 +168,7 @@ describe("given 2 unseen insights in the inbox", () => {
     it("drops the bell instead of drawing the cached inbox", async () => {
       const host = new FlippableInsightHost();
       renderWithInsightHost({
-        element: (
-          <FlagSwitch host={host}>
-            <InsightsBell />
-          </FlagSwitch>
-        ),
+        element: <FlagSwitch host={host}>{() => <InsightsBell />}</FlagSwitch>,
         host,
         answer: () => Promise.resolve(UNSEEN.slice(0, 2)),
       });

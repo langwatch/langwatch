@@ -100,11 +100,7 @@ describe("given a rejected inbox read", () => {
         Promise.reject(new UiProcedureRefusal("FORBIDDEN", 403)),
       );
       renderWithInsightHost({
-        element: (
-          <FlagSwitch host={host}>
-            <InsightsScreen />
-          </FlagSwitch>
-        ),
+        element: <FlagSwitch host={host}>{() => <InsightsScreen />}</FlagSwitch>,
         host,
         answer: read,
       });

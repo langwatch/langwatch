@@ -109,20 +109,21 @@ export class FlippableInsightHost extends StubInsightHost {
 }
 
 /**
- * Draws `children` beside a "Turn flag off" button that flips the host and redraws: the host is
- * read on render, so the flip alone changes nothing until something redraws.
+ * Draws `children()` beside a "Turn flag off" button that flips the host and redraws: the host is
+ * read on render, so the flip alone changes nothing until something redraws. `children` is a
+ * function because a fixed element would let React skip re-rendering it.
  */
 export function FlagSwitch({
   host,
   children,
 }: {
   host: FlippableInsightHost;
-  children: ReactNode;
+  children: () => ReactNode;
 }) {
   const [, redraw] = useReducer((count: number) => count + 1, 0);
   return (
     <>
-      {children}
+      {children()}
       <button
         type="button"
         onClick={() => {
