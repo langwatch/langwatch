@@ -4706,6 +4706,10 @@ const presentations = {
     title: "Unsubscribe links are unavailable",
     describe: () => "This is on our side. Try again later.",
   },
+  digest_operator_address_missing: {
+    title: "Your account has no email address",
+    describe: () => "Add an email address to your account, then send the test again.",
+  },
   digest_organization_not_enrolled: {
     title: "Organization not enrolled",
     describe: () => "Enrol this organization in the digest before sending a test.",

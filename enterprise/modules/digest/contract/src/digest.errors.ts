@@ -38,6 +38,20 @@ export class DigestNothingToSendError extends HandledError {
   }
 }
 
+/** The operator asked for a test but has no address to send it to. */
+export class DigestOperatorAddressMissingError extends HandledError {
+  declare readonly code: "digest_operator_address_missing";
+
+  constructor() {
+    super(
+      "digest_operator_address_missing",
+      "Your account has no email address, so a test digest can't be sent to you.",
+      { httpStatus: 409, fault: "customer" },
+    );
+    this.name = "DigestOperatorAddressMissingError";
+  }
+}
+
 /** A test was asked for an organization that is not enrolled in the digest. */
 export class DigestOrganizationNotEnrolledError extends HandledError {
   declare readonly code: "digest_organization_not_enrolled";

@@ -281,6 +281,7 @@ export const APP_ERROR_CODES = [
   "digest_member_not_found",
   "digest_member_unsubscribed",
   "digest_nothing_to_send",
+  "digest_operator_address_missing",
   "digest_organization_not_enrolled",
   "docs_origin_not_registered",
   "docs_playground_sessions_disabled",

@@ -597,6 +597,22 @@ describe("an operator's test send", () => {
     });
   });
 
+  describe("when the operator has no address to send to", () => {
+    it("is refused as an operator without an address and mails no one", async () => {
+      await enrol();
+      everyoneNearTheLimit();
+
+      await expect(
+        digest.sendTest({ organizationId: ORGANIZATION, userId: MEMBER, operatorId: "ghost" }),
+      ).rejects.toMatchObject({
+        code: "digest_operator_address_missing",
+        httpStatus: 409,
+        message: "Your account has no email address, so a test digest can't be sent to you.",
+      });
+      expect(digest.mail).toEqual([]);
+    });
+  });
+
   describe("when the organization is not enrolled", () => {
     /** @scenario "A test send respects enrolment" */
     it("is refused as not enrolled and mails no one", async () => {

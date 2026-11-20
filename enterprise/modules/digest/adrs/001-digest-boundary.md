@@ -124,7 +124,7 @@ baseline are swept every hour.
 
 The rules are total. `digest_member_not_found` refuses a test for someone who is not an active
 member of the organization named. `digest_nothing_to_send` refuses a test whose pick has nothing
-to show. The test send respects enrolment and opt-out: `digest_organization_not_enrolled` refuses
+to show. `digest_operator_address_missing` refuses a test when the operator has no address. The test send respects enrolment and opt-out: `digest_organization_not_enrolled` refuses
 a test for an organization not enrolled, and `digest_member_unsubscribed` one for a member who
 opted out; arming is not required. `digest_link_invalid` refuses an unsubscribe token that does
 not verify, has expired, or names a person who no longer exists, so no subscription row is

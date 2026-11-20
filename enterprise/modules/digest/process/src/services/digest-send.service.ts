@@ -4,6 +4,7 @@ import {
   DigestMemberNotFoundError,
   DigestMemberUnsubscribedError,
   DigestNothingToSendError,
+  DigestOperatorAddressMissingError,
   DigestOrganizationNotEnrolledError,
 } from "@langwatch/enterprise-digest-contract";
 import { createLogger } from "@langwatch/observability";
@@ -292,7 +293,7 @@ export class DigestSendService {
       throw new DigestMemberUnsubscribedError(userId);
     }
     const operator = await this.deps.users.findById({ id: operatorId });
-    if (!operator?.email) throw new DigestMemberNotFoundError(operatorId);
+    if (!operator?.email) throw new DigestOperatorAddressMissingError();
     const isoWeek = sendableWeek(this.deps.now());
     // The member's own view: the operator sees what the member would be sent.
     const week = await this.#visibleWeek({

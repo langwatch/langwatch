@@ -48,7 +48,8 @@ import {
 } from "@langwatch/user-contract";
 import { z } from "zod";
 
-import { MemoryDigestMailChannel } from "../../channels/memory/memory.digest.channels.ts";
+import { DigestMailChannel, type RenderedDigestMail } from "../../channels/digest-mail.channel.ts";
+import { MemoryDigestMailChannel } from "../../channels/memory/memory.digest-mail.channel.ts";
 import { MemoryDigestAudienceRepository } from "../../repositories/memory/memory.digest-audience.repository.ts";
 import { MemoryDigestRepositories } from "../../repositories/memory/memory.digest.repositories.ts";
 import { emptyProjectWeek } from "../../rules/digest-week.rules.ts";
@@ -180,7 +181,8 @@ export function installDigest(
   // The test is the outbox: the runtime's own dispatcher and wake stay paused.
   eventing.processRuntime.pause();
   const commands = DigestCommandsService.create();
-  const mail = MemoryDigestMailChannel.create();
+  const memoryMail = MemoryDigestMailChannel.create();
+  const mail = new FailsAfterAcceptingMailChannel(memoryMail);
   const now = () => Date.now() + world.clockOffsetMs;
   const users = {
     findById: async ({ id }: { id: string }) =>
@@ -347,8 +349,8 @@ export function installDigest(
     world,
     repositories,
     /** Every email handed to the mail channel, in order. */
-    mail: mail.sent,
-    /** The mail channel itself, for a test that makes it fail. */
+    mail: memoryMail.sent,
+    /** The mail channel digest sends through, for a test that makes it fail. */
     mailChannel: mail,
     unsubscribes,
     /** The hourly wake's plan of the sendable week, as the outbox carries it out. */
@@ -463,7 +465,30 @@ export function installDigest(
 
 export type InstalledDigest = ReturnType<typeof installDigest>;
 
-/** A person as the user module answers them: digest reads only the address. */
+/**
+ * The memory channel behind a wrapper that can lose the connection after the mailer accepted:
+ * the email is recorded, then the call throws once.
+ */
+class FailsAfterAcceptingMailChannel extends DigestMailChannel {
+  #failNext = false;
+
+  constructor(private readonly inner: DigestMailChannel) {
+    super();
+  }
+
+  /** The next email is taken, then the call fails. */
+  failAfterAccepting(): void {
+    this.#failNext = true;
+  }
+
+  async send(mail: RenderedDigestMail): Promise<void> {
+    await this.inner.send(mail);
+    if (!this.#failNext) return;
+    this.#failNext = false;
+    throw new Error("the connection closed after the mailer accepted the email");
+  }
+}
+
 /** A project as the project module names it; every project sits on the one team. */
 function projectIdentity(id: string) {
   return {
@@ -478,6 +503,7 @@ function projectIdentity(id: string) {
   };
 }
 
+/** A person as the user module answers them: digest reads only the address. */
 function userProfile(id: string, deactivated: boolean) {
   const at = new Date("2026-01-01T00:00:00Z");
   return {
