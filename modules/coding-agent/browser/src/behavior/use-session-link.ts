@@ -13,10 +13,12 @@ import { useCodingAgentToaster, useShowErrorToast } from "./coding-agent-feedbac
 import { useCodingAgentRouter } from "./coding-agent-router.ts";
 import type { SessionListRow } from "./session-list-row.ts";
 
-type Resolved =
-  | Readonly<{ kind: "unlisted" }>
-  | Readonly<{ kind: "failed" }>
-  | Readonly<{ kind: "turn"; turn: ConversationTurn | null; tenantId: string | undefined }>;
+type Resolved = Readonly<{ linkKey: string }> &
+  (
+    | Readonly<{ kind: "unlisted" }>
+    | Readonly<{ kind: "failed" }>
+    | Readonly<{ kind: "turn"; turn: ConversationTurn | null; tenantId: string | undefined }>
+  );
 
 /**
  * Applies each `session=` or `sessionName=` link once the list has loaded: looks the session's
@@ -38,35 +40,39 @@ export function useSessionLink({
   const link = findSessionLink(router.query);
   const linkKey = JSON.stringify({ projectId, link });
   const handledLinkRef = useRef<string | null>(null);
+  const generationRef = useRef(0);
   const [resolved, setResolved] = useState<Resolved | null>(null);
 
   useEffect(() => {
     if (link === null) {
       handledLinkRef.current = null;
+      generationRef.current += 1;
       return;
     }
     if (!isLoaded || handledLinkRef.current === linkKey) return;
     handledLinkRef.current = linkKey;
+    generationRef.current += 1;
+    const generation = generationRef.current;
     const row = sessionOfLink({ link, rows });
     if (row === null) {
-      setResolved({ kind: "unlisted" });
+      setResolved({ kind: "unlisted", linkKey });
       return;
     }
     const tenantId = memberTenantOf({ tenantId: row.tenantId, projectId });
-    // A lookup the address has moved on from answers nothing.
-    const isCurrent = () => handledLinkRef.current === linkKey;
+    // A lookup the address has moved on from answers nothing, even if it later returns to it.
+    const isCurrent = () => generationRef.current === generation;
     lastTurnOfSession({ utils, projectId, sessionId: row.sessionId, tenantId })
       .then((turn) => {
-        if (isCurrent()) setResolved({ kind: "turn", turn, tenantId });
+        if (isCurrent()) setResolved({ kind: "turn", turn, tenantId, linkKey });
       })
       .catch((error: unknown) => {
         if (!isCurrent()) return;
         showErrorToast({ error, fallbackTitle: "Couldn't open the terminal replay" });
-        setResolved({ kind: "failed" });
+        setResolved({ kind: "failed", linkKey });
       });
   }, [link, linkKey, isLoaded, rows, projectId, utils, showErrorToast]);
 
-  useAppliedSessionLink({ resolved, setResolved, projectId });
+  useAppliedSessionLink({ resolved, setResolved, projectId, linkKey });
 }
 
 /** Acts on a resolved link: opens the replay, or says why it could not, then drops the link. */
@@ -74,10 +80,12 @@ function useAppliedSessionLink({
   resolved,
   setResolved,
   projectId,
+  linkKey,
 }: {
   resolved: Resolved | null;
   setResolved: (next: null) => void;
   projectId: string;
+  linkKey: string;
 }): void {
   const router = useCodingAgentRouter();
   const toaster = useCodingAgentToaster();
@@ -85,6 +93,7 @@ function useAppliedSessionLink({
   useEffect(() => {
     if (resolved === null) return;
     setResolved(null);
+    if (resolved.linkKey !== linkKey) return;
     if (resolved.kind === "turn" && resolved.turn !== null) {
       openReplayHere({
         turn: resolved.turn,
@@ -105,5 +114,5 @@ function useAppliedSessionLink({
       sayNothingWasStored(toaster);
     }
     router.setQueryParams(withoutSessionLink(), { replace: true });
-  }, [resolved, setResolved, projectId, router, toaster]);
+  }, [resolved, setResolved, projectId, linkKey, router, toaster]);
 }
