@@ -6,8 +6,8 @@
 import { describe, expect, it } from "vitest";
 
 import { MemoryNurturingMemberSourceRepository } from "../../repositories/memory/memory.nurturing-member-source.repository.ts";
-import type { NurturingSourceMember } from "../../repositories/nurturing-member-source.repository.ts";
 import { MemoryNurturingOrganizationMemberRepository } from "../../repositories/memory/memory.nurturing-organization-member.repository.ts";
+import type { NurturingSourceMember } from "../../repositories/nurturing-member-source.repository.ts";
 import {
   NurturingMemberBackfillTask,
   runNurturingMemberBackfill,
