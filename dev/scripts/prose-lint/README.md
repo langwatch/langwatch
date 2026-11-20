@@ -79,10 +79,10 @@ The instruction wording is what the calibration tuned; the criteria matter as mu
 
 ### Where the rules come from
 
-Both files were derived on 2026-09-18 from the two Nexus wiki pages:
+Both files were derived on 2026-09-18 from two pages of the internal company wiki, now the Laze wiki of the LangWatch workspace (`laze wiki get <page>`):
 
-- `rules/docs.json` from https://nexus.langwatch.ai/wiki/docs-writing-rules
-- `rules/writing.json` from https://nexus.langwatch.ai/wiki/writing-rules
+- `rules/docs.json` from `rules/docs-writing-rules`
+- `rules/writing.json` from `rules/writing-rules`
 
 The JSON is a hand-written translation of those pages, not a generated artifact, and nothing keeps the two in sync. When either page changes, read the diff and regenerate the affected entries: a new rule becomes a new `id`, a reworded rule needs its `instruction` and its `yes` / `no` criteria rewritten from the new text, and a removed rule goes out of the file. Re-run `node calibrate.mjs` afterwards and update `CALIBRATION.md` with the new table and the date.
 
