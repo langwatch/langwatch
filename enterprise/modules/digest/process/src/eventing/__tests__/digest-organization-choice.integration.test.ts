@@ -41,8 +41,8 @@ const sendIn = ({ userId, organizationId }: { userId: string; organizationId: st
   digest.carryOut({ userId, organizationId, isoWeek: SENT_WEEK, admin: false, at: WAKE_AT });
 
 /** The week's trace count an email shows; only the traces-week template shows one. */
-const tracesOf = (mail: RenderedDigestMail) =>
-  mail.templateId === "digest-traces-week" ? tracesOf(mail) : undefined;
+const tracesOf = (mail: RenderedDigestMail): number | undefined =>
+  mail.templateId === "digest-traces-week" ? mail.props.traces : undefined;
 
 /** The send intents asked so far, waited for since the plan's requests become intents async. */
 async function asked(expected: number) {
