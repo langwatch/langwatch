@@ -4,9 +4,10 @@
  * @see enterprise/modules/nurturing/specs/coding-agent-signals.feature
  */
 import type { CioBatchCall, NurturingSignalOf } from "@langwatch/enterprise-nurturing-contract";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { CustomerIoChannel } from "../../channels/customer-io.channel.ts";
+import { HttpCustomerIoChannel } from "../../channels/http/http.customer-io.channel.ts";
 import { MemoryNurturingClaimRepository } from "../../repositories/memory/memory.nurturing.repositories.ts";
 import { NurturingOwnCodingDeliveryService } from "../nurturing-own-coding-delivery.service.ts";
 import { NurturingService } from "../nurturing.service.ts";
@@ -34,14 +35,6 @@ class FlakyChannel extends CustomerIoChannel {
   async batch(calls: CioBatchCall[]): Promise<void> {
     if (this.failing) throw new Error("Customer.io unavailable");
     this.sent.push(...calls);
-  }
-}
-
-/** Like the HTTP channel: batch swallows a failed send, only batchOrThrow rejects. */
-class SwallowingChannel extends FlakyChannel {
-  override async batch(): Promise<void> {}
-  override async batchOrThrow(): Promise<void> {
-    throw new Error("Customer.io rejected the batch");
   }
 }
 
@@ -81,12 +74,18 @@ describe("NurturingOwnCodingDeliveryService", () => {
     });
   });
 
-  describe("when the channel swallows batch failures and only batchOrThrow rejects", () => {
+  describe("when the real HTTP channel gets a 500 on batchOrThrow", () => {
     it("still gives the first-session claim back and does not throw", async () => {
       const claims = MemoryNurturingClaimRepository.create();
+      const fetchFn = vi.fn().mockResolvedValue({ ok: false, status: 500 });
       const delivery = NurturingOwnCodingDeliveryService.create({
         claims,
-        customerIo: NurturingService.create({ channel: new SwallowingChannel() }),
+        customerIo: NurturingService.create({
+          channel: HttpCustomerIoChannel.create({
+            config: { customerIoApiKey: "key" },
+            fetchFn,
+          }),
+        }),
       });
 
       await expect(delivery.deliver(ownSession)).resolves.toBeUndefined();
