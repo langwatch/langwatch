@@ -71,7 +71,7 @@ func FfmpegCacheProblems(root string) ([]string, error) {
 			problems = append(problems, fmt.Sprintf("ffmpeg key does not name %s, so a new runner image would restore stale packages", part))
 		}
 	}
-	problems = append(problems, ffmpegRestoreProblems(restore)...)
+	problems = append(problems, ffmpegRestoreProblems(&restore)...)
 	if !ffmpegArchivesOption.MatchString(install.Run) {
 		problems = append(problems, "ffmpeg install does not download into the cached directory (-o Dir::Cache::Archives=$debs)")
 	}
@@ -84,13 +84,13 @@ func FfmpegCacheProblems(root string) ([]string, error) {
 	if install.ContinueOnError != nil {
 		problems = append(problems, "ffmpeg install sets continue-on-error, so a failed install would not stop the job")
 	}
-	for _, step := range []ciscan.Step{key, restore, install} {
+	for _, step := range []*ciscan.Step{&key, &restore, &install} {
 		problems = append(problems, mediaGateProblems(step)...)
 	}
 	return append(problems, ffmpegSaveProblems(steps)...), nil
 }
 
-func ffmpegRestoreProblems(restore ciscan.Step) []string {
+func ffmpegRestoreProblems(restore *ciscan.Step) []string {
 	var problems []string
 	if got, _ := restore.With["key"].(string); got != ffmpegKeyOutput {
 		problems = append(problems, fmt.Sprintf("ffmpeg restore key is %q, want %q", got, ffmpegKeyOutput))
@@ -101,7 +101,7 @@ func ffmpegRestoreProblems(restore ciscan.Step) []string {
 	return problems
 }
 
-func mediaGateProblems(step ciscan.Step) []string {
+func mediaGateProblems(step *ciscan.Step) []string {
 	var problems []string
 	for _, gate := range mediaCacheHitGates {
 		if !strings.Contains(step.If, gate) {
@@ -134,5 +134,5 @@ func ffmpegSaveProblems(steps []ciscan.Step) []string {
 	if strings.Contains(save.If, "always()") || strings.Contains(save.If, "failure()") || strings.Contains(save.If, "cancelled()") {
 		problems = append(problems, "ffmpeg save runs after a failed install, so a half download could be cached")
 	}
-	return append(problems, mediaGateProblems(save)...)
+	return append(problems, mediaGateProblems(&save)...)
 }

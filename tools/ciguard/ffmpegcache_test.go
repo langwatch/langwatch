@@ -105,7 +105,9 @@ func TestFfmpegFailedInstallSavesNothing(t *testing.T) {
 // @scenario "An exact docs-media cache hit skips the ffmpeg steps"
 func TestFfmpegStepsSkipOnADocsMediaHit(t *testing.T) {
 	for _, gate := range mediaCacheHitGates {
-		ungated := strings.ReplaceAll(goodFfmpegAction, " && "+gate, "")
+		// The gate leads some conditions and trails others.
+		ungated := strings.ReplaceAll(strings.ReplaceAll(goodFfmpegAction, gate+" && ", ""), " && "+gate, "")
+		assert.NotEqual(t, goodFfmpegAction, ungated, gate)
 		assert.NotEmpty(t, ffmpegProblems(t, ungated), gate)
 	}
 }
