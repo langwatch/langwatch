@@ -747,6 +747,32 @@ describe("the personal Sessions table", () => {
       expect(writtenQueries()).toEqual([{}]);
     });
 
+    /** @scenario "A session link opens that session's terminal replay" */
+    it("drops a lookup the project moved on from while the new list loads", async () => {
+      let failFirst: (error: Error) => void = () => {};
+      utils.traces.conversationContext.fetch
+        .mockReturnValueOnce(
+          new Promise((_, reject) => {
+            failFirst = reject;
+          }),
+        )
+        .mockReturnValue(new Promise(() => {}));
+      const { rerender } = renderTable({ session: "session-1" });
+      await waitFor(() => expect(utils.traces.conversationContext.fetch).toHaveBeenCalled());
+
+      queryImpls["codingAgents.sessionsList"] = () => ({
+        data: undefined,
+        isLoading: true,
+        isError: false,
+        isFetched: false,
+      });
+      rerender(<SessionsTable projectId="proj-other" projectSlug="acme-other" />);
+      failFirst(new Error("clickhouse is down"));
+
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      expect(host.recording.failures).toEqual([]);
+    });
+
     it("reports a failed lookup rather than opening an empty replay", async () => {
       utils.traces.conversationContext.fetch.mockRejectedValue(new Error("clickhouse is down"));
       const user = userEvent.setup();

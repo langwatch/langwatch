@@ -41,17 +41,21 @@ export function useSessionLink({
   const linkKey = JSON.stringify({ projectId, link });
   const handledLinkRef = useRef<string | null>(null);
   const generationRef = useRef(0);
+  const seenLinkRef = useRef<string | null>(null);
   const [resolved, setResolved] = useState<Resolved | null>(null);
 
   useEffect(() => {
+    // A new project or link makes every lookup still in flight stale, even while the list loads.
+    if (seenLinkRef.current !== linkKey) {
+      seenLinkRef.current = linkKey;
+      generationRef.current += 1;
+    }
     if (link === null) {
       handledLinkRef.current = null;
-      generationRef.current += 1;
       return;
     }
     if (!isLoaded || handledLinkRef.current === linkKey) return;
     handledLinkRef.current = linkKey;
-    generationRef.current += 1;
     const generation = generationRef.current;
     const row = sessionOfLink({ link, rows });
     if (row === null) {
@@ -59,7 +63,6 @@ export function useSessionLink({
       return;
     }
     const tenantId = memberTenantOf({ tenantId: row.tenantId, projectId });
-    // A lookup the address has moved on from answers nothing, even if it later returns to it.
     const isCurrent = () => generationRef.current === generation;
     lastTurnOfSession({ utils, projectId, sessionId: row.sessionId, tenantId })
       .then((turn) => {
