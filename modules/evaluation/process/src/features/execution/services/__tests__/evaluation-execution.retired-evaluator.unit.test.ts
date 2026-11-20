@@ -5,6 +5,7 @@ import { HandledError } from "@langwatch/handled-error";
  * failure has to name it: a bare throw reaches the customer as a generic
  * "unknown error". @see specs/npx-installer/07-lean-install.feature
  */
+import type { ProjectApi } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
@@ -54,6 +55,7 @@ function run() {
     decisionModels: { resolveDecisionModel: async () => ({ kind: "langwatch" }) },
     judgeRouting: { isRouted: async () => false, isHostedOff: async () => false },
     monitorJudgments: { recall: async () => ({ kind: "not_kept" }), keep: async () => undefined },
+    projects: createApiFixture<ProjectApi>({ findOrganizationId: async () => "organization-1" }),
     installEnvironment: {},
   };
 

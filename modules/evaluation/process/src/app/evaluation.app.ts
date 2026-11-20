@@ -444,15 +444,12 @@ export class EvaluationModule implements EvaluationApiContract {
       workflowExecutor: WorkflowEvaluationService.create(dependencies.workflows),
       judges: dependencies.judges,
       decisionModels: dependencies.modelProviders,
-      judgeRouting: EvaluationJudgeRoutingService.create({
-        flags: dependencies.featureFlags,
-        projects: dependencies.projects,
-      }),
+      judgeRouting: EvaluationJudgeRoutingService.create({ flags: dependencies.featureFlags }),
       monitorJudgments: EvaluationMonitorJudgmentsService.create({
         results: channels.instantEvalResults,
         flags: dependencies.featureFlags,
-        projects: dependencies.projects,
       }),
+      projects: dependencies.projects,
       installEnvironment: environment.read(),
       telemetry,
     });

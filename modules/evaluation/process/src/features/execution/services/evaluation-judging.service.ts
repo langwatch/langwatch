@@ -13,6 +13,7 @@ import {
   type InstantEvalJudgeRouteRequest,
 } from "@langwatch/instant-eval-judge-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 import type { Trace } from "@langwatch/trace-contract";
 
 import { instantEvalGuardrailSkipOf } from "../../../rules/instant-eval-guardrail-skip.rules.ts";
@@ -42,13 +43,18 @@ type EvaluationJudgingDeps = Readonly<{
   judgeRouting: EvaluationJudgeRouting;
   /** A monitor's kept verdicts, behind `release_instant_eval_results` (ADR-189 section 5). */
   monitorJudgments: Pick<EvaluationMonitorJudgmentsService, "recall" | "keep">;
+  /** The project's organization, looked up at most once per judge call for every flag read. */
+  projects: Pick<ProjectApi, "findOrganizationId">;
 }>;
+
+/** The project and its organization, which every organization-ruled flag is read for. */
+type EvaluationFlagTarget = { projectId: string; organizationId: string | undefined };
 
 export type EvaluationJudgeRouting = Readonly<{
   /** The judge router flag (ADR-190 decision 8). */
-  isRouted: (input: { projectId: string }) => Promise<boolean>;
+  isRouted: (input: EvaluationFlagTarget) => Promise<boolean>;
   /** Whether LangWatch switched its hosted model off for the organization, whatever its plan. */
-  isHostedOff: (input: { projectId: string }) => Promise<boolean>;
+  isHostedOff: (input: EvaluationFlagTarget) => Promise<boolean>;
 }>;
 
 /** What an LLM-as-judge evaluator asks the router for; the table picks its slot and mode. */
@@ -121,6 +127,10 @@ export class EvaluationJudgingService {
     const request = buildInstantEvalJudgeRequest({ judge, inputs });
     if (request.kind === "nothing_to_judge") return instantEvalSkipResultOf("nothing_to_judge");
 
+    // One lookup per call, made only when a flag read needs it, never cached across calls.
+    let organization: Promise<string | undefined> | undefined;
+    const organizationOf = () =>
+      (organization ??= this.deps.projects.findOrganizationId(projectId));
     const resolved = await this.deps.decisionModels.resolveDecisionModel({
       projectId,
       ...(decisionModel === undefined ? {} : { model: decisionModel }),
@@ -132,12 +142,16 @@ export class EvaluationJudgingService {
     // An organization LangWatch keeps on its own models never reaches the hosted judge.
     if (
       resolved.kind === "langwatch" &&
-      (await this.deps.judgeRouting.isHostedOff({ projectId }))
+      (await this.deps.judgeRouting.isHostedOff({
+        projectId,
+        organizationId: await organizationOf(),
+      }))
     ) {
       return instantEvalSkipResultOf("classifier_not_configured");
     }
     const recall = await this.deps.monitorJudgments.recall({
       projectId,
+      organizationOf,
       monitor,
       traceId: trace?.trace_id,
       occurredAt: trace?.timestamps.started_at,
@@ -151,7 +165,11 @@ export class EvaluationJudgingService {
     }
     // An own decision model is never routed, so the flag is read on LangWatch's model only.
     const isRouted =
-      resolved.kind === "langwatch" && (await this.deps.judgeRouting.isRouted({ projectId }));
+      resolved.kind === "langwatch" &&
+      (await this.deps.judgeRouting.isRouted({
+        projectId,
+        organizationId: await organizationOf(),
+      }));
     const answer = await this.deps.judges.judge({
       projectId,
       text: request.text,

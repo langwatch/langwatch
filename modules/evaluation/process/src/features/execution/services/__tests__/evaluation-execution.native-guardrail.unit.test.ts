@@ -5,6 +5,7 @@ import {
   type NativeEvaluatorExecutionInput,
   type SingleEvaluationResult,
 } from "@langwatch/evaluator-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, type Mock, vi } from "vitest";
 
@@ -70,6 +71,7 @@ function buildService(langevalsEvaluate: Mock<LangevalsEvaluatorService["evaluat
     decisionModels: { resolveDecisionModel: async () => ({ kind: "langwatch" }) },
     judgeRouting: { isRouted: async () => false, isHostedOff: async () => false },
     monitorJudgments: { recall: async () => ({ kind: "not_kept" }), keep: async () => undefined },
+    projects: createApiFixture<ProjectApi>({ findOrganizationId: async () => "organization-1" }),
     installEnvironment: {},
   };
 

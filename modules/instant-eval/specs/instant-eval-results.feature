@@ -17,7 +17,9 @@ Feature: Every trace-linked Instant Evals result is kept, and recalled before ju
     id) or monitor (the monitor id), and carries the project's trace retention.
   - A monitor's row keys on the trace alone and a hash of its mapped input, output and contexts,
     with judged column "monitor"; a thread-level monitor is not kept. The flag read and each
-    eval_results call a monitor makes are bounded by 300 ms.
+    eval_results call a monitor makes are bounded by 300 ms. The flag reuses the judge call's one
+    organization lookup, so on LangWatch's judge the flag off adds no query, only the cached flag
+    read.
 
   # ============================================================================
   # The key
@@ -246,6 +248,12 @@ Feature: Every trace-linked Instant Evals result is kept, and recalled before ju
     Given a write to eval_results that fails
     When the monitor evaluates a trace
     Then the judged verdict and its cost are still reported
+
+  @unit
+  Scenario: A monitor's judge call looks up its organization once for every flag it reads
+    Given a monitor on LangWatch's judge, whose router reads its own flags
+    When it evaluates a trace with release_instant_eval_results on
+    Then the router and kept-results flags are read from one organization lookup
 
   @unit
   Scenario: A monitor whose flag read times out is judged as today

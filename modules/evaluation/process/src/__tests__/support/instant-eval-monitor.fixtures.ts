@@ -9,6 +9,7 @@ import {
   type InstantEvalJudgeApi,
   type InstantEvalJudgeCall,
 } from "@langwatch/instant-eval-judge-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { Trace } from "@langwatch/trace-contract";
 import { vi } from "vitest";
@@ -16,6 +17,7 @@ import { vi } from "vitest";
 import { EvaluationExecutionIntentService } from "../../features/execution/services/evaluation-execution-intent.service.ts";
 import { EvaluationExecutionReceiptService } from "../../features/execution/services/evaluation-execution-receipt.service.ts";
 import { EvaluationExecutionService } from "../../features/execution/services/evaluation-execution.service.ts";
+import type { EvaluationJudgeRouting } from "../../features/execution/services/evaluation-judging.service.ts";
 import type { EvaluationMonitorJudgmentsService } from "../../features/execution/services/evaluation-monitor-judgments.service.ts";
 import {
   buildExecutionDeps,
@@ -49,10 +51,14 @@ function traceOf({ projectId, traceId }: { projectId: string; traceId: string })
 export function buildInstantEvalMonitor({
   judge,
   monitorJudgments = NOT_KEPT,
+  judgeRouting = { isRouted: async () => false, isHostedOff: async () => false },
+  projects = createApiFixture<ProjectApi>({ findOrganizationId: async () => "organization-1" }),
   traceId = "trace-evaluation-test",
 }: {
   judge: Judge;
   monitorJudgments?: Pick<EvaluationMonitorJudgmentsService, "recall" | "keep">;
+  judgeRouting?: EvaluationJudgeRouting;
+  projects?: Pick<ProjectApi, "findOrganizationId">;
   traceId?: string;
 }) {
   const calls: InstantEvalJudgeCall[] = [];
@@ -93,8 +99,9 @@ export function buildInstantEvalMonitor({
       },
     },
     decisionModels: { resolveDecisionModel: async () => ({ kind: "langwatch" }) },
-    judgeRouting: { isRouted: async () => false, isHostedOff: async () => false },
+    judgeRouting,
     monitorJudgments,
+    projects,
     installEnvironment: {},
   });
   const costRecorder = new TestCostRecorder();

@@ -6,6 +6,7 @@
 import type { EvaluationApi, EvaluationCostRecord } from "@langwatch/evaluation-contract";
 import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import type { InstantEvalJudgeApi } from "@langwatch/instant-eval-judge-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 
 import { EvaluationExecutionService } from "../../features/execution/services/evaluation-execution.service.ts";
@@ -45,6 +46,7 @@ export function instantEvalGuardrailCheckOver({
     decisionModels: { resolveDecisionModel: async () => ({ kind: "langwatch" }) },
     judgeRouting: { isRouted: async () => false, isHostedOff: async () => false },
     monitorJudgments: { recall: async () => ({ kind: "not_kept" }), keep: async () => undefined },
+    projects: createApiFixture<ProjectApi>({ findOrganizationId: async () => "organization-1" }),
     installEnvironment: {},
   });
   const check = EvaluationGuardrailCheckService.create({

@@ -20,6 +20,7 @@ import {
 } from "@langwatch/evaluator-contract";
 import type { InstantEvalJudgeApi } from "@langwatch/instant-eval-judge-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 import type { Protections, Trace, TraceApi } from "@langwatch/trace-contract";
 
 import type { EvaluationRunRepository } from "../../../repositories/evaluation.repository.ts";
@@ -86,6 +87,8 @@ export interface EvaluationExecutionDeps {
   judgeRouting: EvaluationJudgeRouting;
   /** A monitor's kept Instant Evals verdicts, behind `release_instant_eval_results` (ADR-189). */
   monitorJudgments: Pick<EvaluationMonitorJudgmentsService, "recall" | "keep">;
+  /** The project's organization, looked up at most once per judge call for every flag read. */
+  projects: Pick<ProjectApi, "findOrganizationId">;
   /**
    * The install environment the optional evaluators read their opt-out
    * switches from. Stated by the process rather than read here, because a

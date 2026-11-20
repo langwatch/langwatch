@@ -4,9 +4,10 @@
  * @see modules/instant-eval/specs/instant-eval-results.feature
  */
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
-import type {
-  InstantEvalMonitorJudgementAnswer,
-  InstantEvalMonitorJudgment,
+import {
+  INSTANT_EVAL_RESULTS_FLAG,
+  type InstantEvalMonitorJudgementAnswer,
+  type InstantEvalMonitorJudgment,
 } from "@langwatch/instant-eval-contract";
 import type {
   InstantEvalJudgeApi,
@@ -18,6 +19,7 @@ import { describe, expect, it } from "vitest";
 
 import type { EvaluationInstantEvalResults } from "../channels/evaluation-instant-eval-results.channel.ts";
 import { MemoryEvaluationInstantEvalResultsChannel } from "../channels/memory/memory.evaluation-instant-eval-results.channel.ts";
+import { EvaluationJudgeRoutingService } from "../features/execution/services/evaluation-judge-routing.service.ts";
 import { EvaluationMonitorJudgmentsService } from "../features/execution/services/evaluation-monitor-judgments.service.ts";
 import { buildExecuteCommand } from "./support/evaluation-execution.fixtures.ts";
 import { buildInstantEvalMonitor, reportedOf } from "./support/instant-eval-monitor.fixtures.ts";
@@ -52,7 +54,10 @@ class ScriptedInstantEvalResults implements EvaluationInstantEvalResults {
   }
 }
 
-/** The real gate over a results channel, with the flag answered as the test says. */
+/**
+ * The real gate over a results channel. The kept-results flag answers as the test says; every
+ * other flag (the judge router's) reads off. `flags` is shared so the router can read it too.
+ */
 function monitorJudgmentsWith({
   results,
   isFlagOn = true,
@@ -65,18 +70,31 @@ function monitorJudgmentsWith({
   timeoutMs?: number;
 }) {
   const flagReads: string[] = [];
+  const flags = createApiFixture<FeatureFlagApi>({
+    isEnabled: (flagKey) => {
+      flagReads.push(flagKey);
+      if (flagKey !== INSTANT_EVAL_RESULTS_FLAG) return Promise.resolve(false);
+      return isFlagHanging ? new Promise<boolean>(() => undefined) : Promise.resolve(isFlagOn);
+    },
+  });
   const judgments = EvaluationMonitorJudgmentsService.create({
     results,
-    flags: createApiFixture<FeatureFlagApi>({
-      isEnabled: (flagKey) => {
-        flagReads.push(flagKey);
-        return isFlagHanging ? new Promise<boolean>(() => undefined) : Promise.resolve(isFlagOn);
-      },
-    }),
-    projects: createApiFixture<ProjectApi>({ findOrganizationId: async () => "organization-1" }),
+    flags,
     ...(timeoutMs === undefined ? {} : { timeoutMs }),
   });
-  return { judgments, flagReads };
+  return { judgments, flags, flagReads };
+}
+
+/** The project's organization, counting every lookup. */
+function countedProjects() {
+  const lookups: string[] = [];
+  const projects = createApiFixture<ProjectApi>({
+    findOrganizationId: async (projectId) => {
+      lookups.push(projectId);
+      return "organization-1";
+    },
+  });
+  return { projects, lookups };
 }
 
 function monitorCommand({
@@ -114,6 +132,54 @@ describe("Instant Evals judge on a monitor, with kept results", () => {
         expect(flagged.calls).toHaveLength(2);
         expect(reportedOf(again).passed).toBe(true);
         expect(reportedOf(events)).toEqual(reportedOf(todays));
+      });
+    });
+  });
+
+  describe("given a monitor on LangWatch's judge, whose router reads its flags too", () => {
+    describe("when it evaluates a trace with release_instant_eval_results on", () => {
+      /** @scenario "A monitor's judge call looks up its organization once for every flag it reads" */
+      it("reads the router and kept-results flags from one organization lookup", async () => {
+        const results = MemoryEvaluationInstantEvalResultsChannel.create();
+        const { judgments, flags, flagReads } = monitorJudgmentsWith({ results });
+        const { projects, lookups } = countedProjects();
+        const { handler, calls } = buildInstantEvalMonitor({
+          judge: politeJudge,
+          monitorJudgments: judgments,
+          judgeRouting: EvaluationJudgeRoutingService.create({ flags }),
+          projects,
+        });
+
+        await handler.handle(monitorCommand({ evaluationId: "eval-1" }));
+
+        expect(lookups).toEqual(["project-evaluation-test"]);
+        expect(flagReads).toEqual([
+          "instant_evals_hosted_disabled",
+          INSTANT_EVAL_RESULTS_FLAG,
+          "release_instant_evals_judge_router",
+        ]);
+        expect(calls).toHaveLength(1);
+        expect(results.calls.map((call) => call.operation)).toEqual(["find", "keep"]);
+      });
+    });
+
+    describe("when it evaluates a trace with release_instant_eval_results off", () => {
+      it("adds no lookup to the router's and asks instant-eval nothing", async () => {
+        const results = MemoryEvaluationInstantEvalResultsChannel.create();
+        const { judgments, flags } = monitorJudgmentsWith({ results, isFlagOn: false });
+        const { projects, lookups } = countedProjects();
+        const { handler, calls } = buildInstantEvalMonitor({
+          judge: politeJudge,
+          monitorJudgments: judgments,
+          judgeRouting: EvaluationJudgeRoutingService.create({ flags }),
+          projects,
+        });
+
+        await handler.handle(monitorCommand({ evaluationId: "eval-1" }));
+
+        expect(lookups).toHaveLength(1);
+        expect(calls).toHaveLength(1);
+        expect(results.calls).toEqual([]);
       });
     });
   });
@@ -157,6 +223,7 @@ describe("Instant Evals judge on a monitor, with kept results", () => {
 
         const recall = await judgments.recall({
           projectId: "project-evaluation-test",
+          organizationOf: async () => "organization-1",
           monitor: { id: "monitor-test", isGuardrail: false, isThreadLevel: true },
           traceId: "trace-evaluation-test",
           occurredAt: 0,
