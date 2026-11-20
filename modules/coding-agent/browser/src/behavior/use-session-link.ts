@@ -36,7 +36,7 @@ export function useSessionLink({
   const showErrorToast = useShowErrorToast();
   const router = useCodingAgentRouter();
   const link = findSessionLink(router.query);
-  const linkKey = JSON.stringify(link);
+  const linkKey = JSON.stringify({ projectId, link });
   const handledLinkRef = useRef<string | null>(null);
   const [resolved, setResolved] = useState<Resolved | null>(null);
 
@@ -53,9 +53,14 @@ export function useSessionLink({
       return;
     }
     const tenantId = memberTenantOf({ tenantId: row.tenantId, projectId });
+    // A lookup the address has moved on from answers nothing.
+    const isCurrent = () => handledLinkRef.current === linkKey;
     lastTurnOfSession({ utils, projectId, sessionId: row.sessionId, tenantId })
-      .then((turn) => setResolved({ kind: "turn", turn, tenantId }))
+      .then((turn) => {
+        if (isCurrent()) setResolved({ kind: "turn", turn, tenantId });
+      })
       .catch((error: unknown) => {
+        if (!isCurrent()) return;
         showErrorToast({ error, fallbackTitle: "Couldn't open the terminal replay" });
         setResolved({ kind: "failed" });
       });
