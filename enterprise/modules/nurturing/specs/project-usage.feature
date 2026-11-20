@@ -177,6 +177,14 @@ Feature: Per-email usage reaches Customer.io from nurturing's own project rows
     Then no evaluation-day row is added or changed
     And no old usage row is changed
 
+  @integration
+  Scenario: The copy skips an evaluation row whose active days are not a list
+    Given an evaluation usage row with a list of active days
+    And evaluation usage rows whose active days are an object and a string
+    When the migration's copy runs
+    Then it succeeds
+    And nurturing's evaluation-day copy holds only the listed row's days
+
   @unit @integration
   Scenario: A trace is its root span, counted on its project's day
     Given root spans of a project's traces appended on one UTC day

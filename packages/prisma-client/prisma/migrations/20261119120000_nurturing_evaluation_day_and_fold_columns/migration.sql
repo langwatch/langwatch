@@ -17,7 +17,7 @@
 --
 -- Spec: enterprise/modules/nurturing/specs/project-usage.feature
 --
--- IRREVERSIBLE: there is no down migration. It reverses by hand:
+-- Not reversed automatically (there is no down migration); the manual reverse is:
 --
 --   DROP TABLE "NurturingProjectEvaluationDay";
 --   ALTER TABLE "NurturingOrganizationPlan" DROP COLUMN "winnerEventId", DROP COLUMN "appliedEventIds";
@@ -37,7 +37,13 @@ CREATE TABLE IF NOT EXISTS "NurturingProjectEvaluationDay" (
 INSERT INTO "NurturingProjectEvaluationDay" ("projectId", "day")
 SELECT usage."projectId", days.day
 FROM "NurturingProjectUsageView" AS usage
-CROSS JOIN LATERAL jsonb_array_elements_text(usage."folded" -> 'activeDays') AS days(day)
+-- The guard sits inside the function's input because SQL may call the function before any WHERE
+-- filter, and a non-array activeDays would then abort the migration.
+CROSS JOIN LATERAL jsonb_array_elements_text(
+  CASE WHEN jsonb_typeof(usage."folded" -> 'activeDays') = 'array'
+    THEN usage."folded" -> 'activeDays'
+    ELSE '[]'::jsonb
+  END
+) AS days(day)
 WHERE usage."owner" = 'evaluation'
-  AND jsonb_typeof(usage."folded" -> 'activeDays') = 'array'
 ON CONFLICT DO NOTHING;

@@ -65,8 +65,16 @@ describe.skipIf(!databaseUrl)("the nurturing evaluation-day copy migration", () 
   const NO_DAYS = `project-none-${ns}`;
   const OTHER_OWNER = `project-prompt-${ns}`;
   const projectIds = [TWO_DAYS, THREE_DAYS, NO_DAYS, OTHER_OWNER];
+  const VALID_DAYS = `project-valid-${ns}`;
+  const OBJECT_DAYS = `project-object-${ns}`;
+  const STRING_DAYS = `project-string-${ns}`;
+  const malformedCaseIds = [VALID_DAYS, OBJECT_DAYS, STRING_DAYS];
   const updatedAt = new Date("2026-11-01T00:00:00.000Z");
-  const usage = (projectId: string, owner: string, activeDays: string[]) => ({
+  const usage = (
+    projectId: string,
+    owner: string,
+    activeDays: string[] | Record<string, string> | string,
+  ) => ({
     projectId,
     owner,
     folded: { projectId, activeDays },
@@ -87,11 +95,13 @@ describe.skipIf(!databaseUrl)("the nurturing evaluation-day copy migration", () 
   });
 
   afterAll(async () => {
-    if (!prisma) return;
+    if (!connection) return;
+    const seeded = [...projectIds, ...malformedCaseIds];
     await prisma.nurturingProjectEvaluationDay.deleteMany({
-      where: { projectId: { in: projectIds } },
+      where: { projectId: { in: seeded } },
     });
-    await prisma.nurturingProjectUsageView.deleteMany({ where: { projectId: { in: projectIds } } });
+    await prisma.nurturingProjectUsageView.deleteMany({ where: { projectId: { in: seeded } } });
+    await connection.closeOnce();
   });
 
   const oldRows = () =>
@@ -131,5 +141,24 @@ describe.skipIf(!databaseUrl)("the nurturing evaluation-day copy migration", () 
 
     expect(await newRows()).toEqual(rows);
     expect(await oldRows()).toEqual(before);
+  });
+
+  /** @scenario The copy skips an evaluation row whose active days are not a list */
+  it("copies a valid evaluation row's days and skips rows whose active days are an object or a string", async () => {
+    await prisma.nurturingProjectUsageView.createMany({
+      data: [
+        usage(VALID_DAYS, "evaluation", ["2026-11-06"]),
+        usage(OBJECT_DAYS, "evaluation", { day: "2026-11-07" }),
+        usage(STRING_DAYS, "evaluation", "2026-11-08"),
+      ],
+    });
+
+    await prisma.$executeRawUnsafe(copyScopedTo({ projectIds: malformedCaseIds }));
+
+    const copied = await prisma.nurturingProjectEvaluationDay.findMany({
+      where: { projectId: { in: malformedCaseIds } },
+      orderBy: [{ projectId: "asc" }, { day: "asc" }],
+    });
+    expect(copied.map((row) => [row.projectId, row.day])).toEqual([[VALID_DAYS, "2026-11-06"]]);
   });
 });
