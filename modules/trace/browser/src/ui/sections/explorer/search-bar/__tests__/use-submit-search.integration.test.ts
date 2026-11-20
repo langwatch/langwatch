@@ -405,6 +405,22 @@ describe("given the text is an eval chip typed by hand", () => {
       expect(run).not.toHaveProperty("typedQuery");
     });
 
+    /** @scenario "A NOT the run of a typed chip cannot answer is refused" */
+    it.each([
+      'NOT eval:"the user is annoyed" OR status:error',
+      'NOT (eval:"the user is annoyed" AND status:error)',
+    ])("refuses %s with a warning rather than rebuilding it", (queryText) => {
+      useFilterStore.getState().applyQueryText("model:gpt-5-mini");
+      const { result } = renderSubmit({ isInstantEvalAvailable: false });
+      act(() => result.current.submitSearch(queryText));
+      expect(handlers.onInstantEval).not.toHaveBeenCalled();
+      expect(mutation.mutate).not.toHaveBeenCalled();
+      expect(useFilterStore.getState().queryText).toBe("model:gpt-5-mini");
+      expect(toast).toHaveBeenCalledWith(
+        expect.objectContaining({ title: "This NOT cannot be judged as typed", type: "warning" }),
+      );
+    });
+
     /** @scenario "A chip typed by hand starts its run on Enter" */
     it("keeps the typed text when only another chip is under an OR", () => {
       const { result } = renderSubmit();

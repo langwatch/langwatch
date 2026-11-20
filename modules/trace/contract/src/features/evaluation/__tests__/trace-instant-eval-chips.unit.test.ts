@@ -6,6 +6,8 @@ import { describe, expect, it } from "vitest";
 
 import {
   hasInstantEvalChipUnderOr,
+  hasNegatedInstantEvalChipUnderOr,
+  isInstantEvalChipNegated,
   instantEvalChipsOf,
   instantEvalChipText,
   instantEvalRunKey,
@@ -192,6 +194,38 @@ describe("hasInstantEvalChipUnderOr", () => {
     expect(under('NOT (eval:"the user" AND status:error)')).toBe(true);
     expect(under('NOT (status:error AND (eval:"the  user"))')).toBe(true);
     expect(under('status:error AND NOT (eval:"the user")')).toBe(false);
+  });
+});
+
+describe("hasNegatedInstantEvalChipUnderOr", () => {
+  const refused = (queryText: string, question = "q") =>
+    hasNegatedInstantEvalChipUnderOr({ queryText, field: "eval", question });
+
+  /** @scenario "A NOT the run of a typed chip cannot answer is refused" */
+  it("refuses a NOT on the chip under an OR, and a NOT over a group holding it", () => {
+    expect(refused('NOT eval:"q" OR status:error')).toBe(true);
+    expect(refused('NOT (eval:"q" AND status:error)')).toBe(true);
+    expect(refused('NOT (eval:"q" OR status:error)')).toBe(true);
+  });
+
+  /** @scenario "A NOT the run of a typed chip cannot answer is refused" */
+  it("leaves a NOT on the chip beside AND, an OR without NOT, and another chip alone", () => {
+    expect(refused('status:error AND NOT eval:"q"')).toBe(false);
+    expect(refused('status:error OR eval:"q"')).toBe(false);
+    expect(refused('NOT eval:"b" AND (status:error OR eval:"q")')).toBe(false);
+    expect(refused('NOT eval:"b" OR status:error')).toBe(false);
+  });
+});
+
+describe("isInstantEvalChipNegated", () => {
+  /** @scenario "A pending chip under NOT is not judged yet" */
+  it("finds a NOT above the named chip at any depth, and only that chip", () => {
+    const negated = (queryText: string, question = "q") =>
+      isInstantEvalChipNegated({ queryText, field: "eval", question });
+    expect(negated('NOT eval:"q"')).toBe(true);
+    expect(negated('status:error AND NOT (eval:"q")')).toBe(true);
+    expect(negated('eval:"q" AND NOT status:error')).toBe(false);
+    expect(negated('NOT eval:"b" AND eval:"q"')).toBe(false);
   });
 });
 

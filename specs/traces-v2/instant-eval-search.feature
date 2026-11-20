@@ -40,12 +40,20 @@ Feature: Instant Evals inside the Trace Explorer
       And the run is estimated and started on the question as written, with the other terms as its filter
       And no model rewrites the question on the way, since the reader wrote it
       And a chip spelled `eval.conversation:` keeps judging conversations, whatever the lens shows
-      And a chip typed under NOT keeps its NOT, so the run lists the rows the judge did not match
+      And a chip typed under NOT keeps its NOT, so the run lists the rows it judged and did not pass
       And a chip under an OR, or under a NOT over other terms, is rebuilt beside them, as its run judges only those
+      And a chip a NOT reaches from there is refused instead, as no rebuild keeps what was typed
       And the same question under another target is another chip, kept in the filter of the run that starts
       And a chip a run already answered is applied with no call at all
       And a refusal leaves the typed chip where it is rather than replacing it with a phrase search
       And "Judge these results" under an empty table starts the same run the same way
+
+    @integration
+    Scenario: A NOT the run of a typed chip cannot answer is refused
+      Given the reader types `NOT eval:"the user is annoyed" OR status:error` or `NOT (eval:"the user is annoyed" AND status:error)`
+      When Enter is pressed
+      Then a warning says a NOT on an eval chip must sit beside the other terms with AND
+      And nothing is searched and no run is estimated or started, whether Instant Evals are on or off
 
     @unit
     Scenario: A space belongs to the question being typed
@@ -128,6 +136,13 @@ Feature: Instant Evals inside the Trace Explorer
       When the chips are resolved
       Then the chip is reported as pending and no evalRuns entry is sent for it
 
+    @integration
+    Scenario: A pending chip under NOT is not judged yet
+      Given a chip `NOT eval:"the user is annoyed"` and no run under its key
+      When the table and the counts read the results
+      Then the table shows "These results are not judged yet" rather than every row as a non-match
+      And the counts read zero, as no row was judged
+
   Rule: tRPC wraps the run service for the Explorer
 
     @unit
@@ -204,7 +219,8 @@ Feature: Instant Evals inside the Trace Explorer
     Scenario: A negated eval chip keeps the traces the judge did not match
       Given a query negating an eval chip with a registered run
       When the filter is compiled
-      Then the verdict subquery is negated whole
+      Then it keeps the rows whose latest verdict for the run is a judged "no", and no row that passed
+      And a row the run never judged, past the cap, after a stop or newer than the run, is left out
 
     @unit
     Scenario: A target modifier only resolves a run of that target

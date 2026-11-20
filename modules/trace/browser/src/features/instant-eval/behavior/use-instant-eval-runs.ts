@@ -1,4 +1,4 @@
-import { resolveInstantEvalChips } from "@langwatch/trace-contract";
+import { isInstantEvalChipNegated, resolveInstantEvalChips } from "@langwatch/trace-contract";
 import { useMemo } from "react";
 
 import { useFilterStore, useViewStore } from "../../../behavior/explorer.store.ts";
@@ -35,5 +35,19 @@ export function useInstantEvalRuns(): InstantEvalRunsResult {
         runsByKey: runsByKey ?? {},
       }),
     [queryText, lensId, timeRange.from, timeRange.to, timeRange.presetId, runsByKey],
+  );
+}
+
+/**
+ * Whether a chip with no run has a `NOT` above it. It negates nothing judged, so
+ * the reads would list every row; the table shows it as not judged instead.
+ */
+export function useHasPendingNegatedEval(): boolean {
+  const queryText = useFilterStore((s) => s.debouncedQueryText) ?? "";
+  const { chips } = useInstantEvalRuns();
+  return chips.some(
+    (chip) =>
+      chip.runId === null &&
+      isInstantEvalChipNegated({ queryText, field: chip.field, question: chip.question }),
   );
 }

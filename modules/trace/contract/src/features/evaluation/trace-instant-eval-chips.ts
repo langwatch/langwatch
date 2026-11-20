@@ -218,6 +218,60 @@ function tagsUnderNegatedGroup(
   return found;
 }
 
+/** Every tag with a `NOT` anywhere above it, whatever the parity. */
+function tagsUnderNot(
+  ast: LiqeQuery,
+  inNot = false,
+  found: Set<LiqeQuery> = new Set(),
+): Set<LiqeQuery> {
+  if (ast.type === "Tag") {
+    if (inNot) found.add(ast);
+  } else if (ast.type === "UnaryOperator") {
+    tagsUnderNot(ast.operand, true, found);
+  } else if (ast.type === "ParenthesizedExpression") {
+    tagsUnderNot(ast.expression, inNot, found);
+  } else if (ast.type === "LogicalExpression") {
+    tagsUnderNot(ast.left, inNot, found);
+    tagsUnderNot(ast.right, inNot, found);
+  }
+  return found;
+}
+
+/** Whether one of `nodes` is the chip `field:question`, spacing aside. */
+function holdsChip({
+  nodes,
+  field,
+  question,
+}: {
+  nodes: Iterable<LiqeQuery>;
+  field: string;
+  question: string;
+}): boolean {
+  const wanted = question.replace(/\s+/g, " ").trim();
+  return [...nodes].some(
+    (node) =>
+      node.type === "Tag" &&
+      node.field.type === "Field" &&
+      node.field.name === field &&
+      node.expression.type === "LiteralExpression" &&
+      String(node.expression.value).replace(/\s+/g, " ").trim() === wanted,
+  );
+}
+
+/** The parsed query, or null when it does not parse. */
+function parseOrNull(queryText: string): LiqeQuery | null {
+  try {
+    return parse(queryText.trim());
+  } catch {
+    return null;
+  }
+}
+
+/** The tags under an `OR`, or under a `NOT` that spans other terms. */
+function tangledTags(ast: LiqeQuery): Set<LiqeQuery> {
+  return new Set([...tagsUnderOr(ast), ...tagsUnderNegatedGroup(ast)]);
+}
+
 /**
  * Whether the chip `field:question` sits below an `OR`, or below a `NOT` that
  * spans other terms too (`NOT (a AND b)` is `NOT a OR NOT b`). Its run judges
@@ -232,22 +286,45 @@ export function hasInstantEvalChipUnderOr({
   field: string;
   question: string;
 }): boolean {
-  let tangled: LiqeQuery[];
-  try {
-    const ast = parse(queryText.trim());
-    tangled = [...tagsUnderOr(ast), ...tagsUnderNegatedGroup(ast)];
-  } catch {
-    return false;
-  }
-  const wanted = question.replace(/\s+/g, " ").trim();
-  return tangled.some(
-    (node) =>
-      node.type === "Tag" &&
-      node.field.type === "Field" &&
-      node.field.name === field &&
-      node.expression.type === "LiteralExpression" &&
-      String(node.expression.value).replace(/\s+/g, " ").trim() === wanted,
-  );
+  const ast = parseOrNull(queryText);
+  return ast !== null && holdsChip({ nodes: tangledTags(ast), field, question });
+}
+
+/**
+ * Whether the chip is tangled as above and a `NOT` reaches it too. No rebuild
+ * beside the other terms keeps that meaning, so such a chip is refused.
+ */
+export function hasNegatedInstantEvalChipUnderOr({
+  queryText,
+  field,
+  question,
+}: {
+  queryText: string;
+  field: string;
+  question: string;
+}): boolean {
+  const ast = parseOrNull(queryText);
+  if (ast === null) return false;
+  const negated = tagsUnderNot(ast);
+  const nodes = [...tangledTags(ast)].filter((node) => negated.has(node));
+  return holdsChip({ nodes, field, question });
+}
+
+/**
+ * Whether a `NOT` reaches the chip `field:question`. With no run behind it such a
+ * chip negates nothing judged, so it would list every row as a non-match.
+ */
+export function isInstantEvalChipNegated({
+  queryText,
+  field,
+  question,
+}: {
+  queryText: string;
+  field: string;
+  question: string;
+}): boolean {
+  const ast = parseOrNull(queryText);
+  return ast !== null && holdsChip({ nodes: tagsUnderNot(ast), field, question });
 }
 
 /**

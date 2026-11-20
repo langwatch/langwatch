@@ -67,11 +67,30 @@ describe("given an eval chip with a registered run", () => {
     });
 
     /** @scenario "A negated eval chip keeps the traces the judge did not match" */
-    it("negates the verdict subquery under NOT", () => {
+    it("keeps only judged rows whose latest verdict did not pass, under NOT", () => {
       const result = compile('NOT eval:"the user is annoyed"', [run()]);
-      expect(result?.sql).toMatch(
-        /^\(\(TenantId, TraceId\) NOT IN \(SELECT TenantId, TraceId FROM instant_eval_judgments/,
+      const where = `${tenantSet()} AND RunId = {evalRun_0:String} AND CreatedAt >= fromUnixTimestamp64Milli({evalWrittenFrom_1:Int64}) AND CreatedAt <= fromUnixTimestamp64Milli({evalWrittenUntil_2:Int64})`;
+      const group = "GROUP BY TenantId, TraceId, SpanId, QuestionId";
+      // A row the run never judged (past the cap, after a stop, newer than the run) is in neither
+      // set, so it is not listed as a non-match.
+      expect(result?.sql).toBe(
+        `(((TenantId, TraceId) IN (SELECT TenantId, TraceId FROM instant_eval_judgments WHERE ${where} ${group} HAVING argMax(coalesce(Passed, 2), UpdatedAt) = 0))` +
+          ` AND ((TenantId, TraceId) NOT IN (SELECT TenantId, TraceId FROM instant_eval_judgments WHERE ${where} ${group} HAVING argMax(Passed, UpdatedAt) = 1)))`,
       );
+    });
+
+    /** @scenario "A negated eval chip keeps the traces the judge did not match" */
+    it("keeps only judged conversations that did not pass, for a threads run under NOT", () => {
+      const result = compile('NOT eval.conversation:"the user is annoyed"', [
+        run({ target: "threads" }),
+      ]);
+      expect(result?.sql).toMatch(
+        /^\(\(\(TenantId, Attributes\['gen_ai\.conversation\.id'\]\) IN \(SELECT/,
+      );
+      expect(result?.sql).toContain(
+        "HAVING argMax(coalesce(Passed, 2), UpdatedAt) = 0 AND MatchedThreadId != ''",
+      );
+      expect(result?.sql).toContain(") NOT IN (SELECT TenantId, argMax(ThreadId, UpdatedAt)");
     });
 
     it("matches the question by its words, whatever the spacing", () => {

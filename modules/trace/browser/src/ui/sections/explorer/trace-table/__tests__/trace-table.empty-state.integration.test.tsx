@@ -55,6 +55,10 @@ let mockGrouping: "flat" | "by-conversation" = "flat";
 // rewrites when the server refused it as too complex.
 const mockFilterState = {
   queryText: "",
+  // The debounced copy the eval chips are resolved from; no run is registered.
+  debouncedQueryText: "",
+  debouncedTimeRange: { from: 1_000, to: 2_000 },
+  evalRuns: {},
   timeRange: { from: Date.now() - 3600000, to: Date.now(), label: "Last 1h" },
   clearAll: vi.fn(),
   setTimeRange: vi.fn(),
@@ -176,6 +180,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   mockGrouping = "flat";
   mockFilterState.queryText = "";
+  mockFilterState.debouncedQueryText = "";
   mockTraceListResult = {
     data: [],
     totalHits: 0,
@@ -274,6 +279,27 @@ describe("<TraceTable /> empty-state gating", () => {
         expect(screen.getByTestId("trace-lens-body")).toBeInTheDocument();
       });
     });
+  });
+});
+
+describe("<TraceTable /> pending NOT eval chip", () => {
+  /** @scenario "A pending chip under NOT is not judged yet" */
+  it.each([
+    ['NOT eval:"the user is annoyed"', true],
+    ['status:error AND NOT eval:"the user is annoyed"', true],
+    ['eval:"the user is annoyed" AND NOT status:error', false],
+  ])("with %s, shows the not-judged state instead of rows: %s", (queryText, notJudged) => {
+    mockFilterState.debouncedQueryText = queryText;
+    mockTraceListResult = {
+      ...mockTraceListResult,
+      data: [{ traceId: "trace-abc-123" }] as typeof mockTraceListResult.data,
+      totalHits: 1,
+    };
+
+    renderTable();
+
+    expect(screen.queryByTestId("empty-filter-state") !== null).toBe(notJudged);
+    expect(screen.queryByTestId("trace-lens-body") !== null).toBe(!notJudged);
   });
 });
 

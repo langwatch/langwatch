@@ -3,6 +3,7 @@ import type { ExplorerSearchClassification } from "@langwatch/instant-eval-contr
 import {
   combineQueries,
   hasInstantEvalChipUnderOr,
+  hasNegatedInstantEvalChipUnderOr,
   isRouteKind,
   type ModelTrouble,
   queryWithoutInstantEvalChip,
@@ -42,6 +43,14 @@ interface UseSubmitSearchOptions {
    */
   onSupersede: () => void;
 }
+
+/** The toast for a typed chip whose `NOT` no run can answer; nothing is searched. */
+const UNJUDGEABLE_NOT_TOAST = {
+  title: "This NOT cannot be judged as typed",
+  description:
+    "An Instant Eval judges only the rows the other terms keep, so a NOT on its chip " +
+    'must sit beside them with AND, as in status:error AND NOT eval:"...".',
+};
 
 /** What the toast adds when the router itself could not be reached. */
 const PHRASE_INSTEAD_NOTE = "The words were searched as a phrase instead.";
@@ -150,9 +159,9 @@ function useApplyRoute({
 }
 
 /**
- * The run a typed eval chip asks for, or null when every chip already has one.
- * The question is judged as written, with no model between Enter and the
- * estimate, and the fallback is the query as typed so a refusal leaves it be.
+ * The run a typed eval chip asks for, or null when every chip already has one. The question is
+ * judged as written, and the fallback is the query as typed so a refusal leaves it be. A chip a
+ * `NOT` reaches from above an `OR` or a group is unjudgeable.
  */
 function typedEvalRunOf({
   queryText,
@@ -160,7 +169,7 @@ function typedEvalRunOf({
 }: {
   queryText: string;
   projectId: string;
-}): InstantEvalRoutePayload | null {
+}): InstantEvalRoutePayload | "unjudgeable" | null {
   // Read from the store at submit time, not from the debounced copy: the chip
   // just typed is matched against the window and lens the search will run in.
   const { activeLensId, timeRange, evalRuns } = useFilterStore.getState();
@@ -176,6 +185,8 @@ function typedEvalRunOf({
   });
   const pending = chips.find((chip) => chip.runId === null);
   if (!pending) return null;
+  const chip = { queryText, field: pending.field, question: pending.question };
+  if (hasNegatedInstantEvalChipUnderOr(chip)) return "unjudgeable";
   return {
     projectId,
     sentence: pending.question,
@@ -187,9 +198,7 @@ function typedEvalRunOf({
       question: pending.question,
     }),
     fallbackQuery: queryText,
-    ...(hasInstantEvalChipUnderOr({ queryText, field: pending.field, question: pending.question })
-      ? {}
-      : { typedQuery: queryText }),
+    ...(hasInstantEvalChipUnderOr(chip) ? {} : { typedQuery: queryText }),
     timeRange: { from: timeRange.from, to: timeRange.to },
   };
 }
@@ -308,6 +317,7 @@ function useRouteSubmit({
 
 /** Where a submit goes, once the typed-eval run and the sentence are known. */
 type SubmitPath =
+  | { kind: "unjudgeable" }
   | { kind: "refuse"; run: InstantEvalRoutePayload }
   | { kind: "filter"; run: InstantEvalRoutePayload | null }
   | { kind: "requote" }
@@ -315,8 +325,8 @@ type SubmitPath =
 
 /**
  * The routing decision for a non-empty submit, in the order a reader checks by hand: a typed chip
- * the deployment cannot run is refused first; a text with no bare words is a filter; a bare-word
- * text with no project is requoted; anything left routes.
+ * no run can answer is refused first, then one the deployment cannot run; a text with no bare
+ * words is a filter; a bare-word text with no project is requoted; anything left routes.
  */
 function submitPathOf({
   trimmed,
@@ -326,9 +336,10 @@ function submitPathOf({
 }: {
   trimmed: string;
   projectId: string | null;
-  run: InstantEvalRoutePayload | null;
+  run: InstantEvalRoutePayload | "unjudgeable" | null;
   isInstantEvalAvailable: boolean;
 }): SubmitPath {
+  if (run === "unjudgeable") return { kind: "unjudgeable" };
   if (run && !isInstantEvalAvailable) return { kind: "refuse", run };
   const { sentence } = splitBareWords(trimmed);
   if (!sentence) return { kind: "filter", run };
@@ -399,6 +410,10 @@ export function useSubmitSearch({
         isInstantEvalAvailable,
       });
       switch (path.kind) {
+        case "unjudgeable":
+          // Nothing is searched or started: any rebuild would change what was typed.
+          toaster.create({ ...UNJUDGEABLE_NOT_TOAST, type: "warning" });
+          return;
         case "refuse":
           // Nothing is searched: the typed chip stays in the bar under the
           // popover that says why the run did not start.

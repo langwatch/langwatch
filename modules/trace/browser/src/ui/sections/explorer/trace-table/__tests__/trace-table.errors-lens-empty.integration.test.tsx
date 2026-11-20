@@ -51,6 +51,7 @@ vi.mock("../../../../../features/explorer/behavior/use-explorer-counts.ts", () =
 }));
 vi.mock("../../../../../features/instant-eval/behavior/use-instant-eval-runs.ts", () => ({
   useInstantEvalRuns: () => ({ chips: [] }),
+  useHasPendingNegatedEval: () => false,
 }));
 vi.mock("../trace-lens-body.tsx", () => ({
   TraceLensBody: () => <div data-testid="trace-lens-body" />,

@@ -63,15 +63,18 @@ function compileRun({
   ctx.params[fromParam] = run.writtenFrom;
   ctx.params[untilParam] = run.writtenUntil;
 
-  return wrapMembership(
+  const membership = (verdict: "passed" | "not_passed") =>
     instantEvalJudgmentsSubquery({
       by: run.target === "threads" ? "conversation" : "trace",
       runParam,
       fromParam,
       untilParam,
-    }),
-    negated,
-  );
+      verdict,
+    });
+  if (!negated) return membership("passed");
+  // NOT keeps only rows the run judged and did not pass: a row past the cap, after a stop
+  // or newer than the run was never judged, so it is no non-match either.
+  return `(${membership("not_passed")} AND ${wrapMembership(membership("passed"), true)})`;
 }
 
 /**

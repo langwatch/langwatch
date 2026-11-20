@@ -7,7 +7,10 @@ import {
   selectInstantEvalRunPhase,
   useInstantEvalRunStore,
 } from "../../instant-eval/behavior/instant-eval-run.store.ts";
-import { useInstantEvalRuns } from "../../instant-eval/behavior/use-instant-eval-runs.ts";
+import {
+  useHasPendingNegatedEval,
+  useInstantEvalRuns,
+} from "../../instant-eval/behavior/use-instant-eval-runs.ts";
 import { useSessionGroups } from "./use-session-groups.ts";
 import { useTraceListQuery } from "./use-trace-list-query.ts";
 
@@ -55,9 +58,11 @@ export function useExplorerCounts(): ExplorerCounts {
   const list = useTraceListQuery();
   const sessions = useSessionGroups();
   const byConversation = useExplorerStore((s) => s.grouping) === "by-conversation";
+  // The rows a pending NOT chip lists were never judged, so none of them count.
+  const hasPendingNegatedEval = useHasPendingNegatedEval();
   const pageTraceIds = useMemo(
-    () => (byConversation ? [] : list.data.map((trace) => trace.traceId)),
-    [byConversation, list.data],
+    () => (byConversation || hasPendingNegatedEval ? [] : list.data.map((trace) => trace.traceId)),
+    [byConversation, hasPendingNegatedEval, list.data],
   );
   const { chips } = useInstantEvalRuns();
   const runs = useInstantEvalRunStore((s) => s.runs);
@@ -68,7 +73,7 @@ export function useExplorerCounts(): ExplorerCounts {
     [chips, runs, stoppedByUser, settled],
   );
 
-  const counts = byConversation
+  const read = byConversation
     ? {
         totalHits: sessions.totalHits,
         itemNoun: "conversations" as const,
@@ -83,6 +88,7 @@ export function useExplorerCounts(): ExplorerCounts {
         isFetching: list.isFetching,
         isPlaceholderData: list.isPlaceholderData,
       };
+  const counts = hasPendingNegatedEval ? { ...read, totalHits: 0 } : read;
 
   // The store keeps the last answer so a reader of the page state (Langy's
   // `explorer.getState`) sees the count the page shows.

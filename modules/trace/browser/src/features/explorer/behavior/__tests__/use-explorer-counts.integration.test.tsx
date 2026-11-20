@@ -39,11 +39,12 @@ vi.mock("../use-session-groups.ts", () => ({
   SESSIONS_MAX_PAGE_SIZE: 100,
 }));
 
-import { useExplorerStore } from "../../../../behavior/explorer.store.ts";
+import { useExplorerStore, useFilterStore } from "../../../../behavior/explorer.store.ts";
 import { useExplorerCounts } from "../use-explorer-counts.ts";
 
 beforeEach(() => {
   useExplorerStore.setState({ grouping: "flat" });
+  useFilterStore.setState({ debouncedQueryText: "" });
 });
 
 describe("useExplorerCounts", () => {
@@ -88,6 +89,15 @@ describe("useExplorerCounts", () => {
         instantEval: null,
         summary: "7 conversations",
       });
+    });
+  });
+
+  describe("given a NOT eval chip with no run behind it", () => {
+    /** @scenario "A pending chip under NOT is not judged yet" */
+    it("counts none of the rows it lists, since none was judged", () => {
+      useFilterStore.setState({ debouncedQueryText: 'NOT eval:"the user is annoyed"' });
+      const { result } = renderHook(() => useExplorerCounts());
+      expect(result.current).toMatchObject({ totalHits: 0, pageTraceIds: [], summary: "0 traces" });
     });
   });
 });
