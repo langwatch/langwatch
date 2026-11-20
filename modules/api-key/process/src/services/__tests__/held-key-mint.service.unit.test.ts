@@ -36,6 +36,7 @@ function createFixture({
   beforeActivate?: (row: ApiKeyRow) => void;
 }) {
   const start = Date.now();
+  const reopened: CreateHeldApiKeyInput["key"][] = [];
   const memory = MemoryApiKeyDatabase.create();
   const repository = MemoryApiKeyRepository.create({ memory });
   const disabled = (
@@ -79,7 +80,10 @@ function createFixture({
       id: string;
       token: string;
       input: CreateHeldApiKeyInput["key"];
-    }) => disabled(id, token, input),
+    }) => {
+      reopened.push(input);
+      return disabled(id, token, input);
+    },
     grantAndActivate: async (key: DisabledApiKey) => {
       // The real grant waits out the authz fold before it gives up.
       await vi.advanceTimersByTimeAsync(GRANT_WAIT_MS);
@@ -93,6 +97,7 @@ function createFixture({
   return {
     repository,
     memory,
+    reopened,
     rows: () => memory.keys(),
     service: HeldKeyMintService.create({
       sharedKeys: SharedKeyMintService.create({ apiKeys, keys: repository }),
@@ -154,6 +159,21 @@ describe("HeldKeyMintService", () => {
     expect(rows()).toHaveLength(1);
     // The first try only wrote the key; the retry that activated it is the one mint.
     expect(second).toMatchObject({ apiKeyId: rows()[0]?.id, created: true });
+  });
+
+  /** @scenario "A held key is written once and handed to a retry with its pending grant" */
+  it("describes a reopened key with the expiry its row was written with", async () => {
+    const { service, rows, reopened } = createFixture({ landsAtMs: 45_000 });
+    const written = keyInput();
+    await service.createHeld({ holdKey: "run-1", key: written }).catch(() => undefined);
+    const later = { ...keyInput(), expiresAt: new Date("2026-10-01T18:00:00.000Z") };
+
+    await attempts(() => service.createHeld({ holdKey: "run-1", key: later }));
+
+    expect(rows()[0]?.expiresAt?.epochMilliseconds).toBe(written.expiresAt.getTime());
+    expect(reopened.map(({ expiresAt }) => expiresAt.getTime())).toEqual([
+      written.expiresAt.getTime(),
+    ]);
   });
 
   it("reports the call that activated the key as the one that created it", async () => {

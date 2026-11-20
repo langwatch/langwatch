@@ -5,6 +5,7 @@ import type { SharedCredentialStore } from "@langwatch/secrets/shared-credential
 import { Temporal, nowInstant } from "@langwatch/time";
 
 import type { ApiKeyRepository } from "../repositories/api-key.repository.ts";
+import { isKeyLive } from "../rules/api-key-held-answer.rules.ts";
 import { scopeOf } from "../rules/api-key-own-grant-ids.rules.ts";
 import { isRunKeyReusable } from "../rules/run-key.rules.ts";
 import type { SharedKeyMintService } from "./shared-key-mint.service.ts";
@@ -54,16 +55,12 @@ export class HeldKeyMintService {
       address: { tenantId: key.organizationId, contentKey: holdKey },
       identity: identityOf(key),
       newExpiresAt: () => Temporal.Instant.fromEpochMilliseconds(key.expiresAt.getTime()),
-      keyFor: () => key,
+      keyFor: (expiresAt) => ({ ...key, expiresAt: new Date(expiresAt.epochMilliseconds) }),
       reusable: ({ expiresAtMs }) =>
         isRunKeyReusable({ expiresAtMs, nowMs: nowInstant().epochMilliseconds, minRemainingMs }),
       isLive: async (apiKeyId) => {
         const row = await keys.findLivenessById({ id: apiKeyId });
-        return (
-          row !== null &&
-          row.revokedAt === null &&
-          (row.expiresAt === null || Temporal.Instant.compare(row.expiresAt, nowInstant()) > 0)
-        );
+        return row !== null && isKeyLive({ key: row, now: nowInstant() });
       },
       retryAfterMs: HELD_KEY_GRANT_RETRY_AFTER_MS,
     });
