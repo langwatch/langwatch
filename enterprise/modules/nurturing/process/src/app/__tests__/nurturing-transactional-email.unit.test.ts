@@ -11,7 +11,7 @@ import {
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import { ScopedSecrets, SecretsChain, SecretsResolver } from "@langwatch/secrets";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import type { UserApi } from "@langwatch/user-contract";
+import type { UserApi, UserProfile } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";
 
 import type { CustomerIoTransactionalChannel } from "../../channels/customer-io-transactional.channel.ts";
@@ -39,10 +39,11 @@ const email: TransactionalEmail = {
 /** The real module, built with a transactional Customer.io channel or without one. */
 function moduleWith(
   customerIoTransactional: CustomerIoTransactionalChannel | undefined,
+  users: Partial<UserApi> = { findByEmail: async () => null },
 ): Promise<NurturingModule> {
   return NurturingModule.create({
     dependencies: {
-      users: createApiFixture<UserApi>({}, "UserApi"),
+      users: createApiFixture<UserApi>(users, "UserApi"),
       organizations: createApiFixture<OrganizationApi>({}, "OrganizationApi"),
     },
     config,
@@ -92,6 +93,44 @@ describe("given nurturing holding the Customer.io App API key", () => {
         status: 429,
       });
     });
+  });
+});
+
+describe("given the address belongs to a LangWatch user", () => {
+  it("files the send under the user id and sends no address identifier", async () => {
+    const channel = MemoryCustomerIoTransactionalChannel.create();
+    const app = await moduleWith(channel, {
+      findByEmail: async () => ({ id: "user-1" }) as UserProfile,
+    });
+
+    await app.sendTransactionalEmail(email);
+
+    expect(channel.sent).toEqual([{ ...email, identifiers: { id: "user-1" } }]);
+  });
+});
+
+describe("given the address belongs to no user", () => {
+  it("files the send under the address", async () => {
+    const channel = MemoryCustomerIoTransactionalChannel.create();
+    const app = await moduleWith(channel);
+
+    await app.sendTransactionalEmail(email);
+
+    expect(channel.sent).toEqual([{ ...email, identifiers: { email: "ada@acme.test" } }]);
+  });
+});
+
+describe("given the user lookup throws", () => {
+  it("still sends, by address", async () => {
+    const channel = MemoryCustomerIoTransactionalChannel.create();
+    const app = await moduleWith(channel, {
+      findByEmail: async () => {
+        throw new Error("database down");
+      },
+    });
+
+    await expect(app.sendTransactionalEmail(email)).resolves.toMatchObject({ outcome: "queued" });
+    expect(channel.sent).toEqual([{ ...email, identifiers: { email: "ada@acme.test" } }]);
   });
 });
 

@@ -1,9 +1,8 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-import type { TransactionalEmail } from "@langwatch/enterprise-nurturing-contract";
-
 import {
   CustomerIoTransactionalChannel,
   CustomerIoTransactionalError,
+  type CustomerIoTransactionalRequest,
 } from "../customer-io-transactional.channel.ts";
 
 const API_HOSTS = { eu: "api-eu.customer.io", us: "api.customer.io" } as const;
@@ -42,7 +41,7 @@ export class HttpCustomerIoTransactionalChannel extends CustomerIoTransactionalC
     super();
   }
 
-  async send(email: TransactionalEmail): Promise<{ deliveryId: string }> {
+  async send(email: CustomerIoTransactionalRequest): Promise<{ deliveryId: string }> {
     let response: Response;
     try {
       response = await this.fetchFn(this.url, {
@@ -79,7 +78,7 @@ export class HttpCustomerIoTransactionalChannel extends CustomerIoTransactionalC
  * link would pass them through Customer.io's click tracker. `send_to_unsubscribed` because these
  * are transactional: a person who left the marketing list still gets their own account's mail.
  */
-function payloadOf(email: TransactionalEmail) {
+function payloadOf(email: CustomerIoTransactionalRequest) {
   return {
     transactional_message_id: email.transactionalMessageId,
     identifiers: email.identifiers,

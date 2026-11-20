@@ -12,7 +12,7 @@ const transactionalEmailSchemaDefinition = z
   .object({
     /** The trigger name of the transactional message in Customer.io. */
     transactionalMessageId: z.string().min(1),
-    /** The person Customer.io files the delivery under, by bare address. */
+    /** The recipient's bare address; nurturing files the delivery under the user's id when it belongs to a user. */
     identifiers: z.object({ email: z.string().min(1) }).strict(),
     to: z.string().min(1),
     from: z.string().min(1),

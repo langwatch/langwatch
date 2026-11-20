@@ -49,7 +49,8 @@ fallback. Nurturing holds `CUSTOMER_IO_APP_API_KEY` and posts to `/v1/send/email
 [customer-io-transactional.feature](specs/customer-io-transactional.feature).
 
 - **One message per recipient**, with our own subject and HTML, link tracking off, the person
-  identified by address. A replyless send keeps the real recipient and answers to the no-reply
+  filed under the user's id when the address belongs to a user, else by address (nurturing
+  looks it up). A replyless send keeps the real recipient and answers to the no-reply
   address.
 - **Any refusal falls back.** A non-2xx reply, a timeout (10 s), a network error or an unreadable
   reply sends that recipient through the install's own mailer, once, with a warning naming the

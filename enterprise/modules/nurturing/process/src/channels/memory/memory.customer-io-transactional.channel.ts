@@ -1,12 +1,10 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-import type {
-  TransactionalEmail,
-  TransactionalEmailRefusal,
-} from "@langwatch/enterprise-nurturing-contract";
+import type { TransactionalEmailRefusal } from "@langwatch/enterprise-nurturing-contract";
 
 import {
   CustomerIoTransactionalChannel,
   CustomerIoTransactionalError,
+  type CustomerIoTransactionalRequest,
 } from "../customer-io-transactional.channel.ts";
 
 /** How a scripted send fails, as the HTTP client reports each kind. */
@@ -24,7 +22,7 @@ export class MemoryCustomerIoTransactionalChannel extends CustomerIoTransactiona
     return new MemoryCustomerIoTransactionalChannel();
   }
 
-  readonly sent: TransactionalEmail[] = [];
+  readonly sent: CustomerIoTransactionalRequest[] = [];
 
   private failure: CustomerIoScriptedFailure | undefined;
 
@@ -38,7 +36,7 @@ export class MemoryCustomerIoTransactionalChannel extends CustomerIoTransactiona
     return this;
   }
 
-  async send(email: TransactionalEmail): Promise<{ deliveryId: string }> {
+  async send(email: CustomerIoTransactionalRequest): Promise<{ deliveryId: string }> {
     this.sent.push(email);
     if (this.failure) {
       throw new CustomerIoTransactionalError(this.failure.reason, this.failure.status);

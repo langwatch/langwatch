@@ -54,7 +54,8 @@ Each package has one root export. Nurturing serves no route: the contract's
 `NurturingApi` carries `recordSignal` and `sendTransactionalEmail`. The second
 sends one transactional email for another module through Customer.io and
 answers `queued`, `refused` or `off`; it never throws on a Customer.io refusal,
-so the caller can send the email another way.
+so the caller can send the email another way. Nurturing files the send under the
+user's id when the address belongs to a user, else by address.
 
 ## Dependencies
 

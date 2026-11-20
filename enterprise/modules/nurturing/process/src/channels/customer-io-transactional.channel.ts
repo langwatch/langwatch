@@ -22,7 +22,15 @@ export class CustomerIoTransactionalError extends Error {
   }
 }
 
+/**
+ * What reaches Customer.io: the caller's message, filed under the person nurturing already
+ * created (`id`, the LangWatch user id) or, for an address with no account, under the address.
+ */
+export type CustomerIoTransactionalRequest = Omit<TransactionalEmail, "identifiers"> & {
+  identifiers: { id: string } | { email: string };
+};
+
 /** Customer.io's transactional email API: hands one rendered message over, or throws. */
 export abstract class CustomerIoTransactionalChannel {
-  abstract send(email: TransactionalEmail): Promise<{ deliveryId: string }>;
+  abstract send(email: CustomerIoTransactionalRequest): Promise<{ deliveryId: string }>;
 }

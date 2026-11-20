@@ -178,6 +178,7 @@ export class NurturingModule implements NurturingApi {
       traceCounting,
       transactionalEmail: NurturingTransactionalEmailService.create({
         channel: channels.customerIoTransactional,
+        users: dependencies.users,
       }),
     });
   }
