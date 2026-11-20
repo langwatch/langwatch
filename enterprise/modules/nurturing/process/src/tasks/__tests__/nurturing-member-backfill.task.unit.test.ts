@@ -26,7 +26,10 @@ function setup() {
     },
   });
   const members = MemoryNurturingOrganizationMemberRepository.create();
-  return { peers: { source, members }, members };
+  const organizations = {
+    listAllIds: async () => ({ ids: ["org-1", "org-2"], next: null }),
+  };
+  return { peers: { organizations, source, members }, members };
 }
 
 const rows = (members: MemoryNurturingOrganizationMemberRepository) =>
@@ -149,6 +152,32 @@ describe("runNurturingMemberBackfill", () => {
       expect(outcome.dryRun.aborted).toBe(true);
       expect(await rows(members)).toEqual([]);
     });
+  });
+});
+
+describe("runNurturingMemberBackfill over several organization pages", () => {
+  it("handles every organization and asks for the second page after the first page's next", async () => {
+    const { peers, members } = setup();
+    const asked: (string | undefined)[] = [];
+    const organizations = {
+      listAllIds: async (input?: { after?: string }) => {
+        asked.push(input?.after);
+        return input?.after === undefined
+          ? { ids: ["org-1"], next: "org-1" }
+          : { ids: ["org-2"], next: null };
+      },
+    };
+
+    const outcome = await runNurturingMemberBackfill({
+      peers: { ...peers, organizations },
+      execute: true,
+      signal,
+    });
+
+    // The dry run pages first, then the real run pages again.
+    expect(asked).toEqual([undefined, "org-1", undefined, "org-1"]);
+    expect(outcome.executed).toMatchObject({ organizations: 2, created: 3 });
+    expect(await rows(members)).toHaveLength(3);
   });
 });
 

@@ -7,9 +7,9 @@ import type {
 } from "../nurturing-member-source.repository.ts";
 
 /** Only the shared delegates this reader touches; it claims no table (R40). */
-type PrismaNurturingMemberSourceDatabase = Pick<PrismaClient, "organization" | "organizationUser">;
+type PrismaNurturingMemberSourceDatabase = Pick<PrismaClient, "organizationUser">;
 
-/** Organization's `Organization` and `OrganizationUser` rows, through shares (R40). */
+/** Organization's `OrganizationUser` rows, through a share (R40). */
 export class PrismaNurturingMemberSourceRepository implements NurturingMemberSourceRepository {
   private constructor(private readonly prisma: PrismaNurturingMemberSourceDatabase) {}
 
@@ -19,19 +19,6 @@ export class PrismaNurturingMemberSourceRepository implements NurturingMemberSou
     prisma: PrismaNurturingMemberSourceDatabase;
   }>): PrismaNurturingMemberSourceRepository {
     return new PrismaNurturingMemberSourceRepository(prisma);
-  }
-
-  async findOrganizationIds({
-    after,
-    limit,
-  }: Readonly<{ after?: string; limit: number }>): Promise<string[]> {
-    const rows = await this.prisma.organization.findMany({
-      select: { id: true },
-      orderBy: { id: "asc" },
-      take: limit,
-      ...(after === undefined ? {} : { where: { id: { gt: after } } }),
-    });
-    return rows.map(({ id }) => id);
   }
 
   async findActiveMembers({

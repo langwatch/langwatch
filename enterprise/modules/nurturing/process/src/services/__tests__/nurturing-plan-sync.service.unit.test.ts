@@ -216,7 +216,12 @@ describe("NurturingPlanSyncService", () => {
           "org-a": [{ userId: "alice", joinedAt: 2_000 }],
         },
       });
-      await NurturingMemberBackfillService.create({ peers: { source, members } }).backfill({
+      const organizations = {
+        listAllIds: async () => ({ ids: ["org-a", "org-b"], next: null }),
+      };
+      await NurturingMemberBackfillService.create({
+        peers: { organizations, source, members },
+      }).backfill({
         dryRun: false,
         signal: new AbortController().signal,
       });

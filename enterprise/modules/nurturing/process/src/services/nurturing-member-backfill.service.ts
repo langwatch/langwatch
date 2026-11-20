@@ -3,12 +3,13 @@
  * Copies each organization's current members into nurturing's member copy, which only member
  * facts wrote until now. Spec: enterprise/modules/nurturing/specs/organization-member-facts.feature
  */
+import { ORGANIZATION_ID_PAGE_LIMIT, type OrganizationApi } from "@langwatch/organization-contract";
+
 import type { NurturingMemberSourceRepository } from "../repositories/nurturing-member-source.repository.ts";
 import type { NurturingOrganizationMemberRepository } from "../repositories/nurturing-organization-member.repository.ts";
 
-const ORGANIZATIONS_PER_PAGE = 100;
-
 export type NurturingMemberBackfillPeers = Readonly<{
+  organizations: Pick<OrganizationApi, "listAllIds">;
   source: NurturingMemberSourceRepository;
   members: Pick<
     NurturingOrganizationMemberRepository,
@@ -57,18 +58,17 @@ export class NurturingMemberBackfillService {
       alreadyPresent: 0,
     };
     let after: string | undefined;
-    let ids: string[];
     do {
-      ids = await this.peers.source.findOrganizationIds({
+      const page = await this.peers.organizations.listAllIds({
         after,
-        limit: ORGANIZATIONS_PER_PAGE,
+        limit: ORGANIZATION_ID_PAGE_LIMIT,
       });
-      for (const organizationId of ids) {
+      for (const organizationId of page.ids) {
         if (signal.aborted) return totals;
         await this.#backfillOrganization({ organizationId, dryRun, totals });
       }
-      after = ids.at(-1);
-    } while (ids.length >= ORGANIZATIONS_PER_PAGE);
+      after = page.next ?? undefined;
+    } while (after !== undefined);
     return totals;
   }
 

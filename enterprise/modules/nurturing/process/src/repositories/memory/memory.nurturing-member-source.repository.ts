@@ -20,16 +20,6 @@ export class MemoryNurturingMemberSourceRepository implements NurturingMemberSou
     >,
   ) {}
 
-  async findOrganizationIds({
-    after,
-    limit,
-  }: Readonly<{ after?: string; limit: number }>): Promise<string[]> {
-    return Object.keys(this.membersByOrganization)
-      .toSorted()
-      .filter((id) => after === undefined || id > after)
-      .slice(0, limit);
-  }
-
   async findActiveMembers({
     organizationId,
   }: Readonly<{ organizationId: string }>): Promise<NurturingSourceMember[]> {

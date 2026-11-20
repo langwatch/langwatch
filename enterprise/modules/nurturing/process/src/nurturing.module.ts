@@ -22,8 +22,12 @@ export const nurturingProcessModule: PublishedProcessModule<
   .withEventing(nurturingProjectUsageEventing)
   .withEventing(nurturingTraceWindowEndEventing)
   // Hand-run after the rollout, dry run unless --execute: the member copy was never backfilled.
-  .withTasks(({ repositories }) => [
+  .withTasks(({ repositories, dependencies }) => [
     NurturingMemberBackfillTask.create({
-      peers: { source: repositories.memberSource, members: repositories.members },
+      peers: {
+        organizations: dependencies.organizations,
+        source: repositories.memberSource,
+        members: repositories.members,
+      },
     }),
   ]);

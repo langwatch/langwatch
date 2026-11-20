@@ -45,6 +45,10 @@ https://github.com/langwatch/tasks/issues/1131:
   in `process/src/services/nurturing-member-facts.service.ts`, and
   `OrganizationApi.getAllMembers` in
   `process/src/services/nurturing-coding-milestones.service.ts`.
+- `process/src/repositories/prisma/prisma.nurturing-member-source.repository.ts`
+  reads the `OrganizationUser` table for an organization's active members and when they
+  joined, for the one-off member backfill; `OrganizationApi` does not expose a member's
+  user deactivation.
 - `UserApi.findById` in `process/src/services/nurturing-delivery.service.ts`, for
   a person's email and name when the signup is sent.
 
