@@ -920,7 +920,7 @@ Permission `analytics:view`. Declared at `src/transport/graph.rest.ts:40`.
 Answers at `/api/graphs`, `/api/v1/graphs`; also, undocumented, `/api/graphs/2026-08-07`, `/api/v1/graphs/2026-08-07`, `/api/graphs/latest`, `/api/v1/graphs/latest`.
 
 ```typescript
-// Query: graphRestListQuerySchema, ../contract/src/graph.ts:84
+// Query: graphRestListQuerySchema, ../contract/src/graph.ts:104
 interface Query {
   dashboardId?: string;
 }
@@ -936,7 +936,7 @@ Permission `analytics:view`. Declared at `src/transport/graph.rest.ts:58`.
 Answers at `/api/graphs/:id`, `/api/v1/graphs/:id`; also, undocumented, `/api/graphs/2026-08-07/:id`, `/api/v1/graphs/2026-08-07/:id`, `/api/graphs/latest/:id`, `/api/v1/graphs/latest/:id`.
 
 ```typescript
-// Params: graphRestParamsSchema, ../contract/src/graph.ts:88
+// Params: graphRestParamsSchema, ../contract/src/graph.ts:108
 interface Params {
   id: string;
 }
@@ -952,7 +952,7 @@ Permission `analytics:create`. Declared at `src/transport/graph.rest.ts:70`.
 Answers at `/api/graphs`, `/api/v1/graphs`; also, undocumented, `/api/graphs/2026-08-07`, `/api/v1/graphs/2026-08-07`, `/api/graphs/latest`, `/api/v1/graphs/latest`.
 
 ```typescript
-// Body: graphRestCreateSchema, ../contract/src/graph.ts:107
+// Body: graphRestCreateSchema, ../contract/src/graph.ts:120
 interface Body {
   name: string;
   graph: Record<string, unknown>;
@@ -975,8 +975,8 @@ Permission `analytics:update`. Declared at `src/transport/graph.rest.ts:97`.
 Answers at `/api/graphs/:id`, `/api/v1/graphs/:id`; also, undocumented, `/api/graphs/2026-08-07/:id`, `/api/v1/graphs/2026-08-07/:id`, `/api/graphs/latest/:id`, `/api/v1/graphs/latest/:id`.
 
 ```typescript
-type Params = z.infer<typeof graphRestParamsSchema>; // ../contract/src/graph.ts:88
-// Body: graphRestUpdateSchema, ../contract/src/graph.ts:115
+type Params = z.infer<typeof graphRestParamsSchema>; // ../contract/src/graph.ts:108
+// Body: graphRestUpdateSchema, ../contract/src/graph.ts:128
 interface Body {
   name?: string;
   graph?: Record<string, unknown>;
@@ -994,7 +994,7 @@ Permission `analytics:manage`. Declared at `src/transport/graph.rest.ts:122`.
 Answers at `/api/graphs/:id`, `/api/v1/graphs/:id`; also, undocumented, `/api/graphs/2026-08-07/:id`, `/api/v1/graphs/2026-08-07/:id`, `/api/graphs/latest/:id`, `/api/v1/graphs/latest/:id`.
 
 ```typescript
-type Params = z.infer<typeof graphRestParamsSchema>; // ../contract/src/graph.ts:88
+type Params = z.infer<typeof graphRestParamsSchema>; // ../contract/src/graph.ts:108
 // Response: graphDeletedResponseSchema, ../contract/src/dashboard.responses.ts:159
 interface Response {
   id: string;
@@ -1446,7 +1446,7 @@ interface Output {
 
 ### `graphs`
 
-Contract `../contract/src/graph.trpc.ts:180`, router `src/transport/graph.trpc.ts:31`.
+Contract `../contract/src/graph.trpc.ts:167`, router `src/transport/graph.trpc.ts:31`.
 
 | Procedure                   | Kind     | Gate                          | Input                                   | Output                      |
 | --------------------------- | -------- | ----------------------------- | --------------------------------------- | --------------------------- |
