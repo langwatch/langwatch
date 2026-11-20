@@ -7,7 +7,10 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { renderWithDesignSystem } from "../../../testing/index.tsx";
 import { ProjectPicker, type ProjectPickerGroup } from "../project-picker.tsx";
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.restoreAllMocks();
+});
 
 const WEB_ID = "project_0000aBcDeFgHiJH1Ziwj";
 const BILLING_ID = "project_0000kLmNoPqRsTSr4Pwe";
@@ -179,6 +182,20 @@ describe("ProjectPicker", () => {
       expect(field).toBeVisible();
     });
 
+    /** @scenario "Hovering the copy button names what it does" */
+    it("labels the copy button Copy project ID, then Copied after the click", async () => {
+      renderPicker();
+      const { user } = await open();
+
+      await user.hover(screen.getByRole("option", { name: /Billing sync/ }));
+      const button = await screen.findByRole("button", { name: "Copy the ID of Billing sync" });
+      await user.hover(button);
+
+      expect(await screen.findByRole("tooltip")).toHaveTextContent("Copy project ID");
+      await user.click(button);
+      await waitFor(() => expect(screen.getByRole("tooltip")).toHaveTextContent("Copied"));
+    });
+
     /** @scenario "Clicking the rest of a row still switches project" */
     it("opens the project when the row itself is clicked", async () => {
       const { onOpenProject } = renderPicker();
@@ -221,6 +238,19 @@ describe("ProjectPicker", () => {
 
       await waitFor(async () => expect(await navigator.clipboard.readText()).toBe(BILLING_ID));
       expect(onOpenProject).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "The arrow-key highlighted project shows its ID and copies it" */
+    it("leaves Ctrl+C alone while the search field holds text", async () => {
+      renderPicker();
+      const { user, field } = await open();
+      await navigator.clipboard.writeText("untouched");
+
+      searchFor("billing");
+      await waitFor(() => expect(field).toHaveValue("billing"));
+      await user.keyboard("{ArrowDown}{Control>}c{/Control}");
+
+      expect(await navigator.clipboard.readText()).toBe("untouched");
     });
   });
 });

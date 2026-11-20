@@ -65,7 +65,7 @@ export function ProjectPicker(props: ProjectPickerProps) {
     if (REVEALING_KEYS.has(event.key)) setRevealing(true);
     const copyKeys = (event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "c";
     const field = event.currentTarget;
-    if (!copyKeys || !highlighted || field.selectionStart !== field.selectionEnd) return;
+    if (!copyKeys || !highlighted || query || field.selectionStart !== field.selectionEnd) return;
     event.preventDefault();
     setRevealing(true);
     idCopy.copy({ value: highlighted.value, name: highlighted.label });
@@ -363,6 +363,7 @@ function ProjectIdWithCopy({
   idCopy: ProjectIdCopy;
 }) {
   const feedback = idCopy.feedback?.value === projectId ? idCopy.feedback : null;
+  const [hovered, setHovered] = useState(false);
   return (
     <HStack
       position="absolute"
@@ -376,9 +377,10 @@ function ProjectIdWithCopy({
         {projectId}
       </InlineCode>
       <Tooltip
-        open={feedback !== null}
-        content={feedback?.outcome === "failed" ? "Couldn't copy the ID" : "Copied"}
-        positioning={{ placement: "top" }}
+        open={hovered || feedback !== null}
+        onOpenChange={(details) => setHovered(details.open)}
+        content={copyTooltip(feedback)}
+        positioning={{ placement: "right" }}
       >
         <IconButton
           type="button"
@@ -398,6 +400,11 @@ function ProjectIdWithCopy({
       </Tooltip>
     </HStack>
   );
+}
+
+function copyTooltip(feedback: CopyFeedback | null): string {
+  if (!feedback) return "Copy project ID";
+  return feedback.outcome === "copied" ? "Copied" : "Couldn't copy the ID";
 }
 
 interface CopyFeedback {

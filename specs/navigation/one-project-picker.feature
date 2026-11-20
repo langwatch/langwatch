@@ -92,6 +92,13 @@ Feature: Every project switch is the top bar's searchable picker
     And the picker stays open and no project is opened
 
   @integration
+  Scenario: Hovering the copy button names what it does
+    Given I hover a project in the open project picker
+    When I hover its copy button
+    Then a tooltip beside the button reads "Copy project ID"
+    And after I click it the same tooltip reads "Copied"
+
+  @integration
   Scenario: Clicking the rest of a row still switches project
     Given I hover a project other than the current one
     When I click its name
