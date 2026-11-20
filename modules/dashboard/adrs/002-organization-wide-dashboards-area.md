@@ -18,8 +18,8 @@ Today every board is tied to a project:
 - Boards (`DashboardsV2`), widgets (`DashboardWidget`) and favourites
   (`DashboardFavourite`) all carry a required `projectId`.
 - An `ORGANIZATION` board keeps an owning project. It is listed in every project
-  of the organization and is read-only outside the owner (`findBoards` in
-  `board.service.ts`).
+  of the organization (`findBoards` in `board.service.ts`) and is read-only
+  outside the owner (`getWritable` in `dashboard-access.service.ts`).
 - Every route is `/:project/dashboards...` (`apps/ui/src/shell/ui-route-table.ts`).
 - The top bar shows the project picker because Dashboards has `scopeKind`
   `"project"` (`modules/navigation/browser/src/model/products.ts`).
