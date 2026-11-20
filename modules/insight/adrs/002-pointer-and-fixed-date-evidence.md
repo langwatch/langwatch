@@ -21,10 +21,11 @@ exists. The inbox row asks analytics to draw the pointer
 (`DashboardPointerToken`): a link while the board or widget exists, the filed
 name with "(deleted)" once it is gone.
 
-**How it was filed is stored.** `filedVia` is `run` (a scheduled run), which
-is what the product writes now, or `chat` (filed from a Langy chat). `chat` is
-no longer offered once Save as insight is dropped and stays only for rows
-already written. The row says "Saved from a chat with Langy" or "Daily run".
+**How it was filed is stored.** `filedVia` is `run` (a scheduled run) or
+`chat` (filed through the tRPC `insights.file` route). No screen offers Save as
+insight any more, so the product's screens no longer file `chat`. The route
+still exists and writes `chat` for any caller, and older rows keep it. The row
+says "Saved from a chat with Langy" or "Daily run".
 Nobody but its owner sees the insight either way ([ADR-003](./003-personal-insights.md)).
 
 **Evidence is what to run, never a result.** An insight keeps its query

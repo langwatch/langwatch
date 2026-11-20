@@ -101,9 +101,9 @@ const REPLAY = {
 };
 const QUERY = "SELECT count() FROM traces WHERE model = {model:String}";
 
-describe("given a member saves a Langy answer that was about a widget on a board", () => {
+describe("given a member files an insight through the filing route, naming a widget on a board", () => {
   describe("when the insight is filed", () => {
-    /** @scenario "An insight filed from a board keeps a pointer to the board and the widget" */
+    /** @scenario "An insight filed through the filing route keeps a pointer to the board and the widget" */
     it("keeps the board and the widget, ids and names, in its owner's inbox", async () => {
       const filed = await installed.app.fileInsight({ ...filing({ board: BOARD }), userId: FILER });
 
@@ -115,9 +115,9 @@ describe("given a member saves a Langy answer that was about a widget on a board
   });
 });
 
-describe("given a member files an insight away from any board", () => {
+describe("given a member files an insight through the filing route, away from any board", () => {
   describe("when they read their inbox", () => {
-    /** @scenario "A member's filing is recorded as saved from a chat" */
+    /** @scenario "An insight a member files through the filing route is recorded as filed from a chat" */
     it("records it as filed from a chat, with no pointer and no window", async () => {
       const filed = await installed.app.fileInsight({ ...filing(), userId: FILER });
 

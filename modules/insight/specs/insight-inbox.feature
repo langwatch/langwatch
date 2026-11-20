@@ -108,17 +108,18 @@ Feature: The insights inbox
     nothing checks that either exists, and the insight reads the same once either is deleted.
 
     @unit
-    Scenario: An insight filed from a board keeps a pointer to the board and the widget
-      Given a member saves a Langy answer that was about a widget on a board
+    Scenario: An insight filed through the filing route keeps a pointer to the board and the widget
+      Given a member files an insight through the filing route, naming a widget on a board
       When the insight is filed
       Then it keeps the ids and the names of the board and the widget as they were
       And its owner reads that pointer in their inbox
 
     @unit
-    Scenario: A member's filing is recorded as saved from a chat
-      Given a member files an insight
+    Scenario: An insight a member files through the filing route is recorded as filed from a chat
+      Given a member files an insight through the filing route, away from any board
       When they read their inbox
       Then the insight is recorded as filed from a chat, not by a run
+      And it has no pointer and no window
 
     @unit
     Scenario: An insight filed before pointers existed still reads
