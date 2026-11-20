@@ -41,6 +41,7 @@ Feature: Shared Dashboard service
     When a client posts a graph to /api/graphs without colSpan or rowSpan
     Then the response gives colSpan 4 and rowSpan 3
     And a size the caller sent is kept
+    And a missing dimension takes the service default, by design: colSpan 2 alone lands two by three
 
   @unit
   Scenario: A graph created over REST without a size reads back, lists and renames at four by three

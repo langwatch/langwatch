@@ -3,6 +3,7 @@
  * The `/api/graphs` wire: the size a graph posted without one lands at, and that
  * it reads back, lists and renames at that size. Spec: dashboard-service.feature.
  */
+import { CHART_GRID_DEFAULT_ROW_SPAN } from "@langwatch/analytics-contract/chart-grid";
 import { canonicalErrorResponse, createRestRuntime } from "@langwatch/api/rest";
 import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { describe, expect, it } from "vitest";
@@ -88,6 +89,20 @@ describe("the graphs REST family", () => {
       const created = await graphs.create({ ...GRAPH, colSpan: 2, rowSpan: 2 });
 
       expect(sizeOf(created.json)).toEqual({ colSpan: 2, rowSpan: 2 });
+    });
+  });
+
+  describe("when a graph is posted with only a width", () => {
+    /** @scenario "A graph created over REST without a size lands at the grid's default of four by three" */
+    it("takes the service default height, so colSpan 2 lands two by three", async () => {
+      const graphs = mountedGraphs();
+
+      const created = await graphs.create({ ...GRAPH, colSpan: 2 });
+
+      expect({ status: created.status, size: sizeOf(created.json) }).toEqual({
+        status: 201,
+        size: { colSpan: 2, rowSpan: CHART_GRID_DEFAULT_ROW_SPAN },
+      });
     });
   });
 

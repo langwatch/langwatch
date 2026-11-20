@@ -26,11 +26,31 @@ const graphLayoutSchemaDefinition = chartGridPlacementSchema.strict();
 export interface GraphLayoutSchema extends Named<typeof graphLayoutSchemaDefinition> {}
 export const graphLayoutSchema: GraphLayoutSchema = graphLayoutSchemaDefinition;
 
-/** A layout the grid can draw: its column and span also stay inside the right edge. */
-const graphPlacementSchemaDefinition = graphLayoutSchema.refine(fitsChartGridWidth, {
+/** The refusal every width check on a graph placement raises. */
+export const fitsGridWidthIssue = {
   message: "gridColumn + colSpan must not exceed the grid's columns",
   path: ["colSpan"],
-});
+};
+
+/**
+ * Width check for a placement whose fields are each optional: an omitted
+ * one is stored at the grid's default, so the check runs on that placement.
+ */
+export function partialPlacementFitsGridWidth({
+  gridColumn = 0,
+  colSpan = CHART_GRID_DEFAULT_COL_SPAN,
+}: {
+  gridColumn?: number;
+  colSpan?: number;
+}): boolean {
+  return fitsChartGridWidth({ gridColumn, colSpan });
+}
+
+/** A layout the grid can draw: its column and span also stay inside the right edge. */
+const graphPlacementSchemaDefinition = graphLayoutSchema.refine(
+  fitsChartGridWidth,
+  fitsGridWidthIssue,
+);
 export interface GraphPlacementSchema extends Named<typeof graphPlacementSchemaDefinition> {}
 export const graphPlacementSchema: GraphPlacementSchema = graphPlacementSchemaDefinition;
 
@@ -95,14 +115,7 @@ const graphRestCreateSchemaDefinition = z
     filters: z.record(z.string(), z.unknown()).optional(),
     ...chartGridPlacementSchema.partial().shape,
   })
-  .refine(
-    ({ gridColumn = 0, colSpan = CHART_GRID_DEFAULT_COL_SPAN }) =>
-      fitsChartGridWidth({ gridColumn, colSpan }),
-    {
-      message: "gridColumn + colSpan must not exceed the grid's columns",
-      path: ["colSpan"],
-    },
-  );
+  .refine(partialPlacementFitsGridWidth, fitsGridWidthIssue);
 export interface GraphRestCreateSchema extends Named<typeof graphRestCreateSchemaDefinition> {}
 export const graphRestCreateSchema: GraphRestCreateSchema = graphRestCreateSchemaDefinition;
 

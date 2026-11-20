@@ -4,7 +4,6 @@
  * Spec: dashboard-service.feature.
  */
 import {
-  CHART_GRID_DEFAULT_COL_SPAN,
   chartGridPlacementSchema,
   fitsChartGridWidth,
 } from "@langwatch/analytics-contract/chart-grid";
@@ -13,12 +12,7 @@ import { triggerSchema } from "@langwatch/automation-contract";
 import { defineTrpcContract, type Named } from "@langwatch/module";
 import { z } from "zod";
 
-import { graphSchema } from "./graph.ts";
-
-const fitsGridWidth = {
-  message: "gridColumn + colSpan must not exceed the grid's columns",
-  path: ["colSpan"],
-};
+import { fitsGridWidthIssue, graphSchema, partialPlacementFitsGridWidth } from "./graph.ts";
 
 /**
  * `create` takes each placement field optionally and persists the grid's
@@ -34,14 +28,7 @@ const graphApiCreateInputSchemaDefinition = z
     dashboardId: z.string().optional(),
     ...chartGridPlacementSchema.partial().shape,
   })
-  .refine(
-    (value) =>
-      fitsChartGridWidth({
-        gridColumn: value.gridColumn ?? 0,
-        colSpan: value.colSpan ?? CHART_GRID_DEFAULT_COL_SPAN,
-      }),
-    fitsGridWidth,
-  );
+  .refine(partialPlacementFitsGridWidth, fitsGridWidthIssue);
 export interface GraphApiCreateInputSchema extends Named<
   typeof graphApiCreateInputSchemaDefinition
 > {}
@@ -86,7 +73,7 @@ const graphApiUpdateLayoutInputSchemaDefinition = z
     graphId: z.string(),
     ...chartGridPlacementSchema.shape,
   })
-  .refine(fitsChartGridWidth, fitsGridWidth);
+  .refine(fitsChartGridWidth, fitsGridWidthIssue);
 export interface GraphApiUpdateLayoutInputSchema extends Named<
   typeof graphApiUpdateLayoutInputSchemaDefinition
 > {}
@@ -98,7 +85,7 @@ const graphApiBatchUpdateLayoutsInputSchemaDefinition = z.object({
   layouts: z.array(
     z
       .object({ graphId: z.string(), ...chartGridPlacementSchema.shape })
-      .refine(fitsChartGridWidth, fitsGridWidth),
+      .refine(fitsChartGridWidth, fitsGridWidthIssue),
   ),
 });
 export interface GraphApiBatchUpdateLayoutsInputSchema extends Named<
