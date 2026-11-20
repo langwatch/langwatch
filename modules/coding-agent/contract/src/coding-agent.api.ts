@@ -9,6 +9,7 @@ import type {
 } from "./coding-agent-trace-pull-request.ts";
 import type { CodingAgentTranscript } from "./coding-agent-transcript.ts";
 import type {
+  CodingAgentSessionLastTurn,
   CodingAgentSessionLookupInput,
   CodingAgentGithubConnection,
   CodingAgentPersonalPullRequestUsage,
@@ -65,6 +66,10 @@ export interface CodingAgentApi {
     projectId: string;
     traceId: string;
   }): Promise<CodingAgentSession | null>;
+  findLastTurnOfSession(input: {
+    projectId: string;
+    sessionId: string;
+  }): Promise<CodingAgentSessionLastTurn | null>;
   readTranscriptForViewer(input: {
     projectId: string;
     traceId: string;

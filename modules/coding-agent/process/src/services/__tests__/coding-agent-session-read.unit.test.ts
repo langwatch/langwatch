@@ -159,6 +159,41 @@ describe("Coding Agent session reads", () => {
     expect(sessions.findInputs.map((input) => input.window === undefined)).toEqual([false, true]);
   });
 
+  /** @scenario "The session's latest stored trace is found through its own trace map" */
+  it("answers the session's newest mapped trace, read from the session's start", async () => {
+    const sessions = new TestSessions();
+    const startedAtMs = TEST_NOW_MS - 3_600_000;
+    sessions.rows = [session({ startedAtMs })];
+    const traceSessions = new TestTraceSessions();
+    traceSessions.mapping = {
+      tenantId: PROJECT,
+      traceId: TRACE,
+      sessionId: SESSION,
+      occurredAtMs: TEST_NOW_MS - 1_000,
+    };
+    const service = serviceWith({ sessions, traceSessions });
+
+    await expect(
+      service.findLastTurnOfSession({ projectId: PROJECT, sessionId: SESSION }),
+    ).resolves.toEqual({ traceId: TRACE, occurredAtMs: TEST_NOW_MS - 1_000 });
+    expect(traceSessions.latestInputs).toEqual([
+      {
+        tenantId: PROJECT,
+        sessionId: SESSION,
+        fromMs: startedAtMs - CODING_AGENT_SESSION_READ_WINDOW_MS,
+        toMs: TEST_NOW_MS + CODING_AGENT_SESSION_READ_WINDOW_MS,
+      },
+    ]);
+  });
+
+  it("answers nothing when no trace of the session was mapped", async () => {
+    const service = serviceWith({});
+
+    await expect(
+      service.findLastTurnOfSession({ projectId: PROJECT, sessionId: SESSION }),
+    ).resolves.toBeNull();
+  });
+
   /** @scenario "a stale hint degrades to a slower read, not a missing session" */
   it("retries a stale session hint without hiding the durable session", async () => {
     const sessions = new TestSessions();

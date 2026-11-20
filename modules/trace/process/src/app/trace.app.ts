@@ -2507,6 +2507,7 @@ export class TraceModule implements TraceApi, CollectorApp {
   extractLogRecordIO(input: LogRecordReceivedEventData): {
     input: string | null;
     output: string | null;
+    outputDeclared: boolean;
     truncated: boolean;
   } {
     const io = TraceLogRecordIOService.create(this.#dependencies.traces.canonicalisation).extractIO(
@@ -2519,6 +2520,7 @@ export class TraceModule implements TraceApi, CollectorApp {
     return {
       input: previewInput,
       output: previewOutput,
+      outputDeclared: io.outputDeclared === true,
       truncated: previewInput !== io.input || previewOutput !== io.output,
     };
   }
