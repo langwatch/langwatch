@@ -251,13 +251,16 @@ describe("given three tenants' attribution traces, read over a 60-day period and
       return pending;
     };
 
-    beforeAll(async () => {
-      sweepSeedSeconds = await seedAttributionTenants({
-        harness,
-        tenants: SWEEP_ONLY_TENANTS,
-        managedColumn,
-      });
-    }, 2 * SWEEP_SEED_BUDGET_SECONDS * 1000);
+    beforeAll(
+      async () => {
+        sweepSeedSeconds = await seedAttributionTenants({
+          harness,
+          tenants: SWEEP_ONLY_TENANTS,
+          managedColumn,
+        });
+      },
+      2 * SWEEP_SEED_BUDGET_SECONDS * 1000,
+    );
 
     afterAll(async () => {
       const rows: SweepRow[] = [];
