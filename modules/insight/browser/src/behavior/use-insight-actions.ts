@@ -3,7 +3,7 @@
  * the worker folds the event a moment later; the read hint then brings the folded row back.
  */
 
-import type { FileInsightInput, InsightEntry } from "@langwatch/insight-contract";
+import type { InsightEntry } from "@langwatch/insight-contract";
 import { nowInstant } from "@langwatch/time";
 import { useEffect } from "react";
 
@@ -126,22 +126,4 @@ export function useMarkShownSeen({
     );
     mutate({ projectId, insightIds: [...ids] });
   }, [key, projectId, mutate, utils]);
-}
-
-/** Filing from a Langy answer: the new entry goes to the top of the cached inbox. */
-export function useFileInsight({ projectId }: { projectId: string }) {
-  const utils = insightApi.useUtils();
-  const file = insightApi.insights.file.useMutation({
-    onSuccess: (entry) =>
-      utils.insights.getAll.setData({ projectId }, (entries: InsightEntry[] | undefined) =>
-        entries ? [entry, ...entries.filter((existing) => existing.id !== entry.id)] : entries,
-      ),
-  });
-  return {
-    file: (
-      input: Omit<FileInsightInput, "projectId">,
-      options: { onSuccess: () => void; onError: (error: unknown) => void },
-    ) => file.mutate({ ...input, projectId }, options),
-    isPending: file.isPending,
-  };
 }

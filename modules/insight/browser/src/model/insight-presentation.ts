@@ -146,18 +146,3 @@ export function insightBodyBlocks(body: string): InsightBodyBlock[] {
       return header?.[1] ? { kind: "header", text: header[1] } : { kind: "paragraph", text: block };
     });
 }
-
-/** The first line of an answer, cut to a title's length, as the dialog's starting title. */
-export function titleFromAnswer(answer: string): string {
-  const firstLine =
-    answer
-      .split("\n")
-      .map((line) =>
-        line
-          .replace(/^[#>*\-\s]+/, "")
-          .replace(/\*\*/g, "")
-          .trim(),
-      )
-      .find((line) => line.length > 0) ?? "";
-  return firstLine.length > 120 ? `${firstLine.slice(0, 117).trimEnd()}...` : firstLine;
-}

@@ -6,7 +6,7 @@
 
 import { uiTokens } from "@langwatch/module";
 
-import type { InsightEntry, InsightTone } from "./insight.ts";
+import type { InsightEntry } from "./insight.ts";
 
 export type InsightsBellProps = Record<string, never>;
 
@@ -49,13 +49,7 @@ export type InsightInbox = Readonly<{
   unseen: readonly InsightEntry[];
   /** What the bell and the sidebar count show. */
   count: number;
-  /** Langy's verdict balance over the unseen news: more good than bad reads green. */
-  tone: "good" | "bad";
 }>;
-
-function countTone(entries: readonly InsightEntry[], tone: InsightTone): number {
-  return entries.filter((entry) => entry.tone === tone).length;
-}
 
 export function deriveInsightInbox({
   entries,
@@ -75,7 +69,6 @@ export function deriveInsightInbox({
     ...folders,
     unseen,
     count: unseen.length,
-    tone: countTone(unseen, "good") >= countTone(unseen, "bad") ? "good" : "bad",
   };
 }
 

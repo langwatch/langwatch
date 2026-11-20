@@ -10,12 +10,12 @@ import type {
   InsightRunBoard,
   InsightRunSettings,
 } from "@langwatch/insight-contract";
-import { isAggregateProjectKind } from "@langwatch/project-contract";
 import { currentTimeZone } from "@langwatch/time";
 
 import { defaultRunSettings, runTimeWords, TEMPLATE_BOARD_NOTE } from "../model/daily-run.ts";
 import { useInsightHost } from "../model/insight-host.ts";
 import { insightApi } from "./insight-api.ts";
+import { useInsightsShown } from "./use-insights-shown.ts";
 
 const NEVER_DECIDED: InsightDailyRunSetting = {
   state: "undecided",
@@ -36,11 +36,7 @@ export function useBoardDailyInsights({ board }: { board: InsightRunBoard }) {
   const project = host.project();
   const projectId = project?.id ?? "";
   // An aggregate takes no setting, and its read answers undecided: no control there at all.
-  const available =
-    project !== undefined &&
-    !isAggregateProjectKind(project.kind) &&
-    host.isEnabled() === true &&
-    host.hasPermission("analytics:view");
+  const available = useInsightsShown();
   const scope = { projectId, board: { kind: board.kind, id: board.id } };
   const query = insightApi.insights.getBoardDailyRun.useQuery(scope, { enabled: available });
   const utils = insightApi.useUtils();

@@ -10,10 +10,9 @@ reads it or acts on it (ADR-003).
   and the `InsightModule`; and the `insight_daily_run` pipeline, which keeps each
   person's daily run setting on a board, wakes it, carries the run out and keeps
   how the last one ended.
-- `browser/`: the Insights page, the top bar bell, the sidebar count, the
-  "Save as insight" action on Langy answers, Copy, which is how an owner
-  shares an insight, and "Daily insights" in a board's header, where a person
-  sets their daily run for that board.
+- `browser/`: the Insights page, the top bar bell, the sidebar count, Copy,
+  which is how an owner shares an insight, and "Daily insights" in a board's
+  header, where a person sets their daily run for that board.
 
 An insight may point at the board and widget it came from, and keeps its
 evidence as a query with fixed dates. Analytics lends the links and the chart

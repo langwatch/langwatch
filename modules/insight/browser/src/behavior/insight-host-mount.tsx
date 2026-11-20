@@ -44,6 +44,7 @@ class CapabilityInsightHost extends InsightHostApi {
     private readonly deps: {
       project: InsightHostProject | undefined;
       enabled: boolean | undefined;
+      dashboardsEnabled: boolean | undefined;
       session: UiSession;
       route: UiRoute;
       navigation: UiNavigation;
@@ -60,6 +61,10 @@ class CapabilityInsightHost extends InsightHostApi {
 
   isEnabled(): boolean | undefined {
     return this.deps.enabled;
+  }
+
+  isDashboardsEnabled(): boolean | undefined {
+    return this.deps.dashboardsEnabled;
   }
 
   hasPermission(permission: string): boolean {
@@ -101,7 +106,9 @@ export default function InsightHostMount({ children }: { children?: ReactNode })
   const { session, route, navigation, feedback } = useUiHostServices();
   const langy = useLentOperations(LangyAskToken);
   // Read as a primitive: the flags service hands a new object on every render.
-  const enabled = useUiFlags().flag(FrontendFlags.release_insights);
+  const flags = useUiFlags();
+  const enabled = flags.flag(FrontendFlags.release_insights);
+  const dashboardsEnabled = flags.flag(FrontendFlags.release_dashboards);
   const scopeProject = session.snapshot().scope.project;
   const projectId = scopeProject?.id;
   const projectSlug = scopeProject?.slug;
@@ -119,13 +126,25 @@ export default function InsightHostMount({ children }: { children?: ReactNode })
               }
             : void 0,
         enabled,
+        dashboardsEnabled,
         session,
         route,
         navigation,
         feedback,
         langy,
       }),
-    [projectId, projectSlug, projectKind, enabled, session, route, navigation, feedback, langy],
+    [
+      projectId,
+      projectSlug,
+      projectKind,
+      enabled,
+      dashboardsEnabled,
+      session,
+      route,
+      navigation,
+      feedback,
+      langy,
+    ],
   );
   return <InsightHostProvider value={host}>{children}</InsightHostProvider>;
 }

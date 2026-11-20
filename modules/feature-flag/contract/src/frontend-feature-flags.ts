@@ -44,7 +44,7 @@ export const FRONTEND_FEATURE_FLAGS = [
   "release_ui_agent_testing_v2_enabled",
   // The Dashboards area, its sidebar entry and its saved-dashboards list.
   "release_dashboards",
-  // The Insights inbox, its sidebar entry, the topbar bell and "Save as insight" on Langy answers.
+  // The Insights inbox, its sidebar entry and the topbar bell.
   "release_insights",
   // The Braids pages and their settings entry; braids already made still apply.
   "release_braids",

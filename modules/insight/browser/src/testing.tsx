@@ -13,8 +13,8 @@ import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import type { InsightEntry } from "@langwatch/insight-contract";
 import type { LangyAskRequest } from "@langwatch/langy-contract";
 import { nowInstant } from "@langwatch/time";
-import { render, type RenderResult } from "@testing-library/react";
-import type { ReactElement } from "react";
+import { act, render, type RenderResult } from "@testing-library/react";
+import { type ReactElement, type ReactNode, useReducer } from "react";
 
 import { insightApi } from "./behavior/insight-api.ts";
 import {
@@ -29,6 +29,8 @@ export type StubInsightHostOptions = {
   project?: InsightHostProject | undefined;
   /** `release_insights`; on unless a test says otherwise. */
   enabled?: boolean | undefined;
+  /** `release_dashboards`; on unless a test says otherwise. */
+  dashboardsEnabled?: boolean | undefined;
   /** A viewer unless a test says otherwise: `analytics:view` is all insight asks for. */
   permissions?: readonly string[];
   query?: Readonly<Record<string, string | undefined>>;
@@ -56,6 +58,10 @@ export class StubInsightHost extends InsightHostApi {
 
   isEnabled(): boolean | undefined {
     return "enabled" in this.options ? this.options.enabled : true;
+  }
+
+  isDashboardsEnabled(): boolean | undefined {
+    return "dashboardsEnabled" in this.options ? this.options.dashboardsEnabled : true;
   }
 
   hasPermission(permission: string): boolean {
@@ -91,6 +97,44 @@ export class StubInsightHost extends InsightHostApi {
   askLangy(request: LangyAskRequest): void {
     this.langyAsks.push(request);
   }
+}
+
+/** A host whose `release_insights` answer a test can turn off after the first draw. */
+export class FlippableInsightHost extends StubInsightHost {
+  on = true;
+
+  override isEnabled(): boolean {
+    return this.on;
+  }
+}
+
+/**
+ * Draws `children()` beside a "Turn flag off" button that flips the host and redraws: the host is
+ * read on render, so the flip alone changes nothing until something redraws. `children` is a
+ * function because a fixed element would let React skip re-rendering it.
+ */
+export function FlagSwitch({
+  host,
+  children,
+}: {
+  host: FlippableInsightHost;
+  children: () => ReactNode;
+}) {
+  const [, redraw] = useReducer((count: number) => count + 1, 0);
+  return (
+    <>
+      {children()}
+      <button
+        type="button"
+        onClick={() => {
+          host.on = false;
+          redraw();
+        }}
+      >
+        Turn flag off
+      </button>
+    </>
+  );
 }
 
 /**
@@ -156,4 +200,15 @@ export function insightEntry(overrides: Partial<InsightEntry> = {}): InsightEntr
     keptAt: null,
     ...overrides,
   };
+}
+
+/**
+ * Lets a query that is going to fire do so: the effect starts it, the batch link sends it on a
+ * timer, then the transport answers across microtasks. Absence and its positive control share it;
+ * the positive control is what makes this round count safe: it proves the rounds suffice to read.
+ */
+export async function flushReads(): Promise<void> {
+  for (let round = 0; round < 5; round += 1) {
+    await act(() => new Promise<void>((resolve) => setTimeout(resolve, 0)));
+  }
 }

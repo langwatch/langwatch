@@ -106,6 +106,8 @@ function InboxBody({
   onSelectFolder: (folder: InsightFolder) => void;
 }) {
   const host = useInsightHost();
+  // Where Dashboards answers not-found, pointing at a board would dead-end.
+  const dashboardsOpen = host.isDashboardsEnabled() === true;
   if (reading.error) {
     return (
       <VStack align="start" gap={2} paddingY={6}>
@@ -118,26 +120,47 @@ function InboxBody({
       </VStack>
     );
   }
+  if (reading.unavailable === "aggregate") {
+    return (
+      <NoDataInfoBlock
+        title="Insights are not available here"
+        description="An aggregate project files no insights; open one of its projects to read them."
+        icon={<Inbox size={24} />}
+        testId="insights-unavailable"
+      />
+    );
+  }
   if (!reading.inbox || !reading.project) return <InboxSkeleton />;
   const { inbox } = reading;
+  const project = reading.project;
   if (inbox.inbox.length + inbox.stale.length + inbox.archived.length === 0) {
     return (
       <NoDataInfoBlock
         title="Langy writes your brief here"
-        description="Save a Langy answer as an insight and it lands here: judged good or bad news, kept until it stops being true. It is yours alone; copy one to share it."
+        description={
+          dashboardsOpen
+            ? "Turn on Daily insights on a board and Langy files what it finds here, kept until it stops being true. It is yours alone; copy one to share it."
+            : "Langy files what it finds here, kept until it stops being true. It is yours alone; copy one to share it."
+        }
         icon={<Inbox size={24} />}
         testId="insights-day-zero"
       >
-        <Button size="sm" variant="outline" onClick={() => host.askLangy({ draft: "" })}>
-          Open Langy
-        </Button>
+        {dashboardsOpen ? (
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => host.navigate(`/${project.slug}/dashboards`)}
+          >
+            Open Dashboards
+          </Button>
+        ) : null}
       </NoDataInfoBlock>
     );
   }
   return (
     <FolderView
       inbox={inbox}
-      projectId={reading.project.id}
+      projectId={project.id}
       now={reading.now}
       folder={folder}
       density={density}

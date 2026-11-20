@@ -21,10 +21,12 @@ exists. The inbox row asks analytics to draw the pointer
 (`DashboardPointerToken`): a link while the board or widget exists, the filed
 name with "(deleted)" once it is gone.
 
-**How it was filed is stored.** `filedVia` is `chat` (a member saved a Langy
-answer) or `run` (a scheduled run). Only `chat` is written today. The row says
-"Saved from a chat with Langy" or "Daily run". Nobody but its owner sees the
-insight either way ([ADR-003](./003-personal-insights.md)).
+**How it was filed is stored.** `filedVia` is `run` (a scheduled run) or
+`chat` (filed through the tRPC `insights.file` route). No screen offers Save as
+insight any more, so the product's screens no longer file `chat`. The route
+still exists and writes `chat` for any caller, and older rows keep it. The row
+says "Saved from a chat with Langy" or "Daily run".
+Nobody but its owner sees the insight either way ([ADR-003](./003-personal-insights.md)).
 
 **Evidence is what to run, never a result.** An insight keeps its query
 (`lwql`), a fixed window (`replay.start`, `replay.end`, `replay.granularitySeconds`)
@@ -51,14 +53,7 @@ a new field with a default is the default, not an upcast.
 - The board's Source (which origins a board leaves out) is not kept yet,
   because no board has one on this branch. It joins `replayContext`, the JSON
   column beside the window, with no migration.
-- An answer that carries an insights card hands "Save as insight" that card
-  (`LangyAnswerActionProps.insights`). Saving one of its findings files the
-  finding's title, body, tone, topic and valid days, the card's board with the
-  finding's widget, the finding's query and the card's window, all as typed
-  data. The query is Langy's own text and is not checked when it is filed: the
-  LangWatchQL door checks it when a reader replays it.
-- No asking module hands Langy a structured subject for an ordinary answer yet
-  (`LangyAnswerActionProps.subject`), so an answer with no card is saved from
-  its text and carries no pointer and no window.
+- Removed 2026-10-23 (https://github.com/langwatch/langwatch/issues/8998): "Save as
+  insight" is gone, and a daily run is the one way the product files an insight.
 - An old image that folds a new filed event drops the three fields, because it
   does not know them. Replaying the insight projection restores them.

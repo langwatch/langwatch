@@ -2,7 +2,7 @@
   "name": "@langwatch/insight-browser",
   "version": "0.1.0",
   "private": true,
-  "description": "Browser-safe Insights inbox: the inbox screen, the topbar bell, the sidebar count, 'Save as insight' on a Langy answer and 'Daily insights' in a board's header.",
+  "description": "Browser-safe Insights inbox: the inbox screen, the topbar bell, the sidebar count and 'Daily insights' in a board's header.",
   "files": [
     "src"
   ],

@@ -1,7 +1,7 @@
 /**
  * The port the inbox screen and everything insight lends read: scope, the release flag,
  * grants, the address, notices, the clipboard and Langy's ask. Mounted above the routed tree,
- * so the bell in the topbar and the action under a Langy answer find it too.
+ * so the bell in the topbar and a board's header find it too.
  */
 
 import type { LangyAskRequest } from "@langwatch/langy-contract";
@@ -25,6 +25,9 @@ export abstract class InsightHostApi {
 
   /** `release_insights`: undefined while not answered yet. */
   abstract isEnabled(): boolean | undefined;
+
+  /** `release_dashboards`: with it off the Dashboards address answers not-found. */
+  abstract isDashboardsEnabled(): boolean | undefined;
 
   abstract hasPermission(permission: string): boolean;
 
