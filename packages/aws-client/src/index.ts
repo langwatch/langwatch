@@ -17,6 +17,7 @@ export {
 export {
   AwsClientConfiguration,
   OutboundProxyResolver,
+  MissingStaticAwsCredentialsError,
   staticCredentialsOrUndefined,
   type AssumeRoleCredentials,
   type AwsClientConfig,
