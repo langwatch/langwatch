@@ -44,6 +44,7 @@ export function guidedPathLanding({
     case "llmops":
       return `/${projectSlug}/traces`;
     case "coding":
+      // Spelled here, not read from user-contract's CODING_AGENTS_PATH: that import would cycle.
       return "/coding-agents";
     case "gateway":
       return "/gateway";

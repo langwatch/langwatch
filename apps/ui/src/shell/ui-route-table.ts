@@ -5,6 +5,12 @@
  */
 
 import { installedModuleScreens } from "@langwatch/browser/module-screens";
+import {
+  CODING_AGENTS_PATH,
+  codingAgentsPath,
+  RETIRED_PERSONAL_PATH,
+  RETIRED_PERSONAL_SEGMENT,
+} from "@langwatch/user-contract";
 
 import { browserModules } from "../browser-modules.generated.ts";
 
@@ -553,19 +559,19 @@ export const uiRouteTable: readonly UiRouteDescriptor[] = [
           // Coding agents: the personal-scope routes (must precede the /:project
           // catch-all so "coding-agents" doesn't get treated as a project slug)
           {
-            path: "/coding-agents",
+            path: CODING_AGENTS_PATH,
             page: "pages/coding-agents/index",
           },
           {
-            path: "/coding-agents/configure",
+            path: `${CODING_AGENTS_PATH}/configure`,
             page: "pages/coding-agents/configure",
           },
           {
-            path: "/coding-agents/pull-requests",
+            path: `${CODING_AGENTS_PATH}/pull-requests`,
             page: "pages/coding-agents/pull-requests",
           },
           {
-            path: "/coding-agents/sessions",
+            path: `${CODING_AGENTS_PATH}/sessions`,
             page: "pages/coding-agents/sessions",
           },
           {
@@ -573,7 +579,7 @@ export const uiRouteTable: readonly UiRouteDescriptor[] = [
             // opens. The page file existed but routes.tsx is explicit (Vite migration)
             // - without this entry the URL 404'd, breaking the per-spec
             // budget-exceeded → request flow Ariana caught in dogfood.
-            path: "/coding-agents/budget/request",
+            path: `${CODING_AGENTS_PATH}/budget/request`,
             page: "pages/coding-agents/budget/request",
           },
 
@@ -1021,17 +1027,17 @@ function projectSegments(paths: readonly string[]): string[] {
  * page. One-segment pages and a bare `/*` tail are already covered by those rows.
  */
 function projectPageTwins(paths: readonly string[]): string[] {
-  const twins = paths.flatMap((path) =>
-    /^\/:project\/[^/]+\/(?!\*$)/.test(path) ? [path.replace(":project", "me")] : [],
-  );
+  const deep = paths.filter((path) => /^\/:project\/[^/]+\/(?!\*$)/.test(path));
+  const twins = deep.map((path) => path.replace(":project", RETIRED_PERSONAL_SEGMENT));
   return [...new Set(twins)];
 }
 
 /** Every page under `/coding-agents/`, as the path after it: `sessions`, `budget/request`. */
 function codingAgentsPages(table: readonly UiRouteDescriptor[]): string[] {
   return uiRouteDescriptors(table).flatMap((descriptor) => {
-    const page = descriptor.path?.match(/^\/coding-agents\/([^:*]+)$/)?.[1];
-    return page === void 0 ? [] : [page];
+    const prefix = `${CODING_AGENTS_PATH}/`;
+    const page = descriptor.path?.startsWith(prefix) ? descriptor.path.slice(prefix.length) : "";
+    return page === "" || /[:*]/.test(page) ? [] : [page];
   });
 }
 
@@ -1046,7 +1052,11 @@ const KEPT_SEGMENTS: Readonly<Record<string, string>> = Object.fromEntries(
   codingAgentsPageList.filter((page) => !page.includes("/")).map((page) => [page, page]),
 );
 
-const toCodingAgents = { from: "/me", to: "/coding-agents", mapSegment: KEPT_SEGMENTS } as const;
+const toCodingAgents = {
+  from: RETIRED_PERSONAL_PATH,
+  to: CODING_AGENTS_PATH,
+  mapSegment: KEPT_SEGMENTS,
+} as const;
 
 /**
  * Moved /me to /coding-agents; CLIs still print /me links. Mounted above the chrome, which would
@@ -1056,19 +1066,19 @@ const toCodingAgents = { from: "/me", to: "/coding-agents", mapSegment: KEPT_SEG
 export const uiCodingAgentsRedirectRoutes: readonly UiRedirectRouteDescriptor[] = [
   {
     // The devices inventory is a tab of configure; straight there, no chaining.
-    path: "/me/devices",
+    path: `${RETIRED_PERSONAL_PATH}/devices`,
     redirect: {
-      from: "/me/devices",
-      to: "/coding-agents/configure",
+      from: `${RETIRED_PERSONAL_PATH}/devices`,
+      to: codingAgentsPath({ page: "configure" }),
       pinParams: { tab: "devices" },
     },
   },
   {
     // A device's own address has no page of its own; it still belongs on the Devices tab.
-    path: "/me/devices/*",
+    path: `${RETIRED_PERSONAL_PATH}/devices/*`,
     redirect: {
-      from: "/me/devices",
-      to: "/coding-agents/configure",
+      from: `${RETIRED_PERSONAL_PATH}/devices`,
+      to: codingAgentsPath({ page: "configure" }),
       pinParams: { tab: "devices" },
       mapSegment: {},
     },
@@ -1076,16 +1086,16 @@ export const uiCodingAgentsRedirectRoutes: readonly UiRedirectRouteDescriptor[] 
   ...codingAgentsPageList
     .filter((page) => page.includes("/"))
     .map((page) => ({
-      path: `/me/${page}`,
-      redirect: { from: "/me", to: "/coding-agents" },
+      path: `${RETIRED_PERSONAL_PATH}/${page}`,
+      redirect: { from: RETIRED_PERSONAL_PATH, to: CODING_AGENTS_PATH },
     })),
   ...projectSegments(servedPaths).flatMap((segment) => [
-    { path: `/me/${segment}`, redirect: toCodingAgents },
-    { path: `/me/${segment}/*`, redirect: toCodingAgents },
+    { path: `${RETIRED_PERSONAL_PATH}/${segment}`, redirect: toCodingAgents },
+    { path: `${RETIRED_PERSONAL_PATH}/${segment}/*`, redirect: toCodingAgents },
   ]),
   ...projectPageTwins(servedPaths).map((path) => ({ path, redirect: toCodingAgents })),
-  { path: "/me/*", redirect: toCodingAgents },
-  { path: "/me", redirect: toCodingAgents },
+  { path: `${RETIRED_PERSONAL_PATH}/*`, redirect: toCodingAgents },
+  { path: RETIRED_PERSONAL_PATH, redirect: toCodingAgents },
 ];
 
 /** The top-level retired address the /me rows sit after, beside it and above the chrome. */

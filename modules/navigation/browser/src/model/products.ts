@@ -1,5 +1,6 @@
 import type { AuthzPermission } from "@langwatch/authorization";
 import type { FrontendFeatureFlag } from "@langwatch/feature-flag-contract";
+import { CODING_AGENTS_PATH, RETIRED_PERSONAL_PATH } from "@langwatch/user-contract";
 import {
   Boxes,
   Building2,
@@ -57,7 +58,7 @@ export const PRODUCTS: readonly ProductDefinition[] = [
     pitch: "Track your coding assistants",
     icon: UserRound,
     scopeKind: "personal",
-    homeHref: () => "/coding-agents",
+    homeHref: () => CODING_AGENTS_PATH,
     gates: [{ flag: "release_ui_ai_governance_enabled", closesPages: true }],
   },
   {
@@ -143,7 +144,10 @@ export function isPathUnder({ pathname, base }: { pathname: string; base: string
 export function productFromPathname(pathname: string): ProductId | null {
   // The legacy /me address is still this product for the one render its
   // redirect to /coding-agents takes, so landing memory is not overwritten.
-  if (isPathUnder({ pathname, base: "/coding-agents" }) || isPathUnder({ pathname, base: "/me" })) {
+  if (
+    isPathUnder({ pathname, base: CODING_AGENTS_PATH }) ||
+    isPathUnder({ pathname, base: RETIRED_PERSONAL_PATH })
+  ) {
     return "me";
   }
   if (isPathUnder({ pathname, base: "/gateway" })) return "gateway";

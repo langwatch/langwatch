@@ -15,6 +15,7 @@ import {
 import { StatTile, StatTileFigure } from "@langwatch/design-system/stat-tile";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { formatBudgetUsd } from "@langwatch/gateway-contract";
+import { codingAgentsPath } from "@langwatch/user-contract";
 import numeral from "numeral";
 import { useState } from "react";
 
@@ -267,10 +268,14 @@ export function PersonalOverviewScreen() {
             title="Coding-agent usage (last 30 days)"
             action={
               <HStack gap={4}>
-                <Link href="/coding-agents/sessions" fontSize="sm" color="blue.fg">
+                <Link href={codingAgentsPath({ page: "sessions" })} fontSize="sm" color="blue.fg">
                   View sessions
                 </Link>
-                <Link href="/coding-agents/pull-requests" fontSize="sm" color="blue.fg">
+                <Link
+                  href={codingAgentsPath({ page: "pull-requests" })}
+                  fontSize="sm"
+                  color="blue.fg"
+                >
                   View pull requests
                 </Link>
               </HStack>

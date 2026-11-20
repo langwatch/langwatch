@@ -1981,7 +1981,7 @@ type Output = {
 interface Input {
   organizationId: string;
 }
-// Output: personaResolutionSchema, ../contract/src/features/personal/persona-home.ts:53
+// Output: personaResolutionSchema, ../contract/src/features/personal/persona-home.ts:54
 interface Output {
   persona: "personal_only" | "mixed" | "project_only" | "governance_admin";
   destination: string;

@@ -1,3 +1,5 @@
+import { CODING_AGENTS_PATH } from "@langwatch/user-contract";
+
 import { type ProductId, productById } from "./products.ts";
 
 /**
@@ -27,6 +29,6 @@ export function resolveOrgSwitchDestination({
     if (home) return home;
   }
   if (projectSlug) return `/${projectSlug}`;
-  if (reachableProducts.includes("me")) return "/coding-agents";
+  if (reachableProducts.includes("me")) return CODING_AGENTS_PATH;
   return "/";
 }

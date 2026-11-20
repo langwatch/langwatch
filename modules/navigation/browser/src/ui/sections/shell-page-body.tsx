@@ -7,6 +7,7 @@ import { PageHeaderSizeProvider } from "@langwatch/design-system/page-layout";
 import { Box, type StackProps, VStack } from "@langwatch/design-system/primitives";
 import { RestrictedAccess } from "@langwatch/design-system/restricted-access";
 import type { NavigationTeam } from "@langwatch/navigation-contract";
+import { CODING_AGENTS_PATH } from "@langwatch/user-contract";
 import { useEffect, type ReactNode } from "react";
 import { ErrorBoundary } from "react-error-boundary";
 
@@ -186,7 +187,7 @@ export const ShellPageBody = ({
       ? { label: team.name }
       : null;
   const isPersonalScopeRoute =
-    personalScope || isPathUnder({ pathname, base: "/coding-agents" }) || isOnOwnPersonalProject;
+    personalScope || isPathUnder({ pathname, base: CODING_AGENTS_PATH }) || isOnOwnPersonalProject;
 
   // Audit emission for cross-scope reads. Fires once per project the
   // administrator drills into. Fail-quiet: a refused emission must not stop

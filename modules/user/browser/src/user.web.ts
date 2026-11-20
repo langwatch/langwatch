@@ -6,7 +6,7 @@
 
 import { defineBrowserModule } from "@langwatch/browser";
 import { FrontendFlags } from "@langwatch/feature-flag-contract";
-import { userTrpc } from "@langwatch/user-contract";
+import { CODING_AGENTS_PATH, userTrpc } from "@langwatch/user-contract";
 
 import { personalWorkspaceApi } from "./behavior/personal-workspace-api.ts";
 
@@ -22,27 +22,27 @@ export const userWeb = defineBrowserModule("user")
   })
   .withScreens({
     "pages/coding-agents/index": {
-      path: "/coding-agents",
+      path: CODING_AGENTS_PATH,
       flags: [FrontendFlags.release_ui_ai_governance_enabled],
       load: () => import("./ui/sections/personal-workspace/personal-overview.screen.tsx"),
     },
     "pages/coding-agents/configure": {
-      path: "/coding-agents/configure",
+      path: `${CODING_AGENTS_PATH}/configure`,
       flags: [FrontendFlags.release_ui_ai_governance_enabled],
       load: () => import("./ui/sections/personal-workspace/personal-configure.screen.tsx"),
     },
     "pages/coding-agents/pull-requests": {
-      path: "/coding-agents/pull-requests",
+      path: `${CODING_AGENTS_PATH}/pull-requests`,
       flags: [FrontendFlags.release_ui_ai_governance_enabled],
       load: () => import("./ui/sections/personal-workspace/personal-pull-requests.screen.tsx"),
     },
     "pages/coding-agents/sessions": {
-      path: "/coding-agents/sessions",
+      path: `${CODING_AGENTS_PATH}/sessions`,
       flags: [FrontendFlags.release_ui_ai_governance_enabled],
       load: () => import("./ui/sections/personal-workspace/personal-sessions.screen.tsx"),
     },
     "pages/coding-agents/budget/request": {
-      path: "/coding-agents/budget/request",
+      path: `${CODING_AGENTS_PATH}/budget/request`,
       flags: [FrontendFlags.release_ui_ai_governance_enabled],
       load: () => import("./ui/sections/personal-workspace/personal-budget-request.screen.tsx"),
     },

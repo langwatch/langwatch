@@ -8,6 +8,7 @@ import { UserAvatar } from "@langwatch/design-system/avatar";
 import { Menu } from "@langwatch/design-system/menu";
 import { Box, Button, HStack, Portal } from "@langwatch/design-system/primitives";
 import type { NavigationUser } from "@langwatch/navigation-contract";
+import { CODING_AGENTS_PATH } from "@langwatch/user-contract";
 import { Monitor, PanelsTopLeft } from "lucide-react";
 
 import {
@@ -199,7 +200,7 @@ function PersonalWorkspaceEntries({
   if (orgLess) {
     return (
       <Menu.Item value="my-workspace" asChild>
-        <NavigationLink href="/coding-agents">My Workspace</NavigationLink>
+        <NavigationLink href={CODING_AGENTS_PATH}>My Workspace</NavigationLink>
       </Menu.Item>
     );
   }
@@ -216,7 +217,7 @@ function PersonalWorkspaceEntries({
                 teamId: "",
                 projectSlug: "",
               });
-              host.navigate("/coding-agents");
+              host.navigate(CODING_AGENTS_PATH);
             }}
           >
             My Workspace

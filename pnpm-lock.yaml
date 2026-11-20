@@ -2099,6 +2099,9 @@ importers:
       '@langwatch/user-browser':
         specifier: workspace:*
         version: link:../../modules/user/browser
+      '@langwatch/user-contract':
+        specifier: workspace:*
+        version: link:../../modules/user/contract
       '@langwatch/workflow-browser':
         specifier: workspace:*
         version: link:../../modules/workflow/browser
@@ -3399,6 +3402,9 @@ importers:
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../../packages/time
+      '@langwatch/user-contract':
+        specifier: workspace:*
+        version: link:../../../../modules/user/contract
       zod:
         specifier: 'catalog:'
         version: 4.6.7
@@ -5439,6 +5445,9 @@ importers:
       '@langwatch/trace-contract':
         specifier: workspace:*
         version: link:../../trace/contract
+      '@langwatch/user-contract':
+        specifier: workspace:*
+        version: link:../../user/contract
       diff:
         specifier: 'catalog:'
         version: 9.0.0
@@ -9474,6 +9483,9 @@ importers:
       '@langwatch/trace-contract':
         specifier: workspace:*
         version: link:../../trace/contract
+      '@langwatch/user-contract':
+        specifier: workspace:*
+        version: link:../../user/contract
       '@langwatch/webhook-contract':
         specifier: workspace:*
         version: link:../../webhook/contract
@@ -13512,6 +13524,9 @@ importers:
       '@langwatch/upgrade':
         specifier: workspace:*
         version: link:../../../packages/upgrade
+      '@langwatch/user-contract':
+        specifier: workspace:*
+        version: link:../../user/contract
       '@trpc/server':
         specifier: 'catalog:'
         version: 11.18.0(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))

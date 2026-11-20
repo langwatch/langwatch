@@ -8,6 +8,7 @@ import {
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
+import { codingAgentsPath } from "@langwatch/user-contract";
 import { Bot, Check, Terminal } from "lucide-react";
 import { type ReactNode, useState } from "react";
 
@@ -306,7 +307,7 @@ function RawOtlpAdvancedTile() {
             Bring your own OTLP, raw shape. Use for custom telemetry pipelines.
           </Text>
           <Link
-            href="/coding-agents/configure#otlp"
+            href={`${codingAgentsPath({ page: "configure" })}#otlp`}
             color="orange.fg"
             fontSize="xs"
             fontWeight="medium"

@@ -1,4 +1,5 @@
 import type { FrontendFeatureFlag } from "@langwatch/feature-flag-contract";
+import { CODING_AGENTS_PATH } from "@langwatch/user-contract";
 
 import type { DashboardsSidebarHint } from "./dashboards-sidebar-hint.ts";
 import {
@@ -135,7 +136,7 @@ export function resolveShellRoute({
     !isSettingsRoute &&
     !isOrgScopedProduct &&
     (isPersonalScope ||
-      isPathUnder({ pathname, base: "/coding-agents" }) ||
+      isPathUnder({ pathname, base: CODING_AGENTS_PATH }) ||
       isOnOwnPersonalProject);
   const activeProductId = activeProductFor({
     isSettingsRoute,

@@ -1,3 +1,4 @@
+import { CODING_AGENTS_PATH, codingAgentsPath } from "@langwatch/user-contract";
 import {
   Bot,
   ClipboardList,
@@ -24,28 +25,28 @@ export interface PersonalNavItemData {
 
 export const personalUsageNavItem = {
   label: "My Usage",
-  href: "/coding-agents",
+  href: CODING_AGENTS_PATH,
   icon: Gauge,
   keywords: ["usage", "my usage", "spend", "cost", "tokens"],
 } as const;
 
 export const personalSessionsNavItem = {
   label: "Sessions",
-  href: "/coding-agents/sessions",
+  href: codingAgentsPath({ page: "sessions" }),
   icon: SquareTerminal,
   keywords: ["sessions", "coding agent sessions", "claude code", "codex"],
 } as const;
 
 export const personalPullRequestsNavItem = {
   label: "Pull Requests",
-  href: "/coding-agents/pull-requests",
+  href: codingAgentsPath({ page: "pull-requests" }),
   icon: GitPullRequest,
   keywords: ["pull request", "pull requests", "pr", "prs", "github"],
 } as const;
 
 export const personalConfigureNavItem = {
   label: "Configure",
-  href: "/coding-agents/configure",
+  href: codingAgentsPath({ page: "configure" }),
   icon: Sliders,
   keywords: ["configure", "personal settings", "setup"],
 } as const;
