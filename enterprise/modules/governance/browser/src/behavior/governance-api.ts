@@ -7,6 +7,7 @@ import type {
   aiToolsTrpc,
   governanceAgentsTrpc,
   governanceCostTrpc,
+  governanceKillSwitchTrpc,
   governancePeopleTrpc,
   sessionPolicyTrpc,
   AnomalyRule,
@@ -95,7 +96,8 @@ export type GovernanceApiMap = ContractApiMap<typeof activityMonitorTrpc> &
   ContractApiMap<typeof governancePeopleTrpc> &
   ContractApiMap<typeof governanceAgentsTrpc> &
   ContractApiMap<typeof aiToolsTrpc> &
-  ContractApiMap<typeof governanceCostTrpc> & {
+  ContractApiMap<typeof governanceCostTrpc> &
+  ContractApiMap<typeof governanceKillSwitchTrpc> & {
     modelProvider: {
       getResolvedDefault: {
         query: {

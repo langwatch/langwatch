@@ -16,6 +16,9 @@ const { queryImpls, utils, mockOnClose } = vi.hoisted(() => ({
     traces: {
       conversationContext: { fetch: vi.fn(), prefetch: vi.fn() },
     },
+    codingAgents: {
+      lastTurn: { fetch: vi.fn() },
+    },
   },
   mockOnClose: vi.fn(),
 }));
@@ -208,6 +211,7 @@ beforeEach(() => {
   for (const key of Object.keys(queryImpls)) delete queryImpls[key];
   utils.traces.conversationContext.fetch.mockReset();
   utils.traces.conversationContext.prefetch.mockReset();
+  utils.codingAgents.lastTurn.fetch.mockReset().mockResolvedValue(null);
   mockOnClose.mockClear();
 });
 

@@ -66,6 +66,7 @@ export const RETENTION_CLASS_BY_AGGREGATE_TYPE: Record<string, EventLogRetention
   suite_run: "scenarios",
   // Everything else: lifecycle, configuration, billing, authz, identity, governance, meters.
   agent: "indefinite",
+  agent_stop: "indefinite",
   annotation: "indefinite",
   authz_aggregate_read: "indefinite",
   authz_grant: "indefinite",

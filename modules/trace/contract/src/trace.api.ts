@@ -1070,6 +1070,7 @@ export interface TraceApi extends TraceOtlpIngestApi {
   extractLogRecordIO(input: LogRecordReceivedEventData): {
     input: string | null;
     output: string | null;
+    outputDeclared: boolean;
     truncated: boolean;
   };
   /** Sends trace_processing's recordLogContribution batch; refuses where none is registered. */

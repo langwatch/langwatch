@@ -39,7 +39,7 @@ func TestNearExpiryCacheHits_StartOneBackgroundRefresh(t *testing.T) {
 	r.returns = []resolverReturn{{bundle: freshBundle("vk_hot", time.Now().Add(10*time.Minute))}}
 	svc, _ := newService(t, Options{Resolver: r, ConfigFetcher: r})
 	key := domain.PresentedKey{Token: "vk-lw-hot"}
-	svc.storeL1(hashKey(key), freshBundle("vk_hot", time.Now().Add(30*time.Second)), "")
+	seedL1(svc, hashKey(key), freshBundle("vk_hot", time.Now().Add(30*time.Second)), "")
 
 	for range 20 {
 		_, err := svc.Resolve(context.Background(), key)
@@ -59,7 +59,7 @@ func TestBackgroundRefresh_KeepsAKeyEvictedMidRefreshEvicted(t *testing.T) {
 	svc, _ := newService(t, Options{Resolver: r, ConfigFetcher: r})
 	key := domain.PresentedKey{Token: "vk-lw-rev"}
 	h := hashKey(key)
-	svc.storeL1(h, freshBundle("vk_rev", time.Now().Add(30*time.Second)), "")
+	seedL1(svc, h, freshBundle("vk_rev", time.Now().Add(30*time.Second)), "")
 	r.during = func() { svc.l1.Remove(h) }
 
 	refreshCurrent(svc, key, h)

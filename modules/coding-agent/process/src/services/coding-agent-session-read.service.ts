@@ -4,6 +4,7 @@ import {
   type CodingAgentSession,
   type CodingAgentSessionCursor,
   type CodingAgentSessionEvent,
+  type CodingAgentSessionLastTurn,
   codingAgentSessionEventsInputSchema,
   codingAgentSessionLookupInputSchema,
   codingAgentTraceSessionLookupInputSchema,
@@ -26,6 +27,8 @@ import {
 import type { CodingAgentClock } from "./coding-agent-clock.service.ts";
 
 export const CODING_AGENT_SESSION_READ_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+/** How far back a session with no stored row is looked for. */
+const CODING_AGENT_SESSION_LAST_TURN_LOOKBACK_MS = 90 * 24 * 60 * 60 * 1000;
 
 /** Private owner of session, trace, metric and event read-model coordination. */
 export class CodingAgentSessionReadService {
@@ -143,6 +146,35 @@ export class CodingAgentSessionReadService {
       sessionId: mapping.sessionId,
       startedAtMs: mapping.occurredAtMs,
     });
+  }
+
+  /**
+   * The session's newest stored trace, from its own trace map. A launcher can name the
+   * trace's conversation after its own thread, so the session id alone does not find it.
+   */
+  async findLastTurnOfSession(input: {
+    projectId: string;
+    sessionId: string;
+  }): Promise<CodingAgentSessionLastTurn | null> {
+    const parsed = codingAgentSessionLookupInputSchema.parse(input);
+    const nowMs = this.dependencies.clock.nowMs();
+    const session = await this.dependencies.sessions.findBySessionId({
+      tenantId: parsed.projectId,
+      sessionId: parsed.sessionId,
+    });
+    const fromMs =
+      session === null
+        ? nowMs - CODING_AGENT_SESSION_LAST_TURN_LOOKBACK_MS
+        : session.startedAtMs - CODING_AGENT_SESSION_READ_WINDOW_MS;
+    const mapping = await this.dependencies.traceSessions.findLatestBySessionId({
+      tenantId: parsed.projectId,
+      sessionId: parsed.sessionId,
+      fromMs,
+      toMs: nowMs + CODING_AGENT_SESSION_READ_WINDOW_MS,
+    });
+    if (mapping === null) return null;
+
+    return { traceId: mapping.traceId, occurredAtMs: mapping.occurredAtMs };
   }
 
   async listRecent(input: CodingAgentRecentSessionsInput): Promise<CodingAgentSession[]> {

@@ -5944,9 +5944,9 @@ A leaked provider credential is a different problem. Rotate that one in the prov
 | Revoke    | Every request answers `403 virtual_key_revoked`. The key is dead and cannot come back                          | The secret is publicly exposed                                                                      |
 | Rotate    | Keeps working for 24 hours, then fails                                                                         | The secret left a trusted boundary but is not exposed, and callers need time to pick up the new one |
 
-Disable and revoke contain the leak as soon as the change reaches every gateway pod. The control plane writes a change event, and a pod that receives it stops serving the key on the next request, in about 10 seconds.
+Disable and revoke contain the leak as soon as the change reaches every gateway pod. The control plane writes a change event, and a pod that receives it stops serving the key on the next request, usually within a second or two.
 
-A pod that cannot reach the control plane serves the cached key for longer: up to the token expiry of 15 minutes, and past it to the hard cap set by `LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS`, six hours by default. Read [Step 3](#step-3-stop-the-traffic) for the three paths and their timings, and report containment against the slowest one that applies.
+A pod that received the event keeps refusing the key even if the control plane goes down afterwards. A pod that missed the event and cannot reach the control plane serves the cached key up to the hard cap set by `LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS`, six hours by default, unless `LW_GATEWAY_AUTH_CACHE_FAIL_CLOSED_AFTER_SECONDS` is set. Read [Step 3](#step-3-stop-the-traffic) for the paths and their timings.
 
 Rotate leaves the old secret working for a day, so it is a rollover tool rather than a containment tool.
 
@@ -6020,11 +6020,15 @@ New requests stop as each gateway pod learns about the change:
 
 | Path                                                                                                | Timing                                                                                    |
 | --------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
-| The change feed, which carries the revoke or disable event and evicts the key from that pod's cache | About 10 seconds                                                                          |
+| The change feed, which carries the revoke or disable event and evicts the key from that pod's cache | Usually a second or two                                                                   |
 | The key's own token expiring, if the change feed is not delivering                                  | 15 minutes                                                                                |
-| The stale-serving window, if the pod cannot reach the control plane at all                          | Up to `LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS` past the token expiry, default six hours |
+| The stale-serving window, if the pod missed the event and cannot reach the control plane            | Up to `LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS` past the token expiry, default six hours, or `LW_GATEWAY_AUTH_CACHE_FAIL_CLOSED_AFTER_SECONDS` when set |
 
-The third row is the case worth planning for. While the control plane is reachable, a revoked key is refused within seconds, because a `403` from the control plane evicts the cached entry at once with no grace. The grace window only covers a control plane the pod cannot reach, and during such an outage a key revoked just before it can keep serving to the cap.
+The third row is the case worth planning for. A pod that receives the revoke or disable event refuses the key within seconds and records it on a revocation list, so it keeps answering `403` through a later outage. The list is bounded: if the entry is pushed out before the outage, the pod still refuses the key, because the event removed its cached copies, but the caller gets `503 auth_upstream_unavailable` instead of `403`.
+
+A pod that missed the event keeps serving its cached copy until it next asks the control plane: near the token expiry, after a spend change, or when the cached config goes stale. A token refresh gets the control plane's `403` and evicts the entry with no grace. A config refresh sees the key is no longer active and evicts the entry, so the next request gets that `403`.
+
+The grace window only covers a pod that missed the event and cannot reach the control plane. To bound it, set `LW_GATEWAY_AUTH_CACHE_FAIL_CLOSED_AFTER_SECONDS` (minimum 30): once neither the key nor the organization's change feed was confirmed within that limit, the pod answers `503 auth_upstream_unavailable` instead of serving the cached key. Read [Revocation latency](/ai-gateway/self-hosting/config#revocation-latency) for the trade-off.
 
 If you need every pod to forget the key immediately, restart the gateway Deployment. Every new pod starts with an empty cache and resolves each key from the control plane on its first request.
 
@@ -6813,7 +6817,7 @@ curl -sS -X POST "$LW/api/gateway/v1/virtual-keys/$VK_ID/disable" \
   -d '{"reason": "payment overdue"}'
 ```
 
-Requests on the key are rejected with `403 virtual_key_disabled` until you call `/enable`. Budgets, scopes, key material and any running rotation grace stay intact. The gateway picks the change up on its next change-feed poll, a long poll of about 10 seconds. Both transitions emit `gateway.virtual_key.disabled` and `gateway.virtual_key.enabled` events.
+Requests on the key are rejected with `403 virtual_key_disabled` until you call `/enable`. Budgets, scopes, key material and any running rotation grace stay intact. The gateway picks the change up from its change feed, usually within a second or two. Both transitions emit `gateway.virtual_key.disabled` and `gateway.virtual_key.enabled` events.
 
 **The customer resets their API key in your UI.** `POST /api/gateway/v1/virtual-keys/{id}/rotate` returns a new secret; send it to the customer once. The old secret keeps authenticating for 24 hours, so a client you have not reached yet does not fail mid-rollout. The event is `gateway.virtual_key.rotated`.
 
@@ -7749,6 +7753,7 @@ The config part of the entry (credentials, routing chain, budgets) has its own T
 | `LW_GATEWAY_AUTH_CACHE_SOFT_BUMP_SECONDS` | `300` | Extension per failed refresh. |
 | `LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS` | `21600` (6 hours) | Cap on stale serving past the JWT expiry. A negative value disables stale serving. |
 | `LW_GATEWAY_AUTH_CACHE_CONFIG_TTL_SECONDS` | `60` | Config re-fetch interval. A negative value disables it. |
+| `LW_GATEWAY_AUTH_CACHE_FAIL_CLOSED_AFTER_SECONDS` | `0` (off) | Refuses a cached key not re-checked for this long while its change feed is also silent. Minimum 30. |
 
 ## Budget enforcement
 
@@ -8727,6 +8732,8 @@ The gateway serves `GET /metrics` on its own listener, separate from the API por
 | ---------------------------------- | ------- | ------ | ------------------------------------------------------- |
 | `gateway_auth_cache_hits_total`    | counter | `tier` | Virtual-key resolutions served from cache               |
 | `gateway_auth_cache_misses_total`  | counter | `tier` | Resolutions that fell through to the control plane      |
+| `gateway_auth_cache_refusals_total` | counter | `reason` | Cached keys refused by the revocation list (`denied_vk_revoked`, `denied_vk_disabled`) or the fail-closed rule (`fail_closed`) |
+| `gateway_auth_cache_stale_serves_total` | counter | `source` | Keys served from cache because the control plane could not answer (`stale_while_error`, `last_known`) |
 | `gateway_auth_cache_lookups_total` | counter | none   | Resolutions attempted. The denominator for the hit rate |
 | `gateway_auth_cache_size`          | gauge   | `tier` | Virtual keys held in the cache                          |
 
@@ -11472,10 +11479,27 @@ The gateway caches each resolved virtual key in process. When a cached entry pas
 
 A change-feed event (a budget debit, a provider or routing edit) also evicts the entry so the next request reads fresh config. If that refetch fails for a transport reason, the gateway serves the evicted entry again, for up to one hour after its config was last confirmed. Revoking, disabling or rotating a key leaves no such fallback.
 
+### Revocation latency
+
+Revoking or disabling a key reaches every gateway replica through the change feed, a long poll per organization, usually within a second or two.
+
+Each replica records the key in a revocation list kept apart from the key cache. The stale-serve window does not expire the list, so a revoked key is refused even if the control plane goes down right after. Re-enabling the key, or a later successful check with the control plane, clears it.
+
+A replica that starts, or reconnects after an outage, first reads the change history it missed, in pages. A disable found there removes the key from the cache, and the replica checks the key with the control plane until it reaches the newest change. A key disabled and later re-enabled therefore keeps working through a restart, as long as the control plane answers; if it can't, the request gets the retryable `503 auth_upstream_unavailable`.
+
+Once the replica has caught up, the revocation list refuses the keys the history left revoked or disabled with `403`. The list is bounded: a key pushed out of it is still refused, because its cached copies are gone, but the caller gets `503 auth_upstream_unavailable` during an outage.
+
+Rotating a key is not a revocation. The old secret keeps working through its grace period, and the gateway asks the control plane about it.
+
+A replica that cannot reach the control plane cannot learn about a revocation made during that outage. Set `LW_GATEWAY_AUTH_CACHE_FAIL_CLOSED_AFTER_SECONDS` to bound that window. Once a key's last check and its organization's change feed are both older than the limit, the gateway checks the key with the control plane once, at most every 5 seconds per key. If that check fails, the key gets a retryable `auth_upstream_unavailable` error.
+
+The limit is off by default, so an outage does not stop traffic. When set, it must be at least 30 seconds, because a healthy change feed can hold a poll open for about 10 seconds.
+
 | Var                                        | Default | Purpose                                                                                                                                                                   |
 | ------------------------------------------ | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `LW_GATEWAY_AUTH_CACHE_SOFT_BUMP_SECONDS`  | `300`   | Extension granted per failed refresh during a control plane outage. `0` takes the default                                                                                 |
 | `LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS` | `21600` | Cap on stale serving, measured from the JWT expiry. `0` takes the default. A negative value disables stale serving, so a key fails at its JWT expiry                      |
+| `LW_GATEWAY_AUTH_CACHE_FAIL_CLOSED_AFTER_SECONDS` | `0` | When positive, refuses a cached key once its last control-plane check and its organization's last change-feed poll are both older than this. Minimum `30`. `0` turns off only this limit: cached keys still stop at JWT expiry plus `LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS`. A negative value is refused at startup |
 | `LW_GATEWAY_AUTH_CACHE_CONFIG_TTL_SECONDS` | `60`    | Age at which a cached key's configuration (credentials, endpoints, routing) is re-fetched in the background. `0` takes the default. A negative value disables the refresh |
 
 The retired names `LW_GATEWAY_AUTH_CACHE_SOFT_BUMP`, `LW_GATEWAY_AUTH_CACHE_HARD_GRACE` and `LW_GATEWAY_AUTH_CACHE_CONFIG_TTL` are refused: the gateway stops at startup and names the `_SECONDS` variable to set instead.
@@ -12458,6 +12482,7 @@ What you can tune is how long a cached key survives without the control plane, a
 | `LW_GATEWAY_AUTH_CACHE_CONFIG_TTL_SECONDS` | `60`    | Age at which a cached key's configuration is re-fetched in the background   |
 | `LW_GATEWAY_AUTH_CACHE_SOFT_BUMP_SECONDS`  | `300`   | Extension granted per failed refresh while the control plane is unreachable |
 | `LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS` | `21600` | Cap on serving a key past its token expiry                                  |
+| `LW_GATEWAY_AUTH_CACHE_FAIL_CLOSED_AFTER_SECONDS` | `0` | Off by default. Refuses a cached key not re-checked for this long while the change feed is also silent (minimum 30) |
 
 Add them to the pod yourself; the chart does not render them. See [Config](/ai-gateway/self-hosting/config#auth-cache).
 
@@ -12836,11 +12861,11 @@ You changed a limit, an allowlist or a credential, and requests still behave the
 
 | Path                                                       | Timing                                                 |
 | ---------------------------------------------------------- | ------------------------------------------------------ |
-| The change feed, a long poll against the control plane     | About 10 seconds                                       |
+| The change feed, a long poll against the control plane     | Usually a second or two                                |
 | The configuration re-fetch, for changes that emit no event | `LW_GATEWAY_AUTH_CACHE_CONFIG_TTL_SECONDS`, default 60 |
 | The key's own token expiring                               | 15 minutes                                             |
 
-Rotations, revocations, budget edits, routing changes and cache-rule edits all travel on the change feed, so 10 seconds is the normal case.
+Rotations, revocations, budget edits, routing changes and cache-rule edits all travel on the change feed, so a second or two is the normal case. An idle poll is held open about 10 seconds and answers as soon as a change lands.
 
 **Confirm the feed is running:** the pod log carries an `auth_cache_change_evict` line with the change kind and the key id when a change lands. A `change_feed_poll_failed` line instead means the pod cannot reach the control plane, and every cached key stays as it is until the poll recovers.
 
@@ -12883,6 +12908,10 @@ A `401`, `403` or `404` from the control plane about the key itself is not an ou
 | `auth_cache_serve_stale`                                | info  | The grace window is active and keys are still being served                            |
 | `auth_cache_refresh_transport_failure`                  | warn  | Each refresh is failing. This is the outage signal, and cached keys are still serving |
 | `auth_cache_hard_evict` with `reason=hard_cap_exceeded` | error | The grace window is spent and requests are now refused                                |
+| `auth_cache_key_denied`                                 | info  | The change feed revoked or disabled a key, and every cache tier now refuses it        |
+| `auth_cache_refused` with `reason=denied_vk_revoked` or `denied_vk_disabled` | info | A request presented a denied key and got its `403`, even with the control plane down |
+| `auth_cache_refused` with `reason=fail_closed`          | info  | `LW_GATEWAY_AUTH_CACHE_FAIL_CLOSED_AFTER_SECONDS` refused a key it could not re-check   |
+| `auth_cache_denial_cleared`                             | info  | A re-enable or a later key check lifted a denial                                      |
 
 **Fix:** restore the control plane. Raise `LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS` while an outage is still running if you would rather extend than refuse. Set it to a negative value to switch stale serving off entirely, which is what a strict revocation policy wants.
 
@@ -75156,6 +75185,7 @@ A rollback never runs migrations and never needs a down migration. Every migrati
 - The previous version starts on the newer schema.
 - The Upgrades page shows **Rolled back** while the older version runs. Background steps that an older version can undo are reopened, and run again after you upgrade again.
 - Data the newer version wrote stays. Features the older version does not know about are unavailable until you upgrade again.
+- The agent registry's change feed and `/versions` skip an event type the running version does not know, so they keep answering after a rollback. LangWatch 3.25 and earlier refuse such an event, so a release adds a feed event type only once every version it can roll back to skips unknown types.
 
 ### Helm
 
@@ -77668,6 +77698,100 @@ openapi: "GET /api/v1/governance/registry/events"
 ---
 title: "Search the registry (ARD search)"
 openapi: "POST /api/v1/governance/registry/ard/search"
+---
+
+---
+
+# FILE: ./api-reference/governance-kill-switch/approve-a-pending-stop.mdx
+
+---
+title: "Approve a pending stop"
+openapi: "POST /api/v1/governance/agent-stops/{stopId}/approve"
+---
+
+---
+
+# FILE: ./api-reference/governance-kill-switch/deny-a-pending-stop.mdx
+
+---
+title: "Deny a pending stop"
+openapi: "POST /api/v1/governance/agent-stops/{stopId}/deny"
+---
+
+---
+
+# FILE: ./api-reference/governance-kill-switch/get-an-agent-s-latest-stop.mdx
+
+---
+title: "Get an agent's latest stop"
+openapi: "GET /api/v1/governance/agents/{agentId}/stop"
+---
+
+---
+
+# FILE: ./api-reference/governance-kill-switch/get-an-agent-s-stop-plan.mdx
+
+---
+title: "Get an agent's stop plan"
+openapi: "GET /api/v1/governance/agents/{agentId}/stop-plan"
+---
+
+---
+
+# FILE: ./api-reference/governance-kill-switch/list-the-organisation-s-agent-stops.mdx
+
+---
+title: "List the organisation's agent stops"
+openapi: "GET /api/v1/governance/agent-stops"
+---
+
+---
+
+# FILE: ./api-reference/governance-kill-switch/overview.mdx
+
+---
+title: "Overview"
+description: "Stop a registry agent on the targets of its stop plan: Databricks serving endpoints, Amazon Bedrock agent aliases and gateway virtual keys. Set each agent's stop plan, request a stop, approve or deny it, read every target's outcome, retry a failed stop and restore the agent. Needs an organization API key on an Enterprise plan with the agent registry. Reads need the governance:view permission and changes need governance:manage."
+---
+
+## Intro
+
+Stop a registry agent on the targets of its stop plan: Databricks serving endpoints, Amazon Bedrock agent aliases and gateway virtual keys. Set each agent's stop plan, request a stop, approve or deny it, read every target's outcome, retry a failed stop and restore the agent. Needs an organization API key on an Enterprise plan with the agent registry. Reads need the governance:view permission and changes need governance:manage.
+
+---
+
+# FILE: ./api-reference/governance-kill-switch/replace-an-agent-s-stop-plan.mdx
+
+---
+title: "Replace an agent's stop plan"
+openapi: "PUT /api/v1/governance/agents/{agentId}/stop-plan"
+---
+
+---
+
+# FILE: ./api-reference/governance-kill-switch/restore-a-stopped-agent.mdx
+
+---
+title: "Restore a stopped agent"
+openapi: "POST /api/v1/governance/agent-stops/{stopId}/restore"
+---
+
+---
+
+# FILE: ./api-reference/governance-kill-switch/retry-a-stop.mdx
+
+---
+title: "Retry a stop"
+openapi: "POST /api/v1/governance/agent-stops/{stopId}/retry"
+---
+
+---
+
+# FILE: ./api-reference/governance-kill-switch/stop-an-agent.mdx
+
+---
+title: "Stop an agent"
+openapi: "POST /api/v1/governance/agents/{agentId}/stop"
 ---
 
 ---

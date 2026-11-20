@@ -7458,6 +7458,117 @@ model AgentRegistryBaseline {
   baselinedAt    DateTime
 }
 
+/// One target of a registry agent's kill switch stop plan (enterprise/modules/governance/specs/
+/// agent-kill-switch.feature): a Databricks serving endpoint, a Bedrock agent alias or a gateway
+/// virtual key. A plan write replaces every row of the agent at once.
+model AgentStopPlanTarget {
+  id             String   @id
+  organizationId String
+  /// The AgentRegistryEntry the plan belongs to.
+  agentId        String
+  position       Int
+  label          String
+  target         Json
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @default(now()) @updatedAt
+
+  @@index([organizationId, agentId])
+}
+
+/// One agent's stop plan version: bumped by every save, so a save over a plan someone else saved
+/// since it was read is refused. No row means the plan was never saved (version 0).
+model AgentStopPlan {
+  organizationId String
+  /// The AgentRegistryEntry the plan belongs to.
+  agentId        String
+  version        Int
+  updatedAt      DateTime @default(now()) @updatedAt
+
+  @@id([organizationId, agentId])
+}
+
+/// An AWS credential a Bedrock kill switch target signs with: a static key pair, a role to assume,
+/// or both. The secret access key and the external id are stored sealed.
+model GovernanceAwsConnection {
+  id                       String   @id
+  organizationId           String
+  name                     String
+  accessKeyId              String?
+  encryptedSecretAccessKey String?
+  roleArn                  String?
+  encryptedExternalId      String?
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @default(now()) @updatedAt
+
+  @@index([organizationId])
+}
+
+/// The `agent_stop` aggregate's Postgres projection: one row per kill switch stop, its status and
+/// every target's outcome, folded from the stop's events.
+model AgentStop {
+  id                  String    @id
+  organizationId      String
+  agentId             String
+  agentName           String
+  status              String
+  severity            String
+  approval            String
+  trigger             String
+  reason              String
+  requestedByUserId   String?
+  requestedByApiKeyId String?
+  decidedByUserId     String?
+  decidedByApiKeyId   String?
+  restoredByUserId    String?
+  restoredByApiKeyId  String?
+  targets             Json
+  requestedAt         DateTime
+  decidedAt           DateTime?
+  quarantinedAt       DateTime?
+  restoreRequestedAt  DateTime?
+  restoredAt          DateTime?
+  lastAppliedEventId  String
+  lastAcceptedAt      BigInt
+  lastOccurredAt      BigInt
+  projectionVersion   String
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @default(now()) @updatedAt
+
+  @@index([organizationId, agentId])
+  @@index([organizationId, status])
+}
+
+/// The one open stop an agent may have: the api takes this row before it sends a stop's request,
+/// so two requests at once cannot both open one. A later request takes it over once the stop it
+/// names has closed.
+/// `sentAt` is set once the request command was sent: from then on the claim passes on only after
+/// its stop closed, never on age. `decision` is taken by the one approve or deny that wins.
+/// `decisionTakenAt` is set while that decision is in flight and cleared once its command was
+/// sent; a decision left in flight is taken over once abandoned.
+model AgentStopClaim {
+  organizationId  String
+  agentId         String
+  stopId          String
+  claimedAt       DateTime
+  sentAt          DateTime?
+  decision        String?
+  decisionTakenAt DateTime?
+
+  @@id([organizationId, agentId])
+}
+
+/// Whether a target was already stopped before a stop first touched it, recorded once before the
+/// stop's platform call, so a retried call after a success still knows the change is the stop's own.
+model AgentStopTargetPriorState {
+  organizationId String
+  stopId         String
+  targetId       String
+  wasStopped     Boolean
+  recordedAt     DateTime
+
+  @@id([organizationId, stopId, targetId])
+}
+
 /// The dated match table: "`user_abc123` on Anthropic is platform user #42,
 /// valid from March 3", closed when it stops being true.
 ///

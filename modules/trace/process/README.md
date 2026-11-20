@@ -1092,7 +1092,7 @@ canonicalizeSpanAttributes(input: CanonicalizeSpanAttributesInput): Canonicalize
 A log record's input and output, each cut to Trace's 64 KiB projection preview.
 
 ```typescript
-extractLogRecordIO(input: LogRecordReceivedEventData): { input: string | null; output: string | null; truncated: boolean; };
+extractLogRecordIO(input: LogRecordReceivedEventData): { input: string | null; output: string | null; outputDeclared: boolean; truncated: boolean; };
 ```
 
 #### `recordLogContributions`

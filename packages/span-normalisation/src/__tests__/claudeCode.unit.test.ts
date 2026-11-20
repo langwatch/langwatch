@@ -53,6 +53,20 @@ describe("ClaudeCodeCanonicaliserService.applyLog", () => {
     expect(ctx.out["langwatch.input"]).toBe("hi");
   });
 
+  /** @scenario A user prompt's declared input replaces the wrapped prompt */
+  it("keeps a launcher's declared input over the wrapped prompt", () => {
+    const ctx = createLogExtractorContext(SCOPE, {
+      "event.name": "user_prompt",
+      prompt: "## Context\nmemory\n[#support] Ada · message msg_1\nCan you check the build?",
+      "langwatch.input": "Can you check the build?",
+      "session.id": "sess_wrapped",
+    });
+
+    ClaudeCodeCanonicaliserService.create().applyLog(ctx);
+
+    expect(ctx.out["langwatch.input"]).toBe("Can you check the build?");
+  });
+
   it("returns no-op for a non-claude_code scope", () => {
     const ctx = createLogExtractorContext("com.openai.codex.events", {
       "event.name": "user_prompt",
