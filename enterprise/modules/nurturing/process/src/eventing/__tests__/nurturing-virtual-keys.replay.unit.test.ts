@@ -5,9 +5,11 @@
  * logs, the module's own steps, memory repositories. The per-fact memory twin is the oracle.
  * Spec: enterprise/modules/nurturing/specs/gateway-facts.feature
  */
+import type { CioBatchCall } from "@langwatch/enterprise-nurturing-contract";
 import {
   defineAggregate,
   definePipeline,
+  InMemoryProcessStore,
   type ReplayEvent,
   ReplayService,
   projectionLaneReplayer,
@@ -26,6 +28,10 @@ import {
   USER_IDENTITY_AGGREGATE_TYPE,
   userErasedPayloadSchema,
 } from "@langwatch/identity-contract";
+import type { OrganizationApi } from "@langwatch/organization-contract";
+import { ResourceScope } from "@langwatch/process";
+import { ScopedSecrets } from "@langwatch/secrets";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { memoryRedisDouble } from "@langwatch/test-harness/client-doubles/redis";
 import {
   isMigrationStep,
@@ -37,10 +43,14 @@ import {
   USER_ERASED_EVENT_TYPE,
   USER_LIFECYCLE_EVENT_VERSION,
   USER_LIFECYCLE_PIPELINE_NAME,
+  type UserApi,
   userErasedEventDataSchema,
 } from "@langwatch/user-contract";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 
+import { NurturingModule } from "../../app/nurturing.app.ts";
+import { CustomerIoChannel } from "../../channels/customer-io.channel.ts";
+import { nurturingProcessModule } from "../../nurturing.module.ts";
 import { MemoryNurturingVirtualKeyRepository } from "../../repositories/memory/memory.nurturing-gateway-key.repository.ts";
 import { MemoryNurturingRepositories } from "../../repositories/memory/memory.nurturing.repositories.ts";
 import type { NurturingVirtualKeyRepository } from "../../repositories/nurturing-gateway-key.repository.ts";
@@ -48,8 +58,16 @@ import { virtualKeyFactOf } from "../../rules/nurturing-virtual-key.rules.ts";
 import {
   buildNurturingProjectUsagePipeline,
   NURTURING_PROJECT_USAGE_PIPELINE_NAME,
+  nurturingProjectUsageEventing,
+  nurturingProjectUsagePeerEvents,
 } from "../nurturing-project-usage.pipeline.ts";
-import { lifecycleFact, ORGANIZATION_ID } from "./nurturing-gateway-facts.test-helpers.ts";
+import {
+  ADMIN_USER_ID,
+  gatewayEvent,
+  lifecycleFact,
+  liveSubscribersOf,
+  ORGANIZATION_ID,
+} from "./nurturing-gateway-facts.test-helpers.ts";
 import {
   IDENTITY_MARKS_STEP,
   KEYS_STEP,
@@ -143,6 +161,35 @@ function owners() {
   ];
 }
 
+/**
+ * Stand-ins for the owners whose facts the usage folds take: a worker with a Customer.io channel
+ * registers those folds, and the replayer refuses a fold whose owner no pipeline declares.
+ */
+function usageFoldOwners() {
+  return Object.entries(nurturingProjectUsagePeerEvents).map(([owner, events]) =>
+    sealPipelineDefinition(
+      ownerPipeline(`${owner}_events`, owner)
+        .withEvents(events.map(({ type, data }) => testEventSchema(type, data)))
+        .build(),
+    ),
+  );
+}
+
+/** The real lane replayer over a log and the lanes the registered pipelines declare. */
+const laneReplayerOver = (
+  log: NurturingSeededLog,
+  projections: ReturnType<typeof replayProjectionsOf>,
+) =>
+  projectionLaneReplayer({
+    service: new ReplayService({
+      eventSource: log,
+      redis: memoryRedisDouble({
+        script: { hdel: async () => 0, hlen: async () => 0, lpush: async () => 0 },
+      }),
+    }),
+    projections,
+  });
+
 /** How a step runs: for real or dry, from the start or from the report a failed run saved. */
 type StepRunOptions = { dryRun?: boolean; resumeFrom?: MigrationStepReport | null };
 
@@ -169,16 +216,7 @@ function deploy({
     sync: undefined,
   });
   const projections = replayProjectionsOf([...owners(), sealPipelineDefinition(pipeline)]);
-  const replayer = projectionLaneReplayer({
-    service: new ReplayService({
-      eventSource: log,
-      redis: memoryRedisDouble({
-        script: { hdel: async () => 0, hlen: async () => 0, lpush: async () => 0 },
-      }),
-    }),
-    projections,
-  });
-  const steps = nurturingReplayStepsOver(replayer);
+  const steps = nurturingReplayStepsOver(laneReplayerOver(log, projections));
   const step = (id: string): MigrationStep => {
     const found = steps.find((each) => each.id === id);
     if (!found || !isMigrationStep(found)) throw new Error(`no step ${id}`);
@@ -569,15 +607,7 @@ describe("given the module's steps", () => {
   /** @scenario "The key copy's replay step names the lane the usage pipeline declares" */
   it("refuses the subscriber's old lane name as one no pipeline declares", async () => {
     const worker = deploy({ events: [] });
-    const replayer = projectionLaneReplayer({
-      service: new ReplayService({
-        eventSource: worker.log,
-        redis: memoryRedisDouble({
-          script: { hdel: async () => 0, hlen: async () => 0, lpush: async () => 0 },
-        }),
-      }),
-      projections: worker.projections,
-    });
+    const replayer = laneReplayerOver(worker.log, worker.projections);
 
     await expect(
       replayer.replayLane({
@@ -586,5 +616,183 @@ describe("given the module's steps", () => {
         dryRun: true,
       }),
     ).rejects.toMatchObject({ code: "projection_lane_not_found" });
+  });
+});
+
+/**
+ * Nurturing's Customer.io channel as an in-memory fake: every call any service makes on it, by
+ * method, in order. Each send, one call or a batch, goes through one of these methods.
+ */
+class RecordingCustomerIoChannel extends CustomerIoChannel {
+  readonly calls: { method: string; input: unknown }[] = [];
+
+  identifyUser(input: Parameters<CustomerIoChannel["identifyUser"]>[0]): Promise<void> {
+    return this.record("identifyUser", input);
+  }
+
+  trackEvent(input: Parameters<CustomerIoChannel["trackEvent"]>[0]): Promise<void> {
+    return this.record("trackEvent", input);
+  }
+
+  groupUser(input: Parameters<CustomerIoChannel["groupUser"]>[0]): Promise<void> {
+    return this.record("groupUser", input);
+  }
+
+  batch(calls: CioBatchCall[]): Promise<void> {
+    return this.record("batch", calls);
+  }
+
+  // Recorded under their own names: the base class would forward each to the method above.
+  override trackEventOrThrow(input: Parameters<CustomerIoChannel["trackEvent"]>[0]): Promise<void> {
+    return this.record("trackEventOrThrow", input);
+  }
+
+  override batchOrThrow(calls: CioBatchCall[]): Promise<void> {
+    return this.record("batchOrThrow", calls);
+  }
+
+  private record(method: string, input: unknown): Promise<void> {
+    this.calls.push({ method, input });
+    return Promise.resolve();
+  }
+}
+
+/**
+ * A worker as it composes nurturing: the real app over memory copies and a recording Customer.io
+ * channel, both event pipelines as the module's eventing builds them over that app, and the real
+ * lane replayer over those pipelines, their owners' and the seeded log. The steps are the ones
+ * `nurturingProcessModule.install` returns over that replayer. Install builds its channels from
+ * the store tier and takes none, so the app it installs is built here, by the same class.
+ */
+async function liveWorker({ events }: { events: ReplayEvent[] }) {
+  const customerIo = new RecordingCustomerIoChannel();
+  const repositories = MemoryNurturingRepositories.create();
+  const app = await NurturingModule.create({
+    dependencies: {
+      users: createApiFixture<UserApi>({}, "UserApi"),
+      organizations: createApiFixture<OrganizationApi>({}, "OrganizationApi"),
+    },
+    config: {
+      customerIoRegion: void 0,
+      customerIoBaseUrl: void 0,
+      posthogKey: void 0,
+      posthogHost: void 0,
+    },
+    resources: { own: () => void 0, ownService: () => void 0 },
+    secrets: new ScopedSecrets(async (_handle, build) => build(undefined)),
+    repositories,
+    channels: { customerIo, posthog: void 0 },
+  });
+  // nurturingEventing builds `app.pipeline()`; the usage pipeline syncs, as a channel is present.
+  const nurturing = app.pipeline();
+  const usage = nurturingProjectUsageEventing.build({
+    participation: "consume",
+    repositories,
+    app,
+    processStore: InMemoryProcessStore.createForTesting(),
+  });
+  const replayer = laneReplayerOver(
+    new NurturingSeededLog(events),
+    replayProjectionsOf([
+      ...owners(),
+      ...usageFoldOwners(),
+      sealPipelineDefinition(nurturing),
+      sealPipelineDefinition(usage),
+    ]),
+  );
+  const installed = await nurturingProcessModule.install({
+    resources: new ResourceScope(),
+    config: {
+      customerIoRegion: void 0,
+      customerIoBaseUrl: void 0,
+      posthogKey: void 0,
+      posthogHost: void 0,
+    },
+    repositorySelection: { tier: "memory", members: {} },
+    role: "worker",
+    secrets: new ScopedSecrets(async (_handle, build) => build(undefined)),
+    replayer,
+    resolve: () => createApiFixture<never>(),
+  });
+  const steps = (installed.migrationSteps ?? []).filter(isMigrationStep);
+  /** Every step the module declares, for real, in the order it declares them. */
+  const runModuleSteps = async () => {
+    for (const step of steps) {
+      await step.run({
+        log: { info: () => undefined, warn: () => undefined },
+        checkpoint: { resumeFrom: null, save: async () => undefined },
+        dryRun: false,
+        signal: new AbortController().signal,
+      });
+    }
+  };
+  // The copied admin, a current member: who a created key that no member holds is told to.
+  await repositories.milestones.recordOrganization({
+    organizationId: ORGANIZATION_ID,
+    adminUserId: ADMIN_USER_ID,
+    seeded: false,
+  });
+  await repositories.members.recordMembershipChange({
+    organizationId: ORGANIZATION_ID,
+    userId: ADMIN_USER_ID,
+    change: "joined",
+    at: 1,
+  });
+  return {
+    customerIo,
+    repositories,
+    steps,
+    runModuleSteps,
+    deliverLive: liveSubscribersOf(nurturing),
+  };
+}
+
+describe("given a worker composing nurturing with a recording Customer.io channel", () => {
+  const people = { user: "user-erased-before-deploy", identity: "identity-erased-before-deploy" };
+  const createdKey = { virtual_key_id: keyId(60), occurred_at: 1_000 };
+  let worker: Awaited<ReturnType<typeof liveWorker>>;
+
+  beforeEach(async () => {
+    worker = await liveWorker({
+      events: [gatewayFact(createdKey), userErased(people.user), identityErased(people.identity)],
+    });
+  });
+
+  describe("when the module's three replay steps run over owner logs holding a created key", () => {
+    it("sends nothing to Customer.io, while the steps fill the key copy and the marks", async () => {
+      await worker.runModuleSteps();
+
+      expect(worker.customerIo.calls).toEqual([]);
+      expect(worker.steps.map(({ id }) => id)).toEqual([
+        USER_MARKS_STEP,
+        IDENTITY_MARKS_STEP,
+        KEYS_STEP,
+      ]);
+      await expect(
+        worker.repositories.virtualKeys.findKey({
+          organizationId: ORGANIZATION_ID,
+          virtualKeyId: createdKey.virtual_key_id,
+        }),
+      ).resolves.toMatchObject([{ keyCreatedAt: 1_000 }]);
+      await expect(
+        worker.repositories.erasedUsers.findErased({ userIds: Object.values(people) }),
+      ).resolves.toHaveLength(2);
+    });
+  });
+
+  describe("when the same created fact reaches the live virtualKeyCreated subscriber", () => {
+    it("sends the one virtual_key_created track to the admin, so the channel is reachable", async () => {
+      await worker.deliverLive(
+        gatewayEvent({ type: GATEWAY_VK_LIFECYCLE_EVENT_TYPE, data: lifecycleFact(createdKey) }),
+      );
+
+      expect(worker.customerIo.calls).toHaveLength(1);
+      expect(worker.customerIo.calls).toMatchObject([
+        {
+          method: "batchOrThrow",
+          input: [{ type: "track", userId: ADMIN_USER_ID, event: "virtual_key_created" }],
+        },
+      ]);
+    });
   });
 });

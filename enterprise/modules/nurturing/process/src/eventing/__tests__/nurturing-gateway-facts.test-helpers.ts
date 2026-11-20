@@ -52,7 +52,7 @@ import {
   NURTURING_VIRTUAL_KEYS_PROJECTION_NAME,
   nurturingMembershipSubscriber,
 } from "../nurturing-project-usage.pipeline.ts";
-import { buildNurturingPipeline } from "../nurturing.pipeline.ts";
+import { buildNurturingPipeline, type NurturingPipeline } from "../nurturing.pipeline.ts";
 
 export const ORGANIZATION_ID = "org-1";
 export const ADMIN_USER_ID = "user-admin";
@@ -176,6 +176,24 @@ function registeredKeyLane({
   for (const projection of pipeline.globalProjections ?? []) projection.register(registry);
   if (!apply) throw new Error("the usage pipeline registers no key lane");
   return apply;
+}
+
+/**
+ * The nurturing pipeline's peer subscribers as a worker registers them, and the live router's
+ * hand-off: an owner's event goes to every subscriber declaring its type, in registration order.
+ */
+export function liveSubscribersOf(pipeline: NurturingPipeline): (event: Event) => Promise<void> {
+  const subscribers: EventSubscriberDefinition<Event>[] = [];
+  const registry = createApiFixture<
+    Parameters<NonNullable<NurturingPipeline["globalProjections"]>[number]["register"]>[0]
+  >({ registerEventSubscriber: (subscriber) => void subscribers.push(subscriber) });
+  for (const projection of pipeline.globalProjections ?? []) projection.register(registry);
+  return async (event) => {
+    const lanes = subscribers.filter(({ eventTypes }) => eventTypes.includes(event.type));
+    for (const lane of lanes) {
+      await lane.handle(event, { tenantId: event.tenantId, aggregateId: event.aggregateId });
+    }
+  };
 }
 
 /** User's erasure fact for one account. */
@@ -312,11 +330,7 @@ export async function gatewayFactsOver({
     virtualKeyCreated: (input) => gatewayFacts.virtualKeyCreated(input),
     keyBudgetCrossed: (input) => gatewayFacts.keyBudgetCrossed(input),
   });
-  const subscribers: EventSubscriberDefinition<Event>[] = [];
-  const registry = createApiFixture<
-    Parameters<NonNullable<typeof pipeline.globalProjections>[number]["register"]>[0]
-  >({ registerEventSubscriber: (subscriber) => void subscribers.push(subscriber) });
-  for (const projection of pipeline.globalProjections ?? []) projection.register(registry);
+  const toSubscribers = liveSubscribersOf(pipeline);
   // The key copy as the usage pipeline registers it: the live lane's parse, then its store.
   const keyLane = registeredKeyLane({ virtualKeys, members });
   const memberCopy = nurturingMembershipSubscriber({
@@ -339,10 +353,7 @@ export async function gatewayFactsOver({
       });
     }
     if (event.type === GATEWAY_VK_LIFECYCLE_EVENT_TYPE) await keyLane(event);
-    const lanes = subscribers.filter(({ eventTypes }) => eventTypes.includes(event.type));
-    for (const lane of lanes) {
-      await lane.handle(event, { tenantId: event.tenantId, aggregateId: event.aggregateId });
-    }
+    await toSubscribers(event);
   };
   /** A current member of the organization since `at`, as an owner's join fact records one. */
   async function joined(userId: string, at = 1): Promise<void> {
