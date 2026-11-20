@@ -81,7 +81,8 @@ Feature: AI Gateway Governance — Personal budget exceeded surfaces (CLI + dash
   Scenario: The box falls back to the static request page when the payload has no signed URL
     Given the 402 payload carries an empty `request_increase_url`
     When jane runs `langwatch claude`
-    Then the box's "Request an increase" line prints `<control_plane_url>/coding-agents/budget/request`
+    Then the box's "Request an increase" line prints `<control_plane_url>/me/budget/request`
+    # /me, not /coding-agents: older servers have no /coding-agents route; newer ones redirect /me/budget/request with its query.
     # There is no `langwatch request-increase` command anymore: the box
     # prints the URL directly, so the one thing the command did happens
     # without a second step.

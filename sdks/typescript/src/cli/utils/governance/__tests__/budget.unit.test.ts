@@ -104,10 +104,10 @@ describe("renderBudgetExceeded", () => {
   it("falls back to the static request page when the payload has no signed URL", () => {
     const out = renderBudgetExceeded(
       { ...baseEvent, request_increase_url: "" },
-      { fallbackUrl: "http://app.example/coding-agents/budget/request" },
+      { fallbackUrl: "http://app.example/me/budget/request" },
     );
     expect(out).toContain("Need urgent access? Request an increase:");
-    expect(out).toContain("http://app.example/coding-agents/budget/request");
+    expect(out).toContain("http://app.example/me/budget/request");
   });
 
   it("omits the request block when no URL is known at all", () => {
