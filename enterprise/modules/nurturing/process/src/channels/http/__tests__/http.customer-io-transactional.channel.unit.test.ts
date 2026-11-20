@@ -38,7 +38,7 @@ function network(answer: () => Promise<Response>) {
 }
 
 /** The JSON body the client posts is always a string; anything else fails the test loudly. */
-function stringBody(body: BodyInit | null | undefined): string {
+function stringBody(body: RequestInit["body"]): string {
   if (typeof body !== "string") throw new Error("expected a string request body");
   return body;
 }
