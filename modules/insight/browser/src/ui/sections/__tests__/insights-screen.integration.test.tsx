@@ -13,10 +13,11 @@ import {
 import { nowInstant } from "@langwatch/time";
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { useReducer } from "react";
 import { describe, expect, it, vi } from "vitest";
 
 import {
+  FlagSwitch,
+  FlippableInsightHost,
   flushReads,
   insightEntry,
   renderWithInsightHost,
@@ -69,39 +70,44 @@ describe("given a project with no insights", () => {
   });
 });
 
+describe("given a project with no insights where Dashboards is off", () => {
+  describe("when a member opens Insights", () => {
+    /** @scenario "A project with no insights offers no Dashboards action where Dashboards is off" */
+    it("offers no action that opens Dashboards and does not mention a board", async () => {
+      const { host } = renderWithInsightHost({
+        element: <InsightsScreen />,
+        host: new StubInsightHost({ dashboardsEnabled: false }),
+        answer: project({ entries: [] }).answer,
+      });
+
+      expect(await screen.findByText("Langy writes your brief here")).toBeInTheDocument();
+      await flushReads();
+
+      expect(screen.queryByRole("button", { name: "Open Dashboards" })).not.toBeInTheDocument();
+      expect(screen.queryByText(/board/i)).not.toBeInTheDocument();
+      expect(host.navigations).toEqual([]);
+    });
+  });
+});
+
 describe("given a rejected inbox read", () => {
   describe("when the rule turns false afterwards", () => {
     /** @scenario "Insights shows nothing while release_insights is off" */
     it("shows no error or Retry and reads no more", async () => {
-      class FlippableHost extends StubInsightHost {
-        on = true;
-        override isEnabled() {
-          return this.on;
-        }
-      }
-      const host = new FlippableHost();
+      const host = new FlippableInsightHost();
       const read = vi.fn<UiProcedureAnswer>(() =>
         // A 403 is not retried, so the error shows at once.
         Promise.reject(new UiProcedureRefusal("FORBIDDEN", 403)),
       );
-      function Switch() {
-        const [, redraw] = useReducer((count: number) => count + 1, 0);
-        return (
-          <>
+      renderWithInsightHost({
+        element: (
+          <FlagSwitch host={host}>
             <InsightsScreen />
-            <button
-              type="button"
-              onClick={() => {
-                host.on = false;
-                redraw();
-              }}
-            >
-              Turn flag off
-            </button>
-          </>
-        );
-      }
-      renderWithInsightHost({ element: <Switch />, host, answer: read });
+          </FlagSwitch>
+        ),
+        host,
+        answer: read,
+      });
       expect(await screen.findByRole("button", { name: "Retry" })).toBeInTheDocument();
       const reads = read.mock.calls.length;
 

@@ -106,6 +106,8 @@ function InboxBody({
   onSelectFolder: (folder: InsightFolder) => void;
 }) {
   const host = useInsightHost();
+  // Where Dashboards answers not-found, pointing at a board would dead-end.
+  const dashboardsOpen = host.isDashboardsEnabled() === true;
   if (reading.error) {
     return (
       <VStack align="start" gap={2} paddingY={6}>
@@ -135,17 +137,23 @@ function InboxBody({
     return (
       <NoDataInfoBlock
         title="Langy writes your brief here"
-        description="Turn on Daily insights on a board and Langy files what it finds here, kept until it stops being true. It is yours alone; copy one to share it."
+        description={
+          dashboardsOpen
+            ? "Turn on Daily insights on a board and Langy files what it finds here, kept until it stops being true. It is yours alone; copy one to share it."
+            : "Langy files what it finds here, kept until it stops being true. It is yours alone; copy one to share it."
+        }
         icon={<Inbox size={24} />}
         testId="insights-day-zero"
       >
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={() => host.navigate(`/${project.slug}/dashboards`)}
-        >
-          Open Dashboards
-        </Button>
+        {dashboardsOpen ? (
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => host.navigate(`/${project.slug}/dashboards`)}
+          >
+            Open Dashboards
+          </Button>
+        ) : null}
       </NoDataInfoBlock>
     );
   }

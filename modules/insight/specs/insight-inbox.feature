@@ -348,6 +348,15 @@ Feature: The insights inbox
       And an action that opens Dashboards
 
     @integration
+    Scenario: A project with no insights offers no Dashboards action where Dashboards is off
+      Given a project with no insights
+      And release_dashboards is off
+      When a member opens Insights
+      Then they see "Langy writes your brief here"
+      And no action that opens Dashboards
+      And no mention of a board
+
+    @integration
     Scenario: The inbox is one list, newest first, whatever the verdict
       Given insights in the inbox that are bad, watch and good, filed at different times
       When a member opens Insights

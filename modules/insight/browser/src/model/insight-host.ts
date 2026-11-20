@@ -26,6 +26,9 @@ export abstract class InsightHostApi {
   /** `release_insights`: undefined while not answered yet. */
   abstract isEnabled(): boolean | undefined;
 
+  /** `release_dashboards`: with it off the Dashboards address answers not-found. */
+  abstract isDashboardsEnabled(): boolean | undefined;
+
   abstract hasPermission(permission: string): boolean;
 
   abstract query(): Readonly<Record<string, string | undefined>>;

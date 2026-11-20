@@ -1,7 +1,6 @@
 /**
  * @vitest-environment jsdom
  * @see modules/dashboard/specs/dashboards-v1.feature
- * @see modules/insight/specs/insight-inbox.feature
  */
 
 import {
@@ -11,7 +10,6 @@ import {
 } from "@langwatch/analytics-client";
 import { uiDeclarations, type UiDeclarations } from "@langwatch/browser-host/declarations";
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
-import { InsightsNavCountToken } from "@langwatch/insight-contract";
 import { cleanup, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -51,11 +49,6 @@ function LentStarred() {
   return <div data-testid="starred-dashboards">Pinned dashboards</div>;
 }
 
-/** Stands in for insight's lent unread pill. */
-function LentInsightsCount() {
-  return <span data-testid="insights-nav-count">3</span>;
-}
-
 const analyticsLends = uiDeclarations([
   {
     name: "analytics",
@@ -65,13 +58,6 @@ const analyticsLends = uiDeclarations([
         { token: SavedDashboardsToken, load: async () => ({ default: LentList }) },
         { token: StarredDashboardsToken, load: async () => ({ default: LentStarred }) },
       ],
-    },
-  },
-  {
-    name: "insight",
-    installation: {
-      capabilities: {},
-      lends: [{ token: InsightsNavCountToken, load: async () => ({ default: LentInsightsCount }) }],
     },
   },
 ]);
@@ -84,7 +70,6 @@ function renderSidebar({
   dashboardsLoading = false,
   organizationLoading = false,
   kind,
-  insightsFlag = false,
 }: {
   surface: "llm-ops" | "dashboards" | "gateway" | "governance" | "me" | "settings";
   pathname: string;
@@ -93,7 +78,6 @@ function renderSidebar({
   dashboardsLoading?: boolean;
   organizationLoading?: boolean;
   kind?: string;
-  insightsFlag?: boolean;
 }) {
   declarations.current = analyticsLends;
   return renderWithDesignSystem(
@@ -105,7 +89,6 @@ function renderSidebar({
         isLoading: organizationLoading,
         flags: {
           release_dashboards: { enabled: dashboardsFlag, isLoading: dashboardsLoading },
-          release_insights: { enabled: insightsFlag, isLoading: false },
         },
         commandBar: { shortcut: "⌘K", open: vi.fn(), trigger: null },
       }}
@@ -152,57 +135,6 @@ describe("the Dashboards product sidebar", () => {
       renderSidebar({ surface: "dashboards", pathname: "/demo/dashboards" });
 
       expect(await screen.findByTestId("saved-dashboards")).toHaveTextContent("open:none");
-    });
-  });
-});
-
-describe("the Insights entry", () => {
-  describe("given release_insights is on and the member holds analytics:view", () => {
-    /** @scenario "The LLM Ops side menu holds the one Insights entry with its unread count" */
-    it("sits first under Home in the LLM Ops sidebar, with the lent count", async () => {
-      renderSidebar({ surface: "llm-ops", pathname: "/demo", insightsFlag: true });
-
-      const entry = screen.getByRole("link", { name: /^Insights/ });
-      expect(screen.getAllByRole("link", { name: /Insights/ })).toHaveLength(1);
-      expect(entry).toHaveAttribute("href", "/demo/insights");
-      const links = screen.getAllByRole("link");
-      expect(links[links.indexOf(entry) - 1]).toBe(screen.getByRole("link", { name: "Home" }));
-      expect(await within(entry).findByTestId("insights-nav-count")).toHaveTextContent("3");
-    });
-
-    /** @scenario "No other product's side menu holds the Insights entry" */
-    it.each([
-      { surface: "dashboards" as const, pathname: "/demo/dashboards" },
-      { surface: "gateway" as const, pathname: "/gateway/virtual-keys" },
-    ])("is not in the $surface sidebar", async ({ surface, pathname }) => {
-      renderSidebar({ surface, pathname, insightsFlag: true });
-
-      await screen.findByRole("button", { name: "Quick Search" });
-      expect(screen.queryByRole("link", { name: /Insights/ })).toBeNull();
-    });
-
-    /** @scenario "An aggregate project's side menu holds no Insights entry" */
-    it("is not in an aggregate project's LLM Ops sidebar", () => {
-      renderSidebar({
-        surface: "llm-ops",
-        pathname: "/demo",
-        insightsFlag: true,
-        kind: "aggregate",
-      });
-
-      expect(screen.queryByRole("link", { name: /Insights/ })).toBeNull();
-    });
-  });
-
-  describe("given release_insights is off or the member lacks analytics:view", () => {
-    /** @scenario "The side menu shows no Insights entry while the flag is off" */
-    it.each([
-      { case: "the flag is off", insightsFlag: false, permissions: ["analytics:view"] },
-      { case: "no analytics:view", insightsFlag: true, permissions: [] },
-    ])("draws no Insights entry in the LLM Ops sidebar: $case", ({ insightsFlag, permissions }) => {
-      renderSidebar({ surface: "llm-ops", pathname: "/demo", insightsFlag, permissions });
-
-      expect(screen.queryByRole("link", { name: /Insights/ })).toBeNull();
     });
   });
 });

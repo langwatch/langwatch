@@ -8,10 +8,11 @@ import type { UiProcedureAnswer } from "@langwatch/browser/testing-transport";
 import { nowInstant } from "@langwatch/time";
 import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { useReducer } from "react";
 import { describe, expect, it, type Mock, vi } from "vitest";
 
 import {
+  FlagSwitch,
+  FlippableInsightHost,
   flushReads,
   insightEntry,
   renderWithInsightHost,
@@ -165,32 +166,13 @@ describe("given 2 unseen insights in the inbox", () => {
   describe("when the rule turns false after the inbox was read", () => {
     /** @scenario "Insights shows nothing while release_insights is off" */
     it("drops the bell instead of drawing the cached inbox", async () => {
-      class FlippableHost extends StubInsightHost {
-        on = true;
-        override isEnabled() {
-          return this.on;
-        }
-      }
-      const host = new FlippableHost();
-      function Switch() {
-        const [, redraw] = useReducer((count: number) => count + 1, 0);
-        return (
-          <>
-            <InsightsBell />
-            <button
-              type="button"
-              onClick={() => {
-                host.on = false;
-                redraw();
-              }}
-            >
-              Turn flag off
-            </button>
-          </>
-        );
-      }
+      const host = new FlippableInsightHost();
       renderWithInsightHost({
-        element: <Switch />,
+        element: (
+          <FlagSwitch host={host}>
+            <InsightsBell />
+          </FlagSwitch>
+        ),
         host,
         answer: () => Promise.resolve(UNSEEN.slice(0, 2)),
       });

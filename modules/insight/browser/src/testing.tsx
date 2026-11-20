@@ -14,7 +14,7 @@ import type { InsightEntry } from "@langwatch/insight-contract";
 import type { LangyAskRequest } from "@langwatch/langy-contract";
 import { nowInstant } from "@langwatch/time";
 import { act, render, type RenderResult } from "@testing-library/react";
-import type { ReactElement } from "react";
+import { type ReactElement, type ReactNode, useReducer } from "react";
 
 import { insightApi } from "./behavior/insight-api.ts";
 import {
@@ -29,6 +29,8 @@ export type StubInsightHostOptions = {
   project?: InsightHostProject | undefined;
   /** `release_insights`; on unless a test says otherwise. */
   enabled?: boolean | undefined;
+  /** `release_dashboards`; on unless a test says otherwise. */
+  dashboardsEnabled?: boolean | undefined;
   /** A viewer unless a test says otherwise: `analytics:view` is all insight asks for. */
   permissions?: readonly string[];
   query?: Readonly<Record<string, string | undefined>>;
@@ -56,6 +58,10 @@ export class StubInsightHost extends InsightHostApi {
 
   isEnabled(): boolean | undefined {
     return "enabled" in this.options ? this.options.enabled : true;
+  }
+
+  isDashboardsEnabled(): boolean | undefined {
+    return "dashboardsEnabled" in this.options ? this.options.dashboardsEnabled : true;
   }
 
   hasPermission(permission: string): boolean {
@@ -91,6 +97,43 @@ export class StubInsightHost extends InsightHostApi {
   askLangy(request: LangyAskRequest): void {
     this.langyAsks.push(request);
   }
+}
+
+/** A host whose `release_insights` answer a test can turn off after the first draw. */
+export class FlippableInsightHost extends StubInsightHost {
+  on = true;
+
+  override isEnabled(): boolean {
+    return this.on;
+  }
+}
+
+/**
+ * Draws `children` beside a "Turn flag off" button that flips the host and redraws: the host is
+ * read on render, so the flip alone changes nothing until something redraws.
+ */
+export function FlagSwitch({
+  host,
+  children,
+}: {
+  host: FlippableInsightHost;
+  children: ReactNode;
+}) {
+  const [, redraw] = useReducer((count: number) => count + 1, 0);
+  return (
+    <>
+      {children}
+      <button
+        type="button"
+        onClick={() => {
+          host.on = false;
+          redraw();
+        }}
+      >
+        Turn flag off
+      </button>
+    </>
+  );
 }
 
 /**
