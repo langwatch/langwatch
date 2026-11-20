@@ -11,22 +11,17 @@ const ownMailerFallback: CustomerIoRoute = { fallback: "own-mailer" };
 /**
  * The messages LangWatch Cloud sends through Customer.io, by template id; the rest stays on the
  * own mailer. Security mail (verification, reset, invitations, MFA, SSO, licences, statements,
- * operator notices) never belongs here. Payment recovery waits until main sends it.
+ * operator notices) never belongs here, nor HTML that carries a per-recipient token, a one-click
+ * action link or customer content: the trigger digest, the join-request messages, budget requests
+ * (the requester's own words) and the paused online evaluation (its top error). Payment recovery
+ * waits until main sends it.
  */
 export const CUSTOMER_IO_ROUTES: Readonly<Record<string, CustomerIoRoute>> = {
   "invite-re-request": ownMailerFallback,
-  "join-request-arrived": ownMailerFallback,
-  "join-request-reminder": ownMailerFallback,
-  "join-request-approved": ownMailerFallback,
-  "join-request-rejected": ownMailerFallback,
-  "join-request-expired": ownMailerFallback,
   "domain-auto-joined": ownMailerFallback,
   "seat-request": ownMailerFallback,
   "usage-limit": ownMailerFallback,
-  "budget-increase-request": ownMailerFallback,
   "automation-limit": ownMailerFallback,
-  "trigger-digest": ownMailerFallback,
-  "monitor-auto-paused": ownMailerFallback,
 };
 
 /**

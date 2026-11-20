@@ -12,12 +12,12 @@ import {
 const API_KEY = "cio_app_test_key";
 
 const email: TransactionalEmail = {
-  transactionalMessageId: "trigger-digest",
+  transactionalMessageId: "usage-limit",
   identifiers: { email: "ada@acme.test" },
   to: "ada@acme.test",
   from: "LangWatch <contact@langwatch.test>",
-  subject: "Trigger - Errors above threshold",
-  body: "<p>digest</p>",
+  subject: "You reached your plan's usage limit",
+  body: "<p>Upgrade to keep tracing</p>",
   replyTo: "LangWatch Triggers <no-reply+tag@langwatch.test>",
   headers: {
     "List-Unsubscribe": "<https://app.langwatch.test/api/unsubscribe?token=t>",
@@ -70,12 +70,12 @@ describe("given the client on the default region", () => {
         "Content-Type": "application/json",
       });
       expect(JSON.parse(stringBody(posted[0]?.init.body))).toEqual({
-        transactional_message_id: "trigger-digest",
+        transactional_message_id: "usage-limit",
         identifiers: { email: "ada@acme.test" },
         to: "ada@acme.test",
         from: "LangWatch <contact@langwatch.test>",
-        subject: "Trigger - Errors above threshold",
-        body: "<p>digest</p>",
+        subject: "You reached your plan's usage limit",
+        body: "<p>Upgrade to keep tracing</p>",
         reply_to: "LangWatch Triggers <no-reply+tag@langwatch.test>",
         headers: {
           "List-Unsubscribe": "<https://app.langwatch.test/api/unsubscribe?token=t>",

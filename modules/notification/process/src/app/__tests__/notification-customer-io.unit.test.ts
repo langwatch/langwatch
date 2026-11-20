@@ -34,18 +34,10 @@ const RECIPIENT = "ada@acme.test";
 
 const ROUTED = [
   "invite-re-request",
-  "join-request-arrived",
-  "join-request-reminder",
-  "join-request-approved",
-  "join-request-rejected",
-  "join-request-expired",
   "domain-auto-joined",
   "seat-request",
   "usage-limit",
-  "budget-increase-request",
   "automation-limit",
-  "trigger-digest",
-  "monitor-auto-paused",
 ];
 
 function config({ isSaas }: { isSaas: boolean }): NotificationServerConfig {

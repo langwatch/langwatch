@@ -1,10 +1,11 @@
 Feature: The app's product mail goes through Customer.io on LangWatch Cloud
 
   On LangWatch Cloud a fixed list of product messages leaves through Customer.io's
-  transactional API instead of the install's own mailer: invitation re-requests, the
-  join-request messages, seat and budget requests, usage and automation limits, the
-  trigger digest and the paused online evaluation. Each message is still rendered here;
-  Customer.io only delivers it.
+  transactional API instead of the install's own mailer: invitation re-requests, automatic
+  domain joins, seat requests, and usage and automation limits. Each message is still
+  rendered here; Customer.io only delivers it. A message whose HTML carries a per-recipient
+  token, a one-click action link or customer content stays on the own mailer, so none of
+  that reaches Customer.io.
 
   Nurturing alone talks to Customer.io, so notification keeps the routing list and the
   fallback and asks nurturing to hand each message over. Nurturing holds the App API key
@@ -25,20 +26,12 @@ Feature: The app's product mail goes through Customer.io on LangWatch Cloud
     And the own mailer sends nothing
 
     Examples:
-      | template                |
-      | invite-re-request       |
-      | join-request-arrived    |
-      | join-request-reminder   |
-      | join-request-approved   |
-      | join-request-rejected   |
-      | join-request-expired    |
-      | domain-auto-joined      |
-      | seat-request            |
-      | usage-limit             |
-      | budget-increase-request |
-      | automation-limit        |
-      | trigger-digest          |
-      | monitor-auto-paused     |
+      | template           |
+      | invite-re-request  |
+      | domain-auto-joined |
+      | seat-request       |
+      | usage-limit        |
+      | automation-limit   |
 
   @unit
   Scenario: Every other message stays on the own mailer on Cloud
@@ -78,8 +71,8 @@ Feature: The app's product mail goes through Customer.io on LangWatch Cloud
     Then the own mailer sends to that recipient only
 
   @unit
-  Scenario: A replyless digest reaches the real recipient and answers to no-reply
-    Given a replyless "trigger-digest" message
+  Scenario: A replyless routed message reaches the real recipient and answers to no-reply
+    Given a replyless routed message
     When it is sent through Customer.io
     Then Customer.io is handed the real recipient as the person and the address
     And the reply-to is the no-reply address
@@ -93,9 +86,21 @@ Feature: The app's product mail goes through Customer.io on LangWatch Cloud
 
   @unit
   Scenario: The routing list holds the agreed product messages and no security mail
-    Then the routing list holds exactly the thirteen agreed template ids
+    Then the routing list holds exactly the five agreed template ids
     And no security message is on it
     And every id on it is a template the app sends
+
+  @unit
+  Scenario Outline: A message carrying tokens, action links or trace text stays on the own mailer
+    Given IS_SAAS is set and nurturing holds CUSTOMER_IO_APP_API_KEY
+    When a "<template>" message is sent
+    Then nothing reaches Customer.io
+    And the own mailer sends it
+
+    Examples:
+      | template             |
+      | trigger-digest       |
+      | join-request-arrived |
 
   @unit
   Scenario: No log line carries the key or a recipient address

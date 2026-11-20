@@ -7,18 +7,10 @@ import { CUSTOMER_IO_ROUTES, findCustomerIoRequests } from "../customer-io-routi
 /** Written out here, not read from the table: the list is the agreed scope, not a default. */
 const AGREED = [
   "invite-re-request",
-  "join-request-arrived",
-  "join-request-reminder",
-  "join-request-approved",
-  "join-request-rejected",
-  "join-request-expired",
   "domain-auto-joined",
   "seat-request",
   "usage-limit",
-  "budget-increase-request",
   "automation-limit",
-  "trigger-digest",
-  "monitor-auto-paused",
 ];
 
 const SECURITY = [
@@ -38,8 +30,8 @@ const SECURITY = [
 
 describe("the Customer.io routing list", () => {
   /** @scenario "The routing list holds the agreed product messages and no security mail" */
-  it("holds exactly the thirteen agreed template ids, each falling back to the own mailer", () => {
-    expect(AGREED).toHaveLength(13);
+  it("holds exactly the five agreed template ids, each falling back to the own mailer", () => {
+    expect(AGREED).toHaveLength(5);
     expect(Object.keys(CUSTOMER_IO_ROUTES).toSorted()).toEqual(AGREED.toSorted());
     // Nothing on main sends it yet, so it is not routed.
     expect(Object.hasOwn(CUSTOMER_IO_ROUTES, "payment-recovery")).toBe(false);

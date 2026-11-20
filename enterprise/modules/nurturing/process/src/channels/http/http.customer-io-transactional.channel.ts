@@ -74,8 +74,8 @@ export class HttpCustomerIoTransactionalChannel extends CustomerIoTransactionalC
 }
 
 /**
- * `tracked: false` keeps the links as written: join-request links carry tokens, and a rewritten
- * link would pass them through Customer.io's click tracker. `send_to_unsubscribed` because these
+ * `tracked: false` keeps the links as written, so no click passes through Customer.io's click
+ * tracker. `send_to_unsubscribed` because these
  * are transactional: a person who left the marketing list still gets their own account's mail.
  */
 function payloadOf(email: CustomerIoTransactionalRequest) {

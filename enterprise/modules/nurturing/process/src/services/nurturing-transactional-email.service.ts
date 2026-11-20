@@ -35,14 +35,14 @@ export class NurturingTransactionalEmailService {
     users,
   }: {
     channel: CustomerIoTransactionalChannel | undefined;
-    users: Pick<UserApi, "findByEmail">;
+    users: UserApi;
   }): NurturingTransactionalEmailService {
     return new NurturingTransactionalEmailService(channel, users);
   }
 
   private constructor(
     private readonly channel: CustomerIoTransactionalChannel | undefined,
-    private readonly users: Pick<UserApi, "findByEmail">,
+    private readonly users: UserApi,
   ) {}
 
   async send(email: TransactionalEmail): Promise<TransactionalEmailOutcome> {

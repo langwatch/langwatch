@@ -190,19 +190,13 @@ describe("given nurturing answers off, as it does without the App API key", () =
   });
 });
 
-describe("given a replyless trigger-digest message", () => {
+describe("given a replyless routed message", () => {
   describe("when it is sent through Customer.io", () => {
-    /** @scenario "A replyless digest reaches the real recipient and answers to no-reply" */
+    /** @scenario "A replyless routed message reaches the real recipient and answers to no-reply" */
     it("hands Customer.io the real recipient, answering to the no-reply address", async () => {
       const { customerIo, ownMailer, mail } = compose();
 
-      await mail.sendEmail({
-        to: "ada@acme.test",
-        replyless: { tag: "81d9d46cce00" },
-        subject: "Trigger - Errors above threshold",
-        html: "<p>digest</p>",
-        template: "trigger-digest",
-      });
+      await mail.sendEmail({ ...usageLimit(), replyless: { tag: "81d9d46cce00" } });
 
       expect(customerIo.sent).toEqual([
         expect.objectContaining({
@@ -212,6 +206,29 @@ describe("given a replyless trigger-digest message", () => {
         }),
       ]);
       expect(ownMailer.sent).toEqual([]);
+    });
+  });
+});
+
+describe.each([
+  ["trigger-digest", "its unsubscribe token and trace previews"],
+  ["join-request-arrived", "its approve and reject links"],
+])("given a %s message, which carries %s", (template) => {
+  describe("when it is sent", () => {
+    /** @scenario "A message carrying tokens, action links or trace text stays on the own mailer" */
+    it("sends it through the own mailer and nothing to Customer.io", async () => {
+      const { customerIo, ownMailer, mail } = compose();
+
+      await mail.sendEmail({ ...usageLimit(), template });
+
+      expect(customerIo.sent).toEqual([]);
+      expect(ownMailer.sent).toEqual([
+        expect.objectContaining({
+          to: "ada@acme.test",
+          subject: "You reached your plan's usage limit",
+          html: "<p>Upgrade to keep tracing</p>",
+        }),
+      ]);
     });
   });
 });
@@ -241,16 +258,16 @@ describe("given a routed message with an unsubscribe link and a hidden recipient
         undisclosedRecipients: ["grace@acme.test"],
         replyless: { tag: "tag" },
         unsubscribe: { url: "https://app.langwatch.test/api/unsubscribe?token=t" },
-        subject: "Trigger - Errors above threshold",
-        html: "<p>digest</p>",
-        template: "trigger-digest",
+        subject: "You reached your plan's usage limit",
+        html: "<p>Upgrade to keep tracing</p>",
+        template: "usage-limit",
       });
 
       const shared = {
-        transactionalMessageId: "trigger-digest",
+        transactionalMessageId: "usage-limit",
         from: DEFAULT_FROM,
-        subject: "Trigger - Errors above threshold",
-        body: "<p>digest</p>",
+        subject: "You reached your plan's usage limit",
+        body: "<p>Upgrade to keep tracing</p>",
         replyTo: "LangWatch Triggers <no-reply+tag@langwatch.test>",
         headers: {
           "List-Unsubscribe": "<https://app.langwatch.test/api/unsubscribe?token=t>",
