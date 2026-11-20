@@ -1031,9 +1031,17 @@ jobs:
       - name: Check the workspace invariants (ADR-076)
         run: pnpm --filter @langwatch/server run test:invariants
 
+      # On a format failure, print the fix as a diff so it can be applied by hand.
       - name: Oxfmt (blocking)
         if: ${{ !cancelled() }}
-        run: pnpm format:check
+        run: |
+          if pnpm format:check; then exit 0; fi
+          pnpm format || true
+          git --no-pager diff --stat || true
+          git --no-pager diff | head -n 2000 || true
+          git checkout -- . || true
+          echo "::error::oxfmt found unformatted files; the diff above is the fix (cut at 2000 lines)"
+          exit 1
 
       - name: Architecture policy tests (blocking)
         if: ${{ !cancelled() }}
