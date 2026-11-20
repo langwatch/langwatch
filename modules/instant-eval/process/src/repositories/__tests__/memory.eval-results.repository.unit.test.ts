@@ -194,6 +194,20 @@ describe("given kept results on one trace", () => {
       await expect(repository.findLatestByTrace(traceQuery)).resolves.toEqual([]);
     });
 
+    /** @scenario "A monitor's results are left out of the trace's read" */
+    it("answers an ask row on the trace while leaving the monitor's row out", async () => {
+      await repository.insert([
+        record({ Source: "monitor", SourceId: "monitor-1", JudgedAt: AT + 9 }),
+        record({ Source: "ask", SourceId: "query:1", JudgedAt: AT + 1 }),
+      ]);
+
+      const results = await repository.findLatestByTrace(traceQuery);
+
+      expect(results.map(({ source, sourceId }) => ({ source, sourceId }))).toEqual([
+        { source: "ask", sourceId: "query:1" },
+      ]);
+    });
+
     it("answers nothing to another project, another trace, another key version or a far window", async () => {
       await repository.insert([record()]);
 

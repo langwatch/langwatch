@@ -66,6 +66,7 @@ export class MemoryEvalResultsRepository implements EvalResultsRepository {
         record.TenantId === query.tenantId &&
         record.TraceId === query.traceId &&
         record.KeyVersion === query.keyVersion &&
+        record.Source !== "monitor" &&
         record.OccurredAt >= query.occurredFrom &&
         record.OccurredAt <= query.occurredUntil,
     );
