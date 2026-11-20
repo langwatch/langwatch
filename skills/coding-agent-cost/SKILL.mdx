@@ -8,6 +8,7 @@ compatibility: Works with Claude Code and similar AI assistants. The `langwatch`
 
 import CliInstall from "../_shared/cli-install.mdx";
 import CliSetup from "../_shared/cli-setup.mdx";
+import CodingAgentCostLogin from "../_shared/coding-agent-cost-login.mdx";
 
 # Cut Your Coding Agent's Cost and Context
 
@@ -17,7 +18,7 @@ This skill reads the user's own Claude Code sessions from LangWatch, runs one ch
 
 <CliInstall />
 
-Coding-agent sessions live in the user's personal LangWatch workspace by default. On a laptop `langwatch login --device` signs this machine in. A project key in `LANGWATCH_API_KEY` stands in for that login only for its own project: it refuses `--project` for any other, so reaching a team project still needs `langwatch login --device`. Add `--project <slug>` on every read command except `query run` when the sessions live in a team project instead. `query run` takes the projects to read from `--projects <id,id>` (Step 3), and refuses `--project` beside it.
+<CodingAgentCostLogin />
 
 <CliSetup />
 
