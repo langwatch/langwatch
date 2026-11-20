@@ -404,9 +404,9 @@ interface ResolvedInstantEvalChip extends InstantEvalChip {
 }
 
 /**
- * The chips of a query matched to the runs the store holds, and the wire map
- * the reads send. A chip without a run is pending: it is sent to no read and
- * compiles to no rows, so the table stays truthful while the run starts.
+ * The chips of a query matched to the runs the store holds, and the wire map the reads send. A
+ * chip without a run is pending: it is sent to no read and compiles to no rows, so the table stays
+ * truthful while the run starts. A chip no run can answer (`hasNegatedInstantEvalChipUnderOr`) too.
  */
 export function resolveInstantEvalChips({
   queryText,
@@ -433,7 +433,13 @@ export function resolveInstantEvalChips({
       otherQuery,
       window,
     });
-    const runId = runsByKey[key] ?? null;
+    // A run cannot answer a chip a NOT reaches across an OR, so no read applies it.
+    const isUnjudgeable = hasNegatedInstantEvalChipUnderOr({
+      queryText,
+      field: chip.field,
+      question: chip.question,
+    });
+    const runId = isUnjudgeable ? null : (runsByKey[key] ?? null);
     if (runId) {
       evalRuns[key] = { question: chip.question, target: chip.target, runId };
     }

@@ -95,9 +95,16 @@ describe("useExplorerCounts", () => {
   describe("given a NOT eval chip with no run behind it", () => {
     /** @scenario "A pending chip under NOT is not judged yet" */
     it("counts none of the rows it lists, since none was judged", () => {
-      useFilterStore.setState({ debouncedQueryText: 'NOT eval:"the user is annoyed"' });
+      useFilterStore.setState({ debouncedQueryText: 'NOT eval.trace:"the user is annoyed"' });
       const { result } = renderHook(() => useExplorerCounts());
       expect(result.current).toMatchObject({ totalHits: 0, pageTraceIds: [], summary: "0 traces" });
+    });
+
+    /** @scenario "A pending chip under NOT is not judged yet" */
+    it("counts the rows of a bare chip never typed here, as it may name an evaluator", () => {
+      useFilterStore.setState({ debouncedQueryText: "NOT eval:my_evaluator" });
+      const { result } = renderHook(() => useExplorerCounts());
+      expect(result.current).toMatchObject({ totalHits: 1234, pageTraceIds: ["t-1", "t-2"] });
     });
   });
 });

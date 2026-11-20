@@ -56,6 +56,12 @@ interface InstantEvalRunState {
   quiet: Record<string, true>;
   /** Quiet runs whose final numbers the table and the sidebar have read. */
   settled: Record<string, true>;
+  /**
+   * Run keys of chips the reader submitted as Instant Evals on this page. A bare
+   * chip outside it may still be an evaluator name from before Instant Evals.
+   */
+  typedKeys: Record<string, true>;
+  markTyped: (key: string) => void;
   setRun: (run: ExplorerInstantEvalProgress, now?: number) => void;
   markStopped: (runId: string) => void;
   markSettled: (runId: string) => void;
@@ -114,6 +120,11 @@ export const useInstantEvalRunStore = defineSlice<InstantEvalRunState>({
     stoppedByUser: {},
     quiet: {},
     settled: {},
+    typedKeys: {},
+    markTyped: (key) =>
+      set((state) =>
+        state.typedKeys[key] ? state : { typedKeys: { ...state.typedKeys, [key]: true } },
+      ),
     setRun: (run, now = nowInstant().epochMilliseconds) =>
       set((state) => withRead({ state, run, now })),
     markStopped: (runId) =>

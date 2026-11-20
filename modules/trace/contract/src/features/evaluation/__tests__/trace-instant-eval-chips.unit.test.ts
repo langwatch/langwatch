@@ -256,4 +256,23 @@ describe("resolveInstantEvalChips", () => {
       [key]: { question: "is it rude", target: "traces", runId: "run-1" },
     });
   });
+
+  /** @scenario "A NOT the run of a typed chip cannot answer is refused" */
+  it("sends no run for a chip a NOT reaches across an OR, even when one is registered", () => {
+    const queryText = 'NOT eval:"is it rude" OR status:error';
+    const otherQuery = queryWithoutInstantEvalChips(queryText);
+    const key = instantEvalRunKey({ question: "is it rude", target: "traces", otherQuery, window });
+
+    const resolved = resolveInstantEvalChips({
+      queryText,
+      lensId: undefined,
+      window,
+      runsByKey: { [key]: "run-1" },
+    });
+
+    expect(resolved.evalRuns).toBeUndefined();
+    expect(resolved.chips).toEqual([
+      { question: "is it rude", field: "eval", target: "traces", key, runId: null },
+    ]);
+  });
 });

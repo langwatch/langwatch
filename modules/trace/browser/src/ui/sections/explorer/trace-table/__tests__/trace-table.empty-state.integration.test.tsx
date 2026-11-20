@@ -58,7 +58,7 @@ const mockFilterState = {
   // The debounced copy the eval chips are resolved from; no run is registered.
   debouncedQueryText: "",
   debouncedTimeRange: { from: 1_000, to: 2_000 },
-  evalRuns: {},
+  evalRuns: {} as Record<string, string>,
   timeRange: { from: Date.now() - 3600000, to: Date.now(), label: "Last 1h" },
   clearAll: vi.fn(),
   setTimeRange: vi.fn(),
@@ -166,9 +166,22 @@ vi.mock("../query-breakdown-chips.tsx", () => ({
 
 // ─── Module under test ────────────────────────────────────────────────────────
 
+import { resolveInstantEvalChips } from "@langwatch/trace-contract";
 import type React from "react";
 
+import { useInstantEvalRunStore } from "../../../../../features/instant-eval/behavior/instant-eval-run.store.ts";
 import { TraceTable } from "../trace-table.tsx";
+
+/** The run keys of the query's chips, as the table resolves them. */
+function chipKeysOf(queryText: string): string[] {
+  const { chips } = resolveInstantEvalChips({
+    queryText,
+    lensId: "all-traces",
+    window: mockFilterState.debouncedTimeRange,
+    runsByKey: {},
+  });
+  return chips.map((chip) => chip.key);
+}
 
 // ─── Test lifecycle ───────────────────────────────────────────────────────────
 
@@ -181,6 +194,8 @@ beforeEach(() => {
   mockGrouping = "flat";
   mockFilterState.queryText = "";
   mockFilterState.debouncedQueryText = "";
+  mockFilterState.evalRuns = {};
+  useInstantEvalRunStore.setState({ typedKeys: {} });
   mockTraceListResult = {
     data: [],
     totalHits: 0,
@@ -285,11 +300,36 @@ describe("<TraceTable /> empty-state gating", () => {
 describe("<TraceTable /> pending NOT eval chip", () => {
   /** @scenario "A pending chip under NOT is not judged yet" */
   it.each([
-    ['NOT eval:"the user is annoyed"', true],
-    ['status:error AND NOT eval:"the user is annoyed"', true],
-    ['eval:"the user is annoyed" AND NOT status:error', false],
-  ])("with %s, shows the not-judged state instead of rows: %s", (queryText, notJudged) => {
+    ['NOT eval:"the user is annoyed"', "typed", true],
+    ['status:error AND NOT eval:"the user is annoyed"', "typed", true],
+    ['NOT eval.trace:"the user is annoyed"', "never typed", true],
+    ['eval:"the user is annoyed" AND NOT status:error', "typed", false],
+    ["NOT eval:my_evaluator", "never typed", false],
+  ])(
+    "with %s %s here, shows the not-judged state instead of rows: %s",
+    (queryText, typed, notJudged) => {
+      mockFilterState.debouncedQueryText = queryText;
+      if (typed === "typed") {
+        for (const key of chipKeysOf(queryText)) useInstantEvalRunStore.getState().markTyped(key);
+      }
+      mockTraceListResult = {
+        ...mockTraceListResult,
+        data: [{ traceId: "trace-abc-123" }] as typeof mockTraceListResult.data,
+        totalHits: 1,
+      };
+
+      renderTable();
+
+      expect(screen.queryByTestId("empty-filter-state") !== null).toBe(notJudged);
+      expect(screen.queryByTestId("trace-lens-body") !== null).toBe(!notJudged);
+    },
+  );
+
+  /** @scenario "A NOT the run of a typed chip cannot answer is refused" */
+  it("shows a chip a NOT reaches across an OR as not judged, even with its run registered", () => {
+    const queryText = 'NOT eval:"the user is annoyed" OR status:error';
     mockFilterState.debouncedQueryText = queryText;
+    mockFilterState.evalRuns = Object.fromEntries(chipKeysOf(queryText).map((k) => [k, "run-1"]));
     mockTraceListResult = {
       ...mockTraceListResult,
       data: [{ traceId: "trace-abc-123" }] as typeof mockTraceListResult.data,
@@ -298,8 +338,7 @@ describe("<TraceTable /> pending NOT eval chip", () => {
 
     renderTable();
 
-    expect(screen.queryByTestId("empty-filter-state") !== null).toBe(notJudged);
-    expect(screen.queryByTestId("trace-lens-body") !== null).toBe(!notJudged);
+    expect(screen.getByTestId("empty-filter-state")).toBeInTheDocument();
   });
 });
 

@@ -1,5 +1,9 @@
 import type { ExplorerSearchClassification } from "@langwatch/instant-eval-contract";
-import { instantEvalRunKey, type RouteSearchResult } from "@langwatch/trace-contract";
+import {
+  instantEvalRunKey,
+  queryWithoutInstantEvalChips,
+  type RouteSearchResult,
+} from "@langwatch/trace-contract";
 import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -10,6 +14,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
  * failure on the way is a phrase search rather than an error state.
  */
 import { useFilterStore } from "../../../../../behavior/explorer.store.ts";
+import { useInstantEvalRunStore } from "../../../../../features/instant-eval/behavior/instant-eval-run.store.ts";
 import { useSubmitSearch } from "../use-submit-search.ts";
 
 type MutateOptions = {
@@ -89,6 +94,7 @@ beforeEach(() => {
   useFilterStore.getState().clearAll();
   useFilterStore.setState({ searchNotice: null });
   useFilterStore.setState({ activeLensId: "all-traces" });
+  useInstantEvalRunStore.setState({ typedKeys: {} });
 });
 
 describe("given the text has only field:value terms", () => {
@@ -384,6 +390,24 @@ describe("given the text is an eval chip typed by hand", () => {
       });
     });
 
+    /** @scenario "A pending chip under NOT is not judged yet" */
+    it("marks the chip as typed here, so its rows read as not judged until a run answers", () => {
+      const { result } = renderSubmit({ isInstantEvalAvailable: false });
+      act(() => result.current.submitSearch('NOT eval:"the user is annoyed"'));
+      const { timeRange } = useFilterStore.getState();
+      const key = instantEvalRunKey({
+        question: "the user is annoyed",
+        target: "traces",
+        otherQuery: "",
+        window: {
+          from: timeRange.from,
+          to: timeRange.to,
+          ...(timeRange.presetId ? { presetId: timeRange.presetId } : {}),
+        },
+      });
+      expect(useInstantEvalRunStore.getState().typedKeys).toEqual({ [key]: true });
+    });
+
     /** @scenario "A chip typed by hand starts its run on Enter" */
     it("hands over the text as typed, so a NOT in front of the chip is not lost", () => {
       const { result } = renderSubmit();
@@ -407,11 +431,13 @@ describe("given the text is an eval chip typed by hand", () => {
 
     /** @scenario "A NOT the run of a typed chip cannot answer is refused" */
     it.each([
-      'NOT eval:"the user is annoyed" OR status:error',
-      'NOT (eval:"the user is annoyed" AND status:error)',
-    ])("refuses %s with a warning rather than rebuilding it", (queryText) => {
+      ['NOT eval:"the user is annoyed" OR status:error', true],
+      ['NOT eval:"the user is annoyed" OR status:error', false],
+      ['NOT (eval:"the user is annoyed" AND status:error)', true],
+      ['NOT (eval:"the user is annoyed" AND status:error)', false],
+    ])("refuses %s with a warning rather than rebuilding it (on: %s)", (queryText, isOn) => {
       useFilterStore.getState().applyQueryText("model:gpt-5-mini");
-      const { result } = renderSubmit({ isInstantEvalAvailable: false });
+      const { result } = renderSubmit({ isInstantEvalAvailable: isOn });
       act(() => result.current.submitSearch(queryText));
       expect(handlers.onInstantEval).not.toHaveBeenCalled();
       expect(mutation.mutate).not.toHaveBeenCalled();
@@ -485,6 +511,35 @@ describe("given the text is an eval chip typed by hand", () => {
       expect(mutation.mutate).not.toHaveBeenCalled();
       expect(handlers.onInstantEval).not.toHaveBeenCalled();
       expect(useFilterStore.getState().queryText).toBe('eval:"the user is annoyed"');
+    });
+
+    /** @scenario "A NOT the run of a typed chip cannot answer is refused" */
+    it.each([
+      'NOT eval:"the user is annoyed" OR status:error',
+      'eval:"b" AND (NOT eval:"the user is annoyed" OR status:error)',
+    ])("still refuses %s when a run is registered under its key", (queryText) => {
+      const { timeRange } = useFilterStore.getState();
+      useFilterStore.getState().registerEvalRun({
+        key: instantEvalRunKey({
+          question: "the user is annoyed",
+          target: "traces",
+          otherQuery: queryWithoutInstantEvalChips(queryText),
+          window: {
+            from: timeRange.from,
+            to: timeRange.to,
+            ...(timeRange.presetId ? { presetId: timeRange.presetId } : {}),
+          },
+        }),
+        runId: "run-1",
+      });
+      useFilterStore.getState().applyQueryText("model:gpt-5-mini");
+      const { result } = renderSubmit();
+      act(() => result.current.submitSearch(queryText));
+      expect(handlers.onInstantEval).not.toHaveBeenCalled();
+      expect(useFilterStore.getState().queryText).toBe("model:gpt-5-mini");
+      expect(toast).toHaveBeenCalledWith(
+        expect.objectContaining({ title: "This NOT cannot be judged as typed" }),
+      );
     });
   });
 

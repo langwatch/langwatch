@@ -1,7 +1,12 @@
-import { isInstantEvalChipNegated, resolveInstantEvalChips } from "@langwatch/trace-contract";
+import {
+  INSTANT_EVAL_TARGET_FIELDS,
+  isInstantEvalChipNegated,
+  resolveInstantEvalChips,
+} from "@langwatch/trace-contract";
 import { useMemo } from "react";
 
 import { useFilterStore, useViewStore } from "../../../behavior/explorer.store.ts";
+import { useInstantEvalRunStore } from "./instant-eval-run.store.ts";
 
 /**
  * The query's eval chips, each with its run or none, and the map every read
@@ -39,15 +44,21 @@ export function useInstantEvalRuns(): InstantEvalRunsResult {
 }
 
 /**
- * Whether a chip with no run has a `NOT` above it. It negates nothing judged, so
- * the reads would list every row; the table shows it as not judged instead.
+ * Whether an Instant Eval chip with no run has a `NOT` above it. It negates nothing judged, so the
+ * reads would list every row; the table shows it as not judged instead. A bare chip never submitted
+ * or run here may be an evaluator name from before Instant Evals, so it keeps its rows.
  */
 export function useHasPendingNegatedEval(): boolean {
   const queryText = useFilterStore((s) => s.debouncedQueryText) ?? "";
+  const runsByKey = useFilterStore((s) => s.evalRuns);
+  const typedKeys = useInstantEvalRunStore((s) => s.typedKeys);
   const { chips } = useInstantEvalRuns();
   return chips.some(
     (chip) =>
       chip.runId === null &&
+      (Object.hasOwn(INSTANT_EVAL_TARGET_FIELDS, chip.field) ||
+        Boolean(typedKeys[chip.key]) ||
+        Boolean(runsByKey?.[chip.key])) &&
       isInstantEvalChipNegated({ queryText, field: chip.field, question: chip.question }),
   );
 }

@@ -41,8 +41,8 @@ Feature: Instant Evals inside the Trace Explorer
       And no model rewrites the question on the way, since the reader wrote it
       And a chip spelled `eval.conversation:` keeps judging conversations, whatever the lens shows
       And a chip typed under NOT keeps its NOT, so the run lists the rows it judged and did not pass
-      And a chip under an OR, or under a NOT over other terms, is rebuilt beside them, as its run judges only those
-      And a chip a NOT reaches from there is refused instead, as no rebuild keeps what was typed
+      And a chip under an OR is rebuilt beside the other terms, as its run judges only those
+      And a chip a NOT reaches across other terms or an OR is refused instead, as no rebuild keeps what was typed
       And the same question under another target is another chip, kept in the filter of the run that starts
       And a chip a run already answered is applied with no call at all
       And a refusal leaves the typed chip where it is rather than replacing it with a phrase search
@@ -54,6 +54,8 @@ Feature: Instant Evals inside the Trace Explorer
       When Enter is pressed
       Then a warning says a NOT on an eval chip must sit beside the other terms with AND
       And nothing is searched and no run is estimated or started, whether Instant Evals are on or off
+      And the same holds when a run is already registered under the chip's key
+      And the reads send no run for such a chip, so a loaded link shows its rows as not judged
 
     @unit
     Scenario: A space belongs to the question being typed
@@ -139,9 +141,11 @@ Feature: Instant Evals inside the Trace Explorer
     @integration
     Scenario: A pending chip under NOT is not judged yet
       Given a chip `NOT eval:"the user is annoyed"` and no run under its key
+      And the chip is spelled with a target, or was submitted on this page
       When the table and the counts read the results
       Then the table shows "These results are not judged yet" rather than every row as a non-match
       And the counts read zero, as no row was judged
+      But a bare chip never submitted here, like `NOT eval:my_evaluator`, keeps its evaluator-name rows
 
   Rule: tRPC wraps the run service for the Explorer
 

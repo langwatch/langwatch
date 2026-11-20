@@ -19,6 +19,7 @@ import { useFilterStore } from "../../../../behavior/explorer.store.ts";
 import { type SearchNotice } from "../../../../behavior/query.slice.ts";
 import { api } from "../../../../behavior/trace-api.ts";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
+import { useInstantEvalRunStore } from "../../../../features/instant-eval/behavior/instant-eval-run.store.ts";
 import type { InstantEvalRoutePayload } from "../../../../model/instant-eval-route.ts";
 import { explainAnyError } from "../../errors/index.ts";
 
@@ -183,10 +184,16 @@ function typedEvalRunOf({
     },
     runsByKey: evalRuns ?? {},
   });
+  // Every chip, not only a pending one: a run already under its key cannot answer it either.
+  const isUnjudgeable = chips.some((chip) =>
+    hasNegatedInstantEvalChipUnderOr({ queryText, field: chip.field, question: chip.question }),
+  );
+  if (isUnjudgeable) return "unjudgeable";
   const pending = chips.find((chip) => chip.runId === null);
   if (!pending) return null;
   const chip = { queryText, field: pending.field, question: pending.question };
-  if (hasNegatedInstantEvalChipUnderOr(chip)) return "unjudgeable";
+  // Its rows read as not judged while no run answers it, rather than as an evaluator name.
+  useInstantEvalRunStore.getState().markTyped(pending.key);
   return {
     projectId,
     sentence: pending.question,

@@ -1,7 +1,7 @@
 /**
- * `eval:"question"`: traces an Instant Eval run judged as a match. The run is
- * not in the query text — the client sends it as `evalRuns` and the compiler
- * reads it off the context; a chip with no run compiles to no rows.
+ * `eval:"question"`: traces an Instant Eval run judged as a match. The run is not in the query
+ * text: the client sends it as `evalRuns` and the compiler reads it off the context; a chip with
+ * no run compiles to no rows. Under NOT, it keeps the judged "no" traces, never unjudged ones.
  * @see specs/traces-v2/instant-eval-search.feature
  */
 
