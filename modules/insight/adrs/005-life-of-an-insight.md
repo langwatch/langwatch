@@ -38,6 +38,9 @@ not filed.
 3. Langy decides whether something should be done.
 4. If so, it files a new insight, or renews an open one it repeats.
 
+A run on a project with no trace since the window's start ends as `nothing` (reason
+`no_new_traces`) before Langy reads the board, and files nothing (ADR-004).
+
 **Five life steps.** Citations are at the commit this ADR lands on.
 
 | Step | What happens | Code today |
@@ -75,7 +78,9 @@ Today the skill says "A finding is what changed, got worse, got better or needs 
 the window" (`skills/daily-insights/SKILL.mdx:48`), and the window is the last full day against
 the day before (`modules/insight/process/src/rules/insight-daily-run.rules.ts:73-89`). The
 look-back widens first to a rolling 7 days, later to 28. The run still files at most the
-person's maximum.
+person's maximum. A "gap" is a drop or hole in data Langy can still read in the window, such
+as a widget, metric or segment going quiet while the project still has traffic. A project's
+traffic stopping is ADR-004's `no_new_traces` gate, not a gap.
 
 **D3: "Names a next step" is a rule now, a field later.** The skill tells Langy that every
 finding names a next step, and a finding without one is not filed, as
