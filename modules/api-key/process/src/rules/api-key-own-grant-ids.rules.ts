@@ -9,7 +9,7 @@ import type { ApiKeyScope } from "@langwatch/api-key-contract";
 import { API_KEY_OWN_GRANT_COMMAND_PREFIX } from "@langwatch/authz-contract";
 import type { Instant } from "@langwatch/time";
 
-const scopeOf = (binding: ApiKeyScope) =>
+export const scopeOf = (binding: ApiKeyScope) =>
   JSON.stringify([binding.role, binding.customRoleId ?? null, binding.scopeType, binding.scopeId]);
 
 /**

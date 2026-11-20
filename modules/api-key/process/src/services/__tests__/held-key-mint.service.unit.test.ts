@@ -199,6 +199,24 @@ describe("HeldKeyMintService", () => {
     expect(rows()).toHaveLength(2);
   });
 
+  it("keeps the held key when the same bindings arrive in another order", async () => {
+    const { service, rows } = createFixture({ landsAtMs: 0 });
+    const scopeA = { role: "CUSTOM", scopeType: "PROJECT", scopeId: "project-1" } as const;
+    const scopeB = { role: "CUSTOM", scopeType: "PROJECT", scopeId: "project-2" } as const;
+    const first = await service.createHeld({
+      holdKey: "run-1",
+      key: { ...keyInput(), bindings: [scopeA, scopeB] },
+    });
+
+    const reordered = await service.createHeld({
+      holdKey: "run-1",
+      key: { ...keyInput(), bindings: [scopeB, scopeA] },
+    });
+
+    expect(reordered).toEqual({ ...first, created: false });
+    expect(rows()).toHaveLength(1);
+  });
+
   /** @scenario "A held key revoked before it is activated stays revoked" */
   it("never undoes a revoke that lands before the key is activated", async () => {
     const { service, rows, memory } = createFixture({

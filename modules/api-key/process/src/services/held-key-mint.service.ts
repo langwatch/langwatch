@@ -4,6 +4,7 @@ import type { CreateHeldApiKeyInput } from "@langwatch/api-key-contract";
 import type { SharedCredentialStore } from "@langwatch/secrets/shared-credential";
 import { Temporal, nowInstant } from "@langwatch/time";
 
+import { scopeOf } from "../rules/api-key-own-grant-ids.rules.ts";
 import type { ApiKeyRepository } from "../repositories/api-key.repository.ts";
 import type { SharedKeyMintService } from "./shared-key-mint.service.ts";
 
@@ -75,11 +76,18 @@ export class HeldKeyMintService {
   }
 }
 
-/** Who and what the key is for: a held value never serves a different user, scope or permission. */
+/**
+ * Who and what the key is for: a held value never serves a different user, scope or permission.
+ * Bindings are sorted by `scopeOf`, as the grant ids are, so a reordered retry keeps its key.
+ */
 function identityOf(key: CreateHeldApiKeyInput["key"]): string {
   return createHash("sha256")
     .update(
-      JSON.stringify([key.userId ?? null, key.bindings, [...(key.permissions ?? [])].toSorted()]),
+      JSON.stringify([
+        key.userId ?? null,
+        key.bindings.map(scopeOf).toSorted(),
+        [...(key.permissions ?? [])].toSorted(),
+      ]),
     )
     .digest("hex");
 }
