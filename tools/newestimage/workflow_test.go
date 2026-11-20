@@ -119,6 +119,7 @@ func runReleasedStep(t *testing.T, script, hub string) (string, string, error) {
   case "$HUB" in
     found) echo "sha256:1111111111111111111111111111111111111111111111111111111111111111" ;;
     missing) echo "ERROR: docker.io/langwatch/pii-redaction-model:3.1.0: not found" >&2; return 1 ;;
+    denied) echo "ERROR: pull access denied, repository does not exist or may require authorization: server message: insufficient_scope" >&2; return 1 ;;
     *) echo "ERROR: failed to authorize: 401 Unauthorized" >&2; return 1 ;;
   esac
 }
@@ -155,7 +156,66 @@ func TestTheReleasedStepTellsFoundMissingAndBrokenApart(t *testing.T) {
 	require.NoError(t, err, log)
 	assert.Equal(t, "digest=\n", out)
 
+	_, log, err = runReleasedStep(t, script, "denied")
+	require.Error(t, err, "a repository Docker Hub denies is not a first run")
+	assert.Contains(t, log, "insufficient_scope")
+
 	_, log, err = runReleasedStep(t, script, "broken")
 	require.Error(t, err, "an answer that is neither found nor not found must fail the job")
 	assert.Contains(t, log, "401")
+}
+
+// runNewestStep runs the newest step with gh replaced by a shell function
+// that lists tags (space-separated) as the published releases, or fails.
+func runNewestStep(t *testing.T, script, tags string) (string, string, error) {
+	t.Helper()
+	dir := t.TempDir()
+	fake := `gh() {
+  if [ "$TAGS" = "broken" ]; then echo "HTTP 502: Bad Gateway" >&2; return 1; fi
+  printf '%s\n' $TAGS
+}
+`
+	root, err := os.OpenRoot(dir)
+	require.NoError(t, err)
+	defer root.Close()
+	require.NoError(t, root.WriteFile("newest.sh", []byte(fake+script), 0o600))
+	cmd := exec.Command("bash", "newest.sh")
+	cmd.Dir = dir
+	cmd.Env = append(os.Environ(), "TAGS="+tags, "RELEASE_TAG=langwatch@v3.1.0", "GITHUB_REPOSITORY=langwatch/langwatch", "GITHUB_OUTPUT="+filepath.Join(dir, "output"))
+	log, runErr := cmd.CombinedOutput()
+	written, _ := root.ReadFile("output")
+
+	return string(written), string(log), runErr
+}
+
+// @scenario "latest moves only for the newest release"
+func TestLatestMovesOnlyForTheNewestRelease(t *testing.T) {
+	if _, err := exec.LookPath("bash"); err != nil {
+		t.Skip("bash is not installed")
+	}
+	wf, _ := readWorkflow(t, "publish-docker-app.yml")
+	steps := wf.Jobs["pii-redaction-model"].Steps
+	i := stepIndex(steps, func(s step) bool { return s.ID == "newest" })
+	require.NotEqual(t, -1, i, "no step with id newest decides whether latest moves")
+	assert.Contains(t, steps[i].Run, "select(.draft == false and .prerelease == false)")
+	assert.Contains(t, steps[i].Run, "sort -V")
+	for _, s := range steps {
+		if strings.Contains(s.Run, `"${REPO}:latest"`) || strings.Contains(s.Run, "sign-image.sh") {
+			assert.Contains(t, s.Run, `"${NEWEST}" = "true"`, "latest follows the newest step, not the version's shape")
+			assert.NotContains(t, s.Run, "grep -qE", "the version regex no longer decides latest")
+		}
+	}
+
+	// Another package's newer release, and a lower version that sorts after
+	// 3.1.0 as text, must not count.
+	out, log, err := runNewestStep(t, steps[i].Run, "python-sdk@v9.9.9 langwatch@v3.1.0 langwatch@v3.0.10 langwatch@v2.9.0")
+	require.NoError(t, err, log)
+	assert.Equal(t, "latest=true\n", out)
+
+	out, log, err = runNewestStep(t, steps[i].Run, "langwatch@v3.10.0 langwatch@v3.1.0 python-sdk@v1.0.0")
+	require.NoError(t, err, log)
+	assert.Equal(t, "latest=false\n", out, "a re-run of an older release leaves latest alone")
+
+	_, _, err = runNewestStep(t, steps[i].Run, "broken")
+	require.Error(t, err, "when GitHub cannot say which release is latest, the job fails")
 }

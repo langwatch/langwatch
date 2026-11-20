@@ -37,6 +37,13 @@ Feature: A release publishes the PII redaction model image
     And it fails when it cannot tell whether the version tag exists
 
   @unit
+  Scenario: latest moves only for the newest release
+    Given the release job runs, or runs again, for a langwatch@v release
+    When that release is not the repository's latest release on GitHub
+    Then langwatch/pii-redaction-model:latest stays where it is
+    And a re-run of an older release never moves latest back to its image
+
+  @unit
   Scenario: No plain model image fails the release
     Given the artifacts ECR holds no http-git-<sha> image
     Then cmd/newestimage fails, so the chart release does not run for this release
