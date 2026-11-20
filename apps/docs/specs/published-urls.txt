@@ -11,6 +11,8 @@
 /agent-testing/linking-your-traces
 /agent-testing/other-ways-to-connect
 /agent-testing/overview
+/agent-testing/red-team-open-source
+/agent-testing/red-team-templates
 /agent-testing/red-teaming
 /agent-testing/results
 /agent-testing/run-from-ci
@@ -19,6 +21,7 @@
 /agent-testing/scenarios
 /agent-testing/scenarios-in-code
 /agent-testing/setup-and-teardown-hooks
+/agent-testing/simulated-users
 /agent-testing/targets
 /agent-testing/test-from-the-platform
 /agent-testing/test-suites
@@ -42,6 +45,7 @@
 /ai-gateway/billing-events
 /ai-gateway/budgets
 /ai-gateway/cache-control
+/ai-gateway/cap-spend-per-team
 /ai-gateway/concepts
 /ai-gateway/cookbooks
 /ai-gateway/cookbooks/ci-smoke-test
@@ -336,6 +340,24 @@
 /api-reference/gateway-virtual-keys/revoke-virtual-key
 /api-reference/gateway-virtual-keys/rotate-virtual-key-secret
 /api-reference/gateway-virtual-keys/update-virtual-key
+/api-reference/governance-agent-registry/get-one-registry-agent
+/api-reference/governance-agent-registry/get-the-registry-as-an-ard-manifest
+/api-reference/governance-agent-registry/get-the-registry-s-json-schemas
+/api-reference/governance-agent-registry/list-one-registry-agent-s-versions
+/api-reference/governance-agent-registry/list-the-organisation-s-agent-registry
+/api-reference/governance-agent-registry/overview
+/api-reference/governance-agent-registry/read-the-registry-change-feed
+/api-reference/governance-agent-registry/search-the-registry-ard-search
+/api-reference/governance-kill-switch/approve-a-pending-stop
+/api-reference/governance-kill-switch/deny-a-pending-stop
+/api-reference/governance-kill-switch/get-an-agent-s-latest-stop
+/api-reference/governance-kill-switch/get-an-agent-s-stop-plan
+/api-reference/governance-kill-switch/list-the-organisation-s-agent-stops
+/api-reference/governance-kill-switch/overview
+/api-reference/governance-kill-switch/replace-an-agent-s-stop-plan
+/api-reference/governance-kill-switch/restore-a-stopped-agent
+/api-reference/governance-kill-switch/retry-a-stop
+/api-reference/governance-kill-switch/stop-an-agent
 /api-reference/grants
 /api-reference/grants/change-a-grant-s-role
 /api-reference/grants/get-a-grant
@@ -547,8 +569,10 @@
 /api-reference/teams/remove-member
 /api-reference/teams/update-team
 /api-reference/test-suites
+/api-reference/test-suites/apply-a-suite-template
 /api-reference/test-suites/create-test-suites
 /api-reference/test-suites/delete-test-suites
+/api-reference/test-suites/list-suite-templates
 /api-reference/test-suites/list-test-suites
 /api-reference/test-suites/overview
 /api-reference/test-suites/read-one-test-suite
@@ -605,6 +629,7 @@
 /changelog
 /coding-agents
 /coding-agents/claude-code
+/coding-agents/claude-code-team
 /coding-agents/claude-code-usage
 /coding-agents/codebase-experiment
 /coding-agents/compare-provider-costs
@@ -644,6 +669,7 @@
 /datasets/programmatic-access
 /dspy-visualization
 /dspy-visualization/custom-optimizer
+/dspy-visualization/follow-optimization-in-a-ui
 /dspy-visualization/quickstart
 /dspy-visualization/rag-visualization
 /evaluations
@@ -663,6 +689,7 @@
 /evaluations/experiments/ui/answer-correctness
 /evaluations/experiments/ui/llm-as-a-judge
 /evaluations/experiments/ui/pairwise-compare
+/evaluations/experiments/versions-and-deploy-labels
 /evaluations/guardrails
 /evaluations/guardrails/code-integration
 /evaluations/guardrails/overview
@@ -673,6 +700,7 @@
 /features
 /features/annotations
 /features/automations
+/features/braids
 /features/dashboards
 /features/datasets
 /features/embedded-analytics
@@ -687,6 +715,8 @@
 /features/querying-your-data
 /features/topic-clustering
 /features/webhooks
+/governance/agent-registry
+/governance/kill-switch
 /guardrails/overview
 /guardrails/setting-up-guardrails
 /hybrid-setup
@@ -724,8 +754,10 @@
 /integration/java/integrations
 /integration/java/integrations/spring-ai
 /integration/langflow
+/integration/langgraph-tracing
 /integration/litellm-proxy
 /integration/mcp
+/integration/mcp-debug-traces
 /integration/metadata-and-labels
 /integration/n8n
 /integration/openclaw
@@ -842,6 +874,7 @@
 /langy/security/sandbox
 /langy/token-usage-and-cost
 /observability
+/observability/multi-agent-a2a
 /observability/overview
 /observability/trace-vs-activity-ingestion
 /optimization-studio/datasets
@@ -892,6 +925,7 @@
 /self-hosting/compliance
 /self-hosting/configuration
 /self-hosting/configuration/backups
+/self-hosting/configuration/clickhouse-access
 /self-hosting/configuration/email
 /self-hosting/configuration/environment-variables
 /self-hosting/configuration/object-storage-lifecycle
@@ -955,3 +989,8 @@
 /workflows/overview
 /workflows/workflow-as-agent
 /workflows/workflow-as-evaluator
+/api-reference/governance-ocsf/export-governance-events-as-ocsf-1-9-0
+/api-reference/governance-ocsf/export-project-traces-as-ocsf-1-9-0
+/api-reference/governance-ocsf/export-the-audit-log-as-ocsf-1-9-0
+/api-reference/governance-ocsf/overview
+/api-reference/governance-ocsf/push-ocsf-events-in-from-another-source

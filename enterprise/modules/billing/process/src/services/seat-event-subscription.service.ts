@@ -155,8 +155,9 @@ export class SeatEventSubscriptionService {
       subscriptionId: subscription.stripeSubscriptionId,
     });
 
-    // Must still be live at the provider, even if scheduled for cancellation.
-    if (stripeSubscription.status !== "active") {
+    // Must still be live at the provider, even if scheduled for cancellation or behind on a
+    // payment: a past due subscription can still drop seats, and adding them is held upstream.
+    if (stripeSubscription.status !== "active" && stripeSubscription.status !== "past_due") {
       throw new NoActiveSubscriptionError();
     }
 
@@ -184,6 +185,7 @@ export class SeatEventSubscriptionService {
     membersToAdd,
     isUpgradeFromTiered = false,
     startedByUserId,
+    retentionDays,
   }: {
     organizationId: string;
     customerId: string;
@@ -193,6 +195,8 @@ export class SeatEventSubscriptionService {
     membersToAdd: number;
     isUpgradeFromTiered?: boolean;
     startedByUserId?: string;
+    /** Kept on the pending row; data-retention sets it on the organization once it is paid. */
+    retentionDays?: number;
   }): Promise<{ url: string | null; subscriptionId: string }> => {
     // Resolve the currency before touching the database. A checkout we cannot
     // build in the customer's own currency will be rejected outright, and every
@@ -214,6 +218,7 @@ export class SeatEventSubscriptionService {
       currency: checkoutCurrency,
       interval: billingInterval,
       prices: this.prices,
+      ...(retentionDays === undefined ? {} : { retentionDays }),
     });
 
     const subscription = await this.createPendingSubscription({
@@ -221,6 +226,7 @@ export class SeatEventSubscriptionService {
       membersToAdd,
       checkoutCurrency,
       billingInterval,
+      ...(retentionDays === undefined ? {} : { retentionDays }),
     });
 
     const { url } = await this.checkoutSessions.open({
@@ -252,16 +258,19 @@ export class SeatEventSubscriptionService {
     membersToAdd,
     checkoutCurrency,
     billingInterval,
+    retentionDays,
   }: {
     organizationId: string;
     membersToAdd: number;
     checkoutCurrency: Currency;
     billingInterval: BillingInterval;
+    retentionDays?: number;
   }): Promise<{ id: string }> {
     const subscription = await this.subscriptions.createPendingSeatCheckout({
       organizationId,
       plan: resolveGrowthSeatPlanType({ currency: checkoutCurrency, interval: billingInterval }),
       maxMembers: membersToAdd,
+      ...(retentionDays === undefined ? {} : { maxRetentionDays: retentionDays }),
     });
     return subscription;
   }
@@ -417,9 +426,9 @@ export class SeatEventSubscriptionService {
     ).toUpperCase() as CurrencyType;
     const billingInterval = seatItem.interval ?? "month";
 
-    const { prorationCents, creditAppliedCents } = preview
+    const { prorationCents, creditAppliedCents, taxCents } = preview
       ? chargedAmounts({ preview, lifted, share: plan.chargedShare })
-      : { prorationCents: 0, creditAppliedCents: 0 };
+      : { prorationCents: 0, creditAppliedCents: 0, taxCents: 0 };
 
     const format = (cents: number) => {
       const amount = cents / 100;
@@ -437,6 +446,9 @@ export class SeatEventSubscriptionService {
       formattedAmountDue: format(prorationCents),
       // Null rather than a formatted zero: say nothing about credit on an account with none.
       formattedCreditApplied: creditAppliedCents > 0 ? format(creditAppliedCents) : null,
+      taxCents,
+      formattedAmountDueExcludingTax: taxCents > 0 ? format(prorationCents - taxCents) : null,
+      formattedTax: taxCents > 0 ? format(taxCents) : null,
       formattedRecurringTotal: format(newTotalSeats * unitAmountCents),
       billingInterval,
       // The instant this quote priced, sent back on confirm so the charge matches it.

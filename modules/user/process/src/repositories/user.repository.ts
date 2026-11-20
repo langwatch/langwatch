@@ -81,11 +81,15 @@ export type PasswordHolderRow = Readonly<{
 export interface UserRepository {
   findProfiles(userIds: string[]): Promise<UserFullProfile[]>;
   findById(id: string): Promise<UserProfile | null>;
+  /** Accounts whose id, name or address holds the query, case aside, by address. */
+  searchProfiles(input: { query: string; limit: number }): Promise<UserProfile[]>;
   /** The account holding exactly this address; addresses are stored lower-cased. */
   findByEmail(email: string): Promise<UserProfile[]>;
   /** Every account on this address, case aside, oldest first: rows stored before lower-casing. */
   findByEmailAnyCase(email: string): Promise<UserProfile[]>;
   create(input: CreateUserInput): Promise<UserProfile>;
+  /** The created fact for a row written outside these mints, stamped with its stored creation. */
+  appendCreatedFact(id: string): Promise<void>;
   createCredentialUser(input: CreateCredentialUserRow): Promise<CreatedCredentialUser>;
   createPasskeyUser(input: CreatePasskeyUserRow): Promise<CreatedUser>;
   hasPassword(id: string): Promise<boolean>;
@@ -144,6 +148,11 @@ export interface UserRepository {
   hasAccountOnDomain(domain: string): Promise<boolean>;
   /** Whether any account exists, install-wide. */
   hasAnyAccount(): Promise<boolean>;
+  /**
+   * The id of the earliest-created account, deactivated or not; null when there is none, or when
+   * an erased account was created at or before it, since that one came first.
+   */
+  findFirstCreatedId(): Promise<string | null>;
   /** One page of every account, in id order after `afterId`, for user's lifecycle-fact step. */
   findBackfillPage(input: { afterId: string | null; limit: number }): Promise<UserBackfillRow[]>;
   /** One page of accounts whose stored address is not lower-case, in id order after `afterId`. */

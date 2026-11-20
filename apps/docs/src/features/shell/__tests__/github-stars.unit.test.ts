@@ -3,13 +3,17 @@ import { describe, expect, it } from "vitest";
 import { refreshStars, STARS_FRESH_MS } from "../browser/github-stars.ts";
 
 const NOW = 1_800_000_000_000;
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 /* A window double with one GitHub link, browser storage and a scripted GitHub answer. */
 function fakeWindow({
   cached = null,
   github = { ok: true, stars: 7000 },
+  builtAt = NOW - 2 * DAY_MS,
 }: {
   cached?: { count: number; at: number } | null;
+  /** The start of the day GitHub reported the build's count; null for a page built without one. */
+  builtAt?: number | null;
   github?: { ok: boolean; stars?: unknown } | "offline";
 } = {}) {
   const storage = new Map<string, string>();
@@ -21,6 +25,7 @@ function fakeWindow({
     ["[data-docs-stars]", wrapper],
   ]);
   const link = {
+    dataset: builtAt === null ? {} : { docsStarsAt: String(builtAt) },
     label: "GitHub, 5,000 stars",
     setAttribute: (_name: string, value: string) => {
       link.label = value;
@@ -80,6 +85,26 @@ describe("the live GitHub star count", () => {
         refreshStars({ win: win as never, now: NOW }),
         refreshStars({ win: win as never, now: NOW }),
       ]);
+      expect(requests).toHaveLength(1);
+      expect(count.textContent).toBe("7,000");
+    });
+  });
+
+  describe("when the build read its count the day before", () => {
+    /** @scenario "Show the live GitHub star count, refreshed from the build's and kept for an hour" */
+    it("shows it without asking GitHub", async () => {
+      const { win, count, requests } = fakeWindow({ builtAt: NOW - 2 * DAY_MS + 1 });
+      await refreshStars({ win: win as never, now: NOW });
+      expect(requests).toEqual([]);
+      expect(count.textContent).toBe("5,000");
+    });
+  });
+
+  describe("when the build read its count two days back", () => {
+    /** @scenario "Show the live GitHub star count, refreshed from the build's and kept for an hour" */
+    it("asks GitHub for the live count", async () => {
+      const { win, count, requests } = fakeWindow({ builtAt: NOW - 2 * DAY_MS });
+      await refreshStars({ win: win as never, now: NOW });
       expect(requests).toHaveLength(1);
       expect(count.textContent).toBe("7,000");
     });

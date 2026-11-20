@@ -235,11 +235,13 @@ function PlainMessage({
   );
 }
 
-/** The last run carrying the reply: a said line, or an answer with prose in it. */
-function lastAnswerRun(runs: LangyTranscriptRun[]): number {
+/** The last run that took a step: activity, a said line, or an answer with prose in it. */
+function lastStepRun(runs: LangyTranscriptRun[]): number {
   return runs.findLastIndex(
     (run) =>
-      run.kind === "say" || (run.kind === "answer" && langyRunText(run.parts).trim().length > 0),
+      run.kind === "activity" ||
+      run.kind === "say" ||
+      (run.kind === "answer" && langyRunText(run.parts).trim().length > 0),
   );
 }
 
@@ -400,6 +402,7 @@ function AssistantMessage(props: MessageContentProps) {
   }
   const view: RunView = {
     isStreaming,
+    interrupted,
     // A RECORDED message is left alone: the relay already ruled on its fences.
     isRecorded: isRecordedMessage(message),
     hasActivity: reading.hasActivity,
@@ -410,7 +413,7 @@ function AssistantMessage(props: MessageContentProps) {
     onVerifyDerivedCard: props.onVerifyDerivedCard,
     reasoningTitles: reading.reasoningTitles,
     lastActivityRunIndex: reading.runs.findLastIndex((run) => run.kind === "activity"),
-    lastAnswerRunIndex: lastAnswerRun(reading.runs),
+    lastStepRunIndex: lastStepRun(reading.runs),
     callCards: callCardsOf({
       props,
       reading,
@@ -962,9 +965,11 @@ function SayRun({ parts }: { parts: readonly unknown[] }) {
 type RunView = Omit<Parameters<typeof AnswerRun>[0], "parts" | "isStreaming" | "isRecorded"> & {
   isStreaming: boolean;
   isRecorded: boolean;
+  /** The reader pressed Stop on this turn. */
+  interrupted: boolean;
   reasoningTitles: Parameters<typeof LangyActivityParts>[0]["reasoningTitles"];
   lastActivityRunIndex: number;
-  lastAnswerRunIndex: number;
+  lastStepRunIndex: number;
   /** The cards one call raised, drawn where the call ran. */
   callCards: (part: unknown, key: string) => ReactNode[];
   /** The cumulative PR-flow progress card, drawn once after the last run that moved it on. */
@@ -994,9 +999,9 @@ function renderRun({
             // A call is only ever closed by its own output, so off the streaming
             // turn an open call is an interrupted one.
             live={view.isStreaming}
-            // The turn answered after this run, so a failure inside it is one the
-            // turn recovered from.
-            answeredAfter={index < view.lastAnswerRunIndex}
+            // A failed step keeps its card only when the turn ended on it, unstopped.
+            endsTheTurn={index === view.lastStepRunIndex}
+            interrupted={view.interrupted}
           />
         </LangyCardBoundary>
         {/* A question, a pull request, a proposal, the code access ask or a secret sits

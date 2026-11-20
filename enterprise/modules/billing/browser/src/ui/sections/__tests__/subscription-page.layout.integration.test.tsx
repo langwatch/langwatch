@@ -127,6 +127,10 @@ vi.mock("../../../behavior/billing-api.ts", async () => {
   const setup = await import("./subscription-test-setup.ts");
   return {
     billingApi: {
+      dataRetention: {
+        getOrganizationStorageEstimate: { useQuery: () => ({ data: undefined, isError: false }) },
+        getOrganizationRetention: { useQuery: () => ({ data: undefined, isError: false }) },
+      },
       limits: {
         getUsage: {
           useQuery: () => setup.mockGetUsage(),
@@ -641,6 +645,14 @@ describe("<SubscriptionPage/> layout", () => {
       expect(price).toHaveTextContent("2 seats × €29");
       const header = within(card).getByRole("heading", { name: "Growth plan" }).parentElement;
       expect(header).not.toHaveTextContent("€");
+    });
+
+    /** @scenario "The plan card price says it excludes VAT" */
+    it("says the price excludes VAT", async () => {
+      renderSubscriptionPage();
+
+      const price = await screen.findByTestId("plan-price");
+      expect(price).toHaveTextContent("€58/mo excl. VAT");
     });
 
     /** @scenario "A paid plan's card carries subscription management as its action" */

@@ -74,7 +74,7 @@ export default function InsightsScreen() {
           ]}
         />
       </PageLayout.Header>
-      <PageLayout.Container paddingTop={4}>
+      <PageLayout.Container>
         <VStack align="start" gap={0.5} marginBottom={5}>
           <Text textStyle="bodySm" color="fg.muted">
             {HINT}

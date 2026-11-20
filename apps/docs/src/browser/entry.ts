@@ -1,4 +1,5 @@
-import { startNavigation } from "./navigation.ts";
+import { afterLoad } from "./after-load.ts";
+import { loadSharedSheets, startNavigation } from "./navigation.ts";
 
 import "./islands.css";
 import "../app/docs.css";
@@ -96,6 +97,8 @@ document.addEventListener("click", (event) => {
     break;
   }
 });
+/* Find-in-page opened a collapsed accordion: its island marks the trigger open to match. */
+document.addEventListener("beforematch", () => loadIsland({ name: "disclosures" }), { once: true });
 /* The page's inline key listener marks a search shortcut, even one pressed before this ran. */
 const searchRequested = () => {
   if ((window as { docsSearchKey?: number }).docsSearchKey) loadIsland({ name: "search" });
@@ -108,8 +111,10 @@ const enhanceReading = () => {
   loadIsland({ name: "tabs" });
   loadIsland({ name: "reading" });
 };
+/* The reading enhancements wait for an idle moment; the shared sheet for the load and a frame. */
 if ("requestIdleCallback" in window) window.requestIdleCallback(enhanceReading, { timeout: 1000 });
 else setTimeout(enhanceReading, 100);
+afterLoad(loadSharedSheets);
 for (const eventName of ["pointerover", "focusin"])
   document.addEventListener(eventName, (event) => {
     const trigger =

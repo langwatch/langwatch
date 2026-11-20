@@ -147,6 +147,11 @@ type AuthCacheConfig struct {
 	// re-fetch, covering config mutations that don't emit change-feed
 	// events. Default 60s; negative disables.
 	ConfigTTLSeconds int64 `env:"CONFIG_TTL_SECONDS"`
+	// FailClosedAfterSeconds, when positive, refuses a cached key whose last
+	// control-plane confirmation and whose org's last change-feed poll are both
+	// older than this. 0 (default) keeps serving through an outage; a
+	// negative value is refused at startup.
+	FailClosedAfterSeconds int64 `env:"FAIL_CLOSED_AFTER_SECONDS"`
 }
 
 // CircuitConfig tunes the per-credential circuit breaker that preempts
@@ -314,6 +319,10 @@ func codexBackendURL(base string) string {
 // overflow.
 const MaxConfigurableSeconds = 10 * 365 * 24 * 60 * 60
 
+// MinFailClosedAfterSeconds keeps the fail-closed limit well above the change
+// feed's long-poll hold, so a healthy feed never reads as silent.
+const MinFailClosedAfterSeconds = 30
+
 // validateSecondsFields rejects out-of-range time spans before anything
 // converts them to a time.Duration. Negative values stay legal on the fields
 // whose consumer reads a negative number as an explicit "disabled" signal.
@@ -337,6 +346,7 @@ func validateSecondsFields(cfg Config) error {
 		{env: "LW_GATEWAY_AUTH_CACHE_SOFT_BUMP_SECONDS", value: cfg.AuthCache.SoftBumpSeconds},
 		{env: "LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS", value: cfg.AuthCache.HardGraceSeconds},
 		{env: "LW_GATEWAY_AUTH_CACHE_CONFIG_TTL_SECONDS", value: cfg.AuthCache.ConfigTTLSeconds},
+		{env: "LW_GATEWAY_AUTH_CACHE_FAIL_CLOSED_AFTER_SECONDS", value: cfg.AuthCache.FailClosedAfterSeconds},
 		{env: "LW_GATEWAY_CIRCUIT_WINDOW_S", value: cfg.Circuit.WindowS},
 		{env: "LW_GATEWAY_CIRCUIT_COOLDOWN_S", value: cfg.Circuit.CooldownS},
 		{env: "LW_GATEWAY_SPEND_FLUSH_INTERVAL_SECONDS", value: cfg.SpendEmitter.FlushIntervalSeconds},
@@ -347,6 +357,9 @@ func validateSecondsFields(cfg Config) error {
 		if f.rejectNegative && f.value < 0 {
 			return fmt.Errorf("%s is %d seconds; it is a wait, so it must be zero or positive. Use 0 for no wait at all", f.env, f.value)
 		}
+	}
+	if v := cfg.AuthCache.FailClosedAfterSeconds; v < 0 || (v > 0 && v < MinFailClosedAfterSeconds) {
+		return fmt.Errorf("LW_GATEWAY_AUTH_CACHE_FAIL_CLOSED_AFTER_SECONDS is %d seconds; it must be 0 (off) or at least %d, since a healthy change feed holds a poll open for about 10 seconds", v, MinFailClosedAfterSeconds)
 	}
 	return nil
 }

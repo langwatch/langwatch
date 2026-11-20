@@ -177,6 +177,14 @@ const startRunResponseSchemaDefinition = z.object({
   runId: z.string().describe("Identifier to poll this run with"),
   status: z.literal("running"),
   total: z.number().describe("Number of cells this run will execute"),
+  concurrency: z
+    .number()
+    .int()
+    .positive()
+    .optional()
+    .describe(
+      "Cells this run executes at once: the request's `concurrency`, else the server default",
+    ),
   runUrl: z.string().optional().describe("Link to the run in the LangWatch app"),
 });
 export interface StartRunResponseSchema extends Named<typeof startRunResponseSchemaDefinition> {}
@@ -223,6 +231,13 @@ const runListEntrySchema = z.object({
   timestamps: runTimestampsSchema,
   progress: z.number().nullable().optional(),
   total: z.number().nullable().optional(),
+  concurrency: z
+    .number()
+    .int()
+    .positive()
+    .nullable()
+    .optional()
+    .describe("Cells the run executed at once. Null for a run that recorded none."),
   summary: runAggregateSummarySchema,
 });
 
@@ -305,6 +320,12 @@ const runStatusResponseSchemaDefinition = z.object({
   status: runStatusSchema,
   progress: z.number().describe("Cells finished so far"),
   total: z.number().describe("Cells in the run"),
+  concurrency: z
+    .number()
+    .int()
+    .positive()
+    .optional()
+    .describe("Cells the run executes at once, as it was fixed when the run started"),
   startedAt: z.number().optional().describe("Unix milliseconds"),
   finishedAt: z
     .number()
@@ -369,6 +390,18 @@ const runTargetSchema = z.object({
   promptId: z.string().nullable().optional(),
   promptVersion: z.number().nullable().optional(),
   agentId: z.string().nullable().optional(),
+  agentLabel: z
+    .string()
+    .nullable()
+    .optional()
+    .describe("The deploy label an agent target ran at, such as production"),
+  agentVersion: z
+    .number()
+    .int()
+    .positive()
+    .nullable()
+    .optional()
+    .describe("The agent version the label pointed at when the run started"),
   evaluatorId: z.string().nullable().optional(),
   model: z.string().nullable().optional(),
   metadata: z
@@ -384,6 +417,13 @@ const runResultsResponseSchemaDefinition = z.object({
   workflowVersionId: z.string().nullable().optional(),
   progress: z.number().nullable().optional(),
   total: z.number().nullable().optional(),
+  concurrency: z
+    .number()
+    .int()
+    .positive()
+    .nullable()
+    .optional()
+    .describe("Cells the run executed at once. Null for a run that recorded none."),
   targets: z
     .array(runTargetSchema)
     .nullable()

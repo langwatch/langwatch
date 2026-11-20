@@ -45,6 +45,8 @@ export type BillingSubscription = Readonly<{
   currentPeriodEnd?: number | null;
   /** Lower-case ISO code the subscription bills in. */
   currency?: string | null;
+  /** The customer the subscription bills; absent where a caller did not read it. */
+  customerId?: string | null;
 }>;
 
 /** A line change: an existing line by `id`, or a new one by `price`; these keys are the provider's. */
@@ -74,6 +76,8 @@ export type BillingSubscriptionPreviewChange = Omit<BillingSubscriptionChange, "
 export type BillingInvoicePreview = Readonly<{
   total: number;
   amountDue: number;
+  /** The tax inside `total`, added on top or included; absent when there is none. */
+  tax?: number;
   currency: string | null;
 }>;
 

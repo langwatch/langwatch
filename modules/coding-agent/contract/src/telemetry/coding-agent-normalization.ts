@@ -1,3 +1,4 @@
+import { isConversationalQuerySource } from "@langwatch/span-normalisation";
 // One vocabulary for all coding agents; folds registry definitions into
 // shared detection, prefix-stripping and alias tables; downstream code never
 // compares vendor literals.
@@ -372,6 +373,16 @@ const MAX_PROMPT_TITLE_CHARS = 120;
 const USER_QUERY_WRAPPER = /^\s*<user_query>([\s\S]*)<\/user_query>\s*$/;
 
 /** The human's words out of a Grok-wrapped prompt; any other text comes back unchanged. */
+/**
+ * Claude Code's own housekeeping calls (session titles, side queries) are not the agent talking.
+ * A sub-agent's call (`agent:...`) is conversation, and a record with no source is kept.
+ */
+export function isUtilityQuerySource(attrs: Record<string, unknown>): boolean {
+  const querySource = pickString(attrs, "query_source_safe") ?? pickString(attrs, "query_source");
+  if (querySource === null || querySource.startsWith("agent")) return false;
+  return !isConversationalQuerySource(querySource);
+}
+
 export function unwrapUserQuery(text: string): string {
   return USER_QUERY_WRAPPER.exec(text)?.[1]?.trim() ?? text;
 }
@@ -505,8 +516,13 @@ export function deriveToolName({
 
   const name = spanName ?? "";
   if (name.length === 0) return null;
-  // GenAI semconv names a tool run `execute_tool {tool}` and declares the tool by attribute.
-  if (name.split(" ", 1)[0] === GEN_AI_TOOL_RUN_OPERATION) {
+  // GenAI semconv names a tool run `execute_tool {tool}` and declares the tool by attribute, as
+  // does an agent's declared tool-run span (pi's `pi.harness.tool`, lifted by its canonicaliser).
+  const operation = name.split(" ", 1)[0];
+  const isToolRun =
+    operation === GEN_AI_TOOL_RUN_OPERATION ||
+    CODING_AGENT_REGISTRY.some((agent) => agent.genAiOperations?.toolRun === operation);
+  if (isToolRun) {
     const declared = pickFirstString(attrs, ["gen_ai.tool.name"]);
     if (declared !== null) return declared;
   }

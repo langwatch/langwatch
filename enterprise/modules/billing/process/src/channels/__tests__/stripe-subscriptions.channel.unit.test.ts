@@ -50,6 +50,7 @@ const PREVIEW = {
   object: "invoice",
   currency: "usd",
   total: 1500,
+  total_excluding_tax: 1240,
   amount_due: 1500,
 } as Stripe.Invoice;
 
@@ -112,7 +113,9 @@ function overTheProvider(): StripeSubscriptionsChannel {
 function overTheTwin(): StripeSubscriptionsChannel {
   const subscriptions = MemoryStripeSubscriptionsChannel.create();
   subscriptions.seed({ subscription: ACTIVE_HELD });
-  subscriptions.seedPreview({ preview: { total: 1500, amountDue: 1500, currency: "usd" } });
+  subscriptions.seedPreview({
+    preview: { total: 1500, amountDue: 1500, tax: 260, currency: "usd" },
+  });
   subscriptions.seedCheckoutLineItems({
     checkoutSessionId: "cs_1",
     lineItems: [{ priceId: "price_seat", quantity: 4 }],
@@ -161,7 +164,7 @@ describe.each(tiers)("Stripe subscriptions over $tier", ({ compose }) => {
           subscriptionId: "sub_1",
           change: { items: [{ id: "si_seat", quantity: 3 }] },
         }),
-      ).resolves.toEqual({ currency: "usd", total: 1500, amountDue: 1500 });
+      ).resolves.toEqual({ currency: "usd", total: 1500, amountDue: 1500, tax: 260 });
     });
   });
 
@@ -367,7 +370,8 @@ describe("Billing's subscription shapes over the provider", () => {
       },
     });
 
-    expect(preview).toEqual({ total: 1500, amountDue: 1500, currency: "usd" });
+    // The tax is what the invoice adds on top of its pre-tax total.
+    expect(preview).toEqual({ total: 1500, amountDue: 1500, tax: 260, currency: "usd" });
     expect(calls).toEqual([
       {
         operation: "invoices.createPreview",

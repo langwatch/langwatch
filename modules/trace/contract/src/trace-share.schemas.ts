@@ -92,6 +92,9 @@ const sharedSpanTreeNodeSchema = spanTreeNodeSchema.pick({
   // in-app; arguments/results are span CONTENT and stay behind the detail
   // read's redaction pass.
   toolName: true,
+  // Agent names and the A2A mark are names too, so the shared tree labels them alike.
+  agentName: true,
+  isA2aCall: true,
   // `gateTreeCost` nulls per-span spend on the same `cost:view` rule as the
   // header.
   cost: true,

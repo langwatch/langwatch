@@ -20,6 +20,7 @@ import {
  * through `IngestionTemplateService`, so `buildApi()` supplies no facade and tests seed the
  * repository.
  * @see specs/ai-gateway/governance/governance-api-cli-mcp-coverage.feature
+ * @see specs/ai-gateway/governance/ingestion-template-rest-validation.feature
  */
 import type { ScimApi } from "@langwatch/enterprise-scim-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
@@ -205,6 +206,16 @@ async function buildApi(
     asUser: requestWith(`Bearer ${USER_BOUND_TOKEN}`, "Authorization"),
     asProjectKey: requestWith(LEGACY_PROJECT_TOKEN, "X-Auth-Token"),
   };
+}
+
+/** Every template the admin list can see, read back over the wire. */
+async function writtenTemplates(
+  asUser: (path: string, init?: RequestOptions) => Promise<Response> | Response,
+): Promise<unknown[]> {
+  const response = await asUser("/api/governance/ingestion-templates/admin");
+  const body = (await response.json()) as { data: unknown[] };
+
+  return body.data;
 }
 
 describe("the governance REST family", () => {
@@ -402,6 +413,23 @@ describe("the governance REST family", () => {
       expect(body.code).toBe(new InvalidSourceTypeError().code);
     });
 
+    /** @scenario An empty source type is refused at the door */
+    it("refuses an empty source type at the door and writes nothing", async () => {
+      const { asUser } = await buildApi();
+
+      const response = await asUser("/api/governance/ingestion-templates", {
+        method: "POST",
+        body: JSON.stringify({ source_type: "", display_name: "No Source" }),
+      });
+
+      expect(response.status).toBe(422);
+      await expect(response.json()).resolves.toMatchObject({
+        code: "validation_error",
+        meta: { target: "json", fields: ["source_type"] },
+      });
+      await expect(writtenTemplates(asUser)).resolves.toEqual([]);
+    });
+
     it("refuses a body with no display name before the application sees it", async () => {
       const { asUser, repositories } = await buildApi();
       const createWithAudit = vi.spyOn(repositories.ingestionTemplates, "createWithAudit");
@@ -570,6 +598,23 @@ describe("the governance REST family", () => {
         ottl_rules: 'set(attributes["from"], "platform")',
       });
       expect(body.ingestion_template.id).not.toBe(source.id);
+    });
+
+    /** @scenario An empty source template id is refused at the door */
+    it("refuses an empty source template id at the door and writes nothing", async () => {
+      const { asUser } = await buildApi();
+
+      const response = await asUser("/api/governance/ingestion-templates/clone", {
+        method: "POST",
+        body: JSON.stringify({ source_template_id: "" }),
+      });
+
+      expect(response.status).toBe(422);
+      await expect(response.json()).resolves.toMatchObject({
+        code: "validation_error",
+        meta: { target: "json", fields: ["source_template_id"] },
+      });
+      await expect(writtenTemplates(asUser)).resolves.toEqual([]);
     });
 
     it("reports an unknown source as not found", async () => {

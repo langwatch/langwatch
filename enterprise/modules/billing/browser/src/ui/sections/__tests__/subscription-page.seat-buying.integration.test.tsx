@@ -141,6 +141,10 @@ vi.mock("../../../behavior/billing-api.ts", async () => {
   const setup = await import("./subscription-test-setup.ts");
   return {
     billingApi: {
+      dataRetention: {
+        getOrganizationStorageEstimate: { useQuery: () => ({ data: undefined, isError: false }) },
+        getOrganizationRetention: { useQuery: () => ({ data: undefined, isError: false }) },
+      },
       limits: { getUsage: { useQuery: () => setup.mockGetUsage() } },
       plan: { getActivePlan: { useQuery: () => setup.mockGetActivePlan() } },
       organization: {
@@ -395,6 +399,26 @@ describe("<SubscriptionPage/> buying seats", () => {
       const total = within(dialog.getByTestId("upgrade-seats-total"));
       expect(total.getByText("€87/mo")).toBeInTheDocument();
       expect(total.getByText("3 seats × €29")).toBeInTheDocument();
+    });
+
+    /** @scenario "The seat dialog says its total excludes VAT" */
+    it("says the total excludes VAT", async () => {
+      givenFree(1);
+      renderPage();
+
+      const total = within(within(await openSeatDialog()).getByTestId("upgrade-seats-total"));
+      expect(total.getByText("€29/mo")).toBeInTheDocument();
+      expect(total.getByText("excl. VAT")).toBeInTheDocument();
+    });
+
+    /** @scenario "The Growth offer says its price excludes VAT" */
+    it("says the Growth offer's price excludes VAT", async () => {
+      givenFree(2);
+      renderPage();
+
+      const offer = await screen.findByTestId("upgrade-total");
+      expect(offer).toHaveTextContent("€58/mo for 2 seats");
+      expect(offer).toHaveTextContent("excl. VAT");
     });
 
     /** @scenario "The seat dialog never goes below the people already in the organization" */
@@ -757,6 +781,35 @@ describe("<SubscriptionPage/> buying seats", () => {
       expect(confirm.getByRole("button", { name: "Pay €24.17 and add" })).toBeEnabled();
     });
 
+    /** @scenario "The seat change confirm splits VAT out of the charge today" */
+    it("charges the VAT-inclusive amount today and splits the VAT out", async () => {
+      mockPreviewProration.mockImplementation(() => ({
+        data: {
+          ...addQuote,
+          amountDueCents: 2924,
+          formattedAmountDue: "€29.24",
+          taxCents: 507,
+          formattedAmountDueExcludingTax: "€24.17",
+          formattedTax: "€5.07",
+        },
+        isLoading: false,
+        isError: false,
+      }));
+      givenGrowth({ paid: 3, inUse: 3 });
+      renderPage();
+      await openManageSeats();
+
+      addPerson("qux@acme.example");
+      fireEvent.click(lastButton("Add 1 seat · €29/mo"));
+
+      const confirm = within(await screen.findByTestId("seat-confirm-dialog"));
+      expect(confirm.getByText("€29.24")).toBeInTheDocument();
+      expect(confirm.getByText("€24.17 + €5.07 VAT")).toBeInTheDocument();
+      expect(confirm.getByText("€116/mo")).toBeInTheDocument();
+      expect(confirm.getByText("excl. VAT")).toBeInTheDocument();
+      expect(confirm.getByRole("button", { name: "Pay €29.24 and add" })).toBeEnabled();
+    });
+
     /** @scenario "Confirming the added seat changes the subscription and sends the invite" */
     it("changes the subscription at the quote, invites and closes", async () => {
       givenGrowth({ paid: 3, inUse: 3 });
@@ -908,11 +961,32 @@ describe("<SubscriptionPage/> buying seats", () => {
 
       fireEvent.click(screen.getByTestId("drawer-seats-stepper-plus"));
 
-      const confirm = lastButton("Add 1 seat · €29/mo");
+      const confirm = lastButton("Add 1 seat");
       expect(confirm).toBeDisabled();
       expect(screen.getByTestId("seat-drawer-price-failed")).toHaveTextContent(
         "The price for this change did not load.",
       );
+    });
+
+    /** @scenario "The seat drawer explains a held price with the failed payment" */
+    it("names the failed payment when the price is held for it", async () => {
+      givenGrowth({ paid: 3, inUse: 3 });
+      mockPreviewProration.mockImplementation(() => ({
+        data: undefined,
+        isLoading: false,
+        isError: true,
+        error: { code: "seats_held_for_payment", httpStatus: 409 },
+      }));
+      renderPage();
+      await openManageSeats();
+
+      fireEvent.click(screen.getByTestId("drawer-seats-stepper-plus"));
+
+      expect(lastButton("Add 1 seat")).toBeDisabled();
+      expect(screen.queryByTestId("seat-change-summary")).toBeNull();
+      const note = screen.getByTestId("seat-drawer-price-failed");
+      expect(note).toHaveTextContent("A payment failed, so seats can't be added.");
+      expect(note).toHaveTextContent("Update the card on the billing page");
     });
 
     /** @scenario "A charge the payment provider refuses keeps the confirm open and invites nobody" */
@@ -957,11 +1031,11 @@ describe("<SubscriptionPage/> buying seats", () => {
   });
 
   describe("given Other seat types on Growth", () => {
-    const givenDeveloperPrice = () => {
+    const givenDeveloperPrice = (quantity = 0) => {
       mockDeveloperSeats.mockReturnValue({
         data: {
           available: true,
-          quantity: 0,
+          quantity,
           unitAmountCents: 500,
           currency: "EUR",
           billingInterval: "month",
@@ -988,6 +1062,62 @@ describe("<SubscriptionPage/> buying seats", () => {
           name: /Other seat types/,
         }),
       );
+
+    /** `developers` Developers in use beside `members` full members, as the server counts them. */
+    const givenDevelopersInUse = ({
+      members,
+      developers,
+    }: {
+      members: number;
+      developers: number;
+    }) =>
+      mockGetUsage.mockReturnValue({
+        data: {
+          seatLimitInfo: { status: "ok", message: "" },
+          membersCount: members,
+          membersDeveloperCount: developers,
+        },
+        isLoading: false,
+        refetch: vi.fn(),
+      } as ReturnType<typeof mockGetUsage>);
+
+    /** @scenario "The Developer seat stepper stops at the Developers in use" */
+    it("stops lowering Developer seats at the Developers in use and says why", async () => {
+      givenGrowth({ paid: 3, inUse: 3 });
+      givenDevelopersInUse({ members: 3, developers: 2 });
+      givenDeveloperPrice(3);
+      renderPage();
+      await openManageSeats();
+
+      unfold();
+      fireEvent.click(await screen.findByTestId("developer-seats-stepper-minus"));
+      fireEvent.click(screen.getByTestId("developer-seats-stepper-minus"));
+
+      expect(screen.getByTestId("developer-seats-stepper-value")).toHaveTextContent("2");
+      expect(screen.getByTestId("developer-seats-stepper-minus")).toBeDisabled();
+      expect(screen.getByTestId("developer-seats-minimum")).toHaveTextContent(
+        "2 people use Developer seats. Remove someone in Users to go lower.",
+      );
+    });
+
+    /** @scenario "Raising Developer seats skips the counts below the Developers in use" */
+    it("raises Developer seats straight to the Developers in use", async () => {
+      givenGrowth({ paid: 3, inUse: 3 });
+      givenDevelopersInUse({ members: 3, developers: 2 });
+      givenDeveloperPrice(0);
+      renderPage();
+      await openManageSeats();
+
+      unfold();
+      fireEvent.click(await screen.findByTestId("developer-seats-stepper-plus"));
+
+      expect(screen.getByTestId("developer-seats-stepper-value")).toHaveTextContent("2");
+      expect(screen.getByTestId("developer-seats-minimum")).toHaveTextContent(
+        "2 people use Developer seats, so you need at least 2.",
+      );
+      fireEvent.click(screen.getByTestId("developer-seats-stepper-minus"));
+      expect(screen.getByTestId("developer-seats-stepper-value")).toHaveTextContent("0");
+    });
 
     /** @scenario "Other seat types are folded at the bottom of Manage seats on Growth" */
     it("folds Lite members under Other seat types", async () => {

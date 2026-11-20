@@ -6,6 +6,7 @@
  */
 import type { PlanInfo } from "@langwatch/enterprise-licensing-contract";
 
+import { EXCLUDING_VAT } from "./billing-plans.ts";
 import { PricingModel } from "./prisma-types.ts";
 
 export type SubscriptionPlanFlags = {
@@ -176,6 +177,8 @@ export function planEventUsage({
 /** The plan card's price row: the period total, then seats times the seat price. */
 export type PlanPrice = {
   total: string;
+  /** Quiet words beside the total: Cloud prices exclude VAT. */
+  note?: string;
   /** Seats times the seat price (from two seats), then the per-month seat price on annual plans. */
   breakdown?: string;
 };
@@ -196,7 +199,11 @@ export function planPrice({
     seatCount > 1 ? `${seatCount} seats \u00d7 ${seatPrice}` : undefined,
     monthlyEquivalent,
   ].filter((part): part is string => Boolean(part));
-  return { total, breakdown: parts.length > 0 ? parts.join(" · ") : undefined };
+  return {
+    total,
+    note: EXCLUDING_VAT,
+    breakdown: parts.length > 0 ? parts.join(" · ") : undefined,
+  };
 }
 
 /** Seats a contract or licence fixes until renewal: only LangWatch changes them. */

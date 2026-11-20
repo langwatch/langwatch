@@ -7,7 +7,12 @@ export const GATEWAY_OVERRIDES: Record<string, Partial<DatasetOverride>> = {
     description: "Individual API request spend and reconciliation details",
     grain: "one row per GatewayRequestId",
     timeColumn: "OccurredAt",
-    dedup: { versionColumn: "EventTimestamp" },
+    // Latest-in-order: a stock widget reads it (analytics ADR-006).
+    dedup: {
+      versionColumn: "EventTimestamp",
+      strategy: "latest-in-order",
+      tieBreakColumns: ["Version"],
+    },
   },
   gateway_budget_scope_totals: {
     description:

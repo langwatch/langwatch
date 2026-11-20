@@ -38,6 +38,7 @@ import {
   attachedContextToChip,
   type LangyPanelEffect,
   type LangyPanelMode,
+  selectConversationOpenIn,
   useLangyStore,
 } from "../../../../behavior/langy.store.ts";
 import { useGlobalLangyShortcut } from "../../../../behavior/use-global-langy-shortcut.ts";
@@ -88,6 +89,7 @@ import {
 import {
   useLangyHistoryError,
   useLangyListError,
+  useReleaseTurnOfLostConversation,
 } from "../../behavior/panel/use-langy-panel-errors.ts";
 import {
   useLangyDevInspector,
@@ -234,7 +236,7 @@ function LangyPanel({
   const isOpen = useLangyStore((s) => s.isOpen);
   const closePanel = useLangyStore((s) => s.closePanel);
   const pickModel = useLangyStore((s) => s.pickModel);
-  const activeConversationId = useLangyStore((s) => s.activeConversationId);
+  const activeConversationId = useLangyStore((s) => selectConversationOpenIn(s, projectId));
   const pendingPrompt = useLangyStore((s) => s.pendingPrompt);
   const pendingKickoff = useLangyStore((s) => s.pendingKickoff);
   const guidedTourRunning = useGuidedTour().useRunning();
@@ -277,6 +279,7 @@ function LangyPanel({
   const model = useLangyComposerModel({ projectId });
   const makeDefault = useLangyMakeDefault({ resolvedDefault: model.resolvedDefault });
   const engine = useLangyChatEngine({ transport });
+  refs.sendStrandedRef.current = () => engine.applyHistoryToEngine([]);
   const isBusy = engine.status === "submitted" || engine.status === "streaming";
   useLangyWarmWorker({
     projectId,
@@ -397,6 +400,10 @@ function LangyPanel({
     messages: engine.messages,
     retryEngineTurn: engine.retryTurn,
     restoreDraftOnFailure,
+  });
+  useReleaseTurnOfLostConversation({
+    errorKinds: [failure.turnError?.kind, historyError.presentation?.kind],
+    stopEngine: engine.stop,
   });
   useLangyOutlivedTurnError({
     error: engine.error,

@@ -404,26 +404,29 @@ services:
   # NLP SERVICE (profile: nlp)
   # =============================================================================
   # nlpgo — the Go NLP engine (services/nlpgo, run as the `nlpgo` subcommand of
-  # the cmd/service monobinary). Dockerfile.langwatch_nlp builds a static Go
-  # binary; there is no Python uvicorn/litellm service anymore. The image still
+  # the cmd/service monobinary), the nlp target of Dockerfile.go-services.
+  # There is no Python uvicorn/litellm service anymore. The image still
   # publishes as langwatch/langwatch_nlp and binds :5561, so the app/workers
   # dial http://langwatch_nlp:5561 (LANGWATCH_NLP_SERVICE) unchanged.
 
   langwatch_nlp:
-    # Build from local services/nlpgo source (via Dockerfile.langwatch_nlp)
+    # Build from local services/nlpgo source (the nlp target of Dockerfile.go-services)
     # instead of the published langwatch/langwatch_nlp:latest image, which
     # lags the source. Building from source keeps the engine in lockstep with
     # this checkout, so evaluator output (e.g. the `details`/reasoning
     # envelope) matches the code here. See #5151.
     build:
       context: .
-      dockerfile: infra/docker/Dockerfile.langwatch_nlp
+      dockerfile: infra/docker/Dockerfile.go-services
+      target: nlp
+    command: [nlpgo]
     profiles: [nlp, scenarios, full]
     # No host port - accessed via docker network as "langwatch_nlp:5561"
     environment:
       # nlpgo reads LANGWATCH_ENDPOINT for evaluator + agent-workflow callbacks
       # (falls back to it when NLPGO_ENGINE_LANGWATCH_BASE_URL is unset).
       LANGWATCH_ENDPOINT: http://app:5560
+      SERVER_ADDR: ":5561"
     deploy:
       resources:
         limits:

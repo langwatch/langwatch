@@ -1,3 +1,4 @@
+import { growthRetentionDaysSchema } from "@langwatch/data-retention-contract";
 import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
@@ -13,6 +14,16 @@ export interface OrganizationApiScopeSchema extends Named<
 export const organizationApiScopeSchema: OrganizationApiScopeSchema =
   organizationApiScopeSchemaDefinition;
 export type OrganizationApiScope = z.infer<typeof organizationApiScopeSchema>;
+
+/** The docs playground switch an administrator saves for one organization. */
+const organizationApiSaveDocsPlaygroundPolicyInputSchemaDefinition = z
+  .object({ organizationId: z.string(), docsPlaygroundSessionsEnabled: z.boolean() })
+  .strict();
+export interface OrganizationApiSaveDocsPlaygroundPolicyInputSchema extends Named<
+  typeof organizationApiSaveDocsPlaygroundPolicyInputSchemaDefinition
+> {}
+export const organizationApiSaveDocsPlaygroundPolicyInputSchema: OrganizationApiSaveDocsPlaygroundPolicyInputSchema =
+  organizationApiSaveDocsPlaygroundPolicyInputSchemaDefinition;
 
 /** One member of one organization. */
 const organizationApiMemberScopeSchemaDefinition = z.object({
@@ -209,6 +220,8 @@ const organizationApiSeatCheckoutInputSchemaDefinition = z.object({
   currency: z.enum(["USD", "EUR"]).optional(),
   billingInterval: z.enum(["monthly", "annual"]).optional(),
   totalSeats: z.number().min(1),
+  /** The retention picked in the upgrade dialog; billing keeps it for the paid activation. */
+  retentionDays: growthRetentionDaysSchema.optional(),
   invites: z.array(
     z.object({
       email: z.string().email(),

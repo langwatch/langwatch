@@ -14,6 +14,7 @@ import {
   type CodingAgentPullRequestUsage,
   type CodingAgentRecentSessionsInput,
   type CodingAgentSession,
+  type CodingAgentSessionLastTurn,
   type CodingAgentSessionEvent,
   type CodingAgentSessionEventsInput,
   type CodingAgentSessionListRow,
@@ -351,6 +352,13 @@ export class CodingAgentModule implements CodingAgentApi {
     traceId: string;
   }): Promise<CodingAgentSession | null> {
     return this.#codingAgents.findSessionForTrace(input);
+  }
+
+  findLastTurnOfSession(input: {
+    projectId: string;
+    sessionId: string;
+  }): Promise<CodingAgentSessionLastTurn | null> {
+    return this.#codingAgents.findLastTurnOfSession(input);
   }
 
   /** Port of main's `traces.codingAgentTranscript`: trace redacts for the viewer, then builds. */

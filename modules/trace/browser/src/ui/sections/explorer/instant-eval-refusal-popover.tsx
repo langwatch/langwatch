@@ -18,6 +18,8 @@ import type { ExplorerSelfHostedInstantEvalOffer } from "@langwatch/trace-contra
 import { Sparkles } from "lucide-react";
 import type React from "react";
 
+import { DecisionModelPicker } from "./decision-model-picker.tsx";
+
 /**
  * Why an Instant Eval did not start. `opt_in`, `ask_admin` and `unreleased` are one refusal told to
  * three readers: the switch, an admin, or (enterprise) a word with us. A self-hosted install is
@@ -36,6 +38,15 @@ export const UPGRADE_HREF = "/settings/subscription";
 
 /** Where a model provider is connected, which is what a judge runs on. */
 export const MODEL_PROVIDERS_HREF = "/settings/model-providers";
+
+/**
+ * Every refusal but a broken judge gates LangWatch's own model only: a project on its own decision
+ * model, picked in Default models, runs whatever the release, plan or license says (ADR-182).
+ */
+export const OWN_MODEL_LINK = {
+  label: "Run them on your own decision model",
+  href: MODEL_PROVIDERS_HREF,
+} as const;
 
 /** What an Instant Eval does, said once on the Enterprise lock. */
 const INSTANT_EVALS_DESCRIPTION =
@@ -72,6 +83,16 @@ interface InstantEvalRefusalPopoverProps {
   viaConnect?: boolean;
   /** The reader may manage the organization, so the license lock offers the License page. */
   canActivateLicense?: boolean;
+  /** The own-decision-model kill switch is on, so Default models can pick one: offer it. */
+  offersOwnModel?: boolean;
+  /** The reader may set the project's default models, so the decision model is picked in place. */
+  canPickDecisionModel?: boolean;
+  /** The project's runnable decision models, for the in-place picker; undefined while loading. */
+  decisionModels?: readonly { value: string; label: string }[] | undefined;
+  /** Saves the picked model as the project's Instant Evals default, then runs the eval. */
+  onPickDecisionModel?: (model: string) => void;
+  /** The model being saved, if any. */
+  pickingDecisionModel?: string | null;
   children: React.ReactElement;
 }
 
@@ -81,6 +102,10 @@ interface InstantEvalRefusalCopy {
   action?: { label: string; href?: string };
   /** A second, quieter link beside the action, when the copy has one. */
   more?: { label: string; href: string };
+  /** The way round a gate on LangWatch's own model: the project's own decision model. */
+  ownModel?: { label: string; href: string };
+  /** The decision model is picked in place, under the body. */
+  picker?: true;
   dismiss: string;
 }
 
@@ -88,6 +113,7 @@ interface InstantEvalRefusalCopy {
 interface InstantEvalLicenseLockCopy {
   lock: "license";
   more: { label: string; href: string };
+  ownModel?: { label: string; href: string };
   dismiss: string;
 }
 
@@ -103,11 +129,17 @@ const SELF_HOSTED_REFUSAL_COPY: { not_in_license: InstantEvalLicenseLockCopy } &
   InstantEvalRefusalCopy
 > = {
   // Also the answer with no license at all, so it never says what a license holds.
-  not_in_license: { lock: "license", more: READ_MORE_SELF_HOSTED, dismiss: "Not now" },
+  not_in_license: {
+    lock: "license",
+    more: READ_MORE_SELF_HOSTED,
+    ownModel: OWN_MODEL_LINK,
+    dismiss: "Not now",
+  },
   switched_off: {
     title: "Instant Evals are switched off for your organization",
     body: "Your license includes Instant Evals, and an organization admin switched them off. An admin can switch them back on in Settings, Connect.",
     action: { label: "Open Connect settings", href: CONNECT_SETTINGS_HREF },
+    ownModel: OWN_MODEL_LINK,
     dismiss: "Not now",
   },
   not_connected: {
@@ -115,12 +147,14 @@ const SELF_HOSTED_REFUSAL_COPY: { not_in_license: InstantEvalLicenseLockCopy } &
     title: "This install isn't connected to LangWatch",
     body: `Instant Evals on a self-hosted install judge through LangWatch. The install needs Connect switched on and ${CONNECT_HOSTS} reachable.`,
     more: READ_MORE_SELF_HOSTED,
+    ownModel: OWN_MODEL_LINK,
     dismiss: "Not now",
   },
   ask_operator: {
     title: "Instant Evals are off on this install",
     body: "This install doesn't judge through LangWatch, so whoever runs it decides when Instant Evals are on. Ask them to switch Instant Evals on.",
     more: READ_MORE_SELF_HOSTED,
+    ownModel: OWN_MODEL_LINK,
     dismiss: "Not now",
   },
 };
@@ -132,13 +166,30 @@ export function isSelfHostedRefusal(
   return kind !== undefined && Object.hasOwn(SELF_HOSTED_REFUSAL_COPY, kind);
 }
 
+type RefusalCopyOptions = {
+  viaConnect?: boolean;
+  offersOwnModel?: boolean;
+  canPickDecisionModel?: boolean;
+};
+
 /**
  * The popover's words, exported so the copy is pinned by a test. An action with an `href` is a
- * link; one without is the organization's switch; no action leaves only the quieter link.
+ * link; one without is the organization's switch; no action leaves only the quieter link. The
+ * own-model link is left out while the own-model switch is off.
  */
 export function instantEvalRefusalCopy(
   refusal: InstantEvalRefusal,
-  { viaConnect = false }: { viaConnect?: boolean } = {},
+  options: RefusalCopyOptions = {},
+): InstantEvalRefusalCopy | InstantEvalLicenseLockCopy {
+  const copy = refusalCopyFor(refusal, options);
+  if (options.offersOwnModel || !copy.ownModel) return copy;
+  const { ownModel: _hidden, ...withoutOwnModel } = copy;
+  return withoutOwnModel;
+}
+
+function refusalCopyFor(
+  refusal: InstantEvalRefusal,
+  { viaConnect = false, offersOwnModel = false, canPickDecisionModel = false }: RefusalCopyOptions,
 ): InstantEvalRefusalCopy | InstantEvalLicenseLockCopy {
   const what =
     "An Instant Eval reads every result in this view and keeps the ones that answer your question, which no filter can do.";
@@ -148,6 +199,7 @@ export function instantEvalRefusalCopy(
       title: "Your free Instant Evals quota is used up",
       body: `${what} Upgrade to keep judging. ${skip}`,
       action: { label: "Compare plans", href: UPGRADE_HREF },
+      ownModel: OWN_MODEL_LINK,
       dismiss: "Skip",
     };
   }
@@ -175,6 +227,7 @@ export function instantEvalRefusalCopy(
       body: `${whereItGoes} Enable turns this on for every project in your organization.`,
       action: { label: "Enable" },
       more: { label: "Read more", href: WHERE_THE_TEXT_GOES_HREF },
+      ownModel: OWN_MODEL_LINK,
       dismiss: "Not now",
     };
   }
@@ -183,13 +236,35 @@ export function instantEvalRefusalCopy(
       title: "Instant Evals aren't turned on for your organization yet",
       body: `${whereItGoes} Ask an organization admin to turn it on for every project in your organization.`,
       more: { label: "Read more", href: WHERE_THE_TEXT_GOES_HREF },
+      ownModel: OWN_MODEL_LINK,
+      dismiss: "Not now",
+    };
+  }
+  const powerful =
+    "Instant Evals are a powerful new tool that turns plain language questions into native filters.";
+  // Without LangWatch's own model, the project's own decision model is the way in: no word with us.
+  if (offersOwnModel && canPickDecisionModel) {
+    return {
+      title: "Pick a decision model",
+      body: "Instant Evals run on a decision model of your own.",
+      picker: true,
+      dismiss: "Not now",
+    };
+  }
+  // Picking one writes the project's default models, which only a project admin may do.
+  if (offersOwnModel) {
+    return {
+      title: "Instant Evals need a decision model",
+      body: "Instant Evals run on a decision model of your own. Ask a project admin to pick one in Default models.",
+      ownModel: OWN_MODEL_LINK,
       dismiss: "Not now",
     };
   }
   return {
     title: "Instant Evals aren't enabled for this project yet",
-    body: "Instant Evals are a powerful new tool that turns plain language questions into native filters. Contact us so we can activate it for you.",
+    body: `${powerful} Contact us so we can activate Evals Preview, our hosted model, for you.`,
     action: { label: "Contact us", href: CONTACT_US_HREF },
+    ownModel: OWN_MODEL_LINK,
     dismiss: "Not now",
   };
 }
@@ -202,9 +277,16 @@ export function InstantEvalRefusalPopover({
   isEnabling,
   viaConnect,
   canActivateLicense = false,
+  offersOwnModel = false,
+  canPickDecisionModel = false,
+  decisionModels,
+  onPickDecisionModel,
+  pickingDecisionModel = null,
   children,
 }: InstantEvalRefusalPopoverProps) {
-  const refusalCopy = refusal ? instantEvalRefusalCopy(refusal, { viaConnect }) : null;
+  const refusalCopy = refusal
+    ? instantEvalRefusalCopy(refusal, { viaConnect, offersOwnModel, canPickDecisionModel })
+    : null;
   const lockCopy = refusalCopy && "lock" in refusalCopy ? refusalCopy : null;
   const copy = refusalCopy && !("lock" in refusalCopy) ? refusalCopy : null;
   const action = copy?.action;
@@ -226,6 +308,7 @@ export function InstantEvalRefusalPopover({
           <RoutedLink href={lockCopy.more.href} target="_blank" rel="noopener noreferrer">
             {lockCopy.more.label}
           </RoutedLink>
+          <OwnModelLink link={lockCopy.ownModel} />
         </>
       }
     />
@@ -265,6 +348,7 @@ export function InstantEvalRefusalPopover({
                         {copy.more.label}
                       </RoutedLink>
                     )}
+                    <OwnModelLink link={copy.ownModel} />
                   </>
                 }
               />
@@ -291,6 +375,15 @@ export function InstantEvalRefusalPopover({
                   <Text textStyle="xs" color="fg.muted" lineHeight="1.5">
                     {copy.body}
                   </Text>
+                  <OwnModelLink link={copy.ownModel} />
+                  {copy.picker && onPickDecisionModel && (
+                    <DecisionModelPicker
+                      pickable={decisionModels}
+                      onPick={onPickDecisionModel}
+                      picking={pickingDecisionModel}
+                      configureHref={MODEL_PROVIDERS_HREF}
+                    />
+                  )}
                   <HStack gap={2}>
                     {action && actionHref === undefined && (
                       <Button
@@ -332,5 +425,22 @@ export function InstantEvalRefusalPopover({
         </PopoverBody>
       </PopoverContent>
     </PopoverRoot>
+  );
+}
+
+/** The quiet link to Default models, where a project picks its own decision model. */
+function OwnModelLink({ link }: { link: { label: string; href: string } | undefined }) {
+  if (!link) return null;
+  return (
+    <Text textStyle="xs">
+      <RoutedLink
+        href={link.href}
+        target="_blank"
+        rel="noopener noreferrer"
+        data-testid="instant-eval-own-model-link"
+      >
+        {link.label}
+      </RoutedLink>
+    </Text>
   );
 }

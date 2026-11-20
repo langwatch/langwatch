@@ -14,10 +14,11 @@ import {
   deriveConversationKey,
   classifyToolCall,
   unwrapUserQuery,
+  isUtilityQuerySource,
 } from "./telemetry/coding-agent-normalization.ts";
 import { pickString } from "./telemetry/coding-agent-span.ts";
 import { grokAgent } from "./telemetry/grok.ts";
-import { toolDecisionOutcome } from "./telemetry/tool-decision.ts";
+import { toolDecisionByUser, toolDecisionOutcome } from "./telemetry/tool-decision.ts";
 
 export function collectLogEntries(
   logs: TranscriptLogRecord[],
@@ -27,6 +28,7 @@ export function collectLogEntries(
   sessionId: string | null;
 } {
   const entries: TranscriptEntry[] = [];
+  const seenScriptCalls = new Set<string>();
   let sessionId: string | null = null;
 
   for (const log of logs) {
@@ -34,7 +36,7 @@ export function collectLogEntries(
     if (event === null) continue;
 
     sessionId ??= deriveConversationKey(log.attributes);
-    const entry = buildLogEntry({ event, log, claimedToolCalls });
+    const entry = buildLogEntry({ event, log, claimedToolCalls, seenScriptCalls });
     if (entry !== null) entries.push(entry);
   }
 
@@ -45,10 +47,12 @@ function buildLogEntry({
   event,
   log,
   claimedToolCalls,
+  seenScriptCalls,
 }: {
   event: string;
   log: TranscriptLogRecord;
   claimedToolCalls: ClaimedToolCalls;
+  seenScriptCalls: Set<string>;
 }): TranscriptEntry | null {
   const attrs = log.attributes;
   const atMs = log.timestampMs;
@@ -57,13 +61,13 @@ function buildLogEntry({
     case "user_prompt":
       return userPromptEntry(attrs, atMs);
     case "assistant_response":
-      return assistantResponseEntry(attrs, atMs);
+      return isUtilityQuerySource(attrs) ? null : assistantResponseEntry(attrs, atMs);
     case "api_response":
       return buildApiResponseEntry(attrs, atMs);
     case "tool_result":
       return buildToolResultEntry({ attrs, atMs, claimedToolCalls });
     case "tool_decision":
-      return buildToolDecisionEntry(attrs, atMs);
+      return buildToolDecisionEntry({ attrs, atMs, seenScriptCalls });
     default:
       return buildTranscriptNoteEntry({ event, attrs, atMs });
   }
@@ -128,7 +132,15 @@ function buildToolResultEntry({
 
   const decision = pickString(attrs, "decision");
   if (decision === "reject") {
-    return { kind: "tool_rejected", atMs, name, reason: decision, outcome: "denied" };
+    // This shape names no decision source, so the line cannot pin the refusal on the user.
+    return {
+      kind: "tool_rejected",
+      atMs,
+      name,
+      reason: decision,
+      outcome: "denied",
+      byUser: false,
+    };
   }
 
   return {
@@ -210,19 +222,66 @@ function buildGrokToolResultEntry(
   };
 }
 
-function buildToolDecisionEntry(
-  attrs: Record<string, unknown>,
-  atMs: number,
-): TranscriptEntry | null {
+function buildToolDecisionEntry({
+  attrs,
+  atMs,
+  seenScriptCalls,
+}: {
+  attrs: Record<string, unknown>;
+  atMs: number;
+  seenScriptCalls: Set<string>;
+}): TranscriptEntry | null {
   const decision = pickString(attrs, "decision");
-  const outcome = toolDecisionOutcome({ decision, source: pickString(attrs, "source") });
-  if (decision === null || outcome === "unknown" || outcome === "allowed") return null;
+  const source = pickString(attrs, "source");
+  const outcome = toolDecisionOutcome({ decision, source });
+  if (outcome === "allowed") return buildScriptToolCallEntry({ attrs, atMs, seenScriptCalls });
+  if (decision === null || outcome === "unknown") return null;
 
   return {
     kind: "tool_rejected",
     atMs,
     name: pickString(attrs, "tool_name"),
-    reason: pickString(attrs, "source") ?? decision,
+    reason: source ?? decision,
     outcome,
+    byUser: toolDecisionByUser({ source }),
+  };
+}
+
+/** Claude Code names a call made from inside a Code Mode REPL script `repl_<uuid>`. */
+const SCRIPT_TOOL_USE_ID_PREFIX = "repl_";
+
+/**
+ * A call a Code Mode script made. Its accepted decision is the only record it leaves: no
+ * span and no result log, so it carries the tool's parameters and no output or duration.
+ */
+function buildScriptToolCallEntry({
+  attrs,
+  atMs,
+  seenScriptCalls,
+}: {
+  attrs: Record<string, unknown>;
+  atMs: number;
+  seenScriptCalls: Set<string>;
+}): TranscriptEntry | null {
+  const toolUseId = pickString(attrs, "tool_use_id");
+  if (toolUseId === null || !toolUseId.startsWith(SCRIPT_TOOL_USE_ID_PREFIX)) return null;
+  if (seenScriptCalls.has(toolUseId)) return null;
+
+  const name = pickString(attrs, "tool_name");
+  if (name === null) return null;
+  seenScriptCalls.add(toolUseId);
+
+  return {
+    kind: "tool",
+    atMs,
+    name,
+    mcpServer: parseMcpToolName(name)?.server ?? null,
+    input: parseMaybeJson(pickString(attrs, "tool_parameters")),
+    output: null,
+    durationMs: null,
+    failed: false,
+    agentId: null,
+    spanId: "",
+    inScript: true,
   };
 }

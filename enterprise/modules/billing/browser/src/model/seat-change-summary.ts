@@ -11,6 +11,11 @@ export const seatQuoteSchema = z.object({
   amountDueCents: z.number(),
   formattedAmountDue: z.string(),
   formattedCreditApplied: z.string().nullable(),
+  /** Of `amountDueCents`, the tax; absent or zero when none is charged. */
+  taxCents: z.number().optional(),
+  formattedAmountDueExcludingTax: z.string().nullable().optional(),
+  formattedTax: z.string().nullable().optional(),
+  /** Seats times the seat price, before any tax. */
   formattedRecurringTotal: z.string(),
   billingInterval: z.string(),
   quotedAt: z.number(),
@@ -24,6 +29,12 @@ export type SeatQuote = z.infer<typeof seatQuoteSchema>;
 export function seatQuoteOf(data: unknown): SeatQuote | undefined {
   const parsed = seatQuoteSchema.safeParse(data);
   return parsed.success ? parsed.data : undefined;
+}
+
+/** "€20.72 + €4.35 VAT" under a quoted charge with VAT; undefined when it has none. */
+export function quoteVatSplit(quote: SeatQuote): string | undefined {
+  if (!quote.formattedAmountDueExcludingTax || !quote.formattedTax) return undefined;
+  return `${quote.formattedAmountDueExcludingTax} + ${quote.formattedTax} VAT`;
 }
 
 /** A billing day as the drawer prints it, "1 Dec"; periods turn over at midnight UTC. */

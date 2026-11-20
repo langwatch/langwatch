@@ -21,6 +21,7 @@ import { isLoggedIn, loadConfig, saveConfig } from "./config";
 import { copilotGatewayModelPreflight, copilotPrespawnWarnings } from "./copilot-prespawn";
 import { runDeviceFlowLogin } from "./login-flow";
 import { ensurePiTelemetryExtension } from "./pi-plugin";
+import { piPrespawnWarnings } from "./pi-prespawn";
 import { clearToolProjectPin, pinToolToProject } from "./project-scope";
 import {
   assertLaunchHookFile,
@@ -28,7 +29,14 @@ import {
   SHELL_FUNCTION_TOOLS,
 } from "./shell-rc";
 import { envForTool } from "./tool-env";
-import { aliasShellFor, infoRunKind, runInfoRun, toolNotFoundMessage } from "./wrapper-info-run";
+import { isToolResolvable } from "./tool-presence";
+import {
+  aliasShellFor,
+  infoRunKind,
+  runInfoRun,
+  shellQuote,
+  toolNotFoundMessage,
+} from "./wrapper-info-run";
 import { resolveWrapperMode } from "./wrapper-mode";
 import {
   parseProjectScopeFlags,
@@ -42,9 +50,6 @@ import { classifyIngestionSetupError, recoverExpiredSession } from "./wrapper-se
  * runs, streaming each completed turn's I/O instead of one burst on exit.
  */
 const CODEX_IO_POLL_MS = 2_500;
-
-/** Single-quote a string for safe interpolation into a `sh -c` command. */
-const shellQuote = (s: string): string => `'${s.replace(/'/g, "'\\''")}'`;
 
 /**
  * Provider families the tool needs upstream, checked by `preflightWrapper`
@@ -466,6 +471,17 @@ function reportModeResult(modeResult: WrapperModeResult): void {
       `${lwTag()} removed the langwatch telemetry env from ` +
         `.claude/settings.local.json (the gateway captures this session).\n`,
     );
+  } else if (pin?.action === "tracked") {
+    process.stderr.write(
+      `${lwTag()} did not pin claude telemetry in .claude/settings.local.json: ` +
+        `git tracks that file, so the ingest key would land in your next commit. ` +
+        `Run \`git rm --cached .claude/settings.local.json\` to keep it local.\n`,
+    );
+  } else if (pin?.action === "unverified") {
+    process.stderr.write(
+      `${lwTag()} did not pin claude telemetry in .claude/settings.local.json this run: ` +
+        `git did not say in time whether it tracks that file.\n`,
+    );
   } else if (pin?.action === "skipped") {
     process.stderr.write(
       `${lwTag()} left the OTLP env in .claude/settings.local.json alone, ` +
@@ -601,6 +617,12 @@ async function prepareLaunch({
   // capture silently incomplete on either path (ADR-039 D8/D9).
   if (tool === "copilot") {
     for (const warning of copilotPrespawnWarnings()) {
+      process.stderr.write(`${warning}\n`);
+    }
+  }
+  // A pi older than the extension's minimum still captures, so it warns and never blocks.
+  if (tool === "pi") {
+    for (const warning of piPrespawnWarnings()) {
       process.stderr.write(`${warning}\n`);
     }
   }
@@ -771,6 +793,13 @@ export async function runWrapped(tool: string, args: string[]): Promise<never> {
   // anything below reads the config, signs in, mints a key or writes wiring.
   const infoRun = infoRunKind(args);
   if (infoRun) return runInfoRun({ tool, args, kind: infoRun });
+
+  // A tool that cannot start gets nothing written for it: no config, login,
+  // key, rc block, hook file or extension.
+  if (!isToolResolvable({ tool })) {
+    process.stderr.write(`${toolNotFoundMessage(tool)}\n`);
+    process.exit(127);
+  }
 
   // Before the config is read, so every save below carries it. The Claude
   // Code plugin's hooks run the CLI through this record when PATH cannot

@@ -4,6 +4,7 @@ import {
   type BindingRoleKey,
   type CollectedBinding,
   type GrantScopeTier,
+  GRANT_SOURCE_BRAID,
   PROJECT_READER_ROLE_KEY,
   STORED_PRINCIPAL_KIND,
   type StoredPrincipalKind,
@@ -25,6 +26,8 @@ export type BindingGrantRow = {
   scopeType: string;
   scopeId: string;
   expiresAt: Instant | null;
+  /** Read so a conditioned row is refused; absent only where a backing never stores one. */
+  condition?: unknown;
 };
 
 /** The columns a share-link check selects off `Grant`. */
@@ -67,6 +70,8 @@ export function collectBindings<TRow extends BindingGrantRow>({
   const bindings: CollectedBinding[] = [];
   for (const row of rows) {
     if (!isBindingScope(row.scopeType)) continue;
+    // ADR-201 v1.10: a conditioned grant only narrows a proof; no yes/no decision counts it.
+    if (row.condition !== undefined && row.condition !== null) continue;
     const { roleKey } = row;
     // Billing reaches a decision only from the organization; the matcher fences the rest.
     const isBilling = roleKey === BILLING_ROLE_KEY && row.scopeType === "ORGANIZATION";
@@ -141,6 +146,9 @@ export function shareLinkRowFrom({
     },
   ];
 }
+
+/** A braid is a shared read its own writer owns; the aggregate list, attach and revoke skip it. */
+export const NOT_A_BRAID = { source: { not: GRANT_SOURCE_BRAID } } as const;
 
 /** The rows that are one reader project's shared reads (ADR-177): the minter's read, and
  *  the ledger's list, revoke and attach. */

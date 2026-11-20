@@ -28,6 +28,15 @@ export class LimitExceededError extends HandledError {
   }
 }
 
+/** The suite cap refused a template apply: the `scenarioSets` limit, counted as suites. */
+export class TestSuiteLimitExceededError extends LimitExceededError {
+  constructor(current: number, max: number) {
+    super("scenarioSets", current, max);
+    this.meta.countedAs = "testSuites";
+    this.message = "You have reached the maximum number of suites";
+  }
+}
+
 /**
  * Domain error thrown when a project is not found or has no organization.
  * This error is framework-agnostic and should be caught and mapped to

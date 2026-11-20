@@ -1,6 +1,6 @@
-import { LANGY_CONVERSATION_PARAM } from "@langwatch/langy-contract";
+import { LANGY_CONVERSATION_PARAM, supersedesConversationLink } from "@langwatch/langy-contract";
 import { useEffect } from "react";
-import { useSearchParams } from "react-router";
+import { useLocation, useNavigate } from "react-router";
 
 import { api } from "./langy-api.ts";
 import { useLangyStore } from "./langy.store.ts";
@@ -12,12 +12,16 @@ import { useOrganizationTeamProject } from "./use-organization-team-project.ts";
  * Mounted once per project, in ProjectLangyLayout. Spec: specs/langy/langy-local-control.feature.
  */
 export function useLangyConversationDeepLink(): void {
-  const [searchParams, setSearchParams] = useSearchParams();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const searchParams = new URLSearchParams(location.search);
   const { project } = useOrganizationTeamProject({
     redirectToOnboarding: false,
     redirectToProjectOnboarding: false,
   });
-  const conversationId = searchParams.get(LANGY_CONVERSATION_PARAM);
+  // A question link beside it supersedes it: useLangyPromptLink opens a new conversation.
+  const isSuperseded = supersedesConversationLink({ search: searchParams.toString() });
+  const conversationId = isSuperseded ? null : searchParams.get(LANGY_CONVERSATION_PARAM);
 
   const detail = api.langy.detail.useQuery(
     {
@@ -45,13 +49,22 @@ export function useLangyConversationDeepLink(): void {
       useLangyStore.getState().selectConversation(conversationId);
     }
 
-    setSearchParams(
-      (prev) => {
-        const next = new URLSearchParams(prev);
-        next.delete(LANGY_CONVERSATION_PARAM);
-        return next;
-      },
+    // Keeps the hash: the Trace Explorer holds its query there.
+    const next = new URLSearchParams(location.search);
+    next.delete(LANGY_CONVERSATION_PARAM);
+    const rest = next.toString();
+    void navigate(
+      { pathname: location.pathname, search: rest ? `?${rest}` : "", hash: location.hash },
       { replace: true },
     );
-  }, [conversationId, project?.id, settled, isVisible, setSearchParams]);
+  }, [
+    conversationId,
+    project?.id,
+    settled,
+    isVisible,
+    navigate,
+    location.pathname,
+    location.search,
+    location.hash,
+  ]);
 }

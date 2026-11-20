@@ -22,6 +22,7 @@ import type {
   RecordPresenceSettingChangedCommandData,
   RecordSignedUpCommandData,
   RecordTraceSharingDisabledCommandData,
+  RecordDocsPlaygroundSessionsDisabledCommandData,
 } from "../eventing/organization-lifecycle.events.ts";
 
 type Sender<Data> = Pick<EventingCommandSender<Data>, "send">;
@@ -42,6 +43,7 @@ export type OrganizationLifecycleSenders = Readonly<{
     "send" | "sendBatch"
   >;
   recordTraceSharingDisabled: Sender<RecordTraceSharingDisabledCommandData>;
+  recordDocsPlaygroundSessionsDisabled: Sender<RecordDocsPlaygroundSessionsDisabledCommandData>;
   recordMemberDisabled: Sender<RecordMemberDisabledCommandData>;
   recordMemberEnabled: Sender<RecordMemberEnabledCommandData>;
   recordMemberRemoved: Sender<RecordMemberRemovedCommandData>;
@@ -160,6 +162,15 @@ export class OrganizationLifecycleNoticeService {
     await sender.send({ ...this.#envelope(input.organizationId), ...input });
   }
 
+  /** Docs playground sessions off; awaited and loud, since api-key revokes keys only on this. */
+  async docsPlaygroundSessionsDisabled(
+    input: Readonly<{ organizationId: string; changedByUserId: string | null }>,
+  ): Promise<void> {
+    const sender = this.#senders?.recordDocsPlaygroundSessionsDisabled;
+    if (!sender) throw new Error("organization_lifecycle is not registered in this process");
+    await sender.send({ ...this.#envelope(input.organizationId), ...input });
+  }
+
   /** A seat taken away; awaited and loud, since user ends the sessions only on this record. */
   async memberDisabled(
     input: Readonly<{
@@ -201,7 +212,7 @@ export class OrganizationLifecycleNoticeService {
 
   /** An organization now exists; awaited and loud, since prompt seeds tags only on this record. */
   async created(
-    input: Readonly<{ organizationId: string; organizationName: string }>,
+    input: Readonly<{ organizationId: string; organizationName: string; userId?: string }>,
   ): Promise<void> {
     const sender = this.#senders?.recordCreated;
     if (!sender) throw new Error("organization_lifecycle is not registered in this process");

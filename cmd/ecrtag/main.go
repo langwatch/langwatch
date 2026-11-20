@@ -5,20 +5,22 @@
 //
 //	go run ./cmd/ecrtag published -repository R -tag T -source label|annotation -revision SHA [-custom] [-refuse-retag] [-built-from TAG]
 //	go run ./cmd/ecrtag lambda -repository R -tag T -revision SHA [-built] [-custom]
-//	go run ./cmd/ecrtag diffbase -repositories "R1 R2" -tag T -revision SHA -custom=false
+//	go run ./cmd/ecrtag select -images JSON -workflow W -tag T -revision SHA [-all] [-custom]
 //	go run ./cmd/ecrtag lwql-access -repository R -tag T -custom=BOOL (-image IMAGE | -from "T1 T2")
 //
 // published prints "true" when the tag is already there for this commit (skip
 // the push) and "false" when it is not there (push it); any other state fails.
-// lambda gives a Lambda image the tag (see tools/ecrtag.Lambda). diffbase
-// prints {"base": tag, "rebuild": [repository]} (tools/ecrtag.DiffBase): where
-// a push run's change set starts, "" when no repository has an image to
-// re-tag, and the repositories it must rebuild whatever the diff says.
-// lwql-access tags T lwql-access-<fingerprint>-T and prints the fingerprint:
-// rendered from -image, or copied from the first -from tag whose image has one
-// (tools/ecrtag.LwqlAccessTag). -registry is
-// the registry host; -refuse-retag, lambda and diffbase read the first-parent
-// git history from the working directory. -refuse-retag fails on a tag naming the image a push
+// lambda gives a Lambda image the tag (see tools/ecrtag.Lambda). select reads
+// -images, a JSON array of {"image", "dockerfile"}, and prints one
+// tools/ecrtag.Plan per image: its inputs hash, and whether to build it or
+// re-tag the image of the nearest ancestor (tools/ecrtag.Select); -all builds
+// every image, as a dispatch does, and reads no registry. lwql-access tags T
+// lwql-access-<fingerprint>-T and prints the fingerprint: rendered from -image,
+// or copied from the first -from tag whose image has one
+// (tools/ecrtag.LwqlAccessTag). -registry is the registry host; -refuse-retag,
+// lambda and select read the first-parent git history from the working
+// directory, and select reads the checkout of -revision there. -refuse-retag
+// fails on a tag naming the image a push
 // run's re-tag would copy; -built-from is the per-arch tag an index must name.
 //
 // Spec: specs/ci/publish-ecr-images.feature
@@ -41,8 +43,10 @@ const ancestorScript = ".github/scripts/nearest-ancestor-tag.sh"
 
 type options struct {
 	repository, tag, source, revision, host, head, builtFrom, image string
-	repositories, from                                              []string
-	custom, built, refuseRetag                                      bool
+	images                                                          []ecrtag.ImageSpec
+	from                                                            []string
+	workflow                                                        string
+	custom, built, refuseRetag, all                                 bool
 }
 
 func main() {
@@ -64,7 +68,7 @@ func main() {
 }
 
 func usage() {
-	fmt.Fprintln(os.Stderr, "usage: ecrtag published|lambda|diffbase|lwql-access -repository R -tag T [flags]")
+	fmt.Fprintln(os.Stderr, "usage: ecrtag published|lambda|select|lwql-access -repository R -tag T [flags]")
 	os.Exit(2)
 }
 
@@ -81,17 +85,20 @@ func parse(command string, args []string) (options, error) {
 	fs.BoolVar(&o.built, "built", false, "lambda: this run rebuilt the image and pushed the tag itself")
 	fs.BoolVar(&o.refuseRetag, "refuse-retag", false, "published: fail on a tag naming the image a re-tag would copy")
 	fs.StringVar(&o.builtFrom, "built-from", "", "published: the per-arch tag this run built, which an index tag must name")
-	repositories := fs.String("repositories", "", "diffbase: every repository the run re-tags, space separated")
+	images := fs.String("images", "", `select: a JSON array of {"image", "dockerfile"}`)
+	fs.BoolVar(&o.all, "all", false, "select: build every image, as a dispatch does")
+	fs.StringVar(&o.workflow, "workflow", "", "select: the workflow whose build steps every image's inputs include")
 	fs.StringVar(&o.image, "image", "", "lwql-access: the image to render the access model in")
 	from := fs.String("from", "", "lwql-access: tags whose image's fingerprint to copy, space separated")
 	if err := fs.Parse(args); err != nil {
 		return o, err
 	}
-	o.repositories = strings.Fields(*repositories)
 	o.from = strings.Fields(*from)
 	switch command {
-	case "diffbase":
-		return o, diffBaseOptions(o)
+	case "select":
+		err := selectOptions(&o, *images)
+
+		return o, err
 	case "lwql-access":
 		return o, lwqlAccessOptions(o)
 	}
@@ -111,13 +118,13 @@ func run(ctx context.Context, command string, o options) error {
 		return published(ctx, o)
 	case "lambda":
 		return lambda(ctx, o)
-	case "diffbase":
-		return diffBase(ctx, o)
+	case "select":
+		return selectImages(ctx, o)
 	case "lwql-access":
 		return lwqlAccess(ctx, o)
 	}
 
-	return fmt.Errorf("unknown command %q; use published, lambda, diffbase or lwql-access", command)
+	return fmt.Errorf("unknown command %q; use published, lambda, select or lwql-access", command)
 }
 
 func (o options) ref() ecrtag.Ref { return ecrtag.Ref{Repository: o.repository, Tag: o.tag} }
@@ -173,27 +180,69 @@ func lambda(ctx context.Context, o options) error {
 	return nil
 }
 
-// diffBaseOptions: only a push run's commit tag has a change set; a custom
-// tag is a dispatch, which rebuilds every image.
-func diffBaseOptions(o options) error {
-	if len(o.repositories) == 0 || o.tag == "" || o.revision == "" {
-		return errors.New("diffbase: -repositories, -tag and -revision are required")
+// selectOptions reads -images. A custom tag is a dispatch, which builds
+// every image; a run with no -all needs the commit tag it publishes and the
+// commit, to find what a re-tag would copy.
+func selectOptions(o *options, images string) error {
+	o.all = o.all || o.custom
+	if err := json.Unmarshal([]byte(images), &o.images); err != nil {
+		return fmt.Errorf("select: -images: %w", err)
 	}
-	if o.custom {
-		return errors.New("diffbase: a custom tag has no change set; a dispatch rebuilds every image")
+	if len(o.images) == 0 {
+		return errors.New("select: -images names no image")
+	}
+	if err := checkImages(o.images); err != nil {
+		return err
+	}
+	if o.revision == "" || o.workflow == "" || (!o.all && o.tag == "") {
+		return errors.New("select: -revision, -workflow, and -tag unless -all, are required")
+	}
+	if o.head == "" {
+		o.head = o.revision
 	}
 
 	return nil
 }
 
-func diffBase(ctx context.Context, o options) error {
-	base, err := ecrtag.DiffBase{
-		Registry: o.registry(), Ancestry: ancestry(), Repositories: o.repositories, Tag: o.tag, Head: o.revision,
-	}.Find(ctx)
+// checkImages fails an image without a name or a Dockerfile.
+func checkImages(images []ecrtag.ImageSpec) error {
+	for _, img := range images {
+		if img.Image == "" || img.Dockerfile == "" {
+			return fmt.Errorf("select: image %+v needs an image and a dockerfile", img)
+		}
+	}
+
+	return nil
+}
+
+func selectImages(ctx context.Context, o options) error {
+	tree, err := ecrtag.GitRepo{Run: ecrtag.Run, Root: "."}.Tree(ctx, o.revision)
 	if err != nil {
 		return err
 	}
-	out, err := json.Marshal(base)
+	build, err := ecrtag.BuildSteps(".", o.workflow)
+	if err != nil {
+		return err
+	}
+	plans, err := ecrtag.Select{
+		Registry: o.registry(), Ancestry: ancestry(),
+		Inputs: ecrtag.Inputs{Build: build, Tree: tree, Read: ecrtag.ReadFile("."), GoDeps: ecrtag.GoList(ecrtag.Run, ".")},
+		Tag:    o.tag, Head: o.head, All: o.all,
+	}.Plan(ctx, o.images)
+	if err != nil {
+		return err
+	}
+	for _, p := range plans {
+		verb := "re-tag"
+		if p.Build {
+			verb = "build"
+		}
+		if p.Inputs == "" {
+			fmt.Fprintf(os.Stderr, "::warning::%s: %s; building it\n", p.Image, p.Reason)
+		}
+		fmt.Fprintf(os.Stderr, "%s: %s, %s\n", p.Image, verb, p.Reason)
+	}
+	out, err := json.Marshal(plans)
 	if err != nil {
 		return err
 	}

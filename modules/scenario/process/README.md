@@ -144,6 +144,8 @@ findTestSuite(input: ScenarioTestSuiteIdInput): Promise<ScenarioTestSuite | null
 
 #### `createTestSuite`
 
+With a `templateId`, refused with `LimitExceededError` once the Free suite cap is reached.
+
 ```typescript
 createTestSuite(input: ScenarioTestSuiteCreateInput): Promise<ScenarioTestSuite>;
 ```
@@ -204,8 +206,10 @@ readByIdIncludingArchived(input: ScenarioIdInput): Promise<ScenarioLookup>;
 
 #### `create`
 
+`sourceTemplateId` marks a scenario a suite template apply creates: the Free scenario cap skips the check and never counts it. Every other create, a copy included, counts.
+
 ```typescript
-create(input: Omit<ScenarioCreateInput, "lastUpdatedById">, by: ScenarioCaller): Promise<Scenario>;
+create(input: Omit<ScenarioCreateInput, "lastUpdatedById">, by: ScenarioCaller, options?: { sourceTemplateId?: string }): Promise<Scenario>;
 ```
 
 #### `update`
@@ -508,13 +512,13 @@ Permission `scenarios:create`. Declared at `src/transport/scenario-agent-test.re
 Answers at `/api/v1/agents/:id/test`.
 
 ```typescript
-// Params: agentTestRestParamsSchema, ../contract/src/scenario-rest.schemas.ts:273
+// Params: agentTestRestParamsSchema, ../contract/src/scenario-rest.schemas.ts:287
 interface Params {
   id: string;
 }
-// Body: testAgentBodySchema, ../contract/src/scenario-rest.schemas.ts:278
+// Body: testAgentBodySchema, ../contract/src/scenario-rest.schemas.ts:292
 type Body = Record<string, unknown>;
-// Response: agentTestRunResponseSchema, ../contract/src/scenario-rest.schemas.ts:289
+// Response: agentTestRunResponseSchema, ../contract/src/scenario-rest.schemas.ts:303
 interface Response {
   scenarioRunId: string;
   batchRunId: string;
@@ -797,11 +801,11 @@ Permission `scenarios:view`. Declared at `src/transport/scenario.rest.ts:156`.
 Answers at `/api/scenarios/:id`, `/api/v1/scenarios/:id`; also, undocumented, `/api/scenarios/2026-08-07/:id`, `/api/v1/scenarios/2026-08-07/:id`, `/api/scenarios/latest/:id`, `/api/v1/scenarios/latest/:id`.
 
 ```typescript
-// Params: scenarioRestIdParamsSchema, ../contract/src/scenario-rest.schemas.ts:248
+// Params: scenarioRestIdParamsSchema, ../contract/src/scenario-rest.schemas.ts:262
 interface Params {
   id: string;
 }
-type Response = z.infer<typeof scenarioRestResponseWithPlatformUrlSchema>; // ../contract/src/scenario-rest.schemas.ts:89
+type Response = z.infer<typeof scenarioRestResponseWithPlatformUrlSchema>; // ../contract/src/scenario-rest.schemas.ts:94
 ```
 
 #### `POST /` · `postApiScenarios`
@@ -813,49 +817,49 @@ Permission `scenarios:create`. Declared at `src/transport/scenario.rest.ts:180`.
 Answers at `/api/scenarios`, `/api/v1/scenarios`; also, undocumented, `/api/scenarios/2026-08-07`, `/api/v1/scenarios/2026-08-07`, `/api/scenarios/latest`, `/api/v1/scenarios/latest`.
 
 ```typescript
-type Body = z.infer<typeof scenarioRestCreateSchema>; // ../contract/src/scenario-rest.schemas.ts:211
-type Response = z.infer<typeof scenarioRestResponseWithPlatformUrlSchema>; // ../contract/src/scenario-rest.schemas.ts:89
+type Body = z.infer<typeof scenarioRestCreateSchema>; // ../contract/src/scenario-rest.schemas.ts:225
+type Response = z.infer<typeof scenarioRestResponseWithPlatformUrlSchema>; // ../contract/src/scenario-rest.schemas.ts:94
 ```
 
 #### `PUT /:id` · `putApiScenariosById`
 
 Update an existing scenario
 
-Permission `scenarios:update`. Declared at `src/transport/scenario.rest.ts:228`.
+Permission `scenarios:update`. Declared at `src/transport/scenario.rest.ts:230`.
 
 Answers at `/api/scenarios/:id`, `/api/v1/scenarios/:id`; also, undocumented, `/api/scenarios/2026-08-07/:id`, `/api/v1/scenarios/2026-08-07/:id`, `/api/scenarios/latest/:id`, `/api/v1/scenarios/latest/:id`.
 
 ```typescript
-type Params = z.infer<typeof scenarioRestIdParamsSchema>; // ../contract/src/scenario-rest.schemas.ts:248
-type Body = z.infer<typeof scenarioRestUpdateSchema>; // ../contract/src/scenario-rest.schemas.ts:241
-type Response = z.infer<typeof scenarioRestResponseWithPlatformUrlSchema>; // ../contract/src/scenario-rest.schemas.ts:89
+type Params = z.infer<typeof scenarioRestIdParamsSchema>; // ../contract/src/scenario-rest.schemas.ts:262
+type Body = z.infer<typeof scenarioRestUpdateSchema>; // ../contract/src/scenario-rest.schemas.ts:255
+type Response = z.infer<typeof scenarioRestResponseWithPlatformUrlSchema>; // ../contract/src/scenario-rest.schemas.ts:94
 ```
 
 #### `PATCH /:id` · `patchApiScenariosById`
 
 Update an existing scenario
 
-Permission `scenarios:update`. Declared at `src/transport/scenario.rest.ts:260`.
+Permission `scenarios:update`. Declared at `src/transport/scenario.rest.ts:262`.
 
 Answers at `/api/scenarios/:id`, `/api/v1/scenarios/:id`; also, undocumented, `/api/scenarios/2026-08-07/:id`, `/api/v1/scenarios/2026-08-07/:id`, `/api/scenarios/latest/:id`, `/api/v1/scenarios/latest/:id`.
 
 ```typescript
-type Params = z.infer<typeof scenarioRestIdParamsSchema>; // ../contract/src/scenario-rest.schemas.ts:248
-type Body = z.infer<typeof scenarioRestUpdateSchema>; // ../contract/src/scenario-rest.schemas.ts:241
-type Response = z.infer<typeof scenarioRestResponseWithPlatformUrlSchema>; // ../contract/src/scenario-rest.schemas.ts:89
+type Params = z.infer<typeof scenarioRestIdParamsSchema>; // ../contract/src/scenario-rest.schemas.ts:262
+type Body = z.infer<typeof scenarioRestUpdateSchema>; // ../contract/src/scenario-rest.schemas.ts:255
+type Response = z.infer<typeof scenarioRestResponseWithPlatformUrlSchema>; // ../contract/src/scenario-rest.schemas.ts:94
 ```
 
 #### `DELETE /:id` · `deleteApiScenariosById`
 
 Archive (soft-delete) a scenario
 
-Permission `scenarios:manage`. Declared at `src/transport/scenario.rest.ts:295`.
+Permission `scenarios:manage`. Declared at `src/transport/scenario.rest.ts:297`.
 
 Answers at `/api/scenarios/:id`, `/api/v1/scenarios/:id`; also, undocumented, `/api/scenarios/2026-08-07/:id`, `/api/v1/scenarios/2026-08-07/:id`, `/api/scenarios/latest/:id`, `/api/v1/scenarios/latest/:id`.
 
 ```typescript
-type Params = z.infer<typeof scenarioRestIdParamsSchema>; // ../contract/src/scenario-rest.schemas.ts:248
-// Response: scenarioRestArchivedSchema, ../contract/src/scenario-rest.schemas.ts:263
+type Params = z.infer<typeof scenarioRestIdParamsSchema>; // ../contract/src/scenario-rest.schemas.ts:262
+// Response: scenarioRestArchivedSchema, ../contract/src/scenario-rest.schemas.ts:277
 interface Response {
   id: string;
   archived: boolean;
@@ -866,18 +870,18 @@ interface Response {
 
 List the saved versions of a scenario, newest first. A scenario saved before versions were recorded closes its history with a synthesized Created entry.
 
-Permission `scenarios:view`. Declared at `src/transport/scenario.rest.ts:321`.
+Permission `scenarios:view`. Declared at `src/transport/scenario.rest.ts:323`.
 
 Answers at `/api/scenarios/:id/versions`, `/api/v1/scenarios/:id/versions`; also, undocumented, `/api/scenarios/2026-08-07/:id/versions`, `/api/v1/scenarios/2026-08-07/:id/versions`, `/api/scenarios/latest/:id/versions`, `/api/v1/scenarios/latest/:id/versions`.
 
 ```typescript
-type Params = z.infer<typeof scenarioRestIdParamsSchema>; // ../contract/src/scenario-rest.schemas.ts:248
-// Query: scenarioRestListVersionsQuerySchema, ../contract/src/scenario-rest.schemas.ts:173
+type Params = z.infer<typeof scenarioRestIdParamsSchema>; // ../contract/src/scenario-rest.schemas.ts:262
+// Query: scenarioRestListVersionsQuerySchema, ../contract/src/scenario-rest.schemas.ts:178
 interface Query {
   limit?: number;
   cursor?: number;
 }
-// Response: scenarioRestVersionListResponseSchema, ../contract/src/scenario-rest.schemas.ts:130
+// Response: scenarioRestVersionListResponseSchema, ../contract/src/scenario-rest.schemas.ts:135
 interface Response {
   versions: {
     version: number;
@@ -896,17 +900,17 @@ interface Response {
 
 Get one saved version of a scenario, with the name, situation, criteria, labels and parameters as that version saved them.
 
-Permission `scenarios:view`. Declared at `src/transport/scenario.rest.ts:359`.
+Permission `scenarios:view`. Declared at `src/transport/scenario.rest.ts:361`.
 
 Answers at `/api/scenarios/:id/versions/:version`, `/api/v1/scenarios/:id/versions/:version`; also, undocumented, `/api/scenarios/2026-08-07/:id/versions/:version`, `/api/v1/scenarios/2026-08-07/:id/versions/:version`, `/api/scenarios/latest/:id/versions/:version`, `/api/v1/scenarios/latest/:id/versions/:version`.
 
 ```typescript
-// Params: scenarioRestIdVersionParamsSchema, ../contract/src/scenario-rest.schemas.ts:257
+// Params: scenarioRestIdVersionParamsSchema, ../contract/src/scenario-rest.schemas.ts:271
 interface Params {
   id: string;
   version: number;
 }
-type Response = z.infer<typeof scenarioRestVersionDetailResponseSchema>; // ../contract/src/scenario-rest.schemas.ts:158
+type Response = z.infer<typeof scenarioRestVersionDetailResponseSchema>; // ../contract/src/scenario-rest.schemas.ts:163
 ```
 
 ### `createSimulationRunsRest`
@@ -993,7 +997,7 @@ type Response = z.infer<typeof simulationBatchSummaryRestSchema>; // ../contract
 
 ### `scenarios`
 
-Contract `../contract/src/scenario.trpc.ts:185`, router `src/transport/scenario.trpc.ts:40`.
+Contract `../contract/src/scenario.trpc.ts:194`, router `src/transport/scenario.trpc.ts:40`.
 
 | Procedure                               | Kind         | Gate                                                                                                                                                                                                                                | Input                               | Output                               |
 | --------------------------------------- | ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------- | ------------------------------------ |
@@ -1038,55 +1042,55 @@ Contract `../contract/src/scenario.trpc.ts:185`, router `src/transport/scenario.
 
 ```typescript
 // scenarios.create
-type Input = z.infer<typeof scenarioTrpcCreateSchema>; // ../contract/src/scenario.trpc.ts:105
-type Output = z.infer<typeof scenarioSchema>; // ../contract/src/scenario.ts:63
+type Input = z.infer<typeof scenarioTrpcCreateSchema>; // ../contract/src/scenario.trpc.ts:114
+type Output = z.infer<typeof scenarioSchema>; // ../contract/src/scenario.ts:191
 
 // scenarios.getAll
-// Input: projectSchema, ../contract/src/scenario.trpc.ts:67
+// Input: projectSchema, ../contract/src/scenario.trpc.ts:72
 interface Input {
   projectId: string;
 }
-// Output: scenarioSchema.array() (inline, ../contract/src/scenario.trpc.ts:193)
+// Output: scenarioSchema.array() (inline, ../contract/src/scenario.trpc.ts:202)
 
 // scenarios.getById
-// Input: scenarioIdSchema, ../contract/src/scenario.trpc.ts:75
+// Input: scenarioIdSchema, ../contract/src/scenario.trpc.ts:80
 interface Input {
   projectId: string;
   id: string;
 }
-type Output = z.infer<typeof scenarioSchema>; // ../contract/src/scenario.ts:63
+type Output = z.infer<typeof scenarioSchema>; // ../contract/src/scenario.ts:191
 
 // scenarios.getByIdIncludingArchived
-type Input = z.infer<typeof scenarioIdSchema>; // ../contract/src/scenario.trpc.ts:75
-// Output: scenarioSchema.nullable() (inline, ../contract/src/scenario.trpc.ts:201)
+type Input = z.infer<typeof scenarioIdSchema>; // ../contract/src/scenario.trpc.ts:80
+// Output: scenarioSchema.nullable() (inline, ../contract/src/scenario.trpc.ts:210)
 
 // scenarios.update
-type Input = z.infer<typeof scenarioTrpcUpdateSchema>; // ../contract/src/scenario.trpc.ts:136
-type Output = z.infer<typeof scenarioSchema>; // ../contract/src/scenario.ts:63
+type Input = z.infer<typeof scenarioTrpcUpdateSchema>; // ../contract/src/scenario.trpc.ts:145
+type Output = z.infer<typeof scenarioSchema>; // ../contract/src/scenario.ts:191
 
 // scenarios.archive
-type Input = z.infer<typeof scenarioIdSchema>; // ../contract/src/scenario.trpc.ts:75
-type Output = z.infer<typeof scenarioSchema>; // ../contract/src/scenario.ts:63
+type Input = z.infer<typeof scenarioIdSchema>; // ../contract/src/scenario.trpc.ts:80
+type Output = z.infer<typeof scenarioSchema>; // ../contract/src/scenario.ts:191
 
 // scenarios.moveToTestSuite
-// Input: inline, ../contract/src/scenario.trpc.ts:214
+// Input: inline, ../contract/src/scenario.trpc.ts:223
 interface Input {
   projectId: string;
   scenarioId: string;
   testSuiteId: string | null;
 }
-type Output = z.infer<typeof scenarioSchema>; // ../contract/src/scenario.ts:63
+type Output = z.infer<typeof scenarioSchema>; // ../contract/src/scenario.ts:191
 
 // scenarios.duplicate
-// Input: inline, ../contract/src/scenario.trpc.ts:223
+// Input: inline, ../contract/src/scenario.trpc.ts:232
 interface Input {
   projectId: string;
   scenarioId: string;
 }
-type Output = z.infer<typeof scenarioSchema>; // ../contract/src/scenario.ts:63
+type Output = z.infer<typeof scenarioSchema>; // ../contract/src/scenario.ts:191
 
 // scenarios.batchArchive
-// Input: inline, ../contract/src/scenario.trpc.ts:227
+// Input: inline, ../contract/src/scenario.trpc.ts:236
 interface Input {
   projectId: string;
   ids: string[];
@@ -1101,7 +1105,7 @@ interface Output {
 }
 
 // scenarios.listVersions
-// Input: inline, ../contract/src/scenario.trpc.ts:233
+// Input: inline, ../contract/src/scenario.trpc.ts:242
 interface Input {
   projectId: string;
   scenarioId: string;
@@ -1111,7 +1115,7 @@ interface Input {
 type Output = z.infer<typeof scenarioVersionPageSchema>; // ../contract/src/scenario.responses.ts:35
 
 // scenarios.getVersion
-// Input: inline, ../contract/src/scenario.trpc.ts:244
+// Input: inline, ../contract/src/scenario.trpc.ts:253
 interface Input {
   projectId: string;
   scenarioId: string;
@@ -1120,16 +1124,16 @@ interface Input {
 type Output = z.infer<typeof scenarioVersionDetailSchema>; // ../contract/src/scenario.version.ts:153
 
 // scenarios.restoreVersion
-// Input: inline, ../contract/src/scenario.trpc.ts:250
+// Input: inline, ../contract/src/scenario.trpc.ts:259
 interface Input {
   projectId: string;
   scenarioId: string;
   version: number;
 }
-type Output = z.infer<typeof scenarioSchema>; // ../contract/src/scenario.ts:63
+type Output = z.infer<typeof scenarioSchema>; // ../contract/src/scenario.ts:191
 
 // scenarios.run
-type Input = z.infer<typeof scenarioTrpcRunSchema>; // ../contract/src/scenario.trpc.ts:157
+type Input = z.infer<typeof scenarioTrpcRunSchema>; // ../contract/src/scenario.trpc.ts:166
 // Output: scenarioRunScheduledSchema, ../contract/src/scenario.responses.ts:76
 interface Output {
   scheduled: true;
@@ -1139,7 +1143,7 @@ interface Output {
 }
 
 // scenarios.cancelJob
-// Input: inline, ../contract/src/scenario.trpc.ts:265
+// Input: inline, ../contract/src/scenario.trpc.ts:274
 interface Input {
   projectId: string;
   scenarioSetId: string;
@@ -1153,7 +1157,7 @@ interface Output {
 }
 
 // scenarios.cancelBatchRun
-// Input: inline, ../contract/src/scenario.trpc.ts:277
+// Input: inline, ../contract/src/scenario.trpc.ts:286
 interface Input {
   projectId: string;
   scenarioSetId: string;
@@ -1166,13 +1170,13 @@ interface Output {
 }
 
 // scenarios.getScenarioSetsData
-// Input: inline, ../contract/src/scenario.trpc.ts:283
+// Input: inline, ../contract/src/scenario.trpc.ts:292
 interface Input {
   projectId: string;
   startDate?: number;
   endDate?: number;
 }
-// Output: inline, ../contract/src/scenario.trpc.ts:284
+// Output: inline, ../contract/src/scenario.trpc.ts:293
 type Output = {
   scenarioSetId: string;
   scenarioCount: number;
@@ -1180,7 +1184,7 @@ type Output = {
 }[];
 
 // scenarios.getSuiteRunData
-// Input: inline, ../contract/src/scenario.trpc.ts:289
+// Input: inline, ../contract/src/scenario.trpc.ts:298
 interface Input {
   projectId: string;
   scenarioSetId?: string;
@@ -1193,17 +1197,17 @@ interface Input {
 type Output = z.infer<typeof simulationAllSuitesRunDataSchema>; // ../contract/src/features/simulation/simulation.ts:342
 
 // scenarios.getLastResultSummaries
-// Input: inline, ../contract/src/scenario.trpc.ts:307
+// Input: inline, ../contract/src/scenario.trpc.ts:316
 interface Input {
   projectId: string;
   scenarioIds?: string[];
   startDate?: number;
   endDate?: number;
 }
-// Output: simulationLastResultSummarySchema.array() (inline, ../contract/src/scenario.trpc.ts:313)
+// Output: simulationLastResultSummarySchema.array() (inline, ../contract/src/scenario.trpc.ts:322)
 
 // scenarios.getSuiteRunFreshness
-// Input: inline, ../contract/src/scenario.trpc.ts:330
+// Input: inline, ../contract/src/scenario.trpc.ts:339
 interface Input {
   projectId: string;
   scenarioSetId?: string;
@@ -1216,7 +1220,7 @@ interface Output {
 }
 
 // scenarios.getScenarioSetRunData
-// Input: inline, ../contract/src/scenario.trpc.ts:336
+// Input: inline, ../contract/src/scenario.trpc.ts:345
 interface Input {
   projectId: string;
   scenarioSetId: string;
@@ -1228,17 +1232,17 @@ interface Input {
 type Output = z.infer<typeof simulationScenarioSetRunDataSchema>; // ../contract/src/features/simulation/simulation.ts:369
 
 // scenarios.getAllScenarioSetRunData
-// Input: inline, ../contract/src/scenario.trpc.ts:348
+// Input: inline, ../contract/src/scenario.trpc.ts:357
 interface Input {
   projectId: string;
   scenarioSetId: string;
   startDate?: number;
   endDate?: number;
 }
-// Output: simulationRunDataSchema.array() (inline, ../contract/src/scenario.trpc.ts:349)
+// Output: simulationRunDataSchema.array() (inline, ../contract/src/scenario.trpc.ts:358)
 
 // scenarios.getRunState
-// Input: inline, ../contract/src/scenario.trpc.ts:352
+// Input: inline, ../contract/src/scenario.trpc.ts:361
 interface Input {
   projectId: string;
   scenarioRunId: string;
@@ -1246,7 +1250,7 @@ interface Input {
 type Output = z.infer<typeof simulationRunDataSchema>; // ../contract/src/features/simulation/simulation.ts:208
 
 // scenarios.getScenarioSetBatchRunCount
-// Input: inline, ../contract/src/scenario.trpc.ts:356
+// Input: inline, ../contract/src/scenario.trpc.ts:365
 interface Input {
   projectId: string;
   scenarioSetId: string;
@@ -1259,7 +1263,7 @@ interface Output {
 }
 
 // scenarios.getScenarioSetBatchHistory
-// Input: inline, ../contract/src/scenario.trpc.ts:361
+// Input: inline, ../contract/src/scenario.trpc.ts:370
 interface Input {
   projectId: string;
   scenarioSetId: string;
@@ -1271,7 +1275,7 @@ interface Input {
 type Output = z.infer<typeof simulationBatchHistorySchema>; // ../contract/src/features/simulation/simulation.ts:308
 
 // scenarios.getBatchRunData
-// Input: inline, ../contract/src/scenario.trpc.ts:375
+// Input: inline, ../contract/src/scenario.trpc.ts:384
 interface Input {
   projectId: string;
   scenarioSetId: string;
@@ -1282,13 +1286,13 @@ interface Input {
 type Output = z.infer<typeof simulationBatchRunDataSchema>; // ../contract/src/features/simulation/simulation.ts:323
 
 // scenarios.getExternalSetSummaries
-// Input: inline, ../contract/src/scenario.trpc.ts:393
+// Input: inline, ../contract/src/scenario.trpc.ts:402
 interface Input {
   projectId: string;
   startDate?: number;
   endDate?: number;
 }
-// Output: inline, ../contract/src/scenario.trpc.ts:394
+// Output: inline, ../contract/src/scenario.trpc.ts:403
 type Output = {
   scenarioSetId: string;
   passedCount: number;
@@ -1298,7 +1302,7 @@ type Output = {
 }[];
 
 // scenarios.getAllSuiteRunData
-// Input: inline, ../contract/src/scenario.trpc.ts:399
+// Input: inline, ../contract/src/scenario.trpc.ts:408
 interface Input {
   projectId: string;
   limit?: number;
@@ -1309,7 +1313,7 @@ interface Input {
 type Output = z.infer<typeof simulationAllSuitesRunDataSchema>; // ../contract/src/features/simulation/simulation.ts:342
 
 // scenarios.onSimulationUpdate
-// Input: inline, ../contract/src/scenario.trpc.ts:415
+// Input: inline, ../contract/src/scenario.trpc.ts:424
 interface Input {
   projectId: string;
   tabKey?: string;
@@ -1322,21 +1326,21 @@ interface Output {
 }
 
 // scenarios.getCodeScenarios
-// Input: windowSchema, ../contract/src/scenario.trpc.ts:179
+// Input: windowSchema, ../contract/src/scenario.trpc.ts:188
 interface Input {
   projectId: string;
   startDate?: number;
   endDate?: number;
 }
-// Output: inline, ../contract/src/scenario.trpc.ts:430
+// Output: inline, ../contract/src/scenario.trpc.ts:439
 type Output = {
   key: string;
   name: string;
 }[];
 
 // scenarios.getRunTargets
-type Input = z.infer<typeof windowSchema>; // ../contract/src/scenario.trpc.ts:179
-// Output: inline, ../contract/src/scenario.trpc.ts:438
+type Input = z.infer<typeof windowSchema>; // ../contract/src/scenario.trpc.ts:188
+// Output: inline, ../contract/src/scenario.trpc.ts:447
 type Output = {
   key: string;
   referenceId: string | null;
@@ -1345,7 +1349,7 @@ type Output = {
 }[];
 
 // scenarios.getResultsOverview
-// Input: inline, ../contract/src/scenario.trpc.ts:449
+// Input: inline, ../contract/src/scenario.trpc.ts:458
 interface Input {
   projectId: string;
   startDate?: number;
@@ -1361,18 +1365,18 @@ interface Input {
 type Output = z.infer<typeof resultsOverviewSchema>; // ../contract/src/scenario.responses.ts:194
 
 // scenarios.getResultAtoms
-// Input: z.object({ ...resultsFilterSchema.shape, limit: z.number().int().min(1).max(MAX_ATOM_PAGE… (inline, ../contract/src/scenario.trpc.ts:466)
+// Input: z.object({ ...resultsFilterSchema.shape, limit: z.number().int().min(1).max(MAX_ATOM_PAGE… (inline, ../contract/src/scenario.trpc.ts:475)
 type Output = z.infer<typeof resultAtomsPageSchema>; // ../contract/src/scenario.responses.ts:145
 
 // scenarios.getRunConfigurations
-// Input: inline, ../contract/src/scenario.trpc.ts:480
+// Input: inline, ../contract/src/scenario.trpc.ts:489
 interface Input {
   projectId: string;
   startDate?: number;
   endDate?: number;
   limit?: number;
 }
-// Output: runConfigurationEntrySchema.array() (inline, ../contract/src/scenario.trpc.ts:487)
+// Output: runConfigurationEntrySchema.array() (inline, ../contract/src/scenario.trpc.ts:496)
 
 // scenarios.mintVoiceSession
 type Input = z.infer<typeof voiceSessionMintInputSchema>; // ../contract/src/voice/voice-session.schemas.ts:18
@@ -1426,48 +1430,50 @@ None: this module declares no websocket, rawsocket or rawhttp door.
 
 ### Pipeline `scenario_lifecycle` (aggregate `scenario`)
 
-Declared at `src/eventing/scenario-lifecycle.pipeline.ts:30`. Events: `scenarioCreatedEventSchema`.
+Declared at `src/eventing/scenario-lifecycle.pipeline.ts:34`. Events: `scenarioCreatedEventSchema`, `simulationSetCreatedEventSchema`.
 
-| Kind    | Name                    | Handles | Declared at                                      |
-| ------- | ----------------------- | ------- | ------------------------------------------------ |
-| command | `recordScenarioCreated` | –       | `src/eventing/scenario-lifecycle.pipeline.ts:37` |
+| Kind    | Name                         | Handles | Declared at                                      |
+| ------- | ---------------------------- | ------- | ------------------------------------------------ |
+| command | `recordScenarioCreated`      | –       | `src/eventing/scenario-lifecycle.pipeline.ts:41` |
+| command | `recordSimulationSetCreated` | –       | `src/eventing/scenario-lifecycle.pipeline.ts:42` |
 
 ### Pipeline `simulation_processing` (aggregate `simulation_run`)
 
-Declared at `src/eventing/simulation-processing.pipeline.ts:117`. Events: `SimulationRunQueuedEventSchema`, `SimulationRunStartedEventSchema`, `SimulationMessageSnapshotEventSchema`, `SimulationRunFinishedEventSchema`, `SimulationRunEvaluatedEventSchema`, `SimulationTextMessageStartEventSchema`, `SimulationTextMessageEndEventSchema`, `SimulationRunMetricsComputedEventSchema`, `SimulationRunCancelRequestedEventSchema`, `SimulationRunAgentInstanceRecordedEventSchema`, `SimulationRunCutAtLimitRecordedEventSchema`, `SimulationRunHooksRecordedEventSchema`, `SimulationRunDeletedEventSchema`, `SimulationSetArchivedEventSchema`.
+Declared at `src/eventing/simulation-processing.pipeline.ts:118`. Events: `SimulationRunQueuedEventSchema`, `SimulationRunStartedEventSchema`, `SimulationMessageSnapshotEventSchema`, `SimulationRunFinishedEventSchema`, `SimulationRunEvaluatedEventSchema`, `SimulationTextMessageStartEventSchema`, `SimulationTextMessageEndEventSchema`, `SimulationRunMetricsComputedEventSchema`, `SimulationRunCancelRequestedEventSchema`, `SimulationRunAgentInstanceRecordedEventSchema`, `SimulationRunCutAtLimitRecordedEventSchema`, `SimulationRunHooksRecordedEventSchema`, `SimulationRunRedTeamReportRecordedEventSchema`, `SimulationRunDeletedEventSchema`, `SimulationSetArchivedEventSchema`.
 
 | Kind                       | Name                                                                                    | Handles                                                                                                                                                                                                                                                                                           | Declared at                                          |
 | -------------------------- | --------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
-| command                    | –                                                                                       | –                                                                                                                                                                                                                                                                                                 | `src/eventing/simulation-processing.pipeline.ts:174` |
-| command                    | `startRun`                                                                              | –                                                                                                                                                                                                                                                                                                 | `src/eventing/simulation-processing.pipeline.ts:179` |
-| command                    | `messageSnapshot`                                                                       | –                                                                                                                                                                                                                                                                                                 | `src/eventing/simulation-processing.pipeline.ts:180` |
-| command                    | `textMessageStart`                                                                      | –                                                                                                                                                                                                                                                                                                 | `src/eventing/simulation-processing.pipeline.ts:181` |
-| command                    | `textMessageEnd`                                                                        | –                                                                                                                                                                                                                                                                                                 | `src/eventing/simulation-processing.pipeline.ts:182` |
-| command                    | –                                                                                       | –                                                                                                                                                                                                                                                                                                 | `src/eventing/simulation-processing.pipeline.ts:183` |
-| command                    | –                                                                                       | –                                                                                                                                                                                                                                                                                                 | `src/eventing/simulation-processing.pipeline.ts:188` |
-| command                    | `cancelRun`                                                                             | –                                                                                                                                                                                                                                                                                                 | `src/eventing/simulation-processing.pipeline.ts:193` |
-| command                    | `deleteRun`                                                                             | –                                                                                                                                                                                                                                                                                                 | `src/eventing/simulation-processing.pipeline.ts:194` |
-| command                    | `recordAgentInstance`                                                                   | –                                                                                                                                                                                                                                                                                                 | `src/eventing/simulation-processing.pipeline.ts:195` |
-| command                    | `recordCutAtLimit`                                                                      | –                                                                                                                                                                                                                                                                                                 | `src/eventing/simulation-processing.pipeline.ts:196` |
-| command                    | `recordHooks`                                                                           | –                                                                                                                                                                                                                                                                                                 | `src/eventing/simulation-processing.pipeline.ts:197` |
-| command                    | –                                                                                       | –                                                                                                                                                                                                                                                                                                 | `src/eventing/simulation-processing.pipeline.ts:198` |
-| process manager            | `≈ deps.scenarioRunExecution.name`                                                      | ≈ applier `deps.scenarioRunExecution.process`                                                                                                                                                                                                                                                     | `src/eventing/simulation-processing.pipeline.ts:172` |
-| process manager            | `≈ deps.scenarioEvaluations.name`                                                       | ≈ applier `deps.scenarioEvaluations.process`                                                                                                                                                                                                                                                      | `src/eventing/simulation-processing.pipeline.ts:173` |
-| subscriber                 | `snapshotUpdateBroadcast`                                                               | `lw.simulation_run.queued`, `lw.simulation_run.started`, `lw.simulation_run.message_snapshot`, `lw.simulation_run.text_message_end`, `lw.simulation_run.finished`, `lw.simulation_run.evaluated`, `lw.simulation_run.deleted`, `lw.simulation_run.cancel_requested` from [scenario](../README.md) | `src/eventing/simulation-processing.pipeline.ts:145` |
-| subscriber                 | `traceMetricsSync`                                                                      | `lw.simulation_run.finished` from [scenario](../README.md)                                                                                                                                                                                                                                        | `src/eventing/simulation-processing.pipeline.ts:149` |
-| peer subscriber            | `traceSpanMetricsSync`                                                                  | `lw.obs.trace.span_received` from [trace](../../trace/README.md)                                                                                                                                                                                                                                  | `src/eventing/simulation-processing.pipeline.ts:153` |
-| ClickHouse fold projection | `≈ SimulationRunStateFoldProjection.create({ store: deps.simulationRunStore })`         | –                                                                                                                                                                                                                                                                                                 | `src/eventing/simulation-processing.pipeline.ts:139` |
-| ClickHouse map projection  | `≈ SimulationRunMetricsMapProjection.create({ store: deps.simulationRunMetricsStore })` | –                                                                                                                                                                                                                                                                                                 | `src/eventing/simulation-processing.pipeline.ts:142` |
-| lane aliases               | `≈ mainSimulationLaneAliases({ evaluationsProcess: deps.scenarioEvaluations.name })`    | –                                                                                                                                                                                                                                                                                                 | `src/eventing/simulation-processing.pipeline.ts:212` |
-| retention                  | `≈ deps.retention`                                                                      | –                                                                                                                                                                                                                                                                                                 | `src/eventing/simulation-processing.pipeline.ts:215` |
+| command                    | –                                                                                       | –                                                                                                                                                                                                                                                                                                 | `src/eventing/simulation-processing.pipeline.ts:176` |
+| command                    | `startRun`                                                                              | –                                                                                                                                                                                                                                                                                                 | `src/eventing/simulation-processing.pipeline.ts:181` |
+| command                    | `messageSnapshot`                                                                       | –                                                                                                                                                                                                                                                                                                 | `src/eventing/simulation-processing.pipeline.ts:182` |
+| command                    | `textMessageStart`                                                                      | –                                                                                                                                                                                                                                                                                                 | `src/eventing/simulation-processing.pipeline.ts:183` |
+| command                    | `textMessageEnd`                                                                        | –                                                                                                                                                                                                                                                                                                 | `src/eventing/simulation-processing.pipeline.ts:184` |
+| command                    | –                                                                                       | –                                                                                                                                                                                                                                                                                                 | `src/eventing/simulation-processing.pipeline.ts:185` |
+| command                    | –                                                                                       | –                                                                                                                                                                                                                                                                                                 | `src/eventing/simulation-processing.pipeline.ts:190` |
+| command                    | `cancelRun`                                                                             | –                                                                                                                                                                                                                                                                                                 | `src/eventing/simulation-processing.pipeline.ts:195` |
+| command                    | `deleteRun`                                                                             | –                                                                                                                                                                                                                                                                                                 | `src/eventing/simulation-processing.pipeline.ts:196` |
+| command                    | `recordAgentInstance`                                                                   | –                                                                                                                                                                                                                                                                                                 | `src/eventing/simulation-processing.pipeline.ts:197` |
+| command                    | `recordCutAtLimit`                                                                      | –                                                                                                                                                                                                                                                                                                 | `src/eventing/simulation-processing.pipeline.ts:198` |
+| command                    | `recordHooks`                                                                           | –                                                                                                                                                                                                                                                                                                 | `src/eventing/simulation-processing.pipeline.ts:199` |
+| command                    | `recordRedTeamReport`                                                                   | –                                                                                                                                                                                                                                                                                                 | `src/eventing/simulation-processing.pipeline.ts:200` |
+| command                    | –                                                                                       | –                                                                                                                                                                                                                                                                                                 | `src/eventing/simulation-processing.pipeline.ts:201` |
+| process manager            | `≈ deps.scenarioRunExecution.name`                                                      | ≈ applier `deps.scenarioRunExecution.process`                                                                                                                                                                                                                                                     | `src/eventing/simulation-processing.pipeline.ts:174` |
+| process manager            | `≈ deps.scenarioEvaluations.name`                                                       | ≈ applier `deps.scenarioEvaluations.process`                                                                                                                                                                                                                                                      | `src/eventing/simulation-processing.pipeline.ts:175` |
+| subscriber                 | `snapshotUpdateBroadcast`                                                               | `lw.simulation_run.queued`, `lw.simulation_run.started`, `lw.simulation_run.message_snapshot`, `lw.simulation_run.text_message_end`, `lw.simulation_run.finished`, `lw.simulation_run.evaluated`, `lw.simulation_run.deleted`, `lw.simulation_run.cancel_requested` from [scenario](../README.md) | `src/eventing/simulation-processing.pipeline.ts:147` |
+| subscriber                 | `traceMetricsSync`                                                                      | `lw.simulation_run.finished` from [scenario](../README.md)                                                                                                                                                                                                                                        | `src/eventing/simulation-processing.pipeline.ts:151` |
+| peer subscriber            | `traceSpanMetricsSync`                                                                  | `lw.obs.trace.span_received` from [trace](../../trace/README.md)                                                                                                                                                                                                                                  | `src/eventing/simulation-processing.pipeline.ts:155` |
+| ClickHouse fold projection | `≈ SimulationRunStateFoldProjection.create({ store: deps.simulationRunStore })`         | –                                                                                                                                                                                                                                                                                                 | `src/eventing/simulation-processing.pipeline.ts:141` |
+| ClickHouse map projection  | `≈ SimulationRunMetricsMapProjection.create({ store: deps.simulationRunMetricsStore })` | –                                                                                                                                                                                                                                                                                                 | `src/eventing/simulation-processing.pipeline.ts:144` |
+| lane aliases               | `≈ mainSimulationLaneAliases({ evaluationsProcess: deps.scenarioEvaluations.name })`    | –                                                                                                                                                                                                                                                                                                 | `src/eventing/simulation-processing.pipeline.ts:215` |
+| retention                  | `≈ deps.retention`                                                                      | –                                                                                                                                                                                                                                                                                                 | `src/eventing/simulation-processing.pipeline.ts:218` |
 
 ## Configuration
 
 | Kind   | Leaf                                                  | Environment variable                      | Declared at                              |
 | ------ | ----------------------------------------------------- | ----------------------------------------- | ---------------------------------------- |
-| secret | `voiceSessionSigning`                                 | `CREDENTIALS_SECRET`                      | `src/app/scenario.app.ts:271`            |
-| secret | `voiceSessionSigningFallback`                         | `NEXTAUTH_SECRET`                         | `src/app/scenario.app.ts:272`            |
-| secret | `nlpInternal`                                         | `LANGWATCH_NLP_INTERNAL_SECRET`           | `src/app/scenario.app.ts:274`            |
+| secret | `voiceSessionSigning`                                 | `CREDENTIALS_SECRET`                      | `src/app/scenario.app.ts:273`            |
+| secret | `voiceSessionSigningFallback`                         | `NEXTAUTH_SECRET`                         | `src/app/scenario.app.ts:274`            |
+| secret | `nlpInternal`                                         | `LANGWATCH_NLP_INTERNAL_SECRET`           | `src/app/scenario.app.ts:276`            |
 | config | `langwatchEndpoint`                                   | `LANGWATCH_ENDPOINT`                      | `../contract/src/scenario.config.ts:96`  |
 | config | `voicePublicBaseUrl`                                  | `VOICE_PUBLIC_BASE_URL`                   | `../contract/src/scenario.config.ts:98`  |
 | config | `voiceTunnel`                                         | `VOICE_TUNNEL`                            | `../contract/src/scenario.config.ts:100` |

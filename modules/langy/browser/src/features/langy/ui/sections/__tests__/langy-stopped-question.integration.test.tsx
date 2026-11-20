@@ -90,7 +90,8 @@ describe("a question tool call on a settled turn", () => {
         reply,
       ]);
 
-      expect(container.textContent).toContain("carried on");
+      expect(container.textContent).toContain("1 action failed");
+      expect(container.textContent).not.toContain("carried on");
     });
   });
 });

@@ -87,7 +87,7 @@ describe("PlansComparisonPage", () => {
           "Everything in Free",
           "200,000 events included",
           `${events} per additional 100,000 events`,
-          `30 days retention (+ custom at ${retention}/GB)`,
+          `90 days retention (+ custom at ${retention}/GB)`,
           "Volume discounts above 20 users",
           "Unlimited lite users",
           "Unlimited evals, simulations and prompts",
@@ -101,6 +101,8 @@ describe("PlansComparisonPage", () => {
         })) {
           expect(within(column("growth")).getByText(line)).toBeInTheDocument();
         }
+        expect(within(column("growth")).getByText("excl. VAT")).toBeInTheDocument();
+        expect(within(column("free")).queryByText("excl. VAT")).not.toBeInTheDocument();
 
         fireEvent.click(screen.getByTestId("currency-toggle"));
 
@@ -165,16 +167,16 @@ describe("PlansComparisonPage", () => {
         renderPlans({ activePlan: { type: "GROWTH_SEAT_EUR_MONTHLY", free: false } });
 
         expect(
-          within(column("growth")).getByText("30 days retention (+ custom at \u20AC3/GB)"),
+          within(column("growth")).getByText("90 days retention (+ custom at \u20AC3/GB)"),
         ).toBeInTheDocument();
 
         fireEvent.click(screen.getByTestId("currency-toggle"));
 
         expect(
-          within(column("growth")).getByText("30 days retention (+ custom at $4/GB)"),
+          within(column("growth")).getByText("90 days retention (+ custom at $4/GB)"),
         ).toBeInTheDocument();
         expect(
-          within(column("growth")).queryByText("30 days retention (+ custom at \u20AC3/GB)"),
+          within(column("growth")).queryByText("90 days retention (+ custom at \u20AC3/GB)"),
         ).not.toBeInTheDocument();
       });
     });

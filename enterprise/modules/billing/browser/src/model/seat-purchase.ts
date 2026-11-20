@@ -5,12 +5,14 @@
  */
 import { Temporal } from "@langwatch/time";
 
-import { type Currency, formatPrice } from "./billing-plans.ts";
+import { type Currency, EXCLUDING_VAT, formatPrice } from "./billing-plans.ts";
 import { billingDay, type SeatQuote } from "./seat-change-summary.ts";
 
 export type SeatSummaryLine = {
   label: string;
   value: string;
+  /** Quiet words beside the value: "excl. VAT", or how a charge splits into price and VAT. */
+  note?: string;
   muted?: boolean;
   /** A rule above this line: the total under the breakdown. */
   ruled?: boolean;
@@ -35,7 +37,25 @@ export type SeatPrice = {
 
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
 const people = (n: number) => (n === 1 ? "1 person" : `${n} people`);
+/** "1 person uses", "2 people use": the count and its verb in agreement. */
+const peopleUse = (n: number) => `${people(n)} ${n === 1 ? "uses" : "use"}`;
 const money = (price: SeatPrice, cents: number) => formatPrice({ cents, currency: price.currency });
+/** "excl. VAT" beside a recurring price; nothing beside a free one. */
+const recurringNote = (cents: number) => (cents > 0 ? EXCLUDING_VAT : undefined);
+
+/** "€24.17 + €5.07 VAT" under a charge that carries VAT; undefined for one that carries none. */
+export function vatSplit({
+  price,
+  dueCents,
+  taxCents,
+}: {
+  price: SeatPrice;
+  dueCents: number | undefined;
+  taxCents: number;
+}): string | undefined {
+  if (dueCents === undefined || dueCents <= 0 || taxCents <= 0) return undefined;
+  return `${money(price, dueCents - taxCents)} + ${money(price, taxCents)} VAT`;
+}
 
 /** A billing day, "1 Dec", or undefined when the instant is unknown. */
 export function billingDayOrUndefined(at: number | null | undefined): string | undefined {
@@ -47,10 +67,46 @@ export function developerSeatHint({ price, unitCents }: { price: SeatPrice; unit
   return `Their own project only, nothing shared. ${money(price, unitCents)}${price.periodSuffix} each.`;
 }
 
-/** "€87/mo" and "3 seats × €29", the seat dialog's live total. */
+/** The Developer stepper's floor: the Developers in use, never above the seats billed now. */
+export function developerSeatMinimum({ current, inUse }: { current: number; inUse: number }) {
+  return Math.min(current, inUse);
+}
+
+type DeveloperFloor = { current: number; inUse: number };
+
+/** A pick under the floor, made before the Developers in use were counted, lifted to it. */
+export function developerTargetWithin({ target, ...floor }: DeveloperFloor & { target: number }) {
+  return Math.max(target, developerSeatMinimum(floor));
+}
+
+/** The stepper's next count, skipping the counts the server refuses: under use and not billed. */
+export function snapDeveloperTarget({
+  previous,
+  next,
+  current,
+  inUse,
+}: DeveloperFloor & { previous: number; next: number }) {
+  if (next === current || next >= inUse) return next;
+  return next > previous ? inUse : Math.min(current, previous);
+}
+
+/** Why the Developer stepper stopped where it did, once it reaches the Developers in use. */
+export function developerMinimumHint({
+  target,
+  current,
+  inUse,
+}: DeveloperFloor & { target: number }): string | undefined {
+  if (inUse === 0 || target !== inUse || target === current) return undefined;
+  return target < current
+    ? `${peopleUse(inUse)} Developer seats. Remove someone in Users to go lower.`
+    : `${peopleUse(inUse)} Developer seats, so you need at least ${inUse}.`;
+}
+
+/** "€87/mo", "excl. VAT" and "3 seats × €29", the seat dialog's live total. */
 export function upgradeTotal({ seats, price }: { seats: number; price: SeatPrice }) {
   return {
     total: `${money(price, seats * price.seatCents)}${price.periodSuffix}`,
+    note: EXCLUDING_VAT,
     breakdown: `${plural(seats, "seat")} × ${money(price, price.seatCents)}`,
   };
 }
@@ -157,6 +213,7 @@ export function freeSeatPlan({
         {
           label: "Monthly price",
           value: `${money(price, total * price.seatCents)}${price.periodSuffix}`,
+          note: recurringNote(total * price.seatCents),
           ruled: true,
           emphasis: true,
         },
@@ -192,8 +249,12 @@ export type GrowthSeatPlan = {
   quote: SeatQuote | undefined;
   developer: DeveloperSeatPlan | undefined;
   developerDueCents: number | undefined;
+  /** Of `developerDueCents`, the VAT; absent when none is charged. */
+  developerTaxCents?: number;
   /** When the period already paid for ends, epoch milliseconds. */
   periodEndsAt: number | undefined;
+  /** The price did not load, so the confirm names the change without one. */
+  priceFailed?: boolean;
 };
 
 /** The seats the drawer may not go under: everyone who holds or is invited to a full seat. */
@@ -217,18 +278,26 @@ export function growthSeatPlan(plan: GrowthSeatPlan) {
         : undefined,
     note: growthNote({ delta, paid, seats, quote, day }),
     summary: growthSummary({ ...plan, delta, devDelta, day, monthly }),
-    action: growthAction({ delta, devDelta, seats, invites, price, developer }),
+    action: growthAction({
+      delta,
+      devDelta,
+      seats,
+      invites,
+      price,
+      developer,
+      priceFailed: plan.priceFailed === true,
+    }),
   };
 }
 
 function growthMinimumHint({ inUse, held }: { inUse: number; held: HeldSeats }): string {
   const lower = "Remove someone in Users to go lower.";
-  if (!("firstFreesOn" in held)) return `${people(inUse)} use full seats. ${lower}`;
+  if (!("firstFreesOn" in held)) return `${peopleUse(inUse)} full seats. ${lower}`;
   const heldPart =
     held.count === 1
       ? `1 more is held until ${held.firstFreesOn}`
       : `${held.count} more are held, the first until ${held.firstFreesOn}`;
-  return `${people(inUse - held.count)} use full seats and ${heldPart}. ${lower}`;
+  return `${peopleUse(inUse - held.count)} full seats and ${heldPart}. ${lower}`;
 }
 
 function nextPeriodDay({
@@ -273,12 +342,14 @@ function growthSummary({
   quote,
   developer,
   developerDueCents,
+  developerTaxCents,
   delta,
   devDelta,
   day,
   monthly,
 }: GrowthSeatPlan & { delta: number; devDelta: number; day: string | undefined; monthly: number }) {
   const perPeriod = (cents: number) => `${money(price, cents)}${price.periodSuffix}`;
+  const keptCents = paid * price.seatCents;
   const devLine: SeatSummaryLine[] =
     developer && developer.target > 0
       ? [
@@ -297,12 +368,14 @@ function growthSummary({
         label: day ? `Until ${day}` : "Until the period ends",
         value: quote?.formattedKeptRecurringTotal
           ? `${quote.formattedKeptRecurringTotal}${price.periodSuffix}`
-          : perPeriod(paid * price.seatCents),
+          : perPeriod(keptCents),
+        note: recurringNote(keptCents),
         muted: true,
       },
       {
         label: day ? `From ${day}` : "From the next period",
         value: perPeriod(monthly),
+        note: recurringNote(monthly),
         ruled: true,
         emphasis: true,
       },
@@ -310,13 +383,20 @@ function growthSummary({
   }
   if (delta > 0 || devDelta > 0) {
     const due = dueTodayCents({ delta, quote, devDelta, developerDueCents });
+    const taxCents = dueTodayTaxCents({ delta, quote, devDelta, developerTaxCents });
     const seatsValue = delta > 0 ? `${paid} → ${seats}` : `${seats}, ${inUse} in use`;
-    return addingSummary({ seatsValue, devLine, due, day, monthly: perPeriod(monthly), price });
+    return addingSummary({ seatsValue, devLine, due, taxCents, day, monthly, price });
   }
   return [
     { label: "Full seats", value: `${seats}, ${inUse} in use`, muted: true },
     ...devLine,
-    { label: "Monthly price", value: perPeriod(monthly), ruled: true, emphasis: true },
+    {
+      label: "Monthly price",
+      value: perPeriod(monthly),
+      note: recurringNote(monthly),
+      ruled: true,
+      emphasis: true,
+    },
   ];
 }
 
@@ -324,6 +404,7 @@ function addingSummary({
   seatsValue,
   devLine,
   due,
+  taxCents,
   day,
   monthly,
   price,
@@ -331,17 +412,23 @@ function addingSummary({
   seatsValue: string;
   devLine: SeatSummaryLine[];
   due: number | undefined;
+  taxCents: number;
   day: string | undefined;
-  monthly: string;
+  monthly: number;
   price: SeatPrice;
 }): SeatSummaryLine[] {
   return [
     { label: "Full seats", value: seatsValue, muted: true },
     ...devLine,
-    { label: "Due today, prorated", value: due === undefined ? "…" : money(price, due) },
+    {
+      label: "Due today, prorated",
+      value: due === undefined ? "…" : money(price, due),
+      note: vatSplit({ price, dueCents: due, taxCents }),
+    },
     {
       label: day ? `Then from ${day}` : "Then each period",
-      value: monthly,
+      value: `${money(price, monthly)}${price.periodSuffix}`,
+      note: recurringNote(monthly),
       ruled: true,
       emphasis: true,
     },
@@ -366,6 +453,23 @@ export function dueTodayCents({
   return Math.max(0, seatsDue) + Math.max(0, devDue);
 }
 
+/** The VAT inside `dueTodayCents`; zero while none is charged or a quote has not loaded. */
+export function dueTodayTaxCents({
+  delta,
+  quote,
+  devDelta,
+  developerTaxCents,
+}: {
+  delta: number;
+  quote: SeatQuote | undefined;
+  devDelta: number;
+  developerTaxCents: number | undefined;
+}): number {
+  const seatsTax = delta > 0 ? (quote?.taxCents ?? 0) : 0;
+  const devTax = devDelta > 0 ? (developerTaxCents ?? 0) : 0;
+  return Math.max(0, seatsTax) + Math.max(0, devTax);
+}
+
 function growthAction({
   delta,
   devDelta,
@@ -373,6 +477,7 @@ function growthAction({
   invites,
   price,
   developer,
+  priceFailed,
 }: {
   delta: number;
   devDelta: number;
@@ -380,20 +485,22 @@ function growthAction({
   invites: number;
   price: SeatPrice;
   developer: DeveloperSeatPlan | undefined;
+  priceFailed: boolean;
 }): SeatAction {
-  const per = (cents: number) => `${money(price, cents)}${price.periodSuffix}`;
+  const priced = (text: string, cents: number) =>
+    priceFailed ? text : `${text} · ${money(price, cents)}${price.periodSuffix}`;
   if (delta !== 0 && devDelta !== 0) return { kind: "change", label: "Confirm seat changes" };
   if (delta > 0) {
     return {
       kind: "change",
-      label: `Add ${plural(delta, "seat")} · ${per(delta * price.seatCents)}`,
+      label: priced(`Add ${plural(delta, "seat")}`, delta * price.seatCents),
     };
   }
   if (delta < 0) return { kind: "change", label: `Lower to ${plural(seats, "seat")}` };
   if (devDelta > 0 && developer) {
     return {
       kind: "change",
-      label: `Add ${plural(devDelta, "developer seat")} · ${per(devDelta * developer.unitCents)}`,
+      label: priced(`Add ${plural(devDelta, "developer seat")}`, devDelta * developer.unitCents),
     };
   }
   if (devDelta < 0 && developer) {
@@ -404,7 +511,13 @@ function growthAction({
 }
 
 /** A line of the confirm dialog: what, when, and how much. */
-export type ConfirmLine = { label: string; detail: string; value: string };
+export type ConfirmLine = {
+  label: string;
+  detail: string;
+  value: string;
+  /** Quiet words under the value: "excl. VAT", or how a charge splits into price and VAT. */
+  note?: string;
+};
 
 export type SeatConfirm = {
   title: string;
@@ -454,19 +567,31 @@ function loweringConfirm({
     devDelta > 0
       ? dueTodayCents({ delta: 0, quote, devDelta, developerDueCents: plan.developerDueCents })
       : undefined;
+  const taxCents = dueTodayTaxCents({
+    delta: 0,
+    quote,
+    devDelta,
+    developerTaxCents: plan.developerTaxCents,
+  });
   const kept = quote?.keptSeats ?? paid;
   const rest = quote?.billingInterval === "year" ? "year" : "month";
   const until = day ? `until ${day}` : "until the period ends";
   return {
     title: `Lower to ${plural(seats, "seat")}${day ? ` from ${day}` : ""}?`,
     lines: [
-      ...todayLine({ due, price, todayMs, day }),
+      ...todayLine({ due, taxCents, price, todayMs, day }),
       {
         label: day ? `Until ${day}` : "Until the period ends",
         detail: `${plural(kept, "seat")} × ${money(price, price.seatCents)}`,
         value: perPeriod(kept * price.seatCents),
+        note: recurringNote(kept * price.seatCents),
       },
-      { label: fromDay, detail: seatsDetail(seats), value: perPeriod(monthly(seats)) },
+      {
+        label: fromDay,
+        detail: seatsDetail(seats),
+        value: perPeriod(monthly(seats)),
+        note: recurringNote(monthly(seats)),
+      },
     ],
     body: `You keep ${kept} seats ${until}. From then you pay ${perPeriod(monthly(seats))} for ${seats}. No refund for the rest of this ${rest}.`,
     actionLabel: `Lower to ${plural(seats, "seat")}`,
@@ -475,11 +600,13 @@ function loweringConfirm({
 
 function todayLine({
   due,
+  taxCents,
   price,
   todayMs,
   day,
 }: {
   due: number | undefined;
+  taxCents: number;
   price: SeatPrice;
   todayMs: number;
   day: string | undefined;
@@ -494,6 +621,7 @@ function todayLine({
       label: "Today",
       detail: `Charged today to the card on file, for ${period}.`,
       value: money(price, due),
+      note: vatSplit({ price, dueCents: due, taxCents }),
     },
   ];
 }
@@ -522,6 +650,12 @@ export function seatConfirm({
   if (delta < 0) return loweringConfirm({ plan, pricing, devDelta, todayMs });
 
   const due = dueTodayCents({ delta, quote, devDelta, developerDueCents: plan.developerDueCents });
+  const taxCents = dueTodayTaxCents({
+    delta,
+    quote,
+    devDelta,
+    developerTaxCents: plan.developerTaxCents,
+  });
   const added = delta > 0 ? plural(delta, "seat") : plural(Math.max(devDelta, 0), "developer seat");
   const charged = due !== undefined && due > 0;
   return {
@@ -530,11 +664,12 @@ export function seatConfirm({
         ? `Add ${added} to your organization?`
         : "Change your developer seats?",
     lines: [
-      ...todayLine({ due, price, todayMs, day: pricing.day }),
+      ...todayLine({ due, taxCents, price, todayMs, day: pricing.day }),
       {
         label: pricing.fromDay,
         detail: pricing.seatsDetail(seats),
         value: pricing.perPeriod(pricing.monthly(seats)),
+        note: recurringNote(pricing.monthly(seats)),
       },
     ],
     body: inviteBody({ emails, delta }),

@@ -18,7 +18,13 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-function Demo({ initial }: { initial: ScopeTriadEntry[] }) {
+function Demo({
+  initial,
+  quickPicks = false,
+}: {
+  initial: ScopeTriadEntry[];
+  quickPicks?: boolean;
+}) {
   const [value, setValue] = useState(initial);
   return (
     <ScopeChipPicker
@@ -28,6 +34,14 @@ function Demo({ initial }: { initial: ScopeTriadEntry[] }) {
       organizationName="Acme"
       availableTeams={[{ id: "team-1", name: "Platform" }]}
       availableProjects={[{ id: "project-1", name: "Support bot", teamId: "team-1" }]}
+      {...(quickPicks
+        ? {
+            showQuickPicks: true,
+            currentOrganizationId: "org-1",
+            currentTeamId: "team-1",
+            currentProjectId: "project-1",
+          }
+        : {})}
     />
   );
 }
@@ -38,4 +52,9 @@ export const Default: Story = {
 
 export const ProjectSelected: Story = {
   render: () => <Demo initial={[{ scopeType: "PROJECT", scopeId: "project-1" }]} />,
+};
+
+/** The quick picks and the helper name the current team and project. */
+export const QuickPicksNameTheCurrentScope: Story = {
+  render: () => <Demo initial={[{ scopeType: "PROJECT", scopeId: "project-1" }]} quickPicks />,
 };

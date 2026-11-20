@@ -29,10 +29,12 @@ import {
 import type { LangWatchQLViewDefinition } from "./langwatch-ql-catalog-shapes.service.ts";
 import { LangWatchQLDiagnosticsService } from "./langwatch-ql-diagnostics.service.ts";
 import type { LangWatchQLExtractionService } from "./langwatch-ql-extraction.service.ts";
+import { LangWatchQLFlooredReadService } from "./langwatch-ql-floored-read.service.ts";
 import type { LangWatchQLRunTelemetryService } from "./langwatch-ql-run-telemetry.service.ts";
 import type { LangWatchQLGranularityResolution } from "./langwatch-ql-time-window.service.ts";
 
 const lwqlDiagnostics = LangWatchQLDiagnosticsService.create();
+const flooredRead = LangWatchQLFlooredReadService.create();
 
 const logger = createLogger("langwatch:analytics:lwql");
 
@@ -87,7 +89,7 @@ export class LangWatchQLExecutionService {
   }: LangWatchQLExecutionInput): Promise<LangWatchQLQueryResult> {
     const { database, views } = this.deps;
     const { validation, granularity, memberWindows } = run;
-    const execution = await this.runRestricted(run);
+    const execution = await this.runRestricted({ ...run, projects });
     const hydrationStartedMs = this.deps.stopwatch();
     const answer = await this.deps.extraction.hydrate({
       projects: hydratableProjects({ projects, memberWindows }),
@@ -157,6 +159,7 @@ export class LangWatchQLExecutionService {
   /** The statement as the database runs it, refused when its rows outgrow `maxResultBytes`. */
   private async runRestricted({
     executor,
+    projects,
     sql,
     validation,
     granularity,
@@ -165,7 +168,7 @@ export class LangWatchQLExecutionService {
     timeWindow,
   }: Omit<
     LangWatchQLExecutionInput,
-    "projects" | "protections" | "signal"
+    "protections" | "signal" | "telemetry"
   >): Promise<LangWatchQLExecutionResult> {
     const { database, views, limits } = this.deps;
     // The resolved record plus the step this run was bucketed at, when the
@@ -173,23 +176,26 @@ export class LangWatchQLExecutionService {
     // empty, so an unparameterised query keeps the request shape it had.
     const executionParameters = langWatchQLExecutionParameters({ validation, granularity });
 
-    const execution = await executor.execute({
-      // The submitted statement with a default `LIMIT` when the caller named none, so an
-      // unbounded query is capped rather than streamed.
-      sql: scopeLangWatchQL({
-        sql: langWatchQLRowLimitedSql({ sql, validation, maxRows: limits.maxRows }),
-        database,
-        views,
-        ...(timeWindow ? { timeWindow } : {}),
-        ...(memberWindows ? { memberWindows } : {}),
-      }),
+    // The submitted statement with a default `LIMIT` when the caller named none, so an
+    // unbounded query is capped rather than streamed.
+    const scoped = scopeLangWatchQL({
+      sql: langWatchQLRowLimitedSql({ sql, validation, maxRows: limits.maxRows }),
+      database,
+      views,
+      ...(timeWindow ? { timeWindow } : {}),
+      ...(memberWindows ? { memberWindows } : {}),
+    });
+    const request = {
+      sql: scoped,
       // The resolved record, not the caller's: it is the one carrying the
       // window this surface injected AND the step this run was bucketed at.
       // `validation.boundParameters` is the wrong half: it predates the
       // granularity merge, so passing it drops `period_granularity_seconds`.
       ...(Object.keys(executionParameters).length > 0 ? { parameters: executionParameters } : {}),
       tenantCapability,
-    });
+      projectIds: projects.map(({ id }) => id),
+    };
+    const execution = await flooredRead.execute({ executor, request, database, views });
     // Refused rather than cut: a body that looks whole but is missing its tail is the worse
     // failure for an analytics caller. The row count is already bounded by the LIMIT above.
     this.assertResultWithinByteCeiling({ rows: execution.rows });

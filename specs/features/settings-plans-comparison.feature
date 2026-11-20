@@ -85,6 +85,7 @@ Feature: Settings Plans Comparison Page
     Given I am on /settings/plans
     When I select the <currency> currency
     Then the "Growth" plan shows the monthly seat price from the price catalogue in <currency> per seat/month
+    And the seat price says it excludes VAT
     And the "Growth" plan lists:
       | feature                                        |
       | Everything in Free                             |

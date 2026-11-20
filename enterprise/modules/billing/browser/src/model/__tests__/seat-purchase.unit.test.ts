@@ -7,6 +7,10 @@ import { describe, expect, it } from "vitest";
 
 import {
   type GrowthSeatPlan,
+  developerMinimumHint,
+  developerSeatMinimum,
+  developerTargetWithin,
+  snapDeveloperTarget,
   freeSeatPlan,
   growthMinimumSeats,
   growthSeatPlan,
@@ -47,6 +51,7 @@ describe("upgradeTotal()", () => {
   it("totals the seats and breaks the price down", () => {
     expect(upgradeTotal({ seats: 3, price: EUR })).toEqual({
       total: "€87/mo",
+      note: "excl. VAT",
       breakdown: "3 seats × €29",
     });
   });
@@ -110,6 +115,50 @@ describe("freeSeatPlan()", () => {
   });
 });
 
+describe("developerSeatMinimum()", () => {
+  /** @scenario "The Developer seat stepper stops at the Developers in use" */
+  it("stops the Developer stepper at the Developers in use and says why", () => {
+    expect(developerSeatMinimum({ current: 3, inUse: 2 })).toBe(2);
+    expect(developerMinimumHint({ target: 2, current: 3, inUse: 2 })).toBe(
+      "2 people use Developer seats. Remove someone in Users to go lower.",
+    );
+    expect(developerMinimumHint({ target: 3, current: 3, inUse: 2 })).toBeUndefined();
+  });
+
+  /** @scenario "The Developer seat stepper never plans Developer seats nobody asked for" */
+  it("never raises the floor above the Developer seats billed now", () => {
+    expect(developerSeatMinimum({ current: 0, inUse: 2 })).toBe(0);
+    expect(developerMinimumHint({ target: 0, current: 0, inUse: 2 })).toBeUndefined();
+  });
+
+  /** @scenario "Raising Developer seats skips the counts below the Developers in use" */
+  it("skips the counts the server refuses, up and down", () => {
+    expect(snapDeveloperTarget({ previous: 0, next: 1, current: 0, inUse: 2 })).toBe(2);
+    expect(developerMinimumHint({ target: 2, current: 0, inUse: 2 })).toBe(
+      "2 people use Developer seats, so you need at least 2.",
+    );
+    expect(snapDeveloperTarget({ previous: 2, next: 1, current: 0, inUse: 2 })).toBe(0);
+    expect(snapDeveloperTarget({ previous: 2, next: 3, current: 0, inUse: 2 })).toBe(3);
+    expect(snapDeveloperTarget({ previous: 3, next: 2, current: 3, inUse: 2 })).toBe(2);
+  });
+
+  it("puts the verb in agreement with one person", () => {
+    expect(developerMinimumHint({ target: 1, current: 3, inUse: 1 })).toBe(
+      "1 person uses Developer seats. Remove someone in Users to go lower.",
+    );
+    expect(growthSeatPlan(growth({ paid: 5, seats: 1, inUse: 1 })).minimumHint).toBe(
+      "1 person uses full seats. Remove someone in Users to go lower.",
+    );
+  });
+
+  /** @scenario "Developers counted after a lower pick lift the pick to the floor" */
+  it("lifts a pick below the floor once the Developers in use are counted", () => {
+    expect(developerTargetWithin({ target: 1, current: 3, inUse: 2 })).toBe(2);
+    expect(developerTargetWithin({ target: 3, current: 3, inUse: 2 })).toBe(3);
+    expect(developerTargetWithin({ target: 0, current: 0, inUse: 2 })).toBe(0);
+  });
+});
+
 describe("growthSeatPlan()", () => {
   it("never goes under the people holding or invited to a seat", () => {
     expect(growthMinimumSeats({ inUse: 3, invites: 2 })).toBe(5);
@@ -138,6 +187,44 @@ describe("growthSeatPlan()", () => {
   it("invites into seats already paid for", () => {
     const plan = growthSeatPlan(growth({ paid: 5, seats: 5, invites: 1 }));
     expect(plan.action).toEqual({ kind: "invite", label: "Invite 1 person" });
+  });
+});
+
+describe("recurring prices outside an increase", () => {
+  /** @scenario "Lowering seats says each recurring price excludes VAT" */
+  it("says the kept and the lowered price exclude VAT, in the drawer and the confirm", () => {
+    const plan = growth({ paid: 4, seats: 3 });
+    expect(growthSeatPlan(plan).summary).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ label: "Until 1 Dec", value: "€116/mo", note: "excl. VAT" }),
+        expect.objectContaining({ label: "From 1 Dec", value: "€87/mo", note: "excl. VAT" }),
+      ]),
+    );
+    const confirm = seatConfirm({ plan, emails: [], todayMs: NOV_6 });
+    expect(confirm.lines).toEqual([
+      expect.objectContaining({ label: "Until 1 Dec", value: "€116/mo", note: "excl. VAT" }),
+      expect.objectContaining({ label: "From 1 Dec", value: "€87/mo", note: "excl. VAT" }),
+    ]);
+  });
+
+  /** @scenario "The monthly price with no seat change, and Free past its seats, exclude VAT" */
+  it("says the unchanged Growth price and the Free over-cap price exclude VAT", () => {
+    expect(growthSeatPlan(growth({})).summary).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ label: "Monthly price", value: "€87/mo", note: "excl. VAT" }),
+      ]),
+    );
+    const over = freeSeatPlan({ includedSeats: 2, inUse: 1, invites: 2, price: EUR });
+    expect(over.summary).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ label: "Monthly price", value: "€87/mo", note: "excl. VAT" }),
+      ]),
+    );
+  });
+
+  it("says nothing beside a free price", () => {
+    const within = freeSeatPlan({ includedSeats: 2, inUse: 1, invites: 0, price: EUR });
+    expect(within.summary.find((line) => line.label === "Monthly price")?.note).toBeUndefined();
   });
 });
 
@@ -170,9 +257,72 @@ describe("seatConfirm()", () => {
       label: "From 1 Dec",
       detail: "4 seats × €29",
       value: "€116/mo",
+      note: "excl. VAT",
     });
     expect(confirm.body).toBe("qux@acme.example gets the invite as soon as the seat is added.");
     expect(confirm.actionLabel).toBe("Pay €24.17 and add");
+  });
+
+  describe("when the charge today carries VAT", () => {
+    const taxed = { ...quote, amountDueCents: 2924, formattedAmountDue: "€29.24", taxCents: 507 };
+
+    it("charges the VAT-inclusive amount and splits the VAT out under it", () => {
+      const confirm = seatConfirm({
+        plan: growth({ seats: 4, invites: 1, quote: taxed }),
+        emails: ["qux@acme.example"],
+        todayMs: NOV_6,
+      });
+      expect(confirm.lines[0]).toEqual({
+        label: "Today",
+        detail: "Charged today to the card on file, for 6 Nov to 1 Dec.",
+        value: "€29.24",
+        note: "€24.17 + €5.07 VAT",
+      });
+      expect(confirm.lines[1]).toMatchObject({ value: "€116/mo", note: "excl. VAT" });
+      expect(confirm.actionLabel).toBe("Pay €29.24 and add");
+    });
+
+    it("adds the Developer seats' VAT to the full seats' VAT", () => {
+      const confirm = seatConfirm({
+        plan: growth({
+          seats: 4,
+          quote: taxed,
+          developer: { current: 0, target: 2, unitCents: 500 },
+          developerDueCents: 1008,
+          developerTaxCents: 175,
+        }),
+        emails: [],
+        todayMs: NOV_6,
+      });
+      expect(confirm.lines[0]).toMatchObject({ value: "€39.32", note: "€32.50 + €6.82 VAT" });
+    });
+
+    /** @scenario "The drawer summary splits VAT out of the amount due today" */
+    it("splits the VAT out in the drawer summary too", () => {
+      const { summary } = growthSeatPlan(growth({ seats: 4, quote: taxed }));
+      expect(summary).toContainEqual(
+        expect.objectContaining({
+          label: "Due today, prorated",
+          value: "€29.24",
+          note: "€24.17 + €5.07 VAT",
+        }),
+      );
+      expect(summary).toContainEqual(
+        expect.objectContaining({ label: "Then from 1 Dec", value: "€116/mo", note: "excl. VAT" }),
+      );
+    });
+  });
+
+  /** @scenario "A charge today with no VAT names no split" */
+  it("names no VAT split for a charge without VAT, and still says the price excludes it", () => {
+    const confirm = seatConfirm({
+      plan: growth({ seats: 4, quote: { ...quote, taxCents: 0 } }),
+      emails: [],
+      todayMs: NOV_6,
+    });
+    expect(confirm.lines[0]?.value).toBe("€24.17");
+    expect(confirm.lines[0]?.note).toBeUndefined();
+    expect(confirm.lines[1]?.note).toBe("excl. VAT");
   });
 
   it("says nothing is due when the seats are already kept", () => {

@@ -457,9 +457,13 @@ await it("keeps the page list pinned beside the footer at the bottom of a page",
       const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
       try {
         await page.goto(base + "introduction");
-        await page.evaluate(() =>
-          scrollTo({ top: document.body.scrollHeight, behavior: "instant" }),
-        );
+        /* Images and fonts arriving after a scroll can grow the page and push the footer back
+           out of view, so scroll again on each frame until it is on screen. */
+        await page.waitForFunction(() => {
+          scrollTo({ top: document.body.scrollHeight, behavior: "instant" });
+          const footer = document.querySelector("footer.docs-site-footer");
+          return Boolean(footer && footer.getBoundingClientRect().top < innerHeight);
+        });
         const footer = await page.locator("footer.docs-site-footer").boundingBox();
         const rail = await page.locator(".docs-left-rail").boundingBox();
         assert.ok(footer.y < 900, "the footer is in view");

@@ -280,6 +280,34 @@ Feature: Buying seats
       Then the confirm reads "Add 2 developer seats · €10/mo"
       And the summary reads "Developer seats 2 × €5"
 
+    @unit
+    Scenario: The Developer seat stepper stops at the Developers in use
+      Given the subscription bills 3 Developer seats and 2 Developers are in use
+      When I lower the Developer seats in Manage seats
+      Then the stepper does not go under 2
+      And it reads "2 people use Developer seats. Remove someone in Users to go lower."
+
+    @unit
+    Scenario: The Developer seat stepper never plans Developer seats nobody asked for
+      Given the subscription bills no Developer seats and 2 Developers are in use
+      When I open Manage seats
+      Then the Developer seats read 0 and the stepper's floor is 0
+
+    @unit
+    Scenario: Raising Developer seats skips the counts below the Developers in use
+      Given the subscription bills no Developer seats and 2 Developers are in use
+      When I raise the Developer seats in Manage seats
+      Then the Developer seats read 2
+      And it reads "2 people use Developer seats, so you need at least 2."
+      When I lower them again
+      Then the Developer seats read 0
+
+    @unit
+    Scenario: Developers counted after a lower pick lift the pick to the floor
+      Given Manage seats lowered the Developer seats from 3 to 1 before the Developers in use were counted
+      When 2 Developers are counted in use
+      Then the Developer seats read 2
+
     @integration
     Scenario: Confirming Developer seats changes the subscription
       Given Manage seats on Growth adds 2 Developer seats at €5 a month
@@ -327,6 +355,7 @@ Feature: Buying seats
     @unit
     Scenario: Lowering Developer seats changes the line from the next period with no credit
       Given the subscription bills 3 Developer seats
+      And 1 Developer is in use
       When an administrator sets 1 Developer seat
       Then the Developer seat line moves to 1 with no proration
 
@@ -364,3 +393,62 @@ Feature: Buying seats
       Given "ACME" has a Growth subscription whose period ends on 1 Dec
       When Manage seats raises the seats from 3 to 4
       Then the drawer reads "Then from 1 Dec"
+
+  Rule: prices read before paying say they exclude VAT, and a charge today names its VAT
+
+    # Cloud prices exclude VAT. A buyer who owes it (in the Netherlands, or in the EU without a
+    # VAT ID) pays it on top at checkout, so every price shown before paying says so.
+    @integration
+    Scenario: The seat dialog says its total excludes VAT
+      Given "ACME" is on the Free plan with 1 member
+      When I open the seat dialog
+      Then the total reads "€29/mo" and "excl. VAT"
+
+    @integration
+    Scenario: The Growth offer says its price excludes VAT
+      Given "ACME" is on the Free plan with 2 members
+      When I view the subscription page
+      Then the Growth offer reads "€58/mo for 2 seats" and "excl. VAT"
+
+    @integration
+    Scenario: The plan card price says it excludes VAT
+      Given "ACME" has a Growth subscription for 2 seats
+      When I view the subscription page
+      Then the price row reads "€58/mo" and "excl. VAT"
+
+    @integration
+    Scenario: The seat change confirm splits VAT out of the charge today
+      Given Manage seats on Growth raises the seats from 3 to 4 for "qux@acme.example"
+      And the change charges €29.24 today, €5.07 of it VAT
+      When I choose "Add 1 seat · €29/mo"
+      Then the confirm reads "€29.24" today with "€24.17 + €5.07 VAT"
+      And it reads the price from 1 Dec as "€116/mo" and "excl. VAT"
+      And its button reads "Pay €29.24 and add"
+
+    @unit
+    Scenario: A charge today with no VAT names no split
+      Given Manage seats on Growth raises the seats from 3 to 4
+      And the change charges €24.17 today with no VAT
+      When the confirm is shown
+      Then today reads "€24.17" with no VAT split
+      And the price from 1 Dec still says it excludes VAT
+
+    @unit
+    Scenario: The drawer summary splits VAT out of the amount due today
+      Given Manage seats on Growth raises the seats from 3 to 4
+      And the change charges €29.24 today, €5.07 of it VAT
+      Then the summary reads "Due today, prorated" "€29.24" with "€24.17 + €5.07 VAT"
+      And "Then from 1 Dec" "€116/mo" with "excl. VAT"
+
+    @unit
+    Scenario: Lowering seats says each recurring price excludes VAT
+      Given Manage seats on Growth lowers the seats from 4 to 3
+      Then the summary and the confirm read "Until 1 Dec" "€116/mo" with "excl. VAT"
+      And "From 1 Dec" "€87/mo" with "excl. VAT"
+
+    @unit
+    Scenario: The monthly price with no seat change, and Free past its seats, exclude VAT
+      Given Manage seats on Growth keeps 3 seats
+      Then the summary reads "Monthly price" "€87/mo" with "excl. VAT"
+      And on Free, inviting past the included seats reads "Monthly price" "€87/mo" with "excl. VAT"
+      And on Free within the included seats the €0 price carries no note

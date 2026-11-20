@@ -392,7 +392,9 @@ describe("the usage page", () => {
       renderPage();
 
       expect(within(screen.getByTestId("usage-plan-strip")).getByText("Growth plan")).toBeVisible();
-      expect(screen.getByTestId("usage-plan-summary")).toHaveTextContent("€87/mo · 3 full seats");
+      expect(screen.getByTestId("usage-plan-summary")).toHaveTextContent(
+        "€87/mo excl. VAT · 3 full seats",
+      );
       expect(screen.getByTestId("usage-manage-button")).toHaveAttribute(
         "href",
         "/settings/subscription",

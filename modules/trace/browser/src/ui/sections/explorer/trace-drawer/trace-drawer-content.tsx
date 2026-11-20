@@ -4,6 +4,7 @@ import type { SpanTreeNode, TraceHeader } from "@langwatch/trace-contract";
 import { useRef } from "react";
 
 import { useTraceSwitchOverlay } from "../../../../behavior/explorer/trace-drawer/use-trace-switch-overlay.ts";
+import type { AgentsTab } from "../../../../behavior/explorer/use-agents-tab.ts";
 import { useTraceQueryArgs } from "../../../../behavior/explorer/use-trace-query-args.ts";
 import {
   traceChipDisplayName,
@@ -36,6 +37,8 @@ interface TraceDrawerContentProps {
   /** The header is the list row's fields; what only the header read knows is still loading. */
   isPlaceholder?: boolean;
   isSpansLoading: boolean;
+  /** The drawer's Agents tab; a shared trace passes none and shows no tab. */
+  agentsTab?: AgentsTab;
   onClose: () => void;
   /**
    * Public share view: no session and no drawer chrome. Suppresses the header's
@@ -56,6 +59,7 @@ export function TraceDrawerContent({
   isLoading,
   isPlaceholder = false,
   isSpansLoading,
+  agentsTab,
   onClose,
   readOnly = false,
 }: TraceDrawerContentProps) {
@@ -165,6 +169,7 @@ export function TraceDrawerContent({
                     persisted-viewMode hole) as the conversation gate below. */}
                 <ViewModePane
                   isSpansLoading={isSpansLoading}
+                  agentsTab={agentsTab}
                   layout={layout}
                   readOnly={readOnly}
                   selectedSpan={selectedSpan}
@@ -335,6 +340,7 @@ function TerminalModePane({ trace }: { trace: TraceHeader }) {
 /** Which pane the drawer body shows for the current view mode. */
 function ViewModePane({
   isSpansLoading,
+  agentsTab,
   layout,
   readOnly,
   selectedSpan,
@@ -343,6 +349,7 @@ function ViewModePane({
   viewMode,
 }: {
   isSpansLoading: boolean;
+  agentsTab: AgentsTab | undefined;
   layout: DrawerLayout;
   readOnly: boolean;
   selectedSpan: SpanTreeNode | null;
@@ -368,6 +375,7 @@ function ViewModePane({
       spans={spanTree}
       selectedSpan={selectedSpan}
       isSpansLoading={isSpansLoading}
+      agentsTab={agentsTab}
       layout={layout}
     />
   );

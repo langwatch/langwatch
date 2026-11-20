@@ -1,9 +1,9 @@
 import { formatCost, formatDuration } from "@langwatch/design-system/display-formatters";
-import { Box, Flex, HStack, Icon, Text } from "@langwatch/design-system/primitives";
+import { Badge, Box, Flex, HStack, Icon, Text } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { LangwatchSignalBucket } from "@langwatch/trace-contract";
 import { BookText, ScrollText } from "lucide-react";
-import { memo, useCallback } from "react";
+import { memo, type ReactNode, useCallback } from "react";
 import {
   LuChevronDown,
   LuChevronRight,
@@ -16,7 +16,9 @@ import {
 import type { AnnotationByTrace } from "../../../../../behavior/use-annotations-by-trace-ids.ts";
 import { useSpanHoverStore } from "../../../../../features/trace-drawer/behavior/span-hover.store.ts";
 import { useSpanPulseStore } from "../../../../../features/trace-drawer/behavior/span-pulse.store.ts";
+import { type BraidStrand, spanNodeKey } from "../../../../../model/braids/braided-span.ts";
 import { isSkillSpan } from "../../../../../model/transcript/skill-invocation.ts";
+import { BraidedSpanBadge } from "../../../../elements/explorer/trace-drawer/braids/braided-span-badge.tsx";
 import { LangwatchSignalBadges } from "../../../../elements/explorer/trace-drawer/langwatch-signal-badges.tsx";
 import { TipCell } from "../../../../elements/explorer/trace-drawer/waterfall-view/tip-cell.tsx";
 import { AnchorCommentButton } from "../anchored-comments/anchor-comment-button.tsx";
@@ -39,6 +41,7 @@ export const TreeRow = memo(function TreeRow({
   rootDuration,
   isSelected,
   isPrompt,
+  isA2a = false,
   logCount,
   isCollapsed,
   hasChildren,
@@ -55,6 +58,8 @@ export const TreeRow = memo(function TreeRow({
   onToggleDelete,
   onToggleCollapse,
   onSelect,
+  braid = null,
+  compactBraidBadge = false,
 }: {
   node: WaterfallTreeNode;
   rootStart: number;
@@ -62,6 +67,8 @@ export const TreeRow = memo(function TreeRow({
   isSelected: boolean;
   /** Whether this span carries a managed prompt (shows a book icon). */
   isPrompt: boolean;
+  /** Whether this span is an A2A call (shows an A2A label). */
+  isA2a?: boolean;
   /**
    * Log records correlated to this span — a tool the user denied, an API
    * retry, a compaction — that never show up in the span's own input/output
@@ -105,6 +112,10 @@ export const TreeRow = memo(function TreeRow({
   onToggleDelete?: (spanId: string) => void;
   onToggleCollapse: (spanId: string) => void;
   onSelect: (spanId: string) => void;
+  /** Set on a span braided in from another project: its badge, and no actions on it. */
+  braid?: BraidStrand | null;
+  /** The badge as the mark alone, where the span's name needs the room. */
+  compactBraidBadge?: boolean;
 }) {
   const { span, depth } = node;
   // Hover highlight comes from a store with a per-row boolean selector
@@ -225,7 +236,7 @@ export const TreeRow = memo(function TreeRow({
           <CollapseChevron
             hasChildren={hasChildren}
             isCollapsed={isCollapsed}
-            onToggle={() => onToggleCollapse(span.spanId)}
+            onToggle={() => onToggleCollapse(spanNodeKey(span))}
           />
 
           {/* Uses `colorPalette` scope resolution rather than interpolating the palette into the
@@ -265,11 +276,13 @@ export const TreeRow = memo(function TreeRow({
               </Text>
               <NameBadges
                 isPrompt={isPrompt}
+                isA2a={isA2a}
                 logCount={logCount}
                 isEdited={showsCorrectedTint}
                 isDeletedByCorrection={isDeletedByCorrection}
                 hiddenCount={isCollapsed ? hiddenDescendantCount : 0}
               />
+              <BraidedSpanBadge strand={braid} compact={compactBraidBadge} />
             </HStack>
             {(isLlm || isNamedTool) && (
               <KindPill
@@ -293,28 +306,32 @@ export const TreeRow = memo(function TreeRow({
             <Icon as={LuTriangleAlert} boxSize={3} color="red.fg" flexShrink={0} marginLeft={1} />
           )}
 
-          <RowMarks
-            spanId={span.spanId}
-            displayName={displayName}
-            traceId={traceId}
-            comments={comments}
-            isEditing={isEditing}
-            isDraftDeleted={isDraftDeleted}
-            onToggleDelete={onToggleDelete}
-          />
+          <UnlessBraided braid={braid}>
+            <RowMarks
+              spanId={span.spanId}
+              displayName={displayName}
+              traceId={traceId}
+              comments={comments}
+              isEditing={isEditing}
+              isDraftDeleted={isDraftDeleted}
+              onToggleDelete={onToggleDelete}
+            />
+          </UnlessBraided>
 
           <RowFigures cost={span.cost} durationMs={span.durationMs} />
 
-          <RowHoverActions
-            spanId={span.spanId}
-            displayName={displayName}
-            traceId={traceId}
-            comments={comments}
-            isHovered={isHovered}
-            isEditing={isEditing}
-            isDraftDeleted={isDraftDeleted}
-            onToggleDelete={onToggleDelete}
-          />
+          <UnlessBraided braid={braid}>
+            <RowHoverActions
+              spanId={span.spanId}
+              displayName={displayName}
+              traceId={traceId}
+              comments={comments}
+              isHovered={isHovered}
+              isEditing={isEditing}
+              isDraftDeleted={isDraftDeleted}
+              onToggleDelete={onToggleDelete}
+            />
+          </UnlessBraided>
         </HStack>
       </Box>
     </Tooltip>
@@ -322,6 +339,11 @@ export const TreeRow = memo(function TreeRow({
 });
 
 type WaterfallSpan = WaterfallTreeNode["span"];
+
+/** A braided span is another project's data: the row's comment and edit actions stay off. */
+function UnlessBraided({ braid, children }: { braid: BraidStrand | null; children: ReactNode }) {
+  return braid ? null : children;
+}
 
 const SELECTED_BACKGROUND = { base: "bg.emphasized", _dark: "blue.subtle" };
 
@@ -582,12 +604,14 @@ function CollapseChevron({
 /** What sits beside the span's name: prompt, logs, edit and delete marks, and the hidden count. */
 function NameBadges({
   isPrompt,
+  isA2a,
   logCount,
   isEdited,
   isDeletedByCorrection,
   hiddenCount,
 }: {
   isPrompt: boolean;
+  isA2a: boolean;
   logCount: number;
   isEdited: boolean;
   isDeletedByCorrection: boolean;
@@ -595,6 +619,11 @@ function NameBadges({
 }) {
   return (
     <>
+      {isA2a && (
+        <Badge size="xs" colorPalette="purple" variant="subtle" flexShrink={0}>
+          A2A
+        </Badge>
+      )}
       {/* Book icon (the Prompts nav glyph) flags spans that used a
                   managed prompt, so prompt-bearing spans are spottable in
                   the tree without opening each one. */}
