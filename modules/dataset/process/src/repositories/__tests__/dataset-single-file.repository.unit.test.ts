@@ -66,6 +66,17 @@ describe("FilesystemDatasetSingleFileRepository", () => {
       });
     });
 
+    /** @scenario "Erasing an organization removes its dataset chunks, version chunks and single files" */
+    it("removes a temporary copy a stopped write left beside the file", async () => {
+      const files = FilesystemDatasetSingleFileRepository.create({ localPath: root });
+      await files.putSingleFile({ ...key, text: "[]" });
+      await fs.writeFile(path.join(root, "project_a", "dataset_a.writing"), "[1]", "utf8");
+
+      await files.removeSingleFile(key);
+
+      await expect(fs.readdir(path.join(root, "project_a"))).resolves.toEqual([]);
+    });
+
     it("refuses ids that climb out of the storage path", async () => {
       const files = FilesystemDatasetSingleFileRepository.create({ localPath: root });
 
@@ -94,6 +105,20 @@ describe("ObjectStorageDatasetSingleFileRepository", () => {
       for await (const part of body) parts.push(part);
       expect(Buffer.concat(parts).toString("utf8")).toBe("[]");
       await expect(files.getSingleFile(key)).resolves.toEqual({ outcome: "found", text: "[]" });
+    });
+
+    /** @scenario "Erasing an organization removes its dataset chunks, version chunks and single files" */
+    it("leaves the chunk folder alone when no file sits at the old key", async () => {
+      const objectStorage = memoryObjectStorage();
+      const remove = objectStorage.remove.bind(objectStorage);
+      // A filesystem store keeps the chunks in a folder at the old key and cannot remove a folder.
+      objectStorage.remove = async (at) => {
+        if (at.key === "datasets/project_a/dataset_a") throw new Error("Path is a directory");
+        return remove(at);
+      };
+      const files = ObjectStorageDatasetSingleFileRepository.create({ objectStorage });
+
+      await expect(files.removeSingleFile(key)).resolves.toBeUndefined();
     });
 
     /** @scenario "Searching a single-file dataset larger than one search may read is refused" */

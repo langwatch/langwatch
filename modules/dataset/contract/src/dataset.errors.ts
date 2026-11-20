@@ -136,12 +136,29 @@ export class DuplicateRecordIdError extends HandledError {
   declare readonly code: "dataset_duplicate_record_id";
 
   constructor(id: string) {
-    super("dataset_duplicate_record_id", `Duplicate record id "${id}" in the same write`, {
+    super("dataset_duplicate_record_id", `Duplicate record id "${id}"`, {
       httpStatus: 409,
       fault: "customer",
       meta: { recordId: id },
     });
     this.name = "DuplicateRecordIdError";
+  }
+}
+
+/**
+ * A write to the Postgres records table for a dataset whose rows live in object storage (ADR-032
+ * I-PG). Rows written there would never be read, so the write is refused instead.
+ */
+export class DatasetRecordsTableWriteRefusedError extends HandledError {
+  declare readonly code: "dataset_records_table_write_refused";
+
+  constructor(datasetId: string) {
+    super(
+      "dataset_records_table_write_refused",
+      `Dataset ${datasetId} keeps its rows in object storage; the records table takes none for it`,
+      { httpStatus: 500, fault: "platform", meta: { datasetId } },
+    );
+    this.name = "DatasetRecordsTableWriteRefusedError";
   }
 }
 

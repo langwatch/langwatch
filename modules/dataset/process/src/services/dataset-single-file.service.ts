@@ -1,7 +1,7 @@
 /**
  * The previous release's single-file datasets (`useS3` on the postgres layout): one JSON array,
  * read whole and rewritten whole under the dataset's lock, with `s3RecordCount` kept beside it
- * as that release kept it. Owner's ruling: served in place, never migrated.
+ * as that release kept it, until the `dataset:convert-single-file-datasets` step converts them.
  */
 import {
   DatasetStaleColumnsError,
@@ -29,7 +29,7 @@ import type { DatasetContentRepository } from "../repositories/dataset-content.r
 import type { DatasetSingleFileRepository } from "../repositories/dataset-single-file.repository.ts";
 import type { DatasetRow } from "../repositories/dataset.repository.ts";
 import { mapPreviousColumnsToNewColumns } from "../rules/dataset-chunk-lines.rules.ts";
-import { assertColumnsCurrent } from "../rules/dataset-columns.rules.ts";
+import { assertColumnsCurrent, type CheckedColumn } from "../rules/dataset-columns.rules.ts";
 import {
   matchesDatasetSearch,
   refuseSearchScan,
@@ -42,6 +42,7 @@ import {
 } from "../rules/dataset-selection.rules.ts";
 import {
   appendSingleFileRecords,
+  isSingleFileDataset,
   parseSingleFileRecords,
   removeSingleFileRecords,
   storedRecordTimestampsSchema,
@@ -57,6 +58,23 @@ type DatasetKey = { datasetId: string; projectId: string };
 /** The fields a write needs from either a dataset or its stored row. */
 type DatasetRef = Pick<Dataset, "id" | "projectId">;
 
+/** Where a write goes when the dataset was converted to chunks while it waited for the lock. */
+type ConvertedContent = {
+  content: Pick<
+    DatasetContent,
+    "upsertRecord" | "batchCreateRecords" | "deleteRecords" | "updateColumns"
+  >;
+  reload: (key: DatasetKey) => Promise<Dataset>;
+};
+
+/** Raised under the lock when the dataset is no longer a single-file dataset. */
+class DatasetConvertedDuringWriteError extends Error {
+  constructor(datasetId: string) {
+    super(`Dataset ${datasetId} was converted to chunks while this change waited; try again`);
+    this.name = "DatasetConvertedDuringWriteError";
+  }
+}
+
 export class DatasetSingleFileService implements Omit<
   DatasetContent,
   "createDataset" | "copyDataset" | "updateColumns"
@@ -65,15 +83,27 @@ export class DatasetSingleFileService implements Omit<
     files: DatasetSingleFileRepository;
     datasets: DatasetContentRepository;
     generateId: () => string;
+    converted?: ConvertedContent;
   }): DatasetSingleFileService {
-    return new DatasetSingleFileService(options.files, options.datasets, options.generateId);
+    return new DatasetSingleFileService(options);
   }
 
-  private constructor(
-    private readonly files: DatasetSingleFileRepository,
-    private readonly datasets: DatasetContentRepository,
-    private readonly generateId: () => string,
-  ) {}
+  private readonly files: DatasetSingleFileRepository;
+  private readonly datasets: DatasetContentRepository;
+  private readonly generateId: () => string;
+  private readonly converted: ConvertedContent | undefined;
+
+  private constructor(options: {
+    files: DatasetSingleFileRepository;
+    datasets: DatasetContentRepository;
+    generateId: () => string;
+    converted?: ConvertedContent;
+  }) {
+    this.files = options.files;
+    this.datasets = options.datasets;
+    this.generateId = options.generateId;
+    this.converted = options.converted;
+  }
 
   async listRecords(input: {
     dataset: Dataset;
@@ -162,6 +192,21 @@ export class DatasetSingleFileService implements Omit<
     dataset: Dataset;
     input: UpdateDatasetRecordInput & { recordId: string };
   }): Promise<DatasetRecordMutationResult> {
+    return this.orConverted(
+      input.dataset,
+      () => this.upsertInFile(input),
+      (content, dataset) =>
+        content.upsertRecord({
+          dataset,
+          input: { ...input.input, updatedRecord: sanitizedEntry(input.input.updatedRecord) },
+        }),
+    );
+  }
+
+  private async upsertInFile(input: {
+    dataset: Dataset;
+    input: UpdateDatasetRecordInput & { recordId: string };
+  }): Promise<DatasetRecordMutationResult> {
     const { dataset } = input;
     const entry = sanitizedEntry(input.input.updatedRecord);
     const created = await this.rewrite(dataset, (records, now, current) => {
@@ -184,47 +229,108 @@ export class DatasetSingleFileService implements Omit<
   async batchCreateRecords(input: {
     dataset: Dataset;
     input: CreateDatasetRecordsInput;
+    /** The columns the entries were checked against; the append is refused when one is gone. */
+    columns?: readonly string[] | undefined;
   }): Promise<DatasetRecord[]> {
     const { dataset } = input;
+    const columns = input.columns ?? dataset.columnTypes.map((column) => column.name);
     const added = input.input.entries.map(({ id, ...entry }) => ({
       id: id ?? this.generateId(),
       entry,
     }));
-    await this.appendRecords({ dataset, records: added });
-    return added.map((record) =>
-      this.toDatasetRecord({ id: record.id, entry: sanitizedEntry(record.entry) }, dataset),
+    return this.orConverted(
+      dataset,
+      async () => {
+        await this.appendToFile({ dataset, records: added, columns });
+        return added.map((record) =>
+          this.toDatasetRecord({ id: record.id, entry: sanitizedEntry(record.entry) }, dataset),
+        );
+      },
+      (content, fresh) =>
+        content.batchCreateRecords({ dataset: fresh, input: input.input, columns }),
     );
   }
 
-  /** Records appended after the stored ones, as the previous release appended them. */
+  /**
+   * Records appended after the stored ones, as the previous release appended them;
+   * `converted` when the dataset moved to chunks while this waited, so the caller appends there.
+   */
   async appendRecords(input: {
     dataset: DatasetRef;
     records: readonly { id: string; entry: Record<string, unknown> }[];
+    columns?: readonly CheckedColumn[] | undefined;
+  }): Promise<"appended" | "converted"> {
+    try {
+      await this.appendToFile(input);
+      return "appended";
+    } catch (error) {
+      if (error instanceof DatasetConvertedDuringWriteError) return "converted";
+      throw error;
+    }
+  }
+
+  private async appendToFile(input: {
+    dataset: DatasetRef;
+    records: readonly { id: string; entry: Record<string, unknown> }[];
+    columns?: readonly CheckedColumn[] | undefined;
   }): Promise<void> {
     const { dataset } = input;
     const added = input.records.map((record) => ({
       id: record.id,
       entry: sanitizedEntry(record.entry),
     }));
-    await this.rewrite(dataset, (records, now) => ({
-      records: appendSingleFileRecords({ ...keyOf(dataset), records, added, now }),
-      answer: undefined,
-    }));
+    await this.rewrite(dataset, (records, now, current) => {
+      assertColumnsCurrent({ columns: input.columns, columnTypes: current.columnTypes });
+      return {
+        records: appendSingleFileRecords({ ...keyOf(dataset), records, added, now }),
+        answer: undefined,
+      };
+    });
   }
 
   async deleteRecords(input: {
     dataset: Dataset;
     input: DeleteDatasetRecordsInput;
   }): Promise<{ count: number }> {
-    const count = await this.rewrite(input.dataset, (records) => {
-      const result = removeSingleFileRecords({ records, recordIds: input.input.recordIds });
-      return { records: result.records, answer: result.deleted };
-    });
-    return { count };
+    return this.orConverted(
+      input.dataset,
+      async () => {
+        const count = await this.rewrite(input.dataset, (records) => {
+          const result = removeSingleFileRecords({ records, recordIds: input.input.recordIds });
+          return { records: result.records, answer: result.deleted };
+        });
+        return { count };
+      },
+      (content, dataset) => content.deleteRecords({ dataset, input: input.input }),
+    );
   }
 
   /** Re-keys every record to the new columns and stores them, under the dataset's lock. */
   async updateColumns(input: {
+    dataset: Dataset;
+    columnTypes: DatasetColumns;
+    columnRenames?: DatasetColumnRenames | undefined;
+  }): Promise<void> {
+    return this.orConverted(
+      input.dataset,
+      () => this.updateColumnsInFile(input),
+      async (content, dataset) => {
+        if (JSON.stringify(dataset.columnTypes) !== JSON.stringify(input.dataset.columnTypes)) {
+          throw new DatasetStaleColumnsError();
+        }
+        await content.updateColumns({
+          dataset,
+          projectId: dataset.projectId,
+          name: dataset.name,
+          slug: dataset.slug,
+          columnTypes: input.columnTypes,
+          ...(input.columnRenames ? { columnRenames: input.columnRenames } : {}),
+        });
+      },
+    );
+  }
+
+  private async updateColumnsInFile(input: {
     dataset: Dataset;
     columnTypes: DatasetColumns;
     columnRenames?: DatasetColumnRenames | undefined;
@@ -248,6 +354,21 @@ export class DatasetSingleFileService implements Omit<
     });
   }
 
+  /** The file write, or the same change on the chunks when the dataset was converted first. */
+  private async orConverted<T>(
+    dataset: DatasetRef,
+    write: () => Promise<T>,
+    onChunks: (content: ConvertedContent["content"], dataset: Dataset) => Promise<T>,
+  ): Promise<T> {
+    try {
+      return await write();
+    } catch (error) {
+      if (!(error instanceof DatasetConvertedDuringWriteError) || !this.converted) throw error;
+      const fresh = await this.converted.reload(keyOf(dataset));
+      return onChunks(this.converted.content, fresh);
+    }
+  }
+
   /**
    * Read, change and write the whole file under the dataset's lock. The count is recorded
    * first: a failed count update leaves the file untouched, and a failed file write rolls
@@ -264,6 +385,7 @@ export class DatasetSingleFileService implements Omit<
     const key = keyOf(dataset);
     return this.datasets.withDatasetLock(dataset.id, async (locked) => {
       const current = await locked.getOne({ id: dataset.id, projectId: dataset.projectId });
+      if (!isSingleFileDataset(current)) throw new DatasetConvertedDuringWriteError(dataset.id);
       const changed = change(await this.readStored(key), nowInstant().toString(), current);
       await locked.update({
         id: dataset.id,

@@ -318,6 +318,11 @@ ENV TIKTOKENS_PATH=/app/tiktoken
 COPY dev/scripts/download-tiktoken-encodings.mjs ./dev/scripts/download-tiktoken-encodings.mjs
 RUN cd modules/trace/process && node ../../../dev/scripts/download-tiktoken-encodings.mjs "$TIKTOKENS_PATH"
 
+# The local object storage root (LANGWATCH_LOCAL_STORAGE_PATH's default), for installs with no
+# object storage configured. It exists in the image, owned by the user the chart runs as (uid
+# 1000), because a volume mounted here takes the folder's owner from the image on first mount.
+RUN mkdir -p /var/lib/langwatch/objects && chown node:node /var/lib/langwatch/objects
+
 EXPOSE 5560
 
 # Set bash as the default shell

@@ -8,7 +8,6 @@ import {
   DatasetVersionNotFoundError,
   DatasetVersionRestoreUnsupportedError,
   type Dataset,
-  type DatasetColumns,
   type DatasetVersion,
   type DatasetVersionAuthor,
   type DatasetVersionComparison,
@@ -40,15 +39,15 @@ import {
   versionChunksOfPage,
   versionRowOf,
 } from "../rules/dataset-version.rules.ts";
-import { StreamingChunkWriterService } from "./dataset-chunk-writer.service.ts";
 import { DatasetContentHasherService } from "./dataset-content-hasher.service.ts";
-
-const logger = createLogger("langwatch:dataset:versions");
+import { DatasetRestoreContentService } from "./dataset-restore-content.service.ts";
 
 /** Rows read per page of a postgres-layout dataset while snapshotting it. */
 const RECORD_PAGE_SIZE = 500;
 /** Concurrent saves that each take the next number; past this the save gives up. */
 const MAX_NUMBER_ATTEMPTS = 5;
+/** A dataset changes layout at most twice (single file or records table, then chunks), plus one. */
+const MAX_LAYOUT_ATTEMPTS = 3;
 
 export type DatasetVersionServiceDeps = {
   versions: DatasetVersionRepository;
@@ -71,6 +70,8 @@ export type DatasetVersionServiceDeps = {
 type VersionSavedSink = (data: DatasetVersionSavedEventData) => Promise<void>;
 
 export type DatasetSnapshot = { version: DatasetVersion; created: boolean };
+
+const logger = createLogger("langwatch:dataset:versions");
 
 export class DatasetVersionService {
   #announce: VersionSavedSink = async () => undefined;
@@ -99,16 +100,28 @@ export class DatasetVersionService {
     pinned?: boolean;
     restoredFromVersion?: number;
   }): Promise<DatasetSnapshot> {
-    const dataset = await this.#readyDataset(input);
-    const { contentHash } = await this.#hashCurrent(dataset);
-    const latest = await this.deps.versions.findLatest({
-      projectId: input.projectId,
-      datasetId: dataset.id,
-    });
-    if (latest && latest.contentHash === contentHash) {
-      return { version: await this.#keepUnchanged({ latest, input }), created: false };
+    // The read takes no lock: a pass that a move to new storage overlapped is read again.
+    for (let attempt = 1; attempt <= MAX_LAYOUT_ATTEMPTS; attempt++) {
+      const dataset = await this.#readyDataset(input);
+      const { contentHash } = await this.#hashCurrent(dataset);
+      if (await this.#movedSince(dataset)) continue;
+      const latest = await this.deps.versions.findLatest({
+        projectId: input.projectId,
+        datasetId: dataset.id,
+      });
+      if (latest && latest.contentHash === contentHash) {
+        return { version: await this.#keepUnchanged({ latest, input }), created: false };
+      }
+      const written = await this.#writeVersion({ dataset, latest, input });
+      if (written !== "moved") return written;
     }
-    return this.#writeVersion({ dataset, latest, input });
+    throw new Error(`Dataset ${input.datasetId} kept moving while a version was saved`);
+  }
+
+  /** Whether the dataset's rows moved to another layout since `dataset` was read. */
+  async #movedSince(dataset: Dataset): Promise<boolean> {
+    const now = await this.deps.lookup({ projectId: dataset.projectId, slugOrId: dataset.id });
+    return now.contentLayout !== dataset.contentLayout || now.useS3 !== dataset.useS3;
   }
 
   /**
@@ -240,7 +253,11 @@ export class DatasetVersionService {
 
     const rows = await this.readWhole(target);
     await this.snapshot({ ...input, datasetId: dataset.id, trigger: "autosave" });
-    await this.#replaceContent({ dataset, columns: target.columnTypes, rows });
+    await DatasetRestoreContentService.create(this.deps).replace({
+      dataset,
+      columns: target.columnTypes,
+      rows,
+    });
     const restored = await this.snapshot({
       ...input,
       datasetId: dataset.id,
@@ -332,39 +349,73 @@ export class DatasetVersionService {
     return hasher.digest();
   }
 
+  /** Writes and records a version; a failure before its rows are kept or removed removes them. */
+  async #writeVersion(input: {
+    dataset: Dataset;
+    latest: DatasetVersion | null;
+    input: Parameters<DatasetVersionService["snapshot"]>[0];
+  }): Promise<DatasetSnapshot | "moved"> {
+    const id = this.deps.generateId();
+    const { projectId } = input.input;
+    const address = { projectId, datasetId: input.dataset.id, versionId: id };
+    const progress = { chunkCount: 0, settled: false };
+    try {
+      return await this.#writeAndRecord({ ...input, id, address, progress });
+    } catch (error) {
+      if (!progress.settled) {
+        await this.deps.versionContent
+          .deleteChunks({ ...address, chunkCount: progress.chunkCount })
+          .catch((cause: unknown) =>
+            logger.warn({ ...address, cause }, "Version chunks left behind"),
+          );
+      }
+      throw error;
+    }
+  }
+
   /** Writes the content again while hashing it, so the stored hash is of the stored rows. */
-  async #writeVersion({
+  async #writeAndRecord({
     dataset,
     latest,
     input,
+    id,
+    address,
+    progress,
   }: {
     dataset: Dataset;
     latest: DatasetVersion | null;
     input: Parameters<DatasetVersionService["snapshot"]>[0];
-  }): Promise<DatasetSnapshot> {
-    const id = this.deps.generateId();
-    const address = { projectId: input.projectId, datasetId: dataset.id, versionId: id };
+    id: string;
+    address: { projectId: string; datasetId: string; versionId: string };
+    progress: { chunkCount: number; settled: boolean };
+  }): Promise<DatasetSnapshot | "moved"> {
     const hasher = DatasetContentHasherService.create({ columns: dataset.columnTypes });
     let buffer: DatasetVersionRow[] = [];
-    let chunkCount = 0;
+    const flush = async () => {
+      const chunk = { ...address, index: progress.chunkCount, rows: buffer };
+      await this.deps.versionContent.writeChunk(chunk);
+      progress.chunkCount++;
+      buffer = [];
+    };
     for await (const row of this.#currentRows(dataset)) {
       hasher.push(row);
       buffer.push(row);
-      if (buffer.length === DATASET_VERSION_ROWS_PER_CHUNK) {
-        const chunk = { ...address, index: chunkCount++, rows: buffer };
-        await this.deps.versionContent.writeChunk(chunk);
-        buffer = [];
-      }
+      if (buffer.length === DATASET_VERSION_ROWS_PER_CHUNK) await flush();
     }
-    if (buffer.length > 0) {
-      await this.deps.versionContent.writeChunk({ ...address, index: chunkCount++, rows: buffer });
-    }
+    if (buffer.length > 0) await flush();
+    const { chunkCount } = progress;
     const digest = hasher.digest();
+    if (await this.#movedSince(dataset)) {
+      await this.deps.versionContent.deleteChunks({ ...address, chunkCount });
+      progress.settled = true;
+      return "moved";
+    }
 
     let previous = latest;
     for (let attempt = 1; attempt <= MAX_NUMBER_ATTEMPTS; attempt++) {
       if (previous && previous.contentHash === digest.contentHash) {
         await this.deps.versionContent.deleteChunks({ ...address, chunkCount });
+        progress.settled = true;
         return { version: await this.#keepUnchanged({ latest: previous, input }), created: false };
       }
       let version: DatasetVersion;
@@ -387,16 +438,14 @@ export class DatasetVersionService {
           pinned: input.pinned ?? false,
         });
       } catch (error) {
-        if (!(error instanceof DatasetVersionNumberTakenError)) {
-          await this.deps.versionContent.deleteChunks({ ...address, chunkCount });
-          throw error;
-        }
+        if (!(error instanceof DatasetVersionNumberTakenError)) throw error;
         previous = await this.deps.versions.findLatest({
           projectId: input.projectId,
           datasetId: dataset.id,
         });
         continue;
       }
+      progress.settled = true;
       await this.#announce({
         projectId: input.projectId,
         datasetId: dataset.id,
@@ -406,7 +455,6 @@ export class DatasetVersionService {
       });
       return { version, created: true };
     }
-    await this.deps.versionContent.deleteChunks({ ...address, chunkCount });
     throw new Error(
       `Dataset ${dataset.id} took no version number after ${MAX_NUMBER_ATTEMPTS} tries`,
     );
@@ -443,53 +491,6 @@ export class DatasetVersionService {
       more = page.length === RECORD_PAGE_SIZE;
       cursorId = page.at(-1)?.id;
     }
-  }
-
-  async #replaceContent({
-    dataset,
-    columns,
-    rows,
-  }: {
-    dataset: Dataset;
-    columns: DatasetColumns;
-    rows: readonly DatasetVersionRow[];
-  }): Promise<void> {
-    const { projectId, id: datasetId } = dataset;
-    if (dataset.contentLayout === "s3_jsonl") {
-      await this.deps.content.withDatasetLock(datasetId, async (tx) => {
-        const writer = StreamingChunkWriterService.create({
-          storage: this.deps.chunks,
-          projectId,
-          datasetId,
-        });
-        for (const row of rows) await writer.push(row.entry, { id: row.id });
-        const meta = await writer.finalize();
-        await this.deps.chunks.deleteChunksFrom({
-          projectId,
-          datasetId,
-          fromIndex: meta.chunkCount,
-        });
-        await tx.updateContent({
-          id: datasetId,
-          projectId,
-          content: {
-            rowCount: meta.rowCount,
-            sizeBytes: BigInt(meta.sizeBytes),
-            chunkCount: meta.chunkCount,
-            chunkOffsets: meta.chunkOffsets,
-            columnTypes: columns,
-          },
-        });
-      });
-      return;
-    }
-
-    const entries = rows.map((row) => ({ ...row.entry, id: row.id }));
-    await this.deps.records.withDatasetLock({ datasetId, projectId }, async (records) => {
-      await records.replaceAll({ datasetId, projectId, entries });
-      await records.setColumnTypes(columns);
-    });
-    logger.info({ projectId, datasetId, rows: rows.length }, "Restored a dataset version in place");
   }
 
   #address(version: DatasetVersion): { projectId: string; datasetId: string; versionId: string } {

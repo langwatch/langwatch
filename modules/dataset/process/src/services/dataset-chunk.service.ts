@@ -4,13 +4,16 @@
  * advisory lock (Decision 9 / I-COUNT); this class keeps append, edit and locate.
  */
 
-import { type DatasetColumnRenames, type DatasetColumns } from "@langwatch/dataset-contract";
+import {
+  type DatasetColumnRenames,
+  type DatasetColumns,
+  DuplicateRecordIdError,
+} from "@langwatch/dataset-contract";
 import { createLogger } from "@langwatch/observability";
 
 import type { DatasetChunkRepository } from "../repositories/dataset-chunk.repository.ts";
 import type { DatasetContentRepository } from "../repositories/dataset-content.repository.ts";
 import {
-  type ChunkLine,
   type DatasetMutationRecord,
   type RecomputedDatasetCounts,
   assertReady,
@@ -24,25 +27,12 @@ import {
   chunkedMeta,
   chunkMetaOf,
 } from "../rules/dataset-chunking.rules.ts";
-import { assertColumnsCurrent } from "../rules/dataset-columns.rules.ts";
+import { assertColumnsCurrent, type CheckedColumn } from "../rules/dataset-columns.rules.ts";
 import { DatasetChunkDeleteService } from "./dataset-chunk-delete.service.ts";
 import { DatasetChunkMaintenanceService } from "./dataset-chunk-maintenance.service.ts";
+import { DatasetChunkRowEditService } from "./dataset-chunk-row-edit.service.ts";
 
 const logger = createLogger("langwatch:datasets:mutations");
-
-/** What the off-lock locate scan reported, or null when it was skipped or abandoned. */
-type LocateHint = { affectedIndices: number[]; locatedIds: Set<string> } | null;
-
-/** The one row an edit targets, together with the lock's transaction and re-read row. */
-type EditTarget = {
-  tx: DatasetContentRepository;
-  current: DatasetMutationRecord;
-  dataset: DatasetMutationRecord;
-  projectId: string;
-  recordId: string;
-  entry: unknown;
-  storage: DatasetChunkRepository;
-};
 
 /**
  * Every write to a dataset stored as s3_jsonl chunks. `repository` is
@@ -53,6 +43,8 @@ export class DatasetChunkService {
   private readonly deletes: DatasetChunkDeleteService;
 
   private readonly maintenance: DatasetChunkMaintenanceService;
+
+  private readonly rowEdits = DatasetChunkRowEditService.create();
 
   private constructor(private readonly datasets: DatasetContentRepository) {
     this.deletes = DatasetChunkDeleteService.create({
@@ -146,18 +138,33 @@ export class DatasetChunkService {
     entries,
     forcedIds,
     storage,
+    columns,
+    newIds,
   }: {
     dataset: DatasetMutationRecord;
     projectId: string;
     entries: unknown[];
     forcedIds?: (string | undefined)[];
     storage: DatasetChunkRepository;
+    /** The columns the caller checked the entries against; refused when one is gone. */
+    columns?: readonly CheckedColumn[] | undefined;
+    /** Ids the chunks must not hold yet, as the records table refuses a taken id. */
+    newIds?: readonly string[] | undefined;
   }): Promise<{ appended: number }> {
     const datasetStorage = storage;
 
     return this.datasets.withDatasetLock(dataset.id, async (tx) => {
       const current = await tx.getOne({ id: dataset.id, projectId });
       assertReady(current);
+      assertColumnsCurrent({ columns, columnTypes: current.columnTypes });
+      if (newIds && newIds.length > 0) {
+        const wanted = new Set(newIds);
+        for (let index = 0; index < (current.chunkCount ?? 0); index++) {
+          const rows = await datasetStorage.readChunk({ projectId, datasetId: dataset.id, index });
+          const taken = rows.find((line) => isChunkLine(line) && wanted.has(line.id));
+          if (isChunkLine(taken)) throw new DuplicateRecordIdError(taken.id);
+        }
+      }
 
       return this.appendLines({
         tx,
@@ -213,14 +220,8 @@ export class DatasetChunkService {
       assertColumnsCurrent({ columns, columnTypes: current.columnTypes });
 
       const target = { tx, current, dataset, projectId, recordId, entry, storage: datasetStorage };
-      const hinted = await this.editHintedChunk({ ...target, hint });
-      if (hinted) {
-        return hinted;
-      }
-
-      const scanned = await this.editByFullScan(target);
-      if (scanned) {
-        return scanned;
+      if ((await this.rowEdits.editInPlace({ ...target, hint })) === "edited") {
+        return { updated: true };
       }
 
       // Not an existing row → append it, pinning the requested id (matches the PG
@@ -236,105 +237,6 @@ export class DatasetChunkService {
 
       return { updated: false };
     });
-  }
-
-  /**
-   * Replace the row's entry at (index, rowIndex) in place and patch only that chunk's
-   * byteSize — rows don't move on edit, so startRow/endRow are unchanged. Shared by the
-   * hinted and full-scan branches.
-   */
-  private async rewriteRowAt({
-    tx,
-    current,
-    dataset,
-    projectId,
-    recordId,
-    entry,
-    storage,
-    index,
-    rows,
-    rowIndex,
-  }: EditTarget & { index: number; rows: unknown[]; rowIndex: number }): Promise<void> {
-    const offsets = readOffsets(current);
-    const updatedRows = rows.slice();
-    updatedRows[rowIndex] = { id: recordId, entry } satisfies ChunkLine;
-    const offset = await storage.rewriteChunk({
-      projectId,
-      datasetId: dataset.id,
-      index,
-      records: updatedRows,
-    });
-    const oldByteSize = offsets[index]?.byteSize ?? 0;
-    const patched = offsets.map((o) =>
-      o.index === index ? { ...o, byteSize: offset.byteSize } : o,
-    );
-    await tx.updateContent({
-      id: dataset.id,
-      projectId,
-      content: {
-        sizeBytes: (current.sizeBytes ?? 0n) + BigInt(offset.byteSize - oldByteSize),
-        chunkOffsets: patched,
-      },
-    });
-  }
-
-  /**
-   * Fast path — the pre-scan located the row and the offset index covers every chunk, so
-   * only that one chunk is re-read under the lock. Null means the hint did not hold and the
-   * caller falls through to the full scan.
-   */
-  private async editHintedChunk(
-    target: EditTarget & { hint: LocateHint },
-  ): Promise<{ updated: true } | null> {
-    const { current, dataset, projectId, recordId, storage, hint } = target;
-    const chunkCount = current.chunkCount ?? 0;
-    const offsets = readOffsets(current);
-    if (!hint?.locatedIds.has(recordId) || offsets.length !== chunkCount) {
-      return null;
-    }
-
-    const index = hint.affectedIndices[0]!;
-    if (index >= chunkCount) {
-      return null;
-    }
-
-    const rows = await storage.readChunk({ projectId, datasetId: dataset.id, index });
-    const rowIndex = rows.findIndex((line) => isChunkLine(line) && line.id === recordId);
-    if (rowIndex === -1) {
-      // Row moved/removed since the scan → fall through to the full scan.
-      logger.warn(
-        { projectId, datasetId: dataset.id, recordId, index },
-        "edit fast-path drift: located row not in hinted chunk; falling back to full in-lock scan",
-      );
-
-      return null;
-    }
-
-    await this.rewriteRowAt({ ...target, index, rows, rowIndex });
-
-    return { updated: true };
-  }
-
-  /**
-   * The proven path: read chunks in order until the id is found and rewrite it in place.
-   * Null means the id exists in no chunk, so the caller appends it as a new row.
-   */
-  private async editByFullScan(target: EditTarget): Promise<{ updated: true } | null> {
-    const { current, dataset, projectId, recordId, storage } = target;
-    const chunkCount = current.chunkCount ?? 0;
-    for (let index = 0; index < chunkCount; index++) {
-      const rows = await storage.readChunk({ projectId, datasetId: dataset.id, index });
-      const rowIndex = rows.findIndex((line) => isChunkLine(line) && line.id === recordId);
-      if (rowIndex === -1) {
-        continue;
-      }
-
-      await this.rewriteRowAt({ ...target, index, rows, rowIndex });
-
-      return { updated: true };
-    }
-
-    return null;
   }
 
   /**

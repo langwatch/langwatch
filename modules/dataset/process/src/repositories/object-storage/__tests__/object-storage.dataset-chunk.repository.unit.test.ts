@@ -23,4 +23,33 @@ describe("ObjectStorageDatasetChunkRepository", () => {
       expect(read.byteSize).not.toBe(Buffer.byteLength(JSON.stringify(records)));
     });
   });
+
+  describe("when a removal of every chunk stops part way and runs again", () => {
+    /** @scenario "Erasing an organization removes its dataset chunks, version chunks and single files" */
+    it("leaves no chunk behind, because it never opens a gap a re-run would stop at", async () => {
+      const objectStorage = memoryObjectStorage();
+      const chunks = ObjectStorageDatasetChunkRepository.create({ objectStorage });
+      for (const index of [0, 1, 2]) {
+        await chunks.writeChunks({ ...address, records: [{ index }], fromIndex: index });
+      }
+      const remove = objectStorage.remove.bind(objectStorage);
+      let removals = 0;
+      objectStorage.remove = async (at) => {
+        if (++removals === 2) throw new Error("storage went away");
+        return remove(at);
+      };
+
+      await expect(chunks.deleteChunksFrom({ ...address, fromIndex: 0 })).rejects.toThrow(
+        "storage went away",
+      );
+      objectStorage.remove = remove;
+      await chunks.deleteChunksFrom({ ...address, fromIndex: 0 });
+
+      for (const index of [0, 1, 2]) {
+        await expect(chunks.readChunk({ ...address, index })).rejects.toThrow(
+          "Missing dataset chunk",
+        );
+      }
+    });
+  });
 });

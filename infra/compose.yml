@@ -24,6 +24,12 @@ services:
       - path: platform/app/.env
         required: false
     pull_policy: always
+    # With no object storage configured, dataset files and other stored objects are written
+    # under LANGWATCH_LOCAL_STORAGE_PATH (default /var/lib/langwatch/objects). Postgres keeps
+    # no copy of them, so the app and the workers mount the same named volume there: it is
+    # the only copy, and it outlives the containers.
+    volumes:
+      - langwatch-objects:/var/lib/langwatch/objects
     ports:
       - "5560:5560"
     depends_on:
@@ -59,6 +65,9 @@ services:
       - path: platform/app/.env
         required: false
     pull_policy: always
+    # The volume the app writes stored objects to (see the app service above).
+    volumes:
+      - langwatch-objects:/var/lib/langwatch/objects
     depends_on:
       postgres:
         condition: service_healthy
@@ -153,3 +162,4 @@ volumes:
   db-data:
   redis-data:
   clickhouse-data:
+  langwatch-objects:

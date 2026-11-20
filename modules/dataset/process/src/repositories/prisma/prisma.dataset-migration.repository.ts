@@ -9,6 +9,7 @@ import type {
   DatasetMigrationMetadata,
   DatasetMigrationOutcome,
   DatasetMigrationRepository,
+  DatasetMoveNotes,
 } from "../dataset-migration.repository.ts";
 import {
   DATASET_MUTATION_TXN_MAX_WAIT_MS,
@@ -56,11 +57,35 @@ export class PrismaDatasetMigrationRepository implements DatasetMigrationReposit
     return current?.contentLayout === "postgres" && !current.useS3;
   }
 
+  async findMoveNotes(input: { datasetId: string; projectId: string }): Promise<DatasetMoveNotes> {
+    const [dataset, misfiled] = await Promise.all([
+      this.options.database.dataset.findFirst({
+        where: { id: input.datasetId, projectId: input.projectId },
+        select: { archivedAt: true },
+      }),
+      // A row whose project differs from its dataset's is never read by the move, which reads
+      // by both; this counts them so the report names what stays behind.
+      this.options.database.$queryRaw<{ count: bigint }[]>` ${skipTenantCheck({
+        // Counts, by dataset id, the rows filed under any other project: no tenant to bind.
+        SKIP_TENANT_CHECK: true,
+      })}
+        SELECT count(*) AS count
+          FROM "DatasetRecord"
+         WHERE "datasetId" = ${input.datasetId}
+           AND "projectId" <> ${input.projectId}
+      `,
+    ]);
+    return {
+      archived: dataset?.archivedAt != null,
+      rowsUnderOtherProject: Number(misfiled[0]?.count ?? 0n),
+    };
+  }
+
   getFingerprint(input: {
     datasetId: string;
     projectId: string;
   }): Promise<DatasetMigrationFingerprint> {
-    return fingerprintOf(this.options.database.datasetRecord, input);
+    return fingerprintOf(this.options.database, input);
   }
 
   /**
@@ -114,14 +139,15 @@ SELECT pg_advisory_xact_lock(hashtextextended(${`dataset:${input.datasetId}`}, 0
           return "already-migrated";
         }
 
-        const recheck = await fingerprintOf(database.datasetRecord, {
+        const recheck = await fingerprintOf(database, {
           datasetId: input.datasetId,
           projectId: input.projectId,
         });
         const recordSetChanged =
           recheck.count !== input.baseline.count ||
           recheck.maxUpdatedAt?.epochMilliseconds !==
-            input.baseline.maxUpdatedAt?.epochMilliseconds;
+            input.baseline.maxUpdatedAt?.epochMilliseconds ||
+          recheck.digest !== input.baseline.digest;
         if (recordSetChanged) {
           logger.warn(input, "Dataset records changed during migration; leaving Postgres live");
           return "skipped-concurrent-write";
@@ -162,15 +188,31 @@ SELECT pg_advisory_xact_lock(hashtextextended(${`dataset:${input.datasetId}`}, 0
   }
 }
 
+/**
+ * One pass in Postgres, nothing per row in the process: the digest sums a 60-bit slice of
+ * each row's md5 over id, millisecond updatedAt and entry, so it needs no sort and no
+ * row-sized string, and any edit to one row moves it, same millisecond too (ADR-032).
+ */
 async function fingerprintOf(
-  records: PrismaClient["datasetRecord"],
+  database: Pick<PrismaClient, "$queryRaw">,
   input: { datasetId: string; projectId: string },
 ): Promise<DatasetMigrationFingerprint> {
-  const result = await records.aggregate({
-    where: input,
-    _count: { _all: true },
-    _max: { updatedAt: true },
-  });
-  const maxUpdatedAt = result._max.updatedAt;
-  return { count: result._count._all, maxUpdatedAt: maxUpdatedAt ? fromDate(maxUpdatedAt) : null };
+  const [row] = await database.$queryRaw<
+    { count: number; maxUpdatedAt: Date | null; digest: string }[]
+  >`
+    SELECT count(*)::int AS "count",
+           max("updatedAt") AS "maxUpdatedAt",
+           coalesce(sum(('x' || substr(md5(
+             "id" || ':' || floor(extract(epoch FROM "updatedAt") * 1000)::bigint::text
+               || ':' || "entry"::text
+           ), 1, 15))::bit(60)::bigint), 0)::text AS "digest"
+      FROM "DatasetRecord"
+     WHERE "datasetId" = ${input.datasetId}
+       AND "projectId" = ${input.projectId}
+  `;
+  return {
+    count: row?.count ?? 0,
+    maxUpdatedAt: row?.maxUpdatedAt ? fromDate(row.maxUpdatedAt) : null,
+    digest: row?.digest ?? "0",
+  };
 }

@@ -113,6 +113,7 @@ export const reads = {
   "@langwatch/entitlement-process": ["docs/pricing.mdx", "docs/pricing/billable-events.mdx"],
   "@langwatch/group-queue": ["apps/*/package.json"],
   "@langwatch/process": ["charts/langwatch/**/*"],
+  "@langwatch/process-stores": ["infra/compose.yml", "infra/docker/Dockerfile"],
   "@langwatch/automation-contract": ["modules/automation/**/*"],
   "@langwatch/config": ["packages/browser/src/wire/public-config.ts"],
   "@langwatch/mail": ["skills/tracing/SKILL.mdx"],
@@ -223,6 +224,7 @@ export const reads = {
   ],
   "@langwatch/user-browser": ["docs/coding-agents/explore-your-usage-with-your-own-agent.mdx"],
   "@langwatch/gateway-contract": [".env.example"],
+  "@langwatch/dataset-process": [".env.example", "pnpm-workspace.yaml"],
   "@langwatch/analytics-contract": [
     "dev/scripts/build-charts-lib.mjs",
     "docs/features/querying-your-data.mdx",

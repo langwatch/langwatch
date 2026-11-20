@@ -311,15 +311,20 @@ export class DatasetContentService implements DatasetContent {
   async batchCreateRecords({
     dataset,
     input,
+    columns,
   }: {
     dataset: Dataset;
     input: CreateDatasetRecordsInput;
+    /** The columns the entries were checked against; the append is refused when one is gone. */
+    columns?: readonly string[] | undefined;
   }): Promise<DatasetRecord[]> {
     // Minted here, not in the chunk write, so each answered row carries the id it was stored under.
     const forcedIds = input.entries.map(
       (entry) => entry.id ?? generate(RECORD_KSUID_RESOURCE).toString(),
     );
     const entries = input.entries.map(({ id: _id, ...entry }) => entry);
+    // A chosen id the chunks already hold is refused, as the records table's key refuses it.
+    const newIds = input.entries.flatMap((entry) => (entry.id ? [entry.id] : []));
     entries.forEach((entry) => assertStoredRowWithinLimit(entry));
     const storage = this.storage;
     await this.chunks.append({
@@ -328,6 +333,8 @@ export class DatasetContentService implements DatasetContent {
       entries,
       forcedIds,
       storage,
+      columns,
+      newIds,
     });
     return entries.map((entry, index) => toDatasetRecord({ id: forcedIds[index], entry }, dataset));
   }
@@ -404,6 +411,7 @@ export class DatasetContentService implements DatasetContent {
     slug,
     columnTypes,
     columnRenames,
+    previousColumns,
   }: {
     dataset: Dataset;
     projectId: string;
@@ -411,11 +419,13 @@ export class DatasetContentService implements DatasetContent {
     slug: string;
     columnTypes: Dataset["columnTypes"];
     columnRenames?: DatasetColumnRenames;
+    /** The columns the edit was prepared against, when not the given dataset's own. */
+    previousColumns?: Dataset["columnTypes"];
   }): Promise<Dataset> {
     const updated = await this.chunks.migrateColumns({
       dataset,
       projectId,
-      oldColumnTypes: dataset.columnTypes,
+      oldColumnTypes: previousColumns ?? dataset.columnTypes,
       newColumnTypes: columnTypes,
       ...(columnRenames ? { columnRenames } : {}),
       name,

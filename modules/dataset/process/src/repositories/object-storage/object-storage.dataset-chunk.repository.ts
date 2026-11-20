@@ -106,10 +106,11 @@ export class ObjectStorageDatasetChunkRepository implements DatasetChunkReposito
     fromIndex: number;
   }): Promise<void> {
     assertNoTraversal(params.projectId, params.datasetId);
-    for (let index = params.fromIndex; index < Number.MAX_SAFE_INTEGER; index++) {
-      const at = chunkAddress(params.projectId, params.datasetId, index);
-      if (!(await this.exists(at))) return;
-      await this.objects.remove(at);
+    let end = params.fromIndex;
+    while (await this.exists(chunkAddress(params.projectId, params.datasetId, end))) end++;
+    // Last first: a removal that stops part way leaves an unbroken run a re-run finds whole.
+    for (let index = end - 1; index >= params.fromIndex; index--) {
+      await this.objects.remove(chunkAddress(params.projectId, params.datasetId, index));
     }
   }
 

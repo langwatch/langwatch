@@ -4391,6 +4391,12 @@ const presentations = {
     title: "There's nothing to retry",
     describe: () => "This dataset has no failed import to run again.",
   },
+  dataset_records_table_write_refused: {
+    // Platform fault: a write reached the old records table after the dataset moved to object storage.
+    title: "That change didn't save",
+    describe: () =>
+      "The dataset moved to new storage while you edited it. Reload it and make the change again.",
+  },
   dataset_too_large_to_edit_columns: {
     // A limit, not a breakage: the change would rewrite more rows than one edit can hold.
     title: "This dataset is too large to change column types",

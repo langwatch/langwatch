@@ -22,8 +22,11 @@ export const userProcessModule: PublishedProcessModule<"user", UserApi, UserServ
     .withApi(UserModule)
     .withTransports(meRest, userAvatarRest, userTrpcTransport)
     .withEventing(userLifecycleEventing)
-    .withTasks(({ repositories }) => [
-      createGdprUserDataEraseRunner({ repository: repositories.dataErase }),
+    .withTasks(({ app, repositories }) => [
+      createGdprUserDataEraseRunner({
+        repository: repositories.dataErase,
+        datasetContent: { eraseStoredContent: (input) => app.eraseStoredDatasetContent(input) },
+      }),
     ])
     .withMigrations(({ app, repositories }) => [
       defineMigrationStep({

@@ -157,9 +157,6 @@
       "path": "../../modules/experiment/process/tsconfig.build.json"
     },
     {
-      "path": "../../packages/eventing/tsconfig.build.json"
-    },
-    {
       "path": "../../modules/evaluator/process/tsconfig.build.json"
     },
     {
@@ -212,6 +209,9 @@
     },
     {
       "path": "../../modules/dataset/process/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/dataset/contract/tsconfig.build.json"
     },
     {
       "path": "../../modules/data-retention/process/tsconfig.build.json"
@@ -271,10 +271,25 @@
       "path": "../../packages/vitest-config/tsconfig.build.json"
     },
     {
+      "path": "../../modules/user/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../packages/test-harness/tsconfig.build.json"
     },
     {
+      "path": "../../modules/stored-object/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../modules/prompt/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/project/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/eventing/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/entitlement/contract/tsconfig.build.json"
     }
   ]
 }

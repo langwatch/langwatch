@@ -3,9 +3,10 @@ import type { DatasetChunkRepository } from "./dataset-chunk.repository.ts";
 import type { DatasetContentRepository } from "./dataset-content.repository.ts";
 import type { DatasetCountRepository } from "./dataset-count.repository.ts";
 import type { DatasetMigrationRepository } from "./dataset-migration.repository.ts";
-import type { DatasetRecordContentRepository } from "./dataset-record-content.repository.ts";
 import type { DatasetRecordRepository } from "./dataset-record.repository.ts";
+import type { DatasetSingleFileConversionRepository } from "./dataset-single-file-conversion.repository.ts";
 import type { DatasetSingleFileRepository } from "./dataset-single-file.repository.ts";
+import type { DatasetStorageAuditRepository } from "./dataset-storage-audit.repository.ts";
 import type { DatasetVersionContentRepository } from "./dataset-version-content.repository.ts";
 import type { DatasetVersionRepository } from "./dataset-version.repository.ts";
 import type { DatasetRepository } from "./dataset.repository.ts";
@@ -17,8 +18,6 @@ export interface DatasetRepositories {
   readonly records: DatasetRecordRepository;
   /** Dataset rows as stored, plus the counters an object-backed dataset keeps. */
   readonly content: DatasetContentRepository;
-  /** The entries an upload appends. */
-  readonly recordContent: DatasetRecordContentRepository;
   /** The batch-evaluation rows an experiment's runs are summarised by. */
   readonly batchEvaluations: BatchEvaluationRepository;
   /** The usage report's counts over the three tables above. */
@@ -29,8 +28,12 @@ export interface DatasetRepositories {
   readonly migration: DatasetMigrationRepository;
   /** The chunk store that move writes into. */
   readonly migrationChunks: DatasetChunkRepository;
+  /** Read-only counts of what is still outside object-storage chunks, per project. */
+  readonly storageAudit: DatasetStorageAuditRepository;
   /** The previous release's single-file datasets, read and rewritten where it kept them. */
   readonly singleFiles: DatasetSingleFileRepository;
+  /** Which single-file datasets the conversion step still has to convert. */
+  readonly singleFileConversion: DatasetSingleFileConversionRepository;
   /** The numbered snapshots of each dataset and the runs that read them. */
   readonly versions: DatasetVersionRepository;
   /** The rows of each snapshot, in object storage beside the dataset's chunks. */
