@@ -1460,7 +1460,7 @@ Contract `../contract/src/graph.trpc.ts:167`, router `src/transport/graph.trpc.t
 
 ```typescript
 // graphs.create
-// Input: graphApiCreateInputSchema, ../contract/src/graph.trpc.ts:49
+// Input: graphApiCreateInputSchema, ../contract/src/graph.trpc.ts:36
 interface Input {
   projectId: string;
   name: string;
@@ -1472,30 +1472,30 @@ interface Input {
   colSpan?: number;
   rowSpan?: number;
 }
-type Output = z.infer<typeof legacyGraphSchema>; // ../contract/src/graph.trpc.ts:122
+type Output = z.infer<typeof legacyGraphSchema>; // ../contract/src/graph.trpc.ts:109
 
 // graphs.getAll
-// Input: graphApiListInputSchema, ../contract/src/graph.trpc.ts:57
+// Input: graphApiListInputSchema, ../contract/src/graph.trpc.ts:44
 interface Input {
   projectId: string;
   dashboardId?: string;
 }
-// Output: graphListItemSchema.array() (inline, ../contract/src/graph.trpc.ts:191)
+// Output: graphListItemSchema.array() (inline, ../contract/src/graph.trpc.ts:178)
 
 // graphs.delete
-// Input: graphApiGraphInputSchema, ../contract/src/graph.trpc.ts:68
+// Input: graphApiGraphInputSchema, ../contract/src/graph.trpc.ts:55
 interface Input {
   projectId: string;
   id: string;
 }
-type Output = z.infer<typeof legacyGraphSchema>; // ../contract/src/graph.trpc.ts:122
+type Output = z.infer<typeof legacyGraphSchema>; // ../contract/src/graph.trpc.ts:109
 
 // graphs.getById
-type Input = z.infer<typeof graphApiGraphInputSchema>; // ../contract/src/graph.trpc.ts:68
-type Output = z.infer<typeof graphDetailSchema>; // ../contract/src/graph.trpc.ts:171
+type Input = z.infer<typeof graphApiGraphInputSchema>; // ../contract/src/graph.trpc.ts:55
+type Output = z.infer<typeof graphDetailSchema>; // ../contract/src/graph.trpc.ts:158
 
 // graphs.updateById
-// Input: graphApiUpdateInputSchema, ../contract/src/graph.trpc.ts:81
+// Input: graphApiUpdateInputSchema, ../contract/src/graph.trpc.ts:68
 interface Input {
   projectId: string;
   name: string;
@@ -1503,10 +1503,10 @@ interface Input {
   graphId: string;
   filterParams?: unknown;
 }
-type Output = z.infer<typeof legacyGraphSchema>; // ../contract/src/graph.trpc.ts:122
+type Output = z.infer<typeof legacyGraphSchema>; // ../contract/src/graph.trpc.ts:109
 
 // graphs.updateLayout
-// Input: graphApiUpdateLayoutInputSchema, ../contract/src/graph.trpc.ts:94
+// Input: graphApiUpdateLayoutInputSchema, ../contract/src/graph.trpc.ts:81
 interface Input {
   projectId: string;
   graphId: string;
@@ -1515,10 +1515,10 @@ interface Input {
   colSpan: number;
   rowSpan: number;
 }
-type Output = z.infer<typeof legacyGraphSchema>; // ../contract/src/graph.trpc.ts:122
+type Output = z.infer<typeof legacyGraphSchema>; // ../contract/src/graph.trpc.ts:109
 
 // graphs.batchUpdateLayouts
-// Input: graphApiBatchUpdateLayoutsInputSchema, ../contract/src/graph.trpc.ts:108
+// Input: graphApiBatchUpdateLayoutsInputSchema, ../contract/src/graph.trpc.ts:95
 interface Input {
   projectId: string;
   layouts: {
@@ -1529,7 +1529,7 @@ interface Input {
     rowSpan: number;
   }[];
 }
-// Output: graphLayoutsUpdatedSchema, ../contract/src/graph.trpc.ts:178
+// Output: graphLayoutsUpdatedSchema, ../contract/src/graph.trpc.ts:165
 interface Output {
   success: true;
 }
