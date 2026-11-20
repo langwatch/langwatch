@@ -96,11 +96,12 @@ a rolling 7 days, later to 28. The step widens with it: the last full day stays 
 (`DAILY_RUN_GRANULARITY_SECONDS`, one hour), and the wider window is read in daily steps, so a
 28 day window is 28 points per query, not 672. The skill's rule "read its hourly steps before
 you report a total" then applies to the last day only: for the older days Langy reads the daily
-steps, and when most of a change falls in one day it names that day and its numbers. The step
-is a reversible default. The run still files at most the person's maximum. A "gap" is a drop
-or hole in data Langy can still read in the window, such as a widget, metric or segment going
-quiet while the project still has traffic. A project's traffic stopping is ADR-004's
-`no_new_traces` gate, not a gap.
+steps, and when most of a change falls in one day it names that day and its numbers. A filed
+insight's replay window keeps the step its evidence query was answered in, so a finding from
+the daily part replays at the daily step. The step is a reversible default. The run still
+files at most the person's maximum. A "gap" is a drop or hole in data Langy can still read in
+the window, such as a widget, metric or segment going quiet while the project still has
+traffic. A project's traffic stopping is ADR-004's `no_new_traces` gate, not a gap.
 
 **D3: "Names a next step" is a rule now, a field later.** The skill tells Langy that every
 finding names a next step, and a finding without one is not filed, as
@@ -130,6 +131,12 @@ Stored `good` insights stay readable.
   module owner's agreement.
 - The wider window reads daily steps beyond the last day (D2), so the brief's single `Step:`
   line becomes one step per window.
+- The handback check (`isHandedBack` in
+  `modules/insight/process/src/rules/insight-daily-run-answer.rules.ts`) accepts a stored query
+  only with the hourly step written in, and the filed replay window is pinned to
+  `DAILY_RUN_GRANULARITY_SECONDS` (`dailyRunReplay` in `insight-daily-run.rules.ts`). Both
+  change here: the check accepts the daily step as well, and the replay takes the answered
+  step. Otherwise a daily-step query is dropped and the finding files without evidence.
 - One thread per schedule means one conversation grows for as long as the run is on. Langy's
   own context handling decides how much of an older day it still reads.
 - A person who writes in the thread writes into a conversation the next run continues. The run

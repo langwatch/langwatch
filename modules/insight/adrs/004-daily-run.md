@@ -139,9 +139,6 @@ project, person and board derive.
 **The run's conversation is the person's own.** It shows in their Langy history
 under a title that names the board and the day, with the origin `run`, and it sends
 no push notification.
-Amended by ADR-005 (005-life-of-an-insight.md): the title clause is replaced by
-`Daily insights - <board>`, with no day, for the run's one thread per schedule, as a
-proposed reversible default.
 
 **The setting is the person's own.** Per person and per board: `undecided` until they
 choose, then `on` with an hour (0 to 23), an IANA time zone and a maximum (1, 3, 5 or
