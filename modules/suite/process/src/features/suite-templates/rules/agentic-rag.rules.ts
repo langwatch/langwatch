@@ -7,7 +7,7 @@ export const agenticRagTemplate: SuiteTemplate = {
   kind: "archetype",
   title: "Agentic RAG",
   description:
-    "For agents that search, read and cross-check documents in several steps, with tender verification as the example: {{agentName}} checks a bid against the tender requirements, finds a missing document, follows a requirement across documents, spots a conflict and says when the documents have no answer.",
+    "Five tender checks for an agent that searches and cross-checks documents: a bid against the requirements, a missing document, a requirement spread across files, a conflict and a question with no answer.",
   criteria: [
     "The agent cites the clause or section each statement relies on",
     "The agent never does any of these: {{mustNever}}",
