@@ -40,6 +40,7 @@ describe("TraceCanonicalisationService", () => {
 
     expect(result.attributes).toEqual({
       "langwatch.input": "Summarise the trace session",
+      "gen_ai.conversation.id": "session-2026-08-26",
       "langwatch.thread.id": "session-2026-08-26",
     });
     expect(result.appliedRules).toContain("claude-code/user_prompt");

@@ -76,6 +76,29 @@ Feature: Coding Agent Trace Fidelity (Path B direct OTLP)
     Then the trace belongs to the session's conversation
     And a codex log record that names no conversation files the trace nowhere
 
+  # --- Which conversation a Claude Code turn belongs to ---------------------
+
+  # A Claude Code subagent's spans name the subagent's own id as their
+  # conversation, not the session's. The trace keeps the first conversation a
+  # span names, and a subagent's spans often reach LangWatch before the turn's
+  # own spans do, so the turn was filed under the subagent: the session's
+  # threads split and the turn showed a thread id no session had. The turn's
+  # user_prompt record names the session, whichever spans came first.
+
+  @unit
+  Scenario: A Claude Code turn is filed under its session by its prompt record
+    Given a Claude Code user_prompt record that names its session
+    When the record is canonicalised
+    Then the trace belongs to the session's conversation
+    And a user_prompt record that names no session files the trace nowhere
+
+  @unit
+  Scenario: A Claude Code turn whose subagent span lands first stays in its session
+    Given a Claude Code turn whose subagent span reaches the trace before anything else
+    When the turn's user_prompt record is folded after that span
+    Then the trace's conversation is the session, not the subagent
+    And a subagent span folded after the record leaves the session in place
+
   # --- Reasoning effort (the request setting, not the token count) -----------
 
   @unit
