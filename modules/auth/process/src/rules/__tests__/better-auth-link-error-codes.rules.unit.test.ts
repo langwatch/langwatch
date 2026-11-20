@@ -68,9 +68,10 @@ function callbackCodes(): string[] {
  * (underscored) and as the SSO plugin's OIDC callback does (raw).
  */
 function signInResultCodes(): string[] {
-  return [...libraryFile("link-account.mjs").matchAll(/\berror:\s*"([a-z][a-z ]+)"/g)].flatMap(
-    (match) => [match[1] ?? "", (match[1] ?? "").split(" ").join("_")],
-  );
+  return [...libraryFile("link-account.mjs").matchAll(/\berror:\s*"([^"]+)"/g)].flatMap((match) => [
+    match[1] ?? "",
+    (match[1] ?? "").split(" ").join("_"),
+  ]);
 }
 
 describe("given the installed Better Auth", () => {
