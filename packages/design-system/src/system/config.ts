@@ -590,7 +590,7 @@ export const designSystemConfig = defineConfig({
           },
           // An Enterprise entry the plan includes: a very quiet gold, never a warning yellow.
           enterprise: {
-            value: { _light: "{colors.yellow.600}", _dark: "{colors.yellow.300}" },
+            value: { _light: "{colors.yellow.700}", _dark: "{colors.yellow.300}" },
           },
         },
 

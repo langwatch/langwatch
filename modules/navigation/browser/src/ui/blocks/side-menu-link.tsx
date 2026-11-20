@@ -78,7 +78,8 @@ function EnterpriseMark({
         display="inline-flex"
         flexShrink={0}
         color={isLocked ? "fg.subtle" : "nav.enterprise"}
-        opacity={isLocked ? 1 : 0.55}
+        // Full strength in light mode for 3:1 contrast; dark mode stays quiet.
+        opacity={isLocked ? 1 : { base: 1, _dark: 0.55 }}
       >
         <Icon size={14} aria-label={message} />
       </Box>
