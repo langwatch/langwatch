@@ -520,9 +520,7 @@ describe("TraceModule", () => {
             summary: TraceSummaryService.create({ repository }),
             instantEvalResults,
           });
-          vi.spyOn(app, "resolveViewerProtections").mockResolvedValue(
-            withheldFrom(withheldFromMs),
-          );
+          vi.spyOn(app, "resolveViewerProtections").mockResolvedValue(withheldFrom(withheldFromMs));
           return { app, findResultsByTrace };
         }
 
