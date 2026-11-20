@@ -55,6 +55,15 @@ vi.mock("../../../../../../features/trace-drawer/behavior/use-trace-header.ts", 
   useTraceHeaderCanonical: () => ({ data: undefined }),
 }));
 
+vi.mock("../../../../../../features/trace-drawer/behavior/use-text-translation.ts", () => ({
+  useTextTranslation: ({ texts }: { texts: Record<string, string> }) => ({
+    displayTexts: texts,
+    isActive: false,
+    isLoading: false,
+    toggle: () => undefined,
+  }),
+}));
+
 vi.mock("../../../../../../features/trace-drawer/behavior/use-trace-events.ts", () => ({
   useTraceEvents: () => ({ events: [], isLoading: false }),
 }));
