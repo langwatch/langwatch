@@ -183,7 +183,12 @@ describe("the Insights entry", () => {
 
     /** @scenario "An aggregate project's side menu holds no Insights entry" */
     it("is not in an aggregate project's LLM Ops sidebar", () => {
-      renderSidebar({ surface: "llm-ops", pathname: "/demo", insightsFlag: true, kind: "aggregate" });
+      renderSidebar({
+        surface: "llm-ops",
+        pathname: "/demo",
+        insightsFlag: true,
+        kind: "aggregate",
+      });
 
       expect(screen.queryByRole("link", { name: /Insights/ })).toBeNull();
     });
