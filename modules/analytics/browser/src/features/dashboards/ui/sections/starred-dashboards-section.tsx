@@ -56,6 +56,7 @@ function InProject({
   children: ReactNode;
 }) {
   const host = useAnalyticsHost();
+  const pageProjectId = host.project()?.id;
   const services = useOptionalUiHostServices();
   const scoped = useMemo(
     () => analyticsHostInProject({ host, project: { id, slug, name } }),
@@ -66,10 +67,14 @@ function InProject({
       services?.analytics
         ? {
             ...services,
-            analytics: uiAnalyticsInProject({ analytics: services.analytics, projectId: id }),
+            analytics: uiAnalyticsInProject({
+              analytics: services.analytics,
+              projectId: id,
+              pageProjectId,
+            }),
           }
         : void 0,
-    [services, id],
+    [services, id, pageProjectId],
   );
   const section = <AnalyticsHostProvider value={scoped}>{children}</AnalyticsHostProvider>;
   if (!scopedServices) return section;

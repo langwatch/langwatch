@@ -115,22 +115,38 @@ export function analyticsHostInProject({
   return new AnalyticsHostInProject({ host, inProject: { ...project, hasFirstMessage: true } });
 }
 
-/** Every event carries `projectId`, which wins over the page's registered one. */
+/**
+ * Each event goes out with `projectId` registered as this project, as the shell registers the
+ * page's, and the page's is put back straight after: tracking is synchronous, so none slips by.
+ */
 class UiAnalyticsInProject extends UiAnalytics {
   private readonly analytics: UiAnalytics;
   private readonly projectId: string;
+  private readonly pageProjectId: string | undefined;
 
-  constructor({ analytics, projectId }: { analytics: UiAnalytics; projectId: string }) {
+  constructor({
+    analytics,
+    projectId,
+    pageProjectId,
+  }: {
+    analytics: UiAnalytics;
+    projectId: string;
+    pageProjectId: string | undefined;
+  }) {
     super();
     this.analytics = analytics;
     this.projectId = projectId;
+    this.pageProjectId = pageProjectId;
   }
 
   track(event: UiAnalyticsEvent): void {
-    this.analytics.track({
-      ...event,
-      attributes: { ...event.attributes, projectId: this.projectId },
-    });
+    this.analytics.register({ projectId: this.projectId });
+    try {
+      this.analytics.track(event);
+    } finally {
+      if (this.pageProjectId) this.analytics.register({ projectId: this.pageProjectId });
+      else this.analytics.unregister("projectId");
+    }
   }
 
   register(properties: Readonly<Record<string, unknown>>): void {
@@ -155,15 +171,17 @@ class UiAnalyticsInProject extends UiAnalytics {
 }
 
 /**
- * `analytics`, sending every event as about `projectId`: the shell registers the page's project
- * on each event, and a board made from Gateway or Coding agents belongs to another one.
+ * `analytics`, sending every event about `projectId`: a board made from Gateway or Coding
+ * agents belongs to it, not to `pageProjectId`, the project the shell registered for the page.
  */
 export function uiAnalyticsInProject({
   analytics,
   projectId,
+  pageProjectId,
 }: {
   analytics: UiAnalytics;
   projectId: string;
+  pageProjectId: string | undefined;
 }): UiAnalytics {
-  return new UiAnalyticsInProject({ analytics, projectId });
+  return new UiAnalyticsInProject({ analytics, projectId, pageProjectId });
 }

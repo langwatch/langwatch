@@ -8,6 +8,7 @@
  */
 
 import type { StarredDashboardsProject } from "@langwatch/analytics-client";
+import type { UiAnalyticsEvent } from "@langwatch/browser-host/analytics";
 
 import type { UiProcedureCall } from "@langwatch/browser/testing-transport";
 import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
@@ -37,6 +38,31 @@ const LATENCY = {
   updatedAt: new Date("2026-01-01"),
   _count: { graphs: 0 },
 };
+
+/**
+ * Keeps what is registered as PostHog does, and notes the projectId each event went out with.
+ * Starts as the shell leaves it: the page's project ("proj-1") registered.
+ */
+class RegisteringUiAnalytics extends RecordingUiAnalytics {
+  registered: Readonly<Record<string, unknown>> = { projectId: "proj-1" };
+  readonly sent: { action?: string; attributes?: unknown; projectId: unknown }[] = [];
+
+  override register(properties: Readonly<Record<string, unknown>>): void {
+    this.registered = { ...this.registered, ...properties };
+  }
+
+  override unregister(property: string): void {
+    this.registered = Object.fromEntries(
+      Object.entries(this.registered).filter(([key]) => key !== property),
+    );
+  }
+
+  override track(event: UiAnalyticsEvent): void {
+    super.track(event);
+    const { action, attributes } = event;
+    this.sent.push({ action, attributes, projectId: this.registered.projectId });
+  }
+}
 
 /** Viewing only: no analytics:create. */
 const VIEWER = ["analytics:view"];
@@ -476,9 +502,9 @@ describe("the Dashboards section handed a project, in Gateway or Coding agents",
 
   describe("when the member makes a board, then unpins one", () => {
     /** @scenario "Telemetry: a board made or unpinned from Gateway or Coding agents names its project" */
-    it("sends each event about that project, not the page's", async () => {
+    it("sends each event with that project registered, then puts the page's back", async () => {
       const user = userEvent.setup();
-      const tracked = new RecordingUiAnalytics();
+      const tracked = new RegisteringUiAnalytics();
       const { host } = renderSection({
         stars: [{ kind: "board", dashboard: { ...LATENCY, projectId: "proj-shop" } }],
         project: SHOP,
@@ -493,13 +519,12 @@ describe("the Dashboards section handed a project, in Gateway or Coding agents",
       await user.click(await screen.findByRole("menuitem", { name: "Unpin" }));
 
       await waitFor(() =>
-        expect(
-          tracked.events.map(({ action, attributes }) => ({ action, attributes })),
-        ).toEqual([
-          { action: "created", attributes: { createdFrom: "blank", projectId: "proj-shop" } },
-          { action: "favourited", attributes: { starred: false, projectId: "proj-shop" } },
+        expect(tracked.sent).toEqual([
+          { action: "created", attributes: { createdFrom: "blank" }, projectId: "proj-shop" },
+          { action: "favourited", attributes: { starred: false }, projectId: "proj-shop" },
         ]),
       );
+      expect(tracked.registered).toEqual({ projectId: "proj-1" });
     });
   });
 
