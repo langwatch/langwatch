@@ -258,6 +258,14 @@ With `onDashboardId`, a widget on any other board, or on none, is not found.
 getDashboardWidget(input: { projectId: string; id: string; onDashboardId?: string; viewer?: DashboardViewer; }): Promise<DashboardWidget>;
 ```
 
+#### `getDeletableDashboardWidget`
+
+As `getDashboardWidget`, but a From LangWatch widget, never deletable, is not found.
+
+```typescript
+getDeletableDashboardWidget(input: { projectId: string; id: string; onDashboardId?: string; viewer?: DashboardViewer; }): Promise<DashboardWidget>;
+```
+
 #### `createDashboardWidget`
 
 Placed on `dashboardId` when named, otherwise on the unplaced authoring grid.

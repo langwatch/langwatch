@@ -1,7 +1,4 @@
-import {
-  CURATED_BOARD_SEGMENT,
-  curatedBoardWidgetById,
-} from "@langwatch/analytics-catalogue";
+import { CURATED_BOARD_SEGMENT, curatedBoardWidgetById } from "@langwatch/analytics-catalogue";
 import {
   type DashboardWidget,
   DashboardWidgetNotFoundError,
