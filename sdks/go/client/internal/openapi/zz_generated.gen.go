@@ -20757,6 +20757,678 @@ func (e GetApiGovernanceRegistrySchema500JSONResponseBodyFault) Valid() bool {
 	}
 }
 
+// Defines values for PostApiGovernanceSecurityLakeSourcesJSONBodyConfigSources.
+const (
+	PostApiGovernanceSecurityLakeSourcesJSONBodyConfigSourcesCLOUDTRAILMGMT  PostApiGovernanceSecurityLakeSourcesJSONBodyConfigSources = "CLOUD_TRAIL_MGMT"
+	PostApiGovernanceSecurityLakeSourcesJSONBodyConfigSourcesLAMBDAEXECUTION PostApiGovernanceSecurityLakeSourcesJSONBodyConfigSources = "LAMBDA_EXECUTION"
+	PostApiGovernanceSecurityLakeSourcesJSONBodyConfigSourcesS3DATA          PostApiGovernanceSecurityLakeSourcesJSONBodyConfigSources = "S3_DATA"
+)
+
+// Valid indicates whether the value is a known member of the PostApiGovernanceSecurityLakeSourcesJSONBodyConfigSources enum.
+func (e PostApiGovernanceSecurityLakeSourcesJSONBodyConfigSources) Valid() bool {
+	switch e {
+	case PostApiGovernanceSecurityLakeSourcesJSONBodyConfigSourcesCLOUDTRAILMGMT:
+		return true
+	case PostApiGovernanceSecurityLakeSourcesJSONBodyConfigSourcesLAMBDAEXECUTION:
+		return true
+	case PostApiGovernanceSecurityLakeSourcesJSONBodyConfigSourcesS3DATA:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiGovernanceSecurityLakeSources200JSONResponseBodySources.
+const (
+	PostApiGovernanceSecurityLakeSources200JSONResponseBodySourcesCLOUDTRAILMGMT  PostApiGovernanceSecurityLakeSources200JSONResponseBodySources = "CLOUD_TRAIL_MGMT"
+	PostApiGovernanceSecurityLakeSources200JSONResponseBodySourcesLAMBDAEXECUTION PostApiGovernanceSecurityLakeSources200JSONResponseBodySources = "LAMBDA_EXECUTION"
+	PostApiGovernanceSecurityLakeSources200JSONResponseBodySourcesS3DATA          PostApiGovernanceSecurityLakeSources200JSONResponseBodySources = "S3_DATA"
+)
+
+// Valid indicates whether the value is a known member of the PostApiGovernanceSecurityLakeSources200JSONResponseBodySources enum.
+func (e PostApiGovernanceSecurityLakeSources200JSONResponseBodySources) Valid() bool {
+	switch e {
+	case PostApiGovernanceSecurityLakeSources200JSONResponseBodySourcesCLOUDTRAILMGMT:
+		return true
+	case PostApiGovernanceSecurityLakeSources200JSONResponseBodySourcesLAMBDAEXECUTION:
+		return true
+	case PostApiGovernanceSecurityLakeSources200JSONResponseBodySourcesS3DATA:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiGovernanceSecurityLakeSources400JSONResponseBodyFault.
+const (
+	PostApiGovernanceSecurityLakeSources400JSONResponseBodyFaultCustomer         PostApiGovernanceSecurityLakeSources400JSONResponseBodyFault = "customer"
+	PostApiGovernanceSecurityLakeSources400JSONResponseBodyFaultPlatform         PostApiGovernanceSecurityLakeSources400JSONResponseBodyFault = "platform"
+	PostApiGovernanceSecurityLakeSources400JSONResponseBodyFaultPresumedPlatform PostApiGovernanceSecurityLakeSources400JSONResponseBodyFault = "presumed_platform"
+	PostApiGovernanceSecurityLakeSources400JSONResponseBodyFaultProvider         PostApiGovernanceSecurityLakeSources400JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the PostApiGovernanceSecurityLakeSources400JSONResponseBodyFault enum.
+func (e PostApiGovernanceSecurityLakeSources400JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case PostApiGovernanceSecurityLakeSources400JSONResponseBodyFaultCustomer:
+		return true
+	case PostApiGovernanceSecurityLakeSources400JSONResponseBodyFaultPlatform:
+		return true
+	case PostApiGovernanceSecurityLakeSources400JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case PostApiGovernanceSecurityLakeSources400JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiGovernanceSecurityLakeSources401JSONResponseBodyFault.
+const (
+	PostApiGovernanceSecurityLakeSources401JSONResponseBodyFaultCustomer         PostApiGovernanceSecurityLakeSources401JSONResponseBodyFault = "customer"
+	PostApiGovernanceSecurityLakeSources401JSONResponseBodyFaultPlatform         PostApiGovernanceSecurityLakeSources401JSONResponseBodyFault = "platform"
+	PostApiGovernanceSecurityLakeSources401JSONResponseBodyFaultPresumedPlatform PostApiGovernanceSecurityLakeSources401JSONResponseBodyFault = "presumed_platform"
+	PostApiGovernanceSecurityLakeSources401JSONResponseBodyFaultProvider         PostApiGovernanceSecurityLakeSources401JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the PostApiGovernanceSecurityLakeSources401JSONResponseBodyFault enum.
+func (e PostApiGovernanceSecurityLakeSources401JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case PostApiGovernanceSecurityLakeSources401JSONResponseBodyFaultCustomer:
+		return true
+	case PostApiGovernanceSecurityLakeSources401JSONResponseBodyFaultPlatform:
+		return true
+	case PostApiGovernanceSecurityLakeSources401JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case PostApiGovernanceSecurityLakeSources401JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiGovernanceSecurityLakeSources403JSONResponseBodyFault.
+const (
+	PostApiGovernanceSecurityLakeSources403JSONResponseBodyFaultCustomer         PostApiGovernanceSecurityLakeSources403JSONResponseBodyFault = "customer"
+	PostApiGovernanceSecurityLakeSources403JSONResponseBodyFaultPlatform         PostApiGovernanceSecurityLakeSources403JSONResponseBodyFault = "platform"
+	PostApiGovernanceSecurityLakeSources403JSONResponseBodyFaultPresumedPlatform PostApiGovernanceSecurityLakeSources403JSONResponseBodyFault = "presumed_platform"
+	PostApiGovernanceSecurityLakeSources403JSONResponseBodyFaultProvider         PostApiGovernanceSecurityLakeSources403JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the PostApiGovernanceSecurityLakeSources403JSONResponseBodyFault enum.
+func (e PostApiGovernanceSecurityLakeSources403JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case PostApiGovernanceSecurityLakeSources403JSONResponseBodyFaultCustomer:
+		return true
+	case PostApiGovernanceSecurityLakeSources403JSONResponseBodyFaultPlatform:
+		return true
+	case PostApiGovernanceSecurityLakeSources403JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case PostApiGovernanceSecurityLakeSources403JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiGovernanceSecurityLakeSources422JSONResponseBodyFault.
+const (
+	PostApiGovernanceSecurityLakeSources422JSONResponseBodyFaultCustomer         PostApiGovernanceSecurityLakeSources422JSONResponseBodyFault = "customer"
+	PostApiGovernanceSecurityLakeSources422JSONResponseBodyFaultPlatform         PostApiGovernanceSecurityLakeSources422JSONResponseBodyFault = "platform"
+	PostApiGovernanceSecurityLakeSources422JSONResponseBodyFaultPresumedPlatform PostApiGovernanceSecurityLakeSources422JSONResponseBodyFault = "presumed_platform"
+	PostApiGovernanceSecurityLakeSources422JSONResponseBodyFaultProvider         PostApiGovernanceSecurityLakeSources422JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the PostApiGovernanceSecurityLakeSources422JSONResponseBodyFault enum.
+func (e PostApiGovernanceSecurityLakeSources422JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case PostApiGovernanceSecurityLakeSources422JSONResponseBodyFaultCustomer:
+		return true
+	case PostApiGovernanceSecurityLakeSources422JSONResponseBodyFaultPlatform:
+		return true
+	case PostApiGovernanceSecurityLakeSources422JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case PostApiGovernanceSecurityLakeSources422JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiGovernanceSecurityLakeSources500JSONResponseBodyFault.
+const (
+	PostApiGovernanceSecurityLakeSources500JSONResponseBodyFaultCustomer         PostApiGovernanceSecurityLakeSources500JSONResponseBodyFault = "customer"
+	PostApiGovernanceSecurityLakeSources500JSONResponseBodyFaultPlatform         PostApiGovernanceSecurityLakeSources500JSONResponseBodyFault = "platform"
+	PostApiGovernanceSecurityLakeSources500JSONResponseBodyFaultPresumedPlatform PostApiGovernanceSecurityLakeSources500JSONResponseBodyFault = "presumed_platform"
+	PostApiGovernanceSecurityLakeSources500JSONResponseBodyFaultProvider         PostApiGovernanceSecurityLakeSources500JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the PostApiGovernanceSecurityLakeSources500JSONResponseBodyFault enum.
+func (e PostApiGovernanceSecurityLakeSources500JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case PostApiGovernanceSecurityLakeSources500JSONResponseBodyFaultCustomer:
+		return true
+	case PostApiGovernanceSecurityLakeSources500JSONResponseBodyFaultPlatform:
+		return true
+	case PostApiGovernanceSecurityLakeSources500JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case PostApiGovernanceSecurityLakeSources500JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiGovernanceSecurityLakeSourcesById200JSONResponseBodySources.
+const (
+	GetApiGovernanceSecurityLakeSourcesById200JSONResponseBodySourcesCLOUDTRAILMGMT  GetApiGovernanceSecurityLakeSourcesById200JSONResponseBodySources = "CLOUD_TRAIL_MGMT"
+	GetApiGovernanceSecurityLakeSourcesById200JSONResponseBodySourcesLAMBDAEXECUTION GetApiGovernanceSecurityLakeSourcesById200JSONResponseBodySources = "LAMBDA_EXECUTION"
+	GetApiGovernanceSecurityLakeSourcesById200JSONResponseBodySourcesS3DATA          GetApiGovernanceSecurityLakeSourcesById200JSONResponseBodySources = "S3_DATA"
+)
+
+// Valid indicates whether the value is a known member of the GetApiGovernanceSecurityLakeSourcesById200JSONResponseBodySources enum.
+func (e GetApiGovernanceSecurityLakeSourcesById200JSONResponseBodySources) Valid() bool {
+	switch e {
+	case GetApiGovernanceSecurityLakeSourcesById200JSONResponseBodySourcesCLOUDTRAILMGMT:
+		return true
+	case GetApiGovernanceSecurityLakeSourcesById200JSONResponseBodySourcesLAMBDAEXECUTION:
+		return true
+	case GetApiGovernanceSecurityLakeSourcesById200JSONResponseBodySourcesS3DATA:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiGovernanceSecurityLakeSourcesById400JSONResponseBodyFault.
+const (
+	GetApiGovernanceSecurityLakeSourcesById400JSONResponseBodyFaultCustomer         GetApiGovernanceSecurityLakeSourcesById400JSONResponseBodyFault = "customer"
+	GetApiGovernanceSecurityLakeSourcesById400JSONResponseBodyFaultPlatform         GetApiGovernanceSecurityLakeSourcesById400JSONResponseBodyFault = "platform"
+	GetApiGovernanceSecurityLakeSourcesById400JSONResponseBodyFaultPresumedPlatform GetApiGovernanceSecurityLakeSourcesById400JSONResponseBodyFault = "presumed_platform"
+	GetApiGovernanceSecurityLakeSourcesById400JSONResponseBodyFaultProvider         GetApiGovernanceSecurityLakeSourcesById400JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the GetApiGovernanceSecurityLakeSourcesById400JSONResponseBodyFault enum.
+func (e GetApiGovernanceSecurityLakeSourcesById400JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case GetApiGovernanceSecurityLakeSourcesById400JSONResponseBodyFaultCustomer:
+		return true
+	case GetApiGovernanceSecurityLakeSourcesById400JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiGovernanceSecurityLakeSourcesById400JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case GetApiGovernanceSecurityLakeSourcesById400JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiGovernanceSecurityLakeSourcesById401JSONResponseBodyFault.
+const (
+	GetApiGovernanceSecurityLakeSourcesById401JSONResponseBodyFaultCustomer         GetApiGovernanceSecurityLakeSourcesById401JSONResponseBodyFault = "customer"
+	GetApiGovernanceSecurityLakeSourcesById401JSONResponseBodyFaultPlatform         GetApiGovernanceSecurityLakeSourcesById401JSONResponseBodyFault = "platform"
+	GetApiGovernanceSecurityLakeSourcesById401JSONResponseBodyFaultPresumedPlatform GetApiGovernanceSecurityLakeSourcesById401JSONResponseBodyFault = "presumed_platform"
+	GetApiGovernanceSecurityLakeSourcesById401JSONResponseBodyFaultProvider         GetApiGovernanceSecurityLakeSourcesById401JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the GetApiGovernanceSecurityLakeSourcesById401JSONResponseBodyFault enum.
+func (e GetApiGovernanceSecurityLakeSourcesById401JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case GetApiGovernanceSecurityLakeSourcesById401JSONResponseBodyFaultCustomer:
+		return true
+	case GetApiGovernanceSecurityLakeSourcesById401JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiGovernanceSecurityLakeSourcesById401JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case GetApiGovernanceSecurityLakeSourcesById401JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiGovernanceSecurityLakeSourcesById403JSONResponseBodyFault.
+const (
+	GetApiGovernanceSecurityLakeSourcesById403JSONResponseBodyFaultCustomer         GetApiGovernanceSecurityLakeSourcesById403JSONResponseBodyFault = "customer"
+	GetApiGovernanceSecurityLakeSourcesById403JSONResponseBodyFaultPlatform         GetApiGovernanceSecurityLakeSourcesById403JSONResponseBodyFault = "platform"
+	GetApiGovernanceSecurityLakeSourcesById403JSONResponseBodyFaultPresumedPlatform GetApiGovernanceSecurityLakeSourcesById403JSONResponseBodyFault = "presumed_platform"
+	GetApiGovernanceSecurityLakeSourcesById403JSONResponseBodyFaultProvider         GetApiGovernanceSecurityLakeSourcesById403JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the GetApiGovernanceSecurityLakeSourcesById403JSONResponseBodyFault enum.
+func (e GetApiGovernanceSecurityLakeSourcesById403JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case GetApiGovernanceSecurityLakeSourcesById403JSONResponseBodyFaultCustomer:
+		return true
+	case GetApiGovernanceSecurityLakeSourcesById403JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiGovernanceSecurityLakeSourcesById403JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case GetApiGovernanceSecurityLakeSourcesById403JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiGovernanceSecurityLakeSourcesById500JSONResponseBodyFault.
+const (
+	GetApiGovernanceSecurityLakeSourcesById500JSONResponseBodyFaultCustomer         GetApiGovernanceSecurityLakeSourcesById500JSONResponseBodyFault = "customer"
+	GetApiGovernanceSecurityLakeSourcesById500JSONResponseBodyFaultPlatform         GetApiGovernanceSecurityLakeSourcesById500JSONResponseBodyFault = "platform"
+	GetApiGovernanceSecurityLakeSourcesById500JSONResponseBodyFaultPresumedPlatform GetApiGovernanceSecurityLakeSourcesById500JSONResponseBodyFault = "presumed_platform"
+	GetApiGovernanceSecurityLakeSourcesById500JSONResponseBodyFaultProvider         GetApiGovernanceSecurityLakeSourcesById500JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the GetApiGovernanceSecurityLakeSourcesById500JSONResponseBodyFault enum.
+func (e GetApiGovernanceSecurityLakeSourcesById500JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case GetApiGovernanceSecurityLakeSourcesById500JSONResponseBodyFaultCustomer:
+		return true
+	case GetApiGovernanceSecurityLakeSourcesById500JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiGovernanceSecurityLakeSourcesById500JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case GetApiGovernanceSecurityLakeSourcesById500JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PatchApiGovernanceSecurityLakeSourcesByIdJSONBodyConfigSources.
+const (
+	PatchApiGovernanceSecurityLakeSourcesByIdJSONBodyConfigSourcesCLOUDTRAILMGMT  PatchApiGovernanceSecurityLakeSourcesByIdJSONBodyConfigSources = "CLOUD_TRAIL_MGMT"
+	PatchApiGovernanceSecurityLakeSourcesByIdJSONBodyConfigSourcesLAMBDAEXECUTION PatchApiGovernanceSecurityLakeSourcesByIdJSONBodyConfigSources = "LAMBDA_EXECUTION"
+	PatchApiGovernanceSecurityLakeSourcesByIdJSONBodyConfigSourcesS3DATA          PatchApiGovernanceSecurityLakeSourcesByIdJSONBodyConfigSources = "S3_DATA"
+)
+
+// Valid indicates whether the value is a known member of the PatchApiGovernanceSecurityLakeSourcesByIdJSONBodyConfigSources enum.
+func (e PatchApiGovernanceSecurityLakeSourcesByIdJSONBodyConfigSources) Valid() bool {
+	switch e {
+	case PatchApiGovernanceSecurityLakeSourcesByIdJSONBodyConfigSourcesCLOUDTRAILMGMT:
+		return true
+	case PatchApiGovernanceSecurityLakeSourcesByIdJSONBodyConfigSourcesLAMBDAEXECUTION:
+		return true
+	case PatchApiGovernanceSecurityLakeSourcesByIdJSONBodyConfigSourcesS3DATA:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PatchApiGovernanceSecurityLakeSourcesByIdJSONBodyStatus.
+const (
+	PatchApiGovernanceSecurityLakeSourcesByIdJSONBodyStatusActive   PatchApiGovernanceSecurityLakeSourcesByIdJSONBodyStatus = "active"
+	PatchApiGovernanceSecurityLakeSourcesByIdJSONBodyStatusDisabled PatchApiGovernanceSecurityLakeSourcesByIdJSONBodyStatus = "disabled"
+)
+
+// Valid indicates whether the value is a known member of the PatchApiGovernanceSecurityLakeSourcesByIdJSONBodyStatus enum.
+func (e PatchApiGovernanceSecurityLakeSourcesByIdJSONBodyStatus) Valid() bool {
+	switch e {
+	case PatchApiGovernanceSecurityLakeSourcesByIdJSONBodyStatusActive:
+		return true
+	case PatchApiGovernanceSecurityLakeSourcesByIdJSONBodyStatusDisabled:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PatchApiGovernanceSecurityLakeSourcesById200JSONResponseBodySources.
+const (
+	PatchApiGovernanceSecurityLakeSourcesById200JSONResponseBodySourcesCLOUDTRAILMGMT  PatchApiGovernanceSecurityLakeSourcesById200JSONResponseBodySources = "CLOUD_TRAIL_MGMT"
+	PatchApiGovernanceSecurityLakeSourcesById200JSONResponseBodySourcesLAMBDAEXECUTION PatchApiGovernanceSecurityLakeSourcesById200JSONResponseBodySources = "LAMBDA_EXECUTION"
+	PatchApiGovernanceSecurityLakeSourcesById200JSONResponseBodySourcesS3DATA          PatchApiGovernanceSecurityLakeSourcesById200JSONResponseBodySources = "S3_DATA"
+)
+
+// Valid indicates whether the value is a known member of the PatchApiGovernanceSecurityLakeSourcesById200JSONResponseBodySources enum.
+func (e PatchApiGovernanceSecurityLakeSourcesById200JSONResponseBodySources) Valid() bool {
+	switch e {
+	case PatchApiGovernanceSecurityLakeSourcesById200JSONResponseBodySourcesCLOUDTRAILMGMT:
+		return true
+	case PatchApiGovernanceSecurityLakeSourcesById200JSONResponseBodySourcesLAMBDAEXECUTION:
+		return true
+	case PatchApiGovernanceSecurityLakeSourcesById200JSONResponseBodySourcesS3DATA:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PatchApiGovernanceSecurityLakeSourcesById400JSONResponseBodyFault.
+const (
+	PatchApiGovernanceSecurityLakeSourcesById400JSONResponseBodyFaultCustomer         PatchApiGovernanceSecurityLakeSourcesById400JSONResponseBodyFault = "customer"
+	PatchApiGovernanceSecurityLakeSourcesById400JSONResponseBodyFaultPlatform         PatchApiGovernanceSecurityLakeSourcesById400JSONResponseBodyFault = "platform"
+	PatchApiGovernanceSecurityLakeSourcesById400JSONResponseBodyFaultPresumedPlatform PatchApiGovernanceSecurityLakeSourcesById400JSONResponseBodyFault = "presumed_platform"
+	PatchApiGovernanceSecurityLakeSourcesById400JSONResponseBodyFaultProvider         PatchApiGovernanceSecurityLakeSourcesById400JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the PatchApiGovernanceSecurityLakeSourcesById400JSONResponseBodyFault enum.
+func (e PatchApiGovernanceSecurityLakeSourcesById400JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case PatchApiGovernanceSecurityLakeSourcesById400JSONResponseBodyFaultCustomer:
+		return true
+	case PatchApiGovernanceSecurityLakeSourcesById400JSONResponseBodyFaultPlatform:
+		return true
+	case PatchApiGovernanceSecurityLakeSourcesById400JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case PatchApiGovernanceSecurityLakeSourcesById400JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PatchApiGovernanceSecurityLakeSourcesById401JSONResponseBodyFault.
+const (
+	PatchApiGovernanceSecurityLakeSourcesById401JSONResponseBodyFaultCustomer         PatchApiGovernanceSecurityLakeSourcesById401JSONResponseBodyFault = "customer"
+	PatchApiGovernanceSecurityLakeSourcesById401JSONResponseBodyFaultPlatform         PatchApiGovernanceSecurityLakeSourcesById401JSONResponseBodyFault = "platform"
+	PatchApiGovernanceSecurityLakeSourcesById401JSONResponseBodyFaultPresumedPlatform PatchApiGovernanceSecurityLakeSourcesById401JSONResponseBodyFault = "presumed_platform"
+	PatchApiGovernanceSecurityLakeSourcesById401JSONResponseBodyFaultProvider         PatchApiGovernanceSecurityLakeSourcesById401JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the PatchApiGovernanceSecurityLakeSourcesById401JSONResponseBodyFault enum.
+func (e PatchApiGovernanceSecurityLakeSourcesById401JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case PatchApiGovernanceSecurityLakeSourcesById401JSONResponseBodyFaultCustomer:
+		return true
+	case PatchApiGovernanceSecurityLakeSourcesById401JSONResponseBodyFaultPlatform:
+		return true
+	case PatchApiGovernanceSecurityLakeSourcesById401JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case PatchApiGovernanceSecurityLakeSourcesById401JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PatchApiGovernanceSecurityLakeSourcesById403JSONResponseBodyFault.
+const (
+	PatchApiGovernanceSecurityLakeSourcesById403JSONResponseBodyFaultCustomer         PatchApiGovernanceSecurityLakeSourcesById403JSONResponseBodyFault = "customer"
+	PatchApiGovernanceSecurityLakeSourcesById403JSONResponseBodyFaultPlatform         PatchApiGovernanceSecurityLakeSourcesById403JSONResponseBodyFault = "platform"
+	PatchApiGovernanceSecurityLakeSourcesById403JSONResponseBodyFaultPresumedPlatform PatchApiGovernanceSecurityLakeSourcesById403JSONResponseBodyFault = "presumed_platform"
+	PatchApiGovernanceSecurityLakeSourcesById403JSONResponseBodyFaultProvider         PatchApiGovernanceSecurityLakeSourcesById403JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the PatchApiGovernanceSecurityLakeSourcesById403JSONResponseBodyFault enum.
+func (e PatchApiGovernanceSecurityLakeSourcesById403JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case PatchApiGovernanceSecurityLakeSourcesById403JSONResponseBodyFaultCustomer:
+		return true
+	case PatchApiGovernanceSecurityLakeSourcesById403JSONResponseBodyFaultPlatform:
+		return true
+	case PatchApiGovernanceSecurityLakeSourcesById403JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case PatchApiGovernanceSecurityLakeSourcesById403JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PatchApiGovernanceSecurityLakeSourcesById422JSONResponseBodyFault.
+const (
+	PatchApiGovernanceSecurityLakeSourcesById422JSONResponseBodyFaultCustomer         PatchApiGovernanceSecurityLakeSourcesById422JSONResponseBodyFault = "customer"
+	PatchApiGovernanceSecurityLakeSourcesById422JSONResponseBodyFaultPlatform         PatchApiGovernanceSecurityLakeSourcesById422JSONResponseBodyFault = "platform"
+	PatchApiGovernanceSecurityLakeSourcesById422JSONResponseBodyFaultPresumedPlatform PatchApiGovernanceSecurityLakeSourcesById422JSONResponseBodyFault = "presumed_platform"
+	PatchApiGovernanceSecurityLakeSourcesById422JSONResponseBodyFaultProvider         PatchApiGovernanceSecurityLakeSourcesById422JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the PatchApiGovernanceSecurityLakeSourcesById422JSONResponseBodyFault enum.
+func (e PatchApiGovernanceSecurityLakeSourcesById422JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case PatchApiGovernanceSecurityLakeSourcesById422JSONResponseBodyFaultCustomer:
+		return true
+	case PatchApiGovernanceSecurityLakeSourcesById422JSONResponseBodyFaultPlatform:
+		return true
+	case PatchApiGovernanceSecurityLakeSourcesById422JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case PatchApiGovernanceSecurityLakeSourcesById422JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PatchApiGovernanceSecurityLakeSourcesById500JSONResponseBodyFault.
+const (
+	PatchApiGovernanceSecurityLakeSourcesById500JSONResponseBodyFaultCustomer         PatchApiGovernanceSecurityLakeSourcesById500JSONResponseBodyFault = "customer"
+	PatchApiGovernanceSecurityLakeSourcesById500JSONResponseBodyFaultPlatform         PatchApiGovernanceSecurityLakeSourcesById500JSONResponseBodyFault = "platform"
+	PatchApiGovernanceSecurityLakeSourcesById500JSONResponseBodyFaultPresumedPlatform PatchApiGovernanceSecurityLakeSourcesById500JSONResponseBodyFault = "presumed_platform"
+	PatchApiGovernanceSecurityLakeSourcesById500JSONResponseBodyFaultProvider         PatchApiGovernanceSecurityLakeSourcesById500JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the PatchApiGovernanceSecurityLakeSourcesById500JSONResponseBodyFault enum.
+func (e PatchApiGovernanceSecurityLakeSourcesById500JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case PatchApiGovernanceSecurityLakeSourcesById500JSONResponseBodyFaultCustomer:
+		return true
+	case PatchApiGovernanceSecurityLakeSourcesById500JSONResponseBodyFaultPlatform:
+		return true
+	case PatchApiGovernanceSecurityLakeSourcesById500JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case PatchApiGovernanceSecurityLakeSourcesById500JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiGovernanceSecurityLakeSourcesByIdHealth400JSONResponseBodyFault.
+const (
+	GetApiGovernanceSecurityLakeSourcesByIdHealth400JSONResponseBodyFaultCustomer         GetApiGovernanceSecurityLakeSourcesByIdHealth400JSONResponseBodyFault = "customer"
+	GetApiGovernanceSecurityLakeSourcesByIdHealth400JSONResponseBodyFaultPlatform         GetApiGovernanceSecurityLakeSourcesByIdHealth400JSONResponseBodyFault = "platform"
+	GetApiGovernanceSecurityLakeSourcesByIdHealth400JSONResponseBodyFaultPresumedPlatform GetApiGovernanceSecurityLakeSourcesByIdHealth400JSONResponseBodyFault = "presumed_platform"
+	GetApiGovernanceSecurityLakeSourcesByIdHealth400JSONResponseBodyFaultProvider         GetApiGovernanceSecurityLakeSourcesByIdHealth400JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the GetApiGovernanceSecurityLakeSourcesByIdHealth400JSONResponseBodyFault enum.
+func (e GetApiGovernanceSecurityLakeSourcesByIdHealth400JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case GetApiGovernanceSecurityLakeSourcesByIdHealth400JSONResponseBodyFaultCustomer:
+		return true
+	case GetApiGovernanceSecurityLakeSourcesByIdHealth400JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiGovernanceSecurityLakeSourcesByIdHealth400JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case GetApiGovernanceSecurityLakeSourcesByIdHealth400JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiGovernanceSecurityLakeSourcesByIdHealth401JSONResponseBodyFault.
+const (
+	GetApiGovernanceSecurityLakeSourcesByIdHealth401JSONResponseBodyFaultCustomer         GetApiGovernanceSecurityLakeSourcesByIdHealth401JSONResponseBodyFault = "customer"
+	GetApiGovernanceSecurityLakeSourcesByIdHealth401JSONResponseBodyFaultPlatform         GetApiGovernanceSecurityLakeSourcesByIdHealth401JSONResponseBodyFault = "platform"
+	GetApiGovernanceSecurityLakeSourcesByIdHealth401JSONResponseBodyFaultPresumedPlatform GetApiGovernanceSecurityLakeSourcesByIdHealth401JSONResponseBodyFault = "presumed_platform"
+	GetApiGovernanceSecurityLakeSourcesByIdHealth401JSONResponseBodyFaultProvider         GetApiGovernanceSecurityLakeSourcesByIdHealth401JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the GetApiGovernanceSecurityLakeSourcesByIdHealth401JSONResponseBodyFault enum.
+func (e GetApiGovernanceSecurityLakeSourcesByIdHealth401JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case GetApiGovernanceSecurityLakeSourcesByIdHealth401JSONResponseBodyFaultCustomer:
+		return true
+	case GetApiGovernanceSecurityLakeSourcesByIdHealth401JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiGovernanceSecurityLakeSourcesByIdHealth401JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case GetApiGovernanceSecurityLakeSourcesByIdHealth401JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiGovernanceSecurityLakeSourcesByIdHealth403JSONResponseBodyFault.
+const (
+	GetApiGovernanceSecurityLakeSourcesByIdHealth403JSONResponseBodyFaultCustomer         GetApiGovernanceSecurityLakeSourcesByIdHealth403JSONResponseBodyFault = "customer"
+	GetApiGovernanceSecurityLakeSourcesByIdHealth403JSONResponseBodyFaultPlatform         GetApiGovernanceSecurityLakeSourcesByIdHealth403JSONResponseBodyFault = "platform"
+	GetApiGovernanceSecurityLakeSourcesByIdHealth403JSONResponseBodyFaultPresumedPlatform GetApiGovernanceSecurityLakeSourcesByIdHealth403JSONResponseBodyFault = "presumed_platform"
+	GetApiGovernanceSecurityLakeSourcesByIdHealth403JSONResponseBodyFaultProvider         GetApiGovernanceSecurityLakeSourcesByIdHealth403JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the GetApiGovernanceSecurityLakeSourcesByIdHealth403JSONResponseBodyFault enum.
+func (e GetApiGovernanceSecurityLakeSourcesByIdHealth403JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case GetApiGovernanceSecurityLakeSourcesByIdHealth403JSONResponseBodyFaultCustomer:
+		return true
+	case GetApiGovernanceSecurityLakeSourcesByIdHealth403JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiGovernanceSecurityLakeSourcesByIdHealth403JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case GetApiGovernanceSecurityLakeSourcesByIdHealth403JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiGovernanceSecurityLakeSourcesByIdHealth500JSONResponseBodyFault.
+const (
+	GetApiGovernanceSecurityLakeSourcesByIdHealth500JSONResponseBodyFaultCustomer         GetApiGovernanceSecurityLakeSourcesByIdHealth500JSONResponseBodyFault = "customer"
+	GetApiGovernanceSecurityLakeSourcesByIdHealth500JSONResponseBodyFaultPlatform         GetApiGovernanceSecurityLakeSourcesByIdHealth500JSONResponseBodyFault = "platform"
+	GetApiGovernanceSecurityLakeSourcesByIdHealth500JSONResponseBodyFaultPresumedPlatform GetApiGovernanceSecurityLakeSourcesByIdHealth500JSONResponseBodyFault = "presumed_platform"
+	GetApiGovernanceSecurityLakeSourcesByIdHealth500JSONResponseBodyFaultProvider         GetApiGovernanceSecurityLakeSourcesByIdHealth500JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the GetApiGovernanceSecurityLakeSourcesByIdHealth500JSONResponseBodyFault enum.
+func (e GetApiGovernanceSecurityLakeSourcesByIdHealth500JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case GetApiGovernanceSecurityLakeSourcesByIdHealth500JSONResponseBodyFaultCustomer:
+		return true
+	case GetApiGovernanceSecurityLakeSourcesByIdHealth500JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiGovernanceSecurityLakeSourcesByIdHealth500JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case GetApiGovernanceSecurityLakeSourcesByIdHealth500JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiGovernanceSecurityLakeSourcesByIdTestJSONBodyConfigSources.
+const (
+	PostApiGovernanceSecurityLakeSourcesByIdTestJSONBodyConfigSourcesCLOUDTRAILMGMT  PostApiGovernanceSecurityLakeSourcesByIdTestJSONBodyConfigSources = "CLOUD_TRAIL_MGMT"
+	PostApiGovernanceSecurityLakeSourcesByIdTestJSONBodyConfigSourcesLAMBDAEXECUTION PostApiGovernanceSecurityLakeSourcesByIdTestJSONBodyConfigSources = "LAMBDA_EXECUTION"
+	PostApiGovernanceSecurityLakeSourcesByIdTestJSONBodyConfigSourcesS3DATA          PostApiGovernanceSecurityLakeSourcesByIdTestJSONBodyConfigSources = "S3_DATA"
+)
+
+// Valid indicates whether the value is a known member of the PostApiGovernanceSecurityLakeSourcesByIdTestJSONBodyConfigSources enum.
+func (e PostApiGovernanceSecurityLakeSourcesByIdTestJSONBodyConfigSources) Valid() bool {
+	switch e {
+	case PostApiGovernanceSecurityLakeSourcesByIdTestJSONBodyConfigSourcesCLOUDTRAILMGMT:
+		return true
+	case PostApiGovernanceSecurityLakeSourcesByIdTestJSONBodyConfigSourcesLAMBDAEXECUTION:
+		return true
+	case PostApiGovernanceSecurityLakeSourcesByIdTestJSONBodyConfigSourcesS3DATA:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiGovernanceSecurityLakeSourcesByIdTest400JSONResponseBodyFault.
+const (
+	PostApiGovernanceSecurityLakeSourcesByIdTest400JSONResponseBodyFaultCustomer         PostApiGovernanceSecurityLakeSourcesByIdTest400JSONResponseBodyFault = "customer"
+	PostApiGovernanceSecurityLakeSourcesByIdTest400JSONResponseBodyFaultPlatform         PostApiGovernanceSecurityLakeSourcesByIdTest400JSONResponseBodyFault = "platform"
+	PostApiGovernanceSecurityLakeSourcesByIdTest400JSONResponseBodyFaultPresumedPlatform PostApiGovernanceSecurityLakeSourcesByIdTest400JSONResponseBodyFault = "presumed_platform"
+	PostApiGovernanceSecurityLakeSourcesByIdTest400JSONResponseBodyFaultProvider         PostApiGovernanceSecurityLakeSourcesByIdTest400JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the PostApiGovernanceSecurityLakeSourcesByIdTest400JSONResponseBodyFault enum.
+func (e PostApiGovernanceSecurityLakeSourcesByIdTest400JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case PostApiGovernanceSecurityLakeSourcesByIdTest400JSONResponseBodyFaultCustomer:
+		return true
+	case PostApiGovernanceSecurityLakeSourcesByIdTest400JSONResponseBodyFaultPlatform:
+		return true
+	case PostApiGovernanceSecurityLakeSourcesByIdTest400JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case PostApiGovernanceSecurityLakeSourcesByIdTest400JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiGovernanceSecurityLakeSourcesByIdTest401JSONResponseBodyFault.
+const (
+	PostApiGovernanceSecurityLakeSourcesByIdTest401JSONResponseBodyFaultCustomer         PostApiGovernanceSecurityLakeSourcesByIdTest401JSONResponseBodyFault = "customer"
+	PostApiGovernanceSecurityLakeSourcesByIdTest401JSONResponseBodyFaultPlatform         PostApiGovernanceSecurityLakeSourcesByIdTest401JSONResponseBodyFault = "platform"
+	PostApiGovernanceSecurityLakeSourcesByIdTest401JSONResponseBodyFaultPresumedPlatform PostApiGovernanceSecurityLakeSourcesByIdTest401JSONResponseBodyFault = "presumed_platform"
+	PostApiGovernanceSecurityLakeSourcesByIdTest401JSONResponseBodyFaultProvider         PostApiGovernanceSecurityLakeSourcesByIdTest401JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the PostApiGovernanceSecurityLakeSourcesByIdTest401JSONResponseBodyFault enum.
+func (e PostApiGovernanceSecurityLakeSourcesByIdTest401JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case PostApiGovernanceSecurityLakeSourcesByIdTest401JSONResponseBodyFaultCustomer:
+		return true
+	case PostApiGovernanceSecurityLakeSourcesByIdTest401JSONResponseBodyFaultPlatform:
+		return true
+	case PostApiGovernanceSecurityLakeSourcesByIdTest401JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case PostApiGovernanceSecurityLakeSourcesByIdTest401JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiGovernanceSecurityLakeSourcesByIdTest403JSONResponseBodyFault.
+const (
+	PostApiGovernanceSecurityLakeSourcesByIdTest403JSONResponseBodyFaultCustomer         PostApiGovernanceSecurityLakeSourcesByIdTest403JSONResponseBodyFault = "customer"
+	PostApiGovernanceSecurityLakeSourcesByIdTest403JSONResponseBodyFaultPlatform         PostApiGovernanceSecurityLakeSourcesByIdTest403JSONResponseBodyFault = "platform"
+	PostApiGovernanceSecurityLakeSourcesByIdTest403JSONResponseBodyFaultPresumedPlatform PostApiGovernanceSecurityLakeSourcesByIdTest403JSONResponseBodyFault = "presumed_platform"
+	PostApiGovernanceSecurityLakeSourcesByIdTest403JSONResponseBodyFaultProvider         PostApiGovernanceSecurityLakeSourcesByIdTest403JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the PostApiGovernanceSecurityLakeSourcesByIdTest403JSONResponseBodyFault enum.
+func (e PostApiGovernanceSecurityLakeSourcesByIdTest403JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case PostApiGovernanceSecurityLakeSourcesByIdTest403JSONResponseBodyFaultCustomer:
+		return true
+	case PostApiGovernanceSecurityLakeSourcesByIdTest403JSONResponseBodyFaultPlatform:
+		return true
+	case PostApiGovernanceSecurityLakeSourcesByIdTest403JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case PostApiGovernanceSecurityLakeSourcesByIdTest403JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiGovernanceSecurityLakeSourcesByIdTest500JSONResponseBodyFault.
+const (
+	PostApiGovernanceSecurityLakeSourcesByIdTest500JSONResponseBodyFaultCustomer         PostApiGovernanceSecurityLakeSourcesByIdTest500JSONResponseBodyFault = "customer"
+	PostApiGovernanceSecurityLakeSourcesByIdTest500JSONResponseBodyFaultPlatform         PostApiGovernanceSecurityLakeSourcesByIdTest500JSONResponseBodyFault = "platform"
+	PostApiGovernanceSecurityLakeSourcesByIdTest500JSONResponseBodyFaultPresumedPlatform PostApiGovernanceSecurityLakeSourcesByIdTest500JSONResponseBodyFault = "presumed_platform"
+	PostApiGovernanceSecurityLakeSourcesByIdTest500JSONResponseBodyFaultProvider         PostApiGovernanceSecurityLakeSourcesByIdTest500JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the PostApiGovernanceSecurityLakeSourcesByIdTest500JSONResponseBodyFault enum.
+func (e PostApiGovernanceSecurityLakeSourcesByIdTest500JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case PostApiGovernanceSecurityLakeSourcesByIdTest500JSONResponseBodyFaultCustomer:
+		return true
+	case PostApiGovernanceSecurityLakeSourcesByIdTest500JSONResponseBodyFaultPlatform:
+		return true
+	case PostApiGovernanceSecurityLakeSourcesByIdTest500JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case PostApiGovernanceSecurityLakeSourcesByIdTest500JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ListGrantsParamsPrincipalType.
 const (
 	ListGrantsParamsPrincipalTypeApiKey ListGrantsParamsPrincipalType = "apiKey"
@@ -22028,19 +22700,19 @@ func (e PostLangyControlFramesJSONBodyFrames3Type) Valid() bool {
 
 // Defines values for PostLangyControlFramesJSONBodyFrames4Decision.
 const (
-	PostLangyControlFramesJSONBodyFrames4DecisionAllowOnce    PostLangyControlFramesJSONBodyFrames4Decision = "allow_once"
-	PostLangyControlFramesJSONBodyFrames4DecisionAllowPattern PostLangyControlFramesJSONBodyFrames4Decision = "allow_pattern"
-	PostLangyControlFramesJSONBodyFrames4DecisionDeny         PostLangyControlFramesJSONBodyFrames4Decision = "deny"
+	AllowOnce    PostLangyControlFramesJSONBodyFrames4Decision = "allow_once"
+	AllowPattern PostLangyControlFramesJSONBodyFrames4Decision = "allow_pattern"
+	Deny         PostLangyControlFramesJSONBodyFrames4Decision = "deny"
 )
 
 // Valid indicates whether the value is a known member of the PostLangyControlFramesJSONBodyFrames4Decision enum.
 func (e PostLangyControlFramesJSONBodyFrames4Decision) Valid() bool {
 	switch e {
-	case PostLangyControlFramesJSONBodyFrames4DecisionAllowOnce:
+	case AllowOnce:
 		return true
-	case PostLangyControlFramesJSONBodyFrames4DecisionAllowPattern:
+	case AllowPattern:
 		return true
-	case PostLangyControlFramesJSONBodyFrames4DecisionDeny:
+	case Deny:
 		return true
 	default:
 		return false
@@ -53490,6 +54162,158 @@ type GetApiGovernanceRegistrySchema403JSONResponseBodyFault string
 // GetApiGovernanceRegistrySchema500JSONResponseBodyFault defines parameters for GetApiGovernanceRegistrySchema.
 type GetApiGovernanceRegistrySchema500JSONResponseBodyFault string
 
+// PostApiGovernanceSecurityLakeSourcesJSONBody defines parameters for PostApiGovernanceSecurityLakeSources.
+type PostApiGovernanceSecurityLakeSourcesJSONBody struct {
+	Config struct {
+		MaxMessagesPerRun *int                                                         `json:"maxMessagesPerRun,omitempty"`
+		MaxReceives       *int                                                         `json:"maxReceives,omitempty"`
+		QueueUrl          string                                                       `json:"queueUrl"`
+		Region            string                                                       `json:"region"`
+		S3Endpoint        *string                                                      `json:"s3Endpoint,omitempty"`
+		Schedule          *string                                                      `json:"schedule,omitempty"`
+		Sources           *[]PostApiGovernanceSecurityLakeSourcesJSONBodyConfigSources `json:"sources,omitempty"`
+		SqsEndpoint       *string                                                      `json:"sqsEndpoint,omitempty"`
+		SubscriberRoleArn string                                                       `json:"subscriberRoleArn"`
+	} `json:"config"`
+	Credentials struct {
+		AwsAccessKeyId     string  `json:"aws_access_key_id"`
+		AwsSecretAccessKey string  `json:"aws_secret_access_key"`
+		AwsSessionToken    *string `json:"aws_session_token,omitempty"`
+	} `json:"credentials"`
+	Description *string `json:"description,omitempty"`
+	Name        string  `json:"name"`
+}
+
+// PostApiGovernanceSecurityLakeSourcesJSONBodyConfigSources defines parameters for PostApiGovernanceSecurityLakeSources.
+type PostApiGovernanceSecurityLakeSourcesJSONBodyConfigSources string
+
+// PostApiGovernanceSecurityLakeSources200JSONResponseBodySources defines parameters for PostApiGovernanceSecurityLakeSources.
+type PostApiGovernanceSecurityLakeSources200JSONResponseBodySources string
+
+// PostApiGovernanceSecurityLakeSources400JSONResponseBodyFault defines parameters for PostApiGovernanceSecurityLakeSources.
+type PostApiGovernanceSecurityLakeSources400JSONResponseBodyFault string
+
+// PostApiGovernanceSecurityLakeSources401JSONResponseBodyFault defines parameters for PostApiGovernanceSecurityLakeSources.
+type PostApiGovernanceSecurityLakeSources401JSONResponseBodyFault string
+
+// PostApiGovernanceSecurityLakeSources403JSONResponseBodyFault defines parameters for PostApiGovernanceSecurityLakeSources.
+type PostApiGovernanceSecurityLakeSources403JSONResponseBodyFault string
+
+// PostApiGovernanceSecurityLakeSources422JSONResponseBodyFault defines parameters for PostApiGovernanceSecurityLakeSources.
+type PostApiGovernanceSecurityLakeSources422JSONResponseBodyFault string
+
+// PostApiGovernanceSecurityLakeSources500JSONResponseBodyFault defines parameters for PostApiGovernanceSecurityLakeSources.
+type PostApiGovernanceSecurityLakeSources500JSONResponseBodyFault string
+
+// GetApiGovernanceSecurityLakeSourcesById200JSONResponseBodySources defines parameters for GetApiGovernanceSecurityLakeSourcesById.
+type GetApiGovernanceSecurityLakeSourcesById200JSONResponseBodySources string
+
+// GetApiGovernanceSecurityLakeSourcesById400JSONResponseBodyFault defines parameters for GetApiGovernanceSecurityLakeSourcesById.
+type GetApiGovernanceSecurityLakeSourcesById400JSONResponseBodyFault string
+
+// GetApiGovernanceSecurityLakeSourcesById401JSONResponseBodyFault defines parameters for GetApiGovernanceSecurityLakeSourcesById.
+type GetApiGovernanceSecurityLakeSourcesById401JSONResponseBodyFault string
+
+// GetApiGovernanceSecurityLakeSourcesById403JSONResponseBodyFault defines parameters for GetApiGovernanceSecurityLakeSourcesById.
+type GetApiGovernanceSecurityLakeSourcesById403JSONResponseBodyFault string
+
+// GetApiGovernanceSecurityLakeSourcesById500JSONResponseBodyFault defines parameters for GetApiGovernanceSecurityLakeSourcesById.
+type GetApiGovernanceSecurityLakeSourcesById500JSONResponseBodyFault string
+
+// PatchApiGovernanceSecurityLakeSourcesByIdJSONBody defines parameters for PatchApiGovernanceSecurityLakeSourcesById.
+type PatchApiGovernanceSecurityLakeSourcesByIdJSONBody struct {
+	Config *struct {
+		MaxMessagesPerRun *int                                                              `json:"maxMessagesPerRun,omitempty"`
+		MaxReceives       *int                                                              `json:"maxReceives,omitempty"`
+		QueueUrl          *string                                                           `json:"queueUrl,omitempty"`
+		Region            *string                                                           `json:"region,omitempty"`
+		S3Endpoint        *string                                                           `json:"s3Endpoint,omitempty"`
+		Schedule          *string                                                           `json:"schedule,omitempty"`
+		Sources           *[]PatchApiGovernanceSecurityLakeSourcesByIdJSONBodyConfigSources `json:"sources,omitempty"`
+		SqsEndpoint       *string                                                           `json:"sqsEndpoint,omitempty"`
+		SubscriberRoleArn *string                                                           `json:"subscriberRoleArn,omitempty"`
+	} `json:"config,omitempty"`
+	Credentials *struct {
+		AwsAccessKeyId     string  `json:"aws_access_key_id"`
+		AwsSecretAccessKey string  `json:"aws_secret_access_key"`
+		AwsSessionToken    *string `json:"aws_session_token,omitempty"`
+	} `json:"credentials,omitempty"`
+	Description *string                                                  `json:"description,omitempty"`
+	Name        *string                                                  `json:"name,omitempty"`
+	Status      *PatchApiGovernanceSecurityLakeSourcesByIdJSONBodyStatus `json:"status,omitempty"`
+}
+
+// PatchApiGovernanceSecurityLakeSourcesByIdJSONBodyConfigSources defines parameters for PatchApiGovernanceSecurityLakeSourcesById.
+type PatchApiGovernanceSecurityLakeSourcesByIdJSONBodyConfigSources string
+
+// PatchApiGovernanceSecurityLakeSourcesByIdJSONBodyStatus defines parameters for PatchApiGovernanceSecurityLakeSourcesById.
+type PatchApiGovernanceSecurityLakeSourcesByIdJSONBodyStatus string
+
+// PatchApiGovernanceSecurityLakeSourcesById200JSONResponseBodySources defines parameters for PatchApiGovernanceSecurityLakeSourcesById.
+type PatchApiGovernanceSecurityLakeSourcesById200JSONResponseBodySources string
+
+// PatchApiGovernanceSecurityLakeSourcesById400JSONResponseBodyFault defines parameters for PatchApiGovernanceSecurityLakeSourcesById.
+type PatchApiGovernanceSecurityLakeSourcesById400JSONResponseBodyFault string
+
+// PatchApiGovernanceSecurityLakeSourcesById401JSONResponseBodyFault defines parameters for PatchApiGovernanceSecurityLakeSourcesById.
+type PatchApiGovernanceSecurityLakeSourcesById401JSONResponseBodyFault string
+
+// PatchApiGovernanceSecurityLakeSourcesById403JSONResponseBodyFault defines parameters for PatchApiGovernanceSecurityLakeSourcesById.
+type PatchApiGovernanceSecurityLakeSourcesById403JSONResponseBodyFault string
+
+// PatchApiGovernanceSecurityLakeSourcesById422JSONResponseBodyFault defines parameters for PatchApiGovernanceSecurityLakeSourcesById.
+type PatchApiGovernanceSecurityLakeSourcesById422JSONResponseBodyFault string
+
+// PatchApiGovernanceSecurityLakeSourcesById500JSONResponseBodyFault defines parameters for PatchApiGovernanceSecurityLakeSourcesById.
+type PatchApiGovernanceSecurityLakeSourcesById500JSONResponseBodyFault string
+
+// GetApiGovernanceSecurityLakeSourcesByIdHealth400JSONResponseBodyFault defines parameters for GetApiGovernanceSecurityLakeSourcesByIdHealth.
+type GetApiGovernanceSecurityLakeSourcesByIdHealth400JSONResponseBodyFault string
+
+// GetApiGovernanceSecurityLakeSourcesByIdHealth401JSONResponseBodyFault defines parameters for GetApiGovernanceSecurityLakeSourcesByIdHealth.
+type GetApiGovernanceSecurityLakeSourcesByIdHealth401JSONResponseBodyFault string
+
+// GetApiGovernanceSecurityLakeSourcesByIdHealth403JSONResponseBodyFault defines parameters for GetApiGovernanceSecurityLakeSourcesByIdHealth.
+type GetApiGovernanceSecurityLakeSourcesByIdHealth403JSONResponseBodyFault string
+
+// GetApiGovernanceSecurityLakeSourcesByIdHealth500JSONResponseBodyFault defines parameters for GetApiGovernanceSecurityLakeSourcesByIdHealth.
+type GetApiGovernanceSecurityLakeSourcesByIdHealth500JSONResponseBodyFault string
+
+// PostApiGovernanceSecurityLakeSourcesByIdTestJSONBody defines parameters for PostApiGovernanceSecurityLakeSourcesByIdTest.
+type PostApiGovernanceSecurityLakeSourcesByIdTestJSONBody struct {
+	Config *struct {
+		MaxMessagesPerRun *int                                                                 `json:"maxMessagesPerRun,omitempty"`
+		MaxReceives       *int                                                                 `json:"maxReceives,omitempty"`
+		QueueUrl          *string                                                              `json:"queueUrl,omitempty"`
+		Region            *string                                                              `json:"region,omitempty"`
+		S3Endpoint        *string                                                              `json:"s3Endpoint,omitempty"`
+		Schedule          *string                                                              `json:"schedule,omitempty"`
+		Sources           *[]PostApiGovernanceSecurityLakeSourcesByIdTestJSONBodyConfigSources `json:"sources,omitempty"`
+		SqsEndpoint       *string                                                              `json:"sqsEndpoint,omitempty"`
+		SubscriberRoleArn *string                                                              `json:"subscriberRoleArn,omitempty"`
+	} `json:"config,omitempty"`
+	Credentials *struct {
+		AwsAccessKeyId     string  `json:"aws_access_key_id"`
+		AwsSecretAccessKey string  `json:"aws_secret_access_key"`
+		AwsSessionToken    *string `json:"aws_session_token,omitempty"`
+	} `json:"credentials,omitempty"`
+}
+
+// PostApiGovernanceSecurityLakeSourcesByIdTestJSONBodyConfigSources defines parameters for PostApiGovernanceSecurityLakeSourcesByIdTest.
+type PostApiGovernanceSecurityLakeSourcesByIdTestJSONBodyConfigSources string
+
+// PostApiGovernanceSecurityLakeSourcesByIdTest400JSONResponseBodyFault defines parameters for PostApiGovernanceSecurityLakeSourcesByIdTest.
+type PostApiGovernanceSecurityLakeSourcesByIdTest400JSONResponseBodyFault string
+
+// PostApiGovernanceSecurityLakeSourcesByIdTest401JSONResponseBodyFault defines parameters for PostApiGovernanceSecurityLakeSourcesByIdTest.
+type PostApiGovernanceSecurityLakeSourcesByIdTest401JSONResponseBodyFault string
+
+// PostApiGovernanceSecurityLakeSourcesByIdTest403JSONResponseBodyFault defines parameters for PostApiGovernanceSecurityLakeSourcesByIdTest.
+type PostApiGovernanceSecurityLakeSourcesByIdTest403JSONResponseBodyFault string
+
+// PostApiGovernanceSecurityLakeSourcesByIdTest500JSONResponseBodyFault defines parameters for PostApiGovernanceSecurityLakeSourcesByIdTest.
+type PostApiGovernanceSecurityLakeSourcesByIdTest500JSONResponseBodyFault string
+
 // ListGrantsParams defines parameters for ListGrants.
 type ListGrantsParams struct {
 	PrincipalType *ListGrantsParamsPrincipalType `form:"principalType,omitempty" json:"principalType,omitempty"`
@@ -63610,6 +64434,15 @@ type PostApiGovernanceOcsfIngestJSONRequestBody PostApiGovernanceOcsfIngestJSONB
 
 // PostApiGovernanceRegistryArdSearchJSONRequestBody defines body for PostApiGovernanceRegistryArdSearch for application/json ContentType.
 type PostApiGovernanceRegistryArdSearchJSONRequestBody PostApiGovernanceRegistryArdSearchJSONBody
+
+// PostApiGovernanceSecurityLakeSourcesJSONRequestBody defines body for PostApiGovernanceSecurityLakeSources for application/json ContentType.
+type PostApiGovernanceSecurityLakeSourcesJSONRequestBody PostApiGovernanceSecurityLakeSourcesJSONBody
+
+// PatchApiGovernanceSecurityLakeSourcesByIdJSONRequestBody defines body for PatchApiGovernanceSecurityLakeSourcesById for application/json ContentType.
+type PatchApiGovernanceSecurityLakeSourcesByIdJSONRequestBody PatchApiGovernanceSecurityLakeSourcesByIdJSONBody
+
+// PostApiGovernanceSecurityLakeSourcesByIdTestJSONRequestBody defines body for PostApiGovernanceSecurityLakeSourcesByIdTest for application/json ContentType.
+type PostApiGovernanceSecurityLakeSourcesByIdTestJSONRequestBody PostApiGovernanceSecurityLakeSourcesByIdTestJSONBody
 
 // CreateGrantJSONRequestBody defines body for CreateGrant for application/json ContentType.
 type CreateGrantJSONRequestBody CreateGrantJSONBody
@@ -136030,6 +136863,27 @@ type ClientInterface interface {
 	// GetApiGovernanceRegistrySchema request
 	GetApiGovernanceRegistrySchema(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// PostApiGovernanceSecurityLakeSourcesWithBody request with any body
+	PostApiGovernanceSecurityLakeSourcesWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	PostApiGovernanceSecurityLakeSources(ctx context.Context, body PostApiGovernanceSecurityLakeSourcesJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetApiGovernanceSecurityLakeSourcesById request
+	GetApiGovernanceSecurityLakeSourcesById(ctx context.Context, sourceId string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PatchApiGovernanceSecurityLakeSourcesByIdWithBody request with any body
+	PatchApiGovernanceSecurityLakeSourcesByIdWithBody(ctx context.Context, sourceId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	PatchApiGovernanceSecurityLakeSourcesById(ctx context.Context, sourceId string, body PatchApiGovernanceSecurityLakeSourcesByIdJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetApiGovernanceSecurityLakeSourcesByIdHealth request
+	GetApiGovernanceSecurityLakeSourcesByIdHealth(ctx context.Context, sourceId string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PostApiGovernanceSecurityLakeSourcesByIdTestWithBody request with any body
+	PostApiGovernanceSecurityLakeSourcesByIdTestWithBody(ctx context.Context, sourceId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	PostApiGovernanceSecurityLakeSourcesByIdTest(ctx context.Context, sourceId string, body PostApiGovernanceSecurityLakeSourcesByIdTestJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// ListGrants request
 	ListGrants(ctx context.Context, params *ListGrantsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -140533,6 +141387,102 @@ func (c *Client) GetApiGovernanceRegistryEvents(ctx context.Context, params *Get
 
 func (c *Client) GetApiGovernanceRegistrySchema(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetApiGovernanceRegistrySchemaRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) PostApiGovernanceSecurityLakeSourcesWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPostApiGovernanceSecurityLakeSourcesRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) PostApiGovernanceSecurityLakeSources(ctx context.Context, body PostApiGovernanceSecurityLakeSourcesJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPostApiGovernanceSecurityLakeSourcesRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) GetApiGovernanceSecurityLakeSourcesById(ctx context.Context, sourceId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetApiGovernanceSecurityLakeSourcesByIdRequest(c.Server, sourceId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) PatchApiGovernanceSecurityLakeSourcesByIdWithBody(ctx context.Context, sourceId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPatchApiGovernanceSecurityLakeSourcesByIdRequestWithBody(c.Server, sourceId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) PatchApiGovernanceSecurityLakeSourcesById(ctx context.Context, sourceId string, body PatchApiGovernanceSecurityLakeSourcesByIdJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPatchApiGovernanceSecurityLakeSourcesByIdRequest(c.Server, sourceId, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) GetApiGovernanceSecurityLakeSourcesByIdHealth(ctx context.Context, sourceId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetApiGovernanceSecurityLakeSourcesByIdHealthRequest(c.Server, sourceId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) PostApiGovernanceSecurityLakeSourcesByIdTestWithBody(ctx context.Context, sourceId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPostApiGovernanceSecurityLakeSourcesByIdTestRequestWithBody(c.Server, sourceId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) PostApiGovernanceSecurityLakeSourcesByIdTest(ctx context.Context, sourceId string, body PostApiGovernanceSecurityLakeSourcesByIdTestJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPostApiGovernanceSecurityLakeSourcesByIdTestRequest(c.Server, sourceId, body)
 	if err != nil {
 		return nil, err
 	}
@@ -154436,6 +155386,208 @@ func NewGetApiGovernanceRegistrySchemaRequest(server string) (*http.Request, err
 	return req, nil
 }
 
+// NewPostApiGovernanceSecurityLakeSourcesRequest calls the generic PostApiGovernanceSecurityLakeSources builder with application/json body
+func NewPostApiGovernanceSecurityLakeSourcesRequest(server string, body PostApiGovernanceSecurityLakeSourcesJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewPostApiGovernanceSecurityLakeSourcesRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewPostApiGovernanceSecurityLakeSourcesRequestWithBody generates requests for PostApiGovernanceSecurityLakeSources with any type of body
+func NewPostApiGovernanceSecurityLakeSourcesRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/governance/security-lake/sources")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewGetApiGovernanceSecurityLakeSourcesByIdRequest generates requests for GetApiGovernanceSecurityLakeSourcesById
+func NewGetApiGovernanceSecurityLakeSourcesByIdRequest(server string, sourceId string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "sourceId", sourceId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/governance/security-lake/sources/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewPatchApiGovernanceSecurityLakeSourcesByIdRequest calls the generic PatchApiGovernanceSecurityLakeSourcesById builder with application/json body
+func NewPatchApiGovernanceSecurityLakeSourcesByIdRequest(server string, sourceId string, body PatchApiGovernanceSecurityLakeSourcesByIdJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewPatchApiGovernanceSecurityLakeSourcesByIdRequestWithBody(server, sourceId, "application/json", bodyReader)
+}
+
+// NewPatchApiGovernanceSecurityLakeSourcesByIdRequestWithBody generates requests for PatchApiGovernanceSecurityLakeSourcesById with any type of body
+func NewPatchApiGovernanceSecurityLakeSourcesByIdRequestWithBody(server string, sourceId string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "sourceId", sourceId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/governance/security-lake/sources/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPatch, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewGetApiGovernanceSecurityLakeSourcesByIdHealthRequest generates requests for GetApiGovernanceSecurityLakeSourcesByIdHealth
+func NewGetApiGovernanceSecurityLakeSourcesByIdHealthRequest(server string, sourceId string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "sourceId", sourceId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/governance/security-lake/sources/%s/health", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewPostApiGovernanceSecurityLakeSourcesByIdTestRequest calls the generic PostApiGovernanceSecurityLakeSourcesByIdTest builder with application/json body
+func NewPostApiGovernanceSecurityLakeSourcesByIdTestRequest(server string, sourceId string, body PostApiGovernanceSecurityLakeSourcesByIdTestJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewPostApiGovernanceSecurityLakeSourcesByIdTestRequestWithBody(server, sourceId, "application/json", bodyReader)
+}
+
+// NewPostApiGovernanceSecurityLakeSourcesByIdTestRequestWithBody generates requests for PostApiGovernanceSecurityLakeSourcesByIdTest with any type of body
+func NewPostApiGovernanceSecurityLakeSourcesByIdTestRequestWithBody(server string, sourceId string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "sourceId", sourceId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/governance/security-lake/sources/%s/test", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
 // NewListGrantsRequest generates requests for ListGrants
 func NewListGrantsRequest(server string, params *ListGrantsParams) (*http.Request, error) {
 	var err error
@@ -165033,6 +166185,27 @@ type ClientWithResponsesInterface interface {
 
 	// GetApiGovernanceRegistrySchemaWithResponse request
 	GetApiGovernanceRegistrySchemaWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetApiGovernanceRegistrySchemaResponse, error)
+
+	// PostApiGovernanceSecurityLakeSourcesWithBodyWithResponse request with any body
+	PostApiGovernanceSecurityLakeSourcesWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostApiGovernanceSecurityLakeSourcesResponse, error)
+
+	PostApiGovernanceSecurityLakeSourcesWithResponse(ctx context.Context, body PostApiGovernanceSecurityLakeSourcesJSONRequestBody, reqEditors ...RequestEditorFn) (*PostApiGovernanceSecurityLakeSourcesResponse, error)
+
+	// GetApiGovernanceSecurityLakeSourcesByIdWithResponse request
+	GetApiGovernanceSecurityLakeSourcesByIdWithResponse(ctx context.Context, sourceId string, reqEditors ...RequestEditorFn) (*GetApiGovernanceSecurityLakeSourcesByIdResponse, error)
+
+	// PatchApiGovernanceSecurityLakeSourcesByIdWithBodyWithResponse request with any body
+	PatchApiGovernanceSecurityLakeSourcesByIdWithBodyWithResponse(ctx context.Context, sourceId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PatchApiGovernanceSecurityLakeSourcesByIdResponse, error)
+
+	PatchApiGovernanceSecurityLakeSourcesByIdWithResponse(ctx context.Context, sourceId string, body PatchApiGovernanceSecurityLakeSourcesByIdJSONRequestBody, reqEditors ...RequestEditorFn) (*PatchApiGovernanceSecurityLakeSourcesByIdResponse, error)
+
+	// GetApiGovernanceSecurityLakeSourcesByIdHealthWithResponse request
+	GetApiGovernanceSecurityLakeSourcesByIdHealthWithResponse(ctx context.Context, sourceId string, reqEditors ...RequestEditorFn) (*GetApiGovernanceSecurityLakeSourcesByIdHealthResponse, error)
+
+	// PostApiGovernanceSecurityLakeSourcesByIdTestWithBodyWithResponse request with any body
+	PostApiGovernanceSecurityLakeSourcesByIdTestWithBodyWithResponse(ctx context.Context, sourceId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostApiGovernanceSecurityLakeSourcesByIdTestResponse, error)
+
+	PostApiGovernanceSecurityLakeSourcesByIdTestWithResponse(ctx context.Context, sourceId string, body PostApiGovernanceSecurityLakeSourcesByIdTestJSONRequestBody, reqEditors ...RequestEditorFn) (*PostApiGovernanceSecurityLakeSourcesByIdTestResponse, error)
 
 	// ListGrantsWithResponse request
 	ListGrantsWithResponse(ctx context.Context, params *ListGrantsParams, reqEditors ...RequestEditorFn) (*ListGrantsResponse, error)
@@ -182844,6 +184017,632 @@ func (r GetApiGovernanceRegistrySchemaResponse) ContentType() string {
 	return ""
 }
 
+type PostApiGovernanceSecurityLakeSourcesResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		ExternalId        string                                                           `json:"externalId"`
+		Id                string                                                           `json:"id"`
+		Name              string                                                           `json:"name"`
+		QueueUrl          string                                                           `json:"queueUrl"`
+		Region            string                                                           `json:"region"`
+		Schedule          *string                                                          `json:"schedule"`
+		Sources           []PostApiGovernanceSecurityLakeSources200JSONResponseBodySources `json:"sources"`
+		Status            string                                                           `json:"status"`
+		SubscriberRoleArn string                                                           `json:"subscriberRoleArn"`
+	}
+	JSON400 *struct {
+		Code      string                                                        `json:"code"`
+		DocsUrl   *string                                                       `json:"docs_url,omitempty"`
+		Fault     *PostApiGovernanceSecurityLakeSources400JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                        `json:"message"`
+		Meta      *map[string]interface{}                                       `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                                `json:"reasons,omitempty"`
+		Retryable bool                                                          `json:"retryable"`
+		SpanId    *string                                                       `json:"span_id,omitempty"`
+		Tips      *[]string                                                     `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+	JSON401 *struct {
+		Code      string                                                        `json:"code"`
+		DocsUrl   *string                                                       `json:"docs_url,omitempty"`
+		Fault     *PostApiGovernanceSecurityLakeSources401JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                        `json:"message"`
+		Meta      *map[string]interface{}                                       `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                                `json:"reasons,omitempty"`
+		Retryable bool                                                          `json:"retryable"`
+		SpanId    *string                                                       `json:"span_id,omitempty"`
+		Tips      *[]string                                                     `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+	JSON403 *struct {
+		Code      string                                                        `json:"code"`
+		DocsUrl   *string                                                       `json:"docs_url,omitempty"`
+		Fault     *PostApiGovernanceSecurityLakeSources403JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                        `json:"message"`
+		Meta      *map[string]interface{}                                       `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                                `json:"reasons,omitempty"`
+		Retryable bool                                                          `json:"retryable"`
+		SpanId    *string                                                       `json:"span_id,omitempty"`
+		Tips      *[]string                                                     `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+	JSON422 *struct {
+		Code      string                                                        `json:"code"`
+		DocsUrl   *string                                                       `json:"docs_url,omitempty"`
+		Fault     *PostApiGovernanceSecurityLakeSources422JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                        `json:"message"`
+		Meta      *map[string]interface{}                                       `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                                `json:"reasons,omitempty"`
+		Retryable bool                                                          `json:"retryable"`
+		SpanId    *string                                                       `json:"span_id,omitempty"`
+		Tips      *[]string                                                     `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+	JSON500 *struct {
+		Code      string                                                        `json:"code"`
+		DocsUrl   *string                                                       `json:"docs_url,omitempty"`
+		Fault     *PostApiGovernanceSecurityLakeSources500JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                        `json:"message"`
+		Meta      *map[string]interface{}                                       `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                                `json:"reasons,omitempty"`
+		Retryable bool                                                          `json:"retryable"`
+		SpanId    *string                                                       `json:"span_id,omitempty"`
+		Tips      *[]string                                                     `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+}
+
+// Status returns HTTPResponse.Status
+func (r PostApiGovernanceSecurityLakeSourcesResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r PostApiGovernanceSecurityLakeSourcesResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r PostApiGovernanceSecurityLakeSourcesResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type GetApiGovernanceSecurityLakeSourcesByIdResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		ExternalId        string                                                              `json:"externalId"`
+		Id                string                                                              `json:"id"`
+		Name              string                                                              `json:"name"`
+		QueueUrl          string                                                              `json:"queueUrl"`
+		Region            string                                                              `json:"region"`
+		Schedule          *string                                                             `json:"schedule"`
+		Sources           []GetApiGovernanceSecurityLakeSourcesById200JSONResponseBodySources `json:"sources"`
+		Status            string                                                              `json:"status"`
+		SubscriberRoleArn string                                                              `json:"subscriberRoleArn"`
+	}
+	JSON400 *struct {
+		Code      string                                                           `json:"code"`
+		DocsUrl   *string                                                          `json:"docs_url,omitempty"`
+		Fault     *GetApiGovernanceSecurityLakeSourcesById400JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                           `json:"message"`
+		Meta      *map[string]interface{}                                          `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                                   `json:"reasons,omitempty"`
+		Retryable bool                                                             `json:"retryable"`
+		SpanId    *string                                                          `json:"span_id,omitempty"`
+		Tips      *[]string                                                        `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+	JSON401 *struct {
+		Code      string                                                           `json:"code"`
+		DocsUrl   *string                                                          `json:"docs_url,omitempty"`
+		Fault     *GetApiGovernanceSecurityLakeSourcesById401JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                           `json:"message"`
+		Meta      *map[string]interface{}                                          `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                                   `json:"reasons,omitempty"`
+		Retryable bool                                                             `json:"retryable"`
+		SpanId    *string                                                          `json:"span_id,omitempty"`
+		Tips      *[]string                                                        `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+	JSON403 *struct {
+		Code      string                                                           `json:"code"`
+		DocsUrl   *string                                                          `json:"docs_url,omitempty"`
+		Fault     *GetApiGovernanceSecurityLakeSourcesById403JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                           `json:"message"`
+		Meta      *map[string]interface{}                                          `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                                   `json:"reasons,omitempty"`
+		Retryable bool                                                             `json:"retryable"`
+		SpanId    *string                                                          `json:"span_id,omitempty"`
+		Tips      *[]string                                                        `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+	JSON500 *struct {
+		Code      string                                                           `json:"code"`
+		DocsUrl   *string                                                          `json:"docs_url,omitempty"`
+		Fault     *GetApiGovernanceSecurityLakeSourcesById500JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                           `json:"message"`
+		Meta      *map[string]interface{}                                          `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                                   `json:"reasons,omitempty"`
+		Retryable bool                                                             `json:"retryable"`
+		SpanId    *string                                                          `json:"span_id,omitempty"`
+		Tips      *[]string                                                        `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+}
+
+// Status returns HTTPResponse.Status
+func (r GetApiGovernanceSecurityLakeSourcesByIdResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetApiGovernanceSecurityLakeSourcesByIdResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetApiGovernanceSecurityLakeSourcesByIdResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type PatchApiGovernanceSecurityLakeSourcesByIdResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		ExternalId        string                                                                `json:"externalId"`
+		Id                string                                                                `json:"id"`
+		Name              string                                                                `json:"name"`
+		QueueUrl          string                                                                `json:"queueUrl"`
+		Region            string                                                                `json:"region"`
+		Schedule          *string                                                               `json:"schedule"`
+		Sources           []PatchApiGovernanceSecurityLakeSourcesById200JSONResponseBodySources `json:"sources"`
+		Status            string                                                                `json:"status"`
+		SubscriberRoleArn string                                                                `json:"subscriberRoleArn"`
+	}
+	JSON400 *struct {
+		Code      string                                                             `json:"code"`
+		DocsUrl   *string                                                            `json:"docs_url,omitempty"`
+		Fault     *PatchApiGovernanceSecurityLakeSourcesById400JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                             `json:"message"`
+		Meta      *map[string]interface{}                                            `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                                     `json:"reasons,omitempty"`
+		Retryable bool                                                               `json:"retryable"`
+		SpanId    *string                                                            `json:"span_id,omitempty"`
+		Tips      *[]string                                                          `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+	JSON401 *struct {
+		Code      string                                                             `json:"code"`
+		DocsUrl   *string                                                            `json:"docs_url,omitempty"`
+		Fault     *PatchApiGovernanceSecurityLakeSourcesById401JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                             `json:"message"`
+		Meta      *map[string]interface{}                                            `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                                     `json:"reasons,omitempty"`
+		Retryable bool                                                               `json:"retryable"`
+		SpanId    *string                                                            `json:"span_id,omitempty"`
+		Tips      *[]string                                                          `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+	JSON403 *struct {
+		Code      string                                                             `json:"code"`
+		DocsUrl   *string                                                            `json:"docs_url,omitempty"`
+		Fault     *PatchApiGovernanceSecurityLakeSourcesById403JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                             `json:"message"`
+		Meta      *map[string]interface{}                                            `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                                     `json:"reasons,omitempty"`
+		Retryable bool                                                               `json:"retryable"`
+		SpanId    *string                                                            `json:"span_id,omitempty"`
+		Tips      *[]string                                                          `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+	JSON422 *struct {
+		Code      string                                                             `json:"code"`
+		DocsUrl   *string                                                            `json:"docs_url,omitempty"`
+		Fault     *PatchApiGovernanceSecurityLakeSourcesById422JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                             `json:"message"`
+		Meta      *map[string]interface{}                                            `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                                     `json:"reasons,omitempty"`
+		Retryable bool                                                               `json:"retryable"`
+		SpanId    *string                                                            `json:"span_id,omitempty"`
+		Tips      *[]string                                                          `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+	JSON500 *struct {
+		Code      string                                                             `json:"code"`
+		DocsUrl   *string                                                            `json:"docs_url,omitempty"`
+		Fault     *PatchApiGovernanceSecurityLakeSourcesById500JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                             `json:"message"`
+		Meta      *map[string]interface{}                                            `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                                     `json:"reasons,omitempty"`
+		Retryable bool                                                               `json:"retryable"`
+		SpanId    *string                                                            `json:"span_id,omitempty"`
+		Tips      *[]string                                                          `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+}
+
+// Status returns HTTPResponse.Status
+func (r PatchApiGovernanceSecurityLakeSourcesByIdResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r PatchApiGovernanceSecurityLakeSourcesByIdResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r PatchApiGovernanceSecurityLakeSourcesByIdResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type GetApiGovernanceSecurityLakeSourcesByIdHealthResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		Health struct {
+			Dropped    int      `json:"dropped"`
+			Invalid    int      `json:"invalid"`
+			LagMs      *float32 `json:"lagMs"`
+			LastReadAt *float32 `json:"lastReadAt"`
+			Messages   int      `json:"messages"`
+			Objects    int      `json:"objects"`
+			Poison     []struct {
+				At        float32 `json:"at"`
+				Key       string  `json:"key"`
+				MessageId string  `json:"messageId"`
+				Reason    string  `json:"reason"`
+			} `json:"poison"`
+			PoisonCount int `json:"poisonCount"`
+			Retried     int `json:"retried"`
+			Rows        int `json:"rows"`
+			Runs        int `json:"runs"`
+			Written     int `json:"written"`
+		} `json:"health"`
+		LastError *string `json:"lastError"`
+		SourceId  string  `json:"sourceId"`
+		Status    string  `json:"status"`
+	}
+	JSON400 *struct {
+		Code      string                                                                 `json:"code"`
+		DocsUrl   *string                                                                `json:"docs_url,omitempty"`
+		Fault     *GetApiGovernanceSecurityLakeSourcesByIdHealth400JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                                 `json:"message"`
+		Meta      *map[string]interface{}                                                `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                                         `json:"reasons,omitempty"`
+		Retryable bool                                                                   `json:"retryable"`
+		SpanId    *string                                                                `json:"span_id,omitempty"`
+		Tips      *[]string                                                              `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+	JSON401 *struct {
+		Code      string                                                                 `json:"code"`
+		DocsUrl   *string                                                                `json:"docs_url,omitempty"`
+		Fault     *GetApiGovernanceSecurityLakeSourcesByIdHealth401JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                                 `json:"message"`
+		Meta      *map[string]interface{}                                                `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                                         `json:"reasons,omitempty"`
+		Retryable bool                                                                   `json:"retryable"`
+		SpanId    *string                                                                `json:"span_id,omitempty"`
+		Tips      *[]string                                                              `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+	JSON403 *struct {
+		Code      string                                                                 `json:"code"`
+		DocsUrl   *string                                                                `json:"docs_url,omitempty"`
+		Fault     *GetApiGovernanceSecurityLakeSourcesByIdHealth403JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                                 `json:"message"`
+		Meta      *map[string]interface{}                                                `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                                         `json:"reasons,omitempty"`
+		Retryable bool                                                                   `json:"retryable"`
+		SpanId    *string                                                                `json:"span_id,omitempty"`
+		Tips      *[]string                                                              `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+	JSON500 *struct {
+		Code      string                                                                 `json:"code"`
+		DocsUrl   *string                                                                `json:"docs_url,omitempty"`
+		Fault     *GetApiGovernanceSecurityLakeSourcesByIdHealth500JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                                 `json:"message"`
+		Meta      *map[string]interface{}                                                `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                                         `json:"reasons,omitempty"`
+		Retryable bool                                                                   `json:"retryable"`
+		SpanId    *string                                                                `json:"span_id,omitempty"`
+		Tips      *[]string                                                              `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+}
+
+// Status returns HTTPResponse.Status
+func (r GetApiGovernanceSecurityLakeSourcesByIdHealthResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetApiGovernanceSecurityLakeSourcesByIdHealthResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetApiGovernanceSecurityLakeSourcesByIdHealthResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type PostApiGovernanceSecurityLakeSourcesByIdTestResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		Error    *string `json:"error"`
+		InFlight *int    `json:"inFlight"`
+		Ok       bool    `json:"ok"`
+		Waiting  *int    `json:"waiting"`
+	}
+	JSON400 *struct {
+		Code      string                                                                `json:"code"`
+		DocsUrl   *string                                                               `json:"docs_url,omitempty"`
+		Fault     *PostApiGovernanceSecurityLakeSourcesByIdTest400JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                                `json:"message"`
+		Meta      *map[string]interface{}                                               `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                                        `json:"reasons,omitempty"`
+		Retryable bool                                                                  `json:"retryable"`
+		SpanId    *string                                                               `json:"span_id,omitempty"`
+		Tips      *[]string                                                             `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+	JSON401 *struct {
+		Code      string                                                                `json:"code"`
+		DocsUrl   *string                                                               `json:"docs_url,omitempty"`
+		Fault     *PostApiGovernanceSecurityLakeSourcesByIdTest401JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                                `json:"message"`
+		Meta      *map[string]interface{}                                               `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                                        `json:"reasons,omitempty"`
+		Retryable bool                                                                  `json:"retryable"`
+		SpanId    *string                                                               `json:"span_id,omitempty"`
+		Tips      *[]string                                                             `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+	JSON403 *struct {
+		Code      string                                                                `json:"code"`
+		DocsUrl   *string                                                               `json:"docs_url,omitempty"`
+		Fault     *PostApiGovernanceSecurityLakeSourcesByIdTest403JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                                `json:"message"`
+		Meta      *map[string]interface{}                                               `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                                        `json:"reasons,omitempty"`
+		Retryable bool                                                                  `json:"retryable"`
+		SpanId    *string                                                               `json:"span_id,omitempty"`
+		Tips      *[]string                                                             `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+	JSON500 *struct {
+		Code      string                                                                `json:"code"`
+		DocsUrl   *string                                                               `json:"docs_url,omitempty"`
+		Fault     *PostApiGovernanceSecurityLakeSourcesByIdTest500JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                                `json:"message"`
+		Meta      *map[string]interface{}                                               `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                                        `json:"reasons,omitempty"`
+		Retryable bool                                                                  `json:"retryable"`
+		SpanId    *string                                                               `json:"span_id,omitempty"`
+		Tips      *[]string                                                             `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+}
+
+// Status returns HTTPResponse.Status
+func (r PostApiGovernanceSecurityLakeSourcesByIdTestResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r PostApiGovernanceSecurityLakeSourcesByIdTestResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r PostApiGovernanceSecurityLakeSourcesByIdTestResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 type ListGrantsResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -198684,6 +200483,75 @@ func (c *ClientWithResponses) GetApiGovernanceRegistrySchemaWithResponse(ctx con
 		return nil, err
 	}
 	return ParseGetApiGovernanceRegistrySchemaResponse(rsp)
+}
+
+// PostApiGovernanceSecurityLakeSourcesWithBodyWithResponse request with arbitrary body returning *PostApiGovernanceSecurityLakeSourcesResponse
+func (c *ClientWithResponses) PostApiGovernanceSecurityLakeSourcesWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostApiGovernanceSecurityLakeSourcesResponse, error) {
+	rsp, err := c.PostApiGovernanceSecurityLakeSourcesWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePostApiGovernanceSecurityLakeSourcesResponse(rsp)
+}
+
+func (c *ClientWithResponses) PostApiGovernanceSecurityLakeSourcesWithResponse(ctx context.Context, body PostApiGovernanceSecurityLakeSourcesJSONRequestBody, reqEditors ...RequestEditorFn) (*PostApiGovernanceSecurityLakeSourcesResponse, error) {
+	rsp, err := c.PostApiGovernanceSecurityLakeSources(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePostApiGovernanceSecurityLakeSourcesResponse(rsp)
+}
+
+// GetApiGovernanceSecurityLakeSourcesByIdWithResponse request returning *GetApiGovernanceSecurityLakeSourcesByIdResponse
+func (c *ClientWithResponses) GetApiGovernanceSecurityLakeSourcesByIdWithResponse(ctx context.Context, sourceId string, reqEditors ...RequestEditorFn) (*GetApiGovernanceSecurityLakeSourcesByIdResponse, error) {
+	rsp, err := c.GetApiGovernanceSecurityLakeSourcesById(ctx, sourceId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetApiGovernanceSecurityLakeSourcesByIdResponse(rsp)
+}
+
+// PatchApiGovernanceSecurityLakeSourcesByIdWithBodyWithResponse request with arbitrary body returning *PatchApiGovernanceSecurityLakeSourcesByIdResponse
+func (c *ClientWithResponses) PatchApiGovernanceSecurityLakeSourcesByIdWithBodyWithResponse(ctx context.Context, sourceId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PatchApiGovernanceSecurityLakeSourcesByIdResponse, error) {
+	rsp, err := c.PatchApiGovernanceSecurityLakeSourcesByIdWithBody(ctx, sourceId, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePatchApiGovernanceSecurityLakeSourcesByIdResponse(rsp)
+}
+
+func (c *ClientWithResponses) PatchApiGovernanceSecurityLakeSourcesByIdWithResponse(ctx context.Context, sourceId string, body PatchApiGovernanceSecurityLakeSourcesByIdJSONRequestBody, reqEditors ...RequestEditorFn) (*PatchApiGovernanceSecurityLakeSourcesByIdResponse, error) {
+	rsp, err := c.PatchApiGovernanceSecurityLakeSourcesById(ctx, sourceId, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePatchApiGovernanceSecurityLakeSourcesByIdResponse(rsp)
+}
+
+// GetApiGovernanceSecurityLakeSourcesByIdHealthWithResponse request returning *GetApiGovernanceSecurityLakeSourcesByIdHealthResponse
+func (c *ClientWithResponses) GetApiGovernanceSecurityLakeSourcesByIdHealthWithResponse(ctx context.Context, sourceId string, reqEditors ...RequestEditorFn) (*GetApiGovernanceSecurityLakeSourcesByIdHealthResponse, error) {
+	rsp, err := c.GetApiGovernanceSecurityLakeSourcesByIdHealth(ctx, sourceId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetApiGovernanceSecurityLakeSourcesByIdHealthResponse(rsp)
+}
+
+// PostApiGovernanceSecurityLakeSourcesByIdTestWithBodyWithResponse request with arbitrary body returning *PostApiGovernanceSecurityLakeSourcesByIdTestResponse
+func (c *ClientWithResponses) PostApiGovernanceSecurityLakeSourcesByIdTestWithBodyWithResponse(ctx context.Context, sourceId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostApiGovernanceSecurityLakeSourcesByIdTestResponse, error) {
+	rsp, err := c.PostApiGovernanceSecurityLakeSourcesByIdTestWithBody(ctx, sourceId, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePostApiGovernanceSecurityLakeSourcesByIdTestResponse(rsp)
+}
+
+func (c *ClientWithResponses) PostApiGovernanceSecurityLakeSourcesByIdTestWithResponse(ctx context.Context, sourceId string, body PostApiGovernanceSecurityLakeSourcesByIdTestJSONRequestBody, reqEditors ...RequestEditorFn) (*PostApiGovernanceSecurityLakeSourcesByIdTestResponse, error) {
+	rsp, err := c.PostApiGovernanceSecurityLakeSourcesByIdTest(ctx, sourceId, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePostApiGovernanceSecurityLakeSourcesByIdTestResponse(rsp)
 }
 
 // ListGrantsWithResponse request returning *ListGrantsResponse
@@ -220454,6 +222322,744 @@ func ParseGetApiGovernanceRegistrySchemaResponse(rsp *http.Response) (*GetApiGov
 			Retryable bool                                                    `json:"retryable"`
 			SpanId    *string                                                 `json:"span_id,omitempty"`
 			Tips      *[]string                                               `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParsePostApiGovernanceSecurityLakeSourcesResponse parses an HTTP response from a PostApiGovernanceSecurityLakeSourcesWithResponse call
+func ParsePostApiGovernanceSecurityLakeSourcesResponse(rsp *http.Response) (*PostApiGovernanceSecurityLakeSourcesResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &PostApiGovernanceSecurityLakeSourcesResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest struct {
+			ExternalId        string                                                           `json:"externalId"`
+			Id                string                                                           `json:"id"`
+			Name              string                                                           `json:"name"`
+			QueueUrl          string                                                           `json:"queueUrl"`
+			Region            string                                                           `json:"region"`
+			Schedule          *string                                                          `json:"schedule"`
+			Sources           []PostApiGovernanceSecurityLakeSources200JSONResponseBodySources `json:"sources"`
+			Status            string                                                           `json:"status"`
+			SubscriberRoleArn string                                                           `json:"subscriberRoleArn"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Code      string                                                        `json:"code"`
+			DocsUrl   *string                                                       `json:"docs_url,omitempty"`
+			Fault     *PostApiGovernanceSecurityLakeSources400JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                        `json:"message"`
+			Meta      *map[string]interface{}                                       `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                                `json:"reasons,omitempty"`
+			Retryable bool                                                          `json:"retryable"`
+			SpanId    *string                                                       `json:"span_id,omitempty"`
+			Tips      *[]string                                                     `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest struct {
+			Code      string                                                        `json:"code"`
+			DocsUrl   *string                                                       `json:"docs_url,omitempty"`
+			Fault     *PostApiGovernanceSecurityLakeSources401JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                        `json:"message"`
+			Meta      *map[string]interface{}                                       `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                                `json:"reasons,omitempty"`
+			Retryable bool                                                          `json:"retryable"`
+			SpanId    *string                                                       `json:"span_id,omitempty"`
+			Tips      *[]string                                                     `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest struct {
+			Code      string                                                        `json:"code"`
+			DocsUrl   *string                                                       `json:"docs_url,omitempty"`
+			Fault     *PostApiGovernanceSecurityLakeSources403JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                        `json:"message"`
+			Meta      *map[string]interface{}                                       `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                                `json:"reasons,omitempty"`
+			Retryable bool                                                          `json:"retryable"`
+			SpanId    *string                                                       `json:"span_id,omitempty"`
+			Tips      *[]string                                                     `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest struct {
+			Code      string                                                        `json:"code"`
+			DocsUrl   *string                                                       `json:"docs_url,omitempty"`
+			Fault     *PostApiGovernanceSecurityLakeSources422JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                        `json:"message"`
+			Meta      *map[string]interface{}                                       `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                                `json:"reasons,omitempty"`
+			Retryable bool                                                          `json:"retryable"`
+			SpanId    *string                                                       `json:"span_id,omitempty"`
+			Tips      *[]string                                                     `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON422 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest struct {
+			Code      string                                                        `json:"code"`
+			DocsUrl   *string                                                       `json:"docs_url,omitempty"`
+			Fault     *PostApiGovernanceSecurityLakeSources500JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                        `json:"message"`
+			Meta      *map[string]interface{}                                       `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                                `json:"reasons,omitempty"`
+			Retryable bool                                                          `json:"retryable"`
+			SpanId    *string                                                       `json:"span_id,omitempty"`
+			Tips      *[]string                                                     `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetApiGovernanceSecurityLakeSourcesByIdResponse parses an HTTP response from a GetApiGovernanceSecurityLakeSourcesByIdWithResponse call
+func ParseGetApiGovernanceSecurityLakeSourcesByIdResponse(rsp *http.Response) (*GetApiGovernanceSecurityLakeSourcesByIdResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetApiGovernanceSecurityLakeSourcesByIdResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest struct {
+			ExternalId        string                                                              `json:"externalId"`
+			Id                string                                                              `json:"id"`
+			Name              string                                                              `json:"name"`
+			QueueUrl          string                                                              `json:"queueUrl"`
+			Region            string                                                              `json:"region"`
+			Schedule          *string                                                             `json:"schedule"`
+			Sources           []GetApiGovernanceSecurityLakeSourcesById200JSONResponseBodySources `json:"sources"`
+			Status            string                                                              `json:"status"`
+			SubscriberRoleArn string                                                              `json:"subscriberRoleArn"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Code      string                                                           `json:"code"`
+			DocsUrl   *string                                                          `json:"docs_url,omitempty"`
+			Fault     *GetApiGovernanceSecurityLakeSourcesById400JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                           `json:"message"`
+			Meta      *map[string]interface{}                                          `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                                   `json:"reasons,omitempty"`
+			Retryable bool                                                             `json:"retryable"`
+			SpanId    *string                                                          `json:"span_id,omitempty"`
+			Tips      *[]string                                                        `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest struct {
+			Code      string                                                           `json:"code"`
+			DocsUrl   *string                                                          `json:"docs_url,omitempty"`
+			Fault     *GetApiGovernanceSecurityLakeSourcesById401JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                           `json:"message"`
+			Meta      *map[string]interface{}                                          `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                                   `json:"reasons,omitempty"`
+			Retryable bool                                                             `json:"retryable"`
+			SpanId    *string                                                          `json:"span_id,omitempty"`
+			Tips      *[]string                                                        `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest struct {
+			Code      string                                                           `json:"code"`
+			DocsUrl   *string                                                          `json:"docs_url,omitempty"`
+			Fault     *GetApiGovernanceSecurityLakeSourcesById403JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                           `json:"message"`
+			Meta      *map[string]interface{}                                          `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                                   `json:"reasons,omitempty"`
+			Retryable bool                                                             `json:"retryable"`
+			SpanId    *string                                                          `json:"span_id,omitempty"`
+			Tips      *[]string                                                        `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest struct {
+			Code      string                                                           `json:"code"`
+			DocsUrl   *string                                                          `json:"docs_url,omitempty"`
+			Fault     *GetApiGovernanceSecurityLakeSourcesById500JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                           `json:"message"`
+			Meta      *map[string]interface{}                                          `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                                   `json:"reasons,omitempty"`
+			Retryable bool                                                             `json:"retryable"`
+			SpanId    *string                                                          `json:"span_id,omitempty"`
+			Tips      *[]string                                                        `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParsePatchApiGovernanceSecurityLakeSourcesByIdResponse parses an HTTP response from a PatchApiGovernanceSecurityLakeSourcesByIdWithResponse call
+func ParsePatchApiGovernanceSecurityLakeSourcesByIdResponse(rsp *http.Response) (*PatchApiGovernanceSecurityLakeSourcesByIdResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &PatchApiGovernanceSecurityLakeSourcesByIdResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest struct {
+			ExternalId        string                                                                `json:"externalId"`
+			Id                string                                                                `json:"id"`
+			Name              string                                                                `json:"name"`
+			QueueUrl          string                                                                `json:"queueUrl"`
+			Region            string                                                                `json:"region"`
+			Schedule          *string                                                               `json:"schedule"`
+			Sources           []PatchApiGovernanceSecurityLakeSourcesById200JSONResponseBodySources `json:"sources"`
+			Status            string                                                                `json:"status"`
+			SubscriberRoleArn string                                                                `json:"subscriberRoleArn"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Code      string                                                             `json:"code"`
+			DocsUrl   *string                                                            `json:"docs_url,omitempty"`
+			Fault     *PatchApiGovernanceSecurityLakeSourcesById400JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                             `json:"message"`
+			Meta      *map[string]interface{}                                            `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                                     `json:"reasons,omitempty"`
+			Retryable bool                                                               `json:"retryable"`
+			SpanId    *string                                                            `json:"span_id,omitempty"`
+			Tips      *[]string                                                          `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest struct {
+			Code      string                                                             `json:"code"`
+			DocsUrl   *string                                                            `json:"docs_url,omitempty"`
+			Fault     *PatchApiGovernanceSecurityLakeSourcesById401JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                             `json:"message"`
+			Meta      *map[string]interface{}                                            `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                                     `json:"reasons,omitempty"`
+			Retryable bool                                                               `json:"retryable"`
+			SpanId    *string                                                            `json:"span_id,omitempty"`
+			Tips      *[]string                                                          `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest struct {
+			Code      string                                                             `json:"code"`
+			DocsUrl   *string                                                            `json:"docs_url,omitempty"`
+			Fault     *PatchApiGovernanceSecurityLakeSourcesById403JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                             `json:"message"`
+			Meta      *map[string]interface{}                                            `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                                     `json:"reasons,omitempty"`
+			Retryable bool                                                               `json:"retryable"`
+			SpanId    *string                                                            `json:"span_id,omitempty"`
+			Tips      *[]string                                                          `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest struct {
+			Code      string                                                             `json:"code"`
+			DocsUrl   *string                                                            `json:"docs_url,omitempty"`
+			Fault     *PatchApiGovernanceSecurityLakeSourcesById422JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                             `json:"message"`
+			Meta      *map[string]interface{}                                            `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                                     `json:"reasons,omitempty"`
+			Retryable bool                                                               `json:"retryable"`
+			SpanId    *string                                                            `json:"span_id,omitempty"`
+			Tips      *[]string                                                          `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON422 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest struct {
+			Code      string                                                             `json:"code"`
+			DocsUrl   *string                                                            `json:"docs_url,omitempty"`
+			Fault     *PatchApiGovernanceSecurityLakeSourcesById500JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                             `json:"message"`
+			Meta      *map[string]interface{}                                            `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                                     `json:"reasons,omitempty"`
+			Retryable bool                                                               `json:"retryable"`
+			SpanId    *string                                                            `json:"span_id,omitempty"`
+			Tips      *[]string                                                          `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetApiGovernanceSecurityLakeSourcesByIdHealthResponse parses an HTTP response from a GetApiGovernanceSecurityLakeSourcesByIdHealthWithResponse call
+func ParseGetApiGovernanceSecurityLakeSourcesByIdHealthResponse(rsp *http.Response) (*GetApiGovernanceSecurityLakeSourcesByIdHealthResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetApiGovernanceSecurityLakeSourcesByIdHealthResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest struct {
+			Health struct {
+				Dropped    int      `json:"dropped"`
+				Invalid    int      `json:"invalid"`
+				LagMs      *float32 `json:"lagMs"`
+				LastReadAt *float32 `json:"lastReadAt"`
+				Messages   int      `json:"messages"`
+				Objects    int      `json:"objects"`
+				Poison     []struct {
+					At        float32 `json:"at"`
+					Key       string  `json:"key"`
+					MessageId string  `json:"messageId"`
+					Reason    string  `json:"reason"`
+				} `json:"poison"`
+				PoisonCount int `json:"poisonCount"`
+				Retried     int `json:"retried"`
+				Rows        int `json:"rows"`
+				Runs        int `json:"runs"`
+				Written     int `json:"written"`
+			} `json:"health"`
+			LastError *string `json:"lastError"`
+			SourceId  string  `json:"sourceId"`
+			Status    string  `json:"status"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Code      string                                                                 `json:"code"`
+			DocsUrl   *string                                                                `json:"docs_url,omitempty"`
+			Fault     *GetApiGovernanceSecurityLakeSourcesByIdHealth400JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                                 `json:"message"`
+			Meta      *map[string]interface{}                                                `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                                         `json:"reasons,omitempty"`
+			Retryable bool                                                                   `json:"retryable"`
+			SpanId    *string                                                                `json:"span_id,omitempty"`
+			Tips      *[]string                                                              `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest struct {
+			Code      string                                                                 `json:"code"`
+			DocsUrl   *string                                                                `json:"docs_url,omitempty"`
+			Fault     *GetApiGovernanceSecurityLakeSourcesByIdHealth401JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                                 `json:"message"`
+			Meta      *map[string]interface{}                                                `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                                         `json:"reasons,omitempty"`
+			Retryable bool                                                                   `json:"retryable"`
+			SpanId    *string                                                                `json:"span_id,omitempty"`
+			Tips      *[]string                                                              `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest struct {
+			Code      string                                                                 `json:"code"`
+			DocsUrl   *string                                                                `json:"docs_url,omitempty"`
+			Fault     *GetApiGovernanceSecurityLakeSourcesByIdHealth403JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                                 `json:"message"`
+			Meta      *map[string]interface{}                                                `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                                         `json:"reasons,omitempty"`
+			Retryable bool                                                                   `json:"retryable"`
+			SpanId    *string                                                                `json:"span_id,omitempty"`
+			Tips      *[]string                                                              `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest struct {
+			Code      string                                                                 `json:"code"`
+			DocsUrl   *string                                                                `json:"docs_url,omitempty"`
+			Fault     *GetApiGovernanceSecurityLakeSourcesByIdHealth500JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                                 `json:"message"`
+			Meta      *map[string]interface{}                                                `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                                         `json:"reasons,omitempty"`
+			Retryable bool                                                                   `json:"retryable"`
+			SpanId    *string                                                                `json:"span_id,omitempty"`
+			Tips      *[]string                                                              `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParsePostApiGovernanceSecurityLakeSourcesByIdTestResponse parses an HTTP response from a PostApiGovernanceSecurityLakeSourcesByIdTestWithResponse call
+func ParsePostApiGovernanceSecurityLakeSourcesByIdTestResponse(rsp *http.Response) (*PostApiGovernanceSecurityLakeSourcesByIdTestResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &PostApiGovernanceSecurityLakeSourcesByIdTestResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest struct {
+			Error    *string `json:"error"`
+			InFlight *int    `json:"inFlight"`
+			Ok       bool    `json:"ok"`
+			Waiting  *int    `json:"waiting"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Code      string                                                                `json:"code"`
+			DocsUrl   *string                                                               `json:"docs_url,omitempty"`
+			Fault     *PostApiGovernanceSecurityLakeSourcesByIdTest400JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                                `json:"message"`
+			Meta      *map[string]interface{}                                               `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                                        `json:"reasons,omitempty"`
+			Retryable bool                                                                  `json:"retryable"`
+			SpanId    *string                                                               `json:"span_id,omitempty"`
+			Tips      *[]string                                                             `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest struct {
+			Code      string                                                                `json:"code"`
+			DocsUrl   *string                                                               `json:"docs_url,omitempty"`
+			Fault     *PostApiGovernanceSecurityLakeSourcesByIdTest401JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                                `json:"message"`
+			Meta      *map[string]interface{}                                               `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                                        `json:"reasons,omitempty"`
+			Retryable bool                                                                  `json:"retryable"`
+			SpanId    *string                                                               `json:"span_id,omitempty"`
+			Tips      *[]string                                                             `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest struct {
+			Code      string                                                                `json:"code"`
+			DocsUrl   *string                                                               `json:"docs_url,omitempty"`
+			Fault     *PostApiGovernanceSecurityLakeSourcesByIdTest403JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                                `json:"message"`
+			Meta      *map[string]interface{}                                               `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                                        `json:"reasons,omitempty"`
+			Retryable bool                                                                  `json:"retryable"`
+			SpanId    *string                                                               `json:"span_id,omitempty"`
+			Tips      *[]string                                                             `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest struct {
+			Code      string                                                                `json:"code"`
+			DocsUrl   *string                                                               `json:"docs_url,omitempty"`
+			Fault     *PostApiGovernanceSecurityLakeSourcesByIdTest500JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                                `json:"message"`
+			Meta      *map[string]interface{}                                               `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                                        `json:"reasons,omitempty"`
+			Retryable bool                                                                  `json:"retryable"`
+			SpanId    *string                                                               `json:"span_id,omitempty"`
+			Tips      *[]string                                                             `json:"tips,omitempty"`
 			Trace     *struct {
 				LogsUrl  *string `json:"logsUrl,omitempty"`
 				SpanId   *string `json:"spanId,omitempty"`
