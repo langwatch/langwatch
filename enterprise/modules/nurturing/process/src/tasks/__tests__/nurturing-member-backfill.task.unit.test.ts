@@ -6,6 +6,7 @@
 import { describe, expect, it } from "vitest";
 
 import { MemoryNurturingMemberSourceRepository } from "../../repositories/memory/memory.nurturing-member-source.repository.ts";
+import type { NurturingSourceMember } from "../../repositories/nurturing-member-source.repository.ts";
 import { MemoryNurturingOrganizationMemberRepository } from "../../repositories/memory/memory.nurturing-organization-member.repository.ts";
 import {
   NurturingMemberBackfillTask,
@@ -14,20 +15,26 @@ import {
 
 const signal = new AbortController().signal;
 
-/** org-1 holds user-1 and user-2, org-2 holds user-1; the copy is empty. */
-function setup() {
-  const source = MemoryNurturingMemberSourceRepository.create({
-    membersByOrganization: {
-      "org-1": [
-        { userId: "user-1", joinedAt: 1_000 },
-        { userId: "user-2", joinedAt: 2_000 },
-      ],
-      "org-2": [{ userId: "user-1", joinedAt: 3_000 }],
-    },
-  });
+/**
+ * org-1 holds user-1 and user-2, org-2 holds user-1; the copy is empty. A deactivated user keeps
+ * their membership rows but the owner's member read leaves them out.
+ */
+function setup({ deactivatedUserIds = [] }: { deactivatedUserIds?: readonly string[] } = {}) {
+  const membersByOrganization: Record<string, NurturingSourceMember[]> = {
+    "org-1": [
+      { userId: "user-1", joinedAt: 1_000 },
+      { userId: "user-2", joinedAt: 2_000 },
+    ],
+    "org-2": [{ userId: "user-1", joinedAt: 3_000 }],
+  };
+  const source = MemoryNurturingMemberSourceRepository.create({ membersByOrganization });
   const members = MemoryNurturingOrganizationMemberRepository.create();
   const organizations = {
     listAllIds: async () => ({ ids: ["org-1", "org-2"], next: null }),
+    getAllMembers: async ({ organizationId }: { organizationId: string }) =>
+      (membersByOrganization[organizationId] ?? [])
+        .filter(({ userId }) => !deactivatedUserIds.includes(userId))
+        .map(({ userId }) => ({ id: userId })) as never,
   };
   return { peers: { organizations, source, members }, members };
 }
@@ -137,6 +144,21 @@ describe("runNurturingMemberBackfill", () => {
       expect(left).toMatchObject({ joinedAt: 100, leftAt: 5_000 });
     });
 
+    /** @scenario "The member backfill skips a member whose account is deactivated" */
+    it("skips a member whose account is deactivated", async () => {
+      const { peers, members } = setup({ deactivatedUserIds: ["user-2"] });
+
+      const outcome = await runNurturingMemberBackfill({ peers, execute: true, signal });
+
+      expect(
+        (await rows(members)).map(({ organizationId, userId }) => [organizationId, userId]),
+      ).toEqual([
+        ["org-1", "user-1"],
+        ["org-2", "user-1"],
+      ]);
+      expect(outcome.executed).toMatchObject({ memberships: 2, created: 2 });
+    });
+
     it("does not start the real run when aborted after the dry run", async () => {
       const { peers, members } = setup();
       const controller = new AbortController();
@@ -160,6 +182,7 @@ describe("runNurturingMemberBackfill over several organization pages", () => {
     const { peers, members } = setup();
     const asked: (string | undefined)[] = [];
     const organizations = {
+      ...peers.organizations,
       listAllIds: async (input?: { after?: string }) => {
         asked.push(input?.after);
         return input?.after === undefined

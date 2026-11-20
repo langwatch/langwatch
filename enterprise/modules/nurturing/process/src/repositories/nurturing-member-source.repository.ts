@@ -12,6 +12,9 @@ export type NurturingSourceMember = Readonly<{
  * claims no table: the owners keep theirs. Only the member backfill reads it.
  */
 export interface NurturingMemberSourceRepository {
-  /** Members neither disabled nor deactivated: the ones nurturing's copy holds as current. */
+  /**
+   * Members whose membership is not disabled. A deactivated user is still listed: deactivation
+   * lives on `User`, which this read may not touch, so callers filter it through the owner's API.
+   */
   findActiveMembers(input: Readonly<{ organizationId: string }>): Promise<NurturingSourceMember[]>;
 }

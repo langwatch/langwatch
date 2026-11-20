@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * @vitest-environment node
- * The owners' active members, read through shares: disabled memberships and deactivated users
- * are left out.
+ * The owners' membership rows, read through shares: disabled memberships are left out.
+ * Deactivated users are filtered by the backfill service through the owner's API, not here.
  * Spec: enterprise/modules/nurturing/specs/organization-member-facts.feature
  */
 import { randomUUID } from "node:crypto";
@@ -23,8 +23,7 @@ const namespace = `test-nurturing-source-${randomUUID()}`;
 const organizationId = `${namespace}-org`;
 const activeUserId = `${namespace}-active`;
 const disabledUserId = `${namespace}-disabled`;
-const deactivatedUserId = `${namespace}-deactivated`;
-const userIds = [activeUserId, disabledUserId, deactivatedUserId];
+const userIds = [activeUserId, disabledUserId];
 
 describe.skipIf(!databaseUrl)("given the owners' organization and membership rows", () => {
   let connection: PrismaConnection;
@@ -43,13 +42,7 @@ describe.skipIf(!databaseUrl)("given the owners' organization and membership row
       data: { id: organizationId, name: namespace, slug: namespace },
     });
     for (const id of userIds) {
-      await client.user.create({
-        data: {
-          id,
-          email: `${id}@acme.test`,
-          ...(id === deactivatedUserId ? { deactivatedAt: new Date() } : {}),
-        },
-      });
+      await client.user.create({ data: { id, email: `${id}@acme.test` } });
       await client.organizationUser.create({
         data: {
           userId: id,
@@ -70,8 +63,8 @@ describe.skipIf(!databaseUrl)("given the owners' organization and membership row
     await connection.closeOnce();
   });
 
-  /** @scenario "The member backfill skips disabled members and deactivated users" */
-  it("lists only the member whose membership and user are both active", async () => {
+  /** @scenario "The member backfill skips disabled members" */
+  it("lists only the member whose membership is not disabled", async () => {
     const members = await source.findActiveMembers({ organizationId });
 
     expect(members.map(({ userId }) => userId)).toEqual([activeUserId]);

@@ -4,7 +4,7 @@ import type {
   NurturingSourceMember,
 } from "../nurturing-member-source.repository.ts";
 
-/** Holds the active members it is given; a composition over memory stores has none. */
+/** Holds the non-disabled members it is given; a composition over memory stores has none. */
 export class MemoryNurturingMemberSourceRepository implements NurturingMemberSourceRepository {
   static create({
     membersByOrganization = {},

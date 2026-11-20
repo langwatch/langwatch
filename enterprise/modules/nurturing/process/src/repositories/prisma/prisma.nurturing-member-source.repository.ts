@@ -9,7 +9,10 @@ import type {
 /** Only the shared delegates this reader touches; it claims no table (R40). */
 type PrismaNurturingMemberSourceDatabase = Pick<PrismaClient, "organizationUser">;
 
-/** Organization's `OrganizationUser` rows, through a share (R40). */
+/**
+ * Organization's `OrganizationUser` rows, through a share (R40). Deactivation lives on `User`,
+ * which nurturing may not read, so the backfill service filters it through the owner's API.
+ */
 export class PrismaNurturingMemberSourceRepository implements NurturingMemberSourceRepository {
   private constructor(private readonly prisma: PrismaNurturingMemberSourceDatabase) {}
 
@@ -25,7 +28,7 @@ export class PrismaNurturingMemberSourceRepository implements NurturingMemberSou
     organizationId,
   }: Readonly<{ organizationId: string }>): Promise<NurturingSourceMember[]> {
     const rows = await this.prisma.organizationUser.findMany({
-      where: { organizationId, disabledAt: null, user: { deactivatedAt: null } },
+      where: { organizationId, disabledAt: null },
       select: { userId: true, createdAt: true },
     });
     return rows.map(({ userId, createdAt }) => ({ userId, joinedAt: createdAt.getTime() }));

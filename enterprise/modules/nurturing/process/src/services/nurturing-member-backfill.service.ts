@@ -9,7 +9,7 @@ import type { NurturingMemberSourceRepository } from "../repositories/nurturing-
 import type { NurturingOrganizationMemberRepository } from "../repositories/nurturing-organization-member.repository.ts";
 
 export type NurturingMemberBackfillPeers = Readonly<{
-  organizations: Pick<OrganizationApi, "listAllIds">;
+  organizations: Pick<OrganizationApi, "listAllIds" | "getAllMembers">;
   source: NurturingMemberSourceRepository;
   members: Pick<
     NurturingOrganizationMemberRepository,
@@ -81,7 +81,14 @@ export class NurturingMemberBackfillService {
     dryRun: boolean;
     totals: NurturingMemberBackfillTotals;
   }): Promise<void> {
-    const active = await this.peers.source.findActiveMembers({ organizationId });
+    // The source cannot see deactivation (it lives on `User`); the owner's member read leaves
+    // deactivated users out, so only users it returns count as current.
+    const current = new Set(
+      (await this.peers.organizations.getAllMembers({ organizationId })).map(({ id }) => id),
+    );
+    const active = (await this.peers.source.findActiveMembers({ organizationId })).filter(
+      ({ userId }) => current.has(userId),
+    );
     const present = new Set(
       (await this.peers.members.findMembershipsOfUsers({ userIds: active.map((m) => m.userId) }))
         .filter((row) => row.organizationId === organizationId)

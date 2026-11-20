@@ -218,6 +218,7 @@ describe("NurturingPlanSyncService", () => {
       });
       const organizations = {
         listAllIds: async () => ({ ids: ["org-a", "org-b"], next: null }),
+        getAllMembers: async () => [{ id: "alice" }] as never,
       };
       await NurturingMemberBackfillService.create({
         peers: { organizations, source, members },
