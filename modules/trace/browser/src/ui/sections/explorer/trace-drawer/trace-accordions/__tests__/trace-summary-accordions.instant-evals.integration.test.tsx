@@ -6,7 +6,10 @@
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import type { InstantEvalTraceResultWire } from "@langwatch/instant-eval-contract";
 import type { SpanTreeNode, TraceHeader } from "@langwatch/trace-contract";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, fireEvent, within } from "@testing-library/react";
+import type { TRPCLink } from "@trpc/client";
+import { observable } from "@trpc/server/observable";
 import "@testing-library/jest-dom/vitest";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -55,15 +58,6 @@ vi.mock("../../../../../../features/trace-drawer/behavior/use-trace-header.ts", 
   useTraceHeaderCanonical: () => ({ data: undefined }),
 }));
 
-vi.mock("../../../../../../features/trace-drawer/behavior/use-text-translation.ts", () => ({
-  useTextTranslation: ({ texts }: { texts: Record<string, string> }) => ({
-    displayTexts: texts,
-    isActive: false,
-    isLoading: false,
-    toggle: () => undefined,
-  }),
-}));
-
 vi.mock("../../../../../../features/trace-drawer/behavior/use-trace-events.ts", () => ({
   useTraceEvents: () => ({ events: [], isLoading: false }),
 }));
@@ -104,6 +98,7 @@ import {
   openTraceDrawerAt,
   setWindowAddress,
 } from "../../../../../../__tests__/window-location-router.ts";
+import { traceApi } from "../../../../../../behavior/trace-api.ts";
 import { toInstantEvalResultEntry } from "../../../../../../model/instant-eval-trace-results.ts";
 import { TraceSummaryAccordions } from "../trace-summary-accordions.tsx";
 
@@ -176,6 +171,28 @@ function result(overrides: Partial<InstantEvalTraceResultWire>): InstantEvalTrac
   };
 }
 
+// The summary's input and output panels read and write annotations over tRPC.
+// This suite is about the Instant Evals section, so every such call stays pending.
+function pendingLink(): TRPCLink<never> {
+  return () =>
+    () =>
+      observable((_observer) => {
+        return () => void 0;
+      });
+}
+
+function renderSummary({ onSelectSpan }: { onSelectSpan?: (spanId: string) => void } = {}) {
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const client = traceApi.createClient({ links: [pendingLink()] });
+  return renderWithDesignSystem(
+    <traceApi.Provider client={client} queryClient={queryClient}>
+      <QueryClientProvider client={queryClient}>
+        <TraceSummaryAccordions trace={header()} spans={SPANS} onSelectSpan={onSelectSpan} />
+      </QueryClientProvider>
+    </traceApi.Provider>,
+  );
+}
+
 function sectionOrder(container: HTMLElement): (string | null)[] {
   return Array.from(container.querySelectorAll("[data-section]"), (element) =>
     element.getAttribute("data-section"),
@@ -212,9 +229,7 @@ describe("the Instant Evals section of the trace summary", () => {
   describe("given release_instant_eval_results is on and the trace holds kept results", () => {
     describe("when the summary renders", () => {
       it("shows the Instant Evals section with each result", () => {
-        const { container } = renderWithDesignSystem(
-          <TraceSummaryAccordions trace={header()} spans={SPANS} />,
-        );
+        const { container } = renderSummary();
 
         const section = instantEvalsSection(container);
         expect(within(section).getByText("Instant Evals")).toBeInTheDocument();
@@ -224,9 +239,7 @@ describe("the Instant Evals section of the trace summary", () => {
 
       /** @scenario "The Instant Evals section comes straight after Evals" */
       it("orders the section straight after Evals", () => {
-        const { container } = renderWithDesignSystem(
-          <TraceSummaryAccordions trace={header()} spans={SPANS} />,
-        );
+        const { container } = renderSummary();
 
         const order = sectionOrder(container);
         expect(order).toContain("evals");
@@ -236,9 +249,7 @@ describe("the Instant Evals section of the trace summary", () => {
       /** @scenario "A result read from a span opens that span" */
       it("names the span a result was read from, and opens it when clicked", () => {
         const onSelectSpan = vi.fn();
-        const { container } = renderWithDesignSystem(
-          <TraceSummaryAccordions trace={header()} spans={SPANS} onSelectSpan={onSelectSpan} />,
-        );
+        const { container } = renderSummary({ onSelectSpan });
         const section = instantEvalsSection(container);
 
         const spanLink = within(section).getByRole("button", { name: SPAN_NAME });
