@@ -116,9 +116,6 @@ function identityErased(userId: string): ReplayEvent {
 /** How a step runs: for real or dry, from the start or from the report a failed run saved. */
 type StepRunOptions = { dryRun?: boolean; resumeFrom?: MigrationStepReport | null };
 
-/** How a step runs: for real or dry, from the start or from the report a failed run saved. */
-type StepRunOptions = { dryRun?: boolean; resumeFrom?: MigrationStepReport | null };
-
 /** A worker's deploy over the seeded owner logs: nurturing's own steps and its memory copies. */
 function deploy({
   events,
