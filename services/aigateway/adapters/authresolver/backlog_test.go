@@ -264,39 +264,167 @@ func TestBacklog_KeyCachedBeforeReconnectIsRefusedByMissedDisable(t *testing.T) 
 	mustServe(t, svc, back, "the re-enabled key keeps serving through the outage")
 }
 
-// @scenario "a disable that lands while the replay is in flight is refused"
-func TestBacklog_DisableLandingDuringTheReplayIsRefused(t *testing.T) {
-	res := &hookResolver{bundle: orgBundle("vk_mid", time.Now().Add(time.Hour))}
+// stepResolver answers resolve-key from steps in order, keeping the last; the
+// first call runs during before it answers, so a test can land a page then.
+type stepResolver struct {
+	mu     sync.Mutex
+	steps  []resolverReturn
+	during func()
+	calls  int
+}
+
+func (r *stepResolver) ResolveKey(_ context.Context, _ domain.PresentedKey) (*domain.Bundle, error) {
+	r.mu.Lock()
+	r.calls++
+	during := r.during
+	r.during = nil
+	step := r.steps[0]
+	if len(r.steps) > 1 {
+		r.steps = r.steps[1:]
+	}
+	r.mu.Unlock()
+	if during != nil {
+		during()
+	}
+	return step.bundle, step.err
+}
+
+func (r *stepResolver) FetchConfig(_ context.Context, _, _ string) (domain.ConfigFetchResult, error) {
+	return domain.ConfigFetchResult{}, nil
+}
+
+func (r *stepResolver) callCount() int {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.calls
+}
+
+// replayingService is a gateway whose org feed is paging a backlog, with a
+// resolve for vk_mid that lands a pending disable while it is in flight.
+func replayingService(t *testing.T, steps ...resolverReturn) (*Service, *stepResolver, *pagedPoller, *orgCursor) {
+	t.Helper()
+	res := &stepResolver{steps: steps}
 	poller := &pagedPoller{}
 	svc, _ := newService(t, Options{Resolver: res, ConfigFetcher: res, ChangePoller: poller})
 	seedL1(svc, hashKey(domain.PresentedKey{Token: "vk-lw-other"}), orgBundle("vk_other", time.Now().Add(time.Hour)), "")
 	cursor := feedCursor(t, svc, "org_1")
 	poller.queue(fullPage())
 	pollOnce(t, svc, cursor)
-	key := domain.PresentedKey{Token: "vk-lw-mid"}
-
 	res.during = func() {
 		poller.queue(fullPage(disabledEvent("vk_mid")))
 		pollOnce(t, svc, cursor)
 	}
-	mustBeDisabled(t, svc, key, "an answer read before the disable must not serve")
+	return svc, res, poller, cursor
+}
+
+// @scenario "an answer read before a pending denial is re-asked, not served"
+func TestBacklog_AnswerVoidedByPendingDenialIsReasked(t *testing.T) {
+	key := domain.PresentedKey{Token: "vk-lw-mid"}
+	active := resolverReturn{bundle: orgBundle("vk_mid", time.Now().Add(time.Hour))}
+
+	t.Run("the control plane answers again", func(t *testing.T) {
+		svc, res, _, _ := replayingService(t, active, active)
+		mustServe(t, svc, key, "the control plane's current answer serves")
+		if n := res.callCount(); n != 2 {
+			t.Fatalf("the voided answer must be re-asked once; got %d calls", n)
+		}
+	})
+
+	t.Run("the second call fails", func(t *testing.T) {
+		svc, _, _, _ := replayingService(t, active, resolverReturn{err: errControlPlaneDown})
+		_, err := svc.Resolve(context.Background(), key)
+		var refusal herr.E
+		if !errors.Is(err, domain.ErrAuthUpstream) || !errors.As(err, &refusal) || !refusal.Retryable {
+			t.Fatalf("want a retryable auth_upstream_unavailable, got %v", err)
+		}
+	})
+}
+
+// @scenario "a disable that lands while the replay is in flight is refused"
+func TestBacklog_DisableLandingDuringTheReplayIsRefused(t *testing.T) {
+	key := domain.PresentedKey{Token: "vk-lw-mid"}
+	disabled := resolverReturn{err: controlPlaneDisabled()}
+	svc, res, poller, cursor := replayingService(t,
+		resolverReturn{bundle: orgBundle("vk_mid", time.Now().Add(time.Hour))}, disabled, disabled)
+
+	mustBeDisabled(t, svc, key, "the re-asked control plane refuses the key")
+	if n := res.callCount(); n != 2 {
+		t.Fatalf("the answer read before the disable must be re-asked; got %d calls", n)
+	}
 	if svc.l1.Len() != 1 {
 		t.Fatalf("the racing answer must not be cached; L1 holds %d entries", svc.l1.Len())
 	}
-
-	res.bundle, res.err = nil, controlPlaneDisabled()
-	calls := res.calls
 	mustBeDisabled(t, svc, key, "the control plane refuses the disabled key")
-	if res.calls == calls {
-		t.Fatal("while the replay pages, the key is checked with the control plane")
+	if n := res.callCount(); n != 3 {
+		t.Fatalf("while the replay pages, the key is checked with the control plane; got %d calls", n)
 	}
 
 	poller.queue(lastPage())
 	pollOnce(t, svc, cursor)
-	res.err = errControlPlaneDown
-	calls = res.calls
+	res.mu.Lock()
+	res.steps = []resolverReturn{{err: errControlPlaneDown}}
+	res.mu.Unlock()
 	mustBeDisabled(t, svc, key, "once the replay ends, the disable refuses the key through an outage")
-	if res.calls != calls {
-		t.Fatal("once the replay ends, the key is refused without a control-plane call")
+	if n := res.callCount(); n != 3 {
+		t.Fatalf("once the replay ends, the key is refused without a control-plane call; got %d calls", n)
+	}
+}
+
+// @scenario "a held session survives an outage between backlog pages"
+func TestBacklog_HeldSessionSurvivesOutageBetweenBacklogPages(t *testing.T) {
+	fetcher := &heldKeyFetcher{err: errControlPlaneDown}
+	svc, _ := newService(t, Options{Resolver: &fetcher.fakeResolver, ConfigFetcher: fetcher})
+	svc.denyPending("vk_held", ChangeKindVirtualKeyDisabled)
+
+	got, err := svc.ReadHeldKey(context.Background(), heldBundle(), "42")
+
+	if got.Revoked {
+		t.Fatal("a pending denial must not end the session of a key a later page may re-enable")
+	}
+	if !errors.Is(err, errControlPlaneDown) {
+		t.Fatalf("the read must fail as the outage it is, got %v", err)
+	}
+}
+
+// @scenario "a stale denied-list entry never refuses a key whose denial is pending"
+func TestBacklog_StaleDeniedEntryDoesNotRefuseAPendingDenial(t *testing.T) {
+	res := newKeyedResolver()
+	poller := &pagedPoller{}
+	svc, _ := newService(t, Options{Resolver: res, ConfigFetcher: res, ChangePoller: poller})
+	key := domain.PresentedKey{Token: "vk-lw-stale"}
+	res.set(key.Token, resolverReturn{bundle: orgBundle("vk_stale", time.Now().Add(time.Hour))})
+	mustServe(t, svc, key, "the first request caches the key")
+	svc.deniedKeys.Add(hashKey(key), "vk_stale")
+
+	poller.queue(fullPage(disabledEvent("vk_stale")))
+	pollOnce(t, svc, feedCursor(t, svc, "org_1"))
+	before := res.callsFor(key.Token)
+	mustServe(t, svc, key, "a pending denial must not refuse the key through a stale index entry")
+	if res.callsFor(key.Token) == before {
+		t.Fatal("the key must be checked with the control plane")
+	}
+}
+
+// @scenario "a key that leaves the revocation list leaves the credential index too"
+func TestBacklog_KeyOffTheRevocationListLeavesTheIndex(t *testing.T) {
+	res := newKeyedResolver()
+	svc, _ := newService(t, Options{Resolver: res, ConfigFetcher: res})
+	key := domain.PresentedKey{Token: "vk-lw-pushed"}
+	h := hashKey(key)
+	seedL1(svc, h, orgBundle("vk_pushed", time.Now().Add(time.Hour)), "")
+	svc.applyChange("org_1", disabledEvent("vk_pushed"))
+	if _, ok := svc.deniedKeys.Peek(h); !ok {
+		t.Fatal("the disabled key's credential must be refused locally")
+	}
+
+	for i := 0; i < denySetSize; i++ {
+		svc.deny("vk_flood_"+strconv.Itoa(i), ChangeKindVirtualKeyRevoked)
+	}
+
+	if svc.denied.Contains("vk_pushed") {
+		t.Fatal("the flood must push the key off the revocation list")
+	}
+	if vk, ok := svc.deniedKeys.Peek(h); ok {
+		t.Fatalf("the credential still maps to %s after its key left the list", vk)
 	}
 }

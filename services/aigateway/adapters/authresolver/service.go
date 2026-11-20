@@ -740,6 +740,9 @@ func (s *Service) Resolve(ctx context.Context, key domain.PresentedKey) (*domain
 			}
 		}
 	}
+	if errors.Is(err, errPendingDenial) {
+		return s.reaskVoided(ctx, key, h)
+	}
 	if errors.Is(err, domain.ErrAuthUpstream) {
 		s.countRefusal(answer.bundle.VirtualKeyID, refusalFailClosed)
 	}

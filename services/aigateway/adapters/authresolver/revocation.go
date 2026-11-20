@@ -2,6 +2,7 @@ package authresolver
 
 import (
 	"context"
+	"errors"
 	"sync"
 	"time"
 
@@ -107,7 +108,7 @@ func (s *Service) scheduleRecheck(key domain.PresentedKey, h [64]byte) {
 		return
 	}
 	d, ok := s.denied.Peek(vkID)
-	if !ok || !s.rechecks.begin(h, d.at) {
+	if !ok || d.pending || !s.rechecks.begin(h, d.at) {
 		return
 	}
 	go s.recheckDenied(key, h, vkID)
@@ -204,13 +205,19 @@ func (s *Service) clearDenial(vkID, source string) {
 // clearDenialLocked reports whether vkID was denied.
 func (s *Service) clearDenialLocked(vkID string) bool {
 	was := s.denied.Remove(vkID)
+	s.forgetCredentialsLocked(vkID)
+	return was
+}
+
+// forgetCredentialsLocked drops the credentials vkID carried from the index.
+// The caller holds denyMu.
+func (s *Service) forgetCredentialsLocked(vkID string) {
 	for h := range s.deniedByVK[vkID] {
 		if v, ok := s.deniedKeys.Peek(h); ok && v == vkID {
 			s.deniedKeys.Remove(h)
 		}
 	}
 	delete(s.deniedByVK, vkID)
-	return was
 }
 
 // liftDenialBefore lifts vkID's denial when it is older than a confirmation
@@ -263,15 +270,15 @@ func (s *Service) indexDeniedLocked(vkID string) {
 	}
 }
 
-// pruneDeniedIndexLocked drops keys that left the revocation list once the
-// index outgrows it. The caller holds denyMu.
+// pruneDeniedIndexLocked drops keys that left the revocation list, with their
+// credentials, once the index outgrows it. The caller holds denyMu.
 func (s *Service) pruneDeniedIndexLocked() {
 	if len(s.deniedByVK) <= denySetSize {
 		return
 	}
 	for id := range s.deniedByVK {
 		if !s.denied.Contains(id) {
-			delete(s.deniedByVK, id)
+			s.forgetCredentialsLocked(id)
 		}
 	}
 }
@@ -307,8 +314,7 @@ func (s *Service) admit(ctx context.Context, h [64]byte, in served) (*domain.Bun
 	if b.VirtualKeyID != "" {
 		if _, ok := s.denied.Peek(b.VirtualKeyID); ok {
 			if d, kept := s.liftDenialBefore(b.VirtualKeyID, authStart, "confirmation"); kept {
-				s.dropAndCountDenied(h, b.VirtualKeyID, denialReason(d.kind))
-				return nil, denialError(ctx, d.kind)
+				return nil, s.refuseVoided(ctx, voidedAnswer{h: h, vkID: b.VirtualKeyID, by: d})
 			}
 		}
 	}
@@ -320,6 +326,56 @@ func (s *Service) admit(ctx context.Context, h [64]byte, in served) (*domain.Bun
 		}).WithRetryable(true)
 	}
 	return b, nil
+}
+
+// errPendingDenial is admit's answer when a pending denial voided the
+// confirmation: Resolve asks the control plane again (reaskVoided).
+var errPendingDenial = errors.New("confirmation voided by a pending denial")
+
+// voidedAnswer is a credential whose confirmation the denial `by` voided.
+type voidedAnswer struct {
+	h    [64]byte
+	vkID string
+	by   denial
+}
+
+// refuseVoided refuses an answer a denial voided. A pending one may come from
+// an event a later page undoes, so the answer is asked again, not refused.
+func (s *Service) refuseVoided(ctx context.Context, v voidedAnswer) error {
+	h, vkID, d := v.h, v.vkID, v.by
+	if d.pending {
+		s.rememberDenied(vkID, h)
+		return errPendingDenial
+	}
+	s.dropAndCountDenied(h, vkID, denialReason(d.kind))
+	return denialError(ctx, d.kind)
+}
+
+// reaskVoided asks the control plane once more about a key whose answer a
+// pending denial voided, and admits that answer. One it cannot get, or one a
+// newer pending denial voids again, is retryable.
+func (s *Service) reaskVoided(ctx context.Context, key domain.PresentedKey, h [64]byte) (*domain.Bundle, error) {
+	answer, err := s.resolveFresh(ctx, key, h)
+	if err != nil && classifyRefreshError(err) == classTransportFailure {
+		return nil, errReaskUnavailable(ctx, err)
+	}
+	if err != nil {
+		return nil, err
+	}
+	bundle, err := s.admit(ctx, h, answer)
+	if errors.Is(err, errPendingDenial) {
+		return nil, errReaskUnavailable(ctx, err)
+	}
+	if err == nil && answer.stale != "" {
+		s.recordStaleServe(answer.stale)
+	}
+	return bundle, err
+}
+
+func errReaskUnavailable(ctx context.Context, cause error) error {
+	return herr.New(ctx, domain.ErrAuthUpstream, herr.M{
+		"message": "this key changed while the gateway was catching up and the control plane could not re-check it; retry shortly",
+	}, cause).WithRetryable(true)
 }
 
 // claimReconfirm lets one request per FailClosedReconfirmInterval re-check a
@@ -476,7 +532,7 @@ func (s *Service) refusalIfDenied(ctx context.Context, h [64]byte) error {
 		return nil
 	}
 	d, ok := s.denied.Peek(vkID)
-	if !ok || !d.at.After(s.confirmedAt(h)) {
+	if !ok || d.pending || !d.at.After(s.confirmedAt(h)) {
 		return nil
 	}
 	s.dropAndCountDenied(h, vkID, denialReason(d.kind))
