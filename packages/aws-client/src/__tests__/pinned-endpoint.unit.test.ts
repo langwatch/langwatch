@@ -1,5 +1,3 @@
-// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-
 import { describe, expect, it } from "vitest";
 
 import {
@@ -8,15 +6,9 @@ import {
   pinnedHostsConfig,
   pinnedHostsLookup,
   pinnedLookup,
-} from "../s3.object-store.channel.ts";
+} from "../pinned-endpoint.ts";
 
-const base = {
-  originalUrl: "https://sqs.example.com/",
-  hostname: "sqs.example.com",
-  port: 443,
-  protocol: "https:",
-  path: "/",
-};
+const HOST = "sqs.example.com";
 
 function lookupOnce(lookup: ReturnType<typeof pinnedLookup>, all: boolean): Promise<unknown> {
   return new Promise((resolve, reject) => {
@@ -39,19 +31,15 @@ describe("pinnedLookup", () => {
 
 describe("pinnedEndpointConfig", () => {
   it("refuses an endpoint the fence could not resolve", () => {
-    expect(() =>
-      pinnedEndpointConfig({ ...base, type: "unresolved", reason: "dns-failed" }),
-    ).toThrow(/did not resolve/);
+    expect(() => pinnedEndpointConfig({ hostname: HOST })).toThrow(/did not resolve/);
   });
 
   it("builds a handler for a resolved endpoint", () => {
-    expect(
-      pinnedEndpointConfig({ ...base, type: "resolved", resolvedIp: "203.0.113.7" }),
-    ).toBeDefined();
+    expect(pinnedEndpointConfig({ hostname: HOST, resolvedIp: "203.0.113.7" })).toBeDefined();
   });
 
   it("refuses an allowlisted host the fence did not resolve", () => {
-    expect(() => pinnedEndpointConfig({ ...base, type: "allowlisted" })).toThrow(/did not resolve/);
+    expect(() => pinnedEndpointConfig({ hostname: HOST })).toThrow(/did not resolve/);
   });
 });
 
@@ -77,8 +65,8 @@ describe("pinnedHostsConfig", () => {
   it("refuses when one judged host did not resolve", () => {
     expect(() =>
       pinnedHostsConfig([
-        { ...base, type: "resolved", resolvedIp: "203.0.113.7" },
-        { ...base, hostname: "queue.acme.example", type: "allowlisted" },
+        { hostname: HOST, resolvedIp: "203.0.113.7" },
+        { hostname: "queue.acme.example" },
       ]),
     ).toThrow(/queue.acme.example did not resolve/);
   });

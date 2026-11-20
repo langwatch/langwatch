@@ -64,7 +64,8 @@ type PullRuns = {
 
 /**
  * Creates, edits, tests and reports on Security Lake sources. A source is an ingestion source of
- * type security_lake whose pull schedule drives the reader. Spec: specs/security-lake-ingest.feature
+ * type security_lake whose pull schedule drives the reader.
+ * Spec: enterprise/modules/governance/specs/security-lake-ingest.feature
  */
 export class SecurityLakeSourceService {
   private constructor(

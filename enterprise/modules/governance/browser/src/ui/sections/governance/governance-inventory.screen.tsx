@@ -127,6 +127,13 @@ function InventoryTabs({
   );
 }
 
+/** Security Lake sources have their own section; the generic edit would overwrite their config. */
+function genericallyManagedSources<T extends { sourceType: string }>(
+  sources: readonly T[] | undefined,
+): T[] | undefined {
+  return sources?.filter((source) => source.sourceType !== SECURITY_LAKE_SOURCE_TYPE);
+}
+
 /**
  * Everything under the Sources tab: the connectors header with the add control
  * an admin only sees with the manage grant, and the table itself.
@@ -136,13 +143,6 @@ function InventoryTabs({
  * about a read that failed underneath them is then noise about data they are
  * not looking at, and the banner above already says the screen is a mock-up.
  */
-/** Security Lake sources have their own section; the generic edit would overwrite their config. */
-function genericallyManagedSources<T extends { sourceType: string }>(
-  sources: readonly T[] | undefined,
-): T[] | undefined {
-  return sources?.filter((source) => source.sourceType !== SECURITY_LAKE_SOURCE_TYPE);
-}
-
 function InventorySourcesPane({ page }: { page: ReturnType<typeof useIngestionSourcesPage> }) {
   const { orgId, sourcesQuery, mutations } = page;
   const generic = genericallyManagedSources(sourcesQuery.data);

@@ -70,7 +70,6 @@
     "@langwatch/user-contract": "workspace:*",
     "@langwatch/webhook-contract": "workspace:*",
     "@opentelemetry/otlp-transformer": "catalog:",
-    "@smithy/node-http-handler": "^4.9.11",
     "@trpc/server": "catalog:",
     "hono": "catalog:",
     "hono-openapi": "catalog:",

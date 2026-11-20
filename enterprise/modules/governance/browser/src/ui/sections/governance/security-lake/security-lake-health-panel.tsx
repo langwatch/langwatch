@@ -1,5 +1,6 @@
-import { FormattedDate } from "@langwatch/design-system/formatted-date";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+
+import { FormattedDate } from "@langwatch/design-system/formatted-date";
 import {
   Alert,
   Badge,
@@ -18,7 +19,7 @@ const formatTime = (ms: number | null): ReactNode =>
   ms === null ? "Not read yet" : <FormattedDate value={ms} />;
 
 /** Lag in the largest unit that keeps it a whole number of minutes, hours or seconds. */
-export function formatLag(ms: number | null): string {
+function formatLag(ms: number | null): string {
   if (ms === null) return "None";
   if (ms < 60_000) return `${Math.round(ms / 1000)}s`;
   if (ms < 3_600_000) return `${Math.round(ms / 60_000)} min`;

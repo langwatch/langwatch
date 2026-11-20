@@ -26,3 +26,11 @@ export {
   type AwsStaticCredentialIdentity,
   type StaticAwsCredentials,
 } from "./aws-client.ts";
+export {
+  pinnedEndpointConfig,
+  pinnedHandlerOptions,
+  pinnedHostsConfig,
+  pinnedHostsLookup,
+  pinnedLookup,
+  type JudgedEndpoint,
+} from "./pinned-endpoint.ts";

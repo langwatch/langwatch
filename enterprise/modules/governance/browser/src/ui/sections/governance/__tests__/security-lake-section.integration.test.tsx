@@ -7,6 +7,7 @@
 import { cleanup, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import "@testing-library/jest-dom/vitest";
+import { useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { fakeGovernanceHost, renderWithGovernanceHost } from "../../../../testing.tsx";
@@ -15,8 +16,22 @@ import { SecurityLakeSection } from "../security-lake/security-lake-section.tsx"
 const calls = vi.hoisted(() => ({
   callers: [] as { input: unknown; options: { enabled?: boolean } | undefined }[],
   tested: [] as unknown[],
-  resets: 0,
 }));
+
+/** A connection-test mutation that keeps its last answer until reset, as the real hook does. */
+function useStatefulTestConnection() {
+  const [state, setState] = useState<{ variables: unknown; data: unknown } | null>(null);
+  return {
+    isPending: false,
+    data: state?.data,
+    variables: state?.variables ?? null,
+    mutate: (input: unknown) => {
+      calls.tested.push(input);
+      setState({ variables: input, data: { ok: true, waiting: 3, inFlight: 0 } });
+    },
+    reset: () => setState(null),
+  };
+}
 
 vi.mock("../../../../behavior/governance-api.ts", () => {
   const mutation = () => ({ mutate: vi.fn(), isPending: false, data: undefined, variables: null });
@@ -25,15 +40,7 @@ vi.mock("../../../../behavior/governance-api.ts", () => {
       ingestionSources: {
         securityLakeCreate: { useMutation: mutation },
         securityLakeUpdate: { useMutation: mutation },
-        securityLakeTestConnection: {
-          useMutation: () => ({
-            ...mutation(),
-            mutate: (input: unknown) => calls.tested.push(input),
-            reset: () => {
-              calls.resets += 1;
-            },
-          }),
-        },
+        securityLakeTestConnection: { useMutation: () => useStatefulTestConnection() },
         securityLakeGet: {
           useQuery: () => ({ data: { externalId: "lw-0123456789abcdef0123456789abcdef" } }),
         },
@@ -71,7 +78,6 @@ const renderSection = (props: {
 beforeEach(() => {
   calls.callers.length = 0;
   calls.tested.length = 0;
-  calls.resets = 0;
 });
 afterEach(cleanup);
 
@@ -121,9 +127,11 @@ describe("SecurityLakeSection", () => {
       }),
     ]);
     expect(calls.tested[0]).not.toHaveProperty("credentials");
-    const resetsBeforeCancel = calls.resets;
+    expect(screen.getByText(/Queue reachable: 3 waiting/)).toBeInTheDocument();
+
     await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
-    expect(calls.resets).toBe(resetsBeforeCancel + 1);
-    expect(resetsBeforeCancel).toBe(1);
+    await userEvent.click(screen.getByRole("button", { name: "Edit" }));
+
+    expect(screen.queryByText(/Queue reachable/)).not.toBeInTheDocument();
   });
 });

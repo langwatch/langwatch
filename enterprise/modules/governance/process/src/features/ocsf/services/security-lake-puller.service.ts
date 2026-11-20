@@ -9,6 +9,7 @@ import {
   securityLakePullConfigSchema,
   type SecurityLakePullConfig,
 } from "@langwatch/enterprise-governance-contract";
+import { DispatchError, extractHttpStatus, isRetryableHttpStatus } from "@langwatch/eventing";
 import { type InternalProjectQuery, PROJECT_KIND } from "@langwatch/project-contract";
 import { Temporal } from "@langwatch/time";
 
@@ -58,16 +59,35 @@ export function securityLakeCredentialsOf(
     secretAccessKey,
     sessionToken: credentials?.aws_session_token?.trim() || undefined,
     requireStaticKeys: true,
-    ...(emulated || !externalId
-      ? {}
-      : { assumeRole: { roleArn: config.subscriberRoleArn, externalId } }),
+    ...(emulated ? {} : { assumeRole: { roleArn: config.subscriberRoleArn, externalId } }),
   };
+}
+
+/**
+ * A failed run as the pull runner reads it: a 4xx from AWS or a missing key is the customer's to
+ * fix, so it is refused rather than retried. The message keeps only the error code, since AWS's
+ * own text can name our principals; the original error stays as the cause.
+ */
+function securityLakeRunFailure(error: unknown): DispatchError {
+  const customerMessage = describeAwsFailure(error);
+  const status = extractHttpStatus(error);
+  const setupMissing =
+    error instanceof MissingStaticAwsCredentialsError ||
+    error instanceof MissingSecurityLakeExternalIdError;
+  const retryable = !setupMissing && (status === undefined || isRetryableHttpStatus(status));
+  return new DispatchError({
+    message: customerMessage,
+    retryable,
+    cause: error,
+    ...(retryable ? {} : { customerMessage }),
+  });
 }
 
 /**
  * Security Lake as a scheduled pull: each run on the source's schedule reads its subscriber queue
  * once. Events go straight to governance_ocsf_events, so the run returns none, and the cursor holds
- * the source health folded from every run. Spec: specs/security-lake-ingest.feature
+ * the source health folded from every run.
+ * Spec: enterprise/modules/governance/specs/security-lake-ingest.feature
  */
 export class SecurityLakePullerService implements GovernancePuller<SecurityLakePullConfig> {
   readonly id: string = SECURITY_LAKE_ADAPTER_ID;
@@ -98,16 +118,19 @@ export class SecurityLakePullerService implements GovernancePuller<SecurityLakeP
       organizationId: options.context.organizationId,
       kind: PROJECT_KIND.INTERNAL_GOVERNANCE,
     });
-    const run = await this.deps.reader
-      .readOnce({
-        tenantId: tenant.id,
-        sourceId: options.context.ingestionSourceId,
-        config,
-        credentials: securityLakeCredentialsOf(options.credentials, config),
-        ...(options.signal === undefined ? {} : { signal: options.signal }),
-      })
+    const sourceId = options.context.ingestionSourceId;
+    const run = await Promise.resolve()
+      .then(() =>
+        this.deps.reader.readOnce({
+          tenantId: tenant.id,
+          sourceId,
+          config,
+          credentials: securityLakeCredentialsOf(options.credentials, config),
+          ...(options.signal === undefined ? {} : { signal: options.signal }),
+        }),
+      )
       .catch((error: unknown) => {
-        throw new Error(describeAwsFailure(error));
+        throw securityLakeRunFailure(error);
       });
     const nowMs = this.deps.now();
     const health = foldSecurityLakeRun({

@@ -2,7 +2,7 @@
 /**
  * @vitest-environment node
  * The Security Lake procedures that save a source ask for `ingestionSources:manage` before the
- * handler runs. Spec: specs/security-lake-ingest.feature
+ * handler runs. Spec: enterprise/modules/governance/specs/security-lake-ingest.feature
  */
 import type { GovernanceRestApi } from "@langwatch/enterprise-governance-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
