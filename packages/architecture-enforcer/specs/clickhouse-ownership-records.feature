@@ -5,12 +5,7 @@ Feature: ClickHouse ownership records and named exceptions
   one-statement subqueries into other modules' tables are named exceptions.
   A third (EF-5, 2026-10-07): an owner may share a table for reading with
   named modules, as trace shares trace_analytics with analytics; writes stay
-  the owner's. A record may also reserve a table for the module that will
-  write it (ADR-189 reserved eval_results for instant-eval until its first
-  write deleted the record): the table counts as that module's, so another
-  module reading or writing it is reported, and the module's first write asks
-  for the record to be deleted. Each record, exception and shared table
-  carries a reason.
+  the owner's. Each record, exception and shared table carries a reason.
 
   Background:
     Given the policy reads the table list from the goose migrations
@@ -30,43 +25,6 @@ Feature: ClickHouse ownership records and named exceptions
     Then no finding names stored_objects as having no module owner
 
   @unit @architecture
-  Scenario: A table reserved for a module is not an ownerless table
-    Given a migration creates eval_results and no module writes it yet
-    And the policy records eval_results as reserved for instant-eval with a reason
-    When the policy runs
-    Then no finding names eval_results as having no module owner
-
-  @unit @architecture
-  Scenario: The reserved module's first write asks for the record to be deleted
-    Given the policy records eval_results as reserved for instant-eval
-    When instant-eval's repository inserts into eval_results
-    Then the policy reports the reservation as done and asks for the record to be deleted
-
-  @unit @architecture
-  Scenario: Another module writing a reserved table is reported
-    Given the policy records eval_results as reserved for instant-eval
-    When trace's repository inserts into eval_results
-    Then the policy reports trace writing a table reserved for instant-eval
-
-  @unit @architecture
-  Scenario: Another module reading a reserved table is reported
-    Given the policy records eval_results as reserved for instant-eval
-    When trace's repository reads eval_results
-    Then the policy reports trace reading a table owned by instant-eval
-
-  @unit @architecture
-  Scenario: Another module writing and reading a reserved table is reported once
-    Given the policy records eval_results as reserved for instant-eval
-    When trace's repository inserts into and reads eval_results
-    Then the policy reports trace writing it and no separate read
-
-  @unit @architecture
-  Scenario: A reserved table's owner is its named writer
-    Given the policy records eval_results as reserved for instant-eval
-    When the table owners are listed
-    Then eval_results is owned by instant-eval
-
-  @unit @architecture
   Scenario: A module writing a recorded table is reported
     Given the policy records event_log as framework owned
     When a module's repository inserts into event_log
@@ -77,13 +35,6 @@ Feature: ClickHouse ownership records and named exceptions
     Given the policy records a table that no migration creates
     When the policy runs
     Then the policy reports the record as stale and asks for it to be deleted
-
-  @unit @architecture
-  Scenario: A reserved record naming a table no migration creates is reported
-    Given the policy records a table as reserved for instant-eval
-    And no migration creates that table
-    When the policy runs
-    Then the policy asks for the record to be deleted, saying the table is reserved for instant-eval
 
   @unit @architecture
   Scenario: A declared one-statement subquery passes

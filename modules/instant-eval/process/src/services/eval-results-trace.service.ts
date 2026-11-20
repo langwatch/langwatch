@@ -7,9 +7,11 @@
 import type { InstantEvalTraceResultWire } from "@langwatch/instant-eval-contract";
 
 import type { EvalResultsRepository } from "../repositories/eval-results.repository.ts";
-import { EVAL_RESULTS_KEY_VERSION } from "../rules/eval-results-key.rules.ts";
+import {
+  EVAL_RESULTS_KEY_VERSION,
+  EVAL_RESULTS_RECALL_WINDOW_PADDING_MS,
+} from "../rules/eval-results-key.rules.ts";
 import { toInstantEvalTraceResultWire } from "../rules/eval-results-trace.rules.ts";
-import { EVAL_RESULTS_RECALL_WINDOW_PADDING_MS } from "./eval-results-recall.service.ts";
 
 /** What this service asks of other modules, narrowed to the one answer it needs. */
 export interface EvalResultsTracePeers {

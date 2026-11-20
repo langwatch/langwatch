@@ -14,6 +14,22 @@ const SOURCE_LABELS: Readonly<Record<InstantEvalTraceResultSource, string>> = {
   dashboard: "Dashboard",
 };
 
+/** The stored judged column is the extraction function's name, which a customer never typed. */
+const JUDGED_TEXT_LABELS: ReadonlyMap<string, string> = new Map([
+  ["llm_readable_trace", "trace"],
+  ["llm_messages", "messages"],
+  ["llm_input_messages", "input messages"],
+  ["llm_output_messages", "output messages"],
+  ["llm_messages_span", "span messages"],
+  ["trace_json", "full trace"],
+  ["monitor", "monitor"],
+]);
+
+/** The judged text in plain words; a column this list does not know reads as itself. */
+export function instantEvalJudgedTextLabel(judgedColumn: string): string {
+  return JUDGED_TEXT_LABELS.get(judgedColumn) ?? judgedColumn;
+}
+
 /** One row of the drawer's Instant Evals section. */
 export interface InstantEvalResultEntry {
   readonly key: string;
@@ -27,6 +43,8 @@ export interface InstantEvalResultEntry {
   /** Absent for the trace's own text. */
   readonly spanId?: string;
   readonly judgedColumn: string;
+  /** The judged text in plain words, as the drawer shows it. */
+  readonly judgedTextLabel: string;
 }
 
 /** The verdict in words: a boolean's likelihood, a score, a category, or why there is none. */
@@ -55,5 +73,6 @@ export function toInstantEvalResultEntry(
     judgedAt: result.judgedAt,
     ...(result.spanId === "" ? {} : { spanId: result.spanId }),
     judgedColumn: result.judgedColumn,
+    judgedTextLabel: instantEvalJudgedTextLabel(result.judgedColumn),
   };
 }

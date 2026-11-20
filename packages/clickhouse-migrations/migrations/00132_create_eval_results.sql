@@ -13,7 +13,8 @@
 --
 -- The sort key leads with the trace, so the recall lookup and the trace page's
 -- read are both prefix reads. InputHash and JudgedColumn are in the key so a
--- question asked of a trace's input and of its output are two rows, never one.
+-- question asked of two texts of one trace (say llm_input_messages and
+-- llm_output_messages) are two rows, never one.
 -- JudgedAt ends the key so every judgment is kept: a judge is not
 -- deterministic, and a re-judgment of the same trace by the same source adds a
 -- row rather than replacing one. A
@@ -23,7 +24,7 @@
 -- JudgedAt across every source. Reads MUST be replacement-aware (argMax or FINAL).
 -- A reader that shows a verdict groups by (TraceId, SpanId, QuestionHash,
 -- JudgedColumn) at the current KeyVersion and takes the latest judged row by
--- (JudgedAt, UpdatedAt, SourceId), as recall does, so input and output stay
+-- (JudgedAt, UpdatedAt, SourceId), as recall does, so two judged texts stay
 -- two results and a newer verdict replaces an older one.
 --
 -- KeyVersion is the version of the recall key's hashing. Recall reads only rows
@@ -76,8 +77,10 @@ CREATE TABLE IF NOT EXISTS ${CLICKHOUSE_DATABASE}.eval_results
     -- {input, output, contexts} as canonical JSON.
     InputHash String DEFAULT '' CODEC(ZSTD(1)),
 
-    -- The judged column (input, output, ...); 'monitor' for a monitor. Every
-    -- writer sets it; an empty value is a writer bug. Readers group by it.
+    -- The extraction that read the judged text: llm_readable_trace,
+    -- llm_messages, llm_input_messages, llm_output_messages, llm_messages_span
+    -- or trace_json; 'monitor' for a monitor. Every writer sets it; an empty
+    -- value is a writer bug. Readers group by it.
     JudgedColumn LowCardinality(String) DEFAULT '' CODEC(ZSTD(1)),
 
     -- The version of the recall key's hashing.

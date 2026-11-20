@@ -508,7 +508,11 @@ export const instantEvalSampleSchema: InstantEvalSampleSchema = instantEvalSampl
 /** One kept result on a trace (ADR-189 section 3): a question's latest verdict on one text. */
 const instantEvalTraceResultSchemaDefinition = z.object({
   spanId: z.string().describe("The span the judged text was read from; empty for the trace's own."),
-  judgedColumn: z.string().describe("The text that was judged, such as input or output."),
+  judgedColumn: z
+    .string()
+    .describe(
+      "The extraction that read the judged text: llm_readable_trace, llm_messages, llm_input_messages, llm_output_messages, llm_messages_span or trace_json; monitor for a monitor's judgment.",
+    ),
   question: z.string().describe("The question as it was asked."),
   kind: z.string().describe("What kind of question was asked."),
   status: z

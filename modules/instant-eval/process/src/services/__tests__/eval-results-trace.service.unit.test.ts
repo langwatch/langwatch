@@ -8,8 +8,10 @@ import { describe, expect, it } from "vitest";
 
 import type { EvalResultRecord } from "../../repositories/eval-results.repository.ts";
 import { MemoryEvalResultsRepository } from "../../repositories/memory/memory.eval-results.repository.ts";
-import { EVAL_RESULTS_KEY_VERSION } from "../../rules/eval-results-key.rules.ts";
-import { EVAL_RESULTS_RECALL_WINDOW_PADDING_MS } from "../eval-results-recall.service.ts";
+import {
+  EVAL_RESULTS_KEY_VERSION,
+  EVAL_RESULTS_RECALL_WINDOW_PADDING_MS,
+} from "../../rules/eval-results-key.rules.ts";
 import { EvalResultsTraceService } from "../eval-results-trace.service.ts";
 
 const TRACE_START = Date.UTC(2026, 10, 2, 10);

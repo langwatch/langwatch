@@ -29,7 +29,7 @@ Facts the design rests on:
 - A run writes one bulk insert per page of up to 500 rows (`INSTANT_EVAL_PAGE_SIZE`, `instant-eval-run-sizing.rules.ts:15`) through `instant-eval-judge-page.service.ts:452`, with `async_insert` (`clickhouse.instant-eval-judgments.repository.ts:87-113`). The record carries no `_retention_days`, so every row keeps the default 0, which means never expire.
 - `instant_eval_judgments` and `instant_eval_runs` are in `INDEFINITE_DEFAULT_RETENTION_TABLES` (`modules/data-retention/contract/src/retention-tables.ts:84-91`), not in the customer cascade.
 - `Passed` is derived at write from `Probability >= threshold` (`instant-eval-verdicts.rules.ts:49-54`). So a pass can be derived again on read with any threshold.
-- Two readers depend on the judgments table: the Explorer `eval:"question"` chip (`trace-query-subquery.rules.ts:74`, a declared exception in `clickhouse-table-ownership.ts:141-146`) and the LWQL `analytics.judgments` view (`lwql-view-catalog.rules.ts:2798-2800`).
+- Two readers depend on the judgments table: the Explorer `eval:"question"` chip (`trace-query-subquery.rules.ts:74`, a declared exception in `clickhouse-table-ownership.ts:129-134`) and the LWQL `analytics.judgments` view (`lwql-view-catalog.rules.ts:2798-2800`).
 - `evaluation_runs` is `ReplacingMergeTree(UpdatedAt)`, `PARTITION BY toYearWeek(ScheduledAt)`, `ORDER BY (TenantId, EvaluationId)` (00002). The trace page reads it through `trace-evaluation-runs.repository.ts`, helped by the `evaluation_runs_by_trace_id_index` (00121).
 
 ## The two questions
@@ -68,7 +68,7 @@ CREATE TABLE IF NOT EXISTS ${CLICKHOUSE_DATABASE}.eval_results
     Kind LowCardinality(String) CODEC(ZSTD(1)),
     JudgeModel LowCardinality(String) CODEC(ZSTD(1)),
     InputHash String DEFAULT '' CODEC(ZSTD(1)),
-    JudgedColumn LowCardinality(String) DEFAULT '' CODEC(ZSTD(1)),  -- the judged column (input, output, ...); 'monitor' for a monitor; every writer sets it
+    JudgedColumn LowCardinality(String) DEFAULT '' CODEC(ZSTD(1)),  -- the extraction that read the judged text (llm_readable_trace, llm_messages, llm_input_messages, llm_output_messages, llm_messages_span, trace_json); 'monitor' for a monitor; every writer sets it
     KeyVersion UInt16 CODEC(ZSTD(1)),  -- recall reads only the current version
 
     -- Who asked: ask, run, dashboard or monitor, and the id of that query, run, widget or monitor.
@@ -176,7 +176,7 @@ The rule: every Instant Evals judgment is a row in `eval_results`, whoever asked
 
 No row of `instant_eval_judgments` is copied into `eval_results`. Two recall key columns cannot be rebuilt from what an old row and its run store:
 
-- **`InputHash`** is sha256 of the judged column name and its text (`eval-results-key.rules.ts:70-78`). Neither table stores the text or a hash of it: 00097 keeps no judged text (lines 29-34), and `instant_eval_runs` keeps the statement and its questions (00098 lines 55-63). Reading the trace's text again does not count: the text can change after it was judged (open question 2) and retention can drop it, so the hash would name text that was never judged.
+- **`InputHash`** is sha256 of the judged column name and its text (`eval-results-key.rules.ts:75-83`). Neither table stores the text or a hash of it: 00097 keeps no judged text (lines 29-34), and `instant_eval_runs` keeps the statement and its questions (00098 lines 55-63). Reading the trace's text again does not count: the text can change after it was judged (open question 2) and retention can drop it, so the hash would name text that was never judged.
 - **`JudgeModel`** is the project's decision model at judge time (`instant-eval.app.ts:504-505`). No run or judgment column records it, and the project may have changed its decision model since.
 
 A guessed key would let recall serve a verdict on text, or from a judge, that never produced it, which is what the key exists to prevent. A run whose `Questions` carry no `judgedText` (`instant-eval-run-questions.rules.ts:38-39`) has no `JudgedColumn` either.

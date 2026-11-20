@@ -49,14 +49,10 @@ type ScanRoot = { module: string; directory: string };
 const ALLOWED =
   "Write a ClickHouse table from one module's repositories only, and read it elsewhere through that module's api. See ADR-134.";
 
-/**
- * A table no module writes, recorded with who does and why (Alex, 2026-10-06, Q207).
- * A `reserved` table is created ahead of its writer: `writer` names the module
- * whose first write must replace the record.
- */
+/** A table no module writes, recorded with who does and why (Alex, 2026-10-06, Q207). */
 export type OwnershipRecord = {
   table: string;
-  owner: "framework" | "legacy" | "reserved";
+  owner: "framework" | "legacy";
   writer: string;
   reason: string;
 };
@@ -671,104 +667,35 @@ function owners(access: readonly Access[]): Map<string, Access[]> {
 
 type Feeds = ReadonlyMap<string, readonly string[]>;
 
-/** What a module writing a recorded table is told, by the kind of record. */
-function writeMessage({ record, module }: { record: OwnershipRecord; module: string }): string {
-  if (record.owner !== "reserved") {
-    return `${module} writes ${record.table}, recorded as ${record.owner} owned (${record.writer}: ${record.reason}).`;
-  }
-
-  return module === record.writer
-    ? `${module} writes ${record.table}, reserved for it. Delete the record: the write owns the table now.`
-    : `${module} writes ${record.table}, reserved for ${record.writer} (${record.reason}).`;
-}
-
-/** What a record no migration backs is told, by the kind of record. */
-function staleMessage(record: OwnershipRecord): string {
-  const recorded =
-    record.owner === "reserved"
-      ? `reserved for ${record.writer}`
-      : `recorded as ${record.owner} owned`;
-
-  return `Table ${record.table} is ${recorded} but no migration creates it. Delete the record.`;
-}
-
-/**
- * A recorded table no migration creates, a module writing one, or a foreign read
- * of a reserved one.
- */
+/** A recorded table no migration creates, or a module writing one. */
 function recordFindings({
   tables,
   writers,
   records,
-  context,
+  root,
 }: {
   tables: ReadonlyMap<string, string>;
   writers: ReadonlyMap<string, Access[]>;
   records: readonly OwnershipRecord[];
-  context: Pick<TableContext, "access" | "exceptions" | "root">;
+  root: string;
 }): Finding[] {
-  const { root } = context;
   return records.flatMap((record): Finding[] => {
     if (!tables.has(record.table)) {
       return [
         {
           key: `record|${record.table}`,
           file: join(root, MIGRATIONS),
-          message: staleMessage(record),
+          message: `Table ${record.table} is recorded as ${record.owner} owned but no migration creates it. Delete the record.`,
         },
       ];
     }
 
-    const writes = (writers.get(record.table) ?? []).map((writer) => ({
+    return (writers.get(record.table) ?? []).map((writer) => ({
       key: `${writer.module}|${record.table}`,
       file: writer.file,
       line: writer.line,
-      message: writeMessage({ record, module: writer.module }),
+      message: `${writer.module} writes ${record.table}, recorded as ${record.owner} owned (${record.writer}: ${record.reason}).`,
     }));
-
-    if (record.owner !== "reserved") return writes;
-    const written = new Set(writes.map((finding) => finding.key));
-
-    return [
-      ...writes,
-      ...reservedReads({ record, context }).filter((finding) => !written.has(finding.key)),
-    ];
-  });
-}
-
-/**
- * A reserved table has a known owner, so a read by any other module is reported as for a
- * written table.
- */
-function reservedReads({
-  record,
-  context,
-}: {
-  record: OwnershipRecord;
-  context: Pick<TableContext, "access" | "exceptions" | "root">;
-}): Finding[] {
-  const { access, exceptions, root } = context;
-  const readers = access.filter(
-    (entry) =>
-      entry.table === record.table &&
-      !entry.write &&
-      entry.module !== record.writer &&
-      !isExcepted({ entry, exceptions, root }),
-  );
-  const seen = new Set<string>();
-
-  return readers.flatMap((entry): Finding[] => {
-    if (seen.has(entry.module)) return [];
-    seen.add(entry.module);
-
-    return [
-      {
-        key: `${entry.module}|${record.table}`,
-        file: entry.file,
-        line: entry.line,
-        message: `${entry.module} reads ${record.table}, owned by ${record.writer}.`,
-      },
-    ];
   });
 }
 
@@ -951,7 +878,7 @@ function collectFindings({
 
   return [
     ...findings.values(),
-    ...recordFindings({ tables, writers, records: declared.records, context }),
+    ...recordFindings({ tables, writers, records: declared.records, root }),
     ...staleExceptions({ access, exceptions, root }),
     ...staleShared({ access, tables, writers, feeds, shared, root }),
   ];
@@ -989,9 +916,9 @@ export function clickhouseScanOf(snapshot: WorkspaceSnapshot): ClickhouseScan {
   return scan;
 }
 
-/** A framework or reserved table is its named writer's; every legacy table is owner `legacy`. */
+/** A framework table is its writing package's; every legacy table is one owner, `legacy`. */
 function recordedOwner(record: OwnershipRecord): string {
-  return record.owner === "legacy" ? "legacy" : record.writer;
+  return record.owner === "framework" ? record.writer : "legacy";
 }
 
 /** Each table's owner: its writing module, its view source's, or its record (D3). */

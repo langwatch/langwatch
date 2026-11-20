@@ -19,6 +19,7 @@ import type {
 } from "../repositories/eval-results.repository.ts";
 import {
   EVAL_RESULTS_KEY_VERSION,
+  EVAL_RESULTS_RECALL_WINDOW_PADDING_MS,
   type EvalResultsCellKey,
   evalResultsMatchKeyId,
   findEvalResultsCellKeys,
@@ -31,12 +32,6 @@ import type { InstantEvalJudgementUnit } from "../rules/instant-eval-judge-page.
 import type { InstantEvalRunQuestion } from "../rules/instant-eval-run-questions.rules.ts";
 
 const logger = createLogger("langwatch:instant-eval:eval-results");
-
-/**
- * How far past its rows' own trace times a recall reads. A span's start and its trace's start
- * differ by the trace's length, so a row a span statement wrote is still found by a trace one.
- */
-export const EVAL_RESULTS_RECALL_WINDOW_PADDING_MS = 24 * 60 * 60 * 1000;
 
 /** Who asked, as the kept rows name it: a query, a run or a widget, by its id. */
 export interface EvalResultsSourceReference {

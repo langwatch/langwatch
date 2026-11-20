@@ -15,6 +15,7 @@ import { nowInstant } from "@langwatch/time";
 import type { EvalResultsRepository } from "../repositories/eval-results.repository.ts";
 import {
   EVAL_RESULTS_KEY_VERSION,
+  EVAL_RESULTS_RECALL_WINDOW_PADDING_MS,
   evalResultsJudgeModelOf,
   evalResultsMonitorCellKey,
 } from "../rules/eval-results-key.rules.ts";
@@ -22,7 +23,6 @@ import {
   evalResultRecordOf,
   recalledEvalResultVerdict,
 } from "../rules/eval-results-recall.rules.ts";
-import { EVAL_RESULTS_RECALL_WINDOW_PADDING_MS } from "./eval-results-recall.service.ts";
 
 /** What this service asks of other modules, each narrowed to the one answer it needs. */
 interface EvalResultsMonitorPeers {

@@ -37,7 +37,7 @@ export function InstantEvalResultRow({
       </HStack>
       <HStack gap={1} color="fg.subtle" flexWrap="wrap">
         <Text textStyle="2xs">
-          {[result.sourceLabel, result.judgedColumn, result.judgeModel].join(" · ")}
+          {[result.sourceLabel, result.judgedTextLabel, result.judgeModel].join(" · ")}
         </Text>
         <Tooltip content={`Judged ${formatAbsoluteTime(result.judgedAt)}`}>
           <Text textStyle="2xs">· {formatRelativeTimeAgo(result.judgedAt)}</Text>

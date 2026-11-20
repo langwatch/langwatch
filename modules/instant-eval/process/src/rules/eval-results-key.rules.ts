@@ -26,6 +26,12 @@ export const EVAL_RESULTS_KEY_VERSION = 1;
 /** The judged column a monitor's row names: it judges a mapping, not one extracted column. */
 export const EVAL_RESULTS_MONITOR_JUDGED_COLUMN = "monitor";
 
+/**
+ * How far past its rows' own trace times a recall reads. A span's start and its trace's start
+ * differ by the trace's length, so a row a span statement wrote is still found by a trace one.
+ */
+export const EVAL_RESULTS_RECALL_WINDOW_PADDING_MS = 24 * 60 * 60 * 1000;
+
 /** Where one judged cell's result is kept, and when its trace happened. */
 export interface EvalResultsCellKey extends EvalResultsMatchKey {
   /** The extraction that produced the text, e.g. `llm_readable_trace`. */

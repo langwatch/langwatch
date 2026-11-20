@@ -7,6 +7,7 @@ import type { InstantEvalTraceResultWire } from "@langwatch/instant-eval-contrac
 import { describe, expect, it } from "vitest";
 
 import {
+  instantEvalJudgedTextLabel,
   instantEvalVerdictLabel,
   toInstantEvalResultEntry,
 } from "../instant-eval-trace-results.ts";
@@ -52,6 +53,49 @@ describe("toInstantEvalResultEntry", () => {
     it("names the span only for the span's result", () => {
       expect(toInstantEvalResultEntry(result()).spanId).toBeUndefined();
       expect(toInstantEvalResultEntry(result({ spanId: "span-1" })).spanId).toBe("span-1");
+    });
+  });
+});
+
+describe("instantEvalJudgedTextLabel", () => {
+  describe("given each judged column a writer stores", () => {
+    it("reads it in plain words", () => {
+      const columns = [
+        "llm_readable_trace",
+        "llm_messages",
+        "llm_input_messages",
+        "llm_output_messages",
+        "llm_messages_span",
+        "trace_json",
+        "monitor",
+      ];
+
+      expect(columns.map(instantEvalJudgedTextLabel)).toEqual([
+        "trace",
+        "messages",
+        "input messages",
+        "output messages",
+        "span messages",
+        "full trace",
+        "monitor",
+      ]);
+    });
+  });
+
+  describe("given a judged column it does not know", () => {
+    it("reads it as stored", () => {
+      expect(instantEvalJudgedTextLabel("custom_extraction")).toBe("custom_extraction");
+    });
+  });
+
+  describe("given a result as the drawer lists it", () => {
+    it("carries the plain label beside the stored column", () => {
+      const entry = toInstantEvalResultEntry(result({ judgedColumn: "llm_messages_span" }));
+
+      expect(entry).toMatchObject({
+        judgedColumn: "llm_messages_span",
+        judgedTextLabel: "span messages",
+      });
     });
   });
 });
