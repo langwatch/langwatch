@@ -67,6 +67,10 @@ class AdminSession extends UiSession {
     return true;
   }
 
+  override hasOrganizationPermission(): boolean {
+    return true;
+  }
+
   isSettled(): boolean {
     return true;
   }

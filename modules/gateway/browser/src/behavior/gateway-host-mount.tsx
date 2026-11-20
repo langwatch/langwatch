@@ -237,7 +237,10 @@ export default function GatewayHostMount({ children }: { children?: ReactNode })
   // The plan tier only: the session-cached read, not the monthly usage count.
   const activePlan = gatewayApi.plan.getActivePlan.useQuery(
     { organizationId: organizationId ?? "" },
-    { enabled: !!organizationId && session.hasPermission("organization:view"), retry: false },
+    {
+      enabled: !!organizationId && session.hasOrganizationPermission("organization:view"),
+      retry: false,
+    },
   );
   const plan = useMemo(
     () => planOf({ activePlan: activePlan.data, isLoading: activePlan.isLoading }),

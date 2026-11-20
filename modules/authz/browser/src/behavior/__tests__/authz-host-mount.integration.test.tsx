@@ -67,6 +67,10 @@ class GrantedSession extends UiSession {
     return this.grants.includes(permission);
   }
 
+  override hasOrganizationPermission(permission: string): boolean {
+    return this.grants.includes(permission);
+  }
+
   isSettled(): boolean {
     return true;
   }

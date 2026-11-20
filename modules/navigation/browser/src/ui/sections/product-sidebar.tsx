@@ -214,6 +214,7 @@ function DetourMenuBody({
               showLabel={showExpanded}
               badgeNumber={badgeFor?.(item.href)}
               isLocked={item.isLocked}
+              isEnterpriseIncluded={item.isEnterpriseIncluded}
             />
           ))}
         </SidebarSection>

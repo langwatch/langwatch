@@ -52,7 +52,8 @@ export function useUiOrganizationFacts(): UiOrganizationFacts {
   const { isSaaS } = useUiDeployment();
   const rpc = useUiRpc();
   const { organizationId } = useUiScope().activeScope();
-  const mayReadPlan = organizationId !== null && session.hasPermission("organization:view");
+  const mayReadPlan =
+    organizationId !== null && session.hasOrganizationPermission("organization:view");
 
   const planInput = { organizationId: organizationId ?? "" };
   const plan = useQuery({

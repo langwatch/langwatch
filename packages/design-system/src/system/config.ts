@@ -588,6 +588,10 @@ export const designSystemConfig = defineConfig({
           bgHover: {
             value: { _light: "{colors.gray.200}", _dark: "{colors.zinc.800}" },
           },
+          // An Enterprise entry the plan includes: a very quiet gold, never a warning yellow.
+          enterprise: {
+            value: { _light: "{colors.yellow.700}", _dark: "{colors.yellow.300}" },
+          },
         },
 
         // Label semantic tokens - for form labels, section headers
