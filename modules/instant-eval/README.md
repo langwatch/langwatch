@@ -11,7 +11,7 @@ Instant evaluations: the opt-in, the estimate, and running or cancelling an inst
 | Classification | core (`modules/catalogue.json`)                                                                                          |
 | Subjects       | instant-eval                                                                                                             |
 | Halves         | [contract](contract) · [process](process/README.md)                                                                      |
-| Api token      | `InstantEvalApi` = `moduleApi<InstantEvalApi>()("instant-eval")`, `contract/src/instant-eval.api.ts:231` (18 operations) |
+| Api token      | `InstantEvalApi` = `moduleApi<InstantEvalApi>()("instant-eval")`, `contract/src/instant-eval.api.ts:236` (18 operations) |
 | Other token    | `InstantEvalBrowserApi`, `process/src/transport/instant-eval.trpc.ts:48`                                                 |
 | Installed by   | api, worker, tasks (process)                                                                                             |
 
@@ -19,6 +19,7 @@ Instant evaluations: the opt-in, the estimate, and running or cancelling an inst
 
 | Kind                      | Name                                                                                                                                                                               | Declared at                                                                               |
 | ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| ClickHouse table (writes) | `eval_results`                                                                                                                                                                     | `process/src/repositories/clickhouse/clickhouse.eval-results.repository.ts:94`            |
 | ClickHouse table (writes) | `instant_eval_judgments`                                                                                                                                                           | `process/src/repositories/clickhouse/clickhouse.instant-eval-judgments.repository.ts:103` |
 | ClickHouse table (writes) | `instant_eval_runs`                                                                                                                                                                | `process/src/repositories/clickhouse/clickhouse.instant-eval-run.repository.ts:188`       |
 | Stores required           |                                                                                                                                                                                    | `process/src/channels/instant-eval.channels.ts:22`                                        |
@@ -38,6 +39,7 @@ Anything else instant-eval needs belongs to another module and is reached throug
 | `modelProviders` | `ModelProviderApi` | [model-provider](../model-provider/README.md) |
 | `organizations`  | `OrganizationApi`  | [organization](../organization/README.md)     |
 | `plans`          | `EntitlementApi`   | [entitlement](../entitlement/README.md)       |
+| `retention`      | `DataRetentionApi` | [data-retention](../data-retention/README.md) |
 | `traces`         | `TraceApi`         | [trace](../trace/README.md)                   |
 
 ## Who depends on instant-eval

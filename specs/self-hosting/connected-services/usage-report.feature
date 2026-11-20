@@ -168,6 +168,13 @@ Feature: The usage report a self-hosted install sends
     Then each is counted lifetime and over both windows
     And the first run is dated from the oldest row
 
+  @unit
+  Scenario: Instant Evals judge calls are counted only where results are kept
+    Given judge calls in an organization that keeps its Instant Evals results and in one that does not
+    When the report is taken
+    Then judge calls are counted lifetime and over both windows for the first organization only
+    And an install where no organization keeps them leaves the figures out
+
   @integration
   Scenario: Langy turns and the people sending them are counted
     Given one person with a conversation active this week and one long idle

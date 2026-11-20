@@ -417,6 +417,12 @@ export class UsageReportCollectionService {
       ...windowed("spans", traces, (count) => count.spans),
       ...windowed("instant_eval_runs", instantEvals, (count) => count.runs),
       ...windowed("instant_eval_judgments", instantEvals, (count) => count.judgments),
+      // Instant-eval answers judge calls only for organizations that keep their results.
+      ...windowedWhereCounted(
+        "instant_eval_judge_calls",
+        instantEvals,
+        (count) => count.judgeCalls,
+      ),
       ...windowed("coding_agent_sessions", codingAgents, (count) => count.sessions),
       ...windowed("gateway_requests", gateway, (count) => count.requests),
       ...windowed("gateway_spend_usd", gateway, (count) => count.spendUsd),
@@ -470,6 +476,21 @@ function windowed<T>(
     [`${key}_7d`]: pick(answer.sevenDays),
     [`${key}_28d`]: pick(answer.twentyEightDays),
   };
+}
+
+/** One figure under its three keys, or none where its owner left any stretch uncounted. */
+function windowedWhereCounted<T>(
+  key: string,
+  answer: Windowed<T>,
+  pick: (count: T) => number | undefined,
+): Record<string, number> {
+  const lifetime = pick(answer.lifetime);
+  const sevenDays = pick(answer.sevenDays);
+  const twentyEightDays = pick(answer.twentyEightDays);
+  if (lifetime === undefined || sevenDays === undefined || twentyEightDays === undefined) {
+    return {};
+  }
+  return { [key]: lifetime, [`${key}_7d`]: sevenDays, [`${key}_28d`]: twentyEightDays };
 }
 
 /** The wire's timestamp shape: ISO 8601 with milliseconds, as the report has always sent. */

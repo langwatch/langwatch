@@ -1,6 +1,8 @@
 import { AnalyticsApi, type LangWatchQLRunCaller } from "@langwatch/analytics-contract";
 import type { Actor } from "@langwatch/authorization";
 import { AuthzApi } from "@langwatch/authz-contract";
+import { DataRetentionApi } from "@langwatch/data-retention-contract";
+import { RETENTION_TABLE_CATEGORY_MAP } from "@langwatch/data-retention-contract/retention-tables";
 import { EntitlementApi, isEnterpriseTier } from "@langwatch/entitlement-contract";
 import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { GatewayApi } from "@langwatch/gateway-contract";
@@ -24,6 +26,7 @@ import {
   type InstantEvalUsageCount,
   type InstantEvalRunWire,
   type InstantEvalServerConfig,
+  INSTANT_EVAL_RESULTS_FLAG,
   instantEvalConfig,
   isInstantEvalBounded,
 } from "@langwatch/instant-eval-contract";
@@ -55,6 +58,7 @@ import {
 import { InstantEvalRunProjectionStore } from "../eventing/instant-eval-run.store.ts";
 import type { InstantEvalCancellationRepository } from "../repositories/instant-eval-cancellation.repository.ts";
 import type { InstantEvalRepositories } from "../repositories/instant-eval.repositories.ts";
+import { evalResultsJudgeModelOf } from "../rules/eval-results-key.rules.ts";
 import {
   toExplorerRunInput,
   toExplorerRunProgress,
@@ -71,6 +75,8 @@ import {
   toInstantEvalJudgmentWire,
   toInstantEvalRunWire,
 } from "../rules/instant-eval-wire.rules.ts";
+import { EvalResultsRecallService } from "../services/eval-results-recall.service.ts";
+import { EvalResultsUsageService } from "../services/eval-results-usage.service.ts";
 import {
   InstantEvalAccessService,
   type InstantEvalHostedSwitchReader,
@@ -143,6 +149,8 @@ type InstantEvalDependencies = Readonly<{
   authz: typeof AuthzApi;
   /** The project's Instant Evals column of Default models (ADR-182). */
   modelProviders: typeof ModelProviderApi;
+  /** The trace retention every kept result is stamped with (ADR-189 section 4). */
+  retention: typeof DataRetentionApi;
 }>;
 
 type InstantEvalSetup = FeatureSetup<
@@ -163,6 +171,7 @@ export class InstantEvalModule implements InstantEvalApiContract, InstantEvalBro
     organizations: OrganizationApi,
     authz: AuthzApi,
     modelProviders: ModelProviderApi,
+    retention: DataRetentionApi,
   };
   static readonly config = instantEvalConfig;
 
@@ -253,7 +262,19 @@ export class InstantEvalModule implements InstantEvalApiContract, InstantEvalBro
     const reads = InstantEvalReadsService.create({
       runs: repositories.runs,
       judgments: repositories.judgments,
+      judgeCalls: EvalResultsUsageService.create({
+        results: repositories.evalResults,
+        peers: {
+          findOrganizationId: (projectId) => setup.channels.projects.findOrganizationId(projectId),
+          isReleasedForOrganization: ({ organizationId }) =>
+            setup.dependencies.featureFlags.isEnabled(INSTANT_EVAL_RESULTS_FLAG, {
+              kind: "organization",
+              organizationId,
+            }),
+        },
+      }),
     });
+    const results = InstantEvalModule.resultsOf(setup);
     const dispatcher = InstantEvalCommandDispatcherService.create();
     const rowSource = InstantEvalRowSourceService.create({ analytics, access });
     // The extraction half of a judged plan, which is Analytics' own: this module judges the
@@ -318,7 +339,7 @@ export class InstantEvalModule implements InstantEvalApiContract, InstantEvalBro
       },
     });
     const queries = InstantEvalQueryJudgingService.create({
-      rows: InstantEvalJudgeRowsService.create({ judge }),
+      rows: InstantEvalJudgeRowsService.create({ judge, results }),
       budget,
       spend: judgedSpend,
       holdPricing: () => setup.channels.judges.queryHoldPricing(),
@@ -405,6 +426,7 @@ export class InstantEvalModule implements InstantEvalApiContract, InstantEvalBro
             budget,
             analytics,
             judgedSpend,
+            results,
           }),
           commands: () => dispatcher.outcomeCommands(),
         },
@@ -419,6 +441,32 @@ export class InstantEvalModule implements InstantEvalApiContract, InstantEvalBro
     const { plans } = setup.dependencies;
     return async (organizationId) =>
       isEnterpriseTier((await plans.getActivePlan({ organizationId })).type);
+  }
+
+  /** Recall before judging and keep what was judged, behind `release_instant_eval_results`. */
+  private static resultsOf(setup: InstantEvalSetup): EvalResultsRecallService {
+    const { featureFlags, modelProviders, retention } = setup.dependencies;
+    const { projects } = setup.channels;
+    return EvalResultsRecallService.create({
+      results: setup.repositories.evalResults,
+      peers: {
+        isReleased: async ({ projectId }) => {
+          const organizationId = await projects.findOrganizationId(projectId);
+          return featureFlags.isEnabled(INSTANT_EVAL_RESULTS_FLAG, {
+            kind: "project",
+            projectId,
+            ...(organizationId === undefined ? {} : { organizationId }),
+          });
+        },
+        judgeModelOf: async ({ projectId }) =>
+          evalResultsJudgeModelOf(await modelProviders.resolveDecisionModel({ projectId })),
+        retentionDaysOf: ({ projectId }) =>
+          retention.getRetentionDays({
+            projectId,
+            category: RETENTION_TABLE_CATEGORY_MAP.eval_results,
+          }),
+      },
+    });
   }
 
   /** LangWatch's own switch for its hosted model, read for the project within its organization. */
@@ -513,6 +561,7 @@ export class InstantEvalModule implements InstantEvalApiContract, InstantEvalBro
     budget,
     analytics,
     judgedSpend,
+    results,
   }: {
     context: InstantEvalRunContextService;
     rowSource: InstantEvalRowSourceService;
@@ -523,6 +572,7 @@ export class InstantEvalModule implements InstantEvalApiContract, InstantEvalBro
     budget: InstantEvalFreeBudgetService;
     analytics: AnalyticsApi;
     judgedSpend: InstantEvalJudgedSpendService;
+    results: EvalResultsRecallService;
   }): InstantEvalRunExecutor {
     const plans = InstantEvalPlanService.create({
       context,
@@ -538,6 +588,7 @@ export class InstantEvalModule implements InstantEvalApiContract, InstantEvalBro
       judgments,
       cancellation: cancellations,
       budget,
+      results,
     });
     const finishes = InstantEvalFinishService.create({
       spend: judgedSpend,

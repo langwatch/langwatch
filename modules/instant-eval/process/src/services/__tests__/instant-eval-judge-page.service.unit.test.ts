@@ -22,6 +22,7 @@ import type {
 } from "../../channels/instant-eval-judging.channel.ts";
 import type { InstantEvalCancellationRepository } from "../../repositories/instant-eval-cancellation.repository.ts";
 import type { InstantEvalJudgmentRecord } from "../../repositories/instant-eval-judgments.repository.ts";
+import { MemoryEvalResultsRepository } from "../../repositories/memory/memory.eval-results.repository.ts";
 import { MemoryInstantEvalRunRepository } from "../../repositories/memory/memory.instant-eval-run.repository.ts";
 import {
   INSTANT_EVAL_CANCEL_POLL_MS,
@@ -31,6 +32,7 @@ import type {
   InstantEvalKeyPage,
   InstantEvalRowKey,
 } from "../../rules/instant-eval-row-keys.rules.ts";
+import { EvalResultsRecallService } from "../eval-results-recall.service.ts";
 import type { InstantEvalTextSource } from "../instant-eval-estimate.service.ts";
 import { InstantEvalJudgePageService } from "../instant-eval-judge-page.service.ts";
 import type { InstantEvalRowSourceService } from "../instant-eval-row-source.service.ts";
@@ -194,6 +196,7 @@ async function judging({
   assertWithinBudget = async () => undefined,
   onInsert,
   runCostUsd = 0,
+  results,
 }: {
   keyPage?: InstantEvalKeyPage;
   keySource?: Pick<InstantEvalRowSourceService, "keys">;
@@ -207,6 +210,7 @@ async function judging({
   onInsert?: () => void;
   /** The running row's routed cost so far; zero on an unrouted run, as on main. */
   runCostUsd?: number;
+  results?: EvalResultsRecallService;
 }): Promise<{
   service: InstantEvalJudgePageService;
   judge: ScriptedJudge;
@@ -251,6 +255,7 @@ async function judging({
       budget: { assertWithinBudget },
       concurrency,
       now,
+      ...(results ? { results } : {}),
     }),
     judge,
     judgments,
@@ -258,6 +263,58 @@ async function judging({
     cancellation,
   };
 }
+
+describe("given a run page of two traces, one already kept", () => {
+  describe("when the page is judged", () => {
+    /** @scenario "A run keeps every verdict it delivers in its own judgements" */
+    it("sends only the other trace, writes both verdicts to the run, and names the run", async () => {
+      const kept = MemoryEvalResultsRepository.create();
+      const results = EvalResultsRecallService.create({
+        results: kept,
+        peers: {
+          isReleased: async () => true,
+          judgeModelOf: async () => "langwatch/instant-evals",
+          retentionDaysOf: async () => 30,
+        },
+        now: () => AT.epochMilliseconds,
+      });
+      const keptQuestion = {
+        ...QUESTION,
+        judgedText: { function: "llm_readable_trace", keyKind: "trace" as const },
+      };
+      const rows = [
+        { TraceId: "t1", OccurredAt: "2026-09-18 09:00:00.000", annoyed: "the first" },
+        { TraceId: "t2", OccurredAt: "2026-09-18 09:00:00.000", annoyed: "the second" },
+      ];
+      const earlier = await judging({
+        keyPage: { keys: [rowKey("t1")], hasMore: false },
+        rows: rows.slice(0, 1),
+        results,
+        questions: [keptQuestion],
+      });
+      await earlier.service.judgePage(INPUT);
+      const { service, judge, judgments } = await judging({
+        keyPage: { keys: [rowKey("t1"), rowKey("t2")], hasMore: false },
+        rows,
+        answer: async () => judged(0.4),
+        results,
+        questions: [keptQuestion],
+      });
+
+      await service.judgePage(INPUT);
+
+      expect(judge.requests.map((request) => request.text)).toEqual(["the second"]);
+      expect(judgments.written[0]).toMatchObject([
+        { TraceId: "t1", Status: "judged", Probability: 0.9 },
+        { TraceId: "t2", Status: "judged", Probability: 0.4 },
+      ]);
+      expect(kept.list().map((row) => [row.TraceId, row.Source, row.SourceId])).toEqual([
+        ["t1", "run", RUN_ID],
+        ["t2", "run", RUN_ID],
+      ]);
+    });
+  });
+});
 
 describe("given a page of rows whose texts were extracted", () => {
   describe("when it is judged", () => {

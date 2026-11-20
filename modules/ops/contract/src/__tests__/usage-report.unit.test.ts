@@ -53,8 +53,8 @@ describe("given the dictionary", () => {
     it("declares exactly the fields the schema version stands for", () => {
       // A field added or removed is a schema version bump, and this is the
       // number that makes somebody notice they owe one.
-      expect(USAGE_FIELDS).toHaveLength(107);
-      expect(USAGE_REPORT_SCHEMA_VERSION).toBe(5);
+      expect(USAGE_FIELDS).toHaveLength(110);
+      expect(USAGE_REPORT_SCHEMA_VERSION).toBe(6);
     });
   });
 
@@ -67,6 +67,7 @@ describe("given the dictionary", () => {
         ["gateway_spend_usd", "gateway_spend_usd"],
         ["instant_eval_runs", "instant_eval_runs"],
         ["instant_eval_judgments", "instant_eval_judgments"],
+        ["instant_eval_judge_calls", "instant_eval_judge_calls"],
         ["langy_turns", "langy_turns"],
         ["langy_active_users", "langy_users"],
         ["coding_agent_sessions", "coding_agent_sessions"],

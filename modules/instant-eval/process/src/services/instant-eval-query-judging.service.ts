@@ -75,6 +75,7 @@ export class InstantEvalQueryJudgingService {
     judgements,
     rows,
     signal,
+    source,
   }: InstantEvalQueryJudgingInput): Promise<InstantEvalQueryJudging> {
     const questions = instantEvalRunQuestions(judgements);
     if (questions.length === 0) return { rows, skipped: {} };
@@ -91,6 +92,8 @@ export class InstantEvalQueryJudgingService {
         questions,
         tokenBudget: queryTokenBudget,
         signal: signal ?? null,
+        // An ask is named by its own query id, the id its hold already carries (ADR-189).
+        source: source ?? { kind: "ask", id: reservationId },
       });
       // Recorded before a cancel is answered: what was judged was paid for.
       isRecorded = await this.#recordSpend({ projectId, usage: judged.usage });

@@ -9,7 +9,7 @@ import type {
   LangWatchQLProtections,
   LangWatchQLQueryResult,
 } from "@langwatch/analytics-contract";
-import type { InstantEvalApi } from "@langwatch/instant-eval-contract";
+import type { InstantEvalApi, InstantEvalQuerySource } from "@langwatch/instant-eval-contract";
 
 import { DEFAULT_LWQL_HYDRATION_LIMITS } from "../features/hydration/rules/langwatch-ql-hydration-assembly.rules.ts";
 import {
@@ -48,12 +48,15 @@ export class LangWatchQLExtractionService {
     validation,
     execution,
     signal,
+    source,
   }: {
     readonly projects: readonly LangWatchQLCaller[];
     readonly protections: LangWatchQLProtections;
     readonly validation: Pick<AcceptedLangWatchQL, "appFunctions">;
     readonly execution: Pick<LangWatchQLQueryResult, "columns" | "rows">;
     readonly signal?: AbortSignal;
+    /** The widget that asked, which its kept eval results name; absent, the query is an ask. */
+    readonly source?: InstantEvalQuerySource;
   }): Promise<
     Pick<LangWatchQLQueryResult, "columns" | "rows"> & {
       readonly appFunctions?: LangWatchQLAppFunctionDiagnosticsInput;
@@ -86,7 +89,13 @@ export class LangWatchQLExtractionService {
           }
         : {}),
     });
-    const judged = await this.judge({ projects, judgements, rows: hydrated.rows, signal });
+    const judged = await this.judge({
+      projects,
+      judgements,
+      rows: hydrated.rows,
+      signal,
+      source,
+    });
 
     return {
       columns: langWatchQLJudgedColumns({
@@ -114,11 +123,13 @@ export class LangWatchQLExtractionService {
     judgements,
     rows,
     signal,
+    source,
   }: {
     readonly projects: readonly LangWatchQLCaller[];
     readonly judgements: ReturnType<typeof langWatchQLJudgementCalls>;
     readonly rows: readonly Record<string, unknown>[];
-    readonly signal?: AbortSignal;
+    readonly signal?: AbortSignal | undefined;
+    readonly source?: InstantEvalQuerySource | undefined;
   }): Promise<{
     rows: readonly Record<string, unknown>[];
     skipped?: Readonly<Record<string, number>>;
@@ -133,6 +144,7 @@ export class LangWatchQLExtractionService {
       judgements,
       rows,
       ...(signal ? { signal } : {}),
+      ...(source ? { source } : {}),
     });
     if (judged.cancellation) {
       throw signal?.reason instanceof Error

@@ -93,6 +93,11 @@ export interface InstantEvalUsageCount {
   readonly runs: number;
   readonly judgments: number;
   readonly firstRunAt?: number;
+  /**
+   * Judge calls made, from `eval_results` (a recall adds no row), counted for the organizations
+   * with `release_instant_eval_results` on; absent when none of them has it (ADR-189).
+   */
+  readonly judgeCalls?: number;
 }
 
 export interface InstantEvalApi {

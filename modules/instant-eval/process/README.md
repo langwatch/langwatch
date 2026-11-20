@@ -12,7 +12,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 ## Module API (`InstantEvalApi`)
 
-Peers call these through the token, declared at `../contract/src/instant-eval.api.ts:98`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/instant-eval.api.ts:103`; nothing else in this package is public.
 
 #### `isEnabled`
 

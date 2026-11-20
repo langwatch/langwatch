@@ -6,10 +6,11 @@ Feature: ClickHouse ownership records and named exceptions
   A third (EF-5, 2026-10-07): an owner may share a table for reading with
   named modules, as trace shares trace_analytics with analytics; writes stay
   the owner's. A record may also reserve a table for the module that will
-  write it (ADR-189: eval_results for instant-eval): the table counts as that
-  module's, so another module reading or writing it is reported, and the
-  module's first write asks for the record to be deleted. Each record,
-  exception and shared table carries a reason.
+  write it (ADR-189 reserved eval_results for instant-eval until its first
+  write deleted the record): the table counts as that module's, so another
+  module reading or writing it is reported, and the module's first write asks
+  for the record to be deleted. Each record, exception and shared table
+  carries a reason.
 
   Background:
     Given the policy reads the table list from the goose migrations

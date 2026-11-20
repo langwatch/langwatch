@@ -46,6 +46,9 @@ export const INSTANT_EVAL_SELECTION_PARAMETER = "instant_eval_selection_ids";
 /** The flag that releases Instant Evals to a project. */
 export const INSTANT_EVALS_FLAG = "release_instant_evals";
 
+/** The flag that keeps a project's Instant Evals results and recalls them (ADR-189). */
+export const INSTANT_EVAL_RESULTS_FLAG = "release_instant_eval_results";
+
 /** Whether a judgement was made, declined, or attempted and lost. */
 export const INSTANT_EVAL_JUDGMENT_STATUSES = ["judged", "skipped", "failed"] as const;
 

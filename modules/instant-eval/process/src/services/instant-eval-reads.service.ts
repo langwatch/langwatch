@@ -23,24 +23,29 @@ import type {
 } from "../repositories/instant-eval-run.repository.ts";
 import { instantEvalWrittenWindow } from "../rules/instant-eval-judgments.rules.ts";
 import { publishedInstantEvalStatus } from "../rules/instant-eval-run-status.rules.ts";
+import type { EvalResultsUsageService } from "./eval-results-usage.service.ts";
 
 export class InstantEvalReadsService {
   private constructor(
     private readonly runs: InstantEvalRunRepository,
     private readonly judgments: InstantEvalJudgmentsRepository,
+    private readonly judgeCalls: Pick<EvalResultsUsageService, "countJudgeCalls"> | undefined,
     private readonly now: () => Instant,
   ) {}
 
   static create({
     runs,
     judgments,
+    judgeCalls,
     now = nowInstant,
   }: {
     runs: InstantEvalRunRepository;
     judgments: InstantEvalJudgmentsRepository;
+    /** The judge calls the kept results count (ADR-189); absent, the report leaves them out. */
+    judgeCalls?: Pick<EvalResultsUsageService, "countJudgeCalls">;
     now?: () => Instant;
   }): InstantEvalReadsService {
-    return new InstantEvalReadsService(runs, judgments, now);
+    return new InstantEvalReadsService(runs, judgments, judgeCalls, now);
   }
 
   /** The usage report's figures (ADR-156, section 10). */
@@ -48,11 +53,12 @@ export class InstantEvalReadsService {
     projectIds: readonly string[];
     since?: number;
   }): Promise<InstantEvalUsageCount> {
-    const [runs, judgments] = await Promise.all([
+    const [runs, judgments, judgeCalls] = await Promise.all([
       this.runs.countUsage(input),
       this.judgments.countUsage(input),
+      this.judgeCalls ? this.judgeCalls.countJudgeCalls(input) : {},
     ]);
-    return { ...runs, judgments };
+    return { ...runs, judgments, ...judgeCalls };
   }
 
   /** The run, or the refusal naming the id that has none. */

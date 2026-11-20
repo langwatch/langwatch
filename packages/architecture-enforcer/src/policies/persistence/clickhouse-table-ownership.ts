@@ -128,13 +128,6 @@ export const DECLARED_OWNERSHIP: DeclaredOwnership = {
       writer: LEGACY,
       reason: "Langy conversation content (migration 00036), still read; no module writes it here",
     },
-    {
-      table: "eval_results",
-      owner: "reserved",
-      writer: "instant-eval",
-      reason:
-        "created ahead of instant-eval's recall-and-write repository (ADR-189 step 1); its first write deletes this record",
-    },
   ],
   exceptions: [
     {

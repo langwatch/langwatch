@@ -5,7 +5,7 @@
  * @see specs/lwql/eval-functions.feature
  * @see specs/lwql/app-functions.feature
  */
-import type { LangWatchQLColumn } from "@langwatch/analytics-contract";
+import type { LangWatchQLColumn, LangWatchQLRunTelemetry } from "@langwatch/analytics-contract";
 import {
   computeInstantEvalTranscriptFit,
   type InstantEvalApi,
@@ -211,10 +211,12 @@ function query({
   service,
   sql,
   signal,
+  telemetry,
 }: {
   service: LangWatchQLService;
   sql: string;
   signal?: AbortSignal;
+  telemetry?: LangWatchQLRunTelemetry;
 }) {
   return service.executeForProjects({
     projects: [{ id: "project-1", lwqlKey: "key-1" }],
@@ -222,6 +224,7 @@ function query({
     sql,
     isInstantEvalsEnabled: true,
     ...(signal ? { signal } : {}),
+    ...(telemetry ? { telemetry } : {}),
   });
 }
 
@@ -328,6 +331,32 @@ describe("LangWatchQLService with an eval function", () => {
         { TraceId: "trace-of-Sorry about that", apology: "Sorry about that" },
       ]);
       expect(traces.reads).toBe(0);
+    });
+  });
+
+  describe("when a dashboard widget runs the query", () => {
+    /** @scenario "A dashboard widget's results name the widget" */
+    it("names the widget as the source its kept results carry", async () => {
+      const { service, asked } = serviceOver({ judgeQuery: answering(0.9) });
+
+      await query({
+        service,
+        sql: ANNOYED_QUERY,
+        telemetry: { caller: "dashboard_widget", dashboardId: "board-1", widgetId: "widget-1" },
+      });
+
+      expect(asked[0]?.source).toEqual({ kind: "dashboard", id: "widget-1" });
+    });
+  });
+
+  describe("when the workbench runs the query", () => {
+    /** @scenario "A quick eval() ask's results name the query" */
+    it("names no source, so instant-eval names the ask by its own query id", async () => {
+      const { service, asked } = serviceOver({ judgeQuery: answering(0.9) });
+
+      await query({ service, sql: ANNOYED_QUERY, telemetry: { caller: "workbench" } });
+
+      expect(asked[0]).not.toHaveProperty("source");
     });
   });
 

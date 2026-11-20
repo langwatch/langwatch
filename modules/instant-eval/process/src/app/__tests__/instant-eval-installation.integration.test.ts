@@ -12,6 +12,7 @@ import type {
   LangWatchQLQueryResult,
 } from "@langwatch/analytics-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
+import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import type { LicensingApi } from "@langwatch/enterprise-licensing-contract";
 import type { EntitlementApi, Plan } from "@langwatch/entitlement-contract";
 import { EventSourcing, InMemoryProcessStore } from "@langwatch/eventing";
@@ -251,6 +252,8 @@ function installation({
           recordInstantEvalsOptIn: recordOptIn,
         }),
         authz: createApiFixture<AuthzApi>({ can: async () => mayManageOrganization }),
+        // The trace retention a kept Instant Evals result is stamped with (ADR-189).
+        "data-retention": createApiFixture<DataRetentionApi>({ getRetentionDays: async () => 0 }),
         "feature-flag": createApiFixture<FeatureFlagApi>({
           isEnabled: async (flagKey) =>
             flagKey === INSTANT_EVALS_HOSTED_DISABLED_FLAG ? isHostedOff : isReleased,

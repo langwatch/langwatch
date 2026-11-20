@@ -40,6 +40,7 @@ import {
   type InstantEvalKeyPage,
 } from "../rules/instant-eval-row-keys.rules.ts";
 import { instantEvalHydrationPlan } from "../rules/instant-eval-run-sizing.rules.ts";
+import type { EvalResultsRecallService } from "./eval-results-recall.service.ts";
 import type { InstantEvalTextSource } from "./instant-eval-estimate.service.ts";
 import type { InstantEvalFreeBudgetService } from "./instant-eval-free-budget.service.ts";
 import {
@@ -100,6 +101,7 @@ export class InstantEvalJudgePageService {
     budget: Pick<InstantEvalFreeBudgetService, "assertWithinBudget">;
     readAhead: InstantEvalReadAheadService;
     concurrency: number;
+    results: Pick<EvalResultsRecallService, "recall" | "write"> | undefined;
     now: () => number;
   }) {
     this.context = options.context;
@@ -113,6 +115,7 @@ export class InstantEvalJudgePageService {
     this.judgeRows = InstantEvalJudgeRowsService.create({
       judge: options.judge,
       concurrency: options.concurrency,
+      ...(options.results ? { results: options.results } : {}),
     });
     this.now = options.now;
   }
@@ -127,6 +130,7 @@ export class InstantEvalJudgePageService {
     budget,
     readAhead = InstantEvalReadAheadService.create(),
     concurrency = INSTANT_EVAL_JUDGE_CONCURRENCY,
+    results,
     now = () => nowInstant().epochMilliseconds,
   }: {
     context: InstantEvalRunContextService;
@@ -139,6 +143,8 @@ export class InstantEvalJudgePageService {
     /** The next page of each run, read while the current one judges. */
     readAhead?: InstantEvalReadAheadService;
     concurrency?: number;
+    /** Recalls a page's texts before judging and keeps what it judged (ADR-189). */
+    results?: Pick<EvalResultsRecallService, "recall" | "write">;
     now?: () => number;
   }): InstantEvalJudgePageService {
     return new InstantEvalJudgePageService({
@@ -151,6 +157,7 @@ export class InstantEvalJudgePageService {
       budget,
       readAhead,
       concurrency,
+      results,
       now,
     });
   }
@@ -336,11 +343,13 @@ export class InstantEvalJudgePageService {
     const stops = [watch.signal, deadline].filter((candidate) => candidate !== null);
     const signal = stops.length > 0 ? AbortSignal.any(stops) : null;
     try {
+      // A recalled verdict is still written to the run's own judgements, so its page stays whole.
       const judged = await this.judgeRows.judgeRows({
         projectId: input.projectId,
         rows,
         questions: loaded.questions,
         signal,
+        source: { kind: "run", id: input.runId },
       });
 
       return { judged, ...pageStopFor({ watch: watch.signal, deadline }) };

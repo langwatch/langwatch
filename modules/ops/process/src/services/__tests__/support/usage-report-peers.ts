@@ -12,6 +12,7 @@ export type IngestedFigure =
   | "scenario_runs"
   | "instant_eval_runs"
   | "instant_eval_judgments"
+  | "instant_eval_judge_calls"
   | "coding_agent_sessions"
   | "gateway";
 
@@ -30,6 +31,8 @@ export class UsageReportWorld {
   readonly membersByOrganization = new Map<string, string[]>();
   readonly emailsByUser = new Map<string, string>();
   readonly signedInUserIds = new Set<string>();
+  /** Projects whose organization keeps its Instant Evals results: only they count judge calls. */
+  readonly judgeCallsReleasedProjectIds = new Set<string>();
   /** The sign-in mode auth names; absent reads as a process that composes none. */
   authProvider: string | undefined = "email";
   mailProvider: string | undefined = undefined;
@@ -114,10 +117,21 @@ export class UsageReportWorld {
       instantEvals: {
         countUsage: async (input) => {
           const firstRunAt = first("instant_eval_runs", input.projectIds);
+          const released = input.projectIds.filter((projectId) =>
+            this.judgeCallsReleasedProjectIds.has(projectId),
+          );
           return {
             runs: count("instant_eval_runs")(input).length,
             judgments: count("instant_eval_judgments")(input).length,
             ...(firstRunAt === undefined ? {} : { firstRunAt }),
+            ...(released.length === 0
+              ? {}
+              : {
+                  judgeCalls: count("instant_eval_judge_calls")({
+                    ...input,
+                    projectIds: released,
+                  }).length,
+                }),
           };
         },
       },
