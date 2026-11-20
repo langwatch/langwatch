@@ -33,6 +33,15 @@ var (
 	releaseQuoted      = regexp.MustCompile(`"([^"]+)"`)
 )
 
+// Repo-relative files the guard reads. Declared once so the read list and the
+// files map in ReleaseLock cannot drift apart.
+const (
+	releaseConfigPath    = ".github/release-please-config.json"
+	releaseManifestPath  = ".github/.release-please-manifest.json"
+	releaseRootPyproject = "pyproject.toml"
+	releaseLockPath      = "uv.lock"
+)
+
 // releaseLockFiles holds the repository file contents checked against each other.
 type releaseLockFiles struct {
 	Config, Manifest, RootPyproject, Lock string
@@ -42,7 +51,7 @@ type releaseLockFiles struct {
 // releaseLockInputPaths lists the repo-relative files ReleaseLock reads, so the
 // go-ci path filter can be checked against the guard rather than a copy of it.
 func releaseLockInputPaths() []string {
-	paths := []string{".github/release-please-config.json", ".github/.release-please-manifest.json", "pyproject.toml", "uv.lock"}
+	paths := []string{releaseConfigPath, releaseManifestPath, releaseRootPyproject, releaseLockPath}
 	for _, pkg := range releasePackages {
 		paths = append(paths, pkg.Path+"/pyproject.toml")
 	}
@@ -62,10 +71,10 @@ func ReleaseLock(root string) ([]string, error) {
 		contents[rel] = string(raw)
 	}
 	files := releaseLockFiles{
-		Config:        contents[".github/release-please-config.json"],
-		Manifest:      contents[".github/.release-please-manifest.json"],
-		RootPyproject: contents["pyproject.toml"],
-		Lock:          contents["uv.lock"],
+		Config:        contents[releaseConfigPath],
+		Manifest:      contents[releaseManifestPath],
+		RootPyproject: contents[releaseRootPyproject],
+		Lock:          contents[releaseLockPath],
 		Pyprojects:    map[string]string{},
 	}
 	for _, pkg := range releasePackages {
