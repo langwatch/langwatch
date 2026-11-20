@@ -1126,6 +1126,7 @@ Feature: The daily insights run
       Given a From LangWatch board
       When a member turns its daily run on
       Then the setting is sent with the kind template and the template's id
+      And the toast says Langy reads the board every day
 
     @integration
     Scenario: The control is absent without the flag, the grant or a project that takes runs

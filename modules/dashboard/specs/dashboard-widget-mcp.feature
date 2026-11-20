@@ -71,6 +71,12 @@ Feature: Editing a dashboard widget from an agent, and where each widget came fr
     When the app looks for a deletable widget under that id
     Then it is refused as not found
 
+  @unit
+  Scenario: A delete on a project without widgets is refused as disabled, even for a template widget id
+    Given a project with dashboard widgets closed
+    When the app looks for a deletable widget under a From LangWatch widget id
+    Then it is refused as disabled, not as not found
+
   @integration
   Scenario: A From LangWatch widget is read under its own board's path only
     Given a project key with analytics:view
