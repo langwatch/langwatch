@@ -54,10 +54,11 @@ func main() {
 		{name: "transform-cache", run: ciguard.TransformCacheProblems},
 		{name: "vitest-transform-flag", run: ciguard.UncachedVitestScripts},
 		{name: "main-suites", run: ciguard.MainSuites},
+		{name: "release-lock", run: ciguard.ReleaseLock},
 	}
 
 	if failed := runAll(guards, repoRoot); failed {
-		fmt.Fprintln(os.Stderr, "\nSee specs/ci/lean-checkout.feature, specs/ci/go-version-consistency.feature, specs/ci/pr-review-bot.feature, specs/ci/one-pull-request-workflow.feature specs/ci/no-static-cloud-keys.feature, specs/ci/publish-ecr-images.feature, specs/ci/publish-prerelease-charts-to-ecr.feature and specs/ci/package-suites-transform-cache.feature")
+		fmt.Fprintln(os.Stderr, "\nSee specs/ci/lean-checkout.feature, specs/ci/go-version-consistency.feature, specs/ci/pr-review-bot.feature, specs/ci/one-pull-request-workflow.feature specs/ci/no-static-cloud-keys.feature, specs/ci/publish-ecr-images.feature, specs/ci/publish-prerelease-charts-to-ecr.feature, specs/ci/package-suites-transform-cache.feature and specs/ci/release-lock.feature")
 		os.Exit(1)
 	}
 }
