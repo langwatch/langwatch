@@ -68,16 +68,24 @@ export function templateWidgetId({ templateId, key }: { templateId: string; key:
   return `${TEMPLATE_WIDGET_PREFIX}${templateId}:${key}`;
 }
 
-const CURATED_POINTER_PREFIX = "curated/";
+/** The route segment of a From LangWatch board's page and the head of its pointer id. */
+export const CURATED_BOARD_SEGMENT = "curated";
+
+const CURATED_POINTER_PREFIX = `${CURATED_BOARD_SEGMENT}/`;
 
 /** The board id a peer keeps for a From LangWatch board: `curated/<templateId>`, its address. */
 export function curatedBoardPointerId(templateId: string): string {
   return `${CURATED_POINTER_PREFIX}${templateId}`;
 }
 
+/** Whether an id is a From LangWatch board's pointer, even one whose template was retired. */
+export function isCuratedBoardPointerId(id: string): boolean {
+  return id.startsWith(CURATED_POINTER_PREFIX);
+}
+
 /** The template id a pointer id names; undefined for a stored board's id or an unknown template. */
 export function templateIdOfCuratedBoardPointer(id: string): string | undefined {
-  if (!id.startsWith(CURATED_POINTER_PREFIX)) return undefined;
+  if (!isCuratedBoardPointerId(id)) return undefined;
   return curatedBoardDefinitionById(id.slice(CURATED_POINTER_PREFIX.length))?.templateId;
 }
 

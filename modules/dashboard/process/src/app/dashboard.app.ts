@@ -610,6 +610,16 @@ export class DashboardModule implements DashboardApi {
     return this.#widgets.getById(input);
   }
 
+  /** The widget a delete may name; a From LangWatch widget can never be deleted: not found. */
+  getDeletableDashboardWidget(input: {
+    projectId: string;
+    id: string;
+    onDashboardId?: string;
+    viewer?: DashboardViewer;
+  }): Promise<DashboardWidget> {
+    return this.#widgets.getDeletable(input);
+  }
+
   /** A new widget, on the dashboard named or on the unplaced authoring grid. */
   async createDashboardWidget(
     input: {

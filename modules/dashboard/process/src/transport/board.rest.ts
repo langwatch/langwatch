@@ -3,7 +3,6 @@
  * 404 while `release_dashboards` is off (dashboards-v2.feature AC199l, AC199n to AC199q); bare
  * `/api/dashboards` answers too, deprecated (AC199v). Reports: /api/v1/analytics/reports.
  */
-import { curatedBoardWidgetById } from "@langwatch/analytics-catalogue";
 import { DashboardWidgetNotFoundError } from "@langwatch/analytics-contract";
 import {
   apiErrorSchema,
@@ -379,20 +378,17 @@ export const boardRest = defineRestRouter(DashboardApi)
     resource: "dashboard widget",
     action: "delete",
     idParam: "widgetId",
-    // A `template:` widget id gets no card under any board's path, as none can be deleted: 404.
     name: async ({ app, projectId, id, ownerUserId, input }) =>
-      curatedBoardWidgetById(id)
-        ? undefined
-        : nameUnlessMissing({
-            read: app.getDashboardWidget({
-              projectId,
-              id,
-              onDashboardId: boardIdParamsSchema.parse(input).dashboardId,
-              ...viewerOfOwner({ ownerUserId }),
-            }),
-            missing: DashboardWidgetNotFoundError,
-            nameOf: (widget) => widget.name,
-          }),
+      nameUnlessMissing({
+        read: app.getDeletableDashboardWidget({
+          projectId,
+          id,
+          onDashboardId: boardIdParamsSchema.parse(input).dashboardId,
+          ...viewerOfOwner({ ownerUserId }),
+        }),
+        missing: DashboardWidgetNotFoundError,
+        nameOf: (widget) => widget.name,
+      }),
   })
   .withMiddlewareContext(boardsReleased)
   .withOutput(z.void())

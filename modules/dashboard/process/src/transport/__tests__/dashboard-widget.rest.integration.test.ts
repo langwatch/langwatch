@@ -259,6 +259,9 @@ describe("given a From LangWatch board's widget", () => {
         name: widget.name,
         definition: { queries: widget.definition.queries },
         dashboardId: null,
+        platformUrl: expect.stringMatching(
+          new RegExp(`/dashboards/curated/${board.templateId}$`),
+        ),
       });
       expect(updated.status).toBe(404);
       expect(removed.status).toBe(404);

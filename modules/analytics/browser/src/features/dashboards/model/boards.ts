@@ -3,6 +3,7 @@
  * boards get and the addresses in the area. Addresses are built and read here only.
  */
 
+import { CURATED_BOARD_SEGMENT } from "@langwatch/analytics-catalogue";
 import { MY_DASHBOARD_NAME } from "@langwatch/dashboard-contract";
 
 export { MY_DASHBOARD_NAME };
@@ -39,11 +40,8 @@ export function dashboardsPath({
 /** The templates library's segment; the route table ranks it above a board id, so none takes it. */
 export const TEMPLATES_SEGMENT = "templates";
 
-/**
- * The From LangWatch boards' route segment, ranked above a board id like the library's.
- * The pointer id prefix is a different thing; it lives in the catalogue codec.
- */
-export const CURATED_SEGMENT = "curated";
+/** The From LangWatch boards' route segment, ranked above a board id like the library's. */
+export const CURATED_SEGMENT = CURATED_BOARD_SEGMENT;
 
 /** The address of the templates library. */
 export function dashboardTemplatesPath({ projectSlug }: { projectSlug: string }): string {

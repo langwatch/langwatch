@@ -1,4 +1,7 @@
-import { curatedBoardWidgetById } from "@langwatch/analytics-catalogue";
+import {
+  CURATED_BOARD_SEGMENT,
+  curatedBoardWidgetById,
+} from "@langwatch/analytics-catalogue";
 import {
   type DashboardWidget,
   DashboardWidgetNotFoundError,
@@ -76,6 +79,23 @@ const widgetOrBoardNotFoundResponse: Record<404, RouteResponse> = {
   },
 };
 
+/** A From LangWatch widget links to its board's `curated` page; a stored one to its board. */
+function widgetPlatformUrl({
+  widget,
+  platformUrl,
+}: {
+  widget: DashboardWidget;
+  platformUrl: string;
+}): string {
+  const curated = curatedBoardWidgetById(widget.id);
+  if (curated) {
+    return `${platformUrl}/${CURATED_BOARD_SEGMENT}/${encodeURIComponent(curated.templateId)}`;
+  }
+  return widget.dashboardId
+    ? `${platformUrl}/${encodeURIComponent(widget.dashboardId)}`
+    : platformUrl;
+}
+
 /**
  * The widget as the API publishes it. `platformUrl` is the Dashboards list; a widget on a board
  * links to that board's page.
@@ -90,9 +110,7 @@ export function widgetResource(
     definition: { ...widget.definition, queries: [...widget.definition.queries] },
     createdAt: widget.createdAt.toString(),
     updatedAt: widget.updatedAt.toString(),
-    platformUrl: widget.dashboardId
-      ? `${platformUrl}/${encodeURIComponent(widget.dashboardId)}`
-      : platformUrl,
+    platformUrl: widgetPlatformUrl({ widget, platformUrl }),
     dashboardId: widget.dashboardId,
     gridColumn: widget.gridColumn,
     gridRow: widget.gridRow,
@@ -298,15 +316,16 @@ export const dashboardWidgetRest = defineRestRouter(DashboardApi)
     resource: "dashboard widget",
     action: "delete",
     idParam: "widgetId",
-    // A From LangWatch widget can never be deleted, so it gets no card: the delete answers 404.
     name: async ({ app, projectId, id, ownerUserId }) =>
-      curatedBoardWidgetById(id)
-        ? undefined
-        : nameUnlessMissing({
-            read: app.getDashboardWidget({ projectId, id, ...viewerOfOwner({ ownerUserId }) }),
-            missing: DashboardWidgetNotFoundError,
-            nameOf: (widget) => widget.name,
-          }),
+      nameUnlessMissing({
+        read: app.getDeletableDashboardWidget({
+          projectId,
+          id,
+          ...viewerOfOwner({ ownerUserId }),
+        }),
+        missing: DashboardWidgetNotFoundError,
+        nameOf: (widget) => widget.name,
+      }),
   })
   .withOutput(z.void())
   .withDocs({

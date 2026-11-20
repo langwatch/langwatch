@@ -241,6 +241,13 @@ export interface DashboardApi {
     onDashboardId?: string;
     viewer?: DashboardViewer;
   }): Promise<DashboardWidget>;
+  /** As `getDashboardWidget`, but a From LangWatch widget, never deletable, is not found. */
+  getDeletableDashboardWidget(input: {
+    projectId: string;
+    id: string;
+    onDashboardId?: string;
+    viewer?: DashboardViewer;
+  }): Promise<DashboardWidget>;
   /** Placed on `dashboardId` when named, otherwise on the unplaced authoring grid. */
   createDashboardWidget(
     input: {

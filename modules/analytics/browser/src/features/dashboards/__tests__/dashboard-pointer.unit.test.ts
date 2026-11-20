@@ -148,6 +148,16 @@ describe("given a pointer to a From LangWatch board", () => {
 
       expect(resolved).toEqual({ board: { name: "Retired board", deleted: true } });
     });
+
+    it("is deleted at once, while the stored boards still load", () => {
+      const resolved = resolve({
+        pointer: { boardId: "curated/retired", boardName: "Retired board" },
+        boards: undefined,
+        widgets: undefined,
+      });
+
+      expect(resolved).toEqual({ board: { name: "Retired board", deleted: true } });
+    });
   });
 });
 

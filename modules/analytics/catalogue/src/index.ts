@@ -19,12 +19,14 @@ export {
 } from "./model/catalogue-filter.ts";
 export {
   CURATED_BOARD_DEFINITIONS,
+  CURATED_BOARD_SEGMENT,
   CURATED_TEMPLATE_IDS,
   type CuratedBoardDefinition,
   curatedBoardDefinitionById,
   curatedBoardPointerId,
   type CuratedBoardWidget,
   curatedBoardWidgetById,
+  isCuratedBoardPointerId,
   templateIdOfCuratedBoardPointer,
   templateWidgetId,
 } from "./model/curated-boards.ts";

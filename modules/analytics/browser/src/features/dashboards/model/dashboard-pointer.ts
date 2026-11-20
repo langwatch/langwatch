@@ -4,7 +4,10 @@
  * so what is drawn is decided here, against the boards and widgets that exist now. Pure.
  */
 
-import { templateIdOfCuratedBoardPointer } from "@langwatch/analytics-catalogue";
+import {
+  isCuratedBoardPointerId,
+  templateIdOfCuratedBoardPointer,
+} from "@langwatch/analytics-catalogue";
 
 import { curatedBoardPath, dashboardsPath } from "./boards.ts";
 import type { CuratedBoard } from "./curated-boards.ts";
@@ -55,8 +58,8 @@ export function resolveDashboardPointer({
   curated: readonly CuratedBoard[];
   projectSlug: string;
 }): ResolvedPointer {
-  const templateId = templateIdOfCuratedBoardPointer(pointer.boardId);
-  if (templateId !== void 0) {
+  if (isCuratedBoardPointerId(pointer.boardId)) {
+    const templateId = templateIdOfCuratedBoardPointer(pointer.boardId);
     return curatedPointer({ pointer, templateId, curated, projectSlug });
   }
   if (boards === void 0) return keptDashboardPointer(pointer);
@@ -88,12 +91,14 @@ function curatedPointer({
   projectSlug,
 }: {
   pointer: DashboardPointer;
-  templateId: string;
+  templateId: string | undefined;
   curated: readonly CuratedBoard[];
   projectSlug: string;
 }): ResolvedPointer {
   const board = curated.find((each) => each.templateId === templateId);
-  if (!board) return { board: gone(pointer.boardName), ...keptWidget(pointer) };
+  if (!board || templateId === void 0) {
+    return { board: gone(pointer.boardName), ...keptWidget(pointer) };
+  }
   const href = curatedBoardPath({ projectSlug, templateId });
   if (!pointer.widget) return { board: { name: board.name, href, deleted: false } };
   const widgetKey = pointer.widget.id;

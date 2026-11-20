@@ -106,6 +106,12 @@ export class DashboardWidgetService {
     return this.#present(await this.#visibleRow(input));
   }
 
+  /** The widget a delete may name: a From LangWatch widget is read-only, so it is not found. */
+  async getDeletable(input: DashboardWidgetScope & Viewed & OnBoard): Promise<DashboardWidget> {
+    if (curatedBoardWidgetById(input.id)) throw new DashboardWidgetNotFoundError();
+    return this.getById(input);
+  }
+
   async createWidget(
     input: Omit<CreateDashboardWidgetInput, "id"> & Viewed & Keyed,
   ): Promise<DashboardWidget> {

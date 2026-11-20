@@ -3,6 +3,8 @@
  * them. Exercises the app's widget operations through its private service.
  * @vitest-environment node
  */
+import { CURATED_BOARD_DEFINITIONS, templateWidgetId } from "@langwatch/analytics-catalogue";
+import { DashboardWidgetNotFoundError } from "@langwatch/analytics-contract";
 import { dashboardWidgetDefinitionSchema } from "@langwatch/analytics-contract/dashboard-widget-definition";
 import { describe, expect, it } from "vitest";
 
@@ -52,6 +54,24 @@ describe("DashboardModule dashboard widgets", () => {
     await dashboard.deleteDashboardWidget({ projectId: "project-1", id: created.id });
 
     await expect(dashboard.listDashboardWidgets({ projectId: "project-1" })).resolves.toEqual([]);
+  });
+
+  /** @scenario "A From LangWatch widget is read over the API by its template widget id" */
+  it("finds no deletable widget under a From LangWatch widget id", async () => {
+    const dashboard = createDashboardTestApp({
+      repositories: await createDashboardTestRepositoriesWithBoard(),
+    });
+    const [board] = CURATED_BOARD_DEFINITIONS;
+    const [widget] = board?.widgets ?? [];
+    if (!board || !widget) throw new Error("No From LangWatch board ships a widget");
+    const id = templateWidgetId({ templateId: board.templateId, key: widget.key });
+
+    await expect(
+      dashboard.getDashboardWidget({ projectId: "project-1", id }),
+    ).resolves.toBeTruthy();
+    await expect(
+      dashboard.getDeletableDashboardWidget({ projectId: "project-1", id }),
+    ).rejects.toBeInstanceOf(DashboardWidgetNotFoundError);
   });
 
   /** @scenario "AC123 Ask Langy: the prompt is stored on built widgets and kept on edit and duplicate" */
