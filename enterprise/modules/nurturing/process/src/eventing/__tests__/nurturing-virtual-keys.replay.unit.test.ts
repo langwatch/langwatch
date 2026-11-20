@@ -143,6 +143,9 @@ function owners() {
   ];
 }
 
+/** How a step runs: for real or dry, from the start or from the report a failed run saved. */
+type StepRunOptions = { dryRun?: boolean; resumeFrom?: MigrationStepReport | null };
+
 /** A worker's deploy over the seeded owner logs: nurturing's own steps and its memory copies. */
 function deploy({
   events,
@@ -181,13 +184,7 @@ function deploy({
     if (!found || !isMigrationStep(found)) throw new Error(`no step ${id}`);
     return found;
   };
-  const run = (
-    id: string,
-    { dryRun = false, resumeFrom = null }: {
-      dryRun?: boolean;
-      resumeFrom?: MigrationStepReport | null;
-    } = {},
-  ) =>
+  const run = (id: string, { dryRun = false, resumeFrom = null }: StepRunOptions = {}) =>
     step(id).run({
       log: { info: () => undefined, warn: () => undefined },
       checkpoint: { resumeFrom, save: async () => undefined },
