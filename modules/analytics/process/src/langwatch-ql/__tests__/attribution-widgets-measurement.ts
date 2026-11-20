@@ -26,11 +26,7 @@ function fixture(name: string): readonly StockQuery[] {
   );
 }
 
-const QUERY_LABELS = [
-  "att-change/change",
-  "att-change/units",
-  "att-table/passRates",
-] as const;
+const QUERY_LABELS = ["att-change/change", "att-change/units", "att-table/passRates"] as const;
 export type QueryLabel = (typeof QUERY_LABELS)[number];
 
 /** Main's SQL for the three, frozen as the catalogue held it before the fix. */

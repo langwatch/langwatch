@@ -31,8 +31,8 @@ import {
   SWEEP_ONLY_TENANTS,
   SWEEP_TENANTS,
   type TenantName,
-  type TenantSeed,
   TENANTS,
+  type TenantSeed,
   VIEWS,
 } from "./attribution-widgets-seed.ts";
 import {
