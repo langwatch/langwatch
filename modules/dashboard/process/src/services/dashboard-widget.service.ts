@@ -110,7 +110,7 @@ export class DashboardWidgetService {
   async getDeletable(input: DashboardWidgetScope & Viewed & OnBoard): Promise<DashboardWidget> {
     await this.#assertEnabled(input);
     if (curatedBoardWidgetById(input.id)) throw new DashboardWidgetNotFoundError();
-    return this.getById(input);
+    return this.#present(await this.#visibleRow(input));
   }
 
   async createWidget(

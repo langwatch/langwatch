@@ -99,6 +99,35 @@ describe("DashboardModule dashboard widgets", () => {
     ).rejects.toBeInstanceOf(CustomChartPlaygroundNotEnabledError);
   });
 
+  /** @scenario "A delete read of a stored widget checks widgets are enabled once" */
+  it("checks widgets are enabled once when reading a stored widget to delete", async () => {
+    let enabledChecks = 0;
+    const analytics = createDashboardTestAnalytics({
+      assertDashboardWidgetsEnabled: async () => {
+        enabledChecks += 1;
+      },
+    });
+    const dashboard = createDashboardTestApp({
+      repositories: await createDashboardTestRepositoriesWithBoard(),
+      dependencies: { analytics },
+    });
+    const created = await dashboard.createDashboardWidget({
+      projectId: "project-1",
+      name: "Usage",
+      code: "export default () => null;",
+      queries: [],
+    });
+    enabledChecks = 0;
+
+    const deletable = await dashboard.getDeletableDashboardWidget({
+      projectId: "project-1",
+      id: created.id,
+    });
+
+    expect(deletable.id).toBe(created.id);
+    expect(enabledChecks).toBe(1);
+  });
+
   /** @scenario "AC123 Ask Langy: the prompt is stored on built widgets and kept on edit and duplicate" */
   it("stores a widget's Langy prompt and keeps it when its code is edited", async () => {
     const dashboard = createDashboardTestApp();

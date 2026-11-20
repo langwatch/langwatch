@@ -77,6 +77,13 @@ Feature: Editing a dashboard widget from an agent, and where each widget came fr
     When the app looks for a deletable widget under a From LangWatch widget id
     Then it is refused as disabled, not as not found
 
+  @unit
+  Scenario: A delete read of a stored widget checks widgets are enabled once
+    Given a project with dashboard widgets open and a stored widget
+    When the app looks for a deletable widget under the stored widget's id
+    Then it answers the stored widget
+    And widgets were checked as enabled exactly once
+
   @integration
   Scenario: A From LangWatch widget is read under its own board's path only
     Given a project key with analytics:view
