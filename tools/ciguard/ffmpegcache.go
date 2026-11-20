@@ -98,7 +98,7 @@ func ffmpegInstallProblems(install *ciscan.Step) []string {
 	if !ffmpegTimeout.MatchString(install.Run) {
 		problems = append(problems, "ffmpeg install has no timeout, so a trickling mirror can stall the job")
 	}
-	if install.ContinueOnError != nil {
+	if coe := install.ContinueOnError; coe != nil && fmt.Sprint(coe) != "false" {
 		problems = append(problems, "ffmpeg install sets continue-on-error, so a failed install would not stop the job")
 	}
 	return problems

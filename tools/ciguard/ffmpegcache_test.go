@@ -97,6 +97,17 @@ func TestFfmpegWarmRunRestoresWhereAptLooks(t *testing.T) {
 func TestFfmpegFailedInstallSavesNothing(t *testing.T) {
 	afterFailure := strings.Replace(goodFfmpegAction, "      if: steps.media-cache.outputs.cache-hit != 'true' && steps.media-restore.outputs.cache-hit != 'true' && steps.ffmpeg-debs", "      if: always() && steps.ffmpeg-debs", 1)
 	tolerated := strings.Replace(goodFfmpegAction, "      id: ffmpeg-install\n", "      id: ffmpeg-install\n      continue-on-error: true\n", 1)
+	savePath := strings.LastIndex(goodFfmpegAction, "path: ~/.cache/ffmpeg-debs")
+	wrongSavePath := goodFfmpegAction[:savePath] + "path: ~/.cache/elsewhere" + goodFfmpegAction[savePath+len("path: ~/.cache/ffmpeg-debs"):]
+	notTolerated := strings.Replace(goodFfmpegAction, "      id: ffmpeg-install\n", "      id: ffmpeg-install\n      continue-on-error: false\n", 1)
+
+	assert.Contains(t, strings.Join(ffmpegProblems(t, wrongSavePath), "\n"), "ffmpeg save path")
+	for _, fn := range []string{"failure()", "cancelled()"} {
+		gated := strings.Replace(goodFfmpegAction, "&& steps.ffmpeg-debs.outputs.cache-hit != 'true'", "&& steps.ffmpeg-debs.outputs.cache-hit != 'true' && "+fn, 1)
+		assert.NotEqual(t, goodFfmpegAction, gated, fn)
+		assert.Contains(t, strings.Join(ffmpegProblems(t, gated), "\n"), "failed install", fn)
+	}
+	assert.Empty(t, ffmpegProblems(t, notTolerated))
 
 	assert.Contains(t, strings.Join(ffmpegProblems(t, afterFailure), "\n"), "failed install")
 	assert.Contains(t, strings.Join(ffmpegProblems(t, tolerated), "\n"), "continue-on-error")
