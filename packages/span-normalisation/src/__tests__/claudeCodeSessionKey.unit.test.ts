@@ -3,7 +3,11 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { canonicaliseSpanAttributes, orderedSpanCanonicalisers } from "../spanCanonicalisation.ts";
+import {
+  canonicaliseLogRecord,
+  canonicaliseSpanAttributes,
+  orderedSpanCanonicalisers,
+} from "../spanCanonicalisation.ts";
 
 const codexScopes = { isCodexScope: () => false, execScope: "codex_exec" };
 
@@ -85,5 +89,31 @@ describe("a Claude Code span's conversation", () => {
     const attributes = canonicalise({ "session.id": "cc-run-4" }, { "langwatch.session.id": 42 });
 
     expect(attributes["gen_ai.conversation.id"]).toBe("42");
+  });
+
+  /** @scenario a session with no declared session is keyed by the agent's own session id */
+  it("keeps a conversation the span itself carried as the thread", () => {
+    const attributes = canonicalise({
+      "session.id": "cc-run-1",
+      "gen_ai.conversation.id": "conversation_acme",
+    });
+
+    expect(attributes["gen_ai.conversation.id"]).toBe("cc-run-1");
+    expect(attributes["langwatch.thread.id"]).toBe("conversation_acme");
+  });
+});
+
+describe("a Claude Code prompt record's thread", () => {
+  /** @scenario a launcher's declared session groups every harness session it runs */
+  it("is a session declared on the record's resource", () => {
+    const { attributes } = canonicaliseLogRecord({
+      canonicalisers: orderedSpanCanonicalisers({ codexScopes }),
+      scopeName: "com.anthropic.claude_code.events",
+      body: "claude_code.user_prompt",
+      attributes: { "event.name": "user_prompt", prompt: "hi", "session.id": "cc-run-5" },
+      resourceAttributes: { "langwatch.session.id": "agent_scout" },
+    });
+
+    expect(attributes["langwatch.thread.id"]).toBe("agent_scout");
   });
 });

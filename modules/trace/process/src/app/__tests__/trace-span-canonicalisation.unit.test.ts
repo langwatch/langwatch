@@ -109,4 +109,18 @@ describe("TraceModule.canonicalizeSpanAttributes", () => {
       expect(ingested.spanAttributes["gen_ai.conversation.id"]).toBe("agent_scout");
     });
   });
+
+  describe("given a Claude Code prompt record whose resource declares the launcher's session", () => {
+    /** @scenario a launcher's declared session groups every harness session it runs */
+    it("threads the record on the declared session through the API", () => {
+      const lifted = app.canonicalizeLogRecord({
+        scopeName: "com.anthropic.claude_code.events",
+        body: "claude_code.user_prompt",
+        attributes: { "event.name": "user_prompt", prompt: "hi", "session.id": "cc-run-1" },
+        resourceAttributes: { "langwatch.session.id": "agent_scout" },
+      });
+
+      expect(lifted.attributes["langwatch.thread.id"]).toBe("agent_scout");
+    });
+  });
 });

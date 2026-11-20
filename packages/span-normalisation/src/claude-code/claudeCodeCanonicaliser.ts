@@ -7,6 +7,7 @@ import {
 } from "../canonicalAttributes.ts";
 import { markInputAsFresh } from "../canonicalExtraction.ts";
 import { asNumber } from "../canonicalGuard.ts";
+import { asSessionKey, readDeclaredSessionKey } from "../langwatch/declaredSession.ts";
 import { ClaudeCodeResponseService } from "./claudeCodeResponse.ts";
 
 const claudeCodeResponseService = ClaudeCodeResponseService.create();
@@ -21,10 +22,6 @@ const CLAUDE_CODE_SPAN_PREFIX = "claude_code.";
 
 const asString = (raw: unknown): string | null =>
   typeof raw === "string" && raw.length > 0 ? raw : null;
-
-/** A session key as the coding-agent aggregate reads it: a string, or a finite number as text. */
-const asSessionKey = (raw: unknown): string | null =>
-  typeof raw === "number" && Number.isFinite(raw) ? String(raw) : asString(raw);
 
 export class ClaudeCodeCanonicaliserService implements AttributeCanonicaliser {
   static create(): ClaudeCodeCanonicaliserService {
@@ -180,11 +177,18 @@ export class ClaudeCodeCanonicaliserService implements AttributeCanonicaliser {
    */
   private keySession(ctx: ExtractorContext): void {
     const session =
-      asSessionKey(ctx.bag.attrs.get(ATTR_KEYS.LANGWATCH_SESSION_ID)) ??
-      asSessionKey(ctx.span.resourceAttributes?.[ATTR_KEYS.LANGWATCH_SESSION_ID]) ??
-      asSessionKey(ctx.bag.attrs.get("session.id"));
-    const conversation = asString(ctx.out[ATTR_KEYS.GEN_AI_CONVERSATION_ID]);
-    if (session === null || session === conversation) return;
+      readDeclaredSessionKey({
+        attributes: ctx.bag.attrs,
+        resourceAttributes: ctx.span.resourceAttributes,
+      }) ?? asSessionKey(ctx.bag.attrs.get("session.id"));
+    const conversation =
+      asString(ctx.out[ATTR_KEYS.GEN_AI_CONVERSATION_ID]) ??
+      asString(takeAttribute(ctx.bag.attrs, ATTR_KEYS.GEN_AI_CONVERSATION_ID));
+    if (session === null || session === conversation) {
+      if (conversation !== null)
+        ctx.setAttrIfAbsent(ATTR_KEYS.GEN_AI_CONVERSATION_ID, conversation);
+      return;
+    }
     if (conversation !== null) ctx.setAttrIfAbsent(ATTR_KEYS.LANGWATCH_THREAD_ID, conversation);
     ctx.setAttr(ATTR_KEYS.GEN_AI_CONVERSATION_ID, session);
     ctx.recordRule("claude-code/session");
@@ -205,7 +209,11 @@ export class ClaudeCodeCanonicaliserService implements AttributeCanonicaliser {
     }
 
     // The record's thread is the agent's session, as a span's conversation is (keySession).
-    const session = asSessionKey(ctx.bag.attrs.get(ATTR_KEYS.LANGWATCH_SESSION_ID)) ?? sessionId;
+    const session =
+      readDeclaredSessionKey({
+        attributes: ctx.bag.attrs,
+        resourceAttributes: ctx.resourceAttributes,
+      }) ?? sessionId;
     if (session !== null) {
       ctx.setAttrIfAbsent(ATTR_KEYS.LANGWATCH_THREAD_ID, session);
       fired = true;

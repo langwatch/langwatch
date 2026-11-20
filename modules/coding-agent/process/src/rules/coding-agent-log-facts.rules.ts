@@ -1,7 +1,7 @@
 import {
   type ContributeLogFactsCommandData,
   deriveConversationKey,
-  deriveDeclaredSessionKey,
+  readDeclaredSessionKey,
   deriveSessionTitleFromPrompt,
   detectCodingAgent,
   extractCodingAgentLogFacts,
@@ -128,7 +128,7 @@ function keyContribution({
   facts: LogFacts;
 }): LogContribution {
   const sessionKey =
-    deriveDeclaredSessionKey({ attrs: attributes, resourceAttrs: resourceAttributes }) ??
+    readDeclaredSessionKey({ attributes, resourceAttributes }) ??
     deriveConversationKey(attributes) ??
     (record.providerSessionId || null);
   const correlated = record.correlationSource !== "none";

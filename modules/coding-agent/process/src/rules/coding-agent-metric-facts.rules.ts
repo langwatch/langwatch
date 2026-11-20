@@ -1,7 +1,7 @@
 import {
   type ContributeMetricFactsCommandData,
   deriveConversationKey,
-  deriveDeclaredSessionKey,
+  readDeclaredSessionKey,
   detectCodingAgent,
   isCodingAgentMetricName,
 } from "@langwatch/coding-agent-contract";
@@ -32,8 +32,7 @@ export function liftMetricContribution(point: CanonicalMetricDataPoint): MetricC
   if (attributes === null) return IGNORED;
   const resourceAttributes = parsePointAttributes(point.resourceAttributesJson);
   const sessionKey =
-    deriveDeclaredSessionKey({ attrs: attributes, resourceAttrs: resourceAttributes }) ??
-    deriveConversationKey(attributes);
+    readDeclaredSessionKey({ attributes, resourceAttributes }) ?? deriveConversationKey(attributes);
   if (sessionKey === null) return IGNORED;
 
   const intValue = point.valueInt !== null ? Number(point.valueInt) : null;
