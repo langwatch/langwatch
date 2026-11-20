@@ -283,6 +283,8 @@ export const APP_ERROR_CODES = [
   "digest_nothing_to_send",
   "digest_operator_address_missing",
   "digest_organization_not_enrolled",
+  "digest_public_base_url_missing",
+  "digest_unsubscribe_rate_limited",
   "docs_origin_not_registered",
   "docs_playground_sessions_disabled",
   "dspy_step_not_found",

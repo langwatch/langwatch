@@ -2,13 +2,13 @@ Feature: Weekly digest emails
   LangWatch Cloud sends each person one weekly email about their week's usage, picked from five
   templates by what their data shows, and sent through our own mailer. Operators choose the cohort
   and arm the send in Cloud admin; nothing is sent until they do. Anyone can unsubscribe in one
-  click; clicks and unsubscribes are counted.
+  click; an unsubscribe is recorded.
   Design: dev/docs/plans/weekly-digest.md
 
   # Built: the pick, the folds' redelivery rule, the weekly send through our own mailer, the
-  # one-click unsubscribe, the operators' switches and clearing digest rows on user erasure. The
-  # other folds' peer intake, click tracking, the rate limit, the "what's new" card and the Cloud
-  # admin gallery and its metrics are @unimplemented.
+  # one-click unsubscribe and its rate limit, the operators' switches and clearing digest rows on
+  # user erasure. The other folds' peer intake, click tracking and its rate limit, the "what's
+  # new" card and the Cloud admin gallery and its metrics are @unimplemented.
 
   # Picking a template
 
@@ -300,9 +300,15 @@ Feature: Weekly digest emails
     When a click token names a link key its send does not hold
     Then the answer is not found and nothing redirects
 
+  @integration
+  Scenario: The unsubscribe pages are rate limited, and a refused call touches nothing
+    When one caller asks, unsubscribes or resubscribes past the limit
+    Then the caller is refused as digest_unsubscribe_rate_limited
+    And the token is not verified, no subscription is read, and nothing is written
+
   @integration @unimplemented
-  Scenario: The unauthenticated routes are rate limited
-    When one caller asks the unsubscribe or click route past the limit
+  Scenario: The click route is rate limited
+    When one caller asks the click route past the limit
     Then the caller is refused as too many requests
 
   # Cloud admin

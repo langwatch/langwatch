@@ -8,10 +8,14 @@
  */
 import { createHmac } from "node:crypto";
 
+import type { DigestTokenCall } from "@langwatch/enterprise-digest-contract";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { isoWeekOf } from "../../rules/digest-week.rules.ts";
-import { LINK_LIFETIME_SECONDS } from "../../services/digest-unsubscribe.service.ts";
+import {
+  ATTEMPT_LIMITS,
+  LINK_LIFETIME_SECONDS,
+} from "../../services/digest-unsubscribe.service.ts";
 import {
   ADMIN,
   BASE_URL,
@@ -38,6 +42,8 @@ const IN_SENT_WEEK = Date.parse("2026-11-11T12:00:00Z");
 /** An hour of the Monday the sent week's email goes out, 2026-W47's first day. */
 const mondayAt = (hour: number) => Date.UTC(2026, 10, 16, hour);
 const DAY_MS = 24 * 60 * 60 * 1000;
+/** The address the public pages count a caller as. */
+const CALLER = "203.0.113.7";
 
 let digest: InstalledDigest;
 
@@ -265,6 +271,23 @@ describe("the weekly digest send", () => {
         true,
       );
     });
+
+    it("refuses by name with no public base URL, and records no send", async () => {
+      await enrol();
+      await arm();
+      everyoneNearTheLimit();
+      digest.world.publicBaseUrl = "";
+
+      await expect(sendFor({ userId: MEMBER, isoWeek: SENT_WEEK })).rejects.toMatchObject({
+        code: "digest_public_base_url_missing",
+        httpStatus: 503,
+      });
+
+      expect(digest.mail).toEqual([]);
+      expect(await digest.repositories.sends.isSent({ userId: MEMBER, isoWeek: SENT_WEEK })).toBe(
+        false,
+      );
+    });
   });
 
   describe("when two attempts at one member's week run at once", () => {
@@ -397,10 +420,10 @@ describe("unsubscribing from the digest", () => {
     it("opts the member out, records the send it came from, and skips next week", async () => {
       const token = tokenOf((await sentEmailOf(MEMBER)).oneClickUnsubscribeUrl);
 
-      await digest.unsubscribes.unsubscribe({ token });
-      await digest.unsubscribes.unsubscribe({ token });
+      await digest.unsubscribes.unsubscribe({ token, callerAddress: CALLER });
+      await digest.unsubscribes.unsubscribe({ token, callerAddress: CALLER });
 
-      expect(await digest.unsubscribes.isSubscribed({ token })).toBe(false);
+      expect(await digest.unsubscribes.isSubscribed({ token, callerAddress: CALLER })).toBe(false);
       expect(digest.repositories.audience.unsubscribeSources().get(MEMBER)).toBe(
         `${MEMBER}:${SENT_WEEK}`,
       );
@@ -417,10 +440,11 @@ describe("unsubscribing from the digest", () => {
       const forgedFor = Buffer.from(JSON.stringify({ u: ADMIN, s: "x" })).toString("base64url");
 
       for (const forged of [`${forgedFor}.${signature}`, `${payload}.${"0".repeat(64)}`, "junk"]) {
-        await expect(digest.unsubscribes.isSubscribed({ token: forged })).rejects.toMatchObject({
+        const forgedCall = { token: forged, callerAddress: CALLER };
+        await expect(digest.unsubscribes.isSubscribed(forgedCall)).rejects.toMatchObject({
           code: "digest_link_invalid",
         });
-        await expect(digest.unsubscribes.unsubscribe({ token: forged })).rejects.toMatchObject({
+        await expect(digest.unsubscribes.unsubscribe(forgedCall)).rejects.toMatchObject({
           code: "digest_link_invalid",
         });
       }
@@ -434,13 +458,14 @@ describe("unsubscribing from the digest", () => {
       const token = tokenOf((await sentEmailOf(MEMBER)).oneClickUnsubscribeUrl);
 
       digest.world.clockOffsetMs = (LINK_LIFETIME_SECONDS - 24 * 60 * 60) * 1000;
-      expect(await digest.unsubscribes.isSubscribed({ token })).toBe(true);
+      const call = { token, callerAddress: CALLER };
+      expect(await digest.unsubscribes.isSubscribed(call)).toBe(true);
 
       digest.world.clockOffsetMs = LINK_LIFETIME_SECONDS * 1000;
-      await expect(digest.unsubscribes.isSubscribed({ token })).rejects.toMatchObject({
+      await expect(digest.unsubscribes.isSubscribed(call)).rejects.toMatchObject({
         code: "digest_link_invalid",
       });
-      await expect(digest.unsubscribes.unsubscribe({ token })).rejects.toMatchObject({
+      await expect(digest.unsubscribes.unsubscribe(call)).rejects.toMatchObject({
         code: "digest_link_invalid",
       });
       expect(await digest.repositories.audience.findUnsubscribed({ userIds: MEMBERS })).toEqual([]);
@@ -461,10 +486,13 @@ describe("unsubscribing from the digest", () => {
           .digest("hex")}`;
 
       await expect(
-        digest.unsubscribes.isSubscribed({ token: signedAs(serialized) }),
+        digest.unsubscribes.isSubscribed({ token: signedAs(serialized), callerAddress: CALLER }),
       ).rejects.toMatchObject({ code: "digest_link_invalid" });
       expect(
-        await digest.unsubscribes.isSubscribed({ token: signedAs(`digest.v1:${serialized}`) }),
+        await digest.unsubscribes.isSubscribed({
+          token: signedAs(`digest.v1:${serialized}`),
+          callerAddress: CALLER,
+        }),
       ).toBe(true);
     });
   });
@@ -476,9 +504,9 @@ describe("unsubscribing from the digest", () => {
       digest.world.users = digest.world.users.filter((userId) => userId !== MEMBER);
 
       for (const call of [
-        () => digest.unsubscribes.isSubscribed({ token }),
-        () => digest.unsubscribes.unsubscribe({ token }),
-        () => digest.unsubscribes.resubscribe({ token }),
+        () => digest.unsubscribes.isSubscribed({ token, callerAddress: CALLER }),
+        () => digest.unsubscribes.unsubscribe({ token, callerAddress: CALLER }),
+        () => digest.unsubscribes.resubscribe({ token, callerAddress: CALLER }),
       ]) {
         await expect(call()).rejects.toMatchObject({ code: "digest_link_invalid" });
       }
@@ -490,15 +518,105 @@ describe("unsubscribing from the digest", () => {
     /** @scenario "Resubscribing from the unsubscribe page" */
     it("sends them next week's email", async () => {
       const token = tokenOf((await sentEmailOf(MEMBER)).oneClickUnsubscribeUrl);
-      await digest.unsubscribes.unsubscribe({ token });
+      await digest.unsubscribes.unsubscribe({ token, callerAddress: CALLER });
 
-      await digest.unsubscribes.resubscribe({ token });
+      await digest.unsubscribes.resubscribe({ token, callerAddress: CALLER });
       await sendFor({ userId: MEMBER, isoWeek: "2026-W47" });
 
-      expect(await digest.unsubscribes.isSubscribed({ token })).toBe(true);
+      expect(await digest.unsubscribes.isSubscribed({ token, callerAddress: CALLER })).toBe(true);
       expect(digest.mail.map((mail) => mail.idempotencyKey)).toEqual([
         `digest:${MEMBER}:${SENT_WEEK}`,
         `digest:${MEMBER}:2026-W47`,
+      ]);
+    });
+  });
+
+  describe("when one caller is past the limit", () => {
+    type Action = keyof typeof ATTEMPT_LIMITS;
+    const ACTIONS = Object.keys(ATTEMPT_LIMITS) as Action[];
+    const OTHER_CALLER = "198.51.100.1";
+    const attempts: Record<Action, (call: DigestTokenCall) => Promise<unknown>> = {
+      resolve: (call) => digest.unsubscribes.isSubscribed(call),
+      "one-click": (call) => digest.unsubscribes.unsubscribe(call),
+      resubscribe: (call) => digest.unsubscribes.resubscribe(call),
+    };
+    /** One attempt with a forged token: refused as an invalid link, or as limited once past. */
+    const forged = (action: Action, callerAddress: string | null) =>
+      attempts[action]({ token: "junk", callerAddress });
+    /** Spends a caller's whole window on forged tokens, which are refused and change nothing. */
+    const exhaust = async (action: Action, callerAddress: string | null) => {
+      for (let attempt = 0; attempt < ATTEMPT_LIMITS[action]; attempt += 1) {
+        await expect(forged(action, callerAddress)).rejects.toMatchObject({
+          code: "digest_link_invalid",
+        });
+      }
+    };
+
+    /** @scenario "The unsubscribe pages are rate limited, and a refused call touches nothing" */
+    it.each(ACTIONS)("refuses %s past its cap, for that caller alone", async (action) => {
+      await exhaust(action, CALLER);
+
+      await expect(forged(action, CALLER)).rejects.toMatchObject({
+        code: "digest_unsubscribe_rate_limited",
+        httpStatus: 429,
+      });
+      await expect(forged(action, OTHER_CALLER)).rejects.toMatchObject({
+        code: "digest_link_invalid",
+      });
+    });
+
+    /** @scenario "The unsubscribe pages are rate limited, and a refused call touches nothing" */
+    it("counts callers with no address in one shared bucket, not skipping the count", async () => {
+      await exhaust("resolve", null);
+
+      await expect(forged("resolve", null)).rejects.toMatchObject({
+        code: "digest_unsubscribe_rate_limited",
+      });
+    });
+
+    /** @scenario "The unsubscribe pages are rate limited, and a refused call touches nothing" */
+    it.each(ACTIONS)("reads nothing on a refused %s call", async (action) => {
+      const token = tokenOf((await sentEmailOf(MEMBER)).oneClickUnsubscribeUrl);
+      await exhaust(action, CALLER);
+      // Had the call got past the count, a forged token and a token for a person who no longer
+      // exists would each be refused as an invalid link: the signature check and the user read.
+      digest.world.users = digest.world.users.filter((userId) => userId !== MEMBER);
+      const subscriptionRead = vi.spyOn(digest.repositories.audience, "findUnsubscribed");
+
+      for (const candidate of ["junk", token]) {
+        await expect(
+          attempts[action]({ token: candidate, callerAddress: CALLER }),
+        ).rejects.toMatchObject({ code: "digest_unsubscribe_rate_limited" });
+      }
+
+      expect(subscriptionRead).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "The unsubscribe pages are rate limited, and a refused call touches nothing" */
+    it("records no unsubscribe on a refused one-click call", async () => {
+      const token = tokenOf((await sentEmailOf(MEMBER)).oneClickUnsubscribeUrl);
+      await exhaust("one-click", CALLER);
+
+      await expect(
+        digest.unsubscribes.unsubscribe({ token, callerAddress: CALLER }),
+      ).rejects.toMatchObject({ code: "digest_unsubscribe_rate_limited" });
+
+      expect(digest.repositories.audience.unsubscribeSources().has(MEMBER)).toBe(false);
+      expect(await digest.repositories.audience.findUnsubscribed({ userIds: MEMBERS })).toEqual([]);
+    });
+
+    /** @scenario "The unsubscribe pages are rate limited, and a refused call touches nothing" */
+    it("leaves the member unsubscribed on a refused resubscribe call", async () => {
+      const token = tokenOf((await sentEmailOf(MEMBER)).oneClickUnsubscribeUrl);
+      await digest.unsubscribes.unsubscribe({ token, callerAddress: OTHER_CALLER });
+      await exhaust("resubscribe", CALLER);
+
+      await expect(
+        digest.unsubscribes.resubscribe({ token, callerAddress: CALLER }),
+      ).rejects.toMatchObject({ code: "digest_unsubscribe_rate_limited" });
+
+      expect(await digest.repositories.audience.findUnsubscribed({ userIds: MEMBERS })).toEqual([
+        MEMBER,
       ]);
     });
   });
@@ -531,11 +649,15 @@ describe("when no signing secret is configured", () => {
     const payload = Buffer.from(JSON.stringify({ u: MEMBER, s: "x", exp: 0 }));
     const token = `${payload.toString("base64url")}.${"0".repeat(64)}`;
 
-    await expect(digest.unsubscribes.isSubscribed({ token })).rejects.toMatchObject({
+    await expect(
+      digest.unsubscribes.isSubscribed({ token, callerAddress: CALLER }),
+    ).rejects.toMatchObject({
       code: "digest_links_unavailable",
       httpStatus: 503,
     });
-    await expect(digest.unsubscribes.unsubscribe({ token })).rejects.toMatchObject({
+    await expect(
+      digest.unsubscribes.unsubscribe({ token, callerAddress: CALLER }),
+    ).rejects.toMatchObject({
       code: "digest_links_unavailable",
     });
   });
@@ -569,7 +691,7 @@ describe("an operator's test send", () => {
       await digest.sendTest({ organizationId: ORGANIZATION, userId: MEMBER, operatorId: OPERATOR });
       const token = tokenOf(digest.mail[0]?.oneClickUnsubscribeUrl ?? "");
 
-      await digest.unsubscribes.unsubscribe({ token });
+      await digest.unsubscribes.unsubscribe({ token, callerAddress: CALLER });
 
       expect(
         await digest.repositories.audience.findUnsubscribed({ userIds: [MEMBER, OPERATOR] }),

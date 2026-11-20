@@ -6,6 +6,7 @@ import {
   DigestNothingToSendError,
   DigestOperatorAddressMissingError,
   DigestOrganizationNotEnrolledError,
+  DigestPublicBaseUrlMissingError,
 } from "@langwatch/enterprise-digest-contract";
 import { createLogger } from "@langwatch/observability";
 import {
@@ -227,14 +228,21 @@ export class DigestSendService {
       this.deps.audience.findUnsubscribed({ userIds: [userId] }),
       this.deps.sends.isSent({ userId, isoWeek }),
     ]);
-    if (!settings.armed || !enrolled.includes(organizationId)) return;
-    if (unsubscribed.length > 0 || sent) return;
+    // A skipped send is otherwise silent: the reason is the only trace of why no email went out.
+    // Never the address: logs outlive the email.
+    const skip = (reason: string) =>
+      logger.info({ reason, userId, organizationId, isoWeek }, "the digest skipped a send");
+    if (!settings.armed) return skip("digest is not armed");
+    if (!enrolled.includes(organizationId)) return skip("organization is not enrolled");
+    if (unsubscribed.length > 0) return skip("member opted out");
+    if (sent) return skip("week already sent to this member");
     const membership = await this.#membership({ organizationId, userId });
-    if (membership.kind === "gone") return;
+    if (membership.kind === "gone") return skip("member left or was disabled");
     const user = await this.deps.users.findById({ id: userId });
-    if (!user?.email || user.deactivatedAt !== null) return;
+    if (!user?.email) return skip("member has no email address");
+    if (user.deactivatedAt !== null) return skip("member is deactivated");
     const choice = { organizationId, userId, isoWeek, enrolled, homeOrganizationId };
-    if (!(await this.#isHomeOrganization(choice))) return;
+    if (!(await this.#isHomeOrganization(choice))) return skip("another organization is home");
     const week = await this.#visibleWeek({
       week: await this.deps.weeks.organizationWeek({ organizationId, isoWeek }),
       userId,
@@ -244,7 +252,7 @@ export class DigestSendService {
       member: { userId, admin: membership.admin },
       recipient: { userId, sendId: digestSendKey({ userId, isoWeek }) },
     });
-    if (!composed) return;
+    if (!composed) return skip("no template has anything to show");
     // Rendered and checked before the claim: a refusal fails this attempt and leaves the week
     // unclaimed, so the retry can still send it.
     const rendered = await renderDigestMail({
@@ -264,7 +272,7 @@ export class DigestSendService {
       templateId: composed.pick.template,
       sentAt: this.deps.now(),
     });
-    if (!claimed) return;
+    if (!claimed) return skip("another attempt claimed the week");
     await this.deps.mail.send(rendered);
   }
 
@@ -491,7 +499,7 @@ export class DigestSendService {
 
   #baseUrl(): string {
     const base = this.deps.publicBaseUrl;
-    if (!base) throw new Error("digest needs the deployment's public base URL (BASE_HOST) to send");
+    if (!base) throw new DigestPublicBaseUrlMissingError();
     return base.replace(/\/$/, "");
   }
 }

@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import type { DigestAudienceRepository } from "./digest-audience.repository.ts";
+import type { DigestCallCounterRepository } from "./digest-call-counter.repository.ts";
 import type { DigestSendRepository } from "./digest-send.repository.ts";
 import type {
   DigestProjectWeekRepository,
@@ -12,4 +13,6 @@ export interface DigestRepositories {
   readonly userWeeks: DigestUserWeekRepository;
   readonly sends: DigestSendRepository;
   readonly audience: DigestAudienceRepository;
+  /** The per-caller attempt count on the public unsubscribe pages. */
+  readonly callCounter: DigestCallCounterRepository;
 }

@@ -91,7 +91,8 @@ Until the "what's new" editor exists no card is published, so a person whose pic
     from the same page. The token is an HMAC over `(userId, sendId)` with the session secret.
   - Not built: `GET /api/digest/c/:token` (record a click and redirect; the token names a send id and
     a link key only, the target URL read from `DigestSend.links`, so there is no open redirect), and a
-    per-caller rate limit on the unsubscribe routes as automation's pair has.
+    per-caller rate limit on that click route. The unsubscribe routes are limited per caller, as
+    automation's pair is, and past the limit answer 429 `digest_unsubscribe_rate_limited`.
 - tRPC `digest.*` (Cloud admin only, `ops:manage`): enrol/unenrol an organization, arm/disarm, send
   myself a test of a member's email (to the operator's own address, `[Test]` in the subject, no
   `DigestSend` row). Not built: cohort list, preview, refresh, the update editor, metrics.

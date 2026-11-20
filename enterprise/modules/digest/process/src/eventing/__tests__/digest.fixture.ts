@@ -190,6 +190,7 @@ export function installDigest(
   };
   const unsubscribes = DigestUnsubscribeService.create({
     secret,
+    limits: repositories.callCounter,
     audience,
     users,
     now,

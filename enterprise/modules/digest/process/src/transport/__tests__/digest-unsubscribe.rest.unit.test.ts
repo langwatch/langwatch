@@ -5,15 +5,24 @@
  * be framed, and a missing signing secret answers as a handled refusal, not a server fault.
  * @see enterprise/modules/digest/specs/digest.feature
  */
-import { canonicalErrorResponse, createRestRuntime } from "@langwatch/api/rest";
-import { type DigestApi, DigestLinksUnavailableError } from "@langwatch/enterprise-digest-contract";
+import {
+  bindMiddlewareContext,
+  canonicalErrorResponse,
+  createRestRuntime,
+} from "@langwatch/api/rest";
+import {
+  type DigestApi,
+  DigestLinksUnavailableError,
+  DigestUnsubscribeRateLimitedError,
+} from "@langwatch/enterprise-digest-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { describe, expect, it } from "vitest";
 
-import { digestUnsubscribeRest } from "../digest-unsubscribe.rest.ts";
+import { digestCallerAddress, digestUnsubscribeRest } from "../digest-unsubscribe.rest.ts";
 
 const TOKEN = "payload.signature";
+const CALLER = "203.0.113.7";
 
 /** The address over the slice of the digest a case names; the caller presents no credential. */
 function mount(app: Partial<DigestApi>) {
@@ -30,6 +39,7 @@ function mount(app: Partial<DigestApi>) {
     app: () => createApiFixture<DigestApi>(app, "DigestApi"),
     credential: "public",
     onError: canonicalErrorResponse,
+    middlewareContext: [bindMiddlewareContext(digestCallerAddress, () => CALLER)],
   });
   return (method: "GET" | "POST", path: string) =>
     hono.fetch(new Request(`http://api.test${path}?token=${TOKEN}`, { method }));
@@ -101,6 +111,42 @@ describe("the digest's unsubscribe pages", () => {
       // A 5xx the caller did not cause keeps its code off the wire unless it is a transient
       // refusal (TRANSIENT_REFUSAL_CODES); a missing secret is not one, retrying fixes nothing.
       expect(await response.json()).toMatchObject({ code: "internal_error" });
+    });
+  });
+
+  describe("when a caller is past the limit", () => {
+    /** @scenario "The unsubscribe pages are rate limited, and a refused call touches nothing" */
+    it.each([
+      ["GET", "/api/digest/unsubscribe"],
+      ["POST", "/api/digest/unsubscribe"],
+      ["POST", "/api/digest/resubscribe"],
+    ] as const)("%s %s answers 429, naming its code", async (method, path) => {
+      const limited = async (): Promise<never> => {
+        throw new DigestUnsubscribeRateLimitedError();
+      };
+      const send = mount({ isSubscribed: limited, unsubscribe: limited, resubscribe: limited });
+
+      const response = await send(method, path);
+
+      expect(response.status).toBe(429);
+      expect(await response.json()).toMatchObject({ code: "digest_unsubscribe_rate_limited" });
+    });
+  });
+
+  describe("when a page is asked", () => {
+    /** @scenario "The unsubscribe pages are rate limited, and a refused call touches nothing" */
+    it("hands the app the token and the address the request was counted as", async () => {
+      const calls: unknown[] = [];
+      const send = mount({
+        isSubscribed: async (input) => {
+          calls.push(input);
+          return true;
+        },
+      });
+
+      await send("GET", "/api/digest/unsubscribe");
+
+      expect(calls).toEqual([{ token: TOKEN, callerAddress: CALLER }]);
     });
   });
 });

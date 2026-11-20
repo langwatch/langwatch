@@ -4718,6 +4718,15 @@ const presentations = {
     title: "Member opted out",
     describe: () => "This member opted out of the digest, so no test is sent. Pick someone else.",
   },
+  digest_public_base_url_missing: {
+    title: "Public address not configured",
+    describe: () => "This is on our side. Try again later.",
+  },
+  digest_unsubscribe_rate_limited: {
+    // Read on the digest's unsubscribe page, by someone with no session and nothing to fix.
+    title: "Too many attempts just now",
+    describe: () => "Wait a few minutes, then open the link again.",
+  },
 
   // ---- automations & notifications ----
   automation_not_found: {

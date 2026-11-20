@@ -4,11 +4,14 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 import {
   DigestLinkInvalidError,
   DigestLinksUnavailableError,
+  type DigestTokenCall,
+  DigestUnsubscribeRateLimitedError,
 } from "@langwatch/enterprise-digest-contract";
 import type { UserApi } from "@langwatch/user-contract";
 import { z } from "zod";
 
 import type { DigestAudienceRepository } from "../repositories/digest-audience.repository.ts";
+import type { DigestCallCounterRepository } from "../repositories/digest-call-counter.repository.ts";
 
 /**
  * What an unsubscribe token signs: the person, the send whose link it rode in, and when it
@@ -30,9 +33,15 @@ export const LINK_LIFETIME_SECONDS = 180 * 24 * 60 * 60;
  */
 const SIGNED_PURPOSE = "digest.v1:";
 
+/** The attempts window and each action's cap in it: automation's unsubscribe pair, same values. */
+export const ATTEMPT_WINDOW_SECONDS = 60;
+export const ATTEMPT_LIMITS = { resolve: 30, "one-click": 10, resubscribe: 10 } as const;
+
 type Deps = Readonly<{
   /** The session secret; absent or empty, no token is signed or accepted. */
   secret: string | undefined;
+  /** Counts attempts per caller, so one caller's attempts at the public pages are capped. */
+  limits: DigestCallCounterRepository;
   audience: Pick<DigestAudienceRepository, "findUnsubscribed" | "unsubscribe" | "resubscribe">;
   /** Whether the person a link names still exists; a link for no one is an invalid link. */
   users: Pick<UserApi, "findById">;
@@ -45,7 +54,9 @@ type Deps = Readonly<{
  * `digest.v1:` and the JSON, compared in constant time; the token is the whole authorization,
  * so it names one person and nothing else can be done with it. A link naming a person who no
  * longer exists is refused as `digest_link_invalid`, so no subscription row is written for them.
- * Without a secret every call refuses with `digest_links_unavailable`.
+ * Without a secret every call refuses with `digest_links_unavailable`. Each public call counts one
+ * attempt per caller first, and past the limit refuses with `digest_unsubscribe_rate_limited`
+ * having read and written nothing.
  */
 export class DigestUnsubscribeService {
   static create(deps: Deps): DigestUnsubscribeService {
@@ -60,19 +71,41 @@ export class DigestUnsubscribeService {
     return `${Buffer.from(serialized).toString("base64url")}.${this.#signature(serialized)}`;
   }
 
-  async isSubscribed({ token }: { token: string }): Promise<boolean> {
+  async isSubscribed({ token, callerAddress }: DigestTokenCall): Promise<boolean> {
+    await this.#countAttempt({ action: "resolve", callerAddress });
     const { u } = await this.#existing(token);
     return (await this.deps.audience.findUnsubscribed({ userIds: [u] })).length === 0;
   }
 
-  async unsubscribe({ token }: { token: string }): Promise<void> {
+  async unsubscribe({ token, callerAddress }: DigestTokenCall): Promise<void> {
+    await this.#countAttempt({ action: "one-click", callerAddress });
     const { u, s } = await this.#existing(token);
     await this.deps.audience.unsubscribe({ userId: u, sendId: s, at: this.deps.now() });
   }
 
-  async resubscribe({ token }: { token: string }): Promise<void> {
+  async resubscribe({ token, callerAddress }: DigestTokenCall): Promise<void> {
+    await this.#countAttempt({ action: "resubscribe", callerAddress });
     const { u } = await this.#existing(token);
     await this.deps.audience.resubscribe({ userId: u });
+  }
+
+  /**
+   * One attempt at the public pages, counted before the token is checked or anything is read.
+   * A caller with no address shares one bucket: a missing address must still throttle.
+   */
+  async #countAttempt({
+    action,
+    callerAddress,
+  }: {
+    action: keyof typeof ATTEMPT_LIMITS;
+    callerAddress: string | null;
+  }): Promise<void> {
+    const limit = await this.deps.limits.count({
+      key: `digest-unsubscribe:${action}:${callerAddress ?? "unknown"}`,
+      windowSeconds: ATTEMPT_WINDOW_SECONDS,
+      max: ATTEMPT_LIMITS[action],
+    });
+    if (!limit.allowed) throw new DigestUnsubscribeRateLimitedError();
   }
 
   /** The verified payload, only while its person exists; the user is read after the signature. */

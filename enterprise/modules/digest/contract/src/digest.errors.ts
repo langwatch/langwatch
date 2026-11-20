@@ -92,3 +92,31 @@ export class DigestLinksUnavailableError extends HandledError {
     this.name = "DigestLinksUnavailableError";
   }
 }
+
+/** No public base URL is configured, so no link the email carries can point back at us. */
+export class DigestPublicBaseUrlMissingError extends HandledError {
+  declare readonly code: "digest_public_base_url_missing";
+
+  constructor() {
+    super(
+      "digest_public_base_url_missing",
+      "The deployment's public address is not configured, so digest emails can't be sent.",
+      { httpStatus: 503, fault: "platform" },
+    );
+    this.name = "DigestPublicBaseUrlMissingError";
+  }
+}
+
+/** One caller made too many digest unsubscribe-page attempts in the window; waiting is the remedy. */
+export class DigestUnsubscribeRateLimitedError extends HandledError {
+  declare readonly code: "digest_unsubscribe_rate_limited";
+
+  constructor() {
+    super(
+      "digest_unsubscribe_rate_limited",
+      "Too many attempts. Wait a few minutes and try again.",
+      { httpStatus: 429, fault: "customer" },
+    );
+    this.name = "DigestUnsubscribeRateLimitedError";
+  }
+}

@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+import { ClientAddress } from "@langwatch/api/policy";
 import type { DigestApi, DigestServerConfig } from "@langwatch/enterprise-digest-contract";
 import { defineProcessModule, type PublishedProcessModule } from "@langwatch/process";
 
@@ -16,5 +17,8 @@ export const digestProcessModule: PublishedProcessModule<"digest", DigestApi, Di
     .withChannels(digestChannels)
     .withApi(DigestModule)
     .withTransports(digestTrpcTransport, digestUnsubscribeRest)
+    .provideMiddlewareContext({
+      digestCallerAddress: (request) => ClientAddress.resolvedFor(request) ?? null,
+    })
     .withEventing(digestEventing)
     .withEventing(digestSendEventing);

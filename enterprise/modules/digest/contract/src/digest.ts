@@ -66,3 +66,9 @@ const digestTokenQuerySchemaDefinition = z.object({ token: z.string().min(1).max
 export interface DigestTokenQuerySchema extends Named<typeof digestTokenQuerySchemaDefinition> {}
 export const digestTokenQuerySchema: DigestTokenQuerySchema = digestTokenQuerySchemaDefinition;
 export type DigestTokenQuery = z.infer<typeof digestTokenQuerySchema>;
+
+/**
+ * A token call and who made it: the public routes count one attempt per caller, and a caller
+ * whose address is unknown shares one bucket rather than bypassing the count.
+ */
+export type DigestTokenCall = DigestTokenQuery & { callerAddress: string | null };

@@ -106,6 +106,7 @@ export class DigestModule implements DigestApiContract {
     const commands = DigestCommandsService.create();
     const unsubscribes = DigestUnsubscribeService.create({
       secret,
+      limits: repositories.callCounter,
       audience: repositories.audience,
       users: dependencies.users,
       now: nowEpochMs,
@@ -196,12 +197,10 @@ export class DigestModule implements DigestApiContract {
       operatorId: await this.#operators.admitManager(operator),
     });
 
-  isSubscribed: DigestApiContract["isSubscribed"] = ({ token }) =>
-    this.#unsubscribes.isSubscribed({ token });
+  isSubscribed: DigestApiContract["isSubscribed"] = (input) =>
+    this.#unsubscribes.isSubscribed(input);
 
-  unsubscribe: DigestApiContract["unsubscribe"] = ({ token }) =>
-    this.#unsubscribes.unsubscribe({ token });
+  unsubscribe: DigestApiContract["unsubscribe"] = (input) => this.#unsubscribes.unsubscribe(input);
 
-  resubscribe: DigestApiContract["resubscribe"] = ({ token }) =>
-    this.#unsubscribes.resubscribe({ token });
+  resubscribe: DigestApiContract["resubscribe"] = (input) => this.#unsubscribes.resubscribe(input);
 }
