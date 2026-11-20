@@ -1,17 +1,11 @@
 package a2aproxy
 
 import (
-	"context"
 	"errors"
-	"fmt"
-	"net"
 	"net/http"
-	"net/netip"
-	"strings"
-	"syscall"
 	"time"
 
-	"github.com/langwatch/langwatch/pkg/ssrf"
+	"github.com/langwatch/langwatch/services/aigateway/adapters/egress"
 )
 
 // Upstream timeouts. A stream may run as long as the agent works, so there
@@ -38,34 +32,14 @@ type UpstreamPolicy struct {
 }
 
 // NewUpstreamClient is the client the proxy calls targets with. Every dial
-// is checked after DNS resolution against pkg/ssrf. No environment proxy is
-// used, so the address check always sees the real target. Redirects are
-// refused, so the target's upstream headers never follow one to another host.
+// is checked after DNS resolution by the gateway's egress rule. No environment
+// proxy is used, so the address check always sees the real target. Redirects
+// are refused, so upstream headers never follow one to another host.
 func NewUpstreamClient(policy UpstreamPolicy) *http.Client {
-	allowed := make(map[string]bool, len(policy.AllowedHosts))
-	for _, h := range policy.AllowedHosts {
-		if h = normalizeHost(h); h != "" {
-			allowed[h] = true
-		}
-	}
-	dialerFor := func(blockLocal bool) *net.Dialer {
-		return &net.Dialer{
-			Timeout:   upstreamDialTimeout,
-			KeepAlive: 30 * time.Second,
-			Control: func(_, address string, _ syscall.RawConn) error {
-				return checkDialAddress(address, blockLocal)
-			},
-		}
-	}
-	strict, open := dialerFor(policy.BlockLocal), dialerFor(false)
+	dialer := egress.NewPolicy(policy.BlockLocal, policy.AllowedHosts).Dialer(upstreamDialTimeout)
 	transport := &http.Transport{
-		Proxy: nil,
-		DialContext: func(ctx context.Context, network, address string) (net.Conn, error) {
-			if host, _, err := net.SplitHostPort(address); err == nil && allowed[normalizeHost(host)] {
-				return open.DialContext(ctx, network, address)
-			}
-			return strict.DialContext(ctx, network, address)
-		},
+		Proxy:                 nil,
+		DialContext:           dialer.DialContext,
 		TLSHandshakeTimeout:   upstreamTLSTimeout,
 		ResponseHeaderTimeout: upstreamHeaderTimeout,
 		IdleConnTimeout:       90 * time.Second,
@@ -78,32 +52,4 @@ func NewUpstreamClient(policy UpstreamPolicy) *http.Client {
 			return errRedirectRefused
 		},
 	}
-}
-
-func normalizeHost(host string) string {
-	return strings.TrimSuffix(strings.ToLower(strings.TrimSpace(host)), ".")
-}
-
-// checkDialAddress refuses a resolved ip:port the proxy may not reach.
-func checkDialAddress(address string, blockLocal bool) error {
-	host, _, err := net.SplitHostPort(address)
-	if err != nil {
-		return fmt.Errorf("%w: %s", errAddressBlocked, address)
-	}
-	addr, err := netip.ParseAddr(host)
-	if err != nil {
-		return fmt.Errorf("%w: %s", errAddressBlocked, address)
-	}
-	addr = addr.Unmap()
-	switch ssrf.Classify(addr) {
-	case ssrf.CategoryGlobal:
-		return nil
-	case ssrf.CategoryMetadata:
-		return errAddressBlocked
-	case ssrf.CategorySpecial:
-		if blockLocal || addr.IsUnspecified() || addr.IsLinkLocalUnicast() || addr.IsLinkLocalMulticast() {
-			return errAddressBlocked
-		}
-	}
-	return nil
 }

@@ -6,12 +6,10 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"net"
 	"net/http"
 	"sort"
 	"strings"
 	"sync"
-	"syscall"
 	"time"
 
 	"go.uber.org/zap"
@@ -137,7 +135,7 @@ var hostedModelCatalogs = map[domain.ProviderID]catalogProbe{
 //     the host itself, so a name that answers with a public address then
 //     a private one (DNS rebinding) would otherwise slip past it.
 func newModelsDiscoveryClient(policy customerEndpointPolicy) *http.Client {
-	dialer := policyDialer(policy, modelsDiscoveryTimeout)
+	dialer := policy.egress.Dialer(modelsDiscoveryTimeout)
 	return &http.Client{
 		Timeout:   modelsDiscoveryTimeout,
 		Transport: &http.Transport{DialContext: dialer.DialContext},
@@ -145,52 +143,6 @@ func newModelsDiscoveryClient(policy customerEndpointPolicy) *http.Client {
 			return http.ErrUseLastResponse
 		},
 	}
-}
-
-// policyDialer builds a dialer that re-checks every resolved address against
-// the endpoint policy immediately before connecting. Shared by the direct
-// HTTP lanes that carry a customer credential to a customer-configured host:
-// catalog discovery and the realtime session mint.
-func policyDialer(policy customerEndpointPolicy, timeout time.Duration) endpointPolicyDialer {
-	return endpointPolicyDialer{dialer: &net.Dialer{
-		Timeout:   timeout,
-		KeepAlive: 30 * time.Second,
-		ControlContext: func(ctx context.Context, _, address string, _ syscall.RawConn) error {
-			dialHost, _ := ctx.Value(dialHostKey{}).(string)
-			return policy.allowsDialAddress(address, dialHost)
-		},
-	}}
-}
-
-// dialHostKey carries the host a dial was asked for (before resolution) to
-// the pre-connect check, so an allowlisted name keeps its exemption there.
-type dialHostKey struct{}
-
-type endpointPolicyDialer struct{ dialer *net.Dialer }
-
-func (d endpointPolicyDialer) DialContext(ctx context.Context, network, address string) (net.Conn, error) {
-	if host, _, err := net.SplitHostPort(address); err == nil {
-		ctx = context.WithValue(ctx, dialHostKey{}, normalizeEndpointHost(host))
-	}
-	return d.dialer.DialContext(ctx, network, address)
-}
-
-// allowsDialAddress applies the endpoint policy to a resolved "host:port"
-// the dialer is about to connect to. Only an exact ALLOWED_PROXY_HOSTS entry
-// (the dialed IP itself, or the host it was resolved from) is exempt; cloud
-// metadata and link-local stay refused by endpointAddressError either way.
-func (p customerEndpointPolicy) allowsDialAddress(address, dialHost string) error {
-	host, _, err := net.SplitHostPort(address)
-	if err != nil {
-		return fmt.Errorf("customer endpoint address is not host:port")
-	}
-	ip := net.ParseIP(host)
-	if ip == nil {
-		return fmt.Errorf("customer endpoint did not resolve to an IP address")
-	}
-	_, ipAllowlisted := p.allowedHosts[normalizeEndpointHost(ip.String())]
-	_, hostAllowlisted := p.allowedHosts[dialHost]
-	return endpointAddressError(ip, p.blockLocal, ipAllowlisted || (dialHost != "" && hostAllowlisted))
 }
 
 // discoveredCatalog is one round's answer: the models plus the gaps

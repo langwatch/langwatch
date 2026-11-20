@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 
+	"github.com/langwatch/langwatch/services/aigateway/adapters/egress"
 	"github.com/langwatch/langwatch/services/aigateway/domain"
 )
 
@@ -127,7 +128,7 @@ func TestAllowedHostReachesLocalAddressWithoutEnvProxy(t *testing.T) {
 
 	blocked := NewUpstreamClient(UpstreamPolicy{BlockLocal: true})
 	_, err := blocked.Get(up.URL)
-	require.ErrorIs(t, err, errAddressBlocked)
+	require.ErrorIs(t, err, egress.ErrBlocked)
 
 	allowed := NewUpstreamClient(UpstreamPolicy{BlockLocal: true, AllowedHosts: []string{" 127.0.0.1. "}})
 	resp, err := allowed.Get(up.URL)

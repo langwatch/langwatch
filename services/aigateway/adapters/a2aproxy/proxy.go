@@ -19,6 +19,7 @@ import (
 	"go.opentelemetry.io/otel/trace"
 
 	"github.com/langwatch/langwatch/pkg/customertracebridge"
+	"github.com/langwatch/langwatch/services/aigateway/adapters/egress"
 	"github.com/langwatch/langwatch/services/aigateway/domain"
 )
 
@@ -441,7 +442,7 @@ func upstreamRefusal(err error) refusal {
 	switch {
 	case errors.Is(err, errRedirectRefused):
 		return refuseUpstream.withMessage(errRedirectRefused.Error())
-	case errors.Is(err, errAddressBlocked):
+	case errors.Is(err, egress.ErrBlocked):
 		return refuseUpstream.withMessage(errAddressBlocked.Error())
 	}
 	return refuseUpstream
