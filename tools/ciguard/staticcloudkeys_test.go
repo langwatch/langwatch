@@ -8,7 +8,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"gopkg.in/yaml.v3"
 
 	"github.com/langwatch/langwatch/pkg/ciscan"
 	"github.com/langwatch/langwatch/tools/ciguard"
@@ -194,17 +193,7 @@ func TestStaticCloudKeysRejectsAStoredKeyUnderAnyCondition(t *testing.T) {
 
 // @scenario "A change to a composite action runs the guard"
 func TestStaticCloudKeysRunsOnCompositeActionChanges(t *testing.T) {
-	root, err := ciscan.RepoRoot(".")
-	require.NoError(t, err)
-	workflow, err := ciscan.Load(root, ".github/workflows/go-ci.yaml")
-	require.NoError(t, err)
-
-	var filters map[string][]string
-	for _, step := range workflow.Jobs["changes"].Steps {
-		if text, ok := step.StringWith("filters"); ok {
-			require.NoError(t, yaml.Unmarshal([]byte(text), &filters))
-		}
-	}
+	filters := goCIChangesFilters(t)
 
 	assert.Contains(t, filters["ciguards"], ".github/actions/**")
 }

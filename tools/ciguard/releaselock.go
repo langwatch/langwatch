@@ -14,15 +14,15 @@ import (
 // package release. Otherwise CI's `uv run` relocks and fails on `git diff`.
 // Plain line scanning: the Go modules have no TOML dependency.
 
-// ReleasePackage is a release-please package that is also a uv workspace member.
-type ReleasePackage struct {
+// releasePackage is a release-please package that is also a uv workspace member.
+type releasePackage struct {
 	Path     string // repo-relative directory, also the manifest key
 	LockName string // the package name in uv.lock
 }
 
-// ReleasePackages must list every member of the root pyproject's uv workspace;
+// releasePackages must list every member of the root pyproject's uv workspace;
 // workspaceProblems fails when it does not.
-var ReleasePackages = []ReleasePackage{
+var releasePackages = []releasePackage{
 	{Path: "sdks/python", LockName: "langwatch"},
 	{Path: "packages/ksuid-python", LockName: "langwatch-ksuid"},
 }
@@ -36,14 +36,14 @@ var (
 // releaseLockFiles holds the repository file contents checked against each other.
 type releaseLockFiles struct {
 	Config, Manifest, RootPyproject, Lock string
-	Pyprojects                            map[string]string // by ReleasePackage.Path
+	Pyprojects                            map[string]string // by releasePackage.Path
 }
 
 // releaseLockInputPaths lists the repo-relative files ReleaseLock reads, so the
 // go-ci path filter can be checked against the guard rather than a copy of it.
 func releaseLockInputPaths() []string {
 	paths := []string{".github/release-please-config.json", ".github/.release-please-manifest.json", "pyproject.toml", "uv.lock"}
-	for _, pkg := range ReleasePackages {
+	for _, pkg := range releasePackages {
 		paths = append(paths, pkg.Path+"/pyproject.toml")
 	}
 
@@ -68,7 +68,7 @@ func ReleaseLock(root string) ([]string, error) {
 		Lock:          contents["uv.lock"],
 		Pyprojects:    map[string]string{},
 	}
-	for _, pkg := range ReleasePackages {
+	for _, pkg := range releasePackages {
 		files.Pyprojects[pkg.Path] = contents[pkg.Path+"/pyproject.toml"]
 	}
 
@@ -86,7 +86,7 @@ func releaseLockProblems(files releaseLockFiles) ([]string, error) {
 		return nil, fmt.Errorf("release-please config: %w", err)
 	}
 	problems := workspaceProblems(files.RootPyproject)
-	for _, pkg := range ReleasePackages {
+	for _, pkg := range releasePackages {
 		problems = append(problems, releaseExtraFilesProblems(config, pkg)...)
 		problems = append(problems, lockProblems(pkg, lockInputs{Lock: files.Lock, Pyproject: files.Pyprojects[pkg.Path], ManifestVersion: manifestVersions[pkg.Path]})...)
 	}
@@ -94,7 +94,7 @@ func releaseLockProblems(files releaseLockFiles) ([]string, error) {
 	return problems, nil
 }
 
-// workspaceProblems fails when the root uv workspace members differ from ReleasePackages.
+// workspaceProblems fails when the root uv workspace members differ from releasePackages.
 func workspaceProblems(rootPyproject string) []string {
 	match := releaseMembersLine.FindStringSubmatch(rootPyproject)
 	if match == nil {
@@ -104,13 +104,13 @@ func workspaceProblems(rootPyproject string) []string {
 	for _, quote := range releaseQuoted.FindAllStringSubmatch(match[1], -1) {
 		members = append(members, quote[1])
 	}
-	for _, pkg := range ReleasePackages {
+	for _, pkg := range releasePackages {
 		known = append(known, pkg.Path)
 	}
 	slices.Sort(members)
 	slices.Sort(known)
 	if !slices.Equal(members, known) {
-		return []string{fmt.Sprintf("uv workspace members %v differ from the packages the release-lock guard checks %v: update ReleasePackages in tools/ciguard/releaselock.go", members, known)}
+		return []string{fmt.Sprintf("uv workspace members %v differ from the packages the release-lock guard checks %v: update releasePackages in tools/ciguard/releaselock.go", members, known)}
 	}
 
 	return nil
@@ -124,14 +124,25 @@ type releaseConfig struct {
 }
 
 // releaseExtraFilesProblems requires the toml uv.lock entry on the package.
-func releaseExtraFilesProblems(config releaseConfig, pkg ReleasePackage) []string {
+func releaseExtraFilesProblems(config releaseConfig, pkg releasePackage) []string {
 	matches := 0
+	var wrongJSONPaths []string
+	want := releaseLockJSONPath(pkg)
 	for _, raw := range config.Packages[pkg.Path].ExtraFiles {
-		if isReleaseLockEntry(raw, pkg) {
+		entry, ok := parseReleaseLockEntry(raw)
+		if !ok {
+			continue
+		}
+		switch {
+		case entry.JSONPath == want:
 			matches++
+		default:
+			wrongJSONPaths = append(wrongJSONPaths, entry.JSONPath)
 		}
 	}
 	switch {
+	case matches == 0 && len(wrongJSONPaths) > 0:
+		return []string{fmt.Sprintf("the %s extra-files has a toml /uv.lock entry with the wrong jsonpath: expected %q, found %q", pkg.Path, want, wrongJSONPaths)}
 	case matches == 0:
 		return []string{fmt.Sprintf("release-please would leave uv.lock stale: add the toml /uv.lock entry to the %s extra-files", pkg.Path)}
 	case matches > 1:
@@ -141,18 +152,26 @@ func releaseExtraFilesProblems(config releaseConfig, pkg ReleasePackage) []strin
 	return nil
 }
 
-func isReleaseLockEntry(raw json.RawMessage, pkg ReleasePackage) bool {
-	var entry struct {
-		Type     string `json:"type"`
-		Path     string `json:"path"`
-		JSONPath string `json:"jsonpath"`
-	}
+// releaseLockJSONPath is the jsonpath that selects the package's version in uv.lock.
+func releaseLockJSONPath(pkg releasePackage) string {
+	return fmt.Sprintf("$.package[?(@.name.value=='%s')].version", pkg.LockName)
+}
+
+// releaseExtraFile is one release-please extra-files entry, as the guard reads it.
+type releaseExtraFile struct {
+	Type     string `json:"type"`
+	Path     string `json:"path"`
+	JSONPath string `json:"jsonpath"`
+}
+
+// parseReleaseLockEntry returns the entry and true only for a toml /uv.lock entry.
+func parseReleaseLockEntry(raw json.RawMessage) (releaseExtraFile, bool) {
+	var entry releaseExtraFile
 	if json.Unmarshal(raw, &entry) != nil {
-		return false
+		return entry, false
 	}
 
-	return entry.Type == "toml" && entry.Path == "/uv.lock" &&
-		entry.JSONPath == fmt.Sprintf("$.package[?(@.name.value=='%s')].version", pkg.LockName)
+	return entry, entry.Type == "toml" && entry.Path == "/uv.lock"
 }
 
 // lockInputs are the contents lockProblems compares for one package.
@@ -162,7 +181,7 @@ type lockInputs struct {
 }
 
 // lockProblems checks the package's uv.lock entry against pyproject and manifest.
-func lockProblems(pkg ReleasePackage, in lockInputs) []string {
+func lockProblems(pkg releasePackage, in lockInputs) []string {
 	var named []string
 	for _, block := range strings.Split(in.Lock, "\n[[package]]\n")[1:] {
 		if lockField(block, "name") == pkg.LockName {
@@ -184,7 +203,7 @@ func lockProblems(pkg ReleasePackage, in lockInputs) []string {
 
 // releaseVersionProblems reports manifest drift before lock drift: while pyproject and
 // manifest disagree, `uv lock` could rewind the lock to the wrong version.
-func releaseVersionProblems(pkg ReleasePackage, lockVersion string, in lockInputs) []string {
+func releaseVersionProblems(pkg releasePackage, lockVersion string, in lockInputs) []string {
 	projectVersion, manifestVersion := releaseProjectVersionOf(in.Pyproject), in.ManifestVersion
 	switch {
 	case projectVersion == "":

@@ -20,3 +20,9 @@ type ReleaseConfig = releaseConfig
 
 // ReleaseExtraFilesProblems exposes the extra-files check to the external tests.
 var ReleaseExtraFilesProblems = releaseExtraFilesProblems
+
+// ReleasePackage exposes the release-please package shape to the external tests.
+type ReleasePackage = releasePackage
+
+// ReleasePackages exposes the checked release packages to the external tests.
+var ReleasePackages = releasePackages

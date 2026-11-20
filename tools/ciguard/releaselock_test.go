@@ -9,7 +9,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"gopkg.in/yaml.v3"
 
 	"github.com/langwatch/langwatch/pkg/ciscan"
 	"github.com/langwatch/langwatch/tools/ciguard"
@@ -68,14 +67,23 @@ func releaseLockProblemsOf(t *testing.T, files ciguard.ReleaseLockFiles) string 
 func TestExtraFilesProblems(t *testing.T) {
 	good := releaseLockEntry("langwatch")
 	cases := map[string]struct {
-		extra  string
-		want   int
-		advice string
+		extra     string
+		want      int
+		advice    string
+		notAdvice string
+		found     string
 	}{
-		"entry present":   {`"src/__version__.py",` + good, 0, ""},
-		"entry missing":   {`"src/__version__.py"`, 1, "add the toml"},
-		"other package":   {releaseLockEntry("langwatch-ksuid"), 1, "add the toml"},
-		"entry duplicate": {good + "," + good, 1, "remove the extras"},
+		"entry present":   {extra: `"src/__version__.py",` + good},
+		"entry missing":   {extra: `"src/__version__.py"`, want: 1, advice: "add the toml"},
+		"other package":   {extra: releaseLockEntry("langwatch-ksuid"), want: 1, advice: "wrong jsonpath", notAdvice: "add the"},
+		"entry duplicate": {extra: good + "," + good, want: 1, advice: "remove the extras"},
+		"wrong jsonpath": {
+			extra:     `{"type":"toml","path":"/uv.lock","jsonpath":"$.package[0].version"}`,
+			want:      1,
+			advice:    "$.package[?(@.name.value=='langwatch')].version",
+			notAdvice: "add the",
+			found:     "$.package[0].version",
+		},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -87,6 +95,12 @@ func TestExtraFilesProblems(t *testing.T) {
 			require.Len(t, got, tc.want)
 			if tc.want > 0 {
 				assert.Contains(t, got[0], tc.advice)
+			}
+			if tc.notAdvice != "" {
+				assert.NotContains(t, got[0], tc.notAdvice)
+			}
+			if tc.found != "" {
+				assert.Contains(t, got[0], tc.found)
 			}
 		})
 	}
@@ -274,17 +288,7 @@ func TestMultiLineMembersFails(t *testing.T) {
 
 // @scenario "A change to any file the release-lock guard reads runs the guard"
 func TestReleaseLockRunsWhenAFileItReadsChanges(t *testing.T) {
-	root, err := ciscan.RepoRoot(".")
-	require.NoError(t, err)
-	workflow, err := ciscan.Load(root, ".github/workflows/go-ci.yaml")
-	require.NoError(t, err)
-
-	var filters map[string][]string
-	for _, step := range workflow.Jobs["changes"].Steps {
-		if text, ok := step.StringWith("filters"); ok {
-			require.NoError(t, yaml.Unmarshal([]byte(text), &filters))
-		}
-	}
+	filters := goCIChangesFilters(t)
 
 	for _, path := range ciguard.ReleaseLockInputPaths() {
 		require.Contains(t, filters["ciguards"], path, "go-ci's ciguards filter must list %s", path)
