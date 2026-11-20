@@ -228,6 +228,22 @@ describe("given the schedule's process still waits on the run", () => {
   });
 });
 
+describe("given the process store cannot be read when the run ends", () => {
+  it("still records the run's outcome as failed with the reason timeout", async () => {
+    const unreadable = Object.assign(InMemoryProcessStore.createForTesting(), {
+      findByRef: async () => {
+        throw new Error("process store unavailable");
+      },
+    });
+    const { service, settled } = harness();
+    service.connect(unreadable);
+
+    await service.run(RUN);
+
+    expect(settled).toEqual([expect.objectContaining({ runId: "run-1", reason: "timeout" })]);
+  });
+});
+
 describe("given a newer run took the run over before its answer was filed", () => {
   it("files nothing and records no outcome", async () => {
     const { service, started, settled, filed } = harness({

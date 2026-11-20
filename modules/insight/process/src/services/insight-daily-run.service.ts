@@ -405,12 +405,19 @@ export class InsightDailyRunService implements InsightDailyRunExecutor {
   private async isHandedOn({ projectId, scheduleId, runId }: RunInput): Promise<boolean> {
     // No store lent, or no instance: nothing says the run was handed on.
     if (!this.#instances) return false;
-    const instance = await this.#instances.findByRef({
-      ref: { processName: INSIGHT_DAILY_RUN_PROCESS_NAME, projectId, processKey: scheduleId },
-    });
-    if (instance === null) return false;
-    const { pendingRun } = insightDailyRunStateSchema.parse(instance.state);
-    if (pendingRun?.runId === runId) return false;
+    // A failed read must not skip the outcome: it is recorded as if nothing handed it on.
+    let pendingRunId: string | undefined;
+    try {
+      const instance = await this.#instances.findByRef({
+        ref: { processName: INSIGHT_DAILY_RUN_PROCESS_NAME, projectId, processKey: scheduleId },
+      });
+      if (instance === null) return false;
+      pendingRunId = insightDailyRunStateSchema.parse(instance.state).pendingRun?.runId;
+    } catch (error) {
+      logger.warn({ error, projectId, scheduleId, runId }, "could not read the run's process");
+      return false;
+    }
+    if (pendingRunId === runId) return false;
     logger.warn({ projectId, scheduleId, runId }, "daily run was handed on; recording nothing");
     return true;
   }
