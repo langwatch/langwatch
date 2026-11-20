@@ -37,9 +37,18 @@ export function detectCodingAgent({
   return "unknown";
 }
 
+/** A launcher's own session: groups every harness session it runs into one row (any agent). */
+export const DECLARED_SESSION_ID_ATTR = "langwatch.session.id";
+
 /** The sole session key every agent agrees on; varies by vendor under four different names. */
 export function deriveConversationKey(attrs: Record<string, unknown>): string | null {
-  const candidates = ["session.id", "conversation.id", "gen_ai.conversation.id", "thread.id"];
+  const candidates = [
+    DECLARED_SESSION_ID_ATTR,
+    "session.id",
+    "conversation.id",
+    "gen_ai.conversation.id",
+    "thread.id",
+  ];
   for (const key of candidates) {
     const value = attrs[key];
     if (typeof value === "string" && value.length > 0) return value;
@@ -62,13 +71,35 @@ export function deriveSpanConversationKey({
   agent,
   name,
   attrs,
+  resourceAttrs = {},
 }: {
   agent: CodingAgent;
   name: string;
   attrs: Record<string, unknown>;
+  resourceAttrs?: Record<string, unknown>;
 }): string | null {
+  const declared = deriveDeclaredSessionKey({ attrs, resourceAttrs });
+  if (declared !== null) return declared;
   const definition = CODING_AGENT_REGISTRY.find((candidate) => candidate.id === agent);
   return definition?.deriveSessionKeyFromSpan?.({ name, attrs }) ?? deriveConversationKey(attrs);
+}
+
+/** `langwatch.session.id` off the record, else off its resource (`OTEL_RESOURCE_ATTRIBUTES`). */
+export function deriveDeclaredSessionKey({
+  attrs,
+  resourceAttrs,
+}: {
+  attrs: Record<string, unknown>;
+  resourceAttrs: Record<string, unknown> | null;
+}): string | null {
+  for (const value of [
+    attrs[DECLARED_SESSION_ID_ATTR],
+    resourceAttrs?.[DECLARED_SESSION_ID_ATTR],
+  ]) {
+    if (typeof value === "string" && value.length > 0) return value;
+    if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  }
+  return null;
 }
 
 /**

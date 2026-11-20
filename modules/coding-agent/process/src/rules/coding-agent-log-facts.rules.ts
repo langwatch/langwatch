@@ -1,6 +1,7 @@
 import {
   type ContributeLogFactsCommandData,
   deriveConversationKey,
+  deriveDeclaredSessionKey,
   deriveSessionTitleFromPrompt,
   detectCodingAgent,
   extractCodingAgentLogFacts,
@@ -76,7 +77,7 @@ export function liftLogContribution({
   });
   if (agent === null) return IGNORED;
   restateModelCallFigures({ agent, attributes, facts });
-  return keyContribution({ record, attributes, agent, facts });
+  return keyContribution({ record, attributes, resourceAttributes, agent, facts });
 }
 
 /**
@@ -116,15 +117,20 @@ function isDroppedEvent(eventName: unknown): boolean {
 function keyContribution({
   record,
   attributes,
+  resourceAttributes,
   agent,
   facts,
 }: {
   record: CanonicalLogRecord;
   attributes: Record<string, unknown>;
+  resourceAttributes: Record<string, unknown> | null;
   agent: string;
   facts: LogFacts;
 }): LogContribution {
-  const sessionKey = deriveConversationKey(attributes) ?? (record.providerSessionId || null);
+  const sessionKey =
+    deriveDeclaredSessionKey({ attrs: attributes, resourceAttrs: resourceAttributes }) ??
+    deriveConversationKey(attributes) ??
+    (record.providerSessionId || null);
   const correlated = record.correlationSource !== "none";
   const correlationTraceId =
     correlated && record.correlationTraceId ? record.correlationTraceId : null;

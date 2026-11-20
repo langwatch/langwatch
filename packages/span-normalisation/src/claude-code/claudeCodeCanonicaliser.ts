@@ -17,6 +17,9 @@ export const CLAUDE_CODE_SCOPE_NAMES: ReadonlySet<string> = new Set([
 
 /** One tool call; its `.execution` and `.blocked_on_user` children are phases of it, not tools. */
 const CLAUDE_CODE_TOOL_SPAN_NAME = "claude_code.tool";
+const CLAUDE_CODE_SPAN_PREFIX = "claude_code.";
+/** A launcher's own session id, grouping every Claude Code session it runs. */
+const DECLARED_SESSION_ID = "langwatch.session.id";
 
 const asString = (raw: unknown): string | null =>
   typeof raw === "string" && raw.length > 0 ? raw : null;
@@ -31,6 +34,7 @@ export class ClaudeCodeCanonicaliserService implements AttributeCanonicaliser {
   readonly id = "claude-code";
 
   apply(ctx: ExtractorContext): void {
+    if (ctx.span.name.startsWith(CLAUDE_CODE_SPAN_PREFIX)) this.keySession(ctx);
     if (ctx.span.name === CLAUDE_CODE_TOOL_SPAN_NAME) {
       ctx.setAttrIfAbsent(ATTR_KEYS.SPAN_TYPE, "tool");
       ctx.recordRule("claude-code/tool");
@@ -167,6 +171,20 @@ export class ClaudeCodeCanonicaliserService implements AttributeCanonicaliser {
     }
   }
 
+  /**
+   * The conversation is the agent's session: a launcher's declared `langwatch.session.id`, else
+   * Claude Code's own `session.id`. A thread the launcher declared stays as `langwatch.thread.id`.
+   */
+  private keySession(ctx: ExtractorContext): void {
+    const session =
+      asString(ctx.bag.attrs.get(DECLARED_SESSION_ID)) ?? asString(ctx.bag.attrs.get("session.id"));
+    const conversation = asString(ctx.out[ATTR_KEYS.GEN_AI_CONVERSATION_ID]);
+    if (session === null || session === conversation) return;
+    if (conversation !== null) ctx.setAttrIfAbsent(ATTR_KEYS.LANGWATCH_THREAD_ID, conversation);
+    ctx.setAttr(ATTR_KEYS.GEN_AI_CONVERSATION_ID, session);
+    ctx.recordRule("claude-code/session");
+  }
+
   private liftUserPrompt(ctx: LogExtractorContext): void {
     const prompt = asString(takeAttribute(ctx.bag.attrs, "prompt"));
     const sessionId = asString(ctx.bag.attrs.get("session.id"));
@@ -181,8 +199,10 @@ export class ClaudeCodeCanonicaliserService implements AttributeCanonicaliser {
       fired = true;
     }
 
-    if (sessionId !== null) {
-      ctx.setAttrIfAbsent("langwatch.thread.id", sessionId);
+    // The record's thread is the agent's session, as a span's conversation is (keySession).
+    const session = asString(ctx.bag.attrs.get(DECLARED_SESSION_ID)) ?? sessionId;
+    if (session !== null) {
+      ctx.setAttrIfAbsent(ATTR_KEYS.LANGWATCH_THREAD_ID, session);
       fired = true;
     }
 

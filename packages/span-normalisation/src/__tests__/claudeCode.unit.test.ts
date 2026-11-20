@@ -53,6 +53,20 @@ describe("ClaudeCodeCanonicaliserService.applyLog", () => {
     expect(ctx.out["langwatch.input"]).toBe("hi");
   });
 
+  /** @scenario a launcher's declared session groups every harness session it runs */
+  it("threads the record on a launcher's declared session over the run's session id", () => {
+    const ctx = createLogExtractorContext(SCOPE, {
+      "event.name": "user_prompt",
+      prompt: "hi",
+      "session.id": "sess_run",
+      "langwatch.session.id": "agent_scout",
+    });
+
+    ClaudeCodeCanonicaliserService.create().applyLog(ctx);
+
+    expect(ctx.out["langwatch.thread.id"]).toBe("agent_scout");
+  });
+
   /** @scenario A user prompt's declared input replaces the wrapped prompt */
   it("keeps a launcher's declared input over the wrapped prompt", () => {
     const ctx = createLogExtractorContext(SCOPE, {

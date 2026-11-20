@@ -113,6 +113,12 @@ describe("deriveConversationKey", () => {
     expect(deriveConversationKey({ "thread.id": "s-1" })).toBe("s-1");
   });
 
+  it("prefers a declared langwatch.session.id over the agent's own key", () => {
+    expect(
+      deriveConversationKey({ "langwatch.session.id": "agent_scout", "session.id": "s-1" }),
+    ).toBe("agent_scout");
+  });
+
   it("returns null rather than an empty string when there is no session", () => {
     expect(deriveConversationKey({})).toBeNull();
     expect(deriveConversationKey({ "session.id": "" })).toBeNull();
@@ -149,6 +155,17 @@ describe("deriveSpanConversationKey", () => {
         },
       }),
     ).toBe("01a00987-1926-74b1-b765-turn");
+  });
+
+  it("puts a launcher's declared session ahead of codex's thread id", () => {
+    expect(
+      deriveSpanConversationKey({
+        agent: "codex",
+        name: "session_task.turn",
+        attrs: { "thread.id": "01a00987-187a-7b23-b6d8-session" },
+        resourceAttrs: { "langwatch.session.id": "agent_scout" },
+      }),
+    ).toBe("agent_scout");
   });
 
   it("leaves every other agent on the shared order", () => {
