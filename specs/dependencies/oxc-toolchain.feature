@@ -95,7 +95,7 @@ Feature: Repository-wide Oxc lint and format toolchain
       Then the command exits non-zero
       And the file remains byte-for-byte unchanged
 
-    @ci @format @unimplemented
+    @integration @format @ci @unimplemented
     Scenario: A failing CI format check prints the fix and leaves the worktree unchanged
       Given a supported first-party file is not in canonical Oxfmt form
       When the CI format step runs
