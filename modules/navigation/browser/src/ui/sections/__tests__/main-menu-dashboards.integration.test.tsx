@@ -25,7 +25,9 @@ const dashboardsRelease: {
   fallback: boolean;
 } = vi.hoisted(() => ({ byProject: {}, fallback: false }));
 
-/** The reader's own permissions as each project resolves them; `fallback` for a project not named. */
+/**
+ * The reader's own permissions as each project resolves them; `fallback` for a project not named.
+ */
 const grants: {
   byProject: Readonly<Record<string, readonly string[]>>;
   fallback: readonly string[];
