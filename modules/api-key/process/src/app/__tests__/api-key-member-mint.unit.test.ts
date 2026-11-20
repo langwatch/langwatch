@@ -73,6 +73,10 @@ async function appOver() {
           },
         ),
         attachBindings,
+        resolveGrantId: vi.fn<AuthzApi["resolveGrantId"]>(
+          async ({ principal, scope, resourceToken }) =>
+            `grant:${principal.id}:${scope.type}:${scope.id}:${resourceToken}`,
+        ),
         revokeBindingsWhere: vi.fn(async () => 0),
         listApiKeyBindings: vi.fn(async ({ apiKeyIds }) =>
           attachBindings.mock.calls.flatMap(([call]) =>

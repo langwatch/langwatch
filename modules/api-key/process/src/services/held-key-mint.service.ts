@@ -6,6 +6,7 @@ import { Temporal, nowInstant } from "@langwatch/time";
 
 import type { ApiKeyRepository } from "../repositories/api-key.repository.ts";
 import { scopeOf } from "../rules/api-key-own-grant-ids.rules.ts";
+import { HELD_KEY_MIN_REMAINING_MS } from "../rules/run-key.rules.ts";
 import type { SharedKeyMintService } from "./shared-key-mint.service.ts";
 
 /**
@@ -14,9 +15,6 @@ import type { SharedKeyMintService } from "./shared-key-mint.service.ts";
  * confirmed at once by the next try: two retries at this pace outlast both.
  */
 export const HELD_KEY_GRANT_RETRY_AFTER_MS = 40_000;
-
-/** A held key with less life left than this is minted over, never handed out about to lapse. */
-const HELD_KEY_MIN_REMAINING_MS = 60_000;
 
 /**
  * `create` for a caller that is retried: the key is written once per `holdKey` and every retry
@@ -78,7 +76,7 @@ export class HeldKeyMintService {
 
 /**
  * Who and what the key is for: a held value never serves a different user, scope or permission.
- * Bindings are sorted by `scopeOf`, as the grant ids are, so a reordered retry keeps its key.
+ * Bindings are sorted by `scopeOf`, as the command id is, so a reordered retry keeps its key.
  */
 function identityOf(key: CreateHeldApiKeyInput["key"]): string {
   return createHash("sha256")

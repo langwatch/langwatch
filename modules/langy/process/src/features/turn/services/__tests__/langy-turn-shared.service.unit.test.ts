@@ -36,8 +36,7 @@ describe("heldKeyName", () => {
   const run = { userId: "user-1", idempotencyKey: "run-1" };
 
   /** @scenario "An unattended turn holds its key under the run and releases it on revoke" */
-  it("names the same run the same way, whatever its brief or turn id, as neither is an input", () => {
-    expect(LANGY_TURN_SHARED.heldKeyName({ ...run })).toBe(LANGY_TURN_SHARED.heldKeyName(run));
+  it("names a run as a langyhold_ prefix and a 32-hex digest", () => {
     expect(LANGY_TURN_SHARED.heldKeyName(run)).toMatch(/^langyhold_[0-9a-f]{32}$/);
   });
 

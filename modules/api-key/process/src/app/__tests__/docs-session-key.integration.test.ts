@@ -138,6 +138,10 @@ async function appOver(
     listApiKeyBindings: vi.fn<AuthzApi["listApiKeyBindings"]>(async () => []),
     revokeBindingsWhere: vi.fn<AuthzApi["revokeBindingsWhere"]>(async () => 0),
     attachBindings,
+    resolveGrantId: vi.fn<AuthzApi["resolveGrantId"]>(
+      async ({ principal, scope, resourceToken }) =>
+        `grant:${principal.id}:${scope.type}:${scope.id}:${resourceToken}`,
+    ),
     findPermissionsBeyondCaller: vi.fn<AuthzApi["findPermissionsBeyondCaller"]>(async () => []),
     listUserBindings: vi.fn<AuthzApi["listUserBindings"]>(async () => []),
   });

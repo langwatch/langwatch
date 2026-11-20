@@ -5,7 +5,11 @@
  * @see modules/api-key/specs/api-key.feature
  */
 import type { CreateHeldApiKeyInput } from "@langwatch/api-key-contract";
-import { AuthzGrantNotConfirmedError, type AuthzApi } from "@langwatch/authz-contract";
+import {
+  AuthzGrantNotConfirmedError,
+  type AuthzApi,
+  type AuthzGrantIdInput,
+} from "@langwatch/authz-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { MemorySharedCredentialStore } from "@langwatch/secrets/shared-credential";
@@ -28,10 +32,15 @@ const CONVERGENCE_POLL_MS = 250;
 const FOLDS_MS = [25_000, 48_000];
 const MAX_ATTEMPTS = 4;
 
+/** A stand-in for authz's grant id: one id per grant fact. */
+const grantIdOf = ({ principal, scope, resourceToken, occurredAtMs }: AuthzGrantIdInput) =>
+  `grant:${principal.id}:${scope.type}:${scope.id}:${resourceToken}:${occurredAtMs}`;
+
 /** A ledger whose every append lands `foldMs` after it was made. */
 function slowFoldLedger(foldMs: number) {
   const roleAppends: { roleId: string; append: number }[] = [];
   const grantAppends: string[] = [];
+  const resolvedGrantIds: string[] = [];
   const roleConfirmations: { own: number; landedBy: number }[] = [];
   const attachAnswers: { attached: string[]; duplicates: string[] }[] = [];
   const defineRoleCalls: Parameters<AuthzApi["defineRole"]>[0][] = [];
@@ -51,7 +60,7 @@ function slowFoldLedger(foldMs: number) {
     if (!isConverged) throw new AuthzGrantNotConfirmedError();
   }
 
-  const grants: Pick<AuthzApi, "defineRole" | "attachBindings"> = {
+  const grants: Pick<AuthzApi, "defineRole" | "attachBindings" | "resolveGrantId"> = {
     async defineRole(call) {
       defineRoleCalls.push(call);
       const { roleId, name, permissions } = call;
@@ -90,12 +99,17 @@ function slowFoldLedger(foldMs: number) {
       attachAnswers.push(answer);
       return answer;
     },
+    async resolveGrantId(input) {
+      resolvedGrantIds.push(grantIdOf(input));
+      return grantIdOf(input);
+    },
   };
 
   return {
     grants,
     roleAppends,
     grantAppends,
+    resolvedGrantIds,
     roleConfirmations,
     attachAnswers,
     defineRoleCalls,
@@ -219,9 +233,11 @@ describe("HeldKeyMintService over a ledger that folds slower than one try", () =
             { own: 2, landedBy: 1 },
             { own: 3, landedBy: 2 },
           ]);
-          // The binding is appended once; the last try finds it landed and appends nothing.
+          // The binding is appended once under the id every try resolved; the last try finds it
+          // landed and appends nothing.
           const [bindingId] = ledger.grantAppends;
-          expect(ledger.grantAppends).toEqual([expect.stringMatching(/^rolebinding_/)]);
+          expect(ledger.grantAppends).toHaveLength(1);
+          expect(new Set(ledger.resolvedGrantIds)).toEqual(new Set([bindingId]));
           expect(ledger.attachAnswers).toEqual([{ attached: [], duplicates: [bindingId] }]);
         });
       });
@@ -246,7 +262,15 @@ describe("HeldKeyMintService over a ledger that folds slower than one try", () =
         const commandId = ledger.defineRoleCalls[0]?.commandId;
         const bindingId = ledger.attachCalls[0]?.bindings[0]?.bindingId;
         expect(commandId).toMatch(new RegExp(`^apikeygrant:${result.apiKeyId}:[0-9a-f]{32}$`));
-        expect(bindingId).toMatch(/^rolebinding_/);
+        expect(bindingId).toBe(
+          grantIdOf({
+            organizationId: ORG_ID,
+            principal: { type: "apiKey", id: result.apiKeyId },
+            scope: { type: "ORGANIZATION", id: ORG_ID },
+            resourceToken: JSON.stringify(["CUSTOM", roleId]),
+            occurredAtMs: Number(occurredAtMs),
+          }),
+        );
         const role = {
           organizationId: ORG_ID,
           roleId,

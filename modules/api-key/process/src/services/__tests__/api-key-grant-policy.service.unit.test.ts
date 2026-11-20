@@ -9,6 +9,7 @@ import {
   ApiKeyScopeViolationError,
 } from "@langwatch/api-key-contract";
 import type { ApiKeyScope } from "@langwatch/api-key-contract";
+import type { AuthzGrantIdInput } from "@langwatch/authz-contract";
 import { MemberNotFoundError } from "@langwatch/organization-contract";
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
@@ -36,8 +37,13 @@ type Fakes = {
   calls?: Record<string, unknown>[];
 };
 
+/** A stand-in for authz's grant id: one id per grant fact. */
+const grantIdOf = ({ principal, scope, resourceToken, occurredAtMs }: AuthzGrantIdInput) =>
+  `grant:${principal.id}:${scope.type}:${scope.id}:${resourceToken}:${occurredAtMs}`;
+
 function policyWith(fakes: Fakes = {}) {
   const calls: Record<string, unknown>[] = [];
+  const grantIdInputs: AuthzGrantIdInput[] = [];
   const service = ApiKeyGrantPolicyService.create({
     authz: {
       hasPermission: async () => true,
@@ -98,10 +104,14 @@ function policyWith(fakes: Fakes = {}) {
       revokeBindingsWhere: async (input: Record<string, unknown>) => {
         calls.push({ method: "revokeBindingsWhere", ...input });
       },
+      resolveGrantId: async (input: AuthzGrantIdInput) => {
+        grantIdInputs.push(input);
+        return grantIdOf(input);
+      },
     },
   } as never);
 
-  return { calls, service };
+  return { calls, grantIdInputs, service };
 }
 
 const ORG = "organization-1";
@@ -912,8 +922,18 @@ describe("ApiKeyGrantPolicyService", () => {
           created.createdAt.epochMilliseconds,
           created.createdAt.epochMilliseconds,
         ]);
+        // The grant's id is authz's, asked for the key, scope, role and creation.
+        expect(first.grantIdInputs).toEqual([
+          {
+            organizationId: ORG,
+            principal: { type: "apiKey", id: "key-1" },
+            scope: { type: "PROJECT", id: "project-1" },
+            resourceToken: JSON.stringify(["CUSTOM", "apikey:key-1"]),
+            occurredAtMs: created.createdAt.epochMilliseconds,
+          },
+        ]);
         expect(attach?.bindings).toEqual([
-          expect.objectContaining({ bindingId: expect.stringMatching(/^rolebinding_/) }),
+          expect.objectContaining({ bindingId: grantIdOf(first.grantIdInputs[0]!) }),
         ]);
         expect(sent(retry.calls)).toEqual(sent(first.calls));
         expect(sent(changed.calls)[0]?.commandId).not.toBe(define?.commandId);
@@ -924,6 +944,7 @@ describe("ApiKeyGrantPolicyService", () => {
         expect(sent(edit.calls)[1]?.bindings).toEqual([
           expect.objectContaining({ bindingId: "generated-binding" }),
         ]);
+        expect(edit.grantIdInputs).toEqual([]);
       });
 
       /** @scenario "A held key's retries send its own role and grant under the same ids" */
@@ -947,7 +968,7 @@ describe("ApiKeyGrantPolicyService", () => {
         expect(own?.commandId).toBe(define?.commandId);
         const [extraId] = (extra?.bindings ?? []) as { bindingId: string }[];
         const [ownId] = (own?.bindings ?? []) as { bindingId: string }[];
-        expect(extraId?.bindingId).toMatch(/^rolebinding_/);
+        expect([extraId?.bindingId, ownId?.bindingId]).toEqual(first.grantIdInputs.map(grantIdOf));
         expect(extraId?.bindingId).not.toBe(ownId?.bindingId);
         expect(sent(retry.calls)).toEqual(sent(first.calls));
         expect(sent(edit.calls).map((call) => call.commandId)).toEqual([

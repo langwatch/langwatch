@@ -399,6 +399,10 @@ function dependencies(overrides: Partial<ApiKeyDependencies> = {}): ApiKeyDepend
       revokeBindingsWhere: vi.fn().mockResolvedValue(0),
       defineRole: vi.fn().mockResolvedValue(undefined),
       deleteRole: vi.fn().mockResolvedValue(undefined),
+      resolveGrantId: vi.fn<AuthzApi["resolveGrantId"]>(
+        async ({ principal, scope, resourceToken }) =>
+          `grant:${principal.id}:${scope.type}:${scope.id}:${resourceToken}`,
+      ),
     }),
     organizations: createApiFixture<OrganizationApi>({
       getTeam: vi.fn().mockResolvedValue({ id: "team-1", name: "Team" }),

@@ -125,6 +125,10 @@ function createServers() {
     }),
     revokeBindingsWhere: vi.fn().mockResolvedValue(0),
     deleteRole: vi.fn().mockResolvedValue(undefined),
+    resolveGrantId: vi.fn<AuthzApi["resolveGrantId"]>(
+      async ({ principal, scope, resourceToken }) =>
+        `grant:${principal.id}:${scope.type}:${scope.id}:${resourceToken}`,
+    ),
   });
   const server = () => {
     const repository = MemoryApiKeyRepository.create({ memory: database });

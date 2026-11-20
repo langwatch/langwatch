@@ -6,7 +6,6 @@ import {
   type ApiKeyScope,
 } from "@langwatch/api-key-contract";
 import {
-  GRANT_KSUID_RESOURCE,
   bindingScopeCanGrantPermission,
   permissionsConferred,
   type AuthzAccessBinding,
@@ -14,15 +13,11 @@ import {
   type AuthzGrantCaller,
   type AuthzPrincipalRef,
 } from "@langwatch/authz-contract";
-import { getEnvironment, Instance, Ksuid } from "@langwatch/ksuid";
 import { MemberNotFoundError } from "@langwatch/organization-contract";
 import { isAggregateProjectKind } from "@langwatch/project-contract";
 import { type Instant, Temporal, fromDate, nowInstant } from "@langwatch/time";
 
-import {
-  ownGrantBindingKsuidParts,
-  ownGrantCommandId,
-} from "../rules/api-key-own-grant-ids.rules.ts";
+import { ownGrantCommandId } from "../rules/api-key-own-grant-ids.rules.ts";
 import type { ApiKeyDependencies } from "./api-key.service.ts";
 
 /**
@@ -33,23 +28,6 @@ const createFact = ({ commandId, createdAt }: { commandId: string; createdAt: In
   commandId,
   occurredAtMs: createdAt.epochMilliseconds,
 });
-
-/** A binding's id under the create's command id: a rolebinding KSUID dated by the key's create. */
-function ownGrantBindingId(input: {
-  commandId: string;
-  binding: ApiKeyScope;
-  createdAt: Instant;
-}): string {
-  const { timestamp, instanceBytes, sequenceId } = ownGrantBindingKsuidParts(input);
-  return new Ksuid({
-    environment: getEnvironment(),
-    resource: GRANT_KSUID_RESOURCE,
-    timestamp,
-    instance: new Instance(Instance.schemes.RANDOM, instanceBytes),
-    sequenceId,
-    layout: "v2",
-  }).toString();
-}
 
 type ResolvedScope =
   | { type: "organization"; id: string; organizationId: string }
@@ -446,19 +424,25 @@ export class ApiKeyGrantPolicyService {
   }): Promise<AuthzAttachOutcome> {
     if (input.bindings.length === 0) return { attached: [], duplicates: [] };
     const { stableIds } = input;
+    const bindings = await Promise.all(
+      input.bindings.map(async (binding) => {
+        const customRoleId = binding.role === "CUSTOM" ? (binding.customRoleId ?? null) : null;
+        return {
+          bindingId: stableIds
+            ? await this.ownGrantId({ ...input, binding, customRoleId, stableIds })
+            : this.options.bindingIds.generateBindingId(),
+          principal: { apiKeyId: input.apiKeyId },
+          role: binding.role,
+          customRoleId,
+          scopeType: binding.scopeType,
+          scopeId: binding.scopeId,
+        };
+      }),
+    );
 
     return this.options.grants.attachBindings({
       organizationId: input.organizationId,
-      bindings: input.bindings.map((binding) => ({
-        bindingId: stableIds
-          ? ownGrantBindingId({ ...stableIds, binding })
-          : this.options.bindingIds.generateBindingId(),
-        principal: { apiKeyId: input.apiKeyId },
-        role: binding.role,
-        customRoleId: binding.role === "CUSTOM" ? (binding.customRoleId ?? null) : null,
-        scopeType: binding.scopeType,
-        scopeId: binding.scopeId,
-      })),
+      bindings,
       caller: input.caller,
       actor: input.actor,
       source: "grants-service",
@@ -469,6 +453,23 @@ export class ApiKeyGrantPolicyService {
       // append that is not yet readable would hand out a token the resolver
       // refuses, or drop the grants the key already had.
       requireProjection: true,
+    });
+  }
+
+  /** Authz's own id for a create's grant, so a retry names the same grant it already stored. */
+  private ownGrantId(input: {
+    apiKeyId: string;
+    organizationId: string;
+    binding: ApiKeyScope;
+    customRoleId: string | null;
+    stableIds: { createdAt: Instant };
+  }): Promise<string> {
+    return this.options.grants.resolveGrantId({
+      organizationId: input.organizationId,
+      principal: { type: "apiKey", id: input.apiKeyId },
+      scope: { type: input.binding.scopeType, id: input.binding.scopeId },
+      resourceToken: JSON.stringify([input.binding.role, input.customRoleId]),
+      occurredAtMs: input.stableIds.createdAt.epochMilliseconds,
     });
   }
 }
