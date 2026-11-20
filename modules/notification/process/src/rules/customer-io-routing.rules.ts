@@ -9,13 +9,9 @@ export type CustomerIoRoute = Readonly<{ fallback: "own-mailer" }>;
 const ownMailerFallback: CustomerIoRoute = { fallback: "own-mailer" };
 
 /**
- * The messages LangWatch Cloud sends through Customer.io, by template id; the rest stays on the
- * own mailer. Security mail (verification, reset, invitations, MFA, SSO, licences, statements,
- * operator notices) never belongs here, nor HTML that carries a per-recipient token, a one-click
- * action link or customer content. Of the product mail that keeps three off: the trigger digest
- * (a per-recipient unsubscribe token and trace previews), budget requests (the requester's own
- * words) and the paused online evaluation (its top error). Payment recovery waits until main
- * sends it.
+ * Templates LangWatch Cloud sends through Customer.io; the rest stays on the own mailer. Never
+ * security mail, nor HTML carrying a per-recipient token, a one-click action link or customer
+ * content. Full exclusions: modules/notification/README.md, "Customer.io on LangWatch Cloud".
  */
 export const CUSTOMER_IO_ROUTES: Readonly<Record<string, CustomerIoRoute>> = {
   "invite-re-request": ownMailerFallback,

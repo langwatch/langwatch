@@ -42,8 +42,12 @@ None: notification declares no peers.
 
 On a deployment with `IS_SAAS` set, a fixed list of templates goes through Customer.io's
 transactional API: the list is `CUSTOMER_IO_ROUTES` in
-`process/src/rules/customer-io-routing.rules.ts`. Security mail is never on it, nor a message
-whose HTML carries a per-recipient token, a one-click action link or customer content. Nurturing
+`process/src/rules/customer-io-routing.rules.ts`. Security mail is never on it (verification,
+password reset, invitations, MFA, SSO, licences, statements, operator notices), nor a message
+whose HTML carries a per-recipient token, a one-click action link or customer content. That
+keeps three product messages off: the trigger digest (a per-recipient unsubscribe token and
+trace previews), budget increase requests (the requester's own words) and the paused online
+evaluation notice (its top error). Payment recovery mail is not routed. Nurturing
 alone talks to Customer.io, so notification hands each message to `NurturingApi.sendTransactionalEmail`
 through its `customerIoMail` channel (a binding, not a peer) and keeps the routing and the
 fallback. Nurturing holds `CUSTOMER_IO_APP_API_KEY` and posts to `/v1/send/email` (EU unless
