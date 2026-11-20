@@ -105,6 +105,18 @@ export abstract class AnalyticsHostApi {
   abstract hasPermission(permission: string): boolean;
 
   /**
+   * Whether the reader holds `permission` in another project, by that project's own grants:
+   * false until they land, and for a project on no team of theirs. Asking starts the read.
+   */
+  abstract hasPermissionIn({
+    projectId,
+    permission,
+  }: {
+    projectId: string;
+    permission: string;
+  }): boolean;
+
+  /**
    * Whether the grants have arrived: before then `hasPermission` answers
    * `false` for everything.
    */

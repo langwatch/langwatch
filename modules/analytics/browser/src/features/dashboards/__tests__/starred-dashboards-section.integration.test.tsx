@@ -1,20 +1,29 @@
 /**
  * @vitest-environment jsdom
- * The Dashboards section analytics lends the LLM Ops sidebar: the dashboards the member pinned
- * to the project as links into Dashboards, a "+" that makes a pinned dashboard and opens
+ * The Dashboards section analytics lends the sidebars: the dashboards the member pinned to the
+ * project as links into Dashboards, a "+" that makes a pinned dashboard and opens
  * "Add a widget" on it, and an "Add dashboard" item when nothing is pinned.
  * @see modules/navigation/specs/product-sidebars.feature
+ * @see modules/dashboard/specs/dashboards-telemetry.feature
  */
+
+import type { StarredDashboardsProject } from "@langwatch/analytics-client";
 
 import type { UiProcedureCall } from "@langwatch/browser/testing-transport";
 import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { StubAnalyticsHost } from "../../../testing.tsx";
+import { ANALYTICS_MEMBER_PERMISSIONS, StubAnalyticsHost } from "../../../testing.tsx";
 import { CURATED_BOARDS } from "../model/curated-boards.ts";
 import { StarredDashboardsSection } from "../ui/sections/starred-dashboards-section.tsx";
-import { HOME_BOARD, NO_PROCEDURES, renderDashboards } from "./render-dashboards.test-helpers.tsx";
+import {
+  HOME_BOARD,
+  NO_PROCEDURES,
+  RecordingUiAnalytics,
+  renderDashboards,
+  withAnalytics,
+} from "./render-dashboards.test-helpers.tsx";
 
 const LATENCY = {
   ...HOME_BOARD,
@@ -38,6 +47,9 @@ function renderSection({
   permissions,
   pinFails = false,
   gate = Promise.resolve(),
+  project,
+  projectPermissions,
+  tracked,
 }: {
   stars: unknown[];
   fails?: boolean;
@@ -45,8 +57,17 @@ function renderSection({
   pinFails?: boolean;
   /** Holds the create answer, so a second press lands while the first is still in flight. */
   gate?: Promise<void>;
+  /** What navigation hands the section on a page about no project. */
+  project?: StarredDashboardsProject;
+  /** The member's grants in projects other than the page's, by project id. */
+  projectPermissions?: Readonly<Record<string, readonly string[]>>;
+  /** Records the product events the section sends. */
+  tracked?: RecordingUiAnalytics;
 }) {
-  const host = new StubAnalyticsHost(permissions ? { permissions } : {});
+  const host = new StubAnalyticsHost({
+    ...(permissions ? { permissions } : {}),
+    ...(projectPermissions ? { projectPermissions } : {}),
+  });
   const calls: UiProcedureCall[] = [];
   const answer = (call: UiProcedureCall) => {
     calls.push(call);
@@ -65,7 +86,12 @@ function renderSection({
     }
     return NO_PROCEDURES(call);
   };
-  renderDashboards({ element: <StarredDashboardsSection />, host, answer });
+  const element = <StarredDashboardsSection project={project} />;
+  renderDashboards({
+    element: tracked ? withAnalytics(element, tracked) : element,
+    host,
+    answer,
+  });
   return { host, calls };
 }
 
@@ -362,6 +388,132 @@ describe("the LLM Ops sidebar's Dashboards section", () => {
       expect(group.getByRole("button", { name: "New dashboard" })).toBeInTheDocument();
       expect(group.queryByRole("link")).toBeNull();
       expect(group.queryByRole("button", { name: "Add dashboard" })).toBeNull();
+    });
+  });
+});
+
+describe("the Dashboards section handed a project, in Gateway or Coding agents", () => {
+  const SHOP = { id: "proj-shop", slug: "shop", name: "Shop" };
+  /** A member who may make and change boards in Shop. */
+  const SHOP_MEMBER = { "proj-shop": ANALYTICS_MEMBER_PERMISSIONS };
+
+  describe("given the member pinned a board in that project", () => {
+    /** @scenario "Gateway and Coding agents show the Dashboards section, naming its project" */
+    it("names the project in its title and lists that project's pins", async () => {
+      const user = userEvent.setup();
+      const { host, calls } = renderSection({
+        stars: [{ kind: "board", dashboard: { ...LATENCY, projectId: "proj-shop" } }],
+        project: SHOP,
+      });
+
+      const group = within(await screen.findByRole("region", { name: "Dashboards · Shop" }));
+      expect(group.getByText("Dashboards · Shop")).toBeInTheDocument();
+      await waitFor(() => expect(inputsTo(calls, "boards.listStarred")).toHaveLength(1));
+      expect(inputsTo(calls, "boards.listStarred")).toEqual([{ projectId: "proj-shop" }]);
+      await user.click(await group.findByRole("link", { name: "Latency" }));
+      expect(host.navigations).toEqual(["/shop/dashboards/board-1"]);
+    });
+  });
+
+  describe("when the member presses the '+' on its title", () => {
+    /** @scenario "The plus button in Gateway or Coding agents makes the dashboard in the named project" */
+    it("makes and pins the board in that project, then opens it with Add a widget", async () => {
+      const user = userEvent.setup();
+      const { host, calls } = renderSection({
+        stars: [],
+        project: SHOP,
+        projectPermissions: SHOP_MEMBER,
+      });
+
+      const group = within(await screen.findByRole("region", { name: "Dashboards · Shop" }));
+      await user.click(group.getByRole("button", { name: "New dashboard" }));
+
+      await waitFor(() =>
+        expect(host.navigations).toEqual(["/shop/dashboards/board-new?addBlock=open"]),
+      );
+      expect(inputsTo(calls, "boards.create")).toEqual([
+        { projectId: "proj-shop", name: "Untitled dashboard 1" },
+      ]);
+      expect(inputsTo(calls, "boards.star")).toEqual([
+        { projectId: "proj-shop", star: { kind: "board", dashboardId: "board-new" } },
+      ]);
+    });
+  });
+
+  describe("given the member may only view dashboards in that project", () => {
+    /** @scenario "In Gateway or Coding agents, what I may do follows the named project's grants" */
+    it("offers no '+' and only Unpin, whatever the page's own project grants", async () => {
+      const user = userEvent.setup();
+      // The page's project grants everything; Shop grants viewing only.
+      renderSection({
+        stars: [{ kind: "board", dashboard: { ...LATENCY, projectId: "proj-shop" } }],
+        project: SHOP,
+        projectPermissions: { "proj-shop": VIEWER },
+      });
+
+      const group = within(await screen.findByRole("region", { name: "Dashboards · Shop" }));
+      await user.click(await group.findByRole("button", { name: "Actions for Latency" }));
+
+      expect(await screen.findByRole("menuitem", { name: "Unpin" })).toBeInTheDocument();
+      expect(screen.queryByRole("menuitem", { name: "Rename" })).toBeNull();
+      expect(screen.queryByRole("menuitem", { name: "Delete" })).toBeNull();
+      expect(group.queryByRole("button", { name: "New dashboard" })).toBeNull();
+    });
+
+    /** @scenario "In Gateway or Coding agents, what I may do follows the named project's grants" */
+    it("draws nothing when they pinned none there", async () => {
+      const { calls } = renderSection({
+        stars: [],
+        project: SHOP,
+        projectPermissions: { "proj-shop": VIEWER },
+      });
+      await waitFor(() => expect(inputsTo(calls, "boards.listStarred")).toHaveLength(1));
+
+      await waitFor(() => expect(screen.queryByText(/^Dashboards/)).toBeNull());
+      expect(screen.queryByText("Add dashboard")).toBeNull();
+    });
+  });
+
+  describe("when the member makes a board, then unpins one", () => {
+    /** @scenario "Telemetry: a board made or unpinned from Gateway or Coding agents names its project" */
+    it("sends each event about that project, not the page's", async () => {
+      const user = userEvent.setup();
+      const tracked = new RecordingUiAnalytics();
+      const { host } = renderSection({
+        stars: [{ kind: "board", dashboard: { ...LATENCY, projectId: "proj-shop" } }],
+        project: SHOP,
+        projectPermissions: SHOP_MEMBER,
+        tracked,
+      });
+
+      const group = within(await screen.findByRole("region", { name: "Dashboards · Shop" }));
+      await user.click(group.getByRole("button", { name: "New dashboard" }));
+      await waitFor(() => expect(host.navigations).toHaveLength(1));
+      await user.click(await group.findByRole("button", { name: "Actions for Latency" }));
+      await user.click(await screen.findByRole("menuitem", { name: "Unpin" }));
+
+      await waitFor(() =>
+        expect(
+          tracked.events.map(({ action, attributes }) => ({ action, attributes })),
+        ).toEqual([
+          { action: "created", attributes: { createdFrom: "blank", projectId: "proj-shop" } },
+          { action: "favourited", attributes: { starred: false, projectId: "proj-shop" } },
+        ]),
+      );
+    });
+  });
+
+  describe("given no project is handed over, as in LLM Ops", () => {
+    /** @scenario "The LLM Ops sidebar's Dashboards section names no project" */
+    it("titles itself Dashboards alone and works in the project in scope", async () => {
+      const { calls } = renderSection({ stars: [] });
+
+      const group = await section();
+      expect(group.getByText("Dashboards")).toBeInTheDocument();
+      expect(group.queryByText(/Dashboards ·/)).toBeNull();
+      await waitFor(() =>
+        expect(inputsTo(calls, "boards.listStarred")).toEqual([{ projectId: "proj-1" }]),
+      );
     });
   });
 });

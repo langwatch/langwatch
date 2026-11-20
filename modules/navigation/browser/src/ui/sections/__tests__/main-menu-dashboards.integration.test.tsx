@@ -1,12 +1,14 @@
 /**
  * @vitest-environment jsdom
  * @see modules/dashboard/specs/dashboards-v1.feature
+ * @see modules/navigation/specs/product-sidebars.feature
  */
 
 import {
   SavedDashboardsToken,
   type SavedDashboardsProps,
   StarredDashboardsToken,
+  type StarredDashboardsProps,
 } from "@langwatch/analytics-client";
 import { uiDeclarations, type UiDeclarations } from "@langwatch/browser-host/declarations";
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
@@ -32,21 +34,39 @@ vi.mock("../../../behavior/navigation-api.ts", () => ({
   },
 }));
 
-import type { NavigationProject } from "@langwatch/navigation-contract";
+import type { NavigationProject, NavigationTeam } from "@langwatch/navigation-contract";
 
 import { WithStubNavigationHost } from "../../../testing.tsx";
 import { ProductSidebar } from "../product-sidebar.tsx";
 
 const PROJECT: NavigationProject = { id: "project-1", slug: "demo", name: "Demo" };
+const SHOP: NavigationProject = { id: "project-shop", slug: "shop", name: "Shop" };
+const PERSONAL: NavigationProject = {
+  id: "project-mine",
+  slug: "my-workspace",
+  name: "My workspace",
+  isPersonal: true,
+};
+const SHOP_TEAM: NavigationTeam = { id: "team-shop", name: "Shop team", projects: [SHOP] };
+const PERSONAL_TEAM: NavigationTeam = {
+  id: "team-mine",
+  name: "My workspace",
+  isPersonal: true,
+  projects: [PERSONAL],
+};
 
 /** Stands in for analytics' lent list, echoing the address it was told is open. */
 function LentList({ openPath }: SavedDashboardsProps) {
   return <div data-testid="saved-dashboards">Saved dashboards open:{openPath || "none"}</div>;
 }
 
-/** Stands in for analytics' lent Dashboards section, which decides itself what it draws. */
-function LentStarred() {
-  return <div data-testid="starred-dashboards">Pinned dashboards</div>;
+/** Stands in for analytics' lent Dashboards section, echoing the project it was handed. */
+function LentStarred({ project }: StarredDashboardsProps) {
+  return (
+    <div data-testid="starred-dashboards">
+      {project ? `Pinned dashboards in ${project.name} (${project.id})` : "Pinned dashboards"}
+    </div>
+  );
 }
 
 const analyticsLends = uiDeclarations([
@@ -70,6 +90,10 @@ function renderSidebar({
   dashboardsLoading = false,
   organizationLoading = false,
   kind,
+  everyProductFlag = false,
+  project = kind ? { ...PROJECT, kind } : PROJECT,
+  openableTeams,
+  rememberedProjectSlug,
 }: {
   surface: "llm-ops" | "dashboards" | "gateway" | "governance" | "me" | "settings";
   pathname: string;
@@ -78,16 +102,26 @@ function renderSidebar({
   dashboardsLoading?: boolean;
   organizationLoading?: boolean;
   kind?: string;
+  /** `release_dashboards_in_every_product`. */
+  everyProductFlag?: boolean;
+  project?: NavigationProject;
+  openableTeams?: readonly NavigationTeam[];
+  rememberedProjectSlug?: string;
 }) {
   declarations.current = analyticsLends;
   return renderWithDesignSystem(
     <WithStubNavigationHost
       readings={{
-        project: kind ? { ...PROJECT, kind } : PROJECT,
+        project,
         pathname,
         permissions,
         isLoading: organizationLoading,
-        flags: { release_dashboards: { enabled: dashboardsFlag, isLoading: dashboardsLoading } },
+        ...(openableTeams ? { openableTeams } : {}),
+        ...(rememberedProjectSlug ? { rememberedProjectSlug } : {}),
+        flags: {
+          release_dashboards: { enabled: dashboardsFlag, isLoading: dashboardsLoading },
+          release_dashboards_in_every_product: { enabled: everyProductFlag, isLoading: false },
+        },
         commandBar: { shortcut: "⌘K", open: vi.fn(), trigger: null },
       }}
     >
@@ -273,6 +307,79 @@ describe("the Dashboards section analytics lends", () => {
       renderSidebar({ surface: "llm-ops", pathname: "/demo", permissions: [] });
 
       await expectNoSection();
+    });
+  });
+});
+
+describe("the Dashboards section with Dashboards in every product on", () => {
+  /** Gateway stands on the remembered project; Coding agents on the member's own workspace. */
+  const outsideLlmOps = [
+    { surface: "gateway", pathname: "/gateway/virtual-keys", project: SHOP },
+    { surface: "me", pathname: "/coding-agents", project: PERSONAL },
+  ] as const;
+
+  describe("given a member who can reach Dashboards, in Gateway or Coding agents", () => {
+    /** @scenario "Gateway and Coding agents show the Dashboards section, naming its project" */
+    it.each(outsideLlmOps)(
+      "hands the section the project LLM Ops would open, in $surface",
+      async ({ surface, pathname, project }) => {
+        renderSidebar({
+          surface,
+          pathname,
+          project,
+          everyProductFlag: true,
+          openableTeams: [PERSONAL_TEAM, SHOP_TEAM],
+          rememberedProjectSlug: "shop",
+        });
+
+        expect(await screen.findByTestId("starred-dashboards")).toHaveTextContent(
+          "Pinned dashboards in Shop (project-shop)",
+        );
+      },
+    );
+  });
+
+  describe("given the same member, in Governance", () => {
+    /** @scenario "Gateway and Coding agents show the Dashboards section, naming its project" */
+    it("draws no section", async () => {
+      renderSidebar({ surface: "governance", pathname: "/governance", everyProductFlag: true });
+
+      await expectNoSection();
+    });
+  });
+
+  describe("given a member who cannot reach Dashboards, in Gateway or Coding agents", () => {
+    /** @scenario "Gateway and Coding agents show the Dashboards section, naming its project" */
+    it.each(outsideLlmOps)("draws no section in $surface", async ({ surface, pathname }) => {
+      renderSidebar({ surface, pathname, permissions: [], everyProductFlag: true });
+
+      await expectNoSection();
+    });
+  });
+
+  describe("given no project LLM Ops could open", () => {
+    /** @scenario "Gateway and Coding agents show the Dashboards section, naming its project" */
+    it("draws no section in Coding agents", async () => {
+      renderSidebar({
+        surface: "me",
+        pathname: "/coding-agents",
+        project: PERSONAL,
+        everyProductFlag: true,
+        openableTeams: [PERSONAL_TEAM],
+      });
+
+      await expectNoSection();
+    });
+  });
+
+  describe("given the same member, in LLM Ops", () => {
+    /** @scenario "The LLM Ops sidebar's Dashboards section names no project" */
+    it("hands the section no project, so it works in the one in scope", async () => {
+      renderSidebar({ surface: "llm-ops", pathname: "/demo", everyProductFlag: true });
+
+      expect(await screen.findByTestId("starred-dashboards")).toHaveTextContent(
+        /^Pinned dashboards$/,
+      );
     });
   });
 });
