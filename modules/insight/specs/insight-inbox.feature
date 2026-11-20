@@ -383,111 +383,68 @@ Feature: The insights inbox
       And it is back in their Inbox folder
 
   Rule: The Insights entry in the side menu
-    Every product's side menu carries one Insights entry, at the bottom just above Settings
-    (above Support for a member who cannot see Settings), with the grey unread pill. The
-    Insights page itself lives in the Dashboards product, so the entry shows only while
-    release_dashboards is on too. Insight decides whether the entry shows, by the same rule as
-    its bell; navigation only places it. Settings and the Admin console are no product and carry none.
-    Governance skips it while it lists its own Insights page (the Preview placeholder behind
-    release_ui_governance_billed_cost_enabled, specs/governance/governance-platform-placeholders.feature):
-    two entries named Insights that open different pages would mislead.
+    The LLM Ops side menu carries the one Insights entry, first under Home, with the grey
+    unread pill; no other product's side menu carries it (#8998 keeps it where it was).
+    Governance's own Insights item opens a different page, /governance/insights.
+    The bell, the page and a board's Daily insights share insight's one rule: release_insights
+    answered on, analytics:view, and a project that is not an aggregate.
 
     @integration
-    Scenario: The Dashboards side menu holds the one Insights entry with its unread count
-      Given the release_insights and release_dashboards flags are on and a member with analytics:view
-      When they look at the Dashboards side menu
-      Then it holds one Insights entry at the bottom, just above Settings, with the unread pill
-      And the entry is marked current on the Insights page
+    Scenario: The LLM Ops side menu holds the one Insights entry with its unread count
+      Given the release_insights flag is on and a member with analytics:view
+      When they look at the LLM Ops side menu
+      Then it holds one Insights entry, first under Home, with the unread pill
+      And the entry opens the project's Insights page
 
     @integration
-    Scenario: Every product's side menu holds the Insights entry above Settings
-      Given the release_insights and release_dashboards flags are on and a member with analytics:view
-      When they look at the LLM Ops, Gateway or Me side menu
-      Then it holds one Insights entry at the bottom, just above Settings, with the unread pill
-
-    @integration
-    Scenario: The Settings and Admin side menus hold no Insights entry
-      Given the release_insights and release_dashboards flags are on and a member with analytics:view
-      When they look at the Settings or the Admin console side menu
-      Then it holds no Insights entry
-
-    @integration
-    Scenario: The Governance side menu holds only its own Insights item
-      Given the release_insights and release_dashboards flags are on and a member with analytics:view
-      And the Governance platform pages are on
-      When they look at the Governance side menu
-      Then it holds no Insights entry above Settings
-      And the only item named Insights is Governance's own, which opens /governance/insights
-
-    @integration
-    Scenario: The Governance side menu holds no Insights entry while its platform flag is loading
-      Given the release_insights and release_dashboards flags are on and a member with analytics:view
-      And the Governance platform flag has not answered yet
-      When they look at the Governance side menu
-      Then it holds no Insights entry, because it is not yet known which Insights item it lists
-
-    @integration
-    Scenario: The Governance side menu pins Insights while it has no Insights page of its own
-      Given the release_insights and release_dashboards flags are on and a member with analytics:view
-      And the Governance platform pages are off
-      When they look at the Governance side menu
-      Then it holds one Insights entry at the bottom, just above Settings
-
-    @integration
-    Scenario: Insights shows nothing while release_dashboards is off
-      Given the release_insights flag is on and the release_dashboards flag is off
-      When a member looks at the top bar
-      Then it holds no insights bell, because the Insights page is closed
-      And with both flags on the bell is there
-
-    @integration
-    Scenario: The Insights page is a 404 while release_dashboards is off
-      Given the release_insights flag is on and the release_dashboards flag is off
-      And a member with analytics:view
-      When they open the Insights page by its address
-      Then it answers not-found, with no product side menu around it
+    Scenario: No other product's side menu holds the Insights entry
+      Given the release_insights flag is on and a member with analytics:view
+      When they look at the Dashboards or the Gateway side menu
+      Then it holds no entry that opens the project's Insights page
 
     @integration
     Scenario: The side menu shows no Insights entry while the flag is off
-      Given the release_insights or the release_dashboards flag is off or not answered yet, or a member without analytics:view
-      When they look at any product's side menu
+      Given the release_insights flag is off, or a member without analytics:view
+      When they look at the LLM Ops side menu
       Then it holds no Insights entry
 
     @integration
     Scenario: An aggregate project's side menu holds no Insights entry
-      Given the release_insights and release_dashboards flags are on and a member with analytics:view
+      Given the release_insights flag is on and a member with analytics:view
       And the project is an aggregate, which files no insight
-      When they look at any product's side menu
+      When they look at the LLM Ops side menu
       Then it holds no Insights entry
 
     @integration
-    Scenario: The top bar holds no insights bell while a release flag has not answered yet
+    Scenario: Insights shows nothing while release_insights is off
+      Given the release_insights flag is off
+      When a member looks at the top bar
+      Then it holds no insights bell
+      And with the flag on the bell is there
+      And an open Insights page drops its inbox, error and Retry once the flag turns off
+
+    @integration
+    Scenario: The top bar holds no insights bell while release_insights has not answered yet
       Given a member with analytics:view
-      And a release flag has not answered yet
+      And the release_insights flag has not answered yet
       When they look at the top bar
       Then it holds no insights bell, and nothing is read
 
-    # The bell and the entry share one rule, so they never disagree on an aggregate.
+    # The bell and the entry agree on an aggregate: neither shows.
     @integration
     Scenario: An aggregate project's top bar holds no insights bell
-      Given the release_insights and release_dashboards flags are on and a member with analytics:view
+      Given the release_insights flag is on and a member with analytics:view
       And the project is an aggregate, which files no insight
       When they look at the top bar
       Then it holds no insights bell
 
     @integration
     Scenario: An aggregate project's Insights page says insights are not available
-      Given the release_insights and release_dashboards flags are on and a member with analytics:view
+      Given the release_insights flag is on and a member with analytics:view
       And the project is an aggregate, which files no insight
       When they open its Insights page
       Then it says insights are not available here
       And no inbox is read
-
-    @unit
-    Scenario: The Insights page stays in the Dashboards product
-      Given a member in Dashboards
-      When they open the Insights page
-      Then the page belongs to the Dashboards product, so the side menu stays the same
 
   Rule: The line under the title
 

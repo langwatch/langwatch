@@ -1,6 +1,6 @@
 /**
- * The one rule for whether insight draws or reads anything: both release flags answered on,
- * `analytics:view`, and a project that is not an aggregate. False while a flag is loading.
+ * The one rule for whether insight draws or reads anything: `release_insights` answered on,
+ * `analytics:view`, and a project that is not an aggregate. False while the flag is loading.
  * @see modules/insight/specs/insight-inbox.feature
  */
 
@@ -21,7 +21,7 @@ export function useInsightsUnavailable(): "aggregate" | "off" | undefined {
   return shown ? undefined : "off";
 }
 
-/** Whether the Insights entry and pages show in this project. */
+/** Whether the bell, the Insights page and a board's Daily insights show in this project. */
 export function useInsightsShown(): boolean {
   return useInsightsUnavailable() === undefined;
 }

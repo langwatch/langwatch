@@ -1,6 +1,6 @@
 /**
  * @vitest-environment jsdom
- * The rule insight lends the side menu and uses for its bell: when either shows at all.
+ * The one rule insight's bell, Insights page and board control share: when they show at all.
  * @see modules/insight/specs/insight-inbox.feature
  */
 
@@ -33,7 +33,7 @@ describe("the rule, from a reader with every condition met", () => {
     expect(shownFor({ enabled: true })).toBe("true");
   });
 
-  /** @scenario "The side menu shows no Insights entry while the flag is off" */
+  /** @scenario "Insights shows nothing while release_insights is off" */
   it.each([
     { case: "a flag is off", options: { enabled: false } },
     { case: "a flag is still loading", options: { enabled: undefined } },
@@ -43,7 +43,7 @@ describe("the rule, from a reader with every condition met", () => {
     expect(shownFor(options)).toBe("false");
   });
 
-  /** @scenario "An aggregate project's side menu holds no Insights entry" */
+  /** @scenario "An aggregate project's top bar holds no insights bell" */
   it("hides when only this changes: the project is an aggregate", () => {
     expect(shownFor({ enabled: true, project: AGGREGATE })).toBe("false");
   });

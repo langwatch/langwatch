@@ -1,7 +1,7 @@
 /**
  * The topbar bell, lent through `InsightsBellToken` (§10.1): your own insights you have not
- * seen, from the same derivation as the page and the sidebar. Shown by the same rule as the
- * side menu's Insights entry (`useInsightsShown`, via the reading).
+ * seen, from the same derivation as the page and the sidebar. Shown by insight's one rule
+ * (`useInsightsShown`, via the reading).
  */
 
 import { Popover } from "@langwatch/design-system/popover";

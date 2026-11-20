@@ -71,7 +71,7 @@ describe("given a project with no insights", () => {
 
 describe("given a rejected inbox read", () => {
   describe("when the rule turns false afterwards", () => {
-    /** @scenario "Insights shows nothing while release_dashboards is off" */
+    /** @scenario "Insights shows nothing while release_insights is off" */
     it("shows no error or Retry and reads no more", async () => {
       class FlippableHost extends StubInsightHost {
         on = true;

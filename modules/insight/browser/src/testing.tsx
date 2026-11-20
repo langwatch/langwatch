@@ -27,10 +27,7 @@ import {
 
 export type StubInsightHostOptions = {
   project?: InsightHostProject | undefined;
-  /**
-   * Stands for the combined rule over `release_insights` and `release_dashboards`; on unless a
-   * test says otherwise.
-   */
+  /** `release_insights`; on unless a test says otherwise. */
   enabled?: boolean | undefined;
   /** A viewer unless a test says otherwise: `analytics:view` is all insight asks for. */
   permissions?: readonly string[];

@@ -96,8 +96,8 @@ async function expectNoBellAndNoRead({ read }: { read: Mock<UiProcedureAnswer> }
 }
 
 describe("given 2 unseen insights in the inbox", () => {
-  describe("when release_dashboards is off", () => {
-    /** @scenario "Insights shows nothing while release_dashboards is off" */
+  describe("when release_insights is off", () => {
+    /** @scenario "Insights shows nothing while release_insights is off" */
     it("shows no bell and reads nothing", async () => {
       const read = vi.fn<UiProcedureAnswer>(() => Promise.resolve(UNSEEN.slice(0, 2)));
       const { host } = renderWithInsightHost({
@@ -111,8 +111,8 @@ describe("given 2 unseen insights in the inbox", () => {
     });
   });
 
-  describe("when a release flag has not answered yet", () => {
-    /** @scenario "The top bar holds no insights bell while a release flag has not answered yet" */
+  describe("when release_insights has not answered yet", () => {
+    /** @scenario "The top bar holds no insights bell while release_insights has not answered yet" */
     it("shows no bell and reads nothing", async () => {
       const read = vi.fn<UiProcedureAnswer>(() => Promise.resolve(UNSEEN.slice(0, 2)));
       const { host } = renderWithInsightHost({
@@ -127,7 +127,7 @@ describe("given 2 unseen insights in the inbox", () => {
   });
 
   describe("when insight is on", () => {
-    /** @scenario "Insights shows nothing while release_dashboards is off" */
+    /** @scenario "Insights shows nothing while release_insights is off" */
     it("shows the bell with the unread count, so the absence cases would see a read", async () => {
       const read = vi.fn<UiProcedureAnswer>(() => Promise.resolve(UNSEEN.slice(0, 2)));
       renderWithInsightHost({
@@ -163,7 +163,7 @@ describe("given 2 unseen insights in the inbox", () => {
   });
 
   describe("when the rule turns false after the inbox was read", () => {
-    /** @scenario "Insights shows nothing while release_dashboards is off" */
+    /** @scenario "Insights shows nothing while release_insights is off" */
     it("drops the bell instead of drawing the cached inbox", async () => {
       class FlippableHost extends StubInsightHost {
         on = true;
