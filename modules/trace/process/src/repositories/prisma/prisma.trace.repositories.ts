@@ -3,6 +3,8 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
 import { ClickHouseTraceBraidReadsRepository } from "../../features/braid/repositories/clickhouse/clickhouse.trace-braid-reads.repository.ts";
 import { TraceLegacyReadClickHouseRepository } from "../../features/legacy/repositories/clickhouse/trace-legacy-read.repository.ts";
+import { MANAGED_PROMPT_VERSION_REPLAY_STEP_ID } from "../../rules/managed-prompt-version-replay.rules.ts";
+import { SPAN_ANALYTICS_REPLAY_STEP_ID } from "../../rules/trace-widget-columns.rules.ts";
 import { ClickHouseTraceAttributeSpendRepository } from "../clickhouse/clickhouse.trace-attribute-spend.repository.ts";
 import { ClickHouseTraceAttributedRollupRepository } from "../clickhouse/clickhouse.trace-attributed-rollup.repository.ts";
 import { ClickHouseTraceClusteringSampleRepository } from "../clickhouse/clickhouse.trace-clustering-sample.repository.ts";
@@ -29,7 +31,6 @@ import {
 } from "../clickhouse/trace-summary.repository.ts";
 import { TraceUsageCountClickHouseRepository } from "../clickhouse/trace-usage-count.repository.ts";
 import type { TraceRepositories } from "../trace.repositories.ts";
-import { PrismaManagedPromptVersionLedgerRepository } from "./prisma.managed-prompt-version-ledger.repository.ts";
 import { PrismaSpanAnalyticsFloorRepository } from "./prisma.span-analytics-floor.repository.ts";
 import { PrismaTraceAnnotationScoresRepository } from "./prisma.trace-annotation-scores.repository.ts";
 import { PrismaTraceAnnotationsRepository } from "./prisma.trace-annotations.repository.ts";
@@ -82,9 +83,13 @@ export class PostgresTraceRepositories {
         readYourWrites: members.evaluationAnalyticsQuorumReads,
       }),
       spanAnalytics: SpanAnalyticsClickHouseRepository.create({ resolveClient: traceClickHouse }),
-      spanAnalyticsFloor: PrismaSpanAnalyticsFloorRepository.create(members.prisma),
-      managedPromptVersionLedger: PrismaManagedPromptVersionLedgerRepository.create({
+      spanAnalyticsFloor: PrismaSpanAnalyticsFloorRepository.create({
         prisma: members.prisma,
+        stepId: SPAN_ANALYTICS_REPLAY_STEP_ID,
+      }),
+      managedPromptVersionLedger: PrismaSpanAnalyticsFloorRepository.create({
+        prisma: members.prisma,
+        stepId: MANAGED_PROMPT_VERSION_REPLAY_STEP_ID,
       }),
       spanStorage: SpanStorageClickHouseRepository.create(storage),
       spanTree: ClickHouseTraceSpanRepository.create(storage),

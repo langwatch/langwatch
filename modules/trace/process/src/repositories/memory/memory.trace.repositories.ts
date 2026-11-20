@@ -15,7 +15,6 @@ import { TracePayloadReaderRepository } from "../trace-payload-reader.repository
 import { TraceProjectedReadRepository } from "../trace-projected-read.repository.ts";
 import type { TraceSummaryFoldCacheRepository } from "../trace-summary-fold-cache.repository.ts";
 import type { TraceRepositories } from "../trace.repositories.ts";
-import { MemoryManagedPromptVersionLedgerRepository } from "./memory.managed-prompt-version-ledger.repository.ts";
 import { MemoryNullTraceAttributedRollupRepository } from "./memory.null-trace-attributed-rollup.repository.ts";
 import { MemoryNullTraceClusteringSampleRepository } from "./memory.null-trace-clustering-sample.repository.ts";
 import { MemoryNullTraceLegacyReadRepository } from "./memory.null-trace-legacy-read.repository.ts";
@@ -156,7 +155,7 @@ export class MemoryTraceRepositories {
       evaluationAnalytics: MemoryTraceEvaluationAnalyticsRepository.create(),
       spanAnalytics: MemorySpanAnalyticsRepository.create(),
       spanAnalyticsFloor: MemorySpanAnalyticsFloorRepository.create(),
-      managedPromptVersionLedger: MemoryManagedPromptVersionLedgerRepository.create(),
+      managedPromptVersionLedger: MemorySpanAnalyticsFloorRepository.create(),
       summaryFoldCache: MemoryTraceSummaryFoldCacheRepository.create(),
       analyticsFoldCache: MemoryTraceAnalyticsFoldCacheRepository.create(),
       spanStorage: MemorySpanStorageRepository.create(spans),

@@ -99,22 +99,6 @@ const TRACE_KEY = "sipHash128(TraceId)";
 const AFTER_EVERY_ROW = "toDateTime64('2200-01-01 00:00:00', 3)";
 
 /**
- * Each trace's managed prompt version and time as `traces` holds them: its newest `trace_metrics`
- * row's. Read from the floor with no upper bound, so the caller drops a newest row past the end;
- * a newest row before the floor goes unseen, and the trace counts with its newest row after it.
- */
-const managedVersionPerTrace = ({
-  where = "",
-}: {
-  where?: string;
-} = {}) => `SELECT ${TRACE_KEY} AS trace,
-        argMax(LastUsedPromptVersionId, UpdatedAt) AS managed,
-        argMax(OccurredAt, UpdatedAt) AS anchored
-      FROM trace_metrics
-      WHERE OccurredAt >= ${PREVIOUS_START}${where}
-      GROUP BY trace`;
-
-/**
  * Judges' verdicts over both periods, dated by the trace on their own row: an evaluation may run
  * long after the answer, and no join to `trace_metrics` (analytics ADR-007). Guardrails guard.
  */
@@ -224,6 +208,20 @@ const METADATA_VERSIONED = `SELECT cityHash64(TraceId)
           AND MetadataPromptVersion != ''`;
 
 /**
+ * Each metadata-less trace's managed prompt version and time as `traces` holds them: its newest
+ * `trace_metrics` row's, read with no upper bound so the caller drops a row past the end.
+ */
+const MANAGED_VERSION_PER_TRACE = `SELECT ${TRACE_KEY} AS trace,
+        argMax(LastUsedPromptVersionId, UpdatedAt) AS managed,
+        argMax(OccurredAt, UpdatedAt) AS anchored
+      FROM trace_metrics
+      WHERE OccurredAt >= ${PREVIOUS_START}
+        AND cityHash64(TraceId) NOT IN (
+          ${METADATA_VERSIONED}
+        )
+      GROUP BY trace`;
+
+/**
  * Each version's first use inside both windows, never all history, as it was on `traces`: a
  * version first used long ago and still in use dates from its first use in the window. A trace
  * counts once, at the time and with the version of its newest `trace_metrics` row.
@@ -238,12 +236,7 @@ const VERSIONS = `SELECT version, min(first_seen) AS first_seen
       UNION ALL
       SELECT managed AS version, min(anchored) AS first_seen
       FROM (
-      ${managedVersionPerTrace({
-        where: `
-        AND cityHash64(TraceId) NOT IN (
-          ${METADATA_VERSIONED}
-        )`,
-      })}
+      ${MANAGED_VERSION_PER_TRACE}
       )
       WHERE anchored < ${END}
         AND managed != ''

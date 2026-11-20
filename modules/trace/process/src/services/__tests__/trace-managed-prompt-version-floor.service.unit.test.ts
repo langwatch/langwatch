@@ -6,8 +6,8 @@
 import type { LedgerStepRecord } from "@langwatch/upgrade/reader";
 import { describe, expect, expectTypeOf, it } from "vitest";
 
-import type { ManagedPromptVersionLedgerRepository } from "../../repositories/managed-prompt-version-ledger.repository.ts";
-import { MemoryManagedPromptVersionLedgerRepository } from "../../repositories/memory/memory.managed-prompt-version-ledger.repository.ts";
+import { MemorySpanAnalyticsFloorRepository } from "../../repositories/memory/memory.span-analytics-floor.repository.ts";
+import type { SpanAnalyticsFloorRepository } from "../../repositories/span-analytics-floor.repository.ts";
 import { TraceManagedPromptVersionFloorService } from "../trace-managed-prompt-version-floor.service.ts";
 
 const SINCE = "2026-07-18T00:00:00Z";
@@ -17,11 +17,11 @@ const UNKNOWN = { from: null, rebuilding: false, unknown: true };
 describe("given the managed prompt version floor", () => {
   describe("when its ledger port is read", () => {
     it("is built from a port whose only member is findReplayStep", () => {
-      expectTypeOf<keyof ManagedPromptVersionLedgerRepository>().toEqualTypeOf<"findReplayStep">();
+      expectTypeOf<keyof SpanAnalyticsFloorRepository>().toEqualTypeOf<"findReplayStep">();
     });
 
     it("answers from a test double that has no write methods", async () => {
-      const readOnly: ManagedPromptVersionLedgerRepository = {
+      const readOnly: SpanAnalyticsFloorRepository = {
         findReplayStep: async () => [
           { status: "done", report: { replayedSince: SINCE }, startedAt: STARTED },
         ],
@@ -36,7 +36,7 @@ describe("given the managed prompt version floor", () => {
       const records: LedgerStepRecord[] = [
         { status: "running", report: { replayedSince: SINCE }, startedAt: STARTED },
       ];
-      const ledger = MemoryManagedPromptVersionLedgerRepository.create({ records });
+      const ledger = MemorySpanAnalyticsFloorRepository.create({ records });
       const before = structuredClone(await ledger.findReplayStep());
 
       await TraceManagedPromptVersionFloorService.create({ ledger }).getFloor();
@@ -57,7 +57,7 @@ describe("given the managed prompt version floor", () => {
   describe("when the ledger read throws", () => {
     /** @scenario "A replay that failed after its retries shows the history as unknown, never the rows" */
     it("answers unknown and does not reject", async () => {
-      const unreadable: ManagedPromptVersionLedgerRepository = {
+      const unreadable: SpanAnalyticsFloorRepository = {
         findReplayStep: async () => {
           throw new Error("relation upgrade_steps does not exist");
         },
@@ -72,7 +72,7 @@ describe("given the managed prompt version floor", () => {
   describe("when the ledger row is failed", () => {
     /** @scenario "A replay that failed after its retries shows the history as unknown, never the rows" */
     it("answers unknown", async () => {
-      const ledger = MemoryManagedPromptVersionLedgerRepository.create({
+      const ledger = MemorySpanAnalyticsFloorRepository.create({
         records: [{ status: "failed", report: { replayedSince: SINCE }, startedAt: STARTED }],
       });
 

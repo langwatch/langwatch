@@ -2,12 +2,14 @@
  * The trace module's managed-version replay step: a background refold of the traceAnalytics lane
  * over the last 122 days, held until no older writer is left (goose 00133).
  */
+import { migrationStepsOverMemory } from "@langwatch/process";
 import { toEpochMs } from "@langwatch/time";
-import type { LaneReplayer } from "@langwatch/upgrade/step";
+import { isDeclaredMigrationStep, type LaneReplayer } from "@langwatch/upgrade/step";
 import { describe, expect, it } from "vitest";
 
 import { TRACE_ANALYTICS_PROJECTION_NAME } from "../eventing/trace-derived.projection.ts";
-import { managedPromptVersionReplayStep } from "../trace.module.ts";
+import { MANAGED_PROMPT_VERSION_REPLAY_STEP_ID } from "../rules/managed-prompt-version-replay.rules.ts";
+import { managedPromptVersionReplayStep, traceProcessModule } from "../trace.module.ts";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 /** Slack for Temporal's clock against Date.now(); far below the day the bound would be off by. */
@@ -58,19 +60,26 @@ describe("the managed prompt version replay step", () => {
       expect(sinceMs).toBeLessThanOrEqual(declaredBy - 122 * DAY_MS + CLOCK_SLACK_MS);
     });
 
-    it("runs after the steps it is told to wait for", () => {
-      const step = managedPromptVersionReplayStep({
-        replayer: recordingReplayer(),
-        after: [
-          "trace:replay-trace-analytics-widget-columns",
-          "trace:replay-trace-evaluation-analytics",
-        ],
+    it("is registered to run after the two replays that share its lane", async () => {
+      const steps = await migrationStepsOverMemory({
+        name: "trace-managed-version-replay-step",
+        modules: [traceProcessModule],
+        environment: {
+          NODE_ENV: "production",
+          BASE_HOST: "http://langwatch.invalid",
+          API_KEY_PEPPER: "trace-managed-version-replay-step",
+        },
+        isMigrationStep: isDeclaredMigrationStep,
       });
 
-      expect(step.after).toEqual([
-        "trace:replay-trace-analytics-widget-columns",
-        "trace:replay-trace-evaluation-analytics",
-      ]);
+      const registered = steps.find(({ id }) => id === MANAGED_PROMPT_VERSION_REPLAY_STEP_ID);
+
+      expect(registered?.after).toEqual(
+        expect.arrayContaining([
+          "trace:replay-trace-analytics-widget-columns",
+          "trace:replay-trace-evaluation-analytics",
+        ]),
+      );
     });
   });
 });

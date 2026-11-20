@@ -1,7 +1,7 @@
 import { createLogger } from "@langwatch/observability";
 import type { TraceManagedPromptVersionFloor } from "@langwatch/trace-contract";
 
-import type { ManagedPromptVersionLedgerRepository } from "../repositories/managed-prompt-version-ledger.repository.ts";
+import type { SpanAnalyticsFloorRepository } from "../repositories/span-analytics-floor.repository.ts";
 import {
   MANAGED_PROMPT_VERSION_HISTORY_UNKNOWN,
   managedPromptVersionFloorOf,
@@ -18,12 +18,12 @@ export class TraceManagedPromptVersionFloorService {
   static create({
     ledger,
   }: {
-    ledger: ManagedPromptVersionLedgerRepository | null;
+    ledger: SpanAnalyticsFloorRepository | null;
   }): TraceManagedPromptVersionFloorService {
     return new TraceManagedPromptVersionFloorService(ledger);
   }
 
-  private constructor(private readonly ledger: ManagedPromptVersionLedgerRepository | null) {}
+  private constructor(private readonly ledger: SpanAnalyticsFloorRepository | null) {}
 
   async getFloor(): Promise<TraceManagedPromptVersionFloor> {
     try {
