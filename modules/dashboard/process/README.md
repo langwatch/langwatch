@@ -952,7 +952,7 @@ Permission `analytics:create`. Declared at `src/transport/graph.rest.ts:70`.
 Answers at `/api/graphs`, `/api/v1/graphs`; also, undocumented, `/api/graphs/2026-08-07`, `/api/v1/graphs/2026-08-07`, `/api/graphs/latest`, `/api/v1/graphs/latest`.
 
 ```typescript
-// Body: graphRestCreateSchema, ../contract/src/graph.ts:100
+// Body: graphRestCreateSchema, ../contract/src/graph.ts:97
 interface Body {
   name: string;
   graph: Record<string, unknown>;
@@ -976,7 +976,7 @@ Answers at `/api/graphs/:id`, `/api/v1/graphs/:id`; also, undocumented, `/api/gr
 
 ```typescript
 type Params = z.infer<typeof graphRestParamsSchema>; // ../contract/src/graph.ts:87
-// Body: graphRestUpdateSchema, ../contract/src/graph.ts:108
+// Body: graphRestUpdateSchema, ../contract/src/graph.ts:105
 interface Body {
   name?: string;
   graph?: Record<string, unknown>;
