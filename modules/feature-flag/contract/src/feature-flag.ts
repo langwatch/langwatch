@@ -177,7 +177,7 @@ export const FEATURE_FLAGS = [
     scope: "PRODUCT",
     defaultValue: true,
     description:
-      "Lets an organization run Instant Evals on its own decision model and key, picked in the Instant Evals column of Default models (ADR-182). On by default; switch it off fleet-wide or per organization. A run on an own key is never metered or capped. Off, the column offers LangWatch Evals Preview only, new picks of any other model are refused, and a project that already picked one skips its Instant Evals as not configured; it is never moved onto the billed LangWatch model.",
+      "Lets an organization run Instant Evals on its own decision model and key, picked in the Instant Evals column of Default models (ADR-182). On by default; switch it off fleet-wide or per organization. A run on an own key is not metered by LangWatch and skips the free budget, but a gateway budget set to block still applies. Off, the column offers LangWatch Evals Preview only, new picks of any other model are refused, and a project that already picked one skips its Instant Evals as not configured; it is never moved onto the billed LangWatch model.",
   },
   {
     key: "instant_evals_hosted_disabled",

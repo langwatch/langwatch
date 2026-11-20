@@ -40,6 +40,8 @@ Feature: Instant Evals inside the Trace Explorer
       And the run is estimated and started on the question as written, with the other terms as its filter
       And no model rewrites the question on the way, since the reader wrote it
       And a chip spelled `eval.conversation:` keeps judging conversations, whatever the lens shows
+      And a chip typed under NOT keeps its NOT, so the run lists the rows the judge did not match
+      And a chip under an OR, or under a NOT over other terms, is rebuilt beside them, as its run judges only those
       And the same question under another target is another chip, kept in the filter of the run that starts
       And a chip a run already answered is applied with no call at all
       And a refusal leaves the typed chip where it is rather than replacing it with a phrase search

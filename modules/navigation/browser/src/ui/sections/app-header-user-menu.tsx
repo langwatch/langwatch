@@ -19,6 +19,7 @@ import {
 } from "../../behavior/navigation-mode.store.ts";
 import { useNavigationMode } from "../../behavior/use-navigation-mode.ts";
 import { usePersonalWorkspaceEntries } from "../../behavior/use-personal-workspace-entries.ts";
+import { useSettingsEntryHref } from "../../behavior/use-settings-entry-href.ts";
 import { useUserAvatarUrl } from "../../behavior/user/use-user-avatar-url.ts";
 import { useNavigationHost, type NavigationHost } from "../../model/navigation-host.ts";
 import { OPERATIONS_CONSOLE } from "../../model/products.ts";
@@ -47,6 +48,7 @@ function userMenuLabel(user: Pick<NavigationUser, "name" | "email"> | null | und
 
 export function AppHeaderUserMenu() {
   const host = useNavigationHost();
+  const settingsHref = useSettingsEntryHref();
   const user = host.currentUser();
   const avatarSrc = useUserAvatarUrl(user?.image);
   const plan = host.plan();
@@ -96,7 +98,7 @@ export function AppHeaderUserMenu() {
                 </Menu.Item>
               )}
               <Menu.Item value="settings" asChild>
-                <NavigationLink href="/settings">Settings</NavigationLink>
+                <NavigationLink href={settingsHref}>Settings</NavigationLink>
               </Menu.Item>
               {host.opsAccess().hasAccess && (
                 <Menu.Item value="admin" asChild>

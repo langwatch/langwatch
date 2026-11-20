@@ -311,7 +311,7 @@ describe("given a plan that lacks Enterprise", () => {
     it("offers the enterprise entries locked", () => {
       expect(
         lockedHrefsIn({ hasPermission: () => true, hasOrganizationPermission: () => true }),
-      ).toEqual(["/settings/audit-log", "/settings/roles", "/settings/braids"]);
+      ).toEqual(["/settings/braids", "/settings/audit-log", "/settings/roles"]);
     });
 
     /** @scenario "A branded feature's entries wear its mark" */
@@ -347,11 +347,11 @@ describe("given a plan that lacks Enterprise", () => {
 
     /** @scenario "A plan without Enterprise sees its entries locked" */
     it("still hides an entry the reader lacks the permission for", () => {
-      expect(lockedHrefsIn({})).toEqual(["/settings/roles", "/settings/braids"]);
+      expect(lockedHrefsIn({})).toEqual(["/settings/braids", "/settings/roles"]);
       expect(lockedHrefsIn({ hasPermission: (p) => p === "auditLog:view" })).toEqual([
+        "/settings/braids",
         "/settings/audit-log",
         "/settings/roles",
-        "/settings/braids",
       ]);
     });
 
@@ -470,6 +470,36 @@ describe("given a member on LangWatch Cloud", () => {
 
       expect(labelOf("/settings/usage")).toBe("Usage");
       expect(labelOf("/settings/subscription")).toBe("Plan & billing");
+    });
+  });
+});
+
+describe("given the settings menu's groups", () => {
+  describe("when the menu is built", () => {
+    /** @scenario The Project group sits between You and Organization */
+    it("puts the plainly labelled Project group between You and Organization", () => {
+      const groups = settingsMenu(EVERYTHING_CLOSED);
+
+      expect(groups.slice(0, 3).map((group) => group.id)).toEqual([
+        "settings-you",
+        "settings-project",
+        "settings-organization",
+      ]);
+      expect(groups[1]?.label).toBe("Project");
+    });
+  });
+
+  describe("when the /settings address is open", () => {
+    /** @scenario The settings address itself still opens the organization's settings */
+    it("lights the Organization group's General entry and nothing else", () => {
+      const items = settingsMenu(EVERYTHING_CLOSED).flatMap((group) =>
+        group.items.map((item) => ({ ...item, group: group.id })),
+      );
+      const lit = items.filter((item) => isSettingsMenuItemActive({ item, pathname: "/settings" }));
+
+      expect(lit.map(({ group, href }) => ({ group, href }))).toEqual([
+        { group: "settings-organization", href: "/settings" },
+      ]);
     });
   });
 });

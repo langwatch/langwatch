@@ -31,4 +31,19 @@ export class MemoryCodingAgentTraceSessionRepository extends CodingAgentTraceSes
       null
     );
   }
+
+  async findLatestBySessionId(input: {
+    tenantId: string;
+    sessionId: string;
+    fromMs: number;
+    toMs: number;
+  }): Promise<CodingAgentTraceSessionRecord | null> {
+    let latest: CodingAgentTraceSessionRecord | null = null;
+    for (const record of this.memory.traceSessions.values()) {
+      if (record.tenantId !== input.tenantId || record.sessionId !== input.sessionId) continue;
+      if (record.occurredAtMs < input.fromMs || record.occurredAtMs > input.toMs) continue;
+      if (latest === null || record.occurredAtMs > latest.occurredAtMs) latest = record;
+    }
+    return latest;
+  }
 }

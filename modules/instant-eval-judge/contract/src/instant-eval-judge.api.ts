@@ -334,6 +334,7 @@ export interface InstantEvalClassifierLimits {
   /**
    * Tokens the judge bills on every request beyond the text and the questions.
    * Provisional: read off e2e bills (190 to 220 per row), not yet measured alone.
+   * Must stay under `reserveTokens`, which keeps room for it in every request.
    */
   readonly requestOverheadTokens: number;
 }
