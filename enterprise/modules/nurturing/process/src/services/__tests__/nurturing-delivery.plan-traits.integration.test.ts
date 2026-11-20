@@ -295,10 +295,10 @@ describe("NurturingDeliveryService, delivering billing's subscription_changed fa
 
   describe("when only a pending checkout remains", () => {
     /** @scenario "A pending checkout does not make the plan paid" */
-    it("sends the plan free", async () => {
+    it("sends the plan free and has_subscription false", async () => {
       const { sent } = await liveRequestsOf(subscriptionChangedFacts.pendingOnly);
 
-      expect(sent).toEqual(requestsFor({ plan: "free", hasSubscription: true }));
+      expect(sent).toEqual(requestsFor({ plan: "free", hasSubscription: false }));
     });
   });
 

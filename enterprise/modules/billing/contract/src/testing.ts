@@ -46,8 +46,8 @@ export const subscriptionChangedFacts = {
   lastCancelled: subscriptionChangedFactFixture({ hasSubscription: false, plan: "FREE" }),
   /** One of two active subscriptions was cancelled; the LAUNCH one remains. */
   otherRemains: subscriptionChangedFactFixture({ plan: "LAUNCH" }),
-  /** The active one was cancelled and only a pending checkout remains. */
-  pendingOnly: subscriptionChangedFactFixture({ plan: "FREE" }),
+  /** The active one was cancelled and only a pending checkout remains, which is no subscription. */
+  pendingOnly: subscriptionChangedFactFixture({ hasSubscription: false, plan: "FREE" }),
   /** The resync's catch-up fact for an organization on LAUNCH. */
   caughtUp: subscriptionChangedFactFixture({ plan: "LAUNCH", fromCatchUp: true }),
 } as const;

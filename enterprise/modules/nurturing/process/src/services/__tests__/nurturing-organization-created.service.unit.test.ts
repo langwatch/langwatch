@@ -14,17 +14,24 @@ import { NurturingOrganizationCreatedService } from "../nurturing-organization-c
 const CREATED_AT = Date.UTC(2026, 10, 17, 9, 0, 0, 750);
 const PINO_KEYS = new Set(["level", "time", "pid", "hostname", "msg"]);
 
-/** The service over a recording Customer.io batch, erasure marks and its own test logger. */
-function serviceOver() {
+/**
+ * The service over a recording Customer.io batch that refuses while `customerIo.refusing`,
+ * erasure marks and its own test logger.
+ */
+function serviceOver({ refusing = false }: { refusing?: boolean } = {}) {
   const sent: CioBatchCall[][] = [];
+  const customerIo = { refusing };
   const { logger, lines } = createTestLogger();
   const erasedUsers = MemoryNurturingErasedUserRepository.create();
   const service = NurturingOrganizationCreatedService.create({
     erasedUsers,
-    sendBatch: async (calls) => void sent.push(calls),
+    sendBatch: async (calls) => {
+      if (customerIo.refusing) throw new Error("refused");
+      sent.push(calls);
+    },
     logger,
   });
-  return { service, sent, lines, erasedUsers };
+  return { service, sent, lines, erasedUsers, customerIo };
 }
 
 const created = (userId: string | undefined): OrganizationCreatedEventData => ({
@@ -54,6 +61,19 @@ describe("NurturingOrganizationCreatedService", () => {
         ],
       ]);
       expect(sent.flat().some((call) => call.type === "track")).toBe(false);
+    });
+  });
+
+  describe("when Customer.io refuses the founder's group call", () => {
+    it("rejects so the subscriber retries, and sends the call on the retry", async () => {
+      const { service, sent, customerIo } = serviceOver({ refusing: true });
+
+      await expect(service.organizationCreated(created("founder-1"))).rejects.toThrow("refused");
+
+      expect(sent).toEqual([]);
+      customerIo.refusing = false;
+      await service.organizationCreated(created("founder-1"));
+      expect(sent).toEqual([[expect.objectContaining({ type: "group", userId: "founder-1" })]]);
     });
   });
 

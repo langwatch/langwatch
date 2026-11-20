@@ -27,14 +27,12 @@ const USAGE_BILLING_FIRST_PAUSE_MS = 200;
 
 const pauseFor = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
+type ActiveSubscription = { plan: string } | null;
+
 type BillingLifecycleAnnouncerDeps = Readonly<{
-  /**
-   * Whether a live subscription remains (pending counts), and the active one's plan (it does not):
-   * the two answers keep their own semantics.
-   */
+  /** The active subscription, or none; a pending checkout is not active. */
   subscriptions: {
-    findLastNonCancelled(organizationId: string): Promise<unknown>;
-    findActive(organizationId: string): Promise<{ plan: string } | null>;
+    findActive(organizationId: string): Promise<ActiveSubscription>;
   };
   /** The organization's active members' ids, through the shares (C2 B). */
   organizations: Pick<BillingAccountFactsRepository, "findActiveMemberIds">;
@@ -103,7 +101,7 @@ export class BillingLifecycleAnnouncerService {
     const { organizationId } = input;
     await this.#subscriptionChanged({
       organizationId,
-      hasSubscription: () => Promise.resolve(true),
+      hasSubscription: () => true,
     });
     await this.usageBillingChanged({ organizationId });
     await this.#record(organizationId, async (commands) => {
@@ -117,12 +115,14 @@ export class BillingLifecycleAnnouncerService {
     });
   }
 
-  /** Whether the organization still holds another live subscription is read after the cancel. */
+  /**
+   * Whether another active subscription remains is read after the cancel, by the resync's rule:
+   * a pending checkout is no subscription, so the live fact and a later resync agree.
+   */
   async subscriptionCancelled(input: { organizationId: string }): Promise<void> {
     await this.#subscriptionChanged({
       ...input,
-      hasSubscription: async () =>
-        (await this.deps.subscriptions.findLastNonCancelled(input.organizationId)) != null,
+      hasSubscription: (active) => active != null,
     });
     await this.usageBillingChanged(input);
   }
@@ -306,21 +306,23 @@ export class BillingLifecycleAnnouncerService {
     };
   }
 
+  /** One findActive read feeds both fields, so plan and hasSubscription cannot disagree. */
   async #subscriptionChanged(input: {
     organizationId: string;
-    hasSubscription: () => Promise<boolean>;
+    hasSubscription: (active: ActiveSubscription) => boolean;
   }): Promise<void> {
     await this.#record(input.organizationId, async (commands) => {
       const { organizationId } = input;
       const occurredAt = (this.deps.now ?? nowInstant)().epochMilliseconds;
       const memberUserIds = await this.deps.organizations.findActiveMemberIds(organizationId);
+      const active = await this.deps.subscriptions.findActive(organizationId);
       await commands.recordSubscriptionChanged.send({
         tenantId: organizationId,
         occurredAt,
         organizationId,
         memberUserIds,
-        hasSubscription: await input.hasSubscription(),
-        plan: await this.#activePlanOf(organizationId),
+        hasSubscription: input.hasSubscription(active),
+        plan: activePlanOf({ active }),
       });
     });
   }
@@ -355,10 +357,6 @@ export class BillingLifecycleAnnouncerService {
       fromCatchUp: true,
     });
     return { members };
-  }
-
-  async #activePlanOf(organizationId: string): Promise<string> {
-    return activePlanOf({ active: await this.deps.subscriptions.findActive(organizationId) });
   }
 
   async #record(
