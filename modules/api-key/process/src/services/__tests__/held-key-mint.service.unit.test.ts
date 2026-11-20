@@ -170,7 +170,7 @@ describe("HeldKeyMintService", () => {
 
     await attempts(() => service.createHeld({ holdKey: "run-1", key: later }));
 
-    expect(rows()[0]?.expiresAt?.epochMilliseconds).toBe(written.expiresAt.getTime());
+    expect(rows()[0]?.expiresAt?.getTime()).toBe(written.expiresAt.getTime());
     expect(reopened.map(({ expiresAt }) => expiresAt.getTime())).toEqual([
       written.expiresAt.getTime(),
     ]);
