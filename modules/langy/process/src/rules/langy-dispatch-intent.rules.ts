@@ -1,4 +1,6 @@
-/** How the worker should start a turn: revive a parked handoff, create a session, or continue one. */
+/**
+ * How the worker should start a turn: revive a parked handoff, create a session, or continue one.
+ */
 export function dispatchIntentOf({
   resumable,
   hasApiKey,
