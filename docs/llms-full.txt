@@ -66571,7 +66571,7 @@ For errors outside the checkup, see [Troubleshooting](/self-hosting/troubleshoot
 title: Buy through Azure or AWS Marketplace
 description: "Buy LangWatch Enterprise through Azure Marketplace or AWS Marketplace, including private offers with custom terms, and bill it to your cloud account"
 sidebarTitle: Cloud marketplaces
-keywords: azure marketplace, aws marketplace, private offer, procurement, MACC, EDP, cloud commit, enterprise, billing, purchase
+keywords: azure marketplace, aws marketplace, private offer, procurement, enterprise, billing, purchase
 ---
 
 Yes, you can buy LangWatch through **Azure Marketplace** and **AWS Marketplace**. The purchase is billed to your cloud account, so it goes through the vendor and procurement process you already have with Microsoft or AWS.
@@ -66589,9 +66589,6 @@ A private offer is a listing made for your organization only: your price, seat c
 
 To get one, [contact sales](https://langwatch.ai/get-a-demo) or email [enterprise@langwatch.ai](mailto:enterprise@langwatch.ai). Tell us which marketplace you use and the account or tenant that will accept the offer.
 
-## Committed cloud spend
-
-Many companies buy through a marketplace so the purchase can count toward a committed-spend agreement with their cloud provider, such as a Microsoft Azure Consumption Commitment (MACC) or an AWS Enterprise Discount Program (EDP). Whether a given purchase counts depends on the listing and on the terms of your agreement, so confirm it with your Microsoft or AWS account team before you buy.
 
 ## What you can buy
 
