@@ -15,7 +15,12 @@ export const normalizeSignInErrorCode = (error: string | null | undefined): stri
   if (error === "email_does_not_match" || error === "email_doesn't_match") {
     return "DIFFERENT_EMAIL_NOT_ALLOWED";
   }
-  if (error === "account_already_linked_to_different_user" || error === "account_not_linked") {
+  // The SSO plugin's OIDC callback redirects with the sign-in refusal's raw, spaced string.
+  if (
+    error === "account_already_linked_to_different_user" ||
+    error === "account_not_linked" ||
+    error === "account not linked"
+  ) {
     return "OAuthAccountNotLinked";
   }
   return error;

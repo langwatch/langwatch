@@ -27,9 +27,17 @@ describe("normalizeSignInErrorCode", () => {
     });
   });
 
+  describe("when the SSO plugin redirects with the sign-in refusal's raw spelling", () => {
+    /** @scenario "The SSO plugin's spaced account-link spelling still shows the account-link message" */
+    it("keeps mapping 'account not linked' to OAuthAccountNotLinked", () => {
+      expect(normalizeSignInErrorCode("account not linked")).toBe("OAuthAccountNotLinked");
+      expect(signInErrorMayCross("account not linked")).toBe(true);
+    });
+  });
+
   describe("when an address carries a spelling no release redirects with", () => {
     /** @scenario "A bookmarked error address with a retired spelling shows the generic error" */
-    it.each(["LINKING_DIFFERENT_EMAILS_NOT_ALLOWED", "account not linked"])(
+    it.each(["LINKING_DIFFERENT_EMAILS_NOT_ALLOWED"])(
       "leaves %s as it is, so it is withheld and the screen shows the generic error",
       (code) => {
         expect(normalizeSignInErrorCode(code)).toBe(code);

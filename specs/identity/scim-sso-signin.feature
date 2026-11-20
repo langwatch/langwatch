@@ -74,8 +74,13 @@ Feature: First sign-in for a provisioned directory member
     Then no error code is read and the redirect passes through unchanged
 
   @unit @regression
+  Scenario: The SSO plugin's spaced account-link spelling still shows the account-link message
+    When the SSO plugin's OIDC callback reports "account not linked"
+    Then the error is treated as OAuthAccountNotLinked
+
+  @unit @regression
   Scenario: A bookmarked error address with a retired spelling shows the generic error
-    When an error address carries "LINKING_DIFFERENT_EMAILS_NOT_ALLOWED" or "account not linked"
+    When an error address carries "LINKING_DIFFERENT_EMAILS_NOT_ALLOWED"
     Then the code is not one of ours to hand to somebody
     And the screen shows the generic sign-in error
 
