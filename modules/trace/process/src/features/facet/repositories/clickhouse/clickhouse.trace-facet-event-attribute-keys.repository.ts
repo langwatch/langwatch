@@ -17,9 +17,8 @@ class ClickHouseTraceFacetEventAttributeKeysRepository {
     );
   }
 
-  /**
-   * Discovers event attribute keys by flattening per-event Maps.
-   */
+  /** Discovers event attribute keys through the `.keys` subcolumn of the per-event Maps,
+   * never the Maps themselves, so the String values beside the keys are never read. */
   buildEventAttributeKeysFacetQuery(ctx: FacetQueryContext): FacetQuery {
     const where = this.facetQueries.buildTimeWhere("StartTime", ctx);
     const prefixFilter = ctx.prefix ? "AND lower(key) ILIKE concat({prefix:String}, '%')" : "";
@@ -31,10 +30,10 @@ class ClickHouseTraceFacetEventAttributeKeysRepository {
           count() AS cnt,
           count() OVER () AS total_distinct
         FROM (
-          SELECT arrayJoin(mapKeys(arrayJoin(\`Events.Attributes\`))) AS key
+          SELECT arrayJoin(arrayJoin(\`Events.Attributes\`.keys)) AS key
           FROM stored_spans
           WHERE ${where}
-            AND length(\`Events.Attributes\`) > 0
+            AND length(\`Events.Attributes\`.keys) > 0
         )
         WHERE key != ''
           ${prefixFilter}
