@@ -29,6 +29,8 @@ let mockChips: { runId: string | null; question: string }[] = [];
 let mockHasUnjudgeableEval = false;
 vi.mock("../../../../../features/instant-eval/behavior/use-instant-eval-runs.ts", () => ({
   useInstantEvalRuns: () => ({ chips: mockChips }),
+}));
+vi.mock("../../../../../features/instant-eval/behavior/use-has-unjudgeable-eval.ts", () => ({
   useHasUnjudgeableEval: () => mockHasUnjudgeableEval,
 }));
 

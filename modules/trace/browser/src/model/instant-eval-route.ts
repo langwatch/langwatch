@@ -27,10 +27,10 @@ export interface InstantEvalRoutePayload {
    */
   typedQuery?: string;
   /**
-   * Set when this submit first marked the question as an Instant Eval. Declining the run or
-   * Skip drops only such a mark, so one made earlier keeps a bare `NOT` chip pending.
+   * The questions this submit first marked as Instant Evals, every chip of it, not only this run's.
+   * Declining the run or Skip drops only these marks, so one made earlier keeps a `NOT` pending.
    */
-  isNewlyTyped?: boolean;
+  newlyTypedQuestions?: string[];
   /** The sentence quoted as one phrase, merged with `otherQuery`. */
   fallbackQuery: string;
   timeRange: { from: number; to: number };

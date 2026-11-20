@@ -14,10 +14,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
  * failure on the way is a phrase search rather than an error state.
  */
 import { useFilterStore } from "../../../../../behavior/explorer.store.ts";
-import {
-  typedQuestionKey,
-  useInstantEvalRunStore,
-} from "../../../../../features/instant-eval/behavior/instant-eval-run.store.ts";
+import { useInstantEvalRunStore } from "../../../../../features/instant-eval/behavior/instant-eval-run.store.ts";
+import { useHasPendingNegatedEval } from "../../../../../features/instant-eval/behavior/use-has-pending-negated-eval.ts";
 import { useSubmitSearch } from "../use-submit-search.ts";
 
 type MutateOptions = {
@@ -65,6 +63,12 @@ const handlers = {
   onInstantEval: vi.fn(),
   onSupersede: vi.fn(),
 };
+
+/** Whether the table reads `NOT eval:"question"` as not judged yet, as it would once submitted. */
+function readsAsNotJudged(question: string): boolean {
+  useFilterStore.setState({ debouncedQueryText: `NOT eval:"${question}"`, evalRuns: {} });
+  return renderHook(() => useHasPendingNegatedEval()).result.current;
+}
 
 function renderSubmit(overrides: Partial<Parameters<typeof useSubmitSearch>[0]> = {}) {
   return renderHook(() =>
@@ -390,7 +394,7 @@ describe("given the text is an eval chip typed by hand", () => {
         otherQuery: "status:error",
         fallbackQuery: 'status:error AND eval:"the user is annoyed"',
         typedQuery: 'status:error AND eval:"the user is annoyed"',
-        isNewlyTyped: true,
+        newlyTypedQuestions: ["the user is annoyed"],
         timeRange: { from: 1000, to: 2000 },
       });
     });
@@ -399,19 +403,15 @@ describe("given the text is an eval chip typed by hand", () => {
     it("marks the chip as typed here, so its rows read as not judged until a run answers", () => {
       const { result } = renderSubmit({ isInstantEvalAvailable: false });
       act(() => result.current.submitSearch('NOT eval:"the user is annoyed"'));
-      expect(useInstantEvalRunStore.getState().typedQuestions).toEqual({
-        [typedQuestionKey({ projectId: "project-1", question: "the user is annoyed" })]: true,
-      });
+      expect(readsAsNotJudged("the user is annoyed")).toBe(true);
     });
 
     /** @scenario "A pending chip under NOT is not judged yet" */
     it("marks every chip of the query as typed, not only the one whose run starts", () => {
       const { result } = renderSubmit({ isInstantEvalAvailable: false });
       act(() => result.current.submitSearch('eval:"a" AND NOT eval:"b"'));
-      expect(useInstantEvalRunStore.getState().typedQuestions).toEqual({
-        [typedQuestionKey({ projectId: "project-1", question: "a" })]: true,
-        [typedQuestionKey({ projectId: "project-1", question: "b" })]: true,
-      });
+      expect(readsAsNotJudged("a")).toBe(true);
+      expect(readsAsNotJudged("b")).toBe(true);
     });
 
     /** @scenario "A pending chip under NOT is not judged yet" */
@@ -420,7 +420,28 @@ describe("given the text is an eval chip typed by hand", () => {
       act(() => result.current.submitSearch('eval:"faithfulness"'));
       const refused = handlers.onInstantEval.mock.calls.at(-1)?.[0];
       act(() => result.current.submitWithoutInstantEval(refused));
-      expect(useInstantEvalRunStore.getState().typedQuestions).toEqual({});
+      expect(readsAsNotJudged("faithfulness")).toBe(false);
+    });
+
+    /** @scenario "A pending chip under NOT is not judged yet" */
+    it("drops every mark the skipped submit made, not only the refused run's question", () => {
+      const { result } = renderSubmit({ isInstantEvalAvailable: false });
+      act(() => result.current.submitSearch('eval:"a" AND NOT eval:"b"'));
+      const refused = handlers.onInstantEval.mock.calls.at(-1)?.[0];
+      act(() => result.current.submitWithoutInstantEval(refused));
+      expect(readsAsNotJudged("a")).toBe(false);
+      expect(readsAsNotJudged("b")).toBe(false);
+    });
+
+    /** @scenario "A pending chip under NOT is not judged yet" */
+    it("keeps a sibling's mark made before the skipped submit, dropping only the new ones", () => {
+      useInstantEvalRunStore.getState().markTyped({ projectId: "project-1", question: "b" });
+      const { result } = renderSubmit({ isInstantEvalAvailable: false });
+      act(() => result.current.submitSearch('eval:"a" AND NOT eval:"b"'));
+      const refused = handlers.onInstantEval.mock.calls.at(-1)?.[0];
+      act(() => result.current.submitWithoutInstantEval(refused));
+      expect(readsAsNotJudged("a")).toBe(false);
+      expect(readsAsNotJudged("b")).toBe(true);
     });
 
     /** @scenario "A pending chip under NOT is not judged yet" */
@@ -430,11 +451,8 @@ describe("given the text is an eval chip typed by hand", () => {
       const { result } = renderSubmit({ isInstantEvalAvailable: false });
       act(() => result.current.submitSearch('eval:"faithfulness"'));
       const refused = handlers.onInstantEval.mock.calls.at(-1)?.[0];
-      expect(refused).not.toHaveProperty("isNewlyTyped");
       act(() => result.current.submitWithoutInstantEval(refused));
-      expect(useInstantEvalRunStore.getState().typedQuestions).toEqual({
-        [typedQuestionKey(mark)]: true,
-      });
+      expect(readsAsNotJudged("faithfulness")).toBe(true);
     });
 
     /** @scenario "A chip typed by hand starts its run on Enter" */

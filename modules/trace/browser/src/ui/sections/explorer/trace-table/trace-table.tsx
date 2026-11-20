@@ -12,7 +12,7 @@ import {
   useSessionGroups,
 } from "../../../../features/explorer/behavior/use-session-groups.ts";
 import { useTraceList } from "../../../../features/explorer/behavior/use-trace-list.ts";
-import { useHasPendingNegatedEval } from "../../../../features/instant-eval/behavior/use-instant-eval-runs.ts";
+import { useHasPendingNegatedEval } from "../../../../features/instant-eval/behavior/use-has-pending-negated-eval.ts";
 import { HandledErrorState, readHandledError } from "../../errors/index.ts";
 import { ConversationLensBody } from "./conversation-lens-body.tsx";
 import { EmptyFilterState } from "./empty-filter-state.tsx";

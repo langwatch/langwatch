@@ -18,10 +18,8 @@ import { useOrganizationTeamProject } from "../../../../behavior/use-organizatio
 import { useSearchSubmitRequestStore } from "../../../../features/explorer/behavior/search-submit-request.store.ts";
 import { useExplorerCounts } from "../../../../features/explorer/behavior/use-explorer-counts.ts";
 import { useInstantEvalRunStore } from "../../../../features/instant-eval/behavior/instant-eval-run.store.ts";
-import {
-  useHasUnjudgeableEval,
-  useInstantEvalRuns,
-} from "../../../../features/instant-eval/behavior/use-instant-eval-runs.ts";
+import { useHasUnjudgeableEval } from "../../../../features/instant-eval/behavior/use-has-unjudgeable-eval.ts";
+import { useInstantEvalRuns } from "../../../../features/instant-eval/behavior/use-instant-eval-runs.ts";
 import { useRetryInstantEval } from "../../../../features/instant-eval/behavior/use-retry-instant-eval.ts";
 import {
   failedInstantEvalChip,

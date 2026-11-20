@@ -14,7 +14,8 @@ import { api } from "../../../behavior/trace-api.ts";
 import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
 import { dueInstantEvalRefetches } from "../../../model/instant-eval-refetch-pacing.ts";
 import { useInstantEvalRunStore } from "./instant-eval-run.store.ts";
-import { useInstantEvalRuns, useMarkRegisteredChipsTyped } from "./use-instant-eval-runs.ts";
+import { useInstantEvalRuns } from "./use-instant-eval-runs.ts";
+import { useMarkRegisteredChipsTyped } from "./use-mark-registered-chips-typed.ts";
 
 export function useInstantEvalRunWatch(): void {
   const { project } = useOrganizationTeamProject();

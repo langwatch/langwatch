@@ -57,6 +57,7 @@ Feature: Instant Evals inside the Trace Explorer
       And nothing is searched and no run is estimated or started, whether Instant Evals are on or off
       And the same holds when a run is already registered under the chip's key
       And the reads send no run for such a chip, so a loaded link shows its rows as not judged
+      And the filter compiles that chip to no rows, so counts, facets and exports list no row the table hides
       And the empty table says the NOT must be rewritten beside the other terms, with no action to judge it
       And a sibling chip with the same question that no NOT reaches keeps its run
       But a bare chip never submitted here, like `NOT eval:my_evaluator OR status:error`, is searched as an evaluator name
@@ -247,6 +248,7 @@ Feature: Instant Evals inside the Trace Explorer
       Given a chip forcing a unit and no run registered for it
       When the filter is compiled
       Then it matches no rows, so the table is empty while the run starts
+      And under NOT it still matches no rows, never every row
 
     @unit
     Scenario: A bare eval chip with no registered run keeps its older meaning

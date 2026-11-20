@@ -308,23 +308,6 @@ export function unjudgeableInstantEvalTags(ast: LiqeQuery): ReadonlySet<LiqeQuer
 }
 
 /**
- * Whether the chip is tangled as above and a `NOT` reaches it too. No rebuild
- * beside the other terms keeps that meaning, so such a chip is refused.
- */
-export function hasNegatedInstantEvalChipUnderOr({
-  queryText,
-  field,
-  question,
-}: {
-  queryText: string;
-  field: string;
-  question: string;
-}): boolean {
-  const ast = parseOrNull(queryText);
-  return ast !== null && holdsChip({ nodes: unjudgeableInstantEvalTags(ast), field, question });
-}
-
-/**
  * Whether a `NOT` reaches the chip `field:question`. With no run behind it such a
  * chip negates nothing judged, so it would list every row as a non-match.
  */

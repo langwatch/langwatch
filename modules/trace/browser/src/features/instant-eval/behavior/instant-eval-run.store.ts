@@ -10,6 +10,8 @@ import type { ExplorerInstantEvalProgress } from "@langwatch/instant-eval-contra
 import { nowInstant } from "@langwatch/time";
 import { isExplorerInstantEvalRunActive } from "@langwatch/trace-contract";
 
+import { typedQuestionKey } from "../../../model/surely-instant-eval-chip.ts";
+
 /**
  * Where a run is, as the page shows it. Counters can still move after the
  * status turns terminal, so the page reads until they hold still. A failed run
@@ -115,20 +117,6 @@ function only<T>(record: Record<string, T>, keep: ReadonlySet<string>): Record<s
   return Object.fromEntries(Object.entries(record).filter(([id]) => keep.has(id)));
 }
 
-/**
- * The mark of a question submitted as an Instant Eval: by project, so another project's bare chip
- * keeps its older meaning, and not by window, so a new range keeps the chip pending.
- */
-export function typedQuestionKey({
-  projectId,
-  question,
-}: {
-  projectId: string;
-  question: string;
-}): string {
-  return JSON.stringify([projectId, question.replace(/\s+/g, " ").trim()]);
-}
-
 export const useInstantEvalRunStore = defineSlice<InstantEvalRunState>({
   name: "trace:instant-eval-run",
   create: (set) => ({
@@ -186,4 +174,16 @@ export function selectInstantEvalRunPhase(
     isStopRequested: state.stoppedByUser[runId] === true,
     isSettled: state.settled[runId] === true,
   });
+}
+
+/** Skip or a declined run: drops the marks the refused submit made, keeping ones made earlier. */
+export function unmarkNewlyTyped({
+  projectId,
+  questions = [],
+}: {
+  projectId: string;
+  questions?: readonly string[];
+}): void {
+  const { unmarkTyped } = useInstantEvalRunStore.getState();
+  for (const question of questions) unmarkTyped({ projectId, question });
 }

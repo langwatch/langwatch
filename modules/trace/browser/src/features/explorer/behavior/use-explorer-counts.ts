@@ -7,10 +7,8 @@ import {
   selectInstantEvalRunPhase,
   useInstantEvalRunStore,
 } from "../../instant-eval/behavior/instant-eval-run.store.ts";
-import {
-  useHasPendingNegatedEval,
-  useInstantEvalRuns,
-} from "../../instant-eval/behavior/use-instant-eval-runs.ts";
+import { useHasPendingNegatedEval } from "../../instant-eval/behavior/use-has-pending-negated-eval.ts";
+import { useInstantEvalRuns } from "../../instant-eval/behavior/use-instant-eval-runs.ts";
 import { useSessionGroups } from "./use-session-groups.ts";
 import { useTraceListQuery } from "./use-trace-list-query.ts";
 

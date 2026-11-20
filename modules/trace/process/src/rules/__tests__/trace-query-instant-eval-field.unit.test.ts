@@ -117,6 +117,11 @@ describe("given an eval chip and no run that fits it", () => {
       expect(compile('eval.trace:"the user is annoyed"')?.sql).toBe("1 = 0");
     });
 
+    /** @scenario "An eval chip with no registered run matches nothing" */
+    it("matches no rows for a forcing spelling under NOT either", () => {
+      expect(compile('NOT eval.trace:"the user is annoyed"')?.sql).toBe("1 = 0");
+    });
+
     /** @scenario "A bare eval chip with no registered run keeps its older meaning" */
     it("reads the bare field as an evaluator name", () => {
       const result = compile("eval:faithfulness");
@@ -129,16 +134,22 @@ describe("given an eval chip and no run that fits it", () => {
   describe("when a NOT reaches the chip across an OR, beside a sibling chip with a run", () => {
     /** @scenario "A NOT the run of a typed chip cannot answer is refused" */
     it.each([
-      [
-        'NOT eval:"the user is annoyed" OR eval.trace:"the user is annoyed"',
-        "FROM evaluation_runs",
-      ],
-      ['NOT eval.trace:"the user is annoyed" OR eval:"the user is annoyed"', "NOT (1 = 0)"],
-    ])("applies the run to the sibling only: %s", (queryText, refusedSql) => {
+      'NOT eval:"the user is annoyed" OR eval.trace:"the user is annoyed"',
+      'NOT eval.trace:"the user is annoyed" OR eval:"the user is annoyed"',
+    ])("applies the run to the sibling only, the NOT matching nothing: %s", (queryText) => {
       const result = compile(queryText, [run()]);
       const runParams = Object.values(result?.params ?? {}).filter((value) => value === "run-1");
       expect(runParams).toHaveLength(1);
-      expect(result?.sql).toContain(refusedSql);
+      expect(result?.sql).toMatch(/^\(?1 = 0 OR /);
+      expect(result?.sql).not.toContain("NOT (1 = 0)");
+      expect(result?.sql).not.toContain("FROM evaluation_runs");
+    });
+
+    /** @scenario "A NOT the run of a typed chip cannot answer is refused" */
+    it("matches nothing for the NOT alone, so counts and exports list no unjudged row", () => {
+      expect(compile('NOT eval.trace:"the user is annoyed" OR status:error', [run()])?.sql).toMatch(
+        /^\(?1 = 0 OR /,
+      );
     });
 
     /** @scenario "A NOT the run of a typed chip cannot answer is refused" */
@@ -150,7 +161,8 @@ describe("given an eval chip and no run that fits it", () => {
       const runParams = Object.values(result?.params ?? {}).filter((value) => value === "run-1");
       expect(runParams).toHaveLength(1);
       expect(result?.sql).toContain("HAVING argMax(Passed, UpdatedAt) = 1");
-      expect(result?.sql).toContain("FROM evaluation_runs");
+      expect(result?.sql).toContain("1 = 0 OR ");
+      expect(result?.sql).not.toContain("FROM evaluation_runs");
     });
   });
 });

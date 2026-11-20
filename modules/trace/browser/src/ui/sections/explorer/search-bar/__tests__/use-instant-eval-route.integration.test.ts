@@ -300,7 +300,9 @@ describe("given a chip typed by hand under NOT", () => {
     useInstantEvalRunStore.setState({ typedQuestions: {} });
     useInstantEvalRunStore.getState().markTyped(mark);
     const { result } = renderHook(() => useInstantEvalRoute({ isInstantEvalAvailable: true }));
-    act(() => result.current.onInstantEvalRoute({ ...typed, isNewlyTyped: true }));
+    act(() =>
+      result.current.onInstantEvalRoute({ ...typed, newlyTypedQuestions: ["the user is annoyed"] }),
+    );
     act(() =>
       estimateCallbacks().onSuccess?.({ rows: 90_000, isRowsCapped: false, priceUsd: 0.5 }),
     );
@@ -309,6 +311,26 @@ describe("given a chip typed by hand under NOT", () => {
 
     expect(useInstantEvalRunStore.getState().typedQuestions).toEqual({});
     expect(useFilterStore.getState().queryText).toBe('NOT eval:"the user is annoyed"');
+  });
+
+  /** @scenario "A pending chip under NOT is not judged yet" */
+  it("drops every mark the submit made on a declined dialog, not only the run's question", () => {
+    useFilterStore.setState({ projectId: "project-1" });
+    useInstantEvalRunStore.setState({ typedQuestions: {} });
+    useInstantEvalRunStore.getState().markTyped({ projectId: "project-1", question: "b" });
+    useInstantEvalRunStore
+      .getState()
+      .markTyped({ projectId: "project-1", question: typed.sentence });
+    const { result } = renderHook(() => useInstantEvalRoute({ isInstantEvalAvailable: true }));
+    act(() =>
+      result.current.onInstantEvalRoute({ ...typed, newlyTypedQuestions: [typed.sentence, "b"] }),
+    );
+    act(() =>
+      estimateCallbacks().onSuccess?.({ rows: 90_000, isRowsCapped: false, priceUsd: 0.5 }),
+    );
+    act(() => result.current.searchWordsInstead());
+
+    expect(useInstantEvalRunStore.getState().typedQuestions).toEqual({});
   });
 
   /** @scenario "A pending chip under NOT is not judged yet" */

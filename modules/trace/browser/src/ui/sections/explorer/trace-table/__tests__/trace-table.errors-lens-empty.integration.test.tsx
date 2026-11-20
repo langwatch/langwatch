@@ -51,7 +51,11 @@ vi.mock("../../../../../features/explorer/behavior/use-explorer-counts.ts", () =
 }));
 vi.mock("../../../../../features/instant-eval/behavior/use-instant-eval-runs.ts", () => ({
   useInstantEvalRuns: () => ({ chips: [] }),
+}));
+vi.mock("../../../../../features/instant-eval/behavior/use-has-unjudgeable-eval.ts", () => ({
   useHasUnjudgeableEval: () => false,
+}));
+vi.mock("../../../../../features/instant-eval/behavior/use-has-pending-negated-eval.ts", () => ({
   useHasPendingNegatedEval: () => false,
 }));
 vi.mock("../trace-lens-body.tsx", () => ({

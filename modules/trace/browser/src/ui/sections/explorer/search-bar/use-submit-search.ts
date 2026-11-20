@@ -19,11 +19,14 @@ import { type SearchNotice } from "../../../../behavior/query.slice.ts";
 import { api } from "../../../../behavior/trace-api.ts";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 import {
-  typedQuestionKey,
+  unmarkNewlyTyped,
   useInstantEvalRunStore,
 } from "../../../../features/instant-eval/behavior/instant-eval-run.store.ts";
-import { isSurelyInstantEvalChip } from "../../../../features/instant-eval/behavior/use-instant-eval-runs.ts";
 import type { InstantEvalRoutePayload } from "../../../../model/instant-eval-route.ts";
+import {
+  isSurelyInstantEvalChip,
+  typedQuestionKey,
+} from "../../../../model/surely-instant-eval-chip.ts";
 import { explainAnyError } from "../../errors/index.ts";
 
 interface UseSubmitSearchOptions {
@@ -243,7 +246,7 @@ function typedEvalRunOf({
 /**
  * Records a submit's chips as Instant Evals, so their rows read as not judged while no run answers
  * them, rather than as an evaluator name. Keyed by the project the explorer shows, as the table
- * reads it. The run comes back flagged when its question had no mark before this submit.
+ * reads it. The run carries the questions that had no mark before this submit.
  */
 function markTypedQuestions<Run extends InstantEvalRoutePayload | null>({
   questions,
@@ -254,12 +257,14 @@ function markTypedQuestions<Run extends InstantEvalRoutePayload | null>({
 }): Run {
   const projectId = useFilterStore.getState().projectId ?? "";
   const { markTyped, typedQuestions } = useInstantEvalRunStore.getState();
-  const wasTyped =
-    run !== null &&
-    Boolean(typedQuestions[typedQuestionKey({ projectId, question: run.question.instructions })]);
+  const newlyTyped = [
+    ...new Set(
+      questions.filter((question) => !typedQuestions[typedQuestionKey({ projectId, question })]),
+    ),
+  ];
   for (const question of questions) markTyped({ projectId, question });
-  if (run === null || wasTyped) return run;
-  return { ...run, isNewlyTyped: true };
+  if (run === null || newlyTyped.length === 0) return run;
+  return { ...run, newlyTypedQuestions: newlyTyped };
 }
 
 /**
@@ -510,13 +515,11 @@ export function useSubmitSearch({
     (payload: InstantEvalRoutePayload) => {
       const seq = ++submitSeqRef.current;
       onSupersede();
-      // The words were no Instant Eval: a mark this submit made goes, one made earlier stays.
-      if (payload.isNewlyTyped) {
-        useInstantEvalRunStore.getState().unmarkTyped({
-          projectId: useFilterStore.getState().projectId ?? "",
-          question: payload.question.instructions,
-        });
-      }
+      // The words were no Instant Eval: the marks this submit made go, ones made earlier stay.
+      unmarkNewlyTyped({
+        projectId: useFilterStore.getState().projectId ?? "",
+        questions: payload.newlyTypedQuestions,
+      });
       const text = combineQueries({ base: payload.otherQuery, addition: payload.sentence });
       if (!splitBareWords(text).sentence || isSamplePreview) {
         applyQueryText(requoteBareTerms(text));

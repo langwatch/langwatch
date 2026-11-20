@@ -6,7 +6,6 @@ import { describe, expect, it } from "vitest";
 
 import {
   hasInstantEvalChipUnderOr,
-  hasNegatedInstantEvalChipUnderOr,
   isInstantEvalChipNegated,
   instantEvalChipsOf,
   instantEvalChipText,
@@ -197,9 +196,11 @@ describe("hasInstantEvalChipUnderOr", () => {
   });
 });
 
-describe("hasNegatedInstantEvalChipUnderOr", () => {
+describe("instantEvalChipsOf isUnjudgeable", () => {
   const refused = (queryText: string, question = "q") =>
-    hasNegatedInstantEvalChipUnderOr({ queryText, field: "eval", question });
+    instantEvalChipsOf({ queryText, lensId: undefined }).some(
+      (chip) => chip.question === question && chip.isUnjudgeable,
+    );
 
   /** @scenario "A NOT the run of a typed chip cannot answer is refused" */
   it("refuses a NOT on the chip under an OR, and a NOT over a group holding it", () => {

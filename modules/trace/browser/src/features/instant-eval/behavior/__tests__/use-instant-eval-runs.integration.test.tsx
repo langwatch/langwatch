@@ -10,12 +10,10 @@ import { beforeEach, describe, expect, it } from "vitest";
  */
 import { useFilterStore, useViewStore } from "../../../../behavior/explorer.store.ts";
 import { useInstantEvalRunStore } from "../instant-eval-run.store.ts";
-import {
-  useHasPendingNegatedEval,
-  useHasUnjudgeableEval,
-  useInstantEvalRuns,
-  useMarkRegisteredChipsTyped,
-} from "../use-instant-eval-runs.ts";
+import { useHasPendingNegatedEval } from "../use-has-pending-negated-eval.ts";
+import { useHasUnjudgeableEval } from "../use-has-unjudgeable-eval.ts";
+import { useInstantEvalRuns } from "../use-instant-eval-runs.ts";
+import { useMarkRegisteredChipsTyped } from "../use-mark-registered-chips-typed.ts";
 
 const WINDOW = { from: 1_000, to: 2_000 };
 const QUESTION = "the user is annoyed";
