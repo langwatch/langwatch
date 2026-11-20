@@ -231,6 +231,27 @@ Feature: Product sidebars
     And a pinned dashboard's "⋮" menu offers only Unpin
     And with nothing pinned to "Shop" there is no such section
 
+  # An organization admin reaches teams they hold no membership row in, so their grants in
+  # "Shop" come from their own standing there, not from the teams they belong to.
+  @integration
+  Scenario: In Gateway or Coding agents, an organization admin's own grants in the named project count
+    Given Dashboards in every product is on
+    And I am an organization admin with no membership in the team that owns "Shop"
+    And my own permissions in "Shop" let me create dashboards but not delete them
+    When I am in Gateway or Coding agents and the section is titled "Dashboards · Shop"
+    Then I may create dashboards in "Shop", so the section offers the "+"
+    But I may not delete them there
+
+  # ADR-002's release gate: Dashboards opens per project, so the section follows "Shop", where
+  # it lists and makes boards, and never the page's own project.
+  @integration
+  Scenario: In Gateway or Coding agents, the Dashboards section follows the named project's release flag
+    Given Dashboards in every product is on
+    And LLM Ops would open the project "Shop"
+    When Dashboards is released for the page's own project but not for "Shop"
+    Then Coding agents shows no Dashboards section and no "+"
+    And when Dashboards is released for "Shop" but not for the page's own project, the section shows
+
   @integration
   Scenario: The LLM Ops sidebar's Dashboards section names no project
     Given Dashboards in every product is on
