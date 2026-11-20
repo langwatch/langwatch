@@ -223,11 +223,12 @@ export default function AnalyticsHostMount({ children }: { children?: ReactNode 
     return permissions ? [[askedProjectId, permissions] as const] : [];
   });
   // useQueries answers a new array every render, so the grants are keyed on what landed.
+  // The map is rebuilt from that key, so the memo depends only on what it reads.
   const landedKey = JSON.stringify(landed);
   const projectGrants = useMemo(
     () =>
       new Map(
-        landed.map(
+        (JSON.parse(landedKey) as typeof landed).map(
           ([askedProjectId, permissions]) => [askedProjectId, new Set(permissions)] as const,
         ),
       ),
