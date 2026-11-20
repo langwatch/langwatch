@@ -2,7 +2,7 @@
 
 **Date:** 2026-10-28
 
-**Status:** Accepted (Drew, 2026-10-29)
+**Status:** Accepted (owner, 2026-10-29)
 
 > One line: every trace-linked Instant Evals result is a row in one ClickHouse table, `eval_results`, linked to its trace and tagged with its source (ask, run, dashboard, monitor). Before judging, we look up the same trace, question, judge model and judged text (its hash), and reuse the row if it exists. The table is append-only and follows the trace's retention. Every trace-linked Instant Evals judgment lands here, whoever asked; a monitor still keeps its own `evaluation_runs`.
 
@@ -10,7 +10,7 @@
 
 - Issue: https://github.com/langwatch/tasks/issues/986
 - On 2026-10-27 a Slack thread found no agreed model for where instant eval results live. Langy gave different answers to the same question.
-- The first draft of this record recommended a split by use, with a monitor as the store for dashboards. Drew rejected it in review (Laze, 2026-10-28). A monitor decides when judging happens. It is not a place to keep results. He asked for one table, like competitors.
+- The first draft of this record recommended a split by use, with a monitor as the store for dashboards. The owner rejected it in review on 2026-10-28. A monitor decides when judging happens. It is not a place to keep results. The owner asked for one table, like competitors.
 - This record builds on ADR-153 (a run is a judgment job), ADR-174 (the judge call is metered) and ADR-182 (the decision model is a Default models column).
 
 ### Today
@@ -158,7 +158,7 @@ Purge and erase: user erase today touches Postgres only (`prisma.user-data-erase
 
 ### 5. Monitors stay separate; their Instant Evals judgments land here too
 
-The rule: every Instant Evals judgment is a row in `eval_results`, whoever asked. Drew decided this on 2026-10-29 (Laze): there is no reason to couple monitors and instant evals, but "the instant evals that a monitor uses should go in the table".
+The rule: every Instant Evals judgment is a row in `eval_results`, whoever asked. The owner decided this on 2026-10-29: there is no reason to couple monitors and instant evals, but "the instant evals that a monitor uses should go in the table".
 
 - **A monitor on the Instant Evals judge** (`evaluation-execution.service.ts:360`, `instantEvalJudgeOf`) recalls from `eval_results` first, then judges the miss, and writes the row with `Source = monitor`. It still writes its result to `evaluation_runs`, so its charts, the `evaluations.passed` filter and its triggers do not change.
 - **A monitor on any other judge** (another LLM, a built-in check) is not touched. It writes `evaluation_runs` only.
@@ -216,12 +216,12 @@ From public documentation read on 2026-10-28. All four keep results beside the t
 
 ## Decisions on the open questions
 
-Drew accepted both on 2026-10-29 (Convoz ask 12563, then Laze).
+The owner accepted both on 2026-10-29.
 
 1. **Monitors into the one table?** No: monitors stay separate, for good, and nothing moves out of `evaluation_runs`. But a monitor's Instant Evals judgments also land in `eval_results` (section 5). This replaces the first answer, "later".
 2. **Does changed judged text count as "something changed"?** Yes. The text is read anyway to judge, and a trace can gain spans after its first judgment. Without it, a recall can return a verdict on text that is no longer there.
 
-Two more were asked as pictures in the Laze deck. On 2026-11-10, @lw-instant-evals took their recommended answers under the rule that a reversible step goes ahead (Convoz 526 #24370). Either can be changed by saying so.
+Two more were asked as pictures in a review deck. On 2026-11-10, their recommended answers were taken under the rule that a reversible step goes ahead. Either can be changed by saying so.
 
 3. **Do runs keep their own table?** Yes, for now. A run keeps writing `instant_eval_judgments` for its run page, chip and view, and also writes `eval_results` for recall (sections 2 and 3). Moving the run page onto `eval_results` is a later change.
 4. **Are threads stored?** No. Traces and spans are stored and recalled; a thread-keyed `eval()` is judged each time, as today (section 2).
