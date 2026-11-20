@@ -4071,6 +4071,9 @@ importers:
       '@types/node':
         specifier: ^26.0.1
         version: 26.2.0
+      liquidjs:
+        specifier: '>=10.27.2 <11'
+        version: 10.30.0
       typescript:
         specifier: 'catalog:'
         version: 7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2)

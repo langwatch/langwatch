@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /** Spec: modules/notification/specs/customer-io-transactional.feature */
 import type { TransactionalEmail } from "@langwatch/enterprise-nurturing-contract";
+import { Liquid } from "liquidjs";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -125,9 +126,44 @@ describe("given a subject and body holding user text that reads as Liquid", () =
         body: "<p>{% if true %}Acme{% endif %} {{{</p>",
       });
 
-      const sent = JSON.parse(stringBody(posted[0]?.init.body)) as { subject: string; body: string };
+      const sent = JSON.parse(stringBody(posted[0]?.init.body)) as {
+        subject: string;
+        body: string;
+      };
       expect(sent.subject).toBe('Usage limit for {{ "{{" }} 7 | plus: 5 }}');
       expect(sent.body).toBe('<p>{{ "{%" }} if true %}Acme{{ "{%" }} endif %} {{ "{{" }}{</p>');
+    });
+  });
+});
+
+describe("given user text that is, or only looks like, Liquid", () => {
+  describe("when it is sent and Customer.io renders the posted subject and body", () => {
+    // Rendering with real Liquid proves the escaping is lossless, which the
+    // exact-string test above cannot: it only pins one encoding.
+    it.each([
+      "Hello {{ x }} there",
+      "{% if a %}b{% endif %}",
+      "a lone {{ here",
+      "plain text with no Liquid",
+      "{{{{ triple and %} closer",
+    ])("renders %j back to the original text", async (text) => {
+      const { posted, fetchFn } = network(accepted);
+      const channel = HttpCustomerIoTransactionalChannel.create({
+        apiKey: API_KEY,
+        region: undefined,
+        fetchFn,
+      });
+
+      await channel.send({ ...email, subject: text, body: text });
+
+      const sent = JSON.parse(stringBody(posted[0]?.init.body)) as {
+        subject: string;
+        body: string;
+      };
+      const liquid = new Liquid();
+      const context = { x: "X", a: true };
+      expect(await liquid.parseAndRender(sent.subject, context)).toBe(text);
+      expect(await liquid.parseAndRender(sent.body, context)).toBe(text);
     });
   });
 });
