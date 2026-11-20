@@ -393,7 +393,8 @@ const isProgramFault = (error: unknown): boolean =>
 
 /** A stable code for a failure the platform did not name itself. */
 const codeForStatus = (status: number): string => {
-  if (status === 401 || status === 403) return "unauthorized";
+  if (status === 401) return "unauthorized";
+  if (status === 403) return "forbidden";
   if (status === 404) return "not_found";
   if (status === 429) return "rate_limited";
   if (status >= SERVER_ERROR_STATUS) return "internal_error";
