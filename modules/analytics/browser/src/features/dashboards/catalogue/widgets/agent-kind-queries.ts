@@ -101,7 +101,7 @@ const AFTER_EVERY_ROW = "toDateTime64('2200-01-01 00:00:00', 3)";
 /**
  * Each trace's managed prompt version and time as `traces` holds them: its newest `trace_metrics`
  * row's. Read from the floor with no upper bound, so the caller drops a newest row past the end;
- * a newest row before the floor goes unseen: the one ruled difference (ADR-006, a falling anchor).
+ * a newest row before the floor goes unseen, and the trace counts with its newest row after it.
  */
 const managedVersionPerTrace = ({
   where = "",
@@ -137,9 +137,9 @@ const JUDGED_UNIT_TRACES = `SELECT ${TRACE_KEY} AS trace,
   GROUP BY trace`;
 
 /**
- * Each judged trace once, with its metadata version and the managed one streamed in beside the
- * verdicts from `trace_metrics`: no join (ADR-004), and floored, where `traces` reads all history
- * (ADR-006). A trace with only a managed-version row is no judged trace and is left out.
+ * Each judged trace once, as {@link JUDGED_UNIT_TRACES}, with the managed prompt version
+ * streamed in beside the verdicts, so no second join (analytics ADR-004); a trace with only a
+ * managed-version row is no judged trace and is left out.
  */
 const JUDGED_VERSION_TRACES = `SELECT t.trace AS trace,
     argMin(t.unit, t.at) AS unit,
@@ -155,13 +155,11 @@ const JUDGED_VERSION_TRACES = `SELECT t.trace AS trace,
     FROM trace_evaluation_metrics
     WHERE ${JUDGED_IN_BOTH_PERIODS}
     UNION ALL
-    SELECT trace, '' AS unit, '' AS version, ${AFTER_EVERY_ROW} AS at,
-      managed, CAST(NULL AS Nullable(Bool)) AS passed, 0 AS judged
-    FROM (
-      ${managedVersionPerTrace()}
-    )
-    WHERE anchored < ${END}
-      AND managed != ''
+    SELECT ${TRACE_KEY} AS trace, '' AS unit, '' AS version, ${AFTER_EVERY_ROW} AS at,
+      LastUsedPromptVersionId AS managed, CAST(NULL AS Nullable(Bool)) AS passed, 0 AS judged
+    FROM traces
+    WHERE ${inPeriodAndPrevious("OccurredAt")}
+      AND LastUsedPromptVersionId != ''
   ) AS t
   GROUP BY t.trace
   HAVING at < ${AFTER_EVERY_ROW}`;

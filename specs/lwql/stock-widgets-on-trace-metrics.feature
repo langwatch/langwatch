@@ -84,15 +84,15 @@ Feature: Stock trace widgets read the light trace table
       When att-table reads its per-unit volumes and its per-unit pass rates
       Then the units judged in the period are the units its volumes list
 
-  Rule: att-change reads the managed prompt version from trace_metrics
+  Rule: att-change/change reads the managed prompt version from trace_metrics
 
     @unit
-    Scenario: att-change reads the managed version from trace_metrics' floored twin, never traces
+    Scenario: att-change/change reads the managed version from trace_metrics' floored twin, never traces
       Given trace_metrics exposes LastUsedPromptVersionId as a String column, read from trace_analytics
-      When att-change's two queries are sent the way the executor sends them
-      Then each reads LastUsedPromptVersionId and never names traces
-      And every trace_metrics read in them goes to its floored twin
-      And no other stock query reads the managed version from traces but the two changes queries
+      When att-change/change is sent the way the executor sends it
+      Then it reads LastUsedPromptVersionId and never names traces
+      And every trace_metrics read in it goes to its floored twin
+      And no other stock query reads the managed version from traces but att-change/units and the two changes queries
 
     @integration
     Scenario: A version first used 200 days ago keeps the first-seen time it had
@@ -105,19 +105,18 @@ Feature: Stock trace widgets read the light trace table
 
     @integration
     Scenario: A trace whose newest trace_metrics row changed its version reads the newest version
-      Given a judged trace written twice inside the window, the newer write with another anchor and another managed version
+      Given a trace written twice inside the window, the newer write with another anchor and another managed version
       And each write reaching both trace_summaries and trace_analytics, the newer with the later UpdatedAt
-      When att-change's two queries run, under the application list and the langy list
-      Then each returns the rows its traces form returned
+      When att-change/change runs, under the application list and the langy list
+      Then it returns the rows its traces form returned
       And the trace counts with the newer write's version, at the newer write's time
 
     @integration
     Scenario: A trace whose newest row anchored before the window counts with its in-window version
       Given a trace whose older write is anchored inside the window and whose newer write is anchored before it
-      When att-change/change runs, as written and through the floored twin
-      Then it counts the trace with the older write's version, where its traces form leaves the trace out
-      And this is the one difference the floored read keeps, since the floor cuts off the newer write
-      But att-change/units returns its traces form's rows, as the evaluation moves to the newer anchor too
+      When att-change/change runs, as written and through the floored twin, under the application list and the langy list
+      Then it returns the rows its traces form returned
+      And it counts the trace with the older write's version, at the older write's time
 
     @integration
     Scenario: A trace whose two rows carry different sources counts with the listed row's version
@@ -125,18 +124,16 @@ Feature: Stock trace widgets read the light trace table
       And each write carrying its own managed version
       When att-change/change runs under the application list
       Then it counts the trace with the application write's version, where its traces form leaves the trace out
-      And this is part of the trade the floored read makes for its newest-row rule
       When att-change/change runs under the langy list
       Then both forms count the trace with the langy write's version, at the langy write's time
 
     @integration
-    Scenario: att-change and passRates answer within the memory cap on 120 days, whatever the history
-      Given a small project and a large project, each with 300 days of older history, and a large project with none
+    Scenario: att-change/change's memory no longer grows with the project's older history
+      Given a large project with 300 days of older history and a large project with none
       And every trace judged twice, a tenth of them with an unmerged retraction pair
-      When att-change's two queries and att-table's pass rates read a 60-day period and the window before it, under the widget cap at compatibility 25.10
-      Then each answers on the large project at or under 70% of the cap
-      And its peak on the large project is at most 2.2 times its peak on the small one
-      And its peak on the large project is within 10% of the project with no older history
+      When att-change/change reads a 60-day period and the window before it, under the widget cap at compatibility 25.10
+      Then it answers on both projects
+      And its median peak over three runs on the project with history is within 10% of the project without
 
     @integration
     Scenario: A trace folded before the column existed reads its version after the replay

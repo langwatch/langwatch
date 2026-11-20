@@ -18,8 +18,6 @@ const flooredRead = LangWatchQLFlooredReadService.create();
  */
 const INVOCATION = randomUUID().replaceAll("-", "");
 
-export const MEMORY_LIMIT_EXCEEDED = 241;
-
 type StockQuery = { label: string; sql: string };
 
 function fixture(name: string): readonly StockQuery[] {
@@ -73,14 +71,6 @@ export function expectAnswered({ runs, context }: { runs: readonly Run[]; contex
     expect(run.refusal, `${context}: ${described(runs)}`).toBeUndefined();
     expect(run.exceptionCode, `${context}: ${described(runs)}`).toBe(0);
   }
-}
-
-/** Fails unless every run ended with exactly the server's `code`. */
-export function expectRefused({ runs, code }: { runs: readonly Run[]; code: number }): void {
-  expect(
-    runs.map((run) => run.exceptionCode),
-    described(runs),
-  ).toEqual(runs.map(() => code));
 }
 
 /** Runs queries as the service sends them and reads each one's cost from the query log. */

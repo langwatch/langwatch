@@ -145,7 +145,7 @@ describe("given a widget that reads LastUsedPromptVersionId", () => {
     });
 
     /** @scenario "A widget reading the managed version says history is rebuilding until the replay is done" */
-    it("gates att-change's own queries, which read the column from trace_metrics", async () => {
+    it("gates att-change, whose change query reads the column from trace_metrics", async () => {
       renderCard({ queries: ATT_CHANGE, floor: REBUILDING });
 
       expect(await noticeInPlaceOfBody()).toHaveTextContent(

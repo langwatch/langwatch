@@ -120,8 +120,8 @@ describe("given the stock queries that keep traces or spans to their sources", (
   it("turns every one of their trace view reads back into the single lookup", () => {
     // The stock queries that read traces, spans or span_metrics with the sources parameter: 58
     // before tasks#1117 moved 15 to trace_metrics, 43 before analytics ADR-004 moved 20 more off,
-    // 23 before att-change's two read the managed version from trace_metrics (goose 00133).
-    expect(COVERED).toHaveLength(21);
+    // 23 before att-change/change read the managed version from trace_metrics (goose 00133).
+    expect(COVERED).toHaveLength(22);
 
     const missed = COVERED.flatMap(({ label, sql }) => {
       const { sql: before, replaced } = singleLookupForm(sql);

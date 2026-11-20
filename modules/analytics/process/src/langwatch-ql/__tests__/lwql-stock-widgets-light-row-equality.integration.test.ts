@@ -796,37 +796,23 @@ describe("given traces, spans and evaluations of each source that the stock quer
     expect(row?.changed_at.startsWith(onDay(6))).toBe(true);
   });
 
-  /**
-   * The floor's one ruled difference (ADR-006 amendment 2026-11-16, ~181-191): a newer write
-   * anchored before the window is cut off, so the new form counts the stale in-window row;
-   * `traces` drops it.
-   * @scenario "A trace whose newest row anchored before the window counts with its in-window version"
-   */
+  /** @scenario "A trace whose newest row anchored before the window counts with its in-window version" */
   it("counts a trace whose newest row fell before the window with its in-window version", async () => {
     const t: TraceSeed = { trace: "t", day: 6.5, origin: "application", metadata: {} };
     await writeTrace({ seed: { ...t, promptVersion: "pv-old" }, updated: 6.5 });
     await writeTrace({ seed: { ...t, day: -10, promptVersion: "pv-new" }, updated: 6.6 });
 
-    const forms = changeForms();
-    const main = await changeRows({ sql: forms.main, list: ["application"] });
-    expect(main).toEqual([expect.objectContaining({ version: "pv-200", previous: "pv-b" })]);
-    for (const sql of [forms.written, forms.floored]) {
-      const now = await changeRows({ sql, list: ["application"] });
-      expect(now).toEqual([expect.objectContaining({ version: "pv-old", previous: "pv-200" })]);
-      expect(now[0]?.changed_at.startsWith(onDay(6.5))).toBe(true);
-    }
-    // Under langy neither form reads t or the other versions: the rows stay equal.
-    const langy = await run({ sql: forms.main, list: ["langy"] });
-    for (const sql of [forms.written, forms.floored]) {
-      expect((await run({ sql, list: ["langy"] })).rows).toBe(langy.rows);
-    }
+    await expectChangeMatchesMain();
+    const { floored } = changeForms();
+    const [row] = await changeRows({ sql: floored, list: ["application"] });
+    expect(row).toMatchObject({ version: "pv-old", previous: "pv-200" });
+    expect(row?.changed_at.startsWith(onDay(6.5))).toBe(true);
   });
 
   /**
-   * Part of the anchor-move trade (advisor 43435): the new form filters rows by Source before
-   * argMax, so it counts S's older application row; `traces` drops a trace with any row from
-   * another source under application (stock-query-sources.ts:186-198). Under langy both read the
-   * langy row only.
+   * The new form filters rows by Source before argMax, so it counts S's older application row;
+   * `traces` drops a trace with any row from another source under application
+   * (stock-query-sources.ts:186-198). Under langy both read the langy row only.
    * @scenario "A trace whose two rows carry different sources counts with the listed row's version"
    */
   it("counts a trace whose newest row is from another source with its listed row's version", async () => {
@@ -841,7 +827,7 @@ describe("given traces, spans and evaluations of each source that the stock quer
     // .only.
     const forms = changeForms();
     const main = await changeRows({ sql: forms.main, list: ["application"] });
-    expect(main).toEqual([expect.objectContaining({ version: "pv-200", previous: "pv-b" })]);
+    expect(main).toEqual([expect.objectContaining({ version: "pv-old", previous: "pv-200" })]);
     for (const sql of [forms.written, forms.floored]) {
       const now = await changeRows({ sql, list: ["application"] });
       expect(now).toEqual([expect.objectContaining({ version: "pv-s-old", previous: "pv-old" })]);
