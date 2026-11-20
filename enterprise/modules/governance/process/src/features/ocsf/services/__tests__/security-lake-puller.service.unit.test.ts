@@ -138,6 +138,19 @@ describe("SecurityLakePullerService", () => {
     });
   });
 
+  describe("when AWS throttles the queue with a 400", () => {
+    it("fails the run as retryable, since throttling passes", async () => {
+      const throttled = Object.assign(new Error("Request is throttled."), {
+        name: "RequestThrottled",
+        $metadata: { httpStatusCode: 400 },
+      });
+
+      const failure = await run({}, { receiveFailure: throttled }).catch((e: unknown) => e);
+
+      expect(failure).toMatchObject({ retryable: true });
+    });
+  });
+
   describe("when AWS is briefly unavailable", () => {
     it("fails the run as retryable, with only the error code in its message", async () => {
       const unavailable = Object.assign(new Error("internal detail"), {
