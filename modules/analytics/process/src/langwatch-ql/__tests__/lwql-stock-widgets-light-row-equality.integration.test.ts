@@ -810,12 +810,12 @@ describe("given traces, spans and evaluations of each source that the stock quer
   });
 
   /**
-   * The new form filters rows by Source before argMax, so it counts S's older application row;
-   * `traces` drops a trace with any row from another source under application
-   * (stock-query-sources.ts:186-198). Under langy both read the langy row only.
-   * @scenario "A trace whose two rows carry different sources counts with the listed row's version"
+   * Under application `traces` leaves out a trace with any row from another source
+   * (stock-query-sources.ts:186-198), and so does the per-trace HAVING. Under langy both count
+   * S with its newest row, the langy one.
+   * @scenario "A trace with a row from a source not in the list is left out under the application list"
    */
-  it("counts a trace whose newest row is from another source with its listed row's version", async () => {
+  it("returns main's rows for a trace whose newest row is from another source", async () => {
     const s: TraceSeed = { trace: "s", day: 6.8, origin: "application", metadata: {} };
     await writeTrace({ seed: { ...s, promptVersion: "pv-s-old" }, updated: 6.8 });
     await writeTrace({
@@ -823,23 +823,61 @@ describe("given traces, spans and evaluations of each source that the stock quer
       updated: 6.9,
     });
 
-    // pv-b and pv-old come from earlier tests' traces (pv-9 from the seeds): fails alone under
+    await expectChangeMatchesMain();
+    // pv-old and pv-200 come from earlier tests' traces, pv-9 from l1's seed: fails alone under
     // .only.
-    const forms = changeForms();
-    const main = await changeRows({ sql: forms.main, list: ["application"] });
-    expect(main).toEqual([expect.objectContaining({ version: "pv-old", previous: "pv-200" })]);
-    for (const sql of [forms.written, forms.floored]) {
-      const now = await changeRows({ sql, list: ["application"] });
-      expect(now).toEqual([expect.objectContaining({ version: "pv-s-old", previous: "pv-old" })]);
-      expect(now[0]?.changed_at.startsWith(onDay(6.8))).toBe(true);
+    const { written, floored } = changeForms();
+    for (const sql of [written, floored]) {
+      const [application] = await changeRows({ sql, list: ["application"] });
+      expect(application).toMatchObject({ version: "pv-old", previous: "pv-200" });
+      expect(application?.changed_at.startsWith(onDay(6.5))).toBe(true);
+      const [langy] = await changeRows({ sql, list: ["langy"] });
+      expect(langy).toMatchObject({ version: "pv-s-new", previous: "pv-9" });
+      expect(langy?.changed_at.startsWith(onDay(6.9))).toBe(true);
     }
+  });
 
-    // l1's pv-9 on day 1.5 is the only other langy version.
-    const langy = await changeRows({ sql: forms.main, list: ["langy"] });
-    expect(langy).toEqual([expect.objectContaining({ version: "pv-s-new", previous: "pv-9" })]);
-    expect(langy[0]?.changed_at.startsWith(onDay(6.9))).toBe(true);
-    for (const sql of [forms.written, forms.floored]) {
-      expect(await changeRows({ sql, list: ["langy"] })).toEqual(langy);
+  /**
+   * S2's newest row is from application and would be the newest version if S2 counted: under
+   * application it stays out, because its older row is from langy.
+   * @scenario "A trace with a row from a source not in the list is left out under the application list"
+   */
+  it("leaves out under application a trace that also has a row from another source", async () => {
+    const s2: TraceSeed = { trace: "s2", day: 6.85, origin: "langy", metadata: {} };
+    await writeTrace({ seed: { ...s2, promptVersion: "pv-s2-langy" }, updated: 6.85 });
+    await writeTrace({
+      seed: { ...s2, day: 6.95, origin: "application", promptVersion: "pv-s2-application" },
+      updated: 6.95,
+    });
+
+    await expectChangeMatchesMain();
+    const { written, floored, main } = changeForms();
+    for (const sql of [main, written, floored]) {
+      const rows = await changeRows({ sql, list: ["application"] });
+      expect(rows).toEqual([expect.objectContaining({ version: "pv-old", previous: "pv-200" })]);
+      expect(rows[0]?.changed_at.startsWith(onDay(6.5))).toBe(true);
+    }
+  });
+
+  /**
+   * `traces` looks sources up one window and a day back (stock-query-sources.ts lookupBound): E's
+   * langy row on day -7.5 sits in that extra day, before the window before the period (day -7).
+   * @scenario "A trace with a row from a source not in the list is left out under the application list"
+   */
+  it("leaves out under application a trace whose other source's row is in the day before the window", async () => {
+    const e: TraceSeed = { trace: "e", day: -7.5, origin: "langy", metadata: {} };
+    await writeTrace({ seed: { ...e, promptVersion: "pv-e-langy" }, updated: -7.5 });
+    await writeTrace({
+      seed: { ...e, day: 6.97, origin: "application", promptVersion: "pv-e-application" },
+      updated: 6.97,
+    });
+
+    await expectChangeMatchesMain();
+    const { written, floored, main } = changeForms();
+    for (const sql of [main, written, floored]) {
+      const rows = await changeRows({ sql, list: ["application"] });
+      expect(rows).toEqual([expect.objectContaining({ version: "pv-old", previous: "pv-200" })]);
+      expect(rows[0]?.changed_at.startsWith(onDay(6.5))).toBe(true);
     }
   });
 });

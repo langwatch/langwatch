@@ -4,6 +4,7 @@
  * check names are the ones the dashboards dev seed sends, so the demo fills every panel.
  */
 
+import { SOURCES_PLACEHOLDER } from "../../model/sources-parameter.ts";
 import { gatheredRows } from "../../templates/model/lwql-gathered.ts";
 import {
   bucketOf,
@@ -207,19 +208,33 @@ const METADATA_VERSIONED = `SELECT cityHash64(TraceId)
         WHERE ${inPeriodAndPrevious("OccurredAt")}
           AND MetadataPromptVersion != ''`;
 
+/** How far back `traces` looks a trace's sources up: one window and a day (lookupBound). */
+const SOURCES_LOOKUP_START = `subtractDays(${PREVIOUS_START}, 1)`;
+
+/**
+ * The traces `traces` keeps to the sources (stock-query-sources.ts): under application, one with
+ * no row from an unlisted source; else one with a row from a listed source.
+ */
+const TRACE_IN_SOURCES = `if(has(${SOURCES_PLACEHOLDER}, 'application'),
+        countIf(Source NOT IN ${SOURCES_PLACEHOLDER}) = 0,
+        countIf(Source IN ${SOURCES_PLACEHOLDER}) > 0)`;
+
 /**
  * Each metadata-less trace's managed prompt version and time as `traces` holds them: its newest
- * `trace_metrics` row's, read with no upper bound so the caller drops a row past the end.
+ * row's inside both windows, with no upper bound so the caller drops a row past the end, and ''
+ * for a trace with none. It keeps to the sources itself, per trace, from every source's rows
+ * back to where `traces` looks them up.
  */
 const MANAGED_VERSION_PER_TRACE = `SELECT ${TRACE_KEY} AS trace,
-        argMax(LastUsedPromptVersionId, UpdatedAt) AS managed,
-        argMax(OccurredAt, UpdatedAt) AS anchored
+        argMaxIf(LastUsedPromptVersionId, UpdatedAt, OccurredAt >= ${PREVIOUS_START}) AS managed,
+        argMaxIf(OccurredAt, UpdatedAt, OccurredAt >= ${PREVIOUS_START}) AS anchored
       FROM trace_metrics
-      WHERE OccurredAt >= ${PREVIOUS_START}
+      WHERE OccurredAt >= ${SOURCES_LOOKUP_START}
         AND cityHash64(TraceId) NOT IN (
           ${METADATA_VERSIONED}
         )
-      GROUP BY trace`;
+      GROUP BY trace
+      HAVING ${TRACE_IN_SOURCES}`;
 
 /**
  * Each version's first use inside both windows, never all history, as it was on `traces`: a

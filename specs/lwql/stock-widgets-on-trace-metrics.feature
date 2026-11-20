@@ -119,13 +119,15 @@ Feature: Stock trace widgets read the light trace table
       And it counts the trace with the older write's version, at the older write's time
 
     @integration
-    Scenario: A trace whose two rows carry different sources counts with the listed row's version
+    Scenario: A trace with a row from a source not in the list is left out under the application list
       Given a trace written twice inside the window, the older write from application, the newer from langy
+      And a second trace written twice inside the window, the older write from langy, the newer from application
+      And a third trace whose older write is from langy, anchored in the day before the window before the period, and whose newer write is from application, inside the period
       And each write carrying its own managed version
-      When att-change/change runs under the application list
-      Then it counts the trace with the application write's version, where its traces form leaves the trace out
-      When att-change/change runs under the langy list
-      Then both forms count the trace with the langy write's version, at the langy write's time
+      When att-change/change runs, as written and through the floored twin, under the application list and the langy list
+      Then it returns the rows its traces form returned
+      And under the application list it leaves all three traces out, so the newest version stays the one before them
+      And under the langy list it counts the first trace with the langy write's version, at the langy write's time
 
     @integration
     Scenario: att-change/change's memory no longer grows with the project's older history
