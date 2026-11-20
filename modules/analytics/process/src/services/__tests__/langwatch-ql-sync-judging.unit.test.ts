@@ -397,6 +397,26 @@ describe("LangWatchQLService with an eval function", () => {
       ]);
     });
 
+    /** @scenario "A query that projects TraceId but not OccurredAt keeps its trace-level result" */
+    it("leaves OccurredAt off every row when the judge returns new rows in another order", async () => {
+      const { service } = serviceOver({
+        judgeQuery: async ({ rows }) => ({
+          rows: rows.map((row) => ({ ...row, apology: 0.9 })).reverse(),
+          skipped: {},
+        }),
+        executor: new RowsAnsweringExecutor([
+          { TraceId: "trace-a", apology: "trace-a" },
+          { TraceId: "trace-gone", apology: "trace-gone" },
+        ]),
+        held: [trace({ id: "trace-a", threadId: "thread-a", startedAt: STARTED_AT })],
+      });
+
+      const result = await query({ service, sql: APOLOGY_QUERY });
+
+      expect(result.rows).toHaveLength(2);
+      for (const row of result.rows) expect(row).not.toHaveProperty("OccurredAt");
+    });
+
     it("keeps a time the statement projected itself, in the judged row and the answer", async () => {
       const projected = "2026-11-01 08:00:00.000";
       const { service, asked } = serviceOver({

@@ -161,7 +161,10 @@ export class LangWatchQLExtractionService {
     }
 
     return {
-      rows: withoutAddedTimes({ judged: judged.rows, sent: timed, projected: rows }),
+      rows: withoutAddedTimes({
+        judged: judged.rows,
+        projectsTime: rows.some((row) => LWQL_TIME_COLUMN in row),
+      }),
       skipped: judged.skipped,
     };
   }
@@ -190,20 +193,19 @@ function withTraceTimes({
 
 /**
  * The judged rows without the time only the judge was given, so the answer holds the columns the
- * statement projected. A row sent as it was projected is the same object, and is left alone.
+ * statement projected. A statement projects the same columns on every row, so whether it projected
+ * a time is decided once, and the strip needs neither the judge's row order nor its objects.
  */
 function withoutAddedTimes({
   judged,
-  sent,
-  projected,
+  projectsTime,
 }: {
   judged: readonly Record<string, unknown>[];
-  sent: readonly Record<string, unknown>[];
-  projected: readonly Record<string, unknown>[];
+  projectsTime: boolean;
 }): readonly Record<string, unknown>[] {
-  return judged.map((row, at) =>
-    sent[at] === projected[at]
-      ? row
-      : Object.fromEntries(Object.entries(row).filter(([column]) => column !== LWQL_TIME_COLUMN)),
+  if (projectsTime) return judged;
+
+  return judged.map((row) =>
+    Object.fromEntries(Object.entries(row).filter(([column]) => column !== LWQL_TIME_COLUMN)),
   );
 }
