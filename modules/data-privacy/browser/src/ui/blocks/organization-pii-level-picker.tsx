@@ -103,7 +103,7 @@ function LevelCard({
 }
 
 /** Essential and Strict side by side; Strict carries the model, its price and the New badge. */
-function LevelCards({ free }: { free: boolean }) {
+function LevelCards({ free, licensed }: { free: boolean; licensed: boolean }) {
   return (
     <Grid templateColumns={{ base: "1fr", md: "1fr 1fr" }} gap={3}>
       <LevelCard
@@ -124,7 +124,7 @@ function LevelCards({ free }: { free: boolean }) {
           </Badge>
         }
         subtitle={PII_REDACTION_MODEL_NAME}
-        price={<PiiRedactionModelPrice free={free} />}
+        price={<PiiRedactionModelPrice free={free} licensed={licensed} />}
         points={[
           "Names and full street addresses in 8 languages",
           "Plus everything Essential finds",
@@ -183,6 +183,7 @@ export function OrganizationPiiLevelPicker({
   pendingLevel,
   otherLevelLabel,
   free,
+  licensed = false,
   canWrite,
   isSaving,
   onPick,
@@ -191,6 +192,8 @@ export function OrganizationPiiLevelPicker({
   pendingLevel: OrganizationPiiLevel | null;
   otherLevelLabel: string;
   free: boolean;
+  /** Self-hosted: included with the Enterprise licence rather than for the organization. */
+  licensed?: boolean;
   canWrite: boolean;
   isSaving: boolean;
   onPick: (level: OrganizationPiiLevel) => void;
@@ -226,7 +229,7 @@ export function OrganizationPiiLevelPicker({
             }
           }}
         >
-          <LevelCards free={free} />
+          <LevelCards free={free} licensed={licensed} />
         </RadioCard.Root>
         {level && <LevelExample level={level} />}
         {level === "strict" && !free && (
