@@ -51,7 +51,7 @@ Feature: Instant Evals inside the Trace Explorer
     @integration
     Scenario: A NOT the run of a typed chip cannot answer is refused
       Given the reader types `NOT eval.trace:"the user is annoyed" OR status:error` or `NOT (eval:"the user is annoyed" AND status:error)`
-      And the chip is spelled with a target, was submitted on this page, or has a run registered under its key
+      And the chip is spelled with a target, was submitted on this page, has a run registered under its key, or is judged by a sibling chip in the same submit
       When Enter is pressed
       Then a warning says a NOT on an eval chip must sit beside the other terms with AND
       And nothing is searched and no run is estimated or started, whether Instant Evals are on or off
@@ -152,6 +152,7 @@ Feature: Instant Evals inside the Trace Explorer
       And a chip submitted here stays so for its project after the time range changes
       But a bare chip never submitted here, like `NOT eval:my_evaluator`, keeps its evaluator-name rows
       And so does one whose refused judgement the reader skipped, declined or closed, or one submitted in another project
+      But a skip, decline or close keeps a mark made before that submit, so a chip run earlier stays pending
       And a chip whose run a link restored stays pending after the time range changes, as a submitted one does
       And a failed read shows its error, not the not-judged state
 

@@ -26,6 +26,11 @@ export interface InstantEvalRoutePayload {
    * not under an `OR`, so its run puts the text back as written, `NOT` kept.
    */
   typedQuery?: string;
+  /**
+   * Set when this submit first marked the question as an Instant Eval. Declining the run or
+   * Skip drops only such a mark, so one made earlier keeps a bare `NOT` chip pending.
+   */
+  isNewlyTyped?: boolean;
   /** The sentence quoted as one phrase, merged with `otherQuery`. */
   fallbackQuery: string;
   timeRange: { from: number; to: number };

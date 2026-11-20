@@ -390,6 +390,7 @@ describe("given the text is an eval chip typed by hand", () => {
         otherQuery: "status:error",
         fallbackQuery: 'status:error AND eval:"the user is annoyed"',
         typedQuery: 'status:error AND eval:"the user is annoyed"',
+        isNewlyTyped: true,
         timeRange: { from: 1000, to: 2000 },
       });
     });
@@ -420,6 +421,20 @@ describe("given the text is an eval chip typed by hand", () => {
       const refused = handlers.onInstantEval.mock.calls.at(-1)?.[0];
       act(() => result.current.submitWithoutInstantEval(refused));
       expect(useInstantEvalRunStore.getState().typedQuestions).toEqual({});
+    });
+
+    /** @scenario "A pending chip under NOT is not judged yet" */
+    it("keeps a mark made before the submit when the reader skips, as a chip run earlier", () => {
+      const mark = { projectId: "project-1", question: "faithfulness" };
+      useInstantEvalRunStore.getState().markTyped(mark);
+      const { result } = renderSubmit({ isInstantEvalAvailable: false });
+      act(() => result.current.submitSearch('eval:"faithfulness"'));
+      const refused = handlers.onInstantEval.mock.calls.at(-1)?.[0];
+      expect(refused).not.toHaveProperty("isNewlyTyped");
+      act(() => result.current.submitWithoutInstantEval(refused));
+      expect(useInstantEvalRunStore.getState().typedQuestions).toEqual({
+        [typedQuestionKey(mark)]: true,
+      });
     });
 
     /** @scenario "A chip typed by hand starts its run on Enter" */
@@ -474,6 +489,17 @@ describe("given the text is an eval chip typed by hand", () => {
         result.current.submitSearch('NOT eval.trace:"the user is annoyed" OR status:error'),
       );
       expect(handlers.onInstantEval).not.toHaveBeenCalled();
+      expect(toast).toHaveBeenCalledWith(
+        expect.objectContaining({ title: "This NOT cannot be judged as typed" }),
+      );
+    });
+
+    /** @scenario "A NOT the run of a typed chip cannot answer is refused" */
+    it("refuses a bare NOT whose question a sibling chip of the same submit judges, before any run", () => {
+      const { result } = renderSubmit();
+      act(() => result.current.submitSearch('(NOT eval:"q" OR status:error) AND eval:"q"'));
+      expect(handlers.onInstantEval).not.toHaveBeenCalled();
+      expect(useInstantEvalRunStore.getState().typedQuestions).toEqual({});
       expect(toast).toHaveBeenCalledWith(
         expect.objectContaining({ title: "This NOT cannot be judged as typed" }),
       );

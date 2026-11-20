@@ -227,11 +227,13 @@ function useInstantEvalOutcome(): {
     setConfirmation(null);
     setRefusal(null);
     if (!pending) return;
-    // Declined or closed, as Skip: a saved bare chip on the question keeps its older meaning.
-    useInstantEvalRunStore.getState().unmarkTyped({
-      projectId: useFilterStore.getState().projectId ?? "",
-      question: pending.payload.question.instructions,
-    });
+    // Declined or closed, as Skip: a mark this submit made goes, one made earlier stays.
+    if (pending.payload.isNewlyTyped) {
+      useInstantEvalRunStore.getState().unmarkTyped({
+        projectId: useFilterStore.getState().projectId ?? "",
+        question: pending.payload.question.instructions,
+      });
+    }
     applyQueryText(pending.payload.fallbackQuery);
   }, [applyQueryText]);
 

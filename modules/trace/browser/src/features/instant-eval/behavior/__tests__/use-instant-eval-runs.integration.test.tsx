@@ -12,6 +12,7 @@ import { useFilterStore, useViewStore } from "../../../../behavior/explorer.stor
 import { useInstantEvalRunStore } from "../instant-eval-run.store.ts";
 import {
   useHasPendingNegatedEval,
+  useHasUnjudgeableEval,
   useInstantEvalRuns,
   useMarkRegisteredChipsTyped,
 } from "../use-instant-eval-runs.ts";
@@ -130,6 +131,43 @@ describe("given a link that restored a run for a bare NOT eval chip", () => {
       renderHook(() => useMarkRegisteredChipsTyped());
       useFilterStore.setState({ debouncedTimeRange: { from: 5_000, to: 9_000 } });
       const { result } = renderHook(() => useHasPendingNegatedEval());
+      expect(result.current).toBe(true);
+    });
+  });
+});
+
+describe("given a NOT that reaches an eval chip from above an OR", () => {
+  beforeEach(() => {
+    useViewStore.setState({ projectId: "project-1" });
+    useInstantEvalRunStore.setState({ typedQuestions: {} });
+  });
+
+  describe("when the chip is bare and was never submitted or run here", () => {
+    /** @scenario "A NOT the run of a typed chip cannot answer is refused" */
+    it("is not unjudgeable, as it may be an evaluator name", () => {
+      useFilterStore.setState({ debouncedQueryText: `NOT eval:"${QUESTION}" OR status:error` });
+      const { result } = renderHook(() => useHasUnjudgeableEval());
+      expect(result.current).toBe(false);
+    });
+  });
+
+  describe("when the bare chip was submitted here", () => {
+    /** @scenario "A NOT the run of a typed chip cannot answer is refused" */
+    it("is unjudgeable", () => {
+      markSubmitted();
+      useFilterStore.setState({ debouncedQueryText: `NOT eval:"${QUESTION}" OR status:error` });
+      const { result } = renderHook(() => useHasUnjudgeableEval());
+      expect(result.current).toBe(true);
+    });
+  });
+
+  describe("when the chip's spelling forces a target", () => {
+    /** @scenario "A NOT the run of a typed chip cannot answer is refused" */
+    it("is unjudgeable though never submitted here", () => {
+      useFilterStore.setState({
+        debouncedQueryText: `NOT eval.trace:"${QUESTION}" OR status:error`,
+      });
+      const { result } = renderHook(() => useHasUnjudgeableEval());
       expect(result.current).toBe(true);
     });
   });

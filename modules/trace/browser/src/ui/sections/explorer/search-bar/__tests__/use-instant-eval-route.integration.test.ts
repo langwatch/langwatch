@@ -300,7 +300,7 @@ describe("given a chip typed by hand under NOT", () => {
     useInstantEvalRunStore.setState({ typedQuestions: {} });
     useInstantEvalRunStore.getState().markTyped(mark);
     const { result } = renderHook(() => useInstantEvalRoute({ isInstantEvalAvailable: true }));
-    act(() => result.current.onInstantEvalRoute(typed));
+    act(() => result.current.onInstantEvalRoute({ ...typed, isNewlyTyped: true }));
     act(() =>
       estimateCallbacks().onSuccess?.({ rows: 90_000, isRowsCapped: false, priceUsd: 0.5 }),
     );
@@ -309,6 +309,31 @@ describe("given a chip typed by hand under NOT", () => {
 
     expect(useInstantEvalRunStore.getState().typedQuestions).toEqual({});
     expect(useFilterStore.getState().queryText).toBe('NOT eval:"the user is annoyed"');
+  });
+
+  /** @scenario "A pending chip under NOT is not judged yet" */
+  it.each([
+    ["a declined cost dialog", "decline"],
+    ["a failed estimate", "error"],
+  ])("keeps a mark made before the submit after %s", (_label, outcome) => {
+    useFilterStore.setState({ projectId: "project-1" });
+    const mark = { projectId: "project-1", question: "the user is annoyed" };
+    useInstantEvalRunStore.setState({ typedQuestions: {} });
+    useInstantEvalRunStore.getState().markTyped(mark);
+    const before = useInstantEvalRunStore.getState().typedQuestions;
+    const { result } = renderHook(() => useInstantEvalRoute({ isInstantEvalAvailable: true }));
+    // A chip run on an earlier window, judged again on a new one: the submit added no mark.
+    act(() => result.current.onInstantEvalRoute(typed));
+    if (outcome === "decline") {
+      act(() =>
+        estimateCallbacks().onSuccess?.({ rows: 90_000, isRowsCapped: false, priceUsd: 0.5 }),
+      );
+      act(() => result.current.searchWordsInstead());
+    } else {
+      act(() => estimateCallbacks().onError?.(new Error("network")));
+    }
+
+    expect(useInstantEvalRunStore.getState().typedQuestions).toEqual(before);
   });
 
   /** @scenario "A chip typed by hand starts its run on Enter" */
