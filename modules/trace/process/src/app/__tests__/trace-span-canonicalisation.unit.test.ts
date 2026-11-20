@@ -78,4 +78,35 @@ describe("TraceModule.canonicalizeSpanAttributes", () => {
       }).toEqual(ingested);
     });
   });
+
+  describe("given a Claude Code span whose resource declares the launcher's session", () => {
+    /** @scenario a launcher's declared session groups every harness session it runs */
+    it("names the declared session as the conversation, through the API and through ingest", () => {
+      const resource = {
+        attributes: [{ key: "langwatch.session.id", value: { stringValue: "agent_scout" } }],
+      };
+      const decoded = decodeOtlpSpan({
+        tenantId: "tenant-1",
+        otlpSpan: claudeModelCall,
+        otlpResource: resource,
+        otlpInstrumentationScope: scope,
+      });
+      const canonical = app.canonicalizeSpanAttributes({
+        spanAttributes: decoded.spanAttributes,
+        events: decoded.events,
+        span: decoded,
+      });
+      const ingested = SpanNormalizationPipelineService.create(
+        canonicalisation,
+      ).normalizeSpanReceived({
+        tenantId: "tenant-1",
+        span: claudeModelCall,
+        resource,
+        instrumentationScope: scope,
+      });
+
+      expect(canonical.attributes["gen_ai.conversation.id"]).toBe("agent_scout");
+      expect(ingested.spanAttributes["gen_ai.conversation.id"]).toBe("agent_scout");
+    });
+  });
 });

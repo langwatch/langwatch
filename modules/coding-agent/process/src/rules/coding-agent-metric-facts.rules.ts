@@ -30,17 +30,17 @@ export function liftMetricContribution(point: CanonicalMetricDataPoint): MetricC
 
   const attributes = parsePointAttributes(point.pointAttributesJson);
   if (attributes === null) return IGNORED;
+  const resourceAttributes = parsePointAttributes(point.resourceAttributesJson);
   const sessionKey =
-    deriveDeclaredSessionKey({
-      attrs: attributes,
-      resourceAttrs: parsePointAttributes(point.resourceAttributesJson),
-    }) ?? deriveConversationKey(attributes);
+    deriveDeclaredSessionKey({ attrs: attributes, resourceAttrs: resourceAttributes }) ??
+    deriveConversationKey(attributes);
   if (sessionKey === null) return IGNORED;
 
   const intValue = point.valueInt !== null ? Number(point.valueInt) : null;
   const value = point.valueType === "double" ? point.valueDouble : intValue;
   if (value === null || !Number.isFinite(value)) return IGNORED;
 
+  const serviceName = resourceAttributes?.["service.name"];
   const contribution: ContributeMetricFactsCommandData = {
     tenantId: point.tenantId,
     sessionId: sessionKey,
@@ -49,7 +49,7 @@ export function liftMetricContribution(point: CanonicalMetricDataPoint): MetricC
       recordName: point.metricName,
       scopeName: point.scopeName,
       // Only the resource's service.name separates Cowork from the Claude Code runtime it reuses.
-      serviceName: extractServiceNameFromResource(point.resourceAttributesJson),
+      serviceName: typeof serviceName === "string" && serviceName.length > 0 ? serviceName : null,
     }),
     occurredAt: point.timeUnixMs,
     seriesId: point.aggregationTemporality === "delta" ? point.pointId : point.seriesId,
@@ -84,10 +84,4 @@ function parsePointAttributes(json: string): MetricAttributes | null {
     logger.warn({ error }, "unparseable metric point attributes; skipping");
     return null;
   }
-}
-
-/** Resource-level service.name off the point's canonical KeyValue JSON. */
-function extractServiceNameFromResource(json: string): string | null {
-  const serviceName = parsePointAttributes(json)?.["service.name"];
-  return typeof serviceName === "string" && serviceName.length > 0 ? serviceName : null;
 }

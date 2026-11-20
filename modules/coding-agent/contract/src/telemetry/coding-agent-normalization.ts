@@ -1,4 +1,4 @@
-import { isConversationalQuerySource } from "@langwatch/span-normalisation";
+import { ATTR_KEYS, isConversationalQuerySource } from "@langwatch/span-normalisation";
 // One vocabulary for all coding agents; folds registry definitions into
 // shared detection, prefix-stripping and alias tables; downstream code never
 // compares vendor literals.
@@ -38,17 +38,11 @@ export function detectCodingAgent({
 }
 
 /** A launcher's own session: groups every harness session it runs into one row (any agent). */
-export const DECLARED_SESSION_ID_ATTR = "langwatch.session.id";
+export const DECLARED_SESSION_ID_ATTR = ATTR_KEYS.LANGWATCH_SESSION_ID;
 
 /** The sole session key every agent agrees on; varies by vendor under four different names. */
 export function deriveConversationKey(attrs: Record<string, unknown>): string | null {
-  const candidates = [
-    DECLARED_SESSION_ID_ATTR,
-    "session.id",
-    "conversation.id",
-    "gen_ai.conversation.id",
-    "thread.id",
-  ];
+  const candidates = ["session.id", "conversation.id", "gen_ai.conversation.id", "thread.id"];
   for (const key of candidates) {
     const value = attrs[key];
     if (typeof value === "string" && value.length > 0) return value;

@@ -16,6 +16,7 @@ import {
   normalizeTokenType,
   parseMcpToolName,
   deriveConversationKey,
+  deriveDeclaredSessionKey,
   deriveSpanConversationKey,
   deriveToolName,
   SESSION_CONTEXT_EVENT_NAME,
@@ -113,10 +114,22 @@ describe("deriveConversationKey", () => {
     expect(deriveConversationKey({ "thread.id": "s-1" })).toBe("s-1");
   });
 
-  it("prefers a declared langwatch.session.id over the agent's own key", () => {
+  it("reads a declared langwatch.session.id off the record, then the resource", () => {
     expect(
-      deriveConversationKey({ "langwatch.session.id": "agent_scout", "session.id": "s-1" }),
+      deriveDeclaredSessionKey({
+        attrs: { "langwatch.session.id": "agent_scout", "session.id": "s-1" },
+        resourceAttrs: { "langwatch.session.id": "agent_other" },
+      }),
     ).toBe("agent_scout");
+    expect(
+      deriveDeclaredSessionKey({
+        attrs: { "session.id": "s-1" },
+        resourceAttrs: { "langwatch.session.id": 42 },
+      }),
+    ).toBe("42");
+    expect(deriveDeclaredSessionKey({ attrs: { "session.id": "s-1" }, resourceAttrs: null })).toBe(
+      null,
+    );
   });
 
   it("returns null rather than an empty string when there is no session", () => {
