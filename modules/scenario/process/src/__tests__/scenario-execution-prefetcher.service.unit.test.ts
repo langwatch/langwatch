@@ -3,7 +3,12 @@
  */
 
 import { ApiKeyPermissionDeniedError, type ApiKeyApi } from "@langwatch/api-key-contract";
-import { ModelNotConfiguredError, findAliasTarget } from "@langwatch/model-provider-contract";
+import {
+  ModelNotConfiguredError,
+  ModelRestrictedForFeatureError,
+  findAliasTarget,
+  type ModelProviderApi,
+} from "@langwatch/model-provider-contract";
 import type {
   ScenarioChildEnvironment,
   ScenarioExecutionPrefetchInput,
@@ -12,9 +17,11 @@ import type {
   LiteLLMParams,
   TargetConfig,
 } from "@langwatch/scenario-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { VoiceTargetReader } from "../features/prefetch/services/scenario-target-prefetch.service.ts";
+import { ScenarioProcessorService } from "../services/scenario-processor.service.ts";
 import {
   type AgentFetcher,
   createTestScenarioExecutionPrefetcherService,
@@ -637,7 +644,7 @@ describe("prefetchWithFixture, when selecting the user-simulator and judge model
       /**
        * @scenario "Defaults resolve to the smart Default model when the scenario has no override"
        */
-      it("resolves the simulator and judge from their DEFAULT-role feature keys", async () => {
+      it("resolves the simulator and judge from their own feature keys (simulator DEFAULT role, judge JUDGE role)", async () => {
         const deps = createMockDeps({
           agentFetcher: { findById: vi.fn().mockResolvedValue(httpAgent) },
           modelParamsProvider: echoingProvider(),
@@ -2808,6 +2815,84 @@ describe("prefetchWithFixture, when choosing where the child posts a turn", () =
     expect(await routeFor({ perProjectEngines: false })).toEqual({
       mode: "direct",
       nlpServiceUrl: "http://langwatch_nlp:5561",
+    });
+  });
+});
+
+async function refusalFor(resolutionError: Error) {
+  const result = await prefetchWithFixture({
+    context: defaultContext,
+    target: { type: "prompt", referenceId: "prompt_123" },
+    deps: createMockDeps({
+      promptFetcher: {
+        findByIdOrHandle: vi.fn().mockResolvedValue({
+          id: "prompt_123",
+          prompt: "You are helpful",
+          messages: [],
+          model: "openai/gpt-4",
+        }),
+      },
+      modelProviders: createApiFixture<ModelProviderApi>({
+        findResolvedDefault: async () => null,
+        resolveModelForFeature: async () => {
+          throw resolutionError;
+        },
+      }),
+    }),
+  });
+  if (result.success) throw new Error("expected the run to be refused");
+
+  const jobLogger = { warn: vi.fn(), error: vi.fn() };
+  ScenarioProcessorService.logPrefetchFailure({ jobLogger, prefetchResult: result });
+  return { result, jobLogger };
+}
+
+describe("prefetchWithFixture, given a project with no usable model", () => {
+  const { projectId } = defaultContext;
+
+  describe("when the project has no model for the simulator", () => {
+    /** @scenario A project with no model for the simulator gets a run refused with the remediation message, logged as a warning, not an error */
+    it("refuses the run with the remediation message and logs a warning, not an error", async () => {
+      const { result, jobLogger } = await refusalFor(
+        new ModelNotConfiguredError({
+          featureKey: "scenarios.user_simulator",
+          role: "DEFAULT",
+          featureDisplayName: "Scenario simulator",
+          projectId,
+        }),
+      );
+
+      expect(result.reason).toBe("model_not_configured");
+      expect(result.error).toBe(
+        `No model configured for "scenarios.user_simulator" (role: DEFAULT, project: ${projectId}).`,
+      );
+      expect(jobLogger.error).not.toHaveBeenCalled();
+      expect(jobLogger.warn).toHaveBeenCalledWith(
+        expect.objectContaining({ reason: "model_not_configured" }),
+        expect.stringContaining("blocked by project configuration"),
+      );
+    });
+  });
+
+  describe("when the project's only models are restricted for the simulator", () => {
+    /** @scenario A project whose only models are restricted for a scenario feature gets the run refused, logged as a warning */
+    it("refuses the run with the restriction message and logs a warning, not an error", async () => {
+      const restricted = new ModelRestrictedForFeatureError({
+        featureKey: "scenarios.user_simulator",
+        role: "DEFAULT",
+        featureDisplayName: "Scenario simulator",
+        projectId,
+        restrictedModels: ["openai_codex/gpt-test"],
+      });
+      const { result, jobLogger } = await refusalFor(restricted);
+
+      expect(result.reason).toBe("model_not_configured");
+      expect(result.error).toBe(restricted.message);
+      expect(jobLogger.error).not.toHaveBeenCalled();
+      expect(jobLogger.warn).toHaveBeenCalledWith(
+        expect.objectContaining({ reason: "model_not_configured" }),
+        expect.stringContaining("blocked by project configuration"),
+      );
     });
   });
 });
