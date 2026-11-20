@@ -2128,13 +2128,13 @@ interface Output {
 }
 
 // organization.deleteMember
-// Input: organizationApiRemoveMemberInputSchema, ../contract/src/organization.responses.ts:449
+// Input: organizationApiRemoveMemberInputSchema, ../contract/src/organization.responses.ts:450
 interface Input {
   organizationId: string;
   userId: string;
   giveSeatToUserId?: string | null;
 }
-// Output: organizationMemberRemovedSchema, ../contract/src/organization.responses.ts:466
+// Output: organizationMemberRemovedSchema, ../contract/src/organization.responses.ts:467
 interface Output {
   success: true;
   seatGivenToUserId: string | null;
@@ -2147,7 +2147,7 @@ interface Input {
   userId: string;
   organizationId: string;
 }
-// Output: organizationSeatRemovalPreviewSchema, ../contract/src/organization.responses.ts:489
+// Output: organizationSeatRemovalPreviewSchema, ../contract/src/organization.responses.ts:490
 interface Output {
   holdsFullSeat: boolean;
   seatFreesAt: unknown | null;
@@ -2160,7 +2160,7 @@ interface Output {
 
 // organization.listHeldSeats
 type Input = z.infer<typeof organizationApiScopeSchema>; // ../contract/src/organization.trpc-schemas.ts:15
-// Output: organizationHeldSeatsSchema, ../contract/src/organization.responses.ts:512
+// Output: organizationHeldSeatsSchema, ../contract/src/organization.responses.ts:513
 interface Output {
   heldSeats: {
     userId: string;
@@ -2238,7 +2238,7 @@ type Output = z.infer<typeof organizationMemberRecordSchema>; // ../contract/src
 
 // organization.getInvitedMemberIds
 type Input = z.infer<typeof organizationApiScopeSchema>; // ../contract/src/organization.trpc-schemas.ts:15
-// Output: organizationInvitedMemberIdsSchema, ../contract/src/organization.responses.ts:424
+// Output: organizationInvitedMemberIdsSchema, ../contract/src/organization.responses.ts:425
 interface Output {
   memberUserIds: string[];
   invitedUserIds: string[];
@@ -2288,7 +2288,7 @@ interface Output {
 
 // organization.getDocsPlaygroundPolicy
 type Input = z.infer<typeof organizationApiScopeSchema>; // ../contract/src/organization.trpc-schemas.ts:15
-// Output: docsPlaygroundPolicySchema, ../contract/src/organization.ts:258
+// Output: docsPlaygroundPolicySchema, ../contract/src/organization.ts:268
 interface Output {
   docsPlaygroundSessionsEnabled: boolean;
   docsPlaygroundSessionsDisabledAt: unknown | null;
@@ -2316,7 +2316,7 @@ interface Input {
   targetKind?: string;
   targetId?: string;
 }
-type Output = z.infer<typeof organizationAuditLogPageSchema>; // ../contract/src/organization.responses.ts:387
+type Output = z.infer<typeof organizationAuditLogPageSchema>; // ../contract/src/organization.responses.ts:388
 ```
 
 ### `personalWorkspaceFeatures`

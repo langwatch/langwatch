@@ -171,9 +171,13 @@ export class ClaudeCodeCanonicaliserService implements AttributeCanonicaliser {
     const prompt = asString(takeAttribute(ctx.bag.attrs, "prompt"));
     const sessionId = asString(ctx.bag.attrs.get("session.id"));
 
+    // A launcher that wraps the request declares the request itself; that one is the input.
+    const declared =
+      asString(ctx.out["langwatch.input"]) ?? asString(ctx.bag.attrs.get("langwatch.input"));
+
     let fired = false;
-    if (prompt !== null) {
-      ctx.setAttr("langwatch.input", prompt);
+    if (declared !== null || prompt !== null) {
+      ctx.setAttr("langwatch.input", declared ?? prompt);
       fired = true;
     }
 

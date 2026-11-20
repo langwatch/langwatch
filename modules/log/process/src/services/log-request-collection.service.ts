@@ -254,7 +254,7 @@ function makeTraceContribution({
     liftedAttributes[ORIGIN_ATTR] = origin;
   }
 
-  const { input, output, truncated } = traces.extractLogRecordIO(legacyView);
+  const { input, output, outputDeclared, truncated } = traces.extractLogRecordIO(legacyView);
   if (truncated) {
     liftedAttributes["langwatch.reserved.log_io_truncated"] = true;
   }
@@ -272,6 +272,7 @@ function makeTraceContribution({
     correlationSource,
     input,
     output,
+    ...(outputDeclared ? { outputDeclared } : {}),
     liftedAttributes,
     nonBillable: normalized.resourceAttributes[NON_BILLABLE_ATTR] === "true",
     piiRedactionLevel: record.piiRedactionLevel,

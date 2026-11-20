@@ -852,7 +852,8 @@
           {
             "group": "Agent Registry",
             "pages": [
-              "governance/agent-registry"
+              "governance/agent-registry",
+              "governance/kill-switch"
             ]
           },
           {
@@ -1460,6 +1461,21 @@
               "api-reference/governance-agent-registry/search-the-registry-ard-search",
               "api-reference/governance-agent-registry/get-one-registry-agent",
               "api-reference/governance-agent-registry/list-one-registry-agent-s-versions"
+            ]
+          },
+          {
+            "group": "Agent Kill Switch",
+            "pages": [
+              "api-reference/governance-kill-switch/overview",
+              "api-reference/governance-kill-switch/list-the-organisation-s-agent-stops",
+              "api-reference/governance-kill-switch/get-an-agent-s-latest-stop",
+              "api-reference/governance-kill-switch/get-an-agent-s-stop-plan",
+              "api-reference/governance-kill-switch/replace-an-agent-s-stop-plan",
+              "api-reference/governance-kill-switch/approve-a-pending-stop",
+              "api-reference/governance-kill-switch/deny-a-pending-stop",
+              "api-reference/governance-kill-switch/restore-a-stopped-agent",
+              "api-reference/governance-kill-switch/retry-a-stop",
+              "api-reference/governance-kill-switch/stop-an-agent"
             ]
           },
           {

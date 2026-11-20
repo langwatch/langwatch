@@ -613,6 +613,74 @@ const registry = {
     ],
     docsPath: "/governance/agent-registry",
   },
+  agent_stop_already_open: {
+    tips: [
+      "Read the open stop with GET /api/governance/agents/{agentId}/stop",
+      "Approve, deny or restore it before requesting a new stop",
+    ],
+    docsPath: "/governance/kill-switch",
+  },
+  agent_stop_not_found: {
+    tips: ["List stops with GET /api/governance/agent-stops and use an `id` from that list"],
+    docsPath: "/governance/kill-switch",
+  },
+  agent_stop_not_pending: {
+    tips: ["Only a stop whose status is `pending_approval` takes an approval or a denial"],
+    docsPath: "/governance/kill-switch",
+  },
+  agent_stop_not_restorable: {
+    tips: ["Restore a stop whose status is `quarantined`, `stop_failed` or `restore_failed`"],
+    docsPath: "/governance/kill-switch",
+  },
+  agent_stop_not_retryable: {
+    tips: ["Retry a stop whose status is `quarantined`, `stop_failed` or `restore_failed`"],
+    docsPath: "/governance/kill-switch",
+  },
+  agent_stop_plan_changed: {
+    tips: [
+      "Read the plan again with GET /api/governance/agents/{agentId}/stop-plan and confirm its targets",
+    ],
+    docsPath: "/governance/kill-switch",
+  },
+  agent_stop_plan_conflict: {
+    tips: [
+      "Read the plan again with GET /api/governance/agents/{agentId}/stop-plan, apply your change to it and send its `version` as `expectedVersion`",
+    ],
+    docsPath: "/governance/kill-switch",
+  },
+  agent_stop_plan_empty: {
+    tips: ["Set the agent's targets with PUT /api/governance/agents/{agentId}/stop-plan"],
+    docsPath: "/governance/kill-switch",
+  },
+  agent_stop_self_approval: {
+    tips: ["Approve with a different API key, or have a person approve it in the Agents page"],
+    docsPath: "/governance/kill-switch",
+  },
+  agent_stop_target_invalid: {
+    tips: [
+      "A serving endpoint target names a Databricks Genie governance source of this organisation",
+      "A Bedrock target names an AWS connection of this organisation",
+      "A virtual key target names a virtual key of this organisation",
+    ],
+    docsPath: "/governance/kill-switch",
+  },
+  agent_stop_target_not_found: {
+    tips: [
+      "A Bedrock target names the alias's region, agent id and alias id as the AWS console shows them",
+      "A serving endpoint target names an endpoint of the source's Databricks workspace",
+    ],
+    docsPath: "/governance/kill-switch",
+  },
+  governance_aws_connection_in_use: {
+    tips: [
+      "Remove the Bedrock targets that use it from every stop plan, and restore the stops that still hold it",
+    ],
+    docsPath: "/governance/kill-switch",
+  },
+  governance_aws_connection_not_found: {
+    tips: ["Create the AWS connection on the Agents page before naming it in a stop plan"],
+    docsPath: "/governance/kill-switch",
+  },
   agent_offline: {
     tips: [
       "Start the process that runs the decorated function; the agent shows Online in the agents list once it connects",
