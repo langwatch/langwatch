@@ -1072,6 +1072,45 @@ Feature: The daily insights run
       And the person reads the new run's outcome
 
     @unit
+    Scenario: A run handed on to a newer run before its turn records no start
+      Given a newer run took the run over before it asked Langy anything
+      When the run is carried out
+      Then it records neither its start nor its outcome
+      And the turn it opened is stopped
+
+    @unit
+    Scenario: A run handed on to a newer run during its turn files nothing
+      Given a newer run took the run over after Langy answered with a finding
+      When the run is carried out
+      Then nothing is filed for the board
+      And no outcome is recorded for the run
+
+    @unit
+    Scenario: A run handed on to a newer run before its outcome records no outcome
+      Given a newer run took the run over while its turn ran
+      When the run ends
+      Then its start is recorded
+      And no outcome is recorded for it
+
+    @unit
+    Scenario: A run the schedule still waits on records its start and its outcome
+      Given the schedule's process still waits on the run
+      When the run is carried out
+      Then its start and its outcome are recorded
+
+    @unit
+    Scenario: A run whose schedule cannot be read still records its outcome
+      Given the schedule's process cannot be read when the run ends
+      When the run ends
+      Then its outcome is recorded as failed with the reason timeout
+
+    @unit
+    Scenario: A replacement handed on records nothing for the run it replaced
+      Given a run that replaces a lost one, and a newer run took it over
+      When the run is carried out
+      Then the lost run is not recorded either
+
+    @unit
     Scenario: An operator's run leaves the schedule's wake armed
       Given a schedule that is on
       When an operator's run is requested and settles before the slot

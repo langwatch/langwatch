@@ -192,6 +192,7 @@ describe("given Langy's turn outlasts the run's deadline", () => {
 });
 
 describe("given a newer run took the run over before it started its turn", () => {
+  /** @scenario "A run handed on to a newer run before its turn records no start" */
   it("records neither its start nor its outcome, and stops its turn", async () => {
     const { service, started, settled, stopped } = harness();
     service.connect(processWaitingOn(["run-2"]));
@@ -205,6 +206,7 @@ describe("given a newer run took the run over before it started its turn", () =>
 });
 
 describe("given a newer run took the run over while its turn ran", () => {
+  /** @scenario "A run handed on to a newer run before its outcome records no outcome" */
   it("records its start, and no outcome", async () => {
     const { service, started, settled } = harness();
     service.connect(processWaitingOn(["run-1", "run-2"]));
@@ -217,6 +219,7 @@ describe("given a newer run took the run over while its turn ran", () => {
 });
 
 describe("given the schedule's process still waits on the run", () => {
+  /** @scenario "A run the schedule still waits on records its start and its outcome" */
   it("records its start and its outcome", async () => {
     const { service, started, settled } = harness();
     service.connect(processWaitingOn(["run-1"]));
@@ -229,6 +232,7 @@ describe("given the schedule's process still waits on the run", () => {
 });
 
 describe("given the process store cannot be read when the run ends", () => {
+  /** @scenario "A run whose schedule cannot be read still records its outcome" */
   it("still records the run's outcome as failed with the reason timeout", async () => {
     const unreadable = Object.assign(InMemoryProcessStore.createForTesting(), {
       findByRef: async () => {
@@ -245,6 +249,7 @@ describe("given the process store cannot be read when the run ends", () => {
 });
 
 describe("given a newer run took the run over before its answer was filed", () => {
+  /** @scenario "A run handed on to a newer run during its turn files nothing" */
   it("files nothing and records no outcome", async () => {
     const { service, started, settled, filed } = harness({
       awaitTurnSettlement: answersOneFinding,
@@ -285,6 +290,7 @@ describe("given a run that replaces a lost one", () => {
     ]);
   });
 
+  /** @scenario "A replacement handed on records nothing for the run it replaced" */
   it("records nothing for the lost run once the process waits on another run", async () => {
     const { service, settled } = harness();
     service.connect(processWaitingOn(["run-2"]));
