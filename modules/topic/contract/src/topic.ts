@@ -185,6 +185,11 @@ export interface TopicApi {
   ): Promise<TopicClusteringRunHistoryPage>;
   /** Asks the project's clustering process for a run; ports main's `requestClustering`. */
   requestClustering(input: TopicClusteringRequestInput): Promise<void>;
+  /** Starts one manual run, preserving the in-flight guard and caller attribution. */
+  triggerTopicClustering(input: {
+    projectId: string;
+    by: Readonly<{ id: string }>;
+  }): Promise<TopicClusteringTriggerResult>;
 }
 
 export const TopicApi = moduleApi<TopicApi>()("topic");

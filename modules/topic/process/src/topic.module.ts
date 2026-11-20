@@ -6,6 +6,7 @@ import { TopicModule } from "./app/topic.app.ts";
 import { topicClusteringEventing } from "./eventing/topic-clustering-processing.pipeline.ts";
 import { topicRepositories } from "./repositories/topic-repositories.registry.ts";
 import { TopicClusteringRunTask } from "./tasks/topic-clustering-run.task.ts";
+import { createTopicClusteringRest } from "./transport/topic.rest.ts";
 import { topicTrpcTransport } from "./transport/topic.trpc.ts";
 
 export const topicProcessModule: PublishedProcessModule<"topic", TopicApi> = defineProcessModule(
@@ -13,7 +14,7 @@ export const topicProcessModule: PublishedProcessModule<"topic", TopicApi> = def
 )
   .withRepositories(topicRepositories)
   .withApi(TopicModule)
-  .withTransports(topicTrpcTransport)
+  .withTransports(createTopicClusteringRest(), topicTrpcTransport)
   .withEventing(topicClusteringEventing)
   .withTasks(({ app }) => [TopicClusteringRunTask.create({ topics: app })])
   .withMigrations(({ app }) => [
