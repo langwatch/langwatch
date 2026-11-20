@@ -137,6 +137,7 @@ export const prismaTableCatalogue = {
   "AuthzUserStanding": "AuthzUserStanding",
   "AuthzEngineSwitch": "AuthzEngineSwitch",
   "AuthzOrganizationPolicy": "AuthzOrganizationPolicy",
+  "AuthzBraidWrite": "AuthzBraidWrite",
   "RoleBinding": "RoleBinding",
   "Grant": "Grant",
   "GrantUsage": "GrantUsage",
@@ -2210,6 +2211,9 @@ export const prismaModelFieldCatalogue = {
     "callerVoice",
     "testSuiteId",
     "testSuite",
+    "kind",
+    "redTeam",
+    "sourceTemplateId",
     "version",
     "versions",
     "lastUpdatedById",
@@ -2249,6 +2253,8 @@ export const prismaModelFieldCatalogue = {
     "fields",
     "evaluators",
     "testSuiteScenarios",
+    "templateId",
+    "templateVersion",
     "archivedAt",
     "createdAt",
     "updatedAt"
@@ -2365,8 +2371,22 @@ export const prismaModelFieldCatalogue = {
   "AuthzOrganizationPolicy": [
     "organizationId",
     "braidsOrganizationAdminsOnly",
+    "braidsEnabled",
     "updatedByUserId",
     "updatedAt"
+  ],
+  "AuthzBraidWrite": [
+    "organizationId",
+    "commandId",
+    "grantId",
+    "readerProjectId",
+    "ownerProjectId",
+    "termsKey",
+    "condition",
+    "expiresAt",
+    "replacesGrantId",
+    "createdByUserId",
+    "createdAt"
   ],
   "RoleBinding": [
     "id",
@@ -3843,6 +3863,7 @@ export const prismaRelationCatalogue = {
   "AuthzUserStanding": {},
   "AuthzEngineSwitch": {},
   "AuthzOrganizationPolicy": {},
+  "AuthzBraidWrite": {},
   "RoleBinding": {
     "organization": "Organization",
     "user": "User",

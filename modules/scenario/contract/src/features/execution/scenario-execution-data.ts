@@ -4,6 +4,7 @@ import { z } from "zod";
 
 import { FieldMappingSchema } from "../../resolve-field-mappings.ts";
 import { runParameterValuesSchema } from "../../scenario.parameters.ts";
+import { redTeamConfigSchema, redTeamRunReportSchema, scenarioKindSchema } from "../../scenario.ts";
 import { callerVoiceConfigSchema } from "../../voice/caller-voice.config.ts";
 import { scenarioRunHooksSchema } from "./scenario-hooks.ts";
 
@@ -358,6 +359,10 @@ const ScenarioConfigSchemaDefinition = z.object({
   labels: z.array(z.string()),
   maxTurns: z.number().int().optional(),
   minTurns: z.number().int().optional(),
+  /** Absent on a job queued before red team runs existed, which reads as "standard". */
+  kind: scenarioKindSchema.optional(),
+  /** The attack a red_team run plays; absent when the stored config was missing or unreadable. */
+  redTeam: redTeamConfigSchema.optional(),
 });
 export interface ScenarioConfigSchema extends Named<typeof ScenarioConfigSchemaDefinition> {}
 export const ScenarioConfigSchema: ScenarioConfigSchema = ScenarioConfigSchemaDefinition;
@@ -462,6 +467,8 @@ const ScenarioExecutionResultSchemaDefinition = z.object({
   isCutAtLimit: z.boolean().optional(),
   /** The setup and teardown hooks the run called, when the agent declared any (ADR-180). */
   hooks: scenarioRunHooksSchema.optional(),
+  /** A red team run's outcome and per-turn scores; absent for a standard run. */
+  redTeam: redTeamRunReportSchema.optional(),
 });
 export interface ScenarioExecutionResultSchema extends Named<
   typeof ScenarioExecutionResultSchemaDefinition

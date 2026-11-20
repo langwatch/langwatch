@@ -1741,6 +1741,9 @@ export interface LwqlPrismaRows {
     readonly fields: "Json?";
     readonly callerVoice: "Json?";
     readonly testSuiteId: "String?";
+    readonly kind: "String";
+    readonly redTeam: "Json?";
+    readonly sourceTemplateId: "String?";
     readonly version: "Int";
     readonly lastUpdatedById: "String?";
     readonly archivedAt: "DateTime?";
@@ -1775,6 +1778,8 @@ export interface LwqlPrismaRows {
     readonly scope: "Json?";
     readonly fields: "Json?";
     readonly evaluators: "Json?";
+    readonly templateId: "String?";
+    readonly templateVersion: "Int?";
     readonly archivedAt: "DateTime?";
     readonly createdAt: "DateTime";
     readonly updatedAt: "DateTime";
@@ -1881,8 +1886,22 @@ export interface LwqlPrismaRows {
   readonly AuthzOrganizationPolicy: {
     readonly organizationId: "String";
     readonly braidsOrganizationAdminsOnly: "Boolean";
+    readonly braidsEnabled: "Boolean";
     readonly updatedByUserId: "String";
     readonly updatedAt: "DateTime";
+  };
+  readonly AuthzBraidWrite: {
+    readonly organizationId: "String";
+    readonly commandId: "String";
+    readonly grantId: "String";
+    readonly readerProjectId: "String";
+    readonly ownerProjectId: "String";
+    readonly termsKey: "String";
+    readonly condition: "Json";
+    readonly expiresAt: "DateTime?";
+    readonly replacesGrantId: "String?";
+    readonly createdByUserId: "String?";
+    readonly createdAt: "DateTime";
   };
   readonly RoleBinding: {
     readonly id: "String";

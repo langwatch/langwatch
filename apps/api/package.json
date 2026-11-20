@@ -1,6 +1,6 @@
 {
   "name": "@langwatch/platform-api",
-  "version": "3.23.0",
+  "version": "3.25.0",
   "private": true,
   "description": "LangWatch interactive API process composition.",
   "files": [
@@ -92,6 +92,7 @@
     "@langwatch/secret-process": "workspace:*",
     "@langwatch/share-process": "workspace:*",
     "@langwatch/slack-process": "workspace:*",
+    "@langwatch/stored-object-contract": "workspace:*",
     "@langwatch/stored-object-process": "workspace:*",
     "@langwatch/suite-process": "workspace:*",
     "@langwatch/time": "workspace:*",

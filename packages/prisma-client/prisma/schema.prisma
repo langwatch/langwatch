@@ -4606,6 +4606,14 @@ model Scenario {
   // See specs/suites/test-suite-membership-invariant.feature.
   testSuiteId     String?
   testSuite       SimulationSuite?  @relation("TestSuiteScenarios", fields: [testSuiteId], references: [id], onDelete: SetNull)
+  // "standard" | "red_team" (scenarioKindSchema in the scenario contract). A
+  // red team scenario runs an attacker in place of the user simulator and
+  // carries its config in redTeam. See modules/scenario/contract/src/scenario.ts.
+  kind            String            @default("standard")
+  redTeam         Json?
+  // The suite template whose apply created this scenario. The Free scenario
+  // cap leaves these out; a copy or a later create in that suite stays null.
+  sourceTemplateId String?
   // Counts one up on every save of the editable fields. Each number has a
   // ScenarioVersion row holding the state as saved; the unique constraint
   // there is what keeps two concurrent saves from sharing a number. See
@@ -4704,6 +4712,10 @@ model SimulationSuite {
   // reads as none. See server/scenarios/evaluator-attachments.ts.
   evaluators         Json?
   testSuiteScenarios Scenario[] @relation("TestSuiteScenarios")
+  // The suite template this test suite was created from, and its version.
+  // Null for a suite built by hand. See modules/suite/specs/suite-templates.feature.
+  templateId         String?
+  templateVersion    Int?
   archivedAt         DateTime?
   createdAt          DateTime   @default(now())
   updatedAt          DateTime   @default(now()) @updatedAt
@@ -4881,8 +4893,29 @@ model AuthzEngineSwitch {
 model AuthzOrganizationPolicy {
   organizationId               String   @id
   braidsOrganizationAdminsOnly Boolean  @default(false)
+  braidsEnabled                Boolean  @default(false)
   updatedByUserId              String
   updatedAt                    DateTime @updatedAt
+}
+
+// ADR-201 §1: every braid write the authz service sent, recorded before its attach command and
+// outside the reader lock's transaction. A retry with the same command id answers the braid it
+// saved; a write the grant projection has not landed still counts in the reader's checks.
+model AuthzBraidWrite {
+  organizationId  String
+  commandId       String
+  grantId         String
+  readerProjectId String
+  ownerProjectId  String
+  termsKey        String
+  condition       Json
+  expiresAt       DateTime?
+  replacesGrantId String?
+  createdByUserId String?
+  createdAt       DateTime  @default(now())
+
+  @@id([organizationId, commandId])
+  @@index([organizationId, readerProjectId, createdAt])
 }
 
 model RoleBinding {

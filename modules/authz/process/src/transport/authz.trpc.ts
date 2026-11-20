@@ -17,6 +17,7 @@ import {
   authzOrganizationBraidsSchema,
   authzOrganizationInputSchema,
   authzOrganizationPolicySchema,
+  authzSetBraidsEnabledInputSchema,
   authzSetBraidsPolicyInputSchema,
   authzProjectBraidsSchema,
   authzRemoveBraidInputSchema,
@@ -101,6 +102,10 @@ export const authzTrpc = defineTrpcContract("authz")
 
   .mutation("setBraidsPolicy")
   .withInput(authzSetBraidsPolicyInputSchema.omit({ actor: true }))
+  .withOutput(authzOrganizationPolicySchema)
+
+  .mutation("setBraidsEnabled")
+  .withInput(authzSetBraidsEnabledInputSchema.omit({ actor: true }))
   .withOutput(authzOrganizationPolicySchema)
 
   .query("listOrganizationBraids")
@@ -199,10 +204,10 @@ export const authzTrpcTransport: TrpcRouterDeclaration<AuthzApi, typeof authzTrp
       app.applyMemberBindings({ ...input, caller: callerOf(actor), actor: toLedgerActor(actor) }),
     )
 
-    /** Members of either project list the braids touching it (ADR-201 §2). */
+    /** Members of either project list the braids touching it, flag or not (ADR-201 §2). */
     .procedure("listBraids")
     .withPermission("project:view", { via: "projectId" })
-    .handle(async ({ app, input }) => app.listBraidsForScreen(input))
+    .handle(async ({ app, input }) => app.listBraids(input))
 
     /** The owner is the first target: braids:manage there, traces:view at the reader. */
     .procedure("createBraid")
@@ -239,6 +244,14 @@ export const authzTrpcTransport: TrpcRouterDeclaration<AuthzApi, typeof authzTrp
     .withPermission("organization:manage")
     .handle(async ({ app, input, actor }) =>
       app.setBraidsPolicy({ ...input, actor: toLedgerActor(actor) }),
+    )
+
+    /** Turning Braids on or off is the organisation admins' alone, and Enterprise. */
+    .procedure("setBraidsEnabled")
+    .withEntitlement("enterprise", braids)
+    .withPermission("organization:manage")
+    .handle(async ({ app, input, actor }) =>
+      app.setBraidsEnabled({ ...input, actor: toLedgerActor(actor) }),
     )
 
     /** The organisation's Braids screen: every live braid, for its admins on any plan. */

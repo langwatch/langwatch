@@ -693,6 +693,11 @@ export class AnalyticsModule
     return this.#dependencies.lwqlKeyMap.syncProject(input);
   }
 
+  /** Whether the project's key-map row is there, written first when missing; never throws. */
+  ensureLwqlKeyMapRow(input: Readonly<{ projectId: string }>): Promise<boolean> {
+    return this.#dependencies.lwqlKeyMap.ensureProject(input);
+  }
+
   /**
    * The series behind every analytics chart and every dashboard graph card. A read with no
    * proof (a scheduled report, a graph alert) on an aggregate is refused by name before any

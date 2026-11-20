@@ -18713,6 +18713,33 @@
           }
         },
         {
+          "name": "kind",
+          "columnName": "kind",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "redTeam",
+          "columnName": "redTeam",
+          "type": "Json",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "sourceTemplateId",
+          "columnName": "sourceTemplateId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
           "name": "version",
           "columnName": "version",
           "type": "Int",
@@ -19083,6 +19110,24 @@
             "references": [],
             "to": "Scenario"
           }
+        },
+        {
+          "name": "templateId",
+          "columnName": "templateId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "templateVersion",
+          "columnName": "templateVersion",
+          "type": "Int",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
         },
         {
           "name": "archivedAt",
@@ -20140,6 +20185,15 @@
           "documentation": ""
         },
         {
+          "name": "braidsEnabled",
+          "columnName": "braidsEnabled",
+          "type": "Boolean",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
           "name": "updatedByUserId",
           "columnName": "updatedByUserId",
           "type": "String",
@@ -20151,6 +20205,116 @@
         {
           "name": "updatedAt",
           "columnName": "updatedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        }
+      ]
+    },
+    {
+      "name": "AuthzBraidWrite",
+      "tableName": "AuthzBraidWrite",
+      "documentation": "",
+      "primaryKey": [
+        "organizationId",
+        "commandId"
+      ],
+      "fields": [
+        {
+          "name": "organizationId",
+          "columnName": "organizationId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "commandId",
+          "columnName": "commandId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "grantId",
+          "columnName": "grantId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "readerProjectId",
+          "columnName": "readerProjectId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "ownerProjectId",
+          "columnName": "ownerProjectId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "termsKey",
+          "columnName": "termsKey",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "condition",
+          "columnName": "condition",
+          "type": "Json",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "expiresAt",
+          "columnName": "expiresAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "replacesGrantId",
+          "columnName": "replacesGrantId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "createdByUserId",
+          "columnName": "createdByUserId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "createdAt",
+          "columnName": "createdAt",
           "type": "DateTime",
           "kind": "scalar",
           "isList": false,

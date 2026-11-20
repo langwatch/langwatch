@@ -131,6 +131,47 @@ describe("TerminalView", () => {
     });
   });
 
+  describe("given either app colour mode", () => {
+    /** What a matching style rule declares; jsdom drops var() colours from computed style. */
+    const declared = (element: Element, properties: string[]): string => {
+      let found = "";
+      for (const sheet of Array.from(document.styleSheets)) {
+        for (const rule of Array.from(sheet.cssRules)) {
+          if (!(rule instanceof CSSStyleRule) || !element.matches(rule.selectorText)) continue;
+          for (const property of properties) {
+            const value = rule.style.getPropertyValue(property);
+            if (value) found = value;
+          }
+        }
+      }
+      return found;
+    };
+    const BACKGROUND = ["background", "background-color"];
+    /** The background declared at or above an element. */
+    const paintedBackground = (element: Element | null): string => {
+      for (let node = element; node; node = node.parentElement) {
+        const background = declared(node, BACKGROUND);
+        if (background) return background;
+      }
+      return "";
+    };
+
+    /** @scenario "The terminal screen stays dark in both colour modes" */
+    it("paints the screen, its text and its diff rows from the terminal palette", () => {
+      renderView();
+      const terminalScreen = screen.getByTestId("terminal-screen");
+
+      expect(declared(terminalScreen, BACKGROUND)).toBe("var(--chakra-colors-terminal-bg)");
+      expect(declared(terminalScreen, ["color"])).toBe("var(--chakra-colors-terminal-fg)");
+      expect(paintedBackground(screen.getByText("const version = 2;"))).toBe(
+        "var(--chakra-colors-terminal-diff-add-bg)",
+      );
+      expect(paintedBackground(screen.getByText("const version = 1;"))).toBe(
+        "var(--chakra-colors-terminal-diff-remove-bg)",
+      );
+    });
+  });
+
   describe("given the session's last model call is a lone tool request with no reply text", () => {
     // The bug this replaces: the client used to rebuild the transcript from
     // the LAST model call's rolling history, so a lone trailing tool call with

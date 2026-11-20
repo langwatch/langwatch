@@ -245,7 +245,6 @@ var (
 		"specs/features/trigger-cli.feature",
 		"specs/features/workflow-cli.feature",
 		"specs/home/onboarding-progress-ui.feature",
-		"specs/home/voice-agents-home-banner.feature",
 		"specs/identity/one-decision-per-write.feature",
 		"specs/identity/org-admin-identity-surface.feature",
 		"specs/langy/langy-agent-service-conventions.feature",

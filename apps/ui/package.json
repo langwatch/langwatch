@@ -76,6 +76,7 @@
     "@langwatch/presence-browser": "workspace:*",
     "@langwatch/project-browser": "workspace:*",
     "@langwatch/prompt-browser": "workspace:*",
+    "@langwatch/react-rum": "workspace:*",
     "@langwatch/scenario-browser": "workspace:*",
     "@langwatch/secret-browser": "workspace:*",
     "@langwatch/share-browser": "workspace:*",

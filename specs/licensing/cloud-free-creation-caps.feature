@@ -9,6 +9,17 @@ Feature: Cloud Free plan caps scenarios, simulations and custom evaluators
   whatever its kind (built-in configuration, code or workflow). Online
   evaluations (monitors) are not evaluators and stay uncapped.
 
+  The scenario cap counts every live scenario except those a suite template apply
+  created while they sit in that template's own live suite. A scenario a member
+  adds to a template's suite, a copy of a template scenario and one moved to
+  another suite count like any other; archiving a suite archives its scenarios. A template's
+  scenarios are bounded by its suite instead: a template apply is refused once the
+  organization's live suites reach the simulations cap (each project's Default suite
+  and a member's suites that hold no scenario do not count, and the count and the
+  write hold one organization lock), or once its counted
+  scenarios already exceed the scenario cap, before anything is written. Only the
+  template apply marks a scenario as template-made; a create request cannot.
+
   Only creating one more is refused. An organization already above a cap keeps
   everything it has and can still edit and run it. A refusal carries the limit
   type, the current count and the cap, and in the app it opens the upgrade
@@ -90,6 +101,61 @@ Feature: Cloud Free plan caps scenarios, simulations and custom evaluators
     When a member saves a new scenario
     Then the request fails as FORBIDDEN with limit type "scenarios", current 3 and max 3
 
+  @unit
+  Scenario: A scenario a suite template creates is not counted against the scenario cap
+    Given an organization on cloud Free with 2 active scenarios
+    When it applies a 10-scenario suite template
+    Then every template scenario is created
+    And a member's next scenario is created
+    And the one after it is refused with the limit shape
+
+  @unit
+  Scenario: A fourth suite from a template is refused before anything is written
+    Given an organization on cloud Free with 3 live test suites
+    When it applies a suite template
+    Then the request fails with limit type "scenarioSets", current 3 and max 3
+    And no suite or scenario is written
+
+  @unit
+  Scenario: The suite cap skips the Default suite and blank suites
+    Given an organization on cloud Free with two projects, each with a Default suite and a blank suite
+    And two live suites from a template
+    When it applies a suite template
+    Then the suite is created
+
+  @integration
+  Scenario: Concurrent template applies cannot both pass the suite cap
+    Given an organization on cloud Free one suite under its suite cap
+    When two template applies run at the same time
+    Then one suite is created
+    And the other is refused with the current count at the cap
+
+  @unit
+  Scenario: The suite cap refusal names suites
+    When a template apply is refused by the suite cap
+    Then the message says the plan includes 3 suites
+
+  @unit
+  Scenario: A template scenario moved out of its suite counts against the scenario cap
+    Given an organization on cloud Free at 3 of 3 counted scenarios
+    And it applied a suite template
+    When it moves a template scenario to its own suite and archives the template suite
+    Then the moved scenario is counted and the archived suite's scenarios are not live
+    And the next template apply is refused with limit type "scenarios"
+
+  @unit
+  Scenario: A scenario create request cannot mark itself as template-made
+    Given a create request that names a source template
+    When the tRPC input or the REST body is read
+    Then both refuse it
+
+  @unit
+  Scenario: A scenario created inside a template's suite counts against the scenario cap
+    Given an organization on cloud Free with 2 active scenarios and an applied template
+    When a member creates a scenario in that template's suite
+    Then it is created
+    And another scenario in that suite is refused with the limit shape
+
   @integration
   Scenario: An organization over the scenario cap can still edit its scenarios
     Given the organization is on the cloud Free plan
@@ -125,6 +191,13 @@ Feature: Cloud Free plan caps scenarios, simulations and custom evaluators
     And it has 3 active scenarios
     When a member duplicates one of them
     Then the request fails as FORBIDDEN with limit type "scenarios", current 3 and max 3
+
+  @unit
+  Scenario: Duplicating a template suite's scenarios counts against the scenario cap
+    Given an organization on cloud Free with 2 active scenarios and an applied template
+    When a member duplicates a template scenario
+    Then the copy is created
+    And a second copy is refused with the limit shape
 
   @integration
   Scenario: Saving a workflow as a fourth custom evaluator is refused with the limit shape

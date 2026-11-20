@@ -278,6 +278,21 @@ describe("explainHandledError", () => {
       expect(description).toContain("3 simulations");
     });
 
+    /** @scenario The suite cap refusal names suites */
+    it("names suites when the suite cap refused a template apply", () => {
+      const { description } = explainHandledError(
+        shape({
+          code: "resource_limit_exceeded",
+          httpStatus: 403,
+          meta: { limitType: "scenarioSets", current: 3, max: 3, countedAs: "testSuites" },
+        }),
+      );
+
+      expect(description).toBe(
+        "Your plan includes 3 suites. Upgrade to create more. Everything you already have keeps working.",
+      );
+    });
+
     it("keeps the generic plan-limit line for every other allowance", () => {
       const { description } = explainHandledError(
         shape({
@@ -1322,6 +1337,27 @@ describe("budget_exceeded", () => {
       expect(copy.description).toBe(
         "Requests are blocked until the limit is raised. An admin can raise it in AI Gateway budgets.",
       );
+    });
+  });
+});
+
+describe("instant_eval_gateway_budget_exceeded", () => {
+  const stopped = (meta: Record<string, unknown>) =>
+    explainHandledError(
+      shape({ code: "instant_eval_gateway_budget_exceeded", httpStatus: 402, meta }),
+    );
+
+  describe("when the refusal names a known scope", () => {
+    it("names whose budget stopped the run", () => {
+      expect(stopped({ scope: "team" }).title).toBe(
+        "Your team's gateway budget stopped Instant Evals",
+      );
+    });
+  });
+
+  describe("when the scope is one the registry does not name", () => {
+    it("keeps the plain headline and never echoes the value", () => {
+      expect(stopped({ scope: "toString" }).title).toBe("A gateway budget stopped Instant Evals");
     });
   });
 });

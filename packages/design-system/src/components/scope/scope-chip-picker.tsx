@@ -1,5 +1,5 @@
 import { Boxes, Building2, CheckCheck, Folder, Search, UserLock, Users } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 
 import {
   Box,
@@ -14,6 +14,7 @@ import {
 } from "../../primitives.ts";
 import { Select } from "../forms/select.tsx";
 import { ProviderScopeChips } from "./provider-scope-chips.tsx";
+import { ScopeNameBadge } from "./scope-name-badge.tsx";
 
 /**
  * ORGANIZATION/TEAM/PROJECT mirror Prisma's `ModelProviderScopeType`.
@@ -74,18 +75,33 @@ interface ScopeOption {
   personalOnly?: boolean;
 }
 
+/** A known name as a badge; the plain words when the picker was not given one. */
+function nameOr({ name, fallback }: { name: string | undefined; fallback: string }): ReactNode {
+  return name ? <ScopeNameBadge name={name} /> : fallback;
+}
+
 function describeSingleScope({
   scopeType,
+  name,
   subjectNoun,
 }: {
   scopeType: ScopeChipPickerScopeType;
+  name: string | undefined;
   subjectNoun: string;
-}): string {
+}): ReactNode {
   switch (scopeType) {
     case "PROJECT":
-      return `Only this project can use this ${subjectNoun}.`;
+      return (
+        <>
+          Only {nameOr({ name, fallback: "this project" })} can use this {subjectNoun}.
+        </>
+      );
     case "TEAM":
-      return `Every project in the team inherits this ${subjectNoun}.`;
+      return (
+        <>
+          Every project in {nameOr({ name, fallback: "the team" })} inherits this {subjectNoun}.
+        </>
+      );
     case "ORGANIZATION":
       return `Every project in the organization inherits this ${subjectNoun}.`;
     case "DEPARTMENT":
@@ -100,10 +116,12 @@ function describeSingleScope({
 function summariseSelection({
   scopes,
   subjectNoun,
+  names,
 }: {
   scopes: ScopeChipPickerEntry[];
   subjectNoun: string;
-}): string {
+  names: ScopeNames;
+}): ReactNode {
   if (scopes.length === 0) {
     return "Pick at least one scope.";
   }
@@ -114,7 +132,11 @@ function summariseSelection({
         ? `Every personal workspace in the organization inherits this ${subjectNoun}.`
         : `The personal workspaces of this department's members inherit this ${subjectNoun}.`;
     }
-    return describeSingleScope({ scopeType: only.scopeType, subjectNoun });
+    return describeSingleScope({
+      scopeType: only.scopeType,
+      name: scopeNameOf({ scope: only, names }),
+      subjectNoun,
+    });
   }
   const personal = scopes.filter((s) => s.personalOnly);
   const plain = scopes.filter((s) => !s.personalOnly);
@@ -282,6 +304,27 @@ function listedOrCurrent<E extends { id: string; name: string }>({
   if (listed && listed.length > 0) return listed;
   if (currentId) return [{ id: currentId, name: currentName }];
   return [];
+}
+
+/** The team and project names the picker was given, for naming a scope in copy. */
+type ScopeNames = {
+  teams: { id: string; name: string }[];
+  projects: { id: string; name: string }[];
+};
+
+/** A team or project's real name, or undefined when the picker was not given it. */
+function scopeNameOf({
+  scope,
+  names,
+}: {
+  scope: { scopeType: ScopeChipPickerScopeType; scopeId: string };
+  names: ScopeNames;
+}): string | undefined {
+  const byId = (listed: { id: string; name: string }[]) =>
+    listed.find((candidate) => candidate.id === scope.scopeId)?.name;
+  if (scope.scopeType === "TEAM") return byId(names.teams);
+  if (scope.scopeType === "PROJECT") return byId(names.projects);
+  return undefined;
 }
 
 // Collapse redundant scopes per lineage; org/dept mutually exclusive.
@@ -490,62 +533,51 @@ export function ScopeChipPicker<T extends ScopeChipPickerScopeType = ScopeTriadT
   const onChange = (next: ScopeChipPickerEntry[]) =>
     inputOnChange(next as { scopeType: T; scopeId: string; personalOnly?: boolean }[]);
 
-  const allowed = useMemo<Set<ScopeChipPickerScopeType>>(
-    () => new Set((allowedScopeTypes ?? DEFAULT_SCOPE_TYPES) as ScopeChipPickerScopeType[]),
-    [allowedScopeTypes],
+  const allowed = new Set<ScopeChipPickerScopeType>(
+    (allowedScopeTypes ?? DEFAULT_SCOPE_TYPES) as ScopeChipPickerScopeType[],
   );
 
-  const options = useMemo(
-    () =>
-      buildScopeOptions({
-        allowed,
-        organizationId,
-        organizationName,
-        availableDepartments,
-        teams: listedOrCurrent({
-          listed: availableTeams,
-          currentId: teamId,
-          currentName: teamName ?? "Team",
-        }),
-        projects: listedOrCurrent({
-          listed: availableProjects,
-          currentId: projectId,
-          currentName: projectName ?? "Project",
-        }),
-        personalScopes,
-      }),
-    [
-      allowed,
-      availableDepartments,
-      organizationId,
-      organizationName,
-      teamId,
-      teamName,
-      projectId,
-      projectName,
-      availableTeams,
-      availableProjects,
-      personalScopes,
+  const options = buildScopeOptions({
+    allowed,
+    organizationId,
+    organizationName,
+    availableDepartments,
+    teams: listedOrCurrent({
+      listed: availableTeams,
+      currentId: teamId,
+      currentName: teamName ?? "Team",
+    }),
+    projects: listedOrCurrent({
+      listed: availableProjects,
+      currentId: projectId,
+      currentName: projectName ?? "Project",
+    }),
+    personalScopes,
+  });
+
+  // Only names the caller actually passed: the "Team"/"Project" fallbacks of
+  // the options are placeholders, never a name to put in copy.
+  const names: ScopeNames = {
+    teams: [
+      ...(availableTeams ?? []),
+      ...(teamId && teamName ? [{ id: teamId, name: teamName }] : []),
     ],
-  );
+    projects: [
+      ...(availableProjects ?? []),
+      ...(projectId && projectName ? [{ id: projectId, name: projectName }] : []),
+    ],
+  };
 
   // The search filter over a long option list. Matches an option's own
   // label and, for a project, its parent team's name, so "platform"
   // finds every project of the Platform team.
   const [scopeSearch, setScopeSearch] = useState("");
   const showSearch = options.length > SCOPE_SEARCH_THRESHOLD;
-  const visibleOptions = useMemo(
-    () =>
-      showSearch
-        ? searchScopeOptions({ options, search: scopeSearch, availableTeams, availableProjects })
-        : options,
-    [options, scopeSearch, showSearch, availableTeams, availableProjects],
-  );
+  const visibleOptions = showSearch
+    ? searchScopeOptions({ options, search: scopeSearch, availableTeams, availableProjects })
+    : options;
 
-  const collection = useMemo(
-    () => createListCollection({ items: visibleOptions }),
-    [visibleOptions],
-  );
+  const collection = createListCollection({ items: visibleOptions });
 
   // In single-scope mode the picker represents exactly one scope, so the
   // value it operates on is collapsed to the first entry. In multi-scope mode
@@ -553,14 +585,14 @@ export function ScopeChipPicker<T extends ScopeChipPickerScopeType = ScopeTriadT
   const scopes = singleSelect ? value.slice(0, 1) : value;
 
   // Quick-pick row + collapsible-multi mode. See `showQuickPicks` prop.
-  const quickPicks = useMemo(
-    () => buildQuickPicks({ allowed, currentOrganizationId, currentTeamId, currentProjectId }),
-    [allowed, currentOrganizationId, currentTeamId, currentProjectId],
-  );
-  const matchingQuickPick = useMemo(
-    () => quickPickFor({ scopes, quickPicks }),
-    [scopes, quickPicks],
-  );
+  const quickPicks = buildQuickPicks({
+    allowed,
+    currentOrganizationId,
+    currentTeamId,
+    currentProjectId,
+    names,
+  });
+  const matchingQuickPick = quickPickFor({ scopes, quickPicks });
 
   // Local UI state; auto-flips on external multi-scope, never off except quick-pick.
   const derivedMultiple = !matchingQuickPick;
@@ -594,6 +626,7 @@ export function ScopeChipPicker<T extends ScopeChipPickerScopeType = ScopeTriadT
         search={search}
         showSummary={showSummary}
         subjectNoun={subjectNoun}
+        names={names}
         compact={size === "sm"}
         onChange={onChange}
       />
@@ -643,14 +676,17 @@ export function ScopeChipPicker<T extends ScopeChipPickerScopeType = ScopeTriadT
           }
         />
       )}
-      {showSummary && <SelectionSummary scopes={scopes} subjectNoun={subjectNoun} />}
+      {showSummary && <SelectionSummary scopes={scopes} subjectNoun={subjectNoun} names={names} />}
     </VStack>
   );
 }
 
 type QuickPick = {
   key: "ORGANIZATION" | "TEAM" | "PROJECT";
-  label: string;
+  /** "Organization", "Team" or "Project"; "This team"/"This project" when no name is known. */
+  kind: string;
+  /** The current team's or project's name, drawn as a badge after the kind. */
+  name?: string;
   icon: React.ReactElement;
   scope: ScopeChipPickerEntry;
 };
@@ -748,33 +784,37 @@ function buildQuickPicks({
   currentOrganizationId,
   currentTeamId,
   currentProjectId,
+  names,
 }: {
   allowed: Set<ScopeChipPickerScopeType>;
   currentOrganizationId: string | null | undefined;
   currentTeamId: string | null | undefined;
   currentProjectId: string | null | undefined;
+  names: ScopeNames;
 }): QuickPick[] {
   const out: QuickPick[] = [];
   if (currentOrganizationId && allowed.has("ORGANIZATION")) {
     out.push({
       key: "ORGANIZATION",
-      label: "Organization",
+      kind: "Organization",
       icon: <Building2 size={14} aria-hidden />,
       scope: { scopeType: "ORGANIZATION", scopeId: currentOrganizationId },
     });
   }
   if (currentTeamId && allowed.has("TEAM")) {
+    const name = scopeNameOf({ scope: { scopeType: "TEAM", scopeId: currentTeamId }, names });
     out.push({
       key: "TEAM",
-      label: "This team",
+      ...(name ? { kind: "Team", name } : { kind: "This team" }),
       icon: <Users size={14} aria-hidden />,
       scope: { scopeType: "TEAM", scopeId: currentTeamId },
     });
   }
   if (currentProjectId && allowed.has("PROJECT")) {
+    const name = scopeNameOf({ scope: { scopeType: "PROJECT", scopeId: currentProjectId }, names });
     out.push({
       key: "PROJECT",
-      label: "This project",
+      ...(name ? { kind: "Project", name } : { kind: "This project" }),
       icon: <Folder size={14} aria-hidden />,
       scope: { scopeType: "PROJECT", scopeId: currentProjectId },
     });
@@ -826,14 +866,16 @@ function entryOf(option: ScopeOption): ScopeChipPickerEntry {
 function SelectionSummary({
   scopes,
   subjectNoun,
+  names,
 }: {
   scopes: ScopeChipPickerEntry[];
   subjectNoun: string;
+  names: ScopeNames;
 }) {
   return (
-    <Box>
-      <Text fontSize="xs" color="fg.muted">
-        {summariseSelection({ scopes, subjectNoun })}
+    <Box minWidth={0} maxWidth="full">
+      <Text fontSize="xs" color="fg.muted" data-testid="scope-summary">
+        {summariseSelection({ scopes, subjectNoun, names })}
       </Text>
     </Box>
   );
@@ -966,6 +1008,7 @@ function SingleScopeSelect({
   search,
   showSummary,
   subjectNoun,
+  names,
   compact,
   onChange,
 }: {
@@ -980,6 +1023,7 @@ function SingleScopeSelect({
   search: ScopeSearch;
   showSummary: boolean;
   subjectNoun: string;
+  names: ScopeNames;
   compact: boolean;
   onChange: (next: ScopeChipPickerEntry[]) => void;
 }) {
@@ -1039,7 +1083,7 @@ function SingleScopeSelect({
           <ProjectOptionGroups {...projectGroups} />
         </Select.Content>
       </Select.Root>
-      {showSummary && <SelectionSummary scopes={scopes} subjectNoun={subjectNoun} />}
+      {showSummary && <SelectionSummary scopes={scopes} subjectNoun={subjectNoun} names={names} />}
     </VStack>
   );
 }
@@ -1070,6 +1114,7 @@ function QuickPickRow({
     <Wrap
       as="fieldset"
       gap={1}
+      maxWidth="full"
       borderWidth="1px"
       borderColor="border.control"
       borderRadius="lg"
@@ -1092,11 +1137,22 @@ function QuickPickRow({
             boxShadow={active ? "xs" : "none"}
             aria-pressed={active}
             onClick={() => onPick(pick.scope)}
+            maxWidth="full"
+            minWidth={0}
+            flexShrink={0}
             data-testid={`quick-scope-${pick.scope.scopeType.toLowerCase()}`}
           >
-            <HStack gap={1}>
+            <HStack gap={1} minWidth={0}>
               {pick.icon}
-              <Text>{pick.label}</Text>
+              <Text as="span" flexShrink={0}>
+                {pick.kind}
+              </Text>
+              {pick.name && (
+                <>
+                  {" "}
+                  <ScopeNameBadge name={pick.name} maxWidth="10rem" />
+                </>
+              )}
             </HStack>
           </Button>
         );
@@ -1111,6 +1167,7 @@ function QuickPickRow({
           boxShadow={multipleMode ? "xs" : "none"}
           aria-pressed={multipleMode}
           onClick={onMultiple}
+          flexShrink={0}
           data-testid="quick-scope-multiple"
         >
           <HStack gap={1}>

@@ -3,9 +3,13 @@
  * member. A legacy URI's object path is `{projectId}/{sha256}`, and that path is
  * the member key (ADR-158 §1: existing objects keep their keys).
  */
-import { Readable } from "node:stream";
+import type { Readable } from "node:stream";
 
-import type { ObjectStorage, StoredObjectAddress } from "@langwatch/process-stores/members";
+import {
+  readableBody,
+  type ObjectStorage,
+  type StoredObjectAddress,
+} from "@langwatch/process-stores/members";
 import { getStoredObjectStorageScheme } from "@langwatch/stored-object-contract";
 
 import { StoredObjectStorageRepository } from "../stored-object-storage.repository.ts";
@@ -27,8 +31,7 @@ export class ObjectStorageStoredObjectStorageRepository extends StoredObjectStor
 
   get = async (uri: string): Promise<Readable> => {
     const body = await this.objects.read(this.addressOf(uri));
-    // The member's own stream frees its socket however a reader stops; a wrapper would not.
-    return body instanceof Readable ? body : Readable.from(body, { objectMode: false });
+    return readableBody(body);
   };
 
   put = async (uri: string, bytes: Buffer, mediaType: string): Promise<void> => {

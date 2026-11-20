@@ -63,6 +63,11 @@ const registry = {
   },
 
   // ---- dataset storage ----
+  stored_object_write_conflict: {
+    tips: [
+      "Another change to the same file landed while this one was written; send the request again",
+    ],
+  },
   private_dataplane_unavailable: {
     tips: [
       "Set the variable this error names (CLICKHOUSE_URL__<label>__<orgId> or DATAPLANE_S3__<label>__<orgId>) and restart the api and worker",
@@ -76,6 +81,22 @@ const registry = {
       "Or point LANGWATCH_LOCAL_STORAGE_PATH at a writable, persistent directory and restart the service",
       "The server log line next to this failure names the directory that was refused",
     ],
+  },
+
+  storage_credentials_refused: {
+    tips: [
+      "On Azure Blob with a shared key, check AZURE_BLOB_ACCOUNT_NAME and AZURE_BLOB_ACCOUNT_KEY name the same account, then restart the api and worker",
+      "Under a token mode, check the identity's client id, tenant and secret or federated token; a role grant does not fix a credential Azure rejects",
+    ],
+    docsPath: "/self-hosting/configuration/environment-variables",
+  },
+
+  storage_permission_denied: {
+    tips: [
+      'Grant the identity "Storage Blob Data Contributor" on the storage account or the container',
+      'The control-plane "Contributor" role does not grant data access',
+    ],
+    docsPath: "/self-hosting/configuration/environment-variables",
   },
 
   dataset_invalid_column: {
@@ -504,8 +525,15 @@ const registry = {
   braids_not_enabled: {
     tips: [
       "Braid management is not switched on for this organisation yet; retrying will not help",
-      "Braids that already exist keep applying to trace reads; ask LangWatch to switch braids on to create or change them",
+      "Removing a braid and revoking a signing key still work; ask LangWatch to switch braids on to create or change them",
     ],
+  },
+  braids_turned_off: {
+    tips: [
+      "On the Enterprise plan, an organisation admin can turn Braids on in the organisation's Braids settings",
+      "While Braids is off, existing braids are paused and kept; removing a braid and revoking a signing key still work",
+    ],
+    docsPath: "/features/braids",
   },
 
   // ---- personal workspace reads ----
@@ -725,6 +753,12 @@ const registry = {
   },
 
   // ---- scenario runs ----
+  scenario_red_team_config_mismatch: {
+    tips: [
+      "Send kind red_team together with a redTeam config holding attackGoal and owaspIds",
+      "For a standard scenario, leave redTeam out",
+    ],
+  },
   scenario_reserved_set_id: {
     tips: [
       "Send the run without a setId; it is then recorded in the project's own one-off bucket",
@@ -1056,6 +1090,12 @@ const registry = {
       "Retry shortly; if it persists, the judgements can be made later by running the same statement as a job",
     ],
   },
+  instant_eval_decision_model_key_invalid: {
+    tips: [
+      "Every row of the run was refused for the key of the project's own Instant Evals model",
+      "Check the key, and that the provider row is switched on, in Settings > Model Providers",
+    ],
+  },
   instant_eval_estimate_unavailable: {
     tips: [
       "The statement was accepted; working out how many rows it matches is what failed",
@@ -1067,6 +1107,13 @@ const registry = {
       "Read `meta.spentUsd` against `meta.budgetUsd`; the organization has spent its free Instant Evals allowance across every project",
       "Upgrade the organization to a paid plan under Settings, Plan & billing; judged queries and runs are then billed per input token",
     ],
+  },
+  instant_eval_gateway_budget_exceeded: {
+    tips: [
+      "Read `meta.scope` and `meta.budgetId`; that gateway budget is set to block, and Instant Evals count against it like gateway traffic",
+      "Compare `meta.spentUsd` with `meta.limitUsd`, then raise or remove the budget under AI Gateway, Budgets, or wait for its `meta.window` to reset",
+    ],
+    docsPath: "/features/instant-evals/limits-and-cost",
   },
   instant_eval_not_enabled: {
     tips: [

@@ -10,6 +10,11 @@ import {
   BRAIDS_ART_SPANS,
   BRAIDS_ART_STRAND_ENDS,
   BRAIDS_ART_STRANDS,
+  BRAIDS_EMPTY_DIVIDER_PATH,
+  BRAIDS_EMPTY_PLUS_PATH,
+  BRAIDS_EMPTY_PROJECT_ROWS,
+  BRAIDS_EMPTY_SPAN_ROWS,
+  BRAIDS_EMPTY_STRANDS,
 } from "./braids-paths.ts";
 import { type FeatureName, svgIdBase } from "./feature-brands.ts";
 import { colorModeClass, type LogoColorMode } from "./logo-icon.tsx";
@@ -34,7 +39,18 @@ const STRAND_WIDTH = 3;
 const STRAND_GAP = STRAND_WIDTH + 6;
 
 const CANVAS_WIDTH = 760;
-const CANVAS_HEIGHT = 256;
+const CANVAS_HEIGHTS: Record<FeatureIllustrationName, number> = {
+  "empty-state": 300,
+  enterprise: 256,
+};
+const CANVAS_HEIGHT = CANVAS_HEIGHTS.enterprise;
+
+/** The empty state's projects, as the app's project badge draws them: two letters on a square. */
+const EMPTY_PROJECTS = [
+  { initials: "WO", name: "Web orchestrator" },
+  { initials: "SA", name: "Specialist agents" },
+  { initials: "SE", name: "Search agent" },
+] as const;
 
 const SUMMARY: Record<FeatureIllustrationName, string> = {
   "empty-state": "One trace, three projects",
@@ -44,7 +60,7 @@ const SUMMARY: Record<FeatureIllustrationName, string> = {
 const project = (index: number) => `feature.braids.project.${index}`;
 const projectInk = (index: number) => `feature.braids.projectInk.${index}`;
 
-/** A project as the app draws one: a round avatar with its first letter, then its name. */
+/** The Enterprise art's project: a round avatar with its first letter, then its name. */
 function ProjectChip({ index }: { index: number }) {
   const { initial, name } = PROJECTS[index - 1] ?? PROJECTS[0];
   const centre = BRAIDS_ART_PROJECT_ROWS[index - 1] ?? 0;
@@ -169,7 +185,146 @@ function SignedCallsPill() {
 
 const STRAND_INDEXES = [1, 2, 3] as const;
 
+function EmptyProjectChip({ index }: { index: number }) {
+  const { initials, name } = EMPTY_PROJECTS[index - 1] ?? EMPTY_PROJECTS[0];
+  const centre = BRAIDS_EMPTY_PROJECT_ROWS[index - 1] ?? 0;
+  return (
+    <g data-project={index}>
+      <chakra.rect
+        x={28.5}
+        y={centre - 22.5}
+        width={178}
+        height={45}
+        rx={10}
+        fill="bg.panel"
+        stroke="border"
+      />
+      <chakra.rect
+        x={38}
+        y={centre - 13}
+        width={27}
+        height={27}
+        rx={7}
+        fill={project(index)}
+        data-badge={index}
+      />
+      <chakra.text
+        x={51.5}
+        y={centre + 4.5}
+        textAnchor="middle"
+        fontSize="9px"
+        fontWeight="600"
+        fill={projectInk(index)}
+      >
+        {initials}
+      </chakra.text>
+      <chakra.text x={75} y={centre + 4.5} fontSize="12px" fill="fg">
+        {name}
+      </chakra.text>
+    </g>
+  );
+}
+
+/** Dotted: these projects are not braided yet. A strand passing under another keeps a gap. */
+function EmptyStrand({ index, maskId }: { index: number; maskId: MaskId }) {
+  const strand = BRAIDS_EMPTY_STRANDS[index - 1];
+  if (!strand) return null;
+  return (
+    <chakra.path
+      d={strand.d}
+      fill="none"
+      stroke={project(index)}
+      strokeWidth={STRAND_WIDTH}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeDasharray="2 8"
+      mask={"under" in strand ? `url(#${maskId(index)})` : undefined}
+      data-strand={index}
+    />
+  );
+}
+
+function EmptyUnderMask({ index, maskId }: { index: number; maskId: MaskId }) {
+  const strand = BRAIDS_EMPTY_STRANDS[index - 1];
+  if (!strand || !("under" in strand)) return null;
+  const over = BRAIDS_EMPTY_STRANDS[strand.under - 1];
+  return (
+    <mask
+      id={maskId(index)}
+      maskUnits="userSpaceOnUse"
+      x="0"
+      y="0"
+      width={CANVAS_WIDTH}
+      height={CANVAS_HEIGHTS["empty-state"]}
+    >
+      <rect width={CANVAS_WIDTH} height={CANVAS_HEIGHTS["empty-state"]} fill="white" />
+      <path d={over?.d} fill="none" stroke="black" strokeWidth={STRAND_GAP + 2} />
+    </mask>
+  );
+}
+
+/** The empty state: projects not yet braided, and an empty trace with a "+" where one starts. */
+function BraidsEmptyArt({ idBase }: { idBase: string }) {
+  const maskId: MaskId = (index) => `${idBase}-empty-under-${index}`;
+  return (
+    <>
+      <defs>
+        {STRAND_INDEXES.map((index) => (
+          <EmptyUnderMask key={index} index={index} maskId={maskId} />
+        ))}
+      </defs>
+      <chakra.text x={28} y={34} fontSize="12px" fill="fg.muted">
+        Your projects
+      </chakra.text>
+      <chakra.text x={500} y={34} fontSize="12px" fill="fg.muted">
+        A shared trace starts here
+      </chakra.text>
+      {STRAND_INDEXES.map((index) => (
+        <EmptyProjectChip key={index} index={index} />
+      ))}
+      {STRAND_INDEXES.map((index) => (
+        <EmptyStrand key={index} index={index} maskId={maskId} />
+      ))}
+      <chakra.rect
+        x={492.5}
+        y={60.5}
+        width={239}
+        height={226}
+        rx={12}
+        fill="bg.subtle"
+        stroke="border"
+      />
+      <chakra.text x={508} y={85} fontSize="13px" fontWeight="600" fill="fg">
+        handle_message
+      </chakra.text>
+      <chakra.path d={BRAIDS_EMPTY_DIVIDER_PATH} stroke="border" strokeWidth={1} />
+      {BRAIDS_EMPTY_SPAN_ROWS.map((row) => (
+        <chakra.rect
+          key={row.y}
+          x={row.x + 0.5}
+          y={row.y + 0.5}
+          width={row.width}
+          height={11}
+          rx={4}
+          fill="none"
+          stroke="border"
+          data-span-row
+        />
+      ))}
+      <chakra.circle cx={612} cy={175} r={23} fill="bg.panel" stroke="border" data-target />
+      <chakra.path
+        d={BRAIDS_EMPTY_PLUS_PATH}
+        fill="none"
+        stroke="fg.muted"
+        strokeWidth={2}
+        strokeLinecap="round"
+      />
+    </>
+  );
+}
+
 function BraidsArt({ name, idBase }: { name: FeatureIllustrationName; idBase: string }) {
+  if (name === "empty-state") return <BraidsEmptyArt idBase={idBase} />;
   const maskId: MaskId = (index) => `${idBase}-under-${index}`;
   return (
     <>
@@ -221,7 +376,7 @@ export function FeatureIllustration({ feature, name, forceColorMode }: FeatureIl
   return (
     <chakra.svg
       xmlns="http://www.w3.org/2000/svg"
-      viewBox={`0 0 ${CANVAS_WIDTH} ${CANVAS_HEIGHT}`}
+      viewBox={`0 0 ${CANVAS_WIDTH} ${CANVAS_HEIGHTS[name]}`}
       width="100%"
       height="auto"
       maxWidth="760px"

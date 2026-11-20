@@ -12,6 +12,7 @@ import { useLlmOpsProjectSlug } from "../../behavior/use-llm-ops-project-slug.ts
 import { useMenuScrollPosition } from "../../behavior/use-menu-scroll-position.ts";
 import { useOpsAttentionCount } from "../../behavior/use-ops-attention-count.ts";
 import { useReachableProducts } from "../../behavior/use-reachable-products.ts";
+import { useSettingsEntryHref } from "../../behavior/use-settings-entry-href.ts";
 import { useSettingsMenu } from "../../behavior/use-settings-menu.ts";
 import { useVisibleSectionNavItems } from "../../behavior/use-visible-section-nav-items.ts";
 import { featureIcons } from "../../model/feature-icons.ts";
@@ -116,6 +117,7 @@ function SidebarBottomBlock({
 }) {
   const host = useNavigationHost();
   const pathname = host.pathname();
+  const settingsHref = useSettingsEntryHref();
 
   return (
     <VStack
@@ -137,7 +139,7 @@ function SidebarBottomBlock({
         <SideMenuLink
           icon={featureIcons.settings.icon}
           label="Settings"
-          href="/settings"
+          href={settingsHref}
           isActive={isPathUnder({ pathname, base: "/settings" })}
           showLabel={showExpanded}
         />

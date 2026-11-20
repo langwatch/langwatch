@@ -93,7 +93,7 @@ import type {
   ModelUsageStatsRow,
   ModelSpanSampleRow,
 } from "./features/span/trace-span-read-model.ts";
-import type { Trace, Span, OwnedSpan, ElasticSearchEvent } from "./trace-format.schemas.ts";
+import type { Trace, Span, ElasticSearchEvent } from "./trace-format.schemas.ts";
 import type {
   TraceFullReadInput,
   TraceFullRecord,
@@ -102,6 +102,7 @@ import type {
 import type { TraceDateField } from "./trace-legacy-read.types.ts";
 import type { CheckPreconditions } from "./trace-precondition.schemas.ts";
 import type {
+  AgentCallGraph,
   TraceCost,
   TraceLegacyListInput,
   TraceSummaryListOptions,
@@ -137,7 +138,7 @@ import type {
   TracesConversationContext,
   TracesSessionsPage,
 } from "./trace.responses.ts";
-import type { NormalizedSpan } from "./trace.spans.ts";
+import type { NormalizedSpan, OwnedSpan } from "./trace.spans.ts";
 import type { SpanTreeNode, SpanTreePage } from "./trace.ts";
 import type { TraceSessionGroupsInput } from "./traces.trpc.ts";
 
@@ -391,10 +392,14 @@ export interface TraceApi extends TraceOtlpIngestApi {
   readSpanTreeForViewer(input: TraceDrawerReadInput): Promise<SpanTreeNode[]>;
   /** Every span's detail, protected and described by its owner (ADR-201 §5). */
   readSpansFullForViewer(input: TraceDrawerReadInput): Promise<SpanDetail[]>;
+  /** Agents in one trace, the calls between them and each agent's tokens and cost. */
+  readAgentCallGraphForViewer(input: TraceDrawerReadInput): Promise<AgentCallGraph>;
   /** The resource pane, each braided span's resources gated by its owner. */
   readSpanResourcesForViewer(input: TraceDrawerReadInput): Promise<TraceResourceInfoDto>;
   /** The drawer timeline, each braided span's events protected by its owner. */
   readTraceEventsForViewer(input: TraceDrawerReadInput): Promise<DerivedTraceEvent[]>;
+  /** Signal buckets per span, the trace opened and owners grouped as the span tree is. */
+  readLangwatchSignalsForViewer(input: TraceDrawerReadInput): Promise<SpanLangwatchSignals[]>;
   /** `GET /api/traces/facets` for an API key: the discovery payload or one field's paged values. */
   readTraceFacetsForApiKey(input: {
     projectId: string;
@@ -630,6 +635,15 @@ export interface TraceApi extends TraceOtlpIngestApi {
     /** `spans`: the trace view's read, where the proof's braids show owners' spans (ADR-201 §5). */
     reads?: "spans" | "traces";
   }): Promise<SpanResourceInfo[]>;
+  /** A trace's spans and their resource rows in one read, audited once for both. */
+  readSpansWithResources(input: {
+    authorization: Authorization;
+    traceId: string;
+    occurredAtMs?: number;
+    visibilityCutoffMs?: number | null;
+    /** `spans`: the trace view's read, where the proof's braids show owners' spans (ADR-201 §5). */
+    reads?: "spans" | "traces";
+  }): Promise<{ spans: OwnedSpan[]; resources: SpanResourceInfo[] }>;
   readTraceEvents(input: {
     authorization: Authorization;
     traceId: string;
