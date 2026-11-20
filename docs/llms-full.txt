@@ -3405,6 +3405,8 @@ Calls to `/a2a/{target}` answer in the A2A binding the caller used. A JSON-RPC c
 | `a2a_budget_exceeded`         | -32022        | 402  | A budget on the key is used up.                                                    |
 | `a2a_target_not_https`        | -32023        | 502  | The gateway calls customer endpoints over https only and the agent's URL is http.  |
 
+The gateway calls an A2A agent under the same egress rule as provider endpoints. With `BLOCK_LOCAL_HTTP_CALLS` on, a private address is refused (`a2a_upstream_unreachable`) unless the agent's host, or the IP address it resolves to, is in `ALLOWED_PROXY_HOSTS`. Listing an IP address therefore admits every hostname that resolves to it. A query parameter the agent's registered URL sets always wins: the gateway drops a caller parameter of the same name.
+
 ## Streaming errors
 
 Once the stream is open the status is already `200`, so a failure arrives as a terminal `event: error` frame and the stream ends:

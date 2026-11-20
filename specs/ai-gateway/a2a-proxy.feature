@@ -215,6 +215,12 @@ Feature: A2A proxy on the gateway
     Then the upstream receives POST /message:send?tenant=7&x=1
 
   @unit
+  Scenario: a caller's query parameter never overrides one the upstream URL sets
+    Given the target's upstream URL is "https://billing.acme.test/?tenant=7"
+    When the caller sends POST /a2a/billing/message:send?tenant=8&ten%61nt=9&x=1
+    Then the upstream receives POST /message:send?tenant=7&x=1
+
+  @unit
   Scenario: the Agent Card lists only the endpoint the gateway serves
     Given the upstream card lists interfaces at the upstream URL and at another path
     When the caller fetches GET /a2a/billing/.well-known/agent.json, the A2A v0.2 card path
@@ -294,6 +300,11 @@ Feature: A2A proxy on the gateway
   Scenario: an A2A reply is never marked cacheable by a shared cache
     When the upstream replies with "Cache-Control: public"
     Then the caller receives "Cache-Control: no-store" on replies, streams, Agent Cards and refusals
+
+  @unit
+  Scenario: a call without a valid virtual key is refused uncacheable too
+    When the caller sends POST /a2a/billing with no virtual key
+    Then the caller receives 401 with "Cache-Control: no-store"
 
   @unit
   Scenario: an overlong streamed event ends the stream with an error event

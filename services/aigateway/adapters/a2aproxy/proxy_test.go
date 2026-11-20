@@ -413,6 +413,33 @@ func TestUpstreamQueryStringStaysAfterThePath(t *testing.T) {
 	assert.Equal(t, "/message:send?tenant=7&x=1", gotURI)
 }
 
+// @scenario "a caller's query parameter never overrides one the upstream URL sets"
+func TestCallerQueryNeverOverridesTheTargetsOwn(t *testing.T) {
+	f := newFixture(t)
+	var gotURI string
+	f.reply = func(w http.ResponseWriter, r *http.Request) {
+		gotURI = r.URL.RequestURI()
+		_, _ = io.WriteString(w, `{}`)
+	}
+	f.setTarget(func(tg *domain.A2ATarget) { tg.UpstreamURL = f.upstream.URL + "/?tenant=7" })
+	rec := f.do(http.MethodPost, "/a2a/billing/message:send?tenant=8&ten%61nt=9&x=1", `{"message":{"parts":[{"text":"hi"}]}}`)
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	assert.Equal(t, "/message:send?tenant=7&x=1", gotURI)
+}
+
+func TestUpstreamEndpointDropsCallerParametersTheTargetSets(t *testing.T) {
+	cases := []struct{ base, query, want string }{
+		{"https://a.test/?tenant=7", "tenant=8", "https://a.test/?tenant=7"},
+		{"https://a.test/?tenant=7", "x=1;tenant=8", "https://a.test/?tenant=7"},
+		{"https://a.test/?tenant=7", "%zz=1&x=2", "https://a.test/?tenant=7&x=2"},
+		{"https://a.test/?tenant=7&k", "k=1&tenant[]=8", "https://a.test/?tenant=7&k&tenant[]=8"},
+		{"https://a.test/", "tenant=8", "https://a.test/?tenant=8"},
+	}
+	for _, tc := range cases {
+		assert.Equal(t, tc.want, upstreamEndpoint(tc.base, "", tc.query), tc.query)
+	}
+}
+
 // @scenario "an A2A reply is never marked cacheable by a shared cache"
 func TestRepliesAreNeverCacheable(t *testing.T) {
 	f := newFixture(t)

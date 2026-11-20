@@ -237,6 +237,7 @@ func NewRouter(deps RouterDeps) http.Handler {
 
 	if deps.A2A != nil {
 		r.Route("/a2a", func(a2a chi.Router) {
+			a2a.Use(noStoreMiddleware)
 			a2a.Use(AuthMiddleware(deps.App.Auth()))
 			a2a.Use(CustomerTraceMiddleware())
 			a2a.Use(TraceRegistryMiddleware(deps.TraceRegistry, deps.DefaultExportEndpoint))
@@ -2343,4 +2344,13 @@ func registerErrorStatusesOnce() {
 	herr.RegisterStatus(domain.ErrRealtimeRegistryUnavailable, http.StatusServiceUnavailable)
 	// 503 with Retry-After: this instance is draining or full, another is not.
 	herr.RegisterStatus(domain.ErrVoiceBrokerUnavailable, http.StatusServiceUnavailable)
+}
+
+// noStoreMiddleware marks every /a2a answer uncacheable before any handler
+// runs, so a refusal the auth middleware writes carries it too.
+func noStoreMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Cache-Control", "no-store")
+		next.ServeHTTP(w, r)
+	})
 }

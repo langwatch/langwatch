@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"slices"
 	"strings"
 )
 
@@ -128,6 +129,7 @@ var jsonRPCMethods = map[string]bool{
 // upstreamEndpoint appends the escaped rest of the path to the upstream URL's
 // path, keeping the upstream's own query and adding the caller's after it. With
 // no rest (a root JSON-RPC call) the registered path stays as it is, slash included.
+// A caller parameter the upstream URL already sets is dropped: the target's wins.
 func upstreamEndpoint(base, rest, query string) string {
 	base, _, _ = strings.Cut(base, "#")
 	base, baseQuery, _ := strings.Cut(base, "?")
@@ -138,8 +140,46 @@ func upstreamEndpoint(base, rest, query string) string {
 	if out == "" || !strings.Contains(strings.TrimPrefix(strings.TrimPrefix(out, "https://"), "http://"), "/") {
 		out += "/"
 	}
-	if q := strings.Trim(baseQuery+"&"+query, "&"); q != "" {
+	if q := strings.Trim(baseQuery+"&"+callerQuery(baseQuery, query), "&"); q != "" {
 		out += "?" + q
 	}
 	return out
+}
+
+// callerQuery is the caller's query without the parameters the target's own
+// query sets. A piece whose names cannot be decoded is dropped too, and names
+// are read across ";" as well as "&", the way some servers split them.
+func callerQuery(targetQuery, query string) string {
+	if targetQuery == "" || query == "" {
+		return query
+	}
+	pinned := map[string]bool{}
+	for _, piece := range strings.Split(targetQuery, "&") {
+		names, _ := queryNames(piece)
+		for _, name := range names {
+			pinned[name] = true
+		}
+	}
+	kept := make([]string, 0, strings.Count(query, "&")+1)
+	for _, piece := range strings.Split(query, "&") {
+		names, ok := queryNames(piece)
+		if ok && !slices.ContainsFunc(names, func(name string) bool { return pinned[name] }) {
+			kept = append(kept, piece)
+		}
+	}
+	return strings.Join(kept, "&")
+}
+
+// queryNames decodes the parameter names in one "&" piece of a query.
+func queryNames(piece string) ([]string, bool) {
+	var names []string
+	for _, part := range strings.Split(piece, ";") {
+		name, _, _ := strings.Cut(part, "=")
+		decoded, err := url.QueryUnescape(name)
+		if err != nil {
+			return nil, false
+		}
+		names = append(names, decoded)
+	}
+	return names, true
 }
