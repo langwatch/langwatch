@@ -7,7 +7,10 @@ import { canonicaliseSpanAttributes, orderedSpanCanonicalisers } from "../spanCa
 
 const codexScopes = { isCodexScope: () => false, execScope: "codex_exec" };
 
-function canonicalise(spanAttributes: Record<string, unknown>) {
+function canonicalise(
+  spanAttributes: Record<string, unknown>,
+  resourceAttributes: Record<string, unknown> = {},
+) {
   return canonicaliseSpanAttributes({
     canonicalisers: orderedSpanCanonicalisers({ codexScopes }),
     spanAttributes,
@@ -19,6 +22,7 @@ function canonicalise(spanAttributes: Record<string, unknown>) {
       statusMessage: null,
       statusCode: null,
       parentSpanId: null,
+      resourceAttributes,
     },
   }).attributes;
 }
@@ -52,5 +56,16 @@ describe("a Claude Code span's conversation", () => {
 
     expect(attributes["gen_ai.conversation.id"]).toBe("agent_scout");
     expect(attributes["langwatch.thread.id"]).toBe("channel_support");
+  });
+
+  /** @scenario a launcher's declared session groups every harness session it runs */
+  it("is a session declared on the resource, as the session aggregate reads it", () => {
+    const attributes = canonicalise(
+      { "session.id": "cc-run-3", "langwatch.thread.id": "channel_support" },
+      { "langwatch.session.id": "agent_scout" },
+    );
+
+    expect(attributes["gen_ai.conversation.id"]).toBe("agent_scout");
+    expect(attributes).not.toHaveProperty("resourceAttributes");
   });
 });

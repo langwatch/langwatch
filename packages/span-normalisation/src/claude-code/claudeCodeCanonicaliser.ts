@@ -172,12 +172,14 @@ export class ClaudeCodeCanonicaliserService implements AttributeCanonicaliser {
   }
 
   /**
-   * The conversation is the agent's session: a launcher's declared `langwatch.session.id`, else
-   * Claude Code's own `session.id`. A thread the launcher declared stays as `langwatch.thread.id`.
+   * The conversation is the agent's session: a launcher's `langwatch.session.id` (span, then
+   * resource), else Claude Code's own `session.id`. A declared thread stays `langwatch.thread.id`.
    */
   private keySession(ctx: ExtractorContext): void {
     const session =
-      asString(ctx.bag.attrs.get(DECLARED_SESSION_ID)) ?? asString(ctx.bag.attrs.get("session.id"));
+      asString(ctx.bag.attrs.get(DECLARED_SESSION_ID)) ??
+      asString(ctx.span.resourceAttributes?.[DECLARED_SESSION_ID]) ??
+      asString(ctx.bag.attrs.get("session.id"));
     const conversation = asString(ctx.out[ATTR_KEYS.GEN_AI_CONVERSATION_ID]);
     if (session === null || session === conversation) return;
     if (conversation !== null) ctx.setAttrIfAbsent(ATTR_KEYS.LANGWATCH_THREAD_ID, conversation);

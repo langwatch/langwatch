@@ -132,7 +132,9 @@ To list all of them as one session, add `langwatch.session.id` to the same resou
 export OTEL_RESOURCE_ATTRIBUTES="${OTEL_RESOURCE_ATTRIBUTES:+$OTEL_RESOURCE_ATTRIBUTES,}langwatch.session.id=nightly-maintenance,langwatch.session.name=nightly-maintenance"
 ```
 
-Every run's traces, tokens and cost then add up under that one session. Link to it with `/<project>/sessions?session=nightly-maintenance`.
+Every run recorded from then on adds its traces, tokens and cost to that one session. Runs recorded before keep their own rows. Link to the session with `/<project>/sessions?session=nightly-maintenance`.
+
+If the managed settings file already sets `OTEL_RESOURCE_ATTRIBUTES`, it wins over the shell export, so add `langwatch.session.id` to the value in the managed settings file instead.
 
 ## See your machines
 
