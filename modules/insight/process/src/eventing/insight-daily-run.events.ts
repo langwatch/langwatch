@@ -48,7 +48,7 @@ export const InsightRunRequestedEventSchema = z.object({
 });
 type InsightRunRequestedEvent = z.infer<typeof InsightRunRequestedEventSchema>;
 
-const InsightRunStartedEventSchema = z.object({
+export const InsightRunStartedEventSchema = z.object({
   ...EventSchema.shape,
   type: z.literal(INSIGHT_DAILY_RUN_EVENT_TYPES.RUN_STARTED),
   version: z.literal(INSIGHT_DAILY_RUN_EVENT_VERSION),

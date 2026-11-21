@@ -1,11 +1,12 @@
 /**
- * A board's daily run as its person reads it: the choices a run takes, the words for when it
- * runs and how the last one ended. Pure, so the control and the settings say the same thing.
+ * A board's daily run as its person reads it: the choices a run takes, the words for when it runs,
+ * how the last one ended, and which run Run now follows to its deadline. Pure, so all views agree.
  * @see modules/insight/specs/insight-daily-run.feature
  */
 
 import {
   DEFAULT_INSIGHT_RUN_MAX_INSIGHTS,
+  INSIGHT_DAILY_RUN_EXPIRY_MS,
   INSIGHT_RUN_MAX_INSIGHTS_CHOICES,
   INSIGHT_RUN_SKIP_REASONS,
   INSIGHT_SCHEDULE_SKIPPED_DAYS_BEFORE_OFF,
@@ -152,6 +153,14 @@ function ranWords({ filedCount, renewedCount, reason }: InsightLastRun): string 
   return parts.join(", ") || "nothing new";
 }
 
+/** Why a run was skipped; a reason the contract does not list says what is sure. */
+function skipWords({ reason }: InsightLastRun): string {
+  const known = INSIGHT_RUN_SKIP_REASONS.find((skipReason) => skipReason === reason);
+  return known ? SKIP_REASON_WORDS[known] : "nothing was filed";
+}
+
+const FAILED_WORDS = "nothing was filed, and the next run tries again";
+
 /**
  * The line under the schedule: what the last run did. A run that never reached Langy says
  * "Did not run" and why, so an empty inbox is an answer and not a question.
@@ -172,10 +181,18 @@ export function lastRunWords({
     return `Ran ${when} · ${ranWords(lastRun)}`;
   }
   if (lastRun.outcome === "failed") {
-    return `Failed ${when} · nothing was filed, and the next run tries again`;
+    return `Failed ${when} · ${FAILED_WORDS}`;
   }
-  const reason = INSIGHT_RUN_SKIP_REASONS.find((known) => known === lastRun.reason);
-  return `Did not run ${when} · ${reason ? SKIP_REASON_WORDS[reason] : "nothing was filed"}`;
+  return `Did not run ${when} · ${skipWords(lastRun)}`;
+}
+
+/** What a person is told when the run they asked for ended with no conversation to open. */
+export function requestedRunEndWords(lastRun: InsightLastRun): string {
+  if (lastRun.outcome === "filed" || lastRun.outcome === "nothing") {
+    return `The run ended: ${ranWords(lastRun)}.`;
+  }
+  if (lastRun.outcome === "failed") return `The run failed: ${FAILED_WORDS}.`;
+  return `The run did not start: ${skipWords(lastRun)}.`;
 }
 
 /**
@@ -184,3 +201,70 @@ export function lastRunWords({
  */
 export const TEMPLATE_BOARD_NOTE =
   "Langy cannot read From LangWatch boards yet. Until it can, a run on this board files nothing.";
+
+/**
+ * When a settled run started. An outcome stored before the start was kept names none: its
+ * settle time stands in, as it did then.
+ */
+function startOfSettled(lastRun: InsightLastRun): number {
+  return lastRun.startedAt ?? lastRun.at;
+}
+
+/**
+ * What a Run now waits for: the run its request named, or another that started after the
+ * request and settled in Langy, never a lost run (no conversation, or started before); see
+ * ADR-004. Once the verdict is owed (`owedSince`), it must have started before that instant.
+ */
+export function requestedRunOf({
+  setting,
+  requestId,
+  requestedAt,
+  owedSince = Number.POSITIVE_INFINITY,
+}: {
+  setting: InsightDailyRunSetting;
+  /** What the server answered Run now with. */
+  requestId: string;
+  /** When the server recorded the request, on the clock that stamps a run's start. */
+  requestedAt: number;
+  /** When the verdict is owed, on that same server clock: the request's expiry. */
+  owedSince?: number;
+}): { conversationId: string | null; settled?: InsightLastRun } | undefined {
+  const { runInFlight, lastRun } = setting;
+  if (
+    runInFlight &&
+    (runInFlight.runId === requestId ||
+      (runInFlight.startedAt >= requestedAt && runInFlight.startedAt < owedSince))
+  ) {
+    return { conversationId: runInFlight.conversationId };
+  }
+  const settledInLangy =
+    lastRun?.conversationId != null &&
+    startOfSettled(lastRun) >= requestedAt &&
+    startOfSettled(lastRun) < owedSince;
+  if (lastRun && (lastRun.runId === requestId || settledInLangy)) {
+    return { conversationId: lastRun.conversationId, settled: lastRun };
+  }
+  return undefined;
+}
+
+/** What the deadline's read shows of the request. */
+export type DeadlineRead =
+  | { kind: "run"; run: NonNullable<ReturnType<typeof requestedRunOf>> }
+  /** No run for the request shows: whether one took it is unknown. */
+  | { kind: "none" }
+  /** Only a run that started after the deadline: it says nothing of the request. */
+  | { kind: "unrelated" };
+
+/** The deadline's read, told apart: the request's run, no run, or a later run that is not it. */
+export function deadlineReadOf(request: {
+  setting: InsightDailyRunSetting;
+  requestId: string;
+  requestedAt: number;
+}): DeadlineRead {
+  // The deadline on the server's clock, the one that stamps a run's start: a browser clock
+  // that runs fast or slow must not move which runs count.
+  const owedSince = request.requestedAt + INSIGHT_DAILY_RUN_EXPIRY_MS;
+  const run = requestedRunOf({ ...request, owedSince });
+  if (run) return { kind: "run", run };
+  return requestedRunOf(request) ? { kind: "unrelated" } : { kind: "none" };
+}

@@ -14,6 +14,7 @@ import type {
   WakeHandler,
 } from "@langwatch/eventing";
 import {
+  INSIGHT_DAILY_RUN_EXPIRY_MS,
   insightRunBoardSchema,
   insightRunHourSchema,
   insightRunMaxInsightsSchema,
@@ -32,12 +33,7 @@ import {
   restartSkipStreak,
   scheduledRunId,
 } from "../rules/insight-daily-skip-streak.rules.ts";
-import {
-  INSIGHT_DAILY_RUN_INTENT,
-  INSIGHT_DAILY_RUN_LEASE_MS,
-  INSIGHT_DAILY_RUN_MAX_ATTEMPTS,
-  type runBoardIntentSchema,
-} from "./insight-daily-run.intent.ts";
+import { INSIGHT_DAILY_RUN_INTENT, type runBoardIntentSchema } from "./insight-daily-run.intent.ts";
 
 export const INSIGHT_DAILY_RUN_PROCESS_NAME = "dailyInsightsSchedule" as const;
 
@@ -52,7 +48,10 @@ const scheduleSchema = z.object({
 /** The schedule's fields came after the first instances, each with a default. */
 export const insightDailyRunStateSchema = z.object({
   lastRequestId: z.string().nullable(),
-  /** The run whose outcome is not recorded yet; `slot` is absent on an older instance. */
+  /**
+   * The run whose outcome is not recorded yet; `slot` is absent on an older instance. `since`
+   * is when it started, every release keeps it, and it orders the schedule's runs (ADR-004).
+   */
   pendingRun: z
     .object({ runId: z.string(), since: z.number(), slot: z.number().optional() })
     .nullable(),
@@ -79,9 +78,6 @@ export const INITIAL_INSIGHT_DAILY_RUN_STATE: InsightDailyRunState = {
   skipStreak: NO_SKIP_STREAK,
   turnedOff: false,
 };
-
-/** A run that recorded no outcome within every attempt's lease is lost, and blocks no more. */
-const PENDING_RUN_EXPIRY_MS = INSIGHT_DAILY_RUN_LEASE_MS * INSIGHT_DAILY_RUN_MAX_ATTEMPTS;
 
 type InsightDailyRunIntents = {
   [INSIGHT_DAILY_RUN_INTENT]: IntentSpec<typeof runBoardIntentSchema>;
@@ -129,12 +125,21 @@ type Started = { state: InsightDailyRunState; intents: ProcessIntent[] };
 /** One run at a time per person and board; a run that outlived every lease holds it no more. */
 function isRunInFlight({ pendingRun }: InsightDailyRunState, context: Context): boolean {
   const now = Math.max(context.at, context.now);
-  return pendingRun !== null && now - pendingRun.since < PENDING_RUN_EXPIRY_MS;
+  return pendingRun !== null && now - pendingRun.since < INSIGHT_DAILY_RUN_EXPIRY_MS;
+}
+
+type PendingRun = NonNullable<InsightDailyRunState["pendingRun"]>;
+type LostRun = NonNullable<z.input<typeof runBoardIntentSchema>["supersedes"]>;
+
+/** The lost run as the run that replaces it records it; an older instance kept no slot. */
+function lostRunOf({ runId, since, slot = since }: PendingRun): LostRun {
+  return { runId, slot, since };
 }
 
 /**
- * The one way a run starts, for a wake and for a request alike: one `runBoard` intent. A run
- * still pending here outlived every lease, so the new run is handed it to record as lost.
+ * The one way a run starts, for a wake and for a request alike: one `runBoard` intent that
+ * carries when it started. A run still pending here outlived every lease, so the new run is
+ * handed it to record as lost.
  */
 function startRun({
   state,
@@ -153,7 +158,8 @@ function startRun({
       context.intent(INSIGHT_DAILY_RUN_INTENT, `run:${run.runId}`, {
         scheduleId: context.key,
         ...run,
-        ...(lost ? { supersedes: { runId: lost.runId, slot: lost.slot ?? lost.since } } : {}),
+        since,
+        ...(lost ? { supersedes: lostRunOf(lost) } : {}),
       }),
     ],
   };

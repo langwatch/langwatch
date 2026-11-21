@@ -187,13 +187,17 @@ async function harness() {
       return { conversationId: "conversation_run", turnId: "turn_run" };
     });
 
-  const startUnattendedTurn = (projectId: string) =>
+  const startUnattendedTurn = (
+    projectId: string,
+    { isExemptFromRateLimit }: { isExemptFromRateLimit?: boolean } = {},
+  ) =>
     app.startUnattendedTurn({
       projectId,
       userId: "user_1",
       idempotencyKey: `run-${projectId}-${unattendedDispatched.mock.calls.length}`,
       text: "Read the board.",
       title: "Daily insights - Costs - 2026-10-09",
+      ...(isExemptFromRateLimit === undefined ? {} : { isExemptFromRateLimit }),
     });
 
   return { startTurn, dispatched, startUnattendedTurn, unattendedDispatched, unattendedPrepared };
@@ -280,6 +284,30 @@ describe("LangyModule.startUnattendedTurn", () => {
         turnId: "turn_1",
       });
       expect(dispatched).toHaveBeenCalledOnce();
+    });
+  });
+
+  describe("given a project whose unattended turns reached their window", () => {
+    describe("when its caller marks a turn as not counted", () => {
+      /** @scenario "A caller can start an unattended turn outside the window" */
+      it("starts it, and the window counts nothing for it", async () => {
+        const { startUnattendedTurn } = await harness();
+        const exempt = () => startUnattendedTurn("project-free", { isExemptFromRateLimit: true });
+        // Uncounted turns first: the whole window is still there for counted ones after them.
+        for (let index = 0; index <= FREE_UNATTENDED_TURNS_PER_MINUTE; index++) {
+          await expect(exempt()).resolves.toMatchObject({ turnId: "turn_run" });
+        }
+        for (let index = 0; index < FREE_UNATTENDED_TURNS_PER_MINUTE; index++) {
+          await expect(startUnattendedTurn("project-free")).resolves.toMatchObject({
+            turnId: "turn_run",
+          });
+        }
+
+        await expect(startUnattendedTurn("project-free")).rejects.toMatchObject({
+          code: "langy_turns_rate_limited",
+        });
+        await expect(exempt()).resolves.toMatchObject({ turnId: "turn_run" });
+      });
     });
   });
 

@@ -10,7 +10,9 @@ import { z } from "zod";
 import {
   configureInsightDailyRunInputSchema,
   insightBoardDailyRunScopeSchema,
+  insightDailyRunRequestedSchema,
   insightDailyRunSettingSchema,
+  runInsightDailyRunNowInputSchema,
   turnOffInsightDailyRunInputSchema,
 } from "./insight-daily-run.ts";
 import {
@@ -46,7 +48,7 @@ export const insightTrpc = defineTrpcContract("insights")
   .withInput(insightScopeSchema)
   .withOutput(z.void())
 
-  // The caller's own daily run on one board; refetched when it is set or a run of it settles.
+  // The caller's own daily run on one board; refetched when it is set, or a run starts or settles.
   .query("getBoardDailyRun", { invalidatedBy: INSIGHT_DAILY_RUN_SETTING_EVENT_TYPES })
   .withInput(insightBoardDailyRunScopeSchema)
   .withOutput(insightDailyRunSettingSchema)
@@ -58,4 +60,8 @@ export const insightTrpc = defineTrpcContract("insights")
   .mutation("turnOffBoardDailyRun")
   .withInput(turnOffInsightDailyRunInputSchema)
   .withOutput(z.void())
+
+  .mutation("runBoardDailyRunNow")
+  .withInput(runInsightDailyRunNowInputSchema)
+  .withOutput(insightDailyRunRequestedSchema)
   .build();

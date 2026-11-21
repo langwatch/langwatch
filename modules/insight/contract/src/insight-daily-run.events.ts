@@ -35,11 +35,19 @@ export const insightRunRequestedEventDataSchema: InsightRunRequestedEventDataSch
   insightRunRequestedEventDataSchemaDefinition;
 export type InsightRunRequestedEventData = z.infer<typeof insightRunRequestedEventDataSchema>;
 
+/**
+ * When the schedule's process started the run, epoch milliseconds: the order of its runs
+ * (ADR-004). Optional wherever it rides: a run an older worker carried has none, and is
+ * ordered by its slot, which is never after its start.
+ */
+export const insightRunSinceSchema = z.number().nonnegative();
+
 /** The run passed its gate and Langy took the turn. `slot` is the instant the run is for. */
 const insightRunStartedEventDataSchemaDefinition = z.object({
   ...scheduleRefShape,
   runId: z.string().min(1),
   slot: z.number().int().nonnegative(),
+  since: insightRunSinceSchema.optional(),
   conversationId: z.string().min(1),
   turnId: z.string().min(1),
 });
@@ -58,6 +66,7 @@ const insightRunSettledEventDataSchemaDefinition = z.object({
   ...scheduleRefShape,
   runId: z.string().min(1),
   slot: z.number().int().nonnegative(),
+  since: insightRunSinceSchema.optional(),
   outcome: insightRunOutcomeSchema,
   reason: insightRunReasonSchema.nullable(),
   filedCount: z.number().int().nonnegative(),

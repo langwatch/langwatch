@@ -4,6 +4,7 @@ import { PrismaInsightDailyScheduleProjectionRepository } from "./prisma.insight
 import { PrismaInsightDailyScheduleRepository } from "./prisma.insight-daily-schedule.repository.ts";
 import { PrismaInsightProjectionRepository } from "./prisma.insight-projection.repository.ts";
 import { PrismaInsightReaderProjectionRepository } from "./prisma.insight-reader-projection.repository.ts";
+import { PrismaInsightRunInFlightProjectionRepository } from "./prisma.insight-run-in-flight-projection.repository.ts";
 import { PrismaInsightRepository } from "./prisma.insight.repository.ts";
 
 export const PostgresInsightRepositories = prismaRepositories({
@@ -12,4 +13,5 @@ export const PostgresInsightRepositories = prismaRepositories({
   insightReaderProjection: PrismaInsightReaderProjectionRepository,
   dailySchedules: PrismaInsightDailyScheduleRepository,
   dailyScheduleProjection: PrismaInsightDailyScheduleProjectionRepository,
+  runInFlightProjection: PrismaInsightRunInFlightProjectionRepository,
 });

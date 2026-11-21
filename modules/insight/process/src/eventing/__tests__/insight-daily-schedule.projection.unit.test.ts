@@ -4,6 +4,7 @@
  * @see modules/insight/specs/insight-daily-run.feature
  */
 
+import { buildIntentAccessor } from "@langwatch/eventing";
 import {
   INSIGHT_DAILY_RUN_EVENT_TYPES,
   INSIGHT_DAILY_RUN_EVENT_VERSION,
@@ -22,6 +23,11 @@ import {
   InsightScheduleRearmRequestedEventSchema,
   InsightScheduleTurnedOffEventSchema,
 } from "../insight-daily-run.events.ts";
+import { runBoardIntentSchema } from "../insight-daily-run.intent.ts";
+import {
+  INITIAL_INSIGHT_DAILY_RUN_STATE,
+  insightRunSettled,
+} from "../insight-daily-run.process.ts";
 import {
   applyInsightDailyRunEvent,
   createInsightDailyScheduleProjection,
@@ -35,6 +41,15 @@ const PROJECTION = createInsightDailyScheduleProjection({
   store: MemoryInsightDailyScheduleProjectionRepository.create({
     rows: InsightMemoryStore.create(),
   }),
+});
+
+/** The schedule's process as it takes an event at `at`. */
+const processContext = (at: number) => ({
+  at,
+  now: at,
+  key: SCHEDULE.scheduleId,
+  projectId: OWNER.projectId,
+  intent: buildIntentAccessor({ runBoard: { schema: runBoardIntentSchema, run: async () => {} } }),
 });
 
 const envelope = (at: number) => ({
@@ -357,5 +372,40 @@ describe("given a setting on a stream that is not its person's and board's", () 
       PROJECTION.init(),
     );
     expect(applyInsightDailyRunEvent(on, turnedOff(T0 + 60_000, other))).toBe(on);
+  });
+});
+
+describe("given a skipped scheduled run, then an operator's and a late wake's run, skipped", () => {
+  const DAY = 24 * 60 * 60_000;
+  // The operator asked after the next slot was due, so the late wake's run is for an earlier slot.
+  const ASKED_AT = T0 + DAY + 3 * 60 * 60_000;
+  const skipped = { outcome: "skipped", reason: "no_access", filedCount: 0 } as const;
+  const outcomes = [
+    settled(T0 + 60_000, { ...skipped, runId: `slot:${T0}`, slot: T0, since: T0 }),
+    settled(ASKED_AT + 60_000, { ...skipped, runId: "request-1", slot: ASKED_AT, since: ASKED_AT }),
+    settled(ASKED_AT + 120_000, {
+      ...skipped,
+      runId: `slot:${T0 + DAY}`,
+      slot: T0 + DAY,
+      since: ASKED_AT + 100_000,
+    }),
+  ];
+
+  describe("when the run's row and the schedule's process fold the three outcomes", () => {
+    /** @scenario "The run's row counts the skipped days the schedule's process counts" */
+    it("counts 2 skipped days on both", () => {
+      const row = outcomes.reduce(
+        (state, event) => applyInsightDailyRunEvent(state, event),
+        PROJECTION.init(),
+      );
+      const instance = outcomes.reduce(
+        (state, { data, occurredAt }) =>
+          insightRunSettled(state, data, processContext(occurredAt)).state,
+        INITIAL_INSIGHT_DAILY_RUN_STATE,
+      );
+
+      expect(row.consecutiveSkips).toBe(2);
+      expect(instance.skipStreak.count).toBe(row.consecutiveSkips);
+    });
   });
 });

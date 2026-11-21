@@ -15,6 +15,7 @@ import {
   type FileInsightInput,
   type InsightBoardDailyRunScope,
   type InsightDailyRun,
+  type InsightDailyRunRequested,
   type InsightDailyRunSetting,
   type InsightEntry,
   type InsightApi as InsightApiContract,
@@ -81,6 +82,7 @@ export class InsightModule implements InsightApiContract {
   readonly #scheduleOperator: InsightDailyScheduleOperatorService;
   readonly #dailyRunCommands: InsightDailyRunCommandsService;
   readonly #dailyRunPipeline: InsightDailyRunPipelineDefinition;
+  readonly #runs: InsightDailyRunService;
 
   private constructor(parts: {
     insights: InsightService;
@@ -92,6 +94,7 @@ export class InsightModule implements InsightApiContract {
     scheduleOperator: InsightDailyScheduleOperatorService;
     dailyRunCommands: InsightDailyRunCommandsService;
     dailyRunPipeline: InsightDailyRunPipelineDefinition;
+    runs: InsightDailyRunService;
   }) {
     this.#insights = parts.insights;
     this.#commands = parts.commands;
@@ -102,6 +105,7 @@ export class InsightModule implements InsightApiContract {
     this.#scheduleOperator = parts.scheduleOperator;
     this.#dailyRunCommands = parts.dailyRunCommands;
     this.#dailyRunPipeline = parts.dailyRunPipeline;
+    this.#runs = parts.runs;
   }
 
   static create(setup: InsightSetup): InsightModule {
@@ -152,6 +156,7 @@ export class InsightModule implements InsightApiContract {
       dailyRunCommands,
       dailyRunPipeline: buildInsightDailyRunPipeline({
         scheduleStore: repositories.dailyScheduleProjection,
+        runInFlightStore: repositories.runInFlightProjection,
         runs,
         reconcile: scheduleReconcile,
         audit: InsightDailyRunAuditService.create({ auditLog: dependencies.auditLog }),
@@ -161,6 +166,7 @@ export class InsightModule implements InsightApiContract {
           projects: dependencies.projects,
         }),
       }),
+      runs,
     });
   }
 
@@ -177,7 +183,7 @@ export class InsightModule implements InsightApiContract {
   /**
    * The pipeline `insight_daily_run` registers, built once by {@link create}. The process that
    * hosts it lends its process store, which the reconcile pass and the operator's list read
-   * each schedule's wake from.
+   * each schedule's wake from, and a run asks whether it is still its schedule's.
    */
   dailyRunPipeline({
     processStore,
@@ -186,6 +192,7 @@ export class InsightModule implements InsightApiContract {
   }): InsightDailyRunPipelineDefinition {
     this.#scheduleReconcile.connect(processStore);
     this.#scheduleOperator.connect(processStore);
+    this.#runs.connect(processStore);
     return this.#dailyRunPipeline;
   }
 
@@ -227,6 +234,11 @@ export class InsightModule implements InsightApiContract {
   async requestDailyRun(input: RequestInsightDailyRunInput): Promise<{ requestId: string }> {
     await this.#rollout.assertEnabled(input);
     return this.#dailySchedules.requestRun(input);
+  }
+
+  async runDailyRunNow(input: RequestInsightDailyRunInput): Promise<InsightDailyRunRequested> {
+    await this.#rollout.assertEnabled(input);
+    return this.#dailySchedules.runNow(input);
   }
 
   async findDailyRuns(input: { projectId: string; userId: string }): Promise<InsightDailyRun[]> {
