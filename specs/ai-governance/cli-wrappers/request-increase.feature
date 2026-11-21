@@ -1,10 +1,10 @@
-Feature: Budget-increase request — `/me/budget/request` page + admin notification
+Feature: Budget-increase request — `/coding-agents/budget/request` page + admin notification
   As a developer who hit a personal/team budget cap
   I want one click to ask my org admin to raise it (or extend the period)
   So that I'm not stuck typing a Slack message and copy-pasting numbers — the
   context (scope, limit_usd, spent_usd, period) carries through automatically.
 
-  One surface: `/me/budget/request?scope=…&scope_id=…&limit_usd=…&spent_usd=…`
+  One surface: `/coding-agents/budget/request?scope=…&scope_id=…&limit_usd=…&spent_usd=…`
   reads those query params, renders a real page, and on submit calls
   `api.user.requestBudgetIncrease` which emails the org admin. The CLI's 402
   budget box prints the URL to this page directly (the gateway-signed variant
@@ -21,7 +21,7 @@ Feature: Budget-increase request — `/me/budget/request` page + admin notificat
   # ────────────────────────────────────────────────────────────────────
   Scenario: Page reads scope context from query params
     When the user navigates to
-      `/me/budget/request?scope=user&scope_id=usr_x&limit_usd=10.00&spent_usd=10.50&period=monthly`
+      `/coding-agents/budget/request?scope=user&scope_id=usr_x&limit_usd=10.00&spent_usd=10.50&period=monthly`
     Then the page renders a "Request budget increase" header
     And the page renders a context block showing
       | field          | value           |
@@ -33,7 +33,7 @@ Feature: Budget-increase request — `/me/budget/request` page + admin notificat
     And the page renders a single primary "Send request" button
 
   Scenario: Page handles missing/invalid query params gracefully
-    When the user navigates to `/me/budget/request` (no query params)
+    When the user navigates to `/coding-agents/budget/request` (no query params)
     Then the page renders the form with the context block omitted
     And the user can still type a free-form message and submit
 
@@ -87,7 +87,7 @@ Feature: Budget-increase request — `/me/budget/request` page + admin notificat
 
   Scenario: User without organization (personal-only / ungoverned)
     Given the user has NO organization membership (org-less personal account)
-    When the user navigates to `/me/budget/request`
+    When the user navigates to `/coding-agents/budget/request`
     Then the page renders a friendly empty-state explaining that budget-increase
       requests only apply to organization-managed accounts
     And no submit button is rendered

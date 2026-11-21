@@ -198,7 +198,7 @@ Feature: OTTL-driven OTLP ingestion source — extract usage + spend
     Then /governance dashboard's "Spend (30d)" reflects the spend for
       that traffic
     And /governance dashboard's "active users" counts Bob
-    And /me dashboard's "Recent activity" lists per-request rows with
+    And /coding-agents dashboard's "Recent activity" lists per-request rows with
       model name and request_id
     And the source row's "events received" counter increments
 

@@ -67,7 +67,7 @@ Then in any terminal:
   langwatch shell      # Subshell with ANTHROPIC_BASE_URL etc. preloaded
 
 Per-user identity comes from your SSO; spend / quota live under each
-dev's Personal Workspace at https://<your-host>/me .
+dev's Personal Workspace at https://<your-host>/coding-agents .
 
 ──────────────────────────────────────────────────────────────────────
 5. Helpful next steps

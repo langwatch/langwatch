@@ -14,7 +14,7 @@ Feature: AI Gateway Governance — Admin Oversight Dashboard
     "Cross-org spend / per-user usage / anomaly alerts / IngestionSource health"
 
   This page is the union of every other governance surface. It does NOT
-  replace `/me` (Persona 1+2) or any per-project page; it summarizes
+  replace `/coding-agents` (Persona 1+2) or any per-project page; it summarizes
   across the org so the admin doesn't have to fan out manually.
 
   Iter-9 ships the UI with mocked data + the route gated behind

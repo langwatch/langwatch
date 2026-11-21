@@ -1094,7 +1094,7 @@ A Lite Member is a read-only seat, counted apart from full seats. On a team or a
 
 A Developer is a seat for somebody who needs their own place to work and no access to the shared projects: a developer sending traces from Claude Code or another coding agent, for example. A Developer gets a personal project and everything a member can do inside it: send traces from the CLI, run queries and evaluations, manage its keys.
 
-A Developer cannot open, be invited to, or be added to any shared team or project, and cannot be given access through a group either. The product switcher offers a Developer the **Me** workspace only: the Gateway and Governance products are organisation-wide, so a Developer cannot open them, by the switcher or by address, and never sees the organisation's gateway keys. Developers are counted on the seat panel and never limited by the plan.
+A Developer cannot open, be invited to, or be added to any shared team or project, and cannot be given access through a group either. The product switcher offers a Developer the **Coding agents** workspace only: the Gateway and Governance products are organisation-wide, so a Developer cannot open them, by the switcher or by address, and never sees the organisation's gateway keys. Developers are counted on the seat panel and never limited by the plan.
 
 Moving a member to a Developer seat removes their bindings on every shared team, shared project and the organization, and records each removal in the audit log. Their personal project, its traces and their API keys stay. A key that pointed at a shared project stops working on its own, because a key can never do more than its owner can. Moving a Developer to a Member seat grants no team access on its own; add teams afterwards.
 
@@ -7634,7 +7634,7 @@ To choose which coding tools and which providers members see on their portal, op
 
 Mint a key for yourself and send one completion through it.
 
-1. Open **Configure** in your personal workspace (`/me/configure`), click **Add a new key**, and copy the secret. It is shown once.
+1. Open **Configure** in your personal workspace (`/coding-agents/configure`), click **Add a new key**, and copy the secret. It is shown once.
 2. Send the request:
 
 ```bash
@@ -8063,7 +8063,7 @@ The first run issues your personal key, prints `issued your personal virtual key
 
 ## Your keys and devices
 
-Open **Configure** in your personal workspace (`/me/configure`). The **Virtual keys** tab lists your keys with their label, the device that issued them and their last use. **Add a new key** creates a second key with a label of your choice, for example `jane-laptop-2`; the secret is shown once. The **Devices and keys** tab lists the CLI sessions signed in on your account, each with the ingestion keys it minted.
+Open **Configure** in your personal workspace (`/coding-agents/configure`). The **Virtual keys** tab lists your keys with their label, the device that issued them and their last use. **Add a new key** creates a second key with a label of your choice, for example `jane-laptop-2`; the secret is shown once. The **Devices and keys** tab lists the CLI sessions signed in on your account, each with the ingestion keys it minted.
 
 Revoke a key from the same list when a laptop is lost or a secret leaked. The gateway refuses the key on the next request.
 
@@ -8075,11 +8075,11 @@ An ingestion key that the CLI mints for a tool belongs to the login session on t
 
 ## Your usage and budget
 
-Open **My Usage** (`/me`) for your spend, your requests and your recent traces. The page lists every budget that applies to you and warns from 80% of a limit.
+Open **My Usage** (`/coding-agents`) for your spend, your requests and your recent traces. The page lists every budget that applies to you and warns from 80% of a limit.
 
 A budget applies to you when your admin creates one with **Applies to: Member** and picks you, or binds one to your personal team, your personal project or your key. Your admin sets the window: per day, per week, per calendar month, or a total with no reset.
 
-When a blocking budget is reached, the gateway refuses the request with `402 budget_exceeded`. The wrapper checks your budget before it starts the tool and prints a link to `/me/budget/request` with the limit and the spend filled in, so you can ask your admin for an increase from there.
+When a blocking budget is reached, the gateway refuses the request with `402 budget_exceeded`. The wrapper checks your budget before it starts the tool and prints a link to `/coding-agents/budget/request` with the limit and the spend filled in, so you can ask your admin for an increase from there.
 
 **Also check:** [Budgets](/ai-gateway/budgets) for the budget windows and the error body.
 
@@ -13348,7 +13348,7 @@ Anomaly rules are not in the table: they have no REST surface and no authoring p
 | Invites | `/api/governance/invites` | [Members and Teams](/platform/members-and-teams) |
 | Role bindings | `/api/governance/role-bindings` | [Access Control (RBAC)](/platform/rbac) |
 | AI tool entries | `/api/governance/ai-tool-entries` | [Personas](/ai-governance/personas) |
-| Sessions | `/api/governance/sessions` | [No-spy mode](/ai-governance/no-spy-mode) (sessions live alongside in `/me/devices`) |
+| Sessions | `/api/governance/sessions` | [No-spy mode](/ai-governance/no-spy-mode) (sessions live alongside in `/coding-agents/configure?tab=devices`) |
 | Virtual keys | `/api/governance/virtual-keys` | [Control plane](/ai-governance/control-plane) |
 
 `audit-log` is intentionally read-only (no create, update, delete), audit rows are emitted by other state-changing routes and are immutable by design.
@@ -14101,7 +14101,7 @@ existing routes:
 | Surface | Purpose | Audience | Where it lives |
 |---------|---------|----------|----------------|
 | `/governance` | Daily-use **org governance home**: spend, ingestion-source health, anomalies, per-user breakdown. Read-mostly. | Org admins whose org's `setupState.governanceActive` is `true` (see [Persona-based home routing](#persona-based-home-routing-the-setup-state-signal) below) | Top-level route, org-scoped. |
-| `/me`, `/me/settings` | Daily-use **personal home**: your usage, your budget, your personal VK, your IDE setup snippet. | Any user with a personal VK | Top-level route, principal-scoped. |
+| `/coding-agents`, `/coding-agents/configure` | Daily-use **personal home**: your usage, your budget, your personal VK, your IDE setup snippet. | Any user with a personal VK | Top-level route, principal-scoped. |
 | `/[project]/...` | LLMOps daily-use, traces, evals, datasets, scenarios, workflows. | Project members | Per-project routes. **Unchanged** from current LangWatch. |
 | `/governance/ingestion-sources`, `/gateway/routing-policies` | Admin-authoring (CRUD), create, rotate, archive sources, publish routing policies. | The governance pages open on `governance:view` and `/gateway/routing-policies` on `routingPolicies:view`. Each write control needs the matching `:manage` grant (`ingestionSources:manage`, `routingPolicies:manage`) and is hidden without it. | Governance sub-routes, deliberately separate from daily-use surfaces. |
 
@@ -14355,7 +14355,7 @@ cursor/gemini`, `langwatch instrument <tool>`, `langwatch whoami`,
   device approval).
 - ✅ **Routing Policies** (Org/Team/Project hierarchy, provider-cred
   validation).
-- ✅ **`/me` + `/me/settings`** dashboards (web app, gated behind the
+- ✅ **`/coding-agents` + `/coding-agents/configure`** dashboards (web app, gated behind the
   `release_ui_ai_governance_enabled` flag).
 - ✅ **`/governance`** admin oversight dashboard
   (org-admin-only via `organization:manage` permission, plus the
@@ -14467,7 +14467,7 @@ You are an org admin on a fresh LangWatch deployment. By the end of this page yo
 
 - Published a default [Routing Policy](/ai-gateway/governance/routing-policies) so developers can sign in via `langwatch login`.
 - Configured an [Ingestion Source](/ai-governance/ingestion-sources/index) that lands telemetry from your gateway (or any OTLP-compatible upstream) in the unified trace store.
-- Imported the [AI Tools Portal](/ai-governance/personal-portal/admin-catalog#starter-pack) starter pack so every developer's `/me` page renders a real catalog instead of an empty state.
+- Imported the [AI Tools Portal](/ai-governance/personal-portal/admin-catalog#starter-pack) starter pack so every developer's `/coding-agents` page renders a real catalog instead of an empty state.
 - Invited a colleague through `/settings/members` and watched their first request land in `/governance`.
 
 If you are a developer trying to _use_ the org as a developer (not configure it), jump to the [developer walkthrough](/ai-governance/getting-started-developer) instead.
@@ -14519,7 +14519,7 @@ If no upstream is ready yet, skip this step. Your gateway itself is an implicit 
 
 ## Step 4: Import the AI Tools Portal starter pack
 
-The [AI Tools Portal](/ai-governance/personal-portal/overview) is the card grid every developer sees on `/me`. A fresh org has an empty catalog; the [admin editor](/ai-governance/personal-portal/admin-catalog) at `/governance/inventory?tab=catalog` shows you a one-click **Import starter pack** CTA on first visit:
+The [AI Tools Portal](/ai-governance/personal-portal/overview) is the card grid every developer sees on `/coding-agents`. A fresh org has an empty catalog; the [admin editor](/ai-governance/personal-portal/admin-catalog) at `/governance/inventory?tab=catalog` shows you a one-click **Import starter pack** CTA on first visit:
 
 1. Navigate to **Governance → Inventory → Catalog tab** (`/governance/inventory?tab=catalog`).
 2. Click **Import starter pack**.
@@ -14601,7 +14601,7 @@ In the meantime, [Budgets](/ai-gateway/budgets) are the control that is availabl
 | Symptom | Likely cause | Fix |
 |---|---|---|
 | Developer sees `409 no_default_routing_policy` on `langwatch login` | Step 2 skipped or no policy marked default | [Routing Policies](/ai-gateway/governance/routing-policies): pick one, tick **Mark as default**. |
-| `/me` shows "your IT team is still setting things up" empty state | Step 4 skipped | Open `/governance/inventory?tab=catalog` → **Import starter pack**. |
+| `/coding-agents` shows "your IT team is still setting things up" empty state | Step 4 skipped | Open `/governance/inventory?tab=catalog` → **Import starter pack**. |
 | Ingestion source sits at `awaiting_first_event` forever | Source-type doesn't have a wired adapter yet | [Ingestion Sources index → State of each receiver](/ai-governance/ingestion-sources/index#state-of-each-receiver-at-a-glance): three rows are setup-contract-only as of this release. |
 | `/governance` doesn't appear in your sidebar | Org's [setup-state OR-of-flags](/ai-governance/control-plane#persona-based-home-routing-the-setup-state-signal) hasn't tripped yet | Any one of these is enough: Personal VKs, Routing Policies, Ingestion Sources, Anomaly Rules, Recent activity (30d). After Steps 2-7 above you will have several. |
 | Member colleague got an `Access Restricted` page on `/settings/audit-log` | Working as designed, audit log is admin-only | Either elevate them to `Admin` or grant a custom role with `organization:manage` (delegable via the `CustomRolePermissions` JSON column). |
@@ -14612,7 +14612,7 @@ In the meantime, [Budgets](/ai-gateway/budgets) are the control that is availabl
 
 ---
 title: Your first 5 minutes (developer)
-description: A new-developer walkthrough, install the LangWatch CLI, sign in via your company SSO, land on /me, run your first request through the gateway, and read your spend back. Each step links into the deeper docs.
+description: A new-developer walkthrough, install the LangWatch CLI, sign in via your company SSO, land on /coding-agents, run your first request through the gateway, and read your spend back. Each step links into the deeper docs.
 sidebarTitle: First 5 minutes (dev)
 ---
 
@@ -14622,7 +14622,7 @@ When you finish you will have:
 
 - A signed-in `langwatch` CLI on your laptop.
 - A [Personal Virtual Key](/ai-gateway/governance/personal-keys) bound to your identity, your monthly budget, and your org's [Routing Policy](/ai-gateway/governance/routing-policies).
-- One real request flowing through the [AI Gateway](/ai-gateway/overview) that you can see in your own [/me dashboard](/ai-governance/personal-portal/overview).
+- One real request flowing through the [AI Gateway](/ai-gateway/overview) that you can see in your own [/coding-agents dashboard](/ai-governance/personal-portal/overview).
 
 If you are an admin trying to make the org _ready_ for developers to do this, jump to the [admin walkthrough](/ai-governance/getting-started-admin) instead.
 
@@ -14634,7 +14634,7 @@ Before you start, your IT admin should already have:
 
 1. Provisioned your account in LangWatch (you should have an invite email or be able to sign in via your company SSO).
 2. Published at least one default [Routing Policy](/ai-gateway/governance/routing-policies). If they haven't, the CLI fails with a `409 no_default_routing_policy` error, see the [CLI error catalog](/ai-governance/cli-debug#error-catalog) and ping your admin.
-3. Optionally: published an [AI Tools Portal](/ai-governance/personal-portal/overview) catalog (the card grid you'll see on `/me`). If they haven't, your `/me` page shows a "your IT team is still setting things up" empty state, you can still use the CLI directly.
+3. Optionally: published an [AI Tools Portal](/ai-governance/personal-portal/overview) catalog (the card grid you'll see on `/coding-agents`). If they haven't, your `/coding-agents` page shows a "your IT team is still setting things up" empty state, you can still use the CLI directly.
 
 If any of those are missing your admin's first stop is [From zero to your first governed request](/ai-governance/getting-started-admin).
 
@@ -14667,9 +14667,9 @@ The Personal VK is bound to your identity via JWT claims (`organization_id`, `pr
 
 If sign-in fails, the [CLI error catalog](/ai-governance/cli-debug#error-catalog) maps every error code (`409 no_default_routing_policy`, `401 unauthorized`, `403 forbidden`) back to the admin action that fixes it.
 
-## Step 3: Land on /me
+## Step 3: Land on /coding-agents
 
-Open `https://<your-langwatch-host>/me` in a browser. You're on your **personal home**.
+Open `https://<your-langwatch-host>/coding-agents` in a browser. You're on your **personal home**.
 
 What you see (top to bottom):
 
@@ -14677,7 +14677,7 @@ What you see (top to bottom):
 - **My Usage**: spend this month vs your budget, request count, most-used model.
 - **Spending over time**: a daily bar chart for the last 30 days.
 - **By tool**: your spend split by coding assistant, model provider.
-- **Recent activity**: the last few requests you made (timestamp, model, cost). No prompt or completion content is rendered here even if the org runs in `full` [no-spy mode](/ai-governance/no-spy-mode): `/me` is a ledger view, not a trace viewer.
+- **Recent activity**: the last few requests you made (timestamp, model, cost). No prompt or completion content is rendered here even if the org runs in `full` [no-spy mode](/ai-governance/no-spy-mode): `/coding-agents` is a ledger view, not a trace viewer.
 
 If your admin has published a catalog, the next step is one click. If they haven't, skip to the alternative path at the bottom of this page.
 
@@ -14712,7 +14712,7 @@ A plain `claude` run then reports to LangWatch. Add `--project <id-or-slug>` to 
 
 ## Step 5: Read your spend back
 
-Refresh `/me`. You should see:
+Refresh `/coding-agents`. You should see:
 
 - **Recent activity**: your request from Step 4 with timestamp, model, and cost.
 - **Spending over time**: today's bar updated.
@@ -14723,14 +14723,14 @@ If the request didn't appear, the [CLI debug commands](/ai-governance/cli-debug)
 ## Where to next
 
 - **Want to switch tools?** Every coding assistant has its own setup page: [Claude Code](/coding-agents/claude-code), [Codex](/coding-agents/openai-codex), [Gemini CLI](/coding-agents/gemini-cli), [Cursor](/coding-agents/overview), [opencode](/coding-agents/opencode), [Aider](/coding-agents/overview).
-- **Want to use a model provider directly from your code?** Click the provider tile on `/me` (OpenAI, Anthropic, Bedrock, Gemini), name a key, and copy the secret once. The form posts to `personalVirtualKeys.issuePersonal` and the result is a virtual key you drop into your app's config, same gateway, same budget, no provider credentials in your dotfiles. See [Model-provider tiles](/ai-governance/personal-portal/end-user#model-provider-tiles).
+- **Want to use a model provider directly from your code?** Click the provider tile on `/coding-agents` (OpenAI, Anthropic, Bedrock, Gemini), name a key, and copy the secret once. The form posts to `personalVirtualKeys.issuePersonal` and the result is a virtual key you drop into your app's config, same gateway, same budget, no provider credentials in your dotfiles. See [Model-provider tiles](/ai-governance/personal-portal/end-user#model-provider-tiles).
 - **Want to share a key with your team?** Don't use a personal VK, create a project and a project-scoped VK instead. The portal nudges you toward this with a "building an app for your team? Consider creating a project" hint.
-- **Want to know which devices are signed in?** [/me/devices](/ai-governance/personal-portal/sessions) lists every active CLI session with platform, hostname, and last-used timestamp; revoke any session in one click.
+- **Want to know which devices are signed in?** [/coding-agents/configure?tab=devices](/ai-governance/personal-portal/sessions) lists every active CLI session with platform, hostname, and last-used timestamp; revoke any session in one click.
 - **Got an error?** [CLI debug → Error catalog](/ai-governance/cli-debug#error-catalog) maps every CLI error to the admin action that fixes it.
 
 ## Alternative path: admin hasn't published a catalog yet
 
-If `/me` shows the empty-state "your IT team is still setting things up" message, you can still use the CLI directly without the portal:
+If `/coding-agents` shows the empty-state "your IT team is still setting things up" message, you can still use the CLI directly without the portal:
 
 ```bash
 # Sign in
@@ -15619,7 +15619,7 @@ LangWatch's **Ingestion Templates** let you connect tool-specific telemetry sour
 without LangWatch ever participating in the upstream tool's authentication.
 
 You install a template, paste an **ingestion key** into your tool's OTLP exporter, and
-traces land at `/me/traces` already shaped into the canonical `gen_ai.*` form, cost,
+traces land in your personal project at `/<personal project slug>/traces` already shaped into the canonical `gen_ai.*` form, cost,
 tokens, and model populated automatically.
 
 An ingestion key is one
@@ -15681,21 +15681,21 @@ org-customizable for admins who need it.
 
 ## Worked example: connect Claude Code on Anthropic 20x
 
-By the end of this flow you have a Claude Code trace visible at `/me/traces` with
+By the end of this flow you have a Claude Code trace visible at `/<personal project slug>/traces` with
 `gen_ai.usage.*`, `gen_ai.response.model`, and `langwatch.cost.usd` populated.
 
 > **Before you start:** you need a LangWatch account. If you're brand new, start with the
 > [getting started guide](/ai-governance/getting-started-developer) and then sign in to
 > LangWatch. First-time sign-in completes onboarding and lands you on your **personal
-> workspace** (`/me`). On self-hosted instances the same path works against your own
+> workspace** (`/coding-agents`). On self-hosted instances the same path works against your own
 > deployment's host.
 
 ### Step 1: open the catalog
 
-Navigate to `/me` and scroll to the **Trace Ingest** section (or jump straight to
-`/me#trace-ingest`).
+Navigate to `/coding-agents` and scroll to the **Trace Ingest** section (or jump straight to
+`/coding-agents#trace-ingest`).
 
-![/me Trace Ingest section, 4 tiles populated](/images/ai-governance/post-bypass/10-me-trace-ingest-scrolled.png)
+![/coding-agents Trace Ingest section, 4 tiles populated](/images/ai-governance/post-bypass/10-me-trace-ingest-scrolled.png)
 
 You'll see four tiles: **Claude Code**, **Cursor**, **Claude cowork**, and the
 **Raw OTLP (advanced)** discovery card. The first three are tool-specific templates; the
@@ -15737,11 +15737,12 @@ Open a new terminal so the env vars take effect, then run Claude Code as you nor
 would. As soon as Claude Code completes its first action, OpenTelemetry exports the span
 to your LangWatch personal workspace.
 
-### Step 4: see the trace at /me/traces
+### Step 4: see the trace in your personal project
 
-Click **View traces →** on the tile, or navigate directly to `/me/traces`.
+Open **Traces** in the Coding agents sidebar, or navigate directly to
+`/<personal project slug>/traces`.
 
-![/me/traces, Claude Code traces with tokens + model populated](/images/ai-governance/post-bypass/12-traces-populated.png)
+![Personal project traces, Claude Code traces with tokens + model populated](/images/ai-governance/post-bypass/12-traces-populated.png)
 
 Open the trace. You should see:
 
@@ -15853,7 +15854,7 @@ The `protectedTemplateAttributeKeys` closed list:
 - `langwatch.origin`, receiver-stamped provenance (`coding_agent` for a CLI
   assistant, `ai_tool` for any other ingest source).
 - `langwatch.source`, receiver-stamped provenance (used for tile filtering at
-  `/me/traces`).
+  `/<personal project slug>/traces`).
 
 Notably **not** in the list:
 
@@ -15881,14 +15882,14 @@ boundary articulation.
 
 If you have a custom telemetry pipeline, your own spans, your own normalisation, your
 own cost calculations, you don't want a template's OTTL rewriting your shape. Use the
-**Raw OTLP (advanced)** card on `/me` Trace Ingest instead.
+**Raw OTLP (advanced)** card on `/coding-agents` Trace Ingest instead.
 
-The card deep-links to the **Personal OTLP Endpoint** panel at `/me/settings#otlp`,
+The card deep-links to the **Personal OTLP Endpoint** panel at `/coding-agents/configure#otlp`,
 which surfaces your personal-project's existing OTLP endpoint and API key for ad-hoc /
-custom telemetry. No template OTTL is applied; your spans land at `/me/traces` exactly
+custom telemetry. No template OTTL is applied; your spans land at `/<personal project slug>/traces` exactly
 as you emit them.
 
-![Personal OTLP Endpoint panel on /me/settings](/images/ai-governance/post-bypass/04-me-settings.png)
+![Personal OTLP Endpoint panel on /coding-agents/configure](/images/ai-governance/post-bypass/04-me-settings.png)
 
 ### When to choose Raw OTLP vs a template
 
@@ -15897,7 +15898,7 @@ as you emit them.
 | Claude Code, Cursor, Claude cowork tile | You run that tool and want LangWatch's catalog OTTL to normalise the spans for you.                                         |
 | Raw OTLP (advanced)                     | You have a custom pipeline, or your spans already follow `gen_ai.*` conventions, or you want to keep your own field shapes. |
 
-You can also surface the same endpoint + token from `/me/settings → Personal OTLP Endpoint`
+You can also surface the same endpoint + token from `/coding-agents/configure → Personal OTLP Endpoint`
 without going through the catalog tile.
 
 ---
@@ -15954,7 +15955,7 @@ re-stamp regardless of OTTL, admin OTTL in org-A cannot misattribute cost to org
 
 A tile flips to green-checked only after the template is verified end to end on a real
 install: an admin publishes it via `/governance/inventory?tab=catalog`, a user installs it
-via `/me`, the upstream tool emits a real trace, and the resulting attribution holds up
+via `/coding-agents`, the upstream tool emits a real trace, and the resulting attribution holds up
 under cross-user isolation and forge attempts against both protected lists.
 
 ### What is audited
@@ -16338,7 +16339,7 @@ LangWatch is open-core. Some governance surfaces work for every self-hosted depl
 | Surface                                                             | License    | Notes                                                                                                                                                                                      |
 | ------------------------------------------------------------------- | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | [Personal IDE keys](/ai-gateway/governance/personal-keys)           | Apache 2.0 | Always available. The Personal Virtual Key + `langwatch login` flow is the open-core floor.                                                                                                |
-| [AI Tools Portal at `/me`](/ai-governance/personal-portal/overview) | Apache 2.0 | Always available. Catalog editor at `/governance/inventory?tab=catalog`, three tile classes, admin-curated.                                                                                |
+| [AI Tools Portal at `/coding-agents`](/ai-governance/personal-portal/overview) | Apache 2.0 | Always available. Catalog editor at `/governance/inventory?tab=catalog`, three tile classes, admin-curated.                                                                                |
 | [Routing Policies](/ai-gateway/governance/routing-policies)         | Apache 2.0 | Always available. The gateway-side policy chain is core.                                                                                                                                   |
 | [CLI debugging](/ai-governance/cli-debug)                           | Apache 2.0 | Always available. CLI 409, 401, 403 catalog.                                                                                                                                               |
 | [Ingestion Sources](/ai-governance/ingestion-sources/index)         | Enterprise | The `otel_generic` source type at the platform default retention window is available on the Apache 2.0 floor; multiple sources and configurable retention require Enterprise.              |
@@ -16390,7 +16391,7 @@ keywords: ai governance, ai inventory, ingestion sources, tool catalog, agents, 
 
 AI Governance is the part of LangWatch where you administer the AI tools your company uses. It is for the platform or IT team that approves those tools and watches their use, and it gives every developer one page with the tools they may use and their own usage.
 
-The section is in the sidebar under **AI Governance**, with four pages: **Overview**, **Inventory**, **Agents** and **People**. Opening them needs the `governance:view` permission, which an organization Admin holds. Each developer also has a personal home page at `/me`.
+The section is in the sidebar under **AI Governance**, with four pages: **Overview**, **Inventory**, **Agents** and **People**. Opening them needs the `governance:view` permission, which an organization Admin holds. Each developer also has a personal home page at `/coding-agents`.
 
 ## The overview page
 
@@ -16420,7 +16421,7 @@ The inventory has two tabs. **Sources** lists the systems that report AI activit
 
 ## Personal home page
 
-`/me` shows each developer the tools published in the catalog, the budgets that apply to them, and their usage this month.
+`/coding-agents` shows each developer the tools published in the catalog, the budgets that apply to them, and their usage this month.
 
 <Frame caption="The personal home page: the tool tiles, the personal and organization budgets, and the Spent, Requests and Most-used model cards.">
   ![The personal home page](/images/ai-governance/me-home.png)
@@ -16442,7 +16443,7 @@ The inventory has two tabs. **Sources** lists the systems that report AI activit
     Departments: the accounting label that spend rolls up by. Assign people, teams and projects to a department, and personal AI use follows the person.
   </Card>
   <Card title="Personal home page" icon="house-user" href="/ai-governance/personal-portal/overview">
-    `/me` shows each developer the tools they may use, the budgets that apply to them, and their spend, requests and most-used model this month.
+    `/coding-agents` shows each developer the tools they may use, the budgets that apply to them, and their spend, requests and most-used model this month.
   </Card>
   <Card title="Roles and permissions" icon="user-shield" href="/platform/rbac">
     Who can open the governance pages and who can change them: `governance:view` and `governance:manage`, plus the permissions for ingestion sources, anomaly rules and the tool catalog.
@@ -16541,14 +16542,14 @@ A [data privacy](/platform/data-privacy) rule can be written at department scope
 
 ---
 title: AI Tools Portal admin catalog editor
-description: How to publish, scope, and edit the AI tools that your developers see on /me. Covers starter-pack import, the three tile-type drawers, scope binding, reordering, and archive.
+description: How to publish, scope, and edit the AI tools that your developers see on /coding-agents. Covers starter-pack import, the three tile-type drawers, scope binding, reordering, and archive.
 sidebarTitle: Admin catalog
 ---
 
 Org admins curate the AI Tools Portal from
 **Governance → Inventory → Catalog**
 (`/governance/inventory?tab=catalog`). Anything you publish here lands on
-every matching user's `/me` portal grid.
+every matching user's `/coding-agents` portal grid.
 
 ![Admin catalog editor, section-grouped list of published tiles](/images/ai-governance/portal/admin-catalog-overview.png)
 
@@ -16567,7 +16568,7 @@ every matching user's `/me` portal grid.
 
 A fresh organization does not start empty: the standard catalog is
 provisioned automatically at signup (and on the portal's first load for
-organizations created before this behavior), so your members' `/me`
+organizations created before this behavior), so your members' `/coding-agents`
 portal renders tiles from day one:
 
 - Coding assistants: Claude Code, Codex, Gemini CLI, opencode
@@ -16691,12 +16692,12 @@ published what.
 
 ---
 title: AI Tools Portal tile interactions
-description: What each tile class expands into when an end user clicks it on /me. Covers coding-assistant setup walkthroughs, inline virtual-key creation, and external-tool guidance pages.
+description: What each tile class expands into when an end user clicks it on /coding-agents. Covers coding-assistant setup walkthroughs, inline virtual-key creation, and external-tool guidance pages.
 sidebarTitle: End-user
 ---
 
 When you sign in via `langwatch login` or open the LangWatch dashboard,
-you land on `/me`. The top of the page is your **AI Tools Portal**: a
+you land on `/coding-agents`. The top of the page is your **AI Tools Portal**: a
 card grid of every tool your IT admin has published for you. Below the
 grid, your usage dashboard (spend vs. budget, requests, recent
 activity) is unchanged.
@@ -16886,13 +16887,13 @@ admin to import the starter pack at
 
 ---
 title: AI Tools Portal overview
-description: A customizable card-grid home at /me where every developer in your organization can see the AI tools available to them, coding assistants, model providers for virtual-key creation, and admin-curated external tools, published and scoped by your IT admins.
+description: A customizable card-grid home at /coding-agents where every developer in your organization can see the AI tools available to them, coding assistants, model providers for virtual-key creation, and admin-curated external tools, published and scoped by your IT admins.
 sidebarTitle: Overview
 ---
 
 The **AI Tools Portal** is the company-wide AI starting point. When an
 engineer signs in via `langwatch login` (without a tool subcommand) or
-opens the LangWatch dashboard, they land on `/me` and see a card grid of
+opens the LangWatch dashboard, they land on `/coding-agents` and see a card grid of
 every AI tool their organization has published for them: the coding
 assistants they can install, the model providers they can mint virtual
 keys for, and the external AI tools (Copilot Studio, internal chat agents,
@@ -16961,7 +16962,7 @@ team entry overrides for users in that team. This is how admins say
 A fresh organization has an empty catalog. The first admin to visit
 `/governance/inventory?tab=catalog` sees a starter-pack import CTA
 ([Admin catalog](/ai-governance/personal-portal/admin-catalog#starter-pack)).
-End users on `/me` see a "your IT team is still setting things up"
+End users on `/coding-agents` see a "your IT team is still setting things up"
 message until the admin publishes the catalog.
 
 ![Portal empty state, end-user view before admin publishes the catalog](/images/ai-governance/portal/portal-empty.png)
@@ -16971,7 +16972,7 @@ message until the admin publishes the catalog.
 Two new RBAC permissions gate the portal surfaces:
 
 - `aiTools:view`, granted to ADMIN, MEMBER, and EXTERNAL by default.
-  Required to see the grid at `/me` and call the public tile list.
+  Required to see the grid at `/coding-agents` and call the public tile list.
   This is intentionally broad: the portal is the company's curated AI
   starting point and must work for everyone.
 - `aiTools:manage`, granted to ADMIN by default. Required to access
@@ -17015,7 +17016,7 @@ last used, and how to revoke any device you no longer need.
   consume each session's VK).
 </Info>
 
-## What you see at /me/devices
+## What you see on the Devices tab
 
 ```text
 ┌─ Your CLI sessions ─────────────────────────────────────────────────┐
@@ -17087,7 +17088,7 @@ refresh is refused too because the pair was deleted, and the CLI prints
 useful if you suspect a compromise or are leaving the company.
 
 Revoking a session does NOT revoke any virtual key the session minted
-(those are persistent until you delete them via `/me`'s Personal Keys
+(those are persistent until you delete them via `/coding-agents`'s Personal Keys
 section). The session is the **right to mint + use**; the virtual keys
 themselves are separate inventory items.
 
@@ -17127,14 +17128,14 @@ Sessions and Personal Virtual Keys are separate but related:
 
 Revoking a session breaks the wrapper commands on that device. To
 revoke an individual VK without breaking the whole session, manage VKs
-under [/me's Personal Keys section](/ai-governance/personal-portal/end-user).
+under [/coding-agents's Personal Keys section](/ai-governance/personal-portal/end-user).
 
 ## Where to next
 
 - [Personal IDE keys](/ai-gateway/governance/personal-keys): the
   device-flow login this surface inventories.
 - [Portal end-user walkthrough](/ai-governance/personal-portal/end-user)
-  , the broader `/me` surface this lives within.
+  , the broader `/coding-agents` surface this lives within.
 
 ---
 
@@ -17142,7 +17143,7 @@ under [/me's Personal Keys section](/ai-governance/personal-portal/end-user).
 
 ---
 title: Personas and default landing
-description: LangWatch detects four personas based on org membership + activity signals, and routes each to the home that fits their work, admin to the bird-eye, personal-only user to /me, project-only LLMOps user to their project, mixed user to /me with a workspace switcher.
+description: LangWatch detects four personas based on org membership + activity signals, and routes each to the home that fits their work, admin to the bird-eye, personal-only user to /coding-agents, project-only LLMOps user to their project, mixed user to /coding-agents with a workspace switcher.
 ---
 
 ## How the default landing is picked
@@ -17160,9 +17161,9 @@ override the default.
 | Persona | Detection signal | Default landing | Why this surface |
 |---------|------------------|-----------------|------------------|
 | **Org admin** (governance-relevant role on at least one org) | `RoleBinding` carries `organization:manage` OR `governance:view` | [`/governance`](/ai-governance/governance-dashboard): the bird-eye dashboard | Their job is org-wide oversight; first paint shows usage-by-team graphs, anomaly alerts, drill-in to per-team, per-user activity. Their own personal traces are secondary. |
-| **Personal-only user** (no project membership beyond their own personal workspace) | `OrganizationUser` role=member AND `Project.isPersonal=true` AND no `TeamUser` membership beyond personal | [`/me`](/ai-governance/personal-portal/end-user): the AI Tools Portal + Trace Ingest section | Their primary use case is *"sign in, install Claude Code, Cursor template, see my own usage"*. AI Tools Portal tile-grid + Trace Ingest catalog is the headline. |
-| **Project-only user** (LLMOps customer, no personal-workspace activity) | `TeamUser` membership exists with `Team.isPersonal=false` AND no traces in `Project.isPersonal` | `/<project>/traces`, the existing LLM Ops Trace Explorer | Existing LLMOps customer story stays unchanged. First paint is the Trace Explorer, not /me. |
-| **Mixed** (personal + project membership) | Combination of above | [`/me`](/ai-governance/personal-portal/end-user) (default) OR last-touched (cookie-tracked) | Cookie remembers where the user last spent time. New mixed user lands at /me first paint to discover the AI Tools Portal, then uses the workspace switcher to flip to project work. |
+| **Personal-only user** (no project membership beyond their own personal workspace) | `OrganizationUser` role=member AND `Project.isPersonal=true` AND no `TeamUser` membership beyond personal | [`/coding-agents`](/ai-governance/personal-portal/end-user): the AI Tools Portal + Trace Ingest section | Their primary use case is *"sign in, install Claude Code, Cursor template, see my own usage"*. AI Tools Portal tile-grid + Trace Ingest catalog is the headline. |
+| **Project-only user** (LLMOps customer, no personal-workspace activity) | `TeamUser` membership exists with `Team.isPersonal=false` AND no traces in `Project.isPersonal` | `/<project>/traces`, the existing LLM Ops Trace Explorer | Existing LLMOps customer story stays unchanged. First paint is the Trace Explorer, not /coding-agents. |
+| **Mixed** (personal + project membership) | Combination of above | [`/coding-agents`](/ai-governance/personal-portal/end-user) (default) OR last-touched (cookie-tracked) | Cookie remembers where the user last spent time. New mixed user lands at /coding-agents first paint to discover the AI Tools Portal, then uses the workspace switcher to flip to project work. |
 
 ## How detection works
 
@@ -17174,32 +17175,32 @@ and the resolver implementation:
 1. **Admin check**: does the user have a governance-relevant role binding
    on any org? If yes AND no recent personal-workspace activity, route to
    `/governance`. (Admins with active personal workspaces still default to
-   `/me`, they tend to wear both hats.)
+   `/coding-agents`, they tend to wear both hats.)
 2. **Personal-only check**: does the user have NO `TeamUser` membership
-   beyond their personal team? If yes, route to `/me`.
+   beyond their personal team? If yes, route to `/coding-agents`.
 3. **Project-only check**: does the user have NO personal-workspace
    activity (no traces in `Project.isPersonal=true` in the past 30 days)?
    If yes, route to their default project's `/traces`.
-4. **Fallback**: for mixed users, route to `/me` unless a cookie remembers
+4. **Fallback**: for mixed users, route to `/coding-agents` unless a cookie remembers
    they last spent time in a project.
 
 The signal-based default avoids two failure modes:
 
-- **Admin lands at /me and never finds the bird-eye.** The opposite was a
+- **Admin lands at /coding-agents and never finds the bird-eye.** The opposite was a
   reported issue before persona-aware routing, admins would sign in,
   see their own (often empty) personal workspace, and not realize the
   governance dashboard existed.
-- **LLMOps customer lands at /me and is confused.** Existing customers
+- **LLMOps customer lands at /coding-agents and is confused.** Existing customers
   upgrading to the governance-aware tier kept their default landing
   unchanged.
 
 ## Overriding the default
 
 Every user can override the persona-based default in
-**`/me/settings → Default landing page`**:
+**`/coding-agents/configure → Default landing page`**:
 
 - **Auto** (default), uses the persona detection above.
-- **Always /me**: always lands on the AI Tools Portal + Trace Ingest
+- **Always /coding-agents**: always lands on the AI Tools Portal + Trace Ingest
   section, regardless of role.
 - **Always project home**: always lands on the user's last-active project's
   `/traces`, regardless of role.
@@ -17217,7 +17218,7 @@ a later iteration). Today, the per-user override is the only knob.
 - [Governance dashboard](/ai-governance/governance-dashboard): what the
   admin sees when routed to `/governance`.
 - [Personal portal, end user](/ai-governance/personal-portal/end-user):
-  what the personal-only user sees when routed to `/me`.
+  what the personal-only user sees when routed to `/coding-agents`.
 - [Workspaces](/ai-governance/workspaces): how the workspace switcher
   works for mixed-persona users.
 - [`governance-home-routing.feature`](https://github.com/langwatch/langwatch/blob/main/specs/ai-gateway/governance/governance-home-routing.feature)
@@ -17451,7 +17452,7 @@ sidebarTitle: Workspaces
 
 LangWatch organizes everything around three workspace scopes. Every Virtual Key, every Routing Policy, every Budget, every Audit Log row, every spend chart attaches to one of:
 
-- **Personal**: _you_. One Personal Workspace per user per org. Your Personal Virtual Keys, your `/me` dashboard, your spend ledger.
+- **Personal**: _you_. One Personal Workspace per user per org. Your Personal Virtual Keys, your `/coding-agents` dashboard, your spend ledger.
 - **Team**: a _group of people_ in the same org. Shared budget envelope, shared routing policy override, shared Audit Log scope.
 - **Project**: a _shared application_. The right home for a virtual key bundled into an app's config (a chatbot, an internal RAG, a workflow). One project, many apps if useful, governed centrally.
 
@@ -17481,13 +17482,13 @@ A Personal Workspace is created automatically the first time you visit a project
 - Owned by you (`isPersonal=true`, `ownerUserId=<your user>`).
 - Scoped to **one** team, your private team, also flagged `isPersonal`.
 - Only ever has **one** project, your Personal Workspace project.
-- The home for every [Personal Virtual Key](/ai-gateway/governance/personal-keys) you mint via `langwatch login` or the `/me` portal.
+- The home for every [Personal Virtual Key](/ai-gateway/governance/personal-keys) you mint via `langwatch login` or the `/coding-agents` portal.
 
 What you do here:
 
 - Use the CLI (`langwatch claude`, `langwatch codex`, `langwatch gemini`, etc.), every request flows through your Personal VK and lands in your personal ledger.
-- Issue Personal Virtual Keys for inline app development (the model-provider tiles on `/me`).
-- Read your own spend, budget, request count, and Recent activity at `/me`.
+- Issue Personal Virtual Keys for inline app development (the model-provider tiles on `/coding-agents`).
+- Read your own spend, budget, request count, and Recent activity at `/coding-agents`.
 
 What you can't do:
 
@@ -17517,7 +17518,7 @@ Teams are groups of people. They:
 
 Create a team at `/settings/teams` (admin-only). Add members from the existing org member list, invites you make from within the team flow have a `Team Assignment` block in the same drawer documented at [Members & invites](/platform/members-and-teams#invite-people).
 
-Teams scope down what an `aiTools:view` permission shows on `/me`. A team-scoped tile catalog entry appears only for members of that team; an org-scoped tile catalog entry appears for everyone. When a team-scoped entry shares a slug with an org-scoped entry, the team override wins for members of that team, the recommended pattern for "engineering gets Cursor, everyone else gets Copilot."
+Teams scope down what an `aiTools:view` permission shows on `/coding-agents`. A team-scoped tile catalog entry appears only for members of that team; an org-scoped tile catalog entry appears for everyone. When a team-scoped entry shares a slug with an org-scoped entry, the team override wins for members of that team, the recommended pattern for "engineering gets Cursor, everyone else gets Copilot."
 
 ## Project
 
@@ -17534,9 +17535,9 @@ When the AI Tools Portal's model-provider tiles offer to mint a virtual key, the
 
 ## Workspace switcher
 
-The header of every authenticated page hosts a single **Workspace Switcher** dropdown. Across the entire `/me` chrome and the project chrome, it's the same component, the only thing that changes is what's currently selected:
+The header of every authenticated page hosts a single **Workspace Switcher** dropdown. Across the entire `/coding-agents` chrome and the project chrome, it's the same component, the only thing that changes is what's currently selected:
 
-- On `/me` and `/me/*`, the switcher shows **My Workspace** (your Personal scope).
+- On `/coding-agents` and `/coding-agents/*`, the switcher shows **My Workspace** (your Personal scope).
 - On `/[project]/*`, it shows the current project name.
 - On `/settings/*` and `/governance`, it shows the current admin scope (org or "Choose workspace" if not bound).
 
@@ -17690,7 +17691,7 @@ LangWatch works per session: it replays what the agent did, shows where the cont
 
 Yes, point the OTLP endpoint at your own instance followed by `/api/otel`. See [Self-hosting](/self-hosting/overview).
 
-Next, run `npx langwatch claude` on your own machine and open [Sessions](https://app.langwatch.ai/me/sessions) to see what your engineers will see, then read [Reduce coding agent cost](/coding-agents/reduce-coding-agent-cost) for what to change once the numbers are in.
+Next, run `npx langwatch claude` on your own machine and open [Sessions](https://app.langwatch.ai/coding-agents/sessions) to see what your engineers will see, then read [Reduce coding agent cost](/coding-agents/reduce-coding-agent-cost) for what to change once the numbers are in.
 
 ---
 
@@ -17734,7 +17735,7 @@ If you read local usage with `ccusage`, this is the same accounting with the con
 
 ## Read your sessions
 
-Open **Sessions** at [/me/sessions](https://app.langwatch.ai/me/sessions). One row per session, with the context it carried, how often it compacted, how long it worked against how long it waited on you, and what it cost.
+Open **Sessions** at [/coding-agents/sessions](https://app.langwatch.ai/coding-agents/sessions). One row per session, with the context it carried, how often it compacted, how long it worked against how long it waited on you, and what it cost.
 
 <Frame caption="One row per session. Context and Compactions show which sessions ran heavy, and Pull requests shows what each one shipped.">
   ![Claude Code sessions list](/images/coding-agents/sessions-list.png)
@@ -17771,7 +17772,7 @@ A tool call the agent was denied stays in the replay, marked as denied, so a ses
 
 ## Cost per pull request
 
-**Pull requests** at [/me/pull-requests](https://app.langwatch.ai/me/pull-requests) sums every session that drove a branch, over the pull request's whole life and across everyone who worked on it. That is the number to compare against what the change was worth.
+**Pull requests** at [/coding-agents/pull-requests](https://app.langwatch.ai/coding-agents/pull-requests) sums every session that drove a branch, over the pull request's whole life and across everyone who worked on it. That is the number to compare against what the change was worth.
 
 <Frame caption="Cost per pull request, summed across every session and contributor that touched the branch.">
   ![Cost per pull request](/images/coding-agents/pull-requests-list.png)
@@ -17801,7 +17802,7 @@ You can point it at its own history too, through the [skills directory](https://
 
 Answer **Using an API key** at the first-run question instead. Paste your `sk-ant-` key at **Settings → Model providers**, and `langwatch claude` routes every call through the LangWatch AI Gateway with a virtual key.
 
-This path adds no extra cost and gives you two things the subscription path cannot. Cost comes from Anthropic's own response rather than from Claude Code's estimate, and a personal budget at **/me → Settings** is enforced rather than advisory: requests fail with `budget_exceeded` once you cross it. On a subscription you get alerts at 80% and 100%, because a proxy cannot gate subscription calls.
+This path adds no extra cost and gives you two things the subscription path cannot. Cost comes from Anthropic's own response rather than from Claude Code's estimate, and a personal budget at **/coding-agents → Settings** is enforced rather than advisory: requests fail with `budget_exceeded` once you cross it. On a subscription you get alerts at 80% and 100%, because a proxy cannot gate subscription calls.
 
 Everything above this section looks the same on either path.
 
@@ -17900,7 +17901,7 @@ This deletes every connection the command-line tool wrote, for every tool.
 
 ## What you get in LangWatch
 
-Open your personal page at `/me`, or open the project you pinned Claude Code to.
+Open your personal page at `/coding-agents`, or open the project you pinned Claude Code to.
 
 - **[Sessions](/coding-agents/sessions)**: one row per Claude Code session, with the context it carried, how often it compacted, how long it worked, and a terminal replay of the whole conversation.
 - **Traces**: one trace per turn, with the tool call tree, the latency of each step, and each subagent on its own branch.
@@ -18599,7 +18600,7 @@ Read my usage with these commands (add `-o json` for machine-readable output):
 Start with the last 7 days: total spend, the most expensive sessions and what made them expensive (context size, cache misses, subagents, retries), and which models consumed the most. Then answer my follow-up questions about my own usage from the same data.
 ```
 
-The same prompt is one click away in the app: on `/me`, once your account has traces, **Connect your agent** offers **Explore via your coding agent**, which copies it to your clipboard.
+The same prompt is one click away in the app: on `/coding-agents`, once your account has traces, **Connect your agent** offers **Explore via your coding agent**, which copies it to your clipboard.
 
 ## Questions your agent can answer
 
@@ -18613,7 +18614,7 @@ Once the prompt is in, ask in plain language:
 - Which skills did I use the most?
 - How much of my usage came from MCP tool results staying in context?
 
-The agent reads the same traces you see on `/me` and `/traces`, so every answer can cite the sessions behind it.
+The agent reads the same traces you see on `/coding-agents` and `/traces`, so every answer can cite the sessions behind it.
 
 ---
 
@@ -18750,7 +18751,7 @@ Write a single self-contained `context-sweet-spot-report.html` in the project ro
 - **Concrete habits**, each tied to the evidence: when to start a fresh session instead of pushing through, what to offload to sub-agents (the sub-agent keeps its context out of the main session), whether the user's compactions happen late, after the context already crossed the sweet spot
 - Links to example sessions in LangWatch for every claim
 
-Also state the top finding directly in the conversation, leading with the number. The LangWatch session detail shows the same cache-health stats per session (`/me/sessions`), so name it as the place to watch the habit change.
+Also state the top finding directly in the conversation, leading with the number. The LangWatch session detail shows the same cache-health stats per session (`/coding-agents/sessions`), so name it as the place to watch the habit change.
 
 ## Common Mistakes
 
@@ -18903,7 +18904,7 @@ This deletes every connection the command-line tool wrote, for every tool.
 
 ## What you get in LangWatch
 
-Open your personal page at `/me`, or open the project you pinned Gemini CLI to.
+Open your personal page at `/coding-agents`, or open the project you pinned Gemini CLI to.
 
 - **[Sessions](/coding-agents/sessions)**: one row per Gemini CLI session, with the context it carried and how long it worked.
 - **Traces**: one trace per turn, with the model, the tokens and the timing of each step, and each tool call with its details.
@@ -19120,7 +19121,7 @@ This mints an ingest key and installs a small agent that starts with your sessio
 
 ## What you get in LangWatch
 
-Open your personal page at `/me`, or open the project you pinned Copilot to.
+Open your personal page at `/coding-agents`, or open the project you pinned Copilot to.
 
 - **[Sessions](/coding-agents/sessions)**: one row per Copilot conversation, from the command-line tool and from Copilot Chat in Visual Studio Code alike, with the models it used, its tokens, its token cost and the tools it ran.
 - **Repository and branch**: with the [hook file](#link-sessions-to-their-pull-requests) installed, each row shows the repository and branch the session worked on, and the pull requests that branch maps to.
@@ -19371,7 +19372,7 @@ This deletes every connection the command-line tool wrote, for every tool, the G
 
 ## What you get in LangWatch
 
-Open your personal page at `/me`, or open the project you pinned Grok to.
+Open your personal page at `/coding-agents`, or open the project you pinned Grok to.
 
 - **[Sessions](/coding-agents/sessions)**: one row per Grok session, with the repository, branch and worktree it ran in. A subagent gets a row of its own, linked to the session that started it.
 - **Turns**: each prompt, the response, and every tool call with its arguments and its result.
@@ -19602,7 +19603,7 @@ If the managed settings file already sets `OTEL_RESOURCE_ATTRIBUTES`, it wins ov
 
 ## See your machines
 
-Every CLI sign-in, CI runners included, appears under **Devices** on [/me/configure](https://app.langwatch.ai/me/configure), where you revoke one machine or all of them. An organization can cap how long a device session lives before it must sign in again; see the session policy on the [governance dashboard](/ai-governance/governance-dashboard).
+Every CLI sign-in, CI runners included, appears under **Devices** on [/coding-agents/configure](https://app.langwatch.ai/coding-agents/configure), where you revoke one machine or all of them. An organization can cap how long a device session lives before it must sign in again; see the session policy on the [governance dashboard](/ai-governance/governance-dashboard).
 
 **Also check:** [Team projects](/coding-agents/team-projects) for pinning interactive machines to a shared project with a login.
 
@@ -19690,7 +19691,7 @@ This deletes every connection the command-line tool wrote, for every tool.
 
 ## What you get in LangWatch
 
-Open your personal page at `/me`, or open the project you pinned Codex to.
+Open your personal page at `/coding-agents`, or open the project you pinned Codex to.
 
 - **[Sessions](/coding-agents/sessions)**: one row per Codex session, with the context it carried, how long it worked, and a terminal replay of the whole conversation.
 - **Traces**: one trace per turn, with the model, the tokens and the timing of each step.
@@ -19981,7 +19982,7 @@ This deletes every connection the command-line tool wrote, for every tool.
 
 ## What you get in LangWatch
 
-Open your personal page at `/me`, or open the project you pinned opencode to.
+Open your personal page at `/coding-agents`, or open the project you pinned opencode to.
 
 - **[Sessions](/coding-agents/sessions)**: one row per OpenCode session, with the context it carried and how long it worked.
 - **Traces**: one trace per turn, with each model call and each tool call in order.
@@ -20378,7 +20379,7 @@ This deletes every connection the command-line tool wrote, for every tool, the p
 
 ## What you get in LangWatch
 
-Open your personal page at `/me`, or open the project you pinned pi to.
+Open your personal page at `/coding-agents`, or open the project you pinned pi to.
 
 - **[Sessions](/coding-agents/sessions)**: one row per pi session, with the repository, branch and worktree it ran in.
 - **Traces**: one trace per run, with each model call and each tool call in order.
@@ -20540,7 +20541,7 @@ keywords:
   - ai spend per change
 ---
 
-Open **Pull requests** at [/me/pull-requests](https://app.langwatch.ai/me/pull-requests), or in the sidebar of a project that receives coding-agent telemetry.
+Open **Pull requests** at [/coding-agents/pull-requests](https://app.langwatch.ai/coding-agents/pull-requests), or in the sidebar of a project that receives coding-agent telemetry.
 
 <Frame caption="The pull requests list. Status is read live from GitHub, and Token cost sums every session that worked on the branch. A branch with no pull request yet keeps its row.">
   ![Pull requests list](/images/coding-agents/pull-requests-list.png)
@@ -20625,9 +20626,9 @@ Each agent's page covers the first-run setup in full, for example [Claude Code](
 
 ## What you see now
 
-Work with the agent for a minute, then open [/me](https://app.langwatch.ai/me):
+Work with the agent for a minute, then open [/coding-agents](https://app.langwatch.ai/coding-agents):
 
-<Frame caption="The sessions list on /me. Each row is one session, with its cost, the context it carried, and the pull requests it created.">
+<Frame caption="The sessions list on /coding-agents. Each row is one session, with its cost, the context it carried, and the pull requests it created.">
   ![Sessions list](/images/coding-agents/sessions-list.png)
 </Frame>
 
@@ -20916,7 +20917,7 @@ Write a single self-contained `coding-agent-cost-report.html` in the project roo
 - The window used, the price list link with its fetch date, and the formula behind each estimate.
 - A note that savings overlap (checks 1 and 4 price the same Opus sub-agent calls; checks 2, 3 and 7 touch the same long threads), so the rows do not add up to a total.
 
-State the top recommendation directly in the conversation too. To check the effect later, run the same queries on a window that starts after the change: the session list at `/me/sessions` shows peak context, compactions and cost per session.
+State the top recommendation directly in the conversation too. To check the effect later, run the same queries on a window that starts after the change: the session list at `/coding-agents/sessions` shows peak context, compactions and cost per session.
 
 ## Common Mistakes
 
@@ -21042,7 +21043,7 @@ LangWatch reads pull request status (open, merged, closed) live from GitHub when
 
 ## Verify it
 
-Run a session, do some work, then open [/me/sessions](https://app.langwatch.ai/me/sessions): the session row shows the pull requests its branches map to. From the terminal:
+Run a session, do some work, then open [/coding-agents/sessions](https://app.langwatch.ai/coding-agents/sessions): the session row shows the pull requests its branches map to. From the terminal:
 
 ```bash
 langwatch ingest context
@@ -21126,7 +21127,7 @@ keywords:
   - terminal replay
 ---
 
-A session is one run of a coding agent: everything between starting Claude Code, Codex or another assistant and closing it, shown as one row. Open **Sessions** on your personal page at [/me/sessions](https://app.langwatch.ai/me/sessions), or in the sidebar of any project that receives coding-agent telemetry.
+A session is one run of a coding agent: everything between starting Claude Code, Codex or another assistant and closing it, shown as one row. Open **Sessions** on your personal page at [/coding-agents/sessions](https://app.langwatch.ai/coding-agents/sessions), or in the sidebar of any project that receives coding-agent telemetry.
 
 <Frame caption="The sessions list. The Context and Compactions columns show which sessions ran heavy; the Pull requests column shows what each session shipped, and a dash means the branch has no pull request yet.">
   ![Sessions list](/images/coding-agents/sessions-list.png)
@@ -21275,9 +21276,9 @@ keywords:
   - usage api
 ---
 
-Usage rolls up everything your sessions spent. Read your own numbers at [/me](https://app.langwatch.ai/me), a project's numbers on the project page, and an organization's numbers on the governance dashboard.
+Usage rolls up everything your sessions spent. Read your own numbers at [/coding-agents](https://app.langwatch.ai/coding-agents), a project's numbers on the project page, and an organization's numbers on the governance dashboard.
 
-## Your usage at /me
+## Your usage at /coding-agents
 
 The personal page opens on this month: what you spent, how many requests you made, and the model you used most, with spend over time and a breakdown by tool underneath.
 
@@ -59072,7 +59073,7 @@ Write a single self-contained `context-sweet-spot-report.html` in the project ro
 - **Concrete habits**, each tied to the evidence: when to start a fresh session instead of pushing through, what to offload to sub-agents (the sub-agent keeps its context out of the main session), whether the user's compactions happen late, after the context already crossed the sweet spot
 - Links to example sessions in LangWatch for every claim
 
-Also state the top finding directly in the conversation, leading with the number. The LangWatch session detail shows the same cache-health stats per session (`/me/sessions`), so name it as the place to watch the habit change.
+Also state the top finding directly in the conversation, leading with the number. The LangWatch session detail shows the same cache-health stats per session (`/coding-agents/sessions`), so name it as the place to watch the habit change.
 
 ## Common Mistakes
 
@@ -59493,7 +59494,7 @@ Write a single self-contained `coding-agent-cost-report.html` in the project roo
 - The window used, the price list link with its fetch date, and the formula behind each estimate.
 - A note that savings overlap (checks 1 and 4 price the same Opus sub-agent calls; checks 2, 3 and 7 touch the same long threads), so the rows do not add up to a total.
 
-State the top recommendation directly in the conversation too. To check the effect later, run the same queries on a window that starts after the change: the session list at `/me/sessions` shows peak context, compactions and cost per session.
+State the top recommendation directly in the conversation too. To check the effect later, run the same queries on a window that starts after the change: the session list at `/coding-agents/sessions` shows peak context, compactions and cost per session.
 
 ## Common Mistakes
 
@@ -66630,7 +66631,7 @@ deployment plan.
 | Custom roles via `CustomRolePermissions` | ❌ | ✅ |
 | PII redaction at trace ingest (Presidio) | ✅ | ✅ |
 | Personal IDE keys + CLI device-flow login | ✅ | ✅ |
-| AI Tools Portal at `/me` (3-tile types, admin catalog) | ✅ | ✅ |
+| AI Tools Portal at `/coding-agents` (3-tile types, admin catalog) | ✅ | ✅ |
 | Routing policies for the AI Gateway | ✅ | ✅ |
 | Ingestion sources, `otel_generic` only, 1 source max | ✅ | ✅ |
 | Ingestion sources, multi-source (Workato, S3, Copilot Studio, OpenAI/Anthropic compliance APIs) | ❌ | ✅ |
@@ -78098,6 +78099,21 @@ description: "Manage custom analytics graphs within dashboards. Create, update, 
 
 Manage custom analytics graphs within dashboards. Create, update, and configure graph visualizations.
 
+## Size
+
+A graph created with `POST /api/graphs` (also served at `/api/v1/graphs`) without `colSpan` or `rowSpan` is four columns wide and three rows tall (4x3), the same size Reports creates. If only one of the two is sent, the other takes its default: `colSpan: 2` alone gives 2x3.
+
+Placement fields must be whole numbers within the grid. Fractional numbers are refused.
+
+| Field | Range |
+| --- | --- |
+| `gridColumn` | 0 to 7 |
+| `gridRow` | 0 to 2000000000 |
+| `colSpan` | 1 to 8 |
+| `rowSpan` | 1 to 20 |
+
+`gridColumn` plus `colSpan` must not exceed 8. A size read from the API can be posted back unchanged.
+
 ---
 
 # FILE: ./api-reference/graphs/update-graphs.mdx
@@ -79817,63 +79833,63 @@ Superseded by the canonical views above; kept for rolling-deployment reads and d
 
 #### Application tables (PostgreSQL)
 
-Every tenant-scoped table of the application database, derived from the schema. Organization- and team-scoped tables appear once per project the caller can reach. Secret material and person identifiers are never exposed; free-text and JSON bodies are gated on the content permissions.
+Every tenant-scoped table of the application database, derived from the schema. Organization- and team-scoped rows are counted once across the projects read, under the lowest project id. Secret material and person identifiers are never exposed; free-text and JSON bodies are gated on the content permissions.
 
 | View | Description | Gates | Grain | Time column |
 |------|-------------|-------|-------|-------------|
 | `agents` | Rows of the Agent table, one row per AgentId. | `output` | one row per AgentId | `CreatedAt` |
-| `ai_tool_entries` | Org-scoped catalog of AI tools surfaced on the personal home portal (/me) and managed by org admins at /governance/tool-catalog. | `output` | one row per (TenantId, AiToolEntryId); an organization-scoped row appears once per project | `CreatedAt` |
-| `ai_tool_entry_departments` | Per-department scope binding for AiToolEntry. | None | one row per (TenantId, AiToolEntryDepartmentId); a row reached through its parent appears once per project | None |
-| `ai_tool_entry_teams` | Per-team scope binding for AiToolEntry. | None | one row per (TenantId, AiToolEntryTeamId); a team-scoped row appears once per project | None |
+| `ai_tool_entries` | Org-scoped catalog of AI tools surfaced on the personal home portal (/me) and managed by org admins at /governance/tool-catalog. | `output` | one row per (AiToolEntryId), counted once across the projects read, under the lowest project id | `CreatedAt` |
+| `ai_tool_entry_departments` | Per-department scope binding for AiToolEntry. | None | one row per (AiToolEntryDepartmentId), counted once across the projects read, under the lowest project id | None |
+| `ai_tool_entry_teams` | Per-team scope binding for AiToolEntry. | None | one row per (AiToolEntryTeamId), counted once across the projects read, under the lowest project id | None |
 | `analytics` | Rows of the Analytics table, one row per AnalyticsId. | `output` | one row per AnalyticsId | `CreatedAt` |
 | `annotation_queue_items` | Rows of the AnnotationQueueItem table, one row per AnnotationQueueItemId. | None | one row per AnnotationQueueItemId | `CreatedAt` |
-| `annotation_queue_scores` | Rows of the AnnotationQueueScores table, one row per (TenantId, AnnotationQueueId, AnnotationScoreId); a row reached through its parent appears once per project. | None | one row per (TenantId, AnnotationQueueId, AnnotationScoreId); a row reached through its parent appears once per project | None |
+| `annotation_queue_scores` | Rows of the AnnotationQueueScores table, one row per (AnnotationQueueId, AnnotationScoreId), counted once across the projects read, under the lowest project id. | None | one row per (AnnotationQueueId, AnnotationScoreId), counted once across the projects read, under the lowest project id | None |
 | `annotation_queues` | Rows of the AnnotationQueue table, one row per AnnotationQueueId. | `output` | one row per AnnotationQueueId | `CreatedAt` |
 | `annotation_scores` | Rows of the AnnotationScore table, one row per AnnotationScoreId. | `output` | one row per AnnotationScoreId | `CreatedAt` |
-| `anomaly_alerts` | Persisted anomaly detection. | `output`, `costs` | one row per (TenantId, AnomalyAlertId); an organization-scoped row appears once per project | `TriggerWindowStart` |
-| `anomaly_rules` | Admin-defined anomaly detection rule. | `output` | one row per (TenantId, AnomalyRuleId); an organization-scoped row appears once per project | `CreatedAt` |
+| `anomaly_alerts` | Persisted anomaly detection. | `output`, `costs` | one row per (AnomalyAlertId), counted once across the projects read, under the lowest project id | `TriggerWindowStart` |
+| `anomaly_rules` | Admin-defined anomaly detection rule. | `output` | one row per (AnomalyRuleId), counted once across the projects read, under the lowest project id | `CreatedAt` |
 | `costs` | Rows of the Cost table, one row per CostId. | `costs`, `output` | one row per CostId | `CreatedAt` |
 | `custom_graphs` | Rows of the CustomGraph table, one row per CustomGraphId. Rows placed on a dashboard set to Only me are not queryable, and dashboard widgets are in dashboard_widgets. | `output` | one row per CustomGraphId | `CreatedAt` |
 | `custom_llm_model_costs` | Rows of the CustomLLMModelCost table, one row per CustomLLMModelCostId. | `costs`, `output` | one row per CustomLLMModelCostId | `CreatedAt` |
 | `dashboard_widgets` | One row per widget in the Dashboards area: its React source and named LangWatchQL queries, and where it sits on its board. Widgets placed on a dashboard set to Only me are not queryable. | `output` | one row per DashboardWidgetId | `CreatedAt` |
 | `dashboards` | One row per Analytics Reports board. Dashboards set to Only me are not queryable, and a board only the Dashboards area holds is in dashboards_v2. | None | one row per DashboardId | `CreatedAt` |
 | `dashboards_v2` | One row per board in the Dashboards area. A board made before Dashboards and Analytics Reports split kept its id, so it can be in dashboards too. Dashboards set to Only me are not queryable. | None | one row per DashboardId | `CreatedAt` |
-| `data_privacy_policies` | Rows of the DataPrivacyPolicy table, one row per (TenantId, DataPrivacyPolicyId); an organization-scoped row appears once per project. | `output` | one row per (TenantId, DataPrivacyPolicyId); an organization-scoped row appears once per project | `CreatedAt` |
+| `data_privacy_policies` | Rows of the DataPrivacyPolicy table, one row per (DataPrivacyPolicyId), counted once across the projects read, under the lowest project id. | `output` | one row per (DataPrivacyPolicyId), counted once across the projects read, under the lowest project id | `CreatedAt` |
 | `dataset_records` | Rows of the DatasetRecord table, one row per DatasetRecordId. | `output` | one row per DatasetRecordId | `CreatedAt` |
 | `datasets` | Rows of the Dataset table, one row per DatasetId. | `output` | one row per DatasetId | `CreatedAt` |
-| `department_membership_histories` | One dated person → department link. | None | one row per (TenantId, DepartmentMembershipHistoryId); an organization-scoped row appears once per project | `CreatedAt` |
-| `departments` | A department is a single-valued accounting dimension, separate from RBAC, for rolling up AI spend by org unit (Engineering, Marketing,...). | None | one row per (TenantId, DepartmentId); an organization-scoped row appears once per project | `CreatedAt` |
-| `discovered_agents` | A non-human actor (a bot, agent or automation) discovered from a connected source, with the provider-native metadata the source published. | `output` | one row per (TenantId, DiscoveredAgentId); an organization-scoped row appears once per project | `CreatedAt` |
-| `discovered_persons` | A name-text seen on a provider's cost or audit rows: "the provider told us someone called m.silva exists". | `output`, `costs` | one row per (TenantId, DiscoveredPersonId); an organization-scoped row appears once per project | `CreatedAt` |
+| `department_membership_histories` | One dated person → department link. | None | one row per (DepartmentMembershipHistoryId), counted once across the projects read, under the lowest project id | `CreatedAt` |
+| `departments` | A department is a single-valued accounting dimension, separate from RBAC, for rolling up AI spend by org unit (Engineering, Marketing,...). | None | one row per (DepartmentId), counted once across the projects read, under the lowest project id | `CreatedAt` |
+| `discovered_agents` | A non-human actor (a bot, agent or automation) discovered from a connected source, with the provider-native metadata the source published. | `output` | one row per (DiscoveredAgentId), counted once across the projects read, under the lowest project id | `CreatedAt` |
+| `discovered_persons` | A name-text seen on a provider's cost or audit rows: "the provider told us someone called m.silva exists". | `output`, `costs` | one row per (DiscoveredPersonId), counted once across the projects read, under the lowest project id | `CreatedAt` |
 | `email_suppressions` | Rows of the EmailSuppression table, one row per EmailSuppressionId. | `output` | one row per EmailSuppressionId | `CreatedAt` |
-| `erased_identifier_suppressions` | Hashes of erased identifiers - the do-not-reimport list. | None | one row per (TenantId, ErasedIdentifierSuppressionId); an organization-scoped row appears once per project | `ErasedAt` |
+| `erased_identifier_suppressions` | Hashes of erased identifiers - the do-not-reimport list. | None | one row per (ErasedIdentifierSuppressionId), counted once across the projects read, under the lowest project id | `ErasedAt` |
 | `evaluators` | Rows of the Evaluator table, one row per EvaluatorId. | `output` | one row per EvaluatorId | `CreatedAt` |
 | `experiment_versions` | Rows of the ExperimentVersion table, one row per ExperimentVersionId. | `output` | one row per ExperimentVersionId | `CreatedAt` |
-| `gateway_budget_bucket_boundaries` | Rows of the GatewayBudgetBucketBoundary table, one row per (TenantId, GatewayBudgetBucketBoundaryId); an organization-scoped row appears once per project. | None | one row per (TenantId, GatewayBudgetBucketBoundaryId); an organization-scoped row appears once per project | `CreatedAt` |
-| `gateway_budget_ledgers` | Rows of the GatewayBudgetLedger table, one row per (TenantId, GatewayBudgetLedgerId); a row reached through its parent appears once per project. Spend through a personal key, or against a budget scoped to one person, is not queryable. | `costs` | one row per (TenantId, GatewayBudgetLedgerId); a row reached through its parent appears once per project | `OccurredAt` |
-| `gateway_budgets` | Rows of the GatewayBudget table, one row per (TenantId, GatewayBudgetId); an organization-scoped row appears once per project. Budgets scoped to one person or to a personal key are not queryable. | `output`, `costs` | one row per (TenantId, GatewayBudgetId); an organization-scoped row appears once per project | `CreatedAt` |
-| `gateway_cache_rules` | Rows of the GatewayCacheRule table, one row per (TenantId, GatewayCacheRuleId); an organization-scoped row appears once per project. | `output` | one row per (TenantId, GatewayCacheRuleId); an organization-scoped row appears once per project | `CreatedAt` |
+| `gateway_budget_bucket_boundaries` | Rows of the GatewayBudgetBucketBoundary table, one row per (GatewayBudgetBucketBoundaryId), counted once across the projects read, under the lowest project id. | None | one row per (GatewayBudgetBucketBoundaryId), counted once across the projects read, under the lowest project id | `CreatedAt` |
+| `gateway_budget_ledgers` | Rows of the GatewayBudgetLedger table, one row per (GatewayBudgetLedgerId), counted once across the projects read, under the lowest project id. | `costs` | one row per (GatewayBudgetLedgerId), counted once across the projects read, under the lowest project id | `OccurredAt` |
+| `gateway_budgets` | Rows of the GatewayBudget table, one row per (GatewayBudgetId), counted once across the projects read, under the lowest project id. | `output`, `costs` | one row per (GatewayBudgetId), counted once across the projects read, under the lowest project id | `CreatedAt` |
+| `gateway_cache_rules` | Rows of the GatewayCacheRule table, one row per (GatewayCacheRuleId), counted once across the projects read, under the lowest project id. | `output` | one row per (GatewayCacheRuleId), counted once across the projects read, under the lowest project id | `CreatedAt` |
 | `gateway_change_events` | Rows of the GatewayChangeEvent table, one row per Revision. | `output` | one row per Revision | `CreatedAt` |
 | `gateway_guardrails` | Rows of the GatewayGuardrail table, one row per GatewayGuardrailId. | `output` | one row per GatewayGuardrailId | `CreatedAt` |
 | `gateway_realtime_sessions` | Rows of the GatewayRealtimeSession table, one row per GatewayRealtimeSessionId. | `output`, `costs` | one row per GatewayRealtimeSessionId | `CreatedAt` |
-| `github_branch_pull_request_checks` | The per-branch bookkeeping behind pull-request mapping: when a branch was last looked up on GitHub, how many pull requests it resolved to, and when it may be asked about again. | `output` | one row per (TenantId, GithubBranchPullRequestCheckId); an organization-scoped row appears once per project | `CreatedAt` |
-| `github_installations` | The organization's GitHub connection: a GitHub App installation mapped to a LangWatch organization. | `output`, `costs` | one row per (TenantId, GithubInstallationId); an organization-scoped row appears once per project | `CreatedAt` |
-| `github_pull_requests` | A pull request discovered through the organization's GitHub connection and mapped to the branch it was opened from, so a coding-agent session that knows only its branch can name the pull request it produced. | `output`, `input` | one row per (TenantId, GithubPullRequestId); an organization-scoped row appears once per project | `CreatedAt` |
-| `governance_tenant_histories` | Every tenant id this organization has ever written governance rows under, appended on first use and never pruned. | None | one row per (TenantId, GovernanceTenantHistoryId); an organization-scoped row appears once per project | `FirstUsedAt` |
-| `identity_match_suggestions` | Match candidates a background job computed and a human has yet to confirm. | None | one row per (TenantId, IdentityMatchSuggestionId); an organization-scoped row appears once per project | `ComputedAt` |
-| `identity_matches` | A dated link from an external account to a platform user, opened when the match holds and closed when it stops being true. | None | one row per (TenantId, IdentityMatchId); an organization-scoped row appears once per project | `CreatedAt` |
+| `github_branch_pull_request_checks` | The per-branch bookkeeping behind pull-request mapping: when a branch was last looked up on GitHub, how many pull requests it resolved to, and when it may be asked about again. | `output` | one row per (GithubBranchPullRequestCheckId), counted once across the projects read, under the lowest project id | `CreatedAt` |
+| `github_installations` | The organization's GitHub connection: a GitHub App installation mapped to a LangWatch organization. | `output`, `costs` | one row per (GithubInstallationId), counted once across the projects read, under the lowest project id | `CreatedAt` |
+| `github_pull_requests` | A pull request discovered through the organization's GitHub connection and mapped to the branch it was opened from, so a coding-agent session that knows only its branch can name the pull request it produced. | `output`, `input` | one row per (GithubPullRequestId), counted once across the projects read, under the lowest project id | `CreatedAt` |
+| `governance_tenant_histories` | Every tenant id this organization has ever written governance rows under, appended on first use and never pruned. | None | one row per (GovernanceTenantHistoryId), counted once across the projects read, under the lowest project id | `FirstUsedAt` |
+| `identity_match_suggestions` | Match candidates a background job computed and a human has yet to confirm. | None | one row per (IdentityMatchSuggestionId), counted once across the projects read, under the lowest project id | `ComputedAt` |
+| `identity_matches` | A dated link from an external account to a platform user, opened when the match holds and closed when it stops being true. | None | one row per (IdentityMatchId), counted once across the projects read, under the lowest project id | `CreatedAt` |
 | `ingestion_pull_run_projections` | Rebuildable per-source pull checkpoint and operator-facing run status. | `output` | one row per IngestionPullRunProjectionId | `CreatedAt` |
-| `ingestion_sources` | Per-platform fleet configuration that connects a closed SaaS product's audit / OTel / S3 stream to LangWatch's Activity Monitor. | `output`, `costs` | one row per (TenantId, IngestionSourceId); a team-scoped row appears once per project | `CreatedAt` |
-| `ingestion_templates` | Admin/platform-curated catalog row for upstream OTLP normalization. | `output` | one row per (TenantId, IngestionTemplateId); an organization-scoped row appears once per project | `CreatedAt` |
+| `ingestion_sources` | Per-platform fleet configuration that connects a closed SaaS product's audit / OTel / S3 stream to LangWatch's Activity Monitor. | `output`, `costs` | one row per (IngestionSourceId), counted once across the projects read, under the lowest project id | `CreatedAt` |
+| `ingestion_templates` | Admin/platform-curated catalog row for upstream OTLP normalization. | `output` | one row per (IngestionTemplateId), counted once across the projects read, under the lowest project id | `CreatedAt` |
 | `langy_active_turns` | Postgres-authoritative one-turn admission for a conversation. Shared Langy conversations only; a member's private conversations are not queryable. | `output` | one row per LangyActiveTurnId | `CreatedAt` |
 | `langy_conversation_projections` | Rebuildable operational state folded from Langy's canonical event stream. Shared Langy conversations only; a member's private conversations are not queryable. | `input`, `output` | one row per LangyConversationProjectionId | `CreatedAt` |
 | `langy_conversation_turn_projections` | Rebuildable per-turn operational render document. Shared Langy conversations only; a member's private conversations are not queryable. | `output` | one row per LangyConversationTurnProjectionId | `CreatedAt` |
 | `langy_message_projections` | Rebuildable operational message fact. Shared Langy conversations only; a member's private conversations are not queryable. | `output` | one row per LangyMessageProjectionId | `CreatedAt` |
 | `langy_turn_requests` | Durable idempotency receipt for one logical Langy send. Shared Langy conversations only; a member's private conversations are not queryable. | `output` | one row per LangyTurnRequestId | `CreatedAt` |
-| `model_default_config_scopes` | Rows of the ModelDefaultConfigScope table, one row per (TenantId, ModelDefaultConfigScopeId); a row reached through its parent appears once per project. | None | one row per (TenantId, ModelDefaultConfigScopeId); a row reached through its parent appears once per project | `CreatedAt` |
-| `model_default_configs` | Rows of the ModelDefaultConfig table, one row per (TenantId, ModelDefaultConfigId); an organization-scoped row appears once per project. | `output` | one row per (TenantId, ModelDefaultConfigId); an organization-scoped row appears once per project | `CreatedAt` |
-| `model_provider_scopes` | Rows of the ModelProviderScope table, one row per (TenantId, ModelProviderScopeId); a row reached through its parent appears once per project. | None | one row per (TenantId, ModelProviderScopeId); a row reached through its parent appears once per project | `CreatedAt` |
-| `model_providers` | Rows of the ModelProvider table, one row per (TenantId, ModelProviderId); an organization-scoped row appears once per project. | `output` | one row per (TenantId, ModelProviderId); an organization-scoped row appears once per project | `CreatedAt` |
+| `model_default_config_scopes` | Rows of the ModelDefaultConfigScope table, one row per (ModelDefaultConfigScopeId), counted once across the projects read, under the lowest project id. | None | one row per (ModelDefaultConfigScopeId), counted once across the projects read, under the lowest project id | `CreatedAt` |
+| `model_default_configs` | Rows of the ModelDefaultConfig table, one row per (ModelDefaultConfigId), counted once across the projects read, under the lowest project id. | `output` | one row per (ModelDefaultConfigId), counted once across the projects read, under the lowest project id | `CreatedAt` |
+| `model_provider_scopes` | Rows of the ModelProviderScope table, one row per (ModelProviderScopeId), counted once across the projects read, under the lowest project id. | None | one row per (ModelProviderScopeId), counted once across the projects read, under the lowest project id | `CreatedAt` |
+| `model_providers` | Rows of the ModelProvider table, one row per (ModelProviderId), counted once across the projects read, under the lowest project id. | `output` | one row per (ModelProviderId), counted once across the projects read, under the lowest project id | `CreatedAt` |
 | `monitors` | Rows of the Monitor table, one row per MonitorId. | `output` | one row per MonitorId | `CreatedAt` |
 | `notifications` | Rows of the Notification table, one row per NotificationId. | `output` | one row per NotificationId | `CreatedAt` |
 | `pinned_traces` | Rows of the PinnedTrace table, one row per PinnedTraceId. | `output` | one row per PinnedTraceId | `CreatedAt` |
@@ -79882,10 +79898,10 @@ Every tenant-scoped table of the application database, derived from the schema. 
 | `process_manager_outbox_attempts` | One row per failed outbox delivery attempt, so the table grows with delivery trouble rather than with traffic. | `output` | one row per ProcessManagerOutboxAttemptId | `OccurredAt` |
 | `process_manager_outboxes` | Transactional intents emitted by a durable process transition. | `output` | one row per ProcessManagerOutboxId | `CreatedAt` |
 | `prompt_tag_assignments` | Rows of the PromptTagAssignment table, one row per PromptTagAssignmentId. | None | one row per PromptTagAssignmentId | `CreatedAt` |
-| `prompt_tags` | Rows of the PromptTag table, one row per (TenantId, PromptTagId); an organization-scoped row appears once per project. | None | one row per (TenantId, PromptTagId); an organization-scoped row appears once per project | `CreatedAt` |
-| `retention_policies` | Rows of the RetentionPolicy table, one row per (TenantId, RetentionPolicyId); an organization-scoped row appears once per project. | `output` | one row per (TenantId, RetentionPolicyId); an organization-scoped row appears once per project | `CreatedAt` |
-| `routing_policies` | Rows of the RoutingPolicy table, one row per (TenantId, RoutingPolicyId); an organization-scoped row appears once per project. | `output` | one row per (TenantId, RoutingPolicyId); an organization-scoped row appears once per project | `CreatedAt` |
-| `routing_policy_scopes` | Rows of the RoutingPolicyScope table, one row per (TenantId, RoutingPolicyScopeId); a row reached through its parent appears once per project. | None | one row per (TenantId, RoutingPolicyScopeId); a row reached through its parent appears once per project | `CreatedAt` |
+| `prompt_tags` | Rows of the PromptTag table, one row per (PromptTagId), counted once across the projects read, under the lowest project id. | None | one row per (PromptTagId), counted once across the projects read, under the lowest project id | `CreatedAt` |
+| `retention_policies` | Rows of the RetentionPolicy table, one row per (RetentionPolicyId), counted once across the projects read, under the lowest project id. | `output` | one row per (RetentionPolicyId), counted once across the projects read, under the lowest project id | `CreatedAt` |
+| `routing_policies` | Rows of the RoutingPolicy table, one row per (RoutingPolicyId), counted once across the projects read, under the lowest project id. | `output` | one row per (RoutingPolicyId), counted once across the projects read, under the lowest project id | `CreatedAt` |
+| `routing_policy_scopes` | Rows of the RoutingPolicyScope table, one row per (RoutingPolicyScopeId), counted once across the projects read, under the lowest project id. | None | one row per (RoutingPolicyScopeId), counted once across the projects read, under the lowest project id | `CreatedAt` |
 | `saved_views` | Rows of the SavedView table, one row per SavedViewId. | `output` | one row per SavedViewId | `CreatedAt` |
 | `scenario_versions` | Rows of the ScenarioVersion table, one row per ScenarioVersionId. | `output` | one row per ScenarioVersionId | `CreatedAt` |
 | `scenarios` | Rows of the Scenario table, one row per ScenarioId. | `output` | one row per ScenarioId | `CreatedAt` |
@@ -79899,8 +79915,8 @@ Every tenant-scoped table of the application database, derived from the schema. 
 | `trace_edit_overlays` | Rows of the TraceEditOverlay table, one row per TraceEditOverlayId. | `output` | one row per TraceEditOverlayId | `CreatedAt` |
 | `trigger_sents` | Rows of the TriggerSent table, one row per TriggerSentId. | None | one row per TriggerSentId | `CreatedAt` |
 | `triggers` | Rows of the Trigger table, one row per TriggerId. | `output` | one row per TriggerId | `CreatedAt` |
-| `virtual_key_scopes` | Rows of the VirtualKeyScope table, one row per (TenantId, VirtualKeyScopeId); a row reached through its parent appears once per project. | None | one row per (TenantId, VirtualKeyScopeId); a row reached through its parent appears once per project | `CreatedAt` |
-| `virtual_keys` | Rows of the VirtualKey table, one row per (TenantId, VirtualKeyId); an organization-scoped row appears once per project. | `output` | one row per (TenantId, VirtualKeyId); an organization-scoped row appears once per project | `CreatedAt` |
+| `virtual_key_scopes` | Rows of the VirtualKeyScope table, one row per (VirtualKeyScopeId), counted once across the projects read, under the lowest project id. | None | one row per (VirtualKeyScopeId), counted once across the projects read, under the lowest project id | `CreatedAt` |
+| `virtual_keys` | Rows of the VirtualKey table, one row per (VirtualKeyId), counted once across the projects read, under the lowest project id. | `output` | one row per (VirtualKeyId), counted once across the projects read, under the lowest project id | `CreatedAt` |
 | `webhook_endpoint_deliveries` | The per-ATTEMPT delivery log for BOTH webhook channels: the endpoints platform's batches and the automations channel's trigger fires. | `output` | one row per WebhookEndpointDeliveryId | `CreatedAt` |
 | `workflow_versions` | Rows of the WorkflowVersion table, one row per WorkflowVersionId. | `output` | one row per WorkflowVersionId | `CreatedAt` |
 | `workflows` | Rows of the Workflow table, one row per WorkflowId. | `output` | one row per WorkflowId | `CreatedAt` |

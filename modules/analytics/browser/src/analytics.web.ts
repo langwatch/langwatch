@@ -109,7 +109,7 @@ export const analyticsWeb = defineBrowserModule("analytics")
         .SavedDashboardsSection,
     }),
   })
-  /** The Dashboards section, lent to the LLM Ops sidebar: pinned dashboards and a "+". */
+  /** The Dashboards section, lent to the product sidebars: pinned dashboards and a "+". */
   .lends(StarredDashboardsToken, {
     load: async () => ({
       default: (await import("./features/dashboards/ui/sections/starred-dashboards-section.tsx"))

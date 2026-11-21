@@ -24,6 +24,7 @@
     "@langwatch/analytics-client": "workspace:*",
     "@langwatch/api": "workspace:*",
     "@langwatch/authorization": "workspace:*",
+    "@langwatch/authz-contract": "workspace:*",
     "@langwatch/browser": "workspace:*",
     "@langwatch/browser-host": "workspace:*",
     "@langwatch/dataset-client": "workspace:*",
