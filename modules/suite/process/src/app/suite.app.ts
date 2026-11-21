@@ -76,6 +76,7 @@ import {
   buildSuiteRunProcessingPipeline,
   type SuiteRunProcessingPipeline,
 } from "../eventing/suite-run-processing.pipeline.ts";
+import { SuiteTemplateService } from "../features/suite-templates/services/suite-template.service.ts";
 import type { SuiteRepositories } from "../repositories/suite.repositories.ts";
 import { suitePlatformUrl } from "../rules/suite-platform-url.rules.ts";
 import { AgentOwnerNamesService } from "../services/agent-owner-names.service.ts";
@@ -95,7 +96,6 @@ import {
   type SuiteRunModelsResolver,
 } from "../services/suite-run-models.service.ts";
 import { SuiteRunScenarioFactsService } from "../services/suite-run-scenario-facts.service.ts";
-import { SuiteTemplateService } from "../services/suite-template.service.ts";
 import { SuiteService } from "../services/suite.service.ts";
 
 /**

@@ -1,4 +1,4 @@
-import { isConversationalQuerySource } from "@langwatch/span-normalisation";
+import { isConversationalQuerySource, readDeclaredSessionKey } from "@langwatch/span-normalisation";
 // One vocabulary for all coding agents; folds registry definitions into
 // shared detection, prefix-stripping and alias tables; downstream code never
 // compares vendor literals.
@@ -62,14 +62,21 @@ export function deriveSpanConversationKey({
   agent,
   name,
   attrs,
+  resourceAttrs = {},
 }: {
   agent: CodingAgent;
   name: string;
   attrs: Record<string, unknown>;
+  resourceAttrs?: Record<string, unknown>;
 }): string | null {
+  const declared = readDeclaredSessionKey({ attributes: attrs, resourceAttributes: resourceAttrs });
+  if (declared !== null) return declared;
   const definition = CODING_AGENT_REGISTRY.find((candidate) => candidate.id === agent);
   return definition?.deriveSessionKeyFromSpan?.({ name, attrs }) ?? deriveConversationKey(attrs);
 }
+
+/** A launcher's own session groups every harness session it runs into one row (any agent). */
+export { readDeclaredSessionKey };
 
 /**
  * The canonical event, from whatever the agent called it. Some agents namespace their event

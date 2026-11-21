@@ -300,6 +300,7 @@ export class TraceSummaryFoldProjection
       scopeName: event.data.scopeName,
       body: event.data.body,
       attributes: event.data.attributes,
+      resourceAttributes: event.data.resourceAttributes,
     }).attributes;
 
     return TraceSummaryFoldProjection.applyLogContribution({

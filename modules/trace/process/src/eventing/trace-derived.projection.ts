@@ -502,6 +502,7 @@ export class TraceAnalyticsFoldProjection
       scopeName: event.data.scopeName,
       body: event.data.body,
       attributes: event.data.attributes,
+      resourceAttributes: event.data.resourceAttributes,
     }).attributes;
 
     return TraceAnalyticsFoldProjection.applyLogContribution({

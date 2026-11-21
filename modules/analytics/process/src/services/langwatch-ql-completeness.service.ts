@@ -108,6 +108,7 @@ export class LangWatchQLCompletenessService {
             views: input.views,
             timeWindow,
             ...(input.memberWindows ? { memberWindows: input.memberWindows } : {}),
+            projectIds: input.projectIds,
           }),
           parameters: {
             [START_PARAMETER]: formatLangWatchQLDateTimeParameter(timeWindow.start),
