@@ -6,6 +6,7 @@
 
 import type { AgentType } from "@langwatch/agent-contract";
 import { createModuleApi, type ContractApiMap } from "@langwatch/api/web";
+import type { AuthzOwnStanding, AuthzOwnStandingInput } from "@langwatch/authz-contract";
 import type { identityTrpc } from "@langwatch/identity-contract";
 import type { OpsApiGetBadgeCountsOutput } from "@langwatch/ops-contract";
 
@@ -164,7 +165,7 @@ export type NavigationApiMap = ContractApiMap<typeof identityTrpc> & {
   authz: {
     /** The reader's own permissions in a named project, as the server resolves them. */
     effectivePermissions: {
-      query: { input: { projectId: string }; output: { permissions: string[] } };
+      query: { input: AuthzOwnStandingInput; output: AuthzOwnStanding };
     };
   };
 

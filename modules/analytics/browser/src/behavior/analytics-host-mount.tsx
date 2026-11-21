@@ -35,6 +35,9 @@ import { automationDrawerAddress } from "../model/analytics-overlay-address.ts";
 import { isPersonalProject } from "../model/analytics-personal-project.ts";
 import { analyticsApi } from "./analytics-api.ts";
 
+/** Main's cadence: a role changed elsewhere reaches the section within a focus. */
+const GRANTS_STALE_TIME_MS = 30_000;
+
 class CapabilityAnalyticsHost extends AnalyticsHostApi {
   private readonly project_: AnalyticsHostProject | undefined;
   private readonly organizationId_: string | undefined;
@@ -215,7 +218,10 @@ export default function AnalyticsHostMount({ children }: { children?: ReactNode 
   );
   const standings = analyticsApi.useQueries((t) =>
     askedProjectIds.map((askedProjectId) =>
-      t.authz.effectivePermissions({ projectId: askedProjectId }),
+      t.authz.effectivePermissions(
+        { projectId: askedProjectId },
+        { staleTime: GRANTS_STALE_TIME_MS },
+      ),
     ),
   );
   const landed = askedProjectIds.flatMap((askedProjectId, index) => {
@@ -223,15 +229,15 @@ export default function AnalyticsHostMount({ children }: { children?: ReactNode 
     return permissions ? [[askedProjectId, permissions] as const] : [];
   });
   // useQueries answers a new array every render, so the grants are keyed on what landed.
-  // The map is rebuilt from that key, so the memo depends only on what it reads.
   const landedKey = JSON.stringify(landed);
   const projectGrants = useMemo(
     () =>
       new Map(
-        (JSON.parse(landedKey) as typeof landed).map(
+        landed.map(
           ([askedProjectId, permissions]) => [askedProjectId, new Set(permissions)] as const,
         ),
       ),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [landedKey],
   );
 

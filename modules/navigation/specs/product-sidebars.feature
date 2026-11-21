@@ -242,6 +242,23 @@ Feature: Product sidebars
     Then I may create dashboards in "Shop", so the section offers the "+"
     But I may not delete them there
 
+  # LLM Ops may open the page's own project, whose grants the page already holds.
+  @unit
+  Scenario: In Gateway or Coding agents, the page's own project answers from the page's grants
+    Given Dashboards in every product is on
+    When the section names the page's own project
+    Then what I may do there is what the page already lets me do, with no read of its grants
+    And in any other named project it is what that project's own grants let me do
+
+  @unit
+  Scenario: Events from the Dashboards section in Gateway or Coding agents are about the named project
+    Given Dashboards in every product is on
+    And the section in Gateway or Coding agents is titled "Dashboards · Shop"
+    When something I do in the section is tracked
+    Then that event is about "Shop"
+    And the events after it are about the page's own project again
+    And on a page about no project, the events after it are about no project
+
   # ADR-002's release gate: Dashboards opens per project, so the section follows "Shop", where
   # it lists and makes boards, and never the page's own project.
   @integration

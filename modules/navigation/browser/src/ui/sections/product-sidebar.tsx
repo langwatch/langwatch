@@ -5,6 +5,7 @@ import { permissionSatisfiedBy } from "@langwatch/authorization";
 import { RawKbd as Kbd } from "@langwatch/design-system/kbd";
 import { Box, VStack } from "@langwatch/design-system/primitives";
 import { ScrollEdgeFade, useScrollEdges } from "@langwatch/design-system/scroll-fade";
+import { CLIENT_FLAG_STALE_TIME_MS } from "@langwatch/feature-flag-client";
 import { FrontendFlags } from "@langwatch/feature-flag-contract";
 import { ArrowLeft, ArrowUpRight, Search } from "lucide-react";
 import { useRef, useState } from "react";
@@ -337,6 +338,9 @@ function DashboardsSidebarBody({ showExpanded }: { showExpanded: boolean }) {
 /** The sidebars that may show the Dashboards section only with every product's flag on. */
 const DASHBOARDS_SECTION_FLAGGED_SURFACES: ReadonlySet<SidebarSurface> = new Set(["gateway", "me"]);
 
+/** Main's cadence: a role changed elsewhere reaches the section within a focus. */
+const GRANTS_STALE_TIME_MS = 30_000;
+
 /**
  * The Dashboards section analytics lends, for a member who can reach Dashboards: in LLM Ops,
  * and with `release_dashboards_in_every_product` in Gateway and Coding agents too.
@@ -365,11 +369,14 @@ function StarredDashboardsGroup({
 
 /** Released and granted per project: the section follows the one it works in, not the page's. */
 function StarredDashboardsInProject({ project }: { project: StarredDashboardsProject }) {
-  const released = navigationApi.featureFlag.isEnabled.useQuery({
-    flag: "release_dashboards",
-    projectId: project.id,
-  });
-  const standing = navigationApi.authz.effectivePermissions.useQuery({ projectId: project.id });
+  const released = navigationApi.featureFlag.isEnabled.useQuery(
+    { flag: "release_dashboards", projectId: project.id },
+    { staleTime: CLIENT_FLAG_STALE_TIME_MS, refetchOnWindowFocus: false },
+  );
+  const standing = navigationApi.authz.effectivePermissions.useQuery(
+    { projectId: project.id },
+    { staleTime: GRANTS_STALE_TIME_MS },
+  );
   const granted = standing.data?.permissions;
   if (!released.data?.enabled || !granted) return null;
   if (!permissionSatisfiedBy({ granted: new Set(granted), requested: "analytics:view" })) {
