@@ -66583,6 +66583,49 @@ For errors outside the checkup, see [Troubleshooting](/self-hosting/troubleshoot
 
 ---
 
+# FILE: ./self-hosting/cloud-marketplaces.mdx
+
+---
+title: Buy through Azure, AWS or Google Cloud Marketplace
+description: "Buy LangWatch Enterprise through Azure Marketplace, AWS Marketplace or Google Cloud Marketplace, including private offers with custom terms, and bill it to your cloud account"
+sidebarTitle: Cloud marketplaces
+keywords: azure marketplace, aws marketplace, google cloud marketplace, gcp marketplace, private offer, procurement, enterprise, billing, purchase
+---
+
+Yes, you can buy LangWatch through **Azure Marketplace**, **AWS Marketplace** and **Google Cloud Marketplace**. The purchase is billed to your cloud account, so it goes through the vendor and procurement process you already have with Microsoft, AWS or Google.
+
+## Where to buy
+
+| Marketplace | How to buy |
+| --- | --- |
+| **Azure Marketplace** | [LangWatch on Azure Marketplace](https://marketplace.microsoft.com/en-us/product/langwatch.langwatch), or a private offer with custom terms |
+| **AWS Marketplace** | A private offer with custom terms: [contact sales](https://langwatch.ai/get-a-demo) |
+| **Google Cloud Marketplace** | A private offer with custom terms: [contact sales](https://langwatch.ai/get-a-demo) |
+
+## Private offers
+
+A private offer is a listing made for your organization only: your price, seat count, contract length and terms, accepted in your own marketplace account. Enterprise deals of any size can go through one.
+
+To get one, [contact sales](https://langwatch.ai/get-a-demo) or email [enterprise@langwatch.ai](mailto:enterprise@langwatch.ai). Tell us which marketplace you use and the account or tenant that will accept the offer.
+
+If you want the purchase to count toward an existing spending commitment with Microsoft, AWS or Google, ask your account rep.
+
+## What you can buy
+
+The Azure Marketplace listing has two plans:
+
+- **Enterprise license, LangWatch Cloud**: Enterprise on [LangWatch Cloud](https://app.langwatch.ai). After purchase we enable Enterprise on your organization.
+- **Enterprise license, self-hosted**: an Enterprise license for LangWatch on your own infrastructure, with [Docker Compose](/self-hosting/deployment/docker-compose) or [Helm](/self-hosting/deployment/kubernetes-helm). See [Editions and licensing](/self-hosting/licensing) for what the license adds.
+
+For [Hybrid](/hybrid-setup/overview), Cloud Enterprise on dedicated instances, or any other setup, [talk to sales](https://langwatch.ai/get-a-demo) about a private offer.
+
+## After you buy
+
+- **LangWatch Cloud**: we turn on Enterprise for your organization.
+- **Self-hosted**: you receive an activation code or a signed license key. [Activate it](/self-hosting/licensing#activating-a-license) in **Settings → License**.
+
+---
+
 # FILE: ./self-hosting/compliance.mdx
 
 ---
@@ -72451,7 +72494,7 @@ In configuration, one setting takes both: the `LANGWATCH_LICENSE_KEY` variable o
 
 <Steps>
 <Step title="Get a license">
-Email [enterprise@langwatch.ai](mailto:enterprise@langwatch.ai) or [talk to sales](https://langwatch.ai/get-a-demo). You receive an activation code or a signed license key.
+Email [enterprise@langwatch.ai](mailto:enterprise@langwatch.ai) or [talk to sales](https://langwatch.ai/get-a-demo). You receive an activation code or a signed license key. You can also buy the license [through Azure Marketplace, AWS Marketplace or Google Cloud Marketplace](/self-hosting/cloud-marketplaces).
 </Step>
 
 <Step title="Activate it">
@@ -73378,6 +73421,8 @@ Choose the deployment method that fits your environment.
 ## Enterprise
 
 For Cloud Enterprise or Hybrid deployments, [contact the LangWatch team](https://langwatch.ai/get-a-demo) to discuss your requirements.
+
+You can also buy LangWatch through Azure Marketplace, AWS Marketplace or Google Cloud Marketplace, including private offers. See [Buy through Azure, AWS or Google Cloud Marketplace](/self-hosting/cloud-marketplaces).
 
 Enterprise capabilities include:
 
@@ -75706,6 +75751,8 @@ The hybrid setup requires coordination with our team to configure the secure con
 2. **Provision your data plane**: We'll help you set up ClickHouse and S3 in your infrastructure
 3. **Configure the connection**: We'll establish a secure link (typically via VPC peering, PrivateLink, or VPN) between LangWatch Cloud and your data plane
 4. **Verify**: Run traces and confirm data flows correctly while staying in your infrastructure
+
+Buying through Azure Marketplace, AWS Marketplace or Google Cloud Marketplace? Ask for a private offer. See [Buy through Azure, AWS or Google Cloud Marketplace](/self-hosting/cloud-marketplaces).
 
 <Card title="Interested in hybrid setup?" icon="envelope" href="mailto:support@langwatch.ai">
   Contact our team to discuss your requirements and get started with a hybrid deployment.
@@ -82363,6 +82410,11 @@ Self-hosted deployments keep the same 49-day default. An Enterprise license open
 <Accordion title="Do you support custom contracts and procurement reviews?">
   Yes. We know procurement and legal teams often have their own review processes. For Enterprise and
   regulated-industry plans, we support custom contracting and custom workflows.
+</Accordion>
+
+<Accordion title="Can I buy LangWatch through Azure, AWS or Google Cloud Marketplace?">
+  Yes. Enterprise plans are available through Azure Marketplace, AWS Marketplace and Google Cloud
+  Marketplace, including private offers with custom terms. See [Buy through Azure, AWS or Google Cloud Marketplace](/self-hosting/cloud-marketplaces).
 </Accordion>
 
 <Accordion title="Is LangWatch secure and compliant?">
