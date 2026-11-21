@@ -10,7 +10,7 @@ import {
   createTestProjects,
   type TestProjects,
   TestSessions,
-  TestStoredTraces,
+  storedTracesFixture,
   TestTraceSessions,
   aggregateProof,
   ownProof,
@@ -35,7 +35,7 @@ function serviceWith(input: {
   return CodingAgentFeatureService.create({
     sessions: input.sessions,
     traceSessions: new TestTraceSessions(),
-    storedTraces: new TestStoredTraces(),
+    storedTraces: storedTracesFixture(),
     metricSeries: new TestMetricSeries(),
     sessionEvents: new TestEvents(),
     github: input.github ?? new TestGithubService(),

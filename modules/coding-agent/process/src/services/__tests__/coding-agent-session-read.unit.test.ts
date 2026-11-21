@@ -10,11 +10,14 @@ import {
   TestMetricSeries,
   createTestProjects,
   TestSessions,
-  TestStoredTraces,
+  storedTracesFixture,
   TestTraceSessions,
   session,
 } from "../../__tests__/fixtures/coding-agent.fixture.ts";
-import { CODING_AGENT_SESSION_READ_WINDOW_MS } from "../coding-agent-session-read.service.ts";
+import {
+  CODING_AGENT_SESSION_READ_WINDOW_MS,
+  type CodingAgentStoredTraces,
+} from "../coding-agent-session-read.service.ts";
 import {
   MAX_SESSION_EVENTS_PAGE_SIZE,
   CodingAgentFeatureService,
@@ -30,14 +33,14 @@ function serviceWith(input: {
   traceSessions?: TestTraceSessions;
   metricSeries?: TestMetricSeries;
   events?: TestEvents;
-  storedTraces?: TestStoredTraces;
+  storedTraces?: CodingAgentStoredTraces;
 }) {
   return CodingAgentFeatureService.create({
     sessions: input.sessions ?? new TestSessions(),
     traceSessions: input.traceSessions ?? new TestTraceSessions(),
     metricSeries: input.metricSeries ?? new TestMetricSeries(),
     sessionEvents: input.events ?? new TestEvents(),
-    storedTraces: input.storedTraces ?? new TestStoredTraces(),
+    storedTraces: input.storedTraces ?? storedTracesFixture(),
     github: new TestGithubService(),
     projects: createTestProjects(),
     billing: new TestBillingPolicy(),
@@ -174,7 +177,10 @@ describe("Coding Agent session reads", () => {
       sessionId: SESSION,
       occurredAtMs: TEST_NOW_MS - 1_000,
     };
-    const service = serviceWith({ sessions, traceSessions });
+    const storedTraces = storedTracesFixture({
+      findExistingTraceIds: async ({ traceIds }) => [...traceIds],
+    });
+    const service = serviceWith({ sessions, traceSessions, storedTraces });
 
     await expect(
       service.findLastTurnOfSession({ projectId: PROJECT, sessionId: SESSION }),
@@ -204,14 +210,19 @@ describe("Coding Agent session reads", () => {
       mapped(TRACE, TEST_NOW_MS - 60_000),
       mapped("older", TEST_NOW_MS - 120_000),
     ];
-    const storedTraces = new TestStoredTraces();
-    storedTraces.missing.add("named-by-a-log-only");
+    const asked: { projectId: string; traceIds: readonly string[] }[] = [];
+    const storedTraces = storedTracesFixture({
+      findExistingTraceIds: async (input) => {
+        asked.push(input);
+        return input.traceIds.filter((traceId) => traceId !== "named-by-a-log-only");
+      },
+    });
     const service = serviceWith({ traceSessions, storedTraces });
 
     await expect(
       service.findLastTurnOfSession({ projectId: PROJECT, sessionId: SESSION }),
     ).resolves.toEqual({ traceId: TRACE, occurredAtMs: TEST_NOW_MS - 60_000 });
-    expect(storedTraces.inputs).toEqual([
+    expect(asked).toEqual([
       { projectId: PROJECT, traceIds: ["named-by-a-log-only", TRACE, "older"] },
     ]);
   });
@@ -224,8 +235,7 @@ describe("Coding Agent session reads", () => {
       sessionId: SESSION,
       occurredAtMs: TEST_NOW_MS - 1_000,
     };
-    const storedTraces = new TestStoredTraces();
-    storedTraces.missing.add(TRACE);
+    const storedTraces = storedTracesFixture({ findExistingTraceIds: async () => [] });
     const service = serviceWith({ traceSessions, storedTraces });
 
     await expect(

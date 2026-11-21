@@ -11,7 +11,7 @@ import {
   TestClickHouseEndpoint,
   TestClock,
   TestGithubService,
-  TestStoredTraces,
+  storedTracesFixture,
   createTestProjects,
   session,
   sessionEventRecord,
@@ -36,7 +36,7 @@ async function runtime() {
     projections: CodingAgentProjectionPersistenceService.create(repositories),
     service: CodingAgentFeatureService.create({
       ...repositories,
-      storedTraces: new TestStoredTraces(),
+      storedTraces: storedTracesFixture(),
       github: new TestGithubService(),
       projects: createTestProjects(),
       billing: new TestBillingPolicy(),
