@@ -260,6 +260,17 @@ const unpricedRows = (query, listed = []) => (query.completeness?.unpriced?.mode
   .map((model) => ({ label: model, value: null, note: "no price",
     title: model + " has no price, so its cost is unknown." }));`;
 
+/**
+ * What the cost figure says while nothing is resolved; reads `NUMBERS` and `COMPLETENESS`. A
+ * spend with no price at all is left out, and a zero sum names its gap: never "$0.00+".
+ */
+export const SPENT_HINT = `function spentHint(query, sum) {
+  const parts = costParts(query, sum);
+  if (parts.unpriced && !parts.priced) return "Nothing resolved yet";
+  if (parts.unpriced && num(sum) === 0) return "$0.00 spent, some spans not priced";
+  return costText(parts) + " spent, nothing resolved yet";
+}`;
+
 /** The Recharts components `SERIES_CHART` draws with. */
 export const SERIES_CHART_IMPORTS = [
   "ResponsiveContainer",

@@ -152,9 +152,12 @@ bounds): the file is its query results.
 
 The chart kit is `@langwatch/charts` in widget code (`model/dashboard-widget/chartsLib`).
 
-- **Sums.** A sum that can only grow once the rest arrives is a lower bound. It gets a "+"
-  ("$830+"), and the hover says why. Ask `isLowerBound({ completeness, field })`. Averages and
-  rates never get a "+".
+- **Sums.** A sum that can only grow once the rest arrives is a lower bound. A sum above 0 with
+  some spans unpriced gets a "+" ("$830+"), and the hover says why. A cost sum reads through
+  `costFigure` (`costParts` underneath); any other sum asks `isLowerBound({ completeness,
+  field })`. A 0 sum with some spans unpriced shows "$0.00, some spans not priced", never
+  "$0.00+". Nothing priced on a card means the cost setup view; on a per-source row it means
+  "Not priced". Averages and rates never get a "+".
 - **Unpriced cost.** Cost with no price is unknown, not $0. Pass `completeness.unpriced` to a
   `Leaderboard` (or `LwqlChart`): each model gets a "no price" row and "–" for its cost.
 - **Averages.** An average divides by the rows that carry the field, so unpriced traces never

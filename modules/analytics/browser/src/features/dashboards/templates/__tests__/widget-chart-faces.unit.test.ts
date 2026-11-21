@@ -8,9 +8,14 @@ import { describe, expect, it } from "vitest";
 
 import { isLowerBound } from "../../../../model/dashboard-widget/chartsLib/index.ts";
 import { IMPLEMENTED_WIDGET_IDS, implementedWidget } from "../../catalogue/index.ts";
-import { SPENT_HINT } from "../../catalogue/widgets/flight-deck-code.ts";
 import { BOARD_TEMPLATES } from "../index.ts";
-import { COMPLETENESS, MARK_HOVER, NUMBERS, SERIES_CHART } from "../model/widget-code-parts.ts";
+import {
+  COMPLETENESS,
+  MARK_HOVER,
+  NUMBERS,
+  SERIES_CHART,
+  SPENT_HINT,
+} from "../model/widget-code-parts.ts";
 
 interface CostParts {
   sum: number | null;
@@ -65,6 +70,9 @@ describe("given a cost card", () => {
   /** @scenario "AC215 Partial cost: no span priced" */
   it('shows "Not priced" when no span has a cost', () => {
     expect(cost.costText({ sum: 0, priced: false, unpriced: true })).toBe("Not priced");
+  });
+
+  it('keeps "Not priced" on costFigure when no span is priced', () => {
     expect(cost.costFigure({ completeness: report({ total: 3, unpriced: 3 }) }, 0)).toBe(
       "Not priced",
     );
@@ -85,7 +93,7 @@ describe("given a cost card", () => {
     expect(cost.costText({ sum: 12.5, priced: true, unpriced: true })).toBe("$12.50+");
   });
 
-  /** @scenario "AC215b Partial cost: some spans priced at zero" */
+  /** @scenario "AC215d Partial cost: a sum above 0 with some spans not priced" */
   it("keeps today's figure for a fully priced sum, and never reads $0.00+", () => {
     expect(cost.costText({ sum: 12.5, priced: true, unpriced: false })).toBe("$12.50");
     expect(cost.costText({ sum: 0, priced: true, unpriced: false })).toBe("$0.00");
@@ -99,7 +107,6 @@ describe("given a cost card", () => {
 });
 
 describe("given the AI cost per resolved figure while nothing is resolved", () => {
-  /** @scenario "AC215 Partial cost: no span priced" */
   it("says only that nothing is resolved when no span has a cost", () => {
     expect(cost.spentHint({ completeness: report({ total: 3, unpriced: 3 }) }, 0)).toBe(
       "Nothing resolved yet",

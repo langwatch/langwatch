@@ -12,6 +12,7 @@ import {
   DATES,
   GAP_BRIDGE,
   NUMBERS,
+  SPENT_HINT,
   TRACE_LINK,
   TABLE,
   widgetCode,
@@ -26,17 +27,6 @@ import {
   TRACES_LINK,
   WORDS,
 } from "./flight-deck-costs-parts.ts";
-
-/**
- * What the cost figure says while nothing is resolved; reads `NUMBERS` and `COMPLETENESS`. A
- * spend with no price at all is left out, and a zero sum names its gap: never "$0.00+".
- */
-export const SPENT_HINT = `function spentHint(query, sum) {
-  const parts = costParts(query, sum);
-  if (parts.unpriced && !parts.priced) return "Nothing resolved yet";
-  if (parts.unpriced && num(sum) === 0) return "$0.00 spent, some spans not priced";
-  return costText(parts) + " spent, nothing resolved yet";
-}`;
 
 /** This period: whether the agent does its job and what a success costs, at a glance. */
 export const KPIS_CODE = widgetCode({

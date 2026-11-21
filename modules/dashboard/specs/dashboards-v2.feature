@@ -58,14 +58,15 @@ Feature: Dashboards v2 polish and bring-your-own-AI
 
   @unit
   Scenario: AC215 Partial cost: no span priced
-    Given a cost card that counts its priced spans, where no span has a cost
+    Given a per-source cost row where no span has a cost
     Then it shows "Not priced"
     And never "$0.00+"
+    And a card whose figure has no priced span shows the cost setup view instead
 
   @unit
   Scenario: AC215b Partial cost: some spans priced at zero
     Given at least one span is priced, every priced span is priced at 0, and some spans have no cost
-    Then it shows "$0.00, some spans not priced"
+    Then the card figure or source row shows "$0.00, some spans not priced"
     And never "$0.00+"
 
   @unit
@@ -76,8 +77,9 @@ Feature: Dashboards v2 polish and bring-your-own-AI
 
   @unit
   Scenario: AC215d Partial cost: a sum above 0 with some spans not priced
-    Given a cost card where at least one span is priced above 0 and some spans have no cost
+    Given a cost card or a per-source cost row where at least one span is priced above 0 and some spans have no cost
     Then it shows the sum marked "+"
+    And a sum with every span priced shows no "+"
 
   @e2e @unimplemented
   Scenario: AC5 The board uses a wide screen

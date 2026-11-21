@@ -5,6 +5,7 @@
 
 import { describe, expect, it } from "vitest";
 
+import { NUMBERS } from "../../templates/model/widget-code-parts.ts";
 import { OUTCOME_JUDGE } from "../widgets/flight-deck-costs-queries.ts";
 import { FLIGHT_DECK_COSTS_BUILDS } from "../widgets/flight-deck-costs-widgets.ts";
 
@@ -162,6 +163,17 @@ describe("given the Running costs widgets", () => {
     }
     expect(queries.main).toContain("'evaluations' AS source\n  FROM evaluation_metrics");
     expect(code).toContain('<Headline value={pct(ratio(test, total), 0)} label="test traffic" />');
+  });
+
+  /** @scenario "AC215 Partial cost: no span priced" */
+  it('shows "Not priced" on a source row whose traces all lack a cost', () => {
+    const figure = build("cost-by-source").code.match(/const figure = ([\s\S]*?);\n/)?.[1];
+    if (!figure) throw new Error("no figure on the source row");
+    // The stored expression is what the row runs; evaluating it is the test.
+    // oxlint-disable-next-line no-implied-eval
+    const rowFigure = new Function("cost", "traces", "unpriced", `${NUMBERS}\nreturn ${figure};`);
+    expect(rowFigure(0, 3, 3)).toBe("Not priced");
+    expect(rowFigure(null, 3, 3)).not.toContain("$0.00+");
   });
 
   /** @scenario "AC30 Running costs: Wasted spend counts each production trace once" */
