@@ -1117,7 +1117,7 @@ const TRACE_METRICS: UngatedViewDefinition = {
       name: "LastUsedPromptVersionId",
       type: "String",
       description:
-        "Version of the last managed prompt the trace used, as traces.LastUsedPromptVersionId has it. Empty when the trace used none, or was last folded before this column existed.",
+        "Version of the last managed prompt the trace used, by the rule traces.LastUsedPromptVersionId follows; the two can differ for a trace whose prompt span arrived late. Empty when the trace used none, or was last folded before this column existed.",
       sourceColumns: ["LastUsedPromptVersionId"],
     },
     // `HasAnnotation`, `EarliestSpanStartMs` and `Attributes` are withheld: the first would answer

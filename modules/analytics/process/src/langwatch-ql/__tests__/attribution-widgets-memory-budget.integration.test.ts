@@ -117,7 +117,6 @@ describe("given three tenants' attribution traces, read over a 60-day period and
   const fileStartedAt = performance.now();
   let harness: LangWatchQLClickHouseHarness;
   let executor: ClickHouseLangWatchQLExecutorRepository;
-  let managedColumn = false;
   let seedSeconds = Number.NaN;
   const measurer = createMeasurer({ harness: () => harness, executor: () => executor });
   const { measurements } = measurer;
@@ -137,13 +136,12 @@ describe("given three tenants' attribution traces, read over a 60-day period and
       suite: "attribution-widgets-memory",
       facts: "migrated",
     });
-    ({ managedColumn } = await provisionAttributionViews({ harness, limits: LIMITS }));
+    await provisionAttributionViews({ harness, limits: LIMITS });
     seedSeconds = await seedAttributionTenants({
       harness,
       tenants: PERMANENT_TENANTS,
-      managedColumn,
     });
-    console.table({ seed: { seconds: Number(seedSeconds.toFixed(1)), managedColumn } });
+    console.table({ seed: { seconds: Number(seedSeconds.toFixed(1)) } });
 
     executor = ClickHouseLangWatchQLExecutorRepository.create({
       connection: {
@@ -261,7 +259,6 @@ describe("given three tenants' attribution traces, read over a 60-day period and
         sweepSeedSeconds = await seedAttributionTenants({
           harness,
           tenants: SWEEP_ONLY_TENANTS,
-          managedColumn,
         });
       },
       2 * SWEEP_SEED_BUDGET_SECONDS * 1000,

@@ -3,8 +3,9 @@
 
 -- The managed prompt version a trace last used, as a trace_analytics column, so att-change reads
 -- it from trace_metrics instead of traces (analytics ADR-006). It is the version of the trace's
--- latest prompt span by start time, the SpanId breaking a tie: the value traces carries as
--- trace_summaries.LastUsedPromptVersionId.
+-- latest prompt span by start time, the SpanId breaking a tie, by trace_summaries' rule. Each fold
+-- reads its own row back and forgets the start time, so a late prompt span can leave this column
+-- and trace_summaries.LastUsedPromptVersionId apart until the trace is refolded.
 --
 -- A plain column with a DEFAULT, no MATERIALIZED expression: the traceAnalytics fold writes it, so
 -- an older release that writes the row leaves ''. This file starts no mutation and copies no rows.

@@ -138,26 +138,15 @@ function seedTraces({ tenant }: { tenant: TenantSeed }): string {
 const KEEP = 0;
 const unitValue = (key: string) => `concat('${key}-', toString(unit))`;
 
-/**
- * The tenant's `trace_analytics` rows. The managed version goes to `LastUsedPromptVersionId` once
- * a migration gives the table that column; main's table has none.
- */
-function traceAnalyticsInsert({
-  facts,
-  tenant,
-  managedColumn,
-}: {
-  facts: string;
-  tenant: TenantSeed;
-  managedColumn: boolean;
-}): string {
+/** The tenant's `trace_analytics` rows, the managed version in `LastUsedPromptVersionId`. */
+function traceAnalyticsInsert({ facts, tenant }: { facts: string; tenant: TenantSeed }): string {
   const metadata = UNIT_METADATA_KEYS.map((key) => `'metadata.${key}', ${unitValue(key)}`);
   return `
-    INSERT INTO ${facts}.trace_analytics (TenantId, TraceId, Version, OccurredAt, CreatedAt, UpdatedAt, TraceName, CustomerId, Origin, Models, Labels, TotalDurationMs, HasError, Attributes, MetadataPromptVersion, _retention_days${managedColumn ? ", LastUsedPromptVersionId" : ""})
+    INSERT INTO ${facts}.trace_analytics (TenantId, TraceId, Version, OccurredAt, CreatedAt, UpdatedAt, TraceName, CustomerId, Origin, Models, Labels, TotalDurationMs, HasError, Attributes, MetadataPromptVersion, _retention_days, LastUsedPromptVersionId)
     SELECT {tenantId:String}, tid, '1', occ, occ, occ, concat('agent-', toString(t % 40)),
       ${unitValue("customer")}, 'application', ['gpt-5-mini'], [${unitValue("label")}], (t * 13) % 60000, false,
       map('langwatch.origin', 'application', ${metadata.join(", ")}),
-      metadata_version, ${KEEP}${managedColumn ? ", managed" : ""}
+      metadata_version, ${KEEP}, managed
     FROM ${seedTraces({ tenant })}
   `;
 }
@@ -207,17 +196,14 @@ function traceEvaluationInsert({
   `;
 }
 
-/**
- * Provisions the views and the access model with `limits`, and maps every tenant's key. Returns
- * whether `trace_analytics` has the managed version column the seed then writes.
- */
+/** Provisions the views and the access model with `limits`, and maps every tenant's key. */
 export async function provisionAttributionViews({
   harness,
   limits,
 }: {
   harness: LangWatchQLClickHouseHarness;
   limits: LangWatchQLResourceLimits;
-}): Promise<{ managedColumn: boolean }> {
+}): Promise<void> {
   const { names, factDatabase: facts } = harness;
   await harness.applyAsAdmin(
     viewProvisioning.setupStatements({
@@ -241,30 +227,15 @@ export async function provisionAttributionViews({
       TenantId: tenantId,
     })),
   });
-  const [column] = await selectRows<{ n: string }>(
-    harness.admin,
-    `SELECT count() AS n FROM system.columns ` +
-      `WHERE database = '${facts}' AND table = 'trace_analytics' ` +
-      `AND name = 'LastUsedPromptVersionId'`,
-  );
-  return { managedColumn: Number(column?.n) > 0 };
 }
 
 /** The statements that write one tenant's traces, its evaluations only when it carries them. */
-function tenantStatements({
-  facts,
-  tenant,
-  managedColumn,
-}: {
-  facts: string;
-  tenant: TenantSeed;
-  managedColumn: boolean;
-}): string[] {
+function tenantStatements({ facts, tenant }: { facts: string; tenant: TenantSeed }): string[] {
   const evaluations = tenant.evaluations
     ? EVALUATION_WRITES.map((write) => traceEvaluationInsert({ facts, tenant, write }))
     : [];
   return [
-    traceAnalyticsInsert({ facts, tenant, managedColumn }),
+    traceAnalyticsInsert({ facts, tenant }),
     traceSummariesInsert({ facts, tenant }),
     ...evaluations,
   ];
@@ -274,11 +245,9 @@ function tenantStatements({
 export async function seedAttributionTenants({
   harness,
   tenants,
-  managedColumn,
 }: {
   harness: LangWatchQLClickHouseHarness;
   tenants: readonly TenantSeed[];
-  managedColumn: boolean;
 }): Promise<number> {
   const facts = harness.factDatabase;
   // One INSERT ... SELECT can outlast the driver's default 30 s on a slow runner.
@@ -290,7 +259,7 @@ export async function seedAttributionTenants({
   });
   const seedStartedAt = performance.now();
   for (const tenant of tenants) {
-    for (const query of tenantStatements({ facts, tenant, managedColumn })) {
+    for (const query of tenantStatements({ facts, tenant })) {
       await seeder.command({
         query,
         query_params: {
