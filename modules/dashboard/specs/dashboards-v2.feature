@@ -64,10 +64,20 @@ Feature: Dashboards v2 polish and bring-your-own-AI
 
   @unit
   Scenario: AC215b Partial cost: some spans priced at zero
-    Given every priced span is priced at 0 and some spans have no cost
+    Given at least one span is priced, every priced span is priced at 0, and some spans have no cost
     Then it shows "$0.00, some spans not priced"
     And never "$0.00+"
-    And the loops card, which cannot count priced spans, shows "$0.00, some spans not priced" whenever its sum is 0 and some repeats have no cost
+
+  @unit
+  Scenario: AC215c Partial cost: the loops card cannot count priced spans
+    Given the "up-loops" card, whose sum is 0 and some of whose repeats have no cost
+    Then it shows "$0.00, some spans not priced"
+    And never "Not priced" or "$0.00+"
+
+  @unit
+  Scenario: AC215d Partial cost: a sum above 0 with some spans not priced
+    Given a cost card where at least one span is priced above 0 and some spans have no cost
+    Then it shows the sum marked "+"
 
   @e2e @unimplemented
   Scenario: AC5 The board uses a wide screen
@@ -2344,4 +2354,4 @@ Feature: Dashboards v2 polish and bring-your-own-AI
   # AC 120-123: "Ask Langy: hand any widget to Langy with a ready draft" → Scenario: AC120 Ask Langy: each widget card offers Ask Langy only when Langy is available; Scenario: AC120b Ask Langy: every widget on every board has Ask Langy, From LangWatch boards included; Scenario: AC121 Ask Langy: clicking drafts the widget's prompt with its name, queries and the period; Scenario: AC122 Ask Langy: a widget without a stored prompt gets a fallback; Scenario: AC123 Ask Langy: the prompt is stored on built widgets and kept on edit and duplicate
   # AC 130-138: "Picker filters: 'Add a widget' narrows like the templates finder" → Scenario: AC130 Picker filters: the picker offers the finder's search and chips; Scenario: AC131 Picker filters: chips narrow the widgets by category and agent type; Scenario: AC132 Picker filters: each chip counts the widgets it would show; Scenario: AC133 Picker filters: search matches the question, line, prompt, branch and agent kinds; Scenario: AC134 Picker filters: sections are branches in tree order, coloured by trunk; Scenario: AC135 Picker filters: a widget picked from a filtered list is added and drafts its Langy prompt; Scenario: AC136 Picker filters: the filters reset when the picker closes; Scenario: AC137 Picker filters: no match says so and offers to clear the search and filters; Scenario: AC138 Picker filters: a row names the agent types its widget is made for
   # AC 140-145: "Product direction: templates and widgets hand off to Langy; alerts and reports are widget actions" → Scenario: AC140 Template pick: the new board opens with the template's report drafted in Langy; Scenario: AC140b Template pick: without Langy the board is made and nothing is drafted; Scenario: AC141 Picker add: a picked widget drafts its own prompt with the widget, as Ask Langy does; Scenario: AC142 Widget menu: Set an alert drafts Langy to alert on that widget; Scenario: AC143 Widget menu: Send as a report drafts Langy to schedule that widget; Scenario: AC143b Widget menu: without Langy the menu offers no alert or report; Scenario: AC144 Template card: the primary button reads Add to this project; Scenario: AC145 Template card: a template already added shows Added, linking to its board
-  # AC 214-217: "Widget UI fixes: whole-number count axes, partial cost words, change markers on hover, the Needs model line" (langwatch/tasks#1187, 2026-11-21) → Scenario: AC214 Count axis whole numbers; Scenario: AC215 Partial cost: no span priced; Scenario: AC215b Partial cost: some spans priced at zero; Scenario: AC216 Change markers; Scenario: AC217 Needs model
+  # AC 214-217: "Widget UI fixes: whole-number count axes, partial cost words, change markers on hover, the Needs model line" (langwatch/tasks#1187, 2026-11-21) → Scenario: AC214 Count axis whole numbers; Scenario: AC215 Partial cost: no span priced; Scenario: AC215b Partial cost: some spans priced at zero; Scenario: AC215c Partial cost: the loops card cannot count priced spans; Scenario: AC215d Partial cost: a sum above 0 with some spans not priced; Scenario: AC216 Change markers; Scenario: AC217 Needs model

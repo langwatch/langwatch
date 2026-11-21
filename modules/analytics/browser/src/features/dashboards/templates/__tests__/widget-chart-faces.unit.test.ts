@@ -1,7 +1,7 @@
 /**
  * What a chart card draws for small counts, partial costs and change markers: whole-number
  * ticks on a count axis, cost words that never read "$0.00+", and marker names on hover only.
- * @see modules/dashboard/specs/dashboards-v2.feature AC214, AC215, AC215b, AC216
+ * @see modules/dashboard/specs/dashboards-v2.feature AC214, AC215, AC215b, AC215d, AC216
  */
 
 import { describe, expect, it } from "vitest";
@@ -80,9 +80,13 @@ describe("given a cost card", () => {
     );
   });
 
-  /** @scenario "AC215b Partial cost: some spans priced at zero" */
-  it("keeps today's figure, + included, for a sum above 0, and never reads $0.00+", () => {
+  /** @scenario "AC215d Partial cost: a sum above 0 with some spans not priced" */
+  it('marks a sum above 0 "+" when some spans have no cost', () => {
     expect(cost.costText({ sum: 12.5, priced: true, unpriced: true })).toBe("$12.50+");
+  });
+
+  /** @scenario "AC215b Partial cost: some spans priced at zero" */
+  it("keeps today's figure for a fully priced sum, and never reads $0.00+", () => {
     expect(cost.costText({ sum: 12.5, priced: true, unpriced: false })).toBe("$12.50");
     expect(cost.costText({ sum: 0, priced: true, unpriced: false })).toBe("$0.00");
     expect(cost.costFigure({ completeness: null }, 0)).toBe("$0.00");
@@ -109,7 +113,7 @@ describe("given the AI cost per resolved figure while nothing is resolved", () =
     );
   });
 
-  /** @scenario "AC215b Partial cost: some spans priced at zero" */
+  /** @scenario "AC215d Partial cost: a sum above 0 with some spans not priced" */
   it("keeps today's figure, + included, for a sum above 0", () => {
     expect(cost.spentHint({ completeness: report({ total: 3, unpriced: 1 }) }, 12.5)).toBe(
       "$12.50+ spent, nothing resolved yet",
