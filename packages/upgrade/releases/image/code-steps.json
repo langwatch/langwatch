@@ -430,6 +430,14 @@
     "needsOldWritersGone": true
   },
   {
+    "id": "stored-object:link-unowned-retained-objects",
+    "kind": "tenant",
+    "mode": "background",
+    "owner": "stored-object",
+    "description": "Links audio and images stored from traces before owner links existed to their trace, so they are deleted with it.",
+    "needsOldWritersGone": true
+  },
+  {
     "id": "suite:replay-scenario-facts-for-open-runs",
     "kind": "data",
     "mode": "background",

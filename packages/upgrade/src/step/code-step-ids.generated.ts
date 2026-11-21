@@ -55,6 +55,7 @@ export type CodeStepId =
   | "scenario:fill-second-id-indexes"
   | "scim:replay-sso-connection-view"
   | "stored-object:import-clickhouse-index"
+  | "stored-object:link-unowned-retained-objects"
   | "suite:replay-scenario-facts-for-open-runs"
   | "suite:fill-id-indexes"
   | "topic:seed-topic-model-history"

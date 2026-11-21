@@ -25464,9 +25464,11 @@ When a message holds both a recording and text, LangWatch treats the text as the
 
 ## What happens to the bytes
 
-LangWatch moves the recording out of the span at ingestion. The bytes go into content-addressed object storage and the message part becomes a `/api/v1/files/<projectId>/<id>` reference, around 60 characters where the base64 was.
+LangWatch moves the recording out of the span at ingestion. The bytes go into object storage and the message part becomes a `/api/v1/files/<projectId>/<id>` reference, around 60 characters where the base64 was.
 
-Storage is addressed by SHA-256, so identical bytes are stored once. For example, a recording captured by a simulation and by the trace of the same call is one stored object, not two.
+The stored bytes follow your project's trace retention: when a trace ages out, the media stored from it is deleted with it.
+
+A recording sent inline has to fit in one OTLP request, which LangWatch caps at 64 MiB, about an hour of compressed call audio. Inside that limit the whole recording is kept, even past the 8 MB cap on a single attribute. On self-hosted, `OTLP_TRACES_MAX_BODY_BYTES` changes the limit.
 
 Raw, header-less audio does not play in a browser on its own. LangWatch wraps `pcm16` and G.711 payloads into a WAV container when it stores them, so the reference plays everywhere without a conversion step of your own.
 
@@ -25678,9 +25680,9 @@ A part that names only a provider-hosted file, such as an OpenAI `file_id` with 
 
 ## What happens to the bytes
 
-LangWatch moves the document out of the span at ingestion. The bytes go into content-addressed object storage and the message part becomes a `/api/v1/files/<projectId>/<id>` reference, around 60 characters where the base64 was.
+LangWatch moves the document out of the span at ingestion. The bytes go into object storage and the message part becomes a `/api/v1/files/<projectId>/<id>` reference, around 60 characters where the base64 was.
 
-Storage is addressed by SHA-256, so identical bytes are stored once. For example, the same contract sent on ten traces costs one stored object.
+The stored bytes follow your project's trace retention: when a trace ages out, the media stored from it is deleted with it.
 
 On read, LangWatch serves PDF files with their original media type, along with images, audio and video. Every other document type, such as CSV, JSON, Markdown and plain text, is served as a download.
 
@@ -26140,9 +26142,9 @@ Always set the media type. Without one, LangWatch leaves the bytes inline in the
 
 ## What happens to the bytes
 
-LangWatch moves the image out of the span at ingestion. The bytes go into content-addressed object storage and the message part becomes a `/api/v1/files/<projectId>/<id>` reference, around 60 characters where the base64 was.
+LangWatch moves the image out of the span at ingestion. The bytes go into object storage and the message part becomes a `/api/v1/files/<projectId>/<id>` reference, around 60 characters where the base64 was.
 
-Storage is addressed by SHA-256, so identical bytes are stored once. For example, the same picture sent on ten traces costs one stored object.
+The stored bytes follow your project's trace retention: when a trace ages out, the media stored from it is deleted with it.
 
 On read, LangWatch serves the original media type for images, audio, video and PDF files. Anything else is served as a download.
 
@@ -28734,9 +28736,11 @@ When a message holds both a recording and text, LangWatch treats the text as the
 
 ## What happens to the bytes
 
-LangWatch moves the recording out of the span at ingestion. The bytes go into content-addressed object storage and the message part becomes a `/api/v1/files/<projectId>/<id>` reference, around 60 characters where the base64 was.
+LangWatch moves the recording out of the span at ingestion. The bytes go into object storage and the message part becomes a `/api/v1/files/<projectId>/<id>` reference, around 60 characters where the base64 was.
 
-Storage is addressed by SHA-256, so identical bytes are stored once. For example, a recording captured by a simulation and by the trace of the same call is one stored object, not two.
+The stored bytes follow your project's trace retention: when a trace ages out, the media stored from it is deleted with it.
+
+A recording sent inline has to fit in one OTLP request, which LangWatch caps at 64 MiB, about an hour of compressed call audio. Inside that limit the whole recording is kept, even past the 8 MB cap on a single attribute. On self-hosted, `OTLP_TRACES_MAX_BODY_BYTES` changes the limit.
 
 Raw, header-less audio does not play in a browser on its own. LangWatch wraps `pcm16` and G.711 payloads into a WAV container when it stores them, so the reference plays everywhere without a conversion step of your own.
 
@@ -28879,9 +28883,9 @@ A part that names only a provider-hosted file, such as an OpenAI `file_id` with 
 
 ## What happens to the bytes
 
-LangWatch moves the document out of the span at ingestion. The bytes go into content-addressed object storage and the message part becomes a `/api/v1/files/<projectId>/<id>` reference, around 60 characters where the base64 was.
+LangWatch moves the document out of the span at ingestion. The bytes go into object storage and the message part becomes a `/api/v1/files/<projectId>/<id>` reference, around 60 characters where the base64 was.
 
-Storage is addressed by SHA-256, so identical bytes are stored once. For example, the same contract sent on ten traces costs one stored object.
+The stored bytes follow your project's trace retention: when a trace ages out, the media stored from it is deleted with it.
 
 On read, LangWatch serves PDF files with their original media type, along with images, audio and video. Every other document type, such as CSV, JSON, Markdown and plain text, is served as a download.
 
@@ -29014,9 +29018,9 @@ Always set the media type. Without one, LangWatch leaves the bytes inline in the
 
 ## What happens to the bytes
 
-LangWatch moves the image out of the span at ingestion. The bytes go into content-addressed object storage and the message part becomes a `/api/v1/files/<projectId>/<id>` reference, around 60 characters where the base64 was.
+LangWatch moves the image out of the span at ingestion. The bytes go into object storage and the message part becomes a `/api/v1/files/<projectId>/<id>` reference, around 60 characters where the base64 was.
 
-Storage is addressed by SHA-256, so identical bytes are stored once. For example, the same picture sent on ten traces costs one stored object.
+The stored bytes follow your project's trace retention: when a trace ages out, the media stored from it is deleted with it.
 
 On read, LangWatch serves the original media type for images, audio, video and PDF files. Anything else is served as a download.
 
@@ -67556,6 +67560,7 @@ The restriction applies to email and password sign-up, passkey sign-up, and firs
 | `LANGWATCH_NLP_INTERNAL_SECRET` | Shared credential for the app to NLP service hop. The app sends it on every NLP request and the NLP service refuses requests that do not carry it, so set the same value on both. Unset on the NLP service, it accepts unauthenticated requests | -                                                                                            |
 | `LANGEVALS_ENDPOINT`            | URL of the LangEvals service                                                                                                                                                                                                                    | - (Docker Compose: `http://langevals:5562`, Helm: `http://<release>-langevals:5562`)         |
 | `LANGWATCH_EVALUATOR_RETRY_WINDOW_MINUTES` | How long an evaluation keeps retrying while LangEvals is unreachable or starting before it is recorded as an error, in minutes (at most 120) | `120` |
+| `OTLP_TRACES_MAX_BODY_BYTES` | Largest OTLP trace export accepted at `/api/otel/v1/traces`, in bytes, checked on the wire and again after decompression. The default fits about an hour of compressed call audio sent inline. Each request is held in memory while it is read, so size the app's memory for a few of these at once. A proxy in front of the app needs a body limit at least this large; the Helm chart sets 64m on an nginx Ingress | `67108864` (64 MiB) |
 
 `LANGWATCH_NLP_INTERNAL_SECRET` is optional, and how you provide it depends on the deployment:
 
@@ -67566,10 +67571,12 @@ The restriction applies to email and password sign-up, passkey sign-up, and firs
 
 The dataplane S3 bucket is the general file-storage layer for all externalized byte content. Current consumers:
 
-- **Stored objects**: externalized byte content (audio, image, video, document) extracted from incoming events and dataset uploads. Bytes are content-addressed under `{projectId}/{sha256}` and served back via `GET /api/v1/files/:id`.
+- **Stored objects**: externalized byte content (audio, image, video, document) extracted from incoming traces, scenario events and dataset uploads, served back via `GET /api/v1/files/:id`. Media lifted out of a trace is deleted when the project's trace retention ends.
 - **Dataset uploads**: persists rows uploaded through the dataset UI. Shares the same `S3_BUCKET_NAME` bucket.
 
 When `S3_BUCKET_NAME` is set, all consumers use that bucket. When it is not set, stored-objects fall back to the local filesystem at `LANGWATCH_LOCAL_STORAGE_PATH`. That is fine for single-replica installs, **not** for horizontally-scaled deployments (see warning below).
+
+Trace media is moved to stored objects by default (`RELEASE_TRACE_MEDIA_EXTRACTION`, on unless set to `0`). The Helm chart sets it to `0` when neither `app.dataplane` nor the local-filesystem volume is enabled, so media stays inline in ClickHouse instead of landing on a disk that is lost on restart. A write the store refuses also keeps that media inline.
 
 | Variable               | Description                                                                                                     | Default |
 | ---------------------- | --------------------------------------------------------------------------------------------------------------- | ------- |

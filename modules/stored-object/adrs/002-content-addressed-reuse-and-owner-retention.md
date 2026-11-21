@@ -78,11 +78,14 @@ ownerKind, ownerId, retainUntil, createdAt, updatedAt)`, records who holds
 - Trace media lives exactly as long as the longest-retained trace that
   references it, and follows retroactive retention changes in both
   directions.
-- Objects extracted before this change carry no link and are never swept;
-  they are the few projects that opted into the flag early. They are never
-  reused for a retained purpose either: a link on one would let the sweep
-  delete it under the older traces that hold it unrecorded. Their bytes are
-  written once more.
+- Objects extracted before this change carry no link; they are the few
+  projects that opted into the flag early. At store time they are never
+  reused for a retained purpose: a link on one would let the sweep delete it
+  under the older trace that holds it unrecorded, so their bytes are written
+  once more. Before reuse every store minted its own object, so the owner on
+  the row is the only one holding it. The background step
+  `stored-object:link-unowned-retained-objects` links each to that owner until
+  its category's retention ends, counted from the object's creation.
 - Stored Objects gains `DataRetentionApi` as a peer. data-retention gains no
   peer: it only records a fact.
 - The pending-upload and deleted-object cleanups remain uncalled; scheduling

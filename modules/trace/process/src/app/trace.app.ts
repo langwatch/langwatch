@@ -183,6 +183,7 @@ import {
   type TraceTopicClusteringPageInput,
   type TraceServerConfig,
   traceConfig,
+  DEFAULT_OTLP_TRACES_MAX_BODY_BYTES,
   TraceIdAmbiguousError,
   TraceNotFoundError,
   type TraceListTracesInput,
@@ -1073,6 +1074,7 @@ export class TraceModule implements TraceApi, CollectorApp {
       resolve: (tenantId) =>
         setup.dependencies.dataRetention.getResolvedForProject({ projectId: tenantId }),
     };
+    app.#otlpTracesMaxBodyBytes = setup.config.otlpTracesMaxBodyBytes;
     app.#collectorEvaluations = TraceCollectorEvaluationsService.create({ role });
     const authorizeFoldRead = foldReadAuthorizer({
       authz: setup.dependencies.authz,
@@ -1425,6 +1427,7 @@ export class TraceModule implements TraceApi, CollectorApp {
   #traceMonthIds: TraceMonthIdsMigrationService | null = null;
   #evaluationOutcomesBackfill: TraceEvaluationOutcomesMigrationService | null = null;
   #retention: RetentionPolicyResolver | null = null;
+  #otlpTracesMaxBodyBytes = DEFAULT_OTLP_TRACES_MAX_BODY_BYTES;
   #collectorEvaluations: TraceCollectorEvaluationsService | null = null;
   #processingCommands: TraceProcessingCommandsService | null = null;
   #modelSpend: TraceModelSpendRepository | null = null;
@@ -4288,6 +4291,10 @@ export class TraceModule implements TraceApi, CollectorApp {
     }
 
     return this.#dependencies.ingestCredential.resolveForOtlp(input);
+  }
+
+  otlpTracesMaxBodyBytes(): number {
+    return this.#otlpTracesMaxBodyBytes;
   }
 
   otlpMarkCredentialUsed(input: { apiKeyId: string }): void {
