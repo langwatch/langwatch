@@ -122,3 +122,9 @@ Feature: One description of how grant commands are dispatched
       Given a revocation applies its deny effect straight to the projection
       When the write is recorded
       Then it is counted under its own cause and not under the other one
+
+    @unit
+    Scenario: An API key's own role deleted early is counted only when it marks the row
+      Given an API key's own role deleted straight on the projection, ahead of its fold
+      When the delete marks the Role row, and again when it marks none
+      Then it is counted once under its own cause, and not under a revocation's

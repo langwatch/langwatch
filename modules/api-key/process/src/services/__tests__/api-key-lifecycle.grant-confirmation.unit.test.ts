@@ -94,6 +94,8 @@ function makeService(
         grantCalls.push({ method: "revokeBindingsWhere", ...input });
       },
       deleteRole: vi.fn(),
+      resolveGrantId: async (input: { scope: { id: string }; resourceToken?: string }) =>
+        `grant:${input.scope.id}:${input.resourceToken}`,
     },
     organizations: { getTeam: async () => ({ id: "team_1" }) },
     projects: {

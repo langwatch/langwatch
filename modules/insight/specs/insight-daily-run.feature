@@ -88,6 +88,13 @@ Feature: The daily insights run
       Then their inbox holds no insight
       And they read no run
 
+    @unit
+    Scenario: A run starts its turn as the person, with a key that outlives the run's lease
+      Given a member with analytics:view and a board with widgets
+      When a run is carried out for them on that board
+      Then one unattended turn is started as them, keyed by the run
+      And it asks for a held key with at least 25 minutes left: the 20 minute lease and 5 to settle
+
   Rule: With the flag off nothing runs
 
     @unit
@@ -548,9 +555,17 @@ Feature: The daily insights run
     @unit
     Scenario: A run that cannot start is retried, then recorded on the last attempt
       Given Langy cannot start the turn
-      When the run is carried out on an attempt that is not the last
-      Then the failure is thrown for the retry and no outcome is recorded
-      And on the last attempt the run is recorded as failed
+      When the run is carried out on its first, second and third attempts
+      Then the failure is thrown for the retry each time and no outcome is recorded
+      And on the fourth and last attempt the run is recorded as failed
+
+    @unit
+    Scenario: A held key whose grant has not landed is retried at the pace it asked for
+      Given Langy cannot start the turn because its held key's grant has not landed
+      And the refusal asks for a retry after 40 seconds
+      When the run is carried out on its first attempt
+      Then the refusal is thrown for the retry with its 40 second pace
+      And no outcome is recorded
 
   Rule: Delivery is at least once
 

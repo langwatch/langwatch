@@ -696,6 +696,16 @@ const authzDefineRoleInputSchemaDefinition = z
     permissions: z.array(z.string().min(1)),
     kind: authzRoleKindSchema,
     actor: ledgerActorSchema,
+    /**
+     * The caller's stable id for this definition: a retry under it is the same fact, one event
+     * and one audit row. Absent, every define is a new fact.
+     */
+    commandId: z.string().min(1).optional(),
+    /**
+     * The business time the caller's fact carries, fixed across its retries: the Role fold keeps
+     * the newest, so a late copy of an earlier fact never overwrites a later one.
+     */
+    occurredAtMs: z.number().int().nonnegative().optional(),
     /** Same contract as `authzAttachBindingsInputSchema.requireProjection`. */
     requireProjection: z.boolean().optional(),
   })

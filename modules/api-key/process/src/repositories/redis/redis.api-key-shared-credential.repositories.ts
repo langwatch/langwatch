@@ -9,6 +9,7 @@ import type { ApiKeyRepositories } from "../api-key.repositories.ts";
 /** Main's TtlCache prefix and JSON encoding, so a sandbox token held before a deploy is read. */
 const SANDBOX_KEY_PREFIX = "ttlcache:agent-sandbox-key:";
 const RUN_KEY_PREFIX = "api-key:run-key:";
+const HELD_KEY_PREFIX = "api-key:held-key:";
 
 /** The sandbox and run tokens every server shares, sealed in Redis (ARCHITECTURE.md §7). */
 export class RedisApiKeySharedCredentialRepositories {
@@ -18,10 +19,11 @@ export class RedisApiKeySharedCredentialRepositories {
   }: {
     redis: SharedCredentialRedis;
     cipher: SharedCredentialCipher;
-  }): Pick<ApiKeyRepositories, "sandboxKeys" | "runKeys"> {
+  }): Pick<ApiKeyRepositories, "sandboxKeys" | "runKeys" | "heldKeys"> {
     return {
       sandboxKeys: RedisSharedCredentialStore.create({ redis, cipher, prefix: SANDBOX_KEY_PREFIX }),
       runKeys: RedisSharedCredentialStore.create({ redis, cipher, prefix: RUN_KEY_PREFIX }),
+      heldKeys: RedisSharedCredentialStore.create({ redis, cipher, prefix: HELD_KEY_PREFIX }),
     };
   }
 }

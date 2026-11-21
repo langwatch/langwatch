@@ -17,6 +17,7 @@ interface LangyTurnAttemptIdentity {
 export class LangyTurnAttemptService {
   private permitReserved = false;
   private mintedApiKeyId: string | null = null;
+  private heldKey: string | undefined;
   private turnCommitted = false;
 
   private constructor(
@@ -35,8 +36,10 @@ export class LangyTurnAttemptService {
     this.permitReserved = reserved;
   }
 
-  retainSessionKey(apiKeyId: string): void {
+  /** `holdKey` when the key was held, so its revoke also drops the held entry. */
+  retainSessionKey(apiKeyId: string, holdKey?: string): void {
     this.mintedApiKeyId = apiKeyId;
+    this.heldKey = holdKey;
   }
 
   /** From this point the worker/terminal-event lifecycle owns all resources. */
@@ -73,6 +76,7 @@ export class LangyTurnAttemptService {
         this.deps.sessionKeys.revoke({
           apiKeyId: this.mintedApiKeyId,
           projectId: this.identity.projectId,
+          ...(this.heldKey ? { holdKey: this.heldKey } : {}),
         }),
       );
     }

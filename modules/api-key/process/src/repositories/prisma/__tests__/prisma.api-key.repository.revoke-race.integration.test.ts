@@ -1,11 +1,13 @@
 /**
  * @vitest-environment node
  * @see specs/ai-gateway/governance/ingest-api-key-lifecycle.feature
+ * @see modules/api-key/specs/api-key.feature
  * A revoke parked on another revoke's row lock re-reads the dead row and records nothing.
  */
 import { randomUUID } from "node:crypto";
 
 import type { ApiKeyRevocationCause } from "@langwatch/api-key-contract";
+import { ApiKeyAlreadyRevokedError } from "@langwatch/api-key-contract";
 import { createLogger } from "@langwatch/observability";
 import {
   PrismaConfigService,
@@ -73,6 +75,32 @@ describe.skipIf(!DB_URL)("api key revocation on Postgres", () => {
         const stored = await prisma.apiKey.findUniqueOrThrow({ where: { id: key.id } });
         expect(stored.revocationCause).toBe("user");
         expect(stored.revokedAt).not.toBeNull();
+      });
+    });
+  });
+
+  describe("given a key revoked with a cause", () => {
+    describe("when it is activated", () => {
+      /** @scenario "A held key revoked before it is activated stays revoked" */
+      it("throws and leaves the key revoked, so a revoke is never undone", async () => {
+        const key = await prisma.apiKey.create({
+          data: {
+            name: `key-${randomUUID().slice(0, 6)}`,
+            lookupId: `lookup-${randomUUID()}`,
+            hashedSecret: `hashed-${randomUUID()}`,
+            organizationId,
+            revokedAt: new Date(),
+            revocationCause: "user",
+          },
+        });
+
+        await expect(
+          PrismaApiKeyRepository.create({ prisma }).activate({ id: key.id, organizationId }),
+        ).rejects.toBeInstanceOf(ApiKeyAlreadyRevokedError);
+
+        const stored = await prisma.apiKey.findUniqueOrThrow({ where: { id: key.id } });
+        expect(stored.revokedAt).not.toBeNull();
+        expect(stored.revocationCause).toBe("user");
       });
     });
   });

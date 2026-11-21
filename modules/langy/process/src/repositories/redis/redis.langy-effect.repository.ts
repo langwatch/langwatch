@@ -8,6 +8,7 @@ import { createLogger } from "@langwatch/observability";
 import { type LangyWorker } from "../../channels/langy-worker.channel.ts";
 import type { LangyIntentEffects } from "../../eventing/langy-conversation.intent.ts";
 import type { LangyFailTurnCommand } from "../../eventing/langy-conversation.subscriber.ts";
+import { dispatchIntentOf } from "../../rules/langy-dispatch-intent.rules.ts";
 import type { LangyTitleGenerator } from "../../services/langy-title-generator.service.ts";
 import type { LangyTurnHandoff } from "../langy-live-turn.repository.ts";
 import type { LangyTurnHandoffRedisRepository } from "./redis.langy-turn-handoff.repository.ts";
@@ -217,15 +218,4 @@ export class RedisLangyEffectRepository {
       },
     };
   }
-}
-
-function dispatchIntentOf({
-  resumable,
-  hasApiKey,
-}: {
-  resumable: boolean;
-  hasApiKey: boolean;
-}): DispatchIntent {
-  if (resumable) return "revive";
-  return hasApiKey ? "create" : "continue";
 }

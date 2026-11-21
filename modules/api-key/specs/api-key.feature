@@ -58,6 +58,13 @@ Feature: API key lifecycle
     Then it receives one organization ADMIN binding
 
   @unit
+  Scenario: A key's create cannot be overtaken by an edit of the key
+    Given a key its create has written but not yet activated
+    When anyone edits the key's grants
+    Then a held key, written system-managed, is refused as not found
+    And any other key is refused as revoked, so no create retry meets a later edit
+
+  @unit
   Scenario: A system-managed key is not customer-addressable
     When a customer uses the reserved Langy session name
     Then creation, rename, read and revoke are rejected as not found or reserved
@@ -345,3 +352,62 @@ Feature: API key lifecycle
     When the run key is minted again
     Then a new key is written and returned
     And the old pending key stays revoked, never activated
+
+  @unit
+  Scenario: A pending run key that was revoked is replaced, never activated
+    Given a run key mint failed with "authz_grant_not_confirmed" after the key was activated
+    And the pending key was then revoked
+    When the run key is minted again
+    Then a new key is written and returned
+
+  # A caller that is retried (a Langy turn for an insights run) holds its key under a name: the
+  # retry reuses the key and its pending grant instead of minting another while the fold is slow.
+  @unit
+  Scenario: A held key is written once and handed to a retry with its pending grant
+    Given a held key was written and its grants have not landed
+    When the same caller asks for the key held under the same name again
+    Then no second key is written
+    And the first attempt's key is granted again and returned once its grants land
+    And only the call that activated the key reports it as created
+
+  @unit
+  Scenario: A held key's grants that land after a slow fold still let the caller proceed
+    Given the grants fold 48 seconds after they are appended
+    When the caller retries at the pace the refusal names, up to four attempts
+    Then the caller gets the key and one key exists
+
+  @unit
+  Scenario: A held key's retries send its own role and grant under the same ids
+    Given the grants fold 25 seconds after they are appended
+    When the caller retries until the grant is read back
+    Then every try defines the key's own role under one command id, from the key and its content
+    And every try sends the key's creation as its business time, so a late try never beats an edit
+    And every try that reaches the attach sends that command id and one binding id per binding
+    And a binding beside the key's own role is named the same way on every try
+    And an edit of the key sends neither, so each edit is a new fact
+
+  @unit
+  Scenario: A held key is never handed to another person
+    Given a key is held under a name for one person
+    When another person asks for a key under the same name
+    Then a new key is written for that person
+
+  @unit
+  Scenario: A held key that was revoked or has lapsed is minted over
+    Given a key held under a name was revoked, or has less life left than its caller needs
+    When the key is asked for under the same name
+    Then a new key is written and returned
+
+  @unit
+  Scenario: A held key revoked before it is activated stays revoked
+    Given a held key was written and its grants landed
+    And the key was revoked before its activation
+    When the key is activated
+    Then it stays revoked
+    And the caller is told to retry, which mints a new key
+
+  @unit
+  Scenario: A released held key is minted fresh
+    Given a key is held under a name
+    When its held entry is released and the key is asked for again
+    Then a new key is written and returned
