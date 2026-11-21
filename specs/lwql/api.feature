@@ -749,6 +749,23 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
     And the boundary carries it as error code lwql_not_permitted, a caller fault
     And the functions those questions are written in are accepted
 
+  @unit @integration
+  Scenario: A set membership test names its set with a subquery
+    Given the LangWatchQL analytics SQL policy
+    When a query tests membership with IN, NOT IN, GLOBAL IN or GLOBAL NOT IN, or the in, notIn, globalIn or globalNotIn functions
+    And it writes the set as a plain name: a view, a table, a FROM alias or a WITH name, quoted, qualified or in parentheses
+    Then the query is refused before it reaches the database
+    And the refusal names the IN_TABLE_OPERAND rule and tells the caller to write the set as a subquery, x IN (SELECT ... FROM view)
+    And a set written as a subquery, a literal, a tuple or array of literals, an allowed function or a query parameter is accepted
+    And a set test the restricted identity runs over a LangWatchQL table matches only its own tenant's rows
+
+  @unit
+  Scenario: A WITH name stands in for a view only when written in the same letter case
+    Given the LangWatchQL analytics SQL policy
+    When a query declares a WITH name that differs from a view it reads only in letter case
+    Then the view reference is checked against the caller's views as a view, not skipped as the WITH name
+    And a windowed read still refuses a WITH name spelt like a view in any letter case
+
   @integration
   Scenario: Query database credentials never reach the caller
     Given an authenticated API client

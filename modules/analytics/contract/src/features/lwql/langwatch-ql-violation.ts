@@ -31,6 +31,11 @@ export const LWQL_VIOLATION_CODES = [
   /** A table function was used as a source. */
   "TABLE_FUNCTION",
   /**
+   * The set of an `IN`, `NOT IN`, `GLOBAL IN` or `GLOBAL NOT IN` test was written as a plain
+   * name rather than a subquery, a literal, an allowed function or a query parameter.
+   */
+  "IN_TABLE_OPERAND",
+  /**
    * A function outside the allowlist was called. Its own code rather than `UNSUPPORTED_SYNTAX`
    * because the remedy differs: the query's *shape* is fine and one expression has to be
    * rewritten, which is a far shorter distance to travel than "this is not a read query".

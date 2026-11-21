@@ -78,11 +78,11 @@ function collectNodes(value: unknown, type: string, found: SqlAstNode[]): SqlAst
   return found;
 }
 
-/** Every `WITH` name a parsed statement declares, in any subquery, lower-cased. */
+/** Every `WITH` name a parsed statement declares, in any subquery, exactly as written. */
 function findWithNames(statements: readonly SqlAstNode[]): ReadonlySet<string> {
   return new Set(
     collectNodes(statements, "WithElement", []).flatMap(({ name }) =>
-      typeof name === "string" ? [name.trim().toLowerCase()] : [],
+      typeof name === "string" ? [name] : [],
     ),
   );
 }
@@ -103,9 +103,11 @@ function assertNoShadowedView({
   windows: ReadonlyMap<string, string> | undefined;
 }): void {
   if (windows === undefined) return;
+  // Case-folded, unlike the reference match: a refusal here can only over-refuse.
+  const folded = new Set([...withNames].map((name) => name.trim().toLowerCase()));
   const shadowed = views
     .map((view) => view.name.toLowerCase())
-    .filter((name) => withNames.has(name));
+    .filter((name) => folded.has(name));
   if (shadowed.length > 0) throw new LangWatchQLShadowedViewError({ names: shadowed });
 }
 
@@ -129,8 +131,8 @@ function findViewReferences({
     if (typeof name !== "string" || typeof start?.offset !== "number") continue;
     if (typeof end?.offset !== "number") continue;
     const qualifier = typeof written === "string" ? written : undefined;
-    const bareName = name.trim().toLowerCase();
-    if (!qualifier && withNames.has(bareName)) continue;
+    // Letter for letter, as the validator matches it: a case variant is a view, and narrowed.
+    if (!qualifier && withNames.has(name)) continue;
     byStart.set(start.offset, {
       qualified: qualifyTableName({ table: name, database: qualifier, defaultDatabase: database }),
       ...(typeof alias === "string" ? {} : { impliedAlias: name }),

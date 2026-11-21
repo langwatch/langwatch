@@ -1029,7 +1029,7 @@ function enterSelectQuery({ node, frame, ctx }: NodeArgs): Frame {
   const ctes = [...frame.ctes];
   for (const item of node.with) {
     if (isNode(item) && item.type === "WithElement" && typeof item.name === "string") {
-      addOnce(ctes, item.name.trim().toLowerCase());
+      addOnce(ctes, item.name);
     }
   }
   return { ...here, ctes };
@@ -1104,8 +1104,9 @@ function visitTableIdentifier({ node, frame, ctx }: NodeArgs): Frame | null {
   }
 
   // A `WITH` name resolves to its own subquery, which is validated on its own
-  // terms; it is not a table reference and never was.
-  const isCteName = frame.ctes.includes(reference.name.trim().toLowerCase());
+  // terms. Matched letter for letter: a name that differs only in case is a
+  // table reference, and is checked as one.
+  const isCteName = frame.ctes.includes(reference.name);
   if (database === undefined && isCteName) {
     return frame;
   }
@@ -1219,6 +1220,46 @@ function enterTableJoin({ node, frame }: NodeArgs): Frame {
   return frame;
 }
 
+/** The set membership tests, by the names `IN` and its variants parse to, lower-cased. */
+const SET_MEMBERSHIP_FUNCTIONS: ReadonlySet<string> = new Set([
+  "in",
+  "notin",
+  "globalin",
+  "globalnotin",
+]);
+
+/** What a set may be written as: never a name, which ClickHouse reads as a whole table. */
+const SET_OPERAND_TYPES: ReadonlySet<string> = new Set([
+  "Subquery",
+  "Literal",
+  "Function",
+  "QueryParameter",
+]);
+
+const IN_TABLE_OPERAND_MESSAGE =
+  "The set of an IN test cannot be a plain name. Write it as a subquery, x IN (SELECT ... FROM view), or as a list of values.";
+
+/**
+ * Refuses a set written as a name, in operator and function form alike. ClickHouse reads
+ * `x IN name` as a table or a `WITH` binding, which the table check never sees, so a `WITH` name
+ * gets no exemption: it is written `x IN (SELECT * FROM name)`.
+ */
+function refuseNamedSetOperands({ node, frame, ctx }: NodeArgs): void {
+  const { name, arguments: args } = node;
+  if (typeof name !== "string" || !SET_MEMBERSHIP_FUNCTIONS.has(name.trim().toLowerCase())) return;
+  if (!Array.isArray(args)) return;
+  for (const operand of args.slice(1)) {
+    if (isNode(operand) && SET_OPERAND_TYPES.has(operand.type)) continue;
+    report({
+      ctx,
+      frame,
+      code: "IN_TABLE_OPERAND",
+      message: IN_TABLE_OPERAND_MESSAGE,
+      node: isNode(operand) ? operand : node,
+    });
+  }
+}
+
 /**
  * Applies the function allowlist, and notes an aggregate for the block. Reports and keeps
  * descending rather than cutting the subtree off, so that a caller who used a refused function
@@ -1245,6 +1286,7 @@ function visitFunction({ node, frame, ctx }: NodeArgs): Frame | null {
     reportRefusedFunction({ name, node, frame, ctx });
     return childFrame;
   }
+  refuseNamedSetOperands({ node, frame, ctx });
   const collapsesRows = isLangWatchQLAggregateFunction(name) && !isWindowCall(node);
   if (childFrame.block && collapsesRows) {
     childFrame.block.isAggregated = true;

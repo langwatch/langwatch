@@ -172,6 +172,7 @@ describe("scopeLangWatchQL with member windows", () => {
     });
 
     /** @scenario "A WITH name spelt like a narrowed view is refused" */
+    /** @scenario "A WITH name stands in for a view only when written in the same letter case" */
     it.each([
       [
         "declared in a subquery the outer view sits beside",
@@ -373,6 +374,16 @@ describe("scopeLangWatchQL with member windows", () => {
       const sql = `WITH ${POSTGRES_VIEW.name} AS (SELECT 1 AS n) SELECT n FROM ${POSTGRES_VIEW.name} FINAL`;
 
       expect(scope({ sql })).toBe(sql);
+    });
+
+    /** @scenario "A WITH name stands in for a view only when written in the same letter case" */
+    it("refuses FINAL on a PostgreSQL-resident view beside a WITH name in another case", () => {
+      const withName = POSTGRES_VIEW.name.toUpperCase();
+      const sql = `WITH ${withName} AS (SELECT 1 AS n) SELECT n FROM ${POSTGRES_VIEW.name} FINAL`;
+      const refusal = captureRefusal(() => scope({ sql }));
+
+      expect(refusal).toBeInstanceOf(LangWatchQLTableModifierError);
+      expect((refusal as LangWatchQLTableModifierError).meta).toEqual({ modifiers: ["FINAL"] });
     });
 
     it("returns a statement that does not parse unchanged, for the validator to refuse", () => {

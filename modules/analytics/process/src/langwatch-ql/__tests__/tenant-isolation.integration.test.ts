@@ -464,6 +464,28 @@ describe("given the LangWatchQL analytics setup applied to a ClickHouse 26.8 ser
     });
 
     /**
+     * `x IN table` tests a value against the table's whole rows, so each probe is one seeded row
+     * as a tuple. The caller's own row is the control: a miss on both would prove nothing.
+     */
+    /** @scenario "A set membership test names its set with a subquery" */
+    it("matches a set test over a whole table against its own tenant's rows only", async () => {
+      await recordSeedControl({ harness, table: "traces", tenantColumn: "TenantId" });
+      const seededRow = (tenantId: string) =>
+        `('${tenantId}', '${tenantId}-trace-1', 'gpt-5-mini', toUInt32(100))`;
+      const matches = (tenantId: string) =>
+        selectScalar<number>(
+          tenantA,
+          `SELECT ${seededRow(tenantId)} IN ${database}.traces AS value`,
+        );
+
+      expect(await matches(harness.tenantA.tenantId), "own row not found by the set test").toBe(1);
+      expect(
+        await matches(harness.tenantB.tenantId),
+        "a set test over a whole table matched a foreign tenant's row",
+      ).toBe(0);
+    });
+
+    /**
      * The correlated `EXISTS` shape is not supported by this engine version.
      * Asserted as the fail-closed rejection it is rather than left untested:
      * writing it as if it returned scoped rows would be a false claim, and

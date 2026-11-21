@@ -366,6 +366,136 @@ describe("validateLangWatchQL given a table function", () => {
   });
 });
 
+describe("validateLangWatchQL given a set membership test", () => {
+  /** @scenario "A set membership test names its set with a subquery" */
+  it.each([
+    ["IN a view name", "SELECT count() FROM spans WHERE TraceId IN traces"],
+    ["NOT IN a view name", "SELECT count() FROM spans WHERE TraceId NOT IN traces"],
+    [
+      "GLOBAL IN a qualified name",
+      "SELECT count() FROM spans WHERE TraceId GLOBAL IN analytics.traces",
+    ],
+    ["GLOBAL NOT IN a view name", "SELECT count() FROM spans WHERE TraceId GLOBAL NOT IN traces"],
+    ["the in function", "SELECT count() FROM spans WHERE in(TraceId, analytics.traces)"],
+    ["the notIn function", "SELECT count() FROM spans WHERE notIn(TraceId, traces)"],
+    ["the globalIn function", "SELECT count() FROM spans WHERE globalIn(TraceId, traces)"],
+    ["the globalNotIn function", "SELECT count() FROM spans WHERE globalNotIn(TraceId, traces)"],
+    ["a function name in upper case", "SELECT count() FROM spans WHERE IN(TraceId, traces)"],
+    ["a name in parentheses", "SELECT count() FROM spans WHERE TraceId IN (traces)"],
+    ["a name in double parentheses", "SELECT count() FROM spans WHERE TraceId IN ((traces))"],
+    ["a backticked name", "SELECT count() FROM spans WHERE TraceId IN `traces`"],
+    [
+      "a double-quoted qualified name",
+      'SELECT count() FROM spans WHERE TraceId IN "analytics"."traces"',
+    ],
+    [
+      "a qualified name split by a comment",
+      "SELECT count() FROM spans WHERE TraceId IN analytics/**/.traces",
+    ],
+    [
+      "a view outside the caller's catalog",
+      "SELECT count() FROM spans WHERE TraceId IN annotations",
+    ],
+    ["a server metadata table", "SELECT count() FROM spans WHERE TraceId IN system.tables"],
+    ["a table in another database", "SELECT count() FROM spans WHERE TraceId IN default.secret"],
+    ["the floored twin", "SELECT count() FROM spans WHERE TraceId IN traces__floor"],
+    [
+      "the qualified floored twin",
+      "SELECT count() FROM spans WHERE TraceId IN analytics.traces__floor",
+    ],
+    ["a FROM alias", "SELECT count() FROM spans AS s WHERE TraceId IN s"],
+    [
+      "a FROM alias spelt like a view",
+      "SELECT count() FROM spans AS traces WHERE TraceId IN traces",
+    ],
+    [
+      "a WITH expression alias",
+      "WITH analytics.traces AS t SELECT count() FROM spans WHERE TraceId IN t",
+    ],
+    [
+      "a WITH subquery name",
+      "WITH t AS (SELECT TraceId FROM traces) SELECT count() FROM spans WHERE TraceId IN t",
+    ],
+    [
+      "a name beside an accepted subquery",
+      "SELECT count() FROM spans " +
+        "WHERE TraceId IN (SELECT TraceId FROM traces) AND TraceId IN gateway_request_spend",
+    ],
+    [
+      "a name inside a subquery",
+      "SELECT count() FROM spans " +
+        "WHERE TraceId IN (SELECT TraceId FROM traces WHERE TraceId IN spans)",
+    ],
+  ])("refuses a set written as %s", (_case, sql) => {
+    expect(codesOf(validate(sql))).toContain("IN_TABLE_OPERAND");
+  });
+
+  /** @scenario "A set membership test names its set with a subquery" */
+  it("tells the caller to write the set as a subquery", () => {
+    const result = validate("SELECT count() FROM spans WHERE TraceId IN traces");
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    const violation = result.violations.find((entry) => entry.code === "IN_TABLE_OPERAND");
+    expect(violation?.message).toContain("x IN (SELECT ... FROM view)");
+    expect(violation?.hint).toContain("x IN (SELECT ... FROM view)");
+    expect(violation?.clause).toBe("filter");
+  });
+
+  /** @scenario "A set membership test names its set with a subquery" */
+  it.each([
+    ["a subquery", "SELECT count() FROM spans WHERE TraceId IN (SELECT TraceId FROM traces)"],
+    [
+      "a subquery over a WITH name",
+      "WITH t AS (SELECT TraceId FROM traces) " +
+        "SELECT count() FROM spans WHERE TraceId IN (SELECT * FROM t)",
+    ],
+    [
+      "a subquery holding a UNION ALL",
+      "SELECT count() FROM spans " +
+        "WHERE TraceId IN (SELECT TraceId FROM traces UNION ALL SELECT TraceId FROM spans)",
+    ],
+    [
+      "a tuple tested against a subquery",
+      "SELECT count() FROM spans WHERE (TraceId, 1) IN (SELECT TraceId, 1 FROM traces)",
+    ],
+    [
+      "the function form over a subquery",
+      "SELECT count() FROM spans WHERE notIn(TraceId, (SELECT TraceId FROM traces))",
+    ],
+    ["a literal", "SELECT count() FROM spans WHERE TraceId IN 'a'"],
+    ["a tuple of literals", "SELECT count() FROM spans WHERE TraceId IN ('a', 'b')"],
+    ["an array of literals", "SELECT count() FROM spans WHERE TraceId GLOBAL IN ['a', 'b']"],
+    ["an allowed function", "SELECT count() FROM spans WHERE TraceId IN tuple('a', 'b')"],
+    ["a query parameter", "SELECT count() FROM spans WHERE TraceId NOT IN {ids:Array(String)}"],
+  ])("accepts a set written as %s", (_case, sql) => {
+    expect(codesOf(validate(sql, UNGATED_POLICY))).toEqual([]);
+  });
+});
+
+describe("validateLangWatchQL given a WITH name differing from a view only in case", () => {
+  /** @scenario "A WITH name stands in for a view only when written in the same letter case" */
+  it.each([
+    [
+      "a view outside the catalog behind an upper-case WITH name",
+      "WITH API_KEY_MAP AS (SELECT 1 AS n) SELECT n FROM api_key_map",
+    ],
+    [
+      "an upper-case reference to a lower-case WITH name",
+      "WITH ledger AS (SELECT Cost FROM traces) SELECT sum(Cost) FROM LEDGER",
+    ],
+  ])("checks the reference as a view: %s", (_case, sql) => {
+    expect(codesOf(validate(sql))).toContain("TABLE_NOT_ALLOWED");
+  });
+
+  /** @scenario "A WITH name stands in for a view only when written in the same letter case" */
+  it("reports the view it reads, not the WITH name", () => {
+    const result = validate("WITH TRACES AS (SELECT 1 AS n) SELECT TraceId FROM traces");
+
+    expect(result.ok && result.tables).toEqual(["analytics.traces"]);
+  });
+});
+
 describe("validateLangWatchQL given a restricted field", () => {
   /**
    * One case per expression position the content-gating policy enumerates.
@@ -768,6 +898,7 @@ describe("validateLangWatchQL given a violation whose refusal should name what e
     ["SCHEMA_NOT_ALLOWED", "SELECT * FROM system.tables"],
     ["TABLE_NOT_ALLOWED", "SELECT id FROM billing.invoices"],
     ["TABLE_FUNCTION", "SELECT * FROM url('http://x', CSV)"],
+    ["IN_TABLE_OPERAND", "SELECT TraceId FROM traces WHERE TraceId IN spans"],
     ["FUNCTION_NOT_ALLOWED", "SELECT unsupportedFn(TraceId) FROM traces"],
     ["GATED_COLUMN", "SELECT body FROM traces"],
     ["WILDCARD_NOT_ALLOWED", "SELECT * FROM traces"],
@@ -811,6 +942,7 @@ describe("validateLangWatchQL given a violation whose refusal should name what e
       "SCHEMA_NOT_ALLOWED",
       "TABLE_NOT_ALLOWED",
       "TABLE_FUNCTION",
+      "IN_TABLE_OPERAND",
       "FUNCTION_NOT_ALLOWED",
       "GATED_COLUMN",
       "WILDCARD_NOT_ALLOWED",
