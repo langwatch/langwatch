@@ -17,4 +17,9 @@ export type NurturingServerConfig = ConfigOf<typeof nurturingConfig>;
 export const nurturingSecrets = {
   /** Customer.io's track API key; absent, no lifecycle signal is sent, as on main. */
   customerIoApiKey: Secret.load("CUSTOMER_IO_API_KEY", { optional: true }),
+  /**
+   * Customer.io's App API key, for transactional email; absent, every transactional send answers
+   * "off". LangWatch Cloud only: the self-hosted chart never sets it.
+   */
+  customerIoAppApiKey: Secret.load("CUSTOMER_IO_APP_API_KEY", { optional: true }),
 } as const;

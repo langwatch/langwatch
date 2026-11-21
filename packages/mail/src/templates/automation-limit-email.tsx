@@ -196,7 +196,12 @@ export const sendAutomationLimitEmail = async ({
 }: AutomationLimitEmailProps & { to: string[]; mailer: MailSender }) => {
   const { subject, html } = await renderMailTemplate(automationLimitEmailTemplate, props);
   const results = await Promise.allSettled(
-    to.map((recipient) => sendEmail({ mailer, content: { to: recipient, subject, html } })),
+    to.map((recipient) =>
+      sendEmail({
+        mailer,
+        content: { to: recipient, subject, html, template: automationLimitEmailTemplate.id },
+      }),
+    ),
   );
 
   const failures = results.filter((result) => result.status === "rejected");

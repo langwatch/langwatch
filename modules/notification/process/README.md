@@ -6,7 +6,7 @@ The server half of [notification](../README.md). Notifications: the records show
 
 ## Installation
 
-`defineProcessModule("notification").withRepositories(notificationRepositories).withApi(NotificationModule).withTransports(notificationTrpcTransport).withEventing(webPushEventing)`, `src/notification.module.ts:16`.
+`defineProcessModule("notification").withRepositories(notificationRepositories).withChannels(notificationChannels).withApi(NotificationModule).withTransports(notificationTrpcTransport).withEventing(webPushEventing)`, `src/notification.module.ts:17`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -90,7 +90,7 @@ None: this module declares no REST family.
 
 ### `notification`
 
-Contract `../contract/src/notification.ts:139`, router `src/transport/notification.trpc.ts:26`.
+Contract `../contract/src/notification.ts:144`, router `src/transport/notification.trpc.ts:26`.
 
 | Procedure                         | Kind     | Gate                                                                                              | Input  | Output                   |
 | --------------------------------- | -------- | ------------------------------------------------------------------------------------------------- | ------ | ------------------------ |
@@ -100,7 +100,7 @@ Contract `../contract/src/notification.ts:139`, router `src/transport/notificati
 
 ```typescript
 // notification.webPushPublicKey
-// Input: inline, ../contract/src/notification.ts:141
+// Input: inline, ../contract/src/notification.ts:146
 interface Input {}
 // Output: webPushPublicKeySchema, ../contract/src/web-push.ts:141
 interface Output {
@@ -108,7 +108,7 @@ interface Output {
 }
 
 // notification.subscribeWebPush
-// Input: inline, ../contract/src/notification.ts:146
+// Input: inline, ../contract/src/notification.ts:151
 interface Input {
   endpoint: string;
   keys: {
@@ -119,7 +119,7 @@ interface Input {
 }
 
 // notification.unsubscribeWebPush
-// Input: inline, ../contract/src/notification.ts:150
+// Input: inline, ../contract/src/notification.ts:155
 interface Input {
   endpoint: string;
 }
@@ -145,10 +145,10 @@ Declared at `src/eventing/web-push.pipeline.ts:98`.
 
 | Kind   | Leaf                 | Environment variable    | Declared at                                 |
 | ------ | -------------------- | ----------------------- | ------------------------------------------- |
-| secret | `sendgrid`           | `SENDGRID_API_KEY`      | `src/app/notification.app.ts:57`            |
-| secret | `smtpUrl`            | `SMTP_URL`              | `src/app/notification.app.ts:58`            |
-| secret | `smtpPassword`       | `SMTP_PASSWORD`         | `src/app/notification.app.ts:59`            |
-| secret | `resend`             | `RESEND_API_KEY`        | `src/app/notification.app.ts:60`            |
+| secret | `sendgrid`           | `SENDGRID_API_KEY`      | `src/app/notification.app.ts:59`            |
+| secret | `smtpUrl`            | `SMTP_URL`              | `src/app/notification.app.ts:60`            |
+| secret | `smtpPassword`       | `SMTP_PASSWORD`         | `src/app/notification.app.ts:61`            |
+| secret | `resend`             | `RESEND_API_KEY`        | `src/app/notification.app.ts:62`            |
 | config | `defaultFrom`        | `EMAIL_DEFAULT_FROM`    | `../contract/src/notification.config.ts:20` |
 | config | `provider`           | `EMAIL_PROVIDER`        | `../contract/src/notification.config.ts:21` |
 | config | `ses.enabled`        | `USE_AWS_SES`           | `../contract/src/notification.config.ts:23` |
@@ -161,5 +161,6 @@ Declared at `src/eventing/web-push.pipeline.ts:98`.
 | config | `publicBaseUrl`      | `BASE_HOST`             | `../contract/src/notification.config.ts:34` |
 | config | `outboundProxy`      | `HTTPS_PROXY`           | `../contract/src/notification.config.ts:36` |
 | config | `webPushServiceBase` | `WEB_PUSH_SERVICE_BASE` | `../contract/src/notification.config.ts:38` |
+| config | `isSaas`             | `IS_SAAS`               | `../contract/src/notification.config.ts:40` |
 
 <!-- readme:generated:end -->
