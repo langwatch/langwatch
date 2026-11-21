@@ -15,7 +15,7 @@ Feature: Persona-aware home CONTENT — what each persona sees on landing
     - Persona 3 (LLMOps majority) home content stays UNCHANGED — regression
       invariant.
     - Personas 1, 2, 4 each get their own home shape.
-    - Users can pin their default landing via `/me/settings`.
+    - Users can pin their default landing via `/coding-agents/configure`.
     - Org admins can pin a default for all members via `/settings/general`
       (Organization.defaultLandingPath — proposed for follow-up PR; this spec
       includes scenarios so the contract is locked).
@@ -29,8 +29,8 @@ Feature: Persona-aware home CONTENT — what each persona sees on landing
   Background:
     Given the four canonical personas:
       | persona            | destination               |
-      | personal_only      | /me                       |
-      | mixed              | /me                       |
+      | personal_only      | /coding-agents                       |
+      | mixed              | /coding-agents                       |
       | project_only       | /[project]/messages       |
       | governance_admin   | /governance               |
     And resolution is via `governance.resolveHome` tRPC
@@ -40,7 +40,7 @@ Feature: Persona-aware home CONTENT — what each persona sees on landing
   # resolver yet. They land on /onboarding/welcome to bootstrap their first
   # org + Personal Team + Personal Project + RoleBindings, then the resolver
   # picks their canonical persona destination. (Ariana QA G73 caught the
-  # regression where org-less users dead-ended at /me with skeleton cards
+  # regression where org-less users dead-ended at /coding-agents with skeleton cards
   # + Access-Restricted on /governance; fixed by `137965526`.)
   # ---------------------------------------------------------------------------
 
@@ -49,11 +49,11 @@ Feature: Persona-aware home CONTENT — what each persona sees on landing
   # → resolver chain end-to-end. Pin @unimplemented until a Playwright
   # signup-flow test exercises the full bootstrap sequence.
   # ---------------------------------------------------------------------------
-  # Persona 1 — personal_only — /me with AiToolsPortal + personal usage
+  # Persona 1 — personal_only — /coding-agents with AiToolsPortal + personal usage
   # ---------------------------------------------------------------------------
 
   # ---------------------------------------------------------------------------
-  # Persona 2 — mixed — /me with personal + projects + cross-project activity
+  # Persona 2 — mixed — /coding-agents with personal + projects + cross-project activity
   # ---------------------------------------------------------------------------
 
   # ---------------------------------------------------------------------------
@@ -72,11 +72,11 @@ Feature: Persona-aware home CONTENT — what each persona sees on landing
 
   @bdd @ui @persona-content @customization @user-pin @unit
   Scenario: User pin overrides auto-detected persona destination
-    Given a user resolves to persona "mixed" (default destination /me)
-    And the user has set `User.lastHomePath = "/<projectSlug>/messages"` via /me/settings
+    Given a user resolves to persona "mixed" (default destination /coding-agents)
+    And the user has set `User.lastHomePath = "/<projectSlug>/messages"` via /coding-agents/configure
     When the user navigates to "/"
     Then `governance.resolveHome` returns destination "/<projectSlug>/messages"
-    And NOT "/me"
+    And NOT "/coding-agents"
     And the resolution carries `isOverride: true`
 
   @unit
