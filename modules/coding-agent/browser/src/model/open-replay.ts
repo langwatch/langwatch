@@ -33,7 +33,16 @@ export async function lastTurnOfSession({
   const context = await utils.traces.conversationContext.fetch(
     conversationContextInput({ projectId, sessionId, tenantId }),
   );
-  return context?.turns[context.turns.length - 1] ?? null;
+  const lastTurn = context?.turns[context.turns.length - 1];
+  if (lastTurn) return lastTurn;
+
+  // A launcher (Laze) names the trace's conversation after its own thread, not the agent's
+  // session, so the session's own trace map is asked next.
+  const mapped = await utils.codingAgents.lastTurn.fetch({
+    projectId: tenantId ?? projectId,
+    sessionId,
+  });
+  return mapped ? { traceId: mapped.traceId, timestamp: mapped.occurredAtMs } : null;
 }
 
 /**
@@ -59,12 +68,15 @@ export function openReplayHere({
   projectId,
   tenantId,
   router,
+  alsoRemove = {},
 }: {
   turn: ConversationTurn;
   projectId: string;
   /** The member project that owns the trace, on a group project. */
   tenantId: string | undefined;
   router: CodingAgentRouter;
+  /** Other address keys dropped in the same write, such as the link that asked for the replay. */
+  alsoRemove?: Readonly<Record<string, undefined>>;
 }): void {
   // The project travels with the trace, since the chrome is still sitting in
   // whichever project was last visited, and a drawer resolving its own
@@ -76,6 +88,7 @@ export function openReplayHere({
   }
   router.setQueryParams({
     ...cleared,
+    ...alsoRemove,
     "drawer.open": "traceV2Details",
     "drawer.traceId": turn.traceId,
     "drawer.t": String(turn.timestamp),

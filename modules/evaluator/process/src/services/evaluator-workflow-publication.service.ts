@@ -66,6 +66,19 @@ export class EvaluatorWorkflowPublicationService {
   }
 
   /**
+   * Flags a workflow that just gained an evaluator through the public API the way the
+   * Studio switch does, so the workflow side lists it as an evaluator and not a component.
+   */
+  async markAsEvaluator(input: { workflowId: string; projectId: string }): Promise<void> {
+    await this.deps.workflows.setWorkflowFlags({
+      workflowId: input.workflowId,
+      projectId: input.projectId,
+      isEvaluator: true,
+      isComponent: false,
+    });
+  }
+
+  /**
    * Nothing keeps an evaluator pointing at a workflow that no longer offers itself as one. A
    * deployed evaluator needs `evaluators:deploy` of `caller`, asked before any flag changes.
    */

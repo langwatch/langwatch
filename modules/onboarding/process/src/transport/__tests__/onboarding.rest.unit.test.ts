@@ -7,6 +7,7 @@ import {
   createRestRuntime,
   canonicalErrorResponse,
 } from "@langwatch/api/rest";
+import { PermissionDeniedError, type AuthzPermission } from "@langwatch/authorization";
 import {
   GuidedOnboardingPathUnknownError,
   type OnboardingApi,
@@ -22,7 +23,13 @@ const ORGANIZATION = "organization-1";
 
 type Credential = { organizationId: string; userId: string | null };
 
-function mount(options: { credential?: Credential; onboarding?: Partial<OnboardingApi> } = {}) {
+function mount(
+  options: {
+    credential?: Credential;
+    onboarding?: Partial<OnboardingApi>;
+    permits?: (permission: string) => boolean;
+  } = {},
+) {
   const credential =
     options.credential === undefined
       ? { organizationId: ORGANIZATION, userId: "user-1" }
@@ -32,10 +39,20 @@ function mount(options: { credential?: Credential; onboarding?: Partial<Onboardi
     audit: { record: () => {} },
     authorization: restTestAuthorization(),
     identity: {
-      authenticate: () => ({
-        actor: credential.userId ? { type: "user", id: credential.userId } : null,
-        scope: { tier: "project", id: PROJECT },
-      }),
+      /* The project door asks the route's permission of the credential, as the real one does. */
+      authenticate: ({ permission }: { permission: string }) => {
+        if (options.permits && !options.permits(permission)) {
+          throw new PermissionDeniedError({
+            permission: permission as AuthzPermission,
+            scope: { type: "project", id: PROJECT },
+            denialReason: "no-grant",
+          });
+        }
+        return {
+          actor: credential.userId ? { type: "user", id: credential.userId } : null,
+          scope: { tier: "project", id: PROJECT },
+        };
+      },
     },
   } as never).mount(onboardingRest.router(), {
     app: () => app,
@@ -126,6 +143,29 @@ describe("given a project whose organization recorded llmops and gateway", () =>
         code: "guided_onboarding_path_unknown",
       });
     });
+  });
+});
+
+describe("given a key that holds only the project's read permissions", () => {
+  const readOnly = (permission: string) => permission.endsWith(":view");
+
+  /** @scenario "completing a path asks a write permission, so a read-only key cannot" */
+  it("reads the guided state but is refused 403 completing a path, writing nothing", async () => {
+    const getGuidedState = vi.fn(async () => ({ paths: [], donePaths: [], variant: null }));
+    const completePath = vi.fn();
+    const { send } = mount({
+      permits: readOnly,
+      onboarding: {
+        getGuidedState: getGuidedState as never,
+        completePath: completePath as never,
+      },
+    });
+
+    expect((await send("GET", "/api/onboarding/guided")).status).toBe(200);
+    const refused = await send("POST", "/api/onboarding/guided/paths/llmops/complete");
+
+    expect(refused.status).toBe(403);
+    expect(completePath).not.toHaveBeenCalled();
   });
 });
 

@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { StubAuthzListingRepository } from "../../repositories/__tests__/support/authz-listing.stub.ts";
 import { StubAuthzManagedGrantRepository } from "../../repositories/__tests__/support/authz-managed-grant.stub.ts";
 import { makeReader } from "../../repositories/__tests__/support/authz-read.stub.ts";
+import { MemoryAuthzOrganizationPolicyRepository } from "../../repositories/memory/memory.authz-organization-policy.repository.ts";
 import { AuthzGrantSnapshotService } from "../authz-grant-snapshot.service.ts";
 import { AuthzService } from "../authz.service.ts";
 
@@ -26,6 +27,7 @@ function liteMemberWithNoProjectGrant() {
     findProjectLineage: vi.fn().mockResolvedValue({ teamId: "team-1", organizationId: ORG }),
   });
   const authz = AuthzService.create({
+    policies: MemoryAuthzOrganizationPolicyRepository.create(),
     isOnEngine: async () => true,
     repository: reader,
     listing: new StubAuthzListingRepository(),

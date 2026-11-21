@@ -36,7 +36,8 @@ export function useLicenseEnforcement(limitType: LimitType) {
         return onAllowed();
       }
 
-      if (checkResult.data.allowed) {
+      // A payment hold is not a plan limit: the write refuses and names the failed payment.
+      if (checkResult.data.allowed || checkResult.data.heldForPayment === true) {
         return onAllowed();
       }
       upgradeModal?.open(limitType, checkResult.data.current, checkResult.data.max);

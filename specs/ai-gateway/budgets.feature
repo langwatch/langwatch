@@ -434,6 +434,15 @@ Feature: AI Gateway — Budgets
     And a window ending at exactly that instant excludes it
 
   @integration
+  Scenario: Usage is read across an organization's projects in one statement
+    Given requests for one key that landed in two projects of the organization
+    When usage is read over the organization's projects
+    Then both requests are counted, each once
+    And a request in a project outside that set is not counted
+    # One statement per project fills the ClickHouse statement queue in an
+    # organization with many projects, and the Usage page is refused.
+
+  @integration
   Scenario: A re-projected trace is counted once, at its latest cost
     Given a trace whose cost was written once and then corrected
     When spend is read before the two writes have been merged

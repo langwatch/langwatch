@@ -10,11 +10,13 @@ import type { NavigationTeam } from "@langwatch/navigation-contract";
 import { useEffect, type ReactNode } from "react";
 import { ErrorBoundary } from "react-error-boundary";
 
+import { PaymentRecoveryBanner } from "../../behavior/lent-payment-recovery-banner.tsx";
 import { navigationApi } from "../../behavior/navigation-api.ts";
 import { useNavigationHost } from "../../model/navigation-host.ts";
 import { planManagementHref } from "../../model/plan-management-href.ts";
 import { isPathUnder } from "../../model/products.ts";
 import { isResolverAddress } from "../../model/resolve-shell-route.ts";
+import { SETTINGS_MEASURE, settingsColumnCss } from "../../model/settings-column.ts";
 import { cloudAdminGroup, instanceGroup } from "../../model/settings-menu.ts";
 import { AdminViewingAsBanner } from "../blocks/admin-viewing-as-banner.tsx";
 import { SeatLimitBanner } from "../blocks/seat-limit-banner.tsx";
@@ -85,11 +87,29 @@ const MEASURED_OPS_PAGES = [...instanceGroup().items, ...cloudAdminGroup().items
 
 /** Every page's header and body share this one edge; the design system reads it. */
 const PAGE_INSET = "var(--chakra-spacing-6)";
-/** Settings-style page bodies read in one centred column this wide, under a full-width header. */
-const SETTINGS_MEASURE = "1248px";
 
 /**
- * Settings, gateway, instance and Cloud admin pages read in the centred settings column.
+ * One plan banner at a time (specs/billing/over-plan-trace-withholding.feature): a failed
+ * payment's banner outranks the seat banner, and the plan page carries its own seat note.
+ */
+function showsSeatBanner({
+  usage,
+  onPlanPage,
+}: {
+  usage:
+    | {
+        activePlan?: { paymentFailed?: boolean; overPlan?: unknown };
+        seatLimitInfo?: { status: string };
+      }
+    | undefined;
+  onPlanPage: boolean;
+}): boolean {
+  if (!usage || onPlanPage || usage.activePlan?.paymentFailed === true) return false;
+  return usage.seatLimitInfo?.status === "exceeded" || !!usage.activePlan?.overPlan;
+}
+
+/**
+ * Settings, gateway, instance and Cloud admin pages read in the settings column.
  * Ops tools other than instance and Cloud admin draw their own frame and get none here.
  */
 function PageMeasure({ pathname, children }: { pathname: string; children: ReactNode }) {
@@ -106,15 +126,7 @@ function PageMeasure({ pathname, children }: { pathname: string; children: React
       overflowY="auto"
       // Clears the floating assistant launcher, so the last action (Save) is never under it.
       paddingBottom={28}
-      // The header spans the full width like every page; the body below it reads in one
-      // centred column. The assistant's floating launcher is a fixed button, so it is skipped.
-      css={{
-        "& [data-page-header] ~ :not(button), &:not(:has([data-page-header])) > :not(button)": {
-          width: `min(${SETTINGS_MEASURE}, calc(100% - 2 * var(--page-inset)))`,
-          marginInline: "auto",
-        },
-        "& [data-page-container]": { paddingInline: 0 },
-      }}
+      css={settingsColumnCss()}
     >
       {children}
     </Box>
@@ -243,6 +255,12 @@ export const ShellPageBody = ({
             Set {missingServiceVariables(deployment).join(" and ")}.
           </Banner>
         )}
+        {organization && deployment.isSaaS && (
+          <PaymentRecoveryBanner
+            organizationId={organization.id}
+            organizationName={organization.name}
+          />
+        )}
         {usage.data?.messageLimitInfo && usage.data.messageLimitInfo.status !== "ok" && (
           <Banner
             status={usage.data.messageLimitInfo.status === "exceeded" ? "error" : "warning"}
@@ -257,13 +275,16 @@ export const ShellPageBody = ({
             }
           />
         )}
-        {/* The plan page carries its own seat note, with the actions this banner links to. */}
-        {usage.data?.seatLimitInfo?.status === "exceeded" &&
-          pathname !== planManagementHref(deployment.isSaaS) && (
+        {usage.data &&
+          showsSeatBanner({
+            usage: usage.data,
+            onPlanPage: pathname === planManagementHref(deployment.isSaaS),
+          }) && (
             <SeatLimitBanner
-              message={usage.data.seatLimitInfo.message}
+              message={usage.data.seatLimitInfo?.message ?? ""}
               isEnterprisePlan={usage.data.activePlan.type === "ENTERPRISE"}
               isSaaS={deployment.isSaaS}
+              isOverPlan={!!usage.data.activePlan.overPlan}
               planManagementHref={planManagementHref(deployment.isSaaS)}
             />
           )}

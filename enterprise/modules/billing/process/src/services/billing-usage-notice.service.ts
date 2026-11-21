@@ -7,6 +7,7 @@ import type {
   SubscriptionNotificationPayload,
 } from "@langwatch/enterprise-billing-contract";
 import {
+  accountPaymentFailedNotice,
   billingThresholdFailureNotice,
   licensePurchaseNotice,
   planLimitReachedNotice,
@@ -234,6 +235,26 @@ export class NotificationService {
       missingConfigLog:
         "SLACK_CHANNEL_SUBSCRIPTIONS is not configured; skipping billing-threshold failure alert",
       errorLog: "Failed to send Slack billing-threshold failure notification",
+    });
+  }
+
+  /** The account team hears an Enterprise charge failed; such an organization is never paused. */
+  async sendSlackAccountPaymentFailed(input: {
+    organizationId: string;
+    organizationName: string;
+    stripeInvoiceId: string;
+    amount: string;
+  }): Promise<void> {
+    await this.sendSlackMessage({
+      channelUrl: this.config.slackSubscriptionsChannel,
+      message: (origin) =>
+        accountPaymentFailedNotice.render({
+          props: { ...input, stripeTestMode: this.config.stripeTestMode ?? false },
+          origin,
+        }),
+      missingConfigLog:
+        "SLACK_CHANNEL_SUBSCRIPTIONS is not configured; skipping Enterprise payment failed alert",
+      errorLog: "Failed to send Slack Enterprise payment failed notification",
     });
   }
 

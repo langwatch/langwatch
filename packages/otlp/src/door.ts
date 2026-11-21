@@ -35,7 +35,14 @@ export type OtlpDoorRefusal =
   | Readonly<{ outcome: "parse-failed" }>
   | Readonly<{ outcome: "not-found" }>;
 
-export type OtlpDoorAnswer = Readonly<{ status: 200 | 400 | 401 | 403 | 404 | 503; body: object }>;
+export type OtlpDoorAnswer = Readonly<{
+  status: 200 | 400 | 401 | 403 | 404 | 503;
+  body: object;
+  headers?: Readonly<Record<string, string>>;
+}>;
+
+/** A retryable 503 names its wait, so an exporter resends after a draining pod left the pool. */
+const OTLP_RETRY_HEADERS = { "Retry-After": "5" } as const;
 
 /** The source billing an ingestion key resolved, per signal, or why it could not. */
 export const otlpSourcePolicySchema = z.discriminatedUnion("status", [
@@ -259,7 +266,7 @@ export function otlpDoorFailureAnswer({
     case "not-found":
       return { status: 404, body: { error: "Not Found" } };
     case "unavailable":
-      return { status: 503, body: { error: result.errorMessage } };
+      return { status: 503, body: { error: result.errorMessage }, headers: OTLP_RETRY_HEADERS };
   }
 }
 

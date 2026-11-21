@@ -88,6 +88,8 @@ export function toolPrimaryArg(input: unknown): string | null {
       ([key]) =>
         key === "file_path" ||
         key === "command" ||
+        // A Code Mode script's Bash call names its whole command line here.
+        key === "full_command" ||
         key === "path" ||
         key === "url" ||
         key === "query" ||

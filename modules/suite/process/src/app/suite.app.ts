@@ -1,7 +1,7 @@
-import { AgentApi, type AgentApi as AgentApiType } from "@langwatch/agent-contract";
 /**
  * The suite feature's application: what both of its doors call.
  */
+import { AgentApi, type AgentApi as AgentApiType } from "@langwatch/agent-contract";
 import { DataRetentionApi } from "@langwatch/data-retention-contract";
 import {
   EvaluatorApi,
@@ -29,6 +29,8 @@ import {
   type EvaluatorAttachment,
   type ScenarioApi as ScenarioApiType,
   type RunActor,
+  type ScenarioActor,
+  type ScenarioCaller,
   type ScenarioRunConfig,
   type ScenarioTestSuite,
   type ScenarioTestSuiteCreateInput,
@@ -39,6 +41,9 @@ import {
 } from "@langwatch/scenario-contract";
 import {
   SuiteApi,
+  type AppliedSuiteTemplate,
+  type ApplySuiteTemplateTrpcInput,
+  type SuiteTemplate,
   SuiteNotFoundError,
   type SuiteRunParameters,
   type SuiteRunResult,
@@ -71,6 +76,7 @@ import {
   buildSuiteRunProcessingPipeline,
   type SuiteRunProcessingPipeline,
 } from "../eventing/suite-run-processing.pipeline.ts";
+import { SuiteTemplateService } from "../features/suite-templates/services/suite-template.service.ts";
 import type { SuiteRepositories } from "../repositories/suite.repositories.ts";
 import { suitePlatformUrl } from "../rules/suite-platform-url.rules.ts";
 import { AgentOwnerNamesService } from "../services/agent-owner-names.service.ts";
@@ -295,6 +301,7 @@ export class SuiteModule implements SuiteApi {
   readonly #runItems: SuiteRunItemCommandsService;
   readonly #runPlans: RunPlanReadService;
   readonly #connectedTargets: ConnectedTargetService;
+  readonly #templates: SuiteTemplateService;
 
   private constructor(
     dependencies: SuiteAppDependencies & {
@@ -311,6 +318,7 @@ export class SuiteModule implements SuiteApi {
     this.#runItems = runItems;
     this.#runPlans = runPlans;
     this.#dependencies = rest;
+    this.#templates = SuiteTemplateService.create({ scenarios: rest.scenarios });
     this.#connectedTargets = ConnectedTargetService.create({
       agents: rest.agents,
       owners: AgentOwnerNamesService.create(rest.agents),
@@ -480,6 +488,18 @@ export class SuiteModule implements SuiteApi {
   /** A new, empty test-suite test suite. */
   createTestSuite(input: ScenarioTestSuiteCreateInput): Promise<ScenarioTestSuite> {
     return this.#dependencies.suites.createTestSuite(input);
+  }
+
+  async listTemplates(_input: { projectId: string }): Promise<SuiteTemplate[]> {
+    return this.#templates.listTemplates();
+  }
+
+  applyTemplate(
+    input: ApplySuiteTemplateTrpcInput,
+    by: ScenarioCaller,
+    author?: ScenarioActor,
+  ): Promise<AppliedSuiteTemplate> {
+    return this.#templates.applyTemplate(input, by, author);
   }
 
   /**

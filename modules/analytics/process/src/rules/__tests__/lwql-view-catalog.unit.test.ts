@@ -22,7 +22,13 @@ import {
   gateForContentCategory,
   isContentAttributeKey,
 } from "../lwql-content-gating.rules.ts";
-import { LWQL_CATALOG, LWQL_VIEW_CATALOG, pickLwqlViewByName } from "../lwql-view-catalog.rules.ts";
+import {
+  LWQL_CATALOG,
+  LWQL_VIEW_CATALOG,
+  pickLwqlViewByName,
+  TENANT_COLUMN,
+} from "../lwql-view-catalog.rules.ts";
+import type { LangWatchQLDedupStrategy } from "../lwql-view-dedup-shape.rules.ts";
 
 const catalogShapes = LangWatchQLCatalogShapesService.create();
 
@@ -134,12 +140,12 @@ function expectViewShapeDeclared(view: (typeof LWQL_VIEW_CATALOG)[number]): void
     ).toContain(column);
   }
 
-  // `none` is the measurement baseline: pinned on an entry it would ship
-  // every unmerged version as its own row.
+  // `none` reads rows as written: pinned on a versioned source it would ship every unmerged
+  // version as its own row, so it is only for a source that writes each row once.
   expect(
-    view.dedup.strategy,
-    `${view.name} pins the dedup strategy that does not deduplicate`,
-  ).not.toBe("none");
+    view.dedup.strategy === "none" && view.dedup.versionColumn !== undefined,
+    `${view.name} pins the dedup strategy that does not deduplicate over a versioned source`,
+  ).toBe(false);
 
   // Nothing to collapse: PostgreSQL keeps one row per key, and a
   // version column here would be a claim about an engine that is not
@@ -155,12 +161,13 @@ function expectViewShapeDeclared(view: (typeof LWQL_VIEW_CATALOG)[number]): void
   // granting it" — which reads as a broken guard rather than as the missing declaration
   // it is. An aggregating source is the one ClickHouse-resident shape with no version,
   // because its rows for a key are summed rather than superseded.
+  const unversioned = view.dedup.aggregating === true || view.dedup.strategy === "none";
   expect(
     view.dedup.versionColumn === undefined,
-    view.dedup.aggregating
-      ? `${view.name} aggregates, so no version supersedes another and declaring one would be a claim about an engine that is not underneath it`
+    unversioned
+      ? `${view.name} aggregates or writes each row once, so no version supersedes another and declaring one would be a claim about an engine that is not underneath it`
       : `${view.name} is ClickHouse-resident and declares no version column, so its view would silently double-count`,
-  ).toBe(Boolean(view.dedup.aggregating));
+  ).toBe(unversioned);
 
   // A ClickHouse-resident view builds its own dedup subquery, so the same
   // columns must additionally be granted on the source table — even when
@@ -528,7 +535,10 @@ describe("given the LangWatchQL view catalog when a dataset's source aggregates 
   /** @scenario "A pre-aggregated view declares that its rows merge rather than supersede" */
   it("leaves a versioned dataset's version column required, so this is not a blanket exemption", () => {
     const versioned = LWQL_VIEW_CATALOG.filter(
-      (view) => !view.dedup.aggregating && !catalogShapes.isPostgresResident(view),
+      (view) =>
+        !view.dedup.aggregating &&
+        view.dedup.strategy !== "none" &&
+        !catalogShapes.isPostgresResident(view),
     );
     expect(
       versioned.length,
@@ -573,21 +583,39 @@ describe("given the LangWatchQL view catalog when a dataset's source sorts by a 
    * "expected".
    */
   /** @scenario "A view whose sort key moves declares the strategy that deduplicates it" */
-  it("leaves the datasets whose sort keys hold still on the shipped default", () => {
-    const pinned = LWQL_VIEW_CATALOG.filter((view) => view.dedup.strategy !== undefined);
+  it("leaves the datasets whose sort keys hold still on the shipped default or on latest-in-order", () => {
+    const pinned = LWQL_VIEW_CATALOG.flatMap((view) =>
+      view.dedup.strategy === undefined ? [] : [{ view, strategy: view.dedup.strategy }],
+    );
     expect(
       pinned.length,
       "no dataset pins a strategy — this case is inspecting nothing",
     ).toBeGreaterThan(0);
-    for (const view of pinned) {
+    const narrowerThanKey = (view: (typeof LWQL_VIEW_CATALOG)[number]) =>
+      catalogShapes.grainColumns(view).length < view.dedup.keyColumns.length;
+    // What each strategy needs of its source (ADR-005, ADR-006, ADR-007); `final` is the
+    // shipped default, so pinning it calls for nothing.
+    const calledFor: Record<
+      LangWatchQLDedupStrategy,
+      (view: (typeof pinned)[number]["view"]) => boolean
+    > = {
+      "in-tuple": narrowerThanKey,
+      "latest-in-order": (view) => view.dedup.versionColumn !== undefined,
+      none: (view) => !narrowerThanKey(view) && view.dedup.versionColumn === undefined,
+      settled: (view) =>
+        view.dedup.signColumn !== undefined &&
+        (view.dedup.versionColumn !== undefined || view.dedup.aggregating === true),
+      final: () => false,
+    };
+    for (const { view, strategy } of pinned) {
       expect(
-        catalogShapes.grainColumns(view).length,
-        `${view.name} pins a strategy its grain does not call for — the shipped default already collapses on the whole key`,
-      ).toBeLessThan(view.dedup.keyColumns.length);
+        calledFor[strategy](view),
+        `${view.name} pins a strategy nothing calls for: in-tuple needs a grain narrower than the key, latest-in-order a version column, none no versions, settled a sign column and a version`,
+      ).toBe(true);
       expect(
-        view.dedup.aggregating,
-        `${view.name} aggregates, so its narrow grain is delivered by the GROUP BY render, not a pinned strategy`,
-      ).not.toBe(true);
+        view.dedup.aggregating === true && strategy !== "settled",
+        `${view.name} aggregates, so its narrow grain is delivered by the GROUP BY render, not a pinned strategy other than settled`,
+      ).toBe(false);
     }
   });
 
@@ -611,9 +639,18 @@ describe("given the LangWatchQL view catalog when a dataset's source sorts by a 
       narrower.length,
       "no dataset narrows its grain — this case is inspecting nothing",
     ).toBeGreaterThan(0);
+    // `latest-in-order` keeps one row per whole key; the tenant's row policy fixes the tenant
+    // column, so that is one row per grain when the key adds only the tenant column (ADR-006).
+    const addsOnlyTheTenant = (view: (typeof narrower)[number]) =>
+      view.dedup.keyColumns
+        .filter((key) => !catalogShapes.grainColumns(view).includes(key))
+        .every((key) => key === (view.tenantColumn ?? TENANT_COLUMN));
     for (const view of narrower) {
       expect(
-        view.dedup.strategy === "in-tuple" || view.dedup.aggregating === true,
+        view.dedup.strategy === "in-tuple" ||
+          view.dedup.strategy === "settled" ||
+          view.dedup.aggregating === true ||
+          (view.dedup.strategy === "latest-in-order" && addsOnlyTheTenant(view)),
         `${view.name} publishes a grain narrower than its engine's key under plain FINAL, which merges on the whole key and cannot deliver it`,
       ).toBe(true);
     }

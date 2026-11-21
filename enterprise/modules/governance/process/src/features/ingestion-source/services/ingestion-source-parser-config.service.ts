@@ -1,5 +1,6 @@
 import {
   GovernanceValidationError,
+  ingestionSourceStatusIsOff,
   type GovernanceIngestionSource,
 } from "@langwatch/enterprise-governance-contract";
 
@@ -146,7 +147,7 @@ export class IngestionSourceParserConfigService {
                     typeof claim.parserConfig.report === "string"
                       ? claim.parserConfig.report
                       : null,
-                  disabled: claim.status === "disabled",
+                  disabled: ingestionSourceStatusIsOff(claim.status),
                 },
               ]
             : [],

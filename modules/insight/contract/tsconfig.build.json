@@ -13,10 +13,13 @@
 
   "references": [
     {
-      "path": "../../../packages/handled-error/tsconfig.build.json"
+      "path": "../../../packages/module/tsconfig.build.json"
     },
     {
-      "path": "../../../packages/module/tsconfig.build.json"
+      "path": "../../../packages/ksuid/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/handled-error/tsconfig.build.json"
     }
   ]
 }

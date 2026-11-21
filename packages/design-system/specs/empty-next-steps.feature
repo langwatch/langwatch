@@ -46,6 +46,13 @@ Feature: Empty states point somewhere useful
     Given a one-line empty state with a next step
     Then the next step sits beside the sentence
 
+  @integration @browser
+  Scenario: A one-line sentence that is one long word wraps and keeps its action in view
+    Given a one-line empty state quoting a long unbroken search and a callback action
+    When it sits in a narrow list
+    Then the sentence wraps inside the list
+    And the action stays inside the list where it can be pressed
+
   @integration
   Scenario: A page body can fill the width
     Given a page container asked to fill

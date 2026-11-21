@@ -7,8 +7,8 @@ Feature: Settings shell
   product dropdown (the icon rail marks its Settings tile instead), and
   the organization control stays. The sidebar opens with Quick Search,
   then a back entry that returns to the product the user came from,
-  then the settings menu regrouped with icons: YOU, ORGANIZATION,
-  PEOPLE & ACCESS, AI INFRASTRUCTURE, DATA CONTROLS, PROJECT, and the internal OPS and
+  then the settings menu regrouped with icons: YOU, PROJECT, ORGANIZATION,
+  PEOPLE & ACCESS, AI INFRASTRUCTURE, DATA CONTROLS, and the internal OPS and
   BACKOFFICE groups with their current gates. A plan without Enterprise
   sees its entries with a quiet lock rather than not at all, and the page
   opens on an upsell; a missing permission still hides an entry. The
@@ -38,6 +38,15 @@ Feature: Settings shell
   than for the provisioning protocol it speaks. Authentication remains in
   ORGANIZATION because it controls how everyone in the organization signs in;
   how the reader themselves signs in is Security, under You.
+
+  Settings opened from inside a project lands on that project's General page,
+  and PROJECT sits right under YOU: a reader who came from a project most often
+  came to change it. It stays plainly "Project". Organization > General is the
+  landing when Settings is opened from anywhere else, from a personal workspace
+  or an aggregate project (neither is the project the settings pages act on), or
+  by a reader who may not update the project. The /settings address itself
+  still opens Organization > General, so deep links and bookmarks keep their page.
+  ADR-098, amendment of 2026-11-19.
 
   @integration
   Scenario: Settings keeps search first and Back immediately below it
@@ -74,11 +83,11 @@ Feature: Settings shell
     And the old page addresses forward to the corresponding consolidated tabs
 
   @integration
-  Scenario: A plan with Enterprise sees its entries marked ENT, not locked
+  Scenario: A plan with Enterprise sees its entries as plain entries
     Given my plan includes Enterprise
     When the settings sidebar renders
-    Then the Enterprise entries carry a quiet grey "ENT" chip
-    And no entry carries a lock
+    Then the Enterprise entries carry no badge and no lock, like any entry the plan includes
+    And no entry carries the "Included in Enterprise" lock
 
   @integration
   Scenario: A plan without Enterprise sees its entries locked
@@ -88,6 +97,19 @@ Feature: Settings shell
     And the lock reads "Included in Enterprise"
     And an entry I lack the permission for stays hidden
     And opening a locked entry shows its page title and an Enterprise upsell, never the feature
+
+  @unit @integration
+  Scenario: A branded feature's entries wear its mark
+    Given the settings menu offers the Braids page
+    Then Braids appears once, under Project, never also under People & access
+    And the entry draws the Braids mark, the one its pages' titles and empty states draw
+
+  @unit
+  Scenario: The organization's braids page lights its Organization entry
+    Given the settings menu offers the Braids page
+    When I open the organization's braids page
+    Then the Organization group's General entry is the active entry
+    And the Braids entry under Project is not lit, since the page is organisation-wide
 
   @unit @integration
   Scenario: Authentication is offered unlocked on every plan
@@ -179,3 +201,46 @@ Feature: Settings shell
     Given I open Settings in the product-switcher mode
     Then the top bar shows "Settings" with no product dropdown
     And the organization control stays in the top bar
+
+  @regression @unit @integration
+  Scenario: Settings opened from a project lands on that project's settings
+    Given I am on a page of a shared project I may update
+    When I open Settings
+    Then I land on Project > General for that project
+    And the back entry still returns me to the page I left
+
+  @unit
+  Scenario: Settings opened from outside a project lands on the organization's settings
+    Given I am on a page that names no project, such as a Gateway page
+    When I open Settings
+    Then I land on Organization > General
+
+  @unit
+  Scenario: Settings opened from a personal workspace lands on the organization's settings
+    Given I am in my personal workspace
+    When I open Settings
+    Then I land on Organization > General
+
+  @unit
+  Scenario: Settings opened from an aggregate project lands on the organization's settings
+    Given I am on an aggregate project's page
+    When I open Settings
+    Then I land on Organization > General
+
+  @unit @integration
+  Scenario: A reader who may not update the project lands on the organization's settings
+    Given I am on a page of a shared project I may only view
+    When I open Settings
+    Then I land on Organization > General
+
+  @unit
+  Scenario: The settings address itself still opens the organization's settings
+    Given I open the /settings address directly
+    Then the page is Organization > General
+    And the Organization group's General entry is the one marked
+
+  @regression @unit @integration
+  Scenario: The Project group sits between You and Organization
+    When the settings sidebar renders
+    Then the groups read You, Project, Organization, then the remaining groups
+    And the Project group is labelled plainly "Project"

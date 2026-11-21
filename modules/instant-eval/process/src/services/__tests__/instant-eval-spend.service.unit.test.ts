@@ -44,7 +44,7 @@ describe("InstantEvalSpendService", () => {
       organizationId: "org-1",
       teamId: "team-1",
       requestType: INSTANT_EVAL_REQUEST_TYPE,
-      model: "jev",
+      model: "langwatch-evals-preview",
       inputTokens: 12_000,
       costNanoUsd: 13_000_000,
     });

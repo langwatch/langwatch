@@ -8,6 +8,7 @@ export { Temporal, type Instant, type PlainDateTime, type ZonedDateTime } from "
 export {
   currentTimeZone,
   fromDate,
+  nowEpochMs,
   nowInstant,
   readableDate,
   toDate,

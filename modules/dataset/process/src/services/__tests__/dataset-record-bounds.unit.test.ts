@@ -8,6 +8,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   createDatasetTestAttachments,
+  createDatasetTestContent,
   createDatasetTestInlineAttachments,
   createDatasetTestRequestBounds,
 } from "../../app/__tests__/dataset.fixture.ts";
@@ -21,6 +22,10 @@ function service(tier: "free" | "paid" | "enterprise" = "free") {
   const datasets = DatasetService.create({
     repository: repositories.datasets,
     records: repositories.records,
+    content: createDatasetTestContent({
+      datasets: repositories.content,
+      storage: repositories.chunks,
+    }),
     generateId: (() => {
       let sequence = 0;
       return () => `record_${++sequence}`;

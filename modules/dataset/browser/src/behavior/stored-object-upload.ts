@@ -27,6 +27,13 @@ export class PresignedUploadFailedError extends Error {
 }
 
 const MEDIA_TYPE_FALLBACK = "application/octet-stream";
+const DIRECT_UPLOAD_DOCS = "https://docs.langwatch.ai/self-hosting/upgrade-dataset-storage";
+
+/** The host a signed URL points at; never its query, which carries the signature. */
+function uploadHostOf(uploadUrl: string): string {
+  if (!URL.canParse(uploadUrl)) return "the storage endpoint";
+  return new URL(uploadUrl).host;
+}
 
 function isSameOrigin(uploadUrl: string): boolean {
   if (typeof window === "undefined") return uploadUrl.startsWith("/");
@@ -63,7 +70,7 @@ export async function putFileToUploadUrl({
       throw error instanceof Error ? error : new Error("Failed to upload the file");
     }
     throw new PresignedUploadFailedError(
-      "Failed to upload the file to object storage (network or CORS error)",
+      `Failed to upload the file to object storage at ${uploadHostOf(upload.uploadUrl)} (network or CORS error). The browser must reach that address; see ${DIRECT_UPLOAD_DOCS}`,
       error,
     );
   }
@@ -71,7 +78,7 @@ export async function putFileToUploadUrl({
   if (response.ok) return;
   if (!sameOrigin) {
     throw new PresignedUploadFailedError(
-      `Failed to upload the file to object storage (status ${response.status})`,
+      `Failed to upload the file to object storage at ${uploadHostOf(upload.uploadUrl)} (status ${response.status})`,
     );
   }
   const body: unknown = await response.json().catch(() => null);

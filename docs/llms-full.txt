@@ -221,6 +221,35 @@ Labels let you zoom in on specific features or A/B test different approaches rig
 
 ---
 
+# FILE: ./observability/multi-agent-a2a.mdx
+
+---
+title: "Multi-agent traces across A2A"
+description: "See every agent of an A2A call chain in one trace, with the calls, errors, latency and cost between them."
+---
+
+When one agent calls another over the Agent2Agent (A2A) protocol, LangWatch shows the whole chain as one trace. Open the trace and pick the **Agents** tab to see which agent called which, how often, how many calls failed, how long they took and what each agent cost.
+
+## How spans join one trace
+
+Spans from different agents join the same trace when the caller sends the W3C `traceparent` header on its A2A request and the callee continues that context. Most OpenTelemetry HTTP instrumentations do this for you. If the callee starts a new trace instead, its spans land in a separate trace and the graph shows only one side.
+
+A span whose parent span ID is not in the trace is still drawn as an agent, marked "Caller not in this trace". This happens when the caller's spans were not sent to LangWatch, or were sent to another project. A callee that got no `traceparent` starts its own trace instead, with no marker.
+
+## Attributes LangWatch reads
+
+Each span belongs to the agent named by `gen_ai.agent.name` (or `gen_ai.agent.id`). An A2A client span can also name its callee through `a2a.agent.name`, `a2a.agent.card.name` or a span name like `invoke_agent Bob`; that span and the spans under it belong to the callee. A span without a name belongs to its parent's agent. When `service.name` changes under a span, the new service becomes its own node, unless the parent is an A2A client span that names its callee.
+
+A span is marked as an A2A call when it carries `a2a.*` attributes, such as `a2a.method`, `a2a.context.id`, `a2a.task.id` and `a2a.task.state`. Those spans get an **A2A** label in the span tree. An edge appears where a span belongs to a different agent than its parent, and it is marked A2A when that span is an A2A span. An A2A span that stays in its parent's agent adds no edge.
+
+## The call graph
+
+Each node is an agent, with its span count and the cost of its own LLM spans, so a parent is never charged for its children. Each edge counts the calls from one agent to another, with errors, average and maximum latency. Click an edge to open its first call in the span details.
+
+The **Agents** tab appears when a trace names more than one agent or holds an A2A call. When the graph finds only one agent, the tab stays and shows that one node. Each edge's latency is the caller's A2A client span when there is one, else the callee's first span. Edges with errors come first, then the busiest; a node with failed calls has a red border and the slowest callee an orange one.
+
+---
+
 # FILE: ./observability/overview.mdx
 
 ---
@@ -925,7 +954,7 @@ Periods are whole weeks. The presets round up so that the label is always covere
 | -------- | --------------------------------------------------------------------------------------- | ----------------------------- |
 | 1 month  | 35                                                                                      | Paid, Enterprise, self-hosted |
 | 2 months | 63                                                                                      | Paid, Enterprise, self-hosted |
-| 3 months | 91                                                                                      | Enterprise, self-hosted       |
+| 3 months | 91                                                                                      | Paid, Enterprise, self-hosted |
 | 1 year   | 371                                                                                     | Enterprise, self-hosted       |
 | 5 years  | 1827                                                                                    | Enterprise, self-hosted       |
 | Custom   | 49 days or more, in weeks, months (28 days) or years (364 days), rounded to whole weeks | Enterprise, self-hosted       |
@@ -1129,7 +1158,7 @@ Manage them at **Settings > Model Providers**. The table lists each configuratio
 | OpenAI | API key, or a base URL for an endpoint that needs none |
 | Codex (OpenAI account) | Sign in with your OpenAI account. Used by coding features only |
 | Anthropic | API key, or a base URL |
-| Gemini | API key. Add a project and a location to use Gemini through Vertex AI |
+| Gemini | API key. Add a project and a location to use Gemini through Vertex AI. An AI Studio key also runs [Instant Evals on Gemini Decision 1](/features/instant-evals/own-model) |
 | Azure OpenAI | API key and endpoint, optional API version. **Use API Gateway** switches to an API gateway base URL and version. Optional **Decisions Deployment** and **Microsoft Decision 1 Deployment** name the deployments [Instant Evals can run on](/features/instant-evals/own-model#azure) |
 | Bedrock | AWS access key id, secret access key and region |
 | Vertex AI | Service account JSON, project and location |
@@ -4902,7 +4931,9 @@ Spend events, spend summaries and the webhook endpoints are an Enterprise capabi
 
 An outcome that arrives after settlement is recorded as `success` or `error`. A `success` event is never downgraded.
 
-An [Instant Eval](/api-reference/instant-evals/running-an-instant-eval) query or run is also one spend event, recorded as `success` with no `admitted` step before it. It carries `request_type: "instant_eval"`, model `jev`, an empty virtual key and no provider; `usage.input_tokens` is what the judge read, `cost` is the customer price, and `metadata` holds the request count. A run's event id starts with `instanteval_` followed by the run id, so a run finished twice is one event. Budgets debit it like any other spend.
+An [Instant Eval](/api-reference/instant-evals/running-an-instant-eval) query or run is also one spend event, recorded as `success` with no `admitted` step before it. It carries `request_type: "instant_eval"`, model `langwatch-evals-preview` (or `langwatch-judge` for a routed LLM judge; older events carry `jev`), an empty virtual key and no provider; `usage.input_tokens` is what the judge read, `cost` is the customer price, and `metadata` holds the request count.
+
+A run's event id starts with `instanteval_` followed by the run id, so a run finished twice is one event. Budgets debit it like any other spend.
 
 Event ids are stable: `<gateway_request_id>:<completed|settled|admitted>`. A retried or replayed delivery carries the same id, so you can dedupe on it. Recorded spend never changes: a budget reset moves a period boundary and leaves every event as it was.
 
@@ -5913,9 +5944,9 @@ A leaked provider credential is a different problem. Rotate that one in the prov
 | Revoke    | Every request answers `403 virtual_key_revoked`. The key is dead and cannot come back                          | The secret is publicly exposed                                                                      |
 | Rotate    | Keeps working for 24 hours, then fails                                                                         | The secret left a trusted boundary but is not exposed, and callers need time to pick up the new one |
 
-Disable and revoke contain the leak as soon as the change reaches every gateway pod. The control plane writes a change event, and a pod that receives it stops serving the key on the next request, in about 10 seconds.
+Disable and revoke contain the leak as soon as the change reaches every gateway pod. The control plane writes a change event, and a pod that receives it stops serving the key on the next request, usually within a second or two.
 
-A pod that cannot reach the control plane serves the cached key for longer: up to the token expiry of 15 minutes, and past it to the hard cap set by `LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS`, six hours by default. Read [Step 3](#step-3-stop-the-traffic) for the three paths and their timings, and report containment against the slowest one that applies.
+A pod that received the event keeps refusing the key even if the control plane goes down afterwards. A pod that missed the event and cannot reach the control plane serves the cached key up to the hard cap set by `LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS`, six hours by default, unless `LW_GATEWAY_AUTH_CACHE_FAIL_CLOSED_AFTER_SECONDS` is set. Read [Step 3](#step-3-stop-the-traffic) for the paths and their timings.
 
 Rotate leaves the old secret working for a day, so it is a rollover tool rather than a containment tool.
 
@@ -5989,11 +6020,15 @@ New requests stop as each gateway pod learns about the change:
 
 | Path                                                                                                | Timing                                                                                    |
 | --------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
-| The change feed, which carries the revoke or disable event and evicts the key from that pod's cache | About 10 seconds                                                                          |
+| The change feed, which carries the revoke or disable event and evicts the key from that pod's cache | Usually a second or two                                                                   |
 | The key's own token expiring, if the change feed is not delivering                                  | 15 minutes                                                                                |
-| The stale-serving window, if the pod cannot reach the control plane at all                          | Up to `LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS` past the token expiry, default six hours |
+| The stale-serving window, if the pod missed the event and cannot reach the control plane            | Up to `LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS` past the token expiry, default six hours, or `LW_GATEWAY_AUTH_CACHE_FAIL_CLOSED_AFTER_SECONDS` when set |
 
-The third row is the case worth planning for. While the control plane is reachable, a revoked key is refused within seconds, because a `403` from the control plane evicts the cached entry at once with no grace. The grace window only covers a control plane the pod cannot reach, and during such an outage a key revoked just before it can keep serving to the cap.
+The third row is the case worth planning for. A pod that receives the revoke or disable event refuses the key within seconds and records it on a revocation list, so it keeps answering `403` through a later outage. The list is bounded: if the entry is pushed out before the outage, the pod still refuses the key, because the event removed its cached copies, but the caller gets `503 auth_upstream_unavailable` instead of `403`.
+
+A pod that missed the event keeps serving its cached copy until it next asks the control plane: near the token expiry, after a spend change, or when the cached config goes stale. A token refresh gets the control plane's `403` and evicts the entry with no grace. A config refresh sees the key is no longer active and evicts the entry, so the next request gets that `403`.
+
+The grace window only covers a pod that missed the event and cannot reach the control plane. To bound it, set `LW_GATEWAY_AUTH_CACHE_FAIL_CLOSED_AFTER_SECONDS` (minimum 30): once neither the key nor the organization's change feed was confirmed within that limit, the pod answers `503 auth_upstream_unavailable` instead of serving the cached key. Read [Revocation latency](/ai-gateway/self-hosting/config#revocation-latency) for the trade-off.
 
 If you need every pod to forget the key immediately, restart the gateway Deployment. Every new pod starts with an empty cache and resolves each key from the control plane on its first request.
 
@@ -6782,7 +6817,7 @@ curl -sS -X POST "$LW/api/gateway/v1/virtual-keys/$VK_ID/disable" \
   -d '{"reason": "payment overdue"}'
 ```
 
-Requests on the key are rejected with `403 virtual_key_disabled` until you call `/enable`. Budgets, scopes, key material and any running rotation grace stay intact. The gateway picks the change up on its next change-feed poll, a long poll of about 10 seconds. Both transitions emit `gateway.virtual_key.disabled` and `gateway.virtual_key.enabled` events.
+Requests on the key are rejected with `403 virtual_key_disabled` until you call `/enable`. Budgets, scopes, key material and any running rotation grace stay intact. The gateway picks the change up from its change feed, usually within a second or two. Both transitions emit `gateway.virtual_key.disabled` and `gateway.virtual_key.enabled` events.
 
 **The customer resets their API key in your UI.** `POST /api/gateway/v1/virtual-keys/{id}/rotate` returns a new secret; send it to the customer once. The old secret keeps authenticating for 24 hours, so a client you have not reached yet does not fail mid-rollout. The event is `gateway.virtual_key.rotated`.
 
@@ -7718,6 +7753,7 @@ The config part of the entry (credentials, routing chain, budgets) has its own T
 | `LW_GATEWAY_AUTH_CACHE_SOFT_BUMP_SECONDS` | `300` | Extension per failed refresh. |
 | `LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS` | `21600` (6 hours) | Cap on stale serving past the JWT expiry. A negative value disables stale serving. |
 | `LW_GATEWAY_AUTH_CACHE_CONFIG_TTL_SECONDS` | `60` | Config re-fetch interval. A negative value disables it. |
+| `LW_GATEWAY_AUTH_CACHE_FAIL_CLOSED_AFTER_SECONDS` | `0` (off) | Refuses a cached key not re-checked for this long while its change feed is also silent. Minimum 30. |
 
 ## Budget enforcement
 
@@ -7737,104 +7773,179 @@ The gateway sub-chart of the `langwatch` Helm chart deploys the gateway as a Dep
 
 ---
 title: OCSF / SIEM export
-description: Pull governance events into your SIEM as OCSF 1.1 records through a cursor-paginated read procedure.
+description: Send AI activity and audit events to your SIEM as OCSF 1.9.0 events, pulled with an API key or pushed to a signed webhook, and push OCSF events from other tools into LangWatch.
 sidebarTitle: OCSF / SIEM export
 ---
 
-## What the export contains
+## What is exported
 
-LangWatch writes one OCSF record per trace that arrives through an [ingestion source](/ai-governance/ingestion-sources/index), and one per admin view of a member's or a team's workspace (`actionName` `governance.viewWorkspaceAs`). Each record is an OCSF 1.1 API Activity event (`class_uid` 6003, `category_uid` 6). A record linked to an anomaly alert has `severity_id` 4 (Medium); every other record has `severity_id` 1 (Informational).
+LangWatch exports three streams of OCSF 1.9.0 API Activity events (`class_uid` 6003, `category_uid` 6):
 
-Records are stored with no expiry. Your SIEM pulls them by cursor, on its own schedule, and keeps its own watermark.
+| Stream | Route | Contains |
+|---|---|---|
+| Governance events | `GET /api/governance/ocsf/events` | Traces from [ingestion sources](/ai-governance/ingestion-sources/index), events pulled from provider audit APIs, admin views of a member's or team's workspace, and OCSF events pushed in from other tools |
+| Project traces | `GET /api/governance/ocsf/traces` | One event per trace in the organization's projects |
+| Audit log | `GET /api/governance/ocsf/audit` | Admin and configuration actions: who did what, on which target, from which address, and whether it failed |
 
-## Endpoint and auth
+Every event LangWatch builds sets `metadata.version` to `1.9.0`, `metadata.uid` to a stable event id and `metadata.tenant_uid` to the organization id. An LLM call is `activity_id` 99 (Other) with `activity_name` `Invoke`, since OCSF API Activity has no invoke activity.
 
-The export is the tRPC query `governance.ocsfExport`. Call it as a `GET` on `/api/trpc/governance.ocsfExport` with the input JSON in the `input` query parameter.
+## AI fields
+
+Each event carries the OCSF 1.9 AI objects when LangWatch knows their values:
+
+| Field | Source |
+|---|---|
+| `ai_model.name`, `ai_model.ai_provider` | The model the call used. A `provider/model` name is split; an unknown provider is `Unknown` |
+| `ai_agent.name`, `ai_agent.uid` | `gen_ai.agent.name` and `gen_ai.agent.id` on the trace |
+| `message_context.prompt_tokens`, `completion_tokens`, `total_tokens` | The trace's or the provider event's token counts |
+| `message_context.uid`, `metadata.correlation_uid` | The trace id |
+| `unmapped.langwatch.cost_usd` | The cost in USD. Provider events priced in another currency carry `cost_amount` and `cost_currency` instead |
+
+Prompt and response text are never exported, and neither is the raw provider payload. `unmapped.langwatch` also carries `source_type`, `source_id`, `trace_id` and `project_id` so you can pivot back to LangWatch.
+
+## Auth
 
 | Requirement | Value |
 |---|---|
 | Plan | Enterprise |
-| Permission | `complianceExport:view`. Organization admins hold it; grant it to another role through a custom role. See [RBAC](/ai-gateway/rbac) |
-| Auth | The session cookie of a signed-in user. API keys and virtual keys are not accepted |
-| Tenancy | The permission is checked against `organizationId`. A call for an organization where the caller does not hold it is refused |
+| Credential | An organization API key, sent as `Authorization: Bearer <key>` |
+| Permission | `complianceExport:view` for the three export routes, `governance:manage` for the ingest route |
 
-## Input
+A key without the permission gets a 403. An organization below Enterprise gets a 402 `enterprise_plan_required`.
 
-| Field | Type | Default | Purpose |
-|---|---|---|---|
-| `organizationId` | string | required | The organization to export |
-| `sinceMs` | integer | `0` | Return records with `eventTimeMs` after this UNIX millisecond watermark |
-| `sinceEventId` | string | none | Paired with `sinceMs`: the `eventId` of the last record you received, so records that share a millisecond are neither skipped nor repeated |
-| `limit` | integer | `500` | Page size, 1 to 1000 |
+## Pulling events
 
-## Output
+All three routes take the same paging parameters:
 
-The HTTP response wraps the procedure result under `result.data.json`. The result is:
+| Parameter | Default | Purpose |
+|---|---|---|
+| `limit` | `500` | Page size, 1 to 1000 |
+| `cursor` | none | The `next_cursor` of the previous page |
+| `since` | none | ISO 8601 start of the first read. A cursor carries its own position |
+| `until` | none | ISO 8601 end bound. The cursor does not carry it, so send it again with every page |
+
+`/events` also takes `source_type` and `source_id`. `/traces` takes `project_id` to read one project. `/audit` returns an entry once it is ten minutes old, so an entry written late is not skipped by a cursor that already passed its time.
+
+Every page answers `next_cursor`, which is always set, and `has_more`. Store `next_cursor` after each page. While `has_more` is true, read again at once; when it is false, wait for your next scheduled run and pass the stored cursor. A trace updated after it was exported is exported again with the same `metadata.uid`, so deduplicate on it.
+
+```bash
+curl -s "https://app.langwatch.ai/api/governance/ocsf/events?limit=500" \
+  -H "Authorization: Bearer $LANGWATCH_ORG_API_KEY"
+```
 
 ```json
 {
-  "events": [
+  "ocsf_version": "1.9.0",
+  "data": [
     {
-      "eventId": "evt_01HZX9N...",
-      "ocsfSchemaVersion": "1.1.0",
-      "traceId": "trace_...",
-      "sourceId": "src_...",
-      "sourceType": "otel_generic",
-      "classUid": 6003,
-      "categoryUid": 6,
-      "activityId": 6,
-      "typeUid": 600306,
-      "severityId": 1,
-      "eventTimeMs": 1748678421123,
-      "actorUserId": "user_...",
-      "actorEmail": "jane@acme.com",
-      "actorEnduserId": "",
-      "actionName": "web_search",
-      "targetName": "anthropic/claude-sonnet-4",
-      "anomalyAlertId": "",
-      "rawOcsfJson": "{...}"
+      "class_uid": 6003,
+      "class_name": "API Activity",
+      "category_uid": 6,
+      "activity_id": 99,
+      "activity_name": "Invoke",
+      "type_uid": 600399,
+      "severity_id": 1,
+      "time": 1763114521123,
+      "status_id": 0,
+      "actor": { "user": { "uid": "user_01H...", "email_addr": "jane@acme.com" } },
+      "api": { "operation": "trace.recorded", "service": { "name": "LangWatch" } },
+      "src_endpoint": { "name": "otel_generic" },
+      "cloud": { "provider": "openai" },
+      "osint": [],
+      "ai_model": { "name": "gpt-5-mini", "ai_provider": "openai" },
+      "ai_agent": { "name": "billing-agent" },
+      "message_context": {
+        "uid": "trace_01H...",
+        "prompt_tokens": 120,
+        "completion_tokens": 30,
+        "total_tokens": 150
+      },
+      "metadata": {
+        "version": "1.9.0",
+        "uid": "trace_01H...",
+        "product": { "name": "LangWatch", "vendor_name": "LangWatch" },
+        "tenant_uid": "organization_01H...",
+        "log_name": "governance",
+        "correlation_uid": "trace_01H..."
+      },
+      "unmapped": {
+        "langwatch": {
+          "source_type": "otel_generic",
+          "source_id": "src_01H...",
+          "trace_id": "trace_01H...",
+          "cost_usd": 0.0042
+        }
+      }
     }
   ],
-  "nextCursor": 1748678421123,
-  "nextCursorCompound": { "eventTimeMs": 1748678421123, "eventId": "evt_01HZX9N..." }
+  "next_cursor": "eyJ0IjoxNzYzMTE0NTIxMTIzLCJlIjoidHJhY2VfMDFIIn0",
+  "has_more": false
 }
 ```
 
-`rawOcsfJson` is the full OCSF 1.1 event as a JSON string. The other fields are the columns your SIEM filters on. `actionName` is the tool the trace invoked, or `trace.recorded` for a trace with no tool call. An organization with no ingestion source yet returns `{ "events": [], "nextCursor": null, "nextCursorCompound": null }`.
+## Pushing events to your SIEM
 
-`anomalyAlertId` is returned on every record and is **always empty**. No attribute sets it, so no exported record is ever linked to an anomaly alert, and `severityId` is always 1 (Informational). Anomaly alerts are not exported as OCSF rows at all. They are delivered by webhook, described in [Anomaly rules](/ai-governance/anomaly-rules).
-
-## Pagination
-
-Persist `nextCursorCompound` after each page. On the next pull, pass its `eventTimeMs` as `sinceMs` and its `eventId` as `sinceEventId`. Records are ordered by `eventTimeMs` ascending.
-
-A page that returns `limit` records may be followed by more. Pull again at once until a page returns fewer than `limit` records, then wait for your next scheduled run.
-
-## Example
-
-Write the cookie into a curl config file that only the job user can read, and pass the file rather than the value. A `-H` argument puts the cookie in the process argument list, where every other user on the host can read it out of `ps`.
+Create a [webhook endpoint](/features/webhooks) subscribed to `ocsf.event`, pointing at your SIEM's HTTP collector or a forwarder in front of it:
 
 ```bash
-conf="$(mktemp)"
-trap 'rm -f "$conf"' EXIT
-printf 'header = "Cookie: %s"\n' "$SESSION_COOKIE" > "$conf"
+curl -s "https://app.langwatch.ai/api/webhooks/v1/endpoints" \
+  -H "Authorization: Bearer $LANGWATCH_ORG_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://siem-forwarder.acme.com/langwatch", "enabled_events": ["ocsf.event"]}'
 ```
 
-`mktemp` makes a new file each run, owned by the job user and readable only by them. Writing to a fixed path instead would reuse whatever file or symlink is already there, and keep its permissions.
+LangWatch queues each governance event when it is written. Deliveries use the standard webhook envelope: a POST holds a `batch` of up to `max_batch_size` webhook events (100 by default), each with `type: "ocsf.event"` and one OCSF 1.9.0 event as its `data`:
+
+```json
+{
+  "batch": [
+    {
+      "id": "evt_f905578f982aee17650a4616b89ad219",
+      "type": "ocsf.event",
+      "created": "2026-11-16T16:47:29.124Z",
+      "schema_version": "1",
+      "data": { "class_uid": 6003, "activity_name": "Invoke", "metadata": { "uid": "47c84f48...", "version": "1.9.0" } }
+    }
+  ]
+}
+```
+
+Deliveries are signed with `X-LangWatch-Signature: t=<unix seconds>,v1=<hmac-sha256>`, retried with backoff, and logged per endpoint; see [verifying signatures](/features/webhooks#verifying-signatures). An event written again, for example when a trace is processed twice, keeps its idempotency key, so it is queued once per endpoint. A retry after a lost acknowledgement can deliver it again, so deduplicate on `metadata.uid`.
+
+OCSF events go only to endpoints that name `ocsf.event` or `ocsf.*`. An endpoint subscribed to `*` does not receive them. The push carries the governance events stream. Project traces and the audit log are pulled.
+
+## Pushing OCSF events into LangWatch
+
+`POST /api/governance/ocsf/ingest` stores OCSF events from another tool, such as your identity provider or an AI platform's own audit feed, next to LangWatch's events:
 
 ```bash
-INPUT='{"json":{"organizationId":"YOUR_ORGANIZATION_ID","sinceMs":0,"limit":500}}'
-
-curl -G "https://app.langwatch.ai/api/trpc/governance.ocsfExport" \
-  --data-urlencode "input=$INPUT" \
-  --config "$conf"
+curl -s "https://app.langwatch.ai/api/governance/ocsf/ingest" \
+  -H "Authorization: Bearer $LANGWATCH_ORG_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "source": "okta",
+    "events": [
+      {
+        "class_uid": 3002,
+        "activity_id": 1,
+        "severity_id": 1,
+        "time": 1763114521123,
+        "metadata": { "uid": "okta-evt-1", "version": "1.4.0", "product": { "name": "Okta" } },
+        "user": { "name": "jane@acme.com" }
+      }
+    ]
+  }'
 ```
 
-`$SESSION_COOKIE` is the cookie of a browser session signed in as a user who holds `complianceExport:view`. Read it from your secrets store into the job environment. The `trap` deletes the config file when the shell exits, on a failed run as well as a clean one. Forward `events[]` to your SIEM's ingest API, then store `nextCursorCompound` for the next run.
+The answer is `{ "accepted": 1 }`. A request holds up to 500 events. Each needs `class_uid`, `severity_id`, `time` (epoch milliseconds) and `metadata.uid` and `metadata.version`, and is at most 64 KiB as JSON. An invalid event is a 422 naming the field.
 
-<Warning>The session cookie is a full browser credential for that user, and this endpoint takes no other credential. It is not scoped to `complianceExport:view`, and it expires on the session's own schedule rather than the job's. Keep it out of shell history, out of the process argument list, and out of any script committed to a repository, and rotate the session when the job host changes.</Warning>
+An event is identified by `source` and `metadata.uid`: sending it again replaces the stored copy. Stored events are read back from `/events` with `source_type=ocsf_push`, exactly as received, and are not pushed to webhook endpoints.
 
-**Also check:** [Anomaly rules](/ai-governance/anomaly-rules) for how a fired alert reaches you, which is by webhook rather than through this export, and [Retention](/ai-gateway/governance/retention) for how long the source traces are kept.
+## Session export
+
+The tRPC query `governance.ocsfExport` still returns the governance events in their stored OCSF 1.1 row shape, for the signed-in UI. Use the REST routes above for a SIEM job.
+
+**Also check:** [Anomaly rules](/ai-governance/anomaly-rules) for how a fired alert reaches you, and [Retention](/ai-gateway/governance/retention) for how long the source traces are kept.
 
 ---
 
@@ -8621,6 +8732,8 @@ The gateway serves `GET /metrics` on its own listener, separate from the API por
 | ---------------------------------- | ------- | ------ | ------------------------------------------------------- |
 | `gateway_auth_cache_hits_total`    | counter | `tier` | Virtual-key resolutions served from cache               |
 | `gateway_auth_cache_misses_total`  | counter | `tier` | Resolutions that fell through to the control plane      |
+| `gateway_auth_cache_refusals_total` | counter | `reason` | Cached keys refused by the revocation list (`denied_vk_revoked`, `denied_vk_disabled`) or the fail-closed rule (`fail_closed`) |
+| `gateway_auth_cache_stale_serves_total` | counter | `source` | Keys served from cache because the control plane could not answer (`stale_while_error`, `last_known`) |
 | `gateway_auth_cache_lookups_total` | counter | none   | Resolutions attempted. The denominator for the hit rate |
 | `gateway_auth_cache_size`          | gauge   | `tier` | Virtual keys held in the cache                          |
 
@@ -11366,10 +11479,27 @@ The gateway caches each resolved virtual key in process. When a cached entry pas
 
 A change-feed event (a budget debit, a provider or routing edit) also evicts the entry so the next request reads fresh config. If that refetch fails for a transport reason, the gateway serves the evicted entry again, for up to one hour after its config was last confirmed. Revoking, disabling or rotating a key leaves no such fallback.
 
+### Revocation latency
+
+Revoking or disabling a key reaches every gateway replica through the change feed, a long poll per organization, usually within a second or two.
+
+Each replica records the key in a revocation list kept apart from the key cache. The stale-serve window does not expire the list, so a revoked key is refused even if the control plane goes down right after. Re-enabling the key, or a later successful check with the control plane, clears it.
+
+A replica that starts, or reconnects after an outage, first reads the change history it missed, in pages. A disable found there removes the key from the cache, and the replica checks the key with the control plane until it reaches the newest change. A key disabled and later re-enabled therefore keeps working through a restart, as long as the control plane answers; if it can't, the request gets the retryable `503 auth_upstream_unavailable`.
+
+Once the replica has caught up, the revocation list refuses the keys the history left revoked or disabled with `403`. The list is bounded: a key pushed out of it is still refused, because its cached copies are gone, but the caller gets `503 auth_upstream_unavailable` during an outage.
+
+Rotating a key is not a revocation. The old secret keeps working through its grace period, and the gateway asks the control plane about it.
+
+A replica that cannot reach the control plane cannot learn about a revocation made during that outage. Set `LW_GATEWAY_AUTH_CACHE_FAIL_CLOSED_AFTER_SECONDS` to bound that window. Once a key's last check and its organization's change feed are both older than the limit, the gateway checks the key with the control plane once, at most every 5 seconds per key. If that check fails, the key gets a retryable `auth_upstream_unavailable` error.
+
+The limit is off by default, so an outage does not stop traffic. When set, it must be at least 30 seconds, because a healthy change feed can hold a poll open for about 10 seconds.
+
 | Var                                        | Default | Purpose                                                                                                                                                                   |
 | ------------------------------------------ | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `LW_GATEWAY_AUTH_CACHE_SOFT_BUMP_SECONDS`  | `300`   | Extension granted per failed refresh during a control plane outage. `0` takes the default                                                                                 |
 | `LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS` | `21600` | Cap on stale serving, measured from the JWT expiry. `0` takes the default. A negative value disables stale serving, so a key fails at its JWT expiry                      |
+| `LW_GATEWAY_AUTH_CACHE_FAIL_CLOSED_AFTER_SECONDS` | `0` | When positive, refuses a cached key once its last control-plane check and its organization's last change-feed poll are both older than this. Minimum `30`. `0` turns off only this limit: cached keys still stop at JWT expiry plus `LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS`. A negative value is refused at startup |
 | `LW_GATEWAY_AUTH_CACHE_CONFIG_TTL_SECONDS` | `60`    | Age at which a cached key's configuration (credentials, endpoints, routing) is re-fetched in the background. `0` takes the default. A negative value disables the refresh |
 
 The retired names `LW_GATEWAY_AUTH_CACHE_SOFT_BUMP`, `LW_GATEWAY_AUTH_CACHE_HARD_GRACE` and `LW_GATEWAY_AUTH_CACHE_CONFIG_TTL` are refused: the gateway stops at startup and names the `_SECONDS` variable to set instead.
@@ -12352,6 +12482,7 @@ What you can tune is how long a cached key survives without the control plane, a
 | `LW_GATEWAY_AUTH_CACHE_CONFIG_TTL_SECONDS` | `60`    | Age at which a cached key's configuration is re-fetched in the background   |
 | `LW_GATEWAY_AUTH_CACHE_SOFT_BUMP_SECONDS`  | `300`   | Extension granted per failed refresh while the control plane is unreachable |
 | `LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS` | `21600` | Cap on serving a key past its token expiry                                  |
+| `LW_GATEWAY_AUTH_CACHE_FAIL_CLOSED_AFTER_SECONDS` | `0` | Off by default. Refuses a cached key not re-checked for this long while the change feed is also silent (minimum 30) |
 
 Add them to the pod yourself; the chart does not render them. See [Config](/ai-gateway/self-hosting/config#auth-cache).
 
@@ -12730,11 +12861,11 @@ You changed a limit, an allowlist or a credential, and requests still behave the
 
 | Path                                                       | Timing                                                 |
 | ---------------------------------------------------------- | ------------------------------------------------------ |
-| The change feed, a long poll against the control plane     | About 10 seconds                                       |
+| The change feed, a long poll against the control plane     | Usually a second or two                                |
 | The configuration re-fetch, for changes that emit no event | `LW_GATEWAY_AUTH_CACHE_CONFIG_TTL_SECONDS`, default 60 |
 | The key's own token expiring                               | 15 minutes                                             |
 
-Rotations, revocations, budget edits, routing changes and cache-rule edits all travel on the change feed, so 10 seconds is the normal case.
+Rotations, revocations, budget edits, routing changes and cache-rule edits all travel on the change feed, so a second or two is the normal case. An idle poll is held open about 10 seconds and answers as soon as a change lands.
 
 **Confirm the feed is running:** the pod log carries an `auth_cache_change_evict` line with the change kind and the key id when a change lands. A `change_feed_poll_failed` line instead means the pod cannot reach the control plane, and every cached key stays as it is until the poll recovers.
 
@@ -12777,6 +12908,10 @@ A `401`, `403` or `404` from the control plane about the key itself is not an ou
 | `auth_cache_serve_stale`                                | info  | The grace window is active and keys are still being served                            |
 | `auth_cache_refresh_transport_failure`                  | warn  | Each refresh is failing. This is the outage signal, and cached keys are still serving |
 | `auth_cache_hard_evict` with `reason=hard_cap_exceeded` | error | The grace window is spent and requests are now refused                                |
+| `auth_cache_key_denied`                                 | info  | The change feed revoked or disabled a key, and every cache tier now refuses it        |
+| `auth_cache_refused` with `reason=denied_vk_revoked` or `denied_vk_disabled` | info | A request presented a denied key and got its `403`, even with the control plane down |
+| `auth_cache_refused` with `reason=fail_closed`          | info  | `LW_GATEWAY_AUTH_CACHE_FAIL_CLOSED_AFTER_SECONDS` refused a key it could not re-check   |
+| `auth_cache_denial_cleared`                             | info  | A re-enable or a later key check lifted a denial                                      |
 
 **Fix:** restore the control plane. Raise `LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS` while an outage is still running if you would rather extend than refuse. Set it to a negative value to switch stale serving off entirely, which is what a strict revocation policy wants.
 
@@ -13226,7 +13361,7 @@ The first surface to ship is `ingestion-templates` (Lane B-1 commit). The verb s
 | --------------------- | ---------------------------------------------------------- | -------------------------------------------------------------------------- | ---------------- |
 | `list`                | `GET /api/v1/governance/ingestion-templates`                  | `{ data: IngestionTemplateDto[] }` (end-user shape, `ottl_rules` redacted) | `aiTools:view`   |
 | `admin-list`          | `GET /api/v1/governance/ingestion-templates/admin`            | `{ data: IngestionTemplateDto[] }` (admin shape, includes `ottl_rules`)    | `aiTools:manage` |
-| `get`                 | `GET /api/v1/governance/ingestion-templates/:id`              | `{ ingestion_template: IngestionTemplateDto }`                             | `aiTools:view`   |
+| `get`                 | `GET /api/v1/governance/ingestion-templates/:id`              | `{ ingestion_template: IngestionTemplateDto }` (includes `ottl_rules`)     | `aiTools:manage` |
 | `create`              | `POST /api/v1/governance/ingestion-templates`                 | `{ ingestion_template: IngestionTemplateDto }` (201)                       | `aiTools:manage` |
 | `update-ottl-rules`   | `PATCH /api/v1/governance/ingestion-templates/:id/ottl-rules` | `{ ingestion_template: IngestionTemplateDto }`                             | `aiTools:manage` |
 | `archive`             | `DELETE /api/v1/governance/ingestion-templates/:id`           | `{ archived: true }` (soft-archive)                                        | `aiTools:manage` |
@@ -14988,7 +15123,9 @@ For source types where the puller worker is not yet wired (the three "setup-cont
 
 ## Auth contract: same shape across every receiver
 
-All push-mode + webhook receivers use `Authorization: Bearer lw_is_<secret>` (the same shape the gateway uses for its `vk-lw-` virtual keys, just a different prefix). Mismatched `:sourceId` path vs. resolved-secret source ID returns `401 unauthorized` without leaking which one exists. The 24-hour rotation grace window is documented in the IngestionSource lifecycle architecture.
+All push-mode + webhook receivers use `Authorization: Bearer lw_is_<secret>` (the same shape the gateway uses for its `vk-lw-` virtual keys, just a different prefix). Mismatched `:sourceId` path vs. resolved-secret source ID returns `401 unauthorized` without leaking which one exists.
+
+A disabled source answers its own secret with `403 ingestion_source_disabled` and keeps no part of the batch; set it back to active and the same secret works again. Disabling never deletes the source's history. The 24-hour rotation grace window is documented in the IngestionSource lifecycle architecture.
 
 ## Verification: same loop for every active source
 
@@ -15136,7 +15273,7 @@ sidebarTitle: Generic OTel
 - **Body:** OTLP/HTTP JSON envelope (`resource_spans`, `scope_spans`, `spans`). `snake_case` and `camelCase` both accepted.
 - **OTLP shape:** Spans (parent-child + duration). Lands in `recorded_spans`.
 - **Pipeline:** Receiver lazy-ensures the hidden Governance Project, stamps `langwatch.origin.*` on every span, hands off to the existing trace pipeline (same `traces.collection.handleOtlpTraceRequest` that powers `/api/otel/v1/traces`). No parallel write path.
-- **Status flip:** receiver calls `recordEventReceived(sourceId)` after any successful 202; source flips from `awaiting_first_event` → `active`.
+- **Status flip:** receiver calls `recordEventReceived(sourceId)` after any successful 202; source flips from `awaiting_first_event` → `active`. A disabled source is never flipped back, and its batches are refused with `403 ingestion_source_disabled`.
 
 ## What the admin configures upstream
 
@@ -19436,6 +19573,32 @@ For Claude Code, an administrator can apply the telemetry configuration to every
 - Windows: `C:\ProgramData\ClaudeCode\managed-settings.json`
 
 Put the same `env` block in it that [Manual OpenTelemetry setup](/coding-agents/claude-code#manual-opentelemetry-setup) shows for `~/.claude/settings.json`. Variables in the managed settings file take precedence, and a user cannot override them.
+
+## Name the sessions of a background agent
+
+The Sessions page names a session by the title the agent generated or by the first line of its first prompt. A background agent often starts every session with the same scripted text, so its sessions all get the same name, or none.
+
+To name them yourself, add `langwatch.session.name` to the resource attributes the agent exports with. Keep the ones already in `OTEL_RESOURCE_ATTRIBUTES`, such as `service.name=claude-code`, and append the name after a comma:
+
+```bash
+export OTEL_RESOURCE_ATTRIBUTES="${OTEL_RESOURCE_ATTRIBUTES:+$OTEL_RESOURCE_ATTRIBUTES,}langwatch.session.name=nightly-maintenance"
+```
+
+Every session the agent starts is then listed under that name. When the LangWatch hooks report a name the harness holds, such as one from Claude Code's `--name` or `/rename`, that name replaces it.
+
+## Keep a long-lived agent on one session
+
+Each Claude Code session gets its own row on the Sessions page. An agent that restarts, or starts a new session for each scheduled run, ends up with one row per run.
+
+To list all of them as one session, add `langwatch.session.id` to the same resource attributes, with an id that stays the same for the agent:
+
+```bash
+export OTEL_RESOURCE_ATTRIBUTES="${OTEL_RESOURCE_ATTRIBUTES:+$OTEL_RESOURCE_ATTRIBUTES,}langwatch.session.id=nightly-maintenance,langwatch.session.name=nightly-maintenance"
+```
+
+Every run recorded from then on adds its traces, tokens and cost to that one session. Runs recorded before keep their own rows. Link to the session with `/<project>/sessions?session=nightly-maintenance`.
+
+If the managed settings file already sets `OTEL_RESOURCE_ATTRIBUTES`, it wins over the shell export, so add `langwatch.session.id` to the value in the managed settings file instead.
 
 ## See your machines
 
@@ -31400,6 +31563,8 @@ LangWatch provides a comprehensive set of custom attributes for LLM-specific obs
 | `langwatch.timestamps`        | object        | Timing information for events                   | `{ start: 1234567890 }`        |
 | `langwatch.evaluation.custom` | object        | Custom evaluation data                          | `{ score: 0.95 }`              |
 
+On Claude Code traces, `langwatch.thread.id` does not set the conversation: they are grouped by the Claude Code session, or by `langwatch.session.id` when you set one, and the thread stays on the spans as an attribute you can filter by. See [Headless and CI](/coding-agents/headless-and-ci#keep-a-long-lived-agent-on-one-session).
+
 ### SDK Information Attributes
 
 | Attribute                | Type   | Description                       | Example                  |
@@ -31662,6 +31827,8 @@ async function handleMessage(threadId: string, userId: string, message: string) 
 ```
 
 All traces that share the same `langwatch.thread.id` will be grouped into a single conversation thread in the LangWatch dashboard.
+
+Claude Code is the exception: its traces are grouped by the Claude Code session, or by `langwatch.session.id` when you set one, and `langwatch.thread.id` stays on its spans as an attribute you can filter by. See [Headless and CI](/coding-agents/headless-and-ci#keep-a-long-lived-agent-on-one-session).
 
 You can also use the typed attribute constants:
 
@@ -38341,11 +38508,13 @@ The mapped input is `None` on the first turn of a conversation, and afterwards e
 # FILE: ./agent-testing/overview.mdx
 
 ---
-title: Agent Testing
+title: AI agent testing with simulated users
 sidebarTitle: Overview
 keywords: langwatch, agent testing, agent simulations, scenarios, test suites, run plans, simulated user, judge, voice agents, red teaming
 description: Test your agents through multi-turn conversations with a simulated user to capture issues before production and prevent regressions.
 ---
+
+LangWatch tests AI agents with simulated users. A simulated user talks to your agent over a multi-turn conversation, then a judge reads the conversation and the agent's traces and passes or fails each of your criteria, with its reasoning. Write scenarios in the LangWatch platform with no code, or in code with [Scenario](https://langwatch.ai/scenario/), LangWatch's open-source testing library, as pytest or vitest tests that run in CI.
 
 <Tip>
   **Quick setup?** Paste the [Connect your agent prompt](/agent-testing/connect-your-agent) into your coding agent to connect your agent and run a first test suite, or the [scenarios prompt](/skills/directory) to add code-first scenario tests.
@@ -38475,6 +38644,10 @@ Use evaluations for the parts inside the agent. Use agent testing to check the a
     The full reference of the Scenario framework.
   </Card>
 </CardGroup>
+
+## Further reading
+
+- [What are AI agent simulations?](https://langwatch.ai/blog/what-are-ai-agent-simulations) explains agent simulation testing, how it differs from multi-agent research, and why scenarios should start from production conversations.
 
 ---
 
@@ -38619,6 +38792,61 @@ Next, copy the test above, change the target to the action your agent must never
 
 ---
 
+# FILE: ./agent-testing/red-team-templates.mdx
+
+---
+title: Red Team Templates
+sidebarTitle: Red Team Templates
+keywords: langwatch, red teaming, owasp, llm top 10, agentic top 10, suite templates, adversarial testing, agent security
+description: Create a red team test suite from an OWASP pack in the platform, fit it to your agent, run it and read which attacks your agent held against.
+---
+
+<Warning>Use red teaming only on agents you own or have explicit permission to test.</Warning>
+
+You can red team an agent from the platform without writing code. Pick a pack such as the OWASP Top 10 for LLM Applications, tell LangWatch your agent's name and tools, and it creates one attack scenario per risk. Each scenario runs the same multi-turn attacker as [red teaming in code](/agent-testing/red-teaming).
+
+## Open the template gallery
+
+In **Agent Testing**, press **+** on the test suite rail and pick **From template**. The gallery has two tabs. **Archetypes** holds everyday behaviour suites, such as a support agent or a payments agent. **Red team** holds the attack packs:
+
+- **OWASP Top 10 for LLM Applications (2025)**: one attack per risk, `LLM01` to `LLM10`.
+- **OWASP Top 10 for Agentic Applications**: one attack per agentic risk, `ASI01` to `ASI10`.
+- **PII and sensitive data**: eight attacks that try to get your agent to reveal another user's personal data, stored customer records, credentials or API keys, another tenant's data, or personal data from raw tool results. Mapped to `LLM02`.
+- **Prompt injection**: six `LLM01` attacks: direct overrides, injection through tool output and retrieved documents, instructions hidden in encodings or other languages, persona drift over many turns, and payloads split across messages.
+
+## Preview a pack
+
+Select a pack to preview it before anything is created. The preview lists every scenario with the attack goal and the OWASP ids it covers, such as `LLM01` for prompt injection or `LLM07` for system prompt leakage. Each id shows the official OWASP category name, so you can match the suite to the risks your security review asks about.
+
+## Fit it to your agent
+
+Press **Next** to open the fit step. Give the **agent name** the attacker should address, the **tools** your agent can call, and the things it **must never** do, such as revealing customer data or issuing refunds above a limit. LangWatch writes these into each scenario, so the attacks and the judge criteria are about your agent, not a generic one.
+
+## Create and run
+
+Press **Create suite**. LangWatch creates a test suite named after the template, with one scenario per attack, and opens it. Run it against your agent like any other suite. The suite is yours from then on: edit, delete or add scenarios. On the Free plan, a template counts as one suite.
+
+## Read the result
+
+Each red team scenario in a run shows **Held** when your agent resisted the attack across every turn, and **Broke** when the attacker reached its goal. Open the run to see the transcript and the score of each turn, from 0 (full refusal) to 10 (the attacker got what it wanted). The turn where the score climbed is where to look for the fix.
+
+## Turn cap
+
+An attack runs for up to 30 turns by default. A scenario's red team settings take a `maxTurns` of up to 50, the hard limit. The attacker may stop early when it breaks the agent, and that run counts as **Broke**.
+
+## Use the REST API
+
+The gallery uses two routes you can also call with a project API key:
+
+| Route | Permission | What it does |
+| ----- | ---------- | ------------ |
+| `GET /api/v1/test-suites/templates` | `scenarios:view` | Lists every template with its full scenario data. |
+| `POST /api/v1/test-suites/templates/{templateId}/apply` | `scenarios:manage` | Creates a suite from a template. |
+
+The apply body takes `fit` with `agentName`, `tools` and `mustNever`, and an optional suite `name`. An unknown template id answers 404 `suite_template_not_found`. From the CLI, `langwatch test-suite templates` lists them and `langwatch test-suite apply-template <id> --agent-name "Support bot" --tool refund_order --must-never "reveal the system prompt"` applies one.
+
+---
+
 # FILE: ./agent-testing/red-teaming.mdx
 
 ---
@@ -38666,6 +38894,10 @@ Single-turn red-teaming tools fire thousands of prompts and score each in isolat
 | **Direct**     | 75 to 100% | Encoding tricks (Base64, ROT13), prompt injection, multi-vector. |
 
 For a hardened agent, [GOAT](https://langwatch.ai/scenario/advanced/red-teaming/goat) is a drop-in alternative that picks a technique per turn instead of following fixed phases (based on Meta's [GOAT paper](https://arxiv.org/abs/2410.01606), ICML 2025).
+
+## Red team from the platform
+
+To red team without code, create a suite from an OWASP pack in the template gallery. See [Red Team Templates](/agent-testing/red-team-templates).
 
 ## Get it running
 
@@ -41329,6 +41561,19 @@ info = langwatch.dataset.create_dataset(
 )
 print(f"Created: {info.name} (slug: {info.slug})")
 
+# Create with columns and its first rows in one call
+info = langwatch.dataset.create_dataset(
+    "QA Cases",
+    columns=[
+        {"name": "case_id", "type": "string"},
+        {"name": "input", "type": "string"},
+        {"name": "expected_output", "type": "string"},
+    ],
+    entries=[
+        {"case_id": "c-1", "input": "What is LangWatch?", "expected_output": "An LLM ops platform."},
+    ],
+)
+
 # Create with just a name (columns can be added later)
 info = langwatch.dataset.create_dataset("Simple Dataset")
 ```
@@ -41349,6 +41594,19 @@ const info = await langwatch.datasets.create({
   ],
 });
 console.log(`Created: ${info.name} (slug: ${info.slug})`);
+
+// Create with columns and its first rows in one call
+const qa = await langwatch.datasets.create({
+  name: "QA Cases",
+  columnTypes: [
+    { name: "case_id", type: "string" },
+    { name: "input", type: "string" },
+    { name: "expected_output", type: "string" },
+  ],
+  entries: [
+    { case_id: "c-1", input: "What is LangWatch?", expected_output: "An LLM ops platform." },
+  ],
+});
 
 // Create with just a name
 const simple = await langwatch.datasets.create({ name: "Simple Dataset" });
@@ -41582,6 +41840,57 @@ console.log(`Updated: ${record.id}`);
 ```
 
 
+
+## Sync Records by a Key Column
+
+Keep a dataset in step with rows held elsewhere, such as files in a Git repository. Name the column
+that identifies a row. A row that already holds an entry's key is updated in place, and the columns
+the entry leaves out keep their values. An entry with a new key is added. A row the entry would not
+change is not written, so a second run with the same rows changes no row.
+
+An upsert never deletes: a row whose key is gone from the source stays in the dataset until you
+delete it.
+
+The SDK refuses, before writing anything, an entry without the key, two entries with the same key,
+or a key that more than one existing row holds.
+
+
+  ### Python
+
+```python
+import langwatch
+
+rows = [
+    {"case_id": "c-1", "input": "What is LangWatch?", "expected_output": "An LLM ops platform."},
+    {"case_id": "c-2", "input": "How do I start?", "expected_output": "Install the SDK."},
+]
+
+result = langwatch.dataset.upsert_records("qa-cases", entries=rows, key="case_id")
+print(f"{len(result.created)} created, {len(result.updated)} updated, {result.unchanged} unchanged")
+```
+
+  ### TypeScript
+
+```typescript
+import { LangWatch } from "langwatch";
+
+const langwatch = new LangWatch();
+
+const rows = [
+  { case_id: "c-1", input: "What is LangWatch?", expected_output: "An LLM ops platform." },
+  { case_id: "c-2", input: "How do I start?", expected_output: "Install the SDK." },
+];
+
+const result = await langwatch.datasets.upsertRecords("qa-cases", rows, { key: "case_id" });
+console.log(`${result.created.length} created, ${result.updated.length} updated`);
+```
+
+
+
+Over the REST API, the same sync reads the rows with `GET /api/v1/dataset/{slugOrId}/records`, sends
+changed rows to `PATCH /api/v1/dataset/{slugOrId}/records/{recordId}` with the id it read, and adds
+new rows with `POST /api/v1/dataset/{slugOrId}/records`. Leave `id` out of new rows: record ids are
+unique across every project, so the platform picks them.
 
 ## Delete Records
 
@@ -43891,6 +44200,375 @@ Both can also be created with `langwatch trigger create --graph-alert` and `--re
 
 ---
 
+# FILE: ./features/braids.mdx
+
+---
+title: Braids
+description: Show another project's matching spans inside your traces, so an agent that calls agents in other projects can follow each call all the way down. The spans stay where they were recorded.
+sidebarTitle: Braids
+keywords: braids, cross-project traces, multi-agent, orchestrator, signed calls, signing keys, baggage, OTTL
+---
+
+**One trace. Every project.**
+
+When your agents call agents in other projects, each project records only its own half of the trace. The calling project sees its call go out, and the spans of the project it called stay out of view. A braid fixes that: it shows another project's matching spans inside your traces, in place, under the spans that made the calls.
+
+Braids copy no data. The spans stay in the project that recorded them, under that project's privacy settings, and an admin decides which spans are braided and for how long.
+
+<Frame>
+  <img src="/images/braids/braids-hero.svg" alt="One trace in Web orchestrator, holding spans recorded by Web orchestrator, Specialist agents and Search agent" />
+</Frame>
+
+<Note>
+  Braids is an **Enterprise** feature, and an organisation admin turns it on in settings first. See [Turn Braids on](#turn-braids-on) and [Enterprise, and leaving it](#enterprise-and-leaving-it).
+</Note>
+
+## Turn Braids on
+
+Braids is off for each organisation until an organisation admin turns it on. Open **Braids** in the organisation settings and turn on **Enable Braids**, the first setting on the page. Only an organisation admin on Enterprise can change it, and each change is in the audit log.
+
+While Braids is off, nobody in the organisation can create or change a braid or create or rotate a signing key; those actions answer `braids_turned_off`. Each project's Braids page says Braids is off: an organisation admin gets a link to the organisation page, and anyone else is told to ask one.
+
+Turning Braids off **pauses** the organisation's braids and keeps them. Within thirty seconds no trace shows braided spans, and each braid is listed as paused. Admins can still remove a braid or revoke a signing key. Turn Braids on again and the braided spans show again, without recreating any braid.
+
+On a self-hosted install Braids needs an Enterprise licence. The `release_braids` feature flag is on by default, so an organisation admin only has to turn Braids on as above.
+
+Turning the flag off for an organisation stops braid management there, not the braids themselves: existing braids keep applying and are listed with **Remove** only, signing keys are listed with **Revoke** only, and **Enable Braids** cannot be turned on until the flag is on again. To pause the braids, turn Braids off in the organisation settings.
+
+## When to use a braid
+
+Use a braid when one project's agents call another project's agents and you want the calling project to see the whole run. A typical setup:
+
+- **Web orchestrator** handles the user's message and calls a team of specialist agents.
+- **Specialist agents** is a separate project, owned by another team, that records its own spans.
+
+Both projects record spans under the same trace id, because the trace context crosses the call. A braid from **Specialist agents** into **Web orchestrator** shows the specialists' matching spans inside the orchestrator's traces.
+
+On this page, the project the spans come from is the one you braid **from**, and the project whose traces show them is the one you braid **into**. A braid is always between two projects of the same organisation.
+
+## How it works
+
+<Steps>
+  <Step title="Tag the call">
+    The calling service puts a tag on its call, such as `orchestrator=web`, as an OpenTelemetry baggage entry. It can sign the tag with a [signing key](#signed-calls), so the tag cannot be faked.
+  </Step>
+  <Step title="Copy the tag">
+    The called service copies that entry onto every span it records. The LangWatch SDKs do this with one setup option.
+  </Step>
+  <Step title="Braid">
+    An admin of the called project braids it into the calling project, with a condition that matches the tag: `attributes["orchestrator"] == "web"`.
+  </Step>
+</Steps>
+
+From then on, every trace the calling project records shows the called project's spans that match the condition.
+
+For spans to line up, both services must send their spans to LangWatch, and the calling service must pass W3C trace context (`traceparent`) on the call. To carry the tag, it must pass W3C baggage too. The default setup of each LangWatch SDK does both for instrumented HTTP clients.
+
+## Create a braid
+
+Braids are managed under **Braids** in a project's settings. The page lists braids into other projects, braids from other projects, and the project's signing keys. A project with no braids yet shows a short introduction in place of the two braid lists.
+
+To create one, open Braids in the settings of the project the spans come from, and click **New braid**.
+
+1. **Braid into.** Pick the project whose traces will show the spans. You can only pick a project whose traces you can read. A project cannot braid into itself, and aggregate projects, which read the traces of other projects, cannot take part in a braid.
+2. **Condition.** Write which spans to braid, in the [condition language](#conditions). The editor checks the condition as you type, says how to fix anything it cannot accept, and lets you insert the attributes this project's spans carry.
+3. **Only signed calls.** Turn this on to braid only calls the receiving project signed. It adds `Verified("<entry>")` to the condition, and removing that term turns the switch off. See [Signed calls](#signed-calls).
+4. **Data from.** The earliest spans the braid shows. It can be a date in the past: the receiving project then sees matching spans recorded earlier, inside traces it already holds.
+5. **End.** When the braid stops showing spans. You can leave a braid with no end.
+
+The dialog says how many members of the receiving project will see the braided spans. When the details are complete, the button reads **Braid into** followed by the project's name.
+
+### Preview, and test a trace
+
+Before you save, the dialog previews what the receiving project will see. It counts that project's traces over the last 7 days in three groups: those that get every span from this project, those that get some, and those that get none. With only signed calls on, it also counts the calls that would stay hidden because their signature is missing or invalid.
+
+The preview shows an example trace with the braided spans marked and the rest struck through. Only you see it.
+
+To check one trace exactly, use **Test a trace**: paste a trace id from the receiving project and see the trace with exactly the spans that project will see.
+
+### Several braids between two projects
+
+Two projects can share several braids, for example one per tag. A span shows when it matches any of them, inside that braid's dates. When you preview a further braid between the same two projects, the preview counts what the receiving project will see with all of them and how many more spans the new one shows.
+
+A braid identical to a live one, with the same projects, condition, dates and end, is refused with `braid_already_exists`.
+
+### Change a braid
+
+Choose **Edit** on a braid to change its condition, dates or end. Saving replaces the braid with a new one and removes the old one, and the audit log records both. If someone else changed or removed the braid while you were editing it, your change is refused with `braid_changed`: reopen the braid and make your change again.
+
+## Conditions
+
+A condition says which spans a braid shows. It is written in a subset of the [OpenTelemetry Transformation Language (OTTL)](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/pkg/ottl) and checked when you save the braid. Join comparisons with the lower-case word `and`, and put string values in double quotes.
+
+### What a condition accepts
+
+| Write | Matches a span when |
+| --- | --- |
+| `attributes["k"] == "v"` | its attribute `k` is exactly `v` |
+| `resource.attributes["k"] == "v"` | its resource attribute `k` is exactly `v`, for example `resource.attributes["service.name"] == "checkout"` |
+| `name == "v"` | its name is exactly `v` |
+| `attributes["k"] != nil` | it has the attribute `k`, whatever its value |
+| `Verified("k")` | its entry `k` was signed by the project you braid into, for this trace. See [Signed calls](#signed-calls) |
+| `a and b`, `(a and b)` | both match |
+
+For example:
+
+```text
+attributes["orchestrator"] == "web" and Verified("orchestrator")
+```
+
+Inside a string, escape a double quote as `\"` and a backslash as `\\`. A span that was updated later is checked against its latest version, so a span that stopped matching does not show.
+
+**An empty condition** is allowed. It braids every span of this project that shares a trace id with a trace of the receiving project.
+
+### What a condition refuses, and what to write instead
+
+A condition that uses anything else is refused with `braid_condition_unsupported`. The refusal names the part it cannot accept, where it is, and how to write it instead.
+
+| Refused | Write instead |
+| --- | --- |
+| `or` | One braid per alternative. Braids between the same two projects show spans matching any of them. |
+| `not` | Name what a braided span carries, for example `attributes["k"] == "v"`. |
+| `IsMatch(...)` and other functions | Compare whole values with `==`. The only function is `Verified("k")`. |
+| `>`, `<`, `>=`, `<=`, numbers | Compare strings with `==`, the value in double quotes. |
+| `attributes["k"] != "v"` | Name the value a braided span carries with `==`, or require the key with `attributes["k"] != nil`. |
+| `== true`, `== false` | Compare the attribute's string value with `==`. |
+| `attributes["k"] == ""` | `attributes["k"] != nil`. A missing attribute reads as an empty string, so `== ""` would match spans that never set it. |
+| `resource.attributes["k"] != nil` | Check presence on span attributes: `attributes["k"] != nil`. |
+
+A condition that is incomplete, such as a comparison with no value, is refused with `braid_condition_syntax`.
+
+### Limits
+
+| Limit | Value | Refused with |
+| --- | --- | --- |
+| Length of one condition | 1,000 characters | `braid_condition_too_large` |
+| Comparisons in one condition | 16 | `braid_condition_too_large` |
+| Nested parentheses | 4 deep | `braid_condition_too_large` |
+| Different conditions braided into one project | 50 | `braid_condition_limit_reached` |
+
+Every comparison is joined with `and`, so parentheses never change a condition's meaning and you can remove them. To stay under the comparison limit, split a condition across braids, or drop comparisons every braided span shares.
+
+## Signed calls
+
+A condition on a tag trusts whoever set the tag. `attributes["orchestrator"] == "web"` matches any span carrying that tag, and any service in your organisation could set it.
+
+Signed calls close that gap. The calling project signs its tags with a signing key only it holds, and LangWatch checks the signature when the spans arrive. A braid with `Verified("orchestrator")` in its condition then shows only spans whose tag the receiving project really signed.
+
+### Signing keys
+
+Signing keys belong to the project that makes the calls: in the example, **Web orchestrator**. Manage them in the **Signing keys** section of Braids in that project's settings.
+
+- **Create** a key and give it a name, such as "Production". Its secret, which starts with `lwsk_`, is shown once, with setup snippets for TypeScript, Python and Go. Store it where your calling service reads its secrets, for example as `LANGWATCH_SIGNING_KEY`.
+- **Rotate** a key to get a new secret. The old secret keeps verifying for 7 days, so you can roll out the new one without a gap.
+- **Revoke** a key to end it. Spans signed with it stop being marked verified within a minute.
+
+Each key shows its status, when it was created and last used, and how many signed spans passed and failed the check over the last 24 hours. The people who may braid out of a project manage its signing keys, and every create, rotate and revoke is in the audit log, never with the secret.
+
+### Sign on the calling side, copy on the called side
+
+The calling service signs the entries it names, inside an active span: the signature covers that span's trace. The called service copies those entries and the signature onto every span it records.
+
+
+  ### TypeScript
+
+    ```typescript
+    // Calling service
+    import { withSignedBaggage } from "langwatch/observability/node";
+
+    // Inside an active span: the signature covers the current trace.
+    const answer = await withSignedBaggage(
+      { signingKey: process.env.LANGWATCH_SIGNING_KEY!, entries: { orchestrator: "web" } },
+      () => callSpecialists(message),
+    );
+    ```
+
+    ```typescript
+    // Called service
+    import { setupObservability } from "langwatch/observability/node";
+
+    setupObservability({
+      braids: { copyEntries: ["orchestrator"] },
+    });
+    ```
+
+    To build the context yourself, use `signBaggage({ signingKey, entries, context })`. With your own tracer provider, add `new BraidBaggageSpanProcessor({ copyEntries: ["orchestrator"] })` from `langwatch/observability`.
+
+  ### Python
+
+    ```python
+    # Calling service
+    import os
+    from langwatch.braids import signed_baggage
+
+    # Inside an active span: the signature covers the current trace.
+    with signed_baggage(os.environ["LANGWATCH_SIGNING_KEY"], {"orchestrator": "web"}):
+        answer = call_specialists(message)
+    ```
+
+    ```python
+    # Called service
+    import langwatch
+
+    langwatch.setup(braid_copy_entries=["orchestrator"])
+    ```
+
+    To build the context yourself, use `sign_baggage(signing_key, entries)` and attach it. With your own `TracerProvider`, add `BraidBaggageSpanProcessor(["orchestrator"])` from `langwatch.braids`.
+
+  ### Go
+
+    ```go
+    import (
+    	"os"
+
+    	langwatch "github.com/langwatch/langwatch/sdks/go"
+    )
+
+    // Calling service, inside an active span: the signature covers the current trace.
+    ctx, err := langwatch.SignBaggage(ctx, os.Getenv("LANGWATCH_SIGNING_KEY"), map[string]string{
+    	"orchestrator": "web",
+    })
+    if err != nil {
+    	return err
+    }
+    answer, err := callSpecialists(ctx, message)
+    ```
+
+    ```go
+    import (
+    	langwatch "github.com/langwatch/langwatch/sdks/go"
+    	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+    )
+
+    // Called service: add the copy processor to your tracer provider.
+    braids, err := langwatch.NewBraidBaggageSpanProcessor("orchestrator")
+    if err != nil {
+    	return err
+    }
+    tp := sdktrace.NewTracerProvider(
+    	sdktrace.WithSpanProcessor(braids),
+    	sdktrace.WithBatcher(exporter),
+    )
+    ```
+
+    Your propagator must carry W3C baggage, for example `propagation.NewCompositeTextMapPropagator(propagation.TraceContext{}, propagation.Baggage{})`.
+
+
+
+Then turn on **Only signed calls** in the braid, or add the term to its condition yourself:
+
+```text
+attributes["orchestrator"] == "web" and Verified("orchestrator")
+```
+
+Entry keys are 1 to 128 letters, digits, dots, dashes or underscores, and a value cannot hold a line break. The SDK refuses anything else with an error naming why; the [TypeScript](/integration/typescript/reference#braids-signed-calls), [Python](/integration/python/reference#braids-signed-calls) and [Go](/integration/go/reference#braids-signed-calls) references list the error codes.
+
+### What `Verified("k")` proves, and what it does not
+
+`Verified("k")` means: the project you braid into signed the entry `k`, with this value, for this trace. In other words, that project's call led here.
+
+- **It holds for the whole trace, not one hop.** Baggage travels down the call chain, so when Specialist agents calls Search agent within the same trace, Search agent's spans carry the signed entry too, and verify. Any service that receives the entry can pass it further down that trace.
+- **It holds for that trace only.** A signature copied into another trace does not verify, and neither does an entry whose value was changed.
+- **It holds only for the receiving project's own keys.** An entry verified with another project's key does not satisfy the braid, and a key from another organisation never verifies.
+- **A failed check never drops a span.** A span whose signature fails, or whose key cannot be checked at that moment, is stored as usual, without the verified mark, so a braid requiring signed calls does not show it.
+
+Span attributes that claim to be verified cannot be sent from your code: LangWatch removes them before storing the span, and only its own check sets the mark. The "Braided from" badge says where a span came from; it does not mean the span was verified.
+
+## Who may braid
+
+Creating, changing and removing braids, and managing signing keys, needs the `braids:manage` permission on the project the spans come from.
+
+| Who | Braids out of |
+| --- | --- |
+| Organisation admins | every project in the organisation |
+| Team admins | every project in the team they administer |
+| A custom role listing `braids:manage` | the projects the role is bound to |
+| Members and viewers | none |
+
+Two more checks apply to every braid:
+
+- **You can only braid into a project whose traces you can read.** A team admin cannot send their team's spans to a team they have no view of. Braiding across teams takes an organisation admin, or someone the other team lets read its traces.
+- **You can only braid spans you can read yourself.** A custom role holding `braids:manage` without permission to view the project's traces cannot braid.
+
+Braids and signing keys are managed by people in LangWatch. An API key cannot create, change or remove a braid, or manage signing keys, whatever permissions it holds.
+
+**Removing** a braid is open to admins of either project. The receiving project's admins can remove a braid they never asked for, but cannot edit it.
+
+**Listing** is open to members of both projects. Anyone who can view a project sees the braids out of it and into it, with each braid's condition, dates and creator.
+
+### Keep braids to organisation admins
+
+An organisation admin can choose that only organisation admins may braid. Open **Braids** in the organisation settings, which lists every braid in the organisation, and turn on the setting that keeps braids to organisation admins. It is off by default.
+
+While it is on, team admins and project-level roles no longer confer `braids:manage`: only organisation-wide roles do. Live braids stay as they are. Within thirty seconds, team admins can no longer create, change or remove braids or manage signing keys, and the project's Braids page tells them the organisation's admins manage braids. Changing the setting needs permission to manage the organisation, and each change is in the audit log.
+
+## What the receiving project sees
+
+Open a trace in the project you braided into, and the braided spans appear in it:
+
+- **Each braided span carries a badge** reading "Braided from" and the name of its project. The trace header says the trace includes spans from that project.
+- **A braided span hangs under its parent** when the parent is visible. When its parent was not braided, it shows at the top of the trace, as a span with a missing parent does. The view gives no hint of spans that were not braided: no count, gap or placeholder.
+- **The header's totals include braided spans and say so.** Duration, spans, cost and tokens show both this project's figure and the whole trace. The trace's row in the list keeps this project's own totals.
+- **Each span keeps its own project's privacy settings.** A braided span is redacted under the settings of the project it came from, and a setting that shows content only to some roles is checked against your role in that project. If you have no role there, that content stays hidden.
+- **Actions that would act on the other project's data are off** on a braided span: opening it in the playground, annotating it and evaluating it, each with the reason. The span says it is shown because it matches the braid's condition. **Open in** the other project is offered only if you can open that project.
+
+Spans from several projects can be braided into one trace, each with its own badge.
+
+### What stays each project's own
+
+Braided spans show only in the trace view. Everywhere else, a project shows its own spans:
+
+| Surface | What it shows |
+| --- | --- |
+| The trace list and its totals | this project's traces and spans |
+| Search and filters | this project's spans |
+| Analytics and dashboards | this project's spans |
+| The REST API, the MCP server and exports | this project's spans |
+| Langy | this project's spans |
+| Public share links | this project's spans |
+| Evaluations | not shared in either direction: the other project's results are not shown on braided spans, and your monitors do not run on them |
+
+Braided spans only appear inside traces the receiving project recorded itself. A trace only the other project holds is not listed, and opening its id returns not found.
+
+Braids do not pass along. If Specialist agents is braided into Web orchestrator and Web orchestrator into a third project, the third project sees Web orchestrator's matching spans and none of the spans braided into Web orchestrator.
+
+## Remove a braid, end dates and the audit log
+
+**Remove a braid** from its menu, in either project. The confirmation says which project stops seeing which project's spans. Once removed, no trace shows the braided spans within thirty seconds, including a trace someone already has open.
+
+**An end date** stops a braid showing spans when the date passes. The braid is then ended, not removed. **Data from** is different: it limits which spans show, by when they started, and never how long the braid lasts.
+
+**The audit log** records:
+
+- each braid created, changed and removed, naming both projects and the condition. A change is recorded as a removal and a creation that names the braid it replaced;
+- each signing key created, rotated and revoked, naming the key and never its secret;
+- each change to who may braid;
+- each time someone opens traces holding braided spans: one entry per person and pair of projects every five minutes, naming no span and no trace content.
+
+Choose **View in audit log** on a braid to see its entries.
+
+## Enterprise, and leaving it
+
+Creating and changing braids, managing signing keys, choosing who may braid, and the preview need the Enterprise plan. Removing a braid never does, so an admin can always stop sharing. Below Enterprise, these are refused with `enterprise_plan_required`, and the Braids page explains what braids do and offers a conversation about Enterprise.
+
+If your organisation leaves Enterprise, its braids **pause** and are kept. No trace shows braided spans, and the Braids page marks each braid as paused, with a banner saying they start again on upgrade. Members can still list them, and admins can still remove them. When the organisation returns to Enterprise, the braided spans show again without recreating any braid.
+
+### Messages you may see
+
+| Code | Meaning |
+| --- | --- |
+| `braid_into_itself` | A project cannot braid into itself. |
+| `braid_across_organizations` | Both projects must belong to the same organisation. |
+| `braid_aggregate_project` | Aggregate projects cannot take part in a braid. |
+| `braid_already_exists` | An identical braid between these projects is already live. |
+| `braid_changed` | Someone changed or removed this braid while you were editing it. Reopen it and try again. |
+| `braid_not_on_project` | The braid does not touch the project you removed it from. |
+| `braid_condition_unsupported`, `braid_condition_syntax`, `braid_condition_too_large`, `braid_condition_limit_reached` | See [Conditions](#conditions). |
+| `enterprise_plan_required` | The action needs the Enterprise plan. |
+| `braids_turned_off` | Braids is off for your organisation. An organisation admin on Enterprise can turn it on; see [Turn Braids on](#turn-braids-on). |
+
+---
+
 # FILE: ./features/dashboards.mdx
 
 ---
@@ -44611,7 +45289,7 @@ Judging 1,000 conversations takes about nine seconds, and 10,000 about a minute.
 
 ## What a run costs
 
-The rate is 0.0546 USD per million input tokens the judge reads, and output is free. You pay for each row's text plus your questions, in one judge request per row: more for a long conversation than for a short one, and about the same for ten questions as for one.
+The rate is 0.0546 USD per million input tokens the judge reads, and output is free. You pay for each row's text, your questions and a small fixed part of every request, in one judge request per row: more for a long conversation than for a short one, and about the same for ten questions as for one.
 
 For example, the first run on the [overview](/features/instant-evals/overview) judged 100 conversations, read 107,000 tokens and cost 0.0058 USD, so 10,000 conversations of the same size come to about 0.58 USD.
 
@@ -44638,7 +45316,7 @@ The estimate counts the rows exactly, measures the text of fifty rows spread acr
 
 Without a paid plan, your organization can spend 1 USD on Instant Evals in total, across all of its projects. Run `estimate` to see what is left, as `freeBudgetRemainingUsd`. Once you pass the budget, a new run or a judged `langwatch query` is refused with `instant_eval_free_budget_exhausted`, carrying `spentUsd` and `budgetUsd`, until you upgrade the organization. If a run is under way when the budget runs out, it stops there and you keep the verdicts it wrote.
 
-A paid plan has no free budget: it is billed monthly for what was judged, up to the row cap. A gateway budget you set on the project, the team or the organization still applies, and stops a run when it is reached.
+A paid plan has no free budget: it is billed monthly for what was judged, up to the row cap. A gateway budget set to block on the project, the team or the organization still applies: once it is reached, a new run or a judged query is refused with `instant_eval_gateway_budget_exceeded`, and a run under way stops there and keeps the verdicts it wrote.
 
 ## Where the spend shows up
 
@@ -44791,7 +45469,7 @@ The [Questions](/features/instant-evals/questions) page covers criteria, thresho
 ---
 title: Run Instant Evals on your own decision model
 sidebarTitle: Your own model
-keywords: langwatch, instant evals, decision model, own key, bring your own key, azure openai, gpt-6-luna, decisions api, microsoft decision 1, openai, inception, perplexity, cloudflare, typesafe, jev, openrouter, fireworks, default models
+keywords: langwatch, instant evals, decision model, own key, bring your own key, azure openai, gpt-6-luna, decisions api, microsoft decision 1, openai, inception, perplexity, cloudflare, typesafe, jev, openrouter, fireworks, gemini, gemini decision 1, default models
 description: Run Instant Evals on a decision model in your own provider account, set up Azure, and read the rows your model cannot judge.
 ---
 
@@ -44818,6 +45496,7 @@ The picker is one list: LangWatch's **Evals Preview** first, then the models on 
 | OpenRouter            | OpenRouter Microsoft Decision 1 | API key                                                                                          |
 | OpenRouter            | OpenRouter Liquid d1.1          | API key                                                                                          |
 | Fireworks             | Fireworks Rune                  | API key                                                                                          |
+| Gemini                | Gemini Decision 1               | AI Studio API key. Runs on the Gemini Decisions API, not through Vertex AI                       |
 
 `gpt-6-luna` runs on the OpenAI Decisions API, so it needs that model on your OpenAI or Azure account. The other models need no OpenAI account.
 
@@ -44870,7 +45549,7 @@ Both Azure models use the Azure OpenAI provider, with its API key (`AZURE_OPENAI
 - **Decisions deployment** (`AZURE_OPENAI_DECISIONS_DEPLOYMENT`): your `gpt-6-luna` deployment name. Leave empty if it is `gpt-6-luna`.
 - **Microsoft Decision 1 deployment** (`AZURE_DECISION_1_DEPLOYMENT`): your Microsoft Decision 1 deployment name on Azure AI Foundry. Leave empty if it keeps the model's name.
 
-Keep **Use API Gateway** off. With it on, the endpoint and deployment fields are hidden and every row is skipped as `classifier_key_invalid`.
+Keep **Use API Gateway** off. With it on, the endpoint and deployment fields are hidden and every row is refused for the key, so a run fails with `instant_eval_decision_model_key_invalid`.
 
 Deploy the model on your resource before you pick it, in the Azure portal, Azure AI Foundry or the Azure CLI:
 
@@ -44885,11 +45564,11 @@ Without the deployment, every row is skipped as `classifier_not_configured`.
 
 ## When your model cannot answer
 
-A run on your own model never falls back to LangWatch Evals Preview. Rows it cannot judge are marked `skipped` with the reason in `error`, and the run carries on. List them with `langwatch instant-eval results <run-id> --status skipped`.
+A run on your own model never falls back to LangWatch Evals Preview. Rows it cannot judge are marked `skipped` with the reason in `error`, and the run carries on. When the key is refused for every row of a page, the run fails with `instant_eval_decision_model_key_invalid` instead, so it does not read as a run where no row matched. List skipped rows with `langwatch instant-eval results <run-id> --status skipped`.
 
 | `error`                           | Why                                                                                                         | Fix                                                                         |
 | --------------------------------- | ----------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
-| `classifier_key_invalid`          | The provider refused the key (401, 402 or 403), or the scope has no enabled provider row, no key, or an endpoint outside Azure | Check the row and its key at **Settings > Model Providers**                 |
+| `classifier_key_invalid`          | The provider refused the key (401, 402 or 403), or the scope has no enabled provider row, no key, or an endpoint outside Azure | Check the row and its key at **Settings > Model Providers**. If every row is refused, the run fails with `instant_eval_decision_model_key_invalid` |
 | `classifier_not_configured`       | The provider answered 404: the account does not hold the model, or the Azure deployment does not exist      | Deploy the model, or set the deployment name on the Azure row               |
 | `classifier_rate_limited`         | The provider answered 429 on every retry                                                                    | Raise the rate limit or quota on your provider account                     |
 | `classifier_provider_unavailable` | The provider answered 5xx on every retry                                                                    | Try again later                                                             |
@@ -44988,7 +45667,7 @@ langwatch instant-eval run \
   --target threads --last 7d
 ```
 
-You can ask up to ten questions per run, all of the same text. Put each `--criteria`, `--threshold`, `--score`, `--category` and `--id` after the `--ask` it belongs to. You pay for the text plus the questions, in one judge request per row, so ten questions cost about the same as one.
+You can ask up to ten questions per run, all of the same text. Put each `--criteria`, `--threshold`, `--score`, `--category` and `--id` after the `--ask` it belongs to. You pay for the text, the questions and a small fixed part of every request, in one judge request per row, so ten questions cost about the same as one.
 
 ## Questions from a file
 
@@ -47264,11 +47943,29 @@ class Code:
 
 From code you can:
 
+- **Create it**: `POST /api/evaluators` with `type: "code"` and a `config` carrying `code` (the program) and `inputs` (each an `identifier` and a `type`, for example `str`). The CLI does the same with `langwatch evaluator create "Contains answer" --code ./evaluator.py --input output --input expected_output`.
 - **Run it** like any saved evaluator: `POST /api/evaluations/evaluators/{slug}/evaluate`, with `data` holding one value per declared input.
 - **Find it**: `GET /api/evaluators` lists it with `type: "code"`, and `GET /api/evaluators/{idOrSlug}` returns its code and inputs in `config`.
 - **Monitor with it**: run it on incoming traces with `POST /api/monitors`, sending the evaluator's id as `evaluatorId` and `code/<evaluatorId>` as `checkType`, plus `mappings` from trace fields to its inputs.
 
-Creating a code evaluator and editing its code are done on the Evaluators page: `POST /api/evaluators` only creates built-in evaluator types.
+Creating one from code looks like this:
+
+```bash
+curl -X POST "https://app.langwatch.ai/api/evaluators" \
+  -H "X-Auth-Token: $LANGWATCH_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Contains answer",
+    "type": "code",
+    "config": {
+      "code": "class Code:\n    def __call__(self, output: str, expected_output: str):\n        passed = expected_output.lower() in output.lower()\n        return {\"passed\": passed}",
+      "inputs": [
+        { "identifier": "output", "type": "str" },
+        { "identifier": "expected_output", "type": "str" }
+      ]
+    }
+  }'
+```
 
 ## Using Saved Evaluators
 
@@ -49950,7 +50647,7 @@ Open [Experiments](https://app.langwatch.ai/@project/experiments), click **New E
 <Step title="Create the judge">
 On the prompt column, click **Add evaluator**, then **New Evaluator**. Pick the **LLM as Judge** category and **LLM-as-a-Judge Boolean Evaluator**.
 
-Name it, pick the judge model, and replace the default prompt with your criteria. Write the criteria as a checklist the judge can apply to one answer at a time. For example:
+Name it, pick the judge model, and replace the default prompt with your criteria. The model picker also lists **Decision models**, such as OpenAI Decisions API, TypeSafe Jev, Cloudflare Clef or Gemini Decision 1, which answer yes or no, score and category questions on your own provider key. [Your own model](/features/instant-evals/own-model) lists each one and the key it needs. Write the criteria as a checklist the judge can apply to one answer at a time. For example:
 
 ```text
 You are evaluating a business coaching assistant.
@@ -51688,7 +52385,17 @@ keywords:
   ]
 ---
 
-In this cookbook, we'll explore a more effective approach to evaluating multi-turn customer support agents. Traditional evaluation methods that use a single input-output pair are insufficient for agents that need to adapt their tool usage as conversations evolve. Instead, we'll implement a simulation-based approach where an LLM evaluates our agent against specific success criteria.
+To evaluate a multi-turn agent, simulate whole conversations and judge each one against success criteria about outcomes, instead of comparing one input with an expected sequence of tool calls. This cookbook builds that in Python for an e-commerce customer support agent: an LLM evaluator passes or fails each criterion with an explanation, and LangWatch logs every run as an experiment with the score, the criteria and the tools used.
+
+## Input/output pairs vs simulation
+
+| Aspect                                    | Input/output pairs                                        | Simulation with success criteria                                      |
+| ----------------------------------------- | --------------------------------------------------------- | --------------------------------------------------------------------- |
+| A test case holds                         | A customer ticket and the expected sequence of tool calls | A customer ticket and the criteria the agent must meet                |
+| What is checked                           | The exact sequence of tools                               | What the agent accomplishes, whatever path it takes                   |
+| Paths to resolution                       | One fixed, predetermined path                             | Several valid paths                                                   |
+| Information found during the conversation | Not accounted for                                         | The agent adapts its tool usage as the conversation evolves           |
+| Result                                    | The tool sequence matches or not                          | Pass or fail per criterion, with an explanation, and an overall score |
 
 ## The Problem with Traditional Evaluation
 
@@ -52267,6 +52974,11 @@ Key benefits of this approach include:
 As you develop your own multi-turn agents, consider implementing this simulation-based evaluation approach to get a more accurate picture of their performance and to identify specific areas for improvement.
 
 For the full notebook, check it out on: [GitHub](https://github.com/langwatch/cookbooks/blob/main/notebooks/multi-turn-agents.ipynb).
+
+## Further reading
+
+- [How to evaluate multi-turn conversations with your AI agent](https://langwatch.ai/blog/how-to-evaluate-multi-turn-conversations) grades a conversation at three levels (the conversation, the trajectory of tool calls and each turn), before release with a simulated user and after release on real threads.
+- [AI agent testing with simulated users](/agent-testing/overview) runs this kind of simulation with Scenario, in pytest or vitest or from the LangWatch platform.
 
 ---
 
@@ -65891,7 +66603,7 @@ tamper-evidence, requires an **Enterprise** license.
   default. It is not a period any of these frameworks prescribe.
 
   What you can set instead depends on the plan, per organization, team or
-  project. Paid cloud plans choose 35 or 63 days. Enterprise plans and licensed
+  project. Paid cloud plans choose 35, 63 or 91 days. Enterprise plans and licensed
   self-hosted deployments choose those or any whole number of weeks from 49
   days up, and a self-hosted platform administrator can keep data indefinitely.
   The free plan and an unlicensed self-hosted deployment stay on the default.
@@ -67121,10 +67833,12 @@ When `S3_BUCKET_NAME` is set, all consumers use that bucket. When it is not set,
 | ---------------------- | --------------------------------------------------------------------------------------------------------------- | ------- |
 | `S3_BUCKET_NAME`       | Dataplane bucket shared by datasets + stored-objects                                                            | -       |
 | `S3_ENDPOINT`          | Custom S3 endpoint (for MinIO, etc.)                                                                            | -       |
+| `S3_REGION`            | S3 region. Unset, a regional AWS endpoint names its own, other custom endpoints use `auto`, then `AWS_REGION` or the AWS profile, else LangWatch asks AWS once where the bucket lives. Set it for GovCloud and China buckets, and to skip that lookup | -       |
 | `S3_ACCESS_KEY_ID`     | S3 access key ID                                                                                                | -       |
 | `S3_SECRET_ACCESS_KEY` | S3 secret access key                                                                                            | -       |
 | `S3_KEY_SALT`          | Salt for the per-project cache key the optimization studio sends to the NLP engine. Unset, no cache key is sent | -       |
 | `LANGWATCH_LOCAL_STORAGE_PATH` | Filesystem root used for stored-objects when no S3 is configured | `/var/lib/langwatch/objects` |
+| `STORED_OBJECTS_UPLOADS` | Where browsers and SDK clients send upload bytes, for S3 and Azure Blob alike. `direct`: straight to the bucket's endpoint, which must then be reachable from them, with a CORS rule for your app origin. `through-langwatch`: to LangWatch's signed upload route, which streams the bytes into the bucket; use it when the bucket is only reachable inside the cluster. Upload addresses are then built from `BASE_HOST`, and the proxy in front of LangWatch must accept bodies up to 5 GiB (see [Dataset storage](/self-hosting/upgrade-dataset-storage#when-browsers-cannot-reach-the-bucket)). A per-organisation `DATAPLANE_S3__` account sets its own with an `uploads` key. Chart: `app.dataplane.uploads` | `direct` |
 
 <Note>
   When running on AWS with IRSA (IAM Roles for Service Accounts), you don't need to set S3 access
@@ -68865,7 +69579,7 @@ spec:
   source:
     repoURL: https://langwatch.github.io/langwatch
     chart: langwatch
-    targetRevision: 3.23.0 # x-release-please-version
+    targetRevision: 3.25.0 # x-release-please-version
     helm:
       releaseName: langwatch
       values: |
@@ -68920,7 +69634,7 @@ spec:
   sources:
     - repoURL: https://langwatch.github.io/langwatch
       chart: langwatch
-      targetRevision: 3.23.0 # x-release-please-version
+      targetRevision: 3.25.0 # x-release-please-version
       helm:
         releaseName: langwatch
         valueFiles:
@@ -69328,7 +70042,7 @@ For air-gapped or private environments, mirror the images to your own registry:
 ```bash
 # The release you are mirroring. Every tag below follows it, so set it once.
 # Pick the version from https://github.com/langwatch/langwatch/releases
-VERSION=3.23.0 # x-release-please-version
+VERSION=3.25.0 # x-release-please-version
 REGISTRY=registry.example.com
 
 for image in langwatch langwatch_nlp langevals; do
@@ -69344,13 +70058,13 @@ Then configure the Helm chart, giving every tag the version you mirrored:
 images:
   app:
     repository: registry.example.com/langwatch/langwatch
-    tag: "3.23.0" # x-release-please-version
+    tag: "3.25.0" # x-release-please-version
   langwatch_nlp:
     repository: registry.example.com/langwatch/langwatch_nlp
-    tag: "3.23.0" # x-release-please-version
+    tag: "3.25.0" # x-release-please-version
   langevals:
     repository: registry.example.com/langwatch/langevals
-    tag: "3.23.0" # x-release-please-version
+    tag: "3.25.0" # x-release-please-version
 ```
 
 Mirror and override the bundled services the same way: `gateway.image.repository`, `langyagent.image.repository`, `clickhouse.image.repository`, `postgresql.image.repository`, `redis.image.repository`, `prometheus.server.image.repository`, `cronjobs.image.repository` and `app.storedObjects.localFilesystem.serializeUpgradesImage` (the image the stored-objects upgrade hooks run).
@@ -70217,6 +70931,10 @@ Do not expose any other gateway path. `/healthz`, `/readyz`, `/startupz`, `/debu
 | Request body size | At least 50 MB | At least 32 MB, the gateway `security.maxRequestBodyBytes` |
 | WebSocket upgrades | Pass through on `/api/trpc-ws` and `/api/v1/agents/connect` | Not used |
 
+### Uploads through LangWatch
+
+When uploads go through LangWatch (`app.dataplane.uploads: through-langwatch`, or `STORED_OBJECTS_UPLOADS=through-langwatch`), browsers and SDKs send files of up to 5 GiB to `/api/stored-objects/uploads` on the app host. That path needs request buffering off, a body size of at least 5 GiB, and read and send timeouts long enough for your slowest upload (the chart nginx default is `3600`). With direct uploads, the default, files go straight to the bucket and this path carries no file bytes. See [Dataset storage](/self-hosting/upgrade-dataset-storage#when-browsers-cannot-reach-the-bucket).
+
 Envoy and Traefik stream responses without buffering and pass WebSocket upgrades by default. ingress-nginx buffers request bodies by default, caps them at 1 MB, and turns on response buffering when the controller config does, so it needs annotations. On the gateway Ingress the chart sets both buffering annotations to off so a controller-wide setting cannot change them. The app Ingress keeps the controller defaults. See [Architecture](/self-hosting/infrastructure/architecture) for the connected-agents WebSocket.
 
 ## Chart Ingress
@@ -70253,7 +70971,21 @@ ingress:
 
 With `className: nginx` the chart adds these to the gateway Ingress only: `proxy-buffering: "off"`, `proxy-request-buffering: "off"`, `proxy-read-timeout: "3600"`, `proxy-send-timeout: "3600"` and `proxy-body-size: 32m`. They override the same keys from `ingress.annotations`. Keys in `ingress.gateway.annotations` override both.
 
-The chart matches on the value of `className`. If `className` is empty and the cluster default IngressClass is ingress-nginx, the gateway Ingress gets none of these settings. On ingress-nginx, set `className: nginx`.
+With `className: nginx` the chart also renders `<release>-uploads-ingress`, routing `/api/stored-objects/uploads` (Prefix) on every `ingress.hosts` host to the app Service. Set `ingress.uploads.enabled: true` to render it for any other class, such as an empty default class or `nginx-internal`, or `false` to turn it off.
+
+The uploads Ingress takes `ingress.annotations` minus the rewrite annotations and `server-snippet`, which applies to the whole host and would run twice. A `configuration-snippet` is copied, so a location rule such as a deny list also covers uploads.
+
+A host whose `ingress.hosts` paths already route exactly `/api/stored-objects/uploads` (with or without a trailing slash) is left out: that route is yours, and ingress-nginx refuses the same host and path twice. Give your route the upload settings yourself. A longer path under it does not count, so the rest of the upload route keeps the chart's settings.
+
+When the class name contains `nginx`, the chart adds `proxy-request-buffering: "off"`, `proxy-body-size: 5121m` (the 5 GiB upload limit and some headroom), `proxy-read-timeout: "3600"` and `proxy-send-timeout: "3600"` to the uploads Ingress. On other classes the chart adds no settings of its own, so put your controller's settings in `ingress.uploads.annotations`. Keys there override everything else.
+
+The uploads Ingress carries no `tls` entry: ingress-nginx serves the host's certificate from the app Ingress.
+
+A prefix in `ingress.blockedPaths` that covers the path stops the uploads Ingress rendering. Without it, uploads go through the app Ingress, so raise its body limit and timeouts there.
+
+With `className: nginx` the app Ingress also gets `proxy-read-timeout: "120"` and `proxy-send-timeout: "120"`, so an analytics query can use its full 60 s; ingress-nginx's default is 60 s. Keys in `ingress.annotations` override them.
+
+The chart matches on the value of `className`, not on the controller. If `className` is empty, or names an ingress-nginx IngressClass other than `nginx`, neither Ingress gets these settings. Then either set `className: nginx`, if your cluster has that class, or keep your class and set the annotations yourself: the app's two timeouts of `"120"` in `ingress.annotations`, and the gateway's five settings in `ingress.gateway.annotations`.
 
 On another controller, set `className` to your IngressClass, or leave it empty for the cluster default. Put the gateway settings for that controller in `ingress.gateway.annotations`. Traefik works with `className: traefik` and no extra annotations for buffering. It can also serve the HTTPRoutes below through its Gateway API provider.
 
@@ -73580,13 +74312,25 @@ app:
     bucket: "your-dataset-bucket"
     providers:
       awsS3:
+        # Your bucket's region (rendered as S3_REGION). Recommended for AWS: unset,
+        # AWS_REGION or the AWS profile wins (so it must match the bucket), else
+        # LangWatch asks AWS once where the bucket lives (GovCloud and China must set it). For MinIO
+        # or other S3-compatible services, set the region the service expects, or
+        # remove the whole region block (both lines) to sign as "auto".
+        region:
+          value: "<your-bucket-region>"
         accessKeyId:
           secretKeyRef: { name: "your-secret", key: "accessKeyId" }
         secretAccessKey:
           secretKeyRef: { name: "your-secret", key: "secretAccessKey" }
-        # For MinIO or other S3-compatible services:
+        # For MinIO or other S3-compatible services. With direct uploads (the
+        # default), browsers and SDK clients upload to this address, so it must
+        # be one they can reach, not a cluster-internal service name:
         # endpoint:
-        #   value: "https://minio.internal:9000"
+        #   value: "https://minio.your-domain.com"
+    # Set to through-langwatch when browsers cannot reach the endpoint above
+    # (see "When browsers cannot reach the bucket" below):
+    # uploads: through-langwatch
   storedObjects:
     localFilesystem:
       enabled: false
@@ -73596,7 +74340,7 @@ With object storage enabled, none of the local-storage constraints apply: no per
 
 Two requirements for the bucket:
 
-1. **CORS**: the browser uploads dataset files directly to the bucket, so your CORS policy must allow `PUT` requests from your LangWatch app origin:
+1. **Reachable, with CORS**: by default the browser and the SDKs upload files directly to the bucket. The endpoint must be reachable from your users' browsers and from wherever your SDK clients run, and its CORS policy must allow `PUT` requests from your LangWatch app origin:
 
 ```json
 {
@@ -73611,6 +74355,35 @@ Two requirements for the bucket:
 ```
 
 2. **Lifecycle rule**: in-progress uploads are staged under the `staging/` prefix before being committed. Add a lifecycle rule that expires objects under `staging/` after 1 to 7 days so abandoned uploads do not accumulate.
+
+### When browsers cannot reach the bucket
+
+If your object storage is only reachable inside the cluster (an in-cluster MinIO, SeaweedFS or any S3-compatible service at a cluster address such as `http://s3.storage.svc.cluster.local:9000`), direct uploads fail in the browser with an error naming that host, for example:
+
+```text
+Failed to upload the file to object storage at s3.storage.svc.cluster.local:9000 (network or CORS error)
+```
+
+Send uploads through LangWatch instead. Browsers and SDK clients then upload to LangWatch, which streams the bytes into the bucket:
+
+```yaml
+app:
+  dataplane:
+    uploads: through-langwatch
+```
+
+The chart renders this as `STORED_OBJECTS_UPLOADS=through-langwatch` on the app and the workers. It works for both the `awsS3` and `azureBlob` providers. No CORS rule is needed in this mode. Upload addresses are built from `app.http.baseHost` (rendered as `BASE_HOST`), so set it to the address your users open LangWatch at, for example `https://langwatch.your-domain.com`, not the chart's `http://localhost:5560` default. LangWatch's storage check fails with `direct_upload_unavailable` when no address is set.
+
+Uploads can be up to 5 GiB, so the path in front of LangWatch must accept large, slow request bodies:
+
+- **ingress-nginx** (`ingress.className: nginx`): the chart renders a second Ingress, `<release>-uploads-ingress`, for `/api/stored-objects/uploads` on your app hosts. It turns request buffering off, allows bodies up to 5121m and waits up to 3600 s. Without it, nginx would refuse any file above its 1m default.
+
+  Your `ingress.annotations` still apply to it, except rewrites and `server-snippet`; override any of its settings with `ingress.uploads.annotations`. If you already route exactly `/api/stored-objects/uploads` yourself in `ingress.hosts`, the chart leaves that host out and your route needs these settings.
+
+  If your ingress-nginx class has another name, or `className` is empty and the cluster default is ingress-nginx, set `ingress.uploads.enabled: true`. A class whose name contains `nginx` gets the same settings; with an empty `className`, put them in `ingress.uploads.annotations`.
+- **Other ingress controllers and load balancers**: uploads go through your app Ingress. Raise its request body limit to at least 5 GiB and its request timeouts to cover your slowest upload. Or set `ingress.uploads.enabled: true` and put your controller's settings for the upload path in `ingress.uploads.annotations`.
+
+LangWatch itself allows an upload body up to two hours, enough for 5 GiB at about 6 Mbit/s.
 
 On EKS with IRSA, put the role on the ServiceAccount the app and workers use (`global.serviceAccount`). The migration runs inside a workers pod, so it uses the same identity.
 
@@ -74106,7 +74879,8 @@ description: "How to upgrade a self-hosted LangWatch to the latest version: what
 2. **Back up your databases**: see [Backups](/self-hosting/configuration/backups)
 3. **Test in a staging environment** before upgrading production
 4. **Keep `CREDENTIALS_SECRET` unchanged.** A new value makes stored provider keys and integration secrets unreadable and invalidates API keys. To replace it, follow [Rotating the credentials secret](/self-hosting/security#rotating-the-credentials-secret) as a separate change, not during an upgrade
-5. **Write the version 2 queue format first.** This release reads only version 2 GroupQueue jobs and drops a job an older release wrote in the earlier format. Before upgrading, set `GROUP_QUEUE_ENVELOPE_WRITES_ENABLED=true` on the running release and roll it out, or pause traffic and let the queue drain. After the upgrade, remove that variable and `ES_FOLD_TRUST_ABSENT_MISS`: this release reads neither
+5. **On AWS S3, set the bucket's region.** Datasets are stored in object storage from this release. On AWS S3 with any credentials (access keys, IRSA or an instance role), set `app.dataplane.providers.awsS3.region` (`S3_REGION`) to your bucket's region, unless `AWS_REGION`, the AWS profile or a regional endpoint (`s3.<region>.amazonaws.com`) already names it. Otherwise LangWatch asks AWS where the bucket lives on first use, which works for commercial regions; GovCloud and China must set the region
+6. **Write the version 2 queue format first.** This release reads only version 2 GroupQueue jobs and drops a job an older release wrote in the earlier format. Before upgrading, set `GROUP_QUEUE_ENVELOPE_WRITES_ENABLED=true` on the running release and roll it out, or pause traffic and let the queue drain. After the upgrade, remove that variable and `ES_FOLD_TRUST_ABSENT_MISS`: this release reads neither
 
 ### The ClickHouse `default` user on chart-managed installs
 
@@ -74275,7 +75049,7 @@ helm search repo langwatch/langwatch --versions
 # x-release-please-start-version
 helm upgrade langwatch langwatch/langwatch \
   --namespace langwatch \
-  --version 3.23.0 \
+  --version 3.25.0 \
   -f values-production.yaml
 # x-release-please-end
 ```
@@ -74429,6 +75203,7 @@ A rollback never runs migrations and never needs a down migration. Every migrati
 - The previous version starts on the newer schema.
 - The Upgrades page shows **Rolled back** while the older version runs. Background steps that an older version can undo are reopened, and run again after you upgrade again.
 - Data the newer version wrote stays. Features the older version does not know about are unavailable until you upgrade again.
+- The agent registry's change feed and `/versions` skip an event type the running version does not know, so they keep answering after a rollback. LangWatch 3.25 and earlier refuse such an event, so a release adds a feed event type only once every version it can roll back to skips unknown types.
 
 ### Helm
 
@@ -76869,6 +77644,225 @@ openapi: "PATCH /api/gateway/v1/virtual-keys/{id}"
 
 ---
 
+# FILE: ./api-reference/governance-agent-registry/get-one-registry-agent.mdx
+
+---
+title: "Get one registry agent"
+openapi: "GET /api/v1/governance/registry/agents/{agentId}"
+---
+
+---
+
+# FILE: ./api-reference/governance-agent-registry/get-the-registry-as-an-ard-manifest.mdx
+
+---
+title: "Get the registry as an ARD manifest"
+openapi: "GET /api/v1/governance/registry/ard.json"
+---
+
+---
+
+# FILE: ./api-reference/governance-agent-registry/get-the-registry-s-json-schemas.mdx
+
+---
+title: "Get the registry's JSON Schemas"
+openapi: "GET /api/v1/governance/registry/schema"
+---
+
+---
+
+# FILE: ./api-reference/governance-agent-registry/list-one-registry-agent-s-versions.mdx
+
+---
+title: "List one registry agent's versions"
+openapi: "GET /api/v1/governance/registry/agents/{agentId}/versions"
+---
+
+---
+
+# FILE: ./api-reference/governance-agent-registry/list-the-organisation-s-agent-registry.mdx
+
+---
+title: "List the organisation's agent registry"
+openapi: "GET /api/v1/governance/registry/agents"
+---
+
+---
+
+# FILE: ./api-reference/governance-agent-registry/overview.mdx
+
+---
+title: "Overview"
+description: "Read every AI agent in your organization with its endpoints, model, instructions, tools and owner, as JSON or as an ARD v0.91 manifest, and follow its changes through the change feed. Needs an organization API key."
+---
+
+## Intro
+
+Read every AI agent in your organization with its endpoints, model, instructions, tools and owner, as JSON or as an ARD v0.91 manifest, and follow its changes through the change feed. Needs an organization API key.
+
+---
+
+# FILE: ./api-reference/governance-agent-registry/read-the-registry-change-feed.mdx
+
+---
+title: "Read the registry change feed"
+openapi: "GET /api/v1/governance/registry/events"
+---
+
+---
+
+# FILE: ./api-reference/governance-agent-registry/search-the-registry-ard-search.mdx
+
+---
+title: "Search the registry (ARD search)"
+openapi: "POST /api/v1/governance/registry/ard/search"
+---
+
+---
+
+# FILE: ./api-reference/governance-kill-switch/approve-a-pending-stop.mdx
+
+---
+title: "Approve a pending stop"
+openapi: "POST /api/v1/governance/agent-stops/{stopId}/approve"
+---
+
+---
+
+# FILE: ./api-reference/governance-kill-switch/deny-a-pending-stop.mdx
+
+---
+title: "Deny a pending stop"
+openapi: "POST /api/v1/governance/agent-stops/{stopId}/deny"
+---
+
+---
+
+# FILE: ./api-reference/governance-kill-switch/get-an-agent-s-latest-stop.mdx
+
+---
+title: "Get an agent's latest stop"
+openapi: "GET /api/v1/governance/agents/{agentId}/stop"
+---
+
+---
+
+# FILE: ./api-reference/governance-kill-switch/get-an-agent-s-stop-plan.mdx
+
+---
+title: "Get an agent's stop plan"
+openapi: "GET /api/v1/governance/agents/{agentId}/stop-plan"
+---
+
+---
+
+# FILE: ./api-reference/governance-kill-switch/list-the-organisation-s-agent-stops.mdx
+
+---
+title: "List the organisation's agent stops"
+openapi: "GET /api/v1/governance/agent-stops"
+---
+
+---
+
+# FILE: ./api-reference/governance-kill-switch/overview.mdx
+
+---
+title: "Overview"
+description: "Stop a registry agent on the targets of its stop plan: Databricks serving endpoints, Amazon Bedrock agent aliases and gateway virtual keys. Set each agent's stop plan, request a stop, approve or deny it, read every target's outcome, retry a failed stop and restore the agent. Needs an organization API key on an Enterprise plan with the agent registry. Reads need the governance:view permission and changes need governance:manage."
+---
+
+## Intro
+
+Stop a registry agent on the targets of its stop plan: Databricks serving endpoints, Amazon Bedrock agent aliases and gateway virtual keys. Set each agent's stop plan, request a stop, approve or deny it, read every target's outcome, retry a failed stop and restore the agent. Needs an organization API key on an Enterprise plan with the agent registry. Reads need the governance:view permission and changes need governance:manage.
+
+---
+
+# FILE: ./api-reference/governance-kill-switch/replace-an-agent-s-stop-plan.mdx
+
+---
+title: "Replace an agent's stop plan"
+openapi: "PUT /api/v1/governance/agents/{agentId}/stop-plan"
+---
+
+---
+
+# FILE: ./api-reference/governance-kill-switch/restore-a-stopped-agent.mdx
+
+---
+title: "Restore a stopped agent"
+openapi: "POST /api/v1/governance/agent-stops/{stopId}/restore"
+---
+
+---
+
+# FILE: ./api-reference/governance-kill-switch/retry-a-stop.mdx
+
+---
+title: "Retry a stop"
+openapi: "POST /api/v1/governance/agent-stops/{stopId}/retry"
+---
+
+---
+
+# FILE: ./api-reference/governance-kill-switch/stop-an-agent.mdx
+
+---
+title: "Stop an agent"
+openapi: "POST /api/v1/governance/agents/{agentId}/stop"
+---
+
+---
+
+# FILE: ./api-reference/governance-ocsf/export-governance-events-as-ocsf-1-9-0.mdx
+
+---
+title: "Export governance events as OCSF 1.9.0"
+openapi: "GET /api/v1/governance/ocsf/events"
+---
+
+---
+
+# FILE: ./api-reference/governance-ocsf/export-project-traces-as-ocsf-1-9-0.mdx
+
+---
+title: "Export project traces as OCSF 1.9.0"
+openapi: "GET /api/v1/governance/ocsf/traces"
+---
+
+---
+
+# FILE: ./api-reference/governance-ocsf/export-the-audit-log-as-ocsf-1-9-0.mdx
+
+---
+title: "Export the audit log as OCSF 1.9.0"
+openapi: "GET /api/v1/governance/ocsf/audit"
+---
+
+---
+
+# FILE: ./api-reference/governance-ocsf/overview.mdx
+
+---
+title: "Overview"
+description: "Pull governance events, project traces and the audit log as OCSF 1.9.0 API Activity events with an organisation API key, and push OCSF events from your other tools into LangWatch. Each stream pages with a cursor, so a SIEM polls by passing next_cursor back."
+---
+
+## Intro
+
+Pull governance events, project traces and the audit log as OCSF 1.9.0 API Activity events with an organisation API key, and push OCSF events from your other tools into LangWatch. Each stream pages with a cursor, so a SIEM polls by passing next_cursor back.
+
+---
+
+# FILE: ./api-reference/governance-ocsf/push-ocsf-events-in-from-another-source.mdx
+
+---
+title: "Push OCSF events in from another source"
+openapi: "POST /api/v1/governance/ocsf/ingest"
+---
+
+---
+
 # FILE: ./api-reference/grants/change-a-grant-s-role.mdx
 
 ---
@@ -77451,6 +78445,10 @@ GROUP BY TraceId, ConversationId
 `priceUsd` is what the run costs you and `costUsd` is what it costs us. One classification is made per row, carrying every question the statement asks, so a statement with four eval columns still sends one request per row.
 
 An organization without a paid plan also gets `freeBudgetRemainingUsd`, what is left of its $1 free budget. Once that is spent, a new run and a judged query answer `402` with `instant_eval_free_budget_exhausted`, carrying `spentUsd` and `budgetUsd` in `meta`, until the organization upgrades. The rate is on [Pricing](/pricing#instant-evals).
+
+On any plan, a [gateway budget](/ai-gateway/budgets) set to block on the project, its team or the organization also applies. Once it is reached, a new run and a judged query answer `402` with `instant_eval_gateway_budget_exceeded`, carrying `budgetId`, `scope`, `window`, `limitUsd` and `spentUsd` in `meta`. A run under way stops before its next page and keeps the verdicts it wrote.
+
+A budget set to warn never refuses. A run on your own decision model is checked too, as its provider usage counts against these budgets.
 
 ## Row Limits
 
@@ -78713,6 +79711,7 @@ Two column families are gated rather than freely selectable: free-text carriers 
 |------|-------------|-------|-------|-------------|
 | `traces` | One row per trace, with its timing, token, cost and error rollups. | `input`, `output`, `costs` | one row per (TenantId, TraceId), latest version only | `OccurredAt` |
 | `spans` | One row per span, with its timing, status and attributes. | `input`, `output`, `costs` | one row per (TenantId, TraceId, SpanId), latest version only | `StartTime` |
+| `span_metrics` | One row per span with its timing, status, cost and the LangWatch facts dashboards group by, and no attribute map. Holds spans from the span_analytics floor on. | `costs` | one row per (TenantId, TraceId, SpanId); a duplicate span is counted | `StartTime` |
 | `logs` | Canonical OpenTelemetry log records: requests, responses and provider events, correlated to their trace and span. | `input`, `output` | one row per (TenantId, TraceId, TimeUnixMs, RecordId) | `TimeUnixMs` |
 | `log_ingestion_usage` | Per-tenant log ingestion usage estimates. | None | one row per (OrganizationId, RecordId), latest version only | `AcceptedAt` |
 | `metric_points` | Individual metric data points with gauges, sums, histograms, and summaries | `output` | one row per (SeriesId, TimeUnixMs, PointId) | `TimeUnixMs` |
@@ -78770,6 +79769,8 @@ Rollup views (`_by_minute`, `_rollups`) return **finalised values only**: figure
 | `model_usage_by_minute` | Span metrics summed per minute, per model and span type: span counts, costs and tokens. | `costs` | one merged row per (TenantId, BucketStart, Model, SpanType), every measure summed | `BucketStart` |
 | `evaluation_metrics` | One row per evaluation, its latest state, time-sorted, carrying its outcome, cost and the trace dimensions it inherited. | `costs` | one row per (TenantId, EvaluationId), latest version only | `OccurredAt` |
 | `evaluation_metrics_by_minute` | Evaluation outcomes summed per minute, per evaluator type and terminal status. Every measure is a sum: pass rate is PassCount over PassCount plus FailCount. | `costs` | one merged row per (TenantId, BucketStart, EvaluatorType, Status), every measure summed | `BucketStart` |
+| `trace_evaluation_metrics` | One row per evaluation of a trace, its live outcome, carrying the evaluated trace's time, source and dimensions, so a read by the trace's period needs no join. | None | one row per (TenantId, TraceId, EvaluationId): each revision grouped with its retractions, kept while its signs sum above zero | `OccurredAt` |
+| `trace_evaluation_checks` | Live evaluations of traces counted per trace, evaluator and outcome, carrying the evaluated trace's time and source. Sum Evaluations to count evaluations. | None | one row per (TenantId, TraceId, OccurredAt, TraceOccurredAt, EvaluatorName, Passed, IsGuardrail, Source, TraceSource), Evaluations summed | `OccurredAt` |
 | `metric_rollups` | Time-bucketed rollups of a metric series: per-bucket min, max, sum, count and histogram buckets. | None | one row per (SeriesId, BucketStart) | `BucketStart` |
 | `session_metrics` | Per-session time-series metrics with aggregate statistics | None | one row per (SessionId, SeriesId) | `AsOf` |
 | `simulation_metric_rollups` | Per-trace simulation cost and latency, merged from the aggregating rollup: total cost and per-role cost and latency maps. | `costs` | one row per (TenantId, ScenarioRunId, TraceId), latest version only | `OccurredAt` |
@@ -78924,36 +79925,36 @@ A query may call only the functions on the allowlist below. `GET /api/v1/query/s
 - `any`, `anyLast`, `argMax`, `argMin`, `arrayAll`, `arrayAvg`, `arrayConcat`, `arrayCount`, `arrayDistinct`, `arrayElement`
 - `arrayEnumerate`, `arrayExists`, `arrayFilter`, `arrayFirst`, `arrayFirstIndex`, `arrayJoin`, `arrayLast`, `arrayMap`, `arrayMax`, `arrayMin`
 - `arrayReverseSort`, `arraySlice`, `arraySort`, `arrayStringConcat`, `arraySum`, `arrayUniq`, `assumeNotNull`, `avg`, `caseWithExpression`, `caseWithoutExpression`
-- `CAST`, `ceil`, `ceiling`, `coalesce`, `concat`, `concatWithSeparator`, `count`, `date_trunc`, `dateDiff`, `dateTrunc`
-- `dense_rank`, `divide`, `empty`, `endsWith`, `equals`, `exists`, `exp`, `extract`, `extractAll`, `first_value`
-- `floor`, `formatDateTime`, `fromUnixTimestamp`, `globalIn`, `globalNotIn`, `greater`, `greaterOrEquals`, `greatest`, `groupArray`, `groupUniqArray`
-- `has`, `hasAll`, `hasAny`, `if`, `ifNull`, `ilike`, `in`, `indexOf`, `intDiv`, `intDivOrZero`
-- `isDistinctFrom`, `isNotDistinctFrom`, `isNotNull`, `isNull`, `isValidJSON`, `JSONExtract`, `JSONExtractArrayRaw`, `JSONExtractBool`, `JSONExtractFloat`, `JSONExtractInt`
-- `JSONExtractKeys`, `JSONExtractKeysAndValues`, `JSONExtractRaw`, `JSONExtractString`, `JSONExtractUInt`, `JSONHas`, `JSONLength`, `JSONType`, `lagInFrame`, `lambda`
-- `last_value`, `leadInFrame`, `least`, `left`, `length`, `lengthUTF8`, `less`, `lessOrEquals`, `like`, `ln`
-- `log`, `log10`, `log2`, `lower`, `lowerUTF8`, `map`, `mapContains`, `mapFilter`, `mapKeys`, `mapValues`
-- `match`, `max`, `median`, `medianExact`, `min`, `minus`, `modulo`, `moduloOrZero`, `multiIf`, `multiply`
-- `negate`, `not`, `notEmpty`, `notEquals`, `notILike`, `notIn`, `notLike`, `now`, `now64`, `nth_value`
-- `ntile`, `nullIf`, `or`, `plus`, `position`, `positionCaseInsensitive`, `pow`, `power`, `quantile`, `quantileExact`
-- `quantiles`, `quantilesExact`, `quantilesTDigest`, `quantilesTiming`, `quantileTDigest`, `quantileTiming`, `rank`, `replaceAll`, `replaceOne`, `replaceRegexpAll`
-- `replaceRegexpOne`, `right`, `round`, `row_number`, `sign`, `simpleJSONExtractBool`, `simpleJSONExtractFloat`, `simpleJSONExtractInt`, `simpleJSONExtractString`, `simpleJSONExtractUInt`
-- `simpleJSONHas`, `splitByChar`, `splitByString`, `sqrt`, `startsWith`, `stddevPop`, `stddevSamp`, `substring`, `substringUTF8`, `subtractDays`
-- `subtractHours`, `subtractMinutes`, `subtractMonths`, `subtractQuarters`, `subtractSeconds`, `subtractWeeks`, `subtractYears`, `sum`, `toBool`, `toDate`
-- `toDate32`, `toDate32OrDefault`, `toDate32OrNull`, `toDate32OrZero`, `toDateOrDefault`, `toDateOrNull`, `toDateOrZero`, `toDateTime`, `toDateTime64`, `toDateTime64OrDefault`
-- `toDateTime64OrNull`, `toDateTime64OrZero`, `toDateTimeOrDefault`, `toDateTimeOrNull`, `toDateTimeOrZero`, `today`, `toDayOfMonth`, `toDayOfWeek`, `toDayOfYear`, `toDecimal128`
-- `toDecimal128OrDefault`, `toDecimal128OrNull`, `toDecimal128OrZero`, `toDecimal256`, `toDecimal256OrDefault`, `toDecimal256OrNull`, `toDecimal256OrZero`, `toDecimal32`, `toDecimal32OrDefault`, `toDecimal32OrNull`
-- `toDecimal32OrZero`, `toDecimal64`, `toDecimal64OrDefault`, `toDecimal64OrNull`, `toDecimal64OrZero`, `toFloat32`, `toFloat32OrDefault`, `toFloat32OrNull`, `toFloat32OrZero`, `toFloat64`
-- `toFloat64OrDefault`, `toFloat64OrNull`, `toFloat64OrZero`, `toHour`, `toInt128`, `toInt128OrDefault`, `toInt128OrNull`, `toInt128OrZero`, `toInt16`, `toInt16OrDefault`
-- `toInt16OrNull`, `toInt16OrZero`, `toInt256`, `toInt256OrDefault`, `toInt256OrNull`, `toInt256OrZero`, `toInt32`, `toInt32OrDefault`, `toInt32OrNull`, `toInt32OrZero`
-- `toInt64`, `toInt64OrDefault`, `toInt64OrNull`, `toInt64OrZero`, `toInt8`, `toInt8OrDefault`, `toInt8OrNull`, `toInt8OrZero`, `toIntervalDay`, `toIntervalHour`
-- `toIntervalMinute`, `toIntervalMonth`, `toIntervalQuarter`, `toIntervalSecond`, `toIntervalWeek`, `toIntervalYear`, `toISOWeek`, `toLastDayOfMonth`, `toMinute`, `toMonday`
-- `toMonth`, `topK`, `toQuarter`, `toSecond`, `toStartOfDay`, `toStartOfFifteenMinutes`, `toStartOfFiveMinutes`, `toStartOfHour`, `toStartOfInterval`, `toStartOfISOWeek`
-- `toStartOfMinute`, `toStartOfMonth`, `toStartOfQuarter`, `toStartOfSecond`, `toStartOfTenMinutes`, `toStartOfWeek`, `toStartOfYear`, `toString`, `toTimeZone`, `toUInt128`
-- `toUInt128OrDefault`, `toUInt128OrNull`, `toUInt128OrZero`, `toUInt16`, `toUInt16OrDefault`, `toUInt16OrNull`, `toUInt16OrZero`, `toUInt256`, `toUInt256OrDefault`, `toUInt256OrNull`
-- `toUInt256OrZero`, `toUInt32`, `toUInt32OrDefault`, `toUInt32OrNull`, `toUInt32OrZero`, `toUInt64`, `toUInt64OrDefault`, `toUInt64OrNull`, `toUInt64OrZero`, `toUInt8`
-- `toUInt8OrDefault`, `toUInt8OrNull`, `toUInt8OrZero`, `toUnixTimestamp`, `toUUID`, `toUUIDOrDefault`, `toUUIDOrNull`, `toUUIDOrZero`, `toWeek`, `toYear`
-- `trim`, `trimBoth`, `trimLeft`, `trimRight`, `trunc`, `truncate`, `tuple`, `tupleElement`, `uniq`, `uniqCombined`
-- `uniqExact`, `upper`, `upperUTF8`, `varPop`, `varSamp`, `yesterday`
+- `CAST`, `ceil`, `ceiling`, `cityHash64`, `coalesce`, `concat`, `concatWithSeparator`, `count`, `date_trunc`, `dateDiff`
+- `dateTrunc`, `dense_rank`, `divide`, `empty`, `endsWith`, `equals`, `exists`, `exp`, `extract`, `extractAll`
+- `first_value`, `floor`, `formatDateTime`, `fromUnixTimestamp`, `globalIn`, `globalNotIn`, `greater`, `greaterOrEquals`, `greatest`, `groupArray`
+- `groupUniqArray`, `has`, `hasAll`, `hasAny`, `if`, `ifNull`, `ilike`, `in`, `indexOf`, `intDiv`
+- `intDivOrZero`, `isDistinctFrom`, `isNotDistinctFrom`, `isNotNull`, `isNull`, `isValidJSON`, `JSONExtract`, `JSONExtractArrayRaw`, `JSONExtractBool`, `JSONExtractFloat`
+- `JSONExtractInt`, `JSONExtractKeys`, `JSONExtractKeysAndValues`, `JSONExtractRaw`, `JSONExtractString`, `JSONExtractUInt`, `JSONHas`, `JSONLength`, `JSONType`, `lagInFrame`
+- `lambda`, `last_value`, `leadInFrame`, `least`, `left`, `length`, `lengthUTF8`, `less`, `lessOrEquals`, `like`
+- `ln`, `log`, `log10`, `log2`, `lower`, `lowerUTF8`, `map`, `mapContains`, `mapFilter`, `mapKeys`
+- `mapValues`, `match`, `max`, `median`, `medianExact`, `min`, `minus`, `modulo`, `moduloOrZero`, `multiIf`
+- `multiply`, `negate`, `not`, `notEmpty`, `notEquals`, `notILike`, `notIn`, `notLike`, `now`, `now64`
+- `nth_value`, `ntile`, `nullIf`, `or`, `plus`, `position`, `positionCaseInsensitive`, `pow`, `power`, `quantile`
+- `quantileExact`, `quantiles`, `quantilesExact`, `quantilesTDigest`, `quantilesTiming`, `quantileTDigest`, `quantileTiming`, `rank`, `replaceAll`, `replaceOne`
+- `replaceRegexpAll`, `replaceRegexpOne`, `right`, `round`, `row_number`, `sign`, `simpleJSONExtractBool`, `simpleJSONExtractFloat`, `simpleJSONExtractInt`, `simpleJSONExtractString`
+- `simpleJSONExtractUInt`, `simpleJSONHas`, `sipHash128`, `splitByChar`, `splitByString`, `sqrt`, `startsWith`, `stddevPop`, `stddevSamp`, `substring`
+- `substringUTF8`, `subtractDays`, `subtractHours`, `subtractMinutes`, `subtractMonths`, `subtractQuarters`, `subtractSeconds`, `subtractWeeks`, `subtractYears`, `sum`
+- `toBool`, `toDate`, `toDate32`, `toDate32OrDefault`, `toDate32OrNull`, `toDate32OrZero`, `toDateOrDefault`, `toDateOrNull`, `toDateOrZero`, `toDateTime`
+- `toDateTime64`, `toDateTime64OrDefault`, `toDateTime64OrNull`, `toDateTime64OrZero`, `toDateTimeOrDefault`, `toDateTimeOrNull`, `toDateTimeOrZero`, `today`, `toDayOfMonth`, `toDayOfWeek`
+- `toDayOfYear`, `toDecimal128`, `toDecimal128OrDefault`, `toDecimal128OrNull`, `toDecimal128OrZero`, `toDecimal256`, `toDecimal256OrDefault`, `toDecimal256OrNull`, `toDecimal256OrZero`, `toDecimal32`
+- `toDecimal32OrDefault`, `toDecimal32OrNull`, `toDecimal32OrZero`, `toDecimal64`, `toDecimal64OrDefault`, `toDecimal64OrNull`, `toDecimal64OrZero`, `toFloat32`, `toFloat32OrDefault`, `toFloat32OrNull`
+- `toFloat32OrZero`, `toFloat64`, `toFloat64OrDefault`, `toFloat64OrNull`, `toFloat64OrZero`, `toHour`, `toInt128`, `toInt128OrDefault`, `toInt128OrNull`, `toInt128OrZero`
+- `toInt16`, `toInt16OrDefault`, `toInt16OrNull`, `toInt16OrZero`, `toInt256`, `toInt256OrDefault`, `toInt256OrNull`, `toInt256OrZero`, `toInt32`, `toInt32OrDefault`
+- `toInt32OrNull`, `toInt32OrZero`, `toInt64`, `toInt64OrDefault`, `toInt64OrNull`, `toInt64OrZero`, `toInt8`, `toInt8OrDefault`, `toInt8OrNull`, `toInt8OrZero`
+- `toIntervalDay`, `toIntervalHour`, `toIntervalMinute`, `toIntervalMonth`, `toIntervalQuarter`, `toIntervalSecond`, `toIntervalWeek`, `toIntervalYear`, `toISOWeek`, `toLastDayOfMonth`
+- `toMinute`, `toMonday`, `toMonth`, `topK`, `toQuarter`, `toSecond`, `toStartOfDay`, `toStartOfFifteenMinutes`, `toStartOfFiveMinutes`, `toStartOfHour`
+- `toStartOfInterval`, `toStartOfISOWeek`, `toStartOfMinute`, `toStartOfMonth`, `toStartOfQuarter`, `toStartOfSecond`, `toStartOfTenMinutes`, `toStartOfWeek`, `toStartOfYear`, `toString`
+- `toTimeZone`, `toUInt128`, `toUInt128OrDefault`, `toUInt128OrNull`, `toUInt128OrZero`, `toUInt16`, `toUInt16OrDefault`, `toUInt16OrNull`, `toUInt16OrZero`, `toUInt256`
+- `toUInt256OrDefault`, `toUInt256OrNull`, `toUInt256OrZero`, `toUInt32`, `toUInt32OrDefault`, `toUInt32OrNull`, `toUInt32OrZero`, `toUInt64`, `toUInt64OrDefault`, `toUInt64OrNull`
+- `toUInt64OrZero`, `toUInt8`, `toUInt8OrDefault`, `toUInt8OrNull`, `toUInt8OrZero`, `toUnixTimestamp`, `toUUID`, `toUUIDOrDefault`, `toUUIDOrNull`, `toUUIDOrZero`
+- `toWeek`, `toYear`, `trim`, `trimBoth`, `trimLeft`, `trimRight`, `trunc`, `truncate`, `tuple`, `tupleElement`
+- `uniq`, `uniqCombined`, `uniqExact`, `upper`, `upperUTF8`, `varPop`, `varSamp`, `yesterday`
 
 ## Response ceilings
 
@@ -80263,6 +81264,15 @@ openapi: "PATCH /api/v1/teams/{teamId}"
 
 ---
 
+# FILE: ./api-reference/test-suites/apply-a-suite-template.mdx
+
+---
+title: "Apply a suite template"
+openapi: "POST /api/v1/test-suites/templates/{templateId}/apply"
+---
+
+---
+
 # FILE: ./api-reference/test-suites/create-test-suites.mdx
 
 ---
@@ -80277,6 +81287,15 @@ openapi: "POST /api/v1/test-suites"
 ---
 title: "Archive a test suite"
 openapi: "DELETE /api/v1/test-suites/{id}"
+---
+
+---
+
+# FILE: ./api-reference/test-suites/list-suite-templates.mdx
+
+---
+title: "List suite templates"
+openapi: "GET /api/v1/test-suites/templates"
 ---
 
 ---
@@ -80682,6 +81701,13 @@ keyed by monitor ID: `{"evaluations.passed": {"<monitorId>": ["false"]}}`.
 A flat list such as `{"evaluations.passed": ["false"]}` is rejected with 422.
 To find failed evaluations across every evaluator, send
 `"filter": "evaluatorVerdict:fail"`.
+</Note>
+
+<Note>
+With `includeSpans: true`, a page holds at most 100 traces, and that is the
+default page size. A larger `pageSize` is refused with a 422
+`trace_page_size_too_large`. When a response carries a `scrollId`, send it to
+fetch the next page.
 </Note>
 
 ---
@@ -81245,7 +82271,7 @@ Each plan includes a base volume of events stored for a default window. For exam
 
 Instant Evals are priced separately from events. A judged query or run is charged per input token sent to the judge, at **$0.0546 per million input tokens**. Output is free. Judging ten thousand conversations of average size costs about a quarter of a dollar.
 
-Input tokens are the text the judge reads plus the questions asked about it. One request carries every question about one text, so a statement with three eval columns costs about the same as one with a single column.
+Input tokens are the text the judge reads, the questions asked about it and a small fixed part of every request. One request carries every question about one text, so a statement with three eval columns costs about the same as one with a single column.
 
 `POST /api/v1/instant-evals/estimate` returns the price of a run before it starts, from the rows the statement matches and a sample of their size. See [Running an Instant Eval](/api-reference/instant-evals/running-an-instant-eval).
 
@@ -81260,9 +82286,9 @@ Retention controls how long your events are kept before they're automatically re
 | Plan | Default retention | Windows you can set |
 | --- | --- | --- |
 | Free | 49 days | None. Trace content older than 14 days is redacted until you upgrade |
-| Accelerate (legacy) | 49 days | 35 or 63 days |
-| Growth | 49 days | 35 or 63 days |
-| Enterprise | 49 days | 35 or 63 days, or any whole number of weeks from 49 days up |
+| Accelerate (legacy) | 49 days | 35, 63 or 91 days |
+| Growth | 49 days | 35, 63 or 91 days |
+| Enterprise | 49 days | 35, 63 or 91 days, or any whole number of weeks from 49 days up |
 
 Retention is set in whole weeks.
 
@@ -81310,7 +82336,7 @@ Self-hosted deployments keep the same 49-day default. An Enterprise license open
 </Accordion>
 
   <Accordion title="Can I customize how long my data is retained?">
-    On LangWatch Cloud every plan keeps events for 49 days by default. Paid plans set 35 or 63 days in **Settings → Data Retention**, per organization, team or project. Enterprise plans set any whole number of weeks from 49 days up, and a higher volume of stored events. Reach out to [enterprise@langwatch.ai](mailto:enterprise@langwatch.ai) to set up an Enterprise window or extra volume.
+    On LangWatch Cloud every plan keeps events for 49 days by default. Paid plans set 35, 63 or 91 days in **Settings → Data Retention**, per organization, team or project. Enterprise plans set any whole number of weeks from 49 days up, and a higher volume of stored events. Reach out to [enterprise@langwatch.ai](mailto:enterprise@langwatch.ai) to set up an Enterprise window or extra volume.
 
     Self-hosted, the data is in your own database and keeps the same 49-day default. A license adds per-scope retention policies, with a separate window for traces, scenarios and experiments.
   </Accordion>

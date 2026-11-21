@@ -105,19 +105,21 @@ function isEndpointStreamState(state: WebhookProcessState): state is EndpointStr
   return "pending" in state && Array.isArray(state.pending);
 }
 
-export function deriveEndpointFlushTarget(
-  state: WebhookProcessState,
-  key: string,
-): { endpointId: string; organizationId: string } | null {
-  if (!isEndpointStreamKey(key) || !isEndpointStreamState(state)) {
-    return null;
-  }
-
-  const organizationId = state.pending[0]?.envelope.data?.organization_id;
-  if (typeof organizationId !== "string" || organizationId === "") {
-    return null;
-  }
-
+/**
+ * The flush a woken endpoint stream asks for. The stream's process lives under its organisation
+ * (`projectId` of the ref), so the target never depends on what an envelope's `data` carries.
+ */
+export function deriveEndpointFlushTarget({
+  state,
+  key,
+  organizationId,
+}: {
+  state: WebhookProcessState;
+  key: string;
+  organizationId: string;
+}): { endpointId: string; organizationId: string } | null {
+  if (!isEndpointStreamKey(key) || !isEndpointStreamState(state)) return null;
+  if (state.pending.length === 0 || organizationId === "") return null;
   return { endpointId: key.slice("endpoint:".length), organizationId };
 }
 

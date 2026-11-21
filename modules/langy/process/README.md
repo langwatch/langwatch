@@ -1343,11 +1343,12 @@ Declared at `src/eventing/langy-conversation.pipeline.ts:117`. Events: `LangyCon
 
 ### Pipeline `langy_guided_onboarding` (aggregate `langy_guided_onboarding`)
 
-Declared at `src/eventing/langy-guided-onboarding.pipeline.ts:31`. Events: `guidedOnboardingTurnFailedEventSchema`.
+Declared at `src/eventing/langy-guided-onboarding.pipeline.ts:41`. Events: `guidedOnboardingTurnFailedEventSchema`, `langyFirstMessageSeenEventSchema`.
 
 | Kind    | Name                               | Handles | Declared at                                           |
 | ------- | ---------------------------------- | ------- | ----------------------------------------------------- |
-| command | `recordGuidedOnboardingTurnFailed` | –       | `src/eventing/langy-guided-onboarding.pipeline.ts:36` |
+| command | `recordGuidedOnboardingTurnFailed` | –       | `src/eventing/langy-guided-onboarding.pipeline.ts:46` |
+| command | `recordLangyFirstMessageSeen`      | –       | `src/eventing/langy-guided-onboarding.pipeline.ts:47` |
 
 ### Pipeline `langy_maintenance` (aggregate `global`)
 

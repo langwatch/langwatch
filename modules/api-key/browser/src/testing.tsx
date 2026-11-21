@@ -28,6 +28,7 @@ import {
   type AuthorizeFailureNotice,
   type AuthorizeSessionStatus,
   type DocsOpener,
+  type DocsSessionAvailabilityReading,
   type McpAuthorizeAnswer,
   type McpAuthorizeRequest,
 } from "./model/authorize-host.ts";
@@ -217,6 +218,8 @@ export class FakeAuthorizeHost extends AuthorizeHostApi {
       /** Whether the page was opened as a popup by the docs. */
       hasOpener?: boolean;
       docsKey?: DocsSessionKeyMinted | Error;
+      /** The organization's docs playground switch; on unless a test says otherwise. */
+      docsSessionAvailability?: DocsSessionAvailabilityReading;
     } = {},
   ) {
     super();
@@ -224,7 +227,7 @@ export class FakeAuthorizeHost extends AuthorizeHostApi {
 
   /** Every message posted to the opener, with the origin it was addressed to. */
   readonly posted: { message: DocsSessionMessage; targetOrigin: string }[] = [];
-  readonly docsMints: { projectId: string; docsOrigin: string }[] = [];
+  readonly docsMints: Parameters<AuthorizeHostApi["mintDocsSessionKey"]>[0][] = [];
   closed = 0;
 
   scope() {
@@ -249,7 +252,11 @@ export class FakeAuthorizeHost extends AuthorizeHostApi {
     return { post: (input) => this.posted.push(input) };
   }
 
-  mintDocsSessionKey(input: { projectId: string; docsOrigin: string }) {
+  docsSessionAvailability(): DocsSessionAvailabilityReading {
+    return this.options.docsSessionAvailability ?? "enabled";
+  }
+
+  mintDocsSessionKey(input: Parameters<AuthorizeHostApi["mintDocsSessionKey"]>[0]) {
     this.docsMints.push(input);
     const answer = this.options.docsKey ?? {
       token: "sk-lw-docs",

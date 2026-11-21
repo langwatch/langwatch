@@ -1,3 +1,5 @@
+import type { EventLogPageCursor } from "../event-log-page-order.ts";
+
 /**
  * Event record format used by repositories for data storage.
  * This is the raw format stored in the database/memory.
@@ -21,6 +23,15 @@ export interface EventRecord {
 export interface EventOccurredAtWindow {
   fromMs: number;
   toMs: number;
+}
+
+/**
+ * What one replica of the event log shows about an aggregate around one of its events: whether
+ * it holds that event, and whether it holds any event the log accepted before it.
+ */
+export interface EventLogProbe {
+  hasEvent: boolean;
+  hasEarlierEvents: boolean;
 }
 
 /**
@@ -78,7 +89,8 @@ export interface EventRepository {
 
   /**
    * Cursor-paginated variant; streams history page-by-page for large aggregates.
-   * Optional: callers detect absence and fall back to getEventRecordsUpTo.
+   * Optional: callers detect absence and fall back to getEventRecordsUpTo. Pages come in
+   * key order, not time order (see EventLogPageCursor).
    */
   getEventRecordsUpToPaged?: (request: {
     tenantId: string;
@@ -86,7 +98,7 @@ export interface EventRepository {
     aggregateId: string;
     upToTimestamp: number;
     upToEventId: string;
-    after: { timestamp: number; eventId: string } | undefined;
+    after: EventLogPageCursor | undefined;
     limit: number;
     /** Partition-pruning lower bound — see {@link EventRepository.getEventRecordsUpTo}. */
     occurredAtFromMs?: number;
@@ -103,6 +115,20 @@ export interface EventRepository {
     beforeTimestamp: number;
     beforeEventId: string;
   }): Promise<number>;
+
+  /**
+   * Whether the log holds an event and any event accepted before it, without reading either:
+   * each answer stops at its first row. `occurredAtFromMs` only prunes partitions.
+   */
+  probeEventRecordsBefore(request: {
+    tenantId: string;
+    aggregateType: string;
+    aggregateId: string;
+    eventTimestamp: number;
+    eventId: string;
+    occurredAtFromMs?: number;
+    ignoreEventIds?: readonly string[];
+  }): Promise<EventLogProbe>;
 
   /**
    * Inserts event records into storage.

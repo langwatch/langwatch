@@ -156,7 +156,14 @@ export const FEATURE_FLAGS = [
     scope: "PRODUCT",
     defaultValue: false,
     description:
-      "Sends an organization's strict PII analysis to the PII redaction model instead of Presidio. Off by default; enable per organization through an operator rule. Only takes effect where the deployment names the model (PII_REDACTION_MODEL_ENDPOINT, a Lambda ARN or an HTTP address). Any failure of the model falls back to Presidio, then Google DLP, exactly as an organization with the flag off.",
+      "Sends an organization's strict PII analysis to the PII redaction model instead of Presidio. Off by default; enable per organization through an operator rule. Only takes effect where the deployment names the model (PII_REDACTION_MODEL_ENDPOINT, a Lambda ARN or an HTTP address). Any failure of the model falls back to Presidio, then Google DLP, exactly as an organization with the flag off. It also shows the organization the Essential or Strict picker on the Data Privacy page, with Strict's price and example; off, the page is unchanged.",
+  },
+  {
+    key: "release_pii_redaction_model_free",
+    scope: "PRODUCT",
+    defaultValue: false,
+    description:
+      "Records an organization's PII redaction model calls at a price of zero, our own cost still kept (ADR-201). Off by default; enable per organization through an operator rule for organizations that use the model for free. It does not let an organization use the model: release_pii_redaction_model_enabled does that. The Data Privacy page shows Strict as included for these organizations, with no price.",
   },
   {
     key: "release_instant_evals",
@@ -170,7 +177,7 @@ export const FEATURE_FLAGS = [
     scope: "PRODUCT",
     defaultValue: true,
     description:
-      "Lets an organization run Instant Evals on its own decision model and key, picked in the Instant Evals column of Default models (ADR-182). On by default; switch it off fleet-wide or per organization. A run on an own key is never metered or capped. Off, the column offers LangWatch Evals Preview only, new picks of any other model are refused, and a project that already picked one skips its Instant Evals as not configured; it is never moved onto the billed LangWatch model.",
+      "Lets an organization run Instant Evals on its own decision model and key, picked in the Instant Evals column of Default models (ADR-182). On by default; switch it off fleet-wide or per organization. A run on an own key is not metered by LangWatch and skips the free budget, but a gateway budget set to block still applies. Off, the column offers LangWatch Evals Preview only, new picks of any other model are refused, and a project that already picked one skips its Instant Evals as not configured; it is never moved onto the billed LangWatch model.",
   },
   {
     key: "instant_evals_hosted_disabled",
@@ -328,6 +335,13 @@ export const FEATURE_FLAGS = [
       "Opens the Insights inbox (/[project]/insights): each person's own saved insights for the project, which only they read, in Inbox, Stale and Archived folders, the sidebar entry with its unread count, the topbar bell, and 'Save as insight' under a Langy answer (spec: modules/insight/specs/insight-inbox.feature). Default off; while off the page answers not-found, the chrome shows nothing and every insights procedure refuses with insights_not_enabled. Force-enable in dev via FEATURE_FLAG_FORCE_ENABLE=release_insights.",
   },
   {
+    key: "release_braids",
+    scope: "PRODUCT",
+    defaultValue: true,
+    description:
+      "Kill switch for braid management (spec: modules/authz/specs/braids-release-flag.feature). Default on (Alex, 2026-11-18): each organisation still turns Braids on in its own Braids settings, which an organisation admin on Enterprise changes. Switch it off per organisation, never by a project rule: organisation-wide procedures ask it for the organisation and project ones for the project, and the two must agree. While off both Braids pages list existing braids with Remove, an organisation admin can still turn the organisation's Braids setting off, the settings entry shows only while braids exist, and the procedures that create, change and list braid targets, set who may braid or turn Braids on, and issue, rotate and list braid signing keys refuse with braids_not_enabled; removing a braid and revoking a signing key still work, since both only narrow access. The flag alone pauses nothing: braids that already exist keep applying (trace reads show braided spans, signed calls are verified, braided reads are audited) until the organisation's own Braids setting is off, which pauses them. Switch it off for an organisation through the operator store.",
+  },
+  {
     key: "release_ui_comparison_leaderboard_enabled",
     scope: "PRODUCT",
     defaultValue: false,
@@ -341,6 +355,14 @@ export const FEATURE_FLAGS = [
     family: "Langy",
     description:
       "Minimising Langy sinks the panel to an edge peek of itself — a sliver of the card at the bottom edge (floating) or of the dock's spine at the right edge (sidebar) that rises on pointer proximity and opens on click (spec: specs/langy/langy-peek-dock.feature). Off = the classic corner launcher orb. Only the closed-state affordance changes; the panel and its Cmd/Ctrl+I activation are the same either way. Force-enable in dev via FEATURE_FLAG_FORCE_ENABLE=release_ui_langy_peek_dock_enabled.",
+  },
+  {
+    key: "release_ui_langy_share_command_names_asker",
+    scope: "PRODUCT",
+    defaultValue: false,
+    family: "Langy",
+    description:
+      "The code access card's share command names who asked with `--as <email>`, so a terminal signed in as someone else says so and offers to switch (spec: specs/langy/langy-code-access.feature). Turn on once the TypeScript SDK release that accepts `langwatch langy --as` is on npm: an older CLI refuses the unknown option. Off = the bare command. Force-enable in dev via FEATURE_FLAG_FORCE_ENABLE=release_ui_langy_share_command_names_asker.",
   },
   {
     key: "release_ui_agent_testing_v2_enabled",

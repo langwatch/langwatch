@@ -322,7 +322,11 @@ export class PrismaActivityMonitorRepository implements ActivityMonitorRepositor
     return (await result.json()) as SourceEventCountRow[];
   }
 
-  /** Rows a puller wrote to `governance_ocsf_events` under the synthetic `pull:` trace id. */
+  /**
+   * Rows a puller wrote to `governance_ocsf_events` under the synthetic `pull:` trace id.
+   * The dedup set is the page's keys only (its LIMIT), and carrying each key's
+   * EventTime prunes the outer, payload-reading scan to the page's months.
+   */
   async findPulledEventsForSource(input: {
     organizationId: string;
     tenantId: string;
@@ -349,14 +353,16 @@ export class PrismaActivityMonitorRepository implements ActivityMonitorRepositor
           AND startsWith(TraceId, 'pull:')
           AND SourceId = {sourceId:String}
           AND EventTime < fromUnixTimestamp64Milli({beforeMs:UInt64})
-          AND (TenantId, EventId, LastUpdatedAt) IN (
-            SELECT TenantId, EventId, max(LastUpdatedAt)
+          AND (TenantId, EventId, LastUpdatedAt, EventTime) IN (
+            SELECT TenantId, EventId, max(LastUpdatedAt), argMax(EventTime, LastUpdatedAt) AS LatestTime
             FROM governance_ocsf_events
             WHERE TenantId = {tenantId:String}
               AND startsWith(TraceId, 'pull:')
               AND SourceId = {sourceId:String}
               AND EventTime < fromUnixTimestamp64Milli({beforeMs:UInt64})
             GROUP BY TenantId, EventId
+            ORDER BY LatestTime DESC, EventId DESC
+            LIMIT {limit:UInt32}
           )
         ORDER BY EventTime DESC, EventId DESC
         LIMIT {limit:UInt32}
