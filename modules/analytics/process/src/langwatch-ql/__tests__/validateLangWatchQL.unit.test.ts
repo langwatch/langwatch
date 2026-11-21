@@ -444,14 +444,20 @@ describe("validateLangWatchQL given a set membership test", () => {
   });
 
   /** @scenario "A set membership test names its set with a subquery" */
-  it("tells the caller to write the set as a subquery", () => {
+  it("tells the caller to write the set as a subquery or as values", () => {
     const result = validate("SELECT count() FROM spans WHERE TraceId IN traces");
 
     expect(result.ok).toBe(false);
     if (result.ok) return;
     const violation = result.violations.find((entry) => entry.code === "IN_TABLE_OPERAND");
-    expect(violation?.message).toContain("x IN (SELECT ... FROM view)");
-    expect(violation?.hint).toContain("x IN (SELECT ... FROM view)");
+    for (const remedy of [
+      "x IN (SELECT ... FROM view)",
+      "x IN ('a', 'b')",
+      "x IN {ids:Array(String)}",
+    ]) {
+      expect(violation?.message).toContain(remedy);
+      expect(violation?.hint).toContain(remedy);
+    }
     expect(violation?.clause).toBe("filter");
   });
 

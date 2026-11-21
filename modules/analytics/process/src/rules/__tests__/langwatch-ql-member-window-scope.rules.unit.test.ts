@@ -105,8 +105,8 @@ function expectSetOperandRefusal(run: () => unknown): void {
         code: "IN_TABLE_OPERAND",
         clause: "statement",
         message:
-          "The set of an IN test cannot be a plain name. Write it as a subquery, x IN (SELECT ... FROM view), or as a list of values.",
-        hint: "Write the set as a subquery: x IN (SELECT ... FROM view).",
+          "The set of an IN test cannot be a plain name. Write rows of a view as a subquery, x IN (SELECT ... FROM view), and a list of values inline, x IN ('a', 'b'), or as a bound parameter, x IN {ids:Array(String)}.",
+        hint: "Write rows of a view as a subquery, x IN (SELECT ... FROM view), and a list of values inline, x IN ('a', 'b'), or as a bound parameter, x IN {ids:Array(String)}.",
       },
     ],
   });

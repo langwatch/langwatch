@@ -46,7 +46,8 @@ export const DEFAULT_VIOLATION_HINTS: Readonly<Record<LangWatchQLViolationCode, 
     "Use one of the views named in this violation's availableViews, or listed by GET /api/v1/query/schema.",
   TABLE_FUNCTION:
     "Read from one of the analytics views listed by GET /api/v1/query/schema instead of a table function.",
-  IN_TABLE_OPERAND: "Write the set as a subquery: x IN (SELECT ... FROM view).",
+  IN_TABLE_OPERAND:
+    "Write rows of a view as a subquery, x IN (SELECT ... FROM view), and a list of values inline, x IN ('a', 'b'), or as a bound parameter, x IN {ids:Array(String)}.",
   FUNCTION_NOT_ALLOWED:
     "Rewrite the expression using one of the functions named in this violation's allowedFunctions.",
   LIMIT_TOO_HIGH: `Lower the LIMIT to ${MAX_ROWS_TEXT} rows or fewer, and page the rest with LIMIT/OFFSET and an ORDER BY.`,

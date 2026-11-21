@@ -32,7 +32,7 @@ export const LWQL_VIOLATION_CODES = [
   "TABLE_FUNCTION",
   /**
    * The set of an `IN`, `NOT IN`, `GLOBAL IN` or `GLOBAL NOT IN` test was written as a plain
-   * name rather than a subquery, a literal, an allowed function or a query parameter.
+   * name, bare or wrapped in a function, rather than a subquery, literals or a value parameter.
    */
   "IN_TABLE_OPERAND",
   /**

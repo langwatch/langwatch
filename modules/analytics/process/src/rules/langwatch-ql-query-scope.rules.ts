@@ -231,14 +231,26 @@ export function assertNoUnsupportedTableModifiers({
 }): void {
   if (!/\b(final|sample)\b/i.test(sql)) return;
   const parsed = clickHouseSqlParser.parse(sql);
-  if (!parsed.ok) return;
+  if (parsed.ok) assertNoPostgresTableModifiers({ statements: parsed.statements, views, database });
+}
+
+/** {@link assertNoUnsupportedTableModifiers} over statements already parsed. */
+function assertNoPostgresTableModifiers({
+  statements,
+  views,
+  database,
+}: {
+  statements: readonly SqlAstNode[];
+  views: readonly LangWatchQLViewDefinition[];
+  database: string;
+}): void {
   const references = findViewReferences({
-    statements: parsed.statements,
+    statements,
     database,
-    withNames: findWithNames(parsed.statements),
+    withNames: findWithNames(statements),
   });
   assertNoTableModifiers({
-    statements: parsed.statements,
+    statements,
     references: postgresReferences({ references, views, database }),
   });
 }
@@ -398,8 +410,10 @@ export function scopeLangWatchQL({
   const isWindowed = memberWindows?.some((window) => window.from > 0) === true;
   const parsed = clickHouseSqlParser.parse(sql);
   if (!isWindowed) {
-    if (parsed.ok) assertNoNamedSetOperands(parsed.statements);
-    assertNoUnsupportedTableModifiers({ sql, views, database });
+    // A statement that does not parse is left for the validator to refuse.
+    if (!parsed.ok) return sql;
+    assertNoNamedSetOperands(parsed.statements);
+    assertNoPostgresTableModifiers({ statements: parsed.statements, views, database });
     return sql;
   }
 
