@@ -803,10 +803,11 @@ Feature: Dashboards v2 polish and bring-your-own-AI
   @unit
   Scenario: AC170 Scope: a new board starts at Project and My dashboard at Only me
     When a member creates a board, duplicates one or adds one from a template
-    Then its scope is Project, and the project it was made in owns it, unless it is made in the
-      create dialog, which sets the scope picked there (dashboards-organization-area.feature)
+    Then its scope is Project, and the project it was made in owns it
     And a member's My dashboard is made with the scope Only me
     And a board made with a project credential has the scope Project
+    # A board made in the create dialog will take the scope picked there
+    # (dashboards-organization-area.feature).
 
   @unit @integration
   Scenario: AC171 Scope: an Only me board exists for its author alone
@@ -870,18 +871,18 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     Then it is titled "Scope" with "Who can see this dashboard.", and offers Only me "Only you",
       Project "Everyone in <project>" and Organization "Everyone in <organization>, in each of
       their projects", with a tick on the current one
-    And a board homed outside LLM Ops offers no Project (dashboards-organization-area.feature)
     And a reader who is not the author sees the same value as a badge that cannot be opened,
       whose hover says only the person who made the dashboard can change its scope
+    # A board homed outside LLM Ops will offer no Project (dashboards-organization-area.feature).
 
   @integration
   Scenario: AC178 Scope control: the sidebar menu offers the same three choices
     When the author opens the "⋮" menu of their board in the sidebar
     Then under "Scope" it offers Only me, Project and Organization with a tick on the current one
     And their My dashboard offers the same three
-    And a board homed outside LLM Ops offers Only me and Organization, and no Project
-      (dashboards-organization-area.feature)
     And a board they did not make, or one another project owns, offers none
+    # A board homed outside LLM Ops will offer Only me and Organization, and no Project
+    # (dashboards-organization-area.feature).
 
   @unit @integration
   Scenario: AC179 Scope change: it asks first only when someone loses the board
@@ -905,17 +906,17 @@ Feature: Dashboards v2 polish and bring-your-own-AI
       by name, after Pinned and before From LangWatch, unless the member pinned them
     And with no such board there is no such group
 
-  @unit @integration @q1-all-projects
+  @unit @integration
   Scenario: AC182 Organization board: the Project chip says whose data it shows
     Given an Organization board
     Then its header has a chip "Project <project>", naming the project whose data is on screen
     When the reader opens the chip
-    Then it lists the projects of the organization they can open, one to choose, and marks the
-      project that owns the board "owner"
-    And in a project view it offers no "All projects"; at org level it also offers "All projects"
-      (dashboards-organization-area.feature)
+    Then it lists the projects of the organization they can open, one to choose, with no
+      "All projects", and marks the project that owns the board "owner"
     And choosing one opens the same board under that project
     And a Project or Only me board has no such chip
+    # That holds in a project view. At org level the chip will also offer "All projects"
+    # (dashboards-organization-area.feature, @q1-all-projects).
 
   @integration
   Scenario: AC183 A board the reader may not open is not available
@@ -935,8 +936,9 @@ Feature: Dashboards v2 polish and bring-your-own-AI
       or deletes, and nothing can be moved or resized
     And the widget menu still offers "Copy widget id" and "Export CSV", which change nothing
     And the description cannot be edited, and the sidebar menu offers no Rename and no Delete
-    And outside the owning project the header reads "<organization> · owned by <project>", or
-      "<organization> · owned by another project" when the reader cannot read the owner
+    And outside the owning project the header reads "<organization> · owned by <project>"
+    # When the reader cannot read the owner, it will read "<organization> · owned by another
+    # project" (dashboards-organization-area.feature).
 
   @integration
   Scenario: AC185 View-only: Duplicate to edit makes the reader's own copy

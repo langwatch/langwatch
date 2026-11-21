@@ -256,7 +256,7 @@ Feature: Product sidebars
     Then what I may do there is what the page already lets me do, with no read of its grants
     And in any other named project it is what that project's own grants let me do
 
-  # Retired in S6 by "Telemetry: boards made, moved or pinned outside a project name their owning project" in modules/dashboard/specs/dashboards-organization-area.feature.
+  # Retired in S6 by "Telemetry: boards made, moved or pinned outside a project name their owning project" in modules/dashboard/specs/dashboards-telemetry.feature.
   @unit
   Scenario: Events from the Dashboards section in Gateway or Coding agents are about the named project
     Given Dashboards in every product is on

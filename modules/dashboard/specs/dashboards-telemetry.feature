@@ -100,7 +100,7 @@ Feature: Dashboards telemetry: product events and query telemetry
     When the app loads with no project in scope
     Then analytics unregisters projectId straight away
 
-  # Retired in S6 by "Telemetry: boards made, moved or pinned outside a project name their owning project" in modules/dashboard/specs/dashboards-organization-area.feature.
+  # Retired in S6 by "Telemetry: boards made, moved or pinned outside a project name their owning project" in modules/dashboard/specs/dashboards-telemetry.feature.
   @integration
   Scenario: Telemetry: a board made or unpinned from Gateway or Coding agents names its project
     Given the Dashboards section in Gateway or Coding agents works in the project "Shop"
