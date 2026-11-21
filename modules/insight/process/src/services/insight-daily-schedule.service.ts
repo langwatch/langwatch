@@ -1,4 +1,5 @@
-import type { DashboardApi } from "@langwatch/dashboard-contract";
+import { curatedBoardDefinitionById } from "@langwatch/analytics-catalogue";
+import { type DashboardApi, DashboardNotFoundError } from "@langwatch/dashboard-contract";
 import {
   type ConfigureInsightDailyRunInput,
   configureInsightDailyRunInputSchema,
@@ -111,7 +112,7 @@ export class InsightDailyScheduleService {
   /**
    * The pointer a schedule keeps. A stored board is read as the person, so the dashboard
    * module refuses one they cannot open as not found, and its name is the board's own. A From
-   * LangWatch board is defined in the browser alone, so its pointer is kept as it was sent.
+   * LangWatch board is read from the catalogue: one no longer offered is not found, too.
    */
   private async openBoard({
     projectId,
@@ -122,7 +123,11 @@ export class InsightDailyScheduleService {
     userId: string;
     board: InsightRunBoard;
   }): Promise<InsightRunBoard> {
-    if (board.kind === "template") return board;
+    if (board.kind === "template") {
+      const curated = curatedBoardDefinitionById(board.id);
+      if (!curated) throw new DashboardNotFoundError(projectId);
+      return { ...board, name: pointerName({ name: curated.name, fallback: board.id }) };
+    }
     const stored = await this.members.dashboards.getBoard({
       projectId,
       dashboardId: board.id,

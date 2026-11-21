@@ -3,8 +3,9 @@
  * link opens the same view. Writes replace the history entry: typing is not a step back.
  */
 
+import { type CatalogueFilters, NO_CATALOGUE_FILTERS } from "@langwatch/analytics-catalogue";
+
 import { useAnalyticsHost } from "../../../model/analytics-host.ts";
-import { type CatalogueFilters, NO_CATALOGUE_FILTERS } from "../model/catalogue-filter.ts";
 import { templateFiltersFromQuery, templateFiltersQuery } from "../model/template-library.ts";
 
 export function useTemplateLibraryFilters() {

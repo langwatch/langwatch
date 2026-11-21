@@ -6,13 +6,13 @@
  * @see modules/dashboard/specs/dashboards-v2.feature
  */
 
+import { PICKER_QUESTIONS, pickerWidgets } from "@langwatch/analytics-catalogue";
 import type { UiProcedureCall } from "@langwatch/browser/testing-transport";
 import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ANALYTICS_MEMBER_PERMISSIONS, StubAnalyticsHost } from "../../../testing.tsx";
-import { PICKER_QUESTIONS, pickerWidgets } from "../catalogue/index.ts";
 import { curatedBoardById } from "../model/curated-boards.ts";
 import CuratedBoardScreen from "../ui/sections/curated-board.screen.tsx";
 import {

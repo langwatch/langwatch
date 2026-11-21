@@ -177,3 +177,9 @@ Feature: Removing something with Langy needs a confirmation click
     When Langy deletes or removes that record
     Then the card names the record, as the delete reads it for the key's owner
     And for a key that names nobody, or names another member, the record reads as not found
+
+  @regression @unit
+  Scenario: A From LangWatch widget's delete card names nothing
+    Given a From LangWatch board widget
+    When a Langy key reads its delete card by the widget's template widget id
+    Then the card names no owner, no other member and no nobody record

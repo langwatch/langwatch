@@ -438,7 +438,7 @@ export interface paths {
         };
         /**
          * Get a widget on a dashboard
-         * @description Returns one widget on this dashboard with its React source and named queries.
+         * @description Returns one widget on this dashboard with its React source and named queries. A From LangWatch board's read-only widgets (`template:<templateId>:<key>`) are answered under the board whose id is their template id, and as not found under any other board.
          */
         get: operations["getApiDashboardsByDashboardIdWidgetsByWidgetId"];
         put?: never;

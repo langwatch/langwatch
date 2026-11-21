@@ -30,9 +30,17 @@ and a reconcile pass's request to arm (`rearm_requested`).
 board is read through the dashboard module, as the person: every read names the board
 and the viewer, so the dashboard module's own scope rules answer it. An Only me board
 is its author's alone, and to anyone else it reads as a board that was deleted. A From LangWatch board is
-named by its template id, but its widgets are defined in the browser bundle alone, so
-a run on one ends as `skipped` with the reason `template_board`. No second copy of
-the catalogue is kept on the server.
+named by its template id, and its widgets are read from `@langwatch/analytics-catalogue`,
+the one copy of the catalogue the browser and the server both import. Each widget is named
+`template:<templateId>:<key>`, which the dashboard widget API answers read-only. Only
+the check that dashboards and custom charts are on for the project goes through the
+dashboard module; the run reads the catalogue itself, as no person. Moving template reads
+behind the dashboard module is pending. A finding filed from a template board keeps it as
+`curated/<templateId>` and the widget by its key, as a chat on that board files it. A
+template id the catalogue no longer offers reads as `board_unreadable`, not `board_deleted`:
+a renamed or retired template turns its schedules off only after the skipped days, so a
+release that brings it back before `INSIGHT_SCHEDULE_SKIPPED_DAYS_BEFORE_OFF` (7) days finds
+them still on. After that, the person must turn each schedule on again.
 
 **The run acts as the person, as they are when it runs.** Nothing about access is
 stored. A gate asks, in this order: the project exists and takes writes, the
@@ -194,8 +202,7 @@ attempt's lease is superseded: the new run is handed its id, and records it as `
 with `timeout` before its own outcome. A scheduled run is named by its slot. An
 operator's run is no scheduled run and takes no date from the schedule. A run that ends
 `skipped` with `board_deleted` turns the schedule off (`turned_off` by `system`), for a
-schedule that is on and no other; a run on a template keeps ending `skipped` with
-`template_board` and the schedule stays on.
+schedule that is on and no other.
 
 **A reconcile pass arms what lost its wake.** `dailyInsightsScheduleReconcile` is a
 scheduled singleton on the same pipeline, hourly and once across the fleet, as topic
@@ -219,8 +226,9 @@ asked for them.
 (`foldSkipStreak`) that the process state and the row both use: it holds the count and
 the slot of the newest run folded, so an outcome folded twice counts once and an
 outcome older than the newest changes nothing. `filed`, `nothing` and `failed` start
-the count over. An operator's run that is skipped is no skipped day, and neither is a
-run skipped with `template_board`: a schedule on a From LangWatch board stays on.
+the count over. An operator's run that is skipped is no skipped day. Runs recorded
+before template boards were read keep the retired reason `template_board`: still parsed,
+and still no skipped day, so a rebuild counts what the live fold counted.
 Turning the run on starts the count over. A wake hands its run the skipped days before it
 (`skippedDaysBefore` on the `runBoard` intent), and the run that records the seventh
 turns the schedule off, by `system` with the reason `skipped_days`, on the path
@@ -318,15 +326,11 @@ contract; insight knows nothing of ops.
   chart. Only a widget's stored query is evidence.
 - A run's brief names custom chart widgets only. Builder graphs and saved charts
   placed on a board are not listed, so a board that holds only those is `board_empty`.
-- Daily runs on From LangWatch boards need the template catalogue, or the part of it
-  a brief needs, readable on the server. Until then they are skipped, visibly: the
-  control says "Did not run" and that Langy cannot read From LangWatch boards yet. The
-  schedule sentence on such a board still says Langy reads it.
 - The browser counts every widget of a board, while a run reads custom chart widgets
   only. A board of builder graphs alone shows the control, and its run ends `board_empty`.
 - The control's "N new" tag counts the person's unseen insights whose pointer has the
-  board's id. A From LangWatch board is pointed at by its template id in a run and by
-  `curated/<template id>` in a chat, so chat insights from a template are not counted.
+  board's id. A From LangWatch board's is `curated/<template id>` from a run and from a
+  chat alike, so both are counted.
 - Hardening adds one peer, `AuditLogApi`, and two fact types of other modules'
   contracts (the organisation's member removed, the project's archived). Ops gains
   `InsightApi` as a peer.

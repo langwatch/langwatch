@@ -3,10 +3,16 @@
  * them. Exercises the app's widget operations through its private service.
  * @vitest-environment node
  */
+import { CURATED_BOARD_DEFINITIONS, templateWidgetId } from "@langwatch/analytics-catalogue";
+import {
+  CustomChartPlaygroundNotEnabledError,
+  DashboardWidgetNotFoundError,
+} from "@langwatch/analytics-contract";
 import { dashboardWidgetDefinitionSchema } from "@langwatch/analytics-contract/dashboard-widget-definition";
 import { describe, expect, it } from "vitest";
 
 import {
+  createDashboardTestAnalytics,
   createDashboardTestApp,
   createDashboardTestRepositoriesWithBoard,
 } from "./dashboard.fixture.ts";
@@ -52,6 +58,74 @@ describe("DashboardModule dashboard widgets", () => {
     await dashboard.deleteDashboardWidget({ projectId: "project-1", id: created.id });
 
     await expect(dashboard.listDashboardWidgets({ projectId: "project-1" })).resolves.toEqual([]);
+  });
+
+  /** @scenario "The app finds no deletable widget under a template widget id" */
+  it("finds no deletable widget under a From LangWatch widget id", async () => {
+    const dashboard = createDashboardTestApp({
+      repositories: await createDashboardTestRepositoriesWithBoard(),
+    });
+    const [board] = CURATED_BOARD_DEFINITIONS;
+    const [widget] = board?.widgets ?? [];
+    if (!board || !widget) throw new Error("No From LangWatch board ships a widget");
+    const id = templateWidgetId({ templateId: board.templateId, key: widget.key });
+
+    await expect(
+      dashboard.getDashboardWidget({ projectId: "project-1", id }),
+    ).resolves.toBeTruthy();
+    await expect(
+      dashboard.getDeletableDashboardWidget({ projectId: "project-1", id }),
+    ).rejects.toBeInstanceOf(DashboardWidgetNotFoundError);
+  });
+
+  /** @scenario "A delete on a project without widgets is refused as disabled, even for a template widget id" */
+  it("refuses a delete under a From LangWatch widget id as disabled, not as not found", async () => {
+    const analytics = createDashboardTestAnalytics({
+      assertDashboardWidgetsEnabled: async () => {
+        throw new CustomChartPlaygroundNotEnabledError();
+      },
+    });
+    const dashboard = createDashboardTestApp({
+      repositories: await createDashboardTestRepositoriesWithBoard(),
+      dependencies: { analytics },
+    });
+    const [board] = CURATED_BOARD_DEFINITIONS;
+    const [widget] = board?.widgets ?? [];
+    if (!board || !widget) throw new Error("No From LangWatch board ships a widget");
+    const id = templateWidgetId({ templateId: board.templateId, key: widget.key });
+
+    await expect(
+      dashboard.getDeletableDashboardWidget({ projectId: "project-1", id }),
+    ).rejects.toBeInstanceOf(CustomChartPlaygroundNotEnabledError);
+  });
+
+  /** @scenario "A delete read of a stored widget checks widgets are enabled once" */
+  it("checks widgets are enabled once when reading a stored widget to delete", async () => {
+    let enabledChecks = 0;
+    const analytics = createDashboardTestAnalytics({
+      assertDashboardWidgetsEnabled: async () => {
+        enabledChecks += 1;
+      },
+    });
+    const dashboard = createDashboardTestApp({
+      repositories: await createDashboardTestRepositoriesWithBoard(),
+      dependencies: { analytics },
+    });
+    const created = await dashboard.createDashboardWidget({
+      projectId: "project-1",
+      name: "Usage",
+      code: "export default () => null;",
+      queries: [],
+    });
+    enabledChecks = 0;
+
+    const deletable = await dashboard.getDeletableDashboardWidget({
+      projectId: "project-1",
+      id: created.id,
+    });
+
+    expect(deletable.id).toBe(created.id);
+    expect(enabledChecks).toBe(1);
   });
 
   /** @scenario "AC123 Ask Langy: the prompt is stored on built widgets and kept on edit and duplicate" */

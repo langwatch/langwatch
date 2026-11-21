@@ -5,6 +5,7 @@
  * @see modules/dashboard/specs/dashboards-v1.feature
  */
 
+import type { BoardTemplate } from "@langwatch/analytics-catalogue";
 import { type UiProcedureCall, UiProcedureRefusal } from "@langwatch/browser/testing-transport";
 import { cleanup, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -15,7 +16,6 @@ import {
   NO_PROCEDURES,
   renderDashboards,
 } from "../../__tests__/render-dashboards.test-helpers.tsx";
-import type { BoardTemplate } from "../../templates/index.ts";
 import { useBoardFromTemplate } from "../use-board-from-template.ts";
 
 const definition = (sql: string) => ({

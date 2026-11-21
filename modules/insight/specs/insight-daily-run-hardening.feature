@@ -76,9 +76,9 @@ Feature: The daily insights run before a wider rollout
       And an operator's run that files starts it over
 
     @unit
-    Scenario: A skipped run on a From LangWatch board is no skipped day
+    Scenario: A run recorded as template_board is no skipped day on a rebuild
       Given a count of 6 skipped days
-      When a scheduled run is skipped with the reason template_board
+      When a rebuild folds a scheduled run recorded with the retired reason template_board
       Then the count is still 6
       And it is still 6 after two more such days
 

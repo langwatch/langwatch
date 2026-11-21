@@ -172,6 +172,9 @@
       "path": "./modules/analytics/browser"
     },
     {
+      "path": "./modules/analytics/catalogue"
+    },
+    {
       "path": "./modules/analytics/client"
     },
     {

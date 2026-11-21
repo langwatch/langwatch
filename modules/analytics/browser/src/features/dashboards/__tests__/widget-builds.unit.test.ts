@@ -4,21 +4,21 @@
  * carries its description and Langy prompt outside its code, and fits its empty face.
  */
 
-import { NAVIGABLE_TARGETS } from "@langwatch/analytics-contract/chart-frame-protocol";
-import { dashboardWidgetDefinitionSchema } from "@langwatch/analytics-contract/dashboard-widget-definition";
-import { describe, expect, it } from "vitest";
-
-import { chartGridPlacementSchema } from "../../../../model/chart-grid.ts";
-import { BOARD_MIN_ROW_SPAN } from "../../model/board-grid.ts";
-import { BOARD_TEMPLATES } from "../../templates/index.ts";
 import {
+  BOARD_TEMPLATES,
   CATALOGUE_WIDGET_BUILDS,
   CATALOGUE_WIDGETS,
   IMPLEMENTED_WIDGET_IDS,
   implementedWidget,
+  isCodingWidget,
   PICKER_SECTIONS,
-} from "../index.ts";
-import { isCodingWidget } from "../model/catalogue-widgets.ts";
+} from "@langwatch/analytics-catalogue";
+import { NAVIGABLE_TARGETS } from "@langwatch/analytics-contract/chart-frame-protocol";
+import { dashboardWidgetDefinitionSchema } from "@langwatch/analytics-contract/dashboard-widget-definition";
+import { describe, expect, it } from "vitest";
+
+import { chartGridPlacementSchema } from "../../../model/chart-grid.ts";
+import { BOARD_MIN_ROW_SPAN } from "../model/board-grid.ts";
 
 const built = IMPLEMENTED_WIDGET_IDS.flatMap((id) => implementedWidget(id) ?? []);
 const tables = built.filter(({ definition }) => definition.code.includes("<table"));

@@ -3,9 +3,9 @@
  * @see modules/dashboard/specs/dashboards-widget-flow.feature
  */
 
+import { CATALOGUE_WIDGETS } from "@langwatch/analytics-catalogue";
 import { describe, expect, it } from "vitest";
 
-import { CATALOGUE_WIDGETS } from "../catalogue/index.ts";
 import { widgetAsks } from "../langy/model/board-langy.ts";
 import { widgetShape } from "../model/widget-shape.ts";
 

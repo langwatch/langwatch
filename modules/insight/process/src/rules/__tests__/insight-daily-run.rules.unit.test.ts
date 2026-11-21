@@ -6,6 +6,11 @@
  * @see modules/insight/specs/insight-daily-run.feature
  */
 
+import {
+  CURATED_BOARD_DEFINITIONS,
+  curatedBoardPointerId,
+  templateWidgetId,
+} from "@langwatch/analytics-catalogue";
 import type { InsightEntry } from "@langwatch/insight-contract";
 import { describe, expect, it } from "vitest";
 
@@ -18,6 +23,7 @@ import {
   matchableInsightsOfBoard,
   openInsightsOfBoard,
   pointerName,
+  runFindingPointer,
   runInsightId,
 } from "../insight-daily-run.rules.ts";
 
@@ -327,6 +333,87 @@ describe("decideRunFindings", () => {
         "file 4",
         "file 5",
       ]);
+    });
+  });
+});
+
+describe("runFindingPointer", () => {
+  const widgets = CURATED_BOARD_DEFINITIONS.flatMap(({ templateId, widgets }) =>
+    widgets.map(({ key }) => ({ templateId, key })),
+  );
+
+  describe("given each widget of each From LangWatch board", () => {
+    /** @scenario "A From LangWatch board is read from the catalogue" */
+    it.each(widgets)("keeps $templateId/$key as curated/<templateId> and the widget's key", (w) => {
+      const pointer = runFindingPointer({
+        board: { kind: "template", id: w.templateId },
+        boardPointerId: curatedBoardPointerId(w.templateId),
+        name: "Board",
+        widget: { id: templateWidgetId(w), name: "Widget" },
+      });
+
+      expect(pointer).toEqual({
+        id: curatedBoardPointerId(w.templateId),
+        name: "Board",
+        widget: { id: w.key, name: "Widget" },
+      });
+    });
+  });
+
+  describe("given a widget id the board does not have", () => {
+    it("files the finding on the board with no widget", () => {
+      const pointer = runFindingPointer({
+        board: { kind: "template", id: "release" },
+        boardPointerId: "curated/release",
+        name: "Board",
+        widget: { id: "template:release:nope", name: "Widget" },
+      });
+
+      expect(pointer.widget).toBeNull();
+    });
+  });
+
+  describe("given a widget of another template", () => {
+    it("files the finding on the board with no widget", () => {
+      const other = widgets.find(({ templateId }) => templateId !== "release");
+      if (!other) throw new Error("No widget on another template");
+
+      const pointer = runFindingPointer({
+        board: { kind: "template", id: "release" },
+        boardPointerId: "curated/release",
+        name: "Board",
+        widget: { id: templateWidgetId(other), name: "Widget" },
+      });
+
+      expect(pointer.widget).toBeNull();
+    });
+  });
+
+  describe("given a stored board", () => {
+    it("keeps the board id and the widget as they came", () => {
+      const widget = { id: "widget-1", name: "Widget" };
+
+      expect(
+        runFindingPointer({
+          board: { kind: "dashboard", id: "board-1" },
+          boardPointerId: "board-1",
+          name: "Board",
+          widget,
+        }),
+      ).toEqual({ id: "board-1", name: "Board", widget });
+    });
+  });
+
+  describe("given a From LangWatch board and no widget", () => {
+    it("files the finding on the board with no widget", () => {
+      expect(
+        runFindingPointer({
+          board: { kind: "template", id: "release" },
+          boardPointerId: "curated/release",
+          name: "Board",
+          widget: null,
+        }),
+      ).toEqual({ id: "curated/release", name: "Board", widget: null });
     });
   });
 });

@@ -3,6 +3,7 @@
  * boards get and the addresses in the area. Addresses are built and read here only.
  */
 
+import { CURATED_BOARD_SEGMENT } from "@langwatch/analytics-catalogue";
 import { MY_DASHBOARD_NAME } from "@langwatch/dashboard-contract";
 
 export { MY_DASHBOARD_NAME };
@@ -39,9 +40,6 @@ export function dashboardsPath({
 /** The templates library's segment; the route table ranks it above a board id, so none takes it. */
 export const TEMPLATES_SEGMENT = "templates";
 
-/** The From LangWatch boards' segment, ranked above a board id like the library's. */
-export const CURATED_SEGMENT = "curated";
-
 /** The address of the templates library. */
 export function dashboardTemplatesPath({ projectSlug }: { projectSlug: string }): string {
   return `${dashboardsPath({ projectSlug })}/${TEMPLATES_SEGMENT}`;
@@ -55,7 +53,8 @@ export function curatedBoardPath({
   projectSlug: string;
   templateId: string;
 }): string {
-  return `${dashboardsPath({ projectSlug })}/${CURATED_SEGMENT}/${encodeURIComponent(templateId)}`;
+  const area = dashboardsPath({ projectSlug });
+  return `${area}/${CURATED_BOARD_SEGMENT}/${encodeURIComponent(templateId)}`;
 }
 
 /** What the area has open, read from the address under `/dashboards/`. */
@@ -70,7 +69,7 @@ export function dashboardsPlace(openPath: string): DashboardsPlace {
   const [first, second] = openPath.split("/").map((segment) => decodeURIComponent(segment));
   if (!first) return { kind: "landing" };
   if (first === TEMPLATES_SEGMENT) return { kind: "templates" };
-  if (first === CURATED_SEGMENT && second) return { kind: "curated", templateId: second };
+  if (first === CURATED_BOARD_SEGMENT && second) return { kind: "curated", templateId: second };
   return { kind: "board", dashboardId: first };
 }
 

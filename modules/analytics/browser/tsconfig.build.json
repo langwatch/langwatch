@@ -76,6 +76,9 @@
     },
     {
       "path": "../client/tsconfig.build.json"
+    },
+    {
+      "path": "../catalogue/tsconfig.build.json"
     }
   ],
   // Dependencies the build does not import get no reference; tsconfig.test.json holds test-only ones (tsconfig-shape-codemod).

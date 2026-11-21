@@ -13,7 +13,7 @@ import type {
 import { isAggregateProjectKind } from "@langwatch/project-contract";
 import { currentTimeZone } from "@langwatch/time";
 
-import { defaultRunSettings, runTimeWords, TEMPLATE_BOARD_NOTE } from "../model/daily-run.ts";
+import { defaultRunSettings, runTimeWords } from "../model/daily-run.ts";
 import { useInsightHost } from "../model/insight-host.ts";
 import { insightApi } from "./insight-api.ts";
 
@@ -74,12 +74,7 @@ export function useBoardDailyInsights({ board }: { board: InsightRunBoard }) {
     write({
       next: (current) => ({ ...current, state: "on", settings, offReason: null }),
       send: (handlers) => configure.mutate({ projectId, board, ...settings }, handlers),
-      // No run reads a From LangWatch board yet, so its toast says so instead of a promise.
-      done: `${done} ${
-        board.kind === "template"
-          ? TEMPLATE_BOARD_NOTE
-          : `Langy reads this board every day ${runTimeWords(settings)}.`
-      }`,
+      done: `${done} Langy reads this board every day ${runTimeWords(settings)}.`,
       fallbackTitle,
     });
   const turnOffWith = ({ done, fallbackTitle }: { done: string; fallbackTitle: string }) =>

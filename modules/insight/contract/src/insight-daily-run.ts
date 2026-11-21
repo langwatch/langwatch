@@ -51,8 +51,8 @@ export const insightRunOutcomeSchema = z.enum(INSIGHT_RUN_OUTCOMES);
 export type InsightRunOutcome = z.infer<typeof insightRunOutcomeSchema>;
 
 /**
- * Why a run never reached Langy. `template_board`: no server can read a template's widgets
- * yet. `board_unreadable`: dashboards or custom charts are off for the project.
+ * Why a run never reached Langy. `board_unreadable`: dashboards or custom charts are off, or
+ * the catalogue no longer offers the From LangWatch board.
  */
 export const INSIGHT_RUN_SKIP_REASONS = [
   "flag_off",
@@ -63,7 +63,6 @@ export const INSIGHT_RUN_SKIP_REASONS = [
   "board_deleted",
   "board_unreadable",
   "board_empty",
-  "template_board",
 ] as const;
 export type InsightRunSkipReason = (typeof INSIGHT_RUN_SKIP_REASONS)[number];
 
@@ -91,8 +90,18 @@ export type InsightRunFailureReason = (typeof INSIGHT_RUN_FAILURE_REASONS)[numbe
 export const INSIGHT_RUN_QUIET_REASONS = ["no_new_traces"] as const;
 export type InsightRunQuietReason = (typeof INSIGHT_RUN_QUIET_REASONS)[number];
 
-export const insightRunReasonSchema = z.enum([
+/** Reasons no run records any more, still read from runs recorded before they retired. */
+export const INSIGHT_RUN_RETIRED_REASONS = ["template_board"] as const;
+export type InsightRunRetiredReason = (typeof INSIGHT_RUN_RETIRED_REASONS)[number];
+
+/** Every reason a recorded `skipped` run can carry: the live ones and the retired. */
+export const INSIGHT_RUN_RECORDED_SKIP_REASONS = [
   ...INSIGHT_RUN_SKIP_REASONS,
+  ...INSIGHT_RUN_RETIRED_REASONS,
+] as const;
+
+export const insightRunReasonSchema = z.enum([
+  ...INSIGHT_RUN_RECORDED_SKIP_REASONS,
   ...INSIGHT_RUN_FAILURE_REASONS,
   ...INSIGHT_RUN_QUIET_REASONS,
 ]);

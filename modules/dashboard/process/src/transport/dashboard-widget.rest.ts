@@ -1,3 +1,4 @@
+import { CURATED_BOARD_SEGMENT, curatedBoardWidgetById } from "@langwatch/analytics-catalogue";
 import {
   type DashboardWidget,
   DashboardWidgetNotFoundError,
@@ -75,6 +76,23 @@ const widgetOrBoardNotFoundResponse: Record<404, RouteResponse> = {
   },
 };
 
+/** A From LangWatch widget links to its board's `curated` page; a stored one to its board. */
+function widgetPlatformUrl({
+  widget,
+  platformUrl,
+}: {
+  widget: DashboardWidget;
+  platformUrl: string;
+}): string {
+  const curated = curatedBoardWidgetById(widget.id);
+  if (curated) {
+    return `${platformUrl}/${CURATED_BOARD_SEGMENT}/${encodeURIComponent(curated.templateId)}`;
+  }
+  return widget.dashboardId
+    ? `${platformUrl}/${encodeURIComponent(widget.dashboardId)}`
+    : platformUrl;
+}
+
 /**
  * The widget as the API publishes it. `platformUrl` is the Dashboards list; a widget on a board
  * links to that board's page.
@@ -89,9 +107,7 @@ export function widgetResource(
     definition: { ...widget.definition, queries: [...widget.definition.queries] },
     createdAt: widget.createdAt.toString(),
     updatedAt: widget.updatedAt.toString(),
-    platformUrl: widget.dashboardId
-      ? `${platformUrl}/${encodeURIComponent(widget.dashboardId)}`
-      : platformUrl,
+    platformUrl: widgetPlatformUrl({ widget, platformUrl }),
     dashboardId: widget.dashboardId,
     gridColumn: widget.gridColumn,
     gridRow: widget.gridRow,
@@ -190,7 +206,7 @@ export const dashboardWidgetRest = defineRestRouter(DashboardApi)
   .withDocs({
     summary: "Get a dashboard widget",
     description:
-      "Returns one dashboard widget with its React source and named queries. A widget saved in another project is reported as not found.",
+      "Returns one dashboard widget with its React source and named queries. A widget saved in another project is reported as not found. It also answers the read-only template:<templateId>:<key> ids of the From LangWatch boards, which the list route never lists and on which PATCH and DELETE answer 404.",
     tags: WIDGET_TAGS,
     responses: {
       ...canonicalBaseResponses,
@@ -297,9 +313,13 @@ export const dashboardWidgetRest = defineRestRouter(DashboardApi)
     resource: "dashboard widget",
     action: "delete",
     idParam: "widgetId",
-    name: ({ app, projectId, id, ownerUserId }) =>
+    name: async ({ app, projectId, id, ownerUserId }) =>
       nameUnlessMissing({
-        read: app.getDashboardWidget({ projectId, id, ...viewerOfOwner({ ownerUserId }) }),
+        read: app.getDeletableDashboardWidget({
+          projectId,
+          id,
+          ...viewerOfOwner({ ownerUserId }),
+        }),
         missing: DashboardWidgetNotFoundError,
         nameOf: (widget) => widget.name,
       }),

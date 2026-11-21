@@ -9,6 +9,14 @@ export type {
   BoardTemplateWidget,
   TemplateProgress,
 } from "./model/board-template.ts";
+export {
+  BUCKETS,
+  COMPLETENESS,
+  DATES,
+  GAP_BRIDGE,
+  NUMBERS,
+  SERIES_CHART,
+} from "./model/widget-code-parts.ts";
 
 /** Every template the gallery offers: the catalogue's, the ones that can be made first. */
 export const BOARD_TEMPLATES: readonly BoardTemplate[] = GALLERY_TEMPLATES;

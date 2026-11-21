@@ -115,8 +115,8 @@ describe("given a count of 6 skipped days", () => {
     });
   });
 
-  describe("when a run on a From LangWatch board is skipped", () => {
-    /** @scenario "A skipped run on a From LangWatch board is no skipped day" */
+  describe("when a rebuild folds runs recorded with the retired template_board reason", () => {
+    /** @scenario "A run recorded as template_board is no skipped day on a rebuild" */
     it("still counts 6, on that day and on every day after", () => {
       const streak = skippedFor(6);
       const days = [6, 7, 8].map((day) => scheduled(day, "skipped", "template_board"));

@@ -313,7 +313,8 @@ export const boardRest = defineRestRouter(DashboardApi)
   .withOutput(dashboardWidgetResourceSchema)
   .withDocs({
     summary: "Get a widget on a dashboard",
-    description: "Returns one widget on this dashboard with its React source and named queries.",
+    description:
+      "Returns one widget on this dashboard with its React source and named queries. A From LangWatch board's read-only widgets (`template:<templateId>:<key>`) are answered under the board whose id is their template id, and as not found under any other board.",
     tags: BOARD_TAGS,
     responses: {
       ...canonicalBaseResponses,
@@ -377,9 +378,9 @@ export const boardRest = defineRestRouter(DashboardApi)
     resource: "dashboard widget",
     action: "delete",
     idParam: "widgetId",
-    name: ({ app, projectId, id, ownerUserId, input }) =>
+    name: async ({ app, projectId, id, ownerUserId, input }) =>
       nameUnlessMissing({
-        read: app.getDashboardWidget({
+        read: app.getDeletableDashboardWidget({
           projectId,
           id,
           onDashboardId: boardIdParamsSchema.parse(input).dashboardId,

@@ -4,7 +4,12 @@
  * so what is drawn is decided here, against the boards and widgets that exist now. Pure.
  */
 
-import { CURATED_SEGMENT, curatedBoardPath, dashboardsPath } from "./boards.ts";
+import {
+  isCuratedBoardPointerId,
+  templateIdOfCuratedBoardPointer,
+} from "@langwatch/analytics-catalogue";
+
+import { curatedBoardPath, dashboardsPath } from "./boards.ts";
 import type { CuratedBoard } from "./curated-boards.ts";
 
 /** What a peer kept: ids, and the names as they were. */
@@ -35,12 +40,6 @@ export function keptDashboardPointer(pointer: DashboardPointer): ResolvedPointer
   return { board: kept(pointer.boardName), ...keptWidget(pointer) };
 }
 
-/** A From LangWatch board's pointer id is its address segment, `curated/<templateId>`. */
-function curatedTemplateId(boardId: string): string | undefined {
-  const prefix = `${CURATED_SEGMENT}/`;
-  return boardId.startsWith(prefix) ? boardId.slice(prefix.length) : void 0;
-}
-
 /**
  * The board and the widget as they are now. `boards` and `widgets` are undefined while
  * they are not known (loading or failed): the kept names then show as plain text, never
@@ -59,8 +58,8 @@ export function resolveDashboardPointer({
   curated: readonly CuratedBoard[];
   projectSlug: string;
 }): ResolvedPointer {
-  const templateId = curatedTemplateId(pointer.boardId);
-  if (templateId !== void 0) {
+  if (isCuratedBoardPointerId(pointer.boardId)) {
+    const templateId = templateIdOfCuratedBoardPointer(pointer.boardId);
     return curatedPointer({ pointer, templateId, curated, projectSlug });
   }
   if (boards === void 0) return keptDashboardPointer(pointer);
@@ -92,13 +91,15 @@ function curatedPointer({
   projectSlug,
 }: {
   pointer: DashboardPointer;
-  templateId: string;
+  templateId: string | undefined;
   curated: readonly CuratedBoard[];
   projectSlug: string;
 }): ResolvedPointer {
   const board = curated.find((each) => each.templateId === templateId);
-  if (!board) return { board: gone(pointer.boardName), ...keptWidget(pointer) };
-  const href = curatedBoardPath({ projectSlug, templateId });
+  if (!board) {
+    return { board: gone(pointer.boardName), ...keptWidget(pointer) };
+  }
+  const href = curatedBoardPath({ projectSlug, templateId: board.templateId });
   if (!pointer.widget) return { board: { name: board.name, href, deleted: false } };
   const widgetKey = pointer.widget.id;
   return {
