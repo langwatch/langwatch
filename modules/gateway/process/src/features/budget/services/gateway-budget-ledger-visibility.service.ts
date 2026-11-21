@@ -59,8 +59,9 @@ export class GatewayBudgetLedgerVisibilityService {
       return asked;
     };
 
-    const budgetOwner = personalBudgetOwner({ detail, gone });
-    if (budgetOwner !== undefined && budgetOwner !== actorUserId && !(await seesOthers())) {
+    const ownership = budgetOwnership({ detail, gone });
+    const callersOwn = ownership.kind === "owned" && ownership.userId === actorUserId;
+    if (ownership.kind !== "shared" && !callersOwn && !(await seesOthers())) {
       throw new GatewayBudgetNotFoundError();
     }
     const othersPersonal = detail.recentLedger.filter(
@@ -118,18 +119,29 @@ function isPersonal({
   );
 }
 
-/** The person a budget belongs to, null when no one can be named, undefined when it is shared. */
-function personalBudgetOwner({
+/** Whether a budget belongs to one person; a personal key's budget may name no one. */
+type BudgetOwnership =
+  | { kind: "shared" }
+  | { kind: "owned"; userId: string }
+  | { kind: "ownerUnnamed" };
+
+function budgetOwnership({
   detail,
   gone,
 }: {
   detail: BudgetDetail;
   gone: ReadonlySet<string>;
-}): string | null | undefined {
-  if (detail.budget.scopeType === "PRINCIPAL") return detail.budget.scopeId;
-  if (detail.budget.scopeType !== "VIRTUAL_KEY") return undefined;
+}): BudgetOwnership {
+  if (detail.budget.scopeType === "PRINCIPAL") {
+    return { kind: "owned", userId: detail.budget.scopeId };
+  }
   const owner = detail.scopeKeyOwner;
-  return isPersonal({ owner, gone }) ? (owner?.principalUserId ?? null) : undefined;
+  if (detail.budget.scopeType !== "VIRTUAL_KEY" || !isPersonal({ owner, gone })) {
+    return { kind: "shared" };
+  }
+  return owner?.principalUserId
+    ? { kind: "owned", userId: owner.principalUserId }
+    : { kind: "ownerUnnamed" };
 }
 
 function withoutOwner({

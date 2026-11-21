@@ -59,6 +59,105 @@ const ACCESS_MODEL_DOCS = fileURLToPath(
   new URL("../../../../../../charts/langwatch/README.md", import.meta.url),
 );
 
+/** Keys the person-tied budget seed mints; the generic seed's `<tenant>-vk` stays shared. */
+function personalUsageKeys({ tenant }: { tenant: string }) {
+  return {
+    personal: `${tenant}-vk-personal`,
+    minted: `${tenant}-vk-minted`,
+    orphaned: `${tenant}-vk-orphaned`,
+    machine: `${tenant}-vk-machine`,
+  };
+}
+
+/** Personal, minted, orphaned and machine keys, budgets of every scope, and spend on them. */
+function personalUsageSeed({ tenant }: { tenant: string }): string[] {
+  const org = `${tenant}-org`;
+  const user = `${tenant}-user`;
+  const sharedBudgetId = `${tenant}-GatewayBudget-1`;
+  const { personal, minted, orphaned, machine } = personalUsageKeys({ tenant });
+  const key = (id: string, principal: string, mintedAsPersonal: boolean, creator: string) =>
+    `('${id}', '${org}', '${id}', 'hash-${id}', 'vk-${id}', ${principal}, ` +
+    `${mintedAsPersonal}, '${creator}')`;
+  const budget = (suffix: string, scopeType: string, scopeId: string) =>
+    `('${tenant}-bdg-${suffix}', '${org}', '${scopeType}', '${scopeId}', '${suffix}', ` +
+    `'MONTH', 10, now(), '${user}')`;
+  const debit = (suffix: string, budgetId: string, keyId: string) =>
+    `('${tenant}-led-${suffix}', '${budgetId}', '${keyId}', 'req-${suffix}', 1, 'gpt-5')`;
+  return [
+    `INSERT INTO "VirtualKey" ("id", "organizationId", "name", "hashedSecret", ` +
+      `"displayPrefix", "principalUserId", "mintedAsPersonal", "createdById") VALUES ` +
+      [
+        key(personal, `'${user}'`, true, user),
+        key(minted, "NULL", true, user),
+        key(orphaned, "NULL", false, `${tenant}-erased-user`),
+        key(machine, "NULL", false, `svc_${tenant}`),
+      ].join(", "),
+    `INSERT INTO "GatewayBudget" ("id", "organizationId", "scopeType", "scopeId", "name", ` +
+      `"window", "limitUsd", "resetsAt", "createdById") VALUES ` +
+      [
+        budget("principal", "PRINCIPAL", user),
+        budget("attributed", "ATTRIBUTED_USER", `${tenant}-vk`),
+        budget("shared-key", "VIRTUAL_KEY", `${tenant}-vk`),
+        budget("personal-key", "VIRTUAL_KEY", personal),
+        budget("orphaned-key", "VIRTUAL_KEY", orphaned),
+        budget("machine-key", "VIRTUAL_KEY", machine),
+      ].join(", "),
+    `INSERT INTO "GatewayBudgetLedger" ("id", "budgetId", "virtualKeyId", ` +
+      `"gatewayRequestId", "amountUsd", "model") VALUES ` +
+      [
+        debit("personal", sharedBudgetId, personal),
+        debit("minted", sharedBudgetId, minted),
+        debit("orphaned", sharedBudgetId, orphaned),
+        debit("machine", sharedBudgetId, machine),
+        debit("on-principal", `${tenant}-bdg-principal`, `${tenant}-vk`),
+      ].join(", "),
+    `INSERT INTO "GatewayBudgetBucketBoundary" ("id", "organizationId", "budgetId", ` +
+      `"bucketScopeId", "periodStartedAt") VALUES ('${tenant}-bnd-attributed', '${org}', ` +
+      `'${tenant}-bdg-attributed', '${tenant}-vk:end-user-1', now())`,
+  ];
+}
+
+function personalUsageCleanup({ tenant }: { tenant: string }): string[] {
+  const keyIds = Object.values(personalUsageKeys({ tenant })).map((id) => `'${id}'`);
+  return [
+    `DELETE FROM "GatewayBudgetLedger" WHERE "id" LIKE '${tenant}-led-%'`,
+    `DELETE FROM "GatewayBudgetBucketBoundary" WHERE "id" = '${tenant}-bnd-attributed'`,
+    `DELETE FROM "GatewayBudget" WHERE "id" LIKE '${tenant}-bdg-%'`,
+    `DELETE FROM "VirtualKey" WHERE "id" IN (${keyIds.join(", ")})`,
+  ];
+}
+
+/** Runs each statement as the superuser, stopping at the first that fails. */
+async function applyAsPostgresAdmin({
+  postgres,
+  statements,
+}: {
+  postgres: Pick<LangWatchQLPostgresHarness, "asAdmin">;
+  statements: readonly string[];
+}): Promise<void> {
+  for (const sql of statements) {
+    const result = await postgres.asAdmin(sql);
+    if (result.exitCode !== 0) throw new Error(`statement failed: ${sql}\n${result.stderr}`);
+  }
+}
+
+/** One id column of a relation, sorted, as the given client reads it. */
+async function readIds({
+  client,
+  relation,
+  column,
+}: {
+  client: ClickHouseClient;
+  relation: string;
+  column: string;
+}): Promise<string[]> {
+  const rows = await selectRows<Record<string, string>>(
+    client,
+    `SELECT ${column} FROM ${relation} ORDER BY ${column}`,
+  );
+  return rows.map((row) => row[column] ?? "");
+}
+
 describe("given the PostgreSQL-resident catalog mapped into ClickHouse through the server-side named collection", () => {
   let harness: LangWatchQLClickHouseHarness;
   let postgres: LangWatchQLPostgresHarness;
@@ -968,116 +1067,49 @@ describe("given the PostgreSQL-resident catalog mapped into ClickHouse through t
     /** The generic seed's organization budget, its ledger row and `<tenant>-vk` are shared. */
     const tenant = () => harness.tenantA.tenantId;
     const sharedBudgetId = () => `${tenant()}-GatewayBudget-1`;
-    const keys = () => ({
-      personal: `${tenant()}-vk-personal`,
-      minted: `${tenant()}-vk-minted`,
-      orphaned: `${tenant()}-vk-orphaned`,
-      machine: `${tenant()}-vk-machine`,
-    });
-
-    const seedStatements = (): string[] => {
-      const org = `${tenant()}-org`;
-      const user = `${tenant()}-user`;
-      const { personal, minted, orphaned, machine } = keys();
-      const key = (id: string, principal: string, mintedAsPersonal: boolean, creator: string) =>
-        `('${id}', '${org}', '${id}', 'hash-${id}', 'vk-${id}', ${principal}, ` +
-        `${mintedAsPersonal}, '${creator}')`;
-      const budget = (suffix: string, scopeType: string, scopeId: string) =>
-        `('${tenant()}-bdg-${suffix}', '${org}', '${scopeType}', '${scopeId}', '${suffix}', ` +
-        `'MONTH', 10, now(), '${user}')`;
-      const debit = (suffix: string, budgetId: string, keyId: string) =>
-        `('${tenant()}-led-${suffix}', '${budgetId}', '${keyId}', 'req-${suffix}', 1, 'gpt-5')`;
-      return [
-        `INSERT INTO "VirtualKey" ("id", "organizationId", "name", "hashedSecret", ` +
-          `"displayPrefix", "principalUserId", "mintedAsPersonal", "createdById") VALUES ` +
-          [
-            key(personal, `'${user}'`, true, user),
-            key(minted, "NULL", true, user),
-            key(orphaned, "NULL", false, `${tenant()}-erased-user`),
-            key(machine, "NULL", false, `svc_${tenant()}`),
-          ].join(", "),
-        `INSERT INTO "GatewayBudget" ("id", "organizationId", "scopeType", "scopeId", "name", ` +
-          `"window", "limitUsd", "resetsAt", "createdById") VALUES ` +
-          [
-            budget("principal", "PRINCIPAL", user),
-            budget("attributed", "ATTRIBUTED_USER", `${tenant()}-vk`),
-            budget("shared-key", "VIRTUAL_KEY", `${tenant()}-vk`),
-            budget("personal-key", "VIRTUAL_KEY", personal),
-            budget("orphaned-key", "VIRTUAL_KEY", orphaned),
-            budget("machine-key", "VIRTUAL_KEY", machine),
-          ].join(", "),
-        `INSERT INTO "GatewayBudgetLedger" ("id", "budgetId", "virtualKeyId", ` +
-          `"gatewayRequestId", "amountUsd", "model") VALUES ` +
-          [
-            debit("personal", sharedBudgetId(), personal),
-            debit("minted", sharedBudgetId(), minted),
-            debit("orphaned", sharedBudgetId(), orphaned),
-            debit("machine", sharedBudgetId(), machine),
-            debit("on-principal", `${tenant()}-bdg-principal`, `${tenant()}-vk`),
-          ].join(", "),
-        `INSERT INTO "GatewayBudgetBucketBoundary" ("id", "organizationId", "budgetId", ` +
-          `"bucketScopeId", "periodStartedAt") VALUES ('${tenant()}-bnd-attributed', '${org}', ` +
-          `'${tenant()}-bdg-attributed', '${tenant()}-vk:end-user-1', now())`,
-      ];
-    };
-
-    const deleteSeed = async (): Promise<void> => {
-      const keyIds = Object.values(keys()).map((id) => `'${id}'`);
-      await postgres.asAdmin(
-        `DELETE FROM "GatewayBudgetLedger" WHERE "id" LIKE '${tenant()}-led-%'`,
-      );
-      await postgres.asAdmin(
-        `DELETE FROM "GatewayBudgetBucketBoundary" WHERE "id" = '${tenant()}-bnd-attributed'`,
-      );
-      await postgres.asAdmin(`DELETE FROM "GatewayBudget" WHERE "id" LIKE '${tenant()}-bdg-%'`);
-      await postgres.asAdmin(`DELETE FROM "VirtualKey" WHERE "id" IN (${keyIds.join(", ")})`);
-    };
-
-    const readIds = async (view: string, column: string): Promise<string[]> => {
-      const rows = await selectRows<Record<string, string>>(
-        tenantA,
-        `SELECT ${column} FROM ${database}.${view} ORDER BY ${column}`,
-      );
-      return rows.map((row) => row[column] ?? "");
-    };
+    const idsIn = (view: string, column: string) =>
+      readIds({ client: tenantA, relation: `${database}.${view}`, column });
+    const seeded = (kind: string, suffixes: readonly string[]) =>
+      suffixes.map((suffix) => `${tenant()}-${kind}-${suffix}`);
 
     beforeAll(async () => {
-      for (const sql of seedStatements()) {
-        const result = await postgres.asAdmin(sql);
-        expect(result.exitCode, `seeding failed: ${sql}\n${result.stderr}`).toBe(0);
-      }
+      await applyAsPostgresAdmin({
+        postgres,
+        statements: personalUsageSeed({ tenant: tenant() }),
+      });
     }, 60_000);
 
     afterAll(async () => {
-      await deleteSeed();
+      await applyAsPostgresAdmin({
+        postgres,
+        statements: personalUsageCleanup({ tenant: tenant() }),
+      });
     });
 
     /** @scenario "The budget views return no rows for personal keys or person-scoped budgets, for any reader" */
     it("keeps shared usage and drops personal-key spend and budgets scoped to a person", async () => {
-      const ledger = await readIds("gateway_budget_ledgers", "GatewayBudgetLedgerId");
-      const budgets = await readIds("gateway_budgets", "GatewayBudgetId");
+      const ledger = await idsIn("gateway_budget_ledgers", "GatewayBudgetLedgerId");
+      const budgets = await idsIn("gateway_budgets", "GatewayBudgetId");
+      const droppedLedger = seeded("led", ["personal", "minted", "on-principal"]);
+      const droppedBudgets = seeded("bdg", ["principal", "attributed", "personal-key"]);
 
       expect(ledger).toContain(`${tenant()}-GatewayBudgetLedger-1`);
-      for (const dropped of ["personal", "minted", "on-principal"]) {
-        expect(ledger, dropped).not.toContain(`${tenant()}-led-${dropped}`);
-      }
+      expect(ledger.filter((id) => droppedLedger.includes(id))).toEqual([]);
       expect(budgets).toContain(sharedBudgetId());
       expect(budgets).toContain(`${tenant()}-bdg-shared-key`);
-      for (const dropped of ["principal", "attributed", "personal-key"]) {
-        expect(budgets, dropped).not.toContain(`${tenant()}-bdg-${dropped}`);
-      }
+      expect(budgets.filter((id) => droppedBudgets.includes(id))).toEqual([]);
       expect(
-        await readIds("gateway_budget_bucket_boundaries", "GatewayBudgetBucketBoundaryId"),
+        await idsIn("gateway_budget_bucket_boundaries", "GatewayBudgetBucketBoundaryId"),
       ).toEqual([`${tenant()}-GatewayBudgetBucketBoundary-1`]);
     }, 60_000);
 
     /** @scenario "A key with no owner whose creator's account is gone counts as personal, unless a machine created it" */
     it("drops a key whose creator's account is gone and keeps a machine-created key", async () => {
-      expect(await readIds("gateway_budget_ledgers", "GatewayBudgetLedgerId")).toEqual([
+      expect(await idsIn("gateway_budget_ledgers", "GatewayBudgetLedgerId")).toEqual([
         `${tenant()}-GatewayBudgetLedger-1`,
         `${tenant()}-led-machine`,
       ]);
-      expect(await readIds("gateway_budgets", "GatewayBudgetId")).toEqual([
+      expect(await idsIn("gateway_budgets", "GatewayBudgetId")).toEqual([
         sharedBudgetId(),
         `${tenant()}-bdg-machine-key`,
         `${tenant()}-bdg-shared-key`,

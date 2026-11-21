@@ -1,8 +1,7 @@
 /**
- * Which virtual keys are someone's own (modules/gateway/specs/gateway-budget-service.feature).
- * The LangWatchQL budget views state the same rule in SQL, in analytics' visibility overrides.
- * They differ on a key row that is gone: SQL reads it as shared, which is moot there since a
- * Postgres ledger row goes with its key; the detail screen reads ClickHouse rows that outlive it.
+ * Which virtual keys are someone's own (gateway-budget-service.feature); analytics' visibility
+ * overrides state it in SQL. A missing key row reads as shared there (its Postgres ledger rows go
+ * with it) but personal here, since the detail screen's ClickHouse rows outlive it.
  */
 
 /** Who a virtual key belongs to, as the personal-key rule reads it. */

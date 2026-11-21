@@ -725,15 +725,9 @@ export class PrismaGatewayBudgetRepository extends GatewayBudgetRepository {
       secondary: null,
     };
 
-    // Recent ledger entries come from ClickHouse
-    // (gateway_budget_ledger_events). The CH events table doesn't carry
-    // the VK name/displayPrefix fields, so we resolve those via a
-    // single Prisma round-trip on the distinct VK ids in the slice.
-    // The ledger is sharded on TenantId = the project the trace landed
-    // in, and org/team/principal/group budgets accrue rows across
-    // every project in the org, so the read fans out over the same
-    // tenant set the utilization read uses. The BudgetId filter keeps
-    // narrower scopes exact.
+    // ClickHouse ledger events lack key names, so one Prisma read resolves them. The ledger shards
+    // on the project a trace landed in and wider budgets accrue across the org's projects, so the
+    // read fans out over the utilization read's tenant set; BudgetId keeps narrow scopes exact.
     const events =
       this.chRepo && input.tenantIds.length > 0
         ? await this.chRepo.recentEventsForBudget(
