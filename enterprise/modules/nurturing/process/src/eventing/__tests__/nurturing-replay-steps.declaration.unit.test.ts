@@ -5,6 +5,9 @@
  * the same pinned ids and lane constants: a module-side change to either breaks here.
  * Spec: enterprise/modules/nurturing/specs/gateway-facts.feature
  */
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+
 import type { ProjectionLaneReplayer } from "@langwatch/eventing";
 import { ResourceScope } from "@langwatch/process";
 import { ScopedSecrets } from "@langwatch/secrets";
@@ -40,6 +43,10 @@ import {
   PLANS_STEP,
   USER_MARKS_STEP,
 } from "./nurturing-replay-steps.test-helpers.ts";
+
+const CODE_STEPS_JSON = fileURLToPath(
+  new URL("../../../../../../../packages/upgrade/releases/image/code-steps.json", import.meta.url),
+);
 
 /** Answers every lane with an empty replay, remembering the lanes asked for and in what order. */
 function recordingReplayer() {
@@ -131,6 +138,11 @@ describe("given the nurturing module installed on a worker", () => {
       [PROJECT_LISTING_STEP],
       undefined,
     ]);
+    // The image ships code-steps.json, not this declaration: a stale list breaks here too.
+    const codeSteps = JSON.parse(readFileSync(CODE_STEPS_JSON, "utf8")) as { id: string }[];
+    expect(
+      codeSteps.map(({ id }) => id).filter((id) => id.startsWith("nurturing:")),
+    ).toEqual(steps.map(({ id }) => id));
 
     // The lane and the trailing pass are only observable by running: each step asks for its lane twice.
     for (const step of steps) await runOnce(step);
