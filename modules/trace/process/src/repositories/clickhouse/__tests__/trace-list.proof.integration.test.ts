@@ -469,7 +469,7 @@ describe.skipIf(!clickHouseConfigured)("TraceListClickHouseRepository through th
       });
     });
 
-    describe("when filters reach side tables no twin row has a match in", () => {
+    describe("when filters reach side tables keyed by tenant and id", () => {
       it("runs each one across the members and matches by tenant and id", async () => {
         // The trace run judged member A's copy of the shared id "no", and B's not at all.
         await ch.insert({
