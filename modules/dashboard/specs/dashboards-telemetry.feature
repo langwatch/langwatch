@@ -100,6 +100,7 @@ Feature: Dashboards telemetry: product events and query telemetry
     When the app loads with no project in scope
     Then analytics unregisters projectId straight away
 
+  # Retired in S6 by "Telemetry: boards made, moved or pinned outside a project name their owning project" in modules/dashboard/specs/dashboards-organization-area.feature.
   @integration
   Scenario: Telemetry: a board made or unpinned from Gateway or Coding agents names its project
     Given the Dashboards section in Gateway or Coding agents works in the project "Shop"
@@ -107,6 +108,16 @@ Feature: Dashboards telemetry: product events and query telemetry
     Then "dashboards.created.dashboard" and "dashboards.favourited.dashboard" go out
     And each goes out with the registered projectId set to "Shop", not the page's project
     And the page's projectId is registered again straight after
+
+  # Boards now have a home product (ADR-002, amended; dashboards-organization-area.feature).
+  @integration @unimplemented
+  Scenario: Telemetry: boards made, moved or pinned outside a project name their owning project
+    Given "Dashboards in every product" is on
+    When I make a board in the create dialog, move one, move a widget, or pin or unpin one, in the library or in a product section
+    Then "dashboards.created.dashboard", "dashboards.moved.dashboard", "dashboards.moved.widget" or "dashboards.favourited.dashboard" goes out
+    And each carries projectId set to the board's owning project (none for a personal board), and the home product
+    And the page's own projectId, or none on an org-level page, is registered again straight after
+    # Evidence: the captured events from analyticssim
 
   # ---------------------------------------------------------------------------
   # Engagement events: what a member does on a board after opening it

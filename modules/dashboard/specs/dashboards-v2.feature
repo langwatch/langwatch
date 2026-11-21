@@ -803,7 +803,8 @@ Feature: Dashboards v2 polish and bring-your-own-AI
   @unit
   Scenario: AC170 Scope: a new board starts at Project and My dashboard at Only me
     When a member creates a board, duplicates one or adds one from a template
-    Then its scope is Project, and the project it was made in owns it
+    Then its scope is Project, and the project it was made in owns it, unless it is made in the
+      create dialog, which sets the scope picked there (dashboards-organization-area.feature)
     And a member's My dashboard is made with the scope Only me
     And a board made with a project credential has the scope Project
 
@@ -849,6 +850,8 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     Given a member with several boards of their own
     Then they can set every one of them to Only me, with no limit
     And they can set their My dashboard to Project or Organization, and back to Only me
+    # This holds for the earlier per-project My dashboards. The personal My dashboard is Only me
+    # and cannot be deleted (dashboards-organization-area.feature).
 
   @unit
   Scenario: AC176 Scope: a narrower scope keeps other members' pins
@@ -867,6 +870,7 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     Then it is titled "Scope" with "Who can see this dashboard.", and offers Only me "Only you",
       Project "Everyone in <project>" and Organization "Everyone in <organization>, in each of
       their projects", with a tick on the current one
+    And a board homed outside LLM Ops offers no Project (dashboards-organization-area.feature)
     And a reader who is not the author sees the same value as a badge that cannot be opened,
       whose hover says only the person who made the dashboard can change its scope
 
@@ -875,6 +879,8 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     When the author opens the "⋮" menu of their board in the sidebar
     Then under "Scope" it offers Only me, Project and Organization with a tick on the current one
     And their My dashboard offers the same three
+    And a board homed outside LLM Ops offers Only me and Organization, and no Project
+      (dashboards-organization-area.feature)
     And a board they did not make, or one another project owns, offers none
 
   @unit @integration
@@ -899,13 +905,15 @@ Feature: Dashboards v2 polish and bring-your-own-AI
       by name, after Pinned and before From LangWatch, unless the member pinned them
     And with no such board there is no such group
 
-  @unit @integration
+  @unit @integration @q1-all-projects
   Scenario: AC182 Organization board: the Project chip says whose data it shows
     Given an Organization board
     Then its header has a chip "Project <project>", naming the project whose data is on screen
     When the reader opens the chip
-    Then it lists the projects of the organization they can open, one to choose, with no
-      "All projects", and marks the project that owns the board "owner"
+    Then it lists the projects of the organization they can open, one to choose, and marks the
+      project that owns the board "owner"
+    And in a project view it offers no "All projects"; at org level it also offers "All projects"
+      (dashboards-organization-area.feature)
     And choosing one opens the same board under that project
     And a Project or Only me board has no such chip
 
@@ -916,6 +924,8 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     Then the page reads "This dashboard is not available" and "It was deleted, or the person who
       made it set its scope to Only me. If you need it, ask them to set it to Project."
     And it shows nothing of the board's name, description or widgets
+    # That text holds with Dashboards in every product off. With it on, the page reads "This
+    # dashboard was deleted or isn't shared with you." with "Back to Dashboards" (dashboards-organization-area.feature).
 
   @unit @integration
   Scenario: AC184 View-only: a board the reader cannot edit offers no edit control
@@ -925,7 +935,8 @@ Feature: Dashboards v2 polish and bring-your-own-AI
       or deletes, and nothing can be moved or resized
     And the widget menu still offers "Copy widget id" and "Export CSV", which change nothing
     And the description cannot be edited, and the sidebar menu offers no Rename and no Delete
-    And outside the owning project the header reads "<organization> · owned by <project>"
+    And outside the owning project the header reads "<organization> · owned by <project>", or
+      "<organization> · owned by another project" when the reader cannot read the owner
 
   @integration
   Scenario: AC185 View-only: Duplicate to edit makes the reader's own copy
@@ -935,6 +946,8 @@ Feature: Dashboards v2 polish and bring-your-own-AI
       with them as its author, and it opens
     And a reader without analytics:create is offered no copy
     And the board's header has no such button, as on a From LangWatch board
+    # At a project address. In the library, see "Duplicate and Delete from the library"
+    # (dashboards-organization-area.feature).
 
   @unit
   Scenario: AC186 Scope: the migration keeps today's audience
@@ -2072,6 +2085,7 @@ Feature: Dashboards v2 polish and bring-your-own-AI
 
   @unit @integration
   Scenario: AC206 Project: a card reads the board's project unless its query names others
+    # A board open in a project view. At org level see dashboards-organization-area.feature.
     Given a stored widget whose query stores no projects, on a board open in project "P"
     When the card runs
     Then the run reads project "P" alone and {dashboard_context_projects:Array(String)} is bound to ["P"]

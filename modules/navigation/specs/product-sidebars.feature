@@ -187,6 +187,7 @@ Feature: Product sidebars
   @integration
   Scenario: The LLM Ops sidebar has a Dashboards section listing the pinned dashboards
     Given I can reach Dashboards and I have pinned dashboards to this project
+    And Dashboards in every product is off
     When I am in LLM Ops
     Then the sidebar shows a "Dashboards" section under the product's own pages
     And its title has the same style as the "Build" title
@@ -203,6 +204,7 @@ Feature: Product sidebars
 
   # Product request, 2026-11-18, behind release_dashboards_in_every_product (default off).
   # Gateway and Coding agents are about no project: the section works in the one LLM Ops opens.
+  # Retired in S6 by "Each product's sidebar lists its own boards" in modules/dashboard/specs/dashboards-organization-area.feature.
   @integration
   Scenario: Gateway and Coding agents show the Dashboards section, naming its project
     Given I can reach Dashboards and Dashboards in every product is on
@@ -214,6 +216,7 @@ Feature: Product sidebars
     And a member who cannot reach Dashboards sees no such section
     And with no project for LLM Ops to open there is no such section
 
+  # Retired in S6 by "A product's "+" fixes the product and says where the board lives" in modules/dashboard/specs/dashboards-organization-area.feature.
   @integration
   Scenario: The plus button in Gateway or Coding agents makes the dashboard in the named project
     Given Dashboards in every product is on and I may create dashboards
@@ -222,6 +225,7 @@ Feature: Product sidebars
     Then a new dashboard is made in "Shop" and pinned to it for me
     And it opens in "Shop" with "Add a widget" open
 
+  # Retired in S6 by "Each product's sidebar lists its own boards" in modules/dashboard/specs/dashboards-organization-area.feature.
   @integration
   Scenario: In Gateway or Coding agents, what I may do follows the named project's grants
     Given Dashboards in every product is on
@@ -233,6 +237,7 @@ Feature: Product sidebars
 
   # An organization admin reaches teams they hold no membership row in, so their grants in
   # "Shop" come from their own standing there, not from the teams they belong to.
+  # Retired in S6 by "Each product's sidebar lists its own boards" in modules/dashboard/specs/dashboards-organization-area.feature.
   @integration
   Scenario: In Gateway or Coding agents, an organization admin's own grants in the named project count
     Given Dashboards in every product is on
@@ -243,6 +248,7 @@ Feature: Product sidebars
     But I may not delete them there
 
   # LLM Ops may open the page's own project, whose grants the page already holds.
+  # Retired in S6 by "Each product's sidebar lists its own boards" in modules/dashboard/specs/dashboards-organization-area.feature.
   @unit
   Scenario: In Gateway or Coding agents, the page's own project answers from the page's grants
     Given Dashboards in every product is on
@@ -250,6 +256,7 @@ Feature: Product sidebars
     Then what I may do there is what the page already lets me do, with no read of its grants
     And in any other named project it is what that project's own grants let me do
 
+  # Retired in S6 by "Telemetry: boards made, moved or pinned outside a project name their owning project" in modules/dashboard/specs/dashboards-organization-area.feature.
   @unit
   Scenario: Events from the Dashboards section in Gateway or Coding agents are about the named project
     Given Dashboards in every product is on
@@ -261,6 +268,7 @@ Feature: Product sidebars
 
   # ADR-002's release gate: Dashboards opens per project, so the section follows "Shop", where
   # it lists and makes boards, and never the page's own project.
+  # Retired in S6 by "Each product's sidebar lists its own boards" in modules/dashboard/specs/dashboards-organization-area.feature.
   @integration
   Scenario: In Gateway or Coding agents, the Dashboards section follows the named project's release flag
     Given Dashboards in every product is on
@@ -271,6 +279,7 @@ Feature: Product sidebars
     And while the page's organization is still unknown, there is no section and the release flag is not asked
 
   # A `?ff_release_dashboards=on|off` link answers the flag in that browser, "Shop" included.
+  # Retired in S6 by "Each product's sidebar lists its own boards" in modules/dashboard/specs/dashboards-organization-area.feature.
   @integration
   Scenario: This browser's Dashboards override decides the named project's section
     Given Dashboards in every product is on
@@ -281,6 +290,7 @@ Feature: Product sidebars
 
   # Reaching Dashboards takes analytics:view where it works, so the section asks "Shop" for the
   # grant, never the page's own project.
+  # Retired in S6 by "Each product's sidebar lists its own boards" in modules/dashboard/specs/dashboards-organization-area.feature.
   @integration
   Scenario: In Gateway or Coding agents, the Dashboards section follows the named project's view grant
     Given Dashboards in every product is on
@@ -289,6 +299,7 @@ Feature: Product sidebars
     Then Coding agents shows no Dashboards section and no "+"
     And when I may view dashboards in "Shop" but not in the page's own project, the section shows
 
+  # Retired in S6 by "Every product's Dashboards section has the same title, never clipped" in modules/dashboard/specs/dashboards-organization-area.feature.
   @integration
   Scenario: The LLM Ops sidebar's Dashboards section names no project
     Given Dashboards in every product is on
@@ -298,6 +309,7 @@ Feature: Product sidebars
   @integration
   Scenario: Pinned dashboards in the LLM Ops sidebar stop at 7
     Given I have pinned more than 7 dashboards to this project
+    And Dashboards in every product is off
     When I am in LLM Ops
     Then the Dashboards section lists the first 7, in my order
     And one more row reads "All pinned (N)", with N the number pinned, and opens Dashboards
@@ -315,6 +327,7 @@ Feature: Product sidebars
   @integration
   Scenario: The Dashboards section's plus button makes a dashboard pinned to this project
     Given I may create dashboards in this project
+    And Dashboards in every product is off
     When I press the "+" at the right of the "Dashboards" title
     Then a new dashboard is made in this project and pinned to it for me
     And it opens with "Add a widget" open
@@ -323,6 +336,7 @@ Feature: Product sidebars
   @integration
   Scenario: With nothing pinned, the Dashboards section offers an Add dashboard item
     Given I may create dashboards and I have pinned none to this project
+    And Dashboards in every product is off
     When I am in LLM Ops
     Then the Dashboards section's first item is a dotted-outline "Add dashboard" item
     And it does what the "+" does
