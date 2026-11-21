@@ -220,10 +220,9 @@ const TRACE_IN_SOURCES = `if(has(${SOURCES_PLACEHOLDER}, 'application'),
         countIf(Source IN ${SOURCES_PLACEHOLDER}) > 0)`;
 
 /**
- * Each metadata-less trace's managed prompt version and time as `traces` holds them: its newest
- * row's inside both windows, with no upper bound so the caller drops a row past the end, and ''
- * for a trace with none. It keeps to the sources itself, per trace, from every source's rows
- * back to where `traces` looks them up.
+ * Each metadata-less trace's managed prompt version and time as `traces` holds them: newest row
+ * inside both windows, no upper bound (the caller drops a row past the end), '' if none. It keeps
+ * to the sources itself, per trace, from every source's rows back to where `traces` looks them up.
  */
 const MANAGED_VERSION_PER_TRACE = `SELECT ${TRACE_KEY} AS trace,
         argMaxIf(LastUsedPromptVersionId, UpdatedAt, OccurredAt >= ${PREVIOUS_START}) AS managed,
