@@ -1103,6 +1103,13 @@ Feature: The daily insights run
       Then the control says 2 new
 
     @integration
+    Scenario: A From LangWatch board counts the unseen insights kept under its curated id
+      Given a From LangWatch board that is on, with 2 unseen insights kept under its curated id
+      And 1 unseen insight kept under its bare template id
+      When the member looks at the board's header
+      Then the control says 2 new
+
+    @integration
     Scenario: A board that is on with no widgets waits
       Given a board that is on and lost its last widget
       When the member opens the dropdown

@@ -417,7 +417,7 @@ describe("given a member turned a board's daily run on", () => {
   });
 
   describe("when a From LangWatch board has 2 unseen insights filed under its pointer id and 1 under its bare template id", () => {
-    /** @scenario "The control counts the board's unseen insights" */
+    /** @scenario "A From LangWatch board counts the unseen insights kept under its curated id" */
     it("says 2 new", async () => {
       // The wire value of the catalogue's pointer id; the browser does not import the catalogue.
       const pointer = { id: "curated/release", name: "Release", widget: null };
