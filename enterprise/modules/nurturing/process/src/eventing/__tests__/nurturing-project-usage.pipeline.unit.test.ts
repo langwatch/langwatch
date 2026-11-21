@@ -263,6 +263,7 @@ describe("the evaluation-day map", () => {
 
     expect(map.options?.coalesceMaxBatch).toBeGreaterThan(1);
     expect(map.store.bulkAppend).toBeDefined();
+    expect(map.options?.groupKeyFn).toBe(evaluationDayGroupOf);
     expect(evaluationDayGroupOf(evaluated("project-1", NOON))).toBe(
       evaluationDayGroupOf(evaluated("project-1", NOON + 1000)),
     );
