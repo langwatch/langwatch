@@ -11,6 +11,7 @@ import { type Prisma, type PrismaClient } from "@langwatch/prisma-client/generat
 import { prismaTables } from "@langwatch/prisma-client/ownership";
 
 import { lockedView } from "../../rules/dataset-record-lock.rules.ts";
+import { verifyDatasetRecords } from "../../rules/dataset-record-retry.rules.ts";
 import type {
   DatasetRecordRepository,
   LockedDatasetRecords,
@@ -151,7 +152,15 @@ SELECT pg_advisory_xact_lock(hashtextextended(${`dataset:${input.datasetId}`}, 0
     datasetId: string;
     projectId: string;
     entries: (DatasetRecordInput & { id: string })[];
+    skipDuplicates?: boolean;
+    verifyExisting?: boolean;
   }): Promise<DatasetRecord[]> {
+    if (input.verifyExisting && this.root) {
+      return this.root.$transaction(
+        (client) => new PrismaDatasetRecordRepository(client, null).createMany(input),
+        { isolationLevel: "Serializable" },
+      );
+    }
     await this.database.datasetRecord.createMany({
       data: input.entries.map(({ id, ...entry }) => ({
         id,
@@ -159,6 +168,7 @@ SELECT pg_advisory_xact_lock(hashtextextended(${`dataset:${input.datasetId}`}, 0
         projectId: input.projectId,
         entry: entry as Prisma.InputJsonValue,
       })),
+      skipDuplicates: input.skipDuplicates ?? false,
     });
     const rows = await this.database.$queryRaw<unknown[]>`
       SELECT "id", "datasetId", "projectId", "entry", "createdAt", "updatedAt"
@@ -168,7 +178,11 @@ SELECT pg_advisory_xact_lock(hashtextextended(${`dataset:${input.datasetId}`}, 0
          AND "id" = ANY(${input.entries.map((entry) => entry.id)}::text[])
        ORDER BY "createdAt" ASC, "id" COLLATE "C" ASC
     `;
-    return rows.map(toDatasetRecord);
+    const records = rows.map(toDatasetRecord);
+    if (input.verifyExisting) {
+      verifyDatasetRecords(input.entries, records);
+    }
+    return records;
   }
 
   async update(input: {

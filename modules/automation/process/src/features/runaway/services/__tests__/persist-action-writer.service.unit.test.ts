@@ -2,7 +2,9 @@ import type { AnnotationApi } from "@langwatch/annotation-contract";
 import {
   type Dataset,
   type DatasetApi,
+  type DatasetRecord,
   DatasetNotFoundError,
+  DatasetRecordConflictError,
   InvalidColumnError,
 } from "@langwatch/dataset-contract";
 import { refusesRetry } from "@langwatch/group-queue";
@@ -43,8 +45,25 @@ const write = {
   datasetId: "dataset-1",
   projectId: "project-1",
   triggerId: "trigger-1",
+  traceId: "trace-1",
   datasetRecords: [{ id: "trigger-1-trace-1-0", question: "why", input: "secret value" }],
 };
+
+/** What the dataset returns when it stored every row: enough of a record for the
+ * writer's id check. */
+function recordsWritten(input: Parameters<DatasetApi["batchCreateRecords"]>[0]): DatasetRecord[] {
+  return input.entries.map(
+    ({ id, ...entry }) =>
+      ({
+        id: id ?? "generated-id",
+        datasetId: input.slugOrId,
+        projectId: input.projectId,
+        entry,
+        createdAt: new Date(0),
+        updatedAt: new Date(0),
+      }) as DatasetRecord,
+  );
+}
 
 describe("PersistActionWriterService.addToDataset", () => {
   describe("given a mapping that names a column the dataset no longer has", () => {
@@ -55,7 +74,7 @@ describe("PersistActionWriterService.addToDataset", () => {
         findBySlugOrId: async () => datasetWith(["question"]),
         batchCreateRecords: async (input) => {
           appended.push(input);
-          return [];
+          return recordsWritten(input);
         },
       });
 
@@ -77,12 +96,61 @@ describe("PersistActionWriterService.addToDataset", () => {
     it("does not warn when every mapped key is a column", async () => {
       const { writer, warnings } = writerOver({
         findBySlugOrId: async () => datasetWith(["question", "input"]),
-        batchCreateRecords: async () => [],
+        batchCreateRecords: async (input) => recordsWritten(input),
       });
 
       await writer.addToDataset(write);
 
       expect(warnings()).toEqual([]);
+    });
+
+    it("asks the dataset to skip ids an earlier attempt already wrote and read them back", async () => {
+      const appended: Parameters<DatasetApi["batchCreateRecords"]>[0][] = [];
+      const { writer } = writerOver({
+        findBySlugOrId: async () => datasetWith(["question", "input"]),
+        batchCreateRecords: async (input) => {
+          appended.push(input);
+          return recordsWritten(input);
+        },
+      });
+
+      await writer.addToDataset(write);
+
+      expect(appended).toEqual([
+        expect.objectContaining({
+          skipDuplicates: true,
+          readBackExisting: true,
+          verifyExisting: true,
+        }),
+      ]);
+    });
+
+    it("accepts a retry when the stored row still matches the mapping", async () => {
+      const { writer } = writerOver({
+        findBySlugOrId: async () => datasetWith(["question", "input"]),
+        batchCreateRecords: async (input) => recordsWritten(input),
+      });
+
+      await expect(writer.addToDataset(write)).resolves.toBeUndefined();
+    });
+
+    it("fails terminally when a stored row no longer matches what the retry would write", async () => {
+      const { writer } = writerOver({
+        findBySlugOrId: async () => datasetWith(["question", "input"]),
+        batchCreateRecords: async () => {
+          throw new DatasetRecordConflictError("row-0");
+        },
+      });
+
+      const refusal = await refusalOf(writer.addToDataset(write));
+
+      expect(refusal).toEqual(
+        expect.objectContaining({
+          retryable: false,
+          message: expect.stringContaining("mapping"),
+        }),
+      );
+      expect(refusesRetry(refusal)).toBe(true);
     });
   });
 
@@ -94,7 +162,7 @@ describe("PersistActionWriterService.addToDataset", () => {
         findBySlugOrId: async () => datasetWith(["trace_id"]),
         batchCreateRecords: async (input) => {
           appended.push(input);
-          return [];
+          return recordsWritten(input);
         },
       });
 
@@ -113,7 +181,7 @@ describe("PersistActionWriterService.addToDataset", () => {
         findBySlugOrId: async () => datasetWith(["trace_id"]),
         batchCreateRecords: async (input) => {
           appended.push(input);
-          return [];
+          return recordsWritten(input);
         },
       });
 
@@ -189,6 +257,51 @@ describe("PersistActionWriterService.addToDataset", () => {
 
       expect(refusal).toBe(outage);
       expect(refusesRetry(refusal)).toBe(false);
+    });
+  });
+
+  describe("given an id that already belongs to another dataset", () => {
+    it("fails terminally instead of reporting a row that was not added", async () => {
+      const { writer } = writerOver({
+        findBySlugOrId: async () => datasetWith(["question", "input"]),
+        // A globally unique id in another dataset is skipped, so the readback omits it.
+        batchCreateRecords: async () => [],
+      });
+
+      const refusal = await refusalOf(writer.addToDataset(write));
+
+      expect(refusal).toEqual(
+        expect.objectContaining({
+          retryable: false,
+          message: expect.stringContaining("already belongs to another dataset"),
+        }),
+      );
+      expect(refusesRetry(refusal)).toBe(true);
+    });
+
+    it("names the ids the dataset could not store in the requested dataset", async () => {
+      const { writer } = writerOver({
+        findBySlugOrId: async () => datasetWith(["question"]),
+        batchCreateRecords: async (input) =>
+          recordsWritten(input).filter((record) => record.id === "r-0"),
+      });
+
+      const refusal = await refusalOf(
+        writer.addToDataset({
+          ...write,
+          datasetRecords: [
+            { id: "r-0", question: "first" },
+            { id: "r-1", question: "second" },
+          ],
+        }),
+      );
+
+      expect(refusal).toEqual(
+        expect.objectContaining({
+          retryable: false,
+          message: expect.stringContaining("r-1"),
+        }),
+      );
     });
   });
 });

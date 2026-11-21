@@ -431,6 +431,135 @@ function contractCases(backend: Backend): void {
     });
   });
 
+  describe.each([
+    { mode: "standalone", locked: false },
+    { mode: "under the dataset lock", locked: true },
+  ])("when a retry verifies existing records $mode", ({ locked }) => {
+    let records: DatasetRecordRepository;
+    beforeEach(() => {
+      records = backend.records();
+    });
+    const write: DatasetRecordRepository["createMany"] = (input) =>
+      locked
+        ? records.withDatasetLock(input, (transaction) => transaction.createMany(input))
+        : records.createMany(input);
+
+    /** @scenario "A verified retry is atomic and compares complete normalized entries" */
+    it("rolls back every new row when a reused id has different content", async () => {
+      const dataset = await create("atomic-retry");
+      const input = {
+        datasetId: dataset.id,
+        projectId: backend.mine(),
+        skipDuplicates: true,
+        verifyExisting: true,
+      };
+      await write({ ...input, entries: [{ id: "existing", input: "old" }] });
+      await expect(
+        write({
+          ...input,
+          entries: [
+            { id: "new-tail", input: "old" },
+            { id: "existing", input: "changed" },
+          ],
+        }),
+      ).rejects.toMatchObject({ code: "dataset_record_conflict" });
+      const rows = await backend.records().findByIds({ ...input, ids: ["existing", "new-tail"] });
+      expect(rows.map(({ id, entry }) => ({ id, entry }))).toEqual([
+        { id: "existing", entry: { input: "old" } },
+      ]);
+    });
+
+    it("rejects removed columns and leaves the original entry intact", async () => {
+      const dataset = await create("removed-column");
+      const input = {
+        datasetId: dataset.id,
+        projectId: backend.mine(),
+        skipDuplicates: true,
+        verifyExisting: true,
+      };
+      await write({ ...input, entries: [{ id: "mapped", input: "old", removed: "value" }] });
+      await expect(
+        write({ ...input, entries: [{ id: "mapped", input: "old" }] }),
+      ).rejects.toMatchObject({ code: "dataset_record_conflict" });
+      const rows = await backend.records().findByIds({ ...input, ids: ["mapped"] });
+      expect(rows[0]?.entry).toEqual({ input: "old", removed: "value" });
+    });
+
+    it("rejects an id in another dataset without leaving the rest of the batch", async () => {
+      const first = await create("first-owner");
+      const second = await create("second-owner");
+      await write({
+        datasetId: first.id,
+        projectId: backend.mine(),
+        entries: [{ id: "owned", input: "old" }],
+      });
+      const input = {
+        datasetId: second.id,
+        projectId: backend.mine(),
+        skipDuplicates: true,
+        verifyExisting: true,
+      };
+      await expect(
+        write({
+          ...input,
+          entries: [
+            { id: "fresh", input: "fresh" },
+            { id: "owned", input: "old" },
+          ],
+        }),
+      ).rejects.toMatchObject({ code: "dataset_record_conflict" });
+      expect(
+        await backend.records().count({ datasetId: second.id, projectId: backend.mine() }),
+      ).toBe(0);
+    });
+
+    it("commits only one conflicting concurrent batch without orphan tail rows", async () => {
+      const dataset = await create("concurrent-retry");
+      const input = {
+        datasetId: dataset.id,
+        projectId: backend.mine(),
+        skipDuplicates: true,
+        verifyExisting: true,
+      };
+      const results = await Promise.allSettled(
+        ["left", "right"].map((value) =>
+          write({
+            ...input,
+            entries: [
+              { id: `tail-${value}`, input: value },
+              { id: "shared", input: value },
+            ],
+          }),
+        ),
+      );
+      expect(results.filter((result) => result.status === "fulfilled")).toHaveLength(1);
+      expect(results.filter((result) => result.status === "rejected")).toHaveLength(1);
+      const page = await backend.records().listAll({ ...input, page: 1, limit: 10 });
+      expect(page.total).toBe(2);
+      const winner = page.records.find((record) => record.id === "shared")?.entry.input;
+      expect(["left", "right"]).toContain(winner);
+      expect(page.records.map((record) => record.id).toSorted()).toEqual([
+        "shared",
+        `tail-${winner}`,
+      ]);
+      expect(page.records.every((record) => record.entry.input === winner)).toBe(true);
+    });
+
+    it("accepts equal JSON objects regardless of key order", async () => {
+      const dataset = await create("same-content");
+      const input = {
+        datasetId: dataset.id,
+        projectId: backend.mine(),
+        skipDuplicates: true,
+        verifyExisting: true,
+      };
+      await write({ ...input, entries: [{ id: "same", input: { a: 1, b: 2 } }] });
+      const rows = await write({ ...input, entries: [{ id: "same", input: { b: 2, a: 1 } }] });
+      expect(rows).toHaveLength(1);
+      expect(rows[0]?.entry).toEqual({ input: { a: 1, b: 2 } });
+    });
+  });
+
   describe("when a record is created under its own identifier", () => {
     /** @scenario "A record identifier is not treated as a column" */
     it("keeps the identifier beside the entry, never inside it", async () => {
