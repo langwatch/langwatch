@@ -635,12 +635,16 @@ export interface GatewayApi extends GatewayInternalProtocol {
     budgets: { scopeType: string; scopeId: string }[],
     organizationId: string | null,
   ): Promise<Map<string, GatewayBudgetScopeTarget>>;
-  findBudgetDetail(input: {
+  /**
+   * The budget's detail as `actorUserId` may see it. A budget scoped to one person or to a
+   * personal key, and personal-key ledger rows, are for that person and holders of
+   * `virtualKeys:viewOtherPersonal`. Throws the handled 404 when there is no such budget for them.
+   */
+  getBudgetDetail(input: {
     id: string;
     organizationId: string;
-  }): Promise<GatewayBudgetDetail | null>;
-  /** The budget's detail; throws the handled 404 when this organization holds none by that id. */
-  getBudgetDetail(input: { id: string; organizationId: string }): Promise<GatewayBudgetDetail>;
+    actorUserId: string;
+  }): Promise<GatewayBudgetDetail>;
   createBudget(input: CreateGatewayBudgetInput): Promise<GatewayBudgetResource>;
   updateBudget(input: UpdateGatewayBudgetInput): Promise<GatewayBudgetResource>;
   archiveBudget(input: ArchiveGatewayBudgetInput): Promise<GatewayBudgetResource>;

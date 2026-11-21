@@ -124,11 +124,12 @@ export const gatewayBudgetTrpcTransport: TrpcRouterDeclaration<
 
   .procedure("get")
   .withPermission("gatewayBudgets:view")
-  .handle(async ({ app, input }) => {
+  .handle(async ({ app, actor, input }) => {
     await app.assertOrganizationExists(input.organizationId);
     const detail = await app.getBudgetDetail({
       id: input.id,
       organizationId: input.organizationId,
+      actorUserId: actor.id,
     });
 
     const providerLabels = await app.resolveProviderLabels([detail.budget]);

@@ -135,18 +135,12 @@ listProjectBudgetsWithHealth(projectId: string): Promise<GatewayBudgetListWithHe
 listBudgetScopeTargets(budgets: { scopeType: string; scopeId: string }[], organizationId: string | null): Promise<Map<string, GatewayBudgetScopeTarget>>;
 ```
 
-#### `findBudgetDetail`
-
-```typescript
-findBudgetDetail(input: { id: string; organizationId: string; }): Promise<GatewayBudgetDetail | null>;
-```
-
 #### `getBudgetDetail`
 
-The budget's detail; throws the handled 404 when this organization holds none by that id.
+The budget's detail as `actorUserId` may see it. A budget scoped to one person or to a personal key, and personal-key ledger rows, are for that person and holders of `virtualKeys:viewOtherPersonal`. Throws the handled 404 when there is no such budget for them.
 
 ```typescript
-getBudgetDetail(input: { id: string; organizationId: string }): Promise<GatewayBudgetDetail>;
+getBudgetDetail(input: { id: string; organizationId: string; actorUserId: string; }): Promise<GatewayBudgetDetail>;
 ```
 
 #### `createBudget`

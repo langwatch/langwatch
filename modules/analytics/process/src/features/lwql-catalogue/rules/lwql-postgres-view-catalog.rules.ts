@@ -1597,6 +1597,7 @@ export const LWQL_POSTGRES_CATALOGUE = defineLwqlCatalog({
       hashedSecret: "omit", // secret
       DisplayPrefix: { source: "displayPrefix", content: "output" },
       PrincipalUserId: { source: "principalUserId" },
+      mintedAsPersonal: "omit", // bookkeeping the budget views' personal-key rule reads
       TraceProjectId: { source: "traceProjectId" },
       Config: { source: "config", content: "output" },
       Revision: { source: "revision" },

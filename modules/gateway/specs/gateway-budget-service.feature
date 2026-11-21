@@ -73,3 +73,50 @@ Feature: Gateway budget decision service
     Given a member of the organization
     When they ask for the budget overview
     Then the answer reports access and the budget read is scoped to that organization
+
+  @unit
+  Scenario: Personal-key usage on a budget's detail is visible only to its owner and to those allowed to see other members' personal keys
+    Given a budget whose recent ledger holds a row spent through a shared key and one through a member's personal key
+    When the key's owner, an organization admin, another member and a viewer each open the budget
+    Then the owner and the admin see both rows
+    And the other member and the viewer see only the shared key's row
+    And a caller whose newest rows are all another member's still sees older shared rows, at most 20
+
+  @unit
+  Scenario: A budget scoped to one person or to a personal key opens only for that person and those allowed to see other members' personal keys
+    Given a budget scoped to one member, and a budget scoped to that member's personal key
+    When the member, an organization admin and a viewer each open it
+    Then the member and the admin see its detail
+    And the viewer is answered exactly as for a budget that does not exist
+    And a budget scoped to a shared key opens for the viewer
+
+  @unit
+  Scenario: A key with no owner whose creator's account is gone counts as personal on a budget's detail
+    Given a budget whose recent ledger holds a row from a key with no principal, never marked personal, whose creator's account is gone
+    When a member opens the budget
+    Then that row is not shown
+    And an organization admin still sees it
+    And when the account lookup fails, the read fails rather than counting the account as gone
+
+  @unit
+  Scenario: A key a machine created never counts as personal on a budget's detail
+    Given a budget whose recent ledger holds a row from a key with no principal, created by a project credential whose creator id starts with "svc_"
+    When a member opens the budget
+    Then that row is shown
+    And no account is looked up for its creator
+
+  @unit
+  Scenario: A key minted for a person stays personal after its principal is cleared
+    Given a virtual key created with a principal user
+    Then the same write marks it minted as personal
+    And a key created without a principal is not marked
+    And an update of a key never writes a principal or the mark
+
+  @unit
+  Scenario: Keys minted for a person before the mark existed are marked by a background step
+    Given keys that carry a principal but no mark, and a key that carries no principal
+    When the background step runs
+    Then each key with a principal is marked, and progress is saved after each page
+    And the key without a principal is left unmarked
+    And a second run marks nothing
+    And a dry run marks nothing and saves no progress

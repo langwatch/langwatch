@@ -11,6 +11,7 @@ import type {
 } from "@langwatch/gateway-contract";
 import { defineProcessModule, type PublishedProcessModule } from "@langwatch/process";
 import type { RedisConnection } from "@langwatch/redis-client";
+import { defineMigrationStep } from "@langwatch/upgrade/step";
 
 import { GatewayModule } from "./app/gateway.app.ts";
 import { gatewayChannels } from "./channels/gateway-channels.registry.ts";
@@ -25,6 +26,7 @@ import {
   GatewayBudgetChangeDedupeService,
   type BudgetChangeEventDedupeService,
 } from "./features/budget/services/gateway-budget-change-dedupe.service.ts";
+import { VirtualKeyPersonalMarkService } from "./features/virtual-key/services/virtual-key-personal-mark.service.ts";
 import { GATEWAY_ID_INDEXES } from "./repositories/clickhouse/clickhouse.gateway-id-indexes.database.ts";
 import { gatewayRepositories } from "./repositories/gateway-repositories.registry.ts";
 import { RedisGatewayBudgetChangeDedupeRepository } from "./repositories/redis/redis.gateway-budget-change-dedupe.repository.ts";
@@ -71,6 +73,27 @@ export const gatewayProcessModule: PublishedProcessModule<
   .withEventing(gatewayConnectManagedKeyEventing)
   .withTasks(({ repositories }) => [
     TraceDestinationReportTask.create({ repository: () => repositories.traceDestinationReport }),
+  ])
+  .withMigrations(({ repositories }) => [
+    defineMigrationStep({
+      id: "gateway:mark-personal-virtual-keys",
+      kind: "data",
+      mode: "background",
+      description: "Marks virtual keys minted for one person, so they stay personal after erasure.",
+      // An older image still serving mints personal keys without the mark.
+      needsOldWritersGone: true,
+      run: async ({ checkpoint, dryRun, signal }) => {
+        const resumed = checkpoint.resumeFrom?.afterId;
+        return VirtualKeyPersonalMarkService.create({
+          virtualKeys: repositories.virtualKeys,
+        }).markPersonalKeys({
+          dryRun,
+          signal,
+          afterId: typeof resumed === "string" ? resumed : null,
+          onPageDone: (report) => checkpoint.save({ report }),
+        });
+      },
+    }),
   ])
   .provideMiddlewareBindings(({ app }) => [
     // The gateway control plane is signed rather than bearer-authenticated.

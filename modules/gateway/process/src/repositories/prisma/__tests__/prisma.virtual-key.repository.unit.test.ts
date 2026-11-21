@@ -31,6 +31,7 @@ function repositoryWith(
     virtualKey: {
       findFirst: record("findFirst"),
       findUnique: record("findUnique"),
+      create: record("create"),
       update: record("update"),
     },
   };
@@ -160,6 +161,70 @@ describe("PrismaGatewayVirtualKeyRepository", () => {
         expect(
           (calls[0]?.args.data as { revokedAt: unknown } | undefined)?.revokedAt,
         ).toBeInstanceOf(Date);
+      });
+    });
+  });
+
+  describe("given a key being minted", () => {
+    const mint = (principalUserId: string | null) => ({
+      id: "key-1",
+      organizationId: "organization-1",
+      name: "key",
+      hashedSecret: "hash",
+      displayPrefix: "lw_vk",
+      principalUserId,
+      config: {},
+      createdById: "user-1",
+      scopes: [],
+    });
+
+    describe("when it is minted for a person", () => {
+      /** @scenario "A key minted for a person stays personal after its principal is cleared" */
+      it("marks it minted as personal in the same write", async () => {
+        const { repository, calls } = repositoryWith();
+
+        await repository.create(mint("user-1"));
+
+        expect(calls[0]?.args.data).toMatchObject({
+          principalUserId: "user-1",
+          mintedAsPersonal: true,
+        });
+      });
+    });
+
+    describe("when it is minted for no one", () => {
+      /** @scenario "A key minted for a person stays personal after its principal is cleared" */
+      it("leaves it unmarked", async () => {
+        const { repository, calls } = repositoryWith();
+
+        await repository.create(mint(null));
+
+        expect(calls[0]?.args.data).toMatchObject({
+          principalUserId: null,
+          mintedAsPersonal: false,
+        });
+      });
+    });
+  });
+
+  describe("given a key being edited", () => {
+    describe("when the edit is written", () => {
+      /** @scenario "A key minted for a person stays personal after its principal is cleared" */
+      it("writes neither a principal nor the personal mark", async () => {
+        const { repository, calls } = repositoryWith();
+
+        await repository.update({
+          id: "key-1",
+          organizationId: "organization-1",
+          name: "renamed",
+          description: null,
+          config: {},
+          traceProjectId: "project-1",
+          routingMode: "NONE",
+        });
+
+        expect(calls[0]?.args.data).not.toHaveProperty("principalUserId");
+        expect(calls[0]?.args.data).not.toHaveProperty("mintedAsPersonal");
       });
     });
   });

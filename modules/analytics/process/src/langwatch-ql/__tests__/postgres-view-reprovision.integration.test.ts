@@ -23,7 +23,10 @@ import {
 } from "../../features/provisioning/services/langwatch-ql-postgres-mapping.service.ts";
 import { LangWatchQLPostgresViewsService } from "../../features/provisioning/services/langwatch-ql-postgres-views.service.ts";
 import { LWQL_VIEW_CATALOG } from "../../rules/lwql-view-catalog.rules.ts";
-import { LangWatchQLCatalogShapesService } from "../../services/langwatch-ql-catalog-shapes.service.ts";
+import {
+  LangWatchQLCatalogShapesService,
+  type LangWatchQLViewDefinition,
+} from "../../services/langwatch-ql-catalog-shapes.service.ts";
 
 class AllowTestQueries extends PrismaQueryGuard {
   execute(context: PrismaQueryContext, next: PrismaQueryExecutor): Promise<unknown> {
@@ -48,6 +51,9 @@ const topics = LangWatchQLCatalogShapesService.create()
   .postgresViews(LWQL_VIEW_CATALOG)
   .find((view) => view.name === "topics");
 const APPROVED_VIEW = topics?.postgres.approvedView ?? "";
+const budgetLedgers = LangWatchQLCatalogShapesService.create()
+  .postgresViews(LWQL_VIEW_CATALOG)
+  .find((view) => view.name === "gateway_budget_ledgers");
 
 function client() {
   if (connection === null) throw new Error("DATABASE_URL is required for the re-provision test");
@@ -109,11 +115,7 @@ describe.skipIf(!databaseUrl)(
     }, 60_000);
 
     afterAll(async () => {
-      try {
-        await dropEverything();
-      } finally {
-        await connection?.closeOnce();
-      }
+      await dropEverything();
     });
 
     describe("given a view provisioned in a column order the catalog no longer matches", () => {
@@ -135,3 +137,50 @@ describe.skipIf(!databaseUrl)(
     });
   },
 );
+
+describe.skipIf(!databaseUrl)(
+  "Re-provisioning an installation provisioned before a view carried its row rule",
+  () => {
+    const ledgersView = budgetLedgers?.postgres.approvedView ?? "";
+    const provision = async (views: readonly LangWatchQLViewDefinition[]) => {
+      for (const statement of postgresViews.approvedViewStatements({ schema: SCHEMA, views })) {
+        await run(statement);
+      }
+    };
+    const definition = async (): Promise<string> => {
+      const rows = await client().$queryRawUnsafe<{ definition: string }[]>(
+        `SELECT pg_get_viewdef('"${SCHEMA}"."${ledgersView}"'::regclass) AS definition`,
+      );
+      return rows[0]?.definition ?? "";
+    };
+
+    beforeAll(async () => {
+      if (!budgetLedgers) {
+        throw new Error("the shipped catalog names no gateway_budget_ledgers view");
+      }
+      await run(`DROP VIEW IF EXISTS "${SCHEMA}"."${ledgersView}"`);
+      await provision([
+        { ...budgetLedgers, postgres: { ...budgetLedgers.postgres, rowFilter: undefined } },
+      ]);
+    }, 60_000);
+
+    afterAll(async () => {
+      await run(`DROP VIEW IF EXISTS "${SCHEMA}"."${ledgersView}"`);
+    });
+
+    describe("given gateway_budget_ledgers provisioned with no row rule", () => {
+      /** @scenario "Re-provisioning puts a view's new row rule in place on an installation already provisioned" */
+      it("carries the personal-key rule once the current statements run", async () => {
+        expect(await definition()).not.toContain("mintedAsPersonal");
+
+        await provision(budgetLedgers ? [budgetLedgers] : []);
+
+        expect(await definition()).toContain('"mintedAsPersonal"');
+      });
+    });
+  },
+);
+
+afterAll(async () => {
+  await connection?.closeOnce();
+});

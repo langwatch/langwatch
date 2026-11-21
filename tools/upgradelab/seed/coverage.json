@@ -132,6 +132,11 @@
       "cells": ["C3", "C4", "C9"],
       "note": "spans this month and last; C4 holds the private target"
     },
+    "gateway:mark-personal-virtual-keys": {
+      "status": "pending",
+      "seed": "unplanned",
+      "note": "needs VirtualKey rows with a principal and no mark, as the previous release wrote them"
+    },
     "governance:migrate-anomaly-webhook-destinations": {
       "status": "pending",
       "seed": "tenancy-sql:governance",

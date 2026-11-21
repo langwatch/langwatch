@@ -2091,6 +2091,7 @@ export interface LwqlPrismaRows {
     readonly hashedSecret: "String";
     readonly displayPrefix: "String";
     readonly principalUserId: "String?";
+    readonly mintedAsPersonal: "Boolean";
     readonly traceProjectId: "String?";
     readonly config: "Json";
     readonly revision: "BigInt";

@@ -964,6 +964,127 @@ describe("given the PostgreSQL-resident catalog mapped into ClickHouse through t
     }, 60_000);
   });
 
+  describe("when an organization's budgets hold usage tied to one person", () => {
+    /** The generic seed's organization budget, its ledger row and `<tenant>-vk` are shared. */
+    const tenant = () => harness.tenantA.tenantId;
+    const sharedBudgetId = () => `${tenant()}-GatewayBudget-1`;
+    const keys = () => ({
+      personal: `${tenant()}-vk-personal`,
+      minted: `${tenant()}-vk-minted`,
+      orphaned: `${tenant()}-vk-orphaned`,
+      machine: `${tenant()}-vk-machine`,
+    });
+
+    const seedStatements = (): string[] => {
+      const org = `${tenant()}-org`;
+      const user = `${tenant()}-user`;
+      const { personal, minted, orphaned, machine } = keys();
+      const key = (id: string, principal: string, mintedAsPersonal: boolean, creator: string) =>
+        `('${id}', '${org}', '${id}', 'hash-${id}', 'vk-${id}', ${principal}, ` +
+        `${mintedAsPersonal}, '${creator}')`;
+      const budget = (suffix: string, scopeType: string, scopeId: string) =>
+        `('${tenant()}-bdg-${suffix}', '${org}', '${scopeType}', '${scopeId}', '${suffix}', ` +
+        `'MONTH', 10, now(), '${user}')`;
+      const debit = (suffix: string, budgetId: string, keyId: string) =>
+        `('${tenant()}-led-${suffix}', '${budgetId}', '${keyId}', 'req-${suffix}', 1, 'gpt-5')`;
+      return [
+        `INSERT INTO "VirtualKey" ("id", "organizationId", "name", "hashedSecret", ` +
+          `"displayPrefix", "principalUserId", "mintedAsPersonal", "createdById") VALUES ` +
+          [
+            key(personal, `'${user}'`, true, user),
+            key(minted, "NULL", true, user),
+            key(orphaned, "NULL", false, `${tenant()}-erased-user`),
+            key(machine, "NULL", false, `svc_${tenant()}`),
+          ].join(", "),
+        `INSERT INTO "GatewayBudget" ("id", "organizationId", "scopeType", "scopeId", "name", ` +
+          `"window", "limitUsd", "resetsAt", "createdById") VALUES ` +
+          [
+            budget("principal", "PRINCIPAL", user),
+            budget("attributed", "ATTRIBUTED_USER", `${tenant()}-vk`),
+            budget("shared-key", "VIRTUAL_KEY", `${tenant()}-vk`),
+            budget("personal-key", "VIRTUAL_KEY", personal),
+            budget("orphaned-key", "VIRTUAL_KEY", orphaned),
+            budget("machine-key", "VIRTUAL_KEY", machine),
+          ].join(", "),
+        `INSERT INTO "GatewayBudgetLedger" ("id", "budgetId", "virtualKeyId", ` +
+          `"gatewayRequestId", "amountUsd", "model") VALUES ` +
+          [
+            debit("personal", sharedBudgetId(), personal),
+            debit("minted", sharedBudgetId(), minted),
+            debit("orphaned", sharedBudgetId(), orphaned),
+            debit("machine", sharedBudgetId(), machine),
+            debit("on-principal", `${tenant()}-bdg-principal`, `${tenant()}-vk`),
+          ].join(", "),
+        `INSERT INTO "GatewayBudgetBucketBoundary" ("id", "organizationId", "budgetId", ` +
+          `"bucketScopeId", "periodStartedAt") VALUES ('${tenant()}-bnd-attributed', '${org}', ` +
+          `'${tenant()}-bdg-attributed', '${tenant()}-vk:end-user-1', now())`,
+      ];
+    };
+
+    const deleteSeed = async (): Promise<void> => {
+      const keyIds = Object.values(keys()).map((id) => `'${id}'`);
+      await postgres.asAdmin(
+        `DELETE FROM "GatewayBudgetLedger" WHERE "id" LIKE '${tenant()}-led-%'`,
+      );
+      await postgres.asAdmin(
+        `DELETE FROM "GatewayBudgetBucketBoundary" WHERE "id" = '${tenant()}-bnd-attributed'`,
+      );
+      await postgres.asAdmin(`DELETE FROM "GatewayBudget" WHERE "id" LIKE '${tenant()}-bdg-%'`);
+      await postgres.asAdmin(`DELETE FROM "VirtualKey" WHERE "id" IN (${keyIds.join(", ")})`);
+    };
+
+    const readIds = async (view: string, column: string): Promise<string[]> => {
+      const rows = await selectRows<Record<string, string>>(
+        tenantA,
+        `SELECT ${column} FROM ${database}.${view} ORDER BY ${column}`,
+      );
+      return rows.map((row) => row[column] ?? "");
+    };
+
+    beforeAll(async () => {
+      for (const sql of seedStatements()) {
+        const result = await postgres.asAdmin(sql);
+        expect(result.exitCode, `seeding failed: ${sql}\n${result.stderr}`).toBe(0);
+      }
+    }, 60_000);
+
+    afterAll(async () => {
+      await deleteSeed();
+    });
+
+    /** @scenario "The budget views return no rows for personal keys or person-scoped budgets, for any reader" */
+    it("keeps shared usage and drops personal-key spend and budgets scoped to a person", async () => {
+      const ledger = await readIds("gateway_budget_ledgers", "GatewayBudgetLedgerId");
+      const budgets = await readIds("gateway_budgets", "GatewayBudgetId");
+
+      expect(ledger).toContain(`${tenant()}-GatewayBudgetLedger-1`);
+      for (const dropped of ["personal", "minted", "on-principal"]) {
+        expect(ledger, dropped).not.toContain(`${tenant()}-led-${dropped}`);
+      }
+      expect(budgets).toContain(sharedBudgetId());
+      expect(budgets).toContain(`${tenant()}-bdg-shared-key`);
+      for (const dropped of ["principal", "attributed", "personal-key"]) {
+        expect(budgets, dropped).not.toContain(`${tenant()}-bdg-${dropped}`);
+      }
+      expect(
+        await readIds("gateway_budget_bucket_boundaries", "GatewayBudgetBucketBoundaryId"),
+      ).toEqual([`${tenant()}-GatewayBudgetBucketBoundary-1`]);
+    }, 60_000);
+
+    /** @scenario "A key with no owner whose creator's account is gone counts as personal, unless a machine created it" */
+    it("drops a key whose creator's account is gone and keeps a machine-created key", async () => {
+      expect(await readIds("gateway_budget_ledgers", "GatewayBudgetLedgerId")).toEqual([
+        `${tenant()}-GatewayBudgetLedger-1`,
+        `${tenant()}-led-machine`,
+      ]);
+      expect(await readIds("gateway_budgets", "GatewayBudgetId")).toEqual([
+        sharedBudgetId(),
+        `${tenant()}-bdg-machine-key`,
+        `${tenant()}-bdg-shared-key`,
+      ]);
+    }, 60_000);
+  });
+
   describe("when a user granted the source tables has no row policy", () => {
     /** @scenario "A user with no row policy is the boundary, and it is documented" */
     it("reads every tenant's rows, and the access-model docs say only the restricted identity is isolated", async () => {

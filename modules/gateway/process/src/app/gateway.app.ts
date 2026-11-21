@@ -163,6 +163,7 @@ import {
 } from "@langwatch/webhook-contract";
 import type { z } from "zod";
 
+import type { GatewayUserDirectoryChannel } from "../channels/gateway-user-directory.channel.ts";
 import type { GatewayChannels } from "../channels/gateway.channels.ts";
 import {
   buildGatewayConnectManagedKeyPipeline,
@@ -197,6 +198,7 @@ import {
 import { GatewayApplicableBudgetsService } from "../features/budget/services/gateway-applicable-budgets.service.ts";
 import { GatewayBudgetChangeDedupeService } from "../features/budget/services/gateway-budget-change-dedupe.service.ts";
 import { GatewayBudgetCrossingService } from "../features/budget/services/gateway-budget-crossing.service.ts";
+import { GatewayBudgetLedgerVisibilityService } from "../features/budget/services/gateway-budget-ledger-visibility.service.ts";
 import { GatewayBudgetLedgerService } from "../features/budget/services/gateway-budget-ledger.service.ts";
 import { BudgetOverviewService } from "../features/budget/services/gateway-budget-overview.service.ts";
 /**
@@ -495,6 +497,8 @@ interface GatewayAppDependencies extends GatewayRestInfrastructure {
    * copies of the same tables, so a rule written through one was invisible to the other.
    */
   budgetDecisions: GatewayService;
+  /** What of a budget's detail a caller sees: a person's budget and rows only where allowed. */
+  budgetLedgerVisibility: GatewayBudgetLedgerVisibilityService;
   /**
    * The ClickHouse budget-spend source. Absent on a deployment without it,
    * which is why every read of it degrades explicitly rather than reporting a
@@ -790,6 +794,8 @@ type GatewayControlPlaneOptions = Readonly<{
   virtualKeyPepper: string | undefined;
   /** Where a virtual key's lifecycle is announced, where the deployment composed a ledger. */
   governanceSignals?: GatewayGovernanceSignals | undefined;
+  /** Whether a key's creator still has an account, for the personal-key rule. */
+  users: GatewayUserDirectoryChannel;
 }>;
 
 type GatewayControlPlane = GatewayAppDependencies &
@@ -864,6 +870,10 @@ function gatewayControlPlane(options: GatewayControlPlaneOptions): GatewayContro
   return {
     virtualKeys,
     budgetDecisions,
+    budgetLedgerVisibility: GatewayBudgetLedgerVisibilityService.create({
+      permissions,
+      users: options.users,
+    }),
     budgetSpend,
     changeEvents: changes,
     principalSpend,
@@ -1199,6 +1209,7 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
       },
       virtualKeyPepper: secrets.virtualKeyPepper,
       governanceSignals: governanceEvents,
+      users: setup.channels.users,
     });
     // `settlementGraceMs` owns the parse, the bound and the warning on the raw
     // `LW_SPEND_SETTLEMENT_GRACE_MS` string, so the reconciliation door and the
@@ -1995,20 +2006,22 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
     return this.#dependencies.budgetDecisions.resolveScopeTargets(budgets, organizationId);
   }
 
-  findBudgetDetail(input: {
+  async getBudgetDetail({
+    id,
+    organizationId,
+    actorUserId,
+  }: {
     id: string;
     organizationId: string;
-  }): Promise<GatewayBudgetDetail | null> {
-    return this.#dependencies.budgetDecisions.findDetailById(input);
-  }
-
-  async getBudgetDetail(input: {
-    id: string;
-    organizationId: string;
+    actorUserId: string;
   }): Promise<GatewayBudgetDetail> {
-    const detail = await this.findBudgetDetail(input);
+    const detail = await this.#dependencies.budgetDecisions.findDetailById({ id, organizationId });
     if (!detail) throw new GatewayBudgetNotFoundError();
-    return detail;
+    return this.#dependencies.budgetLedgerVisibility.detailFor({
+      organizationId,
+      actorUserId,
+      detail,
+    });
   }
 
   createBudget(input: CreateGatewayBudgetInput): Promise<GatewayBudgetResource> {

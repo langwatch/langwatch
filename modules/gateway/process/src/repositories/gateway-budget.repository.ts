@@ -22,10 +22,23 @@ import type {
 import type { ProjectIdentity } from "@langwatch/project-contract";
 import type { Instant } from "@langwatch/time";
 
+import type { VirtualKeyOwnership } from "../rules/gateway-personal-key.rules.ts";
+
 export type ArchiveBudgetInput = ArchiveGatewayBudgetInput;
 export type BudgetCheckInput = GatewayBudgetCheckInput;
 export type BudgetCheckResult = GatewayBudgetCheckResult;
-export type BudgetDetail = GatewayBudgetDetail;
+/**
+ * The detail as read, before the caller's view is applied: each ledger row says whose key it ran
+ * on (null for a key gone), and a VIRTUAL_KEY budget says whose key it is scoped to.
+ */
+export type BudgetDetail = Omit<GatewayBudgetDetail, "recentLedger"> & {
+  recentLedger: (GatewayBudgetDetail["recentLedger"][number] & {
+    keyOwner: VirtualKeyOwnership | null;
+  })[];
+  scopeKeyOwner: VirtualKeyOwnership | null;
+};
+/** Newest ledger rows a detail reads, so enough remain once a caller's view hides some. */
+export const RECENT_LEDGER_READ_LIMIT = 200;
 export type BudgetHealth = GatewayBudgetHealth;
 export type BudgetListWithHealth = GatewayBudgetListWithHealth;
 export type BudgetPageWithHealth = GatewayBudgetPageWithHealth;

@@ -82,6 +82,7 @@ type Tables = {
   bucketBoundaries: Map<string, GatewayBudgetBucketBoundary>;
   virtualKeys: Map<string, GatewayVirtualKeyRecord>;
   connectColumns: Map<string, MemoryGatewayConnectColumns>;
+  mintedAsPersonal: Set<string>;
 };
 
 /**
@@ -99,6 +100,8 @@ export class MemoryGatewayStore {
   bucketBoundaries = new Map<string, GatewayBudgetBucketBoundary>();
   virtualKeys = new Map<string, GatewayVirtualKeyRecord>();
   connectColumns = new Map<string, MemoryGatewayConnectColumns>();
+  /** Ids of the keys whose `mintedAsPersonal` column is set; the key record does not carry it. */
+  mintedAsPersonal = new Set<string>();
   readonly guardrails = new Map<string, GatewayGuardrailResource>();
   /** The audit trail, oldest first; the audit twin appends and a test reads it back. */
   readonly auditEntries: AppendGatewayAuditInput[] = [];
@@ -138,6 +141,7 @@ export class MemoryGatewayStore {
       bucketBoundaries: new Map(this.bucketBoundaries),
       virtualKeys: new Map(this.virtualKeys),
       connectColumns: new Map(this.connectColumns),
+      mintedAsPersonal: new Set(this.mintedAsPersonal),
     };
     try {
       return await work();
@@ -146,6 +150,7 @@ export class MemoryGatewayStore {
       this.bucketBoundaries = before.bucketBoundaries;
       this.virtualKeys = before.virtualKeys;
       this.connectColumns = before.connectColumns;
+      this.mintedAsPersonal = before.mintedAsPersonal;
       throw error;
     }
   }
