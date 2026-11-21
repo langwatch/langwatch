@@ -131,6 +131,7 @@ describe("given a member with analytics:view and a board with widgets", () => {
       });
     });
 
+    /** @scenario "A run starts its turn as the person, with a key that outlives the run's lease" */
     it("starts one unattended turn as that person, keyed by the run", async () => {
       const { runId } = await run();
 
@@ -970,6 +971,7 @@ describe("given a turn that does not end with an answer", () => {
     });
   });
 
+  /** @scenario "A held key whose grant has not landed is retried at the pace it asked for" */
   it("hands the outbox the pace Langy's held key asked for when its grant has not landed", async () => {
     // What Langy's held key mint throws (see the Langy turn's own test for that layer).
     installed.world.langy.startError = new AuthzGrantNotConfirmedError({
