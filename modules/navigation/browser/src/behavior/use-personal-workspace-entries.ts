@@ -1,6 +1,6 @@
 /**
  * "My Workspace" rows: one per governance org, or one for an org-less reader.
- * `/me` reads its org off the ambient scope `OrganizationSelect` writes.
+ * `/coding-agents` reads its org off the ambient scope `OrganizationSelect` writes.
  */
 
 import { CLIENT_FLAG_STALE_TIME_MS } from "@langwatch/feature-flag-client";

@@ -1,4 +1,5 @@
 import type { FrontendFeatureFlag } from "@langwatch/feature-flag-contract";
+import { CODING_AGENTS_PATH } from "@langwatch/user-contract";
 
 import type { DashboardsSidebarHint } from "./dashboards-sidebar-hint.ts";
 import {
@@ -69,7 +70,7 @@ function seatRefusalAt({
 
 /**
  * The product the chrome draws. Dashboards wins over the personal plane: its
- * sidebar is the saved-dashboards list, which the Me sidebar does not carry.
+ * sidebar is the saved-dashboards list, which the Coding agents sidebar does not carry.
  * A reader who clicked in from LLM Ops stays in that sidebar (the hint); no hint, no change.
  */
 function activeProductFor({
@@ -134,7 +135,9 @@ export function resolveShellRoute({
   const isPersonalScopeRoute =
     !isSettingsRoute &&
     !isOrgScopedProduct &&
-    (isPersonalScope || isPathUnder({ pathname, base: "/me" }) || isOnOwnPersonalProject);
+    (isPersonalScope ||
+      isPathUnder({ pathname, base: CODING_AGENTS_PATH }) ||
+      isOnOwnPersonalProject);
   const activeProductId = activeProductFor({
     isSettingsRoute,
     isPersonalScopeRoute,

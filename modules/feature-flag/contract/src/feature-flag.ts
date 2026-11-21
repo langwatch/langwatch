@@ -328,6 +328,13 @@ export const FEATURE_FLAGS = [
       "Opens the Dashboards area (/[project]/dashboards): the Agent Flight Deck and the member's own boards, as a product in the product switcher and saved-dashboards list (spec: modules/dashboard/specs/dashboards-v1.feature). With release_lwql_workbench also on, members build and edit widgets on boards. While it is on, Langy offers its dashboard-widgets skill instead of lwql-charts. Default off; while off the area answers not-found and the sidebar shows no entry. Legacy analytics is untouched either way. Force-enable in dev via FEATURE_FLAG_FORCE_ENABLE=release_dashboards.",
   },
   {
+    key: "release_dashboards_in_every_product",
+    scope: "PRODUCT",
+    defaultValue: false,
+    description:
+      "Shows the sidebar's Dashboards section (the member's pinned dashboards and the \"+\" that makes one) in Gateway and Coding agents as well as LLM Ops (spec: modules/navigation/specs/product-sidebars.feature). Those pages are about no project of their own, so the section lists and creates in the project LLM Ops would open, and its title names that project. Needs release_dashboards: a member who cannot reach Dashboards sees no section either way. Default off; while off only LLM Ops shows the section. Force-enable in dev via FEATURE_FLAG_FORCE_ENABLE=release_dashboards_in_every_product.",
+  },
+  {
     key: "release_insights",
     scope: "PRODUCT",
     defaultValue: false,
