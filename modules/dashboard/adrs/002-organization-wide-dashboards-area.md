@@ -119,7 +119,7 @@ folded into projections owned by the dashboard module.
    homed there; the library is the whole set. The home is a new fact, so it is
    an event on a `dashboard` aggregate in the dashboard module's eventing
    pipeline, folded into a projection table the module owns. An absent row
-   means LLM Ops, so no backfill is needed. A board *lives in a project* only
+   means LLM Ops, so no backfill is needed. A board _lives in a project_ only
    when its home is LLM Ops and its scope is `PROJECT` or `PRIVATE`; every other
    board is org-level. The project view `/:project/dashboards` lists the boards
    that live in that project plus every `ORGANIZATION` board, of any home. A
