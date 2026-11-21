@@ -11,6 +11,7 @@ import {
 import type { LangWatchQLViewDefinition } from "../services/langwatch-ql-catalog-shapes.service.ts";
 import { clickHouseSqlParser, type SqlAstNode } from "./langwatch-ql-parser.rules.ts";
 import { qualifyTableName } from "./langwatch-ql-policy.rules.ts";
+import { findNamedSetOperands } from "./langwatch-ql-set-operand.rules.ts";
 import { clickHouseLiteral } from "./langwatch-ql-sql-literal.rules.ts";
 import { METADATA_FIELDS } from "./langwatch-ql-validation-shape.rules.ts";
 
@@ -109,6 +110,18 @@ function assertNoShadowedView({
     .map((view) => view.name.toLowerCase())
     .filter((name) => folded.has(name));
   if (shadowed.length > 0) throw new LangWatchQLShadowedViewError({ names: shadowed });
+}
+
+/**
+ * Refuses a membership test whose set holds a plain name, which the validator refuses as
+ * `IN_TABLE_OPERAND` before a statement gets here: a second check on the same shape.
+ * @throws {Error} naming the rule, never the statement.
+ */
+function assertNoNamedSetOperands(statements: readonly SqlAstNode[]): void {
+  const functions = collectNodes(statements, "Function", []);
+  if (functions.some((node) => findNamedSetOperands(node).length > 0)) {
+    throw new Error("LangWatchQL scope: a set membership test must name its set with a subquery");
+  }
 }
 
 /** The view references in a parsed statement, last first, each once; `WITH` names are not views. */
@@ -373,15 +386,17 @@ export function scopeLangWatchQL({
 }): string {
   // Whole-history members need no rewrite: the row policy bounds them exactly.
   const isWindowed = memberWindows?.some((window) => window.from > 0) === true;
+  const parsed = clickHouseSqlParser.parse(sql);
   if (!isWindowed) {
+    if (parsed.ok) assertNoNamedSetOperands(parsed.statements);
     assertNoUnsupportedTableModifiers({ sql, views, database });
     return sql;
   }
 
-  const parsed = clickHouseSqlParser.parse(sql);
   if (!parsed.ok) {
     throw new Error("LangWatchQL scope: an accepted statement no longer parses");
   }
+  assertNoNamedSetOperands(parsed.statements);
 
   const windows =
     isWindowed && memberWindows

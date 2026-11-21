@@ -421,6 +421,11 @@ describe("validateLangWatchQL given a set membership test", () => {
       "SELECT count() FROM spans " +
         "WHERE TraceId IN (SELECT TraceId FROM traces) AND TraceId IN gateway_request_spend",
     ],
+    ["a name wrapped in a function", "SELECT count() FROM spans WHERE TraceId IN tuple(traces)"],
+    [
+      "a name beside literals in a nested function",
+      "SELECT count() FROM spans WHERE TraceId IN tuple('a', tuple(analytics.traces))",
+    ],
     [
       "a name inside a subquery",
       "SELECT count() FROM spans " +
@@ -466,7 +471,11 @@ describe("validateLangWatchQL given a set membership test", () => {
     ["a literal", "SELECT count() FROM spans WHERE TraceId IN 'a'"],
     ["a tuple of literals", "SELECT count() FROM spans WHERE TraceId IN ('a', 'b')"],
     ["an array of literals", "SELECT count() FROM spans WHERE TraceId GLOBAL IN ['a', 'b']"],
-    ["an allowed function", "SELECT count() FROM spans WHERE TraceId IN tuple('a', 'b')"],
+    ["an allowed function over literals", "SELECT count() FROM spans WHERE TraceId IN tuple(1, 2)"],
+    [
+      "nested allowed functions over literals",
+      "SELECT count() FROM spans WHERE TraceId IN tuple('a', tuple('b', 'c'))",
+    ],
     ["a query parameter", "SELECT count() FROM spans WHERE TraceId NOT IN {ids:Array(String)}"],
   ])("accepts a set written as %s", (_case, sql) => {
     expect(codesOf(validate(sql, UNGATED_POLICY))).toEqual([]);

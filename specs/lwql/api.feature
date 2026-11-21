@@ -763,7 +763,7 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
   Scenario: A WITH name stands in for a view only when written in the same letter case
     Given the LangWatchQL analytics SQL policy
     When a query declares a WITH name that differs from a view it reads only in letter case
-    Then the view reference is checked against the caller's views as a view, not skipped as the WITH name
+    Then the view reference is checked against the caller's views like any other view reference
     And a windowed read still refuses a WITH name spelt like a view in any letter case
 
   @integration

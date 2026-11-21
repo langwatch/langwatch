@@ -40,6 +40,25 @@ if (!POSTGRES_VIEW) throw new Error("the catalogue has no un-narrowed PostgreSQL
 const B_FROM = `(TenantId = 'project_b' AND OccurredAt >= fromUnixTimestamp64Milli(toInt64(${SHARED_FROM})))`;
 const MEMBERS = `(TenantId IN ('project_a') OR ${B_FROM})`;
 
+/** Sets written as a plain name, which the validator refuses first; the scope checks them again. */
+const NAMED_SETS: [string, string][] = [
+  ["a view name", "SELECT count() FROM spans WHERE TraceId IN traces"],
+  [
+    "a qualified name in function form",
+    "SELECT count() FROM spans WHERE in(TraceId, analytics.traces)",
+  ],
+  ["a name wrapped in a function", "SELECT count() FROM spans WHERE TraceId IN tuple(traces)"],
+  [
+    "a WITH subquery name",
+    "WITH t AS (SELECT TraceId FROM traces) SELECT count() FROM spans WHERE TraceId NOT IN t",
+  ],
+  [
+    "a name inside a subquery",
+    "SELECT count() FROM spans " +
+      "WHERE TraceId IN (SELECT TraceId FROM traces WHERE TraceId GLOBAL IN spans)",
+  ],
+];
+
 function scope({
   sql,
   memberWindows,
@@ -69,6 +88,11 @@ function captureRefusal(run: () => unknown): unknown {
 
 describe("scopeLangWatchQL with member windows", () => {
   describe("given a member shared from a point in time", () => {
+    /** @scenario "A set membership test names its set with a subquery" */
+    it.each(NAMED_SETS)("refuses a set written as %s when scoping", (_case, sql) => {
+      expect(() => scope({ sql, memberWindows: [WHOLE_A, DATED_B] })).toThrow(/subquery/);
+    });
+
     /** @scenario "Every view the statement reads is narrowed to each member's window" */
     it("keeps whole-history members outright and the dated member from its start", () => {
       expect(scope({ sql: "SELECT count() FROM traces", memberWindows: [WHOLE_A, DATED_B] })).toBe(
@@ -321,6 +345,18 @@ describe("scopeLangWatchQL with member windows", () => {
   });
 
   describe("given a plain project", () => {
+    /** @scenario "A set membership test names its set with a subquery" */
+    it.each(NAMED_SETS)("refuses a set written as %s when scoping", (_case, sql) => {
+      expect(() => scope({ sql })).toThrow(/subquery/);
+    });
+
+    /** @scenario "A set membership test names its set with a subquery" */
+    it("leaves a set written as a subquery as written", () => {
+      const sql = "SELECT count() FROM spans WHERE TraceId IN (SELECT TraceId FROM traces)";
+
+      expect(scope({ sql })).toBe(sql);
+    });
+
     /** @scenario "A plain project's statement is left as written" */
     it("runs the statement as written", () => {
       const sql = "SELECT count() FROM traces JOIN spans USING TraceId";

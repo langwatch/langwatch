@@ -31,6 +31,7 @@ import {
 } from "../features/app-functions/rules/langwatch-ql-functions.rules.ts";
 import type { SqlAstNode } from "./langwatch-ql-parser.rules.ts";
 import { qualifyTableName } from "./langwatch-ql-policy.rules.ts";
+import { findNamedSetOperands } from "./langwatch-ql-set-operand.rules.ts";
 import {
   type BlockAccumulator,
   type FieldArgs,
@@ -1220,36 +1221,16 @@ function enterTableJoin({ node, frame }: NodeArgs): Frame {
   return frame;
 }
 
-/** The set membership tests, by the names `IN` and its variants parse to, lower-cased. */
-const SET_MEMBERSHIP_FUNCTIONS: ReadonlySet<string> = new Set([
-  "in",
-  "notin",
-  "globalin",
-  "globalnotin",
-]);
-
-/** What a set may be written as: never a name, which ClickHouse reads as a whole table. */
-const SET_OPERAND_TYPES: ReadonlySet<string> = new Set([
-  "Subquery",
-  "Literal",
-  "Function",
-  "QueryParameter",
-]);
-
 const IN_TABLE_OPERAND_MESSAGE =
   "The set of an IN test cannot be a plain name. Write it as a subquery, x IN (SELECT ... FROM view), or as a list of values.";
 
 /**
- * Refuses a set written as a name, in operator and function form alike. ClickHouse reads
- * `x IN name` as a table or a `WITH` binding, which the table check never sees, so a `WITH` name
+ * Refuses a set written as a name, in operator and function form alike, or wrapped in a function.
+ * Written as a subquery, the set goes through the same checks as any other read; a `WITH` name
  * gets no exemption: it is written `x IN (SELECT * FROM name)`.
  */
 function refuseNamedSetOperands({ node, frame, ctx }: NodeArgs): void {
-  const { name, arguments: args } = node;
-  if (typeof name !== "string" || !SET_MEMBERSHIP_FUNCTIONS.has(name.trim().toLowerCase())) return;
-  if (!Array.isArray(args)) return;
-  for (const operand of args.slice(1)) {
-    if (isNode(operand) && SET_OPERAND_TYPES.has(operand.type)) continue;
+  for (const operand of findNamedSetOperands(node)) {
     report({
       ctx,
       frame,
