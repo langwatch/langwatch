@@ -22,6 +22,10 @@ import {
 
 import { formatDurationSeconds } from "../../../../model/coding-agent/duration.ts";
 import {
+  type ContextHeatLabel,
+  contextHeatLabel,
+} from "../../../../model/coding-agent/trace/context-health.ts";
+import {
   codeModeResultText,
   isCodeModePoll,
   isCodeModeScript,
@@ -122,19 +126,10 @@ function preloadThresholdPx(el: HTMLElement): number {
   return el.clientHeight * PRELOAD_VIEWPORTS;
 }
 
-/**
- * Context-size bands for the "heatmap" note: crossing into a bigger band is worth a line,
- * but every single call isn't. Matches `TokenTimelineChart`'s own bands so the two views
- * agree on what counts as "big".
- */
-const CONTEXT_HEAT_BANDS = [
-  { minTokens: 150_000, color: TERMINAL_TOKENS.red, label: "large" },
-  { minTokens: 50_000, color: TERMINAL_TOKENS.yellow, label: "growing" },
-] as const;
-
-function contextHeatBand(contextTokens: number): (typeof CONTEXT_HEAT_BANDS)[number] | null {
-  return CONTEXT_HEAT_BANDS.find((band) => contextTokens >= band.minTokens) ?? null;
-}
+const CONTEXT_HEAT_COLORS: Record<ContextHeatLabel, string> = {
+  large: TERMINAL_TOKENS.red,
+  growing: TERMINAL_TOKENS.yellow,
+};
 
 /** A note inserted into the transcript at a model call, not a beat of its own. */
 type ContextMarker =
@@ -186,8 +181,9 @@ function markersForModelCall({
   }
 
   const contextTokens = entry.cacheReadTokens + entry.cacheCreationTokens;
-  const band = contextHeatBand(contextTokens);
-  if (!band) return { markers, band: bandState };
+  const label = contextHeatLabel({ contextTokens, model: entry.model });
+  if (!label) return { markers, band: bandState };
+  const band = { label, color: CONTEXT_HEAT_COLORS[label] };
 
   if (bandState.known && band.label !== bandState.label) {
     markers.push({

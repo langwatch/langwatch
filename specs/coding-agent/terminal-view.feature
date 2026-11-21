@@ -237,6 +237,28 @@ Rule: The terminal reads back the whole session
     When an earlier turn is prepended above it
     Then the screen stays where the reader left it instead of following the tail
 
+  # The size bands: "growing" from 50K tokens, "large" from 300K, or from 60% of
+  # the model's window when that is wider (a 1M-context model is large at 600K).
+
+  @unit
+  Scenario: A context that a frontier model handles comfortably is not called large
+    Given a model call whose context is 151K tokens
+    When the replay names its context size band
+    Then the band is "growing", not "large"
+
+  @unit
+  Scenario: A context is large from 300K tokens
+    Given a model call whose context is 300K tokens on a standard-window model
+    When the replay names its context size band
+    Then the band is "large"
+
+  @unit
+  Scenario: A model with a wider window is large later
+    Given a model call whose context is 400K tokens on a 1M-context model
+    When the replay names its context size band
+    Then the band is "growing"
+    And at 600K tokens on the same model the band is "large"
+
   # A context note says the context crossed into a bigger size band, which is a
   # comparison against the call BEFORE the crossing. While earlier turns are
   # still unloaded that call is unknown, and a note drawn from a guess gets
