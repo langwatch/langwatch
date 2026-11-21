@@ -11,7 +11,7 @@ import { type OtlpIngestCredential } from "@langwatch/otlp/door";
 import { LocalFeatureApis } from "@langwatch/process";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
-import { TraceApi } from "@langwatch/trace-contract";
+import { DEFAULT_OTLP_TRACES_MAX_BODY_BYTES, TraceApi } from "@langwatch/trace-contract";
 import type { ErrorHandler } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { describe, expect, it, vi } from "vitest";
@@ -69,6 +69,7 @@ function ingestionSourceDeployment({
     createApiFixture<TraceApi>({
       otlpCredential: async () => credential,
       otlpMarkCredentialUsed: () => undefined,
+      otlpTracesMaxBodyBytes: () => DEFAULT_OTLP_TRACES_MAX_BODY_BYTES,
       otlpUsageLimit: usageLimit,
       otlpTraces,
     }),

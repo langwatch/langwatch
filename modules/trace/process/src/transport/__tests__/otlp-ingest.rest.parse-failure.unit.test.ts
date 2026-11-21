@@ -9,7 +9,7 @@ import type { OtlpIngestCredential } from "@langwatch/otlp/door";
 import type * as TestHarness from "@langwatch/test-harness";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
-import type { TraceApi } from "@langwatch/trace-contract";
+import { DEFAULT_OTLP_TRACES_MAX_BODY_BYTES, type TraceApi } from "@langwatch/trace-contract";
 import type * as LangWatch from "langwatch";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -76,6 +76,7 @@ function mount() {
   const app = createApiFixture<TraceApi>({
     otlpCredential: async () => CREDENTIAL,
     otlpUsageLimit: async () => {},
+    otlpTracesMaxBodyBytes: () => DEFAULT_OTLP_TRACES_MAX_BODY_BYTES,
   });
   const hono = createRestRuntime({
     doors: { otlp_ingest: otlpIngestDoor.open(app) },

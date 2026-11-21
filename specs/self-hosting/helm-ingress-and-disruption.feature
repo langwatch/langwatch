@@ -46,6 +46,7 @@ Feature: Helm install routing and disruption budgets
       Given the app Ingress uses class "nginx"
       When the chart renders
       Then the app Ingress sets a 120s proxy read timeout and a 120s proxy send timeout
+      And a 64m body size, so a trace export carrying a recording reaches the receiver
       And ingress.annotations win over those defaults
       And an app Ingress of another class gets no ingress-nginx annotations
 

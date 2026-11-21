@@ -6,6 +6,7 @@ import { storedObjectChannels } from "#channels/stored-object-channels.registry"
 import { storedObjectRetentionEventing } from "#eventing/stored-object-retention.pipeline";
 import { ClickHouseImportStoredObjectMigration } from "#migrations/clickhouse-import.stored-object.migration";
 import { storedObjectRepositories } from "#repositories/stored-object-repositories.registry";
+import { StoredObjectOwnerLinkBackfillService } from "#services/stored-object-owner-link-backfill.service";
 import { storedObjectFileRest } from "#transport/stored-object-file.rest";
 import { storedObjectImageProxyRest } from "#transport/stored-object-image-proxy.rest";
 import { storedObjectRest } from "#transport/stored-object.rest";
@@ -26,9 +27,14 @@ export const storedObjectProcessModule: PublishedProcessModule<
     storedObjectTrpcTransport,
   )
   .withEventing(storedObjectRetentionEventing)
-  .withMigrations(({ repositories }) => [
+  .withMigrations(({ dependencies, repositories }) => [
     ClickHouseImportStoredObjectMigration.create({
       legacy: repositories.legacySource,
       records: repositories.records,
+    }).step(),
+    StoredObjectOwnerLinkBackfillService.create({
+      records: repositories.records,
+      ownerLinks: repositories.ownerLinks,
+      retention: dependencies.dataRetention,
     }).step(),
   ]);

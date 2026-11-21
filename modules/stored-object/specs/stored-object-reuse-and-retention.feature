@@ -157,3 +157,17 @@ Feature: Stored-object reuse by content and owner-linked retention
   Scenario: Deleting a project's objects removes their links
     When the project's stored objects are deleted
     Then none of the project's owner links remain
+
+  # ===========================================================================
+  # Objects stored before owner links
+  # ===========================================================================
+
+  @unit
+  Scenario: Trace media stored before owner links is linked to the trace that stored it
+    Given available "trace_content" objects that hold no owner link, in a project that keeps traces for 30 days
+    When the background step "stored-object:link-unowned-retained-objects" runs for the project
+    Then each object is linked to the owner it was stored for, until 30 days after its creation
+    And the sweep deletes it once that time has passed
+    And a project that keeps traces forever links its objects with no end
+    And an object that already holds a link, a deleted object or a purpose with no retention category is left alone
+    And a second run links nothing

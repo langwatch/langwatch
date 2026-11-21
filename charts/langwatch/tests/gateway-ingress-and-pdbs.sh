@@ -203,6 +203,11 @@ test_nginx_timeouts_on_the_app_ingress() {
   else
     fail "nginx app timeout" "the nginx app Ingress has no 120s read timeout: $(cat "$tmp/appnginx.err")"
   fi
+  if printf '%s\n' "$app" | grep -q 'proxy-body-size: 64m'; then
+    ok "nginx app body size" "64m body size on the app Ingress"
+  else
+    fail "nginx app body size" "the nginx app Ingress keeps ingress-nginx's 1m body default"
+  fi
   if printf '%s\n' "$app" | grep -q 'proxy-send-timeout: "300"'; then
     ok "nginx app override" "ingress.annotations wins over the app default"
   else
