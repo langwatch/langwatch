@@ -169,9 +169,9 @@ folded into projections owned by the dashboard module.
     any of this is built.
 12. **A read-only port into the gateway (new).** Analytics reads the readable
     keys through `GatewayApi.listVirtualKeyIdsReadableInDashboards({
-    organizationId, userId }) -> { virtualKeyIds }`, with the narrow type
+organizationId, userId }) -> { virtualKeyIds }`, with the narrow type
     `GatewayDashboardKeyScope = Pick<GatewayApi,
-    "listVirtualKeyIdsReadableInDashboards">` beside it. It is a method on
+"listVirtualKeyIdsReadableInDashboards">` beside it. It is a method on
     `GatewayApi`, not a second interface, because a feature contract exposes one
     `<Feature>Api` (ADR-133, `AGENTS.md`). Its implementation applies the whole
     Gateway rule: no ids without `gatewayUsage:view`, and it throws on an authz
