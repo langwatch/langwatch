@@ -1,5 +1,50 @@
 # Changelog
 
+## [3.26.0](https://github.com/langwatch/langwatch/compare/langwatch@v3.25.0...langwatch@v3.26.0) (2026-11-21)
+
+
+### Features
+
+* **aigateway:** refuse revoked keys from cache and add an opt-in fail-closed limit ([#9641](https://github.com/langwatch/langwatch/issues/9641)) ([e5d8293](https://github.com/langwatch/langwatch/commit/e5d829398f23355b1819288b8537281ed565a726))
+* **auth:** keep the join screen to one clear choice when a domain has many organizations ([#9397](https://github.com/langwatch/langwatch/issues/9397)) ([7f36975](https://github.com/langwatch/langwatch/commit/7f36975875efc33bd16de5789ef7af4c96d49eb7))
+* **governance:** agent kill switch to stop agents on Databricks, Bedrock and the gateway, with approval and restore ([#9628](https://github.com/langwatch/langwatch/issues/9628)) ([857cc0d](https://github.com/langwatch/langwatch/commit/857cc0dc254c2cc7e1a1bd0096e753086a53648c))
+* **home:** announce red team suites, braids and the agent call graph ([#9718](https://github.com/langwatch/langwatch/issues/9718)) ([1201e95](https://github.com/langwatch/langwatch/commit/1201e95e357b4883e9e5fad233119d117480cbb3))
+* **langy:** open Langy with a typed question from a link ([#9699](https://github.com/langwatch/langwatch/issues/9699)) ([722bb92](https://github.com/langwatch/langwatch/commit/722bb929a05790a1fcbd1ffde309da7dc62323ed))
+* **settings:** open Settings on the project's own page from inside a project ([#9719](https://github.com/langwatch/langwatch/issues/9719)) ([d4bd05e](https://github.com/langwatch/langwatch/commit/d4bd05ef2a1377ca61ff99074602c18cd47ca903))
+* **suite:** more archetype templates and red team review follow-ups ([#9677](https://github.com/langwatch/langwatch/issues/9677)) ([4061eb8](https://github.com/langwatch/langwatch/commit/4061eb87af96fcd48e40023546a2dc69d80c270c))
+* **ui:** report how every first load ends, stalled boots included ([#9706](https://github.com/langwatch/langwatch/issues/9706)) ([0158cc2](https://github.com/langwatch/langwatch/commit/0158cc26f869c63d98b87f7b54e36e90c7e9fc36))
+
+
+### Bug Fixes
+
+* **aigateway:** an old disable replayed after a restart no longer refuses an active key ([#9756](https://github.com/langwatch/langwatch/issues/9756)) ([c17c280](https://github.com/langwatch/langwatch/commit/c17c280cc7890272da76e052984b9cb9e7dca27e))
+* **auth:** the different-email link error goes back to Security and says what to do ([#9717](https://github.com/langwatch/langwatch/issues/9717)) ([d0b0d4f](https://github.com/langwatch/langwatch/commit/d0b0d4f3ad77a8023fc0f6c41066035008440f1c)), closes [#9711](https://github.com/langwatch/langwatch/issues/9711)
+* **coding-agent:** a Claude Code trace's conversation is its session, and a launcher can declare one session for all its runs ([#9758](https://github.com/langwatch/langwatch/issues/9758)) ([a4bda03](https://github.com/langwatch/langwatch/commit/a4bda03c3bd2933cadfa177d1bb142c20bdcae1b))
+* **coding-agent:** keep launcher sessions whole, show real I/O, render Code Mode, link to a session ([#9755](https://github.com/langwatch/langwatch/issues/9755)) ([dbb1a43](https://github.com/langwatch/langwatch/commit/dbb1a437682edcf6904eb02878354375474d62e0))
+* **data-privacy:** turn off unselected PII types in the Presidio request ([#9736](https://github.com/langwatch/langwatch/issues/9736)) ([747e984](https://github.com/langwatch/langwatch/commit/747e98496bf640f85850a40ac73121789e3774f3))
+* **design-system:** pagination stacks and keeps the pager on one line on phones ([#9750](https://github.com/langwatch/langwatch/issues/9750)) ([c9dc964](https://github.com/langwatch/langwatch/commit/c9dc964cb4e156a16ec56aa5475d8118f75046fb))
+* **design-system:** scope pickers name the current team and project in a badge ([#9723](https://github.com/langwatch/langwatch/issues/9723)) ([bf1f777](https://github.com/langwatch/langwatch/commit/bf1f777937d6c1f6280010dafa4034c92cead307))
+* **instant-eval:** keep skipped and failed judgements on matched=false ([#9744](https://github.com/langwatch/langwatch/issues/9744)) ([ddc3b77](https://github.com/langwatch/langwatch/commit/ddc3b77c454e08ec8be88b8d5e7e5044cf5ace12)), closes [#9741](https://github.com/langwatch/langwatch/issues/9741)
+* **instant-eval:** refuse or heal a project with no LWQL key-map row ([#9659](https://github.com/langwatch/langwatch/issues/9659)) ([2fb4453](https://github.com/langwatch/langwatch/commit/2fb4453f0f9fb8c8a37db97c484ba6abf17170d9))
+* **instant-eval:** review follow-ups for [#9655](https://github.com/langwatch/langwatch/issues/9655), [#9661](https://github.com/langwatch/langwatch/issues/9661), [#9663](https://github.com/langwatch/langwatch/issues/9663), [#9665](https://github.com/langwatch/langwatch/issues/9665) ([#9673](https://github.com/langwatch/langwatch/issues/9673)) ([4e9d886](https://github.com/langwatch/langwatch/commit/4e9d8868d6e5b6301d15a905d0cae57d83b02d3a))
+* keep the terminal tab dark in light mode and size session time cells evenly ([#9715](https://github.com/langwatch/langwatch/issues/9715)) ([585f3e9](https://github.com/langwatch/langwatch/commit/585f3e91ef816da9ef587ce52265664005305a36))
+* **migrationorder:** freeze a released id-index step in its .withIdIndexes call, not in after-list references ([#9696](https://github.com/langwatch/langwatch/issues/9696)) ([f52a7ae](https://github.com/langwatch/langwatch/commit/f52a7ae226d32ba1281ecd84b2230561daeab68b))
+* **project:** settings pages show the top bar's searchable project picker ([#9732](https://github.com/langwatch/langwatch/issues/9732)) ([77405c8](https://github.com/langwatch/langwatch/commit/77405c83145bbb936260442e89757512e72c78bc))
+* **settings:** centre the settings column and the Braids upsell, and correct the Braids docs ([#9704](https://github.com/langwatch/langwatch/issues/9704)) ([c72601f](https://github.com/langwatch/langwatch/commit/c72601f7ae63bd31e95d2a36624a711e3587a5be))
+* **trace:** keep NOT on a typed eval chip when its run starts ([#9657](https://github.com/langwatch/langwatch/issues/9657)) ([ea636c6](https://github.com/langwatch/langwatch/commit/ea636c6f90a5934a6913d61d6408c092ac9359bd))
+* **trace:** the explorer tour keeps the filter already in the address ([#9726](https://github.com/langwatch/langwatch/issues/9726)) ([4b3ee90](https://github.com/langwatch/langwatch/commit/4b3ee90bcd8d05c21e3f3214caaead60befd7ddf))
+
+
+### Miscellaneous
+
+* **main:** release python-sdk 2.0.1 ([#9725](https://github.com/langwatch/langwatch/issues/9725)) ([e4f1535](https://github.com/langwatch/langwatch/commit/e4f15357f85f3ad52ebcc7a6ea6f225f9db15859))
+* unblock main after the braids PRs (LWQL Prisma manifest, test reads row) ([#9716](https://github.com/langwatch/langwatch/issues/9716)) ([32e15b9](https://github.com/langwatch/langwatch/commit/32e15b91e5e71ea104c688efb10fa04818d02c6b))
+
+
+### Documentation
+
+* **insight:** the life of an insight, ADR-005 (proposed) ([#9764](https://github.com/langwatch/langwatch/issues/9764)) ([10a7e80](https://github.com/langwatch/langwatch/commit/10a7e800870d32481ce41e1069d4768305eda4eb))
+
 ## [3.25.0](https://github.com/langwatch/langwatch/compare/langwatch@v3.24.0...langwatch@v3.25.0) (2026-11-18)
 
 
