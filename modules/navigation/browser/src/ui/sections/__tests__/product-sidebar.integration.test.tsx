@@ -244,7 +244,7 @@ describe("the product sidebar", () => {
   describe("when on a Me page", () => {
     /** @scenario The Me sidebar keeps the personal pages without the Govern group */
     it("shows the personal pages and no Govern group", () => {
-      renderSidebar({ surface: "me", pathname: "/me" });
+      renderSidebar({ surface: "me", pathname: "/coding-agents" });
 
       expect(screen.getByText("My Usage")).toBeInTheDocument();
       expect(screen.getByText("Sessions")).toBeInTheDocument();

@@ -7,3 +7,4 @@ export * from "./user.responses.ts";
 export * from "./user-rest.schemas.ts";
 export * from "./user.trpc.ts";
 export * from "./user.config.ts";
+export * from "./coding-agents-paths.ts";

@@ -1,5 +1,6 @@
 import { Dialog } from "@langwatch/design-system/dialog";
 import { Text, VStack } from "@langwatch/design-system/primitives";
+import { codingAgentsPath } from "@langwatch/user-contract";
 
 import type { PersonalFeatureKey } from "./use-personal-feature-gate.ts";
 
@@ -44,8 +45,8 @@ export function PersonalFeatureGateDialog({
           enables Evaluations, Datasets, Annotations, and Automations together.
         </Text>
         <Text fontSize="xs" color="fg.muted">
-          You can disable them later in /me/configure, your data is preserved and reappears on
-          re-enable.
+          You can disable them later in {codingAgentsPath({ page: "configure" })}, your data is
+          preserved and reappears on re-enable.
         </Text>
       </VStack>
     </Dialog>

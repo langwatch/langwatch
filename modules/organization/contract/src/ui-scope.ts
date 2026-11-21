@@ -56,7 +56,7 @@ export type UiScopeRoute = {
   readonly teamParam?: string;
   /**
    * The personal workspace's own pages. Read off the matched route rather than
-   * the raw path: `/me/traces` is a project named "me", not a personal page.
+   * the raw path: `/coding-agents/traces` is a project named "coding-agents", not a personal page.
    */
   readonly isPersonalScopeRoute: boolean;
 };

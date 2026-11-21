@@ -18,7 +18,10 @@ export type UiPageRouteDescriptor = {
   readonly page: string;
   /** The explicit native route mount point for a pre-router web installation. */
   readonly webRouteParent?: "project";
-  /** An account page (`/me`, Settings > Profile and Security): the shell draws its title large. */
+  /**
+   * An account page (`/coding-agents`, Settings > Profile and Security): the
+   * shell draws its title large.
+   */
   readonly heading?: "account";
   readonly children?: readonly UiRouteDescriptor[];
 };
