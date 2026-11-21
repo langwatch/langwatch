@@ -7,6 +7,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, it } from "node:test";
+import { jobBlocks } from "./guard-pull-request-target.ts";
 
 const workflows = join(import.meta.dirname, "..", "workflows");
 const read = (name: string): string => readFileSync(join(workflows, name), "utf8");
@@ -32,22 +33,32 @@ const LEVEL = { none: 0, read: 1, write: 2 } as const;
  */
 const requested = (text: string): Map<string, keyof typeof LEVEL> => {
   const asked = new Map<string, keyof typeof LEVEL>();
-  const blocks = [...text.matchAll(/^( *)permissions:\n((?:\1 +.*\n|[ \t]*\n)*)/gm)];
-  const keys = text.match(/^ *permissions:/gm)?.length ?? 0;
-  assert.equal(blocks.length, keys, "a `permissions:` key is not followed by a map this can read");
-  for (const [, , lines] of blocks) {
-    for (const line of lines.split("\n")) {
-      const trimmed = line.trim();
+  const lines = text.split("\n");
+  lines.forEach((line, index) => {
+    const key = /^( *)permissions:(.*)$/.exec(line);
+    if (!key) return;
+    assert.match(key[2], /^\s*(?:#.*)?$/, `a \`permissions:\` key is not followed by a map: ${line}`);
+    // Comments may sit at any indent, so only a line with content ends the map.
+    const map: string[] = [];
+    for (const next of lines.slice(index + 1)) {
+      const trimmed = next.trim();
       if (trimmed === "" || trimmed.startsWith("#")) continue;
-      const entry = /^\s+([a-z-]+): (none|read|write)$/.exec(line);
-      assert.ok(entry, `unreadable line in a permissions map: ${line}`);
-      const [, scope, level] = entry;
+      if (next.length - next.trimStart().length <= key[1].length) break;
+      map.push(next);
+    }
+    const entries = map.flatMap((entry) => {
+      const match = /^\s+([a-z-]+): (none|read|write)$/.exec(entry);
+      return match ? [match] : [];
+    });
+    assert.ok(map.length > 0, `a \`permissions:\` key is not followed by a map: ${line}`);
+    assert.equal(entries.length, map.length, `unreadable line in a permissions map:\n${map.join("\n")}`);
+    for (const [, scope, level] of entries) {
       const have = asked.get(scope) ?? "none";
       if (LEVEL[level as keyof typeof LEVEL] > LEVEL[have]) {
         asked.set(scope, level as keyof typeof LEVEL);
       }
     }
-  }
+  });
   return asked;
 };
 
@@ -57,15 +68,13 @@ const requested = (text: string): Map<string, keyof typeof LEVEL> => {
  */
 const calls = (
   text: string,
-): { job: string; file: string; granted: Map<string, keyof typeof LEVEL> }[] => {
-  const jobs = text.split(/^jobs:\n/m)[1] ?? "";
-  return jobs.split(/^(?= {2}[\w-]+:\s*$)/m).flatMap((block) => {
-    const file = /^ {4}uses: \.\/\.github\/workflows\/(.+)$/m.exec(block)?.[1];
-    const job = /^ {2}([\w-]+):/m.exec(block)?.[1];
-    if (!file || !job) return [];
+): { job: string; file: string; granted: Map<string, keyof typeof LEVEL> }[] =>
+  jobBlocks(text.split("\n")).flatMap(({ name: job, lines }) => {
+    const block = lines.join("\n");
+    const file = /^ +uses: \.\/\.github\/workflows\/(\S+)/m.exec(block)?.[1];
+    if (!file) return [];
     return [{ job, file, granted: requested(block) }];
   });
-};
 
 void describe("given the nightly workflow", () => {
   const nightly = read("nightly.yml");

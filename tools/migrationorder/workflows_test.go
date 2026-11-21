@@ -291,6 +291,13 @@ func TestCompatWorkflowBootsThePreviousReleaseImageNightly(t *testing.T) {
 	if read := stepNamed(t, steps, "Read the previous release"); !strings.Contains(read.Run, "sort -V | tail -n 1") {
 		t.Errorf("the previous release is not the newest manifest:\n%s", read.Run)
 	}
+	// Head's upgrade boots the module tree, which needs auth's and hosted MCP's base URLs.
+	migrate := stepNamed(t, steps, "Migrate with head's tasks")
+	for _, key := range []string{"BASE_HOST", "NEXTAUTH_URL"} {
+		if migrate.Env[key] != "http://localhost:5560" {
+			t.Errorf("head's upgrade on the previous release's schema sets %s = %q", key, migrate.Env[key])
+		}
+	}
 	smoke := stepNamed(t, steps, "The previous release's image answers and names nothing missing")
 	for _, want := range []string{"/api/health", "does not exist", "P2022"} {
 		if !strings.Contains(smoke.Run, want) {
