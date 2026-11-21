@@ -733,6 +733,7 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     Given a template with a captured image of its board
     Then its preview shows the top of that image in a short inset frame
     And a template without an image shows faint blocks, with no text, where its widgets sit on the board
+    And a widget that is not built yet is sketched at the height a new widget takes on a board
     And the preview runs no query and cannot be focused
 
   @integration
