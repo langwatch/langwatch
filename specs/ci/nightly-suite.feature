@@ -28,6 +28,11 @@ Feature: One nightly suite runs the slow checks and reports them on one dashboar
       And each keeps the manual and pull request or push triggers it had
 
     @unit
+    Scenario: The nightly grants the permissions its called jobs request
+      Given the nightly and every workflow it calls
+      Then each calling job grants every permission that the called workflow's jobs request
+
+    @unit
     Scenario: A nightly run never cancels another run
       Given the nightly workflow and every workflow it calls
       Then the nightly has no concurrency group that cancels a run in progress
