@@ -249,3 +249,15 @@ Feature: Nurturing sends the signals its owners record
     When nurturing's pipeline is built
     Then it tombstones that key for one release
     And the first-trace and trace-received signals still reach nurturing through trace's "projectMetadata" lane, queued beside it under its unchanged key
+
+  @unit
+  Scenario: A sign-up is identified with the first name when the name looks like one
+    Given a person signs up with the name "Jane Doe"
+    When the sign-up is identified to Customer.io
+    Then the person's traits carry first_name "Jane"
+
+  @unit
+  Scenario: A sign-up with an email-like or one-letter name sends no first name
+    Given a person signs up with the name "jane@acme.com", "J", "J Doe" or no name at all
+    When the sign-up is identified to Customer.io
+    Then the person's traits carry no first_name
