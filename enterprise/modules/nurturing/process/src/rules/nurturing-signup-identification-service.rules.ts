@@ -31,6 +31,18 @@ function pickDefined(obj: Record<string, unknown>): Record<string, unknown> {
 }
 
 /**
+ * The first word of a name that looks like a person's name, as typed. Email-like and
+ * one-letter first words are not usable in a greeting, so they yield undefined.
+ */
+export function firstNameOf(name: string | null | undefined): string | undefined {
+  const trimmed = name?.trim();
+  if (!trimmed || trimmed.includes("@")) return undefined;
+
+  const [first] = trimmed.split(/\s+/);
+  return first && first.length > 1 ? first : undefined;
+}
+
+/**
  * Decides the identify, group and track calls that identify a new user in Customer.io
  * during onboarding.
  */
@@ -59,6 +71,7 @@ export function fireSignup({
     ...pickDefined({
       email,
       name,
+      first_name: firstNameOf(name),
       role: signUpData?.yourRole,
       company_size: signUpData?.companySize,
       signup_usage: signUpData?.usage,
