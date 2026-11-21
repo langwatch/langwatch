@@ -16,8 +16,7 @@ const SHARE_WINDOW_LIMITED: LangWatchQLDiagnostic = {
 };
 const GRANULARITY_COARSENED: LangWatchQLDiagnostic = {
   code: "GRANULARITY_COARSENED",
-  message:
-    "The period is too long for 60-second steps, so the query ran at 3600-second steps.",
+  message: "The period is too long for 60-second steps, so the query ran at 3600-second steps.",
 };
 
 describe("widgetLimitNotes", () => {

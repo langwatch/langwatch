@@ -58,7 +58,7 @@ Feature: Dashboards v2 polish and bring-your-own-AI
 
   @unit
   Scenario: AC215 Partial cost: no span priced
-    Given a cost card where no span has a cost
+    Given a cost card that counts its priced spans, where no span has a cost
     Then it shows "Not priced"
     And never "$0.00+"
 
@@ -67,6 +67,7 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     Given some spans priced at 0 and some with no cost
     Then it shows "$0.00, some spans not priced"
     And never "$0.00+"
+    And the loops card, which cannot count priced spans, shows "$0.00, some spans not priced" whenever its sum is 0 and some repeats have no cost
 
   @e2e @unimplemented
   Scenario: AC5 The board uses a wide screen

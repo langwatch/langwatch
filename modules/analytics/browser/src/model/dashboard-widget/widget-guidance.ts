@@ -26,11 +26,15 @@ const FIELD_GUIDANCE: Readonly<Record<string, string>> = {
   UserId: `Send user_id in the trace metadata ${SDK}.`,
   ConversationId: `Send thread_id in the trace metadata ${SDK}.`,
   CustomerId: `Send customer_id in the trace metadata ${SDK}.`,
-  Model: "Choose a model in the evaluator's settings.",
   TopicId: "Topics come from LangWatch's topic clustering over your traces.",
   SubTopicId: "Topics come from LangWatch's topic clustering over your traces.",
   SatisfactionScore:
     "LangWatch works out satisfaction scores from your traces; there is nothing to send.",
+};
+
+/** Evaluation fields with words of their own: the model is the evaluator's, set in its settings. */
+const EVALUATION_FIELD_GUIDANCE: Readonly<Record<string, string>> = {
+  Model: "Choose a model in the evaluator's settings.",
 };
 
 /** Units other than traces, keyed as the completeness report derives them from the view name. */
@@ -49,7 +53,9 @@ export function missingFieldGuidance({
   label: string;
   unit: string;
 }): string | undefined {
-  const own = FIELD_GUIDANCE[field];
+  const own =
+    (unit === "evaluations" ? EVALUATION_FIELD_GUIDANCE[field] : undefined) ??
+    FIELD_GUIDANCE[field];
   if (own) return own;
   if (unit === "traces") return `Send ${label} on your traces ${SDK}.`;
   return undefined;

@@ -124,7 +124,10 @@ type DashboardWidgetFrameOverWindowProps = DashboardWidgetFrameProps & {
   readonly onLimitFailureChange?: (limited: boolean) => void;
   /** Told the messages of what the server limited in the run, joined; "" when it limited none. */
   readonly onLimitsChange?: (limits: string) => void;
-  /** Told where span history starts when the period begins earlier (ADR-006); "" otherwise. */
+  /**
+   * Told where span history starts when the period begins earlier (ADR-006); "" otherwise. With
+   * it, the caller shows the note, as a card does in its footer; without it, the frame does.
+   */
   readonly onSpanFloorNoticeChange?: (notice: string) => void;
   /** Handed what "Export CSV" would write now: the rows the widget's queries last returned. */
   readonly onExportChange?: (widgetExport: WidgetExport) => void;
@@ -207,19 +210,9 @@ function WidgetFrameOverWindow({
   const limitsLine = limits.join(" · ");
   useEffect(() => onLimitsChange?.(limitsLine), [onLimitsChange, limitsLine]);
 
-  // An empty span widget may only lack history, so its empty face keeps the notice. A widget
-  // that reads no spans never asks for the floor: an empty project id leaves the query off.
+  // An empty span widget may only lack history, so its empty face keeps the notice.
   const floorShown =
     (face.kind === "chart" || face.kind === "no_traffic") && readsSpanMetrics(definition.queries);
-  const floor = useSpanDataFloor({ projectId: floorShown ? projectId : "" });
-  const spanFloorNotice = floorShown
-    ? (spanDataFloorNotice({ queries: definition.queries, periodStart: timeWindow.start, floor }) ??
-      "")
-    : "";
-  useEffect(
-    () => onSpanFloorNoticeChange?.(spanFloorNotice),
-    [onSpanFloorNoticeChange, spanFloorNotice],
-  );
 
   const hasQueries = definition.queries.length > 0;
   const widgetExport = useMemo(
@@ -296,8 +289,13 @@ function WidgetFrameOverWindow({
   // The frame stays mounted under a face, so a refresh of the same period can bring the chart
   // back. Retry remounts it through its key instead.
   return (
-    <Box position="relative" height="full">
-      <Box visibility={cover ? "hidden" : "visible"} aria-hidden={cover ? true : undefined}>
+    <Box position="relative" height="full" display="flex" flexDirection="column">
+      <Box
+        flex={1}
+        minHeight={0}
+        visibility={cover ? "hidden" : "visible"}
+        aria-hidden={cover ? true : undefined}
+      >
         <SandboxedChartFrame
           key={`${id}:${attempt}`}
           code={definition.code}
@@ -316,8 +314,54 @@ function WidgetFrameOverWindow({
           {cover}
         </Box>
       )}
+      {floorShown && (
+        <SpanDataFloorNotice
+          projectId={projectId}
+          queries={definition.queries}
+          periodStart={timeWindow.start}
+          onChange={onSpanFloorNoticeChange}
+        />
+      )}
       <FrameDiagnosticBadge diagnostic={diagnostic} />
     </Box>
+  );
+}
+
+/**
+ * Where span history starts, on a span widget whose period begins earlier (analytics ADR-006).
+ * Mounted only for a span widget, so no other frame asks for the floor. Handed to `onChange`
+ * when given, "" once unmounted; else drawn under the plot.
+ */
+function SpanDataFloorNotice({
+  projectId,
+  queries,
+  periodStart,
+  onChange,
+}: {
+  readonly projectId: string;
+  readonly queries: readonly { readonly sql: string }[];
+  readonly periodStart: number;
+  readonly onChange?: (notice: string) => void;
+}) {
+  const floor = useSpanDataFloor({ projectId });
+  const notice = spanDataFloorNotice({ queries, periodStart, floor }) ?? "";
+  useEffect(() => {
+    onChange?.(notice);
+    return () => onChange?.("");
+  }, [onChange, notice]);
+  if (onChange || notice === "") return null;
+  return (
+    <Text
+      as="output"
+      position="relative"
+      flexShrink={0}
+      paddingX={2}
+      textStyle="xs"
+      color="fg.muted"
+      data-testid="widget-span-floor-notice"
+    >
+      {notice}
+    </Text>
   );
 }
 

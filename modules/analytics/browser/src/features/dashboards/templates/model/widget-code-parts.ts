@@ -238,12 +238,15 @@ const earliest = (points, key) => points.find((point) => known(point[key]))?.[ke
 export const COMPLETENESS = `// "+" on a sum that can only grow once the missing rows or prices arrive ("$830+").
 const plus = (query, field = "TotalCost") =>
   isLowerBound({ completeness: query.completeness, field }) ? "+" : "";
-// What the report says of a cost sum, for costText: a row with no unpriced span is priced.
-const costParts = (query, sum, field = "TotalCost") => ({
-  sum,
-  priced: (query.completeness?.unpriced?.count ?? 0) < (query.completeness?.total ?? 1),
-  unpriced: plus(query, field) === "+",
-});
+// What the report says of a cost sum, for costText, read off the cost field itself: with no
+// row priced the report is "missing", not "partial", so isLowerBound would say nothing.
+function costParts(query, sum, field = "TotalCost") {
+  const report = query.completeness;
+  if (!report) return { sum, priced: true, unpriced: false };
+  const present = report.fields?.find((item) => item.field === field)?.present ?? report.total;
+  const unpriced = present < report.total || (report.unpriced?.count ?? 0) > 0;
+  return { sum, priced: present > 0, unpriced };
+}
 const costFigure = (query, sum, field = "TotalCost") => costText(costParts(query, sum, field));
 // The share of rows with a known price: an average cost divides by these rows only.
 function pricedShare(query) {
@@ -283,12 +286,18 @@ export const GAP_BRIDGE = `function bridge({ key, colour, yAxisId }) {
 // An empty bucket of a measure has no value: the hover says so instead of showing 0.
 const tipValue = (format) => (value, name) => [known(value) ? format(value) : "No data", name];`;
 
-/** A change marker's label: no text on the plot, its readable names as the line's hover. */
+/** A change marker's label: no text on the plot, its readable names on hover and on focus. */
 export const MARK_HOVER = `// A thin band over the dashed line; hovering it names the change, so no label crowds the axes.
+// A keyboard reaches it too, and its focus outlines the band.
+const MARK_FOCUS = ".lw-mark:focus-visible { stroke: currentColor; stroke-width: 2; outline: none; }";
 const markHover = (name) => ({ viewBox }) => (
-  <rect x={viewBox.x - 4} y={viewBox.y} width={8} height={viewBox.height} fill="transparent">
-    <title>{name}</title>
-  </rect>
+  <g>
+    <style>{MARK_FOCUS}</style>
+    <rect className="lw-mark" x={viewBox.x - 4} y={viewBox.y} width={8} height={viewBox.height}
+      fill="transparent" tabIndex={0} role="img" aria-label={name}>
+      <title>{name}</title>
+    </rect>
+  </g>
 );`;
 
 /** A time series of bars and lines on one axis; reads `CHART_STYLE` and `GAP_BRIDGE`. */

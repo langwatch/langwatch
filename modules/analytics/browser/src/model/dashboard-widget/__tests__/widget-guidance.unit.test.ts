@@ -31,12 +31,24 @@ describe("missingFieldGuidance", () => {
     });
   });
 
-  describe("given the model, the only model column the completeness report can name", () => {
+  describe("given an evaluation's model", () => {
     /** @scenario "AC217 Needs model" */
     it("says to choose a model in the evaluator's settings", () => {
       expect(missingFieldGuidance({ field: "Model", label: "model", unit: "evaluations" })).toBe(
         "Choose a model in the evaluator's settings.",
       );
+    });
+  });
+
+  describe("given a model field of any other unit", () => {
+    /** @scenario "AC217 Needs model" */
+    it("keeps the unit's own guidance", () => {
+      expect(missingFieldGuidance({ field: "Model", label: "model", unit: "traces" })).toBe(
+        "Send model on your traces with the LangWatch SDK.",
+      );
+      expect(
+        missingFieldGuidance({ field: "Model", label: "model", unit: "simulations" }),
+      ).toBeUndefined();
     });
   });
 

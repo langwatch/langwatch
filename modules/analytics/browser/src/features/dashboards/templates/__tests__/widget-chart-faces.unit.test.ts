@@ -36,7 +36,7 @@ const built = [
 const code = (id: string) => implementedWidget(id)?.definition.code ?? "";
 
 const report = ({ total, unpriced }: { total: number; unpriced: number }) => ({
-  state: "partial",
+  state: unpriced === total ? "missing" : "partial",
   unit: "traces",
   total,
   fields: [{ field: "TotalCost", label: "total cost", present: total - unpriced }],
@@ -114,9 +114,7 @@ describe("given the AI cost per resolved figure while nothing is resolved", () =
     expect(cost.spentHint({ completeness: report({ total: 3, unpriced: 1 }) }, 12.5)).toBe(
       "$12.50+ spent, nothing resolved yet",
     );
-    expect(cost.spentHint({ completeness: null }, 12.5)).toBe(
-      "$12.50 spent, nothing resolved yet",
-    );
+    expect(cost.spentHint({ completeness: null }, 12.5)).toBe("$12.50 spent, nothing resolved yet");
     expect(code("ck-kpis")).toContain("<Hint>{spentHint(spend, num(s.cost))}</Hint>");
   });
 });
@@ -127,6 +125,8 @@ describe("given a widget that marks changes on its time axis", () => {
   /** @scenario "AC216 Change markers" */
   it("draws no marker text on the plot and names each change on hover", () => {
     expect(MARK_HOVER).toContain("<title>{name}</title>");
+    expect(MARK_HOVER).toContain('tabIndex={0} role="img" aria-label={name}');
+    expect(MARK_HOVER).toContain(".lw-mark:focus-visible");
     expect(marked.map(({ key }) => key)).toEqual(
       expect.arrayContaining(["up-errors", "tools-wrong-tool"]),
     );
