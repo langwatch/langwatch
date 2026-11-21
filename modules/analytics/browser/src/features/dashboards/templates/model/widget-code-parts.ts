@@ -53,6 +53,13 @@ function usd(raw) {
   if (abs < 1000) return sign + abs.toFixed(abs < 0.01 ? 4 : 2);
   return sign + compact.format(abs);
 }
+// A cost sum, "+" when some spans had no price ("$830+"). "$0.00+" would read as a known zero.
+function costText({ sum, priced, unpriced }) {
+  if (!unpriced) return usd(sum);
+  if (!priced) return "Not priced";
+  if (num(sum) === 0) return "$0.00, some spans not priced";
+  return usd(sum) + (known(sum) ? "+" : "");
+}
 function ms(raw) {
   const value = num(raw);
   if (value === null) return GAP;
@@ -231,6 +238,13 @@ const earliest = (points, key) => points.find((point) => known(point[key]))?.[ke
 export const COMPLETENESS = `// "+" on a sum that can only grow once the missing rows or prices arrive ("$830+").
 const plus = (query, field = "TotalCost") =>
   isLowerBound({ completeness: query.completeness, field }) ? "+" : "";
+// What the report says of a cost sum, for costText: a row with no unpriced span is priced.
+const costParts = (query, sum, field = "TotalCost") => ({
+  sum,
+  priced: (query.completeness?.unpriced?.count ?? 0) < (query.completeness?.total ?? 1),
+  unpriced: plus(query, field) === "+",
+});
+const costFigure = (query, sum, field = "TotalCost") => costText(costParts(query, sum, field));
 // The share of rows with a known price: an average cost divides by these rows only.
 function pricedShare(query) {
   const report = query.completeness;
@@ -269,6 +283,14 @@ export const GAP_BRIDGE = `function bridge({ key, colour, yAxisId }) {
 // An empty bucket of a measure has no value: the hover says so instead of showing 0.
 const tipValue = (format) => (value, name) => [known(value) ? format(value) : "No data", name];`;
 
+/** A change marker's label: no text on the plot, its readable names as the line's hover. */
+export const MARK_HOVER = `// A thin band over the dashed line; hovering it names the change, so no label crowds the axes.
+const markHover = (name) => ({ viewBox }) => (
+  <rect x={viewBox.x - 4} y={viewBox.y} width={8} height={viewBox.height} fill="transparent">
+    <title>{name}</title>
+  </rect>
+);`;
+
 /** A time series of bars and lines on one axis; reads `CHART_STYLE` and `GAP_BRIDGE`. */
 export const SERIES_CHART = `// series: { key, label, colour, dashed?, bars? }; format labels the axis and the tooltip.
 function SeriesChart({ points, series, format, domain }) {
@@ -283,7 +305,7 @@ function SeriesChart({ points, series, format, domain }) {
             <XAxis dataKey="x" tick={AXIS} tickLine={false} axisLine={false} minTickGap={28}
               dy={4} />
             <YAxis tick={AXIS} tickLine={false} axisLine={false} width={48} domain={domain}
-              tickFormatter={format} />
+              tickFormatter={format} allowDecimals={format !== count} />
             <Tooltip contentStyle={TIP} formatter={tipValue(format)} filterNull={false} />
             {series.filter((item) => !item.bars).map(bridge)}
             {series.map((item) => item.bars ? (

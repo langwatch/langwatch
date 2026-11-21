@@ -124,6 +124,8 @@ type DashboardWidgetFrameOverWindowProps = DashboardWidgetFrameProps & {
   readonly onLimitFailureChange?: (limited: boolean) => void;
   /** Told the messages of what the server limited in the run, joined; "" when it limited none. */
   readonly onLimitsChange?: (limits: string) => void;
+  /** Told where span history starts when the period begins earlier (ADR-006); "" otherwise. */
+  readonly onSpanFloorNoticeChange?: (notice: string) => void;
   /** Handed what "Export CSV" would write now: the rows the widget's queries last returned. */
   readonly onExportChange?: (widgetExport: WidgetExport) => void;
   /** Told whether the card shows none of the widget's data, so a board can offer to set it up. */
@@ -162,6 +164,7 @@ function WidgetFrameOverWindow({
   onFaceChange,
   onLimitFailureChange,
   onLimitsChange,
+  onSpanFloorNoticeChange,
   onExportChange,
   onEmptyChange,
   parsed,
@@ -203,6 +206,20 @@ function WidgetFrameOverWindow({
   useEffect(() => () => limitFailureChange.current?.(false), []);
   const limitsLine = limits.join(" · ");
   useEffect(() => onLimitsChange?.(limitsLine), [onLimitsChange, limitsLine]);
+
+  // An empty span widget may only lack history, so its empty face keeps the notice. A widget
+  // that reads no spans never asks for the floor: an empty project id leaves the query off.
+  const floorShown =
+    (face.kind === "chart" || face.kind === "no_traffic") && readsSpanMetrics(definition.queries);
+  const floor = useSpanDataFloor({ projectId: floorShown ? projectId : "" });
+  const spanFloorNotice = floorShown
+    ? (spanDataFloorNotice({ queries: definition.queries, periodStart: timeWindow.start, floor }) ??
+      "")
+    : "";
+  useEffect(
+    () => onSpanFloorNoticeChange?.(spanFloorNotice),
+    [onSpanFloorNoticeChange, spanFloorNotice],
+  );
 
   const hasQueries = definition.queries.length > 0;
   const widgetExport = useMemo(
@@ -299,44 +316,8 @@ function WidgetFrameOverWindow({
           {cover}
         </Box>
       )}
-      {/* An empty span widget may only lack history, so its empty face keeps the notice. */}
-      {(!cover || face.kind === "no_traffic") && readsSpanMetrics(definition.queries) && (
-        <SpanDataFloorNotice
-          projectId={projectId}
-          queries={definition.queries}
-          periodStart={timeWindow.start}
-        />
-      )}
       <FrameDiagnosticBadge diagnostic={diagnostic} />
     </Box>
-  );
-}
-
-/** Where span history starts, on a span widget whose period begins earlier (analytics ADR-006). */
-function SpanDataFloorNotice({
-  projectId,
-  queries,
-  periodStart,
-}: {
-  readonly projectId: string;
-  readonly queries: readonly { readonly sql: string }[];
-  readonly periodStart: number;
-}) {
-  const floor = useSpanDataFloor({ projectId });
-  const notice = spanDataFloorNotice({ queries, periodStart, floor });
-  if (!notice) return null;
-  return (
-    <Text
-      as="output"
-      position="absolute"
-      bottom={1}
-      left={2}
-      textStyle="xs"
-      color="fg.muted"
-      data-testid="widget-span-floor-notice"
-    >
-      {notice}
-    </Text>
   );
 }
 

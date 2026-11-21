@@ -89,7 +89,7 @@ describe("given the Where my agent breaks widgets", () => {
     // Main's LIMIT 10000 per kind kept an arbitrary 10000 repeats; every repeat now counts.
     expect(sql.daily).not.toContain("LIMIT 10000");
     expect(sql.daily).toContain("sum(uncosted) AS uncosted_spans");
-    expect(code).toContain('usd(repeatCost) + (lowerBound ? "+" : "")');
+    expect(code).toContain("costText({ sum: repeatCost, priced: true, unpriced })");
   });
 
   /** @scenario "AC63 Where my agent breaks: tool error rate says how many tool errors the agent recovered" */

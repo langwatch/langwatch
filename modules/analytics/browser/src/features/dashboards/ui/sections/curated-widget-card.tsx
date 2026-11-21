@@ -12,7 +12,7 @@ import { DashboardWidgetFrameOverWindow } from "../../../dashboard-widget/ui/sec
 import { useWidgetCsvExport } from "../../behavior/use-widget-csv-export.ts";
 import { useWidgetViewed } from "../../behavior/use-widget-viewed.ts";
 import type { BoardPeriod } from "../../model/board-period.ts";
-import { widgetSourcesLine } from "../../model/widget-sources.ts";
+import { widgetCardFooter, widgetSourcesLine } from "../../model/widget-sources.ts";
 import type { BoardTemplateWidget } from "../../templates/index.ts";
 import { AskLangyButton } from "../blocks/ask-langy-button.tsx";
 import { WidgetCardShell, widgetBodyHeightPx } from "../blocks/widget-card-shell.tsx";
@@ -56,6 +56,7 @@ export function CuratedWidgetCard({
 }) {
   const { name, definition } = widget;
   const [face, setFace] = useState<WidgetFace["kind"]>("chart");
+  const [spanFloor, setSpanFloor] = useState("");
   const canAskLangy = onAskLangy !== undefined && face !== "no_access";
   const csvExport = useWidgetCsvExport({ board: boardName, widget: name });
   const viewRef = useWidgetViewed({ widgetSource: "curated" });
@@ -66,7 +67,12 @@ export function CuratedWidgetCard({
       viewRef={viewRef}
       name={name}
       description={definition.description}
-      footer={widgetSourcesLine(definition.queries)}
+      footer={widgetCardFooter({
+        sourcesLine: widgetSourcesLine(definition.queries),
+        projectsLine: "",
+        spanFloor,
+        limits: "",
+      })}
       controls={
         hasControls && (
           <>
@@ -92,6 +98,7 @@ export function CuratedWidgetCard({
         granularitySeconds={granularitySeconds}
         periodKey={periodKey}
         onFaceChange={setFace}
+        onSpanFloorNoticeChange={setSpanFloor}
         limitAudience={{ kind: "built_in" }}
         onExportChange={csvExport.onExportChange}
         onEmptyChange={onEmptyChange}

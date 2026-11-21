@@ -87,6 +87,7 @@ export function BoardWidgetCard({
   const viewRef = useWidgetViewed({ widgetSource: widget.definition.source?.kind ?? "unknown" });
   const [face, setFace] = useState<WidgetFace["kind"]>("chart");
   const [limits, setLimits] = useState("");
+  const [spanFloor, setSpanFloor] = useState("");
   // A widget the reader may not see offers nothing that reads its data: no Langy, alert or report.
   const langyOnData = face === "no_access" ? undefined : langy;
   const canEditCode = face !== "no_access" || host.hasPermission(WIDGET_EDIT_PERMISSION);
@@ -108,6 +109,7 @@ export function BoardWidgetCard({
           boardProjectName: host.project()?.name ?? "",
           readable,
         }),
+        spanFloor,
         limits,
       })}
       controls={
@@ -169,6 +171,7 @@ export function BoardWidgetCard({
             ...(canEditCode && onEdit ? { onEditCode: () => onEdit({ withLangy: false }) } : {}),
           }}
           onLimitsChange={setLimits}
+          onSpanFloorNoticeChange={setSpanFloor}
           onExportChange={csvExport.onExportChange}
           onEmptyChange={onEmptyChange}
           onLimitFailureChange={onLimitFailureChange}

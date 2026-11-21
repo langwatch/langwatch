@@ -30,13 +30,7 @@ import { analyticsApi } from "../../../behavior/analytics-api.ts";
 import type { ChartFrameExecuteQuery } from "../../../behavior/frame-bridge.ts";
 import { createLangWatchQLExecute } from "../../../behavior/lwql-execute.ts";
 import type { LangWatchQLParameterValue } from "../../../model/lwql-request-state.ts";
-
-/** The diagnostics that say the server limited a run, shown on the card as one (i) line. */
-const LIMIT_DIAGNOSTIC_CODES: readonly string[] = [
-  "SHARE_WINDOW_LIMITED",
-  "SOURCES_IGNORED",
-  "GRANULARITY_COARSENED",
-];
+import { widgetLimitNotes } from "../model/widget-limit-notes.ts";
 
 /** Widgets run against the last 24 hours at an hourly step — no toolbar. */
 const DEFAULT_GRANULARITY: LangWatchQLGranularityStep = 3600;
@@ -131,9 +125,7 @@ export function useDashboardWidgetExecutor(
   const [limitsBySql, setLimitsBySql] = useState<Record<string, readonly string[]>>({});
   const noteLimits = useCallback(
     ({ query, result }: { query: string; result: LangWatchQLQueryResult }) => {
-      const messages = result.diagnostics
-        .filter(({ code }) => LIMIT_DIAGNOSTIC_CODES.includes(code))
-        .map(({ message }) => message);
+      const messages = widgetLimitNotes(result.diagnostics);
       setLimitsBySql((prev) =>
         prev[query]?.join() === messages.join() ? prev : { ...prev, [query]: messages },
       );

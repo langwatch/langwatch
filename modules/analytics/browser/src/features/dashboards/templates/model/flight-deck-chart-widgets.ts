@@ -80,7 +80,7 @@ function Tile({ label, value, current, previous, rising }) {
           current={success} previous={successPrev} rising="good" />
         <Tile label="Response time" value={ms(num(row.p95_ms))}
           current={num(row.p95_ms)} previous={num(row.p95_ms_prev)} rising="bad" />
-        <Tile label="Total cost" value={usd(num(row.cost)) + plus(main)}
+        <Tile label="Total cost" value={costFigure(main, num(row.cost))}
           current={num(row.cost)} previous={num(row.cost_prev)} rising="bad" />
       </div>
     </Panel>
@@ -129,7 +129,7 @@ export const THROUGHPUT_CODE = widgetCode({
             <XAxis dataKey="x" tick={AXIS} tickLine={false} axisLine={false} minTickGap={28}
               dy={4} />
             <YAxis yAxisId="req" tick={AXIS} tickLine={false} axisLine={false} width={44}
-              tickFormatter={count} />
+              tickFormatter={count} allowDecimals={false} />
             <YAxis yAxisId="ms" orientation="right" tick={AXIS} tickLine={false}
               axisLine={false} width={48} tickFormatter={ms} />
             <YAxis yAxisId="rate" hide domain={[0, maxRate * 4]} />

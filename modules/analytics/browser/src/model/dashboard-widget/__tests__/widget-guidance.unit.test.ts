@@ -31,6 +31,15 @@ describe("missingFieldGuidance", () => {
     });
   });
 
+  describe("given the model, the only model column the completeness report can name", () => {
+    /** @scenario "AC217 Needs model" */
+    it("says to choose a model in the evaluator's settings", () => {
+      expect(missingFieldGuidance({ field: "Model", label: "model", unit: "evaluations" })).toBe(
+        "Choose a model in the evaluator's settings.",
+      );
+    });
+  });
+
   describe("given a column LangWatch derives", () => {
     /** @scenario "An empty widget names what sends its data" */
     it("says there is nothing to send for the satisfaction score", () => {

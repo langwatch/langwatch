@@ -49,7 +49,7 @@ export const SPEND_CODE = widgetCode({
   return (
     <Panel>
       <Figures>
-        <Figure label="Spent" value={usd(cost) + plus(spend)}>
+        <Figure label="Spent" value={costFigure(spend, cost)}>
           <Change now={cost} before={num(s.cost_prev)} better="down" format={usd} />
         </Figure>
         <Figure label="Cost per success" value={resolved > 0 ? usd(perSuccess) : "Not measured"}>
@@ -98,10 +98,11 @@ const SOURCES = [
   ["other", "Other", C.faint, undefined],
 ];
 
-// A source with no traces says so; one with traces but no price shows a dash, never $0.00.
+// A source with no traces says so; one with traces but no price never shows $0.00.
 function SourceRow({ label, colour, cost, total, traces, unpriced, origin }) {
   const open = origin && traces > 0 ? () => openTraces({ origin }) : undefined;
-  const figure = traces === 0 ? "No runs" : usd(cost) + (unpriced > 0 && known(cost) ? "+" : "");
+  const figure = traces === 0 ? "No runs"
+    : costText({ sum: cost, priced: unpriced < traces, unpriced: unpriced > 0 });
   return (
     <div onClick={open} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 11.5,
       padding: "3px 0", cursor: open ? "pointer" : "default",
@@ -116,7 +117,9 @@ function SourceRow({ label, colour, cost, total, traces, unpriced, origin }) {
       <span style={{ width: 36, textAlign: "right", color: C.subtle }}>
         {traces === 0 ? "" : pct(ratio(cost, total), 0)}
       </span>
-      <span style={{ width: 64, textAlign: "right", fontWeight: 500 }}>{figure}</span>
+      <span style={{ minWidth: 64, textAlign: "right", fontWeight: 500, whiteSpace: "nowrap" }}>
+        {figure}
+      </span>
     </div>
   );
 }

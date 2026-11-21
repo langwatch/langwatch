@@ -27,6 +27,17 @@ import {
   WORDS,
 } from "./flight-deck-costs-parts.ts";
 
+/**
+ * What the cost figure says while nothing is resolved; reads `NUMBERS` and `COMPLETENESS`. A
+ * spend with no price at all is left out, and a zero sum names its gap: never "$0.00+".
+ */
+export const SPENT_HINT = `function spentHint(query, sum) {
+  const parts = costParts(query, sum);
+  if (parts.unpriced && !parts.priced) return "Nothing resolved yet";
+  if (parts.unpriced && num(sum) === 0) return "$0.00 spent, some spans not priced";
+  return costText(parts) + " spent, nothing resolved yet";
+}`;
+
 /** This period: whether the agent does its job and what a success costs, at a glance. */
 export const KPIS_CODE = widgetCode({
   summary: "How often my agent resolves, how much it is used, checks passing and cost per success.",
@@ -36,6 +47,7 @@ export const KPIS_CODE = widgetCode({
   source: "traces",
   compactCallToAction: true,
   parts: [NUMBERS, COMPLETENESS, FIGURES],
+  components: SPENT_HINT,
   queries: ["outcomes", "spend", "checks"],
   body: `  const o = outcomes.data[0] || {};
   const s = spend.data[0] || {};
@@ -78,7 +90,7 @@ export const KPIS_CODE = widgetCode({
           {resolved > 0 ? (
             <Change now={perSuccess} before={perSuccessPrev} better="down" format={usd} />
           ) : (
-            <Hint>{usd(num(s.cost)) + plus(spend)} spent, nothing resolved yet</Hint>
+            <Hint>{spentHint(spend, num(s.cost))}</Hint>
           )}
         </Figure>
       </Figures>

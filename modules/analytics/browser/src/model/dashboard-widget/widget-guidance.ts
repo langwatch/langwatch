@@ -26,6 +26,7 @@ const FIELD_GUIDANCE: Readonly<Record<string, string>> = {
   UserId: `Send user_id in the trace metadata ${SDK}.`,
   ConversationId: `Send thread_id in the trace metadata ${SDK}.`,
   CustomerId: `Send customer_id in the trace metadata ${SDK}.`,
+  Model: "Choose a model in the evaluator's settings.",
   TopicId: "Topics come from LangWatch's topic clustering over your traces.",
   SubTopicId: "Topics come from LangWatch's topic clustering over your traces.",
   SatisfactionScore:
