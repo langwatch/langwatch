@@ -26,6 +26,7 @@ import type { InstantEvalRoutePayload } from "../../../../model/instant-eval-rou
 import {
   isSurelyInstantEvalChip,
   typedQuestionKey,
+  UNJUDGEABLE_NOT_COPY,
 } from "../../../../model/surely-instant-eval-chip.ts";
 import { explainAnyError } from "../../errors/index.ts";
 
@@ -50,14 +51,6 @@ interface UseSubmitSearchOptions {
    */
   onSupersede: () => void;
 }
-
-/** The toast for a typed chip whose `NOT` no run can answer; nothing is searched. */
-const UNJUDGEABLE_NOT_TOAST = {
-  title: "This NOT cannot be judged as typed",
-  description:
-    "An Instant Eval judges only the rows the other terms keep, so a NOT on its chip " +
-    'must sit beside them with AND, as in status:error AND NOT eval:"...".',
-};
 
 /** What the toast adds when the router itself could not be reached. */
 const PHRASE_INSTEAD_NOTE = "The words were searched as a phrase instead.";
@@ -476,7 +469,7 @@ export function useSubmitSearch({
       switch (path.kind) {
         case "unjudgeable":
           // Nothing is searched or started: any rebuild would change what was typed.
-          toaster.create({ ...UNJUDGEABLE_NOT_TOAST, type: "warning" });
+          toaster.create({ ...UNJUDGEABLE_NOT_COPY, type: "warning" });
           return;
         case "refuse":
           // Nothing is searched: the typed chip stays in the bar under the

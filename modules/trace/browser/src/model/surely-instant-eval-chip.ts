@@ -39,3 +39,11 @@ export function isSurelyInstantEvalChip({
     Boolean(runsByKey?.[chip.key])
   );
 }
+
+/** What the submit toast and the empty table both say about a `NOT` no run can answer. */
+export const UNJUDGEABLE_NOT_COPY = {
+  title: "This NOT cannot be judged as typed",
+  description:
+    "An Instant Eval judges only the rows the other terms keep. " +
+    'Rewrite the NOT beside them with AND, as in status:error AND NOT eval:"...".',
+} as const;

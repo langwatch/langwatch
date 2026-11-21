@@ -334,6 +334,42 @@ describe("given a chip typed by hand under NOT", () => {
   });
 
   /** @scenario "A pending chip under NOT is not judged yet" */
+  it("drops the marks the submit made when the reader closes the refusal popover", () => {
+    useFilterStore.setState({ projectId: "project-1" });
+    useInstantEvalRunStore.setState({ typedQuestions: {} });
+    useInstantEvalRunStore.getState().markTyped({ projectId: "project-1", question: "b" });
+    useInstantEvalRunStore
+      .getState()
+      .markTyped({ projectId: "project-1", question: typed.sentence });
+    // Instant Evals off: a legacy NOT eval:<evaluator name> meets the popover, no estimate.
+    const { result } = renderHook(() => useInstantEvalRoute({ isInstantEvalAvailable: false }));
+    act(() =>
+      result.current.onInstantEvalRoute({ ...typed, newlyTypedQuestions: [typed.sentence, "b"] }),
+    );
+    expect(result.current.refusal).not.toBeNull();
+
+    act(() => result.current.dismissRefusal());
+
+    expect(useInstantEvalRunStore.getState().typedQuestions).toEqual({});
+    expect(useFilterStore.getState().queryText).toBe('NOT eval:"the user is annoyed"');
+  });
+
+  /** @scenario "A pending chip under NOT is not judged yet" */
+  it("keeps a mark made before the submit when the reader closes the refusal popover", () => {
+    useFilterStore.setState({ projectId: "project-1" });
+    const mark = { projectId: "project-1", question: "the user is annoyed" };
+    useInstantEvalRunStore.setState({ typedQuestions: {} });
+    useInstantEvalRunStore.getState().markTyped(mark);
+    const before = useInstantEvalRunStore.getState().typedQuestions;
+    const { result } = renderHook(() => useInstantEvalRoute({ isInstantEvalAvailable: false }));
+    act(() => result.current.onInstantEvalRoute(typed));
+
+    act(() => result.current.dismissRefusal());
+
+    expect(useInstantEvalRunStore.getState().typedQuestions).toEqual(before);
+  });
+
+  /** @scenario "A pending chip under NOT is not judged yet" */
   it.each([
     ["a declined cost dialog", "decline"],
     ["a failed estimate", "error"],

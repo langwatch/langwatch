@@ -25,6 +25,7 @@ import {
   failedInstantEvalChip,
   instantEvalFailureMessage,
 } from "../../../../model/instant-eval-failure.ts";
+import { UNJUDGEABLE_NOT_COPY } from "../../../../model/surely-instant-eval-chip.ts";
 import { PIIRedactionAlert } from "../../../blocks/pii-redaction-notice.tsx";
 import { looksLikeEmail, redactsEmailAddresses } from "../utils/email-shaped-query.ts";
 import { QueryBreakdownChips } from "./query-breakdown-chips.tsx";
@@ -78,13 +79,7 @@ function instantEvalEmptyContent({
   if (failedEvalMessage) {
     return { title: "The Instant Eval did not finish", description: failedEvalMessage };
   }
-  if (hasUnjudgeableEval) {
-    return {
-      title: "This NOT cannot be judged as typed",
-      description:
-        'An Instant Eval judges only the rows the other terms keep. Rewrite the NOT beside them with AND, as in status:error AND NOT eval:"...".',
-    };
-  }
+  if (hasUnjudgeableEval) return { ...UNJUDGEABLE_NOT_COPY };
   if (hasUnjudgedEval) {
     return {
       title: "These results are not judged yet",

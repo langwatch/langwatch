@@ -463,8 +463,13 @@ function useInstantEvalSwitch({
     return refused;
   }, [heldRef, pendingRef, refusedRef, seqRef, setRefusal]);
 
+  // Closed, as Skip or a decline: a mark this submit made goes, one made earlier stays.
   const dismissRefusal = useCallback(() => {
-    skipRefusal();
+    const refused = skipRefusal();
+    unmarkNewlyTyped({
+      projectId: useFilterStore.getState().projectId ?? "",
+      questions: refused?.newlyTypedQuestions,
+    });
   }, [skipRefusal]);
 
   return {
