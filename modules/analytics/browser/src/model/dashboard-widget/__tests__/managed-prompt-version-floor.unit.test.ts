@@ -172,23 +172,24 @@ SELECT MetadataPromptVersion AS name FROM trace_metrics`;
     ).toBe(true);
   });
 
-  it("treats a parenthesis inside a string literal as structure: known limit", () => {
-    const fromTracesJoinedToTraceMetrics = (filter: string) => `SELECT name FROM (
+  it.each(["Name != '('", "Name != 'it''s ('", "Name != 'it\\'s ('"])(
+    "reads the parenthesis in %s as text, not structure",
+    (filter) => {
+      const sql = `SELECT name FROM (
   SELECT TraceId, LastUsedPromptVersionId AS name FROM traces WHERE ${filter}
 ) AS t
 INNER JOIN trace_metrics AS m ON m.TraceId = t.TraceId`;
 
-    expect(
-      readsManagedPromptVersionFromTraceMetrics([
-        { sql: fromTracesJoinedToTraceMetrics("Name != ''") },
-      ]),
-    ).toBe(false);
-    // Errs gated (safe): the literal's '(' eats the subquery's ')', so the join reads as inside.
-    expect(
-      readsManagedPromptVersionFromTraceMetrics([
-        { sql: fromTracesJoinedToTraceMetrics("Name != '('") },
-      ]),
-    ).toBe(true);
+      expect(readsManagedPromptVersionFromTraceMetrics([{ sql }])).toBe(false);
+    },
+  );
+
+  it("gates the column from trace_metrics when a literal before its FROM holds ')'", () => {
+    const sql = `SELECT version FROM (
+  SELECT if(Name = ')', '', LastUsedPromptVersionId) AS version FROM trace_metrics
+)`;
+
+    expect(readsManagedPromptVersionFromTraceMetrics([{ sql }])).toBe(true);
   });
 
   it("gates a widget when any one of its queries reads the column from trace_metrics", () => {

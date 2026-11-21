@@ -53,7 +53,11 @@ const RUNS = 3;
 /** Up to nine runs a case, each allowed the profile's 60 s. */
 const CASE_TIMEOUT_MS = 600_000;
 
-/** The one-off sweep to 4M traces of history; too slow to seed on every pull request. */
+/**
+ * The one-off sweep to 4M traces of history; too slow to seed on every pull request. It runs only
+ * with LWQL_ATTRIBUTION_MEMORY_SWEEP=1, set by hand locally or by a one-off env line in
+ * langwatch-app-ci.yml, as for the 468cd7dc578 proof run.
+ */
 const SWEEP = process.env.LWQL_ATTRIBUTION_MEMORY_SWEEP === "1";
 /** Main's form runs once a tenant, or as often as the new one when the sweep compares them. */
 const MAIN_RUNS = SWEEP ? RUNS : 1;

@@ -593,35 +593,6 @@ function annotationInserts(): string {
   );
 }
 
-type QueryRunner = (args: {
-  sql: string;
-  list: readonly string[];
-}) => Promise<{ rows?: string; count?: number; error?: string }>;
-
-/** Each moved query, read once per trace, matches its pre-move form under every source list. */
-async function expectEachMovedQueryMatchesBaseline({
-  run,
-  sent,
-  database,
-}: {
-  run: QueryRunner;
-  sent: (label: string) => string;
-  database: string;
-}): Promise<void> {
-  const onePerTrace = (sql: string) => readingOneRowPerTrace({ sql, database });
-  const differing: string[] = [];
-  for (const { list } of LISTS) {
-    for (const { label, sql: before } of BEFORE) {
-      const now = await run({ sql: onePerTrace(sent(label)), list });
-      const moved = await run({ sql: onePerTrace(before), list });
-      expect(now.error, `${label} now under ${list.join(", ")}`).toBeUndefined();
-      expect(moved.error, `${label} before the move under ${list.join(", ")}`).toBeUndefined();
-      if (now.rows !== moved.rows) differing.push(`${label} under ${list.join(", ")}`);
-    }
-  }
-  expect(differing).toEqual([]);
-}
-
 describe("given trace evaluations with unmerged retraction pairs beside main's facts", () => {
   let harness: LangWatchQLClickHouseHarness;
   let postgres: LangWatchQLPostgresHarness;
@@ -673,8 +644,19 @@ describe("given trace evaluations with unmerged retraction pairs beside main's f
   }
 
   /** Every moved query reads the moved trace as its pre-move form reads it once, at its latest. */
-  function expectMovedQueriesMatchBaseline(): Promise<void> {
-    return expectEachMovedQueryMatchesBaseline({ run, sent, database: oneRowPerTrace });
+  async function expectMovedQueriesMatchBaseline(): Promise<void> {
+    const onePerTrace = (sql: string) => readingOneRowPerTrace({ sql, database: oneRowPerTrace });
+    const differing: string[] = [];
+    for (const { list } of LISTS) {
+      for (const { label, sql: before } of BEFORE) {
+        const now = await run({ sql: onePerTrace(sent(label)), list });
+        const moved = await run({ sql: onePerTrace(before), list });
+        expect(now.error, `${label} now under ${list.join(", ")}`).toBeUndefined();
+        expect(moved.error, `${label} before the move under ${list.join(", ")}`).toBeUndefined();
+        if (now.rows !== moved.rows) differing.push(`${label} under ${list.join(", ")}`);
+      }
+    }
+    expect(differing).toEqual([]);
   }
 
   /** The move wrote a second, unmerged `trace_analytics` row, so the views must pick the later. */

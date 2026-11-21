@@ -40,9 +40,22 @@ const DAY = new Intl.DateTimeFormat("en-GB", {
 
 const BODY: ManagedPromptVersionGate = { kind: "body" };
 
+/** The index just past the string literal opening at `start`; ClickHouse escapes ' as '' or \'. */
+function literalEnd(text: string, start: number): number {
+  let index = start + 1;
+  while (index < text.length) {
+    const char = text.charAt(index);
+    if (char === "\\") index += 2;
+    else if (char !== "'") index++;
+    else if (text.charAt(index + 1) === "'") index += 2;
+    else return index + 1;
+  }
+  return text.length;
+}
+
 /**
  * Each SELECT of a statement as its own text: a subquery's parentheses cut it out into its own
- * entry, a function call's do not, and UNION branches split apart.
+ * entry, a function call's do not, a string literal's are text, and UNION branches split apart.
  */
 function selectsOf(sql: string): string[] {
   const text = sql.replace(LINE_COMMENT, "");
@@ -51,6 +64,12 @@ function selectsOf(sql: string): string[] {
   const opensSubquery: boolean[] = [];
   for (let index = 0; index < text.length; index++) {
     const char = text.charAt(index);
+    if (char === "'") {
+      const end = literalEnd(text, index);
+      open[open.length - 1] += text.slice(index, end);
+      index = end - 1;
+      continue;
+    }
     if (char === "(") {
       const subquery = OPENS_SUBQUERY.test(text.slice(index + 1));
       opensSubquery.push(subquery);
