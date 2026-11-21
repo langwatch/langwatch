@@ -15,6 +15,10 @@ describe("betterAuthLogLevel", () => {
       expect(betterAuthLogLevel({ level: "error", message })).toBe("warn");
     });
 
+    it("writes a sign-in it would not link to an existing account down as a warning", () => {
+      expect(betterAuthLogLevel({ level: "error", message: "account_not_linked" })).toBe("warn");
+    });
+
     /** @scenario "A return address better-auth refuses is written down as a warning, not an error" */
     it.each(["state_not_found", "state_mismatch", "state_invalid", "state_security_mismatch"])(
       "writes a state it could not read back with %s down as a warning",
