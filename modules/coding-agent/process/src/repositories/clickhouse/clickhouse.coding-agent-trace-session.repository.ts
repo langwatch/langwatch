@@ -142,4 +142,64 @@ export class CodingAgentTraceSessionClickHouseRepository implements TraceSession
       occurredAtMs: parseClickHouseDateTimeMs(first.OccurredAt),
     };
   }
+
+  /**
+   * The session's newest mapping, counting only each trace's current version. The table is keyed
+   * by trace, so the read is a tenant range bounded by the session's window.
+   */
+  async findLatestBySessionId({
+    tenantId,
+    sessionId,
+    fromMs,
+    toMs,
+  }: {
+    tenantId: string;
+    sessionId: string;
+    fromMs: number;
+    toMs: number;
+  }): Promise<CodingAgentTraceSessionRecord | null> {
+    EventUtils.validateTenantId(
+      { tenantId },
+      "CodingAgentTraceSessionClickHouseRepository.findLatestBySessionId",
+    );
+    const { rows } = await this.clickhouse.query<TraceSessionReadRow>({
+      tenantId,
+      table: TABLE_NAME,
+      kind: "read",
+      sql: `
+        SELECT TraceId, SessionId, OccurredAt
+        FROM ${TABLE_NAME}
+        WHERE TenantId = {tenantId:String}
+          AND SessionId = {sessionId:String}
+          AND OccurredAt >= fromUnixTimestamp64Milli({fromMs:Int64})
+          AND OccurredAt <= fromUnixTimestamp64Milli({toMs:Int64})
+          AND (TenantId, TraceId, UpdatedAt) IN (
+            SELECT TenantId, TraceId, max(UpdatedAt)
+            FROM ${TABLE_NAME}
+            WHERE TenantId = {tenantId:String}
+              AND TraceId IN (
+                SELECT TraceId
+                FROM ${TABLE_NAME}
+                WHERE TenantId = {tenantId:String}
+                  AND SessionId = {sessionId:String}
+                  AND OccurredAt >= fromUnixTimestamp64Milli({fromMs:Int64})
+                  AND OccurredAt <= fromUnixTimestamp64Milli({toMs:Int64})
+              )
+            GROUP BY TenantId, TraceId
+          )
+        ORDER BY OccurredAt DESC, TraceId ASC
+        LIMIT 1
+      `,
+      params: { tenantId, sessionId, fromMs, toMs },
+    });
+
+    const first = rows[0];
+    if (!first) return null;
+    return {
+      tenantId,
+      traceId: first.TraceId,
+      sessionId: first.SessionId,
+      occurredAtMs: parseClickHouseDateTimeMs(first.OccurredAt),
+    };
+  }
 }

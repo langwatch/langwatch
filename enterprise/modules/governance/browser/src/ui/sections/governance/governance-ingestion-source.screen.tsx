@@ -52,8 +52,8 @@ import { NotFoundScene } from "../../../ui/elements/not-found-scene.tsx";
 import { PermissionRequiredNotice } from "../../../ui/elements/permission-required-notice.tsx";
 import GovernanceLayout from "../../../ui/sections/governance-layout.tsx";
 import { withGovernanceSection } from "../../../ui/sections/governance-section-gate.tsx";
-import { SourceEditDrawer } from "./governance-inventory.screen.tsx";
 import { useDestinationContext } from "./ingestion-source-forms.ts";
+import { SourceEditDrawer } from "./inventory/source-edit-drawer.tsx";
 
 /**
  * Per-source detail page - health metrics + a cursor-walked table of every

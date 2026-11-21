@@ -157,6 +157,8 @@ LangWatch provides a comprehensive set of custom attributes for LLM-specific obs
 | `langwatch.timestamps`        | object        | Timing information for events                   | `{ start: 1234567890 }`        |
 | `langwatch.evaluation.custom` | object        | Custom evaluation data                          | `{ score: 0.95 }`              |
 
+On Claude Code traces, `langwatch.thread.id` does not set the conversation: they are grouped by the Claude Code session, or by `langwatch.session.id` when you set one, and the thread stays on the spans as an attribute you can filter by. See [Headless and CI](/coding-agents/headless-and-ci#keep-a-long-lived-agent-on-one-session).
+
 ### SDK Information Attributes
 
 | Attribute                | Type   | Description                       | Example                  |

@@ -104,7 +104,7 @@ describe("given a braided span in a narrow tree column", () => {
     );
 
     expect(compact).toBe(true);
-    expect(screen.getByText("payments_agent")).toBeInTheDocument();
+    expect(screen.getByText("payments_agent")).toHaveAttribute("title", "payments_agent");
     expect(screen.getByTestId("braided-span-badge")).not.toHaveTextContent("Specialists");
     expect(screen.getByRole("img", { name: "Braided from Specialists" })).toBeInTheDocument();
   });

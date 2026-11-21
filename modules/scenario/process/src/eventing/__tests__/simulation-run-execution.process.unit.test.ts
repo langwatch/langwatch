@@ -66,6 +66,9 @@ class UnusedScenarioExecutionService extends ScenarioExecutionService {
   recordHooks(): Promise<void> {
     throw new Error("recordHooks unexpectedly called in evolve tests");
   }
+  recordRedTeamReport(): Promise<void> {
+    throw new Error("recordRedTeamReport unexpectedly called in evolve tests");
+  }
 }
 
 /**

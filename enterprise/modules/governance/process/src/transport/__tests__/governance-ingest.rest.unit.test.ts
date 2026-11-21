@@ -239,6 +239,20 @@ describe("the ingestion-source receivers", () => {
       },
     );
 
+    /** @scenario "A disabled source answers a wrong endpoint as unknown" */
+    it("answers its secret on another source's endpoint with the bare 401", async () => {
+      const api = mountIngest({ source: { ...SOURCE, status: "disabled" } });
+
+      const response = await api.post("/api/ingest/otel/src_other", traceBody);
+
+      expect(response.status).toBe(401);
+      await expect(response.json()).resolves.toMatchObject({
+        code: "ingestion_source_unauthorized",
+      });
+    });
+  });
+
+  describe("given a live source", () => {
     it.each([
       ["OTLP traces", `/api/ingest/otel/${SOURCE_ID}`, traceBody, "traceCollection"],
       ["OTLP logs", `/api/ingest/otel/${SOURCE_ID}/v1/logs`, logBody, "logCollection"],
@@ -260,18 +274,6 @@ describe("the ingestion-source receivers", () => {
         expect(api[channel]).toHaveBeenCalled();
       },
     );
-
-    /** @scenario "A disabled source answers a wrong endpoint as unknown" */
-    it("answers its secret on another source's endpoint with the bare 401", async () => {
-      const api = mountIngest({ source: { ...SOURCE, status: "disabled" } });
-
-      const response = await api.post("/api/ingest/otel/src_other", traceBody);
-
-      expect(response.status).toBe(401);
-      await expect(response.json()).resolves.toMatchObject({
-        code: "ingestion_source_unauthorized",
-      });
-    });
   });
 
   describe("given a disabled source the admin set back to active", () => {

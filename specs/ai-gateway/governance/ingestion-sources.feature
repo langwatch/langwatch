@@ -201,6 +201,48 @@ Feature: IngestionSource — admin configuration of cross-platform feeds
       When the admin opens it for editing
       Then the drawer title reads "Edit source"
 
+  Rule: The edit drawer opened by address knows who may edit and what it edits
+    # The drawer opens from `?drawer.open=editIngestionSource&drawer.sourceId=<id>`,
+    # so a shared link, a restored tab or a stale bookmark can open it for a
+    # reader who may not edit, before the list has answered, or for a source
+    # that is gone. Each of those used to render a form the server refused, or
+    # nothing at all while the address still said the drawer was open.
+
+    @integration
+    Scenario: A reader without the manage grant is told why instead of shown the edit form
+      Given a reader holding "ingestionSources:view" but not "ingestionSources:manage"
+      When the reader opens the edit address of a source
+      Then the drawer opens and names the "ingestionSources:manage" grant
+      And no edit field and no Save changes action is offered
+      And the source list is not read for the drawer
+
+    @integration
+    Scenario: The edit drawer says it is loading while the source is read
+      Given the admin's session or the organization's source list has not answered yet
+      When the admin opens the edit address of a source
+      Then the drawer opens in its loading state
+      And no Save changes action and no missing-grant notice is shown yet
+
+    @integration
+    Scenario: An edit address naming an unknown source says so and can be closed
+      Given the organization's source list holds no source with the address's id
+      When the admin opens that edit address
+      Then the drawer says the source isn't in the organization's list
+      And closing it closes the drawer and clears the address
+
+    @integration
+    Scenario: A failed source read in the edit drawer shows the failure and a retry
+      Given the organization's source list read fails
+      When the admin opens the edit address of a source
+      Then the drawer shows that the source could not be loaded, with Try again
+      And it does not claim the source is missing
+
+    @integration
+    Scenario: A manager opening the edit address gets the source's edit form
+      Given the organization's source list holds the address's source
+      When the admin opens that edit address
+      Then the drawer shows that source's edit form with Save changes
+
   Rule: The source drawers and the once-shown secret keep their controls
 
     @integration
@@ -223,6 +265,12 @@ Feature: IngestionSource — admin configuration of cross-platform feeds
       Given a new source's secret is shown
       When the admin chooses "View source page"
       Then the admin goes to that source's page
+
+    @unit
+    Scenario: The test command survives an apostrophe in the source name
+      Given a new push source named "O'Brien's laptop"
+      When its once-shown secret offers the test command
+      Then the command's body is one shell argument holding that name
 
   Rule: Notes about why a field is locked sit behind the title, not above the fields
 

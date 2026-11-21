@@ -13966,7 +13966,8 @@
               "description": "Admin/platform-authored OTTL statements.",
               "unit": null,
               "gates": [
-                "output"
+                "output",
+                "aiTools:manage"
               ],
               "available": true
             },
@@ -17067,6 +17068,24 @@
               "available": true
             },
             {
+              "name": "Kind",
+              "type": "String",
+              "description": "Kind",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "RedTeam",
+              "type": "Nullable(String)",
+              "description": "RedTeam",
+              "unit": null,
+              "gates": [
+                "output"
+              ],
+              "available": true
+            },
+            {
               "name": "TestSuiteId",
               "type": "Nullable(String)",
               "description": "TestSuiteId",
@@ -17369,7 +17388,8 @@
           "grain": "one row per SimulationSuiteId",
           "joinKeys": [
             "TenantId",
-            "SimulationSuiteId"
+            "SimulationSuiteId",
+            "TemplateId"
           ],
           "timeColumn": "CreatedAt",
           "freshness": "live — read from PostgreSQL at query time",
@@ -17518,6 +17538,22 @@
               "gates": [
                 "output"
               ],
+              "available": true
+            },
+            {
+              "name": "TemplateId",
+              "type": "Nullable(String)",
+              "description": "TemplateId",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "TemplateVersion",
+              "type": "Nullable(Int32)",
+              "description": "TemplateVersion",
+              "unit": null,
+              "gates": [],
               "available": true
             },
             {

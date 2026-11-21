@@ -905,17 +905,33 @@ describe("the CLI license gate (Q31: main's order and body)", () => {
   });
 
   /** @scenario GET /api/auth/cli/governance/ingest/sources/:id/health returns 402 for non-enterprise */
-  it("answers a source's health with the ingestion sources' plan refusal", async () => {
+  it("answers a source's health with the plan refusal and the upgrade page inline", async () => {
     const response = await mountCli({ planType: "FREE" }).get(
       "/api/auth/cli/governance/ingest/sources/src-123/health",
     );
 
     expect(response.status).toBe(402);
-    await expect(response.json()).resolves.toEqual({
+    await expect(response.json()).resolves.toMatchObject({
       error: "payment_required",
-      error_description: "Ingestion sources require an Enterprise plan",
       upgrade_url: "https://app.test/settings/subscription",
     });
+  });
+
+  /** @scenario A source's events and its health answer the same plan refusal */
+  it("names the activity monitor's plan for both reads, the permission both ask", async () => {
+    const api = mountCli({ planType: "FREE" });
+
+    const events = await api.get("/api/auth/cli/governance/ingest/sources/src-123/events");
+    const health = await api.get("/api/auth/cli/governance/ingest/sources/src-123/health");
+
+    const refusal = {
+      error: "payment_required",
+      error_description: "The activity monitor requires an Enterprise plan",
+      upgrade_url: "https://app.test/settings/subscription",
+    };
+    expect([events.status, health.status]).toEqual([402, 402]);
+    await expect(events.json()).resolves.toEqual(refusal);
+    await expect(health.json()).resolves.toEqual(refusal);
   });
 
   /** @scenario 401 fires before 402 — unauthenticated requests don't leak plan info */

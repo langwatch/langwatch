@@ -20,13 +20,19 @@ import {
   braidedOwnerOf,
   readsBraidedSpans,
 } from "../../features/braid/rules/braided-span-owner.rules.ts";
+import { spanTreeAgentMarksOf } from "../../rules/agent-call-graph.rules.ts";
 import {
   TraceProjectedReadRepository,
   type TraceIngestLagSample,
   type TraceSpanPage,
   type TraceSpanSummaryRecord,
 } from "../trace-projected-read.repository.ts";
-import { chString, chStringMap } from "./stored-span-row.mapper.ts";
+import {
+  AGENT_MARK_ATTRIBUTES_SELECT,
+  chString,
+  chStringMap,
+  validateSpanKind,
+} from "./stored-span-row.mapper.ts";
 
 const STORED_SPANS_TABLE = "stored_spans";
 /** Where a tree read is bounded by the stored_spans id index (id-index plan §4). */
@@ -66,6 +72,8 @@ const spanSummaryRowSchema = z.looseObject({
   DurationMs: numeric,
   UpdatedAtMs: numeric,
   StatusCode: numeric.nullable(),
+  AgentAttributes: chStringMap.optional(),
+  AgentSpanKind: numeric.optional(),
   TenantId: chString.optional(),
 });
 
@@ -100,7 +108,8 @@ const summarySelect = `
   DurationMs,
   toUnixTimestamp64Milli(StartTime) AS StartTimeMs,
   toUnixTimestamp64Milli(UpdatedAt) AS UpdatedAtMs,
-  StatusCode
+  StatusCode,
+  ${AGENT_MARK_ATTRIBUTES_SELECT}
 `;
 
 /** A braided read names each span's owner; a read without braids keeps today's statement. */
@@ -562,6 +571,11 @@ export class ClickHouseTraceSpanRepository extends TraceProjectedReadRepository 
       cacheCreationTokens: ClickHouseTraceSpanRepository.numberOrNull(row.CacheCreationTokens),
       updatedAtMs: Number(row.UpdatedAtMs),
       costInput: ClickHouseTraceSpanRepository.costInputOf(row),
+      ...spanTreeAgentMarksOf({
+        name: row.SpanName,
+        attributes: row.AgentAttributes ?? {},
+        kind: row.AgentSpanKind == null ? null : validateSpanKind(Number(row.AgentSpanKind)),
+      }),
       ...braidedOwnerOf({ authorization, tenantId: row.TenantId }),
     };
   }

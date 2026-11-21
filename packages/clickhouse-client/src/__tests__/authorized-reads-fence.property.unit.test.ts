@@ -8,6 +8,7 @@ import {
   type Authorization,
   type AuthorizationInput,
   BRAID_CONDITION_EVERY_SPAN,
+  BRAID_HELD_MAX_HOPS,
   type BraidConditionTerm,
   type CompiledWhere,
   honourSpanBraids,
@@ -439,16 +440,33 @@ function closingOf({ text, open }: { text: string; open: number }): number {
   throw new Error(`unbalanced bracket at ${open}`);
 }
 
+/** A braid pick opens on the held set: owner spans linked to an own span or a held owner's. */
 const HELD_PICK =
-  "(TraceId IN (SELECT TraceId FROM stored_spans WHERE TenantId IN ({tenantScope_own:Array(String)})" +
+  "(((TenantId, TraceId) IN (SELECT TenantId, TraceId FROM stored_spans WHERE TenantId IN ({tenantScope_heldOwners:Array(String)})" +
   " AND StartTime >= fromUnixTimestamp64Milli({tenantScope_heldFrom:Int64})";
+const HELD_SELECT =
+  /FROM stored_spans WHERE TenantId IN \(\{tenantScope_(?:heldOwners|own):Array\(String\)\}\)/g;
+const STATEMENT_BOUND = /TraceId = \{(?!tenantScope)|fromUnixTimestamp64Milli\(\{(?!tenantScope)/g;
 const ELECTION_GROUP = "(SELECT TenantId, TraceId, SpanId, max(UpdatedAt) FROM stored_spans WHERE ";
 
-const narrowingOf = (held: HeldTraceBound | undefined): string => {
-  if (held === undefined) return ")";
-  if ("traceId" in held) return ` AND TraceId = {${held.traceId}:String})`;
-  return ` AND StartTime >= fromUnixTimestamp64Milli({${held.sinceMs}:Int64}))`;
+const narrowingOf = (held: HeldTraceBound | undefined): string | undefined => {
+  if (held === undefined) return undefined;
+  if ("traceId" in held) return ` AND TraceId = {${held.traceId}:String}`;
+  return ` AND StartTime >= fromUnixTimestamp64Milli({${held.sinceMs}:Int64})`;
 };
+
+/** At most: the reader's ports, each hop's probes, all but the last hop's ports; two per hop. */
+const MAX_HELD_SELECTS = 2 * BRAID_HELD_MAX_HOPS;
+
+/** Whether each of the held set's selects (two per hop, one hop per owner) is narrowed. */
+function heldNarrowed({ body, held }: { body: string; held: HeldTraceBound | undefined }) {
+  const selects = body.match(HELD_SELECT)?.length ?? 0;
+  if (selects < 2 || selects % 2 !== 0 || selects > MAX_HELD_SELECTS) return false;
+  const narrowing = narrowingOf(held);
+  const bounds = body.match(STATEMENT_BOUND)?.length ?? 0;
+  if (narrowing === undefined) return bounds === 0;
+  return bounds === selects && body.split(narrowing).length - 1 === selects;
+}
 
 const slotsOf = ({ text, param }: { text: string; param: string }): number[] =>
   [...text.matchAll(new RegExp(`\\{${param}:`, "g"))].map((match) => match.index);
@@ -481,13 +499,17 @@ function ownerSlotViolation({
         return "a window outside an election";
       continue;
     }
+    if (param === "tenantScope_heldOwners") {
+      if (!groups.some((open) => text.startsWith(HELD_PICK, open)))
+        return "a held owner outside the held-trace semi-join";
+      continue;
+    }
     if (clause === null) return `an owner bound by ${param}`;
     const pickAt = groups.find((open) => text.startsWith(HELD_PICK, open));
     if (pickAt === undefined) return `clause ${clause[1]} outside the held-trace semi-join`;
-    const semiJoinEnd = closingOf({ text, open: pickAt + "(TraceId IN ".length });
-    const semiJoin = text.slice(0, semiJoinEnd + 1);
-    const narrowing = narrowingOf(held);
-    if (!semiJoin.endsWith(narrowing)) return "the semi-join is wider than the read";
+    const semiJoinEnd = closingOf({ text, open: pickAt + 1 });
+    const heldBody = text.slice(pickAt + 1, semiJoinEnd + 1);
+    if (!heldNarrowed({ body: heldBody, held })) return "the semi-join is wider than the read";
     if (!text.startsWith(" AND (", semiJoinEnd + 1)) return "the semi-join is not a conjunct";
     const own = groups.findLast((open) => text.startsWith(`(TenantId IN ({${param}:`, open));
     const body = own === undefined ? "" : text.slice(own, closingOf({ text, open: own }));

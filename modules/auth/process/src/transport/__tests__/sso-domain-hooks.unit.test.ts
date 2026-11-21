@@ -12,6 +12,7 @@ import type {
 import type { OrganizationAdmission, OrganizationApi } from "@langwatch/organization-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { nowInstant, toDate } from "@langwatch/time";
+import type { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import type {
@@ -30,6 +31,7 @@ import type {
   BetterAuthHookUser,
   BetterAuthHooksRepository,
 } from "../../repositories/better-auth-hooks.repository.ts";
+import { recordingUsers } from "./better-auth-transport.test-helpers.ts";
 
 /** The Google account row better-auth hands the hook, for one user. */
 function googleAccountFor(userId: string) {
@@ -129,12 +131,15 @@ function signupCollaborators({
   organizations,
   announcements = new RecordingAnnouncements(),
   invites = new NoInvites(),
+  users = recordingUsers().users,
 }: {
   organizations: SsoDomainOrganizations;
   announcements?: RecordingAnnouncements;
   invites?: Pick<OrganizationApi, "applyPendingInvite">;
+  users?: Pick<UserApi, "recordCreated">;
 }): BetterAuthHookCollaborators {
   return {
+    users,
     linkProposals: createApiFixture<LinkProposals>(),
     organizations,
     federation: new LicensedFederation(),
@@ -308,6 +313,24 @@ describe("signing in through a domain-matched organization's identity provider",
       expect(mocks.createMembership).toHaveBeenCalledTimes(1);
       expect(announcements.announceSignup).not.toHaveBeenCalled();
       expect(announcements.ssoAutoAddNurturing).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given a new single sign-on user", () => {
+    /** @scenario "A new single sign-on user records the new account's created fact" */
+    it.each([
+      { case: "auto-added to the domain-matched organization", organization: ACME },
+      { case: "not auto-added, no organization claiming the domain", organization: null },
+    ])("records the account's created fact once when $case", async ({ organization }) => {
+      const { organizations } = signupRepo(organization);
+      const { users, recorded } = recordingUsers();
+
+      await afterUserCreate({
+        user: NEW_ACME_USER,
+        collaborators: signupCollaborators({ organizations, users }),
+      });
+
+      expect(recorded).toEqual([NEW_ACME_USER.id]);
     });
   });
 

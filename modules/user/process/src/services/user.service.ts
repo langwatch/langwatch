@@ -166,6 +166,13 @@ export class UserService {
     return this.repository.findProfiles([...new Set(parsed.userIds)]);
   }
 
+  searchForOperators(input: { query: string; limit: number }): Promise<UserProfile[]> {
+    const query = input.query.trim();
+    if (query === "") return Promise.resolve([]);
+
+    return this.repository.searchProfiles({ query, limit: input.limit });
+  }
+
   findById(input: UserIdInput): Promise<UserProfile | null> {
     const parsed = userIdInputSchema.parse(input);
 
@@ -205,6 +212,9 @@ export class UserService {
   create(input: CreateUserInput): Promise<UserProfile> {
     return this.repository.create(createUserInputSchema.parse(input));
   }
+
+  recordCreated = (input: UserIdInput): Promise<void> =>
+    this.repository.appendCreatedFact(userIdInputSchema.parse(input).id);
 
   /**
    * The signup form's mint: its registered fact commits with the account. Born confirmed when a

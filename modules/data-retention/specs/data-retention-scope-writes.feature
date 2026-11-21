@@ -84,3 +84,67 @@ Feature: A retention scope write is authorised at the door, inside the organisat
     When an administrator sets, previews or removes an override for a team no row places, naming no organisation
     Then each request is refused as a scope target that was not found
     And no retention policy is written or removed
+
+  # A length that bills storage is set through billing (ruling, Alex, 2026-11-16): on a plan that
+  # bills storage above the 90 days it includes, a scope admin may not add that charge.
+
+  @unit
+  Scenario: A project admin without subscription:manage is refused a billed retention by name
+    Given "acme" is on a Growth seat plan, which bills storage kept longer than 90 days
+    And a caller who may update project "web-app" but does not hold subscription:manage on "acme"
+    When that caller sets a project-level traces retention of 1 year for "web-app" through the scope write
+    Then the request is refused with the code "data_retention_billed_through_billing"
+    And no retention policy is written
+
+  @unit
+  Scenario: The billed write asks subscription:manage on the organisation before data retention runs
+    Given "acme" is on a Growth seat plan
+    And a caller who may update project "web-app" but does not hold subscription:manage on "acme"
+    When that caller sets 1 year for "web-app" through the billed write naming "acme"
+    Then the door refuses the request as forbidden, asking subscription:manage on "acme"
+    And data retention is never called
+
+  @unit
+  Scenario: A retention the plan includes is still set through the scope write
+    Given "acme" is on a Growth seat plan
+    And a caller who may update project "web-app" but does not hold subscription:manage on "acme"
+    When that caller sets 90 days for "web-app" through the scope write
+    Then the override is written, anchored to "acme"
+
+  @unit
+  Scenario: A billing administrator sets a billed retention through the billed write
+    Given "acme" is on a Growth seat plan
+    And a caller who holds subscription:manage on "acme"
+    When that caller sets 1 year for "web-app" through the billed write naming "acme"
+    Then the door asks subscription:manage on "acme"
+    And the override is written, anchored to "acme"
+
+  @unit
+  Scenario: The billed write refuses a length the plan includes
+    Given "acme" is on a Growth seat plan
+    And a caller who holds subscription:manage on "acme"
+    When that caller sets 30 days for "web-app" through the billed write naming "acme"
+    Then the request is refused as a length that does not bill storage
+    And no retention policy is written, so a length the plan includes still needs the scope's own permission
+
+  @unit
+  Scenario: A billed write for a scope outside the named organisation is refused as not found
+    Given "acme" is on a Growth seat plan
+    When a billing administrator of "acme" sets 1 year for project "billing" of "globex" through the billed write naming "acme"
+    Then the request is refused as a scope target that was not found
+    And no retention policy is written
+
+  @integration
+  Scenario: The settings page saves a billed length through the billed write
+    Given the retention settings page for "web-app" in "acme" on a Growth seat plan
+    And the reader holds subscription:manage on "acme"
+    When the reader saves 1 year for "web-app"
+    Then each category is saved through the billed write naming "acme"
+    And a save of 90 days goes through the scope write
+
+  @integration
+  Scenario: A reader without subscription:manage is not offered a billed length
+    Given the retention settings page for "web-app" in "acme" on a Growth seat plan
+    And the reader does not hold subscription:manage on "acme"
+    When the reader opens the retention menu
+    Then 180 days and 1 year are disabled, each marked "needs billing access"

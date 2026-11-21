@@ -65,6 +65,7 @@ import { refusalIsAHandledErrorRule } from "./rules/refusal-is-a-handled-error.r
 import { requestDeliveryFromAnIntentRule } from "./rules/request-delivery-from-an-intent.rule.mjs";
 import { requireFetchTimeoutRule } from "./rules/require-fetch-timeout.rule.mjs";
 import { restRouteRule } from "./rules/rest-route.rule.mjs";
+import { s3ClientRegionRule } from "./rules/s3-client-region.rule.mjs";
 import { schemaOutsideContractRule } from "./rules/schema-outside-contract.rule.mjs";
 import { serviceDoesNotOpenAChannelRule } from "./rules/service-does-not-open-a-channel.rule.mjs";
 import { serviceLoadsItsOwnConfigRule } from "./rules/service-loads-its-own-config.rule.mjs";
@@ -104,6 +105,7 @@ const HOUSE_RULES = [
   noRawFontSizeRule,
   noTautologicalAssertionRule,
   requireFetchTimeoutRule,
+  s3ClientRegionRule,
   bannedVerbPrefixRule,
   moduleClassesRule,
   moduleLayersRule,
@@ -195,6 +197,7 @@ export {
   noFormWatchInChildRule,
   noTautologicalAssertionRule,
   requireFetchTimeoutRule,
+  s3ClientRegionRule,
   resetUnresolvedImportCache,
   bannedVerbPrefixRule,
   moduleClassesRule,

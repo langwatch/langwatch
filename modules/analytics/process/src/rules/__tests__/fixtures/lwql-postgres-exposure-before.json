@@ -1004,6 +1004,8 @@
     ["MinTurns", "minTurns", []],
     ["Fields", "fields", ["output"]],
     ["CallerVoice", "callerVoice", ["output"]],
+    ["Kind", "kind", []],
+    ["RedTeam", "redTeam", ["output"]],
     ["TestSuiteId", "testSuiteId", []],
     ["Version", "version", []],
     ["LastUpdatedById", "lastUpdatedById", []],
@@ -1059,6 +1061,8 @@
     ["ScopeConfig", "scope", ["output"]],
     ["Fields", "fields", ["output"]],
     ["Evaluators", "evaluators", ["output"]],
+    ["TemplateId", "templateId", []],
+    ["TemplateVersion", "templateVersion", []],
     ["ArchivedAt", "archivedAt", []],
     ["CreatedAt", "createdAt", []],
     ["UpdatedAt", "updatedAt", []]

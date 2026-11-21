@@ -4,47 +4,60 @@
  * Spec: modules/authz/specs/braids-screen.feature (design: dev/docs/plans/braids/).
  */
 
+import { SIGNING_KEY_QUERY_KEY } from "@langwatch/api-key-client";
 import { Link } from "@langwatch/browser-host/link";
 import { Banner, BannerAction } from "@langwatch/design-system/banner";
-import { ContentTabs } from "@langwatch/design-system/content-tabs";
-import { FeatureMark } from "@langwatch/design-system/feature-mark";
-import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { PageLayout } from "@langwatch/design-system/page-layout";
-import { Box, Skeleton, Stack, Text } from "@langwatch/design-system/primitives";
-import { BookOpen, Plus } from "lucide-react";
-import { type ReactNode, useState } from "react";
+import { Badge, Box, Button, Skeleton, Stack, Text } from "@langwatch/design-system/primitives";
+import { SettingsSection } from "@langwatch/design-system/settings-section";
+import { Plus } from "lucide-react";
+import { type ReactNode, useEffect, useState } from "react";
 
 import {
   useBraidActivity,
-  useBraidsPolicy,
+  useBraidsReleased,
+  useBraidsSettings,
   useProjectBraids,
   useRemoveBraid,
 } from "../../../behavior/use-braids.ts";
-import { useAuthzHost } from "../../../model/authz-host.ts";
+import { AUTHZ_MANAGE_PERMISSION, useAuthzHost } from "../../../model/authz-host.ts";
 import {
   type BraidAffordances,
   type BraidRow,
-  BRAIDS_GUIDE_HREF,
-  BRAIDS_TAB_QUERY_KEY,
-  type BraidsTab,
+  BRAIDS_SECTION_QUERY_KEY,
+  type BraidsPlanState,
+  type BraidsSection,
   braidAffordances,
+  braidsPauses,
   braidsPlanState,
-  braidsTabOf,
+  braidsStatus,
+  braidsSectionOf,
+  ORGANIZATION_BRAIDS_HREF,
   projectBraidRows,
 } from "../../../model/braids/braids.ts";
 import { BraidsEnterpriseUpsell } from "../../blocks/braids/braids-enterprise-upsell.tsx";
 import { BraidsHowItWorks } from "../../blocks/braids/braids-how-it-works.tsx";
 import { BraidsTable } from "../../blocks/braids/braids-table.tsx";
 import { RemoveBraidDialog } from "../../blocks/braids/remove-braid-dialog.tsx";
+import { BraidsNotEnabledBanner } from "../../elements/braids-not-enabled-banner.tsx";
+import { BraidsPageLinks } from "../../elements/braids-page-links.tsx";
+import { BraidsPlanPausedBanner } from "../../elements/braids-plan-paused-banner.tsx";
 import { BraidsTitle } from "../../elements/braids-title.tsx";
+import { NO_RULE_UNDER_HEADER } from "../../elements/no-rule-under-header.ts";
 import { SectionErrorNotice } from "../../elements/section-error-notice.tsx";
 import { BraidDialog } from "./braid-dialog.tsx";
 import { BraidsSigningKeys } from "./braids-signing-keys.tsx";
 
 const BRAIDS_MANAGE_PERMISSION = "braids:manage";
-
 /** The braid dialog is URL-routed: `?braid=new`, or `?braid=<id>` for Edit. */
 const BRAID_QUERY_KEY = "braid";
+
+/** Where `?section=` scrolls to. */
+const SECTION_ANCHORS: Record<BraidsSection, string> = {
+  into: "braids-shown-elsewhere",
+  from: "braids-shown-here",
+  keys: "braids-signing-keys",
+};
 
 function NewBraidButton({ onOpen }: { onOpen: () => void }) {
   return (
@@ -55,35 +68,46 @@ function NewBraidButton({ onOpen }: { onOpen: () => void }) {
   );
 }
 
-function GuideLink() {
-  return (
-    <PageLayout.HeaderButton asChild>
-      <Link href={BRAIDS_GUIDE_HREF} isExternal>
-        <BookOpen size={14} aria-hidden />
-        How braids work
-      </Link>
-    </PageLayout.HeaderButton>
-  );
-}
-
 function BraidsHeader({
   actions,
   projectName,
+  links,
+  locked = false,
 }: {
   actions?: ReactNode;
-  /** The project the page is about; the organisation screen names none. */
+  /** The project the page is about. */
   projectName?: string;
+  /** The quiet link line under the description. */
+  links?: ReactNode;
+  /** The plan locks Braids: the title shows a lock, as the settings menu does. */
+  locked?: boolean;
 }) {
+  const switcher = useAuthzHost().projectSwitcher();
+  const sentence = projectName
+    ? `Show ${projectName}'s spans inside another project's traces. Nothing is copied.`
+    : "Show spans from one project inside another project's traces. Nothing is copied.";
   return (
     <PageLayout.Header
-      actions={actions}
+      actions={
+        switcher || actions ? (
+          <>
+            {switcher}
+            {actions}
+          </>
+        ) : undefined
+      }
       description={
-        projectName
-          ? `Show ${projectName}'s spans inside another project's traces. Nothing is copied.`
-          : "Show spans from one project inside another project's traces. Nothing is copied."
+        links ? (
+          <>
+            {sentence}
+            {links}
+          </>
+        ) : (
+          sentence
+        )
       }
     >
-      <BraidsTitle />
+      <BraidsTitle locked={locked} />
     </PageLayout.Header>
   );
 }
@@ -92,7 +116,7 @@ function LoadingBraids() {
   return (
     <>
       <BraidsHeader />
-      <Stack gap={4} paddingTop={4} data-testid="braids-loading">
+      <Stack gap={4} data-testid="braids-loading">
         <Skeleton height="32px" width="420px" />
         <Skeleton height="160px" borderRadius="md" />
       </Stack>
@@ -100,21 +124,184 @@ function LoadingBraids() {
   );
 }
 
-function NothingBraidedIn({ projectName }: { projectName: string }) {
+/** One direction of braids: its rows, or one muted line when there are none. */
+function BraidsSectionBand({
+  side,
+  title,
+  hint,
+  count,
+  none,
+  children,
+}: {
+  side: "into" | "from";
+  title: string;
+  hint: string;
+  count: number;
+  none: string;
+  children: ReactNode;
+}) {
   return (
-    <NoDataInfoBlock
-      icon={<FeatureMark feature="braids" size={24} variant="mono" />}
-      title="Nothing braided in"
-      description={`When another project braids its spans into ${projectName}, they show in its traces and are listed here.`}
-      docsHref={BRAIDS_GUIDE_HREF}
-      testId="braids-empty-from"
-    />
+    <SettingsSection
+      title={title}
+      hint={hint}
+      anchorId={SECTION_ANCHORS[side]}
+      badge={
+        <Badge size="sm" variant="subtle" data-testid={`braids-count-${side}`}>
+          {count}
+        </Badge>
+      }
+      data-testid={`braids-section-${side}`}
+    >
+      {count > 0 ? (
+        children
+      ) : (
+        <Text textStyle="sm" color="fg.muted" data-testid={`braids-none-${side}`}>
+          {none}
+        </Text>
+      )}
+    </SettingsSection>
   );
 }
 
+/** The organisation has Braids turned off: who can turn it on, and what happened to the braids. */
+function TurnedOffBanner({
+  total,
+  isOrganizationAdmin,
+}: {
+  total: number;
+  isOrganizationAdmin: boolean;
+}) {
+  const kept =
+    total === 0
+      ? "New braids can be made once it is on."
+      : `${total === 1 ? "This project's braid is" : `This project's ${total} braids are`} paused and kept, and start working again when it is on.`;
+  return (
+    <Banner
+      status="info"
+      title="Braids is off for your organisation"
+      data-testid="braids-turned-off"
+      action={
+        isOrganizationAdmin ? (
+          <BannerAction asChild>
+            <Link href={ORGANIZATION_BRAIDS_HREF}>Turn on Braids</Link>
+          </BannerAction>
+        ) : undefined
+      }
+    >
+      {kept}{" "}
+      {isOrganizationAdmin
+        ? "You can turn it on in the organisation's Braids settings."
+        : "Ask an organisation admin to turn it on."}
+    </Banner>
+  );
+}
+
+function KeptToAdminsBanner() {
+  return (
+    <Banner
+      status="info"
+      title="Your organisation's admins manage braids"
+      action={
+        <BannerAction asChild>
+          <Link href="/settings/directory">Ask an admin</Link>
+        </BannerAction>
+      }
+    >
+      Your organisation keeps braids to its admins, so only they can create, change or remove them.
+    </Banner>
+  );
+}
+
+/** Not-enabled, turned-off, paused and kept-to-admins notices, above the sections. */
+function BraidsNotices({
+  released,
+  turnedOff,
+  turnedOn,
+  paused,
+  total,
+  keptToAdmins,
+  isOrganizationAdmin,
+}: {
+  released: boolean;
+  turnedOff: boolean;
+  /** Known on; undefined while the setting is unread. */
+  turnedOn: boolean | undefined;
+  paused: boolean;
+  total: number;
+  keptToAdmins: boolean;
+  isOrganizationAdmin: boolean;
+}) {
+  if (released && !turnedOff && !paused && !keptToAdmins) return null;
+  return (
+    <Stack gap={4} paddingBottom={4}>
+      {released ? null : (
+        <BraidsNotEnabledBanner
+          removeHere
+          status={braidsStatus({
+            byOrganization: turnedOff,
+            byPlan: paused,
+            settingRead: turnedOn !== undefined,
+          })}
+        />
+      )}
+      {released && turnedOff ? (
+        <TurnedOffBanner total={total} isOrganizationAdmin={isOrganizationAdmin} />
+      ) : null}
+      {paused ? (
+        <BraidsPlanPausedBanner
+          kept={total === 1 ? "Your braid is" : `Your ${total} braids are`}
+          isSingleBraid={total === 1}
+          turnedOn={turnedOn}
+        />
+      ) : null}
+      {keptToAdmins ? <KeptToAdminsBanner /> : null}
+    </Stack>
+  );
+}
+
+/** The api-key module's panel, under its own heading; New signing key for whoever manages keys. */
+function SigningKeysBand({
+  projectId,
+  planState,
+  canIssue,
+  onNewKey,
+}: {
+  projectId: string;
+  planState: BraidsPlanState;
+  canIssue: boolean;
+  onNewKey: (() => void) | undefined;
+}) {
+  return (
+    <SettingsSection
+      title="Signing keys"
+      anchorId={SECTION_ANCHORS.keys}
+      actions={
+        onNewKey ? (
+          <Button size="sm" variant="outline" onClick={onNewKey} data-testid="new-signing-key">
+            <Plus size={14} aria-hidden />
+            New signing key
+          </Button>
+        ) : undefined
+      }
+      data-testid="braids-section-keys"
+    >
+      <BraidsSigningKeys projectId={projectId} planState={planState} canIssue={canIssue} />
+    </SettingsSection>
+  );
+}
+
+/** Who may change braids: one muted footnote at the end of the page. */
 function WhoMayBraidHint({ keptToAdmins }: { keptToAdmins: boolean }) {
   return (
-    <Text textStyle="sm" color="fg.muted" paddingTop={3}>
+    <Text
+      textStyle="caption"
+      color="fg.muted"
+      paddingTop={6}
+      borderTopWidth="1px"
+      borderColor="border.subtle"
+      marginTop={2}
+      data-testid="braids-who-may-braid"
+    >
       {keptToAdmins
         ? "Organisation admins can create, change or remove braids. Every change is in the audit log."
         : "Admins of this project and organisation admins can create, change or remove braids. Every change is in the audit log."}
@@ -126,33 +313,37 @@ export default function BraidsScreen() {
   const host = useAuthzHost();
   const { organizationId, projectId } = host.scope();
   const { isEnterprise, isLoading: isPlanLoading } = host.plan();
+  // Off, the page lists existing braids read-only with Remove (Alex, 2026-11-18).
+  const releasedFlag = useBraidsReleased();
+  const released = releasedFlag === true;
   const braids = useProjectBraids({ projectId });
-  const policy = useBraidsPolicy({ organizationId });
+  const { keptToAdmins, turnedOff, turnedOn } = useBraidsSettings({ organizationId });
   const [removing, setRemoving] = useState<BraidRow | null>(null);
   const removal = useRemoveBraid({ onRemoved: () => setRemoving(null) });
-  const activity = useBraidActivity({ projectId, braids: braids.data });
+  const activity = useBraidActivity({
+    projectId,
+    braids: braids.data,
+    enabled: isEnterprise && released && !turnedOff,
+  });
   const { query } = host.route();
   const openBraid = (braid: string | undefined) =>
     host.setQuery({ ...query, [BRAID_QUERY_KEY]: braid });
-  // The URL names the tab, so a link can open Signing keys; a pick shows at once and is written
-  // back, and a URL that changes after it wins.
-  const urlTab = braidsTabOf(query[BRAIDS_TAB_QUERY_KEY]);
-  const [picked, setPicked] = useState<{ from: BraidsTab; tab: BraidsTab }>();
-  const tab = picked?.from === urlTab ? picked.tab : urlTab;
-  const setTab = (next: BraidsTab) => {
-    setPicked({ from: urlTab, tab: next });
-    host.setQuery(
-      { ...query, [BRAIDS_TAB_QUERY_KEY]: next === "into" ? undefined : next },
-      { replace: true },
-    );
-  };
+  // `?section=` lands a link on one section, Signing keys most often, once its rows are in.
+  const section = braidsSectionOf(query[BRAIDS_SECTION_QUERY_KEY]);
+  const loaded = !!projectId && !isPlanLoading && !!braids.data;
+  useEffect(() => {
+    if (!section || !loaded) return;
+    document.getElementById(SECTION_ANCHORS[section])?.scrollIntoView({ block: "start" });
+  }, [section, loaded]);
 
-  if (!projectId || isPlanLoading || braids.isLoading) return <LoadingBraids />;
+  if (!projectId || isPlanLoading || releasedFlag === undefined || braids.isLoading) {
+    return <LoadingBraids />;
+  }
   if (braids.isError || !braids.data) {
     return (
       <>
         <BraidsHeader />
-        <Box paddingTop={4}>
+        <Box>
           <SectionErrorNotice title="Couldn't load this project's braids" />
         </Box>
       </>
@@ -166,39 +357,41 @@ export default function BraidsScreen() {
     isEnterprise,
     braidCount: rows.into.length + rows.from.length,
   });
-  if (planState === "upsell") {
+  if (planState === "upsell" && released) {
     return (
       <>
-        <BraidsHeader actions={<GuideLink />} projectName={projectName} />
-        <Box paddingTop={4}>
+        <BraidsHeader projectName={projectName} locked />
+        <Box>
           <BraidsEnterpriseUpsell />
         </Box>
       </>
     );
   }
 
-  const keptToAdmins = policy.data?.braidsOrganizationAdminsOnly ?? false;
   const can: BraidAffordances = braidAffordances({
     canManage: host.hasPermission(BRAIDS_MANAGE_PERMISSION),
     planState,
     keptToOrganizationAdmins: keptToAdmins,
+    released,
+    turnedOn: !turnedOff,
   });
-  const paused = planState === "paused";
+  const pauses = braidsPauses({ planState, turnedOff });
+  const paused = pauses.byPlan;
+  const pausedByOrganization = pauses.byOrganization;
+  const seesOrganization = host.hasPermission(AUTHZ_MANAGE_PERMISSION);
   const total = rows.into.length + rows.from.length;
   const table = (side: "into" | "from") => (
-    <>
-      <BraidsTable
-        side={side}
-        rows={side === "into" ? rows.into : rows.from}
-        paused={paused}
-        canEdit={can.canEditInto}
-        canRemove={can.canRemove}
-        activity={activity}
-        onEdit={(row) => openBraid(row.braidId)}
-        onRemove={setRemoving}
-      />
-      <WhoMayBraidHint keptToAdmins={keptToAdmins} />
-    </>
+    <BraidsTable
+      side={side}
+      projectName={projectName}
+      rows={side === "into" ? rows.into : rows.from}
+      paused={paused || pausedByOrganization}
+      canEdit={can.canEditInto}
+      canRemove={can.canRemove}
+      activity={activity}
+      onEdit={(row) => openBraid(row.braidId)}
+      onRemove={setRemoving}
+    />
   );
 
   const asked = query[BRAID_QUERY_KEY];
@@ -209,92 +402,64 @@ export default function BraidsScreen() {
     <>
       <BraidsHeader
         projectName={projectName}
-        actions={
-          <>
-            <GuideLink />
-            {can.canCreate ? <NewBraidButton onOpen={() => openBraid("new")} /> : null}
-          </>
+        locked={paused}
+        actions={can.canCreate ? <NewBraidButton onOpen={() => openBraid("new")} /> : undefined}
+        links={
+          <BraidsPageLinks
+            organization={
+              seesOrganization ? { name: host.organizationStructure().organizationName } : undefined
+            }
+          />
         }
       />
-      <Stack gap={4} paddingTop={paused || can.showKeptToAdminsNote ? 4 : 0}>
-        {paused ? (
-          <Banner
-            status="warning"
-            title="Braids are paused"
-            action={
-              <BannerAction asChild>
-                <Link href="/settings/plans">See plans</Link>
-              </BannerAction>
-            }
-          >
-            Braids need the Enterprise plan. Your {total === 1 ? "braid is" : `${total} braids are`}{" "}
-            kept and start working again when you upgrade.
-          </Banner>
-        ) : null}
-        {can.showKeptToAdminsNote ? (
-          <Banner
-            status="info"
-            title="Your organisation's admins manage braids"
-            action={
-              <BannerAction asChild>
-                <Link href="/settings/directory">Ask an admin</Link>
-              </BannerAction>
-            }
-          >
-            Your organisation keeps braids to its admins, so only they can create, change or remove
-            them.
-          </Banner>
-        ) : null}
-        {/* Only the open tab is mounted: the others hold no read open behind it. */}
-        <ContentTabs
-          label="Braids"
-          value={tab}
-          onValueChange={({ value }) => setTab(value)}
-          mount="active"
-          body="flush"
-          items={[
-            {
-              value: "into",
-              label: "Into other projects",
-              count: rows.into.length,
-              testId: "braids-tab-into",
-              content: (
-                <Box paddingTop={4}>
-                  {rows.into.length > 0 ? (
-                    table("into")
-                  ) : (
-                    <BraidsHowItWorks projectName={projectName} />
-                  )}
-                </Box>
-              ),
-            },
-            {
-              value: "from",
-              label: "From other projects",
-              count: rows.from.length,
-              testId: "braids-tab-from",
-              content: (
-                <Box paddingTop={4}>
-                  {rows.from.length > 0 ? (
-                    table("from")
-                  ) : (
-                    <NothingBraidedIn projectName={projectName} />
-                  )}
-                </Box>
-              ),
-            },
-            {
-              value: "keys",
-              label: "Signing keys",
-              testId: "braids-tab-keys",
-              content: (
-                <Box paddingTop={4}>
-                  <BraidsSigningKeys projectId={projectId} planState={planState} />
-                </Box>
-              ),
-            },
-          ]}
+      <Stack gap={0} css={NO_RULE_UNDER_HEADER}>
+        <BraidsNotices
+          released={released}
+          turnedOff={pausedByOrganization}
+          turnedOn={turnedOn}
+          paused={paused}
+          total={total}
+          keptToAdmins={can.showKeptToAdminsNote}
+          isOrganizationAdmin={seesOrganization}
         />
+        {total === 0 && released ? (
+          <Box paddingBottom={6}>
+            <BraidsHowItWorks projectName={projectName} />
+          </Box>
+        ) : (
+          <>
+            <BraidsSectionBand
+              side="into"
+              title="Shown in other projects"
+              hint={`Projects that show ${projectName}'s matching spans in their traces.`}
+              count={rows.into.length}
+              none={`${projectName} doesn't show its spans in any other project yet.`}
+            >
+              {table("into")}
+            </BraidsSectionBand>
+            <BraidsSectionBand
+              side="from"
+              title="Shown here from other projects"
+              hint={`Projects whose matching spans show in ${projectName}'s traces.`}
+              count={rows.from.length}
+              none={`No project shows its spans in ${projectName} yet.`}
+            >
+              {table("from")}
+            </BraidsSectionBand>
+          </>
+        )}
+        {/* Off, keys list with Revoke only: a leaked key still verifies (Alex, 2026-11-18). */}
+        <SigningKeysBand
+          projectId={projectId}
+          planState={planState}
+          canIssue={released && !pausedByOrganization}
+          onNewKey={
+            can.canCreate
+              ? () => host.setQuery({ ...query, [SIGNING_KEY_QUERY_KEY]: "new" })
+              : undefined
+          }
+        />
+        {released ? <WhoMayBraidHint keptToAdmins={keptToAdmins} /> : null}
       </Stack>
       {dialogOpen ? (
         <BraidDialog

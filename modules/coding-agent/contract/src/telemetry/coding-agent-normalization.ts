@@ -1,3 +1,4 @@
+import { isConversationalQuerySource, readDeclaredSessionKey } from "@langwatch/span-normalisation";
 // One vocabulary for all coding agents; folds registry definitions into
 // shared detection, prefix-stripping and alias tables; downstream code never
 // compares vendor literals.
@@ -61,14 +62,21 @@ export function deriveSpanConversationKey({
   agent,
   name,
   attrs,
+  resourceAttrs = {},
 }: {
   agent: CodingAgent;
   name: string;
   attrs: Record<string, unknown>;
+  resourceAttrs?: Record<string, unknown>;
 }): string | null {
+  const declared = readDeclaredSessionKey({ attributes: attrs, resourceAttributes: resourceAttrs });
+  if (declared !== null) return declared;
   const definition = CODING_AGENT_REGISTRY.find((candidate) => candidate.id === agent);
   return definition?.deriveSessionKeyFromSpan?.({ name, attrs }) ?? deriveConversationKey(attrs);
 }
+
+/** A launcher's own session groups every harness session it runs into one row (any agent). */
+export { readDeclaredSessionKey };
 
 /**
  * The canonical event, from whatever the agent called it. Some agents namespace their event
@@ -372,6 +380,16 @@ const MAX_PROMPT_TITLE_CHARS = 120;
 const USER_QUERY_WRAPPER = /^\s*<user_query>([\s\S]*)<\/user_query>\s*$/;
 
 /** The human's words out of a Grok-wrapped prompt; any other text comes back unchanged. */
+/**
+ * Claude Code's own housekeeping calls (session titles, side queries) are not the agent talking.
+ * A sub-agent's call (`agent:...`) is conversation, and a record with no source is kept.
+ */
+export function isUtilityQuerySource(attrs: Record<string, unknown>): boolean {
+  const querySource = pickString(attrs, "query_source_safe") ?? pickString(attrs, "query_source");
+  if (querySource === null || querySource.startsWith("agent")) return false;
+  return !isConversationalQuerySource(querySource);
+}
+
 export function unwrapUserQuery(text: string): string {
   return USER_QUERY_WRAPPER.exec(text)?.[1]?.trim() ?? text;
 }

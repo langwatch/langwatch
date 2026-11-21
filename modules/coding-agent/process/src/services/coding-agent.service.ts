@@ -9,6 +9,7 @@ import {
   type CodingAgentPullRequestUsageInput,
   type CodingAgentRecentSessionsInput,
   type CodingAgentSession,
+  type CodingAgentSessionLastTurn,
   type CodingAgentSessionCursor,
   type CodingAgentSessionEvent,
   type CodingAgentSessionEventsInput,
@@ -58,6 +59,10 @@ export interface CodingAgentSessionService {
   findSessionForTrace(
     input: CodingAgentTraceSessionLookupInput,
   ): Promise<CodingAgentSession | null>;
+  findLastTurnOfSession(input: {
+    projectId: string;
+    sessionId: string;
+  }): Promise<CodingAgentSessionLastTurn | null>;
   listRecent(input: CodingAgentRecentSessionsInput): Promise<CodingAgentSession[]>;
   backfillPullRequestMappings(input: CodingAgentPullRequestMappingBackfillInput): Promise<void>;
   getUsageTotals(input: CodingAgentUsageTotalsInput): Promise<CodingAgentUsageTotals>;
@@ -173,6 +178,13 @@ export class CodingAgentFeatureService implements CodingAgentSessionService {
     input: CodingAgentTraceSessionLookupInput,
   ): Promise<CodingAgentSession | null> {
     return this.collaborators.sessionReads.findSessionForTrace(input);
+  }
+
+  findLastTurnOfSession(input: {
+    projectId: string;
+    sessionId: string;
+  }): Promise<CodingAgentSessionLastTurn | null> {
+    return this.collaborators.sessionReads.findLastTurnOfSession(input);
   }
 
   listRecent(input: CodingAgentRecentSessionsInput): Promise<CodingAgentSession[]> {

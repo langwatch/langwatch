@@ -4375,6 +4375,24 @@
           "documentation": "Every member of this organization can prove a second factor (D06). A\nMEMBERSHIP CONDITION, not a session policy: it is asked when a member\nreaches this organization's data, it holds the ones who cannot prove\none at an enrollment gate for THIS organization alone, and it ends no\nsession, ever. Turning it on signs nobody out.\nSpec: specs/identity/mfa-and-session-shape.feature."
         },
         {
+          "name": "docsPlaygroundSessionsEnabled",
+          "columnName": "docsPlaygroundSessionsEnabled",
+          "type": "Boolean",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "Whether members may connect the documentation playground to their own access with a\nshort-lived docs session key (ADR-185, amendment of 2026-11-13). On by default; turned off,\nno key is minted and live ones stop authenticating. The pasted-key path is untouched.\nSpec: modules/api-key/specs/docs-session-keys.feature."
+        },
+        {
+          "name": "docsPlaygroundSessionsDisabledAt",
+          "columnName": "docsPlaygroundSessionsDisabledAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "When the docs playground was last turned off, written in the same update as the switch. A\ndocs session key minted at or before it never authenticates again, nor any key minted under\none, so turning it back on revives none of them (ADR-185, amendment of 2026-11-14)."
+        },
+        {
           "name": "lockoutAfterFailedAttempts",
           "columnName": "lockoutAfterFailedAttempts",
           "type": "Int",
@@ -18804,6 +18822,33 @@
           }
         },
         {
+          "name": "kind",
+          "columnName": "kind",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "redTeam",
+          "columnName": "redTeam",
+          "type": "Json",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "sourceTemplateId",
+          "columnName": "sourceTemplateId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
           "name": "version",
           "columnName": "version",
           "type": "Int",
@@ -19192,6 +19237,24 @@
             "references": [],
             "to": "Scenario"
           }
+        },
+        {
+          "name": "templateId",
+          "columnName": "templateId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "templateVersion",
+          "columnName": "templateVersion",
+          "type": "Int",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
         },
         {
           "name": "archivedAt",
@@ -19620,6 +19683,51 @@
         {
           "name": "seatLineLeaseUntil",
           "columnName": "seatLineLeaseUntil",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "paymentRecoveryInvoiceId",
+          "columnName": "paymentRecoveryInvoiceId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "An open failed payment recovery case: the unpaid renewal invoice, day 0 (its first failed\ncharge) and the last notice sent (3, 7, 14 or 21). Cleared when the case closes."
+        },
+        {
+          "name": "paymentRecoveryStartedAt",
+          "columnName": "paymentRecoveryStartedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "paymentRecoveryNoticeDay",
+          "columnName": "paymentRecoveryNoticeDay",
+          "type": "Int",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "overPlanSince",
+          "columnName": "overPlanSince",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "The over-plan mark: traces recorded from overPlanSince are withheld while it is open and the\norganization is on Free with more members than Free allows; ended once that no longer holds."
+        },
+        {
+          "name": "overPlanEndedAt",
+          "columnName": "overPlanEndedAt",
           "type": "DateTime",
           "kind": "scalar",
           "isList": false,
@@ -20204,6 +20312,15 @@
           "documentation": ""
         },
         {
+          "name": "braidsEnabled",
+          "columnName": "braidsEnabled",
+          "type": "Boolean",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
           "name": "updatedByUserId",
           "columnName": "updatedByUserId",
           "type": "String",
@@ -20215,6 +20332,116 @@
         {
           "name": "updatedAt",
           "columnName": "updatedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        }
+      ]
+    },
+    {
+      "name": "AuthzBraidWrite",
+      "tableName": "AuthzBraidWrite",
+      "documentation": "",
+      "primaryKey": [
+        "organizationId",
+        "commandId"
+      ],
+      "fields": [
+        {
+          "name": "organizationId",
+          "columnName": "organizationId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "commandId",
+          "columnName": "commandId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "grantId",
+          "columnName": "grantId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "readerProjectId",
+          "columnName": "readerProjectId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "ownerProjectId",
+          "columnName": "ownerProjectId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "termsKey",
+          "columnName": "termsKey",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "condition",
+          "columnName": "condition",
+          "type": "Json",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "expiresAt",
+          "columnName": "expiresAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "replacesGrantId",
+          "columnName": "replacesGrantId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "createdByUserId",
+          "columnName": "createdByUserId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "createdAt",
+          "columnName": "createdAt",
           "type": "DateTime",
           "kind": "scalar",
           "isList": false,
@@ -27388,6 +27615,865 @@
         {
           "name": "updatedAt",
           "columnName": "updatedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        }
+      ]
+    },
+    {
+      "name": "AgentRegistryEntry",
+      "tableName": "AgentRegistryEntry",
+      "documentation": "One agent in the organisation's governance registry, from any source governance reads\n(enterprise/modules/governance/specs/agent-registry.feature). `entry` is the latest\nmachine-readable snapshot; `version` grows by one on every material change.",
+      "primaryKey": [
+        "id"
+      ],
+      "fields": [
+        {
+          "name": "id",
+          "columnName": "id",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "organizationId",
+          "columnName": "organizationId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "sourceKey",
+          "columnName": "sourceKey",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "Where the agent came from and its id there, e.g. `langwatch:<agentId>`."
+        },
+        {
+          "name": "source",
+          "columnName": "source",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "status",
+          "columnName": "status",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "version",
+          "columnName": "version",
+          "type": "Int",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "fingerprint",
+          "columnName": "fingerprint",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "entry",
+          "columnName": "entry",
+          "type": "Json",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "firstSeenAt",
+          "columnName": "firstSeenAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "lastSeenAt",
+          "columnName": "lastSeenAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "removedAt",
+          "columnName": "removedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "createdAt",
+          "columnName": "createdAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "updatedAt",
+          "columnName": "updatedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        }
+      ]
+    },
+    {
+      "name": "AgentRegistryEvent",
+      "tableName": "AgentRegistryEvent",
+      "documentation": "The registry's append-only change feed: one row per registered, versioned, removed or\ntool-deprecated fact. `sequence` is the pull cursor; `deliveryRecordedAt` marks the webhook\nfan-out as recorded in governance's outbox.",
+      "primaryKey": [
+        "id"
+      ],
+      "fields": [
+        {
+          "name": "id",
+          "columnName": "id",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "organizationId",
+          "columnName": "organizationId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "sequence",
+          "columnName": "sequence",
+          "type": "BigInt",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "type",
+          "columnName": "type",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "entryId",
+          "columnName": "entryId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "fromVersion",
+          "columnName": "fromVersion",
+          "type": "Int",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "toVersion",
+          "columnName": "toVersion",
+          "type": "Int",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "payload",
+          "columnName": "payload",
+          "type": "Json",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "occurredAt",
+          "columnName": "occurredAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "deliveryRecordedAt",
+          "columnName": "deliveryRecordedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        }
+      ]
+    },
+    {
+      "name": "AgentRegistryBaseline",
+      "tableName": "AgentRegistryBaseline",
+      "documentation": "An organisation's registry baseline: its first reconcile, written as already pushed so the\nagents it already had are not announced. Every reconcile after it pushes its changes.",
+      "primaryKey": [
+        "organizationId"
+      ],
+      "fields": [
+        {
+          "name": "organizationId",
+          "columnName": "organizationId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "baselinedAt",
+          "columnName": "baselinedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        }
+      ]
+    },
+    {
+      "name": "AgentStopPlanTarget",
+      "tableName": "AgentStopPlanTarget",
+      "documentation": "One target of a registry agent's kill switch stop plan (enterprise/modules/governance/specs/\nagent-kill-switch.feature): a Databricks serving endpoint, a Bedrock agent alias or a gateway\nvirtual key. A plan write replaces every row of the agent at once.",
+      "primaryKey": [
+        "id"
+      ],
+      "fields": [
+        {
+          "name": "id",
+          "columnName": "id",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "organizationId",
+          "columnName": "organizationId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "agentId",
+          "columnName": "agentId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "The AgentRegistryEntry the plan belongs to."
+        },
+        {
+          "name": "position",
+          "columnName": "position",
+          "type": "Int",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "label",
+          "columnName": "label",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "target",
+          "columnName": "target",
+          "type": "Json",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "createdAt",
+          "columnName": "createdAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "updatedAt",
+          "columnName": "updatedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        }
+      ]
+    },
+    {
+      "name": "AgentStopPlan",
+      "tableName": "AgentStopPlan",
+      "documentation": "One agent's stop plan version: bumped by every save, so a save over a plan someone else saved\nsince it was read is refused. No row means the plan was never saved (version 0).",
+      "primaryKey": [
+        "organizationId",
+        "agentId"
+      ],
+      "fields": [
+        {
+          "name": "organizationId",
+          "columnName": "organizationId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "agentId",
+          "columnName": "agentId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "The AgentRegistryEntry the plan belongs to."
+        },
+        {
+          "name": "version",
+          "columnName": "version",
+          "type": "Int",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "updatedAt",
+          "columnName": "updatedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        }
+      ]
+    },
+    {
+      "name": "GovernanceAwsConnection",
+      "tableName": "GovernanceAwsConnection",
+      "documentation": "An AWS credential a Bedrock kill switch target signs with: a static key pair, a role to assume,\nor both. The secret access key and the external id are stored sealed.",
+      "primaryKey": [
+        "id"
+      ],
+      "fields": [
+        {
+          "name": "id",
+          "columnName": "id",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "organizationId",
+          "columnName": "organizationId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "name",
+          "columnName": "name",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "accessKeyId",
+          "columnName": "accessKeyId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "encryptedSecretAccessKey",
+          "columnName": "encryptedSecretAccessKey",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "roleArn",
+          "columnName": "roleArn",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "encryptedExternalId",
+          "columnName": "encryptedExternalId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "createdAt",
+          "columnName": "createdAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "updatedAt",
+          "columnName": "updatedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        }
+      ]
+    },
+    {
+      "name": "AgentStop",
+      "tableName": "AgentStop",
+      "documentation": "The `agent_stop` aggregate's Postgres projection: one row per kill switch stop, its status and\nevery target's outcome, folded from the stop's events.",
+      "primaryKey": [
+        "id"
+      ],
+      "fields": [
+        {
+          "name": "id",
+          "columnName": "id",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "organizationId",
+          "columnName": "organizationId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "agentId",
+          "columnName": "agentId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "agentName",
+          "columnName": "agentName",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "status",
+          "columnName": "status",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "severity",
+          "columnName": "severity",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "approval",
+          "columnName": "approval",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "trigger",
+          "columnName": "trigger",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "reason",
+          "columnName": "reason",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "requestedByUserId",
+          "columnName": "requestedByUserId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "requestedByApiKeyId",
+          "columnName": "requestedByApiKeyId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "decidedByUserId",
+          "columnName": "decidedByUserId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "decidedByApiKeyId",
+          "columnName": "decidedByApiKeyId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "restoredByUserId",
+          "columnName": "restoredByUserId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "restoredByApiKeyId",
+          "columnName": "restoredByApiKeyId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "targets",
+          "columnName": "targets",
+          "type": "Json",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "requestedAt",
+          "columnName": "requestedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "decidedAt",
+          "columnName": "decidedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "quarantinedAt",
+          "columnName": "quarantinedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "restoreRequestedAt",
+          "columnName": "restoreRequestedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "restoredAt",
+          "columnName": "restoredAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "lastAppliedEventId",
+          "columnName": "lastAppliedEventId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "lastAcceptedAt",
+          "columnName": "lastAcceptedAt",
+          "type": "BigInt",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "lastOccurredAt",
+          "columnName": "lastOccurredAt",
+          "type": "BigInt",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "projectionVersion",
+          "columnName": "projectionVersion",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "createdAt",
+          "columnName": "createdAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "updatedAt",
+          "columnName": "updatedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        }
+      ]
+    },
+    {
+      "name": "AgentStopClaim",
+      "tableName": "AgentStopClaim",
+      "documentation": "The one open stop an agent may have: the api takes this row before it sends a stop's request,\nso two requests at once cannot both open one. A later request takes it over once the stop it\nnames has closed.\n`sentAt` is set once the request command was sent: from then on the claim passes on only after\nits stop closed, never on age. `decision` is taken by the one approve or deny that wins.\n`decisionTakenAt` is set while that decision is in flight and cleared once its command was\nsent; a decision left in flight is taken over once abandoned.",
+      "primaryKey": [
+        "organizationId",
+        "agentId"
+      ],
+      "fields": [
+        {
+          "name": "organizationId",
+          "columnName": "organizationId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "agentId",
+          "columnName": "agentId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "stopId",
+          "columnName": "stopId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "claimedAt",
+          "columnName": "claimedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "sentAt",
+          "columnName": "sentAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "decision",
+          "columnName": "decision",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "decisionTakenAt",
+          "columnName": "decisionTakenAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        }
+      ]
+    },
+    {
+      "name": "AgentStopTargetPriorState",
+      "tableName": "AgentStopTargetPriorState",
+      "documentation": "Whether a target was already stopped before a stop first touched it, recorded once before the\nstop's platform call, so a retried call after a success still knows the change is the stop's own.",
+      "primaryKey": [
+        "organizationId",
+        "stopId",
+        "targetId"
+      ],
+      "fields": [
+        {
+          "name": "organizationId",
+          "columnName": "organizationId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "stopId",
+          "columnName": "stopId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "targetId",
+          "columnName": "targetId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "wasStopped",
+          "columnName": "wasStopped",
+          "type": "Boolean",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "recordedAt",
+          "columnName": "recordedAt",
           "type": "DateTime",
           "kind": "scalar",
           "isList": false,

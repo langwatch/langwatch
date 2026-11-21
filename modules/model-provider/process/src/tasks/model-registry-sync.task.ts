@@ -34,6 +34,7 @@ import {
   mapLitellmModels,
   type UnrepresentableModel,
 } from "../rules/litellm-prices.rules.ts";
+import { pickOutputTokensParameter } from "../rules/output-tokens-parameter.rules.ts";
 import {
   extractProvider,
   hasVariantSuffix,
@@ -231,6 +232,10 @@ function transformModel(model: Model, raw?: RawPricing): LLMModelEntry {
 
   const reasoningConfig = pickReasoningConfig(mappedId);
   if (reasoningConfig) entry.reasoningConfig = reasoningConfig;
+
+  const outputTokensParameter =
+    entry.mode === "chat" ? pickOutputTokensParameter(mappedId) : undefined;
+  if (outputTokensParameter) entry.outputTokensParameter = outputTokensParameter;
 
   return entry;
 }

@@ -42,6 +42,7 @@
     "@aws-sdk/s3-request-presigner": "catalog:",
     "@azure/identity": "catalog:",
     "@clickhouse/client": "catalog:",
+    "@langwatch/aws-client": "workspace:*",
     "@langwatch/clickhouse-client": "workspace:*",
     "@langwatch/config": "workspace:*",
     "@langwatch/eventing": "workspace:*",

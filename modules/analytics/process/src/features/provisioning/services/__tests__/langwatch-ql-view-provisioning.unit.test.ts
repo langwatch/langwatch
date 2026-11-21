@@ -508,6 +508,45 @@ describe("given the views pinned to latest-in-order", () => {
     expect(sql).toContain(`\n) AS ${LWQL_SOURCE_ALIAS}`);
   });
 
+  /** @scenario "A floored twin of a latest-in-order view reads the source from its bound before LIMIT 1 BY" */
+  it("floors trace_metrics' read of trace_analytics on OccurredAt before LIMIT 1 BY", () => {
+    const view = pickLwqlViewByName("trace_metrics");
+    if (!view) throw new Error("trace_metrics is not in the catalog");
+    const twins = viewStatements.flooredViewStatements({
+      names: NAMES,
+      sourceDatabase: SOURCE_DATABASE,
+      view,
+      dedup: SHIPPED_LWQL_DEDUP,
+    });
+
+    expect(twins).toHaveLength(1);
+    expect(twins[0]).toMatch(/^CREATE OR REPLACE VIEW langwatch\.trace_metrics__floor\n/);
+    expect(twins[0]).toContain(
+      "  FROM langwatch.trace_analytics\n" +
+        "  WHERE `OccurredAt` >= {lwql_floor:DateTime64(3)}\n" +
+        "  ORDER BY ",
+    );
+    expect(render("trace_metrics")).not.toContain("lwql_floor");
+  });
+
+  /** @scenario "A floored twin of a latest-in-order view reads the source from its bound before LIMIT 1 BY" */
+  it.each(["traces", "evaluations", "simulations"])(
+    "provisions no twin for %s, a latest-in-order view that declares no floor column",
+    (name) => {
+      const view = pickLwqlViewByName(name);
+      if (!view) throw new Error(`${name} is not in the catalog`);
+
+      expect(
+        viewStatements.flooredViewStatements({
+          names: NAMES,
+          sourceDatabase: SOURCE_DATABASE,
+          view,
+          dedup: SHIPPED_LWQL_DEDUP,
+        }),
+      ).toEqual([]);
+    },
+  );
+
   it("orders trace_metrics by its whole sort key and breaks a version tie on Version", () => {
     const sql = render("trace_metrics");
 

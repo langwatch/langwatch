@@ -45,6 +45,8 @@ export type BillingSubscription = Readonly<{
   currentPeriodEnd?: number | null;
   /** Lower-case ISO code the subscription bills in. */
   currency?: string | null;
+  /** The customer the subscription bills; absent where a caller did not read it. */
+  customerId?: string | null;
 }>;
 
 /** A line change: an existing line by `id`, or a new one by `price`; these keys are the provider's. */

@@ -151,6 +151,19 @@ Feature: Canonical user lifecycle
     Then exactly one "lw.user.created" intent is committed to user's fact outbox with the account row, carrying no address or name
     And it is keyed by the user alone, so a redelivery or the seed step records nothing new
 
+  # Better Auth writes social and single sign-on accounts itself; auth's after-create hook asks.
+  @unit
+  Scenario: An account Better Auth wrote records user's created fact once
+    Given an account Better Auth wrote without passing a mint
+    When auth asks user to record its created fact, once or again on a retried sign-in
+    Then exactly one "lw.user.created" intent is committed to user's fact outbox, stamped with the row's stored creation time
+    And an id with no account is refused, so auth can log it
+
+  @unit
+  Scenario: An account Better Auth wrote is a sign-up to the first-user seed
+    When user records the created fact of an account Better Auth wrote
+    Then the fact is not marked backfilled, so a self-hosted install's first such user becomes platform operator
+
   @unit
   Scenario: A mint answers while the event bus is down
     Given the event bus cannot take user's facts
@@ -470,3 +483,31 @@ Feature: Canonical user lifecycle
     And her account address routes to that connection
     When "ivy" opens her Password settings
     Then they do not offer to set a password
+
+  # /api/v1/me/project is an identity-only read: it asks no permission, so a key that holds only
+  # "traces:create" can still name the project it writes to (a client builds its traces link).
+  Rule: Any API key bound to a project reads that project's identity at /api/v1/me/project
+
+    @integration
+    Scenario: An ingestion key reads the identity of the project it is bound to
+      Given an ingestion key holding only "traces:create" on a project
+      When it asks GET /api/v1/me/project with "Authorization: Bearer <key>"
+      Then it answers 200 with that project's id, name, slug and whether it is personal
+
+    @integration
+    Scenario: A legacy project key reads the identity of its project
+      Given a project's legacy key
+      When it asks GET /api/v1/me/project
+      Then it answers 200 with that project's identity
+
+    @integration
+    Scenario: A key cannot read the identity of a project it is not bound to
+      Given ingestion keys on two projects
+      When the second project's key asks GET /api/v1/me/project naming the first project with X-Project-Id
+      Then it is refused with 401 and no project identity
+
+    @integration
+    Scenario: A revoked key is refused the project's identity
+      Given an ingestion key that was revoked
+      When it asks GET /api/v1/me/project
+      Then it is refused with 401 and no project identity

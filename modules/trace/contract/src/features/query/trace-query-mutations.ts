@@ -5,7 +5,7 @@
 
 import type { LiqeQuery } from "liqe";
 
-import { filterAST, walkAST } from "./trace-query-ast.ts";
+import { filterAST, tagsUnderOr, walkAST } from "./trace-query-ast.ts";
 import type { FacetState } from "./trace-query-metadata.ts";
 import { isEmptyAST, parse, serialize } from "./trace-query-parser.ts";
 
@@ -530,34 +530,6 @@ function isBareWord(node: LiqeQuery, keepExplicit: ReadonlySet<LiqeQuery>): node
     node.expression.type === "LiteralExpression" &&
     !node.expression.quoted
   );
-}
-
-/**
- * Every tag with an `OR` above it, at any depth. Such a tag cannot be taken
- * out on its own: what is left behind rebinds, and the caller rejoins the two
- * halves with AND.
- */
-function tagsUnderOr(
-  ast: LiqeQuery,
-  inOr = false,
-  found: Set<LiqeQuery> = new Set(),
-): Set<LiqeQuery> {
-  if (ast.type === "Tag") {
-    if (inOr) found.add(ast);
-    return found;
-  }
-  if (ast.type === "UnaryOperator") {
-    return tagsUnderOr(ast.operand, inOr, found);
-  }
-  if (ast.type === "ParenthesizedExpression") {
-    return tagsUnderOr(ast.expression, inOr, found);
-  }
-  if (ast.type === "LogicalExpression") {
-    const underOr = inOr || ast.operator.operator === "OR";
-    tagsUnderOr(ast.left, underOr, found);
-    tagsUnderOr(ast.right, underOr, found);
-  }
-  return found;
 }
 
 /**

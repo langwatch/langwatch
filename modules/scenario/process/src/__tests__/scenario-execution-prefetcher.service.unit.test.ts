@@ -1356,7 +1356,7 @@ describe("prefetchWithFixture, when the prefetch succeeds", () => {
           throw new Error("prefetch should have succeeded");
         }
         expect(result.data.context).toEqual(defaultContext);
-        expect(result.data.scenario).toEqual(defaultScenario);
+        expect(result.data.scenario).toEqual({ ...defaultScenario, kind: "standard" });
         expect(result.data.adapterData).toMatchObject({
           type: "prompt",
           promptId: "prompt_123",

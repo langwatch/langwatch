@@ -29,21 +29,23 @@
 import { anthropicAdminPullConfigSchema } from "@langwatch/enterprise-governance-contract";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { buildAnthropicAdminPullConfig } from "../inventory/admin-api-pull-config.ts";
+import { PARSER_FIELDS } from "../inventory/parser-field-catalog.ts";
 import {
   ANTHROPIC_BUCKET_WIDTHS,
-  buildAnthropicAdminPullConfig,
-  type ComposerState,
   dateInputValue,
-  defaultParserValues,
   fieldControl,
-  missingRequiredParserFieldKeys,
-  PARSER_FIELDS,
-  reconcileParserValues,
-  seedComposerParserConfig,
   switchFieldIsOn,
   switchReadOnlyLabel,
+} from "../inventory/parser-field-controls.ts";
+import {
+  defaultParserValues,
+  missingRequiredParserFieldKeys,
+  reconcileParserValues,
   visibleParserFields,
-} from "../governance-inventory.screen.tsx";
+} from "../inventory/parser-fields.ts";
+import { type ComposerState } from "../inventory/source-composer-state.ts";
+import { seedComposerParserConfig } from "../inventory/source-submission.ts";
 
 const fieldFor = (key: string) => {
   const field = PARSER_FIELDS.anthropic_admin.find((f) => f.key === key);
