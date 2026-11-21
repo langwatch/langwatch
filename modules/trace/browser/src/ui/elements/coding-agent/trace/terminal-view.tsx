@@ -26,10 +26,11 @@ import {
   contextHeatLabel,
 } from "../../../../model/coding-agent/trace/context-health.ts";
 import {
-  codeModeResultText,
+  type CodeModeScriptResult,
   isCodeModePoll,
   isCodeModeScript,
   readCodeModeScript,
+  readCodeModeScriptResults,
 } from "../../../../model/coding-agent/trace/terminal-code-mode.ts";
 import {
   TERMINAL_FONT_STACK,
@@ -1405,7 +1406,12 @@ function ToolEntryLine({ entry, ran }: { entry: ToolEntry; ran: TerminalToolSpan
   if (isCodeModeScript(name)) return <CodeScriptCall entry={entry} ran={ran} />;
   const failed = ran?.isError ?? entry.failed;
   if (isCodeModePoll(name) && !failed)
-    return <ScriptWaitLine durationMs={ran?.durationMs ?? entry.durationMs} />;
+    return (
+      <ScriptWaitLine
+        durationMs={ran?.durationMs ?? entry.durationMs}
+        results={readCodeModeScriptResults(ran?.output ?? entry.output)}
+      />
+    );
   return <ToolCall entry={entry} ran={ran} />;
 }
 
@@ -1417,10 +1423,10 @@ function ToolEntryLine({ entry, ran }: { entry: ToolEntry; ran: TerminalToolSpan
 function CodeScriptCall({ entry, ran }: { entry: ToolEntry; ran: TerminalToolSpan | null }) {
   const [expanded, setExpanded] = useState(false);
   const script = readCodeModeScript(entry.input);
-  const resultText = codeModeResultText(ran?.output ?? entry.output);
+  const results = readCodeModeScriptResults(ran?.output ?? entry.output) ?? [];
   const isError = ran?.isError ?? entry.failed;
-  const canExpand = script.code !== null || resultText !== null;
-  const linesLabel = script.lineCount === null ? "" : ` · ${lineCountLabel(script.lineCount)}`;
+  const canExpand = script.code !== null || results.length > 0;
+  const linesLabel = codeScriptSizeLabel(script);
   const toggleLabel = expanded ? "(click to hide)" : "(click to show)";
 
   const heading = (
@@ -1458,29 +1464,63 @@ function CodeScriptCall({ entry, ran }: { entry: ToolEntry; ran: TerminalToolSpa
           <SyntaxHighlightedCode code={script.code} filePath="script.js" />
         </ResultLine>
       )}
-      {expanded && resultText !== null && (
+      {expanded && script.cutFromChars !== null && (
         <ResultLine>
-          <TerminalOutput text={resultText} isError={isError} />
+          <Text {...CELL} color={TERMINAL_TOKENS.faint}>
+            {`Claude Code recorded only the start of this ${script.cutFromChars.toLocaleString("en-GB")}-character script`}
+          </Text>
         </ResultLine>
       )}
+      {expanded &&
+        results.map((result, index) => (
+          <ResultLine key={index}>
+            <TerminalOutput text={result.text} isError={isError || result.isError} />
+          </ResultLine>
+        ))}
     </VStack>
   );
+}
+
+/** The full script's size: its line count, or its length when only its start was recorded. */
+function codeScriptSizeLabel(script: ReturnType<typeof readCodeModeScript>): string {
+  if (script.cutFromChars !== null) {
+    return ` · ${script.cutFromChars.toLocaleString("en-GB")} characters`;
+  }
+  return script.lineCount === null
+    ? " · script not recorded"
+    : ` · ${lineCountLabel(script.lineCount)}`;
 }
 
 function lineCountLabel(count: number): string {
   return count === 1 ? "1 line" : `${count} lines`;
 }
 
-/** Poll: the model waiting on a script still running. One faint line, never a status body. */
-function ScriptWaitLine({ durationMs }: { durationMs: number | null }) {
+/**
+ * Poll: the model waiting on a script still running. One faint line, then what the script
+ * handed back when the session recorded it; never a status body.
+ */
+function ScriptWaitLine({
+  durationMs,
+  results,
+}: {
+  durationMs: number | null;
+  results: CodeModeScriptResult[] | null;
+}) {
   const waited = durationMs !== null && durationMs > 0 ? ` · ${formatDuration(durationMs)}` : "";
   return (
-    <HStack align="flex-start" gap={2}>
-      <Glyph char={GLYPH.note} color={TERMINAL_TOKENS.faint} />
-      <Text {...CELL} color={TERMINAL_TOKENS.faint} flex={1} minWidth={0}>
-        {`Waited for the script${waited}`}
-      </Text>
-    </HStack>
+    <VStack align="stretch" gap={0.5}>
+      <HStack align="flex-start" gap={2}>
+        <Glyph char={GLYPH.note} color={TERMINAL_TOKENS.faint} />
+        <Text {...CELL} color={TERMINAL_TOKENS.faint} flex={1} minWidth={0}>
+          {`Waited for the script${waited}`}
+        </Text>
+      </HStack>
+      {results?.map((result, index) => (
+        <ResultLine key={index}>
+          <TerminalOutput text={result.text} isError={result.isError} />
+        </ResultLine>
+      ))}
+    </VStack>
   );
 }
 
