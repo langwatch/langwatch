@@ -7,6 +7,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, it } from "node:test";
+
 import { jobBlocks } from "./guard-pull-request-target.ts";
 
 const workflows = join(import.meta.dirname, "..", "workflows");
@@ -37,7 +38,11 @@ const requested = (text: string): Map<string, keyof typeof LEVEL> => {
   lines.forEach((line, index) => {
     const key = /^( *)permissions:(.*)$/.exec(line);
     if (!key) return;
-    assert.match(key[2], /^\s*(?:#.*)?$/, `a \`permissions:\` key is not followed by a map: ${line}`);
+    assert.match(
+      key[2],
+      /^\s*(?:#.*)?$/,
+      `a \`permissions:\` key is not followed by a map: ${line}`,
+    );
     // Comments may sit at any indent, so only a line with content ends the map.
     const map: string[] = [];
     for (const next of lines.slice(index + 1)) {
@@ -51,7 +56,11 @@ const requested = (text: string): Map<string, keyof typeof LEVEL> => {
       return match ? [match] : [];
     });
     assert.ok(map.length > 0, `a \`permissions:\` key is not followed by a map: ${line}`);
-    assert.equal(entries.length, map.length, `unreadable line in a permissions map:\n${map.join("\n")}`);
+    assert.equal(
+      entries.length,
+      map.length,
+      `unreadable line in a permissions map:\n${map.join("\n")}`,
+    );
     for (const [, scope, level] of entries) {
       const have = asked.get(scope) ?? "none";
       if (LEVEL[level as keyof typeof LEVEL] > LEVEL[have]) {
