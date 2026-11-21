@@ -17,6 +17,7 @@ import {
 import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 
+import { dispatchIntentOf } from "../rules/langy-dispatch-intent.rules.ts";
 import type { LangyConversationProcessingEvent } from "./langy-conversation-state.projection.ts";
 
 const livenessLogger = createLogger("langwatch:langy:agent-turn-liveness-subscriber");
@@ -387,17 +388,6 @@ export function createLangyTurnAdmissionLifecycleSubscriber(deps: {
       });
     },
   };
-}
-
-function dispatchIntentOf({
-  resumable,
-  hasApiKey,
-}: {
-  resumable: boolean;
-  hasApiKey: boolean;
-}): "create" | "revive" | "continue" {
-  if (resumable) return "revive";
-  return hasApiKey ? "create" : "continue";
 }
 
 /** The folded conversation once it has reached `event`; until then the delivery retries. */

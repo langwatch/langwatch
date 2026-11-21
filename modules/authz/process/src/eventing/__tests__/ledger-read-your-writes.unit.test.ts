@@ -2,11 +2,16 @@
  * Bounded read-your-writes hold; caller can require projection or pass if
  * fold converges.
  */
+import type { DefineRoleCommandData } from "@langwatch/authz-contract";
+import { createTenantId, deduplicateEvents } from "@langwatch/eventing";
 import { HandledError } from "@langwatch/handled-error";
 import { toDate } from "@langwatch/time";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { grantFactToRow } from "../../repositories/prisma/prisma.authz-grant.mapper.ts";
+import { DefineRoleCommand } from "../authz-grant.commands.ts";
+import { EventingAuthzAuditAdapter } from "../authz-grant.subscriber.ts";
+import { KeyedAuditTrailStore } from "./support/authz-audit-trail.stub.ts";
 import { ACTOR, binding, harness, ORG_ID } from "./support/eventing.authz-ledger-fork.harness.ts";
 
 /** A Grant row as Postgres returns it: Dates where the mapped shape holds Instants. */
@@ -389,5 +394,104 @@ describe("given a role deletion", () => {
       where: { id: "role_1", organizationId: ORG_ID, deletedAt: null },
       select: { id: true },
     });
+  });
+});
+
+describe("given an api key's own role defined again", () => {
+  const apiKeyRole = {
+    organizationId: ORG_ID,
+    roleId: "apikey:key_1",
+    name: "apikey:key_1",
+    permissions: ["langy:view"],
+    kind: "system_api_key" as const,
+    actor: ACTOR,
+  };
+  const definitions = (sent: { verb: string; data: unknown }[]) =>
+    sent
+      .filter((entry) => entry.verb === "defineRole")
+      .map((entry) => entry.data as DefineRoleCommandData);
+
+  describe("when a retry sends the caller's command id again before the fold", () => {
+    /** @scenario "A retry under the caller's command id records one role definition" */
+    it("sends it under that id: one role_defined, one audit row", async () => {
+      const { writer, sent } = harness({});
+      const commandId = "apikeygrant:key_1:content";
+
+      for (let attempt = 0; attempt < 2; attempt++) {
+        await expect(writer.defineRole({ ...apiKeyRole, commandId })).rejects.toMatchObject({
+          code: "authz_grant_not_confirmed",
+        });
+      }
+
+      const [first, retry] = definitions(sent);
+      if (!first || !retry) throw new Error("expected a first try and a retry");
+      expect([first.commandId, retry.commandId]).toEqual([commandId, commandId]);
+      // The retry's clock has moved on: one key, two business times, and nothing refuses it.
+      const retriedLater = { ...retry, role: { ...retry.role, occurredAtMs: 1_700_000_040_000 } };
+      const events = [first, retriedLater].flatMap((data) =>
+        new DefineRoleCommand().handle({
+          tenantId: createTenantId(data.tenantId),
+          data,
+        } as never),
+      );
+      expect(new Set(events.map((event) => event.id)).size).toBe(2);
+      expect(deduplicateEvents(events)).toHaveLength(1);
+      const audit = new KeyedAuditTrailStore();
+      const adapter = EventingAuthzAuditAdapter.create({ store: audit });
+      for (const event of events) await adapter.handler(event);
+      expect(audit.rows.size).toBe(1);
+    });
+  });
+
+  describe("when it is defined with no command id of the caller's", () => {
+    /** @scenario "A role defined with no command id is a new fact every time" */
+    it("sends every define, a repeat and a change back included, under a minted id", async () => {
+      const { writer, db, sent } = harness({});
+      db.role.findFirst.mockImplementation(async () => {
+        const last = definitions(sent).at(-1);
+        return { name: "apikey:key_1", description: null, permissions: last?.role.permissions };
+      });
+      const first = ["langy:view"];
+      const second = ["langy:view", "traces:view"];
+
+      for (const permissions of [first, first, second, first]) {
+        await writer.defineRole({ ...apiKeyRole, permissions });
+      }
+
+      const sentDefinitions = definitions(sent);
+      expect(sentDefinitions.map((data) => data.role.permissions)).toEqual([
+        first,
+        first,
+        second,
+        first,
+      ]);
+      // The harness mints one fixed id; in production each define mints its own.
+      expect(sentDefinitions.map((data) => data.commandId)).toEqual(Array(4).fill("authzcmd_test"));
+    });
+  });
+});
+
+describe("given a custom role defined again with the definition it already carries", () => {
+  /** @scenario "A custom role definition is recorded even when it restates the live row" */
+  it("still records the definition each time", async () => {
+    const { writer, db, sent } = harness({});
+    db.role.findFirst.mockResolvedValue({
+      name: "custom_viewer",
+      description: null,
+      permissions: ["traces:view"],
+    });
+    const customRole = {
+      organizationId: ORG_ID,
+      roleId: "role_1",
+      name: "custom_viewer",
+      permissions: ["traces:view"],
+      kind: "custom" as const,
+      actor: ACTOR,
+    };
+
+    await writer.defineRole(customRole);
+    await writer.defineRole(customRole);
+
+    expect(sent.filter((entry) => entry.verb === "defineRole")).toHaveLength(2);
   });
 });

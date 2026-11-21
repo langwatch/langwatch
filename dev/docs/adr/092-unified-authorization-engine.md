@@ -972,6 +972,16 @@ authz check reads. Checks **never** read ClickHouse.
   Grant, Role, RoleBinding, CustomRole, or grant AuditLog rows directly.
 ```
 
+**Audit rows keyed on their fact (tasks#1139).** An API key's own role definition, and any
+API-key grant attached under its create's `apikeygrant:` command id, carry the caller's fixed
+business time (the key's creation), and a retry appends the same fact again under a new event
+id. Such a row takes its id from the fact's idempotency key, not the event id, and is dated by
+the append that first wrote it (`event.createdAt`), not by `occurredAt`: a row dated at the
+key's creation could land behind the SIEM export's settled watermark and never be exported.
+Every other row keeps the event id and `occurredAt`. The insert keeps the first row, and
+subscribers never run on replay, so a later copy surviving the event log's merge never
+re-dates it.
+
 **Dispatch: the queue, best-effort FIFO.** Every command appends (waited) and folds
 through the GroupQueue in per-org FIFO. The ordering authority is the append
 itself — `(acceptedAt, eventId)` is the ledger's order, the projection
@@ -1003,12 +1013,20 @@ there, without waiting for the queue. The fold later applies the same event
 in its FIFO position; deleting an absent row is a no-op, so early
 enforcement and ordered convergence coexist. Redis never gates a
 revocation: with the queue down, the append and the enforcement still
-happen and the fold catches up when the queue returns. This is the **one
-sanctioned direct projection write** by application code — the "one writer"
-doctrine's single named exception — and it is shaped so it can only make
-_deny_ true early, never grant. Known edge, accepted: revoking a grant
-whose attach event is still queued deletes nothing (no row yet); the attach
-then the revoke apply in order and the state converges to revoked.
+happen and the fold catches up when the queue returns. This is the first of
+**two sanctioned direct projection writes** by application code (the "one
+writer" doctrine's named exceptions), and, like the second, it is shaped so
+it can only make _deny_ true early, never grant. Known edge, accepted:
+revoking a grant whose attach event is still queued deletes nothing (no row
+yet); the attach then the revoke apply in order and the state converges to
+revoked.
+
+The second is an API key's own role deleted early: `enforceApiKeyRoleDeletion`
+(`markRoleDeleted`) marks only a `system_api_key` role deleted, and only while
+its `occurredAt <= deletedAt`, so it never grants and never undoes a later
+define. Without it, a define sent right after a key's unawaited revoke would
+confirm against the role row the queued delete is about to remove (scenario
+"A define after a key role's delete not waited for is sent and not confirmed").
 
 **Doctrines** (nothing else backs these; this ADR does):
 

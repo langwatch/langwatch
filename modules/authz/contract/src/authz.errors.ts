@@ -286,14 +286,26 @@ export class AuthzLedgerUnavailableError extends HandledError {
 export class AuthzGrantNotConfirmedError extends HandledError {
   declare readonly code: "authz_grant_not_confirmed";
 
+  /** How long a retrying caller (the outbox honours it) should wait for the fold to land. */
+  readonly retryAfterMs: number | undefined;
+
   /** `retryable` only where a retry waits on the same write, never where it would write again. */
-  constructor({ retryable = false }: { retryable?: boolean } = {}) {
+  constructor({
+    retryable = false,
+    retryAfterMs,
+  }: { retryable?: boolean; retryAfterMs?: number } = {}) {
     super(
       "authz_grant_not_confirmed",
       "Your access change is still processing. Refresh to check its status before trying again.",
-      { httpStatus: 503, fault: "platform", retryable },
+      {
+        httpStatus: 503,
+        fault: "platform",
+        retryable,
+        ...(retryAfterMs === undefined ? {} : { meta: { retryAfterMs } }),
+      },
     );
     this.name = "AuthzGrantNotConfirmedError";
+    this.retryAfterMs = retryAfterMs;
   }
 }
 

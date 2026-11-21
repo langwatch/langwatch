@@ -1,5 +1,6 @@
 import { SYSTEM_ACTORS } from "@langwatch/authorization";
 import {
+  API_KEY_OWN_GRANT_COMMAND_PREFIX,
   BRAID_AUDIT_TARGET_KIND,
   GRANT_ATTACHED_EVENT_TYPE,
   GRANT_REVOKED_EVENT_TYPE,
@@ -18,6 +19,7 @@ import {
   type AuthzAuditRow,
 } from "../repositories/authz-audit-trail.repository.ts";
 import type { AuthzLedgerReadRepository } from "../repositories/authz-ledger-read.repository.ts";
+import { SYSTEM_API_KEY_ROLE_KIND } from "../repositories/eventing/eventing.authz-read.mapper.ts";
 import type { AuthzGrantsEvent } from "./authz-grant.events.ts";
 
 const AUTHZ_AUDIT_ACTION_PREFIX = "authz.grants." as const;
@@ -96,8 +98,29 @@ function isAuditable(event: AuthzGrantsEvent): boolean {
   return true;
 }
 
-function rowId(eventId: string): string {
-  return `authz-evt-${eventId}`;
+/**
+ * An API key's own role definition and its grants, sent under its create's stable id, are audited
+ * on their fact (the caller's idempotency key), as the event log keeps one: a retry appends again
+ * under that key but a new event id, and writes no second row. An edit and others keep theirs.
+ */
+function rowId(event: AuthzGrantsEvent): string {
+  if (!event.idempotencyKey || !isKeyedOnFact(event)) return `authz-evt-${event.id}`;
+  return `authz-evt-${event.tenantId}:${event.aggregateId}:${event.idempotencyKey}`;
+}
+
+function isKeyedOnFact(event: AuthzGrantsEvent): boolean {
+  if (!event.idempotencyKey?.startsWith(API_KEY_OWN_GRANT_COMMAND_PREFIX)) return false;
+  if (event.type === ROLE_DEFINED_EVENT_TYPE) return event.data.kind === SYSTEM_API_KEY_ROLE_KIND;
+  return event.type === GRANT_ATTACHED_EVENT_TYPE && event.data.principal.type === "apiKey";
+}
+
+/**
+ * A row keyed on its fact is dated by the first append that wrote it (the insert keeps the first
+ * row): its fixed business time can predate the write and land behind an export's settled
+ * watermark. Others keep `occurredAt`. ADR-092.
+ */
+function auditedAtMs(event: AuthzGrantsEvent): number {
+  return event.idempotencyKey && isKeyedOnFact(event) ? event.createdAt : event.occurredAt;
 }
 
 function toRow(event: AuthzGrantsEvent): AuthzAuditRow {
@@ -111,8 +134,8 @@ function toRow(event: AuthzGrantsEvent): AuthzAuditRow {
     throw new UnmappedAuthzAuditEventError(event.type);
   }
   return {
-    id: rowId(event.id),
-    createdAt: Temporal.Instant.fromEpochMilliseconds(event.occurredAt),
+    id: rowId(event),
+    createdAt: Temporal.Instant.fromEpochMilliseconds(auditedAtMs(event)),
     userId: actor?.type === "user" ? actor.id : null,
     organizationId: event.tenantId,
     action: `${AUTHZ_AUDIT_ACTION_PREFIX}${verb}`,

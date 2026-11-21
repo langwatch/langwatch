@@ -24,6 +24,7 @@ import { MemoryApiKeyRepository } from "../../repositories/memory/memory.api-key
 import { ApiKeyTokenService } from "../api-key-token.service.ts";
 import { ApiKeyService } from "../api-key.service.ts";
 import { RunKeyMintService } from "../run-key-mint.service.ts";
+import { SharedKeyMintService } from "../shared-key-mint.service.ts";
 
 const projectId = "project-1";
 const input = { userId: "user-1", projectId, permissions: ["traces:create"] };
@@ -124,10 +125,15 @@ function createServers() {
     }),
     revokeBindingsWhere: vi.fn().mockResolvedValue(0),
     deleteRole: vi.fn().mockResolvedValue(undefined),
+    resolveGrantId: vi.fn<AuthzApi["resolveGrantId"]>(
+      async ({ principal, scope, resourceToken }) =>
+        `grant:${principal.id}:${scope.type}:${scope.id}:${resourceToken}`,
+    ),
   });
   const server = () => {
+    const repository = MemoryApiKeyRepository.create({ memory: database });
     const apiKeys = ApiKeyService.create({
-      repository: MemoryApiKeyRepository.create({ memory: database }),
+      repository,
       answers: MemoryApiKeyAnswerCacheRepository.create(),
       authz,
       grants,
@@ -150,7 +156,14 @@ function createServers() {
       prefix: "api-key:run-key:",
     });
 
-    return { apiKeys, runKeys: RunKeyMintService.create({ apiKeys, authz, held }) };
+    return {
+      apiKeys,
+      runKeys: RunKeyMintService.create({
+        sharedKeys: SharedKeyMintService.create({ apiKeys, keys: repository }),
+        authz,
+        held,
+      }),
+    };
   };
 
   return { database, fold, first: server(), second: server() };

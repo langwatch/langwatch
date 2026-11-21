@@ -5,6 +5,7 @@
 import {
   LANGY_SESSION_API_KEY_NAME,
   WORKFLOW_RUN_API_KEY_NAME,
+  ApiKeyAlreadyRevokedError,
   ApiKeyNotFoundError,
 } from "@langwatch/api-key-contract";
 import { describe, expect, it, vi } from "vitest";
@@ -19,7 +20,11 @@ const ORG_ID = "org_1";
 const USER_ID = "user_1";
 const KEY_ID = "key_1";
 
-function makeRepository(name: string, isSystemManaged = false): ApiKeyRepository {
+function makeRepository(
+  name: string,
+  isSystemManaged = false,
+  revokedAt: Date | null = null,
+): ApiKeyRepository {
   const row: StoredApiKey = {
     id: KEY_ID,
     name,
@@ -29,7 +34,7 @@ function makeRepository(name: string, isSystemManaged = false): ApiKeyRepository
     createdByUserId: USER_ID,
     createdByDeviceLabel: null,
     permissionMode: "all",
-    revokedAt: null,
+    revokedAt,
     parentApiKeyId: null,
     lookupId: "lookup",
     expiresAt: null,
@@ -54,8 +59,8 @@ function makeRepository(name: string, isSystemManaged = false): ApiKeyRepository
   });
 }
 
-function makeService(name: string, isSystemManaged = false) {
-  const repository = makeRepository(name, isSystemManaged);
+function makeService(name: string, isSystemManaged = false, revokedAt: Date | null = null) {
+  const repository = makeRepository(name, isSystemManaged, revokedAt);
   const dependencies = {
     authz: { listApiKeyBindings: async () => [] } as never,
     grants: { revokeBindingsWhere: vi.fn(), deleteRole: vi.fn() } as never,
@@ -101,6 +106,27 @@ describe("ApiKeyLifecycleService system-managed guard", () => {
       );
       await expect(sut.revoke({ id: KEY_ID, ...caller })).rejects.toBeInstanceOf(
         ApiKeyNotFoundError,
+      );
+    });
+  });
+
+  describe("given a key its create has written but not yet activated", () => {
+    const bindings = [{ role: "VIEWER" as const, scopeType: "PROJECT" as const, scopeId: "p_2" }];
+
+    // A create's retry is refused by authz once a later edit holds the role, so none may exist.
+    /** @scenario "A key's create cannot be overtaken by an edit of the key" */
+    it("refuses an edit of a held key, written system-managed, as not-found", async () => {
+      const sut = makeService(LANGY_SESSION_API_KEY_NAME, true, new Date());
+      await expect(sut.update({ id: KEY_ID, ...caller, bindings })).rejects.toBeInstanceOf(
+        ApiKeyNotFoundError,
+      );
+    });
+
+    /** @scenario "A key's create cannot be overtaken by an edit of the key" */
+    it("refuses an edit of any other key while it is still disabled", async () => {
+      const sut = makeService("Nightly export", false, new Date());
+      await expect(sut.update({ id: KEY_ID, ...caller, bindings })).rejects.toBeInstanceOf(
+        ApiKeyAlreadyRevokedError,
       );
     });
   });

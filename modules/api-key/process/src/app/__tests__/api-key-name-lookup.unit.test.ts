@@ -56,6 +56,7 @@ async function appOver({ member }: { member: boolean }) {
       answers: MemoryApiKeyAnswerCacheRepository.create(),
       sandboxKeys: MemorySharedCredentialStore.create(),
       runKeys: MemorySharedCredentialStore.create(),
+      heldKeys: MemorySharedCredentialStore.create(),
       signingKeys: MemorySigningKeyRepository.create(),
       signingKeyUsage: MemorySigningKeyUsageRepository.create(),
     },

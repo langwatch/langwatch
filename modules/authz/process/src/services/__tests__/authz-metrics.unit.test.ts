@@ -6,6 +6,7 @@ import {
  * Spec: modules/authz/specs/grants-command-dispatch.feature
  */
 import { createTestLogger } from "@langwatch/test-harness";
+import { nowInstant } from "@langwatch/time";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { AuthzCutoverRepository } from "../../repositories/authz-cutover.repository.ts";
@@ -32,11 +33,23 @@ function gateReadFailures(): number {
   return meter.valueOf("authz_engine_gate_read_failures_total");
 }
 
-function revocations(): PrismaAuthzRevocationRepository {
+/** `rolesMarked` is how many Role rows the API key role delete's update reports it marked. */
+function revocations({
+  rolesMarked = 0,
+}: { rolesMarked?: number } = {}): PrismaAuthzRevocationRepository {
   return PrismaAuthzRevocationRepository.create({
-    database: { grant: { updateMany: async () => ({ count: 0 }) } },
+    database: {
+      grant: { updateMany: async () => ({ count: 0 }) },
+      role: { updateMany: async () => ({ count: rolesMarked }) },
+    },
   });
 }
+
+const API_KEY_ROLE_DELETE = {
+  organizationId: "organization-1",
+  roleId: "apikey:key-1",
+  deletedAt: nowInstant(),
+};
 
 /** An engine switch whose every read fails, as a down Postgres answers. */
 class FailingCutoverRepository extends AuthzCutoverRepository {
@@ -98,6 +111,18 @@ describe("AuthZ counters", () => {
     });
 
     expect(writesBy("offboard")).toBe(offboards + 1);
+    expect(writesBy("revocation")).toBe(revoked);
+  });
+
+  /** @scenario "An API key's own role deleted early is counted only when it marks the row" */
+  it("counts an API key role delete under its own cause only when it marked a row", async () => {
+    const before = writesBy("api_key_role_deletion");
+    const revoked = writesBy("revocation");
+
+    await revocations({ rolesMarked: 1 }).enforceApiKeyRoleDeletion(API_KEY_ROLE_DELETE);
+    await revocations({ rolesMarked: 0 }).enforceApiKeyRoleDeletion(API_KEY_ROLE_DELETE);
+
+    expect(writesBy("api_key_role_deletion")).toBe(before + 1);
     expect(writesBy("revocation")).toBe(revoked);
   });
 });

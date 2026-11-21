@@ -60,7 +60,7 @@ type Seat = Readonly<{ organizationAdmin?: boolean; teams?: Readonly<Record<stri
 type DoorContext = { actor: { id: string } | null };
 
 /** Every memory repository over one store, so the test can seed and read the rows. */
-function repositoriesOver(memory: AuthzMemoryStore): AuthzRepositories {
+export function repositoriesOver(memory: AuthzMemoryStore): AuthzRepositories {
   return {
     bindings: MemoryAuthzManagedGrantRepository.create({ memory }),
     cutover: MemoryAuthzCutoverRepository.create({ memory }),

@@ -9,7 +9,9 @@ import {
   ApiKeyScopeViolationError,
 } from "@langwatch/api-key-contract";
 import type { ApiKeyScope } from "@langwatch/api-key-contract";
+import type { AuthzGrantIdInput } from "@langwatch/authz-contract";
 import { MemberNotFoundError } from "@langwatch/organization-contract";
+import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
 import { ApiKeyGrantPolicyService } from "../api-key-grant-policy.service.ts";
@@ -35,8 +37,13 @@ type Fakes = {
   calls?: Record<string, unknown>[];
 };
 
+/** A stand-in for authz's grant id: one id per grant fact. */
+const grantIdOf = ({ principal, scope, resourceToken, occurredAtMs }: AuthzGrantIdInput) =>
+  `grant:${principal.id}:${scope.type}:${scope.id}:${resourceToken}:${occurredAtMs}`;
+
 function policyWith(fakes: Fakes = {}) {
   const calls: Record<string, unknown>[] = [];
+  const grantIdInputs: AuthzGrantIdInput[] = [];
   const service = ApiKeyGrantPolicyService.create({
     authz: {
       hasPermission: async () => true,
@@ -97,10 +104,14 @@ function policyWith(fakes: Fakes = {}) {
       revokeBindingsWhere: async (input: Record<string, unknown>) => {
         calls.push({ method: "revokeBindingsWhere", ...input });
       },
+      resolveGrantId: async (input: AuthzGrantIdInput) => {
+        grantIdInputs.push(input);
+        return grantIdOf(input);
+      },
     },
   } as never);
 
-  return { calls, service };
+  return { calls, grantIdInputs, service };
 }
 
 const ORG = "organization-1";
@@ -863,6 +874,111 @@ describe("ApiKeyGrantPolicyService", () => {
         expect(methodOrder.indexOf("defineRole")).toBeLessThan(
           methodOrder.indexOf("attachBindings"),
         );
+      });
+    });
+
+    describe("given a key's role and grants written on its create, then on an edit", () => {
+      const created = {
+        ...input,
+        replace: false,
+        bindings: [scope({ role: "CUSTOM" })],
+        permissions: ["traces:view", "project:view"],
+        createdAt: Temporal.Instant.from("2026-10-01T10:00:00Z"),
+      };
+      const sent = (calls: Record<string, unknown>[]) =>
+        calls.flatMap((call) =>
+          call.method === "defineRole" || call.method === "attachBindings"
+            ? [
+                {
+                  commandId: call.commandId,
+                  occurredAtMs: call.occurredAtMs,
+                  bindings: call.bindings,
+                },
+              ]
+            : [],
+        );
+
+      /** @scenario "A held key's retries send its own role and grant under the same ids" */
+      it("sends one id per content on create and none on an edit", async () => {
+        const first = policyWith({});
+        const retry = policyWith({});
+        const changed = policyWith({});
+        const edit = policyWith({});
+
+        await first.service.writeBindings(created);
+        await retry.service.writeBindings({
+          ...created,
+          permissions: created.permissions.toReversed(),
+        });
+        await changed.service.writeBindings({ ...created, permissions: ["traces:view"] });
+        const { createdAt: _createdAt, ...edited } = created;
+        await edit.service.writeBindings(edited);
+
+        const [define, attach] = sent(first.calls);
+        expect(define?.commandId).toMatch(/^apikeygrant:key-1:[0-9a-f]{32}$/);
+        expect(attach?.commandId).toBe(define?.commandId);
+        // Both carry the key's creation, so a late retry never overwrites a later edit.
+        expect([define?.occurredAtMs, attach?.occurredAtMs]).toEqual([
+          created.createdAt.epochMilliseconds,
+          created.createdAt.epochMilliseconds,
+        ]);
+        // The grant's id is authz's, asked for the key, scope, role and creation.
+        expect(first.grantIdInputs).toEqual([
+          {
+            organizationId: ORG,
+            principal: { type: "apiKey", id: "key-1" },
+            scope: { type: "PROJECT", id: "project-1" },
+            resourceToken: JSON.stringify(["CUSTOM", "apikey:key-1"]),
+            occurredAtMs: created.createdAt.epochMilliseconds,
+          },
+        ]);
+        expect(attach?.bindings).toEqual([
+          expect.objectContaining({ bindingId: grantIdOf(first.grantIdInputs[0]!) }),
+        ]);
+        expect(sent(retry.calls)).toEqual(sent(first.calls));
+        expect(sent(changed.calls)[0]?.commandId).not.toBe(define?.commandId);
+        expect(sent(edit.calls).map((call) => [call.commandId, call.occurredAtMs])).toEqual([
+          [undefined, undefined],
+          [undefined, undefined],
+        ]);
+        expect(sent(edit.calls)[1]?.bindings).toEqual([
+          expect.objectContaining({ bindingId: "generated-binding" }),
+        ]);
+        expect(edit.grantIdInputs).toEqual([]);
+      });
+
+      /** @scenario "A held key's retries send its own role and grant under the same ids" */
+      it("names an extra binding the same on a retry, and fresh on an edit", async () => {
+        const withExtra = {
+          ...created,
+          bindings: [...created.bindings, scope({ role: "VIEWER", scopeId: "project-2" })],
+        };
+        const first = policyWith({});
+        const retry = policyWith({});
+        const edit = policyWith({});
+
+        await first.service.writeBindings(withExtra);
+        await retry.service.writeBindings(withExtra);
+        const { createdAt: _createdAt, ...edited } = withExtra;
+        await edit.service.writeBindings(edited);
+
+        // The define, then the extra binding's attach, then the own role's.
+        const [define, extra, own] = sent(first.calls);
+        expect(extra?.commandId).toBe(define?.commandId);
+        expect(own?.commandId).toBe(define?.commandId);
+        const [extraId] = (extra?.bindings ?? []) as { bindingId: string }[];
+        const [ownId] = (own?.bindings ?? []) as { bindingId: string }[];
+        expect([extraId?.bindingId, ownId?.bindingId]).toEqual(first.grantIdInputs.map(grantIdOf));
+        expect(extraId?.bindingId).not.toBe(ownId?.bindingId);
+        expect(sent(retry.calls)).toEqual(sent(first.calls));
+        expect(sent(edit.calls).map((call) => call.commandId)).toEqual([
+          undefined,
+          undefined,
+          undefined,
+        ]);
+        expect(sent(edit.calls)[1]?.bindings).toEqual([
+          expect.objectContaining({ role: "VIEWER", bindingId: "generated-binding" }),
+        ]);
       });
     });
 

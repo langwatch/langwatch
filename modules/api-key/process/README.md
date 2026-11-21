@@ -12,12 +12,28 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 ## Module API (`ApiKeyApi`)
 
-Peers call these through the token, declared at `../contract/src/api-key.api.ts:126`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/api-key.api.ts:134`; nothing else in this package is public.
 
 #### `create`
 
 ```typescript
 create(input: CreateApiKeyInput): Promise<{ token: string; apiKey: ApiKey }>;
+```
+
+#### `createHeld`
+
+`create` for a caller that is retried: the key is written once per `holdKey`, and a retry grants that same key again. Throws a retryable `AuthzGrantNotConfirmedError` (with `retryAfterMs`) until its grants land. `created` marks the call that activated the key.
+
+```typescript
+createHeld(input: CreateHeldApiKeyInput): Promise<{ token: string; apiKeyId: string; created: boolean }>;
+```
+
+#### `releaseHeld`
+
+Drops a held key's entry, so the next `createHeld` mints; call it when the key is revoked.
+
+```typescript
+releaseHeld(input: { organizationId: string; holdKey: string }): Promise<void>;
 ```
 
 #### `update`
@@ -917,10 +933,10 @@ Declared at `src/eventing/docs-playground-revocation.pipeline.ts:37`.
 
 | Kind   | Leaf                 | Environment variable          | Declared at                            |
 | ------ | -------------------- | ----------------------------- | -------------------------------------- |
-| secret | `pepper`             | `API_KEY_PEPPER`              | `src/app/api-key.app.ts:199`           |
-| secret | `pepperFallback`     | `CREDENTIALS_SECRET`          | `src/app/api-key.app.ts:200`           |
-| secret | `pepperLastFallback` | `NEXTAUTH_SECRET`             | `src/app/api-key.app.ts:201`           |
-| secret | `pepperPrevious`     | `CREDENTIALS_SECRET_PREVIOUS` | `src/app/api-key.app.ts:203`           |
+| secret | `pepper`             | `API_KEY_PEPPER`              | `src/app/api-key.app.ts:202`           |
+| secret | `pepperFallback`     | `CREDENTIALS_SECRET`          | `src/app/api-key.app.ts:203`           |
+| secret | `pepperLastFallback` | `NEXTAUTH_SECRET`             | `src/app/api-key.app.ts:204`           |
+| secret | `pepperPrevious`     | `CREDENTIALS_SECRET_PREVIOUS` | `src/app/api-key.app.ts:206`           |
 | config | `docsOrigins`        | `LANGWATCH_DOCS_ORIGINS`      | `../contract/src/api-key.config.ts:23` |
 | config | `isSaas`             | `IS_SAAS`                     | `../contract/src/api-key.config.ts:25` |
 | config | `publicBaseUrl`      | `BASE_HOST`                   | `../contract/src/api-key.config.ts:27` |

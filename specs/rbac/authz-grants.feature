@@ -396,6 +396,13 @@ Feature: Authorization grants
     Then the write is reported as done
 
   @unit
+  Scenario: A retry is confirmed by the earlier attempt's landed append
+    Given a write that failed with "authz_grant_not_confirmed" because its fold lands after the window
+    When it is retried after, or while, the earlier attempt's append lands
+    Then the retry is confirmed by that append, without waiting for its own
+    And a skipping attach reports the earlier grant as a duplicate and only that grant stands
+
+  @unit
   Scenario: A role definition is confirmed by the canonical Role projection
     Given a canonical Role row with the requested name and permissions
     When the role definition is written
@@ -406,6 +413,75 @@ Feature: Authorization grants
     Given a canonical Role row with the requested name and permissions but the old description
     When the role definition is written without a description
     Then the write is not confirmed
+
+  @unit
+  Scenario: A retry under the caller's command id records one role definition
+    Given an API key's own role definition sent under its key's stable command id
+    When the same definition is sent again under that id before it lands
+    Then both are sent under that id
+    And the event log keeps one role definition and the audit trail one row
+
+  @unit
+  Scenario: A role defined with no command id is a new fact every time
+    Given an API key's own role defined with no command id of the caller's
+    When it is defined again, then changed, then changed back
+    Then every define is sent, each under an id the ledger mints for it
+
+  @unit
+  Scenario: A define after a key role's delete not waited for is sent and not confirmed
+    Given an API key's own role, live with the definition a retry restates
+    When the role is deleted without waiting for the fold and then defined again
+    Then the delete is marked on the Role row at once
+    And the definition is sent and refused, the role staying deleted
+
+  @unit
+  Scenario: A custom role's delete not waited for is left to the fold
+    Given a live custom role
+    When it is deleted without waiting for the fold
+    Then the Role row stays live until the delete folds
+
+  @integration
+  Scenario: A held key whose role and grant land after a slow fold has one of each
+    Given an API key's own role and its grant, sent under the key's stable ids each try
+    And a fold that lands the role only after two tries and the grant only after two more
+    When the tries run until the grant is read back
+    Then the event log keeps one role definition and one grant
+    And the audit trail has one row for the role definition and one for the grant
+    And the key holds exactly one live grant
+
+  @integration
+  Scenario: A held key's other grant retried before the fold has one audit row
+    Given an API key's create that also binds the key to a built-in role, under the create's ids
+    And a fold that lands each grant only after a retry
+    When the tries run until both grants are read back
+    Then the event log keeps one grant attach for each grant
+    And the audit trail has one row for each, and the key holds both grants live
+
+  @integration
+  Scenario: A late copy of a key's create never overwrites a later edit
+    Given an API key's own role defined by its create, under the create's id and creation time
+    And the role edited afterwards
+    When a retry of the create is written and folded after the edit
+    Then the role keeps the edit, as the retry carries the older business time
+
+  @integration
+  Scenario: A revoked API key grant attached again is recorded as a new grant
+    Given an API key's own grant that was attached and then revoked
+    When an edit grants the key again, under a fresh binding id and no command id
+    Then a new grant is attached under a new id, live, with its own audit row
+
+  @integration
+  Scenario: Grants other than an API key's own keep the ids they are attached under
+    Given an API key bound to a custom role and to a built-in role
+    When both bindings are attached
+    Then each grant keeps the id it was asked under
+    And each audit row is keyed on its event id
+
+  @unit
+  Scenario: A custom role definition is recorded even when it restates the live row
+    Given a custom role whose live row already carries the requested definition
+    When the same role definition is written again
+    Then the definition is recorded again
 
   @unit
   Scenario: Deleting a role binding twice answers not found the second time
@@ -778,6 +854,30 @@ Feature: Authorization grants
     Given a fact delivered twice
     When it is handled
     Then exactly one audit row exists
+
+  @unit
+  Scenario: A role definition appended twice under one idempotency key writes one audit row
+    Given an API key's own role definition appended twice under its create's command id
+    And each append has its own event id
+    When both are handled
+    Then exactly one audit row exists
+    And a role definition on another role that shares the key still gets its own row
+    And a custom role's definition, and any other event, is still keyed on its event id
+    And an edit of the key's role, under a minted key, keeps its event id and business time
+
+  @unit
+  Scenario: An API key's own-role grant attached twice under one key writes one audit row
+    Given an API key's grant appended twice under its create's stable command id
+    When both are handled
+    Then exactly one audit row exists
+    And any other attach, a user's under that prefix included, keeps its event id as its row id
+
+  @unit
+  Scenario: A key's create audited under its fact is dated by its append
+    Given an API key's grant appended under its create's id, carrying the key's creation time
+    When it is handled
+    Then its audit row is dated by its append, so it never lands behind an export's watermark
+    And every other row is still dated by its business time
 
   @unit @regression
   Scenario: Migrated custom bindings retain their permission restrictions

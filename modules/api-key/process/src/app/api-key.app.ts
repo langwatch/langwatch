@@ -12,6 +12,7 @@ import {
   type ApiKeyTeam,
   type ApiKeyUser,
   type CreateApiKeyInput,
+  type CreateHeldApiKeyInput,
   type CreateIngestionKeyInput,
   type MintAgentSandboxKeyInput,
   type MintRunKeyInput,
@@ -84,6 +85,7 @@ import { ApiKeyTokenService } from "../services/api-key-token.service.ts";
 import { ApiKeyService } from "../services/api-key.service.ts";
 import { BraidSignatureVerificationService } from "../services/braid-signature-verification.service.ts";
 import { DocsSessionKeyService } from "../services/docs-session-key.service.ts";
+import { HeldKeyMintService } from "../services/held-key-mint.service.ts";
 import { IngestionKeyMintService } from "../services/ingestion-key-mint.service.ts";
 import { LegacyApiKeyGrantService } from "../services/legacy-api-key-grant.service.ts";
 import { OrganizationProvisioningService } from "../services/organization-provisioning.service.ts";
@@ -94,6 +96,7 @@ import {
   type VisibleProjectsQuery,
 } from "../services/project-provisioning.service.ts";
 import { RunKeyMintService } from "../services/run-key-mint.service.ts";
+import { SharedKeyMintService } from "../services/shared-key-mint.service.ts";
 import { SigningKeyService } from "../services/signing-key.service.ts";
 import type { ApiKeyOrganizationsDoorApi } from "../transport/api-key-organizations.rest.ts";
 import type { ApiKeyProjectsDoorApi } from "../transport/api-key-projects.rest.ts";
@@ -225,10 +228,19 @@ export class ApiKeyModule implements ApiKeyApi, ApiKeyProjectsDoorApi, ApiKeyOrg
       }),
       tokens: ApiKeyTokenService.create(pepper, previousPepper),
     });
-    const runKeys = RunKeyMintService.create({
+    const sharedKeys = SharedKeyMintService.create({
       apiKeys: service,
+      keys: setup.repositories.apiKeys,
+    });
+    const runKeys = RunKeyMintService.create({
+      sharedKeys,
       authz: authorization,
       held: setup.repositories.runKeys,
+    });
+    const heldKeys = HeldKeyMintService.create({
+      sharedKeys,
+      keys: setup.repositories.apiKeys,
+      held: setup.repositories.heldKeys,
     });
     const sandboxKeys = AgentSandboxKeyService.create({
       apiKeys: service,
@@ -276,6 +288,7 @@ export class ApiKeyModule implements ApiKeyApi, ApiKeyProjectsDoorApi, ApiKeyOrg
       braidSignatures,
       authorization,
       runKeys,
+      heldKeys,
       sandboxKeys,
       docsSessionKeys,
       ingestionKeys,
@@ -290,6 +303,7 @@ export class ApiKeyModule implements ApiKeyApi, ApiKeyProjectsDoorApi, ApiKeyOrg
     braidSignatures: BraidSignatureVerificationService;
     authorization: AuthzApi;
     runKeys: RunKeyMintService;
+    heldKeys: HeldKeyMintService;
     sandboxKeys: AgentSandboxKeyService;
     docsSessionKeys: DocsSessionKeyService;
     ingestionKeys: IngestionKeyMintService;
@@ -301,6 +315,7 @@ export class ApiKeyModule implements ApiKeyApi, ApiKeyProjectsDoorApi, ApiKeyOrg
     this.#braidSignatures = deps.braidSignatures;
     this.#authorization = deps.authorization;
     this.#runKeys = deps.runKeys;
+    this.#heldKeys = deps.heldKeys;
     this.#sandboxKeys = deps.sandboxKeys;
     this.#docsSessionKeys = deps.docsSessionKeys;
     this.#ingestionKeys = deps.ingestionKeys;
@@ -313,6 +328,7 @@ export class ApiKeyModule implements ApiKeyApi, ApiKeyProjectsDoorApi, ApiKeyOrg
   readonly #braidSignatures: BraidSignatureVerificationService;
   readonly #authorization: AuthzApi;
   readonly #runKeys: RunKeyMintService;
+  readonly #heldKeys: HeldKeyMintService;
   readonly #sandboxKeys: AgentSandboxKeyService;
   readonly #docsSessionKeys: DocsSessionKeyService;
   readonly #ingestionKeys: IngestionKeyMintService;
@@ -326,6 +342,14 @@ export class ApiKeyModule implements ApiKeyApi, ApiKeyProjectsDoorApi, ApiKeyOrg
    */
   async create(input: CreateApiKeyInput): Promise<{ token: string; apiKey: ApiKey }> {
     return this.#service.create(input);
+  }
+  async createHeld(
+    input: CreateHeldApiKeyInput,
+  ): Promise<{ token: string; apiKeyId: string; created: boolean }> {
+    return this.#heldKeys.createHeld(input);
+  }
+  async releaseHeld(input: { organizationId: string; holdKey: string }): Promise<void> {
+    return this.#heldKeys.release(input);
   }
   async update(input: UpdateApiKeyInput): Promise<ApiKey> {
     return this.#service.update(input);

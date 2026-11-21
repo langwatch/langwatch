@@ -4,7 +4,7 @@ import { type Instant, nowInstant } from "@langwatch/time";
 
 const logger = createLogger("langwatch:authz:revocation");
 
-export type AuthzRevocationReason = "revocation" | "offboard";
+export type AuthzRevocationReason = "revocation" | "offboard" | "api_key_role_deletion";
 
 /** Writes that bypassed the group queue, labelled by cause; the name is an external interface. */
 export const authzDirectProjectionWriteTotal = counter({
@@ -17,6 +17,13 @@ export type AuthzRevocationMark = {
   grantIds: string[];
   revokedAt: Instant;
   revokedReason: string | null;
+};
+
+/** An API key's own role marked deleted ahead of its fold, at its delete fact's instant. */
+export type AuthzRoleDeletionMark = {
+  organizationId: string;
+  roleId: string;
+  deletedAt: Instant;
 };
 
 /**
@@ -48,5 +55,23 @@ export abstract class AuthzRevocationRepository {
     await this.markRevoked({ organizationId, grantIds, revokedAt, revokedReason });
   }
 
+  /**
+   * An API key's own role (kind `system_api_key`) deleted ahead of its fold, with the fold's own
+   * guards: a define's hold then never confirms on a role about to go. Other roles are untouched.
+   */
+  async enforceApiKeyRoleDeletion(mark: AuthzRoleDeletionMark): Promise<void> {
+    if ((await this.markRoleDeleted(mark)) === 0) return;
+
+    const reason: AuthzRevocationReason = "api_key_role_deletion";
+    authzDirectProjectionWriteTotal.inc({ reason });
+    logger.info(
+      { organizationId: mark.organizationId, reason, roleId: mark.roleId },
+      "authz read model written directly, bypassing the queue",
+    );
+  }
+
   protected abstract markRevoked(mark: AuthzRevocationMark): Promise<void>;
+
+  /** Marks the role when it is an API key's own; answers how many rows it marked. */
+  protected abstract markRoleDeleted(mark: AuthzRoleDeletionMark): Promise<number>;
 }

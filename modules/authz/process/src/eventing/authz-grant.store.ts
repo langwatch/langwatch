@@ -944,6 +944,8 @@ export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
     permissions,
     kind,
     actor,
+    commandId: callerCommandId,
+    occurredAtMs: callerOccurredAtMs,
     requireProjection = true,
   }: {
     organizationId: string;
@@ -953,6 +955,10 @@ export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
     permissions: string[];
     kind: "custom" | "system_api_key";
     actor: LedgerActor;
+    /** The caller's stable id for this definition, same contract as `attachBindings`. */
+    commandId?: string;
+    /** The business time the caller's fact carries, the same on each of its retries. */
+    occurredAtMs?: number;
     /**
      * Whether an unlanded projection is an error, same contract as
      * {@link EventingAuthzLedgerAdapter.attachBindings}: turned on before
@@ -965,7 +971,8 @@ export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
     if (kind === "custom") {
       await this.refuseAddedPlatformPermissions({ organizationId, roleId, permissions });
     }
-    const occurredAtMs = this.now();
+    // A caller's fixed time keeps a late retry of its fact older than any later define.
+    const occurredAtMs = callerOccurredAtMs ?? this.now();
     const role: DefineRoleCommandData["role"] = {
       roleId,
       name,
@@ -979,7 +986,8 @@ export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
     ).commands.defineRole.send({
       tenantId: organizationId,
       organizationId,
-      commandId: this.options.newCommandId?.() ?? newCommandId(),
+      // A caller's own id makes its retry the same fact; without one, every define is a new one.
+      commandId: callerCommandId ?? this.options.newCommandId?.() ?? newCommandId(),
       role,
       actor,
     });
@@ -1032,6 +1040,7 @@ export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
     awaitProjection?: boolean;
   }): Promise<void> {
     refusePlatformTenant(organizationId);
+    const occurredAtMs = this.now();
     await (
       await this.commands()
     ).commands.deleteRole.send({
@@ -1040,7 +1049,14 @@ export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
       commandId: this.options.newCommandId?.() ?? newCommandId(),
       roleId,
       actor,
-      occurredAtMs: this.now(),
+      occurredAtMs,
+    });
+    // An API key's own role is marked now, as a grant revoke is, so its delete is never in
+    // flight unseen; any other role's delete is left to the fold.
+    await this.options.revocation.enforceApiKeyRoleDeletion({
+      organizationId,
+      roleId,
+      deletedAt: Temporal.Instant.fromEpochMilliseconds(occurredAtMs),
     });
     if (awaitProjection) {
       await this.awaitProjection({
