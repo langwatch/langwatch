@@ -8,6 +8,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, it } from "node:test";
 
+import { blockUnder } from "./guard-path-filters.ts";
 import { jobBlocks } from "./guard-pull-request-target.ts";
 
 const workflows = join(import.meta.dirname, "..", "workflows");
@@ -44,13 +45,10 @@ const requested = (text: string): Map<string, keyof typeof LEVEL> => {
       `a \`permissions:\` key is not followed by a map: ${line}`,
     );
     // Comments may sit at any indent, so only a line with content ends the map.
-    const map: string[] = [];
-    for (const next of lines.slice(index + 1)) {
+    const map = blockUnder(lines, index, key[1].length).filter((next) => {
       const trimmed = next.trim();
-      if (trimmed === "" || trimmed.startsWith("#")) continue;
-      if (next.length - next.trimStart().length <= key[1].length) break;
-      map.push(next);
-    }
+      return trimmed !== "" && !trimmed.startsWith("#");
+    });
     const entries = map.flatMap((entry) => {
       const match = /^\s+([a-z-]+): (none|read|write)$/.exec(entry);
       return match ? [match] : [];
