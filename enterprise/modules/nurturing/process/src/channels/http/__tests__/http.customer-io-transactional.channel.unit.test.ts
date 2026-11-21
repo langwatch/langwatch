@@ -1,8 +1,22 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /** Spec: modules/notification/specs/customer-io-transactional.feature */
+import { createHash } from "node:crypto";
+
 import type { TransactionalEmail } from "@langwatch/enterprise-nurturing-contract";
+import type * as TestHarness from "@langwatch/test-harness";
 import { Liquid } from "liquidjs";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+const captured = vi.hoisted(() => ({
+  lines: [] as { level: number; msg?: string; [field: string]: unknown }[],
+}));
+
+vi.mock("@langwatch/observability", async (importOriginal) => {
+  const harness = await vi.importActual<typeof TestHarness>("@langwatch/test-harness");
+  const { logger, lines } = harness.createTestLogger();
+  captured.lines = lines;
+  return { ...(await importOriginal<object>()), createLogger: () => logger };
+});
 
 import {
   CUSTOMER_IO_TRANSACTIONAL_TIMEOUT_MS,
@@ -45,6 +59,10 @@ function stringBody(body: RequestInit["body"]): string {
 
 const accepted = () =>
   Promise.resolve(new Response(JSON.stringify({ delivery_id: "dlv_1", queued_at: 1 })));
+
+beforeEach(() => {
+  captured.lines.length = 0;
+});
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -112,6 +130,7 @@ describe("given the client on the US region", () => {
 
 describe("given a subject and body holding user text that reads as Liquid", () => {
   describe("when it is sent", () => {
+    /** @scenario "Liquid openers in the subject and body are printed literally" */
     it("prints every Liquid opener as a string literal, so Customer.io evaluates none of it", async () => {
       const { posted, fetchFn } = network(accepted);
       const channel = HttpCustomerIoTransactionalChannel.create({
@@ -140,6 +159,7 @@ describe("given user text that is, or only looks like, Liquid", () => {
   describe("when it is sent and Customer.io renders the posted subject and body", () => {
     // Rendering with real Liquid proves the escaping is lossless, which the
     // exact-string test above cannot: it only pins one encoding.
+    /** @scenario "Liquid openers in the subject and body are printed literally" */
     it.each([
       "Hello {{ x }} there",
       "{% if a %}b{% endif %}",
@@ -206,11 +226,32 @@ describe("given Customer.io does not accept a send", () => {
 
     await expect(send(failed)).rejects.toMatchObject({ reason: "network" });
   });
+});
 
-  /** @scenario "A failed usage-limit send still reaches the person" */
-  it("names an unreadable reply when an accepted send returns no delivery id", async () => {
-    const empty = () => Promise.resolve(new Response("{}"));
+describe("given Customer.io accepts a send with a reply that holds no delivery id", () => {
+  describe.each([
+    ["an empty object", () => new Response("{}", { status: 202 })],
+    ["a body that is not JSON", () => new Response("queued", { status: 202 })],
+  ])("when the reply is %s", (_name, reply) => {
+    /** @scenario "An accepted send with no readable delivery id still counts as taken" */
+    it("reports it taken and logs the template, a recipient hash and the status, never the address or key", async () => {
+      const channel = HttpCustomerIoTransactionalChannel.create({
+        apiKey: API_KEY,
+        region: undefined,
+        fetchFn: network(() => Promise.resolve(reply())).fetchFn,
+      });
 
-    await expect(send(empty)).rejects.toMatchObject({ reason: "unreadable-reply" });
+      await expect(channel.send(email)).resolves.toEqual({});
+
+      expect(captured.lines).toHaveLength(1);
+      expect(captured.lines[0]).toMatchObject({
+        template: "usage-limit",
+        recipientHash: createHash("sha256").update("ada@acme.test").digest("hex").slice(0, 16),
+        status: 202,
+      });
+      const logged = JSON.stringify(captured.lines);
+      expect(logged).not.toContain("ada@acme.test");
+      expect(logged).not.toContain(API_KEY);
+    });
   });
 });

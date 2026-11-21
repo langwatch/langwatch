@@ -30,7 +30,10 @@ export type CustomerIoTransactionalRequest = Omit<TransactionalEmail, "identifie
   identifiers: { id: string } | { email: string };
 };
 
-/** Customer.io's transactional email API: hands one rendered message over, or throws. */
+/**
+ * Customer.io's transactional email API: hands one rendered message over, or throws. A taken
+ * message carries Customer.io's delivery id when its reply held one.
+ */
 export abstract class CustomerIoTransactionalChannel {
-  abstract send(email: CustomerIoTransactionalRequest): Promise<{ deliveryId: string }>;
+  abstract send(email: CustomerIoTransactionalRequest): Promise<{ deliveryId?: string }>;
 }

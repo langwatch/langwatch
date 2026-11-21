@@ -1,4 +1,7 @@
-import type { TransactionalEmailOutcome } from "@langwatch/enterprise-nurturing-contract";
+import type {
+  TransactionalEmail,
+  TransactionalEmailOutcome,
+} from "@langwatch/enterprise-nurturing-contract";
 import type { MailDeliveryView, SendEmailCommand } from "@langwatch/notification-contract";
 import { createLogger } from "@langwatch/observability";
 
@@ -51,34 +54,42 @@ export class MailDeliveryService {
     const { replyless } = command;
     const replyTo = replyless && noReplyAddress({ tag: replyless.tag, defaultFrom });
     const customerIo = this.customerIo;
-    const requests = customerIo ? findCustomerIoRequests({ command, defaultFrom, replyTo }) : [];
-    if (!customerIo || requests.length === 0) {
+    const [first, ...rest] = customerIo
+      ? findCustomerIoRequests({ command, defaultFrom, replyTo })
+      : [];
+    if (!customerIo || first === undefined) {
+      await this.delivery.send(envelopeOf({ command, defaultFrom }));
+      return;
+    }
+
+    // `off` is nurturing without the App API key, fixed at boot, so the first answer decides for
+    // every recipient. Nothing went out yet: the message leaves as it would with no Customer.io,
+    // one envelope under the caller's own key.
+    const firstAnswer = await outcomeOf(() => customerIo.send(first));
+    if (firstAnswer.outcome === "off") {
       await this.delivery.send(envelopeOf({ command, defaultFrom }));
       return;
     }
 
     // Every recipient gets its attempt before a failure is raised, so one bad fallback does not
     // cost the others their message.
+    const recipientCount = rest.length + 1;
     const failures: unknown[] = [];
-    for (const [index, request] of requests.entries()) {
-      const answer = await outcomeOf(() => customerIo.send(request));
-      // `off` is nurturing without the App API key, which holds for every recipient alike. Asked
-      // first, it means nothing went out yet: the message leaves as it would with no Customer.io,
-      // one envelope under the caller's own key.
-      if (answer.outcome === "off" && index === 0) {
-        await this.delivery.send(envelopeOf({ command, defaultFrom }));
-        return;
-      }
+    const settleOne = async (request: TransactionalEmail, answer: CustomerIoAnswer) => {
       try {
         await this.settle({
           answer,
           template: request.transactionalMessageId,
-          command: commandForOne({ command, recipient: request.to, of: requests.length }),
+          command: commandForOne({ command, recipient: request.to, of: recipientCount }),
           defaultFrom,
         });
       } catch (error) {
         failures.push(error);
       }
+    };
+    await settleOne(first, firstAnswer);
+    for (const request of rest) {
+      await settleOne(request, await outcomeOf(() => customerIo.send(request)));
     }
     if (failures.length > 0) throw failures[0];
   }
@@ -99,16 +110,17 @@ export class MailDeliveryService {
       logger.info({ template, deliveryId: answer.deliveryId }, "Email handed to Customer.io");
       return;
     }
-    if (answer.outcome === "refused") {
-      logger.warn(
-        { template, reason: answer.reason, status: answer.status },
-        "Customer.io did not take an email, so the own mailer sends it",
-      );
-    }
+    // A later `off` breaks nurturing's boot-fixed answer; it is warned of like any refusal, never
+    // sent through the own mailer unseen.
+    const { outcome, ...refusal } = answer;
+    logger.warn(
+      { template, outcome, ...refusal },
+      "Customer.io did not take an email, so the own mailer sends it",
+    );
     // Customer.io's send API takes no idempotency key, so the caller's never reaches it: a timeout
-    // or an unreadable reply on a send Customer.io did in fact queue makes this a second copy, as
-    // does a caller's retry of a send it queued. We prefer a duplicate to a lost email: these are
-    // messages a person acts on (a request waiting on them, a limit reached).
+    // on a send Customer.io did in fact queue makes this a second copy, as does a caller's retry
+    // of a send it queued. We prefer a duplicate to a lost email: these are messages a person
+    // acts on (a request waiting on them, a limit reached).
     await this.delivery.send(envelopeOf({ command, defaultFrom }));
   }
 

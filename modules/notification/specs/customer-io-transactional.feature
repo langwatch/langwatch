@@ -123,7 +123,37 @@ Feature: The app's product mail goes through Customer.io on LangWatch Cloud
   Scenario: Nurturing answers whether Customer.io took the message
     Given nurturing with, or without, CUSTOMER_IO_APP_API_KEY
     When it is handed a message
-    Then it answers "queued" with the delivery id, "refused" with the reason and status, or "off"
+    Then it answers "queued" with the delivery id when Customer.io gave one, "refused" with the reason and status, or "off"
+
+  @unit
+  Scenario: A user's address is filed under their user id
+    Given nurturing holds CUSTOMER_IO_APP_API_KEY
+    And the recipient's address belongs to a LangWatch user
+    When nurturing is handed a message to that address
+    Then Customer.io is handed the user id as the only identifier, and no address identifier
+
+  @unit
+  Scenario: An address with no user is filed under the address
+    Given nurturing holds CUSTOMER_IO_APP_API_KEY
+    And the recipient's address belongs to no LangWatch user
+    When nurturing is handed a message to that address
+    Then Customer.io is handed the address as the identifier
+
+  @unit
+  Scenario: A failed user lookup still sends by address
+    Given nurturing holds CUSTOMER_IO_APP_API_KEY
+    And the user lookup throws
+    When nurturing is handed a message
+    Then it answers "queued"
+    And Customer.io is handed the address as the identifier
+
+  @unit
+  Scenario: A stalled user lookup sends by address once the lookup deadline passes
+    Given nurturing holds CUSTOMER_IO_APP_API_KEY
+    And the user lookup never answers
+    When nurturing is handed a message and the lookup deadline passes
+    Then it answers "queued"
+    And Customer.io is handed the address as the identifier
 
   @unit
   Scenario: The HTTP client sends the documented request
@@ -131,3 +161,18 @@ Feature: The app's product mail goes through Customer.io on LangWatch Cloud
     Then it posts JSON to the EU /v1/send/email (US when CUSTOMER_IO_REGION is "us") with the key as bearer
     And link tracking is off and unsubscribed people still get it
     And it gives up after ten seconds
+
+  @unit
+  Scenario: Liquid openers in the subject and body are printed literally
+    Given a message whose subject and body hold "{{" and "{%"
+    When the client sends it
+    Then every Liquid opener is posted as a Liquid string literal
+    And Liquid renders the posted subject and body back to the text as written
+
+  @unit
+  Scenario: An accepted send with no readable delivery id still counts as taken
+    Given Customer.io answers a "usage-limit" send with a 2xx whose reply holds no delivery id
+    When the client sends it
+    Then it reports the send taken, with no delivery id, rather than refused
+    And one log line names the template, a hash of the recipient and the status
+    And that line carries neither the recipient address nor the key

@@ -32,13 +32,14 @@ export const transactionalEmailSchema: TransactionalEmailSchema =
 export type TransactionalEmail = z.infer<typeof transactionalEmailSchema>;
 
 /** Why Customer.io did not take a send: a class only, never the request or the reply body. */
-export type TransactionalEmailRefusal = "status" | "timeout" | "network" | "unreadable-reply";
+export type TransactionalEmailRefusal = "status" | "timeout" | "network";
 
 /**
- * `queued`: Customer.io took it. `refused`: it did not, and the caller sends it another way.
- * `off`: this deployment has no Customer.io App API key, so nothing was attempted.
+ * `queued`: Customer.io took it, with its delivery id when the reply held one. `refused`: it did
+ * not, and the caller sends it another way. `off`: this deployment has no Customer.io App API
+ * key, so nothing was attempted.
  */
 export type TransactionalEmailOutcome =
-  | Readonly<{ outcome: "queued"; deliveryId: string }>
+  | Readonly<{ outcome: "queued"; deliveryId?: string }>
   | Readonly<{ outcome: "refused"; reason: TransactionalEmailRefusal; status?: number }>
   | Readonly<{ outcome: "off" }>;

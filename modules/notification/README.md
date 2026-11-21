@@ -59,9 +59,10 @@ fallback. Nurturing holds `CUSTOMER_IO_APP_API_KEY` and posts to `/v1/send/email
   looks it up). A replyless send keeps the real recipient and answers to the no-reply
   address. Nurturing prints any Liquid opener in the subject and HTML literally, so user text
   is never evaluated by Customer.io.
-- **Any refusal falls back.** A non-2xx reply, a timeout (10 s), a network error or an unreadable
-  reply sends that recipient through the install's own mailer, once, with a warning naming the
-  template. Both failing raises the own mailer's error.
+- **Any refusal falls back.** A non-2xx reply, a timeout (10 s) or a network error sends that
+  recipient through the install's own mailer, once, with a warning naming the template. Both
+  failing raises the own mailer's error. A 2xx counts as taken even when its reply holds no
+  delivery id (logged with the template, a recipient hash and the status), so it is not sent twice.
 - **Self-hosted never sees it.** Without `IS_SAAS` notification never asks; without the key
   nurturing answers `off` and the own mailer sends the message as before, one envelope under the
   caller's key, with no warning. The key is not in the Helm

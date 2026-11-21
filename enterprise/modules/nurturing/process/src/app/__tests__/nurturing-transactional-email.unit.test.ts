@@ -98,6 +98,7 @@ describe("given nurturing holding the Customer.io App API key", () => {
 });
 
 describe("given the address belongs to a LangWatch user", () => {
+  /** @scenario "A user's address is filed under their user id" */
   it("files the send under the user id and sends no address identifier", async () => {
     const channel = MemoryCustomerIoTransactionalChannel.create();
     const app = await moduleWith(channel, {
@@ -111,6 +112,7 @@ describe("given the address belongs to a LangWatch user", () => {
 });
 
 describe("given the address belongs to no user", () => {
+  /** @scenario "An address with no user is filed under the address" */
   it("files the send under the address", async () => {
     const channel = MemoryCustomerIoTransactionalChannel.create();
     const app = await moduleWith(channel);
@@ -122,6 +124,7 @@ describe("given the address belongs to no user", () => {
 });
 
 describe("given the user lookup throws", () => {
+  /** @scenario "A failed user lookup still sends by address" */
   it("still sends, by address", async () => {
     const channel = MemoryCustomerIoTransactionalChannel.create();
     const app = await moduleWith(channel, {
@@ -140,6 +143,7 @@ describe("given the user lookup never answers", () => {
     vi.useRealTimers();
   });
 
+  /** @scenario "A stalled user lookup sends by address once the lookup deadline passes" */
   it("sends by address once the lookup deadline passes", async () => {
     const channel = MemoryCustomerIoTransactionalChannel.create();
     const app = await moduleWith(channel, { findByEmail: () => new Promise<null>(() => void 0) });

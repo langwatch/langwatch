@@ -1,4 +1,8 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+import { createHash } from "node:crypto";
+
+import { createLogger } from "@langwatch/observability";
+
 import {
   CustomerIoTransactionalChannel,
   CustomerIoTransactionalError,
@@ -7,13 +11,15 @@ import {
 
 const API_HOSTS = { eu: "api-eu.customer.io", us: "api.customer.io" } as const;
 
+const logger = createLogger("langwatch:nurturing:customer-io-transactional");
+
 /**
  * As the CDP channel's: a send that has not answered in 10 s is given up, so the caller's own
  * mailer still delivers it while the queue is not held up.
  */
 export const CUSTOMER_IO_TRANSACTIONAL_TIMEOUT_MS = 10_000;
 
-/** Customer.io's accepted reply, read loosely: anything without a delivery id is unreadable. */
+/** Customer.io's accepted reply, read loosely: a 2xx counts as queued whatever its body says. */
 type SendReply = { delivery_id?: unknown } | null | undefined;
 
 /**
@@ -41,7 +47,7 @@ export class HttpCustomerIoTransactionalChannel extends CustomerIoTransactionalC
     super();
   }
 
-  async send(email: CustomerIoTransactionalRequest): Promise<{ deliveryId: string }> {
+  async send(email: CustomerIoTransactionalRequest): Promise<{ deliveryId?: string }> {
     let response: Response;
     try {
       response = await this.fetchFn(this.url, {
@@ -66,10 +72,18 @@ export class HttpCustomerIoTransactionalChannel extends CustomerIoTransactionalC
 
     const reply = (await response.json().catch(() => undefined)) as SendReply;
     const deliveryId = reply?.delivery_id;
-    if (typeof deliveryId !== "string" || deliveryId === "") {
-      throw new CustomerIoTransactionalError("unreadable-reply", response.status);
-    }
-    return { deliveryId };
+    if (typeof deliveryId === "string" && deliveryId !== "") return { deliveryId };
+    // A 2xx means Customer.io queued it; refusing here would make the caller's own mailer send a
+    // second copy. The line carries enough to find the mail later, never the address or the key.
+    logger.warn(
+      {
+        template: email.transactionalMessageId,
+        recipientHash: recipientHashOf(email.to),
+        status: response.status,
+      },
+      "Customer.io queued a transactional email but its reply held no delivery id",
+    );
+    return {};
   }
 }
 
@@ -102,6 +116,14 @@ function payloadOf(email: CustomerIoTransactionalRequest) {
  */
 function literalUnderLiquid(text: string): string {
   return text.replace(/\{[{%]/g, (opener) => `{{ "${opener}" }}`);
+}
+
+/**
+ * A short sha256 of the recipient as handed over, as automation hashes its recipients: it
+ * matches a known address to a log line without the line holding the address.
+ */
+function recipientHashOf(recipient: string): string {
+  return createHash("sha256").update(recipient).digest("hex").slice(0, 16);
 }
 
 /** `AbortSignal.timeout` rejects with a `TimeoutError`. */
