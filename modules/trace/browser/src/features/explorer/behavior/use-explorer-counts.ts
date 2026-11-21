@@ -67,9 +67,13 @@ export function useExplorerCounts(): ExplorerCounts {
   const stoppedByUser = useInstantEvalRunStore((s) => s.stoppedByUser);
   const settled = useInstantEvalRunStore((s) => s.settled);
   // Another chip's run still judging counts nothing either: no row of this result was judged.
-  const instantEval = hasPendingNegatedEval
-    ? null
-    : firstUnsettledInstantEval({ chips, state: { runs, stoppedByUser, settled } });
+  const instantEval = useMemo(
+    () =>
+      hasPendingNegatedEval
+        ? null
+        : firstUnsettledInstantEval({ chips, state: { runs, stoppedByUser, settled } }),
+    [hasPendingNegatedEval, chips, runs, stoppedByUser, settled],
+  );
 
   const read = byConversation
     ? {
