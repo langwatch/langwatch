@@ -857,11 +857,13 @@ Feature: Authorization grants
 
   @unit
   Scenario: A role definition appended twice under one idempotency key writes one audit row
-    Given one role definition appended twice, each append with its own event id and the same idempotency key
+    Given an API key's own role definition appended twice under its create's command id
+    And each append has its own event id
     When both are handled
     Then exactly one audit row exists
     And a role definition on another role that shares the key still gets its own row
     And a custom role's definition, and any other event, is still keyed on its event id
+    And an edit of the key's role, under a minted key, keeps its event id and business time
 
   @unit
   Scenario: An API key's own-role grant attached twice under one key writes one audit row

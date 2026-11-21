@@ -33,7 +33,7 @@ const roleDefined: RoleDefinedEvent = {
   ...roleDeleted,
   id: "evt_role_defined",
   type: ROLE_DEFINED_EVENT_TYPE,
-  idempotencyKey: "cmd_1:0",
+  idempotencyKey: `${API_KEY_OWN_GRANT_COMMAND_PREFIX}key_1:content:0`,
   data: {
     roleId: "role_1",
     name: "apikey:key_1",
@@ -80,7 +80,21 @@ describe("EventingAuthzAuditAdapter redelivery", () => {
     await adapter.handler({ ...roleDefined, id: "evt_first_append" });
     await adapter.handler({ ...roleDefined, id: "evt_second_append" });
 
-    expect([...store.rows.keys()]).toEqual(["authz-evt-org_acme:role_1:cmd_1:0"]);
+    expect([...store.rows.keys()]).toEqual([
+      "authz-evt-org_acme:role_1:apikeygrant:key_1:content:0",
+    ]);
+  });
+
+  /** @scenario "A role definition appended twice under one idempotency key writes one audit row" */
+  it("keys and dates an edit of the key's role by its event, not its minted key", async () => {
+    const store = new KeyedAuditTrailStore();
+    const adapter = EventingAuthzAuditAdapter.create({ store });
+
+    await adapter.handler({ ...roleDefined, idempotencyKey: "authzcmd_edit:0" });
+
+    const [row] = [...store.rows.values()];
+    expect(row?.id).toBe("authz-evt-evt_role_defined");
+    expect(row?.createdAt.epochMilliseconds).toBe(roleDefined.occurredAt);
   });
 
   /** @scenario "A role definition appended twice under one idempotency key writes one audit row" */

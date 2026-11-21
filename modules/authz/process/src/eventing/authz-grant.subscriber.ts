@@ -99,9 +99,9 @@ function isAuditable(event: AuthzGrantsEvent): boolean {
 }
 
 /**
- * An API key's own role definition, and any grant of an API key sent under its create's stable
- * id, is audited on its fact (the caller's idempotency key), as the event log keeps one: a retry
- * appends again under that key but a new event id, and writes no second row. Others keep theirs.
+ * An API key's own role definition and its grants, sent under its create's stable id, are audited
+ * on their fact (the caller's idempotency key), as the event log keeps one: a retry appends again
+ * under that key but a new event id, and writes no second row. An edit and others keep theirs.
  */
 function rowId(event: AuthzGrantsEvent): string {
   if (!event.idempotencyKey || !isKeyedOnFact(event)) return `authz-evt-${event.id}`;
@@ -109,12 +109,9 @@ function rowId(event: AuthzGrantsEvent): string {
 }
 
 function isKeyedOnFact(event: AuthzGrantsEvent): boolean {
+  if (!event.idempotencyKey?.startsWith(API_KEY_OWN_GRANT_COMMAND_PREFIX)) return false;
   if (event.type === ROLE_DEFINED_EVENT_TYPE) return event.data.kind === SYSTEM_API_KEY_ROLE_KIND;
-  return (
-    event.type === GRANT_ATTACHED_EVENT_TYPE &&
-    event.data.principal.type === "apiKey" &&
-    (event.idempotencyKey?.startsWith(API_KEY_OWN_GRANT_COMMAND_PREFIX) ?? false)
-  );
+  return event.type === GRANT_ATTACHED_EVENT_TYPE && event.data.principal.type === "apiKey";
 }
 
 /**
