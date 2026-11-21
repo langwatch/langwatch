@@ -983,6 +983,32 @@ describe("given several conversations written in the same instant", () => {
 });
 
 describe("given the pull goes wrong", () => {
+  it.each([429, 500, 503])(
+    "keeps token HTTP %s failures on the existing retry path",
+    async (status) => {
+      const adapter = await newAdapter();
+      responseQueue.push({ status, body: { error: "temporarily_unavailable" } });
+      const result = await adapter.runOnce(
+        { cursor: null, credentials: CREDENTIALS },
+        adapter.validateConfig(CONFIG),
+      );
+      expect(result.errorCount).toBe(1);
+      expect(result.cursor).toBeNull();
+      expect(result.failure).toBeUndefined();
+    },
+  );
+
+  it("does not turn a malformed token reply into a permanent credential refusal", async () => {
+    const adapter = await newAdapter();
+    responseQueue.push({ status: 200, body: { unexpected: "reply" } });
+    const result = await adapter.runOnce(
+      { cursor: null, credentials: CREDENTIALS },
+      adapter.validateConfig(CONFIG),
+    );
+    expect(result.errorCount).toBe(1);
+    expect(result.failure).toBeUndefined();
+  });
+
   it("reports missing credentials rather than calling anything", async () => {
     const adapter = await newAdapter();
     const result = await adapter.runOnce(
@@ -1029,11 +1055,8 @@ describe("given the pull goes wrong", () => {
     );
 
     expect(result.errorCount).toBe(1);
-    // Asserted on what the logger was handed, not on the result: `PullResult`
-    // carries events, a cursor and a count and has never had anywhere to put a
-    // message, so `JSON.stringify(result)` could not have contained the secret
-    // however badly the failure path leaked it. The log line is where the
-    // reason actually travels, and the source page shows it.
+    expect(result.failure).toMatchObject({ errorCode: "pull_refused" });
+    expect(result.failure?.error).toContain("HTTP 401");
     expect(errors.join("\n")).toContain("copilot studio dataverse pull failed");
     expect(errors.join("\n")).not.toContain(CREDENTIALS.clientSecret);
     expect(JSON.stringify(result)).not.toContain(CREDENTIALS.clientSecret);
@@ -1528,5 +1551,63 @@ describe("given a subscription billing both AI services and unrelated infrastruc
       // category outside the list, and it becomes no recorded cost at all.
       expect(read.events.map((event) => event.target)).toEqual(["Foundry Models"]);
     });
+  });
+});
+
+describe("when the transcript sign-in is refused after a side read advanced", () => {
+  function subscribedSkusReply() {
+    return {
+      value: [
+        {
+          skuId: "aaaaaaaa-0000-4000-8000-000000000010",
+          skuPartNumber: "POWER_VIRTUAL_AGENTS_VIRAL",
+          appliesTo: "User",
+          capabilityStatus: "Enabled",
+          consumedUnits: 8,
+          prepaidUnits: { enabled: 10, suspended: 0, warning: 0 },
+        },
+      ],
+    };
+  }
+
+  /** @scenario "A refused transcript sign-in keeps side reads but records a failed run" */
+  it.each([
+    null,
+    JSON.stringify({
+      createdon: "2026-08-25T19:44:43Z",
+      conversationtranscriptid: "11111111-1111-4111-8111-111111111111",
+    }),
+  ])("marks the run as having an unread page", async (cursor) => {
+    const adapter = await newAdapter();
+    // The seat read uses the Graph audience and succeeds, advancing the seat
+    // half of the cursor. The transcript sign-in for the Dataverse audience is
+    // then refused, so no transcript row was read at all.
+    responseQueue.push({ status: 200, body: { access_token: "graph-token" } });
+    responseQueue.push({ status: 200, body: subscribedSkusReply() });
+    responseQueue.push({ status: 400, body: { error: "invalid_client" } });
+
+    const result = await adapter.runOnce(
+      { cursor, credentials: CREDENTIALS },
+      adapter.validateConfig({ ...CONFIG, readSeats: true }),
+    );
+
+    expect(result.errorCount).toBe(1);
+    // The seat read advanced the cursor, but the transcript read produced no
+    // row at all. unreadPage makes the run status count the failure instead of
+    // treating the side-read advance as a clean completion.
+    expect(result.unreadPage).toBe(true);
+    expect(result.failure).toEqual({
+      error:
+        "copilot studio dataverse puller could not sign in: Microsoft refused the application's credentials (HTTP 400)",
+      errorCode: "pull_refused",
+    });
+    expect(result.events).not.toHaveLength(0);
+    expect(result.cursor).not.toBeNull();
+    expect(transcriptPositionOf(result.cursor)).toEqual(
+      transcriptPositionOf(cursor) ?? { createdon: void 0, conversationtranscriptid: void 0 },
+    );
+    expect(JSON.parse(result.cursor ?? "{}").seatsReportedThroughDay).toMatch(
+      /^\d{4}-\d{2}-\d{2}$/,
+    );
   });
 });
