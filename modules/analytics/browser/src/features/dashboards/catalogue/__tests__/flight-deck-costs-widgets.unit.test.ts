@@ -199,7 +199,8 @@ describe("given the Running costs widgets", () => {
 
   /** @scenario "AC215b Partial cost: some spans priced at zero" */
   it("keeps the dash on the evaluations row, whose unpriced count is a constant 0", () => {
-    // Evaluator runs join the evaluations source with 0 AS unpriced, so a null cost may be unpriced.
+    // Evaluator runs join the evaluations source with 0 AS unpriced,
+    // so a null cost may be unpriced.
     expect(sourceRowFigure()(null, 2, 0, false)).toBe("–");
   });
 
