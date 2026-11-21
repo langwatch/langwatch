@@ -648,8 +648,8 @@ catalogs:
       specifier: ^8.55.0
       version: 8.58.1
     undici:
-      specifier: ^8.10.2
-      version: 8.12.1
+      specifier: ^8.12.2
+      version: 8.13.1
     unified:
       specifier: ^11.0.5
       version: 11.0.5
@@ -1467,7 +1467,7 @@ importers:
         version: 10.3.1
       undici:
         specifier: 'catalog:'
-        version: 8.12.1
+        version: 8.13.1
       zod:
         specifier: 'catalog:'
         version: 4.6.7
@@ -3814,7 +3814,7 @@ importers:
         version: 11.18.0(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
       undici:
         specifier: 'catalog:'
-        version: 8.12.1
+        version: 8.13.1
       zod:
         specifier: 'catalog:'
         version: 4.6.7
@@ -10276,7 +10276,7 @@ importers:
         version: link:../../trace/contract
       undici:
         specifier: 'catalog:'
-        version: 8.12.1
+        version: 8.13.1
       zod:
         specifier: 'catalog:'
         version: 4.6.7
@@ -11978,7 +11978,7 @@ importers:
         version: 10.1.1
       undici:
         specifier: 'catalog:'
-        version: 8.12.1
+        version: 8.13.1
       web-push:
         specifier: 'catalog:'
         version: 3.6.7(supports-color@10.2.2)
@@ -16658,7 +16658,7 @@ importers:
         version: 7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2)
       undici:
         specifier: 'catalog:'
-        version: 8.12.1
+        version: 8.13.1
       vitest:
         specifier: 'catalog:'
         version: 5.0.1(patch_hash=6e76d3f23022ff8bd2641479eade71ef47ee1a716eecdfff4bc13c09e77c8d5a)(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/browser-playwright@5.0.1)(@vitest/coverage-v8@5.0.1)(@vitest/ui@5.0.1)(jsdom@30.0.1(@noble/hashes@2.2.0))(msw@2.15.0(@types/node@26.2.0)(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2)))(vite@8.3.4(@types/node@26.2.0)(esbuild@0.28.2)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
@@ -17741,7 +17741,7 @@ importers:
         version: link:../observability
       undici:
         specifier: 'catalog:'
-        version: 8.12.1
+        version: 8.13.1
     devDependencies:
       '@langwatch/vitest-config':
         specifier: workspace:*
@@ -29971,6 +29971,10 @@ packages:
 
   undici@8.12.1:
     resolution: {integrity: sha512-usz3OVQBeh1LxNn0DzU0voLXMgn5CU/WUdpBsY6Ti5afNao+vTkmn4H/NxoXolc10cOqe2+YIG0Hspq2rsl64w==}
+    engines: {node: '>=22.19.0'}
+
+  undici@8.13.1:
+    resolution: {integrity: sha512-Kt7EaPjh0s93lJH/PmW3d5rhkcpUa6fS3jqZ7+YGxNd9L7Xy/i827xe4C2uhhq+pJebM4tQOl5AgHmW11G5Skg==}
     engines: {node: '>=22.19.0'}
 
   unicode-canonical-property-names-ecmascript@2.0.1:
@@ -43181,6 +43185,8 @@ snapshots:
   undici@6.29.0: {}
 
   undici@8.12.1: {}
+
+  undici@8.13.1: {}
 
   unicode-canonical-property-names-ecmascript@2.0.1: {}
 
