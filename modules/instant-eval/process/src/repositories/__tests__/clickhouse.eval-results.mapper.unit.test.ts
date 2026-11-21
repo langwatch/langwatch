@@ -13,6 +13,7 @@ import {
   evalResultsTraceParameters,
   evalResultsWeekOf,
   evalTraceResultRowSchema,
+  recalledEvalResultRowSchema,
   toEvalResultValues,
   toEvalTraceResult,
   toRecalledEvalResult,
@@ -94,22 +95,22 @@ describe("toEvalResultValues", () => {
 });
 
 describe("toRecalledEvalResult", () => {
+  const row = {
+    TraceId: "trace-1",
+    SpanId: "",
+    QuestionHash: "question-hash",
+    InputHash: "input-hash",
+    LatestSourceId: "run-1",
+    Score: null,
+    Label: "",
+    Probability: null,
+    Probabilities: JSON.stringify({ refund: 0.7, billing: 0.3 }),
+    LatestJudgedAt: "1762000000000",
+    LatestUpdatedAt: 1762000000001,
+  };
+
   it("reads quoted epoch milliseconds, an empty label as none, and a distribution", () => {
-    expect(
-      toRecalledEvalResult({
-        TraceId: "trace-1",
-        SpanId: "",
-        QuestionHash: "question-hash",
-        InputHash: "input-hash",
-        LatestSourceId: "run-1",
-        Score: null,
-        Label: "",
-        Probability: null,
-        Probabilities: JSON.stringify({ refund: 0.7, billing: 0.3 }),
-        LatestJudgedAt: "1762000000000",
-        LatestUpdatedAt: 1762000000001,
-      }),
-    ).toEqual({
+    expect(toRecalledEvalResult(recalledEvalResultRowSchema.parse(row))).toEqual({
       traceId: "trace-1",
       spanId: "",
       questionHash: "question-hash",
@@ -122,6 +123,13 @@ describe("toRecalledEvalResult", () => {
       judgedAt: 1762000000000,
       updatedAt: 1762000000001,
     });
+  });
+
+  it("refuses a row with a missing column or an unreadable time", () => {
+    expect(() => recalledEvalResultRowSchema.parse({ ...row, Label: undefined })).toThrow(/Label/);
+    expect(() => recalledEvalResultRowSchema.parse({ ...row, LatestJudgedAt: undefined })).toThrow(
+      /LatestJudgedAt/,
+    );
   });
 });
 

@@ -4,7 +4,10 @@
  * @see modules/instant-eval/specs/instant-eval-results.feature
  */
 
-import type { InstantEvalTraceResultWire } from "@langwatch/instant-eval-contract";
+import {
+  INSTANT_EVAL_TRACE_RESULTS_MAX_WINDOW_MS,
+  type InstantEvalTraceResultWire,
+} from "@langwatch/instant-eval-contract";
 
 import type { EvalResultsRepository } from "../repositories/eval-results.repository.ts";
 import {
@@ -37,7 +40,8 @@ export class EvalResultsTraceService {
 
   /**
    * The trace's latest result per span, question and judged column, newest first. The window is
-   * padded as recall's is, so a row a span statement wrote at the span's time is still found.
+   * padded as recall's is, so a row a span statement wrote at the span's time is still found,
+   * and cut to {@link INSTANT_EVAL_TRACE_RESULTS_MAX_WINDOW_MS} from its start.
    */
   async findResultsByTrace(input: {
     projectId: string;
@@ -47,12 +51,14 @@ export class EvalResultsTraceService {
   }): Promise<InstantEvalTraceResultWire[]> {
     if (!(await this.peers.isReleased({ projectId: input.projectId }))) return [];
 
+    const widestUntil = input.occurredFrom + INSTANT_EVAL_TRACE_RESULTS_MAX_WINDOW_MS;
+    const occurredUntil = Math.min(input.occurredUntil, widestUntil);
     const results = await this.results.findLatestByTrace({
       tenantId: input.projectId,
       traceId: input.traceId,
       keyVersion: EVAL_RESULTS_KEY_VERSION,
       occurredFrom: input.occurredFrom - EVAL_RESULTS_RECALL_WINDOW_PADDING_MS,
-      occurredUntil: input.occurredUntil + EVAL_RESULTS_RECALL_WINDOW_PADDING_MS,
+      occurredUntil: occurredUntil + EVAL_RESULTS_RECALL_WINDOW_PADDING_MS,
     });
     return results.flatMap(toInstantEvalTraceResultWire);
   }

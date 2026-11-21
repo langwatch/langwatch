@@ -68,7 +68,7 @@ vi.mock("../../../../../../features/trace-drawer/behavior/use-trace-evaluations.
 vi.mock(
   "../../../../../../features/trace-drawer/behavior/use-trace-instant-eval-results.ts",
   () => ({
-    useTraceInstantEvalResults: () => ({ isShown: false, results: [], isLoading: false }),
+    useTraceInstantEvalResults: () => ({ isShown: false, results: [] }),
   }),
 );
 

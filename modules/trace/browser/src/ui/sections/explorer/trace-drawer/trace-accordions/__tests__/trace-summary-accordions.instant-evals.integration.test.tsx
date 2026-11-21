@@ -78,7 +78,6 @@ vi.mock(
     useTraceInstantEvalResults: () => ({
       isShown: true,
       results: instantEvals.results,
-      isLoading: false,
     }),
   }),
 );

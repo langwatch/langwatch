@@ -73,22 +73,24 @@ export function toEvalResultValues(record: EvalResultRecord): Record<string, unk
 }
 
 /**
- * A recalled row as the recall query answers it. The ordering columns carry a `Latest` prefix so
- * no alias shadows the column it is read from; times are epoch milliseconds, maybe quoted.
+ * A recalled row as the recall query answers it, checked at the boundary. The ordering columns
+ * carry a `Latest` prefix so no alias shadows the column it is read from; times may arrive quoted.
  */
-export interface RecalledEvalResultRow {
-  TraceId: string;
-  SpanId: string;
-  QuestionHash: string;
-  InputHash: string;
-  LatestSourceId: string;
-  Score: number | null;
-  Label: string;
-  Probability: number | null;
-  Probabilities: string;
-  LatestJudgedAt: number | string;
-  LatestUpdatedAt: number | string;
-}
+export const recalledEvalResultRowSchema = z.object({
+  TraceId: z.string(),
+  SpanId: z.string(),
+  QuestionHash: z.string(),
+  InputHash: z.string(),
+  LatestSourceId: z.string(),
+  Score: z.number().nullable(),
+  Label: z.string(),
+  Probability: z.number().nullable(),
+  Probabilities: z.string(),
+  LatestJudgedAt: z.coerce.number(),
+  LatestUpdatedAt: z.coerce.number(),
+});
+
+export type RecalledEvalResultRow = z.infer<typeof recalledEvalResultRowSchema>;
 
 export function toRecalledEvalResult(row: RecalledEvalResultRow): RecalledEvalResult {
   return {
@@ -101,8 +103,8 @@ export function toRecalledEvalResult(row: RecalledEvalResultRow): RecalledEvalRe
     label: row.Label === "" ? null : row.Label,
     probability: row.Probability,
     probabilities: parseProbabilities(row.Probabilities),
-    judgedAt: Number(row.LatestJudgedAt),
-    updatedAt: Number(row.LatestUpdatedAt),
+    judgedAt: row.LatestJudgedAt,
+    updatedAt: row.LatestUpdatedAt,
   };
 }
 

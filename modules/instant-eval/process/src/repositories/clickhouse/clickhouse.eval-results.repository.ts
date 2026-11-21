@@ -15,7 +15,7 @@ import {
   evalResultsRecallParameters,
   evalResultsTraceParameters,
   evalTraceResultRowSchema,
-  type RecalledEvalResultRow,
+  recalledEvalResultRowSchema,
   toEvalResultValues,
   toEvalTraceResult,
   toRecalledEvalResult,
@@ -26,6 +26,7 @@ const TABLE_NAME = "eval_results" as const;
 
 const totalRowsSchema = z.array(z.object({ Total: z.string() }));
 const traceRowsSchema = z.array(evalTraceResultRowSchema);
+const recalledRowsSchema = z.array(recalledEvalResultRowSchema);
 
 const logger = createLogger("langwatch:instant-evals:eval-results-repository");
 
@@ -156,13 +157,13 @@ export class ClickHouseEvalResultsRepository implements EvalResultsRepository {
   async findLatestJudged(query: EvalResultsRecallQuery): Promise<readonly RecalledEvalResult[]> {
     if (query.keys.length === 0) return [];
     const client = await this.resolveClient(query.tenantId);
-    const result = await client.query<RecalledEvalResultRow>({
+    const result = await client.query({
       query: RECALL_QUERY,
       query_params: evalResultsRecallParameters(query),
       format: "JSONEachRow",
     });
 
-    return (await result.json()).map(toRecalledEvalResult);
+    return recalledRowsSchema.parse(await result.json()).map(toRecalledEvalResult);
   }
 
   async findLatestByTrace(query: EvalResultsTraceQuery): Promise<readonly EvalTraceResult[]> {

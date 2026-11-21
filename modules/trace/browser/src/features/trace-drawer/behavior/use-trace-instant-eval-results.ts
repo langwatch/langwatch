@@ -14,7 +14,6 @@ interface TraceInstantEvalResults {
   /** Whether the drawer shows the section at all: `release_instant_eval_results`. */
   isShown: boolean;
   results: InstantEvalResultEntry[];
-  isLoading: boolean;
 }
 
 /**
@@ -49,6 +48,5 @@ export function useTraceInstantEvalResults({
   return {
     isShown: isReleased,
     results: (query.data ?? []).map(toInstantEvalResultEntry),
-    isLoading: isReleased && query.isLoading,
   };
 }

@@ -54,6 +54,12 @@ export const INSTANT_EVAL_TRACE_RESULT_SOURCES = ["ask", "run", "dashboard"] as 
 
 export type InstantEvalTraceResultSource = (typeof INSTANT_EVAL_TRACE_RESULT_SOURCES)[number];
 
+/**
+ * The longest trace window the drawer's results read spans from the trace's start, so no caller
+ * widens it past partition pruning; a longer trace shows what was kept within this of its start.
+ */
+export const INSTANT_EVAL_TRACE_RESULTS_MAX_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+
 /** Who asked for a kept judgement (ADR-189): a provenance label only, which recall never reads. */
 export const INSTANT_EVAL_RESULT_SOURCES = [
   ...INSTANT_EVAL_TRACE_RESULT_SOURCES,

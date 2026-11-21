@@ -4,6 +4,7 @@
  * @see modules/instant-eval/specs/instant-eval-results.feature
  */
 
+import { INSTANT_EVAL_TRACE_RESULTS_MAX_WINDOW_MS } from "@langwatch/instant-eval-contract";
 import { describe, expect, it } from "vitest";
 
 import type { EvalResultRecord } from "../../repositories/eval-results.repository.ts";
@@ -65,6 +66,34 @@ describe("EvalResultsTraceService", () => {
         });
 
         await expect(service.findResultsByTrace(TRACE)).resolves.toEqual([]);
+      });
+    });
+  });
+
+  describe("given a released project and a read asked over a window wider than seven days", () => {
+    describe("when the trace's results are read", () => {
+      /** @scenario "A trace's read spans at most seven days from the trace's start" */
+      it("reads seven padded days from the trace's start and answers no row past", async () => {
+        const widestUntil =
+          TRACE_START +
+          INSTANT_EVAL_TRACE_RESULTS_MAX_WINDOW_MS +
+          EVAL_RESULTS_RECALL_WINDOW_PADDING_MS;
+        const results = MemoryEvalResultsRepository.create();
+        await results.insert([
+          record({ SpanId: "span-within", OccurredAt: widestUntil }),
+          record({ SpanId: "span-past", OccurredAt: widestUntil + 1 }),
+        ]);
+        const service = EvalResultsTraceService.create({
+          results,
+          peers: { isReleased: async () => true },
+        });
+
+        const answered = await service.findResultsByTrace({
+          ...TRACE,
+          occurredUntil: TRACE_START + 52 * INSTANT_EVAL_TRACE_RESULTS_MAX_WINDOW_MS,
+        });
+
+        expect(answered.map((result) => result.spanId)).toEqual(["span-within"]);
       });
     });
   });

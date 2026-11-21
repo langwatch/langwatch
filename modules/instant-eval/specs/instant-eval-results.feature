@@ -202,6 +202,13 @@ Feature: Every trace-linked Instant Evals result is kept, and recalled before ju
     When its trace's results are read
     Then the answer is empty and eval_results is not read
 
+  @unit
+  Scenario: A trace's read spans at most seven days from the trace's start
+    Given a trace's results read asked over a window far wider than seven days
+    When the trace's results are read
+    Then eval_results is read over seven days from the trace's start, padded as recall's is
+    And a row kept past that is not answered
+
   @integration
   Scenario: A trace's kept results are read from ClickHouse by the trace
     Given judged, failed, skipped, monitor and retired-key rows on one trace in eval_results
