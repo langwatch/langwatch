@@ -57,7 +57,7 @@ Feature: Every catalogued Postgres model is queryable through LangWatchQL
       Then they see only keys belonging to their own organization
 
     # tasks#1212: the fan-out above emits the row once per project, so a query
-    # over two sibling projects would see an organization's budget twice (per the code; this test checks it).
+    # over two sibling projects would see an organization's budget twice.
     @integration
     Scenario: An organization-level row is counted once in a multi-project query
       Given an organization with two projects and one gateway budget with a known limit
@@ -71,6 +71,15 @@ Feature: Every catalogued Postgres model is queryable through LangWatchQL
       When a caller queries each project on its own, summing the budget limit and counting budgets
       Then each read's sum equals the budget's own limit
       And each read's count is one
+
+    # tasks#1212: the view keeps the copy under the lowest project id, so TenantId names that project.
+    @integration
+    Scenario: A multi-project read filters and groups an organization-level row under the lowest project only
+      Given an organization with two projects and one gateway budget with a known limit
+      When a caller who can read both projects filters and groups the budget by TenantId in queries over both
+      Then filtering on the lower project id reads the budget once
+      And filtering on the other project's id reads no budget
+      And grouping by TenantId puts the budget once under the lower project id and nowhere else
 
     @unit
     Scenario: A fanned-out view keeps one row per entity across the projects read

@@ -175,8 +175,11 @@ those copies as before. The view then keeps one copy of each row across the
 projects read, the one under the lowest project id (langwatch/tasks#1212). A
 `COUNT(*)` on such a view counts each row once.
 
-- **Project filters are not yet tested.** How a `TenantId` filter or
-  grouping sees these rows is not yet tested.
+- **Project filters see the lowest project only.** In a multi-project read, a
+  `TenantId` filter or grouping finds such a row under the lowest project id
+  and under no other, so a filter on a sibling's id misses it. Scenario "A
+  multi-project read filters and groups an organization-level row under the
+  lowest project only" in `specs/lwql/postgres-catalog.feature` tests it.
 - **The grain says so.** The generated grain and description name the row by
   its own key, not by `(TenantId, …)`, and state the point above.
 - **A key that holds the scope field keeps its fan-out.** A model whose

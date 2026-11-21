@@ -1031,191 +1031,227 @@ describe("given the PostgreSQL-resident catalog mapped into ClickHouse through t
   });
 });
 
-describe("when a caller reads two sibling projects of one organization in one query", () => {
-  /**
-   * The organization fan-out emits one row per project, so the budget appears once per sibling
-   * the caller reads. tasks#1212: a multi-project SUM must still count it once.
-   */
-  const ORGANIZATION_ID = "lwql-fanout-org";
-  const TEAM_ID = "lwql-fanout-team";
-  const BUDGET_ID = "lwql-fanout-budget";
-  const LIMIT_USD = 250;
-  const SIBLINGS = [1, 2].map((index) => ({
-    id: `lwql-fanout-project-${index}`,
-    lwqlKey: `raw-lwql-key-FANOUT-DO-NOT-LOG-${index}`,
-  }));
-  /** A third project of the same organization, in the key map but never in the caller's key set. */
-  const UNREADABLE = { id: "lwql-fanout-project-3", lwqlKey: "raw-lwql-key-FANOUT-DO-NOT-LOG-3" };
-  const SEEDED = [...SIBLINGS, UNREADABLE];
-  const keyHashes = () =>
-    SEEDED.map(({ lwqlKey }) => lwqlCapability.tenantCapability({ secret: lwqlKey }));
-  const keyMapTable = () => `${harness.factDatabase}.${harness.names.keyMapTable}`;
+describe("given an organization with three projects, two of them readable sibling projects, and one organization-level gateway budget", () => {
+  describe("when a caller reads two sibling projects of one organization in one query", () => {
+    /**
+     * The organization fan-out emits one row per project, so the budget appears once per sibling
+     * the caller reads. tasks#1212: a multi-project SUM must still count it once.
+     */
+    const ORGANIZATION_ID = "lwql-fanout-org";
+    const TEAM_ID = "lwql-fanout-team";
+    const BUDGET_ID = "lwql-fanout-budget";
+    const LIMIT_USD = 250;
+    const SIBLINGS = [1, 2].map((index) => ({
+      id: `lwql-fanout-project-${index}`,
+      lwqlKey: `raw-lwql-key-FANOUT-DO-NOT-LOG-${index}`,
+    }));
+    /**
+     * A third project of the same organization, in the key map but never in the caller's key set.
+     */
+    const UNREADABLE = { id: "lwql-fanout-project-3", lwqlKey: "raw-lwql-key-FANOUT-DO-NOT-LOG-3" };
+    const SEEDED = [...SIBLINGS, UNREADABLE];
+    const keyHashes = () =>
+      SEEDED.map(({ lwqlKey }) => lwqlCapability.tenantCapability({ secret: lwqlKey }));
+    const keyMapTable = () => `${harness.factDatabase}.${harness.names.keyMapTable}`;
 
-  const seedStatements = (): string[] => [
-    `INSERT INTO "Organization" ("id", "name", "slug") ` +
-      `VALUES ('${ORGANIZATION_ID}', 'Fan-out org', '${ORGANIZATION_ID}-slug')`,
-    `INSERT INTO "Team" ("id", "name", "slug", "organizationId") ` +
-      `VALUES ('${TEAM_ID}', 'Fan-out team', '${TEAM_ID}-slug', '${ORGANIZATION_ID}')`,
-    `INSERT INTO "Project" ` +
-      `("id", "name", "slug", "apiKey", "lwqlKey", "teamId", "language", "framework") VALUES ` +
-      SEEDED.map(
-        ({ id }) =>
-          `('${id}', 'Project ${id}', '${id}-slug', 'excluded-apikey-of-${id}', ` +
-          `'excluded-lwqlkey-of-${id}', '${TEAM_ID}', 'python', 'openai')`,
-      ).join(", "),
-    `INSERT INTO "GatewayBudget" ` +
-      `("id", "organizationId", "scopeType", "scopeId", "name", "window", "limitUsd", ` +
-      `"resetsAt", "createdById") VALUES ('${BUDGET_ID}', '${ORGANIZATION_ID}', ` +
-      `'ORGANIZATION', '${ORGANIZATION_ID}', 'Fan-out budget', 'MONTH', ${LIMIT_USD}, ` +
-      `'2027-01-01T00:00:00Z', 'lwql-fanout-user')`,
-  ];
+    const seedStatements = (): string[] => [
+      `INSERT INTO "Organization" ("id", "name", "slug") ` +
+        `VALUES ('${ORGANIZATION_ID}', 'Fan-out org', '${ORGANIZATION_ID}-slug')`,
+      `INSERT INTO "Team" ("id", "name", "slug", "organizationId") ` +
+        `VALUES ('${TEAM_ID}', 'Fan-out team', '${TEAM_ID}-slug', '${ORGANIZATION_ID}')`,
+      `INSERT INTO "Project" ` +
+        `("id", "name", "slug", "apiKey", "lwqlKey", "teamId", "language", "framework") VALUES ` +
+        SEEDED.map(
+          ({ id }) =>
+            `('${id}', 'Project ${id}', '${id}-slug', 'excluded-apikey-of-${id}', ` +
+            `'excluded-lwqlkey-of-${id}', '${TEAM_ID}', 'python', 'openai')`,
+        ).join(", "),
+      `INSERT INTO "GatewayBudget" ` +
+        `("id", "organizationId", "scopeType", "scopeId", "name", "window", "limitUsd", ` +
+        `"resetsAt", "createdById") VALUES ('${BUDGET_ID}', '${ORGANIZATION_ID}', ` +
+        `'ORGANIZATION', '${ORGANIZATION_ID}', 'Fan-out budget', 'MONTH', ${LIMIT_USD}, ` +
+        `'2027-01-01T00:00:00Z', 'lwql-fanout-user')`,
+    ];
 
-  const cleanupStatements = (): string[] => [
-    `DELETE FROM "GatewayBudget" WHERE "id" = '${BUDGET_ID}'`,
-    `DELETE FROM "Project" WHERE "teamId" = '${TEAM_ID}'`,
-    `DELETE FROM "Team" WHERE "id" = '${TEAM_ID}'`,
-    `DELETE FROM "Organization" WHERE "id" = '${ORGANIZATION_ID}'`,
-  ];
+    const cleanupStatements = (): string[] => [
+      `DELETE FROM "GatewayBudget" WHERE "id" = '${BUDGET_ID}'`,
+      `DELETE FROM "Project" WHERE "teamId" = '${TEAM_ID}'`,
+      `DELETE FROM "Team" WHERE "id" = '${TEAM_ID}'`,
+      `DELETE FROM "Organization" WHERE "id" = '${ORGANIZATION_ID}'`,
+    ];
 
-  /** Runs every delete, the key map's too, before asserting, so one failure hides no other. */
-  const deleteSeed = async (): Promise<void> => {
-    const failures: string[] = [];
-    for (const sql of cleanupStatements()) {
-      const result = await postgres.asAdmin(sql);
-      if (result.exitCode !== 0) failures.push(`cleanup failed: ${sql}\n${result.stderr}`);
-    }
-    const quotedHashes = keyHashes().map((hash) => `'${hash}'`);
-    try {
-      await harness.applyAsAdmin([
-        `ALTER TABLE ${keyMapTable()} DELETE WHERE KeyHash IN (${quotedHashes.join(", ")}) ` +
-          "SETTINGS mutations_sync = 2",
-      ]);
-    } catch (error) {
-      failures.push(`key-map cleanup failed: ${String(error)}`);
-    }
-    expect(failures, "seed cleanup left rows behind").toEqual([]);
-  };
+    /** Runs every delete, the key map's too, before asserting, so one failure hides no other. */
+    const deleteSeed = async (): Promise<void> => {
+      const failures: string[] = [];
+      for (const sql of cleanupStatements()) {
+        const result = await postgres.asAdmin(sql);
+        if (result.exitCode !== 0) failures.push(`cleanup failed: ${sql}\n${result.stderr}`);
+      }
+      const quotedHashes = keyHashes().map((hash) => `'${hash}'`);
+      try {
+        await harness.applyAsAdmin([
+          `ALTER TABLE ${keyMapTable()} DELETE WHERE KeyHash IN (${quotedHashes.join(", ")}) ` +
+            "SETTINGS mutations_sync = 2",
+        ]);
+      } catch (error) {
+        failures.push(`key-map cleanup failed: ${String(error)}`);
+      }
+      expect(failures, "seed cleanup left rows behind").toEqual([]);
+    };
 
-  let service: LangWatchQLService;
+    let service: LangWatchQLService;
 
-  const sumBudget = async (
-    projects: typeof SIBLINGS,
-    memberWindows?: readonly LangWatchQLMemberWindow[],
-  ) => {
-    const result = await service.executeForProjects({
-      projects,
-      ...(memberWindows ? { memberWindows } : {}),
-      protections: {
-        catalogue: EVERY_CATALOGUE_PERMISSION,
-        canSeeCosts: true,
-        canSeeCapturedInput: true,
-        canSeeCapturedOutput: true,
-      },
-      sql:
-        "SELECT sum(LimitUsd) AS total, count() AS n FROM gateway_budgets " +
-        `WHERE GatewayBudgetId = '${BUDGET_ID}'`,
-    });
-    return result.rows.map((row) => ({ total: Number(row.total), n: Number(row.n) }));
-  };
+    const PROTECTIONS = {
+      catalogue: EVERY_CATALOGUE_PERMISSION,
+      canSeeCosts: true,
+      canSeeCapturedInput: true,
+      canSeeCapturedOutput: true,
+    };
 
-  beforeAll(async () => {
-    service = LangWatchQLService.create({
-      runTelemetry: TEST_RUN_TELEMETRY,
-      placement: ADMIT_EVERY_PLACEMENT,
-      executor: ClickHouseLangWatchQLExecutorRepository.create({
-        connection: {
-          ...harness.restrictedConnection(),
-          database,
-          tenantSetting: harness.names.tenantSetting,
-        },
-      }),
-      database,
-      views: POSTGRES_VIEWS,
-    });
-    for (const sql of seedStatements()) {
-      const seeded = await postgres.asAdmin(sql);
-      if (seeded.exitCode !== 0) throw new Error(`seeding failed: ${sql}\n${seeded.stderr}`);
-    }
-    await harness.admin.insert({
-      table: keyMapTable(),
-      format: "JSONEachRow",
-      values: SEEDED.map(({ id }, index) => ({ KeyHash: keyHashes()[index], TenantId: id })),
-    });
-  }, 60_000);
+    const sumBudget = async (
+      projects: typeof SIBLINGS,
+      memberWindows?: readonly LangWatchQLMemberWindow[],
+    ) => {
+      const result = await service.executeForProjects({
+        projects,
+        ...(memberWindows ? { memberWindows } : {}),
+        protections: PROTECTIONS,
+        sql:
+          "SELECT sum(LimitUsd) AS total, count() AS n FROM gateway_budgets " +
+          `WHERE GatewayBudgetId = '${BUDGET_ID}'`,
+      });
+      return result.rows.map((row) => ({ total: Number(row.total), n: Number(row.n) }));
+    };
 
-  // A failed cleanup reports as an afterAll error, never in place of a test's own failure.
-  afterAll(async () => {
-    try {
-      // Undefined at runtime when beforeAll failed before creating it.
-      await service?.close();
-    } finally {
-      await deleteSeed();
-    }
-  }, 60_000);
+    const readSiblings = async (sql: string) => {
+      const result = await service.executeForProjects({
+        projects: SIBLINGS,
+        protections: PROTECTIONS,
+        sql,
+      });
+      return result.rows;
+    };
 
-  /** @scenario "An organization-level row is counted once in a multi-project query" */
-  it("sums the organization's budget limit once and counts one budget", async () => {
-    const rows = await sumBudget(SIBLINGS);
-    expect(rows, `got ${JSON.stringify(rows)}`).toEqual([{ total: LIMIT_USD, n: 1 }]);
-  }, 60_000);
+    beforeAll(async () => {
+      service = LangWatchQLService.create({
+        runTelemetry: TEST_RUN_TELEMETRY,
+        placement: ADMIT_EVERY_PLACEMENT,
+        executor: ClickHouseLangWatchQLExecutorRepository.create({
+          connection: {
+            ...harness.restrictedConnection(),
+            database,
+            tenantSetting: harness.names.tenantSetting,
+          },
+        }),
+        database,
+        views: POSTGRES_VIEWS,
+      });
+      for (const sql of seedStatements()) {
+        const seeded = await postgres.asAdmin(sql);
+        if (seeded.exitCode !== 0) throw new Error(`seeding failed: ${sql}\n${seeded.stderr}`);
+      }
+      await harness.admin.insert({
+        table: keyMapTable(),
+        format: "JSONEachRow",
+        values: SEEDED.map(({ id }, index) => ({ KeyHash: keyHashes()[index], TenantId: id })),
+      });
+    }, 60_000);
 
-  /** @scenario "A single project still reads its organization's row once" */
-  it.each(SIBLINGS.map((sibling) => [sibling.id, sibling] as const))(
-    "reads the budget once when %s is the only project in the query",
-    async (_id, sibling) => {
-      const rows = await sumBudget([sibling]);
+    // A failed cleanup reports as an afterAll error, never in place of a test's own failure.
+    afterAll(async () => {
+      try {
+        // Undefined at runtime when beforeAll failed before creating it.
+        await service?.close();
+      } finally {
+        await deleteSeed();
+      }
+    }, 60_000);
+
+    /** @scenario "An organization-level row is counted once in a multi-project query" */
+    it("sums the organization's budget limit once and counts one budget", async () => {
+      const rows = await sumBudget(SIBLINGS);
       expect(rows, `got ${JSON.stringify(rows)}`).toEqual([{ total: LIMIT_USD, n: 1 }]);
-    },
-    60_000,
-  );
+    }, 60_000);
 
-  /** @scenario "A member window on the kept copy does not hide a row a sibling's window admits" */
-  it("reads the budget once when only the sibling whose copy is not kept admits it", async () => {
-    // The view keeps the lowest project's copy, here project 1, whose window opens after the
-    // budget was created; project 2 is shared for its whole history and so admits it.
-    const [kept, sibling] = SIBLINGS;
-    if (!kept || !sibling) throw new Error("the fan-out suite needs two sibling projects");
-    const rows = await sumBudget(SIBLINGS, [
-      { projectId: kept.id, from: Date.parse("2100-01-01T00:00:00.000Z") },
-      { projectId: sibling.id, from: 0 },
-    ]);
-    expect(rows, `got ${JSON.stringify(rows)}`).toEqual([{ total: LIMIT_USD, n: 1 }]);
-  }, 60_000);
-
-  /** @scenario "A member window cannot admit a row through a project the caller cannot read" */
-  it("reads nothing when only an unreadable sibling's window would admit the budget", async () => {
-    // Below the service, which drops a window outside the caller's projects: here project 3's
-    // window reaches the predicate, so only the engine table's row policy keeps its copy out.
-    // Both readable siblings open after the budget was created; project 3 would admit it.
-    const opensAfterTheBudget = Date.parse("2100-01-01T00:00:00.000Z");
-    const sql = scopeLangWatchQL({
-      sql:
-        `SELECT sum(LimitUsd) AS total, count() AS n FROM ${database}.gateway_budgets ` +
-        `WHERE GatewayBudgetId = '${BUDGET_ID}'`,
-      database,
-      views: POSTGRES_VIEWS,
-      memberWindows: [
-        ...SIBLINGS.map(({ id }) => ({ projectId: id, from: opensAfterTheBudget })),
-        { projectId: UNREADABLE.id, from: 0 },
-      ],
-    });
-    expect(sql, "the window predicate must name the unreadable project").toContain(
-      `TenantId IN ('${UNREADABLE.id}')`,
+    /** @scenario "A single project still reads its organization's row once" */
+    it.each(SIBLINGS.map((sibling) => [sibling.id, sibling] as const))(
+      "reads the budget once when %s is the only project in the query",
+      async (_id, sibling) => {
+        const rows = await sumBudget([sibling]);
+        expect(rows, `got ${JSON.stringify(rows)}`).toEqual([{ total: LIMIT_USD, n: 1 }]);
+      },
+      60_000,
     );
-    const reader = await harness.restrictedClient({
-      keyHash: lwqlCapability.tenantCapabilitySet({
-        secrets: SIBLINGS.map(({ lwqlKey }) => lwqlKey),
-      }),
-    });
-    try {
-      const rows = (await selectRows<{ total: unknown; n: unknown }>(reader, sql)).map((row) => ({
-        total: Number(row.total),
+
+    /** @scenario "A multi-project read filters and groups an organization-level row under the lowest project only" */
+    it("puts the budget under the lower project id when filtering or grouping by TenantId", async () => {
+      const [kept, sibling] = SIBLINGS;
+      if (!kept || !sibling) throw new Error("the fan-out suite needs two sibling projects");
+      const ofBudget = `FROM gateway_budgets WHERE GatewayBudgetId = '${BUDGET_ID}'`;
+      const countUnder = async (tenantId: string) => {
+        const rows = await readSiblings(
+          `SELECT count() AS n ${ofBudget} AND TenantId = '${tenantId}'`,
+        );
+        return rows.map((row) => Number(row.n));
+      };
+      expect(await countUnder(kept.id), "filter on the lower project id").toEqual([1]);
+      expect(await countUnder(sibling.id), "filter on the other project's id").toEqual([0]);
+      const groupSql = `SELECT TenantId AS tenant, count() AS n ${ofBudget} GROUP BY TenantId`;
+      const grouped = (await readSiblings(groupSql)).map((row) => ({
+        tenant: String(row.tenant),
         n: Number(row.n),
       }));
-      // An aggregate with no GROUP BY answers one row even over no input rows.
-      expect(rows, `got ${JSON.stringify(rows)}`).toEqual([{ total: 0, n: 0 }]);
-    } finally {
-      await reader.close();
-    }
-  }, 60_000);
+      expect(grouped, `got ${JSON.stringify(grouped)}`).toEqual([{ tenant: kept.id, n: 1 }]);
+    }, 60_000);
+
+    /** @scenario "A member window on the kept copy does not hide a row a sibling's window admits" */
+    it("reads the budget once when only the sibling whose copy is not kept admits it", async () => {
+      // The view keeps the lowest project's copy, here project 1, whose window opens after the
+      // budget was created; project 2 is shared for its whole history and so admits it.
+      const [kept, sibling] = SIBLINGS;
+      if (!kept || !sibling) throw new Error("the fan-out suite needs two sibling projects");
+      const rows = await sumBudget(SIBLINGS, [
+        { projectId: kept.id, from: Date.parse("2100-01-01T00:00:00.000Z") },
+        { projectId: sibling.id, from: 0 },
+      ]);
+      expect(rows, `got ${JSON.stringify(rows)}`).toEqual([{ total: LIMIT_USD, n: 1 }]);
+    }, 60_000);
+
+    /** @scenario "A member window cannot admit a row through a project the caller cannot read" */
+    it("reads nothing when only an unreadable sibling's window would admit the budget", async () => {
+      // Below the service, which drops a window outside the caller's projects: here project 3's
+      // window reaches the predicate, so only the engine table's row policy keeps its copy out.
+      // Both readable siblings open after the budget was created; project 3 would admit it.
+      const opensAfterTheBudget = Date.parse("2100-01-01T00:00:00.000Z");
+      const sql = scopeLangWatchQL({
+        sql:
+          `SELECT sum(LimitUsd) AS total, count() AS n FROM ${database}.gateway_budgets ` +
+          `WHERE GatewayBudgetId = '${BUDGET_ID}'`,
+        database,
+        views: POSTGRES_VIEWS,
+        memberWindows: [
+          ...SIBLINGS.map(({ id }) => ({ projectId: id, from: opensAfterTheBudget })),
+          { projectId: UNREADABLE.id, from: 0 },
+        ],
+      });
+      expect(sql, "the window predicate must name the unreadable project").toContain(
+        `TenantId IN ('${UNREADABLE.id}')`,
+      );
+      const reader = await harness.restrictedClient({
+        keyHash: lwqlCapability.tenantCapabilitySet({
+          secrets: SIBLINGS.map(({ lwqlKey }) => lwqlKey),
+        }),
+      });
+      try {
+        const rows = (await selectRows<{ total: unknown; n: unknown }>(reader, sql)).map((row) => ({
+          total: Number(row.total),
+          n: Number(row.n),
+        }));
+        // An aggregate with no GROUP BY answers one row even over no input rows.
+        expect(rows, `got ${JSON.stringify(rows)}`).toEqual([{ total: 0, n: 0 }]);
+      } finally {
+        await reader.close();
+      }
+    }, 60_000);
+  });
 });

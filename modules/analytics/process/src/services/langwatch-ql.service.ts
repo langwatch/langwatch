@@ -286,29 +286,6 @@ export class LangWatchQLService {
     return validation;
   }
 
-  /**
-   * The executor, once placement admits the run. Fails closed, per request rather than at boot, so
-   * a deployment with no LangWatchQL identity still answers the schema endpoint.
-   */
-  private async admit({
-    projectIds,
-    run,
-  }: {
-    projectIds: readonly string[];
-    run: "query" | "pass";
-  }): Promise<LangWatchQLExecutorRepository> {
-    const { executor } = this.deps;
-    if (!executor) {
-      logger.error(
-        { projectIds },
-        `LangWatchQL ${run} refused: no restricted identity is provisioned`,
-      );
-      throw new LangWatchQLUnavailableError();
-    }
-    await this.deps.placement.admit({ projectIds });
-    return executor;
-  }
-
   /** The result with what the run was bound to, and the notes on what limited or ignored it. */
   private withRunNotes({
     result,
@@ -384,7 +361,16 @@ export class LangWatchQLService {
     // A pass is not scoped, so the FINAL/SAMPLE refusal runs here too.
     assertNoUnsupportedTableModifiers({ sql, views: this.views, database: this.deps.database });
 
-    const executor = await this.admit({ projectIds: [project.id], run: "pass" });
+    const { executor } = this.deps;
+    if (!executor) {
+      logger.error(
+        { projectIds: [project.id] },
+        "LangWatchQL pass refused: no restricted identity is provisioned",
+      );
+
+      throw new LangWatchQLUnavailableError();
+    }
+    await this.deps.placement.admit({ projectIds: [project.id] });
 
     const composed = langWatchQLPassSql({ sql, pass: wrapper });
     const executionParameters = { ...validation.boundParameters, ...composed.parameters };
@@ -445,7 +431,20 @@ export class LangWatchQLService {
       awaitingTimeWindow: validation.awaitingTimeWindow,
     });
 
-    const executor = await this.admit({ projectIds, run: "query" });
+    // Fail closed. The check is here rather than in the constructor so that a
+    // deployment with no LangWatchQL identity still answers the schema endpoint,
+    // and so that the refusal is a per-request handled error rather than a
+    // boot-time crash of an app that mostly does other things.
+    const { executor } = this.deps;
+    if (!executor) {
+      logger.error(
+        { projectIds },
+        "LangWatchQL query refused: no restricted identity is provisioned",
+      );
+
+      throw new LangWatchQLUnavailableError();
+    }
+    await this.deps.placement.admit({ projectIds });
 
     const tenantCapability = lwqlCapability.tenantCapabilitySet({
       secrets: projects.map((project) => project.lwqlKey),
