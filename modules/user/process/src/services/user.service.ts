@@ -372,7 +372,6 @@ export class UserService {
 
   async setLangyCodeAccessPreference(input: UserIdInput & UserCodeAccessPreference): Promise<void> {
     const parsed = setUserCodeAccessPreferenceInputSchema.parse(input);
-
     await this.repository.setLangyCodeAccessPreference(parsed.id, parsed.preference);
   }
 
