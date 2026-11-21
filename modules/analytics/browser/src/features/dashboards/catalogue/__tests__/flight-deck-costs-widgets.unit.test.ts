@@ -165,20 +165,43 @@ describe("given the Running costs widgets", () => {
     expect(code).toContain('<Headline value={pct(ratio(test, total), 0)} label="test traffic" />');
   });
 
-  // The stored expression is what the row runs; evaluating it is the test.
-  function sourceRowFigure() {
-    const figure = build("cost-by-source").code.match(/const figure = ([\s\S]*?);\n/)?.[1];
-    if (!figure) throw new Error("no figure on the source row");
+  type SourceRowProps = {
+    cost: number | null;
+    traces: number;
+    unpriced: number;
+    unpricedCounted?: boolean;
+    total?: number | null;
+  };
+
+  // The stored expressions are what the row runs; evaluating them is the test.
+  function sourceRow() {
+    const code = build("cost-by-source").code;
+    const head = code.match(/function SourceRow\([^)]*\) \{\n([\s\S]*?)\n {2}return \(/)?.[1];
+    const width = code.match(/width: (\(share[^}]*?) \}\}/)?.[1];
+    const share = code.match(/\{(traces === 0 \? "" : pct\(share, 0\))\}/)?.[1];
+    if (!head || !width || !share) throw new Error("no figure, bar or share on the source row");
     // oxlint-disable-next-line no-implied-eval
     const run = new Function(
       "cost",
       "traces",
       "unpriced",
       "unpricedCounted",
-      `${NUMBERS}\nreturn ${figure};`,
+      "total",
+      "origin",
+      `${NUMBERS}\n${head}\nreturn { figure, width: ${width}, share: ${share} };`,
     );
+    return ({ cost, traces, unpriced, unpricedCounted = true, total = null }: SourceRowProps) =>
+      run(cost, traces, unpriced, unpricedCounted, total, undefined) as {
+        figure: string;
+        width: string;
+        share: string;
+      };
+  }
+
+  function sourceRowFigure() {
+    const row = sourceRow();
     return (cost: number | null, traces: number, unpriced: number, unpricedCounted = true) =>
-      run(cost, traces, unpriced, unpricedCounted);
+      row({ cost, traces, unpriced, unpricedCounted }).figure;
   }
 
   /** @scenario "AC215 Partial cost: no span priced" */
@@ -197,7 +220,38 @@ describe("given the Running costs widgets", () => {
     expect(rowFigure(null, 2, 0)).toBe("$0.00");
   });
 
+  // Rows as SPEND_BY_SOURCE_SQL returns them: zero-rate traces sum to a null cost.
+  const ZERO_RATE_ROWS = [
+    { traces: 2, unpriced: 1, cost: null },
+    { traces: 2, unpriced: 0, cost: null },
+  ];
+
   /** @scenario "AC215b Partial cost: some spans priced at zero" */
+  it("gives a zero-rate row beside a priced row a 0% share and an empty bar", () => {
+    const row = sourceRow();
+    const priced = { traces: 45, unpriced: 10, cost: 0.2857 };
+    const total = priced.cost;
+    for (const zeroRate of ZERO_RATE_ROWS) {
+      expect(row({ ...zeroRate, total })).toMatchObject({ width: "0%", share: "0%" });
+    }
+    expect(row({ ...priced, total })).toMatchObject({ width: "100%", share: "100%" });
+  });
+
+  /** @scenario "AC215b Partial cost: some spans priced at zero" */
+  it("shows no NaN on a board where every row is zero-rate", () => {
+    const row = sourceRow();
+    // The card total is 0 when a source sums to 0, and null when every source sums to null.
+    for (const total of [0, null]) {
+      for (const zeroRate of ZERO_RATE_ROWS) {
+        const { figure, width, share } = row({ ...zeroRate, total });
+        expect(width).toBe("0%");
+        expect(share).toBe("–");
+        expect(figure).not.toContain("NaN");
+      }
+    }
+  });
+
+  /** @scenario "AC215e Partial cost: the evaluations source row keeps the dash for a null cost" */
   it("keeps the dash on the evaluations row, whose unpriced count is a constant 0", () => {
     // Evaluator runs join the evaluations source with 0 AS unpriced,
     // so a null cost may be unpriced.
