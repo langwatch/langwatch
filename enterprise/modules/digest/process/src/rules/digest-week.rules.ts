@@ -131,6 +131,8 @@ export const userWeekStateSchema = z.object({
     z.string(),
     z.object({ metric: z.string(), type: z.string().nullable(), value: z.number() }),
   ),
+  /** Series readings seen after the capped set filled; counted, not kept or summed. */
+  seriesOverflow: z.number(),
   repositories: z.record(z.string(), z.number()),
 });
 export type UserWeekState = z.infer<typeof userWeekStateSchema>;
@@ -164,6 +166,7 @@ export function emptyUserWeek(): UserWeekState {
     sessions: [],
     sessionOverflow: 0,
     series: {},
+    seriesOverflow: 0,
     repositories: {},
   };
 }
@@ -233,6 +236,8 @@ export function userWeekTotals(state: UserWeekState): {
   linesChanged: number;
   commits: number;
   pullRequests: number;
+  /** Series were dropped past the cap, so each metric total is a floor. */
+  atLeast: boolean;
 } {
   const sum = (metric: string) =>
     Object.values(state.series)
@@ -246,5 +251,6 @@ export function userWeekTotals(state: UserWeekState): {
     linesChanged: Math.round(sum("lines_of_code")),
     commits: Math.round(sum("commit")),
     pullRequests: Math.round(sum("pull_request")),
+    atLeast: state.seriesOverflow > 0,
   };
 }

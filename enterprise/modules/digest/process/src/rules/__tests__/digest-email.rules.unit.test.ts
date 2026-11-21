@@ -260,7 +260,8 @@ describe("buildDigestTemplateProps()", () => {
         activeMinutes: 0,
         weekUrl: BASE,
       });
-      for (const optional of ["linesChanged", "commits", "pullRequests", "topRepo"]) {
+      const optionals = ["linesChanged", "commits", "pullRequests", "topRepo", "totalsAtLeast"];
+      for (const optional of optionals) {
         expect(props).not.toHaveProperty(optional);
       }
     });
@@ -273,6 +274,18 @@ describe("buildDigestTemplateProps()", () => {
 
       expect(parsedBy({ templateId: pick.template, props })).toMatchObject({
         topRepo: "acme/api",
+      });
+    });
+
+    /** @scenario "A person's week past its series cap reads its totals as floors" */
+    it("marks the totals as floors when the week dropped series past its cap", () => {
+      const capped = userFold({ series: { cost: series("cost_usage", 2) }, seriesOverflow: 4 });
+
+      const { pick, props } = propsFor({ week: codingWeek(capped) });
+
+      expect(parsedBy({ templateId: pick.template, props })).toMatchObject({
+        costUsd: 2,
+        totalsAtLeast: true,
       });
     });
   });

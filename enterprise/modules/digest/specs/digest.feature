@@ -91,6 +91,13 @@ Feature: Weekly digest emails
     When the digest subscriber has handled their events
     Then the user's week holds 3 sessions and the summed tokens, cost and lines
 
+  @unit
+  Scenario: A person's week past its series cap reads its totals as floors
+    Given a person's week that received more coding-agent metric series than it keeps
+    When their digest-coding-agent-week email is built
+    Then its totals are the sums of the series it kept, each shown as "at least"
+    And a week whose series all fit shows its totals without "at least"
+
   @integration
   Scenario: Scenario outcomes fold into the project's week
     Given scenario runs that finished passing and failing this week

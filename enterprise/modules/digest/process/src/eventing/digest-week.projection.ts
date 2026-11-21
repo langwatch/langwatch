@@ -154,6 +154,9 @@ export function applyUserActivity({
             [series.seriesId]: { metric: series.metric, type: series.type, value: series.value },
           }
         : state.series,
+    // Counted, never summed: the fold cannot tell a delta point from a cumulative reading, and
+    // re-adding a cumulative reading would over-count. The email reads the totals as floors.
+    seriesOverflow: state.seriesOverflow + (series !== null && !seriesFits ? 1 : 0),
     repositories:
       activity.repository && !seen
         ? countCapped({

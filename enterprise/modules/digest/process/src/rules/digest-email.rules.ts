@@ -311,6 +311,7 @@ function buildCodingAgentWeekProps({
     ...(totals.linesChanged > 0 ? { linesChanged: totals.linesChanged } : {}),
     ...(totals.commits > 0 ? { commits: totals.commits } : {}),
     ...(totals.pullRequests > 0 ? { pullRequests: totals.pullRequests } : {}),
+    ...(totals.atLeast ? { totalsAtLeast: true } : {}),
     ...(topRepo ? { topRepo } : {}),
     weekUrl: baseUrl,
   };

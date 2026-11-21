@@ -1,10 +1,21 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-/** The person's weekly fold: how a coding-agent fact lands in it, within its caps. */
+/**
+ * The weekly folds: how a fact lands in a person's or a project's week, within its caps.
+ * @see enterprise/modules/digest/specs/digest.feature
+ */
 import { describe, expect, it } from "vitest";
 
-import { emptyUserWeek, MAX_SERIES, type UserWeekState } from "../../rules/digest-week.rules.ts";
-import type { UserActivity } from "../digest-activity.events.ts";
-import { applyUserActivity } from "../digest-week.projection.ts";
+import {
+  emptyProjectWeek,
+  emptyUserWeek,
+  MAX_EVALUATORS,
+  MAX_SERIES,
+  type ProjectWeekState,
+  type UserWeekState,
+  userWeekTotals,
+} from "../../rules/digest-week.rules.ts";
+import type { ProjectActivity, UserActivity } from "../digest-activity.events.ts";
+import { applyProjectActivity, applyUserActivity } from "../digest-week.projection.ts";
 
 const seriesActivity = (seriesId: string): UserActivity => ({
   tenantId: "org-1",
@@ -36,6 +47,80 @@ describe("applyUserActivity()", () => {
 
       expect(Object.hasOwn(series, seriesId)).toBe(false);
       expect(Object.keys(series)).toHaveLength(MAX_SERIES);
+    });
+  });
+
+  describe("when token series arrive, ten tokens each", () => {
+    const tokens = (seriesId: string): UserActivity => ({
+      ...seriesActivity(seriesId),
+      series: { seriesId, metric: "token_usage", type: null, value: 10 },
+    });
+    const weekOf = (count: number) => {
+      const activities = Array.from({ length: count }, (_, index) => tokens(`point-${index}`));
+      return activities.reduce(
+        (state, activity) => applyUserActivity({ state, activity }),
+        emptyUserWeek(),
+      );
+    };
+
+    /** @scenario "A person's week past its series cap reads its totals as floors" */
+    it("totals the kept series and reads them as floors once more arrive than it keeps", () => {
+      const week = weekOf(MAX_SERIES + 3);
+
+      expect(Object.keys(week.series)).toHaveLength(MAX_SERIES);
+      expect(week.seriesOverflow).toBe(3);
+      expect(userWeekTotals(week)).toMatchObject({ tokens: MAX_SERIES * 10, atLeast: true });
+    });
+
+    /** @scenario "A person's week past its series cap reads its totals as floors" */
+    it("reads its totals plainly while every series fits", () => {
+      const week = weekOf(MAX_SERIES);
+
+      expect(week.seriesOverflow).toBe(0);
+      expect(userWeekTotals(week)).toMatchObject({ tokens: MAX_SERIES * 10, atLeast: false });
+    });
+  });
+});
+
+const evaluationActivity = (evaluatorType: string): ProjectActivity => ({
+  tenantId: "project-1",
+  occurredAt: 0,
+  organizationId: "org-1",
+  isoWeek: "2026-W47",
+  sourceKey: `source-${evaluatorType}`,
+  projectId: "project-1",
+  fact: { kind: "evaluation", evaluatorType, outcome: "passed" },
+});
+
+describe("applyProjectActivity()", () => {
+  describe("when the week already holds MAX_EVALUATORS evaluators", () => {
+    const outcomes = { runs: 1, passed: 1, failed: 0 };
+    const full: ProjectWeekState = {
+      ...emptyProjectWeek(),
+      evaluations: { runs: MAX_EVALUATORS, passed: MAX_EVALUATORS, failed: 0 },
+      evaluators: Object.fromEntries(
+        Array.from({ length: MAX_EVALUATORS }, (_, index) => [`evaluator-${index}`, outcomes]),
+      ),
+    };
+
+    it("counts a new evaluator's run in the week but does not keep the evaluator", () => {
+      const week = applyProjectActivity({
+        state: full,
+        activity: evaluationActivity("evaluator-new"),
+      });
+
+      expect(week.evaluations.runs).toBe(MAX_EVALUATORS + 1);
+      expect(Object.hasOwn(week.evaluators, "evaluator-new")).toBe(false);
+      expect(Object.keys(week.evaluators)).toHaveLength(MAX_EVALUATORS);
+    });
+
+    it("still counts a run for an evaluator it already keeps", () => {
+      const week = applyProjectActivity({
+        state: full,
+        activity: evaluationActivity("evaluator-0"),
+      });
+
+      expect(week.evaluators["evaluator-0"]).toEqual({ runs: 2, passed: 2, failed: 0 });
     });
   });
 });

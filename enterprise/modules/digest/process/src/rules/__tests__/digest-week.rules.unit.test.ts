@@ -7,7 +7,9 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  countCapped,
   isoWeekOf,
+  latencyBucketOf,
   latencyPercentile,
   LATENCY_BUCKETS_MS,
   oldestKeptWeek,
@@ -139,6 +141,44 @@ describe("latencyPercentile()", () => {
 
       expect(latencyPercentile({ latency, percentile: 50 })).toBe(100);
       expect(latencyPercentile({ latency, percentile: 95 })).toBe(5_000);
+    });
+  });
+});
+
+describe("countCapped()", () => {
+  describe("when the map already holds `cap` keys", () => {
+    const full = { a: 1, b: 2 };
+
+    it("drops a new key", () => {
+      expect(countCapped({ counts: full, key: "c", cap: 2 })).toEqual({ a: 1, b: 2 });
+    });
+
+    it("still adds to a key it holds", () => {
+      expect(countCapped({ counts: full, key: "b", by: 3, cap: 2 })).toEqual({ a: 1, b: 5 });
+    });
+  });
+
+  describe("when the map has room", () => {
+    it("adds a new key", () => {
+      expect(countCapped({ counts: { a: 1 }, key: "b", cap: 2 })).toEqual({ a: 1, b: 1 });
+    });
+  });
+});
+
+describe("latencyBucketOf()", () => {
+  it.each([
+    [0, 0],
+    [100, 0],
+    [101, 1],
+    [250, 1],
+    [60_000, LATENCY_BUCKETS_MS.length - 1],
+  ])("places %d ms in bucket %d, a bound inside its own bucket", (durationMs, bucket) => {
+    expect(latencyBucketOf(durationMs)).toBe(bucket);
+  });
+
+  describe("when a duration passes the last bound", () => {
+    it("lands in the overflow bucket", () => {
+      expect(latencyBucketOf(60_001)).toBe(LATENCY_BUCKETS_MS.length);
     });
   });
 });
