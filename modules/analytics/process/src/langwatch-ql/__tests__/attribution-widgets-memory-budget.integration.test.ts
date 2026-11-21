@@ -41,8 +41,9 @@ import {
 } from "./lwql-clickhouse-harness.ts";
 
 /**
- * C, below the shipped 1 GB: CI cannot seed production-size history in time. New ~114 MiB flat
- * (0.59 C); main 62.7 MiB bare, +37 MiB per 375k history traces, so ~457 MiB at 4M. Retune here.
+ * C, below the shipped 1 GB: CI cannot seed production-size history in time. Swept at C, the
+ * new form peaks at most 136.6 MiB at every history size to 4M; main answers at 375k (at most
+ * 118.6 MiB) and is refused at the cap (code 241) at 1.5M and 4M. Retune here.
  */
 const ATTRIBUTION_MEMORY_CAP_BYTES = 192 * 2 ** 20;
 /** How far a peak may sit from the no-history tenant's once older history no longer counts. */
