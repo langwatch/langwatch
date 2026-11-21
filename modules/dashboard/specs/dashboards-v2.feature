@@ -245,7 +245,7 @@ Feature: Dashboards v2 polish and bring-your-own-AI
 
   @unit
   Scenario: AC217 Needs model
-    Given a widget whose query reads a model column no row carries
+    Given an evaluations widget whose query reads a model column no row carries
     Then it reads "Choose a model in the evaluator's settings."
 
   @unit
