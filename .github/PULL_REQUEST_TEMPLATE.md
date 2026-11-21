@@ -6,7 +6,16 @@ Closes #
 
 ## Owner's ask
 
-<!-- What the owner asked for, and which parts this PR delivers. Source: a public issue link (`tasks#N` or URL), or a `>` quote ending "— Product owner, YYYY-MM-DD" on the same line. Never a chat link. One `- [ ]` item per part of the ask; tick it only when the diff does it (an unticked part means not ready). Never drop a part; move one out only with the owner's quoted agreement and a linked issue. If no owner request applies, replace this whole section with `## Owner's ask: none — <reason of 3+ words>`; humans may use the none form. -->
+<!--
+What the owner asked for, and which parts this PR delivers.
+The owner is usually whoever filed or prioritised the issue.
+This list names each part of the owner's request; the quote above it is their own words.
+`## Acceptance criteria` holds the testable criteria copied from the issue.
+Source: a public issue link (`tasks#N` or URL), or a `>` quote ending "— Product owner, YYYY-MM-DD" on the same line. Never a chat link.
+One `- [ ]` item per part of the ask; tick it only when the diff does it (an unticked part means not ready).
+Never drop a part; move one out only with the owner's quoted agreement and a linked issue.
+If no owner request applies, replace this whole section with `## Owner's ask: none — <reason of 3+ words>`; humans may use the none form.
+-->
 
 Source: tasks#
 
