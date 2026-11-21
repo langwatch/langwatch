@@ -33,9 +33,48 @@ function isSchemaBehind(message: string): boolean {
   return message.toLowerCase().includes("does not exist") && SCHEMA_BEHIND_SUBJECT.test(message);
 }
 
+const CALLER_HANDLES =
+  /\bP20(?:02|25)\b|required but not found|No record was found for|Unique constraint failed/;
+
+/**
+ * P2025 (no record) and P2002 (unique conflict) also reach their caller as a thrown error, and
+ * some callers catch them on purpose: a fenced update that matched no row, a conflict that is
+ * parked. Prisma's own event for them is a duplicate, so it is debug.
+ */
+function isCallerHandled(message: string): boolean {
+  return CALLER_HANDLES.test(message);
+}
+
 /** A query event carries `query` where a log event carries `message`. */
 function prismaEventMessage(event: Prisma.LogEvent | Prisma.QueryEvent): string {
-  return "query" in event ? event.query : event.message;
+  return "query" in event ? event.query : readablePrismaMessage(event.message);
+}
+
+const INVOCATION_HEADER = /^\s*Invalid `prisma\.([\w.]+)\(\)` invocation:/;
+
+/**
+ * Prisma opens with "Invalid `prisma.x.y()` invocation:" and gives the reason lines later, so
+ * the first line named the call, never the failure. The reason now comes first, the call after.
+ */
+export function readablePrismaMessage(message: string): string {
+  const match = INVOCATION_HEADER.exec(message);
+  const call = match?.[1];
+  const reason = match ? message.slice(match[0].length).trim() : "";
+  if (call === undefined || reason === "") return message;
+  return `${reason} (prisma.${call})`;
+}
+
+/** An error event's level: a behind schema warns; a missing row or a conflict is the caller's. */
+function errorEventLevel({
+  level,
+  message,
+}: {
+  level: Prisma.LogLevel;
+  message: string;
+}): "error" | "warn" | "info" | "debug" {
+  if (level !== "error") return prismaLoggerLevel(level);
+  if (isSchemaBehind(message)) return "warn";
+  return isCallerHandled(message) ? "debug" : "error";
 }
 
 /** Forwards one Prisma client event to the process logger as one structured line. */
@@ -49,8 +88,7 @@ export function forwardPrismaEvent({
   event: Prisma.LogEvent | Prisma.QueryEvent;
 }): void {
   const message = prismaEventMessage(event);
-  const loggerLevel =
-    level === "error" && isSchemaBehind(message) ? "warn" : prismaLoggerLevel(level);
+  const loggerLevel = errorEventLevel({ level, message });
   logger[loggerLevel](
     { target: event.target, message, timestamp: event.timestamp },
     PRISMA_EVENT_MESSAGE[level],

@@ -17,6 +17,7 @@ import {
   PrismaShutdownService,
   type PrismaQueryContext,
   type PrismaQueryExecutor,
+  readablePrismaMessage,
 } from "./connection.ts";
 import { type PrismaDriverAdapter, PrismaDriverAdapterFactory } from "./driver-adapter.ts";
 import { PrismaClient } from "./generated/client.ts";
@@ -348,6 +349,56 @@ describe("explicit Prisma lifecycle", () => {
 
       expect(logger.warn).toHaveBeenCalledOnce();
       expect(logger.error).not.toHaveBeenCalled();
+    });
+
+    it("lands a record-not-found error event at debug, since its caller gets the throw", () => {
+      const logger = fakeLogger();
+      const timestamp = new Date("2026-09-09T00:00:00.000Z");
+
+      forwardPrismaEvent({
+        logger,
+        level: "error",
+        event: {
+          target: "x",
+          message:
+            "Invalid `prisma.grantUsage.update()` invocation: An operation failed because it " +
+            "depends on one or more records that were required but not found. " +
+            "No record was found for an update.",
+          timestamp,
+        },
+      });
+
+      expect(logger.debug).toHaveBeenCalledOnce();
+      expect(logger.error).not.toHaveBeenCalled();
+    });
+
+    it("lands a unique-conflict error event at debug, since its caller gets the throw", () => {
+      const logger = fakeLogger();
+      const timestamp = new Date("2026-09-09T00:00:00.000Z");
+
+      forwardPrismaEvent({
+        logger,
+        level: "error",
+        event: {
+          target: "x",
+          message:
+            "Invalid `prisma.identifier.upsert()` invocation: Unique constraint failed on the " +
+            "constraint: `Identifier_providerId_providerAccountId_live_key`",
+          timestamp,
+        },
+      });
+
+      expect(logger.debug).toHaveBeenCalledOnce();
+      expect(logger.error).not.toHaveBeenCalled();
+    });
+
+    it("puts the reason first and the call after, not Prisma's invocation header", () => {
+      const message = readablePrismaMessage(
+        "\nInvalid `prisma.grantUsage.update()` invocation:\n\n\n" +
+          "No record was found for an update.",
+      );
+
+      expect(message).toBe("No record was found for an update. (prisma.grantUsage.update)");
     });
 
     it("lands a query event on the logger at debug, keyed by its SQL text", () => {
