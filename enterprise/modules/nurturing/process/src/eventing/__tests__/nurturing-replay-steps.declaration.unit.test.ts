@@ -140,9 +140,8 @@ describe("given the nurturing module installed on a worker", () => {
     ]);
     // The image ships code-steps.json, not this declaration: a stale list breaks here too.
     const codeSteps = JSON.parse(readFileSync(CODE_STEPS_JSON, "utf8")) as { id: string }[];
-    expect(
-      codeSteps.map(({ id }) => id).filter((id) => id.startsWith("nurturing:")),
-    ).toEqual(steps.map(({ id }) => id));
+    const shippedIds = codeSteps.map(({ id }) => id).filter((id) => id.startsWith("nurturing:"));
+    expect(shippedIds).toEqual(steps.map(({ id }) => id));
 
     // The lane and the trailing pass are only observable by running: each step asks for its lane twice.
     for (const step of steps) await runOnce(step);
