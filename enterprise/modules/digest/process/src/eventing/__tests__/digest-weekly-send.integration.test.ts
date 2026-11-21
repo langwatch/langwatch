@@ -393,6 +393,53 @@ describe("the weekly digest send", () => {
     });
   });
 
+  describe("when a member had five coding-agent sessions in two repositories", () => {
+    /** @scenario "A member with coding-agent sessions is sent their coding-agent week" */
+    it("mails them coding-agent-week with their totals and busiest repository", async () => {
+      await enrol();
+      await arm();
+      const repositories = ["acme/api", "acme/web", "acme/api", "acme/web", "acme/api"];
+      for (const [index, repository] of repositories.entries()) {
+        await codingAgentFact({ sessionId: `session-${index}`, repository });
+      }
+      const metrics = {
+        token_usage: 1_200,
+        cost_usage: 2.5,
+        active_time: 1_800,
+        lines_of_code: 140,
+        commit: 3,
+        pull_request: 1,
+      };
+      for (const [metric, value] of Object.entries(metrics)) {
+        await codingAgentFact({ sessionId: "session-0", series: { metric, value } });
+      }
+      await vi.waitFor(async () => {
+        const week = await digest.userWeek({ isoWeek: SENT_WEEK, userId: MEMBER });
+        expect(week?.sessions).toHaveLength(5);
+        expect(Object.keys(week?.series ?? {})).toHaveLength(6);
+      });
+
+      await sendFor({ userId: MEMBER, isoWeek: SENT_WEEK });
+
+      expect(recipients()).toEqual([emailOf(MEMBER)]);
+      const [mail] = digest.mail;
+      expect(mail?.templateId).toBe("digest-coding-agent-week");
+      expect(mail?.props).toEqual({
+        weekLabel: "Nov 9 to 15",
+        unsubscribeUrl: mail?.oneClickUnsubscribeUrl,
+        sessions: 5,
+        tokens: 1_200,
+        costUsd: 2.5,
+        activeMinutes: 30,
+        linesChanged: 140,
+        commits: 3,
+        pullRequests: 1,
+        topRepo: "acme/api",
+        weekUrl: BASE_URL,
+      });
+    });
+  });
+
   describe("when a member's pick is the what's new fallback", () => {
     /** @scenario "A member whose pick has nothing to show this week is sent nothing" */
     it("mails them nothing and records no send, since no card is published", async () => {
@@ -873,6 +920,29 @@ describe("the digest fold", () => {
     });
   });
 });
+
+/** One coding-agent fact on the member's sent week, through digest's own record command. */
+function codingAgentFact({
+  sessionId,
+  repository = null,
+  series = null,
+}: {
+  sessionId: string;
+  repository?: string | null;
+  series?: { metric: string; value: number } | null;
+}) {
+  return digest.recordUser({
+    tenantId: PROJECT,
+    occurredAt: IN_SENT_WEEK,
+    organizationId: ORGANIZATION,
+    isoWeek: SENT_WEEK,
+    sourceKey: `${sessionId}:${series?.metric ?? "span"}`,
+    userId: MEMBER,
+    sessionId,
+    repository,
+    series: series && { seriesId: `${sessionId}:${series.metric}`, type: null, ...series },
+  });
+}
 
 /** One root span on the project's week, through digest's own record command. */
 function spanIn({

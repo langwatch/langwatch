@@ -17,7 +17,12 @@ import {
   pickHomeOrganization,
 } from "../digest-email.rules.ts";
 import { pickDigestTemplate } from "../digest-template.rules.ts";
-import { emptyProjectWeek, type ProjectWeekState } from "../digest-week.rules.ts";
+import {
+  emptyProjectWeek,
+  emptyUserWeek,
+  type ProjectWeekState,
+  type UserWeekState,
+} from "../digest-week.rules.ts";
 
 const fold = (overrides: Partial<ProjectWeekState>): ProjectWeekState => ({
   ...emptyProjectWeek(),
@@ -26,6 +31,19 @@ const fold = (overrides: Partial<ProjectWeekState>): ProjectWeekState => ({
   isoWeek: "2026-W46",
   ...overrides,
 });
+
+/** The week of the member `propsFor` builds for, five coding-agent sessions by default. */
+const userFold = (overrides: Partial<UserWeekState>): UserWeekState => ({
+  ...emptyUserWeek(),
+  userId: "u",
+  organizationId: "org-1",
+  isoWeek: "2026-W46",
+  sessions: ["s1", "s2", "s3", "s4", "s5"],
+  ...overrides,
+});
+
+/** One converged metric series, as the fold keeps it. */
+const series = (metric: string, value: number) => ({ metric, type: null, value });
 
 const BASE = "https://app.example.test";
 const UNSUBSCRIBE = `${BASE}/api/digest/unsubscribe?token=signed`;
@@ -189,6 +207,72 @@ describe("buildDigestTemplateProps()", () => {
         limit: 1_000,
         resetsOn: "Dec 1",
         upgradeUrl: `${BASE}/settings/subscription`,
+      });
+    });
+  });
+
+  describe("when a member had five coding-agent sessions", () => {
+    const codingWeek = (user: UserWeekState) => week({ users: new Map([["u", user]]) });
+
+    /** @scenario "A coding-agent week shows only the counts its agent reported" */
+    it("renders coding-agent-week with every count the agent reported", () => {
+      const reported = userFold({
+        series: {
+          input: series("token_usage", 1_000.4),
+          output: series("token_usage", 200),
+          cost: series("cost_usage", 1.25),
+          active: series("active_time", 3_600),
+          lines: series("lines_of_code", 120),
+          commits: series("commit", 4),
+          pulls: series("pull_request", 2),
+        },
+        repositories: { "acme/api": 5 },
+      });
+
+      const { pick, props } = propsFor({ week: codingWeek(reported) });
+
+      expect(pick.template).toBe("digest-coding-agent-week");
+      expect(parsedBy({ templateId: pick.template, props })).toEqual({
+        weekLabel: "Nov 9 to 15",
+        unsubscribeUrl: UNSUBSCRIBE,
+        sessions: 5,
+        tokens: 1_200,
+        costUsd: 1.25,
+        activeMinutes: 60,
+        linesChanged: 120,
+        commits: 4,
+        pullRequests: 2,
+        topRepo: "acme/api",
+        weekUrl: BASE,
+      });
+    });
+
+    /** @scenario "A coding-agent week shows only the counts its agent reported" */
+    it("leaves out each optional count, and the repository, when none was reported", () => {
+      const { pick, props } = propsFor({ week: codingWeek(userFold({})) });
+
+      expect(parsedBy({ templateId: pick.template, props })).toEqual({
+        weekLabel: "Nov 9 to 15",
+        unsubscribeUrl: UNSUBSCRIBE,
+        sessions: 5,
+        tokens: 0,
+        costUsd: 0,
+        activeMinutes: 0,
+        weekUrl: BASE,
+      });
+      for (const optional of ["linesChanged", "commits", "pullRequests", "topRepo"]) {
+        expect(props).not.toHaveProperty(optional);
+      }
+    });
+
+    /** @scenario "A coding-agent week names the repository with the most sessions" */
+    it("names the repository with the most sessions as the top one", () => {
+      const repositories = { "acme/web": 1, "acme/api": 3, "acme/docs": 2 };
+
+      const { pick, props } = propsFor({ week: codingWeek(userFold({ repositories })) });
+
+      expect(parsedBy({ templateId: pick.template, props })).toMatchObject({
+        topRepo: "acme/api",
       });
     });
   });

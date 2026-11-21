@@ -58,6 +58,19 @@ Feature: Weekly digest emails
     When the template is picked for that member
     Then it is digest-whats-new
 
+  @unit
+  Scenario: A coding-agent week shows only the counts its agent reported
+    Given a member with 5 coding-agent sessions this week
+    When their digest-coding-agent-week email is built
+    Then it shows their sessions, tokens, cost and active minutes
+    And lines changed, commits, pull requests and a top repository only when they were reported
+
+  @unit
+  Scenario: A coding-agent week names the repository with the most sessions
+    Given a member whose coding-agent sessions this week ran in three repositories
+    When their digest-coding-agent-week email is built
+    Then its top repository is the one with the most sessions
+
   # Folding the week
 
   @integration
@@ -160,6 +173,13 @@ Feature: Weekly digest emails
     When the week's emails are sent
     Then its admin's email is digest-plan-pressure with the usage, the count and the limit
     And its other members' emails are not
+
+  @integration
+  Scenario: A member with coding-agent sessions is sent their coding-agent week
+    Given the send is armed and a member with 5 coding-agent sessions in two repositories
+    When their send is handled
+    Then their email is digest-coding-agent-week with their sessions and metric totals
+    And it names the repository where most of their sessions ran
 
   @integration
   Scenario: An unsubscribed member is skipped
