@@ -5,6 +5,7 @@
  */
 import {
   type LangWatchQLMemberWindow,
+  LangWatchQLNotPermittedError,
   LangWatchQLShadowedViewError,
   LangWatchQLTableModifierError,
 } from "@langwatch/analytics-contract";
@@ -57,6 +58,10 @@ const NAMED_SETS: [string, string][] = [
     "SELECT count() FROM spans " +
       "WHERE TraceId IN (SELECT TraceId FROM traces WHERE TraceId GLOBAL IN spans)",
   ],
+  [
+    "an Identifier-typed query parameter",
+    "SELECT count() FROM spans WHERE TraceId IN {t:Identifier}",
+  ],
 ];
 
 function scope({
@@ -86,11 +91,32 @@ function captureRefusal(run: () => unknown): unknown {
   throw new Error("expected the rewrite to refuse");
 }
 
+/** The refusal the validator gives a set written as a plain name, from the scope step. */
+function expectSetOperandRefusal(run: () => unknown): void {
+  const refusal = captureRefusal(run);
+
+  expect(refusal).toBeInstanceOf(LangWatchQLNotPermittedError);
+  expect((refusal as LangWatchQLNotPermittedError).message).toBe(
+    "The submitted SQL is not permitted by the LangWatchQL analytics policy.",
+  );
+  expect((refusal as LangWatchQLNotPermittedError).meta).toEqual({
+    violations: [
+      {
+        code: "IN_TABLE_OPERAND",
+        clause: "statement",
+        message:
+          "The set of an IN test cannot be a plain name. Write it as a subquery, x IN (SELECT ... FROM view), or as a list of values.",
+        hint: "Write the set as a subquery: x IN (SELECT ... FROM view).",
+      },
+    ],
+  });
+}
+
 describe("scopeLangWatchQL with member windows", () => {
   describe("given a member shared from a point in time", () => {
     /** @scenario "A set membership test names its set with a subquery" */
     it.each(NAMED_SETS)("refuses a set written as %s when scoping", (_case, sql) => {
-      expect(() => scope({ sql, memberWindows: [WHOLE_A, DATED_B] })).toThrow(/subquery/);
+      expectSetOperandRefusal(() => scope({ sql, memberWindows: [WHOLE_A, DATED_B] }));
     });
 
     /** @scenario "Every view the statement reads is narrowed to each member's window" */
@@ -347,7 +373,7 @@ describe("scopeLangWatchQL with member windows", () => {
   describe("given a plain project", () => {
     /** @scenario "A set membership test names its set with a subquery" */
     it.each(NAMED_SETS)("refuses a set written as %s when scoping", (_case, sql) => {
-      expect(() => scope({ sql })).toThrow(/subquery/);
+      expectSetOperandRefusal(() => scope({ sql }));
     });
 
     /** @scenario "A set membership test names its set with a subquery" */

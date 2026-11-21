@@ -756,7 +756,7 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
     And it writes the set as a plain name: a view, a table, a FROM alias or a WITH name, quoted, qualified or in parentheses
     Then the query is refused before it reaches the database
     And the refusal names the IN_TABLE_OPERAND rule and tells the caller to write the set as a subquery, x IN (SELECT ... FROM view)
-    And a set written as a subquery, a literal, a tuple or array of literals, an allowed function or a query parameter is accepted
+    And a set written as a subquery, a literal, a tuple or array of literals, an allowed function or a query parameter bound to a value is accepted
     And a set test the restricted identity runs over a LangWatchQL table matches only its own tenant's rows
 
   @unit
@@ -765,6 +765,7 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
     When a query declares a WITH name that differs from a view it reads only in letter case
     Then the view reference is checked against the caller's views like any other view reference
     And a windowed read still refuses a WITH name spelt like a view in any letter case
+    And a bounded read of the view is still sent to its floored twin
 
   @integration
   Scenario: Query database credentials never reach the caller

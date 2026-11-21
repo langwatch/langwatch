@@ -2,6 +2,7 @@ import {
   formatLangWatchQLDateTimeParameter,
   type LangWatchQLCaller,
   type LangWatchQLMemberWindow,
+  LangWatchQLNotPermittedError,
   type LangWatchQLProtections,
   LangWatchQLShadowedViewError,
   LangWatchQLTableModifierError,
@@ -11,9 +12,13 @@ import {
 import type { LangWatchQLViewDefinition } from "../services/langwatch-ql-catalog-shapes.service.ts";
 import { clickHouseSqlParser, type SqlAstNode } from "./langwatch-ql-parser.rules.ts";
 import { qualifyTableName } from "./langwatch-ql-policy.rules.ts";
-import { findNamedSetOperands } from "./langwatch-ql-set-operand.rules.ts";
+import {
+  findNamedSetOperands,
+  IN_TABLE_OPERAND_MESSAGE,
+} from "./langwatch-ql-set-operand.rules.ts";
 import { clickHouseLiteral } from "./langwatch-ql-sql-literal.rules.ts";
 import { METADATA_FIELDS } from "./langwatch-ql-validation-shape.rules.ts";
+import { DEFAULT_VIOLATION_HINTS } from "./langwatch-ql-violations.rules.ts";
 
 /**
  * The strictest protections across a readable project set: a content category or a catalogue
@@ -111,15 +116,22 @@ function assertNoShadowedView({
 }
 
 /**
- * Refuses a membership test whose set holds a plain name, which the validator refuses as
- * `IN_TABLE_OPERAND` before a statement gets here: a second check on the same shape.
- * @throws {Error} naming the rule, never the statement.
+ * Refuses a membership test whose set holds a plain name, as the validator does before a
+ * statement gets here: a second check on the same shape, refused the same way.
+ * @throws {LangWatchQLNotPermittedError} with one `IN_TABLE_OPERAND` violation.
  */
 function assertNoNamedSetOperands(statements: readonly SqlAstNode[]): void {
   const functions = collectNodes(statements, "Function", []);
-  if (functions.some((node) => findNamedSetOperands(node).length > 0)) {
-    throw new Error("LangWatchQL scope: a set membership test must name its set with a subquery");
-  }
+  const holdsNamedSet = functions.some((node) => findNamedSetOperands(node).length > 0);
+  if (!holdsNamedSet) return;
+  throw new LangWatchQLNotPermittedError([
+    {
+      code: "IN_TABLE_OPERAND",
+      clause: "statement",
+      message: IN_TABLE_OPERAND_MESSAGE,
+      hint: DEFAULT_VIOLATION_HINTS.IN_TABLE_OPERAND,
+    },
+  ]);
 }
 
 /** The view references in a parsed statement, last first, each once; `WITH` names are not views. */

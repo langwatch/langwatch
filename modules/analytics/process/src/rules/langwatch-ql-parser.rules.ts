@@ -16,6 +16,16 @@ export interface SqlAstNode {
   readonly [field: string]: unknown;
 }
 
+/** Whether a value read off the tree is a node: an object, not an array, with a string `type`. */
+export function isNode(value: unknown): value is SqlAstNode {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    !Array.isArray(value) &&
+    typeof (value as { type?: unknown }).type === "string"
+  );
+}
+
 /** Outcome of parsing. A parser that throws reports `ok: false`, never escapes. */
 type SqlParseOutcome =
   | { readonly ok: true; readonly statements: readonly SqlAstNode[] }

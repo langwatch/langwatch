@@ -417,6 +417,14 @@ describe("validateLangWatchQL given a set membership test", () => {
       "WITH t AS (SELECT TraceId FROM traces) SELECT count() FROM spans WHERE TraceId IN t",
     ],
     [
+      "a WITH alias of a literal array",
+      "WITH ['a', 'b'] AS ids SELECT count() FROM spans WHERE TraceId IN ids",
+    ],
+    [
+      "an Identifier-typed query parameter",
+      "SELECT count() FROM spans WHERE TraceId IN {t:Identifier}",
+    ],
+    [
       "a name beside an accepted subquery",
       "SELECT count() FROM spans " +
         "WHERE TraceId IN (SELECT TraceId FROM traces) AND TraceId IN gateway_request_spend",

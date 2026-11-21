@@ -29,9 +29,12 @@ import {
   isLangWatchQLAggregateFunction,
   LWQL_ALLOWED_FUNCTION_NAMES,
 } from "../features/app-functions/rules/langwatch-ql-functions.rules.ts";
-import type { SqlAstNode } from "./langwatch-ql-parser.rules.ts";
+import { isNode, type SqlAstNode } from "./langwatch-ql-parser.rules.ts";
 import { qualifyTableName } from "./langwatch-ql-policy.rules.ts";
-import { findNamedSetOperands } from "./langwatch-ql-set-operand.rules.ts";
+import {
+  findNamedSetOperands,
+  IN_TABLE_OPERAND_MESSAGE,
+} from "./langwatch-ql-set-operand.rules.ts";
 import {
   type BlockAccumulator,
   type FieldArgs,
@@ -64,15 +67,6 @@ function addOnce(names: string[], name: string): void {
 // Small readers — every one of them treats a surprising shape as a refusal
 // rather than a crash, because the input is a tree built from hostile text.
 // ---------------------------------------------------------------------------
-
-function isNode(value: unknown): value is SqlAstNode {
-  return (
-    typeof value === "object" &&
-    value !== null &&
-    !Array.isArray(value) &&
-    typeof (value as { type?: unknown }).type === "string"
-  );
-}
 
 export function extractPosition(node: SqlAstNode): SqlSourcePosition | undefined {
   const start = (node as { location?: { start?: unknown } }).location?.start;
@@ -1220,9 +1214,6 @@ function enterTableJoin({ node, frame }: NodeArgs): Frame {
   if (frame.block) collectJoinEdges({ node, block: frame.block });
   return frame;
 }
-
-const IN_TABLE_OPERAND_MESSAGE =
-  "The set of an IN test cannot be a plain name. Write it as a subquery, x IN (SELECT ... FROM view), or as a list of values.";
 
 /**
  * Refuses a set written as a name, in operator and function form alike, or wrapped in a function.
