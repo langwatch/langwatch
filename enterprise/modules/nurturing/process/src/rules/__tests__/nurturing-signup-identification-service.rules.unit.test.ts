@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   fireOrganizationCreated,
-  firstNameOf,
+  firstNameTraitOf,
   fireSignup,
 } from "../nurturing-signup-identification-service.rules.ts";
 
@@ -194,23 +194,23 @@ describe("fireSignup", () => {
   });
 });
 
-describe("firstNameOf", () => {
+describe("firstNameTraitOf", () => {
   describe("given a name", () => {
     describe("when its first word is read", () => {
       /** @scenario "A sign-up with an email-like or one-letter name sends no first name" */
       it.each([
-        ["Jane Doe", "Jane"],
-        ["Cher", "Cher"],
-        ["  Ana  Maria Lopez ", "Ana"],
-        ["jane doe", "jane"],
-        ["jane@acme.com", undefined],
-        ["", undefined],
-        ["   ", undefined],
-        [null, undefined],
-        ["J", undefined],
-        ["J Doe", undefined],
+        ["Jane Doe", { first_name: "Jane" }],
+        ["Cher", { first_name: "Cher" }],
+        ["  Ana  Maria Lopez ", { first_name: "Ana" }],
+        ["jane doe", { first_name: "jane" }],
+        ["jane@acme.com", {}],
+        ["", {}],
+        ["   ", {}],
+        [null, {}],
+        ["J", {}],
+        ["J Doe", {}],
       ])("decides %j yields %j", (name, expected) => {
-        expect(firstNameOf(name)).toBe(expected);
+        expect(firstNameTraitOf(name)).toEqual(expected);
       });
     });
   });

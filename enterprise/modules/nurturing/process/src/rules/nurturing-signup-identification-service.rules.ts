@@ -31,15 +31,15 @@ function pickDefined(obj: Record<string, unknown>): Record<string, unknown> {
 }
 
 /**
- * The first word of a name that looks like a person's name, as typed. Email-like and
- * one-letter first words are not usable in a greeting, so they yield undefined.
+ * The first_name trait for a name that looks like a person's name: its first word, as typed.
+ * Email-like and one-letter first words are not usable in a greeting, so they yield no trait.
  */
-export function firstNameOf(name: string | null | undefined): string | undefined {
+export function firstNameTraitOf(name: string | null | undefined): { first_name?: string } {
   const trimmed = name?.trim();
-  if (!trimmed || trimmed.includes("@")) return undefined;
+  if (!trimmed || trimmed.includes("@")) return {};
 
   const [first] = trimmed.split(/\s+/);
-  return first && first.length > 1 ? first : undefined;
+  return first && first.length > 1 ? { first_name: first } : {};
 }
 
 /**
@@ -71,7 +71,7 @@ export function fireSignup({
     ...pickDefined({
       email,
       name,
-      first_name: firstNameOf(name),
+      ...firstNameTraitOf(name),
       role: signUpData?.yourRole,
       company_size: signUpData?.companySize,
       signup_usage: signUpData?.usage,
