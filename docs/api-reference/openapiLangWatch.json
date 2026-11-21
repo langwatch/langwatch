@@ -16075,7 +16075,9 @@
                               "INSTANT_EVAL_SKIPPED",
                               "SHARE_WINDOW_LIMITED",
                               "SOURCES_IGNORED",
-                              "GRANULARITY_COARSENED"
+                              "GRANULARITY_COARSENED",
+                              "SHARE_WINDOW_MISSING",
+                              "SHARED_ROWS_UNDER_LOWEST_PROJECT"
                             ]
                           },
                           "message": {

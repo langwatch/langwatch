@@ -58,14 +58,61 @@ export function shareWindowDiagnostics(
   ];
 }
 
+/**
+ * Says when a project the run reads has no member window, so none of its rows are read. Like
+ * SHARE_WINDOW_LIMITED it names no project and counts none.
+ */
+export function shareWindowMissingDiagnostics({
+  memberWindows,
+  projectIds,
+}: {
+  memberWindows: readonly LangWatchQLMemberWindow[] | undefined;
+  projectIds: readonly string[];
+}): LangWatchQLDiagnostic[] {
+  if (memberWindows === undefined) return [];
+  const windowed = new Set(memberWindows.map((window) => window.projectId));
+  if (projectIds.every((projectId) => windowed.has(projectId))) return [];
+
+  return [
+    {
+      code: "SHARE_WINDOW_MISSING",
+      message: "Some projects are not shared with this read, so none of their rows are included",
+    },
+  ];
+}
+
+/**
+ * Says a multi-project read kept one copy of each team- or organization-level row, under the
+ * lowest project id: a filter or GROUP BY on TenantId finds it there only (tasks#1212).
+ */
+export function sharedRowsDiagnostics(collapsesSharedRows: boolean): LangWatchQLDiagnostic[] {
+  if (!collapsesSharedRows) return [];
+
+  return [
+    {
+      code: "SHARED_ROWS_UNDER_LOWEST_PROJECT",
+      message:
+        "Rows shared by several of these projects, such as organization or team settings, " +
+        "are counted once under the lowest project id, so a TenantId filter or GROUP BY " +
+        "finds them there only.",
+    },
+  ];
+}
+
 /** The notes a run adds to what the database returned: what limited it, ignored or coarsened it. */
 export function runNotes({
   memberWindows,
+  projectIds,
+  collapsesSharedRows,
   sources,
   followsSources,
   granularity,
 }: {
+  /** The windows naming a project the run reads; absent on a plain project. */
   memberWindows: readonly LangWatchQLMemberWindow[] | undefined;
+  projectIds: readonly string[];
+  /** Whether the read kept one copy of a row its views repeat per project. */
+  collapsesSharedRows: boolean;
   sources: RunSources | undefined;
   followsSources: boolean;
   granularity: {
@@ -75,6 +122,8 @@ export function runNotes({
 }): LangWatchQLDiagnostic[] {
   return [
     ...shareWindowDiagnostics(memberWindows),
+    ...shareWindowMissingDiagnostics({ memberWindows, projectIds }),
+    ...sharedRowsDiagnostics(collapsesSharedRows),
     ...sourcesIgnoredDiagnostics({
       sourcesNamed: sources !== undefined && sources !== null,
       followsSources,

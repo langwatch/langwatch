@@ -16,8 +16,8 @@ import {
 } from "../../services/langwatch-ql-catalog-shapes.service.ts";
 import {
   hydratableProjects,
-  readableMemberWindows,
   scopeLangWatchQL,
+  windowsNaming,
 } from "../langwatch-ql-query-scope.rules.ts";
 import { LWQL_VIEW_CATALOG } from "../lwql-view-catalog.rules.ts";
 
@@ -44,12 +44,15 @@ if (!POSTGRES_VIEW) throw new Error("the catalogue has no un-narrowed PostgreSQL
 const B_FROM = `(TenantId = 'project_b' AND OccurredAt >= fromUnixTimestamp64Milli(toInt64(${SHARED_FROM})))`;
 const MEMBERS = `(TenantId IN ('project_a') OR ${B_FROM})`;
 
-/** Scopes `sql`; the caller reads exactly the windows' projects unless `projectIds` says not. */
+/**
+ * Scopes `sql`; the caller reads exactly the windows' projects, else project A alone, unless
+ * `projectIds` says otherwise.
+ */
 function scope({
   sql,
   memberWindows,
   timeWindow,
-  projectIds = memberWindows?.map((window) => window.projectId),
+  projectIds = memberWindows?.map((window) => window.projectId) ?? ["project_a"],
 }: {
   sql: string;
   memberWindows?: readonly LangWatchQLMemberWindow[];
@@ -62,9 +65,15 @@ function scope({
     views: VIEWS,
     ...(memberWindows ? { memberWindows } : {}),
     ...(timeWindow ? { timeWindow } : {}),
-    ...(projectIds ? { projectIds } : {}),
+    projectIds,
   });
 }
+
+/** What a read over several projects appends to a view keyed by `keys`, in order. */
+const keptOnce = (keys: readonly string[]) => {
+  const quoted = keys.map((key) => `\`${key}\``).join(", ");
+  return ` ORDER BY ${quoted}, \`TenantId\` LIMIT 1 BY ${quoted}`;
+};
 
 function captureRefusal(run: () => unknown): unknown {
   try {
@@ -117,7 +126,7 @@ describe("scopeLangWatchQL with member windows", () => {
     });
 
     /** @scenario "A member window on the kept copy does not hide a row a sibling's window admits" */
-    it("picks a fanned-out view's rows by key from the engine table's per-project copies", () => {
+    it("keeps one copy of a fanned-out view's row only after the windows pick the copies", () => {
       const budgets = VIEWS.find((view) => view.name === "gateway_budgets");
       if (!budgets?.timeColumn) throw new Error("gateway_budgets has no time column");
       const picks =
@@ -127,56 +136,9 @@ describe("scopeLangWatchQL with member windows", () => {
       expect(
         scope({ sql: "SELECT count() FROM gateway_budgets", memberWindows: [WHOLE_A, DATED_B] }),
       ).toBe(
-        "SELECT count() FROM (SELECT * FROM gateway_budgets WHERE (`GatewayBudgetId`) IN " +
-          "(SELECT `GatewayBudgetId` FROM analytics.gateway_budgets_pg " +
-          `WHERE TenantId IN ('project_a', 'project_b') AND ${picks})) ` +
-          "AS gateway_budgets",
+        `SELECT count() FROM (SELECT * FROM gateway_budgets WHERE ${picks}` +
+          `${keptOnce(["GatewayBudgetId"])}) AS gateway_budgets`,
       );
-    });
-
-    /** @scenario "A member window on the kept copy does not hide a row a sibling's window admits" */
-    it("picks a fanned-out view keyed on more than one column by the whole key", () => {
-      const budgets = VIEWS.find((view) => view.name === "gateway_budgets");
-      if (!budgets?.postgres) throw new Error("gateway_budgets is not a PostgreSQL view");
-      const shares: LangWatchQLViewDefinition = {
-        ...budgets,
-        name: "budget_shares",
-        sourceTable: "budget_shares_pg",
-        postgres: { ...budgets.postgres, entityKeyColumns: ["GatewayBudgetId", "ScopeId"] },
-      };
-
-      const scoped = scopeLangWatchQL({
-        sql: "SELECT count() FROM budget_shares",
-        database: "analytics",
-        views: [...VIEWS, shares],
-        memberWindows: [WHOLE_A, DATED_B],
-        projectIds: ["project_a", "project_b"],
-      });
-
-      expect(scoped).toContain(
-        "WHERE (`GatewayBudgetId`, `ScopeId`) IN (SELECT `GatewayBudgetId`, `ScopeId` " +
-          "FROM analytics.budget_shares_pg WHERE TenantId IN ('project_a', 'project_b') AND ",
-      );
-    });
-
-    it("refuses a fanned-out view whose key is not a plain identifier", () => {
-      const budgets = VIEWS.find((view) => view.name === "gateway_budgets");
-      if (!budgets?.postgres) throw new Error("gateway_budgets is not a PostgreSQL view");
-      const tampered: LangWatchQLViewDefinition = {
-        ...budgets,
-        name: "tampered_budgets",
-        postgres: { ...budgets.postgres, entityKeyColumns: ["Id`; DROP"] },
-      };
-
-      expect(() =>
-        scopeLangWatchQL({
-          sql: "SELECT count() FROM tampered_budgets",
-          database: "analytics",
-          views: [...VIEWS, tampered],
-          memberWindows: [WHOLE_A, DATED_B],
-          projectIds: ["project_a", "project_b"],
-        }),
-      ).toThrow(/entity key must match/);
     });
 
     it("reads nothing from a view with no time column when every member is dated", () => {
@@ -341,6 +303,7 @@ describe("scopeLangWatchQL with member windows", () => {
         database: "analytics",
         views: VIEWS.filter((view) => view.name !== "traces"),
         memberWindows: [WHOLE_A, DATED_B],
+        projectIds: ["project_a", "project_b"],
       });
 
       expect(scoped).toBe(
@@ -470,7 +433,7 @@ describe("hydratableProjects", () => {
   });
 });
 
-describe("readableMemberWindows", () => {
+describe("windowsNaming", () => {
   const READERS = ["project_a", "project_b"];
 
   /** @scenario "A read where every project has its own whole-history window is left as written" */
@@ -491,13 +454,7 @@ describe("readableMemberWindows", () => {
     const outsider: LangWatchQLMemberWindow = { projectId: "project_c", from: 0 };
 
     expect(
-      readableMemberWindows({
-        projects: [
-          { id: "project_a", lwqlKey: "key_a" },
-          { id: "project_b", lwqlKey: "key_b" },
-        ],
-        memberWindows: [WHOLE_A, DATED_B, outsider],
-      }),
+      windowsNaming({ memberWindows: [WHOLE_A, DATED_B, outsider], projectIds: READERS }),
     ).toEqual([WHOLE_A, DATED_B]);
   });
 
@@ -521,34 +478,119 @@ describe("readableMemberWindows", () => {
 
   /** @scenario "A project with no member window reads nothing once windows are given" */
   it("reads only the project whose window is given, never its windowless sibling", () => {
-    const memberWindows = readableMemberWindows({
-      projects: [
-        { id: "project_a", lwqlKey: "key_a" },
-        { id: "project_b", lwqlKey: "key_b" },
-      ],
-      memberWindows: [WHOLE_A],
-    });
-
-    expect(scope({ sql: "SELECT count() FROM traces", memberWindows, projectIds: READERS })).toBe(
+    expect(
+      scope({ sql: "SELECT count() FROM traces", memberWindows: [WHOLE_A], projectIds: READERS }),
+    ).toBe(
       "SELECT count() FROM (SELECT * FROM traces WHERE (TenantId IN ('project_a'))) AS traces",
     );
   });
 
   /** @scenario "A read whose every member window is dropped reads nothing" */
-  it.each(["traces", "gateway_budgets"])(
+  it.each([
+    ["traces", ""],
+    ["gateway_budgets", keptOnce(["GatewayBudgetId"])],
+  ])(
     "reads nothing from %s when every window names a project outside the caller's",
-    (view) => {
-      const memberWindows = readableMemberWindows({
-        projects: [
-          { id: "project_a", lwqlKey: "key_a" },
-          { id: "project_b", lwqlKey: "key_b" },
-        ],
-        memberWindows: [{ projectId: "project_c", from: 0 }],
-      });
-
+    (view, kept) => {
       expect(
-        scope({ sql: `SELECT count() FROM ${view}`, memberWindows, projectIds: READERS }),
-      ).toBe(`SELECT count() FROM (SELECT * FROM ${view} WHERE 0) AS ${view}`);
+        scope({
+          sql: `SELECT count() FROM ${view}`,
+          memberWindows: [{ projectId: "project_c", from: 0 }],
+          projectIds: READERS,
+        }),
+      ).toBe(`SELECT count() FROM (SELECT * FROM ${view} WHERE 0${kept}) AS ${view}`);
     },
   );
+});
+
+describe("scopeLangWatchQL over several projects", () => {
+  const READERS = ["project_a", "project_b"];
+  const BUDGETS_ONCE = `(SELECT * FROM gateway_budgets${keptOnce(["GatewayBudgetId"])})`;
+
+  /** @scenario "A read over several projects keeps one row per entity of a fanned-out view" */
+  it("keeps one copy of each fanned-out row, with the caller's filter outside it", () => {
+    expect(
+      scope({
+        sql: "SELECT count() FROM gateway_budgets AS b WHERE b.LimitUsd > 0",
+        projectIds: READERS,
+      }),
+    ).toBe(`SELECT count() FROM ${BUDGETS_ONCE} AS b WHERE b.LimitUsd > 0`);
+  });
+
+  /** @scenario "A read over several projects keeps one row per entity of a fanned-out view" */
+  it("reads a project-scoped view beside it as written", () => {
+    expect(
+      scope({
+        sql: "SELECT count() FROM topics UNION ALL SELECT count() FROM ingestion_sources",
+        projectIds: READERS,
+      }),
+    ).toBe(
+      "SELECT count() FROM topics UNION ALL SELECT count() FROM (SELECT * FROM ingestion_sources" +
+        `${keptOnce(["IngestionSourceId"])}) AS ingestion_sources`,
+    );
+  });
+
+  /** @scenario "A read over several projects keeps one row per entity of a fanned-out view" */
+  it("keys a view named by more than one column on the whole key", () => {
+    const budgets = VIEWS.find((view) => view.name === "gateway_budgets");
+    if (!budgets?.postgres) throw new Error("gateway_budgets is not a PostgreSQL view");
+    const shares: LangWatchQLViewDefinition = {
+      ...budgets,
+      name: "budget_shares",
+      postgres: { ...budgets.postgres, entityKeyColumns: ["GatewayBudgetId", "ScopeId"] },
+    };
+
+    expect(
+      scopeLangWatchQL({
+        sql: "SELECT count() FROM budget_shares",
+        database: "analytics",
+        views: [...VIEWS, shares],
+        projectIds: READERS,
+      }),
+    ).toBe(
+      "SELECT count() FROM (SELECT * FROM budget_shares" +
+        `${keptOnce(["GatewayBudgetId", "ScopeId"])}) AS budget_shares`,
+    );
+  });
+
+  it("refuses a fanned-out view whose key is not a plain column name", () => {
+    const budgets = VIEWS.find((view) => view.name === "gateway_budgets");
+    if (!budgets?.postgres) throw new Error("gateway_budgets is not a PostgreSQL view");
+    const tampered: LangWatchQLViewDefinition = {
+      ...budgets,
+      name: "tampered_budgets",
+      postgres: { ...budgets.postgres, entityKeyColumns: ["Id`; DROP"] },
+    };
+
+    expect(() =>
+      scopeLangWatchQL({
+        sql: "SELECT count() FROM tampered_budgets",
+        database: "analytics",
+        views: [...VIEWS, tampered],
+        projectIds: READERS,
+      }),
+    ).toThrow(Error);
+  });
+
+  /** @scenario "A single-project read of a fanned-out view carries no collapse" */
+  it.each([[["project_a"]], [["project_a", "project_a"]]])(
+    "reads a fanned-out view as written for the one project in %j",
+    (projectIds) => {
+      const sql = "SELECT count() FROM gateway_budgets";
+
+      expect(scope({ sql, projectIds })).toBe(sql);
+    },
+  );
+
+  /** @scenario "A WITH name spelt like a narrowed view is refused" */
+  it("refuses a WITH name that would hide a fanned-out view from the collapse", () => {
+    const sql =
+      "SELECT count() FROM analytics.gateway_budgets " +
+      "WHERE 1 IN (WITH gateway_budgets AS (SELECT 1 AS n) SELECT n FROM gateway_budgets)";
+
+    const refusal = captureRefusal(() => scope({ sql, projectIds: READERS }));
+
+    expect(refusal).toBeInstanceOf(LangWatchQLShadowedViewError);
+    expect((refusal as LangWatchQLShadowedViewError).meta).toEqual({ names: ["gateway_budgets"] });
+  });
 });

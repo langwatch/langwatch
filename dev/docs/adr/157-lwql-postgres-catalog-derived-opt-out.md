@@ -171,9 +171,20 @@ change and is a known manual step, not an oversight.
 This reverses the double count accepted under "Why the fan-out lives in the
 view's join chain". The join chain still stamps one copy of a team- or
 organization-scoped row per project, and the predicate and policy still filter
-those copies as before. The view then keeps one copy of each row across the
-projects read, the one under the lowest project id (langwatch/tasks#1212). A
-`COUNT(*)` on such a view counts each row once.
+those copies as before, and the view keeps every copy. A read whose key set
+holds more than one project then keeps one copy of each row, the one under the
+lowest project id it admits (langwatch/tasks#1212), so a `COUNT(*)` counts each
+row once.
+
+- **Only multi-project reads collapse.** The scope rewrite wraps each such
+  view reference in `ORDER BY key, TenantId LIMIT 1 BY key`. No filter passes
+  a `LIMIT BY` (ClickHouse `PredicateRewriteVisitor::rewriteSubquery`; the
+  plan-level push below a `LIMIT BY` takes only key predicates, behind
+  `filter_push_down_below_limit_by`), so a single-project read, where no row
+  repeats, reads the plain view. Member windows filter the copies first, so
+  the kept copy is one a window admits.
+- **The run says so.** A multi-project read of such a view carries the
+  `SHARED_ROWS_UNDER_LOWEST_PROJECT` diagnostic.
 
 - **Project filters see the lowest project only.** In a multi-project read, a
   `TenantId` filter or grouping finds such a row under the lowest project id
@@ -182,6 +193,9 @@ projects read, the one under the lowest project id (langwatch/tasks#1212). A
   lowest project only" in `specs/lwql/postgres-catalog.feature` tests it.
 - **The grain says so.** The generated grain and description name the row by
   its own key, not by `(TenantId, …)`, and state the point above.
+- **A parent chain is followed to its end.** A row reached through a parent
+  fans out only when the chain ends at a team or organization; one under a
+  project-scoped parent has one project and is never collapsed.
 - **A key that holds the scope field keeps its fan-out.** A model whose
   primary key includes its own `teamId` or `organizationId` names a row only
   together with that scope. `TenantId` no longer carries it, so collapsing on

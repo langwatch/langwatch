@@ -48,6 +48,8 @@ export const LWQL_DIAGNOSTIC_CODES = [
   "SHARE_WINDOW_LIMITED",
   "SOURCES_IGNORED",
   "GRANULARITY_COARSENED",
+  "SHARE_WINDOW_MISSING",
+  "SHARED_ROWS_UNDER_LOWEST_PROJECT",
 ] as const;
 export const langWatchQLDiagnosticCodeSchema = z.enum(LWQL_DIAGNOSTIC_CODES);
 export type LangWatchQLDiagnosticCode = z.infer<typeof langWatchQLDiagnosticCodeSchema>;

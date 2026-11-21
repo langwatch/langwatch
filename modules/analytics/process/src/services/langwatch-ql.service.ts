@@ -31,7 +31,8 @@ import type {
 import { langWatchQLPassSql } from "../rules/langwatch-ql-pass-sql.rules.ts";
 import {
   assertNoUnsupportedTableModifiers,
-  readableMemberWindows,
+  collapsesSharedRows,
+  windowsNaming,
 } from "../rules/langwatch-ql-query-scope.rules.ts";
 import { assertNoReservedNameAssigned } from "../rules/langwatch-ql-reserved-names.rules.ts";
 import { DEFAULT_LWQL_RESULT_LIMITS } from "../rules/langwatch-ql-result-limits.rules.ts";
@@ -316,6 +317,7 @@ export class LangWatchQLService {
     granularity,
     followedWindow,
     memberWindows,
+    projectIds,
     sources,
   }: {
     result: LangWatchQLQueryResult;
@@ -323,6 +325,7 @@ export class LangWatchQLService {
     granularity: Parameters<typeof langWatchQLExecutionParameters>[0]["granularity"];
     followedWindow: LangWatchQLTimeWindow | undefined;
     memberWindows: Parameters<typeof runNotes>[0]["memberWindows"];
+    projectIds: readonly string[];
     sources: Parameters<typeof runNotes>[0]["sources"];
   }): LangWatchQLQueryResult {
     return {
@@ -335,6 +338,13 @@ export class LangWatchQLService {
         ...result.diagnostics,
         ...runNotes({
           memberWindows,
+          projectIds,
+          collapsesSharedRows: collapsesSharedRows({
+            tables: validation.tables,
+            views: this.views,
+            database: this.deps.database,
+            projectIds,
+          }),
           sources,
           followsSources: validation.followsSources,
           granularity,
@@ -423,9 +433,9 @@ export class LangWatchQLService {
     LangWatchQLEvalGate &
     LangWatchQLMemberScope): Promise<LangWatchQLQueryResult> {
     const projectIds = projects.map((project) => project.id);
-    // Both the run and its completeness read take their windows from here, never the request's.
+    // The scope drops these windows too; the run notes need the same readable set.
     const memberWindows =
-      requestedWindows && readableMemberWindows({ projects, memberWindows: requestedWindows });
+      requestedWindows && windowsNaming({ memberWindows: requestedWindows, projectIds });
     const boundSources = resolveRunSources(sources);
     const validation = this.validate({
       projectId: projectIds.join(",") || "(none)",
@@ -485,6 +495,7 @@ export class LangWatchQLService {
       granularity,
       followedWindow,
       memberWindows,
+      projectIds,
       sources,
     });
     if (completeness.kind !== "reported") return limited;

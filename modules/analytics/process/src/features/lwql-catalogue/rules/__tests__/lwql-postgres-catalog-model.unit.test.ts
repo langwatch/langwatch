@@ -106,7 +106,7 @@ describe("given the derived Postgres catalog", () => {
   });
 
   describe("when a view's rows fan out to one per project", () => {
-    /** @scenario "A fanned-out view keeps one row per entity across the projects read" */
+    /** @scenario "A read over several projects keeps one row per entity of a fanned-out view" */
     it("names the exposed primary key as the entity a multi-project read keeps once", () => {
       const entityKeys = (name: string) => byName.get(name)!.postgres!.entityKeyColumns;
       expect(entityKeys("gateway_budgets")).toEqual(["GatewayBudgetId"]);
@@ -171,6 +171,28 @@ describe("given the derived Postgres catalog", () => {
       // The parent is organization-scoped, so the tail is the org helper.
       expect(view.postgres!.tenantPath?.slice(1)).toEqual(organizationTenantPath());
       expect(byName.has("gateway_budget_ledgers")).toBe(true);
+    });
+
+    /** @scenario "A row reached through a project-scoped parent is not fanned out" */
+    it("keeps a row whose parent is project-scoped at one row per key, with no collapse", () => {
+      const view = byName.get("annotation_queue_scores")!;
+
+      expect({
+        entityKeyColumns: view.postgres!.entityKeyColumns,
+        keyColumns: view.dedup.keyColumns,
+        grain: view.grain,
+      }).toEqual({
+        entityKeyColumns: undefined,
+        keyColumns: ["AnnotationQueueId", "AnnotationScoreId"],
+        grain: "one row per AnnotationQueueId, AnnotationScoreId",
+      });
+    });
+
+    /** @scenario "A row reached through a project-scoped parent is not fanned out" */
+    it("still collapses a row whose parent chain ends at an organization", () => {
+      expect(byName.get("gateway_budget_ledgers")!.postgres!.entityKeyColumns).toEqual([
+        "GatewayBudgetLedgerId",
+      ]);
     });
   });
 

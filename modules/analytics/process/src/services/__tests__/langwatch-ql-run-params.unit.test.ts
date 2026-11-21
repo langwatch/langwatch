@@ -547,6 +547,73 @@ describe("given member windows the run reads and its completeness report counts"
   });
 });
 
+describe("given a run over several projects reading a fanned-out PostgreSQL view", () => {
+  const READS_BUDGETS = "SELECT count() AS n FROM analytics.gateway_budgets LIMIT 1";
+  const TWO = [
+    { id: "project-a", lwqlKey: "ka" },
+    { id: "project-b", lwqlKey: "kb" },
+  ];
+  const sharedRowNotes = (diagnostics: readonly { code: string }[]) =>
+    diagnostics.filter(({ code }) => code === "SHARED_ROWS_UNDER_LOWEST_PROJECT");
+
+  /** @scenario "A multi-project read of a collapsed view says where shared rows sit" */
+  it("keeps one copy per budget and says shared rows sit under the lowest project", async () => {
+    const { result, request } = await run({ sql: READS_BUDGETS, projects: TWO });
+
+    expect(request?.sql).toContain("LIMIT 1 BY `GatewayBudgetId`");
+    const found = sharedRowNotes(result.diagnostics);
+    expect(found).toHaveLength(1);
+    expect(JSON.stringify(found)).not.toMatch(/project-|\d/);
+  });
+
+  /** @scenario "A multi-project read of a collapsed view says where shared rows sit" */
+  it("adds no such note to a single-project read or to a read of no such view", async () => {
+    const single = await run({ sql: READS_BUDGETS });
+    const other = await run({ sql: READS_NOTHING, projects: TWO });
+
+    expect(single.request?.sql).not.toContain("LIMIT 1 BY");
+    for (const { result } of [single, other]) {
+      expect(sharedRowNotes(result.diagnostics)).toEqual([]);
+    }
+  });
+});
+
+describe("given member windows that leave a project the run reads without one", () => {
+  const TWO = [
+    { id: "project-a", lwqlKey: "ka" },
+    { id: "project-b", lwqlKey: "kb" },
+  ];
+  const missingNotes = (diagnostics: readonly { code: string }[]) =>
+    diagnostics.filter(({ code }) => code === "SHARE_WINDOW_MISSING");
+
+  /** @scenario "A run says when a project it reads has no member window" */
+  it("adds SHARE_WINDOW_MISSING once, naming no project and counting none", async () => {
+    const { result } = await run({
+      sql: READS_NOTHING,
+      projects: TWO,
+      memberWindows: [{ projectId: "project-a", from: 0 }],
+    });
+
+    const found = missingNotes(result.diagnostics);
+    expect(found).toHaveLength(1);
+    expect(JSON.stringify(found)).not.toMatch(/project-|\d/);
+  });
+
+  /** @scenario "A run says when a project it reads has no member window" */
+  it("adds none when every project has a window, or no windows are given", async () => {
+    const windowed = await run({
+      sql: READS_NOTHING,
+      projects: TWO,
+      memberWindows: TWO.map(({ id }) => ({ projectId: id, from: 0 })),
+    });
+    const plain = await run({ sql: READS_NOTHING, projects: TWO });
+
+    for (const { result } of [windowed, plain]) {
+      expect(missingNotes(result.diagnostics)).toEqual([]);
+    }
+  });
+});
+
 describe("given a statement that compares TenantId with a project it may not read", () => {
   /**
    * @scenario "QP14 A statement widening its reach with TenantId still reads nothing it may not"

@@ -9,10 +9,13 @@ import {
 } from "@langwatch/analytics-contract";
 
 import type { LangWatchQLViewDefinition } from "../services/langwatch-ql-catalog-shapes.service.ts";
+import { LangWatchQLSqlTextService } from "../services/langwatch-ql-sql-text.service.ts";
 import { clickHouseSqlParser, type SqlAstNode } from "./langwatch-ql-parser.rules.ts";
 import { qualifyTableName } from "./langwatch-ql-policy.rules.ts";
-import { assertSafeIdentifier, clickHouseLiteral } from "./langwatch-ql-sql-literal.rules.ts";
+import { clickHouseLiteral } from "./langwatch-ql-sql-literal.rules.ts";
 import { METADATA_FIELDS } from "./langwatch-ql-validation-shape.rules.ts";
+
+const sqlText = LangWatchQLSqlTextService.create();
 
 /**
  * The strictest protections across a readable project set: a content category or a catalogue
@@ -88,21 +91,18 @@ function findWithNames(statements: readonly SqlAstNode[]): ReadonlySet<string> {
 }
 
 /**
- * Refuses a `WITH` name spelt like a catalogued view on a read the member windows narrow: names
- * are gathered statement-wide, so one in a subquery would hide the view a sibling reads. A plain
- * project's row policy bounds it alone, so there such a name stays the `WITH`.
+ * Refuses a `WITH` name spelt like a view the rewrite narrows: names are gathered statement-wide,
+ * so one in a subquery would hide the view a sibling reads. Elsewhere such a name stays the `WITH`.
  * @throws {LangWatchQLShadowedViewError} naming the views shadowed.
  */
 function assertNoShadowedView({
   withNames,
   views,
-  windows,
 }: {
   withNames: ReadonlySet<string>;
+  /** The views the rewrite narrows. */
   views: readonly LangWatchQLViewDefinition[];
-  windows: ReadonlyMap<string, string> | undefined;
 }): void {
-  if (windows === undefined) return;
   const shadowed = views
     .map((view) => view.name.toLowerCase())
     .filter((name) => withNames.has(name));
@@ -276,48 +276,65 @@ function buildWindowPredicates({
       ...datedPicks({ view, key, reach }),
     ];
     const tenanted = view.columns.some((column) => column.name === TENANT_COLUMN);
-    predicates.set(
-      key,
-      !tenanted || picks.length === 0
-        ? NO_ROWS
-        : windowPredicate({ view, database, picks, memberWindows }),
-    );
+    predicates.set(key, !tenanted || picks.length === 0 ? NO_ROWS : `(${picks.join(" OR ")})`);
   }
   return predicates;
 }
 
 /**
- * One predicate for the members' picks. A fanned-out view keeps only the lowest project's copy
- * (tasks#1212), which alone would drop a row a sibling's window admits, so the picks run on the
- * per-project copies, under the same row policy, and admit the row's keys. Plain `IN` list leads.
+ * The fanned-out PostgreSQL views a read keeps one copy of each row of, keyed like a reference.
+ * None for a key set of one project, where no row repeats and the plain view path stays.
  */
-function windowPredicate({
-  view,
+function collapsedViews({
+  views,
   database,
-  picks,
-  memberWindows,
+  projectIds,
 }: {
-  view: LangWatchQLViewDefinition;
+  views: readonly LangWatchQLViewDefinition[];
   database: string;
-  picks: readonly string[];
-  memberWindows: readonly LangWatchQLMemberWindow[];
-}): string {
-  const either = `(${picks.join(" OR ")})`;
-  const keys = view.postgres?.entityKeyColumns ?? [];
-  if (keys.length === 0) return either;
-  // Checked as the view DDL checks them: a catalogue name never reaches SQL unchecked.
-  const keyList = keys.map((key) => `\`${identifier(key, "entity key")}\``).join(", ");
-  const table = `${identifier(database, "database")}.${identifier(view.sourceTable, "table")}`;
-  const members = memberWindows.map((window) => clickHouseLiteral(window.projectId)).join(", ");
-  return (
-    `(${keyList}) IN (SELECT ${keyList} FROM ${table} ` +
-    `WHERE ${TENANT_COLUMN} IN (${members}) AND ${either})`
+  projectIds: readonly string[];
+}): ReadonlyMap<string, LangWatchQLViewDefinition> {
+  if (new Set(projectIds).size < 2) return new Map();
+  return new Map(
+    views
+      .filter((view) => (view.postgres?.entityKeyColumns?.length ?? 0) > 0)
+      .map((view): [string, LangWatchQLViewDefinition] => [
+        qualifyTableName({ table: view.name, defaultDatabase: database }),
+        view,
+      ]),
   );
 }
 
-/** `value` when it is a plain identifier; anything else is a catalogue bug, so it throws. */
-function identifier(value: string, role: string): string {
-  return assertSafeIdentifier({ value, role });
+/**
+ * Keeps one copy of each row a view repeats per project, the lowest project's (tasks#1212). It
+ * follows the window, so a row a sibling's window admits is never lost with the dropped copy.
+ */
+function collapseClause(view: LangWatchQLViewDefinition): string {
+  const keys = (view.postgres?.entityKeyColumns ?? [])
+    .map((key) => sqlText.quotedColumn(key))
+    .join(", ");
+  return ` ORDER BY ${keys}, ${sqlText.quotedColumn(TENANT_COLUMN)} LIMIT 1 BY ${keys}`;
+}
+
+/**
+ * Whether a read of `tables` keeps one copy of a row its views repeat per project: it spans more
+ * than one project and reads a fanned-out PostgreSQL view, whose shared rows then sit under the
+ * lowest project id alone.
+ */
+export function collapsesSharedRows({
+  tables,
+  views,
+  database,
+  projectIds,
+}: {
+  /** The tables the statement reads, qualified and lower-cased as the validator records them. */
+  tables: readonly string[];
+  views: readonly LangWatchQLViewDefinition[];
+  database: string;
+  projectIds: readonly string[];
+}): boolean {
+  const collapsed = collapsedViews({ views, database, projectIds });
+  return tables.some((table) => collapsed.has(table));
 }
 
 /** What a view's dated-member windows are built from, the same for every view. */
@@ -388,9 +405,9 @@ function datedPicks({
 }
 
 /**
- * `sql` with each catalogued view it reads kept to the members inside their grants' windows, and
- * a view outside `views` reading nothing (ADR-177 v4.14). It adds no origin condition: a statement
- * is kept to its sources only where its SQL reads the sources parameter (analytics ADR-003).
+ * `sql` with each view kept to the members' windows, one outside `views` reading nothing (ADR-177
+ * v4.14), and over several projects a fanned-out view keeping one copy of a row (tasks#1212). No
+ * origin condition: a statement keeps to its sources only where it reads them (analytics ADR-003).
  */
 export function scopeLangWatchQL({
   sql,
@@ -411,58 +428,79 @@ export function scopeLangWatchQL({
    * project without a window, so every project when the list is empty, admits no row.
    */
   memberWindows?: readonly LangWatchQLMemberWindow[];
-  /**
-   * The projects the caller's key set reads; a window naming any other is dropped. Absent, no
-   * window is dropped and the windows are taken not to cover the projects: the read is rewritten.
-   */
-  projectIds?: readonly string[];
+  /** The projects the caller's key set reads; a window naming any other is dropped. */
+  projectIds: readonly string[];
 }): string {
-  // The service drops these too; dropping them here means no caller widens the key set.
   const memberWindows =
-    requestedWindows && projectIds
-      ? windowsNaming({ memberWindows: requestedWindows, projectIds })
-      : requestedWindows;
+    requestedWindows && windowsNaming({ memberWindows: requestedWindows, projectIds });
   // Whole-history members need no rewrite when each project has exactly its own window: the row
   // policy bounds them exactly. A project without a window must read nothing, so it is rewritten.
   const isWindowed =
     memberWindows !== undefined &&
     (memberWindows.some((window) => window.from > 0) ||
       !windowsCoverProjects({ memberWindows, projectIds }));
-  if (!isWindowed) {
+  const collapsed = collapsedViews({ views, database, projectIds });
+  const parsed = isWindowed || collapsed.size > 0 ? clickHouseSqlParser.parse(sql) : undefined;
+  if (parsed?.ok !== true) {
+    if (isWindowed) throw new Error("LangWatchQL scope: an accepted statement no longer parses");
     assertNoUnsupportedTableModifiers({ sql, views, database });
     return sql;
-  }
-
-  const parsed = clickHouseSqlParser.parse(sql);
-  if (!parsed.ok) {
-    throw new Error("LangWatchQL scope: an accepted statement no longer parses");
   }
 
   const windows =
     isWindowed && memberWindows
       ? buildWindowPredicates({ views, database, memberWindows, timeWindow })
       : undefined;
-  const withNames = findWithNames(parsed.statements);
-  assertNoShadowedView({ withNames, views, windows });
-  const references = findViewReferences({ statements: parsed.statements, database, withNames });
+  return rewriteReferences({
+    sql,
+    statements: parsed.statements,
+    database,
+    views,
+    windows,
+    collapsed,
+  });
+}
+
+/** `sql` with each view reference the windows or the collapse narrow read through a subquery. */
+function rewriteReferences({
+  sql,
+  statements,
+  database,
+  views,
+  windows,
+  collapsed,
+}: {
+  sql: string;
+  statements: readonly SqlAstNode[];
+  database: string;
+  views: readonly LangWatchQLViewDefinition[];
+  windows: ReadonlyMap<string, string> | undefined;
+  collapsed: ReadonlyMap<string, LangWatchQLViewDefinition>;
+}): string {
+  const withNames = findWithNames(statements);
+  assertNoShadowedView({ withNames, views: windows ? views : [...collapsed.values()] });
+  const references = findViewReferences({ statements, database, withNames });
   const rewrites = references.flatMap((reference) => {
-    const window =
+    const predicate =
       windows === undefined ? undefined : (windows.get(reference.qualified) ?? NO_ROWS);
-    return window === undefined ? [] : [{ reference, predicate: window }];
+    const collapse = collapsed.get(reference.qualified);
+    if (predicate === undefined && collapse === undefined) return [];
+    const where = predicate === undefined ? "" : ` WHERE ${predicate}`;
+    return [{ reference, body: `${where}${collapse ? collapseClause(collapse) : ""}` }];
   });
   assertNoTableModifiers({
-    statements: parsed.statements,
+    statements,
     references: [
       ...rewrites.map(({ reference }) => reference),
       ...postgresReferences({ references, views, database }),
     ],
   });
   let scoped = sql;
-  for (const { reference, predicate } of rewrites) {
+  for (const { reference, body } of rewrites) {
     const written = sql.slice(reference.start, reference.end);
     const alias = reference.impliedAlias === undefined ? "" : ` AS ${reference.impliedAlias}`;
     scoped =
-      `${scoped.slice(0, reference.start)}(SELECT * FROM ${written} WHERE ${predicate})${alias}` +
+      `${scoped.slice(0, reference.start)}(SELECT * FROM ${written}${body})${alias}` +
       scoped.slice(reference.end);
   }
   return scoped;
@@ -474,9 +512,8 @@ function windowsCoverProjects({
   projectIds,
 }: {
   memberWindows: readonly LangWatchQLMemberWindow[];
-  projectIds: readonly string[] | undefined;
+  projectIds: readonly string[];
 }): boolean {
-  if (projectIds === undefined) return false;
   const windowed = new Set(memberWindows.map((window) => window.projectId));
   return (
     windowed.size === memberWindows.length &&
@@ -486,21 +523,10 @@ function windowsCoverProjects({
 }
 
 /**
- * The member windows naming a project the caller reads. A window never widens the key set: one
- * for any other project is dropped before a predicate is built from it (tasks#1212).
+ * The member windows naming one of `projectIds`. A window never widens the key set: one for any
+ * other project is dropped before a predicate or a run note is built from it (tasks#1212).
  */
-export function readableMemberWindows({
-  projects,
-  memberWindows,
-}: {
-  projects: readonly LangWatchQLCaller[];
-  memberWindows: readonly LangWatchQLMemberWindow[];
-}): readonly LangWatchQLMemberWindow[] {
-  return windowsNaming({ memberWindows, projectIds: projects.map((project) => project.id) });
-}
-
-/** The windows naming one of `projectIds`. */
-function windowsNaming({
+export function windowsNaming({
   memberWindows,
   projectIds,
 }: {

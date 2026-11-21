@@ -46,6 +46,8 @@ export interface DerivedPostgresView extends LangWatchQLViewDefinition {
 /** One column's tenant scope, and the join chain that reaches its project. */
 interface TenantScope {
   readonly kind: "project" | "team" | "organization" | "parent";
+  /** The scope the tenant path ends at: a parent scope's is its parent's, followed to the end. */
+  readonly root: "project" | "team" | "organization";
   /** Column read on the last alias of {@link tenantPath} to yield `TenantId`. */
   readonly column: string;
   /** The join chain to the relation carrying the project (empty for project). */
@@ -251,6 +253,7 @@ function deriveDirectTenantScope(model: PrismaModel): TenantScope | undefined {
   if (model.name === "Project") {
     return {
       kind: "project",
+      root: "project",
       column: "id",
       tenantPath: [],
       consumedField: "id",
@@ -262,6 +265,7 @@ function deriveDirectTenantScope(model: PrismaModel): TenantScope | undefined {
     if (column === "projectId") {
       return {
         kind: "project",
+        root: "project",
         column,
         tenantPath: projectTenantPath(),
         consumedField: field.name,
@@ -270,6 +274,7 @@ function deriveDirectTenantScope(model: PrismaModel): TenantScope | undefined {
     if (column === "teamId") {
       return {
         kind: "team",
+        root: "team",
         column: "id",
         tenantPath: teamTenantPath(),
         consumedField: field.name,
@@ -277,6 +282,7 @@ function deriveDirectTenantScope(model: PrismaModel): TenantScope | undefined {
     }
     return {
       kind: "organization",
+      root: "organization",
       column: "id",
       tenantPath: organizationTenantPath(),
       consumedField: field.name,
@@ -324,6 +330,7 @@ function parentTenantScope(
   const parentHops = parentScope.tenantPath.filter((hop) => hop.alias.startsWith("j")).length;
   return {
     kind: "parent",
+    root: parentScope.root,
     column: parentScope.column,
     tenantPath: parentTenantPath({
       parent: parent.tableName,
@@ -664,7 +671,8 @@ function deriveModel({
   context: TenantResolveContext;
 }): DerivedPostgresView {
   const scope = resolveTenantScope(model, override, context);
-  const isFannedOut = scope.kind !== "project";
+  // A row reached through a project-scoped parent has one project, so it never fans out.
+  const isFannedOut = scope.root !== "project";
   const { columns, skipColumns } = buildColumns({ name, model, table, scope, override });
   const keyColumns = [
     ...(isFannedOut ? [TENANT_COLUMN] : []),

@@ -85,7 +85,7 @@ beforeAll(async () => {
   });
   database = harness.names.database;
   await mapPostgresIntoClickHouse({ harness, postgres });
-  // The LangWatchQL views over the engine tables — the objects a caller names.
+  // The LangWatchQL views over the engine tables: the objects a caller names.
   // Only the PostgreSQL-resident half: the ClickHouse-resident entries read
   // migrated fact tables this suite does not stand up.
   await harness.applyAsAdmin(
@@ -1206,8 +1206,8 @@ describe("given an organization with three projects, two of them readable siblin
 
     /** @scenario "A member window on the kept copy does not hide a row a sibling's window admits" */
     it("reads the budget once when only the sibling whose copy is not kept admits it", async () => {
-      // The view keeps the lowest project's copy, here project 1, whose window opens after the
-      // budget was created; project 2 is shared for its whole history and so admits it.
+      // Project 1, the lowest, opens its window after the budget was created; project 2 is shared
+      // for its whole history, so the read keeps project 2's copy rather than none.
       const [kept, sibling] = SIBLINGS;
       if (!kept || !sibling) throw new Error("the fan-out suite needs two sibling projects");
       const rows = await sumBudget(SIBLINGS, [
@@ -1233,6 +1233,8 @@ describe("given an organization with three projects, two of them readable siblin
           ...SIBLINGS.map(({ id }) => ({ projectId: id, from: opensAfterTheBudget })),
           { projectId: UNREADABLE.id, from: 0 },
         ],
+        // The scope is told all three, so only the reader's key set below leaves project 3 out.
+        projectIds: SEEDED.map(({ id }) => id),
       });
       expect(sql, "the window predicate must name the unreadable project").toContain(
         `TenantId IN ('${UNREADABLE.id}')`,

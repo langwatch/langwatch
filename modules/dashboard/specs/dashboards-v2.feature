@@ -2254,7 +2254,7 @@ Feature: Dashboards v2 polish and bring-your-own-AI
 
   @unit
   Scenario: AC213 Diagnostics: a card shows what the server limited as one (i) line
-    Given a card whose run answered SHARE_WINDOW_LIMITED, SOURCES_IGNORED or GRANULARITY_COARSENED
+    Given a card whose run answered SHARE_WINDOW_LIMITED, SHARE_WINDOW_MISSING, SOURCES_IGNORED or GRANULARITY_COARSENED
     Then the card shows one (i) line holding the messages of those diagnostics
     And a card whose run was not limited shows no such line
     And the line names no project and counts none
