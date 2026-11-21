@@ -4253,8 +4253,8 @@ function registerGraphCommands(program: Command): void {
       .option("--dashboard-id <id>", "Dashboard to add the graph to")
       .option("--graph <json>", "Graph definition as JSON")
       .option("--filters <json>", "Filter conditions as JSON")
-      .option("--col-span <n>", "Column span (1-2)")
-      .option("--row-span <n>", "Row span (1-2)")
+      .option("--col-span <n>", "Column span (1-8)")
+      .option("--row-span <n>", "Row span (1-20)")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
     async (
       name: string,
