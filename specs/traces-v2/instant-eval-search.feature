@@ -153,7 +153,7 @@ Feature: Instant Evals inside the Trace Explorer
       And the sidebar facets show no counts and no trace is counted as new, as neither read is sent
       And a chip submitted here stays so for its project after the time range changes
       But a bare chip never submitted here, like `NOT eval:my_evaluator`, keeps its evaluator-name rows
-      And so does one whose refused judgement the reader skipped, declined or closed, or one submitted in another project
+      And so does one whose refused judgement the reader skipped, declined, closed or replaced with a later Enter, or one submitted in another project
       But a skip, decline or close keeps a mark made before that submit, so a chip run earlier stays pending
       And a chip whose run a link restored stays pending after the time range changes, as a submitted one does
       And a failed read shows its error, not the not-judged state

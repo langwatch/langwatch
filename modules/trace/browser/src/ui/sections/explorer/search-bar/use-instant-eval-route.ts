@@ -540,8 +540,12 @@ export function useInstantEvalRoute({
   }, [pendingRef, startRun]);
 
   const { refusedRef } = outcome;
+  // A later Enter drops this submit's marks; a resubmit marks them again.
   const abandonPendingRun = useCallback(() => {
     seqRef.current += 1;
+    const projectId = useFilterStore.getState().projectId ?? "";
+    unmarkNewlyTyped({ projectId, questions: pendingRef.current?.payload.newlyTypedQuestions });
+    unmarkNewlyTyped({ projectId, questions: refusedRef.current?.newlyTypedQuestions });
     pendingRef.current = null;
     refusedRef.current = null;
     setConfirmation(null);

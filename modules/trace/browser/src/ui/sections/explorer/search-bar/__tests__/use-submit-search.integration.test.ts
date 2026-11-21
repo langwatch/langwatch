@@ -16,6 +16,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useFilterStore } from "../../../../../behavior/explorer.store.ts";
 import { useInstantEvalRunStore } from "../../../../../features/instant-eval/behavior/instant-eval-run.store.ts";
 import { useHasPendingNegatedEval } from "../../../../../features/instant-eval/behavior/use-has-pending-negated-eval.ts";
+import { UNJUDGEABLE_NOT_COPY } from "../../../../../model/surely-instant-eval-chip.ts";
 import { useSubmitSearch } from "../use-submit-search.ts";
 
 type MutateOptions = {
@@ -495,7 +496,7 @@ describe("given the text is an eval chip typed by hand", () => {
         expect(mutation.mutate).not.toHaveBeenCalled();
         expect(useFilterStore.getState().queryText).toBe("model:gpt-5-mini");
         expect(toast).toHaveBeenCalledWith(
-          expect.objectContaining({ title: "This NOT cannot be judged as typed", type: "warning" }),
+          expect.objectContaining({ ...UNJUDGEABLE_NOT_COPY, type: "warning" }),
         );
       },
     );

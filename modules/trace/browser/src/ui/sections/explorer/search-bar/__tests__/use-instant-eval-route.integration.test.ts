@@ -355,6 +355,27 @@ describe("given a chip typed by hand under NOT", () => {
   });
 
   /** @scenario "A pending chip under NOT is not judged yet" */
+  it.each([
+    ["the refusal popover", false],
+    ["the cost dialog", true],
+  ])("drops the marks the submit made when a later Enter supersedes %s", (_label, available) => {
+    useFilterStore.setState({ projectId: "project-1" });
+    useInstantEvalRunStore.setState({ typedQuestions: {} });
+    useInstantEvalRunStore.getState().markTyped({ projectId: "project-1", question: "b" });
+    const { result } = renderHook(() => useInstantEvalRoute({ isInstantEvalAvailable: available }));
+    act(() => result.current.onInstantEvalRoute({ ...typed, newlyTypedQuestions: ["b"] }));
+    if (available) {
+      act(() =>
+        estimateCallbacks().onSuccess?.({ rows: 90_000, isRowsCapped: false, priceUsd: 0.5 }),
+      );
+    }
+
+    act(() => result.current.abandonPendingRun());
+
+    expect(useInstantEvalRunStore.getState().typedQuestions).toEqual({});
+  });
+
+  /** @scenario "A pending chip under NOT is not judged yet" */
   it("keeps a mark made before the submit when the reader closes the refusal popover", () => {
     useFilterStore.setState({ projectId: "project-1" });
     const mark = { projectId: "project-1", question: "the user is annoyed" };
