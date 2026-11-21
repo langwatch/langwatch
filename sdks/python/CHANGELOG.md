@@ -1,5 +1,17 @@
 # Changelog
 
+## [2.1.0](https://github.com/langwatch/langwatch/compare/python-sdk@v2.0.1...python-sdk@v2.1.0) (2026-11-21)
+
+
+### Features
+
+* **governance:** agent kill switch to stop agents on Databricks, Bedrock and the gateway, with approval and restore ([#9628](https://github.com/langwatch/langwatch/issues/9628)) ([857cc0d](https://github.com/langwatch/langwatch/commit/857cc0dc254c2cc7e1a1bd0096e753086a53648c))
+
+
+### Bug Fixes
+
+* **coding-agent:** a Claude Code trace's conversation is its session, and a launcher can declare one session for all its runs ([#9758](https://github.com/langwatch/langwatch/issues/9758)) ([a4bda03](https://github.com/langwatch/langwatch/commit/a4bda03c3bd2933cadfa177d1bb142c20bdcae1b))
+
 ## [2.0.1](https://github.com/langwatch/langwatch/compare/python-sdk@v2.0.0...python-sdk@v2.0.1) (2026-11-19)
 
 
