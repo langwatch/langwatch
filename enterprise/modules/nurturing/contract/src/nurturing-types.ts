@@ -60,7 +60,7 @@ export interface CioPersonTraits extends CioOrganizationUsageTraits {
   // Onboarding
   email: string;
   name: string;
-  first_name: string;
+  first_name?: string;
   role: string;
   company_size: string;
   signup_usage: string;
