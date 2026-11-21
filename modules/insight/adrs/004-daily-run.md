@@ -203,63 +203,75 @@ schedule that is on and no other; a run on a template keeps ending `skipped` wit
 `template_board` and the schedule stays on.
 
 **Run now asks for the same run.** The board's dropdown offers Run now to a person who
-holds `analytics:view` and `langy:create`, on a board that is on with no run in flight.
-A From LangWatch board and a board with no widgets offer none, since the gate would
-always skip the run.
-`runBoardDailyRunNow` sends the request an operator's task sends, for the caller alone,
-so the run files into the same inbox. The server refuses it with `validation_error`
-unless the caller's run on the board is on, its sentence in `meta.formErrors` for the
-caller to show; an operator's request asks no setting. The request answers its
-`requestId`, and the run it starts takes that id as its `runId`, so the board's read
-names `runId` on both `runInFlight` and `lastRun`. The browser then waits for the run
-with that id to show, with no standing poll: `run_started` and `run_settled` hint the
-board's read, which is read again. A hint is published off the committed event, not after
-the schedule row is folded, so it can outrun the row: the read it brought back may show no
-run. No timer reads again for that. The next hint's read finds the run, `run_settled` at the
-latest, so Langy may open late and never early. The only timer is the one-shot expiry
-deadline below: it fires one read per request and never repeats, so it is not one of the
-timer exceptions in ARCHITECTURE.md's "No timer polling". In flight, it opens Langy on the run's conversation; settled first, it
-ends the wait, opening Langy if the run has a conversation and otherwise telling the
-person how it ended or why it did not start, from `lastRun`.
+holds `analytics:view` and `langy:create`, on a board that is on with no run in flight. A
+From LangWatch board and a board with no widgets offer none, since the gate would always
+skip the run. `runBoardDailyRunNow` sends the request an operator's task sends, for the
+caller alone, so the run files into the same inbox. The server refuses it with
+`validation_error` unless the caller's run on the board is on, its sentence in
+`meta.formErrors` for the caller to show; an operator's request asks no setting. The
+request answers its `requestId`, and the run it starts takes that id as its `runId`, so
+the board's read names `runId` on both `runInFlight` and `lastRun`. The browser then waits
+for the run with that id to show, with no standing poll: `run_started` and `run_settled`
+hint the board's read, which is read again. A hint is published off the committed event,
+not after the schedule row is folded, so it can outrun the row: the read it brought back
+may show no run. No timer reads again for that. The next hint's read finds the run,
+`run_settled` at the latest, so Langy may open late and never early. The only timer is the
+one-shot expiry deadline below: it fires one read per request and never repeats, so it is
+not one of the timer exceptions in ARCHITECTURE.md's "No timer polling". In flight, it
+opens Langy on the run's conversation; settled first, it ends the wait, opening Langy if
+the run has a conversation and otherwise telling the person how it ended or why it did not
+start, from `lastRun`.
 
 While a run is in flight, `runNow` requests nothing and answers that run's id, so the
-browser follows it. The read cannot see a run the process holds before `run_started`
-(a scheduled wake that fired, or a second tab that asked first), and the process drops a
-request while it holds one, so that request's id never runs. The server cannot answer
-the held run's id, as the service reads the row and not the process. So the browser also
+browser follows it. The read cannot see a run the process holds before `run_started` (a
+scheduled wake that fired, or a second tab that asked first), and the process drops a
+request while it holds one, so that request's id never runs. The server cannot answer the
+held run's id, as the service reads the row and not the process. So the browser also
 follows another run that started at or after the request, in flight or settled with a
 conversation: per schedule the process takes events in order, so such a run held the
 request, and the request started nothing. A settled run is judged by its start, not its
 settle: a lost run's last attempt that is still alive can settle itself, with its
-conversation, after the request, and it started before it. The read answers the last
-run's start on `lastRun.startedAt`. Every read of the last run (the setting, the person's
-run list and the operator's list) takes it from the run in flight row once that row has
-taken an outcome, and until then from the schedule row's `lastRun*`; that fallback covers
-boards from before the row existed. A retried attempt appends its own,
-later `run_started` under the run's key; the row keeps the first, as a replay does, so a
-run is judged by the same start in flight and settled. A last run with no start kept
-(one that never reached Langy, or settled before the run in flight table existed) names
-none, and the browser reads that settled run by its settle time, as before. A lost run
-is settled as `failed/timeout` with no conversation just before the run that replaces it
-starts, so a settled run without a conversation is never taken for the held one; a held
-run that never reached Langy leaves the wait to its deadline. Run now answers
-`requestedAt`, the time the server recorded the request on the clock that stamps a
-run's start, so the browser's clock never enters the comparison. A scheduled run that
-settled before the request is shown as the last run, and the wait goes on. A run that
-shows neither within `INSIGHT_DAILY_RUN_EXPIRY_MS` is lost. The spinner ends at that instant, whatever the board
-read, and the browser reads the board once more. That read gives the verdict, and the verdict has no timer of its own:
-if it shows the requested run the wait ends as for any other read, opening Langy or telling
-how the run ended; if it shows none, or fails, the browser says it could not confirm the run started, and that a run already going still delivers its insights, since a run the process held may have taken the request unseen;
-if it never answers, nothing is said and no panel opens until a later hint's read, which
-replaces the stalled one, answers it: a run it shows then opens as above. The verdict is owed for one more `INSIGHT_DAILY_RUN_EXPIRY_MS` after the deadline: a read that answers later than that says nothing and opens nothing, since a hint may only have outrun its row. Within that time, a run counts only if its `runId` is the request's, or it started before the deadline, which is `requestedAt` plus `INSIGHT_DAILY_RUN_EXPIRY_MS`, both on the server's clock, so a browser clock that is off moves nothing. A run that is neither is one that started after the deadline (a settled run that names no start is judged by its settle time), and says nothing of the request: it gives no verdict, not even "Couldn't confirm the run started". No run at all still says the start could not be confirmed. An answer after the page is gone, the request is turned off or a
-newer request was made acts on nothing. While a run is in flight the
-dropdown offers to open it instead.
+conversation, after the request, and it started before it. The read answers the last run's
+start on `lastRun.startedAt`. Every read of the last run (the setting, the person's run
+list and the operator's list) takes it from the run in flight row once that row has taken
+an outcome, and until then from the schedule row's `lastRun*`; that fallback covers boards
+from before the row existed. A retried attempt appends its own, later `run_started` under
+the run's key; the row keeps the first, as a replay does, so a run is judged by the same
+start in flight and settled. A last run with no start kept (one that never reached Langy,
+or settled before the run in flight table existed) names none, and the browser reads that
+settled run by its settle time, as before. A lost run is settled as `failed/timeout` with
+no conversation just before the run that replaces it starts, so a settled run without a
+conversation is never taken for the held one; a held run that never reached Langy leaves
+the wait to its deadline. Run now answers `requestedAt`, the time the server recorded the
+request on the clock that stamps a run's start, so the browser's clock never enters the
+comparison. A scheduled run that settled before the request is shown as the last run, and
+the wait goes on. A run that shows neither within `INSIGHT_DAILY_RUN_EXPIRY_MS` is lost.
+The spinner ends at that instant, whatever the board read, and the browser reads the board
+once more. That read gives the verdict, and the verdict has no timer of its own: if it
+shows the requested run the wait ends as for any other read, opening Langy or telling how
+the run ended; if it shows none, or fails, the browser says it could not confirm the run
+started, and that a run already going still delivers its insights, since a run the process
+held may have taken the request unseen; if it never answers, nothing is said and no panel
+opens until a later hint's read, which replaces the stalled one, answers it: a run it
+shows then opens as above. The verdict is owed for one more `INSIGHT_DAILY_RUN_EXPIRY_MS`
+after the deadline: a read that answers later than that says nothing and opens nothing,
+since a hint may only have outrun its row. Within that time, a run counts only if its
+`runId` is the request's, or it started before the deadline, which is `requestedAt` plus
+`INSIGHT_DAILY_RUN_EXPIRY_MS`, both on the server's clock, so a browser clock that is off
+moves nothing. A run that is neither is one that started after the deadline (a settled run
+that names no start is judged by its settle time), and says nothing of the request: it
+gives no verdict, not even "Couldn't confirm the run started". No run at all still says
+the start could not be confirmed. An answer after the page is gone, the request is turned
+off or a newer request was made acts on nothing. While a run is in flight the dropdown
+offers to open it instead.
 
 The deadline counts from the answer to the request, and nothing but the end of the wait
-moves it: the page's host is rebuilt on each change of the URL's query, and the notice goes
-through the host of that moment. Turning the run off ends the wait at once, also when the
-write is then refused and when it is sent before Run now has answered, so a board switched off opens no panel and says nothing more. Losing
-the last widget does not end the wait: the offer of Run now goes, "Starting a run." stays.
+moves it: the page's host is rebuilt on each change of the URL's query, and the notice
+goes through the host of that moment. Turning the run off ends the wait at once, also when
+the write is then refused and when it is sent before Run now has answered, so a board
+switched off opens no panel and says nothing more. Losing the last widget does not end the
+wait: the offer of Run now goes, "Starting a run." stays.
+
 **A row of its own names the last started run.** The projection `insightRunInFlight` folds
 `run_started` and `run_settled` into `InsightRunInFlightProjection`, one row per schedule,
 beside the schedule's row and not on it: the schedule's projection table is never altered
@@ -269,23 +281,22 @@ flight. Its `run_settled` keeps them, so they carry the settled run's start, and
 `lastSettledRunId`; the `run_settled` of a later run clears a start kept for the run
 settled before, so a run that never started is not read as the earlier one. A
 `run_started` that takes the place of a run still in flight keeps that run's id and start
-(`overtakenRunId`, `overtakenRunStartedAt`), and `run_settled` writes the settled run's own
-start (`lastSettledRunStartedAt`): a run that settles after a newer one started reads its own
-turn's start, not its `since` nor the newer run's. A second `run_started` of the run it
-names, or of a run already settled, leaves the row. Runs are
-ordered by `since`, the instant the schedule's process started the run: `startRun` takes
-the later of the event's instant and the worker's clock and stores it in
-`pendingRun.since`, a field the process state has held since before Run now, so a worker
-of an older release that rewrites the state keeps it; the next run's `supersedes.since` is
-read from that `pendingRun`. It rides the `runBoard` intent, `supersedes`, and optionally
-`run_started` and `run_settled`, so a worker of an older release strips it in transit. A
-run is ordered by `since ?? slot`, and a tie is broken by `runId`, so every worker orders
-two runs the same way. A slot is never after its start: an operator's run has `slot` =
-`at` and `since` = `max(at, now)`, and a wake's slot is at or before its start. So a run
-without `since` is ordered by its slot: an operator's later run that an older worker
-carried is still taken after a late wake's run, and a run is never older than itself, so
-while it is still the row's newest, its own outcome without `since` is ordered by the
-start the row kept for it. The rule is
+(`overtakenRunId`, `overtakenRunStartedAt`), and `run_settled` writes the settled run's
+own start (`lastSettledRunStartedAt`): a run that settles after a newer one started reads
+its own turn's start, not its `since` nor the newer run's. A second `run_started` of the
+run it names, or of a run already settled, leaves the row. Runs are ordered by `since`,
+the instant the schedule's process started the run: `startRun` takes the later of the
+event's instant and the worker's clock and stores it in `pendingRun.since`, a field the
+process state has held since before Run now, so a worker of an older release that rewrites
+the state keeps it; the next run's `supersedes.since` is read from that `pendingRun`. It
+rides the `runBoard` intent, `supersedes`, and optionally `run_started` and `run_settled`,
+so a worker of an older release strips it in transit. A run is ordered by `since ?? slot`,
+and a tie is broken by `runId`, so every worker orders two runs the same way. A slot is
+never after its start: an operator's run has `slot` = `at` and `since` = `max(at, now)`,
+and a wake's slot is at or before its start. So a run without `since` is ordered by its
+slot: an operator's later run that an older worker carried is still taken after a late
+wake's run, and a run is never older than itself, so while it is still the row's newest,
+its own outcome without `since` is ordered by the start the row kept for it. The rule is
 `modules/insight/process/src/rules/insight-daily-run-order.rules.ts`. The instant is read
 from the clock of the worker that started the run, so worker clocks that differ by more
 than the time between two starts can misorder them; one run is in flight at a time, so

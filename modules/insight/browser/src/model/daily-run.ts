@@ -1,6 +1,6 @@
 /**
- * A board's daily run as its person reads it: the choices a run takes, the words for when it
- * runs and how the last one ended. Pure, so the control and the settings say the same thing.
+ * A board's daily run as its person reads it: the choices a run takes, the words for when it runs,
+ * how the last one ended, and which run Run now follows to its deadline. Pure, so all views agree.
  * @see modules/insight/specs/insight-daily-run.feature
  */
 
