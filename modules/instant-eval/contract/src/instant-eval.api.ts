@@ -96,10 +96,10 @@ export interface InstantEvalUsageCount {
   readonly judgments: number;
   readonly firstRunAt?: number;
   /**
-   * Judge calls made, from `eval_results` (a recall adds no row), counted for the organizations
-   * with `release_instant_eval_results` on; absent when none of them has it (ADR-189).
+   * Results judged, one per question per judged text, in `eval_results` (a recall adds no row), for
+   * the organizations with `release_instant_eval_results` on; absent when none has it (ADR-189).
    */
-  readonly judgeCalls?: number;
+  readonly judgedResults?: number;
 }
 
 /** The decision model judging a monitor's texts: LangWatch's judge, or an own model by its id. */

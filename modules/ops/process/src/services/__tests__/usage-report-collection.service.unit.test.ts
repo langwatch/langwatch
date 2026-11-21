@@ -456,27 +456,27 @@ describe("given an install whose ClickHouse owners each ask per project", () => 
   });
 });
 
-describe("given Instant Evals judge calls in two organizations, one keeping its results", () => {
+describe("given Instant Evals judged results in two organizations, one keeping its results", () => {
   describe("when the report is taken", () => {
-    /** @scenario "Instant Evals judge calls are counted only where results are kept" */
-    it("counts the keeping organization's judge calls lifetime and over both windows", async () => {
+    /** @scenario "Instant Evals judged results are counted only where results are kept" */
+    it("counts the keeping organization's judged results, lifetime and windowed", async () => {
       state.projectsByOrganization.set("org-2", ["project-2"]);
-      state.judgeCallsReleasedProjectIds.add("project-1");
+      state.judgedResultsReleasedProjectIds.add("project-1");
       for (const [projectId, iso] of [
         ["project-1", "2026-09-20T00:00:00Z"],
         ["project-1", "2026-09-01T00:00:00Z"],
         ["project-1", "2026-07-01T00:00:00Z"],
         ["project-2", "2026-09-20T00:00:00Z"],
       ] as const) {
-        state.rows.push({ projectId, figure: "instant_eval_judge_calls", at: day(iso) });
+        state.rows.push({ projectId, figure: "instant_eval_judged_results", at: day(iso) });
       }
 
       const payload = await report({ organizationIds: ["org-1", "org-2"] });
 
       expect(payload).toMatchObject({
-        instant_eval_judge_calls: 3,
-        instant_eval_judge_calls_7d: 1,
-        instant_eval_judge_calls_28d: 2,
+        instant_eval_judged_results: 3,
+        instant_eval_judged_results_7d: 1,
+        instant_eval_judged_results_28d: 2,
       });
     });
   });
@@ -484,20 +484,20 @@ describe("given Instant Evals judge calls in two organizations, one keeping its 
 
 describe("given an install where no organization keeps its Instant Evals results", () => {
   describe("when the report is taken", () => {
-    /** @scenario "Instant Evals judge calls are counted only where results are kept" */
-    it("leaves the judge call figures out", async () => {
+    /** @scenario "Instant Evals judged results are counted only where results are kept" */
+    it("leaves the judged result figures out", async () => {
       state.rows.push({
         projectId: "project-1",
-        figure: "instant_eval_judge_calls",
+        figure: "instant_eval_judged_results",
         at: day("2026-09-20T00:00:00Z"),
       });
 
       const payload = await report();
 
       for (const key of [
-        "instant_eval_judge_calls",
-        "instant_eval_judge_calls_7d",
-        "instant_eval_judge_calls_28d",
+        "instant_eval_judged_results",
+        "instant_eval_judged_results_7d",
+        "instant_eval_judged_results_28d",
       ]) {
         expect(payload).not.toHaveProperty(key);
       }

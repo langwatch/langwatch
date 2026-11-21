@@ -110,7 +110,7 @@ describe("given kept results of one key", () => {
     });
   });
 
-  describe("when judge calls are counted", () => {
+  describe("when judged results are counted", () => {
     it("counts judged rows of the named projects since the window's start", async () => {
       await repository.insert([
         record({ SourceId: "a", JudgedAt: AT - 10_000 }),

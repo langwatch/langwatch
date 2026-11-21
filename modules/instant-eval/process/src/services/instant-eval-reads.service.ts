@@ -28,34 +28,34 @@ import type { EvalResultsUsageService } from "./eval-results-usage.service.ts";
 export class InstantEvalReadsService {
   private readonly runs: InstantEvalRunRepository;
   private readonly judgments: InstantEvalJudgmentsRepository;
-  private readonly judgeCalls: Pick<EvalResultsUsageService, "countJudgeCalls"> | undefined;
+  private readonly judgedResults: Pick<EvalResultsUsageService, "countJudgedResults"> | undefined;
   private readonly now: () => Instant;
 
   private constructor(options: {
     runs: InstantEvalRunRepository;
     judgments: InstantEvalJudgmentsRepository;
-    judgeCalls: Pick<EvalResultsUsageService, "countJudgeCalls"> | undefined;
+    judgedResults: Pick<EvalResultsUsageService, "countJudgedResults"> | undefined;
     now: () => Instant;
   }) {
     this.runs = options.runs;
     this.judgments = options.judgments;
-    this.judgeCalls = options.judgeCalls;
+    this.judgedResults = options.judgedResults;
     this.now = options.now;
   }
 
   static create({
     runs,
     judgments,
-    judgeCalls,
+    judgedResults,
     now = nowInstant,
   }: {
     runs: InstantEvalRunRepository;
     judgments: InstantEvalJudgmentsRepository;
-    /** The judge calls the kept results count (ADR-189); absent, the report leaves them out. */
-    judgeCalls?: Pick<EvalResultsUsageService, "countJudgeCalls">;
+    /** The judged results the kept rows count (ADR-189); absent, the report leaves them out. */
+    judgedResults?: Pick<EvalResultsUsageService, "countJudgedResults">;
     now?: () => Instant;
   }): InstantEvalReadsService {
-    return new InstantEvalReadsService({ runs, judgments, judgeCalls, now });
+    return new InstantEvalReadsService({ runs, judgments, judgedResults, now });
   }
 
   /** The usage report's figures (ADR-156, section 10). */
@@ -63,12 +63,12 @@ export class InstantEvalReadsService {
     projectIds: readonly string[];
     since?: number;
   }): Promise<InstantEvalUsageCount> {
-    const [runs, judgments, judgeCalls] = await Promise.all([
+    const [runs, judgments, judgedResults] = await Promise.all([
       this.runs.countUsage(input),
       this.judgments.countUsage(input),
-      this.judgeCalls ? this.judgeCalls.countJudgeCalls(input) : {},
+      this.judgedResults ? this.judgedResults.countJudgedResults(input) : {},
     ]);
-    return { ...runs, judgments, ...judgeCalls };
+    return { ...runs, judgments, ...judgedResults };
   }
 
   /** The run, or the refusal naming the id that has none. */

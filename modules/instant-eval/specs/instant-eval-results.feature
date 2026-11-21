@@ -317,4 +317,4 @@ Feature: Every trace-linked Instant Evals result is kept, and recalled before ju
     Given judged, failed and other-tenant rows in eval_results
     When a key is recalled
     Then only the tenant's latest judged row of that key is answered
-    And judge calls are counted from judged rows only
+    And only judged rows are counted as judged results

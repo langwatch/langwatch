@@ -275,7 +275,7 @@ export class InstantEvalModule implements InstantEvalApiContract, InstantEvalBro
     const reads = InstantEvalReadsService.create({
       runs: repositories.runs,
       judgments: repositories.judgments,
-      judgeCalls: EvalResultsUsageService.create({
+      judgedResults: EvalResultsUsageService.create({
         results: repositories.evalResults,
         peers: {
           findOrganizationId: (projectId) => setup.channels.projects.findOrganizationId(projectId),

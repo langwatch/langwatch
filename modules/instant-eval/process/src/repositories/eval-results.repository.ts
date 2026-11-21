@@ -109,6 +109,6 @@ export interface EvalResultsRepository {
    * judged. Monitor rows are never returned: the trace shows them from evaluation_runs.
    */
   findLatestByTrace(query: EvalResultsTraceQuery): Promise<readonly EvalTraceResult[]>;
-  /** Judged rows, which is judge calls made, judged since `since` (epoch ms) when given. */
+  /** Judged rows, one per question per judged text, judged since `since` (epoch ms) when given. */
   countJudged(input: { projectIds: readonly string[]; since?: number }): Promise<number>;
 }

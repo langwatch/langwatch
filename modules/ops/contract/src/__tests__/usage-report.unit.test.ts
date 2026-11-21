@@ -67,7 +67,7 @@ describe("given the dictionary", () => {
         ["gateway_spend_usd", "gateway_spend_usd"],
         ["instant_eval_runs", "instant_eval_runs"],
         ["instant_eval_judgments", "instant_eval_judgments"],
-        ["instant_eval_judge_calls", "instant_eval_judge_calls"],
+        ["instant_eval_judged_results", "instant_eval_judged_results"],
         ["langy_turns", "langy_turns"],
         ["langy_active_users", "langy_users"],
         ["coding_agent_sessions", "coding_agent_sessions"],

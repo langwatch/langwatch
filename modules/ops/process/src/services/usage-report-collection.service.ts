@@ -417,11 +417,11 @@ export class UsageReportCollectionService {
       ...windowed("spans", traces, (count) => count.spans),
       ...windowed("instant_eval_runs", instantEvals, (count) => count.runs),
       ...windowed("instant_eval_judgments", instantEvals, (count) => count.judgments),
-      // Instant-eval answers judge calls only for organizations that keep their results.
+      // Instant-eval answers judged results only for organizations that keep their results.
       ...windowedWhereCounted(
-        "instant_eval_judge_calls",
+        "instant_eval_judged_results",
         instantEvals,
-        (count) => count.judgeCalls,
+        (count) => count.judgedResults,
       ),
       ...windowed("coding_agent_sessions", codingAgents, (count) => count.sessions),
       ...windowed("gateway_requests", gateway, (count) => count.requests),

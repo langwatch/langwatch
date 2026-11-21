@@ -396,8 +396,8 @@ export const USAGE_FIELDS: readonly UsageField[] = [
     source: "instant_eval_judgments, counted per organization and added up",
   }),
   ...lifetimeAndWindows({
-    key: "instant_eval_judge_calls",
-    why: "How many judge calls Instant Evals actually made (recalls add no row).",
+    key: "instant_eval_judged_results",
+    why: "How many results Instant Evals judged, one per question per judged text (recalls add no row).",
     source: "eval_results rows with Status judged, counted per organization and added up",
   }),
   ...lifetimeAndWindows({
@@ -747,9 +747,9 @@ const usageReportBodySchemaDefinition = z.object({
   instant_eval_judgments: z.number().optional(),
   instant_eval_judgments_7d: z.number().optional(),
   instant_eval_judgments_28d: z.number().optional(),
-  instant_eval_judge_calls: z.number().optional(),
-  instant_eval_judge_calls_7d: z.number().optional(),
-  instant_eval_judge_calls_28d: z.number().optional(),
+  instant_eval_judged_results: z.number().optional(),
+  instant_eval_judged_results_7d: z.number().optional(),
+  instant_eval_judged_results_28d: z.number().optional(),
   langy_turns: z.number().optional(),
   langy_turns_7d: z.number().optional(),
   langy_turns_28d: z.number().optional(),

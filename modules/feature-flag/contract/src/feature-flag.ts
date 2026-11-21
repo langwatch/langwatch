@@ -177,7 +177,7 @@ export const FEATURE_FLAGS = [
     scope: "PRODUCT",
     defaultValue: false,
     description:
-      "Keeps every trace-linked Instant Evals result in eval_results and recalls it before judging (ADR-189): a quick eval(), a run or a dashboard widget asking the same question of the same trace text with the same judge reuses the stored verdict instead of paying for a new judge call. Off by default; enable per project or organization via a targeting rule. Off, nothing reads or writes eval_results and every judgement is made as today. The usage report counts judge calls only for organizations with it on.",
+      "Keeps every trace-linked Instant Evals result in eval_results and recalls it before judging (ADR-189): a quick eval(), a run or a dashboard widget asking the same question of the same trace text with the same judge reuses the stored verdict instead of paying for a new judge call. Off by default; enable per project or organization via a targeting rule. Off, nothing reads or writes eval_results and every judgement is made as today. The usage report counts judged results only for organizations with it on.",
   },
   {
     key: "release_instant_evals_own_decision_model",

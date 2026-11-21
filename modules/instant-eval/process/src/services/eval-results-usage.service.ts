@@ -1,6 +1,6 @@
 /**
- * The usage report's judge calls (ADR-189 Consequences): kept rows that a judge answered, which
- * a recall never adds, counted only for organizations with `release_instant_eval_results` on.
+ * The usage report's judged results (ADR-189 Consequences): kept rows a judge answered, one per
+ * question per judged text, never added by a recall, where `release_instant_eval_results` is on.
  * @see specs/self-hosting/connected-services/usage-report.feature
  */
 
@@ -31,19 +31,19 @@ export class EvalResultsUsageService {
     return new EvalResultsUsageService(results, peers);
   }
 
-  /** Judge calls since `since` (epoch ms); left out where no organization keeps its results. */
-  async countJudgeCalls({
+  /** Judged results since `since` (epoch ms); left out where no organization keeps its results. */
+  async countJudgedResults({
     projectIds,
     since,
   }: {
     projectIds: readonly string[];
     since?: number;
-  }): Promise<Pick<InstantEvalUsageCount, "judgeCalls">> {
+  }): Promise<Pick<InstantEvalUsageCount, "judgedResults">> {
     const released = await this.#releasedProjectIds(projectIds);
     if (released.length === 0) return {};
 
     return {
-      judgeCalls: await this.results.countJudged({
+      judgedResults: await this.results.countJudged({
         projectIds: released,
         ...(since === undefined ? {} : { since }),
       }),

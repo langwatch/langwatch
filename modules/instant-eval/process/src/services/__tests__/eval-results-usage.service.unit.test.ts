@@ -1,6 +1,6 @@
 /**
- * The usage report's judge calls: kept rows a judge answered, counted only for organizations
- * with release_instant_eval_results on, and left out where none has it.
+ * The usage report's judged results, one kept row per question per judged text: counted only for
+ * organizations with release_instant_eval_results on, and left out where none has it.
  * @see specs/self-hosting/connected-services/usage-report.feature
  */
 
@@ -63,8 +63,8 @@ function usageOver({
   });
 }
 
-describe("given judge calls in an organization with the flag and one without", () => {
-  describe("when judge calls are counted", () => {
+describe("given judged results in an organization with the flag and one without", () => {
+  describe("when judged results are counted", () => {
     it("counts only the released organization's projects, lifetime and since a window", async () => {
       const results = await storeWith([
         { tenantId: "project-on", judgedAt: AT },
@@ -74,21 +74,21 @@ describe("given judge calls in an organization with the flag and one without", (
       const usage = usageOver({ results, released: ["organization-on"] });
       const projectIds = ["project-on", "project-off"];
 
-      await expect(usage.countJudgeCalls({ projectIds })).resolves.toEqual({ judgeCalls: 2 });
-      await expect(usage.countJudgeCalls({ projectIds, since: AT })).resolves.toEqual({
-        judgeCalls: 1,
+      await expect(usage.countJudgedResults({ projectIds })).resolves.toEqual({ judgedResults: 2 });
+      await expect(usage.countJudgedResults({ projectIds, since: AT })).resolves.toEqual({
+        judgedResults: 1,
       });
     });
   });
 });
 
 describe("given no organization with the flag", () => {
-  describe("when judge calls are counted", () => {
+  describe("when judged results are counted", () => {
     it("leaves the figure out", async () => {
       const results = await storeWith([{ tenantId: "project-off", judgedAt: AT }]);
       const usage = usageOver({ results, released: [] });
 
-      await expect(usage.countJudgeCalls({ projectIds: ["project-off"] })).resolves.toEqual({});
+      await expect(usage.countJudgedResults({ projectIds: ["project-off"] })).resolves.toEqual({});
     });
   });
 });
