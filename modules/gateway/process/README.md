@@ -6,7 +6,7 @@ The server half of [gateway](../README.md). The AI Gateway: virtual keys, gatewa
 
 ## Installation
 
-`defineProcessModule("gateway").withRepositories(gatewayRepositories).withChannels(gatewayChannels).withApi(GatewayModule).withTransports(agentCacheRest, elevenLabsWebhookRest, gatewayInternalRest, gatewayBudgetTrpcTransport, gatewayCacheRuleTrpcTransport, gatewayGuardrailTrpcTransport, gatewayPlatformRest, gatewaySpendRest, gatewaySpendEventTrpcTransport, gatewayUsageTrpcTransport, virtualKeyTrpcTransport).withEventing(gatewayGovernanceEventsEventing).withEventing(gatewaySpendEventing).withEventing(gatewayRealtimeSessionEventing).withEventing(gatewayPulledUsageLedgerEventing).withEventing(gatewayInstantEvalJudgeSpendEventing).withEventing(gatewayPiiRedactionSpendEventing).withEventing(gatewayConnectManagedKeyEventing).withTasks(…).provideMiddlewareBindings(…).provideMiddlewareContext(…).withIdIndexes(GATEWAY_ID_INDEXES, …)`, `src/gateway.module.ts:48`.
+`defineProcessModule("gateway").withRepositories(gatewayRepositories).withChannels(gatewayChannels).withApi(GatewayModule).withTransports(agentCacheRest, elevenLabsWebhookRest, gatewayInternalRest, gatewayBudgetTrpcTransport, gatewayCacheRuleTrpcTransport, gatewayGuardrailTrpcTransport, gatewayPlatformRest, gatewaySpendRest, gatewaySpendEventTrpcTransport, gatewayUsageTrpcTransport, virtualKeyTrpcTransport).withEventing(gatewayGovernanceEventsEventing).withEventing(gatewaySpendEventing).withEventing(gatewayRealtimeSessionEventing).withEventing(gatewayPulledUsageLedgerEventing).withEventing(gatewayInstantEvalJudgeSpendEventing).withEventing(gatewayPiiRedactionSpendEventing).withEventing(gatewayConnectManagedKeyEventing).withTasks(…).withMigrations(…).provideMiddlewareBindings(…).provideMiddlewareContext(…).withIdIndexes(GATEWAY_ID_INDEXES, …)`, `src/gateway.module.ts:50`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -1811,9 +1811,9 @@ Run by the tasks process, before serve.
 
 | Kind   | Leaf                          | Environment variable                    | Declared at                            |
 | ------ | ----------------------------- | --------------------------------------- | -------------------------------------- |
-| secret | `internalSecret`              | `LW_GATEWAY_INTERNAL_SECRET`            | `src/app/gateway.app.ts:1163`          |
-| secret | `jwtSecret`                   | `LW_GATEWAY_JWT_SECRET`                 | `src/app/gateway.app.ts:1164`          |
-| secret | `virtualKeyPepper`            | `LW_VIRTUAL_KEY_PEPPER`                 | `src/app/gateway.app.ts:1165`          |
+| secret | `internalSecret`              | `LW_GATEWAY_INTERNAL_SECRET`            | `src/app/gateway.app.ts:1173`          |
+| secret | `jwtSecret`                   | `LW_GATEWAY_JWT_SECRET`                 | `src/app/gateway.app.ts:1174`          |
+| secret | `virtualKeyPepper`            | `LW_VIRTUAL_KEY_PEPPER`                 | `src/app/gateway.app.ts:1175`          |
 | config | `spendSettlementGraceMs`      | `LW_SPEND_SETTLEMENT_GRACE_MS`          | `../contract/src/gateway.config.ts:27` |
 | config | `internalUrl`                 | `LW_GATEWAY_INTERNAL_URL`               | `../contract/src/gateway.config.ts:29` |
 | config | `controlPlaneUrl`             | `GATEWAY_CONTROL_PLANE_URL`             | `../contract/src/gateway.config.ts:31` |

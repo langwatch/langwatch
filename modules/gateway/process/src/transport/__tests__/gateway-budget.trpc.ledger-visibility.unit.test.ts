@@ -382,14 +382,14 @@ describe("gatewayBudgets.get, a budget scoped to one person", () => {
     describe(`given a budget scoped to ${label}`, () => {
       /** @scenario "A budget scoped to one person or to a personal key opens only for that person and those allowed to see other members' personal keys" */
       it("opens for its owner", async () => {
-        const { budget: opened } = await (await gatewayFor({ caller: "usr_owner", budget })).open();
+        const opened = await (await gatewayFor({ caller: "usr_owner", budget })).open();
 
         expect(opened.id).toBe(BUDGET_ID);
       });
 
       /** @scenario "A budget scoped to one person or to a personal key opens only for that person and those allowed to see other members' personal keys" */
       it("opens for an organization admin", async () => {
-        const { budget: opened } = await (await gatewayFor({ caller: "usr_admin", budget })).open();
+        const opened = await (await gatewayFor({ caller: "usr_admin", budget })).open();
 
         expect(opened.id).toBe(BUDGET_ID);
       });
@@ -410,7 +410,7 @@ describe("gatewayBudgets.get, a budget scoped to one person", () => {
     /** @scenario "A budget scoped to one person or to a personal key opens only for that person and those allowed to see other members' personal keys" */
     it("opens for a viewer", async () => {
       const budget = budgetScopedTo({ scopeType: "VIRTUAL_KEY", scopeId: "vk_shared" });
-      const { budget: opened } = await (await gatewayFor({ caller: "usr_viewer", budget })).open();
+      const opened = await (await gatewayFor({ caller: "usr_viewer", budget })).open();
 
       expect(opened.id).toBe(BUDGET_ID);
     });

@@ -2591,6 +2591,7 @@ export const prismaModelFieldCatalogue = {
     "displayPrefix",
     "principalUserId",
     "principalUser",
+    "mintedAsPersonal",
     "traceProjectId",
     "config",
     "revision",
