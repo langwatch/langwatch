@@ -159,7 +159,6 @@ describe("the tasks process installation", () => {
         "generate-license",
         "model-registry-sync",
         "model-provider-migrate-custom-models",
-        "nurturing-member-backfill",
         "process-manager-purge",
         "credentials-reseal",
         "grant-platform-operator",

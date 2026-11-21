@@ -6,12 +6,19 @@
  * @see enterprise/modules/nurturing/specs/customer-io-plan-traits.feature
  */
 import type { CioBatchCall, NurturingSignalOf } from "@langwatch/enterprise-nurturing-contract";
+import {
+  ORGANIZATION_AGGREGATE_TYPE,
+  ORGANIZATION_MEMBER_LISTED_EVENT_TYPE,
+} from "@langwatch/organization-contract";
 import { describe, expect, it } from "vitest";
 
-import { MemoryNurturingMemberSourceRepository } from "../../repositories/memory/memory.nurturing-member-source.repository.ts";
+import {
+  copiesOver,
+  liveMapsOver,
+  ownerFact,
+} from "../../eventing/__tests__/nurturing-organization-copies.test-helpers.ts";
 import { MemoryNurturingOrganizationMemberRepository } from "../../repositories/memory/memory.nurturing-organization-member.repository.ts";
-import { MemoryNurturingOrganizationPlanRepository } from "../../repositories/memory/memory.nurturing-organization-plan.repository.ts";
-import { NurturingMemberBackfillService } from "../nurturing-member-backfill.service.ts";
+import { MemoryNurturingRepositories } from "../../repositories/memory/memory.nurturing.repositories.ts";
 import { NurturingPlanSyncService } from "../nurturing-plan-sync.service.ts";
 
 const change: NurturingSignalOf<"subscription_changed"> = {
@@ -25,19 +32,15 @@ const change: NurturingSignalOf<"subscription_changed"> = {
   plan: "LAUNCH",
 };
 
-function planSyncOver(
-  members = MemoryNurturingOrganizationMemberRepository.create(),
-  plans = MemoryNurturingOrganizationPlanRepository.create(),
-) {
+function planSyncOver(members = MemoryNurturingOrganizationMemberRepository.create()) {
   const sent: CioBatchCall[][] = [];
   const record = async (calls: CioBatchCall[]) => void sent.push(calls);
   const planSync = NurturingPlanSyncService.create({
     customerIo: { batchOrThrow: record },
     admins: { adminOf: async () => ({ kind: "admin", userId: "admin-1" }) },
     members,
-    plans,
   });
-  return { planSync, sent, plans };
+  return { planSync, sent };
 }
 
 describe("NurturingPlanSyncService", () => {
@@ -62,8 +65,7 @@ describe("NurturingPlanSyncService", () => {
   });
 
   describe("when Customer.io refuses a live change", () => {
-    it("rejects without recording the plan copy, and sends the change on a retry", async () => {
-      const plans = MemoryNurturingOrganizationPlanRepository.create();
+    it("rejects, and sends the change on a retry", async () => {
       const sent: CioBatchCall[][] = [];
       let refusing = true;
       const send = async (calls: CioBatchCall[]) => {
@@ -74,72 +76,24 @@ describe("NurturingPlanSyncService", () => {
         customerIo: { batchOrThrow: send },
         admins: { adminOf: async () => ({ kind: "admin", userId: "admin-1" }) },
         members: MemoryNurturingOrganizationMemberRepository.create(),
-        plans,
       });
 
       await expect(planSync.planChanged(change)).rejects.toThrow("refused");
 
-      await expect(plans.findPlan({ organizationId: "org-1" })).resolves.toEqual({
-        outcome: "none",
-      });
       refusing = false;
       await planSync.planChanged(change);
       expect(sent).toHaveLength(2);
-      await expect(plans.findPlan({ organizationId: "org-1" })).resolves.toMatchObject({
-        fact: { plan: "LAUNCH" },
-      });
     });
   });
 
-  describe("when the plan copy already holds a newer real fact", () => {
-    it("sends nothing for an older live fact and keeps the newer one", async () => {
-      const { planSync, sent, plans } = planSyncOver();
-      const newer = { ...change, occurredAt: change.occurredAt + 1, plan: "GROWTH" };
-      await planSync.planChanged(newer);
-      sent.length = 0;
-
-      await planSync.planChanged(change);
-
-      expect(sent).toEqual([]);
-      await expect(plans.findPlan({ organizationId: "org-1" })).resolves.toMatchObject({
-        fact: { plan: "GROWTH" },
-      });
-    });
-
-    it("sends nothing for a catch-up fact with the same stamp", async () => {
+  describe("when the plan fold hands over an organization with no active member", () => {
+    it("sends nothing, as nobody is there to tell", async () => {
       const { planSync, sent } = planSyncOver();
-      await planSync.planChanged(change);
-      sent.length = 0;
 
-      await planSync.planCaughtUp({ ...change, fromCatchUp: true });
+      await planSync.planChanged({ ...change, memberUserIds: [] });
+      await planSync.planCaughtUp({ ...change, memberUserIds: [], fromCatchUp: true });
 
       expect(sent).toEqual([]);
-    });
-  });
-
-  describe("when the resync's newer catch-up fact meets an older real one", () => {
-    it("sends the catch-up's plan and replaces the copy, so the resync corrects a wrong plan", async () => {
-      const members = MemoryNurturingOrganizationMemberRepository.create();
-      for (const userId of change.memberUserIds) {
-        await members.recordMembershipChange({
-          organizationId: "org-1",
-          userId,
-          change: "joined",
-          at: 1_000,
-        });
-      }
-      const { planSync, sent, plans } = planSyncOver(members);
-      await planSync.planChanged({ ...change, plan: "FREE" });
-      sent.length = 0;
-
-      const later = { ...change, occurredAt: change.occurredAt + 1, fromCatchUp: true };
-      await planSync.planCaughtUp(later);
-
-      const planOf = (call: CioBatchCall) => ("traits" in call ? call.traits?.plan : undefined);
-      expect(sent.flat().map(planOf)).toEqual(["launch", "launch", "launch"]);
-      await expect(plans.findPlan({ organizationId: "org-1" })).resolves.toMatchObject({
-        fact: { plan: "LAUNCH", fromCatchUp: true },
-      });
     });
   });
 
@@ -205,27 +159,36 @@ describe("NurturingPlanSyncService", () => {
     it.each<[string, ("org-a" | "org-b")[]]>([
       ["paid team's fact first", ["org-a", "org-b"]],
       ["free organization's fact first", ["org-b", "org-a"]],
-    ])("never tells them free after the member backfill (%s)", async (_order, order) => {
-      // Without the backfill the copy holds no row for alice, so org-b's fact finds her in no
-      // other organization (membersWhoseLatestOrganizationIsElsewhere) and identifies her as
-      // free. The backfill is what makes her latest organization, org-a, known.
+    ])("never tells them free once their memberships are listed (%s)", async (_order, order) => {
+      // Without the listed members the copy holds no row for alice, so org-b's fact finds her in
+      // no other organization (membersWhoseLatestOrganizationIsElsewhere) and identifies her as
+      // free. Copying organization's member_listed facts makes her latest organization known.
       const members = MemoryNurturingOrganizationMemberRepository.create();
-      const source = MemoryNurturingMemberSourceRepository.create({
-        membersByOrganization: {
-          "org-b": [{ userId: "alice", joinedAt: 1_000 }],
-          "org-a": [{ userId: "alice", joinedAt: 2_000 }],
-        },
+      const copyMember = liveMapsOver({
+        ...copiesOver(MemoryNurturingRepositories.create()),
+        members,
       });
-      const organizations = {
-        listAllIds: async () => ({ ids: ["org-a", "org-b"], next: null }),
-        getAllMembers: async () => [{ id: "alice" }] as never,
-      };
-      await NurturingMemberBackfillService.create({
-        peers: { organizations, source, members },
-      }).backfill({
-        dryRun: false,
-        signal: new AbortController().signal,
-      });
+      for (const [organizationId, joinedAt] of [
+        ["org-b", 1_000],
+        ["org-a", 2_000],
+      ] as const) {
+        await copyMember(
+          ownerFact({
+            type: ORGANIZATION_MEMBER_LISTED_EVENT_TYPE,
+            aggregateType: ORGANIZATION_AGGREGATE_TYPE,
+            aggregateId: organizationId,
+            tenantId: organizationId,
+            data: {
+              tenantId: organizationId,
+              organizationId,
+              userId: "alice",
+              joinedAt,
+              backfilled: true,
+              occurredAt: 5_000,
+            },
+          }),
+        );
+      }
       const { planSync, sent } = planSyncOver(members);
       const facts: Record<"org-a" | "org-b", NurturingSignalOf<"subscription_changed">> = {
         "org-a": { ...change, organizationId: "org-a", memberUserIds: ["alice"], plan: "LAUNCH" },

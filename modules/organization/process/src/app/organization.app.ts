@@ -197,6 +197,11 @@ import { OrganizationJoinRequestsService } from "../services/organization-join-r
 import type { OrganizationJoinRequests } from "../services/organization-join-requests.service.ts";
 import { OrganizationLifecycleNoticeService } from "../services/organization-lifecycle-notice.service.ts";
 import type { OrganizationLifecycleSenders } from "../services/organization-lifecycle-notice.service.ts";
+import {
+  OrganizationMemberListingService,
+  type OrganizationMemberListingPage,
+  type OrganizationMemberListingSenders,
+} from "../services/organization-member-listing.service.ts";
 import type { OrganizationGrantCache } from "../services/organization-member-role.service.ts";
 import { OrganizationMembershipService } from "../services/organization-membership.service.ts";
 import { OrganizationOperatorDirectoryService } from "../services/organization-operator-directory.service.ts";
@@ -433,6 +438,9 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
       organizations: setup.repositories.organization,
       membership,
     });
+    application.#memberListing = OrganizationMemberListingService.create({
+      organizations: setup.repositories.organization,
+    });
     application.#privateDataplanes = PrivateDataplaneRecordService.create({
       routes: setup.repositories.privateClickHouseRoutes,
       accounts: setup.repositories.privateS3Accounts,
@@ -651,6 +659,7 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
   #joinRequests!: OrganizationJoinRequests;
   #initialization!: OrganizationInitializationService;
   #privateDataplanes!: PrivateDataplaneRecordService;
+  #memberListing!: OrganizationMemberListingService;
   #operatorDirectory!: OrganizationOperatorDirectoryService;
   #seatRequests!: SeatRequestService;
   #seatPeak!: SeatPeakService;
@@ -1903,6 +1912,22 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
 
   connectLifecycle(senders: OrganizationLifecycleSenders): void {
     this.#infrastructure.lifecycle.connect(senders);
+  }
+
+  /** The member listing's sender, from the same pipeline. */
+  connectMemberListing(senders: OrganizationMemberListingSenders): void {
+    this.#memberListing.connect(senders);
+  }
+
+  /**
+   * The `organization:list-member-facts` step's page: one page of organizations' active members.
+   */
+  listMemberFactsPage(input: {
+    afterOrganizationId: string | null;
+    limit: number;
+    dryRun: boolean;
+  }): Promise<OrganizationMemberListingPage> {
+    return this.#memberListing.listPage(input);
   }
 
   /** organization_audit: audit facts committed with their change; audit-log reacts (§9). */

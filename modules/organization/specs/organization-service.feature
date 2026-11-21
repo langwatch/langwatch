@@ -205,6 +205,35 @@ Feature: Shared organization service
     Then each run records each organization's stored presence setting once, marked backfilled, with no changer
     And each organization's fact is keyed alike on both runs, so the second run records nothing new
 
+  # Peers kept their own member copies before organization recorded member facts. The
+  # organization:list-member-facts step lists the memberships from then as organization's facts, so
+  # a peer's copy can be rebuilt from organization's log. It runs once no old image serves.
+  @unit
+  Scenario: Existing active members are listed as organization's facts by the member listing step
+    Given organizations with an active member, a disabled member and a member whose user is deactivated
+    When the organization:list-member-facts step runs
+    Then one member listed fact is recorded for each active membership, with when the membership was created, marked backfilled
+    And none is recorded for the disabled member or the deactivated user
+
+  @unit
+  Scenario: Re-running the member listing step records nothing new
+    Given the member listing step already ran
+    When it runs again
+    Then it sends the same facts, each keyed on its organization and member alone
+    And so the rerun records nothing new
+
+  @unit
+  Scenario: A dry run of the member listing step counts what it would list and records nothing
+    When the member listing step runs as a dry run
+    Then no fact is sent
+    And the report counts the facts a real run sends, by the same rule
+
+  @integration
+  Scenario: The member listing reads only active memberships from Postgres
+    Given organizations in Postgres with an active member, a disabled member and a member whose user is deactivated
+    When a page of their active members is read
+    Then only the active member is listed, with its membership's creation time
+
   @unit
   Scenario: The signed-in person fact may carry an image organization does not read
     Given the process binds the signed-in person with a name, an email and an image
@@ -409,6 +438,12 @@ Feature: Shared organization service
   Scenario: The organization presence step is a background step that waits for old writers to go
     When the worker's installed modules list their upgrade steps
     Then organization:record-presence-settings is a background data step
+    And it runs only once no older image serves
+
+  @integration
+  Scenario: The organization member listing step is a background step that waits for old writers to go
+    When the worker's installed modules list their upgrade steps
+    Then organization:list-member-facts is a background data step
     And it runs only once no older image serves
 
   @unit

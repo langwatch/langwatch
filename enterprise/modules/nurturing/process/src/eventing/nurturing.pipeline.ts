@@ -17,8 +17,6 @@ import {
 import {
   CHECKOUT_COMPLETED_EVENT_TYPE,
   checkoutCompletedEventDataSchema,
-  SUBSCRIPTION_CHANGED_EVENT_TYPE,
-  subscriptionChangedEventDataSchema,
   SUBSCRIPTION_STARTED_EVENT_TYPE,
   subscriptionStartedEventDataSchema,
 } from "@langwatch/enterprise-billing-contract";
@@ -43,7 +41,6 @@ import {
   defineAggregate,
   defineEventingModule,
   definePipeline,
-  type Event,
   type EventingSetup,
   type LaneAlias,
   type StaticPipelineDefinition,
@@ -88,20 +85,7 @@ import {
   membersInvitedEventDataSchema,
   ORGANIZATION_SIGNED_UP_EVENT_TYPE,
   organizationSignedUpEventDataSchema,
-  PERSONAL_TEAM_CREATED_EVENT_TYPE,
-  PERSONAL_WORKSPACE_PROVISIONED_EVENT_TYPE,
-  personalTeamCreatedEventDataSchema,
-  personalWorkspaceProvisionedEventDataSchema,
 } from "@langwatch/organization-contract";
-import {
-  PROJECT_CREATED_EVENT_TYPE,
-  PROJECT_FIRST_MESSAGE_LISTED_EVENT_TYPE,
-  PROJECT_PERSONAL_OWNER_LISTED_EVENT_TYPE,
-  type ProjectCreatedEventData,
-  projectCreatedEventDataSchema,
-  projectFirstMessageListedEventDataSchema,
-  projectPersonalOwnerListedEventDataSchema,
-} from "@langwatch/project-contract";
 import {
   PROMPT_CREATED_EVENT_TYPE,
   promptCreatedEventDataSchema,
@@ -116,8 +100,6 @@ import {
 import {
   FIRST_TRACE_RECORDED_EVENT_TYPE,
   firstTraceRecordedEventDataSchema,
-  PROJECT_TRACED_EVENT_TYPE,
-  projectTracedEventDataSchema,
   TRACE_RECEIVED_EVENT_TYPE,
   traceReceivedEventDataSchema,
 } from "@langwatch/trace-contract";
@@ -162,7 +144,6 @@ import {
   sessionStartedSignal,
   signedUpSignal,
   ssoAutoAddedSignal,
-  subscriptionChangedSignal,
   subscriptionStartedSignal,
   traceReceivedSignal,
   userCreatedSignal,
@@ -242,12 +223,6 @@ export const MAIN_NURTURING_LANE_ALIASES: readonly LaneAlias[] = [
   },
 ];
 
-/** The queue group of a subscription change: its organization, whose one plan copy its jobs fold. */
-export function subscriptionOrganizationGroupOf(event: Event): string {
-  const { data } = event as Event<{ organizationId: string }>;
-  return `subscriptionChanged:${data.organizationId}`;
-}
-
 export type NurturingPipeline = StaticPipelineDefinition<
   NurturingSignalRecordedEvent,
   Record<string, never>,
@@ -260,7 +235,6 @@ export type NurturingPipeline = StaticPipelineDefinition<
  */
 export function buildNurturingPipeline(deps: {
   deliver: (input: { key: string; signal: NurturingSignal }) => Promise<void>;
-  projectCreated: (data: ProjectCreatedEventData) => Promise<void>;
   guidedTurnFailed: (data: GuidedOnboardingTurnFailedEventData) => Promise<void>;
   usageReportReceived: (input: {
     data: UsageReportReceivedEventData;
@@ -284,17 +258,6 @@ export function buildNurturingPipeline(deps: {
   codingSessionsStored: (input: {
     sessions: readonly CodingAgentSessionStoredEventData[];
     deliver: (signal: NurturingSignal) => Promise<void>;
-  }) => Promise<void>;
-  /** Copies a personal project's owner into nurturing's own row; never delivers. */
-  recordPersonalOwner: (input: {
-    projectId: string;
-    organizationId: string;
-    ownerUserId: string;
-  }) => Promise<void>;
-  /** Copies a traced project into nurturing's own row; never delivers. */
-  recordTracedProject: (input: {
-    projectId: string;
-    organizationId: string | null;
   }) => Promise<void>;
   /** Takes an erased account out of nurturing's own rows; never delivers. */
   forgetErasedUser: (input: { userId: string }) => Promise<void>;
@@ -394,21 +357,6 @@ export function buildNurturingPipeline(deps: {
             }),
         }),
       )
-      .withPeerSubscriber("projectCreated", {
-        eventType: PROJECT_CREATED_EVENT_TYPE,
-        data: projectCreatedEventDataSchema,
-        handle: (data) => deps.projectCreated(data),
-      })
-      .withPeerSubscriber("subscriptionChanged", {
-        eventType: SUBSCRIPTION_CHANGED_EVENT_TYPE,
-        data: subscriptionChangedEventDataSchema,
-        // One job per organization at a time: its plan copy is a read-then-write fold.
-        options: { groupKeyFn: subscriptionOrganizationGroupOf },
-        handle: (data, { aggregateId }) => {
-          const signal = subscriptionChangedSignal({ data, aggregateId });
-          return deliverSignal(signal);
-        },
-      })
       .withPeerSubscriber("subscriptionStarted", {
         eventType: SUBSCRIPTION_STARTED_EVENT_TYPE,
         data: subscriptionStartedEventDataSchema,
@@ -589,37 +537,6 @@ export function buildNurturingPipeline(deps: {
             }),
         }),
       )
-      // Copies only: these five write nurturing's own rows and deliver nothing.
-      .withPeerSubscriber("personalTeamCreated", {
-        eventType: PERSONAL_TEAM_CREATED_EVENT_TYPE,
-        data: personalTeamCreatedEventDataSchema,
-        handle: ({ projectId, organizationId, userId }) =>
-          deps.recordPersonalOwner({ projectId, organizationId, ownerUserId: userId }),
-      })
-      .withPeerSubscriber("personalWorkspaceProvisioned", {
-        eventType: PERSONAL_WORKSPACE_PROVISIONED_EVENT_TYPE,
-        data: personalWorkspaceProvisionedEventDataSchema,
-        handle: ({ projectId, organizationId, userId }) =>
-          deps.recordPersonalOwner({ projectId, organizationId, ownerUserId: userId }),
-      })
-      .withPeerSubscriber("personalOwnerListed", {
-        eventType: PROJECT_PERSONAL_OWNER_LISTED_EVENT_TYPE,
-        data: projectPersonalOwnerListedEventDataSchema,
-        handle: ({ projectId, organizationId, ownerUserId }) =>
-          deps.recordPersonalOwner({ projectId, organizationId, ownerUserId }),
-      })
-      .withPeerSubscriber("projectTraced", {
-        eventType: PROJECT_TRACED_EVENT_TYPE,
-        data: projectTracedEventDataSchema,
-        handle: ({ projectId, organizationId }) =>
-          deps.recordTracedProject({ projectId, organizationId }),
-      })
-      .withPeerSubscriber("firstMessageListed", {
-        eventType: PROJECT_FIRST_MESSAGE_LISTED_EVENT_TYPE,
-        data: projectFirstMessageListedEventDataSchema,
-        handle: ({ projectId, organizationId }) =>
-          deps.recordTracedProject({ projectId, organizationId }),
-      })
       // User's erasure fact: nurturing deletes its own rows naming the account, and sends nothing.
       .withPeerSubscriber("userErased", {
         eventType: USER_ERASED_EVENT_TYPE,

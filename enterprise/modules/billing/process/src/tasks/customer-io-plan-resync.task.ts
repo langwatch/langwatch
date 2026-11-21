@@ -25,10 +25,11 @@ export type CustomerIoPlanResyncOutcome = {
 
 /**
  * Records each organization's plan and active members again, so nurturing sends them to
- * Customer.io. Run `nurturing-member-backfill --execute` first. If this runs first, nurturing
- * identifies no member without a member-copy row (the org's group call still carries the plan),
- * so the wrong order sends nothing wrong. To repair it, run the backfill, then re-run this;
- * skipped members otherwise get no plan until the next live fact.
+ * Customer.io. Run it after the deploy's member replay steps
+ * (`nurturing:replay-organization-members`, `nurturing:replay-auth-members`) are done. If this
+ * runs first, nurturing identifies no member without a member-copy row (the org's group call
+ * still carries the plan), so the wrong order sends nothing wrong. To repair it, let the replay
+ * finish, then re-run this; skipped members otherwise get no plan until the next live fact.
  * Always a dry run first, so the totals a real run is about to send are printed
  * before it starts; `--execute` is required to record.
  * Spec: enterprise/modules/nurturing/specs/customer-io-plan-traits.feature

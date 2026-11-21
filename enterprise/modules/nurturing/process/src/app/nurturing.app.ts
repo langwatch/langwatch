@@ -29,7 +29,6 @@ import { NurturingMemberFactsService } from "../services/nurturing-member-facts.
 import { NurturingMilestonesService } from "../services/nurturing-milestones.service.ts";
 import { NurturingOrganizationCreatedService } from "../services/nurturing-organization-created.service.ts";
 import { NurturingOrganizationUsageService } from "../services/nurturing-organization-usage.service.ts";
-import { NurturingProjectFactsService } from "../services/nurturing-project-facts.service.ts";
 import { NurturingTraceCountingService } from "../services/nurturing-trace-counting.service.ts";
 import { NurturingUncopiedProjectsService } from "../services/nurturing-uncopied-projects.service.ts";
 import { NurturingUserErasureService } from "../services/nurturing-user-erasure.service.ts";
@@ -53,6 +52,7 @@ export class NurturingModule implements NurturingApi {
   static readonly secrets = nurturingSecrets;
 
   readonly #pipeline: NurturingPipeline;
+  readonly #delivery: NurturingDeliveryService;
   readonly #organizationUsage: NurturingOrganizationUsageService | undefined;
   readonly #organizationCreated: NurturingOrganizationCreatedService | undefined;
   readonly #uncopiedProjects: NurturingUncopiedProjectsService;
@@ -61,18 +61,21 @@ export class NurturingModule implements NurturingApi {
 
   private constructor({
     pipeline,
+    delivery,
     organizationUsage,
     organizationCreated,
     uncopiedProjects,
     traceCounting,
   }: Readonly<{
     pipeline: NurturingPipeline;
+    delivery: NurturingDeliveryService;
     organizationUsage: NurturingOrganizationUsageService | undefined;
     organizationCreated: NurturingOrganizationCreatedService | undefined;
     uncopiedProjects: NurturingUncopiedProjectsService;
     traceCounting: NurturingTraceCountingService;
   }>) {
     this.#pipeline = pipeline;
+    this.#delivery = delivery;
     this.#organizationUsage = organizationUsage;
     this.#organizationCreated = organizationCreated;
     this.#uncopiedProjects = uncopiedProjects;
@@ -105,7 +108,6 @@ export class NurturingModule implements NurturingApi {
       memberFacts,
       members: repositories.members,
       erasedUsers: repositories.erasedUsers,
-      plans: repositories.plans,
     });
     const gatewayFacts = NurturingGatewayFactsService.create({
       keys: repositories.virtualKeys,
@@ -139,6 +141,7 @@ export class NurturingModule implements NurturingApi {
       ? NurturingOrganizationUsageService.create({
           projectUsage: repositories.projectUsage,
           traceDays: repositories.traceDays,
+          evaluationDays: repositories.evaluationDays,
           copiedProjects,
           placements: repositories.placements,
           organizationsCreated: repositories.organizationsCreated,
@@ -161,11 +164,6 @@ export class NurturingModule implements NurturingApi {
           logger,
         })
       : void 0;
-    const projectFacts = NurturingProjectFactsService.create({
-      personalProjects: repositories.personalProjects,
-      tracedProjects: repositories.tracedProjects,
-      logger: createLogger("langwatch:nurturing:project-facts"),
-    });
     const userErasure = NurturingUserErasureService.create({
       personalProjects: repositories.personalProjects,
       organizations: repositories.milestones,
@@ -184,18 +182,16 @@ export class NurturingModule implements NurturingApi {
     return new NurturingModule({
       pipeline: buildNurturingPipeline({
         deliver: (input) => delivery.deliver(input),
-        projectCreated: (data) => milestones.projectCreated(data),
         guidedTurnFailed: (data) => delivery.deliverGuidedTurnFailed(data),
         usageReportReceived: (input) => delivery.deliverUsageReport(input),
         evaluationsCompleted: (input) => milestones.evaluationsCompleted(input),
         simulationRunsFinished: (input) => milestones.simulationRunsFinished(input),
         codingSessionsStored: (input) => codingMilestones.sessionsStored(input),
-        recordPersonalOwner: (input) => projectFacts.recordPersonalOwner(input),
-        recordTracedProject: (input) => projectFacts.recordTracedProject(input),
         forgetErasedUser: (input) => userErasure.forgetUser(input),
         virtualKeyCreated: (input) => gatewayFacts.virtualKeyCreated(input),
         keyBudgetCrossed: (input) => gatewayFacts.keyBudgetCrossed(input),
       }),
+      delivery,
       organizationUsage,
       organizationCreated,
       uncopiedProjects,
@@ -228,6 +224,14 @@ export class NurturingModule implements NurturingApi {
    */
   async organizationCreated(data: OrganizationCreatedEventData): Promise<void> {
     await this.#organizationCreated?.organizationCreated(data);
+  }
+
+  /**
+   * A plan fact that won nurturing's plan copy, on its live delivery: Customer.io is told the plan.
+   * Rejects when refused, or for a catch-up with no channel, so the plan fold's job retries.
+   */
+  async deliverPlan(input: Readonly<{ key: string; signal: NurturingSignal }>): Promise<void> {
+    await this.#delivery.deliver(input);
   }
 
   /** Counts the traces whose organization is inside its window; rejects while a copy is awaited. */

@@ -211,6 +211,66 @@
       "seed": "unplanned",
       "note": "projection replay from the owner's event log; no seed door written yet"
     },
+    "nurturing:replay-auth-members": {
+      "status": "pending",
+      "seed": "unplanned",
+      "note": "needs auth's sso_auto_added facts and erased members, as the old release wrote them; no seed door written yet"
+    },
+    "nurturing:replay-organization-admins": {
+      "status": "pending",
+      "seed": "unplanned",
+      "note": "needs projects with an admin and organizations whose admin was erased, as the old release wrote them; no seed door written yet"
+    },
+    "nurturing:replay-organization-members": {
+      "status": "pending",
+      "seed": "unplanned",
+      "note": "needs organizations with active, disabled and erased members listed by organization:list-member-facts; no seed door written yet"
+    },
+    "nurturing:replay-organizations-created": {
+      "status": "pending",
+      "seed": "unplanned",
+      "note": "needs organizations with a created fact in organization's log; no seed door written yet"
+    },
+    "nurturing:replay-project-placements": {
+      "status": "pending",
+      "seed": "unplanned",
+      "note": "needs projects with a created fact in project's log; no seed door written yet"
+    },
+    "nurturing:replay-personal-owners-from-organization": {
+      "status": "pending",
+      "seed": "unplanned",
+      "note": "needs personal_team_created facts in organization's log; the seed writes no events"
+    },
+    "nurturing:replay-personal-owners-from-project": {
+      "status": "pending",
+      "seed": "unplanned",
+      "note": "needs personal_owner_listed facts, which project's listing step records; the seed writes no events"
+    },
+    "nurturing:replay-traced-projects-from-trace": {
+      "status": "pending",
+      "seed": "unplanned",
+      "note": "needs project_traced facts in trace's log; the seed writes no events"
+    },
+    "nurturing:replay-traced-projects-from-project": {
+      "status": "pending",
+      "seed": "unplanned",
+      "note": "needs first_message_listed facts, which project's listing step records; the seed writes no events"
+    },
+    "nurturing:replay-last-traces": {
+      "status": "pending",
+      "seed": "unplanned",
+      "note": "needs first_trace_recorded or trace_received facts in trace's log; the seed writes no events"
+    },
+    "nurturing:replay-evaluation-days": {
+      "status": "pending",
+      "seed": "unplanned",
+      "note": "needs evaluation lifecycle_completed facts since 2026-10-19 in the event log; no seed records one yet"
+    },
+    "nurturing:replay-organization-plans": {
+      "status": "pending",
+      "seed": "unplanned",
+      "note": "needs billing subscription_changed facts in the event log; no seed records one yet"
+    },
     "ops:checkup-canary-project": {
       "status": "pending",
       "seed": "unplanned",
@@ -225,6 +285,11 @@
       "status": "pending",
       "seed": "unplanned",
       "note": "needs ADMIN_EMAILS operators; cloud profile sets none"
+    },
+    "organization:list-member-facts": {
+      "status": "pending",
+      "seed": "unplanned",
+      "note": "needs organizations with active, disabled and deactivated members, as the old release wrote them; no seed door written yet"
     },
     "organization:record-presence-settings": {
       "status": "pending",

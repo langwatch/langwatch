@@ -77,9 +77,9 @@ export const SHARED_PRISMA_TABLES: readonly SharedPrismaTable[] = [
   {
     table: "OrganizationUser",
     owner: "organization",
-    readers: ["authz", "data-privacy", "billing", "entitlement", "licensing", "nurturing"],
+    readers: ["authz", "data-privacy", "billing", "entitlement", "licensing"],
     reason:
-      "authz reads memberships for every decision and answers its active administrators from them (R41, R42); data privacy reads a personal project owner's department from the membership, as main did (round 53); billing reads an organisation's administrators and active members for its alerts and lifecycle facts (C2 B, R40); entitlement counts an organisation's member seats for usage stats, never OrganizationApi (R-C1f, R40); licensing counts the same seats for a licence's seat limits (R-C1f, Q9, R40); nurturing reads an organisation's active members and when they joined for its one-off member backfill, which OrganizationApi does not expose (R40)",
+      "authz reads memberships for every decision and answers its active administrators from them (R41, R42); data privacy reads a personal project owner's department from the membership, as main did (round 53); billing reads an organisation's administrators and active members for its alerts and lifecycle facts (C2 B, R40); entitlement counts an organisation's member seats for usage stats, never OrganizationApi (R-C1f, R40); licensing counts the same seats for a licence's seat limits (R-C1f, Q9, R40)",
     writes: [
       {
         reader: "authz",

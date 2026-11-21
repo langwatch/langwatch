@@ -8,11 +8,7 @@ import type {
 } from "../repositories/nurturing-milestones.repository.ts";
 import type { NurturingProjectDirectoryRepository } from "../repositories/nurturing-project-directory.repository.ts";
 import { pickOrganizationDebounce } from "../rules/nurturing-delivery-debounce.rules.ts";
-import {
-  isTraceFact,
-  type KnownTraces,
-  type MemberFactSignal,
-} from "../rules/nurturing-member-facts.rules.ts";
+import type { KnownTraces, MemberFactSignal } from "../rules/nurturing-member-facts.rules.ts";
 import type { NurturingOrganizationAdmin } from "../rules/nurturing-subscription-sync-service.rules.ts";
 import { NurturingClaimReleaseService } from "./nurturing-claim-release.service.ts";
 
@@ -33,9 +29,9 @@ export class NurturingMemberFactsService {
   private constructor(private readonly dependencies: MemberFactsDependencies) {}
 
   /**
-   * Records a trace's time, spends the organization's window, then returns every active member
-   * (one read per window). Empty when the window already sent; a failed read gives it back.
-   * A project its owners do not place tells only the admin the signal names.
+   * Spends the organization's window, then returns every active member (one read per window).
+   * Empty when the window already sent; a failed read gives it back. A project its owners do not
+   * place tells only the admin the signal names.
    */
   async recordFactAndClaimRecipients(signal: MemberFactSignal): Promise<readonly string[]> {
     const placement = await this.dependencies.projects.getPlacement({
@@ -44,14 +40,6 @@ export class NurturingMemberFactsService {
     if (placement.outcome === "unknown") return [signal.userId];
     const { organizationId } = placement;
 
-    // Before this window's claim, so a trace it drops still reaches a joiner. A trace delivery's
-    // per-project window dropped never gets here: the stored time can lag by up to that window.
-    if (isTraceFact(signal)) {
-      await this.dependencies.milestones.recordLastTrace({
-        organizationId,
-        occurredAt: signal.occurredAt,
-      });
-    }
     const debounce = pickOrganizationDebounce({ signal, organizationId });
     if (debounce && !(await this.dependencies.claims.claim(debounce.claimKey, debounce.seconds))) {
       return [];

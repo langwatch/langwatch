@@ -3,12 +3,10 @@ import type { CioBatchCall, NurturingSignalOf } from "@langwatch/enterprise-nurt
 import { createLogger } from "@langwatch/observability";
 
 import type { NurturingOrganizationMemberRepository } from "../repositories/nurturing-organization-member.repository.ts";
-import type { NurturingOrganizationPlanRepository } from "../repositories/nurturing-organization-plan.repository.ts";
 import {
   type NurturingMembership,
   membersWhoseLatestOrganizationIsElsewhere,
 } from "../rules/nurturing-organization-member.rules.ts";
-import { planFactChangesCopy } from "../rules/nurturing-organization-plan.rules.ts";
 import { fireSubscriptionSync } from "../rules/nurturing-subscription-sync-service.rules.ts";
 import type { NurturingMemberFactsService } from "./nurturing-member-facts.service.ts";
 import type { NurturingService } from "./nurturing.service.ts";
@@ -32,15 +30,14 @@ type PlanSyncDependencies = Readonly<{
   admins: Pick<NurturingMemberFactsService, "adminOf">;
   /** The same member copy the usage sync reads, read here by person: whose latest org is whose. */
   members: Pick<NurturingOrganizationMemberRepository, "findMembershipsOfUsers">;
-  /** Nurturing's plan copy: a fact that does not change it tells Customer.io nothing. */
-  plans: NurturingOrganizationPlanRepository;
 }>;
 
 type SubscriptionChanged = NurturingSignalOf<"subscription_changed">;
 
 /**
  * Tells Customer.io an organization's plan, on its members and its company, one request after the
- * other. Spec: enterprise/modules/nurturing/specs/customer-io-plan-traits.feature
+ * other. Which fact is told is the plan fold's to decide: it hands over only the fact that won
+ * nurturing's plan copy. Spec: enterprise/modules/nurturing/specs/customer-io-plan-traits.feature
  */
 export class NurturingPlanSyncService {
   static create(dependencies: PlanSyncDependencies): NurturingPlanSyncService {
@@ -51,13 +48,13 @@ export class NurturingPlanSyncService {
 
   /**
    * A live change: with no channel it is dropped quietly; a refused request or a failed read of
-   * nurturing's copy rejects before the copy is recorded, so the caller gives its claim back and
-   * the job's retry sends it.
+   * nurturing's member copy rejects, so the caller gives its claim back and the job's retry sends
+   * it.
    */
   async planChanged(signal: SubscriptionChanged): Promise<void> {
     const customerIo = this.dependencies.customerIo;
     if (!customerIo) return;
-    await this.foldAndSend(signal, customerIo);
+    await this.send(signal, customerIo);
   }
 
   /**
@@ -67,29 +64,16 @@ export class NurturingPlanSyncService {
   async planCaughtUp(signal: SubscriptionChanged): Promise<void> {
     const customerIo = this.dependencies.customerIo;
     if (!customerIo) throw new NoCustomerIoChannelError();
-    await this.foldAndSend(signal, customerIo);
+    await this.send(signal, customerIo);
   }
 
-  /**
-   * Sends only a fact that changes nurturing's plan copy, and records it once sent: a refused
-   * fact, live or catch-up, is not recorded, so its retry sends again unless a fact that beats it
-   * landed first.
-   */
-  private async foldAndSend(
+  /** An organization with no active member has nobody to tell. */
+  private async send(
     signal: SubscriptionChanged,
     customerIo: Pick<NurturingService, "batchOrThrow">,
   ): Promise<void> {
     if (signal.memberUserIds.length === 0) return;
-    const { organizationId } = signal;
-    const fact = {
-      plan: signal.plan ?? null,
-      occurredAt: signal.occurredAt,
-      fromCatchUp: signal.fromCatchUp ?? false,
-    };
-    const held = await this.dependencies.plans.findPlan({ organizationId });
-    if (!planFactChangesCopy({ held, incoming: fact })) return;
     for (const request of await this.requestsOf(signal)) await customerIo.batchOrThrow(request);
-    await this.dependencies.plans.recordPlan({ organizationId, fact });
   }
 
   private async requestsOf(signal: SubscriptionChanged): Promise<CioBatchCall[][]> {
@@ -103,17 +87,16 @@ export class NurturingPlanSyncService {
       memberships,
       organizationId,
     });
-    // A catch-up fact is only trusted for members the copy holds a row for (any row, even a stale leave
-    // the backfill never rewrites): without the
-    // member backfill a paid-team member with their own free org would be told free. Live facts
-    // keep identifying every member.
+    // A catch-up fact is only trusted for members the copy holds a row for (any row, even a stale
+    // leave): until the member replay step fills the copy, a paid-team member with their own free
+    // org would be told free. Live facts keep identifying every member.
     const noCopyRowMemberUserIds = signal.fromCatchUp
       ? this.membersWithoutCopyRow({ memberships, memberUserIds, organizationId })
       : [];
     if (noCopyRowMemberUserIds.length > 0) {
       logger.info(
         { organizationId, skippedMembers: noCopyRowMemberUserIds.length },
-        "catch-up skipped members with no member-copy row; run nurturing-member-backfill first",
+        "catch-up skipped members with no member-copy row; nurturing:replay-organization-members fills it",
       );
     }
     return fireSubscriptionSync({

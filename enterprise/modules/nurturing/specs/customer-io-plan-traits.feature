@@ -2,12 +2,15 @@ Feature: Customer.io knows each team's real plan
   Lifecycle emails branch on plan, so Customer.io holds the plan billing resolved for each
   team, on its members and on its company. Billing's subscription_changed fact carries the
   plan; nurturing never reads billing (ADR-001). A renewal or a seat change records no fact.
-  Nurturing folds each fact into its own plan copy and tells Customer.io only a fact that changes it.
+  Nurturing folds each fact into its own plan copy, a peer fold over billing's facts keyed by the
+  organization, and tells Customer.io, on a fact's live delivery, only the fact that won the copy.
+  A deploy step fills the copy from billing's log and sends nothing: a replay runs no subscriber.
 
-  Run nurturing-member-backfill --execute first. If the resync runs first, it identifies no member
-  without a member-copy row (the org's group call still carries the plan), so the wrong order sends
-  nothing wrong. To repair it, run the backfill and then the resync again; skipped members otherwise
-  get no plan until the next live fact.
+  Run the resync once the deploy's nurturing:replay-organization-members step is done, which fills
+  the member copy from organization's member facts. If the resync runs first, it identifies no
+  member without a member-copy row (the org's group call still carries the plan), so the wrong order
+  sends nothing wrong. To repair it, run the resync again; skipped members otherwise get no plan
+  until the next live fact.
 
   @unit
   Scenario: A started subscription tells Customer.io the plan on members and company
@@ -158,6 +161,35 @@ Feature: Customer.io knows each team's real plan
     And the newer catch-up replaces it
 
   @unit
+  Scenario: The plan fold sends only the fact that won it
+    Given billing's facts for an organization delivered live, a newer one after an older one
+    When each is folded into nurturing's plan copy
+    Then each fact that wins the copy sends once, and a fact that loses it mints no send
+    And the winning fact delivered again sends nothing more, as its send is claimed
+
+  @unit
+  Scenario: A refused plan send retries its own job
+    Given the plan fold committed a winning fact, and Customer.io refuses its send
+    When the send's job is retried
+    Then the retry sends the plan
+    But a retry after a newer fact won the copy sends nothing
+
+  @unit
+  Scenario: The deploy replay fills the plan copy as live delivery would, and sends nothing
+    Given billing's log holds subscription facts from before the plan fold existed
+    When the nurturing:replay-organization-plans step runs, and runs again
+    Then the plan copy equals the copy live delivery of the same facts builds, its winner included
+    And no Customer.io or PostHog call is made, though the winning fact would send live
+    And a newer live fact afterwards sends exactly once
+
+  @integration
+  Scenario: The plan fold's row keeps the ids it folded and the fact that won
+    Given the plan fold stored an organization's plan, won by one subscription fact
+    When a delivery of an older fact stores the fold's state again
+    Then the row still holds the winning fact and its event id
+    And it holds the ids of that latest delivery, so a redelivery of it folds nothing
+
+  @unit
   Scenario: A catch-up fact with no Customer.io channel fails visibly
     Given the deployment names no Customer.io key
     When a resync catch-up fact is delivered
@@ -175,7 +207,7 @@ Feature: Customer.io knows each team's real plan
   @unit
   Scenario: A person whose paid team is their latest join is never told free by the resync
     Given the member copy is empty and a person joined their own free organization, then a paid one
-    When the member backfill runs and then both organizations' catch-up facts are delivered in either order
+    When organization's member_listed facts are copied and then both organizations' catch-up facts are delivered in either order
     Then the person is identified once, with the paid plan
     And the free organization's fact sends only its company call
 

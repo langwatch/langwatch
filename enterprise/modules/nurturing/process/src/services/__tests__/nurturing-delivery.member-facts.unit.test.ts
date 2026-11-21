@@ -14,7 +14,6 @@ import { HttpCustomerIoChannel } from "../../channels/http/http.customer-io.chan
 import { MemoryNurturingErasedUserRepository } from "../../repositories/memory/memory.nurturing-erased-user.repository.ts";
 import { MemoryNurturingMilestonesRepository } from "../../repositories/memory/memory.nurturing-milestones.repository.ts";
 import { MemoryNurturingOrganizationMemberRepository } from "../../repositories/memory/memory.nurturing-organization-member.repository.ts";
-import { MemoryNurturingOrganizationPlanRepository } from "../../repositories/memory/memory.nurturing-organization-plan.repository.ts";
 import { MemoryNurturingProjectDirectoryRepository } from "../../repositories/memory/memory.nurturing-project-directory.repository.ts";
 import type { NurturingClaimRepository } from "../../repositories/nurturing-claim.repository.ts";
 import { NurturingDeliveryService } from "../nurturing-delivery.service.ts";
@@ -136,15 +135,23 @@ async function organizationWithMembers({
     claims,
     memberFacts,
     members: MemoryNurturingOrganizationMemberRepository.create(),
-    plans: MemoryNurturingOrganizationPlanRepository.create(),
     customerIo: cio.service,
     posthog: undefined,
     users: createApiFixture<UserApi>({
       findById: async () => ({ email: "jane@example.com", name: "Jane" }) as never,
     }),
   });
-  const deliver = (signal: NurturingSignal) =>
-    delivery.deliver({ key: `${signal.kind}:${signal.sourceEventId}`, signal });
+  // The last-trace lane records every trace fact on its own, beside the signal's delivery: the
+  // time is stored before the delivery here, as when the lane's job runs first.
+  const deliver = async (signal: NurturingSignal) => {
+    if (signal.kind === "first_trace_integrated" || signal.kind === "trace_received") {
+      const organizationId = placed.get(signal.projectId);
+      if (organizationId !== undefined) {
+        await milestones.recordLastTrace({ organizationId, occurredAt: signal.occurredAt });
+      }
+    }
+    return delivery.deliver({ key: `${signal.kind}:${signal.sourceEventId}`, signal });
+  };
   return {
     claims,
     cio,
@@ -688,10 +695,6 @@ describe("NurturingDeliveryService organization facts", () => {
       [
         "getPlacement",
         ({ projects }) => vi.spyOn(projects, "getPlacement").mockRejectedValueOnce(down),
-      ],
-      [
-        "recordLastTrace",
-        ({ milestones }) => vi.spyOn(milestones, "recordLastTrace").mockRejectedValueOnce(down),
       ],
       ["getAllMembers", ({ getAllMembers }) => getAllMembers.mockRejectedValueOnce(down)],
     ];

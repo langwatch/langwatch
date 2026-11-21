@@ -16,6 +16,8 @@ import {
   ORGANIZATION_MEMBER_ENABLED_EVENT_VERSION,
   ORGANIZATION_MEMBER_REMOVED_EVENT_TYPE,
   ORGANIZATION_MEMBER_REMOVED_EVENT_VERSION,
+  ORGANIZATION_MEMBER_LISTED_EVENT_TYPE,
+  ORGANIZATION_MEMBER_LISTED_EVENT_VERSION,
   ORGANIZATION_MEMBER_DEPARTMENT_CHANGED_EVENT_TYPE,
   ORGANIZATION_MEMBER_DEPARTMENT_CHANGED_EVENT_VERSION,
   ORGANIZATION_TRACE_SHARING_DISABLED_EVENT_TYPE,
@@ -38,6 +40,7 @@ import {
   type OrganizationMemberDisabledEvent,
   type OrganizationMemberEnabledEvent,
   type OrganizationMemberRemovedEvent,
+  type OrganizationMemberListedEvent,
   type OrganizationMemberDepartmentChangedEvent,
   type OrganizationPresenceSettingChangedEvent,
   type OrganizationSignedUpEvent,
@@ -53,6 +56,7 @@ import {
   RECORD_MEMBER_DISABLED_COMMAND_TYPE,
   RECORD_MEMBER_ENABLED_COMMAND_TYPE,
   RECORD_MEMBER_REMOVED_COMMAND_TYPE,
+  RECORD_MEMBER_LISTED_COMMAND_TYPE,
   RECORD_MEMBER_DEPARTMENT_CHANGED_COMMAND_TYPE,
   RECORD_INVITE_ACCEPTED_COMMAND_TYPE,
   RECORD_MEMBERS_INVITED_COMMAND_TYPE,
@@ -78,6 +82,8 @@ import {
   recordMemberEnabledCommandDataSchema,
   type RecordMemberRemovedCommandData,
   recordMemberRemovedCommandDataSchema,
+  type RecordMemberListedCommandData,
+  recordMemberListedCommandDataSchema,
   type RecordMemberDepartmentChangedCommandData,
   recordMemberDepartmentChangedCommandDataSchema,
   recordInviteAcceptedCommandDataSchema,
@@ -600,6 +606,41 @@ export class RecordMemberRemovedCommand implements CommandHandler<
   }
 
   static getAggregateId(payload: RecordMemberRemovedCommandData): string {
+    return payload.organizationId;
+  }
+}
+
+/**
+ * Lists an existing active membership for the upgrade step. Keyed on the membership alone, so a
+ * rerun collapses onto the first; its moment is the step's, its join time the membership row's.
+ */
+export class RecordMemberListedCommand implements CommandHandler<
+  Command<RecordMemberListedCommandData>,
+  OrganizationMemberListedEvent
+> {
+  static readonly schema = defineCommandSchema(
+    RECORD_MEMBER_LISTED_COMMAND_TYPE,
+    recordMemberListedCommandDataSchema,
+    "List an existing active member of an organization",
+  );
+
+  handle(command: Command<RecordMemberListedCommandData>): OrganizationMemberListedEvent[] {
+    const data = command.data;
+    return [
+      EventUtils.createEvent<OrganizationMemberListedEvent>({
+        aggregateType: ORGANIZATION_AGGREGATE_TYPE,
+        aggregateId: data.organizationId,
+        tenantId: createTenantId(command.tenantId),
+        type: ORGANIZATION_MEMBER_LISTED_EVENT_TYPE,
+        version: ORGANIZATION_MEMBER_LISTED_EVENT_VERSION,
+        data,
+        occurredAt: data.occurredAt,
+        idempotencyKey: `${data.organizationId}:${data.userId}:member_listed`,
+      }),
+    ];
+  }
+
+  static getAggregateId(payload: RecordMemberListedCommandData): string {
     return payload.organizationId;
   }
 }

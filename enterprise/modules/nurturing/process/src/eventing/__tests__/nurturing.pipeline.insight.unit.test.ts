@@ -36,14 +36,11 @@ function nurturing() {
       delivered.push(input.signal);
       await delivery.deliver(input);
     },
-    projectCreated: async () => undefined,
     guidedTurnFailed: async () => undefined,
     usageReportReceived: async () => undefined,
     evaluationsCompleted: async () => undefined,
     simulationRunsFinished: async () => undefined,
     codingSessionsStored: async () => undefined,
-    recordPersonalOwner: async () => undefined,
-    recordTracedProject: async () => undefined,
     forgetErasedUser: async () => undefined,
     virtualKeyCreated: async () => undefined,
     keyBudgetCrossed: async () => undefined,

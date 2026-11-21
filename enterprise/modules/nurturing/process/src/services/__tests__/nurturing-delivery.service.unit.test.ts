@@ -13,7 +13,6 @@ import { MemoryPostHogChannel } from "../../channels/memory/memory.posthog.chann
 import { PostHogChannel } from "../../channels/posthog.channel.ts";
 import { MemoryNurturingErasedUserRepository } from "../../repositories/memory/memory.nurturing-erased-user.repository.ts";
 import { MemoryNurturingOrganizationMemberRepository } from "../../repositories/memory/memory.nurturing-organization-member.repository.ts";
-import { MemoryNurturingOrganizationPlanRepository } from "../../repositories/memory/memory.nurturing-organization-plan.repository.ts";
 import { MemoryNurturingClaimRepository } from "../../repositories/memory/memory.nurturing.repositories.ts";
 import type { NurturingErasedUserRepository } from "../../repositories/nurturing-erased-user.repository.ts";
 import { NurturingDeliveryService } from "../nurturing-delivery.service.ts";
@@ -85,7 +84,6 @@ function deliveryOverBothSinks(
     users: users(),
     memberFacts: unplacedMemberFacts(),
     members,
-    plans: MemoryNurturingOrganizationPlanRepository.create(),
     customerIo: cio.service,
     posthog,
   });
@@ -136,7 +134,6 @@ describe("NurturingDeliveryService", () => {
         users: users(),
         memberFacts: unplacedMemberFacts(),
         members: MemoryNurturingOrganizationMemberRepository.create(),
-        plans: MemoryNurturingOrganizationPlanRepository.create(),
         customerIo: cio.service,
         posthog,
       });
@@ -171,7 +168,6 @@ describe("NurturingDeliveryService", () => {
         users: users(),
         memberFacts: unplacedMemberFacts(),
         members: MemoryNurturingOrganizationMemberRepository.create(),
-        plans: MemoryNurturingOrganizationPlanRepository.create(),
         customerIo: cio.service,
         posthog,
       });
@@ -510,7 +506,6 @@ describe("NurturingDeliveryService", () => {
         users: users(),
         memberFacts: unplacedMemberFacts(),
         members: MemoryNurturingOrganizationMemberRepository.create(),
-        plans: MemoryNurturingOrganizationPlanRepository.create(),
         customerIo: cio.service,
         posthog: new ThrowingPostHogChannel(),
       });
@@ -567,7 +562,6 @@ describe("NurturingDeliveryService", () => {
         users: users(),
         memberFacts,
         members: await memberCopyOf({ organizationId: "org-1", userIds: ["user-1"] }),
-        plans: MemoryNurturingOrganizationPlanRepository.create(),
         customerIo: cio.service,
         posthog: undefined,
       });
@@ -640,7 +634,6 @@ describe("NurturingDeliveryService", () => {
         users: users(),
         memberFacts: unplacedMemberFacts(),
         members: MemoryNurturingOrganizationMemberRepository.create(),
-        plans: MemoryNurturingOrganizationPlanRepository.create(),
         customerIo: cio.service,
         posthog: undefined,
       });
@@ -666,7 +659,6 @@ describe("NurturingDeliveryService", () => {
         users: users(),
         memberFacts: unplacedMemberFacts(),
         members: MemoryNurturingOrganizationMemberRepository.create(),
-        plans: MemoryNurturingOrganizationPlanRepository.create(),
         customerIo: undefined,
         posthog: new ThrowingPostHogChannel(),
       });
@@ -703,7 +695,6 @@ describe("NurturingDeliveryService", () => {
         users: users(),
         memberFacts: unplacedMemberFacts(),
         members: MemoryNurturingOrganizationMemberRepository.create(),
-        plans: MemoryNurturingOrganizationPlanRepository.create(),
         customerIo: service,
         posthog: undefined,
       });
@@ -923,7 +914,6 @@ describe("NurturingDeliveryService", () => {
         users: users(),
         memberFacts: unplacedMemberFacts(),
         members: MemoryNurturingOrganizationMemberRepository.create(),
-        plans: MemoryNurturingOrganizationPlanRepository.create(),
         customerIo: undefined,
         posthog: undefined,
       });
@@ -944,7 +934,6 @@ describe("NurturingDeliveryService", () => {
         users: users(),
         memberFacts: unplacedMemberFacts(),
         members: MemoryNurturingOrganizationMemberRepository.create(),
-        plans: MemoryNurturingOrganizationPlanRepository.create(),
         customerIo: cio.service,
         posthog: undefined,
       });
@@ -967,7 +956,6 @@ describe("NurturingDeliveryService", () => {
         users: users(),
         memberFacts: unplacedMemberFacts(),
         members: MemoryNurturingOrganizationMemberRepository.create(),
-        plans: MemoryNurturingOrganizationPlanRepository.create(),
         customerIo: cio.service,
         posthog: undefined,
       });
@@ -1112,7 +1100,6 @@ describe("NurturingDeliveryService", () => {
         users: users(),
         memberFacts: unplacedMemberFacts(),
         members: MemoryNurturingOrganizationMemberRepository.create(),
-        plans: MemoryNurturingOrganizationPlanRepository.create(),
         customerIo: cio.service,
         posthog: undefined,
       });
@@ -1142,7 +1129,6 @@ describe("NurturingDeliveryService", () => {
         users: users(),
         memberFacts: unplacedMemberFacts(),
         members: MemoryNurturingOrganizationMemberRepository.create(),
-        plans: MemoryNurturingOrganizationPlanRepository.create(),
         customerIo: cio.service,
         posthog: undefined,
       });
@@ -1174,7 +1160,6 @@ describe("NurturingDeliveryService", () => {
         users: users(),
         memberFacts: unplacedMemberFacts(),
         members: MemoryNurturingOrganizationMemberRepository.create(),
-        plans: MemoryNurturingOrganizationPlanRepository.create(),
         customerIo: cio.service,
         posthog: undefined,
       });
@@ -1204,7 +1189,6 @@ describe("NurturingDeliveryService", () => {
         users: users(),
         memberFacts: unplacedMemberFacts(),
         members: MemoryNurturingOrganizationMemberRepository.create(),
-        plans: MemoryNurturingOrganizationPlanRepository.create(),
         customerIo: cio.service,
         posthog: undefined,
       });
@@ -1235,7 +1219,6 @@ describe("NurturingDeliveryService", () => {
         users: users(),
         memberFacts: unplacedMemberFacts(),
         members: MemoryNurturingOrganizationMemberRepository.create(),
-        plans: MemoryNurturingOrganizationPlanRepository.create(),
         customerIo: cio.service,
         posthog: undefined,
       });
@@ -1268,7 +1251,6 @@ describe("NurturingDeliveryService", () => {
         users: users(),
         memberFacts: unplacedMemberFacts(),
         members: MemoryNurturingOrganizationMemberRepository.create(),
-        plans: MemoryNurturingOrganizationPlanRepository.create(),
         customerIo: cio.service,
         posthog: undefined,
       });
@@ -1304,7 +1286,6 @@ describe("NurturingDeliveryService", () => {
         users: users(),
         memberFacts: unplacedMemberFacts(),
         members: MemoryNurturingOrganizationMemberRepository.create(),
-        plans: MemoryNurturingOrganizationPlanRepository.create(),
         customerIo: undefined,
         posthog: MemoryPostHogChannel.create(),
       });
@@ -1333,7 +1314,6 @@ describe("NurturingDeliveryService", () => {
         users: users(),
         memberFacts: unplacedMemberFacts(),
         members: MemoryNurturingOrganizationMemberRepository.create(),
-        plans: MemoryNurturingOrganizationPlanRepository.create(),
         customerIo: undefined,
         posthog,
       });

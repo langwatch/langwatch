@@ -2,8 +2,10 @@ Feature: Per-email usage reaches Customer.io from nurturing's own project rows
 
   Nurturing folds the owners' prompt, evaluator, scenario and simulation-run events into its own
   table (peer folds, ARCHITECTURE §9). A peer fold re-folds from one owner's event log, so there
-  are four folds, one per owner pipeline, each keeping its own row per project. Evaluations add
-  their UTC day to one more row per project, at most once a day. Traces are counted by a peer
+  are four folds, one per owner pipeline, each keeping its own row per project. Evaluation's
+  settled facts add their project's UTC day to nurturing's evaluation-day copy, a peer map written
+  insert-ignore and filled at deploy from evaluation's log; the evaluation rows a retired
+  subscriber kept in the usage table stay there, unread. Traces are counted by a peer
   subscriber on trace's span_received, which queues root spans only: a root span is one trace.
   Failed traces are counted from trace's own lw.trace.trace_failed fact, recorded once per trace
   by trace's rule (any span's error), so nurturing keeps no copy of that rule. Sample and Langy
@@ -18,7 +20,7 @@ Feature: Per-email usage reaches Customer.io from nurturing's own project rows
   syncs no more) sends each organization's trace traits once as null when its window ends, so
   Customer.io removes them and a rolling trait never says "active" for ever; later syncs leave
   them out, and its trace rows are dropped. Nurturing's placement copy is written by its own
-  subscriber, so a new project's first traces can arrive before it: for a project without a copy
+  peer map, so a new project's first traces can arrive before it: for a project without a copy
   the batch fails and the queue retries it, until the copy lands, for five minutes of real time
   from when any worker first saw the project uncopied (the measured lag is seconds). That first
   sighting is a row nurturing keeps, so every worker shares the window and a restart does not open
@@ -40,9 +42,11 @@ Feature: Per-email usage reaches Customer.io from nurturing's own project rows
   written from the owners' member facts: a join by organization's lw.organization.signed_up,
   lw.organization.invite_accepted or lw.organization.created naming its founder, or auth's
   lw.auth.sso_auto_added, a leave by
-  lw.organization.member_removed or member_disabled, a return by member_enabled. Each keeps its
-  latest time, so a redelivery or a late fact changes nothing; "joined last" is the latest join
-  time in the copy. A member who joined before the copy existed is not in it. User's
+  lw.organization.member_removed or member_disabled, a return by member_enabled, and a membership
+  from before organization recorded member facts by its lw.organization.member_listed, joined when
+  its row was created. Each keeps its latest time, so a redelivery, a late fact or a replay changes
+  nothing; "joined last" is the latest join time in the copy. Two peer maps write it, one per owner
+  pipeline (organization's and auth's), filled at deploy by their replay steps. User's
   lw.user.erased marks the account erased (NurturingErasedUser, a hash of its id), then deletes
   every membership of it (with the other rows naming it, project-facts-copies.feature); a member
   fact delivered after the erasure, or while it commits, leaves no row for it, unless its worker
@@ -53,8 +57,9 @@ Feature: Per-email usage reaches Customer.io from nurturing's own project rows
   other sinks' failures are; the group call stands. At a window's end it fails the sweep, which retries. A project's first trace syncs as later ones do. The
   signup day comes from its own copy of
   lw.organization.created. It reads no other module's table and calls no other module's API for
-  a usage fact, and keeps no copy for projects or
-  organizations created before it did: those send nothing. It never pulls owner state on a
+  a usage fact. Its placement, organization-creation and admin copies are peer maps over project's
+  and organization's facts, filled at deploy by replaying those logs, so a project or organization
+  whose creation the owner's log holds is copied however old; one it does not hold sends nothing. It never pulls owner state on a
   schedule, and sends counts and times only, never content. flagged_count waits on its
   definition. Without a Customer.io channel no fold, trace count or sync is registered: nothing is
   counted. The placement, organization-creation and member copies always register, so a channel
@@ -102,16 +107,83 @@ Feature: Per-email usage reaches Customer.io from nurturing's own project rows
     And that day is not in the project's active days
 
   @unit
-  Scenario: A project's evaluation days are written one at a time
-    Given evaluations of one project on two UTC days, taken at once
-    When nurturing adds their days to the project's evaluation row
-    Then they run one after another in the project's lane, so the row keeps both days
-
-  @unit @integration
   Scenario: Evaluations mark a project's day once
-    Given several evaluations of a project complete on the same UTC day
-    Then the project's evaluation row holds that day once
-    And later evaluations that day write nothing
+    Given several evaluations of a project complete on the same UTC day, one of them delivered twice
+    Then nurturing's evaluation-day copy holds that day once for the project
+    And a burst of one project's evaluations on one day is written as one batch
+
+  @unit
+  Scenario: The deploy replay fills the evaluation days as live delivery would
+    Given evaluation's log holds settled evaluations from before the evaluation-day map existed
+    When the nurturing:replay-evaluation-days step runs, and runs again
+    Then nurturing's evaluation-day copy holds the days per-fact live delivery of the same facts holds
+    And the second run changes no row
+
+  @unit
+  Scenario: The deploy replay re-derives every day the migration copied
+    Given the replay step starts 31 days before the earliest release date, a fixed instant
+    When it runs
+    Then it fills every day the usage read reaches at release, the days the migration copied included
+    And a fact older than its instant is not replayed
+
+  @unit
+  Scenario: A deploy replay sends nothing to Customer.io or PostHog
+    Given evaluation's log holds settled evaluations
+    When the evaluation-day replay step runs
+    Then no usage sync, trace count or organization-creation send runs
+
+  @unit
+  Scenario: Evaluation days are dropped once their organization's window has passed
+    Given an organization past its counting window, whose projects hold evaluation days
+    When its usage syncs, or the hourly sweep ends its window
+    Then every evaluation day of its projects is deleted, as nothing reads them past the window
+
+  @integration
+  Scenario: The usage read leaves out the evaluation rows the retired subscriber wrote
+    Given a project's evaluation row in the usage table, as the previous release wrote it
+    When the organization's usage rows are read
+    Then the evaluation row is not among them, and it is left unchanged
+
+  @unit
+  Scenario: A subscription_changed job the previous release queued still sends its plan
+    Given the previous release queued a job under the retired subscriptionChanged lane
+    When a worker of this release takes it
+    Then the plan fold folds it and its send tells Customer.io the plan once
+    And the former lane is routed to the plan fold, never tombstoned
+
+  @unit
+  Scenario: A job queued under a retired copy lane reaches its successor
+    Given the previous release queued a job under the evaluation-day subscriber's lane
+    When a worker of this release takes it
+    Then the evaluation-day map writes its day, and the job is neither dead-lettered nor dropped
+
+  @integration
+  Scenario: A project's evaluation days are kept once each, whatever order and however often they land
+    Given evaluations of a project completed on three UTC days
+    When their days are written one at a time, in one order or its reverse, then again in one batch with repeats
+    Then nurturing's evaluation-day copy holds each of the three days once for the project
+
+  @integration
+  Scenario: The migration copies each evaluation usage row's days and deletes nothing
+    Given evaluation usage rows whose active days are two, three and none, and a row of another owner
+    When the migration's copy runs
+    Then nurturing's evaluation-day copy holds one row per active day of each evaluation row
+    And every old usage row is exactly as it was
+
+  @integration
+  Scenario: The copy can run again without adding or changing a row
+    Given the migration's copy has already run
+    When the copy runs again
+    Then no evaluation-day row is added or changed
+    And no old usage row is changed
+
+  @integration
+  Scenario: The copy skips an evaluation row whose active days are not a list
+    Given an evaluation usage row with a list of active days
+    And evaluation usage rows whose active days are an object and a string
+    When the migration's copy runs
+    Then it succeeds
+    And nurturing's evaluation-day copy holds only the listed row's days
 
   @unit @integration
   Scenario: A trace is its root span, counted on its project's day
@@ -326,7 +398,7 @@ Feature: Per-email usage reaches Customer.io from nurturing's own project rows
 
   @unit
   Scenario: Nurturing keeps its own copy of an organization's members
-    Given the owners' facts of a person joining by signup, invite, single sign-on or founding an organization, leaving by removal or disabling, and returning by enabling
+    Given the owners' facts of a person joining by signup, invite, single sign-on, founding an organization or being listed by organization, leaving by removal or disabling, and returning by enabling
     When nurturing takes them, in any order and any number of times
     Then the person is a current member when their latest join or return is after their latest leave
     And their latest organization is their current membership with the latest join
@@ -400,7 +472,7 @@ Feature: Per-email usage reaches Customer.io from nurturing's own project rows
   @unit @integration
   Scenario: A created project is placed in its organization from the creation fact
     Given project records lw.project.created for a project of an organization
-    When nurturing's placement subscriber takes it, once or redelivered
+    When nurturing's placement map takes it, once or redelivered
     Then nurturing's own copy places the project in that organization
     And the organization's projects list it
 
@@ -413,7 +485,7 @@ Feature: Per-email usage reaches Customer.io from nurturing's own project rows
   @unit @integration
   Scenario: The signup day comes from the organization's creation fact
     Given organization records lw.organization.created
-    When nurturing's subscriber takes it, once or redelivered with a later time
+    When nurturing's creation map takes it, once or redelivered with a later time
     Then nurturing keeps the earliest creation time as the organization's signup day
     And an organization created before nurturing kept the copy has no signup day
 
@@ -422,7 +494,8 @@ Feature: Per-email usage reaches Customer.io from nurturing's own project rows
     Given nurturing runs without a Customer.io channel
     When its usage pipeline is built
     Then it registers no fold, no trace count and no sync, so a root span writes no trace day
-    And it registers the placement, organization-creation and six member copies
+    And it registers the placement, organization-creation, admin and member copies
+    And its evaluation-day lane registers, so its replay step runs, but keeps no day
 
   @integration
   Scenario: Each owner's fold keeps its own row per project
@@ -440,3 +513,79 @@ Feature: Per-email usage reaches Customer.io from nurturing's own project rows
     Given rows for a project of the organization and for another project
     When the organization's rows are read for its projects
     Then every owner's row of its projects is returned and no other
+
+  # Projections build plan rows 1, 3 and 5a: the placement, organization-creation and admin copies
+  # are peer maps whose writes are order-free and idempotent, filled at deploy by their replay steps.
+  @unit
+  Scenario: Projects and organizations created before the copies existed are copied at deploy
+    Given project's and organization's logs hold creations from before nurturing kept the copies
+    When the deploy runs nurturing's placement, organization-creation and admin replay steps
+    Then each copy holds what live delivery of the same facts would have written
+
+  @unit
+  Scenario: Replaying the organization copies twice leaves every row as it was
+    Given the placement, organization-creation and admin steps ran
+    When each runs again
+    Then every row is byte-identical
+
+  @unit
+  Scenario: Each organization copy ends the same whatever order its facts land in, however often
+    Given project's and organization's creation facts
+    When they are delivered live in reverse order, or each twice
+    Then the placement, organization-creation and admin rows are those of one delivery in order
+
+  @unit
+  Scenario: The deploy replay names no admin erased before the copy existed
+    Given project's log names an admin that user's log records erased
+    When the deploy runs the marks steps and then the admin step, or the admin is erased while it runs
+    Then no organization names that person as admin
+
+  @unit
+  Scenario: A late project-created fact naming an erased admin names no one
+    Given an organization's admin copy and a person user's log records erased
+    When a project-created fact naming that person at a later stamp is delivered live
+    Then the organization names no admin
+
+  @unit
+  Scenario: Replaying the organization copies sends nothing
+    Given a deployment with a Customer.io channel and logs holding organization and project creations
+    When the deploy runs nurturing's replay steps
+    Then no organization-created, usage or trace sync runs
+
+  @unit
+  Scenario: Copy jobs the previous release queued reach the peer map that replaced their lane
+    Given the previous release queued jobs under the placement, organization-created, project-created and seven member subscriber keys
+    When a worker of the new release dequeues them
+    Then the placement, organization-creation, admin and member maps each write their copy
+
+  # Projections build plan row 4: the member copy is two peer maps, organization's member facts
+  # (member_listed included) and auth's single sign-on joins, filled at deploy after the marks.
+  @unit
+  Scenario: Members from before the copy existed are copied at deploy from organization's and auth's logs
+    Given organization's log holds member facts and member_listed facts, and auth's holds single sign-on joins
+    When the deploy runs nurturing's organization and auth member replay steps
+    Then the member copy holds what live delivery of the same facts would have written
+
+  @unit
+  Scenario: Replaying the member copy twice leaves every row as it was
+    Given both member steps ran
+    When each runs again
+    Then every member row is byte-identical
+
+  @unit
+  Scenario: Every active member organization lists gets a member row, once
+    Given organization's listing step recorded a member_listed fact for each active membership
+    When the deploy runs the organization member step, and runs it again
+    Then each listed member is a current member of their organization, and the second run adds no row
+
+  @unit
+  Scenario: The deploy replay copies no member erased before the copy existed
+    Given organization's and auth's logs name a member that user's log records erased
+    When the deploy runs the marks steps and then the member steps, or the member is erased while they run, or a fact naming them lands live afterwards
+    Then no membership names that person
+
+  @unit
+  Scenario: Replaying the member copy sends nothing
+    Given a deployment with a Customer.io channel and logs holding member facts
+    When the deploy runs nurturing's replay steps
+    Then no usage, trace or organization-created sync runs

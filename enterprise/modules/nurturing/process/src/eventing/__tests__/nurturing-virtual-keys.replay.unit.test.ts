@@ -5,10 +5,7 @@
  * logs, the module's own steps, memory repositories. The per-fact memory twin is the oracle.
  * Spec: enterprise/modules/nurturing/specs/gateway-facts.feature
  */
-import type { CioBatchCall } from "@langwatch/enterprise-nurturing-contract";
 import {
-  defineAggregate,
-  definePipeline,
   InMemoryProcessStore,
   type ReplayEvent,
   ReplayService,
@@ -16,17 +13,14 @@ import {
   replayProjectionsOf,
   sealPipelineDefinition,
 } from "@langwatch/eventing";
-import { testEventSchema } from "@langwatch/eventing/testing";
 import {
   GATEWAY_VK_LIFECYCLE_EVENT_TYPE,
   type RecordVkLifecycleCommandData,
   recordVkLifecycleCommandDataSchema,
 } from "@langwatch/gateway-contract";
 import {
-  IDENTITY_PIPELINE_NAME,
   USER_ERASED_EVENT_TYPE as IDENTITY_USER_ERASED_EVENT_TYPE,
   USER_IDENTITY_AGGREGATE_TYPE,
-  userErasedPayloadSchema,
 } from "@langwatch/identity-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import { ResourceScope } from "@langwatch/process";
@@ -42,14 +36,11 @@ import {
   USER_AGGREGATE_TYPE,
   USER_ERASED_EVENT_TYPE,
   USER_LIFECYCLE_EVENT_VERSION,
-  USER_LIFECYCLE_PIPELINE_NAME,
   type UserApi,
-  userErasedEventDataSchema,
 } from "@langwatch/user-contract";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { NurturingModule } from "../../app/nurturing.app.ts";
-import { CustomerIoChannel } from "../../channels/customer-io.channel.ts";
 import { nurturingProcessModule } from "../../nurturing.module.ts";
 import { MemoryNurturingVirtualKeyRepository } from "../../repositories/memory/memory.nurturing-gateway-key.repository.ts";
 import { MemoryNurturingRepositories } from "../../repositories/memory/memory.nurturing.repositories.ts";
@@ -59,7 +50,6 @@ import {
   buildNurturingProjectUsagePipeline,
   NURTURING_PROJECT_USAGE_PIPELINE_NAME,
   nurturingProjectUsageEventing,
-  nurturingProjectUsagePeerEvents,
 } from "../nurturing-project-usage.pipeline.ts";
 import {
   ADMIN_USER_ID,
@@ -69,12 +59,30 @@ import {
   ORGANIZATION_ID,
 } from "./nurturing-gateway-facts.test-helpers.ts";
 import {
+  ADMINS_STEP,
+  AUTH_MEMBERS_STEP,
+  MEMBERS_STEP,
+  ORGANIZATIONS_CREATED_STEP,
+  PLACEMENTS_STEP,
+} from "./nurturing-organization-copies.test-helpers.ts";
+import { allNurturingOwnerStandIns } from "./nurturing-owner-stand-ins.test-helpers.ts";
+import {
+  LAST_TRACES_STEP,
+  PERSONAL_OWNERS_OF_ORGANIZATION_STEP,
+  PERSONAL_OWNERS_OF_PROJECT_STEP,
+  TRACED_PROJECTS_OF_PROJECT_STEP,
+  TRACED_PROJECTS_OF_TRACE_STEP,
+} from "./nurturing-project-copies.test-helpers.ts";
+import {
+  EVALUATION_DAYS_STEP,
   IDENTITY_MARKS_STEP,
   KEYS_STEP,
   nurturingReplayStepsOver,
+  PLANS_STEP,
   USER_MARKS_STEP,
 } from "./nurturing-replay-steps.test-helpers.ts";
 import { NurturingSeededLog } from "./nurturing-seeded-log.test-helpers.ts";
+import { RecordingCustomerIoChannel } from "./recording-customer-io-channel.test-helpers.ts";
 
 const BASE_MS = 1_700_000_000_000;
 const KEYS_LANE = `${NURTURING_PROJECT_USAGE_PIPELINE_NAME}.virtualKeys`;
@@ -137,44 +145,6 @@ function identityErased(userId: string): ReplayEvent {
   };
 }
 
-/** An owner's pipeline as a stand-in declaring one event, as a worker installing nurturing registers it. */
-const ownerPipeline = (name: string, aggregateType: string) =>
-  definePipeline({ name, aggregate: defineAggregate({ type: aggregateType }) });
-
-/** The three owners' pipelines as stand-ins. */
-function owners() {
-  const gateway = ownerPipeline("governance_events", "governance_subject")
-    .withEvents([
-      testEventSchema(GATEWAY_VK_LIFECYCLE_EVENT_TYPE, recordVkLifecycleCommandDataSchema),
-    ])
-    .build();
-  const user = ownerPipeline(USER_LIFECYCLE_PIPELINE_NAME, USER_AGGREGATE_TYPE)
-    .withEvents([testEventSchema(USER_ERASED_EVENT_TYPE, userErasedEventDataSchema)])
-    .build();
-  const identity = ownerPipeline(IDENTITY_PIPELINE_NAME, USER_IDENTITY_AGGREGATE_TYPE)
-    .withEvents([testEventSchema(IDENTITY_USER_ERASED_EVENT_TYPE, userErasedPayloadSchema)])
-    .build();
-  return [
-    sealPipelineDefinition(gateway),
-    sealPipelineDefinition(user),
-    sealPipelineDefinition(identity),
-  ];
-}
-
-/**
- * Stand-ins for the owners whose facts the usage folds take: a worker with a Customer.io channel
- * registers those folds, and the replayer refuses a fold whose owner no pipeline declares.
- */
-function usageFoldOwners() {
-  return Object.entries(nurturingProjectUsagePeerEvents).map(([owner, events]) =>
-    sealPipelineDefinition(
-      ownerPipeline(`${owner}_events`, owner)
-        .withEvents(events.map(({ type, data }) => testEventSchema(type, data)))
-        .build(),
-    ),
-  );
-}
-
 /** The real lane replayer over a log and the lanes the registered pipelines declare. */
 const laneReplayerOver = (
   log: NurturingSeededLog,
@@ -206,16 +176,25 @@ function deploy({
   const log = new NurturingSeededLog(events);
   const pipeline = buildNurturingProjectUsagePipeline({
     store: repositories.projectUsage,
+    evaluationDays: repositories.evaluationDays,
     copies: {
       placements: repositories.placements,
       copyLanded: async () => undefined,
       organizationsCreated: repositories.organizationsCreated,
+      admins: repositories.milestones,
       members: repositories.members,
       virtualKeys: keys ? keys(repositories.virtualKeys) : repositories.virtualKeys,
+      personalProjects: repositories.personalProjects,
+      tracedProjects: repositories.tracedProjects,
+      lastTraces: repositories.milestones,
     },
+    plans: { store: repositories.plans, deliver: async () => undefined },
     sync: undefined,
   });
-  const projections = replayProjectionsOf([...owners(), sealPipelineDefinition(pipeline)]);
+  const projections = replayProjectionsOf([
+    ...allNurturingOwnerStandIns(),
+    sealPipelineDefinition(pipeline),
+  ]);
   const steps = nurturingReplayStepsOver(laneReplayerOver(log, projections));
   const step = (id: string): MigrationStep => {
     const found = steps.find((each) => each.id === id);
@@ -620,49 +599,34 @@ describe("given the module's steps", () => {
 });
 
 /**
- * Nurturing's Customer.io channel as an in-memory fake: every call any service makes on it, by
- * method, in order. Each send, one call or a batch, goes through one of these methods.
+ * Every replay step nurturing.module.ts declares, in its declared order: each step's `after`
+ * within nurturing names a step listed before it.
  */
-class RecordingCustomerIoChannel extends CustomerIoChannel {
-  readonly calls: { method: string; input: unknown }[] = [];
-
-  identifyUser(input: Parameters<CustomerIoChannel["identifyUser"]>[0]): Promise<void> {
-    return this.record("identifyUser", input);
-  }
-
-  trackEvent(input: Parameters<CustomerIoChannel["trackEvent"]>[0]): Promise<void> {
-    return this.record("trackEvent", input);
-  }
-
-  groupUser(input: Parameters<CustomerIoChannel["groupUser"]>[0]): Promise<void> {
-    return this.record("groupUser", input);
-  }
-
-  batch(calls: CioBatchCall[]): Promise<void> {
-    return this.record("batch", calls);
-  }
-
-  // Recorded under their own names: the base class would forward each to the method above.
-  override trackEventOrThrow(input: Parameters<CustomerIoChannel["trackEvent"]>[0]): Promise<void> {
-    return this.record("trackEventOrThrow", input);
-  }
-
-  override batchOrThrow(calls: CioBatchCall[]): Promise<void> {
-    return this.record("batchOrThrow", calls);
-  }
-
-  private record(method: string, input: unknown): Promise<void> {
-    this.calls.push({ method, input });
-    return Promise.resolve();
-  }
-}
+const MODULE_STEPS = [
+  USER_MARKS_STEP,
+  IDENTITY_MARKS_STEP,
+  KEYS_STEP,
+  EVALUATION_DAYS_STEP,
+  PLANS_STEP,
+  PLACEMENTS_STEP,
+  ORGANIZATIONS_CREATED_STEP,
+  ADMINS_STEP,
+  MEMBERS_STEP,
+  AUTH_MEMBERS_STEP,
+  PERSONAL_OWNERS_OF_ORGANIZATION_STEP,
+  PERSONAL_OWNERS_OF_PROJECT_STEP,
+  TRACED_PROJECTS_OF_TRACE_STEP,
+  TRACED_PROJECTS_OF_PROJECT_STEP,
+  LAST_TRACES_STEP,
+] as const;
 
 /**
  * A worker as it composes nurturing: the real app over memory copies and a recording Customer.io
  * channel, both event pipelines as the module's eventing builds them over that app, and the real
- * lane replayer over those pipelines, their owners' and the seeded log. The steps are the ones
- * `nurturingProcessModule.install` returns over that replayer. Install builds its channels from
- * the store tier and takes none, so the app it installs is built here, by the same class.
+ * lane replayer over those pipelines, every owner's stand-in and the seeded log. The steps are
+ * the ones `nurturingProcessModule.install` returns over that replayer. Install builds its
+ * channels from the store tier and takes none, so the app it installs is built here, by the
+ * same class.
  */
 async function liveWorker({ events }: { events: ReplayEvent[] }) {
   const customerIo = new RecordingCustomerIoChannel();
@@ -694,8 +658,7 @@ async function liveWorker({ events }: { events: ReplayEvent[] }) {
   const replayer = laneReplayerOver(
     new NurturingSeededLog(events),
     replayProjectionsOf([
-      ...owners(),
-      ...usageFoldOwners(),
+      ...allNurturingOwnerStandIns(),
       sealPipelineDefinition(nurturing),
       sealPipelineDefinition(usage),
     ]),
@@ -758,16 +721,12 @@ describe("given a worker composing nurturing with a recording Customer.io channe
     });
   });
 
-  describe("when the module's three replay steps run over owner logs holding a created key", () => {
+  describe("when every replay step the module installs runs over owner logs holding a created key", () => {
     it("sends nothing to Customer.io, while the steps fill the key copy and the marks", async () => {
       await worker.runModuleSteps();
 
-      expect(worker.customerIo.calls).toEqual([]);
-      expect(worker.steps.map(({ id }) => id)).toEqual([
-        USER_MARKS_STEP,
-        IDENTITY_MARKS_STEP,
-        KEYS_STEP,
-      ]);
+      expect(worker.customerIo.requests).toEqual([]);
+      expect(worker.steps.map(({ id }) => id)).toEqual(MODULE_STEPS);
       await expect(
         worker.repositories.virtualKeys.findKey({
           organizationId: ORGANIZATION_ID,
@@ -786,10 +745,11 @@ describe("given a worker composing nurturing with a recording Customer.io channe
         gatewayEvent({ type: GATEWAY_VK_LIFECYCLE_EVENT_TYPE, data: lifecycleFact(createdKey) }),
       );
 
-      expect(worker.customerIo.calls).toHaveLength(1);
-      expect(worker.customerIo.calls).toMatchObject([
+      expect(worker.customerIo.requests).toHaveLength(1);
+      // The channel's batchOrThrow resolves through batch, so the send records as "batch".
+      expect(worker.customerIo.requests).toMatchObject([
         {
-          method: "batchOrThrow",
+          method: "batch",
           input: [{ type: "track", userId: ADMIN_USER_ID, event: "virtual_key_created" }],
         },
       ]);

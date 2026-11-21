@@ -4,14 +4,20 @@
  * @see enterprise/modules/nurturing/specs/project-usage.feature
  */
 import type { CioBatchCall } from "@langwatch/enterprise-nurturing-contract";
+import { EVALUATION_LIFECYCLE_COMPLETED_EVENT_TYPE } from "@langwatch/evaluation-contract";
 import {
   EVALUATOR_CREATED_EVENT_TYPE,
   EVALUATOR_DELETED_EVENT_TYPE,
 } from "@langwatch/evaluator-contract";
 import { createTenantId, type Event } from "@langwatch/eventing";
 import {
+  ORGANIZATION_AGGREGATE_TYPE,
   ORGANIZATION_CREATED_EVENT_TYPE,
-  organizationSignedUpEventDataSchema,
+  ORGANIZATION_MEMBER_DISABLED_EVENT_TYPE,
+  ORGANIZATION_MEMBER_ENABLED_EVENT_TYPE,
+  ORGANIZATION_MEMBER_LISTED_EVENT_TYPE,
+  ORGANIZATION_MEMBER_REMOVED_EVENT_TYPE,
+  ORGANIZATION_SIGNED_UP_EVENT_TYPE,
 } from "@langwatch/organization-contract";
 import {
   PROMPT_CREATED_EVENT_TYPE,
@@ -33,22 +39,23 @@ import {
 import { describe, expect, it } from "vitest";
 
 import { MemoryNurturingErasedUserRepository } from "../../repositories/memory/memory.nurturing-erased-user.repository.ts";
+import { MemoryNurturingEvaluationDayRepository } from "../../repositories/memory/memory.nurturing-evaluation-day.repository.ts";
 import { MemoryNurturingMilestonesRepository } from "../../repositories/memory/memory.nurturing-milestones.repository.ts";
 import { MemoryNurturingOrganizationCreatedRepository } from "../../repositories/memory/memory.nurturing-organization-created.repository.ts";
 import { MemoryNurturingOrganizationMemberRepository } from "../../repositories/memory/memory.nurturing-organization-member.repository.ts";
 import { MemoryNurturingProjectPlacementRepository } from "../../repositories/memory/memory.nurturing-project-placement.repository.ts";
 import { MemoryNurturingProjectUsageRepository } from "../../repositories/memory/memory.nurturing-project-usage.repository.ts";
 import { MemoryNurturingTraceDayRepository } from "../../repositories/memory/memory.nurturing-trace-day.repository.ts";
+import { MemoryNurturingRepositories } from "../../repositories/memory/memory.nurturing.repositories.ts";
 import type { NurturingProjectUsageOwner } from "../../repositories/nurturing-project-usage.repository.ts";
+import type { NurturingMembership } from "../../rules/nurturing-organization-member.rules.ts";
 import { countingOver } from "../../services/__tests__/nurturing-trace-counting.test-helpers.ts";
 import { NurturingCopiedProjectsService } from "../../services/nurturing-copied-projects.service.ts";
 import { NurturingOrganizationUsageService } from "../../services/nurturing-organization-usage.service.ts";
 import {
-  evaluationDayKeyOf,
-  nurturingMembershipSubscriber,
-  nurturingEvaluationDaySubscriber,
+  evaluationDayGroupOf,
+  nurturingEvaluationDaysMap,
   nurturingFailedTraceDaySubscriber,
-  nurturingFounderMembershipSubscriber,
   type NurturingProjectUsagePeerEvent,
   nurturingProjectUsagePeerFold,
   nurturingTraceDaySubscriber,
@@ -58,6 +65,11 @@ import {
   projectUsageFactOf,
   traceSyncKeyOf,
 } from "../nurturing-project-usage.pipeline.ts";
+import {
+  copiesOver,
+  liveMapsOver,
+  ownerFact,
+} from "./nurturing-organization-copies.test-helpers.ts";
 
 const OCCURRED_AT = 1_000;
 
@@ -189,73 +201,78 @@ describe("traceSyncKeyOf()", () => {
   });
 });
 
-describe("evaluationDayKeyOf()", () => {
+describe("the evaluation-day map", () => {
   const DAY_MS = 24 * 60 * 60 * 1000;
   const NOON = Date.UTC(2026, 10, 20, 12);
+  const evaluated = (projectId: string, occurredAt: number) =>
+    ({
+      ...envelope(EVALUATION_LIFECYCLE_COMPLETED_EVENT_TYPE),
+      id: `evaluation-${projectId}-${occurredAt}`,
+      type: EVALUATION_LIFECYCLE_COMPLETED_EVENT_TYPE,
+      occurredAt,
+      data: {
+        tenantId: projectId,
+        projectId,
+        evaluationId: `evaluation-${occurredAt}`,
+        occurredAt,
+      },
+    }) as const;
+  /** Each fact through the map's mapping and store, one write a fact, as the live lane runs it. */
+  const deliverEach = async (
+    events: readonly ReturnType<typeof evaluated>[],
+    evaluationDays = MemoryNurturingEvaluationDayRepository.create(),
+  ) => {
+    const { map } = nurturingEvaluationDaysMap(evaluationDays);
+    for (const event of events) {
+      const record = map.map(event);
+      if (!record) continue;
+      await map.store.append(record, { aggregateId: event.id, tenantId: event.tenantId });
+    }
+    return evaluationDays;
+  };
 
   /** @scenario "Evaluations mark a project's day once" */
-  it("keys an evaluation on its project's UTC day", () => {
-    const morning = peerFact({ projectId: "project-1" }, NOON - 6 * 60 * 60 * 1000);
-    const evening = peerFact({ projectId: "project-1" }, NOON + 6 * 60 * 60 * 1000);
-    const nextDay = peerFact({ projectId: "project-1" }, NOON + DAY_MS);
+  it("keeps one row for many evaluations of a project on one UTC day, a redelivery included", async () => {
+    const morning = evaluated("project-1", NOON - 6 * 60 * 60 * 1000);
+    const evening = evaluated("project-1", NOON + 6 * 60 * 60 * 1000);
 
-    expect(evaluationDayKeyOf(morning)).toBe("subscriber:evaluationActiveDay:project-1:2026-11-20");
-    expect(evaluationDayKeyOf(evening)).toBe(evaluationDayKeyOf(morning));
-    expect(evaluationDayKeyOf(nextDay)).not.toBe(evaluationDayKeyOf(morning));
+    const days = await deliverEach([morning, evening, morning]);
+
+    await expect(
+      days.findForProjects({ projectIds: ["project-1"], afterDay: "2026-01-01" }),
+    ).resolves.toEqual([{ projectId: "project-1", day: "2026-11-20" }]);
   });
-});
 
-describe("the evaluation day row", () => {
-  const NOON = Date.UTC(2026, 10, 20, 12);
+  /** @scenario "A project's evaluation days are kept once each, whatever order and however often they land" */
+  it("holds the same days whatever order the evaluations land in", async () => {
+    const facts = [0, 1, 2].map((n) => evaluated("project-1", NOON + n * DAY_MS));
+
+    const forward = await deliverEach(facts);
+    const reverse = await deliverEach(facts.toReversed());
+
+    const read = { projectIds: ["project-1"], afterDay: "2026-01-01" };
+    const sorted = async (days: MemoryNurturingEvaluationDayRepository) =>
+      (await days.findForProjects(read)).map(({ day }) => day).toSorted();
+    expect(await sorted(forward)).toEqual(["2026-11-20", "2026-11-21", "2026-11-22"]);
+    expect(await sorted(reverse)).toEqual(await sorted(forward));
+  });
 
   /** @scenario "Evaluations mark a project's day once" */
-  it("adds the evaluation's day to the project's rows, once", async () => {
-    const store = MemoryNurturingProjectUsageRepository.create();
+  it("queues a project's evaluations of one UTC day in one group, so a burst is one write", () => {
+    const { map } = nurturingEvaluationDaysMap(MemoryNurturingEvaluationDayRepository.create());
 
-    await store.recordEvaluationDay({ projectId: "project-1", occurredAt: NOON });
-    await store.recordEvaluationDay({ projectId: "project-1", occurredAt: NOON + 1000 });
-
-    const rows = await store.findForProjects({ projectIds: ["project-1"] });
-    expect(rows.map((row) => row.activeDays)).toEqual([["2026-11-20"]]);
-  });
-});
-
-describe("the evaluation day subscriber", () => {
-  const DAY_MS = 24 * 60 * 60 * 1000;
-  const NOON = Date.UTC(2026, 10, 20, 12);
-  const evaluation = (projectId: string, occurredAt: number) => ({
-    tenantId: projectId,
-    projectId,
-    evaluationId: `evaluation-${occurredAt}`,
-    occurredAt,
-  });
-  const contextOf = (occurredAt: number) => ({
-    tenantId: createTenantId("project-1"),
-    aggregateId: `evaluation-${occurredAt}`,
-    createdAt: occurredAt,
-    occurredAt,
-    eventId: `event-${occurredAt}`,
-  });
-
-  /** @scenario "A project's evaluation days are written one at a time" */
-  it("queues a project's evaluations in one lane whatever their day, so both days are kept", async () => {
-    const store = MemoryNurturingProjectUsageRepository.create();
-    const subscriber = nurturingEvaluationDaySubscriber(store);
-    const group = subscriber.options?.groupKeyFn;
-
-    expect(group?.(peerFact(evaluation("project-1", NOON), NOON))).toBe(
-      group?.(peerFact(evaluation("project-1", NOON + DAY_MS), NOON + DAY_MS)),
+    expect(map.options?.coalesceMaxBatch).toBeGreaterThan(1);
+    expect(map.store.bulkAppend).toBeDefined();
+    expect(map.options?.groupKeyFn).toBe(evaluationDayGroupOf);
+    expect(evaluationDayGroupOf(evaluated("project-1", NOON))).toBe(
+      evaluationDayGroupOf(evaluated("project-1", NOON + 1000)),
     );
-    expect(group?.(peerFact(evaluation("project-2", NOON), NOON))).not.toBe(
-      group?.(peerFact(evaluation("project-1", NOON), NOON)),
+    expect(evaluationDayGroupOf(evaluated("project-1", NOON + DAY_MS))).not.toBe(
+      evaluationDayGroupOf(evaluated("project-1", NOON)),
     );
-
-    if (!subscriber.handle) throw new Error("the evaluation day handles one fact at a time");
-    await subscriber.handle(evaluation("project-1", NOON), contextOf(NOON));
-    await subscriber.handle(evaluation("project-1", NOON + DAY_MS), contextOf(NOON + DAY_MS));
-
-    const rows = await store.findForProjects({ projectIds: ["project-1"] });
-    expect(rows.map((row) => row.activeDays.toSorted())).toEqual([["2026-11-20", "2026-11-21"]]);
+    expect(evaluationDayGroupOf(evaluated("project-2", NOON))).not.toBe(
+      evaluationDayGroupOf(evaluated("project-1", NOON)),
+    );
   });
 });
 
@@ -331,6 +348,7 @@ describe("the trace syncs", () => {
     const usage = NurturingOrganizationUsageService.create({
       projectUsage: MemoryNurturingProjectUsageRepository.create(),
       traceDays: MemoryNurturingTraceDayRepository.create(),
+      evaluationDays: MemoryNurturingEvaluationDayRepository.create(),
       copiedProjects: NurturingCopiedProjectsService.create({ placements, organizationsCreated }),
       placements,
       organizationsCreated,
@@ -736,55 +754,43 @@ describe("the failed-trace count", () => {
 });
 
 describe("nurturing's member copy", () => {
-  const ORGANIZATION_SIGNED_UP = "lw.organization.signed_up";
-  const factAt = (organizationId: string, occurredAt: number) => ({
-    tenantId: organizationId,
-    organizationId,
-    userId: "user-1",
-    occurredAt,
-    organizationName: "Acme",
-  });
-  const context = {
-    tenantId: createTenantId("org-1"),
-    aggregateId: "org-1",
-    createdAt: OCCURRED_AT,
-    occurredAt: OCCURRED_AT,
-    eventId: "member-event",
-  };
-  const subscriberOf = (
-    members: MemoryNurturingOrganizationMemberRepository,
-    change: "joined" | "left" | "returned",
-  ) =>
-    nurturingMembershipSubscriber({
-      eventType: ORGANIZATION_SIGNED_UP,
-      data: organizationSignedUpEventDataSchema,
-      change,
-      members,
-    });
-  const handle = async (
-    subscriber: ReturnType<typeof subscriberOf>,
+  const memberFact = (
+    type: string,
     organizationId: string,
-    at: number,
-  ) => {
-    if (!subscriber.handle) throw new Error("a member fact is handled one at a time");
-    await subscriber.handle(subscriber.data.parse(factAt(organizationId, at)), context);
-  };
+    occurredAt: number,
+    extra: Readonly<Record<string, unknown>> = {},
+  ) =>
+    ownerFact({
+      type,
+      aggregateType: ORGANIZATION_AGGREGATE_TYPE,
+      aggregateId: organizationId,
+      tenantId: organizationId,
+      data: {
+        tenantId: organizationId,
+        organizationId,
+        userId: "user-1",
+        organizationName: "Acme",
+        occurredAt,
+        ...extra,
+      },
+    });
+  const copyOver = (members: MemoryNurturingOrganizationMemberRepository) =>
+    liveMapsOver({ ...copiesOver(MemoryNurturingRepositories.create()), members });
+  const byOrganization = (memberships: readonly NurturingMembership[]) =>
+    memberships.toSorted((a, b) => a.organizationId.localeCompare(b.organizationId));
 
   /** @scenario "Nurturing keeps its own copy of an organization's members" */
   it("keeps each change's latest time, whatever the order or how often it is delivered", async () => {
     const members = MemoryNurturingOrganizationMemberRepository.create();
-    const joined = subscriberOf(members, "joined");
-    const left = subscriberOf(members, "left");
+    const copy = copyOver(members);
 
-    await handle(left, "org-1", 3_000);
-    await handle(joined, "org-1", 1_000);
-    await handle(joined, "org-1", 1_000);
-    await handle(joined, "org-2", 2_000);
+    await copy(memberFact(ORGANIZATION_MEMBER_REMOVED_EVENT_TYPE, "org-1", 3_000));
+    await copy(memberFact(ORGANIZATION_SIGNED_UP_EVENT_TYPE, "org-1", 1_000));
+    await copy(memberFact(ORGANIZATION_SIGNED_UP_EVENT_TYPE, "org-1", 1_000));
+    await copy(memberFact(ORGANIZATION_SIGNED_UP_EVENT_TYPE, "org-2", 2_000));
 
     expect(
-      (await members.findMembershipsOfMembers({ organizationId: "org-1" })).toSorted((a, b) =>
-        a.organizationId.localeCompare(b.organizationId),
-      ),
+      byOrganization(await members.findMembershipsOfMembers({ organizationId: "org-1" })),
     ).toEqual([
       {
         organizationId: "org-1",
@@ -806,21 +812,25 @@ describe("nurturing's member copy", () => {
   /** @scenario "Nurturing keeps its own copy of an organization's members" */
   it("records the founder of a created organization as joined, and no one for a provisioned one", async () => {
     const members = MemoryNurturingOrganizationMemberRepository.create();
-    const founder = nurturingFounderMembershipSubscriber(members);
+    const copy = copyOver(members);
     const created = (organizationId: string, occurredAt: number, userId?: string) =>
-      founder.data.parse({
+      ownerFact({
+        type: ORGANIZATION_CREATED_EVENT_TYPE,
+        aggregateType: ORGANIZATION_AGGREGATE_TYPE,
+        aggregateId: organizationId,
         tenantId: organizationId,
-        organizationId,
-        organizationName: "Acme",
-        occurredAt,
-        ...(userId ? { userId } : {}),
+        data: {
+          tenantId: organizationId,
+          organizationId,
+          organizationName: "Acme",
+          occurredAt,
+          ...(userId ? { userId } : {}),
+        },
       });
-    if (!founder.handle) throw new Error("a creation fact is handled one at a time");
 
-    expect(founder.eventType).toBe(ORGANIZATION_CREATED_EVENT_TYPE);
-    await founder.handle(created("org-1", 1_000, "user-1"), context);
-    await founder.handle(created("org-1", 1_000, "user-1"), context);
-    await founder.handle(created("org-2", 2_000), context);
+    await copy(created("org-1", 1_000, "user-1"));
+    await copy(created("org-1", 1_000, "user-1"));
+    await copy(created("org-2", 2_000));
 
     expect(await members.findMembershipsOfMembers({ organizationId: "org-1" })).toEqual([
       {
@@ -832,5 +842,30 @@ describe("nurturing's member copy", () => {
       },
     ]);
     expect(await members.findMembershipsOfMembers({ organizationId: "org-2" })).toEqual([]);
+  });
+
+  /** @scenario "Nurturing keeps its own copy of an organization's members" */
+  it("joins a listed member at the time organization's membership row was created", async () => {
+    const members = MemoryNurturingOrganizationMemberRepository.create();
+    const copy = copyOver(members);
+
+    await copy(
+      memberFact(ORGANIZATION_MEMBER_LISTED_EVENT_TYPE, "org-1", 9_000, {
+        joinedAt: 1_500,
+        backfilled: true,
+      }),
+    );
+    await copy(memberFact(ORGANIZATION_MEMBER_ENABLED_EVENT_TYPE, "org-1", 4_000));
+    await copy(memberFact(ORGANIZATION_MEMBER_DISABLED_EVENT_TYPE, "org-1", 3_000));
+
+    expect(await members.findMembershipsOfMembers({ organizationId: "org-1" })).toEqual([
+      {
+        organizationId: "org-1",
+        userId: "user-1",
+        joinedAt: 1_500,
+        leftAt: 3_000,
+        returnedAt: 4_000,
+      },
+    ]);
   });
 });

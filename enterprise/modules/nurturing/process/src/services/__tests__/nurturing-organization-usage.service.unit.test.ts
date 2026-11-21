@@ -10,6 +10,7 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import { MemoryNurturingErasedUserRepository } from "../../repositories/memory/memory.nurturing-erased-user.repository.ts";
+import { MemoryNurturingEvaluationDayRepository } from "../../repositories/memory/memory.nurturing-evaluation-day.repository.ts";
 import { MemoryNurturingMilestonesRepository } from "../../repositories/memory/memory.nurturing-milestones.repository.ts";
 import { MemoryNurturingOrganizationCreatedRepository } from "../../repositories/memory/memory.nurturing-organization-created.repository.ts";
 import { MemoryNurturingOrganizationMemberRepository } from "../../repositories/memory/memory.nurturing-organization-member.repository.ts";
@@ -112,6 +113,7 @@ async function serviceOver({
 }) {
   const projectUsage = MemoryNurturingProjectUsageRepository.create();
   const traceDays = MemoryNurturingTraceDayRepository.create();
+  const evaluationDays = MemoryNurturingEvaluationDayRepository.create();
   const milestones = MemoryNurturingMilestonesRepository.create();
   await milestones.recordOrganization({
     organizationId: "org-1",
@@ -124,6 +126,7 @@ async function serviceOver({
   const service = NurturingOrganizationUsageService.create({
     projectUsage,
     traceDays,
+    evaluationDays,
     copiedProjects: NurturingCopiedProjectsService.create({ placements, organizationsCreated }),
     placements,
     organizationsCreated,
@@ -142,7 +145,7 @@ async function serviceOver({
     logger: serviceLogger,
     syncs,
   });
-  return { service, projectUsage, traceDays, sent };
+  return { service, projectUsage, traceDays, evaluationDays, sent };
 }
 
 const usageOf = (projectId: string, promptIds: readonly string[]) =>
@@ -287,6 +290,24 @@ describe("NurturingOrganizationUsageService", () => {
     expect(sent).toEqual([]);
   });
 
+  /** @scenario "Evaluation days are dropped once their organization's window has passed" */
+  it("drops every evaluation day of an organization past its counting window", async () => {
+    const { service, evaluationDays } = await serviceOver({
+      placed: new Map([["project-8", "org-1"]]),
+      createdAt: longEnded,
+    });
+    await evaluationDays.recordDays([
+      { projectId: "project-8", day: "2026-10-12" },
+      { projectId: "project-8", day: "2026-11-18" },
+    ]);
+
+    await service.usageChanged({ projectId: "project-8" });
+
+    await expect(
+      evaluationDays.findForProjects({ projectIds: ["project-8"], afterDay: "2000-01-01" }),
+    ).resolves.toEqual([]);
+  });
+
   /** @scenario "A sync past the counting window deletes old trace days, even without an admin" */
   it("prunes nothing inside the counting window, where no day can be older than the window", async () => {
     const { service, traceDays } = await serviceOver({ placed: new Map([["project-1", "org-1"]]) });
@@ -302,19 +323,30 @@ describe("NurturingOrganizationUsageService", () => {
 
   /** @scenario "Prompt versions, scenario runs and evaluations count toward the habit" */
   it("counts the projects' evaluation days with the trace days for has_habit", async () => {
-    const { service, projectUsage, traceDays, sent } = await serviceOver({
+    const { service, evaluationDays, traceDays, sent } = await serviceOver({
       placed: new Map([["project-1", "org-1"]]),
     });
     await seedTraceDay(traceDays, { projectId: "project-1", day: "2026-11-10" });
     await seedTraceDay(traceDays, { projectId: "project-1", day: "2026-11-13" });
-    await projectUsage.recordEvaluationDay({
-      projectId: "project-1",
-      occurredAt: Date.UTC(2026, 10, 17, 9),
-    });
+    await evaluationDays.recordDay({ projectId: "project-1", day: "2026-11-17" });
 
     await service.usageChanged({ projectId: "project-1" });
 
     expect(sent[0]?.[0]).toMatchObject({ traits: { has_habit: true } });
+  });
+
+  /** @scenario "Prompt versions, scenario runs and evaluations count toward the habit" */
+  it("leaves out an evaluation day older than the window, as the trace days are", async () => {
+    const { service, evaluationDays, traceDays, sent } = await serviceOver({
+      placed: new Map([["project-1", "org-1"]]),
+    });
+    await seedTraceDay(traceDays, { projectId: "project-1", day: "2026-11-10" });
+    await seedTraceDay(traceDays, { projectId: "project-1", day: "2026-11-13" });
+    await evaluationDays.recordDay({ projectId: "project-1", day: "2026-10-01" });
+
+    await service.usageChanged({ projectId: "project-1" });
+
+    expect(sent[0]?.[0]).toMatchObject({ traits: { has_habit: false } });
   });
 
   it("throws when Customer.io refused the call, so the subscriber's job retries", async () => {
@@ -864,6 +896,21 @@ describe("NurturingOrganizationUsageService", () => {
 
       await expect(
         traceDays.findForProjects({ projectIds: ["project-1"], afterDay: "" }),
+      ).resolves.toEqual([]);
+    });
+
+    /** @scenario "Evaluation days are dropped once their organization's window has passed" */
+    it("drops the organization's evaluation days", async () => {
+      const { service, evaluationDays } = await serviceOver({
+        placed: new Map([["project-1", "org-1"]]),
+        createdAt: new Map([["org-1", ended]]),
+      });
+      await evaluationDays.recordDay({ projectId: "project-1", day: "2026-11-19" });
+
+      await service.traceWindowsEnded({ after: NOW - 60 * 60 * 1000, upTo: NOW });
+
+      await expect(
+        evaluationDays.findForProjects({ projectIds: ["project-1"], afterDay: "" }),
       ).resolves.toEqual([]);
     });
 

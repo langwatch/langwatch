@@ -22,7 +22,6 @@ import { HttpCustomerIoChannel } from "../../channels/http/http.customer-io.chan
 import { MemoryNurturingErasedUserRepository } from "../../repositories/memory/memory.nurturing-erased-user.repository.ts";
 import { MemoryNurturingMilestonesRepository } from "../../repositories/memory/memory.nurturing-milestones.repository.ts";
 import type { MemoryNurturingOrganizationMemberRepository } from "../../repositories/memory/memory.nurturing-organization-member.repository.ts";
-import { MemoryNurturingOrganizationPlanRepository } from "../../repositories/memory/memory.nurturing-organization-plan.repository.ts";
 import { MemoryNurturingProjectDirectoryRepository } from "../../repositories/memory/memory.nurturing-project-directory.repository.ts";
 import { MemoryNurturingClaimRepository } from "../../repositories/memory/memory.nurturing.repositories.ts";
 import { subscriptionChangedSignal } from "../../rules/nurturing-owner-signals.rules.ts";
@@ -72,20 +71,18 @@ async function fixtureMemberCopy(): Promise<MemoryNurturingOrganizationMemberRep
 
 /**
  * A delivery whose own copy names admin-1 as org-1's admin, over the fixtures' member copy unless
- * `members` is given; `claims` and `plans` may be shared.
+ * `members` is given; `claims` may be shared.
  */
 async function deliveryOver({
   customerIo,
   claims = MemoryNurturingClaimRepository.create(),
   members,
   erasedUsers = MemoryNurturingErasedUserRepository.create(),
-  plans = MemoryNurturingOrganizationPlanRepository.create(),
 }: {
   customerIo: NurturingService | undefined;
   claims?: MemoryNurturingClaimRepository;
   members?: MemoryNurturingOrganizationMemberRepository;
   erasedUsers?: MemoryNurturingErasedUserRepository;
-  plans?: MemoryNurturingOrganizationPlanRepository;
 }) {
   const milestones = MemoryNurturingMilestonesRepository.create();
   await milestones.recordOrganization({
@@ -106,7 +103,6 @@ async function deliveryOver({
       organizations: createApiFixture<OrganizationApi>({}),
     }),
     members: members ?? (await fixtureMemberCopy()),
-    plans,
   });
 }
 
@@ -337,16 +333,6 @@ describe("NurturingDeliveryService, delivering billing's subscription_changed fa
       const once = requestsFor({ plan: "launch", hasSubscription: true });
       expect(cio.sent).toEqual([...once, ...once]);
     });
-
-    it("sends nothing for a redelivered catch-up fact the plan copy already holds", async () => {
-      const cio = recordingCustomerIo();
-      const delivery = await deliveryOver({ customerIo: cio.service });
-
-      await deliverFact(delivery, subscriptionChangedFacts.caughtUp);
-      await deliverFact(delivery, subscriptionChangedFacts.caughtUp);
-
-      expect(cio.sent).toEqual(requestsFor({ plan: "launch", hasSubscription: true }));
-    });
   });
 
   describe("when Customer.io refuses one organization's catch-up calls", () => {
@@ -380,40 +366,10 @@ describe("NurturingDeliveryService, delivering billing's subscription_changed fa
     });
   });
 
-  describe("when a refused catch-up is retried after a newer live fact landed", () => {
-    it("sends nothing on the retry and keeps the live plan in the copy", async () => {
-      const cio = recordingCustomerIo();
-      const plans = MemoryNurturingOrganizationPlanRepository.create();
-      const delivery = await deliveryOver({ customerIo: cio.service, plans });
-      const { caughtUp } = subscriptionChangedFacts;
-      const live = subscriptionChangedFactFixture({
-        plan: "GROWTH",
-        occurredAt: caughtUp.occurredAt + 1,
-      });
-      cio.refusing.add("admin-1");
-
-      await expect(deliverFact(delivery, caughtUp)).rejects.toThrow(
-        "Customer.io /batch failed: HTTP 500",
-      );
-      cio.refusing.clear();
-      await deliverFact(delivery, live);
-      const sentLive = [...cio.sent];
-      await deliverFact(delivery, caughtUp);
-
-      expect(sentLive).toEqual(requestsFor({ plan: "growth", hasSubscription: true }));
-      expect(cio.sent).toEqual(sentLive);
-      await expect(plans.findPlan({ organizationId: "org-1" })).resolves.toEqual({
-        outcome: "held",
-        fact: { plan: "GROWTH", occurredAt: caughtUp.occurredAt + 1, fromCatchUp: false },
-      });
-    });
-  });
-
   describe("when Customer.io refuses a live change", () => {
-    it("fails the delivery without recording the plan, and sends the change on its retry", async () => {
+    it("fails the delivery and gives its claim back, so its retry sends the change", async () => {
       const cio = recordingCustomerIo();
-      const plans = MemoryNurturingOrganizationPlanRepository.create();
-      const delivery = await deliveryOver({ customerIo: cio.service, plans });
+      const delivery = await deliveryOver({ customerIo: cio.service });
       const live = subscriptionChangedFactFixture({ plan: "GROWTH" });
       cio.refusing.add("admin-1");
 
@@ -421,16 +377,9 @@ describe("NurturingDeliveryService, delivering billing's subscription_changed fa
         "Customer.io /batch failed: HTTP 500",
       );
 
-      await expect(plans.findPlan({ organizationId: "org-1" })).resolves.toEqual({
-        outcome: "none",
-      });
       cio.refusing.clear();
       await deliverFact(delivery, live);
       expect(cio.sent).toEqual(requestsFor({ plan: "growth", hasSubscription: true }));
-      await expect(plans.findPlan({ organizationId: "org-1" })).resolves.toMatchObject({
-        outcome: "held",
-        fact: { plan: "GROWTH" },
-      });
     });
   });
 

@@ -14,7 +14,6 @@ import {
 } from "@langwatch/gateway-contract";
 import {
   INVITE_ACCEPTED_EVENT_TYPE,
-  inviteAcceptedEventDataSchema,
   ORGANIZATION_AGGREGATE_TYPE,
   type OrganizationApi,
 } from "@langwatch/organization-contract";
@@ -33,7 +32,6 @@ import { MemoryNurturingErasedUserRepository } from "../../repositories/memory/m
 import { MemoryNurturingVirtualKeyRepository } from "../../repositories/memory/memory.nurturing-gateway-key.repository.ts";
 import { MemoryNurturingMilestonesRepository } from "../../repositories/memory/memory.nurturing-milestones.repository.ts";
 import { MemoryNurturingOrganizationMemberRepository } from "../../repositories/memory/memory.nurturing-organization-member.repository.ts";
-import { MemoryNurturingOrganizationPlanRepository } from "../../repositories/memory/memory.nurturing-organization-plan.repository.ts";
 import { MemoryNurturingPersonalProjectRepository } from "../../repositories/memory/memory.nurturing-personal-project.repository.ts";
 import { MemoryNurturingProjectDirectoryRepository } from "../../repositories/memory/memory.nurturing-project-directory.repository.ts";
 import {
@@ -48,9 +46,9 @@ import { NurturingUserErasureService } from "../../services/nurturing-user-erasu
 import { NurturingService } from "../../services/nurturing.service.ts";
 import {
   buildNurturingProjectUsagePipeline,
+  NURTURING_ORGANIZATION_MEMBERS_PROJECTION_NAME,
   NURTURING_PROJECT_USAGE_PIPELINE_NAME,
   NURTURING_VIRTUAL_KEYS_PROJECTION_NAME,
-  nurturingMembershipSubscriber,
 } from "../nurturing-project-usage.pipeline.ts";
 import { buildNurturingPipeline, type NurturingPipeline } from "../nurturing.pipeline.ts";
 
@@ -127,11 +125,11 @@ export function gatewayEvent(
 }
 
 /**
- * The usage pipeline's key lane as a worker registers it, whatever the sync flag: the live lane's
- * parse of an event, then its store. Takes the lane at the registry's own generic, so no record or
- * event type is asserted.
+ * The usage pipeline's key and member lanes as a worker registers them, whatever the sync flag:
+ * each live lane's parse of an event, then its store. Takes each lane at the registry's own
+ * generic, so no record or event type is asserted.
  */
-function registeredKeyLane({
+function registeredCopyLanes({
   virtualKeys,
   members,
 }: Readonly<{
@@ -141,28 +139,41 @@ function registeredKeyLane({
   const others = MemoryNurturingRepositories.create();
   const pipeline = buildNurturingProjectUsagePipeline({
     store: others.projectUsage,
+    evaluationDays: others.evaluationDays,
     copies: {
       placements: others.placements,
       copyLanded: async () => undefined,
       organizationsCreated: others.organizationsCreated,
+      admins: others.milestones,
       members,
       virtualKeys,
+      personalProjects: others.personalProjects,
+      tracedProjects: others.tracedProjects,
+      lastTraces: others.milestones,
     },
+    plans: { store: others.plans, deliver: async () => undefined },
     sync: undefined,
   });
-  let apply: ((event: Event) => Promise<void>) | undefined;
+  const copyLanes = new Set(
+    [NURTURING_VIRTUAL_KEYS_PROJECTION_NAME, NURTURING_ORGANIZATION_MEMBERS_PROJECTION_NAME].map(
+      (name) => `${NURTURING_PROJECT_USAGE_PIPELINE_NAME}.${name}`,
+    ),
+  );
+  const applies: ((event: Event) => Promise<void>)[] = [];
   const registry = createApiFixture<
     Parameters<NonNullable<typeof pipeline.globalProjections>[number]["register"]>[0]
   >({
     registerEventSubscriber: () => undefined,
+    // The plan fold and its send register too; this lane reads only the key map.
+    registerPeerFoldProjection: () => undefined,
+    registerSubscriber: () => undefined,
     registerPeerMapProjection: <MapRecord, Own extends Event>(
       map: MapProjectionDefinition<MapRecord, Own>,
     ) => {
-      const keys = `${NURTURING_PROJECT_USAGE_PIPELINE_NAME}.${NURTURING_VIRTUAL_KEYS_PROJECTION_NAME}`;
-      if (map.name !== keys) return;
+      if (!copyLanes.has(map.name)) return;
       // The router hands a lane only the event types it declares; narrowing by them is that contract.
       const isOwn = (event: Event): event is Own => map.eventTypes.includes(event.type);
-      apply = async (event) => {
+      applies.push(async (event) => {
         if (!isOwn(event)) return;
         const record = map.map(event);
         if (record === null) return;
@@ -170,12 +181,14 @@ function registeredKeyLane({
           tenantId: event.tenantId,
           aggregateId: event.aggregateId,
         });
-      };
+      });
     },
   });
   for (const projection of pipeline.globalProjections ?? []) projection.register(registry);
-  if (!apply) throw new Error("the usage pipeline registers no key lane");
-  return apply;
+  if (applies.length !== copyLanes.size) throw new Error("the usage pipeline lacks a copy lane");
+  return async (event) => {
+    for (const apply of applies) await apply(event);
+  };
 }
 
 /**
@@ -300,7 +313,6 @@ export async function gatewayFactsOver({
     users: createApiFixture<UserApi>({}),
     memberFacts,
     members,
-    plans: MemoryNurturingOrganizationPlanRepository.create(),
   });
   const { logger, lines } = createTestLogger();
   const gatewayFacts = NurturingGatewayFactsService.create({
@@ -318,41 +330,22 @@ export async function gatewayFactsOver({
   });
   const pipeline = buildNurturingPipeline({
     deliver: (input) => delivery.deliver(input),
-    projectCreated: async () => undefined,
     guidedTurnFailed: async () => undefined,
     usageReportReceived: async () => undefined,
     evaluationsCompleted: async () => undefined,
     simulationRunsFinished: async () => undefined,
     codingSessionsStored: async () => undefined,
-    recordPersonalOwner: async () => undefined,
-    recordTracedProject: async () => undefined,
     forgetErasedUser: (input) => userErasure.forgetUser(input),
     virtualKeyCreated: (input) => gatewayFacts.virtualKeyCreated(input),
     keyBudgetCrossed: (input) => gatewayFacts.keyBudgetCrossed(input),
   });
   const toSubscribers = liveSubscribersOf(pipeline);
-  // The key copy as the usage pipeline registers it: the live lane's parse, then its store.
-  const keyLane = registeredKeyLane({ virtualKeys, members });
-  const memberCopy = nurturingMembershipSubscriber({
-    eventType: INVITE_ACCEPTED_EVENT_TYPE,
-    data: inviteAcceptedEventDataSchema,
-    change: "joined",
-    members,
-  });
+  // The key and member copies as the usage pipeline registers them: parse, then store.
+  const copyLanes = registeredCopyLanes({ virtualKeys, members });
 
   /** Copies a lifecycle or join fact, then hands the event to every nurturing peer lane on it. */
   const deliverFact = async (event: Event) => {
-    if (event.type === INVITE_ACCEPTED_EVENT_TYPE) {
-      if (!memberCopy.handle) throw new Error("the member copy handles one fact at a time");
-      await memberCopy.handle(inviteAcceptedEventDataSchema.parse(event.data), {
-        tenantId: event.tenantId,
-        aggregateId: event.aggregateId,
-        createdAt: event.createdAt,
-        occurredAt: event.occurredAt,
-        eventId: event.id,
-      });
-    }
-    if (event.type === GATEWAY_VK_LIFECYCLE_EVENT_TYPE) await keyLane(event);
+    await copyLanes(event);
     await toSubscribers(event);
   };
   /** A current member of the organization since `at`, as an owner's join fact records one. */

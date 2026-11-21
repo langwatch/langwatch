@@ -23,14 +23,11 @@ function nurturingRecordingDeliveries() {
   const counted: unknown[][] = [];
   const pipeline = buildNurturingPipeline({
     deliver: async ({ signal }) => void delivered.push(signal),
-    projectCreated: async () => undefined,
     guidedTurnFailed: async () => undefined,
     usageReportReceived: async () => undefined,
     evaluationsCompleted: async ({ evaluations }) => void counted.push([...evaluations]),
     simulationRunsFinished: async () => undefined,
     codingSessionsStored: async () => undefined,
-    recordPersonalOwner: async () => undefined,
-    recordTracedProject: async () => undefined,
     forgetErasedUser: async () => undefined,
     virtualKeyCreated: async () => undefined,
     keyBudgetCrossed: async () => undefined,

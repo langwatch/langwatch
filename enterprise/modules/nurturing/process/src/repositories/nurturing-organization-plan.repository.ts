@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-import type {
-  NurturingPlanFact,
-  NurturingPlanHeld,
-} from "../rules/nurturing-organization-plan.rules.ts";
+import type { FoldProjectionStore } from "@langwatch/eventing";
+
+import type { NurturingPlanFoldState } from "../rules/nurturing-organization-plan.rules.ts";
 
 /**
- * Nurturing's own copy of each organization's plan (`NurturingOrganizationPlan`), folded from
- * billing's subscription_changed facts, so a stale or losing fact tells Customer.io nothing.
+ * Nurturing's own copy of each organization's plan (`NurturingOrganizationPlan`): the store of
+ * the plan's peer fold over billing's subscription_changed facts, one row per organization (the
+ * fold's aggregate), with the ids of the events folded in, so a redelivery folds once, and the
+ * event of the fact that won, the only one whose delivery tells Customer.io.
  */
-export interface NurturingOrganizationPlanRepository {
-  findPlan(input: Readonly<{ organizationId: string }>): Promise<NurturingPlanHeld>;
-  /** Writes the fact only where `planFactChangesCopy` lets it: a racing loser changes nothing. */
-  recordPlan(input: Readonly<{ organizationId: string; fact: NurturingPlanFact }>): Promise<void>;
+export interface NurturingOrganizationPlanRepository extends FoldProjectionStore<NurturingPlanFoldState> {
+  /** Required here: the fold dedupes a redelivered fact by the ids it stored. */
+  getWithApplied: NonNullable<FoldProjectionStore<NurturingPlanFoldState>["getWithApplied"]>;
 }
