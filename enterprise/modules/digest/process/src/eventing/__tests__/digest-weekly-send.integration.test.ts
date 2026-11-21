@@ -83,10 +83,15 @@ function tokenOf(oneClickUrl: string): string {
 const sendFor = ({ userId, isoWeek }: { userId: string; isoWeek: string }) =>
   digest.carryOut({ userId, organizationId: ORGANIZATION, isoWeek, admin: true, at: WAKE_AT });
 
+/** Each send carried out in turn, as the outbox would. */
+async function carryOutAll(payloads: readonly unknown[]): Promise<void> {
+  for (const payload of payloads) await digest.carryOut(payload);
+}
+
 /** Every pending send, carried out once, as the outbox dispatches them. */
 async function sendPlanned(): Promise<number> {
   const leased = await digest.leaseSends();
-  for (const message of leased) await digest.carryOut(message.payload);
+  await carryOutAll(leased.map((message) => message.payload));
   return leased.length;
 }
 
@@ -152,9 +157,9 @@ describe("the weekly digest send", () => {
     /** @scenario "Each enrolled member gets one email a week" */
     it("mails each member once, however often the wake and the sends run", async () => {
       const planned = await planAndCollect({ expected: 3 });
-      for (const payload of planned) await digest.carryOut(payload);
+      await carryOutAll(planned);
       await digest.plan({ at: NEXT_WAKE_AT });
-      for (const payload of planned) await digest.carryOut(payload);
+      await carryOutAll(planned);
       await sendPlanned();
 
       expect(recipients()).toEqual(MEMBERS.map(emailOf).toSorted());
@@ -174,7 +179,7 @@ describe("the weekly digest send", () => {
 
     /** @scenario "Each enrolled member gets one email a week" */
     it("gives every email an RFC 8058 one-click unsubscribe, the same address its footer opens", async () => {
-      for (const payload of await planAndCollect({ expected: 3 })) await digest.carryOut(payload);
+      await carryOutAll(await planAndCollect({ expected: 3 }));
 
       expect(digest.mail).toHaveLength(3);
       for (const mail of digest.mail) {
@@ -223,7 +228,7 @@ describe("the weekly digest send", () => {
         expected: 3,
         plan: () => digest.wake({ at: mondayAt(8) }),
       });
-      for (const payload of planned) await digest.carryOut(payload);
+      await carryOutAll(planned);
       await digest.wake({ at: mondayAt(9) });
       await sendPlanned();
 
@@ -336,7 +341,7 @@ describe("the weekly digest send", () => {
         at: WAKE_AT,
       });
 
-      for (const payload of await planAndCollect({ expected: 3 })) await digest.carryOut(payload);
+      await carryOutAll(await planAndCollect({ expected: 3 }));
 
       expect(recipients()).toEqual([ADMIN, OTHER_MEMBER].map(emailOf).toSorted());
     });
@@ -355,7 +360,7 @@ describe("the weekly digest send", () => {
         enrolled: false,
         by: "operator-1",
       });
-      for (const payload of planned) await digest.carryOut(payload);
+      await carryOutAll(planned);
 
       expect(digest.mail).toEqual([]);
     });
@@ -370,7 +375,7 @@ describe("the weekly digest send", () => {
       const planned = await planAndCollect({ expected: 3 });
 
       await digest.repositories.audience.setArmed({ armed: false });
-      for (const payload of planned) await digest.carryOut(payload);
+      await carryOutAll(planned);
 
       expect(digest.mail).toEqual([]);
     });
@@ -383,7 +388,7 @@ describe("the weekly digest send", () => {
       await arm();
       digest.world.usage = { currentMonthMessagesCount: 900, maxMonthlyUsageLimit: 1_000 };
 
-      for (const payload of await planAndCollect({ expected: 3 })) await digest.carryOut(payload);
+      await carryOutAll(await planAndCollect({ expected: 3 }));
 
       expect(recipients()).toEqual([emailOf(ADMIN)]);
       expect(digest.mail[0]).toMatchObject({
@@ -446,7 +451,7 @@ describe("the weekly digest send", () => {
       await enrol();
       await arm();
 
-      for (const payload of await planAndCollect({ expected: 3 })) await digest.carryOut(payload);
+      await carryOutAll(await planAndCollect({ expected: 3 }));
 
       expect(digest.mail).toEqual([]);
       expect(await digest.repositories.sends.isSent({ userId: MEMBER, isoWeek: SENT_WEEK })).toBe(
@@ -463,7 +468,7 @@ describe("the weekly digest send", () => {
       everyoneNearTheLimit();
       digest.world.users = [ADMIN, OTHER_MEMBER];
 
-      for (const payload of await planAndCollect({ expected: 3 })) await digest.carryOut(payload);
+      await carryOutAll(await planAndCollect({ expected: 3 }));
 
       expect(recipients()).toEqual([ADMIN, OTHER_MEMBER].map(emailOf).toSorted());
     });

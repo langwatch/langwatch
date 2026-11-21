@@ -27,10 +27,7 @@ import {
   type ProjectWeekState,
   type UserWeekState,
 } from "../../rules/digest-week.rules.ts";
-import type {
-  DigestAudienceRepository,
-  DigestSettingsRecord,
-} from "../digest-audience.repository.ts";
+import type { DigestAudienceRepository } from "../digest-audience.repository.ts";
 import type { DigestSendRepository } from "../digest-send.repository.ts";
 import type {
   DigestProjectWeekRepository,
@@ -97,12 +94,13 @@ const person = () => {
 };
 
 // The settings row is one per deployment: it is put back as the run found it.
-let settingsBefore: DigestSettingsRecord | null = null;
+let settingsBefore: { id: string; armed: boolean; lastPlannedWeek: string | null }[] = [];
 
 beforeAll(async () => {
   if (!connection) return;
-  const audience = PrismaDigestAudienceRepository.create({ prisma: connection.client });
-  settingsBefore = await audience.getSettings();
+  settingsBefore = await connection.client.digestSettings.findMany({
+    select: { id: true, armed: true, lastPlannedWeek: true },
+  });
 });
 
 afterAll(async () => {
@@ -117,7 +115,13 @@ afterAll(async () => {
   for (const userId of userIds) {
     await client.digestSubscription.deleteMany({ where: { userId } });
   }
-  if (settingsBefore) await client.digestSettings.updateMany({ data: settingsBefore });
+  for (const { id, ...settings } of settingsBefore) {
+    await client.digestSettings.update({ where: { id }, data: settings });
+  }
+  // A row the run created goes; with none found, that is every row.
+  await client.digestSettings.deleteMany({
+    where: { id: { notIn: settingsBefore.map(({ id }) => id) } },
+  });
   await connection.closeOnce();
 });
 
