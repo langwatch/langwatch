@@ -1,3 +1,9 @@
+/**
+ * The run in flight row of one daily schedule, `InsightRunInFlightState`, and `NO_RUN_STARTED`,
+ * the row a schedule without one reads.
+ * @see modules/insight/adrs/004-daily-run.md
+ */
+
 import type { InsightRunOutcome, InsightRunReason } from "@langwatch/insight-contract";
 
 export interface InsightRunInFlightState {
