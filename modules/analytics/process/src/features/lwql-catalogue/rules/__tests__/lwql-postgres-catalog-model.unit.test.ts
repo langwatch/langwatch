@@ -124,7 +124,10 @@ describe("given the derived Postgres catalog", () => {
         const { columns } = POSTGRES_CATALOGUE[view.name]!;
         const keyFields = entityKeyColumns!.map((key) => sourceField(key, columns[key]));
         expect({ view: view.name, keyFields }).toEqual({ view: view.name, keyFields: primaryKey });
-        expect(primaryKey.filter((field) => SCOPE_FIELDS.has(field)), view.name).toEqual([]);
+        expect(
+          primaryKey.filter((field) => SCOPE_FIELDS.has(field)),
+          view.name,
+        ).toEqual([]);
       }
     });
 
